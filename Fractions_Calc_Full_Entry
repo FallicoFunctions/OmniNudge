@@ -1,0 +1,133 @@
+#include <iostream>
+
+using namespace std;
+
+void addFractions(int& numOne, int& denomOne, int& numTwo, int& denomTwo, int& numAns, int& denomAns); // adds fractions
+void subtractFractions(int& numOne, int& denomOne, int& numTwo, int& denomTwo, int& numAns, int& denomAns); // subtracts fractions
+void multiplyFractions(int& numOne, int& denomOne, int& numTwo, int& denomTwo, int& numAns, int& denomAns); // multiplies fractions
+void divideFractions(int& numOne, int& denomOne, int& numTwo, int& denomTwo, int& numAns, int& denomAns); // divides fractions
+void reduceFractions (int& numAns, int& denomAns); // reduces fractions
+void displayResult(string& operate, int& numOne, int& denomOne, int& numTwo, int& denomTwo, int& numAns, int& denomAns); // displays results of each task
+
+int main()
+{
+	//Declarations
+	char d;
+	char Y;// dummy variable for '/' in fraction entered by user.
+    string operate;; // to verify which operation type (multiply, add, subtract, divide)
+
+	//variables for fractions entered by user
+	int numOne;
+	int denomOne;
+	int numTwo;
+	int denomTwo;
+
+	//variables for answers to fraction calculations
+	int numAns = 0;
+	int denomAns = 0;
+
+	do
+	{
+		cout << "This program allows users to perform arithmetic operations on fractions." << endl;
+		cout << "Fractions are in the form of a/b, and a and b must be integers." << endl;
+		cout << "b should not equal 0." << endl << endl;
+		cout << "Enter your calculation as formated below." << endl << endl;
+		cout << "Menu: " << endl;
+		cout << "\t1.\t1/4 + 1/4" << endl;
+		cout << "\t2.\t1/4 - 1/4" << endl;
+		cout << "\t3.\t1/4 * 1/4" << endl;
+		cout << "\t4.\t1/4 / 1/4" << endl;
+		cout << "Your choice: ";
+		cin >> numOne >> d >> denomOne >> operate >> numTwo >> d >> denomTwo;
+
+		cout << endl << endl;
+
+		if (operate == "+") // adds two fractions
+		{
+			addFractions(numOne, denomOne, numTwo, denomTwo, numAns, denomAns);
+			displayResult(operate, numOne, denomOne, numTwo, denomTwo, numAns, denomAns);
+			//break;
+		}
+		if (operate == "-") // subtracts two fractions
+		{
+			subtractFractions(numOne, denomOne, numTwo, denomTwo, numAns, denomAns);
+			displayResult(operate, numOne, denomOne, numTwo, denomTwo, numAns, denomAns);
+			//break;
+		}
+		if (operate == "*") // multiplies two fractions
+		{
+			multiplyFractions(numOne, denomOne, numTwo, denomTwo, numAns, denomAns);
+			displayResult(operate, numOne, denomOne, numTwo, denomTwo, numAns, denomAns);
+			//break;
+		}
+		if (operate == "/") // divides two fractions
+		{
+			divideFractions(numOne, denomOne, numTwo, denomTwo, numAns, denomAns);
+			displayResult(operate, numOne, denomOne, numTwo, denomTwo, numAns, denomAns);
+			//break;
+		}
+		
+		cout << "Would you like to enter another problem?\n";
+		cout << "Y/y to continue. Any other key to exit: ";
+		cin >> Y;
+	}
+	while (Y == 'Y' || Y == 'y');
+
+	return 0;
+}
+
+//user defined function to add two fractions
+void addFractions(int& numOne, int& denomOne, int& numTwo, int& denomTwo, int& numAns, int& denomAns)
+{
+	numAns = (numOne * denomTwo) + (denomOne * numTwo);
+	denomAns = denomOne * denomTwo;
+	reduceFractions(numAns, denomAns);
+}
+
+//user defined function to subtract two fractions
+void subtractFractions(int& numOne, int& denomOne, int& numTwo, int& denomTwo, int& numAns, int& denomAns)
+{
+	numAns = (numOne * denomTwo) - (denomOne * numTwo);
+	denomAns = denomOne * denomTwo;
+	reduceFractions(numAns, denomAns);
+}
+
+//user defined function to multiply two fractions
+void multiplyFractions(int& numOne, int& denomOne, int& numTwo, int& denomTwo, int& numAns, int& denomAns)
+{
+	numAns = numOne * numTwo;
+	denomAns = denomOne * denomTwo;
+	reduceFractions(numAns, denomAns);
+}
+
+//user defined function to divide two fractions
+void divideFractions(int& numOne, int& denomOne, int& numTwo, int& denomTwo, int& numAns, int& denomAns)
+{
+	numAns = numOne * denomTwo;
+	denomAns = denomOne * numTwo;
+	reduceFractions(numAns, denomAns);
+}
+
+ //user defined function to reduce fractions. 
+void reduceFractions (int& numAns, int& denomAns)
+{
+	for (int i = denomAns * numAns; i > 1; i--)
+		if ((denomAns % i == 0) && (numAns % i == 0))
+		{
+			denomAns /= i;
+			numAns /= i;
+		}
+}
+
+//user defined function to display results based on the calculation chosen by user
+void displayResult(string& operate, int& numOne, int& denomOne, int& numTwo, int& denomTwo, int& numAns, int& denomAns)
+{
+	if (operate == "+") // display results if addition
+		cout << numOne << "/" << denomOne << " + " << numTwo << "/" << denomTwo << " = " << numAns << "/" << denomAns << endl << endl;
+	if (operate == "-") // display results if subtractions
+		cout << numOne << "/" << denomOne << " - " << numTwo << "/" << denomTwo << " = " << numAns << "/" << denomAns << endl << endl; 
+	if (operate == "*") // dipslay results if multiplication
+		cout << numOne << "/" << denomOne << " * " << numTwo << "/" << denomTwo << " = " << numAns << "/" << denomAns << endl << endl;
+	if (operate == "/") // dipsplay results if division
+		cout << numOne << "/" << denomOne << " / " << numTwo << "/" << denomTwo << " = " << numAns << "/" << denomAns << endl << endl;
+}
