@@ -207,6 +207,56 @@
 
 ## Social Features & Comprehensive Reward System
 
+### Minimal Ad System
+
+**Ad Placement (Free Tier Users Only):**
+- Small banner in subreddit feed (between posts every 10-15 posts)
+- Never in active chats
+- Never during media viewing (slideshows, videos)
+- Never during voice/video calls
+- Never intrusive pop-ups
+
+**Ad Types:**
+- Display ads (images/banners)
+- Text ads (like Google AdSense)
+- No video ads (too intrusive)
+- No auto-play audio
+- No pop-ups or interstitials
+
+**Ad Network:**
+- Google AdSense (easiest integration)
+- Or direct ad sales for niche-specific advertising
+- Contextual targeting (based on subreddit being viewed)
+
+**Revenue Expectations:**
+- $1-5 per 1,000 impressions (CPM)
+- With 1,000 active users viewing 10 pages/day: ~10,000 impressions/day
+- Estimated: $10-50/day = $300-1,500/month at 1,000 users
+- At 10,000 users: $3,000-15,000/month potential
+
+**Ad-Free Options:**
+- Purchase premium membership ($4.99/month)
+- Receive Platinum/Diamond awards (temporary ad-free)
+- High karma users (optional - 5,000+ karma)
+
+**User Control:**
+- Can't block ads on free tier
+- But ads are minimal and non-intrusive
+- Clear upgrade path to remove them
+
+**Implementation:**
+- Phase 2 Month 7-8
+- After reward system in place (so users can go ad-free)
+- Start with minimal ads, increase only if needed
+- Monitor user complaints and adjust
+
+**Balance:**
+- Ads should never hurt user experience
+- Better to have fewer ads than drive users away
+- Focus on sustainable, non-annoying advertising
+
+---
+
 ### Friend/Contact System
 
 **Adding Friends:**
