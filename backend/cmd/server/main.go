@@ -44,6 +44,7 @@ func main() {
 
 	// Initialize repositories
 	userRepo := models.NewUserRepository(db.Pool)
+	userSettingsRepo := models.NewUserSettingsRepository(db.Pool)
 
 	// Initialize services
 	authService := services.NewAuthService(
@@ -56,6 +57,7 @@ func main() {
 
 	// Initialize handlers
 	authHandler := handlers.NewAuthHandler(authService, userRepo)
+	settingsHandler := handlers.NewSettingsHandler(userSettingsRepo)
 
 	// Setup Gin router
 	router := gin.Default()
@@ -106,6 +108,9 @@ func main() {
 		{
 			protected.GET("/auth/me", authHandler.GetMe)
 			protected.POST("/auth/logout", authHandler.Logout)
+
+			protected.GET("/settings", settingsHandler.GetSettings)
+			protected.PUT("/settings", settingsHandler.UpdateSettings)
 		}
 	}
 
