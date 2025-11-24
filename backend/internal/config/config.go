@@ -10,6 +10,21 @@ import (
 type Config struct {
 	Server   ServerConfig
 	Database DatabaseConfig
+	Reddit   RedditConfig
+	JWT      JWTConfig
+}
+
+// RedditConfig holds Reddit OAuth configuration
+type RedditConfig struct {
+	ClientID     string
+	ClientSecret string
+	RedirectURI  string
+	UserAgent    string
+}
+
+// JWTConfig holds JWT configuration
+type JWTConfig struct {
+	Secret string
 }
 
 // ServerConfig holds server-related configuration
@@ -42,6 +57,15 @@ func Load() (*Config, error) {
 			Password: getEnv("DB_PASSWORD", "drummer"),
 			DBName:   getEnv("DB_NAME", "chatreddit_dev"),
 			SSLMode:  getEnv("DB_SSLMODE", "disable"),
+		},
+		Reddit: RedditConfig{
+			ClientID:     getEnv("REDDIT_CLIENT_ID", ""),
+			ClientSecret: getEnv("REDDIT_CLIENT_SECRET", ""),
+			RedirectURI:  getEnv("REDDIT_REDIRECT_URI", "http://localhost:8080/api/v1/auth/reddit/callback"),
+			UserAgent:    getEnv("REDDIT_USER_AGENT", "chatreddit:v1.0"),
+		},
+		JWT: JWTConfig{
+			Secret: getEnv("JWT_SECRET", "dev-secret-change-in-production"),
 		},
 	}
 
