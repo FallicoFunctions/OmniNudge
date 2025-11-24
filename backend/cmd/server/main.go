@@ -31,6 +31,13 @@ func main() {
 	defer db.Close()
 	log.Printf("Connected to PostgreSQL database: %s", cfg.Database.DBName)
 
+	// Run database migrations
+	log.Println("Running database migrations...")
+	if err := db.Migrate(context.Background()); err != nil {
+		log.Fatalf("Failed to run migrations: %v", err)
+	}
+	log.Println("Migrations complete")
+
 	// Setup Gin router
 	router := gin.Default()
 
