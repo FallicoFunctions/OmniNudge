@@ -9,8 +9,12 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/chatreddit/backend/internal/api/middleware"
 	"github.com/chatreddit/backend/internal/config"
 	"github.com/chatreddit/backend/internal/database"
+	"github.com/chatreddit/backend/internal/handlers"
+	"github.com/chatreddit/backend/internal/models"
+	"github.com/chatreddit/backend/internal/services"
 	"github.com/gin-gonic/gin"
 )
 
@@ -38,8 +42,26 @@ func main() {
 	}
 	log.Println("Migrations complete")
 
+	// Initialize repositories
+	userRepo := models.NewUserRepository(db.Pool)
+
+	// Initialize services
+	authService := services.NewAuthService(
+		cfg.Reddit.ClientID,
+		cfg.Reddit.ClientSecret,
+		cfg.Reddit.RedirectURI,
+		cfg.JWT.Secret,
+		cfg.Reddit.UserAgent,
+	)
+
+	// Initialize handlers
+	authHandler := handlers.NewAuthHandler(authService, userRepo)
+
 	// Setup Gin router
 	router := gin.Default()
+
+	// Apply CORS middleware
+	router.Use(middleware.CORS())
 
 	// Health check endpoint
 	router.GET("/health", func(c *gin.Context) {
@@ -61,14 +83,30 @@ func main() {
 		})
 	})
 
-	// API routes placeholder
-	api := router.Group("/api")
+	// API v1 routes
+	api := router.Group("/api/v1")
 	{
+		// Ping endpoint (no auth required)
 		api.GET("/ping", func(c *gin.Context) {
 			c.JSON(http.StatusOK, gin.H{
 				"message": "pong",
 			})
 		})
+
+		// Auth routes (no auth required)
+		auth := api.Group("/auth")
+		{
+			auth.GET("/reddit", authHandler.RedditLogin)
+			auth.GET("/reddit/callback", authHandler.RedditCallback)
+		}
+
+		// Protected routes (auth required)
+		protected := api.Group("")
+		protected.Use(middleware.AuthRequired(authService))
+		{
+			protected.GET("/auth/me", authHandler.GetMe)
+			protected.POST("/auth/logout", authHandler.Logout)
+		}
 	}
 
 	// Create HTTP server
