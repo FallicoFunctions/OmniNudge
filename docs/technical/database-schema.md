@@ -9,13 +9,14 @@
 ## Overview
 
 The database schema is designed to support:
-- User authentication via Reddit OAuth
+- User authentication via username/password (email optional)
+- Platform-native posts and comments system
 - E2E encrypted messaging between platform users
-- Reddit Chat message storage (plain text)
 - Conversation management
 - Media file tracking
 - User preferences and settings
 - Blocking relationships
+- Reddit content caching (via public API)
 - Invitation tracking (Phase 2 rewards)
 
 ---
@@ -24,13 +25,15 @@ The database schema is designed to support:
 
 ```
 users
+  ├─── platform_posts (author_id)
+  │      └─── post_comments (user_id, post_id)
   ├─── conversations (user1_id, user2_id)
   │      └─── messages
   ├─── blocked_users (blocker_id, blocked_id)
   ├─── user_settings
   └─── invitations (inviter_id, invited_user_id)
 
-reddit_posts (cached)
+reddit_posts (cached from public API)
 media_files
 ```
 
@@ -40,15 +43,18 @@ media_files
 
 ### 1. users
 
-Stores user account information from Reddit OAuth.
+Stores user account information. Users authenticate with username/password (email is optional).
 
 ```sql
 CREATE TABLE users (
     id SERIAL PRIMARY KEY,
-    reddit_id VARCHAR(50) UNIQUE NOT NULL,
-    username VARCHAR(50) NOT NULL,
+    username VARCHAR(50) UNIQUE NOT NULL,
+    email VARCHAR(255) UNIQUE,  -- Optional, NULL allowed
+    password_hash VARCHAR(255) NOT NULL,
 
-    -- Reddit OAuth tokens
+    -- Reddit integration (optional)
+    reddit_id VARCHAR(50) UNIQUE,
+    reddit_username VARCHAR(50),
     access_token TEXT,
     refresh_token TEXT,
     token_expires_at TIMESTAMP,
@@ -57,9 +63,9 @@ CREATE TABLE users (
     public_key TEXT,
 
     -- Profile info
-    karma INTEGER DEFAULT 0,
-    account_created TIMESTAMP,
     avatar_url TEXT,
+    bio TEXT,
+    karma INTEGER DEFAULT 0,
 
     -- Platform metadata
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -68,32 +74,179 @@ CREATE TABLE users (
     -- Phase 2: Pseudonym system
     default_pseudonym VARCHAR(50),
 
-    CONSTRAINT username_length CHECK (char_length(username) >= 1)
+    CONSTRAINT username_length CHECK (char_length(username) >= 3 AND char_length(username) <= 50),
+    CONSTRAINT email_format CHECK (email IS NULL OR email ~* '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$')
 );
 
-CREATE INDEX idx_users_reddit_id ON users(reddit_id);
 CREATE INDEX idx_users_username ON users(username);
+CREATE INDEX idx_users_email ON users(email) WHERE email IS NOT NULL;
+CREATE INDEX idx_users_reddit_id ON users(reddit_id) WHERE reddit_id IS NOT NULL;
 CREATE INDEX idx_users_last_seen ON users(last_seen DESC);
 ```
 
 **Fields:**
 - `id`: Internal user ID (auto-increment)
-- `reddit_id`: Reddit's unique user ID (e.g., "t2_abc123")
-- `username`: Reddit username
-- `access_token`: OAuth access token (encrypted at rest in production)
-- `refresh_token`: OAuth refresh token
-- `token_expires_at`: When access token expires
+- `username`: Platform username (unique, required, 3-50 characters)
+- `email`: Optional email address for password reset
+- `password_hash`: Bcrypt-hashed password
+- `reddit_id`: Reddit's unique user ID (optional, for future Reddit OAuth integration)
+- `reddit_username`: Reddit username (optional)
+- `access_token`: Reddit OAuth access token (optional, encrypted at rest in production)
+- `refresh_token`: Reddit OAuth refresh token (optional)
+- `token_expires_at`: When Reddit access token expires (optional)
 - `public_key`: RSA public key for E2E encryption (base64 encoded)
-- `karma`: Reddit karma (cached)
-- `account_created`: When Reddit account was created
-- `avatar_url`: Reddit avatar URL
-- `created_at`: When user joined your platform
+- `avatar_url`: User's avatar URL (can be uploaded or default)
+- `bio`: User bio/description
+- `karma`: Platform karma points (based on post/comment votes)
+- `created_at`: When user joined the platform
 - `last_seen`: Last activity timestamp
 - `default_pseudonym`: Phase 2 feature
 
+**Authentication:**
+- Users register with username and password
+- Email is optional but recommended for password recovery
+- Password is hashed with bcrypt (cost factor 12)
+- Future Reddit OAuth integration will populate reddit_id and related fields
+
 ---
 
-### 2. conversations
+### 2. platform_posts
+
+Platform-native posts created by users. These are separate from Reddit posts and exist only on the platform.
+
+```sql
+CREATE TABLE platform_posts (
+    id SERIAL PRIMARY KEY,
+    author_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+
+    -- Post content
+    title VARCHAR(300) NOT NULL,
+    body TEXT,
+
+    -- Categorization
+    tags TEXT[],  -- Array of tags/topics
+
+    -- Media (optional)
+    media_url TEXT,
+    media_type VARCHAR(20),  -- 'image', 'video', 'gif'
+    thumbnail_url TEXT,
+
+    -- Engagement metrics
+    score INTEGER DEFAULT 0,  -- Upvotes - downvotes
+    upvotes INTEGER DEFAULT 0,
+    downvotes INTEGER DEFAULT 0,
+    num_comments INTEGER DEFAULT 0,
+    view_count INTEGER DEFAULT 0,
+
+    -- Status
+    is_deleted BOOLEAN DEFAULT FALSE,
+    is_edited BOOLEAN DEFAULT FALSE,
+    edited_at TIMESTAMP,
+
+    -- Timestamps
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT title_length CHECK (char_length(title) >= 1 AND char_length(title) <= 300)
+);
+
+CREATE INDEX idx_platform_posts_author ON platform_posts(author_id, created_at DESC);
+CREATE INDEX idx_platform_posts_created ON platform_posts(created_at DESC) WHERE is_deleted = FALSE;
+CREATE INDEX idx_platform_posts_score ON platform_posts(score DESC, created_at DESC) WHERE is_deleted = FALSE;
+CREATE INDEX idx_platform_posts_tags ON platform_posts USING GIN(tags);
+```
+
+**Fields:**
+- `id`: Post ID
+- `author_id`: User who created the post
+- `title`: Post title (required, 1-300 characters)
+- `body`: Post body text (optional for image/video posts)
+- `tags`: Array of tags for categorization (e.g., ["funny", "memes"])
+- `media_url`: URL to attached media
+- `media_type`: Type of media attachment
+- `thumbnail_url`: Thumbnail for media posts
+- `score`: Net score (upvotes - downvotes)
+- `upvotes`: Total upvotes
+- `downvotes`: Total downvotes
+- `num_comments`: Comment count (denormalized for performance)
+- `view_count`: Number of times post was viewed
+- `is_deleted`: Soft delete flag
+- `is_edited`: Whether post was edited
+- `edited_at`: When post was last edited
+- `created_at`: Post creation timestamp
+
+**Usage:**
+- Users can create text posts, image posts, or video posts
+- Posts can be tagged with multiple topics
+- Posts appear in unified feed alongside Reddit posts
+- Distinguished from Reddit posts with 💬 icon
+
+---
+
+### 3. post_comments
+
+Comments on platform posts. Supports nested threading (replies to comments).
+
+```sql
+CREATE TABLE post_comments (
+    id SERIAL PRIMARY KEY,
+    post_id INTEGER NOT NULL REFERENCES platform_posts(id) ON DELETE CASCADE,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    parent_comment_id INTEGER REFERENCES post_comments(id) ON DELETE CASCADE,
+
+    -- Comment content
+    body TEXT NOT NULL,
+
+    -- Engagement metrics
+    score INTEGER DEFAULT 0,
+    upvotes INTEGER DEFAULT 0,
+    downvotes INTEGER DEFAULT 0,
+
+    -- Status
+    is_deleted BOOLEAN DEFAULT FALSE,
+    is_edited BOOLEAN DEFAULT FALSE,
+    edited_at TIMESTAMP,
+
+    -- Threading depth (for performance)
+    depth INTEGER DEFAULT 0,
+
+    -- Timestamps
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT body_not_empty CHECK (char_length(body) >= 1)
+);
+
+CREATE INDEX idx_post_comments_post ON post_comments(post_id, created_at DESC);
+CREATE INDEX idx_post_comments_user ON post_comments(user_id, created_at DESC);
+CREATE INDEX idx_post_comments_parent ON post_comments(parent_comment_id) WHERE parent_comment_id IS NOT NULL;
+CREATE INDEX idx_post_comments_score ON post_comments(post_id, score DESC);
+```
+
+**Fields:**
+- `id`: Comment ID
+- `post_id`: Which platform post this comment belongs to
+- `user_id`: Who wrote the comment
+- `parent_comment_id`: NULL for top-level comments, comment ID for replies
+- `body`: Comment text (required)
+- `score`: Net score (upvotes - downvotes)
+- `upvotes`: Total upvotes
+- `downvotes`: Total downvotes
+- `is_deleted`: Soft delete flag
+- `is_edited`: Whether comment was edited
+- `edited_at`: When comment was last edited
+- `depth`: Nesting level (0 = top-level, 1 = reply to top-level, etc.)
+- `created_at`: Comment creation timestamp
+
+**Usage:**
+- Users can comment on platform posts
+- Support for nested replies (comment threads)
+- Sort options: new, top, controversial
+- Depth is tracked for UI rendering (max depth: 10)
+
+**Note:** These are comments on platform posts only. Comments on Reddit posts are not stored in the database - they're viewed through Reddit's public API.
+
+---
+
+### 5. conversations
 
 Represents a 1-on-1 chat between two users.
 
@@ -102,10 +255,6 @@ CREATE TABLE conversations (
     id SERIAL PRIMARY KEY,
     user1_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     user2_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-
-    -- Conversation type
-    type VARCHAR(20) NOT NULL DEFAULT 'platform',
-    -- Values: 'platform' (both on platform), 'reddit_chat' (other user not on platform yet)
 
     -- Metadata
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -127,14 +276,12 @@ CREATE TABLE conversations (
 CREATE INDEX idx_conversations_user1 ON conversations(user1_id);
 CREATE INDEX idx_conversations_user2 ON conversations(user2_id);
 CREATE INDEX idx_conversations_last_message ON conversations(last_message_at DESC);
-CREATE INDEX idx_conversations_type ON conversations(type);
 ```
 
 **Fields:**
 - `id`: Conversation ID
 - `user1_id`: First user (lower ID)
 - `user2_id`: Second user (higher ID)
-- `type`: 'platform' or 'reddit_chat'
 - `created_at`: When conversation started
 - `last_message_at`: Timestamp of last message (for sorting inbox)
 - `user1_auto_delete_after`: How long before User 1's messages delete (NULL = never)
@@ -146,9 +293,9 @@ CREATE INDEX idx_conversations_type ON conversations(type);
 
 ---
 
-### 3. messages
+### 6. messages
 
-Stores all messages (both platform and Reddit Chat).
+Stores all E2E encrypted messages between platform users.
 
 ```sql
 CREATE TABLE messages (
@@ -157,22 +304,15 @@ CREATE TABLE messages (
     sender_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     recipient_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
 
-    -- Message content
-    -- For platform messages: encrypted blob
-    -- For Reddit messages: plain text
-    encrypted_content TEXT,
-    message_text TEXT,  -- Only for Reddit Chat messages
+    -- Message content (E2E encrypted)
+    encrypted_content TEXT NOT NULL,
 
     -- Message type
     message_type VARCHAR(20) NOT NULL DEFAULT 'text',
     -- Values: 'text', 'image', 'video', 'audio'
 
-    -- Source
-    source VARCHAR(20) NOT NULL DEFAULT 'platform',
-    -- Values: 'platform', 'reddit_chat'
-
     -- Encryption metadata
-    encryption_version VARCHAR(10),  -- For future encryption updates
+    encryption_version VARCHAR(10) DEFAULT 'v1',  -- For future encryption updates
 
     -- Media metadata (if message includes media)
     media_url TEXT,
@@ -186,10 +326,7 @@ CREATE TABLE messages (
 
     -- Soft delete (for auto-delete feature, Phase 2)
     deleted_for_sender BOOLEAN DEFAULT FALSE,
-    deleted_for_recipient BOOLEAN DEFAULT FALSE,
-
-    -- Migration tracking
-    migrated_from_reddit BOOLEAN DEFAULT FALSE
+    deleted_for_recipient BOOLEAN DEFAULT FALSE
 );
 
 CREATE INDEX idx_messages_conversation ON messages(conversation_id, sent_at DESC);
@@ -205,10 +342,8 @@ CREATE INDEX idx_messages_auto_delete ON messages(sent_at, deleted_for_recipient
 - `conversation_id`: Which conversation this belongs to
 - `sender_id`: Who sent it
 - `recipient_id`: Who receives it
-- `encrypted_content`: For platform messages (base64 encrypted blob)
-- `message_text`: For Reddit Chat messages (plain text, NOT encrypted)
+- `encrypted_content`: E2E encrypted message content (base64 encrypted blob)
 - `message_type`: Type of message
-- `source`: Where message came from
 - `encryption_version`: Track encryption method for future updates
 - `media_url`: URL to media file (if message includes media)
 - `media_type`: MIME type of media
@@ -218,15 +353,15 @@ CREATE INDEX idx_messages_auto_delete ON messages(sent_at, deleted_for_recipient
 - `read_at`: When recipient opened/read the message
 - `deleted_for_sender`: Soft delete flag (sender's view)
 - `deleted_for_recipient`: Soft delete flag (recipient's view)
-- `migrated_from_reddit`: TRUE if this was imported from Reddit Chat
 
-**Encryption Logic:**
-- Platform messages: `encrypted_content` has value, `message_text` is NULL
-- Reddit messages: `message_text` has value, `encrypted_content` is NULL
+**Encryption:**
+- All messages are end-to-end encrypted using Web Crypto API
+- Server stores only encrypted blobs, cannot read message content
+- Decryption happens client-side only
 
 ---
 
-### 4. blocked_users
+### 7. blocked_users
 
 Tracks blocking relationships.
 
@@ -261,7 +396,7 @@ SELECT EXISTS (
 
 ---
 
-### 5. user_settings
+### 8. user_settings
 
 Stores user preferences.
 
@@ -273,9 +408,6 @@ CREATE TABLE user_settings (
     notification_sound BOOLEAN DEFAULT TRUE,
     show_read_receipts BOOLEAN DEFAULT TRUE,
     show_typing_indicators BOOLEAN DEFAULT TRUE,
-
-    -- Privacy settings
-    auto_append_invitation BOOLEAN DEFAULT TRUE,  -- Append invite link to Reddit DMs
 
     -- UI preferences
     theme VARCHAR(20) DEFAULT 'dark',  -- 'dark', 'light'
@@ -292,16 +424,15 @@ CREATE TABLE user_settings (
 - `notification_sound`: Enable/disable sound notifications
 - `show_read_receipts`: Let others see when you read messages
 - `show_typing_indicators`: Let others see when you're typing
-- `auto_append_invitation`: Add invite link to Reddit messages automatically
 - `theme`: UI theme preference
 - `default_auto_delete_after`: Default auto-delete duration for new conversations
 - `updated_at`: Last updated
 
 ---
 
-### 6. reddit_posts (Cached)
+### 9. reddit_posts (Cached)
 
-Cache Reddit posts to reduce API calls.
+Cache Reddit posts fetched from Reddit's public API to reduce API calls and improve performance.
 
 ```sql
 CREATE TABLE reddit_posts (
@@ -309,10 +440,9 @@ CREATE TABLE reddit_posts (
     reddit_post_id VARCHAR(50) UNIQUE NOT NULL,
     subreddit VARCHAR(50) NOT NULL,
 
-    -- Post data
+    -- Post data (from Reddit public API)
     title TEXT NOT NULL,
     author VARCHAR(50),
-    author_reddit_id VARCHAR(50),
     body TEXT,
     url TEXT,
 
@@ -327,37 +457,46 @@ CREATE TABLE reddit_posts (
     created_utc TIMESTAMP,
 
     -- Cache metadata
+    cache_key VARCHAR(255) NOT NULL,  -- e.g., "r/pics:hot", "r/gaming:top:week"
     cached_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    expires_at TIMESTAMP,
-
-    -- Platform metadata
-    created_from_platform BOOLEAN DEFAULT FALSE,  -- Posted from your site
-    platform_user_id INTEGER REFERENCES users(id)  -- If posted from your site
+    expires_at TIMESTAMP NOT NULL
 );
 
 CREATE INDEX idx_reddit_posts_subreddit ON reddit_posts(subreddit, created_utc DESC);
 CREATE INDEX idx_reddit_posts_reddit_id ON reddit_posts(reddit_post_id);
+CREATE INDEX idx_reddit_posts_cache_key ON reddit_posts(cache_key, expires_at);
 CREATE INDEX idx_reddit_posts_expires ON reddit_posts(expires_at);
-CREATE INDEX idx_reddit_posts_platform_user ON reddit_posts(platform_user_id) WHERE platform_user_id IS NOT NULL;
 ```
 
 **Fields:**
 - `reddit_post_id`: Reddit's ID (e.g., "t3_abc123")
 - `subreddit`: Which subreddit
-- Post content fields
+- `title`: Post title
+- `author`: Reddit username of poster
+- `body`: Post text content (for text posts)
+- `url`: Link URL or media URL
+- `thumbnail_url`: Thumbnail URL
+- `media_type`: Type of content
+- `media_url`: Direct media URL
+- `score`: Reddit score (upvotes - downvotes)
+- `num_comments`: Number of comments on Reddit
+- `created_utc`: When post was created on Reddit
+- `cache_key`: Unique key for this cache entry (includes subreddit, sort, time filter)
 - `cached_at`: When we cached it
 - `expires_at`: When to re-fetch from Reddit
-- `created_from_platform`: TRUE if posted via your site
-- `platform_user_id`: Who posted it (if from your site)
 
 **Cache Strategy:**
-- Cache posts for 5-15 minutes
-- Delete expired posts daily
-- Separate cache keys per sort type (hot, new, top)
+- Hot posts: 5 minutes TTL
+- New posts: 2 minutes TTL
+- Top posts (day/week): 15 minutes TTL
+- Delete expired posts with daily cleanup job
+- Separate cache keys per sort type and time filter
+
+**Important:** This table caches Reddit content fetched via the public JSON API (no authentication required). Platform users cannot post to Reddit - they can only browse.
 
 ---
 
-### 7. media_files
+### 10. media_files
 
 Track uploaded media files.
 
@@ -406,11 +545,11 @@ CREATE INDEX idx_media_files_message ON media_files(used_in_message_id);
 - `duration`: Length (for videos/audio)
 - `uploaded_at`: Upload timestamp
 - `used_in_message_id`: Which message uses this file
-- `used_in_slideshow`: Trackwhether used in slideshow
+- `used_in_slideshow`: Track whether used in slideshow
 
 ---
 
-### 8. invitations (Phase 2)
+### 11. invitations (Phase 2)
 
 Track invitation success for rewards.
 
@@ -463,6 +602,8 @@ Create file `backend/internal/database/migrations/001_initial_schema.sql`:
 ```sql
 -- Run this first
 CREATE TABLE users (...);
+CREATE TABLE platform_posts (...);
+CREATE TABLE post_comments (...);
 CREATE TABLE conversations (...);
 CREATE TABLE messages (...);
 CREATE TABLE blocked_users (...);
@@ -473,6 +614,8 @@ CREATE TABLE media_files (...);
 -- Create indexes
 CREATE INDEX ...;
 ```
+
+**Note:** The existing migration file in your backend needs to be updated to match the new schema with username/password auth and platform posts/comments.
 
 ### Migration Tool
 
@@ -495,6 +638,192 @@ migrate -path backend/internal/database/migrations -database "..." down 1
 ---
 
 ## Sample Queries
+
+### Get Unified Feed (Platform Posts + Reddit Posts)
+
+```sql
+-- Get mixed feed of platform posts and cached Reddit posts
+(
+    SELECT
+        'platform' as source,
+        id,
+        title,
+        body,
+        author_id,
+        NULL as subreddit,
+        score,
+        num_comments,
+        created_at,
+        media_url,
+        media_type,
+        thumbnail_url
+    FROM platform_posts
+    WHERE is_deleted = FALSE
+)
+UNION ALL
+(
+    SELECT
+        'reddit' as source,
+        id,
+        title,
+        body,
+        NULL as author_id,
+        subreddit,
+        score,
+        num_comments,
+        created_utc as created_at,
+        media_url,
+        media_type,
+        thumbnail_url
+    FROM reddit_posts
+    WHERE expires_at > CURRENT_TIMESTAMP
+)
+ORDER BY created_at DESC
+LIMIT 50;
+```
+
+### Get Platform Post with Comments
+
+```sql
+-- Get post details
+SELECT
+    p.*,
+    u.username as author_username,
+    u.avatar_url as author_avatar
+FROM platform_posts p
+JOIN users u ON p.author_id = u.id
+WHERE p.id = $1
+AND p.is_deleted = FALSE;
+
+-- Get top-level comments with user info
+SELECT
+    c.id,
+    c.body,
+    c.score,
+    c.created_at,
+    c.is_edited,
+    c.edited_at,
+    u.username,
+    u.avatar_url,
+    (SELECT COUNT(*) FROM post_comments WHERE parent_comment_id = c.id) as reply_count
+FROM post_comments c
+JOIN users u ON c.user_id = u.id
+WHERE c.post_id = $1
+AND c.parent_comment_id IS NULL
+AND c.is_deleted = FALSE
+ORDER BY c.score DESC
+LIMIT 100;
+```
+
+### Get Comment Replies (Nested Threading)
+
+```sql
+-- Get replies to a specific comment
+WITH RECURSIVE comment_tree AS (
+    -- Base case: get the parent comment
+    SELECT
+        id,
+        post_id,
+        user_id,
+        parent_comment_id,
+        body,
+        score,
+        depth,
+        created_at,
+        is_edited,
+        edited_at,
+        ARRAY[id] as path
+    FROM post_comments
+    WHERE id = $1
+
+    UNION ALL
+
+    -- Recursive case: get all replies
+    SELECT
+        c.id,
+        c.post_id,
+        c.user_id,
+        c.parent_comment_id,
+        c.body,
+        c.score,
+        c.depth,
+        c.created_at,
+        c.is_edited,
+        c.edited_at,
+        ct.path || c.id
+    FROM post_comments c
+    JOIN comment_tree ct ON c.parent_comment_id = ct.id
+    WHERE c.is_deleted = FALSE
+    AND c.depth < 10  -- Max depth limit
+)
+SELECT
+    ct.*,
+    u.username,
+    u.avatar_url
+FROM comment_tree ct
+JOIN users u ON ct.user_id = u.id
+ORDER BY ct.path;
+```
+
+### Create Platform Post
+
+```sql
+INSERT INTO platform_posts (
+    author_id,
+    title,
+    body,
+    tags,
+    media_url,
+    media_type,
+    thumbnail_url
+) VALUES (
+    $1,  -- author_id
+    $2,  -- title
+    $3,  -- body
+    $4,  -- tags array (e.g., ARRAY['funny', 'memes'])
+    $5,  -- media_url
+    $6,  -- media_type
+    $7   -- thumbnail_url
+) RETURNING id, created_at;
+```
+
+### Create Comment on Platform Post
+
+```sql
+-- Calculate depth if replying to another comment
+WITH parent_info AS (
+    SELECT depth FROM post_comments WHERE id = $3
+)
+INSERT INTO post_comments (
+    post_id,
+    user_id,
+    parent_comment_id,
+    body,
+    depth
+) VALUES (
+    $1,  -- post_id
+    $2,  -- user_id
+    $3,  -- parent_comment_id (NULL for top-level)
+    $4,  -- body
+    COALESCE((SELECT depth + 1 FROM parent_info), 0)
+) RETURNING id, created_at;
+
+-- Update comment count on post
+UPDATE platform_posts
+SET num_comments = num_comments + 1
+WHERE id = $1;
+```
+
+### Vote on Platform Post
+
+```sql
+-- Assuming you'll create a post_votes table in the future
+-- For now, directly update the post
+UPDATE platform_posts
+SET upvotes = upvotes + 1,
+    score = score + 1
+WHERE id = $1;
+```
 
 ### Get User's Inbox (Conversations)
 
