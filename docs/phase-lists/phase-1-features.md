@@ -1,49 +1,96 @@
 # Phase 1 - MVP Features
 
-**Launch Target:** October-November 2026
-**Development Time:** 10-11 months at 2 hours/day
-**User Goal:** Launch with core features for real-world use
+**Launch Target:** 12 months from start
+**Development Time:** ~2 hours/day
+**User Goal:** Launch with core features, achieve 100 active users
+**Strategy:** Build standalone platform with Reddit public API integration
 
 ---
 
 ## Authentication & User Management
 
-- Reddit OAuth login integration
-- User profile creation (from Reddit account)
-- User profile display on your site (shows Reddit karma, account age, recent posts)
-- Session management
+- **Username/password registration** (email optional)
+- Password hashing with bcrypt
+- JWT-based session management
+- User profile creation and editing
+- Avatar upload
+- Account settings
 - Logout functionality
+- Password reset (email required)
+
+**Note:** No Reddit OAuth - users register directly on platform
 
 ---
 
-## Reddit Integration - Posts
+## Reddit Integration (Public API)
 
-### Browsing Posts
-- Browse posts from any subreddit on your site
-- Display posts with your custom UI
-- Filter posts by Reddit's native sorting (hot, new, top, rising, best)
-- Click post title to view full post on your site
-- Click username to view Reddit profile on your site
-- Indicator showing if post author is on your platform vs Reddit-only
+### Browsing Reddit Posts
+- Browse posts from any subreddit
+- Display posts with custom UI
+- Filter by Reddit's sorting (hot, new, top, rising, controversial)
+- Time filters (hour, day, week, month, year, all)
+- Post details view
+- View Reddit comments (read-only, links to Reddit)
+- Pagination and infinite scroll
+- Search subreddits
 
-### Creating Posts
-- Create text posts to Reddit from your site
-- Auto-append signature to posts ("Posted from [YourSite] - Click for multimedia chat")
-- UI indicators for posts made on your site:
-  - Icon next to username
-  - Highlight treatment (glow/border)
-  - "Posted via [YourSite]" metadata display
+### Reddit Media
+- Display images from Reddit posts
+- Display videos from Reddit posts
+- Thumbnail previews
+- Full media viewing
+- Direct links to Reddit source
+
+**Limitations:**
+- Cannot post to Reddit
+- Cannot comment on Reddit
+- Cannot vote on Reddit
+- Read-only access via public API
 
 ---
 
-## Two-Tier Messaging System
+## Platform Social Layer
 
-### Platform Messages (Both users on your site)
+### Platform Posts
+- Create text posts on the platform
+- Add titles and body content
+- Tag posts with topics/categories
+- Edit your own posts
+- Delete your own posts
+- View count tracking
+
+### Platform Comments
+- Comment on platform posts
+- Reply to comments (nested threading)
+- Edit your own comments
+- Delete your own comments
+- Sort comments (new, top, controversial)
+
+### Unified Feed
+- Mixed feed showing:
+  - Reddit posts (indicated with 🌐 icon)
+  - Platform posts (indicated with 💬 icon)
+- Filter to show only Reddit or only platform posts
+- Sort by date, popularity, etc.
+- User can distinguish post types at a glance
+
+### User Discovery
+- View other users' profiles
+- See their posts and comments
+- "Send Message" button on profiles
+- "Block User" functionality
+- Online/offline indicators
+
+---
+
+## Messaging System
+
+### Platform Messages (E2E Encrypted)
 
 **Core Messaging:**
-- E2E encrypted text messaging
+- End-to-end encrypted text messages
 - Real-time delivery via WebSocket
-- Persistent message storage
+- Persistent message storage (encrypted blobs)
 - DM inbox interface
 - Conversation list view
 - Unread message counter
@@ -52,42 +99,20 @@
 - Sending
 - Sent ✓
 - Delivered ✓✓
-- Read (only shown on most recent read message)
+- Read ✓✓ (blue)
 
 **Features:**
-- Read receipts (asymmetric - per user setting)
-- Typing indicators ("UserX is typing...")
-- Online/offline status indicators
+- Read receipts (toggle in settings)
+- Typing indicators ("User is typing...")
+- Online/offline status
+- Message timestamps
+- Conversation search
 
-### Reddit Chat Fallback (Other user NOT on your site)
-
-**Integration:**
-- Integration with Reddit Chat API
-- Send text messages via Reddit
-- Send images via Reddit Chat
-- Send GIFs via Reddit Chat
-- Warning banner when entering Reddit Chat mode
-
-**Invitation System:**
-- Auto-append invitation link to Reddit messages (toggleable in settings)
-- "Send Invite" button for Reddit-only users
-- Unique invitation links per user
-
-**Storage & Sync:**
-- Store Reddit chat history locally
-- Sync Reddit messages to your database
-- Visual indicator for Reddit-sourced messages (📱 icon)
-
-### Migration System
-
-When a non-platform user joins your site:
-- One-time migration of Reddit chat history (last 100 messages or 30 days)
-- Import all messages to your database
-- Upgrade conversation from Reddit Chat to platform
-- Show upgrade banner in chat
-- Mark old messages as "via Reddit, not encrypted" (📱)
-- Mark new messages as encrypted (🔒)
-- Notify both users of conversation upgrade
+**Privacy:**
+- Messages encrypted on client before sending
+- Server stores encrypted blobs only
+- Private keys never leave user's browser
+- Decryption happens client-side only
 
 ---
 
@@ -97,84 +122,82 @@ When a non-platform user joins your site:
 
 **Upload:**
 - Upload images from device
-- Multi-file selection (Ctrl+Click or Cmd+Click)
-- Mobile: Select multiple from photo gallery
+- Multi-file selection
+- Drag and drop support
 - Display images inline in chat
-- Click to enlarge
+- Click to enlarge/fullscreen
+- Image compression for performance
 
-**URL Pasting:**
-- Direct image URLs (.jpg, .png, .gif, .webp)
-- Imgur links
-- Reddit image posts
-- Giphy/Tenor GIFs
-- Automatic preview generation
+**Supported Formats:**
+- JPEG, PNG, GIF, WebP
+- Max size: 10MB per image
+- Automatic thumbnail generation
 
 ### Video Handling
 
-**Upload & Embedding:**
+**Upload:**
 - Upload videos from device
-- Video URL embedding from the two supported video sites
-- Display video in chat window
-- Chat remains visible during video playback
+- Display video player in chat
+- Playback controls
+- Chat remains visible during playback
 
-**Synchronized Playback:**
-- Sharer controls playback (play/pause/seek)
-- Playback state syncs to viewer in real-time
-- Only sharer can control (viewer just watches)
+**Supported Formats:**
+- MP4, WebM
+- Max size: 100MB per video
+- Automatic transcoding (Phase 2)
 
 ### Personal Slideshow
 
 **Creation:**
-- Upload multiple images/videos at once
-- Multi-file selection from device
+- Upload multiple images/videos
 - Create slideshow from uploaded files
+- Add captions (optional)
 
 **Controls:**
-- Navigation controls (Next/Previous buttons)
-- Arrow key navigation support
-- Sharer controls navigation initially
-- Ability to transfer control to other user
+- Next/Previous navigation
+- Keyboard arrow keys support
+- Auto-advance with configurable intervals (3s, 5s, 10s, 15s, 30s)
+- Turn off auto-advance option
+- Sharer controls by default
+- Transfer control to other user
 - Only one person controls at a time
 
-**Auto-Advance:**
-- Configurable intervals for images: 3s, 5s, 10s, 15s, 30s
-- Configurable intervals for videos: 0s (immediate), 3s, 5s, 10s after video ends
-- Turn off auto-advance option
-
 **Experience:**
-- Display slideshow in main area
-- Chat remains visible and active on side/bottom
+- Slideshow displays in main chat area
+- Chat remains visible on side/bottom
 - Both users can type while viewing
+- Synchronized viewing (both see same slide)
 
 ### Reddit Subreddit Slideshow
 
 **Setup:**
 - Enter any subreddit name
-- Fetch media-only posts from subreddit
+- Fetch media-only posts from subreddit via public API
 - Filter out text-only posts
-- For text+image posts, display only the image
-- Display post title above each image/video/gif
+- Display post title above each image/video
 
 **Media Types:**
-- Images from Reddit
-- Videos from Reddit
+- Images from Reddit posts
+- Videos from Reddit posts
 - GIFs from Reddit
-- Only show media that displays inline on Reddit (no external navigation required)
+- Inline media only (no external navigation)
 
 **Controls:**
-- Sort options (hot, new, top, rising, best, controversial)
+- Sort options (hot, new, top, rising, controversial)
 - Change sort mid-browse
-- Navigation controls (Next/Previous buttons)
-- Arrow key navigation support
-- Auto-advance feature (same intervals as personal slideshow)
-- Sharer controls navigation initially
-- Ability to transfer control to other user
+- Next/Previous navigation
+- Keyboard arrow key support
+- Auto-advance feature (same as personal slideshow)
+- Sharer controls initially
+- Transfer control to other user
 - Only one person controls at a time
 
 **Interaction:**
-- Click on image to open original Reddit post (on your site)
-- Chat remains visible and active during slideshow
+- Click media to view full post details
+- Link to original Reddit post
+- Chat remains active during slideshow
 - Both users can comment on what they're viewing
+- "Save to favorites" option
 
 ---
 
@@ -183,96 +206,86 @@ When a non-platform user joins your site:
 ### Blocking
 - Block users from sending messages
 - Blocked user can't send new messages
-- Messages from blocked user never show as delivered
 - No notification to blocked user (silent)
 - Unblock option
 - View block list in settings
 
 ### Notifications
-- Notification sounds when receiving messages
-- Toggle to turn sound on/off
+- Browser notifications for new messages
+- Sound notifications (toggle in settings)
 - Inbox badge counter showing unread count
 - Browser tab title updates with unread count
 
-### Messaging Actions
-- "Send DM" button on posts (if user is on platform)
-- "Send Invite" or "Message via Reddit" button (if user is Reddit-only)
-- Platform status indicator on all posts (✅ On Platform / ⚪ Reddit Only)
-- Warning modal before sending Reddit message
+### User Actions
+- "Send DM" button on user profiles
+- "Block User" option
+- Report user (moderation - Phase 2)
+- View user's post history
 
 ### Settings
-- General user settings page
 - Notification sound toggle
-- Read receipt toggle (show/hide)
-- Typing indicator toggle (show/hide)
-- Auto-append invitation link toggle
-- Theme selection
+- Read receipt toggle
+- Typing indicator toggle
+- Theme selection (dark/light)
+- Privacy settings
+- Account management
+- Data export (Phase 2)
 
 ---
 
 ## UI/UX
 
 ### Responsive Design
-- Mobile-responsive design (works on phones/tablets)
-- PWA-capable (can install to home screen)
-- Touch-optimized controls for mobile
+- Mobile-responsive design
+- Works on phones, tablets, desktop
+- Touch-optimized controls
+- PWA-capable (install to home screen)
 
 ### Chat Interface
-- Chat always visible and accessible
+- Clean, modern interface
 - One chat window open at a time
 - Switch between conversations via inbox
-- Clean, modern interface
 - Smooth animations and transitions
+- Message grouping by time
 
 ### Themes
-- Dark mode theme
-- Light mode theme
+- Dark mode (default)
+- Light mode
 - Theme toggle in settings
+- Consistent across entire platform
 
 ### Emoji Reactions
-- Limited emoji reaction set (5-10 quick reactions)
-- Click emoji icon to react to messages
-- Show reaction count on messages
+- Limited emoji reaction set (5-10 reactions)
+- Click emoji to react to messages
+- Show reaction count
 - Multiple users can add same reaction
-
----
-
-## Basic Reward System Foundation
-
-**Phase 1 includes minimal foundation for Phase 2 rewards:**
-- Track successful invitations (count only)
-- Display invitation count on profile
-- Unique invitation links per user
-- Database structure for future karma/points/badges
-- Stripe payment integration setup (basic infrastructure)
-
-**Note:** Full reward system launches in Phase 2
 
 ---
 
 ## Infrastructure & Backend
 
 ### Core Technology Stack
-- **Backend:** Go with Gin or Fiber web framework
+- **Backend:** Go with Gin web framework
 - **Frontend:** React with TypeScript
 - **Database:** PostgreSQL for persistent data
-- **Cache:** Redis for session management and online status
-- **Storage:** AWS S3, Cloudflare R2, or similar for media files
-- **CDN:** CloudFlare or AWS CloudFront for media delivery
+- **Real-time:** WebSocket for messaging
+- **Storage:** S3/R2/CDN for media files
+- **Encryption:** Web Crypto API (client-side)
 
 ### Key Systems
 - WebSocket server for real-time messaging
-- Reddit API integration (OAuth, Posts API, Chat API)
-- E2E encryption using Web Crypto API
+- Reddit public API integration (no auth required)
+- E2E encryption (Web Crypto API)
 - JWT-based session management
 - RESTful API design
 - Image/video upload handling
-- URL parsing and preview generation
+- Rate limiting and caching
 
 ### Security
 - HTTPS/SSL certificates (Let's Encrypt)
-- E2E encryption for platform messages
+- E2E encryption for messages
 - Secure session management
+- Password hashing (bcrypt)
 - Input validation and sanitization
 - Rate limiting to prevent abuse
 - CORS configuration
@@ -284,24 +297,24 @@ When a non-platform user joins your site:
 
 ### Initial Deployment
 - Single VPS hosting (DigitalOcean, Hetzner, or Linode)
-- Domain name registration and DNS configuration
-- Nginx reverse proxy setup
-- SSL certificate installation (automated renewal)
-- Database backups (automated daily)
-- Basic server monitoring
-- Error logging and alerting
+- Domain name and DNS configuration
+- Nginx reverse proxy
+- SSL certificate (automated renewal)
+- PostgreSQL on same VPS
+- Automated database backups
+- Basic monitoring and logging
 
 ### Hosting Requirements (100-500 users)
 - 2GB RAM minimum
 - 2 vCPU
 - 50GB SSD storage
-- Linux (Ubuntu 22.04 LTS recommended)
+- Linux (Ubuntu 22.04 LTS)
 
 ### Estimated Monthly Costs
-- VPS: $10-12/month
+- VPS: $12-15/month
 - Storage (media files): $5-10/month
 - Domain: $12/year ($1/month)
-- **Total: ~$20-25/month**
+- **Total: ~$20-30/month**
 
 ---
 
@@ -310,27 +323,26 @@ When a non-platform user joins your site:
 ### Technical
 - [ ] All core features working without critical bugs
 - [ ] E2E encryption functioning correctly
-- [ ] Reddit OAuth login working reliably
-- [ ] Reddit Chat API integration stable
-- [ ] Media uploads and slideshows functioning on desktop and mobile
+- [ ] User authentication secure and reliable
+- [ ] Reddit public API integration stable
+- [ ] Media uploads and slideshows functioning
 - [ ] WebSocket connections stable
 - [ ] Site loads in under 3 seconds
 - [ ] Mobile responsive on iOS and Android
 
 ### User Experience
-- [ ] Can create Reddit post from your site
-- [ ] Can browse Reddit posts on your site
-- [ ] Can send DM to platform user
-- [ ] Can send Reddit Chat to non-platform user
+- [ ] Can register and login with username/password
+- [ ] Can browse Reddit posts on the platform
+- [ ] Can create platform posts and comments
+- [ ] Can send encrypted DMs to other users
 - [ ] Can share images and create slideshows
 - [ ] Can browse Reddit media together via slideshow
-- [ ] Can embed and sync external videos
-- [ ] Invitation system successfully converts Reddit users
+- [ ] Intuitive UI that users understand immediately
 
 ### Performance
 - [ ] Handles 100+ concurrent users
 - [ ] Messages deliver in under 500ms
-- [ ] Images load quickly (under 2s)
+- [ ] Images load in under 2 seconds
 - [ ] No memory leaks during extended use
 - [ ] Database queries optimized
 
@@ -339,63 +351,97 @@ When a non-platform user joins your site:
 - [ ] No SQL injection vulnerabilities
 - [ ] No XSS vulnerabilities
 - [ ] Session management secure
-- [ ] Reddit OAuth tokens stored securely
+- [ ] Passwords properly hashed
 
 ---
 
 ## What Phase 1 Does NOT Include
 
-The following features are deferred to Phase 2 or 3:
+These features are deferred to Phase 2 or later:
 
 **Deferred to Phase 2:**
 - Voice/video calling
 - Audio messages and voice notes
-- Pseudonym system (Phase 1 shows Reddit usernames)
+- Group chats
 - Auto-delete messages
-- Multiple chat windows open simultaneously
+- Multiple chat windows simultaneously
 - Link previews in chat
 - Full emoji picker
-- Dynamic audio waveforms
 - Friend/contact system
-- Browser corner notifications
+- Push notifications (mobile apps)
 - Save position in Reddit slideshow
-- Full reward system (karma, badges, awards, currency)
-- Leaderboards
+- Advanced search
+- Content recommendation algorithm
 
 **Deferred to Phase 3:**
-- Group chats
-- Mobile native apps
-- Screen sharing on mobile
-- Cryptocurrency payments
+- Monetization features (tips, subscriptions)
+- Creator tools
+- Analytics dashboard
 - Advanced moderation tools
+- API for third-party integrations
+
+**Deferred to Phase 4:**
+- Communities/groups
+- Forums
+- Live streaming
+- Events system
+
+**Deferred to Phase 5:**
+- Professional network features
+- Job board
+- B2B marketplace
+- Verified identity
 
 ---
 
 ## Timeline Breakdown
 
-**Month 0:** Learn Go fundamentals
-**Months 1-2:** Reddit OAuth + post browsing
-**Months 3-4:** Text chat + E2E encryption
-**Months 5-6:** Image/video uploads + personal slideshow
-**Months 7-8:** Reddit slideshow + external video embedding
-**Months 9-10:** Reddit Chat API + migration system
-**Months 11-12:** UI polish, testing, deployment
+**Month 0:** Environment setup (complete)
 
-**Total: 10-11 months part-time development**
+**Months 1-2:**
+- Reddit public API integration
+- Platform posts and comments
+- User profiles
+
+**Months 3-4:**
+- Messaging system
+- WebSocket real-time delivery
+- E2E encryption
+
+**Months 5-6:**
+- Image/video uploads
+- Personal slideshow
+- Media storage
+
+**Months 7-8:**
+- Reddit slideshow
+- Unified feed
+- Post interactions
+
+**Months 9-10:**
+- Frontend polish
+- Mobile optimization
+- Theme system
+
+**Months 11-12:**
+- Security audit
+- Performance optimization
+- Beta testing
+- Launch
 
 ---
 
 ## Key Differentiators
 
-What makes your Phase 1 platform unique:
+What makes Phase 1 platform unique:
 
 1. **Synchronized Media Viewing** - Browse Reddit media together in real-time
 2. **Personal Slideshow Sharing** - Share your own photos/videos seamlessly
-3. **Reddit Integration** - Discovery happens on Reddit, chatting happens on your platform
+3. **Reddit Browser + Social Layer** - Mix Reddit content with platform posts
 4. **E2E Encryption** - Privacy-first messaging
-5. **Two-Tier System** - Can message both platform users and Reddit users
-6. **Seamless Onboarding** - Reddit users can join mid-conversation
+5. **Unified Experience** - One place for discovery and chatting
+6. **No App Required** - Works in any browser, PWA-capable
 
 ---
 
-**Ready to build? See the roadmap documents for step-by-step implementation guides.**
+**Ready to build? Let's create something amazing.**
