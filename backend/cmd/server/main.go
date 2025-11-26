@@ -98,6 +98,11 @@ func main() {
 		// Auth routes (no auth required)
 		auth := api.Group("/auth")
 		{
+			// Username/password authentication
+			auth.POST("/register", authHandler.Register)
+			auth.POST("/login", authHandler.Login)
+
+			// Reddit OAuth (for future use)
 			auth.GET("/reddit", authHandler.RedditLogin)
 			auth.GET("/reddit/callback", authHandler.RedditCallback)
 		}
