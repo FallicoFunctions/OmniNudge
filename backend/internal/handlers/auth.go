@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"net/http"
-	"time"
 
 	"github.com/chatreddit/backend/internal/models"
 	"github.com/chatreddit/backend/internal/services"
@@ -76,9 +75,6 @@ func (h *AuthHandler) RedditCallback(c *gin.Context) {
 		return
 	}
 
-	// Convert Unix timestamp to time.Time
-	accountCreated := time.Unix(redditUser.Created, 0)
-
 	// Determine avatar URL (prefer snoovatar, fall back to icon_img)
 	avatarURL := redditUser.Snoovatar
 	if avatarURL == "" {
@@ -87,23 +83,27 @@ func (h *AuthHandler) RedditCallback(c *gin.Context) {
 
 	// Create or update user in database
 	user := &models.User{
-		RedditID:       redditUser.ID,
 		Username:       redditUser.Name,
+		RedditID:       &redditUser.ID,
+		RedditUsername: &redditUser.Name,
 		AccessToken:    token.AccessToken,
 		RefreshToken:   token.RefreshToken,
 		TokenExpiresAt: &token.Expiry,
 		Karma:          redditUser.Karma,
-		AccountCreated: &accountCreated,
 		AvatarURL:      &avatarURL,
 	}
 
-	if err := h.userRepo.CreateOrUpdate(c.Request.Context(), user); err != nil {
+	if err := h.userRepo.CreateOrUpdateFromReddit(c.Request.Context(), user); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create/update user: " + err.Error()})
 		return
 	}
 
 	// Generate JWT
-	jwtToken, err := h.authService.GenerateJWT(user.ID, user.RedditID, user.Username)
+	redditID := ""
+	if user.RedditID != nil {
+		redditID = *user.RedditID
+	}
+	jwtToken, err := h.authService.GenerateJWT(user.ID, redditID, user.Username)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate token"})
 		return
@@ -145,4 +145,44 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 	// JWT tokens are stateless, so logout is handled client-side
 	// In production, you might want to add token to a blacklist in Redis
 	c.JSON(http.StatusOK, gin.H{"message": "Logged out successfully"})
+}
+
+// Register handles user registration with username/password
+func (h *AuthHandler) Register(c *gin.Context) {
+	var req services.RegisterRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
+		return
+	}
+
+	user, token, err := h.authService.Register(c.Request.Context(), h.userRepo, &req)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusCreated, gin.H{
+		"token": token,
+		"user":  user,
+	})
+}
+
+// Login handles user login with username/password
+func (h *AuthHandler) Login(c *gin.Context) {
+	var req services.LoginRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
+		return
+	}
+
+	user, token, err := h.authService.Login(c.Request.Context(), h.userRepo, &req)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"token": token,
+		"user":  user,
+	})
 }
