@@ -5,11 +5,14 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"time"
 
+	"github.com/chatreddit/backend/internal/models"
+	"github.com/chatreddit/backend/internal/utils"
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/oauth2"
 )
@@ -145,4 +148,90 @@ func (s *AuthService) ValidateJWT(tokenString string) (*JWTClaims, error) {
 	}
 
 	return nil, fmt.Errorf("invalid token")
+}
+
+// RegisterRequest represents the registration request payload
+type RegisterRequest struct {
+	Username string  `json:"username"`
+	Password string  `json:"password"`
+	Email    *string `json:"email,omitempty"`
+}
+
+// LoginRequest represents the login request payload
+type LoginRequest struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
+}
+
+// Register creates a new user with username/password
+func (s *AuthService) Register(ctx context.Context, userRepo *models.UserRepository, req *RegisterRequest) (*models.User, string, error) {
+	// Validate input
+	if len(req.Username) < 3 || len(req.Username) > 50 {
+		return nil, "", errors.New("username must be between 3 and 50 characters")
+	}
+
+	if len(req.Password) < 8 {
+		return nil, "", errors.New("password must be at least 8 characters")
+	}
+
+	// Check if username already exists
+	existingUser, _ := userRepo.GetByUsername(ctx, req.Username)
+	if existingUser != nil {
+		return nil, "", errors.New("username already taken")
+	}
+
+	// Hash password
+	hashedPassword, err := utils.HashPassword(req.Password)
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to hash password: %w", err)
+	}
+
+	// Create user
+	user := &models.User{
+		Username:     req.Username,
+		Email:        req.Email,
+		PasswordHash: hashedPassword,
+	}
+
+	if err := userRepo.Create(ctx, user); err != nil {
+		return nil, "", fmt.Errorf("failed to create user: %w", err)
+	}
+
+	// Generate JWT
+	token, err := s.GenerateJWT(user.ID, "", user.Username)
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to generate token: %w", err)
+	}
+
+	return user, token, nil
+}
+
+// Login authenticates a user with username/password
+func (s *AuthService) Login(ctx context.Context, userRepo *models.UserRepository, req *LoginRequest) (*models.User, string, error) {
+	// Get user by username
+	user, _ := userRepo.GetByUsername(ctx, req.Username)
+	if user == nil {
+		return nil, "", errors.New("invalid username or password")
+	}
+
+	// Check password
+	if err := utils.CheckPassword(user.PasswordHash, req.Password); err != nil {
+		return nil, "", errors.New("invalid username or password")
+	}
+
+	// Update last seen
+	_ = userRepo.UpdateLastSeen(ctx, user.ID)
+
+	// Generate JWT
+	redditID := ""
+	if user.RedditID != nil {
+		redditID = *user.RedditID
+	}
+
+	token, err := s.GenerateJWT(user.ID, redditID, user.Username)
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to generate token: %w", err)
+	}
+
+	return user, token, nil
 }
