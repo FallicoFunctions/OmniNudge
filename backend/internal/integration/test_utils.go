@@ -156,6 +156,8 @@ func newTestDeps(t *testing.T) *TestDeps {
 			protected.PUT("/posts/:id", postsHandler.UpdatePost)
 			protected.DELETE("/posts/:id", postsHandler.DeletePost)
 			protected.POST("/posts/:id/comments", commentsHandler.CreateComment)
+			protected.PUT("/comments/:id", commentsHandler.UpdateComment)
+			protected.DELETE("/comments/:id", commentsHandler.DeleteComment)
 
 			protected.POST("/subreddits", subredditsHandler.Create)
 
