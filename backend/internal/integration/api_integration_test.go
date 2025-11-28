@@ -5,7 +5,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"mime/multipart"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/chatreddit/backend/internal/models"
@@ -100,6 +102,117 @@ func TestPostsAndCommentsFlow(t *testing.T) {
 	req.Header.Set("Authorization", "Bearer "+token)
 	w = doRequest(t, deps.Router, req)
 	require.Equal(t, http.StatusCreated, w.Code)
+}
+
+func TestPostEditForbiddenForNonOwner(t *testing.T) {
+	deps := newTestDeps(t)
+	defer deps.DB.Close()
+
+	owner := createUser(t, deps.UserRepo, "owner", "user")
+	other := createUser(t, deps.UserRepo, "other", "user")
+	ownerToken, _ := deps.AuthService.GenerateJWT(owner.ID, "", owner.Username, owner.Role)
+	otherToken, _ := deps.AuthService.GenerateJWT(other.ID, "", other.Username, other.Role)
+
+	postBody := []byte(`{"title":"hi","body":"body"}`)
+	req, _ := http.NewRequest("POST", "/api/v1/posts", bytes.NewReader(postBody))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+ownerToken)
+	w := doRequest(t, deps.Router, req)
+	require.Equal(t, http.StatusCreated, w.Code)
+	var post models.PlatformPost
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &post))
+
+	updateBody := []byte(`{"title":"hack","body":"x"}`)
+	req, _ = http.NewRequest("PUT", "/api/v1/posts/"+fmt.Sprint(post.ID), bytes.NewReader(updateBody))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+otherToken)
+	w = doRequest(t, deps.Router, req)
+	require.Equal(t, http.StatusForbidden, w.Code)
+}
+
+func TestCommentEditForbiddenForNonOwner(t *testing.T) {
+	deps := newTestDeps(t)
+	defer deps.DB.Close()
+
+	owner := createUser(t, deps.UserRepo, "c1", "user")
+	other := createUser(t, deps.UserRepo, "c2", "user")
+	ownerToken, _ := deps.AuthService.GenerateJWT(owner.ID, "", owner.Username, owner.Role)
+	otherToken, _ := deps.AuthService.GenerateJWT(other.ID, "", other.Username, other.Role)
+
+	postBody := []byte(`{"title":"hi","body":"body"}`)
+	req, _ := http.NewRequest("POST", "/api/v1/posts", bytes.NewReader(postBody))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+ownerToken)
+	w := doRequest(t, deps.Router, req)
+	require.Equal(t, http.StatusCreated, w.Code)
+	var post models.PlatformPost
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &post))
+
+	commentBody := []byte(`{"body":"comment"}`)
+	req, _ = http.NewRequest("POST", "/api/v1/posts/"+fmt.Sprint(post.ID)+"/comments", bytes.NewReader(commentBody))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+ownerToken)
+	w = doRequest(t, deps.Router, req)
+	require.Equal(t, http.StatusCreated, w.Code)
+	var comment models.PostComment
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &comment))
+
+	updateBody := []byte(`{"body":"hack"}`)
+	req, _ = http.NewRequest("PUT", "/api/v1/comments/"+fmt.Sprint(comment.ID), bytes.NewReader(updateBody))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+otherToken)
+	w = doRequest(t, deps.Router, req)
+	require.Equal(t, http.StatusForbidden, w.Code)
+}
+
+func TestAdminPromotionAndAddModerator(t *testing.T) {
+	deps := newTestDeps(t)
+	defer deps.DB.Close()
+
+	admin := createUser(t, deps.UserRepo, "admin", "admin")
+	user := createUser(t, deps.UserRepo, "target", "user")
+	adminToken, _ := deps.AuthService.GenerateJWT(admin.ID, "", admin.Username, admin.Role)
+
+	// Promote user to moderator
+	body := []byte(`{"role":"moderator"}`)
+	req, _ := http.NewRequest("POST", "/api/v1/admin/users/"+fmt.Sprint(user.ID)+"/role", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+adminToken)
+	w := doRequest(t, deps.Router, req)
+	require.Equal(t, http.StatusOK, w.Code)
+
+	// Add as subreddit moderator
+	modBody := []byte(`{"user_id":` + fmt.Sprint(user.ID) + `}`)
+	req, _ = http.NewRequest("POST", "/api/v1/admin/subreddits/general/moderators", bytes.NewReader(modBody))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+adminToken)
+	w = doRequest(t, deps.Router, req)
+	require.Equal(t, http.StatusCreated, w.Code)
+	ok, err := deps.ModRepo.IsModerator(context.Background(), 1, user.ID)
+	require.NoError(t, err)
+	require.True(t, ok)
+}
+
+func TestMediaUploadValidation(t *testing.T) {
+	deps := newTestDeps(t)
+	defer deps.DB.Close()
+
+	user := createUser(t, deps.UserRepo, "media", "user")
+	token, _ := deps.AuthService.GenerateJWT(user.ID, "", user.Username, user.Role)
+
+	var b bytes.Buffer
+	writer := multipart.NewWriter(&b)
+	part, _ := writer.CreateFormFile("file", "bad.txt")
+	part.Write([]byte("not an image"))
+	writer.Close()
+
+	req, _ := http.NewRequest("POST", "/api/v1/media/upload", &b)
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+
+	w := doRequest(t, deps.Router, req)
+	require.Equal(t, http.StatusBadRequest, w.Code)
+	require.True(t, strings.Contains(w.Body.String(), "Unsupported file type"))
 }
 
 func TestReportsRoleEnforcement(t *testing.T) {
