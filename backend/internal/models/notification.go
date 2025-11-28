@@ -2,10 +2,12 @@ package models
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -44,7 +46,6 @@ func (r *NotificationRepository) Create(ctx context.Context, notification *Notif
 			actor_id, milestone_count, votes_per_hour, message
 		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 		RETURNING id, created_at
-		ON CONFLICT ON CONSTRAINT unique_milestone_notification DO NOTHING
 	`
 
 	err := r.pool.QueryRow(
@@ -59,8 +60,13 @@ func (r *NotificationRepository) Create(ctx context.Context, notification *Notif
 		notification.Message,
 	).Scan(&notification.ID, &notification.CreatedAt)
 
-	if err == pgx.ErrNoRows {
-		// Duplicate notification, this is expected and not an error
+	if err == nil {
+		return nil
+	}
+
+	// If this is a duplicate milestone notification, ignore the error
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) && pgErr.SQLState() == "23505" {
 		return nil
 	}
 
