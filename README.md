@@ -15,9 +15,13 @@ ChatReddit allows users to browse Reddit content, discuss it with a growing comm
 - View Reddit media in slideshows while chatting
 
 ### Platform Social Layer
-- Create posts and comments on the platform
+- Create posts and comments in custom hubs
+- Upvote/downvote posts and comments
 - Unified feed showing both Reddit posts and platform posts
-- Find other users through posts and comments
+- Full-text search across posts, comments, users, and hubs
+- Real-time notifications for milestones, velocity, and replies
+- User blocking to filter unwanted content
+- Profile management (bio, avatar)
 - Username/password authentication (optional email)
 
 ### Encrypted Messaging
@@ -73,10 +77,15 @@ chatreddit/
 - User authentication (JWT)
 - User settings endpoints
 - Database schema for messaging, posts, and comments
+- Platform posts and comments with voting
+- Real-time notifications with WebSocket support
+- Full-text search across posts, comments, users, and hubs
+- User blocking system
+- Profile management
+- Rate limiting
 
 🚧 In Development:
 - Reddit public API integration
-- Platform posts and comments
 - Messaging system
 - Frontend application
 
@@ -145,9 +154,50 @@ DB_NAME=chatreddit_dev
 JWT_SECRET=your-secret-key-here
 ```
 
+## API Features
+
+### Notifications
+- Real-time notifications via WebSocket
+- Post milestone notifications (10, 50, 100, 500, 1000+ upvotes)
+- Comment milestone notifications
+- Velocity-based notifications for viral content
+- Comment reply notifications
+- Adaptive baselines for experienced users
+- 15-minute batching to reduce spam
+- Configurable notification preferences
+
+### Search
+- Full-text search using PostgreSQL tsvector
+- Search posts by title and body
+- Search comments by content
+- Search users by username and bio
+- Search hubs by name and description
+- Pagination support with limit/offset
+- Relevance ranking with ts_rank
+
+### User Blocking
+- Block users to hide their content
+- Unblock users to restore visibility
+- List all blocked users with timestamps
+- Prevent self-blocking
+- Idempotent blocking operations
+
+### Profile Management
+- Update bio (max 500 characters)
+- Update avatar URL (HTTPS required)
+- Change password with current password verification
+- Secure password hashing with bcrypt
+
+### Rate Limiting
+- Token bucket algorithm
+- 100 requests/minute for authenticated users
+- 20 requests/minute for anonymous users
+- Per-user and per-IP tracking
+
 ## Documentation
 
 Comprehensive documentation available in `/docs`:
+- [API Documentation](backend/docs/API.md) - Complete REST API reference
 - [Overview & Roadmap](docs/roadmap/00-overview.md) - Complete project vision
 - [Phase 1 Features](docs/phase-lists/phase-1-features.md) - MVP feature list
 - [Architecture](docs/technical/architecture.md) - System design
