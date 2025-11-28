@@ -5,14 +5,15 @@ import (
 	"database/sql"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // PlatformPost represents a native post created by users
 type PlatformPost struct {
-	ID       int    `json:"id"`
-	AuthorID int    `json:"author_id"`
-	Author   *User  `json:"author,omitempty"` // Optional populated user info
+	ID       int   `json:"id"`
+	AuthorID int   `json:"author_id"`
+	Author   *User `json:"author,omitempty"` // Optional populated user info
 
 	// Post content
 	Title string  `json:"title"`
@@ -316,23 +317,84 @@ func (r *PlatformPostRepository) IncrementViewCount(ctx context.Context, postID 
 	return err
 }
 
-// Vote updates vote counts and score for a post
-func (r *PlatformPostRepository) Vote(ctx context.Context, postID int, isUpvote bool) error {
-	var query string
-	if isUpvote {
-		query = `
-			UPDATE platform_posts
-			SET upvotes = upvotes + 1, score = score + 1
-			WHERE id = $1
-		`
-	} else {
-		query = `
-			UPDATE platform_posts
-			SET downvotes = downvotes + 1, score = score - 1
-			WHERE id = $1
-		`
+// Vote records a user's vote and updates aggregate counts, preventing duplicates
+func (r *PlatformPostRepository) Vote(ctx context.Context, postID int, userID int, isUpvote bool) error {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	var existingIsUpvote bool
+	err = tx.QueryRow(ctx, "SELECT is_upvote FROM post_votes WHERE post_id = $1 AND user_id = $2", postID, userID).Scan(&existingIsUpvote)
+	if err != nil && err != pgx.ErrNoRows {
+		return err
 	}
 
-	_, err := r.pool.Exec(ctx, query, postID)
-	return err
+	switch {
+	case err == pgx.ErrNoRows:
+		// New vote
+		if _, err := tx.Exec(ctx, `
+			INSERT INTO post_votes (post_id, user_id, is_upvote)
+			VALUES ($1, $2, $3)
+		`, postID, userID, isUpvote); err != nil {
+			return err
+		}
+
+		if isUpvote {
+			if _, err := tx.Exec(ctx, `
+				UPDATE platform_posts
+				SET upvotes = upvotes + 1, score = score + 1
+				WHERE id = $1
+			`, postID); err != nil {
+				return err
+			}
+		} else {
+			if _, err := tx.Exec(ctx, `
+				UPDATE platform_posts
+				SET downvotes = downvotes + 1, score = score - 1
+				WHERE id = $1
+			`, postID); err != nil {
+				return err
+			}
+		}
+	case existingIsUpvote == isUpvote:
+		// Duplicate same-direction vote: no-op
+		return tx.Commit(ctx)
+	default:
+		// Toggle vote direction
+		if _, err := tx.Exec(ctx, `
+			UPDATE post_votes
+			SET is_upvote = $3, created_at = CURRENT_TIMESTAMP
+			WHERE post_id = $1 AND user_id = $2
+		`, postID, userID, isUpvote); err != nil {
+			return err
+		}
+
+		if isUpvote {
+			// Down -> Up
+			if _, err := tx.Exec(ctx, `
+				UPDATE platform_posts
+				SET upvotes = upvotes + 1,
+				    downvotes = GREATEST(downvotes - 1, 0),
+				    score = score + 2
+				WHERE id = $1
+			`, postID); err != nil {
+				return err
+			}
+		} else {
+			// Up -> Down
+			if _, err := tx.Exec(ctx, `
+				UPDATE platform_posts
+				SET downvotes = downvotes + 1,
+				    upvotes = GREATEST(upvotes - 1, 0),
+				    score = score - 2
+				WHERE id = $1
+			`, postID); err != nil {
+				return err
+			}
+		}
+	}
+
+	return tx.Commit(ctx)
 }

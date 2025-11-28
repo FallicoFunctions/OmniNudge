@@ -230,7 +230,7 @@ func (h *PostsHandler) DeletePost(c *gin.Context) {
 // VotePost handles POST /api/v1/posts/:id/vote
 func (h *PostsHandler) VotePost(c *gin.Context) {
 	// Get user ID from context
-	_, exists := c.Get("user_id")
+	userID, exists := c.Get("user_id")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
 		return
@@ -250,10 +250,7 @@ func (h *PostsHandler) VotePost(c *gin.Context) {
 		return
 	}
 
-	// TODO: Track user votes to prevent duplicate voting
-	// For now, just increment the vote count
-
-	if err := h.postRepo.Vote(c.Request.Context(), postID, req.IsUpvote); err != nil {
+	if err := h.postRepo.Vote(c.Request.Context(), postID, userID.(int), req.IsUpvote); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to vote on post", "details": err.Error()})
 		return
 	}

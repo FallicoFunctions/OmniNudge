@@ -278,7 +278,7 @@ func (h *CommentsHandler) DeleteComment(c *gin.Context) {
 // VoteComment handles POST /api/v1/comments/:id/vote
 func (h *CommentsHandler) VoteComment(c *gin.Context) {
 	// Get user ID from context
-	_, exists := c.Get("user_id")
+	userID, exists := c.Get("user_id")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
 		return
@@ -298,10 +298,7 @@ func (h *CommentsHandler) VoteComment(c *gin.Context) {
 		return
 	}
 
-	// TODO: Track user votes to prevent duplicate voting
-	// For now, just increment the vote count
-
-	if err := h.commentRepo.Vote(c.Request.Context(), commentID, req.IsUpvote); err != nil {
+	if err := h.commentRepo.Vote(c.Request.Context(), commentID, userID.(int), req.IsUpvote); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to vote on comment", "details": err.Error()})
 		return
 	}
