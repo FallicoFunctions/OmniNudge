@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"time"
 
@@ -148,6 +149,7 @@ func (s *BaselineCalculatorService) calculateAvgVotesPerHour(
 	contentType string,
 	windowDays int,
 ) (float64, error) {
+	interval := fmt.Sprintf("%d days", windowDays)
 	query := `
 		WITH content_votes AS (
 			SELECT
@@ -158,7 +160,7 @@ func (s *BaselineCalculatorService) calculateAvgVotesPerHour(
 			FROM vote_activity
 			WHERE author_id = $1
 			AND content_type = $2
-			AND created_at >= NOW() - ($3 || ' days')::INTERVAL
+			AND created_at >= NOW() - $3::INTERVAL
 			GROUP BY content_id
 		),
 		hourly_rates AS (
@@ -181,7 +183,7 @@ func (s *BaselineCalculatorService) calculateAvgVotesPerHour(
 	`
 
 	var avgVPH float64
-	err := s.pool.QueryRow(ctx, query, userID, contentType, windowDays).Scan(&avgVPH)
+	err := s.pool.QueryRow(ctx, query, userID, contentType, interval).Scan(&avgVPH)
 	return avgVPH, err
 }
 

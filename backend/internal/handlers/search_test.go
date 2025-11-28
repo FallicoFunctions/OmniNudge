@@ -3,9 +3,12 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/chatreddit/backend/internal/database"
 	"github.com/chatreddit/backend/internal/models"
@@ -13,6 +16,16 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+var (
+	searchTestSuffix  = time.Now().UnixNano()
+	searchTestCounter int64
+)
+
+func uniqueSearchName(base string) string {
+	id := atomic.AddInt64(&searchTestCounter, 1)
+	return fmt.Sprintf("%s_%d_%d", base, searchTestSuffix, id)
+}
 
 func setupSearchHandlerTest(t *testing.T) (*SearchHandler, *database.Database, func()) {
 	db, err := database.NewTest()
@@ -40,7 +53,7 @@ func TestSearchPosts(t *testing.T) {
 	// Create test data
 	userRepo := models.NewUserRepository(db.Pool)
 	user := &models.User{
-		Username:     "author",
+		Username:     uniqueSearchName("author"),
 		PasswordHash: "test_hash",
 	}
 	err := userRepo.Create(ctx, user)
@@ -48,7 +61,7 @@ func TestSearchPosts(t *testing.T) {
 
 	hubRepo := models.NewHubRepository(db.Pool)
 	hub := &models.Hub{
-		Name:      "test_hub",
+		Name:      uniqueSearchName("test_hub"),
 		CreatedBy: &user.ID,
 	}
 	err = hubRepo.Create(ctx, hub)
@@ -93,7 +106,7 @@ func TestSearchComments(t *testing.T) {
 	// Create test data
 	userRepo := models.NewUserRepository(db.Pool)
 	user := &models.User{
-		Username:     "commenter",
+		Username:     uniqueSearchName("commenter"),
 		PasswordHash: "test_hash",
 	}
 	err := userRepo.Create(ctx, user)
@@ -101,7 +114,7 @@ func TestSearchComments(t *testing.T) {
 
 	hubRepo := models.NewHubRepository(db.Pool)
 	hub := &models.Hub{
-		Name:      "test_hub",
+		Name:      uniqueSearchName("test_hub"),
 		CreatedBy: &user.ID,
 	}
 	err = hubRepo.Create(ctx, hub)
@@ -154,7 +167,7 @@ func TestSearchUsers(t *testing.T) {
 	userRepo := models.NewUserRepository(db.Pool)
 	bioText := "Software engineer interested in machine learning"
 	user := &models.User{
-		Username:     "mlexpert",
+		Username:     uniqueSearchName("mlexpert"),
 		PasswordHash: "test_hash",
 		Bio:          &bioText,
 	}
@@ -189,7 +202,7 @@ func TestSearchHubs(t *testing.T) {
 	// Create test user
 	userRepo := models.NewUserRepository(db.Pool)
 	user := &models.User{
-		Username:     "creator",
+		Username:     uniqueSearchName("creator"),
 		PasswordHash: "test_hash",
 	}
 	err := userRepo.Create(ctx, user)
@@ -199,7 +212,7 @@ func TestSearchHubs(t *testing.T) {
 	hubRepo := models.NewHubRepository(db.Pool)
 	description := "A community for discussing artificial intelligence and deep learning"
 	hub := &models.Hub{
-		Name:        "ai_enthusiasts",
+		Name:        uniqueSearchName("ai_enthusiasts"),
 		Description: &description,
 		CreatedBy:   &user.ID,
 	}
@@ -248,7 +261,7 @@ func TestSearchPagination(t *testing.T) {
 	// Create test user and hub
 	userRepo := models.NewUserRepository(db.Pool)
 	user := &models.User{
-		Username:     "author",
+		Username:     uniqueSearchName("author"),
 		PasswordHash: "test_hash",
 	}
 	err := userRepo.Create(ctx, user)
@@ -256,7 +269,7 @@ func TestSearchPagination(t *testing.T) {
 
 	hubRepo := models.NewHubRepository(db.Pool)
 	hub := &models.Hub{
-		Name:      "test_hub",
+		Name:      uniqueSearchName("test_hub"),
 		CreatedBy: &user.ID,
 	}
 	err = hubRepo.Create(ctx, hub)
