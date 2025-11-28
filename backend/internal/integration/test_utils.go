@@ -112,7 +112,7 @@ func newTestDeps(t *testing.T) *TestDeps {
 	redditHandler := handlers.NewRedditHandler(services.NewRedditClient(cfg.Reddit.UserAgent, services.NoopCache{}, 0))
 	conversationsHandler := handlers.NewConversationsHandler(conversationRepo, messageRepo, userRepo)
 	messagesHandler := handlers.NewMessagesHandler(messageRepo, conversationRepo, hub)
-	usersHandler := handlers.NewUsersHandler(userRepo, postRepo, commentRepo)
+	usersHandler := handlers.NewUsersHandler(userRepo, postRepo, commentRepo, nil)
 	mediaHandler := handlers.NewMediaHandler(models.NewMediaFileRepository(db.Pool))
 	hubsHandler := handlers.NewHubsHandler(hubRepo, postRepo, modRepo)
 	moderationHandler := handlers.NewModerationHandler(reportRepo, modRepo)
