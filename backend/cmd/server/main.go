@@ -50,6 +50,7 @@ func main() {
 	commentRepo := models.NewPostCommentRepository(db.Pool)
 	conversationRepo := models.NewConversationRepository(db.Pool)
 	messageRepo := models.NewMessageRepository(db.Pool)
+	mediaRepo := models.NewMediaFileRepository(db.Pool)
 
 	// Initialize WebSocket hub
 	hub := websocket.NewHub()
@@ -73,10 +74,13 @@ func main() {
 	redditHandler := handlers.NewRedditHandler(redditClient)
 	conversationsHandler := handlers.NewConversationsHandler(conversationRepo, messageRepo, userRepo)
 	messagesHandler := handlers.NewMessagesHandler(messageRepo, conversationRepo, hub)
+	usersHandler := handlers.NewUsersHandler(userRepo, postRepo, commentRepo)
+	mediaHandler := handlers.NewMediaHandler(mediaRepo)
 	wsHandler := handlers.NewWebSocketHandler(hub)
 
 	// Setup Gin router
 	router := gin.Default()
+	router.Static("/uploads", "./uploads")
 
 	// Apply CORS middleware
 	router.Use(middleware.CORS())
@@ -147,6 +151,14 @@ func main() {
 			reddit.GET("/search", redditHandler.SearchPosts)
 		}
 
+		// Public user profile routes
+		users := api.Group("/users")
+		{
+			users.GET("/:username", usersHandler.GetUserProfile)
+			users.GET("/:username/posts", usersHandler.GetUserPosts)
+			users.GET("/:username/comments", usersHandler.GetUserComments)
+		}
+
 		// Protected routes (auth required)
 		protected := api.Group("")
 		protected.Use(middleware.AuthRequired(authService))
@@ -180,6 +192,9 @@ func main() {
 			protected.GET("/conversations/:conversationId/messages", messagesHandler.GetMessages)
 			protected.POST("/conversations/:conversationId/read", messagesHandler.MarkAsRead)
 			protected.DELETE("/messages/:id", messagesHandler.DeleteMessage)
+
+			// Media upload
+			protected.POST("/media/upload", mediaHandler.UploadMedia)
 
 			// WebSocket endpoint for real-time messaging
 			protected.GET("/ws", wsHandler.HandleWebSocket)
