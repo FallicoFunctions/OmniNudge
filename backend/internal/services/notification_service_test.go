@@ -2,6 +2,8 @@ package services
 
 import (
 	"context"
+	"fmt"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -11,6 +13,16 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+var (
+	notificationTestSuffix  = time.Now().UnixNano()
+	notificationTestCounter int64
+)
+
+func uniqueNotificationName(base string) string {
+	id := atomic.AddInt64(&notificationTestCounter, 1)
+	return fmt.Sprintf("%s_%d_%d", base, notificationTestSuffix, id)
+}
 
 func setupNotificationTest(t *testing.T) (*NotificationService, *database.Database, func()) {
 	db, err := database.NewTest()
@@ -105,9 +117,9 @@ func TestMilestoneNotifications(t *testing.T) {
 	ctx := context.Background()
 
 	// Create test users
-	authorID := createTestUser(t, db, "author")
-	creatorID := createTestUser(t, db, "creator")
-	hubID := createTestHub(t, db, "test_hub", creatorID)
+	authorID := createTestUser(t, db, uniqueNotificationName("author"))
+	creatorID := createTestUser(t, db, uniqueNotificationName("creator"))
+	hubID := createTestHub(t, db, uniqueNotificationName("test_hub"), creatorID)
 	postID := createTestPost(t, db, authorID, hubID)
 
 	// Enable milestone notifications
@@ -155,10 +167,10 @@ func TestCommentReplyNotification(t *testing.T) {
 	ctx := context.Background()
 
 	// Create test users
-	parentAuthorID := createTestUser(t, db, "parent_author")
-	replyAuthorID := createTestUser(t, db, "reply_author")
-	creatorID := createTestUser(t, db, "creator")
-	hubID := createTestHub(t, db, "test_hub", creatorID)
+	parentAuthorID := createTestUser(t, db, uniqueNotificationName("parent_author"))
+	replyAuthorID := createTestUser(t, db, uniqueNotificationName("reply_author"))
+	creatorID := createTestUser(t, db, uniqueNotificationName("creator"))
+	hubID := createTestHub(t, db, uniqueNotificationName("test_hub"), creatorID)
 	postID := createTestPost(t, db, parentAuthorID, hubID)
 
 	// Create parent comment
@@ -196,9 +208,9 @@ func TestNotificationSettings(t *testing.T) {
 	ctx := context.Background()
 
 	// Create test user with notifications disabled
-	authorID := createTestUser(t, db, "author")
-	creatorID := createTestUser(t, db, "creator")
-	hubID := createTestHub(t, db, "test_hub", creatorID)
+	authorID := createTestUser(t, db, uniqueNotificationName("author"))
+	creatorID := createTestUser(t, db, uniqueNotificationName("creator"))
+	hubID := createTestHub(t, db, uniqueNotificationName("test_hub"), creatorID)
 	postID := createTestPost(t, db, authorID, hubID)
 
 	settingsRepo := models.NewUserSettingsRepository(db.Pool)
@@ -227,9 +239,9 @@ func TestBatchedNotifications(t *testing.T) {
 	ctx := context.Background()
 
 	// Create test users
-	authorID := createTestUser(t, db, "author")
-	creatorID := createTestUser(t, db, "creator")
-	hubID := createTestHub(t, db, "test_hub", creatorID)
+	authorID := createTestUser(t, db, uniqueNotificationName("author"))
+	creatorID := createTestUser(t, db, uniqueNotificationName("creator"))
+	hubID := createTestHub(t, db, uniqueNotificationName("test_hub"), creatorID)
 	postID := createTestPost(t, db, authorID, hubID)
 
 	// Enable velocity notifications
@@ -266,9 +278,9 @@ func TestSelfReplyNoNotification(t *testing.T) {
 	ctx := context.Background()
 
 	// Create test user
-	userID := createTestUser(t, db, "user")
-	creatorID := createTestUser(t, db, "creator")
-	hubID := createTestHub(t, db, "test_hub", creatorID)
+	userID := createTestUser(t, db, uniqueNotificationName("user"))
+	creatorID := createTestUser(t, db, uniqueNotificationName("creator"))
+	hubID := createTestHub(t, db, uniqueNotificationName("test_hub"), creatorID)
 	postID := createTestPost(t, db, userID, hubID)
 
 	// Create parent comment

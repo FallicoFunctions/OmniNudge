@@ -4,9 +4,12 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/chatreddit/backend/internal/database"
 	"github.com/chatreddit/backend/internal/models"
@@ -15,7 +18,17 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func setupBlockingHandlerTest(t *testing.T) (*BlockingHandler, *database.Database, int, int, func()) {
+var (
+	blockTestSuffix  = time.Now().UnixNano()
+	blockTestCounter int64
+)
+
+func uniqueBlockName(base string) string {
+	id := atomic.AddInt64(&blockTestCounter, 1)
+	return fmt.Sprintf("%s_%d_%d", base, blockTestSuffix, id)
+}
+
+func setupBlockingHandlerTest(t *testing.T) (*BlockingHandler, *database.Database, int, int, string, string, func()) {
 	db, err := database.NewTest()
 	require.NoError(t, err)
 
@@ -26,14 +39,14 @@ func setupBlockingHandlerTest(t *testing.T) (*BlockingHandler, *database.Databas
 	// Create test users
 	userRepo := models.NewUserRepository(db.Pool)
 	blocker := &models.User{
-		Username:     "blocker",
+		Username:     uniqueBlockName("blocker"),
 		PasswordHash: "test_hash",
 	}
 	err = userRepo.Create(ctx, blocker)
 	require.NoError(t, err)
 
 	blocked := &models.User{
-		Username:     "blocked_user",
+		Username:     uniqueBlockName("blocked_user"),
 		PasswordHash: "test_hash",
 	}
 	err = userRepo.Create(ctx, blocked)
@@ -45,11 +58,11 @@ func setupBlockingHandlerTest(t *testing.T) (*BlockingHandler, *database.Databas
 		db.Close()
 	}
 
-	return handler, db, blocker.ID, blocked.ID, cleanup
+	return handler, db, blocker.ID, blocked.ID, blocker.Username, blocked.Username, cleanup
 }
 
 func TestBlockUser(t *testing.T) {
-	handler, _, blockerID, _, cleanup := setupBlockingHandlerTest(t)
+	handler, _, blockerID, blockedID, _, blockedUsername, cleanup := setupBlockingHandlerTest(t)
 	defer cleanup()
 
 	// Create request
@@ -59,7 +72,7 @@ func TestBlockUser(t *testing.T) {
 		handler.BlockUser(c)
 	})
 
-	reqBody := map[string]string{"username": "blocked_user"}
+	reqBody := map[string]string{"username": blockedUsername}
 	jsonBody, _ := json.Marshal(reqBody)
 	req := httptest.NewRequest("POST", "/block", bytes.NewBuffer(jsonBody))
 	req.Header.Set("Content-Type", "application/json")
@@ -76,7 +89,7 @@ func TestBlockUser(t *testing.T) {
 }
 
 func TestBlockSelf(t *testing.T) {
-	handler, _, blockerID, _, cleanup := setupBlockingHandlerTest(t)
+	handler, _, blockerID, _, blockerUsername, _, cleanup := setupBlockingHandlerTest(t)
 	defer cleanup()
 
 	// Create request to block self
@@ -86,7 +99,7 @@ func TestBlockSelf(t *testing.T) {
 		handler.BlockUser(c)
 	})
 
-	reqBody := map[string]string{"username": "blocker"}
+	reqBody := map[string]string{"username": blockerUsername}
 	jsonBody, _ := json.Marshal(reqBody)
 	req := httptest.NewRequest("POST", "/block", bytes.NewBuffer(jsonBody))
 	req.Header.Set("Content-Type", "application/json")
@@ -103,7 +116,7 @@ func TestBlockSelf(t *testing.T) {
 }
 
 func TestUnblockUser(t *testing.T) {
-	handler, db, blockerID, blockedID, cleanup := setupBlockingHandlerTest(t)
+	handler, db, blockerID, blockedID, _, blockedUsername, cleanup := setupBlockingHandlerTest(t)
 	defer cleanup()
 
 	ctx := context.Background()
@@ -122,7 +135,7 @@ func TestUnblockUser(t *testing.T) {
 		handler.UnblockUser(c)
 	})
 
-	req := httptest.NewRequest("DELETE", "/block/blocked_user", nil)
+	req := httptest.NewRequest("DELETE", "/block/"+blockedUsername, nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
@@ -136,7 +149,7 @@ func TestUnblockUser(t *testing.T) {
 }
 
 func TestUnblockNonBlockedUser(t *testing.T) {
-	handler, _, blockerID, _, cleanup := setupBlockingHandlerTest(t)
+	handler, _, blockerID, _, _, blockedUsername, cleanup := setupBlockingHandlerTest(t)
 	defer cleanup()
 
 	// Create request to unblock user that was never blocked
@@ -146,7 +159,7 @@ func TestUnblockNonBlockedUser(t *testing.T) {
 		handler.UnblockUser(c)
 	})
 
-	req := httptest.NewRequest("DELETE", "/block/blocked_user", nil)
+	req := httptest.NewRequest("DELETE", "/block/"+blockedUsername, nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
@@ -160,7 +173,7 @@ func TestUnblockNonBlockedUser(t *testing.T) {
 }
 
 func TestGetBlockedUsers(t *testing.T) {
-	handler, db, blockerID, blockedID, cleanup := setupBlockingHandlerTest(t)
+	handler, db, blockerID, blockedID, _, blockedUsername, cleanup := setupBlockingHandlerTest(t)
 	defer cleanup()
 
 	ctx := context.Background()
@@ -175,7 +188,7 @@ func TestGetBlockedUsers(t *testing.T) {
 	// Create another blocked user
 	userRepo := models.NewUserRepository(db.Pool)
 	anotherBlocked := &models.User{
-		Username:     "another_blocked",
+		Username:     uniqueBlockName("another_blocked"),
 		PasswordHash: "test_hash",
 	}
 	err = userRepo.Create(ctx, anotherBlocked)
@@ -210,7 +223,7 @@ func TestGetBlockedUsers(t *testing.T) {
 }
 
 func TestBlockUserIdempotence(t *testing.T) {
-	handler, db, blockerID, blockedID, cleanup := setupBlockingHandlerTest(t)
+	handler, db, blockerID, blockedID, _, blockedUsername, cleanup := setupBlockingHandlerTest(t)
 	defer cleanup()
 
 	ctx := context.Background()
@@ -222,7 +235,7 @@ func TestBlockUserIdempotence(t *testing.T) {
 		handler.BlockUser(c)
 	})
 
-	reqBody := map[string]string{"username": "blocked_user"}
+	reqBody := map[string]string{"username": blockedUsername}
 	jsonBody, _ := json.Marshal(reqBody)
 	req := httptest.NewRequest("POST", "/block", bytes.NewBuffer(jsonBody))
 	req.Header.Set("Content-Type", "application/json")

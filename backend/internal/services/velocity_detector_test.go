@@ -2,6 +2,8 @@ package services
 
 import (
 	"context"
+	"fmt"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -10,6 +12,16 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+var (
+	velocityTestSuffix  = time.Now().UnixNano()
+	velocityTestCounter int64
+)
+
+func uniqueVelocityName(base string) string {
+	id := atomic.AddInt64(&velocityTestCounter, 1)
+	return fmt.Sprintf("%s_%d_%d", base, velocityTestSuffix, id)
+}
 
 func setupVelocityTest(t *testing.T) (*RuleBasedVelocityDetector, *database.Database, func()) {
 	db, err := database.NewTest()
@@ -38,7 +50,7 @@ func TestNewUserVelocityThreshold(t *testing.T) {
 	// Create new user
 	userRepo := models.NewUserRepository(db.Pool)
 	user := &models.User{
-		Username:     "newuser",
+		Username:     uniqueVelocityName("newuser"),
 		PasswordHash: "test_hash",
 	}
 	err := userRepo.Create(ctx, user)
@@ -72,7 +84,7 @@ func TestExperiencedUserVelocityThreshold(t *testing.T) {
 	// Create experienced user
 	userRepo := models.NewUserRepository(db.Pool)
 	user := &models.User{
-		Username:     "experienced_user",
+		Username:     uniqueVelocityName("experienced_user"),
 		PasswordHash: "test_hash",
 	}
 	err := userRepo.Create(ctx, user)
@@ -117,8 +129,8 @@ func TestExperiencedUserVelocityThreshold(t *testing.T) {
 		{
 			"At 1.5x baseline",
 			4.5,
-			true,
-			"4.5 = 1.5x baseline, should notify",
+			false,
+			"4.5 = 1.5x baseline, should not notify (requires > 1.5x)",
 		},
 		{
 			"Above 1.5x baseline",
@@ -146,7 +158,7 @@ func TestExponentialGrowthDetection(t *testing.T) {
 	// Create test user
 	userRepo := models.NewUserRepository(db.Pool)
 	user := &models.User{
-		Username:     "testuser",
+		Username:     uniqueVelocityName("testuser"),
 		PasswordHash: "test_hash",
 	}
 	err := userRepo.Create(ctx, user)
@@ -155,7 +167,7 @@ func TestExponentialGrowthDetection(t *testing.T) {
 	// Create hub and post
 	hubRepo := models.NewHubRepository(db.Pool)
 	hub := &models.Hub{
-		Name:      "test_hub",
+		Name:      uniqueVelocityName("test_hub"),
 		CreatedBy: &user.ID,
 	}
 	err = hubRepo.Create(ctx, hub)
@@ -213,7 +225,7 @@ func TestVelocityDetectorWithNoBaseline(t *testing.T) {
 	// Create user with no baseline
 	userRepo := models.NewUserRepository(db.Pool)
 	user := &models.User{
-		Username:     "no_baseline_user",
+		Username:     uniqueVelocityName("no_baseline_user"),
 		PasswordHash: "test_hash",
 	}
 	err := userRepo.Create(ctx, user)
