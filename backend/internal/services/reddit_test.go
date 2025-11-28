@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"encoding/json"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"sync/atomic"
@@ -39,13 +40,16 @@ func (t *hostRewriteTransport) RoundTrip(req *http.Request) (*http.Response, err
 func TestRedditClientCachesFrontPage(t *testing.T) {
 	// Mock Reddit response
 	handlerCalls := int32(0)
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	ln, err := net.Listen("tcp4", "127.0.0.1:0")
+	if err != nil {
+		t.Skip("cannot open local listener, skipping cache test:", err)
+	}
+	ts := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		atomic.AddInt32(&handlerCalls, 1)
 		w.Header().Set("Content-Type", "application/json")
 		resp := RedditListing{
 			Kind: "Listing",
 		}
-		// Minimal children to keep payload small
 		resp.Data.Children = []struct {
 			Kind string     `json:"kind"`
 			Data RedditPost `json:"data"`
@@ -54,6 +58,8 @@ func TestRedditClientCachesFrontPage(t *testing.T) {
 		}
 		_ = json.NewEncoder(w).Encode(resp)
 	}))
+	ts.Listener = ln
+	ts.Start()
 	defer ts.Close()
 
 	cache := &mapCache{store: make(map[string]string)}
