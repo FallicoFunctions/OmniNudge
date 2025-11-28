@@ -198,6 +198,8 @@ func (h *CommentsHandler) UpdateComment(c *gin.Context) {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
 		return
 	}
+	role, _ := c.Get("role")
+	roleStr, _ := role.(string)
 
 	commentID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
@@ -218,7 +220,7 @@ func (h *CommentsHandler) UpdateComment(c *gin.Context) {
 	}
 
 	// Verify user owns this comment
-	if existingComment.UserID != userID.(int) {
+	if existingComment.UserID != userID.(int) && roleStr != "moderator" && roleStr != "admin" {
 		c.JSON(http.StatusForbidden, gin.H{"error": "You can only edit your own comments"})
 		return
 	}
@@ -248,6 +250,8 @@ func (h *CommentsHandler) DeleteComment(c *gin.Context) {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
 		return
 	}
+	role, _ := c.Get("role")
+	roleStr, _ := role.(string)
 
 	commentID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
@@ -268,7 +272,7 @@ func (h *CommentsHandler) DeleteComment(c *gin.Context) {
 	}
 
 	// Verify user owns this comment
-	if existingComment.UserID != userID.(int) {
+	if existingComment.UserID != userID.(int) && roleStr != "moderator" && roleStr != "admin" {
 		c.JSON(http.StatusForbidden, gin.H{"error": "You can only delete your own comments"})
 		return
 	}
