@@ -81,7 +81,7 @@ func main() {
 	redditHandler := handlers.NewRedditHandler(redditClient)
 	conversationsHandler := handlers.NewConversationsHandler(conversationRepo, messageRepo, userRepo)
 	messagesHandler := handlers.NewMessagesHandler(messageRepo, conversationRepo, hub)
-	usersHandler := handlers.NewUsersHandler(userRepo, postRepo, commentRepo)
+	usersHandler := handlers.NewUsersHandler(userRepo, postRepo, commentRepo, authService)
 	mediaHandler := handlers.NewMediaHandler(mediaRepo)
 	hubsHandler := handlers.NewHubsHandler(hubRepo, postRepo, hubModRepo)
 	moderationHandler := handlers.NewModerationHandler(reportRepo, hubModRepo)
