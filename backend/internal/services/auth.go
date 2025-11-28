@@ -110,15 +110,17 @@ type JWTClaims struct {
 	UserID   int    `json:"user_id"`
 	RedditID string `json:"reddit_id"`
 	Username string `json:"username"`
+	Role     string `json:"role"`
 	jwt.RegisteredClaims
 }
 
 // GenerateJWT creates a new JWT token for a user
-func (s *AuthService) GenerateJWT(userID int, redditID, username string) (string, error) {
+func (s *AuthService) GenerateJWT(userID int, redditID, username, role string) (string, error) {
 	claims := JWTClaims{
 		UserID:   userID,
 		RedditID: redditID,
 		Username: username,
+		Role:     role,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(7 * 24 * time.Hour)), // 7 days
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
@@ -198,7 +200,7 @@ func (s *AuthService) Register(ctx context.Context, userRepo *models.UserReposit
 	}
 
 	// Generate JWT
-	token, err := s.GenerateJWT(user.ID, "", user.Username)
+	token, err := s.GenerateJWT(user.ID, "", user.Username, user.Role)
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to generate token: %w", err)
 	}
@@ -228,7 +230,7 @@ func (s *AuthService) Login(ctx context.Context, userRepo *models.UserRepository
 		redditID = *user.RedditID
 	}
 
-	token, err := s.GenerateJWT(user.ID, redditID, user.Username)
+	token, err := s.GenerateJWT(user.ID, redditID, user.Username, user.Role)
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to generate token: %w", err)
 	}

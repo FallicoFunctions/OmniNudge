@@ -1,0 +1,2 @@
+DROP TABLE IF EXISTS subreddit_moderators;
+ALTER TABLE users DROP COLUMN IF EXISTS role;

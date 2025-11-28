@@ -10,10 +10,10 @@ import (
 
 // User represents a user in the system
 type User struct {
-	ID           int        `json:"id"`
-	Username     string     `json:"username"`
-	Email        *string    `json:"email,omitempty"`
-	PasswordHash string     `json:"-"` // Never expose password hash in JSON
+	ID           int     `json:"id"`
+	Username     string  `json:"username"`
+	Email        *string `json:"email,omitempty"`
+	PasswordHash string  `json:"-"` // Never expose password hash in JSON
 
 	// Reddit integration (optional)
 	RedditID       *string    `json:"reddit_id,omitempty"`
@@ -29,6 +29,7 @@ type User struct {
 	AvatarURL *string `json:"avatar_url,omitempty"`
 	Bio       *string `json:"bio,omitempty"`
 	Karma     int     `json:"karma"`
+	Role      string  `json:"role"` // user, moderator, admin
 
 	// Timestamps
 	CreatedAt time.Time `json:"created_at"`
@@ -50,7 +51,7 @@ func (r *UserRepository) Create(ctx context.Context, user *User) error {
 	query := `
 		INSERT INTO users (username, email, password_hash, avatar_url, bio)
 		VALUES ($1, $2, $3, $4, $5)
-		RETURNING id, created_at, last_seen
+		RETURNING id, created_at, last_seen, role
 	`
 
 	return r.pool.QueryRow(ctx, query,
@@ -59,7 +60,7 @@ func (r *UserRepository) Create(ctx context.Context, user *User) error {
 		user.PasswordHash,
 		user.AvatarURL,
 		user.Bio,
-	).Scan(&user.ID, &user.CreatedAt, &user.LastSeen)
+	).Scan(&user.ID, &user.CreatedAt, &user.LastSeen, &user.Role)
 }
 
 // CreateOrUpdateFromReddit creates or updates a user from Reddit OAuth (for future use)
@@ -76,7 +77,7 @@ func (r *UserRepository) CreateOrUpdateFromReddit(ctx context.Context, user *Use
 			karma = EXCLUDED.karma,
 			avatar_url = EXCLUDED.avatar_url,
 			last_seen = CURRENT_TIMESTAMP
-		RETURNING id, created_at, last_seen
+		RETURNING id, created_at, last_seen, role
 	`
 
 	return r.pool.QueryRow(ctx, query,
@@ -88,7 +89,7 @@ func (r *UserRepository) CreateOrUpdateFromReddit(ctx context.Context, user *Use
 		user.TokenExpiresAt,
 		user.Karma,
 		user.AvatarURL,
-	).Scan(&user.ID, &user.CreatedAt, &user.LastSeen)
+	).Scan(&user.ID, &user.CreatedAt, &user.LastSeen, &user.Role)
 }
 
 // GetByID retrieves a user by their internal ID
@@ -96,7 +97,7 @@ func (r *UserRepository) GetByID(ctx context.Context, id int) (*User, error) {
 	user := &User{}
 
 	query := `
-		SELECT id, username, email, reddit_id, reddit_username, public_key, avatar_url, bio, karma, created_at, last_seen
+		SELECT id, username, email, reddit_id, reddit_username, public_key, avatar_url, bio, karma, role, created_at, last_seen
 		FROM users WHERE id = $1
 	`
 
@@ -110,6 +111,7 @@ func (r *UserRepository) GetByID(ctx context.Context, id int) (*User, error) {
 		&user.AvatarURL,
 		&user.Bio,
 		&user.Karma,
+		&user.Role,
 		&user.CreatedAt,
 		&user.LastSeen,
 	)
@@ -129,7 +131,7 @@ func (r *UserRepository) GetByUsername(ctx context.Context, username string) (*U
 	user := &User{}
 
 	query := `
-		SELECT id, username, email, password_hash, reddit_id, reddit_username, public_key, avatar_url, bio, karma, created_at, last_seen
+		SELECT id, username, email, password_hash, reddit_id, reddit_username, public_key, avatar_url, bio, karma, role, created_at, last_seen
 		FROM users WHERE username = $1
 	`
 
@@ -144,6 +146,7 @@ func (r *UserRepository) GetByUsername(ctx context.Context, username string) (*U
 		&user.AvatarURL,
 		&user.Bio,
 		&user.Karma,
+		&user.Role,
 		&user.CreatedAt,
 		&user.LastSeen,
 	)
@@ -163,7 +166,7 @@ func (r *UserRepository) GetByRedditID(ctx context.Context, redditID string) (*U
 	user := &User{}
 
 	query := `
-		SELECT id, username, email, reddit_id, reddit_username, public_key, avatar_url, bio, karma, created_at, last_seen
+		SELECT id, username, email, reddit_id, reddit_username, public_key, avatar_url, bio, karma, role, created_at, last_seen
 		FROM users WHERE reddit_id = $1
 	`
 
@@ -177,6 +180,7 @@ func (r *UserRepository) GetByRedditID(ctx context.Context, redditID string) (*U
 		&user.AvatarURL,
 		&user.Bio,
 		&user.Karma,
+		&user.Role,
 		&user.CreatedAt,
 		&user.LastSeen,
 	)
