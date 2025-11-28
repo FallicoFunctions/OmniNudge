@@ -668,116 +668,57 @@ Health check endpoint.
 
 ## WebSocket API
 
-**Connection URL:** `wss://yoursite.com/ws`
-**Development:** `ws://localhost:8080/ws`
+**Connection URL:** `wss://yoursite.com/api/v1/ws`  
+**Development:** `ws://localhost:8080/api/v1/ws`
 
-**Authentication:**
-```
-ws://localhost:8080/ws?token=<JWT_TOKEN>
-```
+**Authentication:** send your JWT as an `Authorization: Bearer <token>` header when opening the socket. (The endpoint is behind the same auth middleware as other protected routes.)
 
 ### Connection Flow
 
 ```
-1. Client connects: ws://localhost:8080/ws?token=xyz
-2. Server validates JWT
-3. Server sends: {"type": "connected", "user_id": 1}
-4. Client and server exchange messages
-5. Server tracks online status in Redis
+1. Client opens ws://localhost:8080/api/v1/ws with Authorization header.
+2. Server validates JWT and registers the user in the hub.
+3. From here, the socket is used for:
+   - Receiving events: new_message, message_delivered, conversation_read, typing
+   - Sending events: typing (to show indicators to the other participant)
 ```
 
-### Message Format
+### Message Format (server → client)
 
-All WebSocket messages are JSON:
+All outbound messages are JSON with a consistent envelope:
 
 ```json
 {
-  "type": "message_type",
-  "data": { },
-  "timestamp": "2025-11-14T15:30:00Z"
+  "recipient_id": 2,
+  "type": "new_message",
+  "payload": { }
 }
 ```
+
+### Server → Client Events
+
+- `new_message`: payload is the full message object that was sent.
+- `message_delivered`: payload `{ "message_id": number, "conversation_id": number }`.
+- `conversation_read`: payload `{ "conversation_id": number, "reader_id": number }`.
+- `typing`: payload `{ "conversation_id": number, "user_id": number, "is_typing": boolean }`.
 
 ### Client → Server Events
 
-#### `message_send`
+Only typing indicators are handled on this socket. Messages are sent via the REST API (`POST /api/v1/messages`).
 
-Send a text message.
-
-```json
-{
-  "type": "message_send",
-  "data": {
-    "conversation_id": 1,
-    "recipient_id": 2,
-    "encrypted_content": "base64_encrypted_blob...",
-    "message_type": "text"
+- `typing`
+  ```json
+  {
+    "type": "typing",
+    "payload": {
+      "conversation_id": 1,
+      "recipient_id": 2,
+      "is_typing": true
+    }
   }
-}
-```
+  ```
 
----
-
-#### `typing_start`
-
-User started typing.
-
-```json
-{
-  "type": "typing_start",
-  "data": {
-    "conversation_id": 1
-  }
-}
-```
-
----
-
-#### `typing_stop`
-
-User stopped typing.
-
-```json
-{
-  "type": "typing_stop",
-  "data": {
-    "conversation_id": 1
-  }
-}
-```
-
----
-
-#### `message_read`
-
-Mark messages as read.
-
-```json
-{
-  "type": "message_read",
-  "data": {
-    "conversation_id": 1,
-    "message_id": 123
-  }
-}
-```
-
----
-
-#### `slideshow_start`
-
-Start a slideshow.
-
-```json
-{
-  "type": "slideshow_start",
-  "data": {
-    "conversation_id": 1,
-    "slideshow_type": "personal",
-    "media_urls": ["url1", "url2", "url3"]
-  }
-}
-```
+Send `is_typing: true` when the user starts typing and `false` when they stop. The server forwards this to `recipient_id` with the `typing` event shown above.
 
 ---
 
