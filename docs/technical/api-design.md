@@ -436,8 +436,8 @@ Upload media file(s).
 **Content-Type:** `multipart/form-data`
 
 **Form Data:**
-- `files`: One or more files
-- `conversation_id` (optional): Associate with conversation
+- `file`: File upload
+- `used_in_message_id` (optional): Associate with a message
 
 **Request:**
 ```
@@ -445,7 +445,7 @@ POST /api/v1/media/upload
 Content-Type: multipart/form-data; boundary=----WebKitFormBoundary...
 
 ------WebKitFormBoundary...
-Content-Disposition: form-data; name="files"; filename="yorkie.jpg"
+Content-Disposition: form-data; name="file"; filename="yorkie.jpg"
 Content-Type: image/jpeg
 
 [binary data]
@@ -455,21 +455,21 @@ Content-Type: image/jpeg
 **Response:**
 ```json
 {
-  "files": [
-    {
-      "id": 1,
-      "filename": "1699900000_abc123.jpg",
-      "original_filename": "yorkie.jpg",
-      "file_type": "image/jpeg",
-      "file_size": 245632,
-      "storage_url": "https://cdn.yoursite.com/images/1/1699900000_abc123.jpg",
-      "thumbnail_url": "https://cdn.yoursite.com/images/1/1699900000_abc123_thumb.jpg",
-      "width": 1920,
-      "height": 1080
-    }
-  ]
+  "id": 1,
+  "filename": "1699900000_abc123.jpg",
+  "original_filename": "yorkie.jpg",
+  "file_type": "image/jpeg",
+  "file_size": 245632,
+  "storage_url": "/uploads/1699900000_abc123.jpg",
+  "thumbnail_url": null,
+  "used_in_message_id": null
 }
 ```
+
+**Limits and Validation:**
+- Allowed types: JPEG, PNG, WebP, GIF, MP4, QuickTime, WebM
+- Max size: 25MB
+- Unsupported types or oversized files return `400 Bad Request`
 
 **Errors:**
 - `413 Payload Too Large`: File exceeds size limit (50MB)
