@@ -12,13 +12,15 @@ import (
 type SubredditsHandler struct {
 	subredditRepo *models.SubredditRepository
 	postRepo      *models.PlatformPostRepository
+	modRepo       *models.SubredditModeratorRepository
 }
 
 // NewSubredditsHandler creates a new handler
-func NewSubredditsHandler(subredditRepo *models.SubredditRepository, postRepo *models.PlatformPostRepository) *SubredditsHandler {
+func NewSubredditsHandler(subredditRepo *models.SubredditRepository, postRepo *models.PlatformPostRepository, modRepo *models.SubredditModeratorRepository) *SubredditsHandler {
 	return &SubredditsHandler{
 		subredditRepo: subredditRepo,
 		postRepo:      postRepo,
+		modRepo:       modRepo,
 	}
 }
 
@@ -33,6 +35,12 @@ func (h *SubredditsHandler) Create(c *gin.Context) {
 	userID, exists := c.Get("user_id")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
+	role, _ := c.Get("role")
+	roleStr, _ := role.(string)
+	if roleStr != "moderator" && roleStr != "admin" {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Only moderators or admins can create subreddits"})
 		return
 	}
 
@@ -51,6 +59,11 @@ func (h *SubredditsHandler) Create(c *gin.Context) {
 	if err := h.subredditRepo.Create(c.Request.Context(), sr); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create subreddit", "details": err.Error()})
 		return
+	}
+
+	// Creator becomes moderator of the subreddit
+	if h.modRepo != nil {
+		_ = h.modRepo.AddModerator(c.Request.Context(), sr.ID, userID.(int))
 	}
 
 	c.JSON(http.StatusCreated, sr)
@@ -125,6 +138,40 @@ func (h *SubredditsHandler) GetPosts(c *gin.Context) {
 		"offset":    offset,
 		"sort":      sortBy,
 	})
+}
+
+// AddModerator handles POST /api/v1/subreddits/:name/moderators
+func (h *SubredditsHandler) AddModerator(c *gin.Context) {
+	name := c.Param("name")
+	sr, err := h.subredditRepo.GetByName(c.Request.Context(), name)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch subreddit", "details": err.Error()})
+		return
+	}
+	if sr == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Subreddit not found"})
+		return
+	}
+
+	var req struct {
+		UserID int `json:"user_id" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body", "details": err.Error()})
+		return
+	}
+
+	if h.modRepo == nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Mod repo not configured"})
+		return
+	}
+
+	if err := h.modRepo.AddModerator(c.Request.Context(), sr.ID, req.UserID); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to add moderator", "details": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusCreated, gin.H{"message": "Moderator added"})
 }
 
 func intPtr(v int) *int {
