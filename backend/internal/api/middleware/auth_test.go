@@ -27,17 +27,19 @@ func performRequest(t *testing.T, h gin.HandlerFunc, role interface{}) *httptest
 
 func TestRequireRole_AllowsMatchingRole(t *testing.T) {
 	allowed := false
-	handler := RequireRole("admin", "moderator")(func(c *gin.Context) {
+	mw := RequireRole("admin", "moderator")
+	handler := func(c *gin.Context) {
 		allowed = true
 		c.Status(http.StatusOK)
-	})
-	w := performRequest(t, handler, "admin")
+	}
+	w := performRequest(t, mw(handler), "admin")
 	require.Equal(t, http.StatusOK, w.Code)
 	require.True(t, allowed, "handler should run for allowed role")
 }
 
 func TestRequireRole_BlocksWhenRoleMissing(t *testing.T) {
-	handler := RequireRole("admin")(func(c *gin.Context) {
+	mw := RequireRole("admin")
+	handler := mw(func(c *gin.Context) {
 		t.Fatalf("handler should not run")
 	})
 	w := performRequest(t, handler, nil)
@@ -45,7 +47,8 @@ func TestRequireRole_BlocksWhenRoleMissing(t *testing.T) {
 }
 
 func TestRequireRole_BlocksWhenRoleMismatch(t *testing.T) {
-	handler := RequireRole("admin")(func(c *gin.Context) {
+	mw := RequireRole("admin")
+	handler := mw(func(c *gin.Context) {
 		t.Fatalf("handler should not run")
 	})
 	w := performRequest(t, handler, "user")
