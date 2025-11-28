@@ -27,9 +27,9 @@ type TestDeps struct {
 	CommentRepo      *models.PostCommentRepository
 	ConversationRepo *models.ConversationRepository
 	MessageRepo      *models.MessageRepository
-	SubredditRepo    *models.SubredditRepository
+	HubRepo          *models.HubRepository
 	ReportRepo       *models.ReportRepository
-	ModRepo          *models.SubredditModeratorRepository
+	ModRepo          *models.HubModeratorRepository
 	AuthService      *services.AuthService
 	Hub              *websocket.Hub
 	Router           *gin.Engine
@@ -48,12 +48,12 @@ func getTestDB(t *testing.T) *database.DB {
 	return db
 }
 
-// resetTables truncates data and seeds default subreddit
+// resetTables truncates data and seeds default hub
 func resetTables(t *testing.T, db *database.DB) {
 	t.Helper()
 	_, err := db.Pool.Exec(context.Background(), `
-		TRUNCATE TABLE reports, subreddit_moderators, post_votes, comment_votes, messages, conversations, post_comments, platform_posts, subreddits, users RESTART IDENTITY CASCADE;
-		INSERT INTO subreddits (name, description) VALUES ('general', 'Default community for all posts');
+		TRUNCATE TABLE reports, hub_moderators, post_votes, comment_votes, messages, conversations, post_comments, platform_posts, hubs, users RESTART IDENTITY CASCADE;
+		INSERT INTO hubs (name, description) VALUES ('general', 'Default community for all posts');
 	`)
 	require.NoError(t, err)
 }
@@ -91,9 +91,9 @@ func newTestDeps(t *testing.T) *TestDeps {
 	commentRepo := models.NewPostCommentRepository(db.Pool)
 	conversationRepo := models.NewConversationRepository(db.Pool)
 	messageRepo := models.NewMessageRepository(db.Pool)
-	subredditRepo := models.NewSubredditRepository(db.Pool)
+	hubRepo := models.NewHubRepository(db.Pool)
 	reportRepo := models.NewReportRepository(db.Pool)
-	modRepo := models.NewSubredditModeratorRepository(db.Pool)
+	modRepo := models.NewHubModeratorRepository(db.Pool)
 	hub := websocket.NewHub()
 	go hub.Run()
 
@@ -107,14 +107,14 @@ func newTestDeps(t *testing.T) *TestDeps {
 
 	// Handlers
 	authHandler := handlers.NewAuthHandler(authService, userRepo)
-	postsHandler := handlers.NewPostsHandler(postRepo, subredditRepo, modRepo)
+	postsHandler := handlers.NewPostsHandler(postRepo, hubRepo, modRepo)
 	commentsHandler := handlers.NewCommentsHandler(commentRepo, postRepo, modRepo)
 	redditHandler := handlers.NewRedditHandler(services.NewRedditClient(cfg.Reddit.UserAgent, services.NoopCache{}, 0))
 	conversationsHandler := handlers.NewConversationsHandler(conversationRepo, messageRepo, userRepo)
 	messagesHandler := handlers.NewMessagesHandler(messageRepo, conversationRepo, hub)
 	usersHandler := handlers.NewUsersHandler(userRepo, postRepo, commentRepo)
 	mediaHandler := handlers.NewMediaHandler(models.NewMediaFileRepository(db.Pool))
-	subredditsHandler := handlers.NewSubredditsHandler(subredditRepo, postRepo, modRepo)
+	hubsHandler := handlers.NewHubsHandler(hubRepo, postRepo, modRepo)
 	moderationHandler := handlers.NewModerationHandler(reportRepo, modRepo)
 	adminHandler := handlers.NewAdminHandler(userRepo)
 	wsHandler := handlers.NewWebSocketHandler(hub)
@@ -140,11 +140,11 @@ func newTestDeps(t *testing.T) *TestDeps {
 			posts.GET("/:id/comments", commentsHandler.GetComments)
 		}
 
-		subreddits := api.Group("/subreddits")
+		hubs := api.Group("/hubs")
 		{
-			subreddits.GET("", subredditsHandler.List)
-			subreddits.GET("/:name", subredditsHandler.Get)
-			subreddits.GET("/:name/posts", subredditsHandler.GetPosts)
+			hubs.GET("", hubsHandler.List)
+			hubs.GET("/:name", hubsHandler.Get)
+			hubs.GET("/:name/posts", hubsHandler.GetPosts)
 		}
 
 		api.GET("/users/:username", usersHandler.GetUserProfile)
@@ -161,7 +161,7 @@ func newTestDeps(t *testing.T) *TestDeps {
 			protected.DELETE("/comments/:id", commentsHandler.DeleteComment)
 			protected.POST("/comments/:id/vote", commentsHandler.VoteComment)
 
-			protected.POST("/subreddits", subredditsHandler.Create)
+			protected.POST("/hubs", hubsHandler.Create)
 
 			protected.POST("/reports", moderationHandler.CreateReport)
 			mod := protected.Group("/mod")
@@ -175,7 +175,7 @@ func newTestDeps(t *testing.T) *TestDeps {
 			admin.Use(middleware.RequireRole("admin"))
 			{
 				admin.POST("/users/:id/role", adminHandler.PromoteUser)
-				admin.POST("/subreddits/:name/moderators", subredditsHandler.AddModerator)
+				admin.POST("/hubs/:name/moderators", hubsHandler.AddModerator)
 			}
 
 			protected.POST("/messages", messagesHandler.SendMessage)
@@ -195,7 +195,7 @@ func newTestDeps(t *testing.T) *TestDeps {
 		CommentRepo:      commentRepo,
 		ConversationRepo: conversationRepo,
 		MessageRepo:      messageRepo,
-		SubredditRepo:    subredditRepo,
+		HubRepo:          hubRepo,
 		ReportRepo:       reportRepo,
 		ModRepo:          modRepo,
 		AuthService:      authService,

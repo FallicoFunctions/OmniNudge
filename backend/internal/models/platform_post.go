@@ -11,11 +11,11 @@ import (
 
 // PlatformPost represents a native post created by users
 type PlatformPost struct {
-	ID          int        `json:"id"`
-	AuthorID    int        `json:"author_id"`
-	Author      *User      `json:"author,omitempty"` // Optional populated user info
-	SubredditID int        `json:"subreddit_id"`
-	Subreddit   *Subreddit `json:"subreddit,omitempty"`
+	ID       int   `json:"id"`
+	AuthorID int   `json:"author_id"`
+	Author   *User `json:"author,omitempty"` // Optional populated user info
+	HubID    int   `json:"hub_id"`
+	Hub      *Hub  `json:"hub,omitempty"`
 
 	// Post content
 	Title string  `json:"title"`
@@ -58,14 +58,14 @@ func NewPlatformPostRepository(pool *pgxpool.Pool) *PlatformPostRepository {
 // Create creates a new platform post
 func (r *PlatformPostRepository) Create(ctx context.Context, post *PlatformPost) error {
 	query := `
-		INSERT INTO platform_posts (author_id, subreddit_id, title, body, tags, media_url, media_type, thumbnail_url)
+		INSERT INTO platform_posts (author_id, hub_id, title, body, tags, media_url, media_type, thumbnail_url)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 		RETURNING id, score, upvotes, downvotes, num_comments, view_count, is_deleted, is_edited, edited_at, created_at
 	`
 
 	return r.pool.QueryRow(ctx, query,
 		post.AuthorID,
-		post.SubredditID,
+		post.HubID,
 		post.Title,
 		post.Body,
 		post.Tags,
@@ -91,7 +91,7 @@ func (r *PlatformPostRepository) GetByID(ctx context.Context, id int) (*Platform
 	post := &PlatformPost{}
 
 	query := `
-		SELECT id, author_id, subreddit_id, title, body, tags, media_url, media_type, thumbnail_url,
+		SELECT id, author_id, hub_id, title, body, tags, media_url, media_type, thumbnail_url,
 			   score, upvotes, downvotes, num_comments, view_count,
 			   is_deleted, is_edited, edited_at, created_at
 		FROM platform_posts
@@ -101,7 +101,7 @@ func (r *PlatformPostRepository) GetByID(ctx context.Context, id int) (*Platform
 	err := r.pool.QueryRow(ctx, query, id).Scan(
 		&post.ID,
 		&post.AuthorID,
-		&post.SubredditID,
+		&post.HubID,
 		&post.Title,
 		&post.Body,
 		&post.Tags,
@@ -142,7 +142,7 @@ func (r *PlatformPostRepository) GetFeed(ctx context.Context, sortBy string, lim
 	}
 
 	query := `
-		SELECT id, author_id, subreddit_id, title, body, tags, media_url, media_type, thumbnail_url,
+		SELECT id, author_id, hub_id, title, body, tags, media_url, media_type, thumbnail_url,
 			   score, upvotes, downvotes, num_comments, view_count,
 			   is_deleted, is_edited, edited_at, created_at
 		FROM platform_posts
@@ -163,7 +163,7 @@ func (r *PlatformPostRepository) GetFeed(ctx context.Context, sortBy string, lim
 		err := rows.Scan(
 			&post.ID,
 			&post.AuthorID,
-			&post.SubredditID,
+			&post.HubID,
 			&post.Title,
 			&post.Body,
 			&post.Tags,
@@ -192,7 +192,7 @@ func (r *PlatformPostRepository) GetFeed(ctx context.Context, sortBy string, lim
 // GetByAuthor retrieves posts by a specific author
 func (r *PlatformPostRepository) GetByAuthor(ctx context.Context, authorID int, limit, offset int) ([]*PlatformPost, error) {
 	query := `
-		SELECT id, author_id, subreddit_id, title, body, tags, media_url, media_type, thumbnail_url,
+		SELECT id, author_id, hub_id, title, body, tags, media_url, media_type, thumbnail_url,
 			   score, upvotes, downvotes, num_comments, view_count,
 			   is_deleted, is_edited, edited_at, created_at
 		FROM platform_posts
@@ -213,7 +213,7 @@ func (r *PlatformPostRepository) GetByAuthor(ctx context.Context, authorID int, 
 		err := rows.Scan(
 			&post.ID,
 			&post.AuthorID,
-			&post.SubredditID,
+			&post.HubID,
 			&post.Title,
 			&post.Body,
 			&post.Tags,
@@ -239,8 +239,8 @@ func (r *PlatformPostRepository) GetByAuthor(ctx context.Context, authorID int, 
 	return posts, rows.Err()
 }
 
-// GetBySubreddit retrieves posts by subreddit
-func (r *PlatformPostRepository) GetBySubreddit(ctx context.Context, subredditID int, sortBy string, limit, offset int) ([]*PlatformPost, error) {
+// GetByHub retrieves posts by hub
+func (r *PlatformPostRepository) GetByHub(ctx context.Context, hubID int, sortBy string, limit, offset int) ([]*PlatformPost, error) {
 	var orderClause string
 	switch sortBy {
 	case "hot", "score":
@@ -252,16 +252,16 @@ func (r *PlatformPostRepository) GetBySubreddit(ctx context.Context, subredditID
 	}
 
 	query := `
-		SELECT id, author_id, subreddit_id, title, body, tags, media_url, media_type, thumbnail_url,
+		SELECT id, author_id, hub_id, title, body, tags, media_url, media_type, thumbnail_url,
 			   score, upvotes, downvotes, num_comments, view_count,
 			   is_deleted, is_edited, edited_at, created_at
 		FROM platform_posts
-		WHERE subreddit_id = $1 AND is_deleted = FALSE
+		WHERE hub_id = $1 AND is_deleted = FALSE
 		` + orderClause + `
 		LIMIT $2 OFFSET $3
 	`
 
-	rows, err := r.pool.Query(ctx, query, subredditID, limit, offset)
+	rows, err := r.pool.Query(ctx, query, hubID, limit, offset)
 	if err != nil {
 		return nil, err
 	}
@@ -273,7 +273,7 @@ func (r *PlatformPostRepository) GetBySubreddit(ctx context.Context, subredditID
 		err := rows.Scan(
 			&post.ID,
 			&post.AuthorID,
-			&post.SubredditID,
+			&post.HubID,
 			&post.Title,
 			&post.Body,
 			&post.Tags,
@@ -302,7 +302,7 @@ func (r *PlatformPostRepository) GetBySubreddit(ctx context.Context, subredditID
 // GetByTags retrieves posts that contain any of the specified tags
 func (r *PlatformPostRepository) GetByTags(ctx context.Context, tags []string, limit, offset int) ([]*PlatformPost, error) {
 	query := `
-		SELECT id, author_id, subreddit_id, title, body, tags, media_url, media_type, thumbnail_url,
+		SELECT id, author_id, hub_id, title, body, tags, media_url, media_type, thumbnail_url,
 			   score, upvotes, downvotes, num_comments, view_count,
 			   is_deleted, is_edited, edited_at, created_at
 		FROM platform_posts
@@ -323,7 +323,7 @@ func (r *PlatformPostRepository) GetByTags(ctx context.Context, tags []string, l
 		err := rows.Scan(
 			&post.ID,
 			&post.AuthorID,
-			&post.SubredditID,
+			&post.HubID,
 			&post.Title,
 			&post.Body,
 			&post.Tags,

@@ -51,9 +51,9 @@ func main() {
 	conversationRepo := models.NewConversationRepository(db.Pool)
 	messageRepo := models.NewMessageRepository(db.Pool)
 	mediaRepo := models.NewMediaFileRepository(db.Pool)
-	subredditRepo := models.NewSubredditRepository(db.Pool)
+	hubRepo := models.NewHubRepository(db.Pool)
 	reportRepo := models.NewReportRepository(db.Pool)
-	subredditModRepo := models.NewSubredditModeratorRepository(db.Pool)
+	hubModRepo := models.NewHubModeratorRepository(db.Pool)
 
 	// Initialize WebSocket hub
 	hub := websocket.NewHub()
@@ -76,15 +76,15 @@ func main() {
 	// Initialize handlers
 	authHandler := handlers.NewAuthHandler(authService, userRepo)
 	settingsHandler := handlers.NewSettingsHandler(userSettingsRepo)
-	postsHandler := handlers.NewPostsHandler(postRepo, subredditRepo, subredditModRepo)
-	commentsHandler := handlers.NewCommentsHandler(commentRepo, postRepo, subredditModRepo)
+	postsHandler := handlers.NewPostsHandler(postRepo, hubRepo, hubModRepo)
+	commentsHandler := handlers.NewCommentsHandler(commentRepo, postRepo, hubModRepo)
 	redditHandler := handlers.NewRedditHandler(redditClient)
 	conversationsHandler := handlers.NewConversationsHandler(conversationRepo, messageRepo, userRepo)
 	messagesHandler := handlers.NewMessagesHandler(messageRepo, conversationRepo, hub)
 	usersHandler := handlers.NewUsersHandler(userRepo, postRepo, commentRepo)
 	mediaHandler := handlers.NewMediaHandler(mediaRepo)
-	subredditsHandler := handlers.NewSubredditsHandler(subredditRepo, postRepo, subredditModRepo)
-	moderationHandler := handlers.NewModerationHandler(reportRepo, subredditModRepo)
+	hubsHandler := handlers.NewHubsHandler(hubRepo, postRepo, hubModRepo)
+	moderationHandler := handlers.NewModerationHandler(reportRepo, hubModRepo)
 	adminHandler := handlers.NewAdminHandler(userRepo)
 	wsHandler := handlers.NewWebSocketHandler(hub)
 
@@ -161,12 +161,12 @@ func main() {
 			reddit.GET("/search", redditHandler.SearchPosts)
 		}
 
-		// Local subreddit routes
-		subreddits := api.Group("/subreddits")
+		// Local hub routes
+		hubs := api.Group("/hubs")
 		{
-			subreddits.GET("", subredditsHandler.List)
-			subreddits.GET("/:name", subredditsHandler.Get)
-			subreddits.GET("/:name/posts", subredditsHandler.GetPosts)
+			hubs.GET("", hubsHandler.List)
+			hubs.GET("/:name", hubsHandler.Get)
+			hubs.GET("/:name/posts", hubsHandler.GetPosts)
 		}
 
 		// Public user profile routes
@@ -199,8 +199,8 @@ func main() {
 			protected.DELETE("/comments/:id", commentsHandler.DeleteComment)
 			protected.POST("/comments/:id/vote", commentsHandler.VoteComment)
 
-			// Protected subreddit creation
-			protected.POST("/subreddits", subredditsHandler.Create)
+			// Protected hub creation
+			protected.POST("/hubs", hubsHandler.Create)
 
 			// Protected conversations routes
 			protected.POST("/conversations", conversationsHandler.CreateConversation)
@@ -232,7 +232,7 @@ func main() {
 			admin.Use(middleware.RequireRole("admin"))
 			{
 				admin.POST("/users/:id/role", adminHandler.PromoteUser)
-				admin.POST("/subreddits/:name/moderators", subredditsHandler.AddModerator)
+				admin.POST("/hubs/:name/moderators", hubsHandler.AddModerator)
 			}
 
 			// WebSocket endpoint for real-time messaging

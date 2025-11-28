@@ -118,6 +118,7 @@ Platform-native posts created by users. These are separate from Reddit posts and
 CREATE TABLE platform_posts (
     id SERIAL PRIMARY KEY,
     author_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    hub_id INTEGER NOT NULL REFERENCES hubs(id) ON DELETE CASCADE,
 
     -- Post content
     title VARCHAR(300) NOT NULL,
@@ -158,6 +159,7 @@ CREATE INDEX idx_platform_posts_tags ON platform_posts USING GIN(tags);
 **Fields:**
 - `id`: Post ID
 - `author_id`: User who created the post
+- `hub_id`: Hub/community the post belongs to
 - `title`: Post title (required, 1-300 characters)
 - `body`: Post body text (optional for image/video posts)
 - `tags`: Array of tags for categorization (e.g., ["funny", "memes"])
@@ -173,6 +175,27 @@ CREATE INDEX idx_platform_posts_tags ON platform_posts USING GIN(tags);
 - `is_edited`: Whether post was edited
 - `edited_at`: When post was last edited
 - `created_at`: Post creation timestamp
+
+**Related tables (communities and moderators):**
+
+```sql
+CREATE TABLE hubs (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(100) NOT NULL UNIQUE,
+    description TEXT,
+    created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE hub_moderators (
+    id SERIAL PRIMARY KEY,
+    hub_id INTEGER NOT NULL REFERENCES hubs(id) ON DELETE CASCADE,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    UNIQUE (hub_id, user_id)
+);
+```
+
+The default seed hub is `general` so posts can be created without specifying a hub explicitly. Hub creators are automatically added as moderators.
 
 **Usage:**
 - Users can create text posts, image posts, or video posts

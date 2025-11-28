@@ -1154,8 +1154,8 @@ When making breaking changes:
 
 ## Backend Behavior Notes (current)
 
-- **Subreddits:** Any authenticated user can create a subreddit via `POST /api/v1/subreddits`.
+- **Hubs (site communities):** Any authenticated user can create a hub via `POST /api/v1/hubs`; the creator is auto-added as a moderator. Hub moderators can be added via `/api/v1/admin/hubs/:name/moderators`.
 - **Voting:** `is_upvote` accepts `true` (upvote), `false` (downvote), or `null` (remove vote) on posts and comments.
 - **Media upload:** `POST /api/v1/media/upload` accepts JPEG/PNG/WebP/GIF and MP4/QuickTime/WebM up to 25MB; unsupported types or oversized files return 400.
-- **Moderation:** Submit reports with `POST /api/v1/reports`. Moderators/admins: list/update via `/api/v1/mod/reports` and role/admin actions via `/api/v1/admin/users/:id/role`, `/api/v1/admin/subreddits/:name/moderators`.
+- **Moderation:** Submit reports with `POST /api/v1/reports`. Moderators/admins: list/update via `/api/v1/mod/reports` and role/admin actions via `/api/v1/admin/users/:id/role`, `/api/v1/admin/hubs/:name/moderators`.
 - **WebSocket:** Connect with `Authorization: Bearer <token>` header; events include `new_message`, `message_delivered`, `conversation_read`, `typing` (server debounced). Messages are sent via REST, typing via WS.

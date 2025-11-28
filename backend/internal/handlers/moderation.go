@@ -11,11 +11,11 @@ import (
 // ModerationHandler handles moderation reports
 type ModerationHandler struct {
 	reportRepo *models.ReportRepository
-	modRepo    *models.SubredditModeratorRepository
+	modRepo    *models.HubModeratorRepository
 }
 
 // NewModerationHandler creates a moderation handler
-func NewModerationHandler(reportRepo *models.ReportRepository, modRepo *models.SubredditModeratorRepository) *ModerationHandler {
+func NewModerationHandler(reportRepo *models.ReportRepository, modRepo *models.HubModeratorRepository) *ModerationHandler {
 	return &ModerationHandler{
 		reportRepo: reportRepo,
 		modRepo:    modRepo,

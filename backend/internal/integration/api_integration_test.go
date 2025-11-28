@@ -52,7 +52,7 @@ func TestAuthRegisterLoginMe(t *testing.T) {
 	require.Equal(t, http.StatusOK, w.Code)
 }
 
-func TestSubredditCreation(t *testing.T) {
+func TestHubCreation(t *testing.T) {
 	deps := newTestDeps(t)
 	defer deps.DB.Close()
 
@@ -60,14 +60,14 @@ func TestSubredditCreation(t *testing.T) {
 	userToken, _ := deps.AuthService.GenerateJWT(user.ID, "", user.Username, user.Role)
 
 	body := []byte(`{"name":"cats","description":"all cats"}`)
-	req, _ := http.NewRequest("POST", "/api/v1/subreddits", bytes.NewReader(body))
+	req, _ := http.NewRequest("POST", "/api/v1/hubs", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+userToken)
 	w := doRequest(t, deps.Router, req)
 	require.Equal(t, http.StatusCreated, w.Code)
 }
 
-func TestSubredditCreationAsModeratorAllowed(t *testing.T) {
+func TestHubCreationAsModeratorAllowed(t *testing.T) {
 	deps := newTestDeps(t)
 	defer deps.DB.Close()
 
@@ -75,7 +75,7 @@ func TestSubredditCreationAsModeratorAllowed(t *testing.T) {
 	modToken, _ := deps.AuthService.GenerateJWT(mod.ID, "", mod.Username, mod.Role)
 
 	body := []byte(`{"name":"dogs","description":"all dogs"}`)
-	req, _ := http.NewRequest("POST", "/api/v1/subreddits", bytes.NewReader(body))
+	req, _ := http.NewRequest("POST", "/api/v1/hubs", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+modToken)
 	w := doRequest(t, deps.Router, req)
@@ -186,9 +186,9 @@ func TestAdminPromotionAndAddModerator(t *testing.T) {
 	w := doRequest(t, deps.Router, req)
 	require.Equal(t, http.StatusOK, w.Code)
 
-	// Add as subreddit moderator
+	// Add as hub moderator
 	modBody := []byte(`{"user_id":` + fmt.Sprint(user.ID) + `}`)
-	req, _ = http.NewRequest("POST", "/api/v1/admin/subreddits/general/moderators", bytes.NewReader(modBody))
+	req, _ = http.NewRequest("POST", "/api/v1/admin/hubs/general/moderators", bytes.NewReader(modBody))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+adminToken)
 	w = doRequest(t, deps.Router, req)
