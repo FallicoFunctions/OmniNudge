@@ -93,6 +93,11 @@ func (h *Hub) IsUserOnline(userID int) bool {
 	return ok
 }
 
+// Register enqueues a client to be registered with the hub
+func (h *Hub) Register(client *Client) {
+	h.register <- client
+}
+
 // GetOnlineUsers returns a list of currently online user IDs
 func (h *Hub) GetOnlineUsers() []int {
 	h.mu.RLock()

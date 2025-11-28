@@ -36,6 +36,12 @@ type Client struct {
 	UserID int
 }
 
+// Start begins read and write pumps for the client
+func (c *Client) Start() {
+	go c.writePump()
+	go c.readPump()
+}
+
 // readPump pumps messages from the WebSocket connection to the hub
 func (c *Client) readPump() {
 	defer func() {
