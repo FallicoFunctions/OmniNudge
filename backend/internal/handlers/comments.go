@@ -95,6 +95,12 @@ func (h *CommentsHandler) CreateComment(c *gin.Context) {
 		return
 	}
 
+	// Default upvote by author (best-effort)
+	upvote := true
+	_ = h.commentRepo.Vote(c.Request.Context(), comment.ID, userID.(int), &upvote)
+	comment.Score++
+	comment.Upvotes++
+
 	c.JSON(http.StatusCreated, comment)
 }
 
@@ -291,7 +297,7 @@ func (h *CommentsHandler) VoteComment(c *gin.Context) {
 	}
 
 	var req struct {
-		IsUpvote bool `json:"is_upvote"`
+		IsUpvote *bool `json:"is_upvote"` // true=upvote, false=downvote, null=remove
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body", "details": err.Error()})

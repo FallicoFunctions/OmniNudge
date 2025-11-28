@@ -322,8 +322,9 @@ func (r *PostCommentRepository) SoftDelete(ctx context.Context, commentID int) e
 	return err
 }
 
-// Vote records a user's vote and updates aggregate counts, preventing duplicates
-func (r *PostCommentRepository) Vote(ctx context.Context, commentID int, userID int, isUpvote bool) error {
+// Vote records a user's vote and updates aggregate counts, preventing duplicates.
+// isUpvote: true (upvote), false (downvote), nil (remove vote)
+func (r *PostCommentRepository) Vote(ctx context.Context, commentID int, userID int, isUpvote *bool) error {
 	tx, err := r.pool.Begin(ctx)
 	if err != nil {
 		return err
@@ -339,14 +340,18 @@ func (r *PostCommentRepository) Vote(ctx context.Context, commentID int, userID 
 	switch {
 	case err == pgx.ErrNoRows:
 		// New vote
+		if isUpvote == nil {
+			return tx.Commit(ctx)
+		}
+
 		if _, err := tx.Exec(ctx, `
 			INSERT INTO comment_votes (comment_id, user_id, is_upvote)
 			VALUES ($1, $2, $3)
-		`, commentID, userID, isUpvote); err != nil {
+		`, commentID, userID, *isUpvote); err != nil {
 			return err
 		}
 
-		if isUpvote {
+		if *isUpvote {
 			if _, err := tx.Exec(ctx, `
 				UPDATE post_comments
 				SET upvotes = upvotes + 1, score = score + 1
@@ -363,7 +368,31 @@ func (r *PostCommentRepository) Vote(ctx context.Context, commentID int, userID 
 				return err
 			}
 		}
-	case existingIsUpvote == isUpvote:
+	case isUpvote == nil:
+		// Remove existing vote
+		if _, err := tx.Exec(ctx, `DELETE FROM comment_votes WHERE comment_id = $1 AND user_id = $2`, commentID, userID); err != nil {
+			return err
+		}
+		if existingIsUpvote {
+			if _, err := tx.Exec(ctx, `
+				UPDATE post_comments
+				SET upvotes = GREATEST(upvotes - 1, 0),
+				    score = score - 1
+				WHERE id = $1
+			`, commentID); err != nil {
+				return err
+			}
+		} else {
+			if _, err := tx.Exec(ctx, `
+				UPDATE post_comments
+				SET downvotes = GREATEST(downvotes - 1, 0),
+				    score = score + 1
+				WHERE id = $1
+			`, commentID); err != nil {
+				return err
+			}
+		}
+	case existingIsUpvote == *isUpvote:
 		// Duplicate same-direction vote: no-op
 		return tx.Commit(ctx)
 	default:
@@ -372,11 +401,11 @@ func (r *PostCommentRepository) Vote(ctx context.Context, commentID int, userID 
 			UPDATE comment_votes
 			SET is_upvote = $3, created_at = CURRENT_TIMESTAMP
 			WHERE comment_id = $1 AND user_id = $2
-		`, commentID, userID, isUpvote); err != nil {
+		`, commentID, userID, *isUpvote); err != nil {
 			return err
 		}
 
-		if isUpvote {
+		if *isUpvote {
 			if _, err := tx.Exec(ctx, `
 				UPDATE post_comments
 				SET upvotes = upvotes + 1,
