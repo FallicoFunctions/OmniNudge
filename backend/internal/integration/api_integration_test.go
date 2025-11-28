@@ -215,6 +215,40 @@ func TestMediaUploadValidation(t *testing.T) {
 	require.True(t, strings.Contains(w.Body.String(), "Unsupported file type"))
 }
 
+func TestMediaUploadHappyPathAndSizeLimit(t *testing.T) {
+	deps := newTestDeps(t)
+	defer deps.DB.Close()
+
+	user := createUser(t, deps.UserRepo, "media2", "user")
+	token, _ := deps.AuthService.GenerateJWT(user.ID, "", user.Username, user.Role)
+
+	// Happy path small PNG
+	var b bytes.Buffer
+	writer := multipart.NewWriter(&b)
+	part, _ := writer.CreateFormFile("file", "image.png")
+	part.Write([]byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A})
+	writer.Close()
+
+	req, _ := http.NewRequest("POST", "/api/v1/media/upload", &b)
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	w := doRequest(t, deps.Router, req)
+	require.Equal(t, http.StatusCreated, w.Code)
+
+	// Size limit
+	var big bytes.Buffer
+	bw := multipart.NewWriter(&big)
+	p2, _ := bw.CreateFormFile("file", "big.mp4")
+	p2.Write(bytes.Repeat([]byte("A"), 26*1024*1024)) // >25MB
+	bw.Close()
+	req, _ = http.NewRequest("POST", "/api/v1/media/upload", &big)
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", bw.FormDataContentType())
+	w = doRequest(t, deps.Router, req)
+	require.Equal(t, http.StatusBadRequest, w.Code)
+	require.True(t, strings.Contains(w.Body.String(), "File too large"))
+}
+
 func TestReportsRoleEnforcement(t *testing.T) {
 	deps := newTestDeps(t)
 	defer deps.DB.Close()
