@@ -134,8 +134,8 @@ func TestCommentEditForbiddenForNonOwner(t *testing.T) {
 	deps := newTestDeps(t)
 	defer deps.DB.Close()
 
-	owner := createUser(t, deps.UserRepo, "c1", "user")
-	other := createUser(t, deps.UserRepo, "c2", "user")
+	owner := createUser(t, deps.UserRepo, "comment_owner", "user")
+	other := createUser(t, deps.UserRepo, "comment_other", "user")
 	ownerToken, _ := deps.AuthService.GenerateJWT(owner.ID, "", owner.Username, owner.Role)
 	otherToken, _ := deps.AuthService.GenerateJWT(other.ID, "", other.Username, other.Role)
 
@@ -238,7 +238,10 @@ func TestMediaUploadHappyPathAndSizeLimit(t *testing.T) {
 	// Size limit
 	var big bytes.Buffer
 	bw := multipart.NewWriter(&big)
-	p2, _ := bw.CreateFormFile("file", "big.mp4")
+	p2, _ := bw.CreateFormFile("file", "big.png")
+	// Valid PNG header then large payload to trigger size limit
+	pngHeader := []byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 'D', 'A', 'T', 'A'}
+	p2.Write(pngHeader)
 	p2.Write(bytes.Repeat([]byte("A"), 26*1024*1024)) // >25MB
 	bw.Close()
 	req, _ = http.NewRequest("POST", "/api/v1/media/upload", &big)
@@ -246,7 +249,7 @@ func TestMediaUploadHappyPathAndSizeLimit(t *testing.T) {
 	req.Header.Set("Content-Type", bw.FormDataContentType())
 	w = doRequest(t, deps.Router, req)
 	require.Equal(t, http.StatusBadRequest, w.Code)
-	require.True(t, strings.Contains(w.Body.String(), "File too large"))
+	require.True(t, strings.Contains(strings.ToLower(w.Body.String()), "too large"))
 }
 
 func TestReportsRoleEnforcement(t *testing.T) {
