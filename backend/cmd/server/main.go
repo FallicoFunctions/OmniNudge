@@ -45,6 +45,7 @@ func main() {
 	// Initialize repositories
 	userRepo := models.NewUserRepository(db.Pool)
 	userSettingsRepo := models.NewUserSettingsRepository(db.Pool)
+	postRepo := models.NewPlatformPostRepository(db.Pool)
 
 	// Initialize services
 	authService := services.NewAuthService(
@@ -58,6 +59,7 @@ func main() {
 	// Initialize handlers
 	authHandler := handlers.NewAuthHandler(authService, userRepo)
 	settingsHandler := handlers.NewSettingsHandler(userSettingsRepo)
+	postsHandler := handlers.NewPostsHandler(postRepo)
 
 	// Setup Gin router
 	router := gin.Default()
@@ -107,6 +109,13 @@ func main() {
 			auth.GET("/reddit/callback", authHandler.RedditCallback)
 		}
 
+		// Public posts routes (no auth required for viewing)
+		posts := api.Group("/posts")
+		{
+			posts.GET("/feed", postsHandler.GetFeed)
+			posts.GET("/:id", postsHandler.GetPost)
+		}
+
 		// Protected routes (auth required)
 		protected := api.Group("")
 		protected.Use(middleware.AuthRequired(authService))
@@ -116,6 +125,12 @@ func main() {
 
 			protected.GET("/settings", settingsHandler.GetSettings)
 			protected.PUT("/settings", settingsHandler.UpdateSettings)
+
+			// Protected posts routes (auth required for creating/editing)
+			protected.POST("/posts", postsHandler.CreatePost)
+			protected.PUT("/posts/:id", postsHandler.UpdatePost)
+			protected.DELETE("/posts/:id", postsHandler.DeletePost)
+			protected.POST("/posts/:id/vote", postsHandler.VotePost)
 		}
 	}
 
