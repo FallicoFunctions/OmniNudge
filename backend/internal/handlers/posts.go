@@ -200,6 +200,8 @@ func (h *PostsHandler) UpdatePost(c *gin.Context) {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
 		return
 	}
+	role, _ := c.Get("role")
+	roleStr, _ := role.(string)
 
 	postID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
@@ -219,8 +221,8 @@ func (h *PostsHandler) UpdatePost(c *gin.Context) {
 		return
 	}
 
-	// Verify user owns this post
-	if existingPost.AuthorID != userID.(int) {
+	// Verify user owns this post or is a global moderator/admin
+	if existingPost.AuthorID != userID.(int) && roleStr != "moderator" && roleStr != "admin" {
 		c.JSON(http.StatusForbidden, gin.H{"error": "You can only edit your own posts"})
 		return
 	}

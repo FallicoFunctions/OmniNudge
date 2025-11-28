@@ -202,6 +202,12 @@ func (r *UserRepository) UpdateLastSeen(ctx context.Context, userID int) error {
 	return err
 }
 
+// UpdateRole updates a user's role
+func (r *UserRepository) UpdateRole(ctx context.Context, userID int, role string) error {
+	_, err := r.pool.Exec(ctx, `UPDATE users SET role = $2 WHERE id = $1`, userID, role)
+	return err
+}
+
 // UpdatePublicKey updates the user's public key for E2E encryption
 func (r *UserRepository) UpdatePublicKey(ctx context.Context, userID int, publicKey string) error {
 	query := `UPDATE users SET public_key = $1 WHERE id = $2`
