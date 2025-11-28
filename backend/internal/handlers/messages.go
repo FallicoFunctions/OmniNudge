@@ -195,16 +195,14 @@ func (h *MessagesHandler) GetMessages(c *gin.Context) {
 		delivered, err := h.messageRepo.MarkUndeliveredAsDelivered(c.Request.Context(), conversationID, userID.(int))
 		if err == nil {
 			for _, dm := range delivered {
-				if h.hub.IsUserOnline(dm.SenderID) {
-					h.hub.Broadcast(&websocket.Message{
-						RecipientID: dm.SenderID,
-						Type:        "message_delivered",
-						Payload: gin.H{
-							"message_id":      dm.ID,
-							"conversation_id": conversationID,
-						},
-					})
-				}
+				h.hub.Broadcast(&websocket.Message{
+					RecipientID: dm.SenderID,
+					Type:        "message_delivered",
+					Payload: gin.H{
+						"message_id":      dm.ID,
+						"conversation_id": conversationID,
+					},
+				})
 			}
 		}
 	}
@@ -257,16 +255,14 @@ func (h *MessagesHandler) MarkAsRead(c *gin.Context) {
 	// Notify the other participant that messages were read
 	if h.hub != nil {
 		otherUserID := conversation.GetOtherUserID(userID.(int))
-		if h.hub.IsUserOnline(otherUserID) {
-			h.hub.Broadcast(&websocket.Message{
-				RecipientID: otherUserID,
-				Type:        "conversation_read",
-				Payload: gin.H{
-					"conversation_id": conversationID,
-					"reader_id":       userID.(int),
-				},
-			})
-		}
+		h.hub.Broadcast(&websocket.Message{
+			RecipientID: otherUserID,
+			Type:        "conversation_read",
+			Payload: gin.H{
+				"conversation_id": conversationID,
+				"reader_id":       userID.(int),
+			},
+		})
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Messages marked as read"})

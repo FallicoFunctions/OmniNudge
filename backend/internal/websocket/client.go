@@ -13,13 +13,16 @@ const (
 	writeWait = 10 * time.Second
 
 	// Time allowed to read the next pong message from the peer
-	pongWait = 60 * time.Second
+	pongWait = 45 * time.Second
 
 	// Send pings to peer with this period (must be less than pongWait)
 	pingPeriod = (pongWait * 9) / 10
 
 	// Maximum message size allowed from peer
 	maxMessageSize = 512 * 1024 // 512 KB
+
+	// Minimum gap between typing events per user (ms)
+	typingDebounce = 800 * time.Millisecond
 )
 
 // Client represents a WebSocket client connection
@@ -34,6 +37,9 @@ type Client struct {
 
 	// User ID of the connected user
 	UserID int
+
+	// Last typing event timestamp
+	lastTyping time.Time
 }
 
 // Start begins read and write pumps for the client
@@ -89,6 +95,13 @@ func (c *Client) readPump() {
 				log.Printf("Failed to parse typing data: %v", err)
 				continue
 			}
+
+			// Debounce typing events to avoid flooding
+			now := time.Now()
+			if now.Sub(c.lastTyping) < typingDebounce {
+				continue
+			}
+			c.lastTyping = now
 
 			// Broadcast typing indicator to the other participant
 			if typingData.RecipientID != 0 {
