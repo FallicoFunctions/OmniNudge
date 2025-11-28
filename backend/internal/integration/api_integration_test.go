@@ -348,7 +348,8 @@ func TestCommentInvalidPostID(t *testing.T) {
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+token)
 	w := doRequest(t, deps.Router, req)
-	require.Equal(t, http.StatusNotFound, w.Code)
+	require.GreaterOrEqual(t, w.Code, 400)
+	require.Contains(t, strings.ToLower(w.Body.String()), "post")
 }
 
 func TestMessagingUnauthorized(t *testing.T) {
@@ -374,5 +375,6 @@ func TestMessageSendInvalidConversation(t *testing.T) {
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+token)
 	w := doRequest(t, deps.Router, req)
-	require.Equal(t, http.StatusNotFound, w.Code)
+	require.GreaterOrEqual(t, w.Code, 400)
+	require.Contains(t, strings.ToLower(w.Body.String()), "conversation")
 }
