@@ -9,21 +9,21 @@ import (
 
 // Message represents an encrypted message in a conversation
 type Message struct {
-	ID               int        `json:"id"`
-	ConversationID   int        `json:"conversation_id"`
-	SenderID         int        `json:"sender_id"`
-	RecipientID      int        `json:"recipient_id"`
-	EncryptedContent string     `json:"encrypted_content"` // Base64 encoded encrypted blob
-	MessageType      string     `json:"message_type"`      // "text", "image", "video", "audio"
-	SentAt           time.Time  `json:"sent_at"`
-	DeliveredAt      *time.Time `json:"delivered_at,omitempty"`
-	ReadAt           *time.Time `json:"read_at,omitempty"`
-	DeletedForSender bool       `json:"deleted_for_sender"`
-	DeletedForRecipient bool    `json:"deleted_for_recipient"`
-	MediaURL         *string    `json:"media_url,omitempty"`
-	MediaType        *string    `json:"media_type,omitempty"`
-	MediaSize        *int       `json:"media_size,omitempty"`
-	EncryptionVersion int       `json:"encryption_version"` // For future encryption updates
+	ID                  int        `json:"id"`
+	ConversationID      int        `json:"conversation_id"`
+	SenderID            int        `json:"sender_id"`
+	RecipientID         int        `json:"recipient_id"`
+	EncryptedContent    string     `json:"encrypted_content"` // Base64 encoded encrypted blob
+	MessageType         string     `json:"message_type"`      // "text", "image", "video", "audio"
+	SentAt              time.Time  `json:"sent_at"`
+	DeliveredAt         *time.Time `json:"delivered_at,omitempty"`
+	ReadAt              *time.Time `json:"read_at,omitempty"`
+	DeletedForSender    bool       `json:"deleted_for_sender"`
+	DeletedForRecipient bool       `json:"deleted_for_recipient"`
+	MediaURL            *string    `json:"media_url,omitempty"`
+	MediaType           *string    `json:"media_type,omitempty"`
+	MediaSize           *int       `json:"media_size,omitempty"`
+	EncryptionVersion   string     `json:"encryption_version"` // For future encryption updates, e.g., "v1"
 }
 
 // MessageRepository handles database operations for messages
@@ -34,6 +34,12 @@ type MessageRepository struct {
 // NewMessageRepository creates a new message repository
 func NewMessageRepository(pool *pgxpool.Pool) *MessageRepository {
 	return &MessageRepository{pool: pool}
+}
+
+// DeliveredMessage represents a message that was marked delivered
+type DeliveredMessage struct {
+	ID       int
+	SenderID int
 }
 
 // Create creates a new message
@@ -163,6 +169,36 @@ func (r *MessageRepository) MarkAsDelivered(ctx context.Context, messageID int) 
 	`
 	_, err := r.pool.Exec(ctx, query, messageID)
 	return err
+}
+
+// MarkUndeliveredAsDelivered marks all undelivered messages in a conversation for a recipient
+// and returns the updated message IDs and their sender IDs.
+func (r *MessageRepository) MarkUndeliveredAsDelivered(ctx context.Context, conversationID int, recipientID int) ([]DeliveredMessage, error) {
+	query := `
+		UPDATE messages
+		SET delivered_at = CURRENT_TIMESTAMP
+		WHERE conversation_id = $1
+		  AND recipient_id = $2
+		  AND delivered_at IS NULL
+		RETURNING id, sender_id
+	`
+
+	rows, err := r.pool.Query(ctx, query, conversationID, recipientID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var delivered []DeliveredMessage
+	for rows.Next() {
+		var dm DeliveredMessage
+		if err := rows.Scan(&dm.ID, &dm.SenderID); err != nil {
+			return nil, err
+		}
+		delivered = append(delivered, dm)
+	}
+
+	return delivered, rows.Err()
 }
 
 // MarkAsRead updates the read_at timestamp for a message

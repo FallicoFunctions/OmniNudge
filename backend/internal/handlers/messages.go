@@ -43,7 +43,7 @@ type SendMessageRequest struct {
 	MediaURL          *string `json:"media_url,omitempty"`
 	MediaType         *string `json:"media_type,omitempty"`
 	MediaSize         *int    `json:"media_size,omitempty"`
-	EncryptionVersion int     `json:"encryption_version" binding:"required"` // Default: 1
+	EncryptionVersion string  `json:"encryption_version" binding:"required"` // Default: v1
 }
 
 // SendMessage handles POST /api/v1/messages
@@ -66,6 +66,10 @@ func (h *MessagesHandler) SendMessage(c *gin.Context) {
 	if !validTypes[req.MessageType] {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid message type. Must be: text, image, video, or audio"})
 		return
+	}
+
+	if req.EncryptionVersion == "" {
+		req.EncryptionVersion = "v1"
 	}
 
 	// Verify conversation exists and user is a participant
@@ -113,12 +117,27 @@ func (h *MessagesHandler) SendMessage(c *gin.Context) {
 	}
 
 	// Broadcast message to recipient via WebSocket if they're online
-	if h.hub != nil && h.hub.IsUserOnline(recipientID) {
-		h.hub.Broadcast(&websocket.Message{
-			RecipientID: recipientID,
-			Type:        "new_message",
-			Payload:     message,
-		})
+	if h.hub != nil {
+		if h.hub.IsUserOnline(recipientID) {
+			// Mark as delivered immediately for online recipient
+			_ = h.messageRepo.MarkAsDelivered(c.Request.Context(), message.ID)
+
+			h.hub.Broadcast(&websocket.Message{
+				RecipientID: recipientID,
+				Type:        "new_message",
+				Payload:     message,
+			})
+
+			// Notify sender that the message was delivered
+			h.hub.Broadcast(&websocket.Message{
+				RecipientID: message.SenderID,
+				Type:        "message_delivered",
+				Payload: gin.H{
+					"message_id":      message.ID,
+					"conversation_id": message.ConversationID,
+				},
+			})
+		}
 	}
 
 	c.JSON(http.StatusCreated, message)
@@ -171,6 +190,25 @@ func (h *MessagesHandler) GetMessages(c *gin.Context) {
 		return
 	}
 
+	// Mark undelivered messages as delivered for this recipient and notify senders
+	if h.hub != nil {
+		delivered, err := h.messageRepo.MarkUndeliveredAsDelivered(c.Request.Context(), conversationID, userID.(int))
+		if err == nil {
+			for _, dm := range delivered {
+				if h.hub.IsUserOnline(dm.SenderID) {
+					h.hub.Broadcast(&websocket.Message{
+						RecipientID: dm.SenderID,
+						Type:        "message_delivered",
+						Payload: gin.H{
+							"message_id":      dm.ID,
+							"conversation_id": conversationID,
+						},
+					})
+				}
+			}
+		}
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"messages": messages,
 		"limit":    limit,
@@ -214,6 +252,21 @@ func (h *MessagesHandler) MarkAsRead(c *gin.Context) {
 	if err := h.messageRepo.MarkAllAsRead(c.Request.Context(), conversationID, userID.(int)); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to mark messages as read", "details": err.Error()})
 		return
+	}
+
+	// Notify the other participant that messages were read
+	if h.hub != nil {
+		otherUserID := conversation.GetOtherUserID(userID.(int))
+		if h.hub.IsUserOnline(otherUserID) {
+			h.hub.Broadcast(&websocket.Message{
+				RecipientID: otherUserID,
+				Type:        "conversation_read",
+				Payload: gin.H{
+					"conversation_id": conversationID,
+					"reader_id":       userID.(int),
+				},
+			})
+		}
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Messages marked as read"})

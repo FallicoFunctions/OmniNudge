@@ -76,6 +76,7 @@ func (c *Client) readPump() {
 			// Parse typing notification
 			var typingData struct {
 				ConversationID int  `json:"conversation_id"`
+				RecipientID    int  `json:"recipient_id"`
 				IsTyping       bool `json:"is_typing"`
 			}
 			if err := json.Unmarshal(incomingMsg.Payload, &typingData); err != nil {
@@ -83,9 +84,18 @@ func (c *Client) readPump() {
 				continue
 			}
 
-			// Broadcast typing indicator (implementation would need to know the other user)
-			// For now, just log it
-			log.Printf("User %d typing in conversation %d: %v", c.UserID, typingData.ConversationID, typingData.IsTyping)
+			// Broadcast typing indicator to the other participant
+			if typingData.RecipientID != 0 {
+				c.Hub.Broadcast(&Message{
+					RecipientID: typingData.RecipientID,
+					Type:        "typing",
+					Payload: map[string]interface{}{
+						"conversation_id": typingData.ConversationID,
+						"user_id":         c.UserID,
+						"is_typing":       typingData.IsTyping,
+					},
+				})
+			}
 
 		default:
 			log.Printf("Unknown message type: %s", incomingMsg.Type)
