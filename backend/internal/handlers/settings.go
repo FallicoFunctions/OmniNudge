@@ -42,6 +42,14 @@ type updateSettingsRequest struct {
 	ShowTypingIndicators *bool   `json:"show_typing_indicators"`
 	AutoAppendInvitation *bool   `json:"auto_append_invitation"`
 	Theme                *string `json:"theme"`
+
+	// Notification preferences
+	NotifyCommentReplies   *bool `json:"notify_comment_replies"`
+	NotifyPostMilestone    *bool `json:"notify_post_milestone"`
+	NotifyPostVelocity     *bool `json:"notify_post_velocity"`
+	NotifyCommentMilestone *bool `json:"notify_comment_milestone"`
+	NotifyCommentVelocity  *bool `json:"notify_comment_velocity"`
+	DailyDigest            *bool `json:"daily_digest"`
 }
 
 // UpdateSettings updates the current user's settings.
@@ -92,6 +100,26 @@ func (h *SettingsHandler) UpdateSettings(c *gin.Context) {
 			return
 		}
 		settings.Theme = theme
+	}
+
+	// Update notification preferences
+	if req.NotifyCommentReplies != nil {
+		settings.NotifyCommentReplies = *req.NotifyCommentReplies
+	}
+	if req.NotifyPostMilestone != nil {
+		settings.NotifyPostMilestone = *req.NotifyPostMilestone
+	}
+	if req.NotifyPostVelocity != nil {
+		settings.NotifyPostVelocity = *req.NotifyPostVelocity
+	}
+	if req.NotifyCommentMilestone != nil {
+		settings.NotifyCommentMilestone = *req.NotifyCommentMilestone
+	}
+	if req.NotifyCommentVelocity != nil {
+		settings.NotifyCommentVelocity = *req.NotifyCommentVelocity
+	}
+	if req.DailyDigest != nil {
+		settings.DailyDigest = *req.DailyDigest
 	}
 
 	updated, err := h.settingsRepo.Update(c.Request.Context(), settings)
