@@ -70,7 +70,7 @@ func TestWebSocketTypingBroadcast(t *testing.T) {
 	require.NoError(t, bobConn.ReadJSON(&incoming))
 	require.Equal(t, "typing", incoming["type"])
 
-	// Send a message to trigger delivered/read
+	// Send a message to trigger new_message/delivered/read
 	msgBody := map[string]interface{}{
 		"conversation_id":    conv.ID,
 		"encrypted_content":  "hi",
@@ -84,7 +84,7 @@ func TestWebSocketTypingBroadcast(t *testing.T) {
 	w = doRequest(t, deps.Router, reqMsg)
 	require.Equal(t, http.StatusCreated, w.Code)
 
-	// Expect at least one event (new_message)
+	// Expect at least one event (new_message) and possibly delivered/read
 	bobConn.SetReadDeadline(time.Now().Add(3 * time.Second))
 	var evt map[string]interface{}
 	require.NoError(t, bobConn.ReadJSON(&evt))
