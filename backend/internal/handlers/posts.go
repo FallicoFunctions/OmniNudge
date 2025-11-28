@@ -10,17 +10,17 @@ import (
 
 // PostsHandler handles HTTP requests for platform posts
 type PostsHandler struct {
-	postRepo      *models.PlatformPostRepository
-	subredditRepo *models.SubredditRepository
-	modRepo       *models.SubredditModeratorRepository
+	postRepo *models.PlatformPostRepository
+	hubRepo  *models.HubRepository
+	modRepo  *models.HubModeratorRepository
 }
 
 // NewPostsHandler creates a new posts handler
-func NewPostsHandler(postRepo *models.PlatformPostRepository, subredditRepo *models.SubredditRepository, modRepo *models.SubredditModeratorRepository) *PostsHandler {
+func NewPostsHandler(postRepo *models.PlatformPostRepository, hubRepo *models.HubRepository, modRepo *models.HubModeratorRepository) *PostsHandler {
 	return &PostsHandler{
-		postRepo:      postRepo,
-		subredditRepo: subredditRepo,
-		modRepo:       modRepo,
+		postRepo: postRepo,
+		hubRepo:  hubRepo,
+		modRepo:  modRepo,
 	}
 }
 
@@ -32,7 +32,7 @@ type CreatePostRequest struct {
 	MediaURL     *string  `json:"media_url"`
 	MediaType    *string  `json:"media_type"`
 	ThumbnailURL *string  `json:"thumbnail_url"`
-	SubredditID  *int     `json:"subreddit_id"`
+	HubID        *int     `json:"hub_id"`
 }
 
 // UpdatePostRequest represents the request body for updating a post
@@ -60,34 +60,34 @@ func (h *PostsHandler) CreatePost(c *gin.Context) {
 		return
 	}
 
-	// Resolve subreddit (default to "general" if none provided)
-	var subredditID int
-	if req.SubredditID != nil {
-		subredditID = *req.SubredditID
+	// Resolve hub (default to "general" if none provided)
+	var hubID int
+	if req.HubID != nil {
+		hubID = *req.HubID
 	} else {
 		// fallback to general
-		sr, err := h.subredditRepo.GetByName(c.Request.Context(), "general")
+		sr, err := h.hubRepo.GetByName(c.Request.Context(), "general")
 		if err != nil || sr == nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid subreddit"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid hub"})
 			return
 		}
-		subredditID = sr.ID
+		hubID = sr.ID
 	}
 
-	// Validate subreddit exists
-	sr, err := h.subredditRepo.GetByID(c.Request.Context(), subredditID)
+	// Validate hub exists
+	sr, err := h.hubRepo.GetByID(c.Request.Context(), hubID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch subreddit", "details": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch hub", "details": err.Error()})
 		return
 	}
 	if sr == nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Subreddit not found"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Hub not found"})
 		return
 	}
 
 	post := &models.PlatformPost{
 		AuthorID:     userID.(int),
-		SubredditID:  subredditID,
+		HubID:        hubID,
 		Title:        req.Title,
 		Body:         req.Body,
 		Tags:         req.Tags,
@@ -141,34 +141,34 @@ func (h *PostsHandler) GetFeed(c *gin.Context) {
 	sortBy := c.DefaultQuery("sort", "new") // "new", "hot", "score"
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "25"))
 	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
-	subredditName := c.Query("subreddit") // optional filter by subreddit name
+	hubName := c.Query("hub") // optional filter by hub name
 
 	// Validate limit
 	if limit < 1 || limit > 100 {
 		limit = 25
 	}
 
-	if subredditName != "" {
-		sr, err := h.subredditRepo.GetByName(c.Request.Context(), subredditName)
+	if hubName != "" {
+		sr, err := h.hubRepo.GetByName(c.Request.Context(), hubName)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch subreddit", "details": err.Error()})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch hub", "details": err.Error()})
 			return
 		}
 		if sr == nil {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Subreddit not found"})
+			c.JSON(http.StatusNotFound, gin.H{"error": "Hub not found"})
 			return
 		}
-		posts, err := h.postRepo.GetBySubreddit(c.Request.Context(), sr.ID, sortBy, limit, offset)
+		posts, err := h.postRepo.GetByHub(c.Request.Context(), sr.ID, sortBy, limit, offset)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get feed", "details": err.Error()})
 			return
 		}
 		c.JSON(http.StatusOK, gin.H{
-			"posts":     posts,
-			"limit":     limit,
-			"offset":    offset,
-			"sort":      sortBy,
-			"subreddit": subredditName,
+			"posts":  posts,
+			"limit":  limit,
+			"offset": offset,
+			"sort":   sortBy,
+			"hub":    hubName,
 		})
 		return
 	}
@@ -223,15 +223,15 @@ func (h *PostsHandler) UpdatePost(c *gin.Context) {
 		return
 	}
 
-	// Verify user owns this post or is a global moderator/admin or subreddit moderator
-	isSubMod := false
+	// Verify user owns this post or is a global moderator/admin or hub moderator
+	isHubMod := false
 	if h.modRepo != nil {
-		if ok, err := h.modRepo.IsModerator(c.Request.Context(), existingPost.SubredditID, userID.(int)); err == nil {
-			isSubMod = ok
+		if ok, err := h.modRepo.IsModerator(c.Request.Context(), existingPost.HubID, userID.(int)); err == nil {
+			isHubMod = ok
 		}
 	}
 
-	if existingPost.AuthorID != userID.(int) && roleStr != "moderator" && roleStr != "admin" && !isSubMod {
+	if existingPost.AuthorID != userID.(int) && roleStr != "moderator" && roleStr != "admin" && !isHubMod {
 		c.JSON(http.StatusForbidden, gin.H{"error": "You can only edit your own posts"})
 		return
 	}
@@ -287,15 +287,15 @@ func (h *PostsHandler) DeletePost(c *gin.Context) {
 		return
 	}
 
-	// Verify user owns this post or is global mod/admin or subreddit mod
-	isSubMod := false
+	// Verify user owns this post or is global mod/admin or hub mod
+	isHubMod := false
 	if h.modRepo != nil {
-		if ok, err := h.modRepo.IsModerator(c.Request.Context(), existingPost.SubredditID, userID.(int)); err == nil {
-			isSubMod = ok
+		if ok, err := h.modRepo.IsModerator(c.Request.Context(), existingPost.HubID, userID.(int)); err == nil {
+			isHubMod = ok
 		}
 	}
 
-	if existingPost.AuthorID != userID.(int) && roleStr != "moderator" && roleStr != "admin" && !isSubMod {
+	if existingPost.AuthorID != userID.(int) && roleStr != "moderator" && roleStr != "admin" && !isHubMod {
 		c.JSON(http.StatusForbidden, gin.H{"error": "You can only delete your own posts"})
 		return
 	}
