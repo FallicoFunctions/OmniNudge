@@ -52,7 +52,7 @@ func TestAuthRegisterLoginMe(t *testing.T) {
 	require.Equal(t, http.StatusOK, w.Code)
 }
 
-func TestSubredditCreationRequiresRole(t *testing.T) {
+func TestSubredditCreation(t *testing.T) {
 	deps := newTestDeps(t)
 	defer deps.DB.Close()
 
