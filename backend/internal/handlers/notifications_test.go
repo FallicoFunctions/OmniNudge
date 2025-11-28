@@ -3,9 +3,11 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
+	"sync/atomic"
 	"testing"
 
 	"github.com/chatreddit/backend/internal/database"
@@ -14,6 +16,13 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+var notifTestCounter int64
+
+func uniqueNotifUsername(base string) string {
+	id := atomic.AddInt64(&notifTestCounter, 1)
+	return fmt.Sprintf("%s_%d", base, id)
+}
 
 func setupNotificationsHandlerTest(t *testing.T) (*NotificationsHandler, *database.Database, int, func()) {
 	db, err := database.NewTest()
@@ -26,7 +35,7 @@ func setupNotificationsHandlerTest(t *testing.T) (*NotificationsHandler, *databa
 	// Create test user
 	userRepo := models.NewUserRepository(db.Pool)
 	user := &models.User{
-		Username:     "testuser",
+		Username:     uniqueNotifUsername("testuser"),
 		PasswordHash: "test_hash",
 	}
 	err = userRepo.Create(ctx, user)
