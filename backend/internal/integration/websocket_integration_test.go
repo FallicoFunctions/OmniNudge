@@ -84,10 +84,15 @@ func TestWebSocketTypingBroadcast(t *testing.T) {
 	w = doRequest(t, deps.Router, reqMsg)
 	require.Equal(t, http.StatusCreated, w.Code)
 
-	// Expect at least one event (new_message) and possibly delivered/read
+	// Expect new_message
 	bobConn.SetReadDeadline(time.Now().Add(3 * time.Second))
 	var evt map[string]interface{}
 	require.NoError(t, bobConn.ReadJSON(&evt))
-	_, ok := evt["type"]
-	require.True(t, ok)
+	require.Equal(t, "new_message", evt["type"])
+
+	// Expect delivered/read to sender or recipient (best-effort)
+	aliceConn.SetReadDeadline(time.Now().Add(3 * time.Second))
+	var evt2 map[string]interface{}
+	require.NoError(t, aliceConn.ReadJSON(&evt2))
+	require.Contains(t, evt2["type"], "delivered")
 }

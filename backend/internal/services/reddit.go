@@ -35,6 +35,11 @@ func NewRedditClient(userAgent string, cache Cache, cacheTTL time.Duration) *Red
 	}
 }
 
+// HTTPClientForTest allows tests to override the transport
+func (r *RedditClient) HTTPClientForTest() *http.Client {
+	return r.httpClient
+}
+
 // RedditPost represents a post from Reddit's API
 type RedditPost struct {
 	ID               string     `json:"id"`
