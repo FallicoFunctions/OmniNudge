@@ -87,7 +87,7 @@ func TestSearchPosts(t *testing.T) {
 	router.ServeHTTP(w, req)
 
 	// Assert response
-	assert.Equal(t, http.StatusOK, w.Code)
+	require.Equal(t, http.StatusOK, w.Code, "body=%s", w.Body.String())
 
 	var response map[string]interface{}
 	err = json.Unmarshal(w.Body.Bytes(), &response)
@@ -147,7 +147,7 @@ func TestSearchComments(t *testing.T) {
 	router.ServeHTTP(w, req)
 
 	// Assert response
-	assert.Equal(t, http.StatusOK, w.Code)
+	require.Equal(t, http.StatusOK, w.Code, "body=%s", w.Body.String())
 
 	var response map[string]interface{}
 	err = json.Unmarshal(w.Body.Bytes(), &response)
@@ -183,7 +183,7 @@ func TestSearchUsers(t *testing.T) {
 	router.ServeHTTP(w, req)
 
 	// Assert response
-	assert.Equal(t, http.StatusOK, w.Code)
+	require.Equal(t, http.StatusOK, w.Code, "body=%s", w.Body.String())
 
 	var response map[string]interface{}
 	err = json.Unmarshal(w.Body.Bytes(), &response)
@@ -228,7 +228,7 @@ func TestSearchHubs(t *testing.T) {
 	router.ServeHTTP(w, req)
 
 	// Assert response
-	assert.Equal(t, http.StatusOK, w.Code)
+	require.Equal(t, http.StatusOK, w.Code, "body=%s", w.Body.String())
 
 	var response map[string]interface{}
 	err = json.Unmarshal(w.Body.Bytes(), &response)

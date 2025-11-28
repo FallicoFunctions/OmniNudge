@@ -184,13 +184,24 @@ func TestExponentialGrowthDetection(t *testing.T) {
 
 	// Insert vote activity to simulate velocity doubling
 	now := time.Now()
-	_, err = db.Pool.Exec(ctx, `
-		INSERT INTO vote_activity (content_type, content_id, hour_timestamp, vote_count)
-		VALUES
-			('post', $1, $2, 5),
-			('post', $1, $3, 10)
-	`, post.ID, now.Add(-1*time.Hour), now)
-	require.NoError(t, err)
+	prevBase := now.Add(-90 * time.Minute)
+	for i := 0; i < 5; i++ {
+		ts := prevBase.Add(time.Duration(i*5) * time.Minute)
+		_, err = db.Pool.Exec(ctx, `
+			INSERT INTO vote_activity (content_type, content_id, author_id, voter_id, is_upvote, hour_bucket, created_at)
+			VALUES ('post', $1, $2, $3, TRUE, date_trunc('hour', $4::timestamptz), $4)
+		`, post.ID, user.ID, user.ID, ts)
+		require.NoError(t, err)
+	}
+	currBase := now.Add(-30 * time.Minute)
+	for i := 0; i < 10; i++ {
+		ts := currBase.Add(time.Duration(i*3) * time.Minute)
+		_, err = db.Pool.Exec(ctx, `
+			INSERT INTO vote_activity (content_type, content_id, author_id, voter_id, is_upvote, hour_bucket, created_at)
+			VALUES ('post', $1, $2, $3, TRUE, date_trunc('hour', $4::timestamptz), $4)
+		`, post.ID, user.ID, user.ID, ts)
+		require.NoError(t, err)
+	}
 
 	// Test exponential growth detection
 	isExponential, err := detector.IsExponentialGrowth(ctx, "post", post.ID, 10.0)
@@ -203,13 +214,26 @@ func TestExponentialGrowthDetection(t *testing.T) {
 	`, post.ID)
 	require.NoError(t, err)
 
-	_, err = db.Pool.Exec(ctx, `
-		INSERT INTO vote_activity (content_type, content_id, hour_timestamp, vote_count)
-		VALUES
-			('post', $1, $2, 5),
-			('post', $1, $3, 6)
-	`, post.ID, now.Add(-1*time.Hour), now)
-	require.NoError(t, err)
+	now = time.Now()
+	prevBase = now.Add(-90 * time.Minute)
+	currBase = now.Add(-30 * time.Minute)
+
+	for i := 0; i < 5; i++ {
+		ts := prevBase.Add(time.Duration(i*5) * time.Minute)
+		_, err = db.Pool.Exec(ctx, `
+			INSERT INTO vote_activity (content_type, content_id, author_id, voter_id, is_upvote, hour_bucket, created_at)
+			VALUES ('post', $1, $2, $3, TRUE, date_trunc('hour', $4::timestamptz), $4)
+		`, post.ID, user.ID, user.ID, ts)
+		require.NoError(t, err)
+	}
+	for i := 0; i < 6; i++ {
+		ts := currBase.Add(time.Duration(i*6) * time.Minute)
+		_, err = db.Pool.Exec(ctx, `
+			INSERT INTO vote_activity (content_type, content_id, author_id, voter_id, is_upvote, hour_bucket, created_at)
+			VALUES ('post', $1, $2, $3, TRUE, date_trunc('hour', $4::timestamptz), $4)
+		`, post.ID, user.ID, user.ID, ts)
+		require.NoError(t, err)
+	}
 
 	isExponential, err = detector.IsExponentialGrowth(ctx, "post", post.ID, 6.0)
 	require.NoError(t, err)
@@ -246,7 +270,7 @@ func TestExponentialGrowthWithInsufficientData(t *testing.T) {
 	// Create test user
 	userRepo := models.NewUserRepository(db.Pool)
 	user := &models.User{
-		Username:     "testuser",
+		Username:     uniqueVelocityName("insufficient_user"),
 		PasswordHash: "test_hash",
 	}
 	err := userRepo.Create(ctx, user)
@@ -255,7 +279,7 @@ func TestExponentialGrowthWithInsufficientData(t *testing.T) {
 	// Create hub and post
 	hubRepo := models.NewHubRepository(db.Pool)
 	hub := &models.Hub{
-		Name:      "test_hub",
+		Name:      uniqueVelocityName("insufficient_hub"),
 		CreatedBy: &user.ID,
 	}
 	err = hubRepo.Create(ctx, hub)
@@ -278,9 +302,9 @@ func TestExponentialGrowthWithInsufficientData(t *testing.T) {
 	// Insert only one data point
 	now := time.Now()
 	_, err = db.Pool.Exec(ctx, `
-		INSERT INTO vote_activity (content_type, content_id, hour_timestamp, vote_count)
-		VALUES ('post', $1, $2, 5)
-	`, post.ID, now)
+		INSERT INTO vote_activity (content_type, content_id, author_id, voter_id, is_upvote, hour_bucket, created_at)
+		VALUES ('post', $1, $2, $2, TRUE, date_trunc('hour', $3::timestamptz), $3)
+	`, post.ID, user.ID, now)
 	require.NoError(t, err)
 
 	isExponential, err = detector.IsExponentialGrowth(ctx, "post", post.ID, 10.0)

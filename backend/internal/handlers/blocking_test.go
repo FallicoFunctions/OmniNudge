@@ -62,7 +62,7 @@ func setupBlockingHandlerTest(t *testing.T) (*BlockingHandler, *database.Databas
 }
 
 func TestBlockUser(t *testing.T) {
-	handler, _, blockerID, blockedID, _, blockedUsername, cleanup := setupBlockingHandlerTest(t)
+	handler, _, blockerID, _, _, blockedUsername, cleanup := setupBlockingHandlerTest(t)
 	defer cleanup()
 
 	// Create request
@@ -173,7 +173,7 @@ func TestUnblockNonBlockedUser(t *testing.T) {
 }
 
 func TestGetBlockedUsers(t *testing.T) {
-	handler, db, blockerID, blockedID, _, blockedUsername, cleanup := setupBlockingHandlerTest(t)
+	handler, db, blockerID, blockedID, _, _, cleanup := setupBlockingHandlerTest(t)
 	defer cleanup()
 
 	ctx := context.Background()

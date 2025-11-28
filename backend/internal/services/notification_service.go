@@ -200,10 +200,13 @@ func (s *NotificationService) checkVelocityNotification(
 // NotifyCommentReply sends a notification for comment replies
 func (s *NotificationService) NotifyCommentReply(
 	ctx context.Context,
-	parentContentID int,
-	replyAuthorID int,
+	replyCommentID int,
 	recipientID int,
+	replyAuthorID int,
 ) error {
+	if recipientID == replyAuthorID {
+		return nil
+	}
 	// Get recipient settings
 	settings, err := s.getOrCreateSettings(ctx, recipientID)
 	if err != nil {
@@ -215,24 +218,9 @@ func (s *NotificationService) NotifyCommentReply(
 		return nil // User has disabled comment reply notifications
 	}
 
-	// Determine content type based on parentContentID
-	var contentType string
-	var contentID int
-	if parentContentID == 0 {
-		// Top-level comment on a post
-		contentType = "post"
-		// contentID would need to be passed separately or queried
-	} else {
-		// Reply to a comment
-		contentType = "comment"
-		contentID = parentContentID
-	}
-
+	contentType := "comment"
+	contentID := replyCommentID
 	message := "Someone replied to your comment"
-	if contentType == "post" {
-		message = "Someone commented on your post"
-	}
-
 	notification := &models.Notification{
 		UserID:           recipientID,
 		NotificationType: "comment_reply",
