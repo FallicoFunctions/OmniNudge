@@ -2,6 +2,8 @@ package services
 
 import (
 	"context"
+	"fmt"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -10,6 +12,16 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+var (
+	baselineTestSuffix  = time.Now().UnixNano()
+	baselineTestCounter int64
+)
+
+func uniqueBaselineName(base string) string {
+	id := atomic.AddInt64(&baselineTestCounter, 1)
+	return fmt.Sprintf("%s_%d_%d", base, baselineTestSuffix, id)
+}
 
 func setupBaselineTest(t *testing.T) (*BaselineCalculatorService, *database.Database, func()) {
 	db, err := database.NewTest()
@@ -35,7 +47,7 @@ func createUserWithContent(t *testing.T, db *database.Database, username string,
 	// Create user
 	userRepo := models.NewUserRepository(db.Pool)
 	user := &models.User{
-		Username:     username,
+		Username:     uniqueBaselineName(username),
 		PasswordHash: "test_hash",
 	}
 	err := userRepo.Create(ctx, user)
@@ -44,7 +56,7 @@ func createUserWithContent(t *testing.T, db *database.Database, username string,
 	// Create hub
 	hubRepo := models.NewHubRepository(db.Pool)
 	hub := &models.Hub{
-		Name:      username + "_hub",
+		Name:      uniqueBaselineName(username + "_hub"),
 		CreatedBy: &user.ID,
 	}
 	err = hubRepo.Create(ctx, hub)
@@ -195,7 +207,7 @@ func TestBaselineWithOldContent(t *testing.T) {
 	// Create user
 	userRepo := models.NewUserRepository(db.Pool)
 	user := &models.User{
-		Username:     "olduser",
+		Username:     uniqueBaselineName("olduser"),
 		PasswordHash: "test_hash",
 	}
 	err := userRepo.Create(ctx, user)
@@ -204,7 +216,7 @@ func TestBaselineWithOldContent(t *testing.T) {
 	// Create hub
 	hubRepo := models.NewHubRepository(db.Pool)
 	hub := &models.Hub{
-		Name:      "old_hub",
+		Name:      uniqueBaselineName("old_hub"),
 		CreatedBy: &user.ID,
 	}
 	err = hubRepo.Create(ctx, hub)

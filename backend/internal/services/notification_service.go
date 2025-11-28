@@ -314,16 +314,17 @@ func (s *NotificationService) calculateVelocity(
 	contentID int,
 	hours int,
 ) (float64, error) {
+	interval := fmt.Sprintf("%d hours", hours)
 	query := `
 		SELECT COUNT(*)
 		FROM vote_activity
 		WHERE content_type = $1
 		AND content_id = $2
-		AND created_at >= NOW() - ($3 || ' hours')::INTERVAL
+		AND created_at >= NOW() - $3::INTERVAL
 	`
 
 	var voteCount int
-	err := s.pool.QueryRow(ctx, query, contentType, contentID, hours).Scan(&voteCount)
+	err := s.pool.QueryRow(ctx, query, contentType, contentID, interval).Scan(&voteCount)
 	if err != nil {
 		return 0, err
 	}
