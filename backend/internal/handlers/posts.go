@@ -12,13 +12,15 @@ import (
 type PostsHandler struct {
 	postRepo      *models.PlatformPostRepository
 	subredditRepo *models.SubredditRepository
+	modRepo       *models.SubredditModeratorRepository
 }
 
 // NewPostsHandler creates a new posts handler
-func NewPostsHandler(postRepo *models.PlatformPostRepository, subredditRepo *models.SubredditRepository) *PostsHandler {
+func NewPostsHandler(postRepo *models.PlatformPostRepository, subredditRepo *models.SubredditRepository, modRepo *models.SubredditModeratorRepository) *PostsHandler {
 	return &PostsHandler{
 		postRepo:      postRepo,
 		subredditRepo: subredditRepo,
+		modRepo:       modRepo,
 	}
 }
 
@@ -221,8 +223,15 @@ func (h *PostsHandler) UpdatePost(c *gin.Context) {
 		return
 	}
 
-	// Verify user owns this post or is a global moderator/admin
-	if existingPost.AuthorID != userID.(int) && roleStr != "moderator" && roleStr != "admin" {
+	// Verify user owns this post or is a global moderator/admin or subreddit moderator
+	isSubMod := false
+	if h.modRepo != nil {
+		if ok, err := h.modRepo.IsModerator(c.Request.Context(), existingPost.SubredditID, userID.(int)); err == nil {
+			isSubMod = ok
+		}
+	}
+
+	if existingPost.AuthorID != userID.(int) && roleStr != "moderator" && roleStr != "admin" && !isSubMod {
 		c.JSON(http.StatusForbidden, gin.H{"error": "You can only edit your own posts"})
 		return
 	}
@@ -257,6 +266,8 @@ func (h *PostsHandler) DeletePost(c *gin.Context) {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
 		return
 	}
+	role, _ := c.Get("role")
+	roleStr, _ := role.(string)
 
 	postID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
@@ -276,8 +287,15 @@ func (h *PostsHandler) DeletePost(c *gin.Context) {
 		return
 	}
 
-	// Verify user owns this post
-	if existingPost.AuthorID != userID.(int) {
+	// Verify user owns this post or is global mod/admin or subreddit mod
+	isSubMod := false
+	if h.modRepo != nil {
+		if ok, err := h.modRepo.IsModerator(c.Request.Context(), existingPost.SubredditID, userID.(int)); err == nil {
+			isSubMod = ok
+		}
+	}
+
+	if existingPost.AuthorID != userID.(int) && roleStr != "moderator" && roleStr != "admin" && !isSubMod {
 		c.JSON(http.StatusForbidden, gin.H{"error": "You can only delete your own posts"})
 		return
 	}

@@ -12,13 +12,15 @@ import (
 type CommentsHandler struct {
 	commentRepo *models.PostCommentRepository
 	postRepo    *models.PlatformPostRepository
+	modRepo     *models.SubredditModeratorRepository
 }
 
 // NewCommentsHandler creates a new comments handler
-func NewCommentsHandler(commentRepo *models.PostCommentRepository, postRepo *models.PlatformPostRepository) *CommentsHandler {
+func NewCommentsHandler(commentRepo *models.PostCommentRepository, postRepo *models.PlatformPostRepository, modRepo *models.SubredditModeratorRepository) *CommentsHandler {
 	return &CommentsHandler{
 		commentRepo: commentRepo,
 		postRepo:    postRepo,
+		modRepo:     modRepo,
 	}
 }
 
@@ -219,8 +221,18 @@ func (h *CommentsHandler) UpdateComment(c *gin.Context) {
 		return
 	}
 
-	// Verify user owns this comment
-	if existingComment.UserID != userID.(int) && roleStr != "moderator" && roleStr != "admin" {
+	// Subreddit mod check
+	isSubMod := false
+	if h.modRepo != nil {
+		if post, _ := h.postRepo.GetByID(c.Request.Context(), existingComment.PostID); post != nil {
+			if ok, err := h.modRepo.IsModerator(c.Request.Context(), post.SubredditID, userID.(int)); err == nil {
+				isSubMod = ok
+			}
+		}
+	}
+
+	// Verify user owns this comment or is mod/admin (global or subreddit)
+	if existingComment.UserID != userID.(int) && roleStr != "moderator" && roleStr != "admin" && !isSubMod {
 		c.JSON(http.StatusForbidden, gin.H{"error": "You can only edit your own comments"})
 		return
 	}
@@ -271,8 +283,18 @@ func (h *CommentsHandler) DeleteComment(c *gin.Context) {
 		return
 	}
 
-	// Verify user owns this comment
-	if existingComment.UserID != userID.(int) && roleStr != "moderator" && roleStr != "admin" {
+	// Subreddit mod check
+	isSubMod := false
+	if h.modRepo != nil {
+		if post, _ := h.postRepo.GetByID(c.Request.Context(), existingComment.PostID); post != nil {
+			if ok, err := h.modRepo.IsModerator(c.Request.Context(), post.SubredditID, userID.(int)); err == nil {
+				isSubMod = ok
+			}
+		}
+	}
+
+	// Verify user owns this comment or is mod/admin (global or subreddit)
+	if existingComment.UserID != userID.(int) && roleStr != "moderator" && roleStr != "admin" && !isSubMod {
 		c.JSON(http.StatusForbidden, gin.H{"error": "You can only delete your own comments"})
 		return
 	}

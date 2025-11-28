@@ -232,6 +232,7 @@ func main() {
 			admin.Use(middleware.RequireRole("admin"))
 			{
 				admin.POST("/users/:id/role", adminHandler.PromoteUser)
+				admin.POST("/subreddits/:name/moderators", subredditsHandler.AddModerator)
 			}
 
 			// WebSocket endpoint for real-time messaging
