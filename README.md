@@ -108,6 +108,24 @@ go run ./cmd/server/
 
 The server will start on `http://localhost:8080`
 
+### Running Tests
+
+Several packages spin up their own PostgreSQL connection during tests, so make sure a **separate** database exists for them (recommended name: `chatreddit_test`).
+
+```bash
+createdb chatreddit_test
+```
+
+Then point the tests at that database using `TEST_DATABASE_URL` before running `go test`:
+
+```bash
+cd backend
+export TEST_DATABASE_URL="postgres://<db-user>@localhost:5432/chatreddit_test?sslmode=disable"
+go test ./...
+```
+
+This ensures unit, service, and integration tests all connect cleanly without interfering with your dev data.
+
 ### Configuration
 
 Environment variables (optional - defaults provided):
