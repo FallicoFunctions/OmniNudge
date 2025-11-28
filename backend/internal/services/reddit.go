@@ -35,7 +35,7 @@ func NewRedditClient(userAgent string, cache Cache, cacheTTL time.Duration) *Red
 	}
 }
 
-// HTTPClientForTest allows tests to override the transport
+// HTTPClientForTest exposes the underlying HTTP client for test overrides.
 func (r *RedditClient) HTTPClientForTest() *http.Client {
 	return r.httpClient
 }
