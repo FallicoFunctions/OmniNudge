@@ -273,37 +273,42 @@ func TestBaselineUpdateIdempotence(t *testing.T) {
 	assert.Equal(t, baseline1.TotalPosts, baseline2.TotalPosts)
 	assert.Equal(t, baseline1.TotalComments, baseline2.TotalComments)
 	// UpdatedAt should be newer
-	assert.True(t, baseline2.UpdatedAt.After(baseline1.UpdatedAt) || baseline2.UpdatedAt.Equal(baseline1.UpdatedAt))
+	assert.True(t, baseline2.LastCalculatedAt.After(baseline1.LastCalculatedAt) || baseline2.LastCalculatedAt.Equal(baseline1.LastCalculatedAt))
 }
 
 func TestGetExperienceLevel(t *testing.T) {
-	service, db, cleanup := setupBaselineTest(t)
+	_, db, cleanup := setupBaselineTest(t)
 	defer cleanup()
 
 	ctx := context.Background()
+	baselineRepo := models.NewUserBaselineRepository(db.Pool)
 
 	tests := []struct {
-		name              string
-		totalPosts        int
-		totalComments     int
-		expectedLevel     string
-		expectedDaysBack  int
+		name          string
+		totalPosts    int
+		totalComments int
+		expectedLevel string
 	}{
-		{"New user", 3, 2, "new", 7},
-		{"Intermediate user", 15, 10, "intermediate", 30},
-		{"Experienced user", 40, 30, "experienced", 90},
+		{"New user", 3, 2, "new"},
+		{"Regular user", 120, 40, "regular"},
+		{"Power user", 400, 200, "power"},
 	}
 
-	for _, tt := range tests {
+	for i, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			userID := i + 1
 			baseline := &models.UserBaseline{
-				TotalPosts:    tt.totalPosts,
-				TotalComments: tt.totalComments,
+				UserID:           userID,
+				TotalPosts:       tt.totalPosts,
+				TotalComments:    tt.totalComments,
+				LastCalculatedAt: time.Now(),
 			}
+			err := baselineRepo.CreateOrUpdate(ctx, baseline)
+			require.NoError(t, err)
 
-			level, daysBack := baseline.GetExperienceLevel()
+			level, err := baselineRepo.GetExperienceLevel(ctx, userID)
+			require.NoError(t, err)
 			assert.Equal(t, tt.expectedLevel, level)
-			assert.Equal(t, tt.expectedDaysBack, daysBack)
 		})
 	}
 }
