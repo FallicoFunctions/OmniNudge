@@ -27,6 +27,7 @@ func TestWebSocketTypingBroadcast(t *testing.T) {
 		wsURL := "ws" + ts.URL[len("http"):] + "/api/v1/ws"
 		h := http.Header{}
 		h.Set("Authorization", "Bearer "+token)
+		h.Set("Origin", "http://localhost:8080")
 		conn, _, err := websocket.DefaultDialer.Dial(wsURL, h)
 		require.NoError(t, err)
 		return conn
