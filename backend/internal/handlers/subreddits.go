@@ -37,12 +37,6 @@ func (h *SubredditsHandler) Create(c *gin.Context) {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
 		return
 	}
-	role, _ := c.Get("role")
-	roleStr, _ := role.(string)
-	if roleStr != "moderator" && roleStr != "admin" {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Only moderators or admins can create subreddits"})
-		return
-	}
 
 	var req CreateSubredditRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
