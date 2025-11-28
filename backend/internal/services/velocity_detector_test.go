@@ -85,9 +85,9 @@ func TestExperiencedUserVelocityThreshold(t *testing.T) {
 		TotalPosts:          15,
 		TotalComments:       20,
 		AvgPostVotesPerHour: 3.0,
-		UpdatedAt:           time.Now(),
+		LastCalculatedAt:    time.Now(),
 	}
-	err = baselineRepo.Upsert(ctx, baseline)
+	err = baselineRepo.CreateOrUpdate(ctx, baseline)
 	require.NoError(t, err)
 
 	tests := []struct {

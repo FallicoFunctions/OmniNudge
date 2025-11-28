@@ -249,7 +249,7 @@ func TestBatchedNotifications(t *testing.T) {
 
 	// Check if batch was created
 	batchRepo := models.NewNotificationBatchRepository(db.Pool)
-	batches, err := batchRepo.GetPending(ctx, time.Now().Add(20*time.Minute), 10)
+	batches, err := batchRepo.GetPendingBatches(ctx, time.Now().Add(20*time.Minute))
 	require.NoError(t, err)
 
 	// Should have created a batch for non-exponential growth

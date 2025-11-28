@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strconv"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -99,6 +100,13 @@ func setupNotificationIntegrationTest(t *testing.T) (*gin.Engine, *database.Data
 	return router, db, notifService, cleanup
 }
 
+var uniqueCounter int64
+
+func uniqueName(base string) string {
+	id := atomic.AddInt64(&uniqueCounter, 1)
+	return fmt.Sprintf("%s_%d", base, id)
+}
+
 func createIntegrationTestData(t *testing.T, db *database.Database) (authorID, voterID, hubID, postID int) {
 	ctx := context.Background()
 
@@ -107,7 +115,7 @@ func createIntegrationTestData(t *testing.T, db *database.Database) (authorID, v
 
 	// Create author
 	author := &models.User{
-		Username:     "post_author",
+		Username:     uniqueName("post_author"),
 		PasswordHash: "test_hash",
 	}
 	err := userRepo.Create(ctx, author)
@@ -127,7 +135,7 @@ func createIntegrationTestData(t *testing.T, db *database.Database) (authorID, v
 
 	// Create voter
 	voter := &models.User{
-		Username:     "voter",
+		Username:     uniqueName("voter"),
 		PasswordHash: "test_hash",
 	}
 	err = userRepo.Create(ctx, voter)
@@ -136,7 +144,7 @@ func createIntegrationTestData(t *testing.T, db *database.Database) (authorID, v
 	// Create hub
 	hubRepo := models.NewHubRepository(db.Pool)
 	hub := &models.Hub{
-		Name:      "test_hub",
+		Name:      uniqueName("test_hub"),
 		CreatedBy: &author.ID,
 	}
 	err = hubRepo.Create(ctx, hub)
@@ -147,7 +155,7 @@ func createIntegrationTestData(t *testing.T, db *database.Database) (authorID, v
 	post := &models.PlatformPost{
 		AuthorID: author.ID,
 		HubID:    hub.ID,
-		Title:    "Test Post",
+		Title:    fmt.Sprintf("Test Post %s", uniqueName("post")),
 	}
 	err = postRepo.Create(ctx, post)
 	require.NoError(t, err)

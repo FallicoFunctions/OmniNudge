@@ -50,8 +50,8 @@ func createTestNotification(t *testing.T, db *database.Database, userID int, not
 		UserID:           userID,
 		NotificationType: notifType,
 		Message:          "Test notification",
-		ContentType:      strPtr("post"),
-		ContentID:        intPtr(1),
+		ContentType:      testStrPtr("post"),
+		ContentID:        testIntPtr(1),
 		Read:             false,
 	}
 
@@ -60,13 +60,9 @@ func createTestNotification(t *testing.T, db *database.Database, userID int, not
 	return notif.ID
 }
 
-func strPtr(s string) *string {
-	return &s
-}
+func testStrPtr(s string) *string { return &s }
 
-func intPtr(i int) *int {
-	return &i
-}
+func testIntPtr(i int) *int { return &i }
 
 func TestGetNotifications(t *testing.T) {
 	handler, db, userID, cleanup := setupNotificationsHandlerTest(t)
