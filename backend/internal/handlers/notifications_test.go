@@ -1,11 +1,11 @@
 package handlers
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"testing"
 
 	"github.com/chatreddit/backend/internal/database"
@@ -47,17 +47,25 @@ func createTestNotification(t *testing.T, db *database.Database, userID int, not
 	notifRepo := models.NewNotificationRepository(db.Pool)
 
 	notif := &models.Notification{
-		UserID:      userID,
-		Type:        notifType,
-		Message:     "Test notification",
-		ContentType: "post",
-		ContentID:   1,
-		IsRead:      false,
+		UserID:           userID,
+		NotificationType: notifType,
+		Message:          "Test notification",
+		ContentType:      strPtr("post"),
+		ContentID:        intPtr(1),
+		Read:             false,
 	}
 
 	err := notifRepo.Create(ctx, notif)
 	require.NoError(t, err)
 	return notif.ID
+}
+
+func strPtr(s string) *string {
+	return &s
+}
+
+func intPtr(i int) *int {
+	return &i
 }
 
 func TestGetNotifications(t *testing.T) {
@@ -137,7 +145,7 @@ func TestMarkAsRead(t *testing.T) {
 		handler.MarkAsRead(c)
 	})
 
-	req := httptest.NewRequest("POST", "/notifications/"+string(rune(notifID))+"/read", nil)
+	req := httptest.NewRequest("POST", "/notifications/"+strconv.Itoa(notifID)+"/read", nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
@@ -148,7 +156,8 @@ func TestMarkAsRead(t *testing.T) {
 	notifRepo := models.NewNotificationRepository(db.Pool)
 	notif, err := notifRepo.GetByID(context.Background(), notifID, userID)
 	require.NoError(t, err)
-	assert.True(t, notif.IsRead)
+	require.NotNil(t, notif)
+	assert.True(t, notif.Read)
 }
 
 func TestMarkAllAsRead(t *testing.T) {
@@ -194,7 +203,7 @@ func TestDeleteNotification(t *testing.T) {
 		handler.DeleteNotification(c)
 	})
 
-	req := httptest.NewRequest("DELETE", "/notifications/"+string(rune(notifID)), nil)
+	req := httptest.NewRequest("DELETE", "/notifications/"+strconv.Itoa(notifID), nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
