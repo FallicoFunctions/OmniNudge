@@ -85,6 +85,7 @@ func main() {
 	mediaHandler := handlers.NewMediaHandler(mediaRepo)
 	subredditsHandler := handlers.NewSubredditsHandler(subredditRepo, postRepo)
 	moderationHandler := handlers.NewModerationHandler(reportRepo, subredditModRepo)
+	adminHandler := handlers.NewAdminHandler(userRepo)
 	wsHandler := handlers.NewWebSocketHandler(hub)
 
 	// Setup Gin router
@@ -224,6 +225,13 @@ func main() {
 			{
 				mod.GET("/reports", moderationHandler.ListReports)
 				mod.POST("/reports/:id/status", moderationHandler.UpdateReportStatus)
+			}
+
+			// Admin endpoints
+			admin := protected.Group("/admin")
+			admin.Use(middleware.RequireRole("admin"))
+			{
+				admin.POST("/users/:id/role", adminHandler.PromoteUser)
 			}
 
 			// WebSocket endpoint for real-time messaging
