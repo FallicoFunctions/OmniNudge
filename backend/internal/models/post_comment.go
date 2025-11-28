@@ -5,16 +5,17 @@ import (
 	"database/sql"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // PostComment represents a comment on a platform post
 type PostComment struct {
-	ID              int        `json:"id"`
-	PostID          int        `json:"post_id"`
-	UserID          int        `json:"user_id"`
-	User            *User      `json:"user,omitempty"` // Optional populated user info
-	ParentCommentID *int       `json:"parent_comment_id,omitempty"`
+	ID              int   `json:"id"`
+	PostID          int   `json:"post_id"`
+	UserID          int   `json:"user_id"`
+	User            *User `json:"user,omitempty"` // Optional populated user info
+	ParentCommentID *int  `json:"parent_comment_id,omitempty"`
 
 	// Comment content
 	Body string `json:"body"`
@@ -321,25 +322,84 @@ func (r *PostCommentRepository) SoftDelete(ctx context.Context, commentID int) e
 	return err
 }
 
-// Vote updates vote counts and score for a comment
-func (r *PostCommentRepository) Vote(ctx context.Context, commentID int, isUpvote bool) error {
-	var query string
-	if isUpvote {
-		query = `
-			UPDATE post_comments
-			SET upvotes = upvotes + 1, score = score + 1
-			WHERE id = $1
-		`
-	} else {
-		query = `
-			UPDATE post_comments
-			SET downvotes = downvotes + 1, score = score - 1
-			WHERE id = $1
-		`
+// Vote records a user's vote and updates aggregate counts, preventing duplicates
+func (r *PostCommentRepository) Vote(ctx context.Context, commentID int, userID int, isUpvote bool) error {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	var existingIsUpvote bool
+	err = tx.QueryRow(ctx, "SELECT is_upvote FROM comment_votes WHERE comment_id = $1 AND user_id = $2", commentID, userID).Scan(&existingIsUpvote)
+	if err != nil && err != pgx.ErrNoRows {
+		return err
 	}
 
-	_, err := r.pool.Exec(ctx, query, commentID)
-	return err
+	switch {
+	case err == pgx.ErrNoRows:
+		// New vote
+		if _, err := tx.Exec(ctx, `
+			INSERT INTO comment_votes (comment_id, user_id, is_upvote)
+			VALUES ($1, $2, $3)
+		`, commentID, userID, isUpvote); err != nil {
+			return err
+		}
+
+		if isUpvote {
+			if _, err := tx.Exec(ctx, `
+				UPDATE post_comments
+				SET upvotes = upvotes + 1, score = score + 1
+				WHERE id = $1
+			`, commentID); err != nil {
+				return err
+			}
+		} else {
+			if _, err := tx.Exec(ctx, `
+				UPDATE post_comments
+				SET downvotes = downvotes + 1, score = score - 1
+				WHERE id = $1
+			`, commentID); err != nil {
+				return err
+			}
+		}
+	case existingIsUpvote == isUpvote:
+		// Duplicate same-direction vote: no-op
+		return tx.Commit(ctx)
+	default:
+		// Toggle vote direction
+		if _, err := tx.Exec(ctx, `
+			UPDATE comment_votes
+			SET is_upvote = $3, created_at = CURRENT_TIMESTAMP
+			WHERE comment_id = $1 AND user_id = $2
+		`, commentID, userID, isUpvote); err != nil {
+			return err
+		}
+
+		if isUpvote {
+			if _, err := tx.Exec(ctx, `
+				UPDATE post_comments
+				SET upvotes = upvotes + 1,
+				    downvotes = GREATEST(downvotes - 1, 0),
+				    score = score + 2
+				WHERE id = $1
+			`, commentID); err != nil {
+				return err
+			}
+		} else {
+			if _, err := tx.Exec(ctx, `
+				UPDATE post_comments
+				SET downvotes = downvotes + 1,
+				    upvotes = GREATEST(upvotes - 1, 0),
+				    score = score - 2
+				WHERE id = $1
+			`, commentID); err != nil {
+				return err
+			}
+		}
+	}
+
+	return tx.Commit(ctx)
 }
 
 // GetReplyCount returns the number of replies to a comment
