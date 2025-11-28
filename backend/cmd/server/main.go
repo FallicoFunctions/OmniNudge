@@ -16,6 +16,7 @@ import (
 	"github.com/chatreddit/backend/internal/models"
 	"github.com/chatreddit/backend/internal/services"
 	"github.com/chatreddit/backend/internal/websocket"
+	"github.com/chatreddit/backend/internal/workers"
 	"github.com/gin-gonic/gin"
 )
 
@@ -54,6 +55,9 @@ func main() {
 	hubRepo := models.NewHubRepository(db.Pool)
 	reportRepo := models.NewReportRepository(db.Pool)
 	hubModRepo := models.NewHubModeratorRepository(db.Pool)
+	notificationRepo := models.NewNotificationRepository(db.Pool)
+	baselineRepo := models.NewUserBaselineRepository(db.Pool)
+	batchRepo := models.NewNotificationBatchRepository(db.Pool)
 
 	// Initialize WebSocket hub
 	hub := websocket.NewHub()
@@ -73,6 +77,24 @@ func main() {
 	}
 	redditClient := services.NewRedditClient(cfg.Reddit.UserAgent, cache, time.Duration(cfg.Redis.TTLSeconds)*time.Second)
 
+	// Initialize notification services
+	notificationService := services.NewNotificationService(
+		db.Pool,
+		notificationRepo,
+		baselineRepo,
+		batchRepo,
+		userSettingsRepo,
+		postRepo,
+		commentRepo,
+		hub,
+	)
+	baselineCalculatorService := services.NewBaselineCalculatorService(db.Pool, baselineRepo)
+
+	// Start background workers
+	workerCtx := context.Background()
+	workerManager := workers.NewWorkerManager(notificationService, baselineCalculatorService)
+	workerManager.Start(workerCtx)
+
 	// Initialize handlers
 	authHandler := handlers.NewAuthHandler(authService, userRepo)
 	settingsHandler := handlers.NewSettingsHandler(userSettingsRepo)
@@ -87,6 +109,13 @@ func main() {
 	moderationHandler := handlers.NewModerationHandler(reportRepo, hubModRepo)
 	adminHandler := handlers.NewAdminHandler(userRepo)
 	wsHandler := handlers.NewWebSocketHandler(hub)
+	notificationsHandler := handlers.NewNotificationsHandler(notificationRepo)
+	searchHandler := handlers.NewSearchHandler(db.Pool)
+	blockingHandler := handlers.NewBlockingHandler(db.Pool, userRepo)
+
+	// Inject notification service into handlers
+	postsHandler.SetNotificationService(notificationService)
+	commentsHandler.SetNotificationService(notificationService)
 
 	// Setup Gin router
 	router := gin.Default()
@@ -177,6 +206,15 @@ func main() {
 			users.GET("/:username/comments", usersHandler.GetUserComments)
 		}
 
+		// Public search routes
+		search := api.Group("/search")
+		{
+			search.GET("/posts", searchHandler.SearchPosts)
+			search.GET("/comments", searchHandler.SearchComments)
+			search.GET("/users", searchHandler.SearchUsers)
+			search.GET("/hubs", searchHandler.SearchHubs)
+		}
+
 		// Protected routes (auth required)
 		protected := api.Group("")
 		protected.Use(middleware.AuthRequired(authService))
@@ -216,6 +254,22 @@ func main() {
 
 			// Media upload
 			protected.POST("/media/upload", mediaHandler.UploadMedia)
+
+			// User profile management
+			protected.PUT("/users/profile", usersHandler.UpdateProfile)
+			protected.POST("/users/change-password", usersHandler.ChangePassword)
+
+			// User blocking
+			protected.POST("/users/block", blockingHandler.BlockUser)
+			protected.DELETE("/users/block/:username", blockingHandler.UnblockUser)
+			protected.GET("/users/blocked", blockingHandler.GetBlockedUsers)
+
+			// Notifications
+			protected.GET("/notifications", notificationsHandler.GetNotifications)
+			protected.GET("/notifications/unread/count", notificationsHandler.GetUnreadCount)
+			protected.POST("/notifications/:id/read", notificationsHandler.MarkAsRead)
+			protected.POST("/notifications/read-all", notificationsHandler.MarkAllAsRead)
+			protected.DELETE("/notifications/:id", notificationsHandler.DeleteNotification)
 
 			// Moderation reports
 			protected.POST("/reports", moderationHandler.CreateReport)

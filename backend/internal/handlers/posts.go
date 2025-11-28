@@ -5,14 +5,16 @@ import (
 	"strconv"
 
 	"github.com/chatreddit/backend/internal/models"
+	"github.com/chatreddit/backend/internal/services"
 	"github.com/gin-gonic/gin"
 )
 
 // PostsHandler handles HTTP requests for platform posts
 type PostsHandler struct {
-	postRepo *models.PlatformPostRepository
-	hubRepo  *models.HubRepository
-	modRepo  *models.HubModeratorRepository
+	postRepo        *models.PlatformPostRepository
+	hubRepo         *models.HubRepository
+	modRepo         *models.HubModeratorRepository
+	notifService    *services.NotificationService
 }
 
 // NewPostsHandler creates a new posts handler
@@ -22,6 +24,11 @@ func NewPostsHandler(postRepo *models.PlatformPostRepository, hubRepo *models.Hu
 		hubRepo:  hubRepo,
 		modRepo:  modRepo,
 	}
+}
+
+// SetNotificationService sets the notification service (called after initialization)
+func (h *PostsHandler) SetNotificationService(notifService *services.NotificationService) {
+	h.notifService = notifService
 }
 
 // CreatePostRequest represents the request body for creating a post
@@ -341,6 +348,14 @@ func (h *PostsHandler) VotePost(c *gin.Context) {
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get updated post", "details": err.Error()})
 		return
+	}
+
+	// Trigger notification check if this was an upvote and service is available
+	if h.notifService != nil && req.IsUpvote != nil && *req.IsUpvote {
+		// Run in background to not block response
+		go func() {
+			_ = h.notifService.CheckAndNotifyVote(c.Request.Context(), "post", postID, post.AuthorID, post.Upvotes)
+		}()
 	}
 
 	c.JSON(http.StatusOK, post)

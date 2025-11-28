@@ -5,14 +5,16 @@ import (
 	"strconv"
 
 	"github.com/chatreddit/backend/internal/models"
+	"github.com/chatreddit/backend/internal/services"
 	"github.com/gin-gonic/gin"
 )
 
 // CommentsHandler handles HTTP requests for post comments
 type CommentsHandler struct {
-	commentRepo *models.PostCommentRepository
-	postRepo    *models.PlatformPostRepository
-	modRepo     *models.HubModeratorRepository
+	commentRepo  *models.PostCommentRepository
+	postRepo     *models.PlatformPostRepository
+	modRepo      *models.HubModeratorRepository
+	notifService *services.NotificationService
 }
 
 // NewCommentsHandler creates a new comments handler
@@ -22,6 +24,11 @@ func NewCommentsHandler(commentRepo *models.PostCommentRepository, postRepo *mod
 		postRepo:    postRepo,
 		modRepo:     modRepo,
 	}
+}
+
+// SetNotificationService sets the notification service (called after initialization)
+func (h *CommentsHandler) SetNotificationService(notifService *services.NotificationService) {
+	h.notifService = notifService
 }
 
 // CreateCommentRequest represents the request body for creating a comment
@@ -102,6 +109,16 @@ func (h *CommentsHandler) CreateComment(c *gin.Context) {
 	_ = h.commentRepo.Vote(c.Request.Context(), comment.ID, userID.(int), &upvote)
 	comment.Score++
 	comment.Upvotes++
+
+	// Trigger notification for comment reply if parent exists and service is available
+	if h.notifService != nil && req.ParentCommentID != nil {
+		go func() {
+			parentComment, err := h.commentRepo.GetByID(c.Request.Context(), *req.ParentCommentID)
+			if err == nil && parentComment != nil {
+				_ = h.notifService.NotifyCommentReply(c.Request.Context(), comment.ID, parentComment.UserID, userID.(int))
+			}
+		}()
+	}
 
 	c.JSON(http.StatusCreated, comment)
 }
@@ -340,6 +357,13 @@ func (h *CommentsHandler) VoteComment(c *gin.Context) {
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get updated comment", "details": err.Error()})
 		return
+	}
+
+	// Trigger notification check if this was an upvote and service is available
+	if h.notifService != nil && req.IsUpvote != nil && *req.IsUpvote {
+		go func() {
+			_ = h.notifService.CheckAndNotifyVote(c.Request.Context(), "comment", commentID, comment.UserID, comment.Upvotes)
+		}()
 	}
 
 	c.JSON(http.StatusOK, comment)
