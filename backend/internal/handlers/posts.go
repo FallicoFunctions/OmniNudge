@@ -10,13 +10,15 @@ import (
 
 // PostsHandler handles HTTP requests for platform posts
 type PostsHandler struct {
-	postRepo *models.PlatformPostRepository
+	postRepo      *models.PlatformPostRepository
+	subredditRepo *models.SubredditRepository
 }
 
 // NewPostsHandler creates a new posts handler
-func NewPostsHandler(postRepo *models.PlatformPostRepository) *PostsHandler {
+func NewPostsHandler(postRepo *models.PlatformPostRepository, subredditRepo *models.SubredditRepository) *PostsHandler {
 	return &PostsHandler{
-		postRepo: postRepo,
+		postRepo:      postRepo,
+		subredditRepo: subredditRepo,
 	}
 }
 
@@ -28,6 +30,7 @@ type CreatePostRequest struct {
 	MediaURL     *string  `json:"media_url"`
 	MediaType    *string  `json:"media_type"`
 	ThumbnailURL *string  `json:"thumbnail_url"`
+	SubredditID  *int     `json:"subreddit_id"`
 }
 
 // UpdatePostRequest represents the request body for updating a post
@@ -55,8 +58,34 @@ func (h *PostsHandler) CreatePost(c *gin.Context) {
 		return
 	}
 
+	// Resolve subreddit (default to "general" if none provided)
+	var subredditID int
+	if req.SubredditID != nil {
+		subredditID = *req.SubredditID
+	} else {
+		// fallback to general
+		sr, err := h.subredditRepo.GetByName(c.Request.Context(), "general")
+		if err != nil || sr == nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid subreddit"})
+			return
+		}
+		subredditID = sr.ID
+	}
+
+	// Validate subreddit exists
+	sr, err := h.subredditRepo.GetByID(c.Request.Context(), subredditID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch subreddit", "details": err.Error()})
+		return
+	}
+	if sr == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Subreddit not found"})
+		return
+	}
+
 	post := &models.PlatformPost{
 		AuthorID:     userID.(int),
+		SubredditID:  subredditID,
 		Title:        req.Title,
 		Body:         req.Body,
 		Tags:         req.Tags,
@@ -110,10 +139,36 @@ func (h *PostsHandler) GetFeed(c *gin.Context) {
 	sortBy := c.DefaultQuery("sort", "new") // "new", "hot", "score"
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "25"))
 	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
+	subredditName := c.Query("subreddit") // optional filter by subreddit name
 
 	// Validate limit
 	if limit < 1 || limit > 100 {
 		limit = 25
+	}
+
+	if subredditName != "" {
+		sr, err := h.subredditRepo.GetByName(c.Request.Context(), subredditName)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch subreddit", "details": err.Error()})
+			return
+		}
+		if sr == nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Subreddit not found"})
+			return
+		}
+		posts, err := h.postRepo.GetBySubreddit(c.Request.Context(), sr.ID, sortBy, limit, offset)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get feed", "details": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{
+			"posts":     posts,
+			"limit":     limit,
+			"offset":    offset,
+			"sort":      sortBy,
+			"subreddit": subredditName,
+		})
+		return
 	}
 
 	posts, err := h.postRepo.GetFeed(c.Request.Context(), sortBy, limit, offset)

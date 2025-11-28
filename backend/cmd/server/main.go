@@ -51,6 +51,7 @@ func main() {
 	conversationRepo := models.NewConversationRepository(db.Pool)
 	messageRepo := models.NewMessageRepository(db.Pool)
 	mediaRepo := models.NewMediaFileRepository(db.Pool)
+	subredditRepo := models.NewSubredditRepository(db.Pool)
 
 	// Initialize WebSocket hub
 	hub := websocket.NewHub()
@@ -69,13 +70,14 @@ func main() {
 	// Initialize handlers
 	authHandler := handlers.NewAuthHandler(authService, userRepo)
 	settingsHandler := handlers.NewSettingsHandler(userSettingsRepo)
-	postsHandler := handlers.NewPostsHandler(postRepo)
+	postsHandler := handlers.NewPostsHandler(postRepo, subredditRepo)
 	commentsHandler := handlers.NewCommentsHandler(commentRepo, postRepo)
 	redditHandler := handlers.NewRedditHandler(redditClient)
 	conversationsHandler := handlers.NewConversationsHandler(conversationRepo, messageRepo, userRepo)
 	messagesHandler := handlers.NewMessagesHandler(messageRepo, conversationRepo, hub)
 	usersHandler := handlers.NewUsersHandler(userRepo, postRepo, commentRepo)
 	mediaHandler := handlers.NewMediaHandler(mediaRepo)
+	subredditsHandler := handlers.NewSubredditsHandler(subredditRepo, postRepo)
 	wsHandler := handlers.NewWebSocketHandler(hub)
 
 	// Setup Gin router
@@ -151,6 +153,14 @@ func main() {
 			reddit.GET("/search", redditHandler.SearchPosts)
 		}
 
+		// Local subreddit routes
+		subreddits := api.Group("/subreddits")
+		{
+			subreddits.GET("", subredditsHandler.List)
+			subreddits.GET("/:name", subredditsHandler.Get)
+			subreddits.GET("/:name/posts", subredditsHandler.GetPosts)
+		}
+
 		// Public user profile routes
 		users := api.Group("/users")
 		{
@@ -180,6 +190,9 @@ func main() {
 			protected.PUT("/comments/:id", commentsHandler.UpdateComment)
 			protected.DELETE("/comments/:id", commentsHandler.DeleteComment)
 			protected.POST("/comments/:id/vote", commentsHandler.VoteComment)
+
+			// Protected subreddit creation
+			protected.POST("/subreddits", subredditsHandler.Create)
 
 			// Protected conversations routes
 			protected.POST("/conversations", conversationsHandler.CreateConversation)
