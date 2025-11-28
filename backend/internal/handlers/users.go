@@ -3,17 +3,21 @@ package handlers
 import (
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/chatreddit/backend/internal/models"
+	"github.com/chatreddit/backend/internal/services"
 	"github.com/gin-gonic/gin"
+	"golang.org/x/crypto/bcrypt"
 )
 
-// UsersHandler serves public user profile data
+// UsersHandler serves public user profile data and profile management
 type UsersHandler struct {
 	userRepo    *models.UserRepository
 	postRepo    *models.PlatformPostRepository
 	commentRepo *models.PostCommentRepository
+	authService *services.AuthService
 }
 
 // NewUsersHandler creates a new UsersHandler
@@ -21,11 +25,13 @@ func NewUsersHandler(
 	userRepo *models.UserRepository,
 	postRepo *models.PlatformPostRepository,
 	commentRepo *models.PostCommentRepository,
+	authService *services.AuthService,
 ) *UsersHandler {
 	return &UsersHandler{
 		userRepo:    userRepo,
 		postRepo:    postRepo,
 		commentRepo: commentRepo,
+		authService: authService,
 	}
 }
 
@@ -131,4 +137,125 @@ func (h *UsersHandler) GetUserComments(c *gin.Context) {
 		"limit":    limit,
 		"offset":   offset,
 	})
+}
+
+type updateProfileRequest struct {
+	Bio       *string `json:"bio"`
+	AvatarURL *string `json:"avatar_url"`
+}
+
+// UpdateProfile handles PUT /api/v1/users/profile
+func (h *UsersHandler) UpdateProfile(c *gin.Context) {
+	userID := c.GetInt("user_id")
+
+	var req updateProfileRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request"})
+		return
+	}
+
+	// Get current user
+	user, err := h.userRepo.GetByID(c.Request.Context(), userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch user"})
+		return
+	}
+	if user == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		return
+	}
+
+	// Validate bio length if provided
+	if req.Bio != nil {
+		bio := strings.TrimSpace(*req.Bio)
+		if len(bio) > 500 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Bio must be 500 characters or less"})
+			return
+		}
+		if bio == "" {
+			user.Bio = nil
+		} else {
+			user.Bio = &bio
+		}
+	}
+
+	// Validate avatar URL if provided
+	if req.AvatarURL != nil {
+		avatarURL := strings.TrimSpace(*req.AvatarURL)
+		if avatarURL == "" {
+			user.AvatarURL = nil
+		} else {
+			// Basic URL validation
+			if !strings.HasPrefix(avatarURL, "http://") && !strings.HasPrefix(avatarURL, "https://") {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "Avatar URL must be a valid HTTP(S) URL"})
+				return
+			}
+			user.AvatarURL = &avatarURL
+		}
+	}
+
+	// Update profile
+	if err := h.userRepo.UpdateProfile(c.Request.Context(), user.ID, user.Bio, user.AvatarURL); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update profile"})
+		return
+	}
+
+	c.JSON(http.StatusOK, UserProfileResponse{
+		ID:        user.ID,
+		Username:  user.Username,
+		AvatarURL: user.AvatarURL,
+		Bio:       user.Bio,
+		Karma:     user.Karma,
+		PublicKey: user.PublicKey,
+		CreatedAt: user.CreatedAt.Format(time.RFC3339),
+		LastSeen:  user.LastSeen.Format(time.RFC3339),
+	})
+}
+
+type changePasswordRequest struct {
+	CurrentPassword string `json:"current_password" binding:"required"`
+	NewPassword     string `json:"new_password" binding:"required,min=8"`
+}
+
+// ChangePassword handles POST /api/v1/users/change-password
+func (h *UsersHandler) ChangePassword(c *gin.Context) {
+	userID := c.GetInt("user_id")
+
+	var req changePasswordRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request. Password must be at least 8 characters"})
+		return
+	}
+
+	// Get current user
+	user, err := h.userRepo.GetByID(c.Request.Context(), userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch user"})
+		return
+	}
+	if user == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		return
+	}
+
+	// Verify current password
+	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.CurrentPassword)); err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Current password is incorrect"})
+		return
+	}
+
+	// Hash new password
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), bcrypt.DefaultCost)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to hash password"})
+		return
+	}
+
+	// Update password
+	if err := h.userRepo.UpdatePassword(c.Request.Context(), user.ID, string(hashedPassword)); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update password"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Password changed successfully"})
 }

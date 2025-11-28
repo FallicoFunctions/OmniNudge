@@ -214,3 +214,17 @@ func (r *UserRepository) UpdatePublicKey(ctx context.Context, userID int, public
 	_, err := r.pool.Exec(ctx, query, publicKey, userID)
 	return err
 }
+
+// UpdateProfile updates a user's bio and avatar
+func (r *UserRepository) UpdateProfile(ctx context.Context, userID int, bio *string, avatarURL *string) error {
+	query := `UPDATE users SET bio = $1, avatar_url = $2 WHERE id = $3`
+	_, err := r.pool.Exec(ctx, query, bio, avatarURL, userID)
+	return err
+}
+
+// UpdatePassword updates a user's password hash
+func (r *UserRepository) UpdatePassword(ctx context.Context, userID int, passwordHash string) error {
+	query := `UPDATE users SET password_hash = $1 WHERE id = $2`
+	_, err := r.pool.Exec(ctx, query, passwordHash, userID)
+	return err
+}
