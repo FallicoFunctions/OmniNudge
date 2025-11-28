@@ -189,8 +189,8 @@ func main() {
 
 			// Protected messages routes
 			protected.POST("/messages", messagesHandler.SendMessage)
-			protected.GET("/conversations/:conversationId/messages", messagesHandler.GetMessages)
-			protected.POST("/conversations/:conversationId/read", messagesHandler.MarkAsRead)
+			protected.GET("/conversations/:id/messages", messagesHandler.GetMessages)
+			protected.POST("/conversations/:id/read", messagesHandler.MarkAsRead)
 			protected.DELETE("/messages/:id", messagesHandler.DeleteMessage)
 
 			// Media upload
