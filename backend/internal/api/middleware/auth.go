@@ -37,7 +37,32 @@ func AuthRequired(authService *services.AuthService) gin.HandlerFunc {
 		c.Set("user_id", claims.UserID)
 		c.Set("reddit_id", claims.RedditID)
 		c.Set("username", claims.Username)
+		c.Set("role", claims.Role)
 
+		c.Next()
+	}
+}
+
+// RequireRole enforces that a user has one of the allowed roles
+func RequireRole(allowedRoles ...string) gin.HandlerFunc {
+	roleSet := make(map[string]bool)
+	for _, r := range allowedRoles {
+		roleSet[r] = true
+	}
+
+	return func(c *gin.Context) {
+		roleVal, exists := c.Get("role")
+		if !exists {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Insufficient permissions"})
+			c.Abort()
+			return
+		}
+		role, ok := roleVal.(string)
+		if !ok || !roleSet[role] {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Insufficient permissions"})
+			c.Abort()
+			return
+		}
 		c.Next()
 	}
 }
