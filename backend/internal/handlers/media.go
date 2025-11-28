@@ -13,6 +13,20 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+const (
+	maxUploadSize = 25 * 1024 * 1024 // 25MB hard cap
+)
+
+var allowedContentTypes = map[string]bool{
+	"image/jpeg":       true,
+	"image/png":        true,
+	"image/webp":       true,
+	"image/gif":        true,
+	"video/mp4":        true,
+	"video/quicktime":  true,
+	"video/webm":       true,
+}
+
 // MediaHandler handles media uploads
 type MediaHandler struct {
 	mediaRepo *models.MediaFileRepository
@@ -31,6 +45,9 @@ func (h *MediaHandler) UploadMedia(c *gin.Context) {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
 		return
 	}
+
+	// Enforce max body size early
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, maxUploadSize+1024)
 
 	file, header, err := c.Request.FormFile("file")
 	if err != nil {
@@ -56,14 +73,42 @@ func (h *MediaHandler) UploadMedia(c *gin.Context) {
 	}
 	defer dst.Close()
 
-	if _, err := io.Copy(dst, file); err != nil {
+	limited := io.LimitReader(file, maxUploadSize+1)
+	var sniff [512]byte
+	n, _ := io.ReadFull(limited, sniff[:])
+	total := int64(n)
+
+	// Detect content type from data, fallback to header
+	contentType := header.Header.Get("Content-Type")
+	if detected := http.DetectContentType(sniff[:n]); detected != "" {
+		contentType = detected
+	}
+	if !allowedContentTypes[contentType] {
+		_ = os.Remove(storagePath)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Unsupported file type", "content_type": contentType})
+		return
+	}
+
+	if n > 0 {
+		if _, err := dst.Write(sniff[:n]); err != nil {
+			_ = os.Remove(storagePath)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save file", "details": err.Error()})
+			return
+		}
+	}
+
+	written, err := io.Copy(dst, limited)
+	total += written
+	if err != nil {
+		_ = os.Remove(storagePath)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save file", "details": err.Error()})
 		return
 	}
 
-	contentType := header.Header.Get("Content-Type")
-	if contentType == "" {
-		contentType = "application/octet-stream"
+	if total > maxUploadSize {
+		_ = os.Remove(storagePath)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "File too large", "max_bytes": maxUploadSize})
+		return
 	}
 
 	var usedInMessageID *int
@@ -78,7 +123,7 @@ func (h *MediaHandler) UploadMedia(c *gin.Context) {
 		Filename:         newName,
 		OriginalFilename: safeName,
 		FileType:         contentType,
-		FileSize:         header.Size,
+		FileSize:         total,
 		StorageURL:       "/uploads/" + newName,
 		StoragePath:      storagePath,
 		UsedInMessageID:  usedInMessageID,
