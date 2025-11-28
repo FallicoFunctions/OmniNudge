@@ -78,6 +78,21 @@ func TestSubredditCreationRequiresRole(t *testing.T) {
 	require.Equal(t, http.StatusCreated, w.Code)
 }
 
+func TestSubredditCreationAsModeratorAllowed(t *testing.T) {
+	deps := newTestDeps(t)
+	defer deps.DB.Close()
+
+	mod := createUser(t, deps.UserRepo, "moduser", "moderator")
+	modToken, _ := deps.AuthService.GenerateJWT(mod.ID, "", mod.Username, mod.Role)
+
+	body := []byte(`{"name":"dogs","description":"all dogs"}`)
+	req, _ := http.NewRequest("POST", "/api/v1/subreddits", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+modToken)
+	w := doRequest(t, deps.Router, req)
+	require.Equal(t, http.StatusCreated, w.Code)
+}
+
 func TestPostsAndCommentsFlow(t *testing.T) {
 	deps := newTestDeps(t)
 	defer deps.DB.Close()
@@ -323,6 +338,39 @@ func TestMessagingFlow(t *testing.T) {
 	req.Header.Set("Authorization", "Bearer "+bobToken)
 	w = doRequest(t, deps.Router, req)
 	require.Equal(t, http.StatusOK, w.Code)
+}
+
+func TestPostVoteLifecycleHTTP(t *testing.T) {
+	deps := newTestDeps(t)
+	defer deps.DB.Close()
+
+	user := createUser(t, deps.UserRepo, "vote_user", "user")
+	token, _ := deps.AuthService.GenerateJWT(user.ID, "", user.Username, user.Role)
+
+	postBody := []byte(`{"title":"vote","body":"body"}`)
+	req, _ := http.NewRequest("POST", "/api/v1/posts", bytes.NewReader(postBody))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
+	w := doRequest(t, deps.Router, req)
+	require.Equal(t, http.StatusCreated, w.Code)
+	var post models.PlatformPost
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &post))
+
+	vote := []byte(`{"is_upvote":true}`)
+	req, _ = http.NewRequest("POST", "/api/v1/posts/"+fmt.Sprint(post.ID)+"/vote", bytes.NewReader(vote))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
+	w = doRequest(t, deps.Router, req)
+	require.Less(t, w.Code, 500)
+	require.Contains(t, w.Body.String(), `"score":1`)
+
+	unvote := []byte(`{"is_upvote":null}`)
+	req, _ = http.NewRequest("POST", "/api/v1/posts/"+fmt.Sprint(post.ID)+"/vote", bytes.NewReader(unvote))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
+	w = doRequest(t, deps.Router, req)
+	require.Equal(t, http.StatusOK, w.Code)
+	require.Contains(t, w.Body.String(), `"score":0`)
 }
 
 func TestUnauthorizedPostCreate(t *testing.T) {
