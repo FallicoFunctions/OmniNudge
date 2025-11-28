@@ -18,6 +18,15 @@ type UserSettings struct {
 	ShowTypingIndicators bool      `json:"show_typing_indicators"`
 	AutoAppendInvitation bool      `json:"auto_append_invitation"`
 	Theme                string    `json:"theme"`
+
+	// Notification preferences
+	NotifyCommentReplies   bool `json:"notify_comment_replies"`
+	NotifyPostMilestone    bool `json:"notify_post_milestone"`
+	NotifyPostVelocity     bool `json:"notify_post_velocity"`
+	NotifyCommentMilestone bool `json:"notify_comment_milestone"`
+	NotifyCommentVelocity  bool `json:"notify_comment_velocity"`
+	DailyDigest            bool `json:"daily_digest"`
+
 	UpdatedAt            time.Time `json:"updated_at"`
 }
 
@@ -35,7 +44,10 @@ func NewUserSettingsRepository(pool *pgxpool.Pool) *UserSettingsRepository {
 func (r *UserSettingsRepository) GetByUserID(ctx context.Context, userID int) (*UserSettings, error) {
 	query := `
 		SELECT user_id, notification_sound, show_read_receipts, show_typing_indicators,
-		       auto_append_invitation, theme, updated_at
+		       auto_append_invitation, theme,
+		       notify_comment_replies, notify_post_milestone, notify_post_velocity,
+		       notify_comment_milestone, notify_comment_velocity, daily_digest,
+		       updated_at
 		FROM user_settings
 		WHERE user_id = $1
 	`
@@ -48,6 +60,12 @@ func (r *UserSettingsRepository) GetByUserID(ctx context.Context, userID int) (*
 		&settings.ShowTypingIndicators,
 		&settings.AutoAppendInvitation,
 		&settings.Theme,
+		&settings.NotifyCommentReplies,
+		&settings.NotifyPostMilestone,
+		&settings.NotifyPostVelocity,
+		&settings.NotifyCommentMilestone,
+		&settings.NotifyCommentVelocity,
+		&settings.DailyDigest,
 		&settings.UpdatedAt,
 	)
 	if err != nil {
@@ -67,7 +85,10 @@ func (r *UserSettingsRepository) CreateDefault(ctx context.Context, userID int) 
 		VALUES ($1)
 		ON CONFLICT (user_id) DO NOTHING
 		RETURNING user_id, notification_sound, show_read_receipts, show_typing_indicators,
-		          auto_append_invitation, theme, updated_at
+		          auto_append_invitation, theme,
+		          notify_comment_replies, notify_post_milestone, notify_post_velocity,
+		          notify_comment_milestone, notify_comment_velocity, daily_digest,
+		          updated_at
 	`
 
 	settings := &UserSettings{}
@@ -78,6 +99,12 @@ func (r *UserSettingsRepository) CreateDefault(ctx context.Context, userID int) 
 		&settings.ShowTypingIndicators,
 		&settings.AutoAppendInvitation,
 		&settings.Theme,
+		&settings.NotifyCommentReplies,
+		&settings.NotifyPostMilestone,
+		&settings.NotifyPostVelocity,
+		&settings.NotifyCommentMilestone,
+		&settings.NotifyCommentVelocity,
+		&settings.DailyDigest,
 		&settings.UpdatedAt,
 	)
 
@@ -101,10 +128,19 @@ func (r *UserSettingsRepository) Update(ctx context.Context, settings *UserSetti
 		    show_typing_indicators = $4,
 		    auto_append_invitation = $5,
 		    theme = $6,
+		    notify_comment_replies = $7,
+		    notify_post_milestone = $8,
+		    notify_post_velocity = $9,
+		    notify_comment_milestone = $10,
+		    notify_comment_velocity = $11,
+		    daily_digest = $12,
 		    updated_at = CURRENT_TIMESTAMP
 		WHERE user_id = $1
 		RETURNING user_id, notification_sound, show_read_receipts, show_typing_indicators,
-		          auto_append_invitation, theme, updated_at
+		          auto_append_invitation, theme,
+		          notify_comment_replies, notify_post_milestone, notify_post_velocity,
+		          notify_comment_milestone, notify_comment_velocity, daily_digest,
+		          updated_at
 	`
 
 	updated := &UserSettings{}
@@ -115,6 +151,12 @@ func (r *UserSettingsRepository) Update(ctx context.Context, settings *UserSetti
 		settings.ShowTypingIndicators,
 		settings.AutoAppendInvitation,
 		settings.Theme,
+		settings.NotifyCommentReplies,
+		settings.NotifyPostMilestone,
+		settings.NotifyPostVelocity,
+		settings.NotifyCommentMilestone,
+		settings.NotifyCommentVelocity,
+		settings.DailyDigest,
 	).Scan(
 		&updated.UserID,
 		&updated.NotificationSound,
@@ -122,6 +164,12 @@ func (r *UserSettingsRepository) Update(ctx context.Context, settings *UserSetti
 		&updated.ShowTypingIndicators,
 		&updated.AutoAppendInvitation,
 		&updated.Theme,
+		&updated.NotifyCommentReplies,
+		&updated.NotifyPostMilestone,
+		&updated.NotifyPostVelocity,
+		&updated.NotifyCommentMilestone,
+		&updated.NotifyCommentVelocity,
+		&updated.DailyDigest,
 		&updated.UpdatedAt,
 	)
 	if err != nil {
