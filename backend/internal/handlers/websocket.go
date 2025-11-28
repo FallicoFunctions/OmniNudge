@@ -59,11 +59,10 @@ func (h *WebSocketHandler) HandleWebSocket(c *gin.Context) {
 	}
 
 	// Register client with hub
-	h.hub.register <- client
+	h.hub.Register(client)
 
 	// Start client goroutines
-	go client.writePump()
-	go client.readPump()
+	client.Start()
 }
 
 // GetHub returns the WebSocket hub (for use in other handlers)
