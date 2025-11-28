@@ -65,7 +65,11 @@ func main() {
 		cfg.JWT.Secret,
 		cfg.Reddit.UserAgent,
 	)
-	redditClient := services.NewRedditClient(cfg.Reddit.UserAgent)
+	var cache services.Cache = services.NoopCache{}
+	if cfg.Redis.Addr != "" {
+		cache = services.NewRedisCache(cfg.Redis.Addr, cfg.Redis.Password, 2*time.Second)
+	}
+	redditClient := services.NewRedditClient(cfg.Reddit.UserAgent, cache, time.Duration(cfg.Redis.TTLSeconds)*time.Second)
 
 	// Initialize handlers
 	authHandler := handlers.NewAuthHandler(authService, userRepo)
