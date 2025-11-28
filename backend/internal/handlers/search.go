@@ -48,7 +48,10 @@ func (h *SearchHandler) SearchPosts(c *gin.Context) {
 
 	rows, err := h.pool.Query(c.Request.Context(), sql, query, limit, offset)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Search failed"})
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error":   "Search failed",
+			"details": err.Error(),
+		})
 		return
 	}
 	defer rows.Close()
@@ -106,7 +109,7 @@ func (h *SearchHandler) SearchComments(c *gin.Context) {
 
 	rows, err := h.pool.Query(c.Request.Context(), sql, query, limit, offset)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Search failed"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Search failed", "details": err.Error()})
 		return
 	}
 	defer rows.Close()
@@ -162,7 +165,7 @@ func (h *SearchHandler) SearchUsers(c *gin.Context) {
 
 	rows, err := h.pool.Query(c.Request.Context(), sql, query, limit, offset)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Search failed"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Search failed", "details": err.Error()})
 		return
 	}
 	defer rows.Close()
@@ -207,7 +210,7 @@ func (h *SearchHandler) SearchHubs(c *gin.Context) {
 	}
 
 	sql := `
-		SELECT id, name, description, creator_id, created_at,
+		SELECT id, name, description, created_by, created_at,
 		       ts_rank(search_vector, plainto_tsquery('english', $1)) as rank
 		FROM hubs
 		WHERE search_vector @@ plainto_tsquery('english', $1)
@@ -217,7 +220,7 @@ func (h *SearchHandler) SearchHubs(c *gin.Context) {
 
 	rows, err := h.pool.Query(c.Request.Context(), sql, query, limit, offset)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Search failed"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Search failed", "details": err.Error()})
 		return
 	}
 	defer rows.Close()

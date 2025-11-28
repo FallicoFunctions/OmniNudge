@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/chatreddit/backend/internal/models"
 	"github.com/gin-gonic/gin"
@@ -120,10 +121,10 @@ func (h *BlockingHandler) GetBlockedUsers(c *gin.Context) {
 	defer rows.Close()
 
 	type blockedUser struct {
-		ID        int     `json:"id"`
-		Username  string  `json:"username"`
-		AvatarURL *string `json:"avatar_url"`
-		BlockedAt string  `json:"blocked_at"`
+		ID        int       `json:"id"`
+		Username  string    `json:"username"`
+		AvatarURL *string   `json:"avatar_url"`
+		BlockedAt time.Time `json:"blocked_at"`
 	}
 
 	var blockedUsers []blockedUser
