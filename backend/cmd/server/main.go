@@ -46,6 +46,7 @@ func main() {
 	userRepo := models.NewUserRepository(db.Pool)
 	userSettingsRepo := models.NewUserSettingsRepository(db.Pool)
 	postRepo := models.NewPlatformPostRepository(db.Pool)
+	commentRepo := models.NewPostCommentRepository(db.Pool)
 
 	// Initialize services
 	authService := services.NewAuthService(
@@ -60,6 +61,7 @@ func main() {
 	authHandler := handlers.NewAuthHandler(authService, userRepo)
 	settingsHandler := handlers.NewSettingsHandler(userSettingsRepo)
 	postsHandler := handlers.NewPostsHandler(postRepo)
+	commentsHandler := handlers.NewCommentsHandler(commentRepo, postRepo)
 
 	// Setup Gin router
 	router := gin.Default()
@@ -114,6 +116,14 @@ func main() {
 		{
 			posts.GET("/feed", postsHandler.GetFeed)
 			posts.GET("/:id", postsHandler.GetPost)
+			posts.GET("/:id/comments", commentsHandler.GetComments)
+		}
+
+		// Public comments routes (no auth required for viewing)
+		comments := api.Group("/comments")
+		{
+			comments.GET("/:id", commentsHandler.GetComment)
+			comments.GET("/:id/replies", commentsHandler.GetCommentReplies)
 		}
 
 		// Protected routes (auth required)
@@ -131,6 +141,12 @@ func main() {
 			protected.PUT("/posts/:id", postsHandler.UpdatePost)
 			protected.DELETE("/posts/:id", postsHandler.DeletePost)
 			protected.POST("/posts/:id/vote", postsHandler.VotePost)
+
+			// Protected comments routes (auth required for creating/editing)
+			protected.POST("/posts/:id/comments", commentsHandler.CreateComment)
+			protected.PUT("/comments/:id", commentsHandler.UpdateComment)
+			protected.DELETE("/comments/:id", commentsHandler.DeleteComment)
+			protected.POST("/comments/:id/vote", commentsHandler.VoteComment)
 		}
 	}
 
