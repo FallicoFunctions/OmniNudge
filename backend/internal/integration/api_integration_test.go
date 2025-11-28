@@ -324,3 +324,55 @@ func TestMessagingFlow(t *testing.T) {
 	w = doRequest(t, deps.Router, req)
 	require.Equal(t, http.StatusOK, w.Code)
 }
+
+func TestUnauthorizedPostCreate(t *testing.T) {
+	deps := newTestDeps(t)
+	defer deps.DB.Close()
+
+	body := []byte(`{"title":"noauth","body":"x"}`)
+	req, _ := http.NewRequest("POST", "/api/v1/posts", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := doRequest(t, deps.Router, req)
+	require.Equal(t, http.StatusUnauthorized, w.Code)
+}
+
+func TestCommentInvalidPostID(t *testing.T) {
+	deps := newTestDeps(t)
+	defer deps.DB.Close()
+
+	user := createUser(t, deps.UserRepo, "cid", "user")
+	token, _ := deps.AuthService.GenerateJWT(user.ID, "", user.Username, user.Role)
+
+	body := []byte(`{"body":"comment"}`)
+	req, _ := http.NewRequest("POST", "/api/v1/posts/99999/comments", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
+	w := doRequest(t, deps.Router, req)
+	require.Equal(t, http.StatusNotFound, w.Code)
+}
+
+func TestMessagingUnauthorized(t *testing.T) {
+	deps := newTestDeps(t)
+	defer deps.DB.Close()
+
+	body := []byte(`{"other_user_id":1}`)
+	req, _ := http.NewRequest("POST", "/api/v1/conversations", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := doRequest(t, deps.Router, req)
+	require.Equal(t, http.StatusUnauthorized, w.Code)
+}
+
+func TestMessageSendInvalidConversation(t *testing.T) {
+	deps := newTestDeps(t)
+	defer deps.DB.Close()
+
+	user := createUser(t, deps.UserRepo, "msender", "user")
+	token, _ := deps.AuthService.GenerateJWT(user.ID, "", user.Username, user.Role)
+
+	body := []byte(`{"conversation_id":9999,"encrypted_content":"x","message_type":"text","encryption_version":"v1"}`)
+	req, _ := http.NewRequest("POST", "/api/v1/messages", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
+	w := doRequest(t, deps.Router, req)
+	require.Equal(t, http.StatusNotFound, w.Code)
+}
