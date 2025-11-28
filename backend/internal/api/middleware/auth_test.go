@@ -10,48 +10,52 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// helper to perform a request through a middleware + handler chain
-func performRequest(t *testing.T, h gin.HandlerFunc, role interface{}) *httptest.ResponseRecorder {
-	t.Helper()
-	gin.SetMode(gin.TestMode)
-	w := httptest.NewRecorder()
-	c, _ := gin.CreateTestContext(w)
-	req, _ := http.NewRequest("GET", "/", nil)
-	c.Request = req
-	if role != nil {
-		c.Set("role", role)
-	}
-	h(c)
-	return w
-}
-
 func TestRequireRole_AllowsMatchingRole(t *testing.T) {
 	allowed := false
-	mw := RequireRole("admin", "moderator")
-	handler := func(c *gin.Context) {
+	router := gin.New()
+	router.Use(func(c *gin.Context) {
+		c.Set("role", "admin")
+	})
+	router.Use(RequireRole("admin", "moderator"))
+	router.GET("/", func(c *gin.Context) {
 		allowed = true
 		c.Status(http.StatusOK)
-	}
-	w := performRequest(t, mw(handler), "admin")
+	})
+
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("GET", "/", nil)
+	router.ServeHTTP(w, req)
+
 	require.Equal(t, http.StatusOK, w.Code)
 	require.True(t, allowed, "handler should run for allowed role")
 }
 
 func TestRequireRole_BlocksWhenRoleMissing(t *testing.T) {
-	mw := RequireRole("admin")
-	handler := mw(func(c *gin.Context) {
+	router := gin.New()
+	router.Use(RequireRole("admin"))
+	router.GET("/", func(c *gin.Context) {
 		t.Fatalf("handler should not run")
 	})
-	w := performRequest(t, handler, nil)
+
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("GET", "/", nil)
+	router.ServeHTTP(w, req)
 	require.Equal(t, http.StatusForbidden, w.Code)
 }
 
 func TestRequireRole_BlocksWhenRoleMismatch(t *testing.T) {
-	mw := RequireRole("admin")
-	handler := mw(func(c *gin.Context) {
+	router := gin.New()
+	router.Use(func(c *gin.Context) {
+		c.Set("role", "user")
+	})
+	router.Use(RequireRole("admin"))
+	router.GET("/", func(c *gin.Context) {
 		t.Fatalf("handler should not run")
 	})
-	w := performRequest(t, handler, "user")
+
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("GET", "/", nil)
+	router.ServeHTTP(w, req)
 	require.Equal(t, http.StatusForbidden, w.Code)
 }
 

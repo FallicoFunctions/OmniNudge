@@ -28,7 +28,9 @@ func getTestDB(t *testing.T) *database.DB {
 func resetTables(t *testing.T, db *database.DB) {
 	t.Helper()
 	_, err := db.Pool.Exec(context.Background(), `
-		TRUNCATE TABLE post_votes, comment_votes, post_comments, platform_posts, users RESTART IDENTITY CASCADE
+		TRUNCATE TABLE post_votes, comment_votes, post_comments, platform_posts, users RESTART IDENTITY CASCADE;
+		TRUNCATE TABLE subreddits RESTART IDENTITY CASCADE;
+		INSERT INTO subreddits (name, description) VALUES ('general', 'Default community for all posts');
 	`)
 	require.NoError(t, err)
 }
