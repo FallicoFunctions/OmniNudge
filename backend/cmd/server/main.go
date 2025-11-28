@@ -15,6 +15,7 @@ import (
 	"github.com/chatreddit/backend/internal/handlers"
 	"github.com/chatreddit/backend/internal/models"
 	"github.com/chatreddit/backend/internal/services"
+	"github.com/chatreddit/backend/internal/websocket"
 	"github.com/gin-gonic/gin"
 )
 
@@ -47,6 +48,12 @@ func main() {
 	userSettingsRepo := models.NewUserSettingsRepository(db.Pool)
 	postRepo := models.NewPlatformPostRepository(db.Pool)
 	commentRepo := models.NewPostCommentRepository(db.Pool)
+	conversationRepo := models.NewConversationRepository(db.Pool)
+	messageRepo := models.NewMessageRepository(db.Pool)
+
+	// Initialize WebSocket hub
+	hub := websocket.NewHub()
+	go hub.Run()
 
 	// Initialize services
 	authService := services.NewAuthService(
@@ -64,6 +71,9 @@ func main() {
 	postsHandler := handlers.NewPostsHandler(postRepo)
 	commentsHandler := handlers.NewCommentsHandler(commentRepo, postRepo)
 	redditHandler := handlers.NewRedditHandler(redditClient)
+	conversationsHandler := handlers.NewConversationsHandler(conversationRepo, messageRepo, userRepo)
+	messagesHandler := handlers.NewMessagesHandler(messageRepo, conversationRepo, hub)
+	wsHandler := handlers.NewWebSocketHandler(hub)
 
 	// Setup Gin router
 	router := gin.Default()
@@ -158,6 +168,21 @@ func main() {
 			protected.PUT("/comments/:id", commentsHandler.UpdateComment)
 			protected.DELETE("/comments/:id", commentsHandler.DeleteComment)
 			protected.POST("/comments/:id/vote", commentsHandler.VoteComment)
+
+			// Protected conversations routes
+			protected.POST("/conversations", conversationsHandler.CreateConversation)
+			protected.GET("/conversations", conversationsHandler.GetConversations)
+			protected.GET("/conversations/:id", conversationsHandler.GetConversation)
+			protected.DELETE("/conversations/:id", conversationsHandler.DeleteConversation)
+
+			// Protected messages routes
+			protected.POST("/messages", messagesHandler.SendMessage)
+			protected.GET("/conversations/:conversationId/messages", messagesHandler.GetMessages)
+			protected.POST("/conversations/:conversationId/read", messagesHandler.MarkAsRead)
+			protected.DELETE("/messages/:id", messagesHandler.DeleteMessage)
+
+			// WebSocket endpoint for real-time messaging
+			protected.GET("/ws", wsHandler.HandleWebSocket)
 		}
 	}
 
