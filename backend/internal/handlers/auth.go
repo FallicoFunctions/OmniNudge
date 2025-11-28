@@ -103,7 +103,7 @@ func (h *AuthHandler) RedditCallback(c *gin.Context) {
 	if user.RedditID != nil {
 		redditID = *user.RedditID
 	}
-	jwtToken, err := h.authService.GenerateJWT(user.ID, redditID, user.Username)
+	jwtToken, err := h.authService.GenerateJWT(user.ID, redditID, user.Username, user.Role)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate token"})
 		return
