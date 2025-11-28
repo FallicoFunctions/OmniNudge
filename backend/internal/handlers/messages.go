@@ -143,7 +143,7 @@ func (h *MessagesHandler) SendMessage(c *gin.Context) {
 	c.JSON(http.StatusCreated, message)
 }
 
-// GetMessages handles GET /api/v1/conversations/:conversationId/messages
+// GetMessages handles GET /api/v1/conversations/:id/messages
 func (h *MessagesHandler) GetMessages(c *gin.Context) {
 	// Get user ID from context
 	userID, exists := c.Get("user_id")
@@ -152,7 +152,7 @@ func (h *MessagesHandler) GetMessages(c *gin.Context) {
 		return
 	}
 
-	conversationID, err := strconv.Atoi(c.Param("conversationId"))
+	conversationID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid conversation ID"})
 		return
@@ -216,7 +216,7 @@ func (h *MessagesHandler) GetMessages(c *gin.Context) {
 	})
 }
 
-// MarkAsRead handles POST /api/v1/conversations/:conversationId/read
+// MarkAsRead handles POST /api/v1/conversations/:id/read
 func (h *MessagesHandler) MarkAsRead(c *gin.Context) {
 	// Get user ID from context
 	userID, exists := c.Get("user_id")
@@ -225,7 +225,7 @@ func (h *MessagesHandler) MarkAsRead(c *gin.Context) {
 		return
 	}
 
-	conversationID, err := strconv.Atoi(c.Param("conversationId"))
+	conversationID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid conversation ID"})
 		return
