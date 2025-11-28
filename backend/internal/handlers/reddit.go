@@ -20,6 +20,11 @@ func NewRedditHandler(redditClient *services.RedditClient) *RedditHandler {
 	}
 }
 
+// NewRedditHandlerForTest allows injection of a custom client (e.g., mocked transport)
+func NewRedditHandlerForTest(redditClient *services.RedditClient) *RedditHandler {
+	return &RedditHandler{redditClient: redditClient}
+}
+
 // GetSubredditPosts handles GET /api/v1/reddit/r/:subreddit
 func (h *RedditHandler) GetSubredditPosts(c *gin.Context) {
 	subreddit := c.Param("subreddit")
