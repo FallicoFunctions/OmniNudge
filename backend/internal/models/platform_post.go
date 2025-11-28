@@ -317,8 +317,9 @@ func (r *PlatformPostRepository) IncrementViewCount(ctx context.Context, postID 
 	return err
 }
 
-// Vote records a user's vote and updates aggregate counts, preventing duplicates
-func (r *PlatformPostRepository) Vote(ctx context.Context, postID int, userID int, isUpvote bool) error {
+// Vote records a user's vote and updates aggregate counts, preventing duplicates.
+// isUpvote: true (upvote), false (downvote), nil (remove vote)
+func (r *PlatformPostRepository) Vote(ctx context.Context, postID int, userID int, isUpvote *bool) error {
 	tx, err := r.pool.Begin(ctx)
 	if err != nil {
 		return err
@@ -334,14 +335,18 @@ func (r *PlatformPostRepository) Vote(ctx context.Context, postID int, userID in
 	switch {
 	case err == pgx.ErrNoRows:
 		// New vote
+		if isUpvote == nil {
+			return tx.Commit(ctx) // nothing to remove
+		}
+
 		if _, err := tx.Exec(ctx, `
 			INSERT INTO post_votes (post_id, user_id, is_upvote)
 			VALUES ($1, $2, $3)
-		`, postID, userID, isUpvote); err != nil {
+		`, postID, userID, *isUpvote); err != nil {
 			return err
 		}
 
-		if isUpvote {
+		if *isUpvote {
 			if _, err := tx.Exec(ctx, `
 				UPDATE platform_posts
 				SET upvotes = upvotes + 1, score = score + 1
@@ -358,7 +363,31 @@ func (r *PlatformPostRepository) Vote(ctx context.Context, postID int, userID in
 				return err
 			}
 		}
-	case existingIsUpvote == isUpvote:
+	case isUpvote == nil:
+		// Remove existing vote
+		if _, err := tx.Exec(ctx, `DELETE FROM post_votes WHERE post_id = $1 AND user_id = $2`, postID, userID); err != nil {
+			return err
+		}
+		if existingIsUpvote {
+			if _, err := tx.Exec(ctx, `
+				UPDATE platform_posts
+				SET upvotes = GREATEST(upvotes - 1, 0),
+				    score = score - 1
+				WHERE id = $1
+			`, postID); err != nil {
+				return err
+			}
+		} else {
+			if _, err := tx.Exec(ctx, `
+				UPDATE platform_posts
+				SET downvotes = GREATEST(downvotes - 1, 0),
+				    score = score + 1
+				WHERE id = $1
+			`, postID); err != nil {
+				return err
+			}
+		}
+	case existingIsUpvote == *isUpvote:
 		// Duplicate same-direction vote: no-op
 		return tx.Commit(ctx)
 	default:
@@ -367,11 +396,11 @@ func (r *PlatformPostRepository) Vote(ctx context.Context, postID int, userID in
 			UPDATE post_votes
 			SET is_upvote = $3, created_at = CURRENT_TIMESTAMP
 			WHERE post_id = $1 AND user_id = $2
-		`, postID, userID, isUpvote); err != nil {
+		`, postID, userID, *isUpvote); err != nil {
 			return err
 		}
 
-		if isUpvote {
+		if *isUpvote {
 			// Down -> Up
 			if _, err := tx.Exec(ctx, `
 				UPDATE platform_posts

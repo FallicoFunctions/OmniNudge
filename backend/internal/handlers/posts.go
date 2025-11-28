@@ -70,6 +70,12 @@ func (h *PostsHandler) CreatePost(c *gin.Context) {
 		return
 	}
 
+	// Default upvote by author (best-effort)
+	upvote := true
+	_ = h.postRepo.Vote(c.Request.Context(), post.ID, userID.(int), &upvote)
+	post.Score++
+	post.Upvotes++
+
 	c.JSON(http.StatusCreated, post)
 }
 
@@ -243,7 +249,7 @@ func (h *PostsHandler) VotePost(c *gin.Context) {
 	}
 
 	var req struct {
-		IsUpvote bool `json:"is_upvote"`
+		IsUpvote *bool `json:"is_upvote"` // true=upvote, false=downvote, null=remove
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body", "details": err.Error()})
