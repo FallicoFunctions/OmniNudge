@@ -56,12 +56,14 @@ func main() {
 		cfg.JWT.Secret,
 		cfg.Reddit.UserAgent,
 	)
+	redditClient := services.NewRedditClient(cfg.Reddit.UserAgent)
 
 	// Initialize handlers
 	authHandler := handlers.NewAuthHandler(authService, userRepo)
 	settingsHandler := handlers.NewSettingsHandler(userSettingsRepo)
 	postsHandler := handlers.NewPostsHandler(postRepo)
 	commentsHandler := handlers.NewCommentsHandler(commentRepo, postRepo)
+	redditHandler := handlers.NewRedditHandler(redditClient)
 
 	// Setup Gin router
 	router := gin.Default()
@@ -124,6 +126,15 @@ func main() {
 		{
 			comments.GET("/:id", commentsHandler.GetComment)
 			comments.GET("/:id/replies", commentsHandler.GetCommentReplies)
+		}
+
+		// Public Reddit routes (no auth required - browsing only)
+		reddit := api.Group("/reddit")
+		{
+			reddit.GET("/frontpage", redditHandler.GetFrontPage)
+			reddit.GET("/r/:subreddit", redditHandler.GetSubredditPosts)
+			reddit.GET("/r/:subreddit/comments/:postId", redditHandler.GetPostComments)
+			reddit.GET("/search", redditHandler.SearchPosts)
 		}
 
 		// Protected routes (auth required)
