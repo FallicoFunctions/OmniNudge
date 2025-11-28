@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"mime/multipart"
 	"net/http"
+	"os"
 	"strings"
 	"testing"
 
@@ -194,6 +195,7 @@ func TestAdminPromotionAndAddModerator(t *testing.T) {
 }
 
 func TestMediaUploadValidation(t *testing.T) {
+	defer os.RemoveAll("uploads")
 	deps := newTestDeps(t)
 	defer deps.DB.Close()
 
@@ -216,6 +218,7 @@ func TestMediaUploadValidation(t *testing.T) {
 }
 
 func TestMediaUploadHappyPathAndSizeLimit(t *testing.T) {
+	defer os.RemoveAll("uploads")
 	deps := newTestDeps(t)
 	defer deps.DB.Close()
 
