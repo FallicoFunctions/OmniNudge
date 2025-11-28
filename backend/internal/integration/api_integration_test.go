@@ -226,7 +226,7 @@ func TestMediaUploadHappyPathAndSizeLimit(t *testing.T) {
 	var b bytes.Buffer
 	writer := multipart.NewWriter(&b)
 	part, _ := writer.CreateFormFile("file", "image.png")
-	part.Write([]byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A})
+	part.Write([]byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 'D', 'A', 'T', 'A'})
 	writer.Close()
 
 	req, _ := http.NewRequest("POST", "/api/v1/media/upload", &b)
