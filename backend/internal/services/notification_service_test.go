@@ -128,7 +128,7 @@ func TestMilestoneNotifications(t *testing.T) {
 	notifs, err := models.NewNotificationRepository(db.Pool).GetByUserID(ctx, authorID, 10, 0, false)
 	require.NoError(t, err)
 	assert.Len(t, notifs, 1)
-	assert.Equal(t, "post_milestone", notifs[0].Type)
+	assert.Equal(t, "post_milestone", notifs[0].NotificationType)
 	assert.Contains(t, notifs[0].Message, "10 upvotes")
 
 	// Test that duplicate milestone notification is not created
@@ -185,7 +185,7 @@ func TestCommentReplyNotification(t *testing.T) {
 	notifs, err := models.NewNotificationRepository(db.Pool).GetByUserID(ctx, parentAuthorID, 10, 0, false)
 	require.NoError(t, err)
 	assert.Len(t, notifs, 1)
-	assert.Equal(t, "comment_reply", notifs[0].Type)
+	assert.Equal(t, "comment_reply", notifs[0].NotificationType)
 	assert.Contains(t, notifs[0].Message, "replied to your comment")
 }
 

@@ -36,3 +36,4 @@ go.work
 .DS_Store
 Thumbs.db
 .cache
+.gocache

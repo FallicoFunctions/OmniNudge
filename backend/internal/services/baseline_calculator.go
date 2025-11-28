@@ -123,6 +123,11 @@ func (s *BaselineCalculatorService) calculateUserBaseline(ctx context.Context, u
 	return s.baselineRepo.CreateOrUpdate(ctx, baseline)
 }
 
+// CalculateUserBaseline exposes single-user baseline calculation for testing
+func (s *BaselineCalculatorService) CalculateUserBaseline(ctx context.Context, userID int) error {
+	return s.calculateUserBaseline(ctx, userID)
+}
+
 // countUserContent counts total posts and comments for a user
 func (s *BaselineCalculatorService) countUserContent(ctx context.Context, userID int) (int, int, error) {
 	query := `

@@ -11,18 +11,18 @@ import (
 
 // Notification represents a user notification
 type Notification struct {
-	ID               int        `json:"id"`
-	UserID           int        `json:"user_id"`
-	NotificationType string     `json:"notification_type"`
-	ContentType      *string    `json:"content_type,omitempty"`
-	ContentID        *int       `json:"content_id,omitempty"`
-	ActorID          *int       `json:"actor_id,omitempty"`
-	Actor            *User      `json:"actor,omitempty"` // Optional populated user info
-	MilestoneCount   *int       `json:"milestone_count,omitempty"`
-	VotesPerHour     *int       `json:"votes_per_hour,omitempty"`
-	Message          string     `json:"message"`
-	Read             bool       `json:"read"`
-	CreatedAt        time.Time  `json:"created_at"`
+	ID               int       `json:"id"`
+	UserID           int       `json:"user_id"`
+	NotificationType string    `json:"notification_type"`
+	ContentType      *string   `json:"content_type,omitempty"`
+	ContentID        *int      `json:"content_id,omitempty"`
+	ActorID          *int      `json:"actor_id,omitempty"`
+	Actor            *User     `json:"actor,omitempty"` // Optional populated user info
+	MilestoneCount   *int      `json:"milestone_count,omitempty"`
+	VotesPerHour     *int      `json:"votes_per_hour,omitempty"`
+	Message          string    `json:"message"`
+	Read             bool      `json:"read"`
+	CreatedAt        time.Time `json:"created_at"`
 }
 
 // NotificationRepository handles database operations for notifications
@@ -177,6 +177,48 @@ func (r *NotificationRepository) Delete(ctx context.Context, notificationID, use
 	}
 
 	return nil
+}
+
+// GetByID fetches a notification by ID for a specific user
+func (r *NotificationRepository) GetByID(ctx context.Context, notificationID, userID int) (*Notification, error) {
+	query := `
+		SELECT
+			n.id, n.user_id, n.notification_type, n.content_type, n.content_id,
+			n.actor_id, n.milestone_count, n.votes_per_hour, n.message, n.read, n.created_at,
+			u.id, u.username, u.avatar_url
+		FROM notifications n
+		LEFT JOIN users u ON n.actor_id = u.id
+		WHERE n.id = $1 AND n.user_id = $2
+	`
+
+	n := &Notification{Actor: &User{}}
+	var actorID *int
+	var actorUsername *string
+	var actorAvatar *string
+
+	err := r.pool.QueryRow(ctx, query, notificationID, userID).Scan(
+		&n.ID, &n.UserID, &n.NotificationType, &n.ContentType, &n.ContentID,
+		&n.ActorID, &n.MilestoneCount, &n.VotesPerHour, &n.Message, &n.Read, &n.CreatedAt,
+		&actorID, &actorUsername, &actorAvatar,
+	)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	if actorID != nil {
+		n.Actor.ID = *actorID
+		if actorUsername != nil {
+			n.Actor.Username = *actorUsername
+		}
+		n.Actor.AvatarURL = actorAvatar
+	} else {
+		n.Actor = nil
+	}
+
+	return n, nil
 }
 
 // CheckMilestoneExists checks if a milestone notification already exists
