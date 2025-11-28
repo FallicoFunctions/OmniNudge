@@ -227,7 +227,7 @@ func (h *SearchHandler) SearchHubs(c *gin.Context) {
 		hub := &models.Hub{}
 		var rank float64
 		err := rows.Scan(
-			&hub.ID, &hub.Name, &hub.Description, &hub.CreatorID,
+			&hub.ID, &hub.Name, &hub.Description, &hub.CreatedBy,
 			&hub.CreatedAt, &rank,
 		)
 		if err != nil {
