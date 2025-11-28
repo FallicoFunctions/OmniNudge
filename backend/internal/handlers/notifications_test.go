@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/chatreddit/backend/internal/database"
 	"github.com/chatreddit/backend/internal/models"
@@ -17,11 +18,14 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var notifTestCounter int64
+var (
+	notifTestCounter   int64
+	notifTestRunSuffix = time.Now().UnixNano()
+)
 
 func uniqueNotifUsername(base string) string {
 	id := atomic.AddInt64(&notifTestCounter, 1)
-	return fmt.Sprintf("%s_%d", base, id)
+	return fmt.Sprintf("%s_%d_%d", base, notifTestRunSuffix, id)
 }
 
 func setupNotificationsHandlerTest(t *testing.T) (*NotificationsHandler, *database.Database, int, func()) {
