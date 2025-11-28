@@ -52,6 +52,7 @@ func main() {
 	messageRepo := models.NewMessageRepository(db.Pool)
 	mediaRepo := models.NewMediaFileRepository(db.Pool)
 	subredditRepo := models.NewSubredditRepository(db.Pool)
+	reportRepo := models.NewReportRepository(db.Pool)
 
 	// Initialize WebSocket hub
 	hub := websocket.NewHub()
@@ -82,6 +83,7 @@ func main() {
 	usersHandler := handlers.NewUsersHandler(userRepo, postRepo, commentRepo)
 	mediaHandler := handlers.NewMediaHandler(mediaRepo)
 	subredditsHandler := handlers.NewSubredditsHandler(subredditRepo, postRepo)
+	moderationHandler := handlers.NewModerationHandler(reportRepo)
 	wsHandler := handlers.NewWebSocketHandler(hub)
 
 	// Setup Gin router
@@ -212,6 +214,12 @@ func main() {
 
 			// Media upload
 			protected.POST("/media/upload", mediaHandler.UploadMedia)
+
+			// Moderation reports
+			protected.POST("/reports", moderationHandler.CreateReport)
+			// Admin/mod endpoints (no auth roles implemented; wire behind auth for now)
+			protected.GET("/mod/reports", moderationHandler.ListReports)
+			protected.POST("/mod/reports/:id/status", moderationHandler.UpdateReportStatus)
 
 			// WebSocket endpoint for real-time messaging
 			protected.GET("/ws", wsHandler.HandleWebSocket)
