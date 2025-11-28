@@ -12,6 +12,7 @@ type Config struct {
 	Database DatabaseConfig
 	Reddit   RedditConfig
 	JWT      JWTConfig
+	Redis    RedisConfig
 }
 
 // RedditConfig holds Reddit OAuth configuration
@@ -43,6 +44,15 @@ type DatabaseConfig struct {
 	SSLMode  string
 }
 
+// RedisConfig holds redis caching configuration
+type RedisConfig struct {
+	Addr string
+	// Optional password; leave empty if none
+	Password string
+	// TTL in seconds for cached Reddit responses
+	TTLSeconds int
+}
+
 // Load reads configuration from environment variables with sensible defaults
 func Load() (*Config, error) {
 	cfg := &Config{
@@ -66,6 +76,11 @@ func Load() (*Config, error) {
 		},
 		JWT: JWTConfig{
 			Secret: getEnv("JWT_SECRET", "dev-secret-change-in-production"),
+		},
+		Redis: RedisConfig{
+			Addr:       getEnv("REDIS_ADDR", ""),
+			Password:   getEnv("REDIS_PASSWORD", ""),
+			TTLSeconds: getEnvAsInt("REDIS_TTL_SECONDS", 300),
 		},
 	}
 
