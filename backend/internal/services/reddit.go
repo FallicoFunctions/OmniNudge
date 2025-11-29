@@ -40,6 +40,11 @@ func (r *RedditClient) HTTPClientForTest() *http.Client {
 	return r.httpClient
 }
 
+// SetHTTPClient allows setting a custom HTTP client (for testing)
+func (r *RedditClient) SetHTTPClient(client *http.Client) {
+	r.httpClient = client
+}
+
 // RedditPost represents a post from Reddit's API
 type RedditPost struct {
 	ID               string     `json:"id"`
