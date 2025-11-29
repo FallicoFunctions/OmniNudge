@@ -5,7 +5,7 @@ import (
 	"log"
 	"time"
 
-	"github.com/chatreddit/backend/internal/services"
+	"github.com/omninudge/backend/internal/services"
 )
 
 // WorkerManager manages all background workers

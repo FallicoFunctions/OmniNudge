@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/chatreddit/backend/internal/models"
+	"github.com/omninudge/backend/internal/models"
 	"github.com/stretchr/testify/require"
 )
 

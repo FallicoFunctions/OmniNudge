@@ -14,7 +14,7 @@
 
 ## Overview
 
-The ChatReddit messaging system provides end-to-end encrypted direct messaging with real-time delivery, read receipts, media sharing, and online status tracking.
+The OmniNudge messaging system provides end-to-end encrypted direct messaging with real-time delivery, read receipts, media sharing, and online status tracking.
 
 **Base URL:** `http://localhost:8080/api/v1`
 

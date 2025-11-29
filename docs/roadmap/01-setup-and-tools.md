@@ -316,13 +316,13 @@ psql postgres  # macOS/Linux
 psql -U postgres  # Windows
 
 # Create database
-CREATE DATABASE chatreddit_dev;
+CREATE DATABASE omninudge_dev;
 
 # Create user (optional but recommended)
-CREATE USER chatreddit_user WITH PASSWORD 'your_secure_password';
+CREATE USER omninudge_user WITH PASSWORD 'your_secure_password';
 
 # Grant privileges
-GRANT ALL PRIVILEGES ON DATABASE chatreddit_dev TO chatreddit_user;
+GRANT ALL PRIVILEGES ON DATABASE omninudge_dev TO omninudge_user;
 
 # List databases to verify
 \l
@@ -871,7 +871,7 @@ exit
 cd ~/projects  # or wherever you want
 
 # Create main project directory
-mkdir chatreddit && cd chatreddit
+mkdir omninudge && cd omninudge
 
 # Create subdirectories
 mkdir -p backend frontend docs
@@ -933,7 +933,7 @@ EOF
 
 # Create README
 cat > README.md << 'EOF'
-# ChatReddit Platform
+# OmniNudge Platform
 
 A social platform combining Reddit integration with multimedia chat features.
 
@@ -960,7 +960,7 @@ git commit -m "Initial project structure"
 Your directory should now look like:
 
 ```
-chatreddit/
+omninudge/
 ├── .git/
 ├── .gitignore
 ├── README.md
@@ -993,9 +993,9 @@ ENV=development
 # Database
 DB_HOST=localhost
 DB_PORT=5432
-DB_USER=chatreddit_user
+DB_USER=omninudge_user
 DB_PASSWORD=your_secure_password
-DB_NAME=chatreddit_dev
+DB_NAME=omninudge_dev
 
 # Redis
 REDIS_HOST=localhost
@@ -1252,7 +1252,7 @@ psql postgres
 redis-cli
 
 # Open project in VS Code
-cd ~/projects/chatreddit
+cd ~/projects/omninudge
 code .
 
 # Run verification script

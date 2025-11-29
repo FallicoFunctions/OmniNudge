@@ -8,7 +8,7 @@
 
 ## Overview
 
-Phase 5 is where ChatReddit becomes a **true creator economy platform**. Creators can now:
+Phase 5 is where OmniNudge becomes a **true creator economy platform**. Creators can now:
 - Convert earned coins to real money
 - Live stream with paid access and tips
 - Integrate YouTube content into their profiles
@@ -113,7 +113,7 @@ const payout = await stripe.transfers.create({
   amount: amountInCents, // e.g., 42500 coins = $425.00 = 42500 cents
   currency: 'usd',
   destination: creator.stripeAccountId,
-  description: `ChatReddit earnings for ${month}`,
+  description: `OmniNudge earnings for ${month}`,
 });
 ```
 
@@ -151,7 +151,7 @@ const payout = await stripe.transfers.create({
 
 **Potential Requirement:**
 - Some states require money transmitter licenses if platform holds user funds
-- ChatReddit *may* need licenses if:
+- OmniNudge *may* need licenses if:
   - Coins are considered "stored value"
   - Platform facilitates money transfers
 
@@ -274,20 +274,20 @@ Scale: Popular creator with 1,000 viewers = $510/stream
 
 **A. Link YouTube Channel:**
 - Creator connects YouTube account (OAuth)
-- YouTube videos display on ChatReddit profile
-- Viewers can watch embedded videos on ChatReddit
+- YouTube videos display on OmniNudge profile
+- Viewers can watch embedded videos on OmniNudge
 - Creator still earns YouTube ad revenue (we don't take a cut)
 
 **B. Video Browser:**
-- Users can search YouTube videos on ChatReddit
+- Users can search YouTube videos on OmniNudge
 - Results displayed in native UI
 - Clicking video opens embedded player
-- Can share video to ChatReddit chat rooms
+- Can share video to OmniNudge chat rooms
 
 **C. Subscription Sync (Optional):**
-- If user subscribes to creator on YouTube, offer discount on ChatReddit subscription
+- If user subscribes to creator on YouTube, offer discount on OmniNudge subscription
 - Cross-promotion between platforms
-- Helps creators migrate audience to ChatReddit
+- Helps creators migrate audience to OmniNudge
 
 **Technical Implementation:**
 ```javascript

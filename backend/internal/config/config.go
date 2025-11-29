@@ -65,14 +65,14 @@ func Load() (*Config, error) {
 			Port:     getEnvAsInt("DB_PORT", 5432),
 			User:     getEnv("DB_USER", "derrf"),
 			Password: getEnv("DB_PASSWORD", "drummer"),
-			DBName:   getEnv("DB_NAME", "chatreddit_dev"),
+			DBName:   getEnv("DB_NAME", "omninudge_dev"),
 			SSLMode:  getEnv("DB_SSLMODE", "disable"),
 		},
 		Reddit: RedditConfig{
 			ClientID:     getEnv("REDDIT_CLIENT_ID", ""),
 			ClientSecret: getEnv("REDDIT_CLIENT_SECRET", ""),
 			RedirectURI:  getEnv("REDDIT_REDIRECT_URI", "http://localhost:8080/api/v1/auth/reddit/callback"),
-			UserAgent:    getEnv("REDDIT_USER_AGENT", "chatreddit:v1.0"),
+			UserAgent:    getEnv("REDDIT_USER_AGENT", "OmniNudge:v1.0"),
 		},
 		JWT: JWTConfig{
 			Secret: getEnv("JWT_SECRET", "dev-secret-change-in-production"),

@@ -3,7 +3,7 @@ package services
 import (
 	"context"
 
-	"github.com/chatreddit/backend/internal/models"
+	"github.com/omninudge/backend/internal/models"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
