@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/chatreddit/backend/internal/models"
+	"github.com/chatreddit/backend/internal/services"
 	"github.com/gin-gonic/gin"
 )
 
@@ -29,12 +30,16 @@ var allowedContentTypes = map[string]bool{
 
 // MediaHandler handles media uploads
 type MediaHandler struct {
-	mediaRepo *models.MediaFileRepository
+	mediaRepo        *models.MediaFileRepository
+	thumbnailService *services.ThumbnailService
 }
 
 // NewMediaHandler creates a new media handler
-func NewMediaHandler(mediaRepo *models.MediaFileRepository) *MediaHandler {
-	return &MediaHandler{mediaRepo: mediaRepo}
+func NewMediaHandler(mediaRepo *models.MediaFileRepository, thumbnailService *services.ThumbnailService) *MediaHandler {
+	return &MediaHandler{
+		mediaRepo:        mediaRepo,
+		thumbnailService: thumbnailService,
+	}
 }
 
 // UploadMedia handles POST /api/v1/media/upload
@@ -127,6 +132,25 @@ func (h *MediaHandler) UploadMedia(c *gin.Context) {
 		StorageURL:       "/uploads/" + newName,
 		StoragePath:      storagePath,
 		UsedInMessageID:  usedInMessageID,
+	}
+
+	// Generate thumbnail and extract dimensions for images
+	if services.IsImageType(contentType) {
+		// Get image dimensions
+		width, height, err := h.thumbnailService.GetImageDimensions(storagePath)
+		if err == nil {
+			media.Width = &width
+			media.Height = &height
+		}
+
+		// Generate thumbnail
+		thumbnailPath, err := h.thumbnailService.GenerateThumbnail(storagePath)
+		if err == nil {
+			// Convert absolute path to URL path
+			thumbnailName := filepath.Base(thumbnailPath)
+			thumbnailURL := "/uploads/" + thumbnailName
+			media.ThumbnailURL = &thumbnailURL
+		}
 	}
 
 	if err := h.mediaRepo.Create(c.Request.Context(), media); err != nil {
