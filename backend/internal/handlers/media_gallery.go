@@ -3,6 +3,7 @@ package handlers
 import (
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5"
@@ -21,15 +22,15 @@ func NewMediaGalleryHandler(pool *pgxpool.Pool) *MediaGalleryHandler {
 
 // MediaItem represents a media item in the gallery
 type MediaItem struct {
-	ID            int    `json:"id"`
-	MessageID     int    `json:"message_id"`
-	SenderID      int    `json:"sender_id"`
-	MessageType   string `json:"message_type"`
-	MediaURL      string `json:"media_url"`
-	MediaType     string `json:"media_type"`
-	MediaSize     int    `json:"media_size"`
-	CreatedAt     string `json:"created_at"`
-	IsMine        bool   `json:"is_mine"` // True if current user sent it
+	ID            int       `json:"id"`
+	MessageID     int       `json:"message_id"`
+	SenderID      int       `json:"sender_id"`
+	MessageType   string    `json:"message_type"`
+	MediaURL      string    `json:"media_url"`
+	MediaType     string    `json:"media_type"`
+	MediaSize     int       `json:"media_size"`
+	SentAt        time.Time `json:"created_at"` // JSON key kept as created_at for API compatibility
+	IsMine        bool      `json:"is_mine"`    // True if current user sent it
 }
 
 // GetConversationMedia handles GET /api/v1/conversations/:id/media
@@ -90,7 +91,7 @@ func (h *MediaGalleryHandler) GetConversationMedia(c *gin.Context) {
 
 	baseQuery := `
 		SELECT id, id as message_id, sender_id, message_type, media_url, media_type,
-		       media_size, created_at
+		       media_size, sent_at
 		FROM messages
 		WHERE conversation_id = $1
 		  AND message_type IN ('image', 'video', 'audio', 'gif')
@@ -99,13 +100,13 @@ func (h *MediaGalleryHandler) GetConversationMedia(c *gin.Context) {
 
 	switch filter {
 	case "mine":
-		query = baseQuery + ` AND sender_id = $2 ORDER BY created_at ASC LIMIT $3 OFFSET $4`
+		query = baseQuery + ` AND sender_id = $2 ORDER BY sent_at ASC LIMIT $3 OFFSET $4`
 		args = []interface{}{conversationID, userID, limit, offset}
 	case "theirs":
-		query = baseQuery + ` AND sender_id = $2 ORDER BY created_at ASC LIMIT $3 OFFSET $4`
+		query = baseQuery + ` AND sender_id = $2 ORDER BY sent_at ASC LIMIT $3 OFFSET $4`
 		args = []interface{}{conversationID, otherUserID, limit, offset}
 	default: // "all"
-		query = baseQuery + ` ORDER BY created_at ASC LIMIT $2 OFFSET $3`
+		query = baseQuery + ` ORDER BY sent_at ASC LIMIT $2 OFFSET $3`
 		args = []interface{}{conversationID, limit, offset}
 	}
 
@@ -118,7 +119,7 @@ func (h *MediaGalleryHandler) GetConversationMedia(c *gin.Context) {
 	defer rows.Close()
 
 	// Collect media items
-	var items []MediaItem
+	items := make([]MediaItem, 0)
 	for rows.Next() {
 		var item MediaItem
 		err := rows.Scan(
@@ -129,7 +130,7 @@ func (h *MediaGalleryHandler) GetConversationMedia(c *gin.Context) {
 			&item.MediaURL,
 			&item.MediaType,
 			&item.MediaSize,
-			&item.CreatedAt,
+			&item.SentAt,
 		)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to parse media"})
@@ -238,7 +239,7 @@ func (h *MediaGalleryHandler) FindMediaIndex(c *gin.Context) {
 
 	baseQuery := `
 		WITH media_list AS (
-			SELECT id, ROW_NUMBER() OVER (ORDER BY created_at ASC) - 1 as index
+			SELECT id, ROW_NUMBER() OVER (ORDER BY sent_at ASC) - 1 as index
 			FROM messages
 			WHERE conversation_id = $1
 			  AND message_type IN ('image', 'video', 'audio', 'gif')

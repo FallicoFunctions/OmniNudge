@@ -490,17 +490,320 @@ All error responses follow this format:
 
 ---
 
+## Slideshow API
+
+### Start Slideshow
+Create a new synchronized slideshow session in a conversation.
+
+**Endpoint:** `POST /conversations/:id/slideshow`
+
+**Headers:** `Authorization: Bearer <token>` (required)
+
+**Request Body:**
+```json
+{
+  "slideshow_type": "reddit",
+  "subreddit": "EarthPorn",
+  "reddit_sort": "top",
+  "media_file_ids": [],
+  "auto_advance": true,
+  "auto_advance_interval": 5
+}
+```
+
+**Parameters:**
+- `slideshow_type` (required) - `"personal"` or `"reddit"`
+- `subreddit` (required if type is `"reddit"`) - Subreddit name
+- `reddit_sort` (optional) - `"hot"`, `"new"`, `"top"`, `"rising"`. Default: `"hot"`
+- `media_file_ids` (required if type is `"personal"`) - Array of media file IDs
+- `auto_advance` (optional) - Enable auto-advance. Default: `false`
+- `auto_advance_interval` (optional) - Seconds between slides. Default: `5`
+
+**Response:** `201 Created`
+```json
+{
+  "id": 123,
+  "conversation_id": 42,
+  "slideshow_type": "reddit",
+  "subreddit": "EarthPorn",
+  "reddit_sort": "top",
+  "current_index": 0,
+  "total_items": 25,
+  "controller_user_id": 5,
+  "auto_advance": true,
+  "auto_advance_interval": 5,
+  "created_at": "2025-01-29T10:00:00Z",
+  "updated_at": "2025-01-29T10:00:00Z"
+}
+```
+
+**Error Response:** `409 Conflict`
+```json
+{
+  "error": "Slideshow already active in this conversation"
+}
+```
+
+---
+
+### Get Slideshow
+Get current slideshow session for a conversation.
+
+**Endpoint:** `GET /conversations/:id/slideshow`
+
+**Headers:** `Authorization: Bearer <token>` (required)
+
+**Response:** `200 OK`
+```json
+{
+  "id": 123,
+  "conversation_id": 42,
+  "slideshow_type": "reddit",
+  "subreddit": "EarthPorn",
+  "current_index": 5,
+  "total_items": 25,
+  "controller_user_id": 5,
+  "auto_advance": false,
+  "auto_advance_interval": 5,
+  "created_at": "2025-01-29T10:00:00Z",
+  "updated_at": "2025-01-29T10:05:00Z"
+}
+```
+
+**Error Response:** `404 Not Found`
+```json
+{
+  "error": "No active slideshow in this conversation"
+}
+```
+
+---
+
+### Navigate Slideshow
+Navigate to a specific slide in the slideshow.
+
+**Endpoint:** `POST /slideshows/:id/navigate`
+
+**Headers:** `Authorization: Bearer <token>` (required)
+
+**Request Body:**
+```json
+{
+  "index": 7
+}
+```
+
+**Response:** `200 OK`
+```json
+{
+  "message": "Navigated to slide 7"
+}
+```
+
+**WebSocket Event:** Broadcasts `slideshow_navigate` to both users
+```json
+{
+  "type": "slideshow_navigate",
+  "data": {
+    "slideshow_id": 123,
+    "current_index": 7,
+    "total_items": 25
+  }
+}
+```
+
+---
+
+### Transfer Control
+Transfer slideshow control to the other user.
+
+**Endpoint:** `POST /slideshows/:id/transfer-control`
+
+**Headers:** `Authorization: Bearer <token>` (required)
+
+**Response:** `200 OK`
+```json
+{
+  "message": "Control transferred to user 7"
+}
+```
+
+**WebSocket Event:** Broadcasts `slideshow_control_transfer` to both users
+```json
+{
+  "type": "slideshow_control_transfer",
+  "data": {
+    "slideshow_id": 123,
+    "new_controller_id": 7
+  }
+}
+```
+
+---
+
+### Update Auto-Advance
+Update auto-advance settings for the slideshow.
+
+**Endpoint:** `PUT /slideshows/:id/auto-advance`
+
+**Headers:** `Authorization: Bearer <token>` (required)
+
+**Request Body:**
+```json
+{
+  "auto_advance": true,
+  "auto_advance_interval": 10
+}
+```
+
+**Response:** `200 OK`
+```json
+{
+  "message": "Auto-advance settings updated"
+}
+```
+
+**WebSocket Event:** Broadcasts `slideshow_auto_advance_update` to both users
+```json
+{
+  "type": "slideshow_auto_advance_update",
+  "data": {
+    "slideshow_id": 123,
+    "auto_advance": true,
+    "auto_advance_interval": 10
+  }
+}
+```
+
+---
+
+### Stop Slideshow
+Stop the current slideshow session.
+
+**Endpoint:** `DELETE /slideshows/:id`
+
+**Headers:** `Authorization: Bearer <token>` (required)
+
+**Response:** `200 OK`
+```json
+{
+  "message": "Slideshow stopped"
+}
+```
+
+**WebSocket Event:** Broadcasts `slideshow_stop` to both users
+```json
+{
+  "type": "slideshow_stop",
+  "data": {
+    "slideshow_id": 123,
+    "conversation_id": 42
+  }
+}
+```
+
+---
+
+## Media Gallery API
+
+### Get Conversation Media
+Get all media from a conversation with optional filtering.
+
+**Endpoint:** `GET /conversations/:id/media`
+
+**Headers:** `Authorization: Bearer <token>` (required)
+
+**Query Parameters:**
+- `filter` (optional) - `"all"`, `"mine"`, `"theirs"`. Defaults to user's saved preference or `"all"`
+- `limit` (optional) - Max items to return (1-500). Default: `100`
+- `offset` (optional) - Pagination offset. Default: `0`
+
+**Response:** `200 OK`
+```json
+{
+  "conversation_id": 42,
+  "filter": "all",
+  "total": 47,
+  "limit": 100,
+  "offset": 0,
+  "items": [
+    {
+      "id": 123,
+      "message_id": 123,
+      "sender_id": 5,
+      "message_type": "image",
+      "media_url": "/uploads/abc123.jpg",
+      "media_type": "image/jpeg",
+      "media_size": 245678,
+      "created_at": "2025-01-29T14:30:00Z",
+      "is_mine": false
+    },
+    {
+      "id": 127,
+      "message_id": 127,
+      "sender_id": 7,
+      "message_type": "video",
+      "media_url": "/uploads/xyz789.mp4",
+      "media_type": "video/mp4",
+      "media_size": 1245678,
+      "created_at": "2025-01-29T14:35:00Z",
+      "is_mine": true
+    }
+  ]
+}
+```
+
+**Error Response:** `400 Bad Request`
+```json
+{
+  "error": "Invalid filter. Must be 'all', 'mine', or 'theirs'"
+}
+```
+
+---
+
+### Find Media Index
+Find the position of a specific message in the filtered media gallery.
+
+**Endpoint:** `GET /conversations/:id/media/:messageId/index`
+
+**Headers:** `Authorization: Bearer <token>` (required)
+
+**Query Parameters:**
+- `filter` (optional) - `"all"`, `"mine"`, `"theirs"`. Default: `"all"`
+
+**Response:** `200 OK`
+```json
+{
+  "message_id": 127,
+  "index": 8,
+  "filter": "all"
+}
+```
+
+**Error Response:** `404 Not Found`
+```json
+{
+  "error": "Message not found in media gallery"
+}
+```
+
+**Use Case:** When user clicks a media item, this endpoint tells you which slide to show in the full-screen viewer. For example, if user clicks message 127 and it returns index 8, open the viewer at slide 8.
+
+---
+
 ## WebSocket API
 
-### Real-time Notifications
-
-Connect to WebSocket for real-time notification delivery:
+Connect to WebSocket for real-time updates:
 
 **Endpoint:** `GET /ws`
 
 **Headers:** `Authorization: Bearer <token>` (required)
 
-**Message Format:**
+### Notification Events
+
+Delivered when user receives a new notification:
+
 ```json
 {
   "type": "notification",
@@ -515,11 +818,75 @@ Connect to WebSocket for real-time notification delivery:
 }
 ```
 
-**Connection Example (JavaScript):**
+### Slideshow Events
+
+**slideshow_navigate** - Sent when slideshow navigates to a new slide:
+```json
+{
+  "type": "slideshow_navigate",
+  "data": {
+    "slideshow_id": 123,
+    "current_index": 7,
+    "total_items": 25
+  }
+}
+```
+
+**slideshow_control_transfer** - Sent when control is transferred:
+```json
+{
+  "type": "slideshow_control_transfer",
+  "data": {
+    "slideshow_id": 123,
+    "new_controller_id": 7
+  }
+}
+```
+
+**slideshow_auto_advance_update** - Sent when auto-advance settings change:
+```json
+{
+  "type": "slideshow_auto_advance_update",
+  "data": {
+    "slideshow_id": 123,
+    "auto_advance": true,
+    "auto_advance_interval": 10
+  }
+}
+```
+
+**slideshow_stop** - Sent when slideshow is stopped:
+```json
+{
+  "type": "slideshow_stop",
+  "data": {
+    "slideshow_id": 123,
+    "conversation_id": 42
+  }
+}
+```
+
+### Connection Example (JavaScript)
+
 ```javascript
 const ws = new WebSocket('ws://localhost:8080/api/v1/ws');
+
 ws.onmessage = (event) => {
-  const notification = JSON.parse(event.data);
-  console.log('New notification:', notification);
+  const message = JSON.parse(event.data);
+
+  switch (message.type) {
+    case 'notification':
+      console.log('New notification:', message.data);
+      break;
+    case 'slideshow_navigate':
+      console.log('Slideshow navigated to:', message.data.current_index);
+      break;
+    case 'slideshow_control_transfer':
+      console.log('Control transferred to:', message.data.new_controller_id);
+      break;
+    case 'slideshow_stop':
+      console.log('Slideshow stopped');
+      break;
+  }
 };
 ```

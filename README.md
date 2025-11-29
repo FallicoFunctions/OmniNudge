@@ -31,10 +31,12 @@ ChatReddit allows users to browse Reddit content, discuss it with a growing comm
 - Online/offline status
 
 ### Multimedia Chat
-- Share images and videos
+- Share images, videos, GIFs, and audio
 - Personal slideshows (upload and share your media)
 - Reddit slideshow (browse subreddit media together)
-- Synchronized video playback
+- Synchronized slideshow with shared control
+- Media gallery navigation through conversation history
+- Filter media by sender (all/mine/theirs)
 
 ## Tech Stack
 
@@ -84,7 +86,8 @@ chatreddit/
 - Profile management
 - Rate limiting
 - Reddit public API integration with caching
-- Media filtering for slideshow features
+- Synchronized slideshow coordination (personal & Reddit media)
+- Media gallery navigation with filtering
 
 🚧 In Development:
 - Messaging system
@@ -195,10 +198,28 @@ JWT_SECRET=your-secret-key-here
 - 20 requests/minute for anonymous users
 - Per-user and per-IP tracking
 
+### Synchronized Slideshows
+- Create slideshow sessions for personal or Reddit media
+- Real-time navigation synchronized between users
+- Controller transfer for shared control
+- Auto-advance with configurable intervals
+- WebSocket-based state synchronization
+
+### Media Gallery
+- Navigate through all conversation media chronologically
+- Filter by sender (all media, mine only, theirs only)
+- Full-screen viewer with arrow key navigation
+- Find media position in filtered lists
+- Persistent user preference for filter setting
+
 ## Documentation
 
 Comprehensive documentation available in `/docs`:
 - [API Documentation](backend/docs/API.md) - Complete REST API reference
+- [Testing Guide](backend/docs/TESTING.md) - Test suite and coverage
+- [Notifications](backend/docs/NOTIFICATIONS.md) - Notification system details
+- [Slideshows](backend/docs/SLIDESHOWS.md) - Synchronized slideshow coordination
+- [Media Gallery](backend/docs/MEDIA_GALLERY.md) - Media navigation feature
 - [Overview & Roadmap](docs/roadmap/00-overview.md) - Complete project vision
 - [Phase 1 Features](docs/phase-lists/phase-1-features.md) - MVP feature list
 - [Architecture](docs/technical/architecture.md) - System design
