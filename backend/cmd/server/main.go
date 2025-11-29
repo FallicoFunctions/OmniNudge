@@ -105,9 +105,12 @@ func main() {
 	commentsHandler := handlers.NewCommentsHandler(commentRepo, postRepo, hubModRepo)
 	redditHandler := handlers.NewRedditHandler(redditClient, redditPostRepo)
 	conversationsHandler := handlers.NewConversationsHandler(conversationRepo, messageRepo, userRepo)
+	// Initialize thumbnail service
+	thumbnailService := services.NewThumbnailService()
+
 	messagesHandler := handlers.NewMessagesHandler(db.Pool, messageRepo, conversationRepo, hub)
 	usersHandler := handlers.NewUsersHandler(userRepo, postRepo, commentRepo, authService)
-	mediaHandler := handlers.NewMediaHandler(mediaRepo)
+	mediaHandler := handlers.NewMediaHandler(mediaRepo, thumbnailService)
 	hubsHandler := handlers.NewHubsHandler(hubRepo, postRepo, hubModRepo)
 	moderationHandler := handlers.NewModerationHandler(reportRepo, hubModRepo)
 	adminHandler := handlers.NewAdminHandler(userRepo)
