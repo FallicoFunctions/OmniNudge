@@ -178,3 +178,86 @@ func (h *RedditHandler) SearchPosts(c *gin.Context) {
 		"posts":     posts,
 	})
 }
+
+// GetSubredditMedia handles GET /api/v1/reddit/r/:subreddit/media
+// Returns only posts with media (images/videos) for slideshow feature
+func (h *RedditHandler) GetSubredditMedia(c *gin.Context) {
+	subreddit := c.Param("subreddit")
+	if subreddit == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Subreddit name is required"})
+		return
+	}
+
+	// Parse query parameters
+	sort := c.DefaultQuery("sort", "hot")
+	timeFilter := c.DefaultQuery("t", "")
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "50"))
+	after := c.DefaultQuery("after", "")
+
+	// Validate limit (fetch more to filter for media)
+	if limit < 1 || limit > 100 {
+		limit = 50
+	}
+
+	// Fetch from Reddit - get more posts to ensure we have enough media
+	listing, err := h.redditClient.GetSubredditPosts(c.Request.Context(), subreddit, sort, timeFilter, 100, after)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch subreddit posts", "details": err.Error()})
+		return
+	}
+
+	// Filter for media posts only
+	mediaPosts := make([]gin.H, 0)
+	for _, child := range listing.Data.Children {
+		post := child.Data
+
+		// Check if post has media
+		isMedia := false
+		mediaType := ""
+		mediaURL := ""
+
+		if post.IsVideo {
+			isMedia = true
+			mediaType = "video"
+			mediaURL = post.URL
+		} else if post.PostHint == "image" || post.Domain == "i.redd.it" || post.Domain == "i.imgur.com" {
+			isMedia = true
+			mediaType = "image"
+			mediaURL = post.URL
+		} else if post.PostHint == "hosted:video" || post.PostHint == "rich:video" {
+			isMedia = true
+			mediaType = "video"
+			mediaURL = post.URL
+		}
+
+		if isMedia {
+			mediaPosts = append(mediaPosts, gin.H{
+				"id":          post.ID,
+				"title":       post.Title,
+				"author":      post.Author,
+				"subreddit":   post.Subreddit,
+				"url":         mediaURL,
+				"media_type":  mediaType,
+				"thumbnail":   post.Thumbnail,
+				"permalink":   "https://reddit.com" + post.Permalink,
+				"score":       post.Score,
+				"created_utc": post.CreatedUTC,
+				"over_18":     post.Over18,
+			})
+
+			// Stop when we have enough media posts
+			if len(mediaPosts) >= limit {
+				break
+			}
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"subreddit":   subreddit,
+		"sort":        sort,
+		"time":        timeFilter,
+		"total":       len(mediaPosts),
+		"media_posts": mediaPosts,
+		"after":       listing.Data.After,
+	})
+}

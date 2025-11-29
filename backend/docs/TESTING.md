@@ -4,11 +4,12 @@
 
 The ChatReddit backend has comprehensive test coverage across all major systems:
 
-**Total Tests: 81** ✅
+**Total Tests: 93** ✅
 
 ### Test Distribution
 
-- **Handlers (27 tests)**: HTTP endpoint tests for all REST API handlers
+- **Handlers (39 tests)**: HTTP endpoint tests for all REST API handlers
+  - Reddit: 12 tests
   - Notifications: 7 tests
   - Search: 6 tests
   - Blocking: 6 tests
@@ -91,7 +92,44 @@ Test HTTP endpoints with mock requests:
 - Error handling
 - Authentication integration
 
-**Example:**
+**Reddit Handler Tests (12 tests):**
+
+The Reddit handler tests use a mock HTTP server to simulate Reddit's API:
+
+```go
+func TestGetSubredditMedia(t *testing.T) {
+    handler, ts, handlerCalls := setupRedditHandlerTest(t)
+    defer ts.Close()
+
+    router := gin.Default()
+    router.GET("/r/:subreddit/media", handler.GetSubredditMedia)
+
+    req := httptest.NewRequest("GET", "/r/golang/media?limit=10", nil)
+    w := httptest.NewRecorder()
+    router.ServeHTTP(w, req)
+
+    require.Equal(t, http.StatusOK, w.Code)
+
+    var response map[string]interface{}
+    json.Unmarshal(w.Body.Bytes(), &response)
+
+    mediaPosts := response["media_posts"].([]interface{})
+    assert.Equal(t, 2, len(mediaPosts)) // Only media posts, not text
+}
+```
+
+Tests cover:
+- Subreddit posts fetching with sorting/filtering
+- Front page fetching
+- Post comments retrieval
+- Reddit post search
+- Media filtering for slideshow feature (images/videos only)
+- Pagination support
+- Input validation
+- Error handling for missing parameters
+
+**Other Handler Tests:**
+
 ```go
 func TestGetNotifications(t *testing.T) {
     handler, db, userID, cleanup := setupNotificationsHandlerTest(t)
