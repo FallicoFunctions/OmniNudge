@@ -7,10 +7,12 @@ import (
 	"github.com/chatreddit/backend/internal/models"
 	"github.com/chatreddit/backend/internal/websocket"
 	"github.com/gin-gonic/gin"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // MessagesHandler handles HTTP requests for messages
 type MessagesHandler struct {
+	pool             *pgxpool.Pool
 	messageRepo      *models.MessageRepository
 	conversationRepo *models.ConversationRepository
 	hub              HubInterface
@@ -24,11 +26,13 @@ type HubInterface interface {
 
 // NewMessagesHandler creates a new messages handler
 func NewMessagesHandler(
+	pool *pgxpool.Pool,
 	messageRepo *models.MessageRepository,
 	conversationRepo *models.ConversationRepository,
 	hub HubInterface,
 ) *MessagesHandler {
 	return &MessagesHandler{
+		pool:             pool,
 		messageRepo:      messageRepo,
 		conversationRepo: conversationRepo,
 		hub:              hub,
@@ -91,6 +95,25 @@ func (h *MessagesHandler) SendMessage(c *gin.Context) {
 
 	// Determine recipient (the other user in the conversation)
 	recipientID := conversation.GetOtherUserID(userID.(int))
+
+	// Check if sender is blocked by recipient
+	var isBlocked bool
+	blockCheckQuery := `
+		SELECT EXISTS(
+			SELECT 1 FROM blocked_users
+			WHERE blocker_id = $1 AND blocked_id = $2
+		)
+	`
+	err = h.pool.QueryRow(c.Request.Context(), blockCheckQuery, recipientID, userID.(int)).Scan(&isBlocked)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check blocking status"})
+		return
+	}
+
+	if isBlocked {
+		c.JSON(http.StatusForbidden, gin.H{"error": "You cannot send messages to this user"})
+		return
+	}
 
 	// Create message
 	message := &models.Message{
@@ -246,14 +269,59 @@ func (h *MessagesHandler) MarkAsRead(c *gin.Context) {
 		return
 	}
 
+	// Get all unread messages before marking as read, so we can send individual events
+	query := `
+		SELECT id, sender_id
+		FROM messages
+		WHERE conversation_id = $1
+		  AND recipient_id = $2
+		  AND read_at IS NULL
+		  AND deleted_for_recipient = false
+	`
+	rows, err := h.pool.Query(c.Request.Context(), query, conversationID, userID.(int))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get unread messages", "details": err.Error()})
+		return
+	}
+	defer rows.Close()
+
+	var unreadMessages []struct {
+		ID       int
+		SenderID int
+	}
+	for rows.Next() {
+		var msg struct {
+			ID       int
+			SenderID int
+		}
+		if err := rows.Scan(&msg.ID, &msg.SenderID); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to scan messages", "details": err.Error()})
+			return
+		}
+		unreadMessages = append(unreadMessages, msg)
+	}
+
 	// Mark all messages as read for this user
 	if err := h.messageRepo.MarkAllAsRead(c.Request.Context(), conversationID, userID.(int)); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to mark messages as read", "details": err.Error()})
 		return
 	}
 
-	// Notify the other participant that messages were read
+	// Notify senders about individual message read events
 	if h.hub != nil {
+		for _, msg := range unreadMessages {
+			h.hub.Broadcast(&websocket.Message{
+				RecipientID: msg.SenderID,
+				Type:        "message_read",
+				Payload: gin.H{
+					"message_id":      msg.ID,
+					"conversation_id": conversationID,
+					"reader_id":       userID.(int),
+				},
+			})
+		}
+
+		// Also notify the other participant that the conversation was read
 		otherUserID := conversation.GetOtherUserID(userID.(int))
 		h.hub.Broadcast(&websocket.Message{
 			RecipientID: otherUserID,
@@ -266,6 +334,67 @@ func (h *MessagesHandler) MarkAsRead(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Messages marked as read"})
+}
+
+// MarkSingleMessageAsRead handles POST /api/v1/messages/:id/read
+func (h *MessagesHandler) MarkSingleMessageAsRead(c *gin.Context) {
+	// Get user ID from context
+	userID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
+
+	messageID, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid message ID"})
+		return
+	}
+
+	// Get message to verify user is the recipient
+	message, err := h.messageRepo.GetByID(c.Request.Context(), messageID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get message", "details": err.Error()})
+		return
+	}
+
+	if message == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Message not found"})
+		return
+	}
+
+	// Only the recipient can mark a message as read
+	if message.RecipientID != userID.(int) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "You can only mark your own received messages as read"})
+		return
+	}
+
+	// Check if already read
+	if message.ReadAt != nil {
+		c.JSON(http.StatusOK, gin.H{"message": "Message already marked as read"})
+		return
+	}
+
+	// Mark message as read
+	if err := h.messageRepo.MarkAsRead(c.Request.Context(), messageID); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to mark message as read", "details": err.Error()})
+		return
+	}
+
+	// Notify sender via WebSocket
+	if h.hub != nil {
+		h.hub.Broadcast(&websocket.Message{
+			RecipientID: message.SenderID,
+			Type:        "message_read",
+			Payload: gin.H{
+				"message_id":      messageID,
+				"conversation_id": message.ConversationID,
+				"reader_id":       userID.(int),
+			},
+		})
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Message marked as read"})
 }
 
 // DeleteMessage handles DELETE /api/v1/messages/:id
