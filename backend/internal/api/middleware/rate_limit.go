@@ -3,119 +3,69 @@ package middleware
 import (
 	"net/http"
 	"sync"
-	"time"
 
 	"github.com/gin-gonic/gin"
+	"golang.org/x/time/rate"
 )
 
-// Simple in-memory rate limiter using token bucket algorithm
-// For production, use Redis-based implementation
-
-type tokenBucket struct {
-	tokens        int
-	maxTokens     int
-	refillRate    int // tokens per minute
-	lastRefill    time.Time
-	mu            sync.Mutex
-}
-
+// RateLimiter manages rate limiters for users
 type RateLimiter struct {
-	buckets map[string]*tokenBucket
-	mu      sync.RWMutex
+	limiters map[int]*rate.Limiter
+	mu       sync.RWMutex
+	limit    rate.Limit
+	burst    int
 }
 
-func NewRateLimiter() *RateLimiter {
-	rl := &RateLimiter{
-		buckets: make(map[string]*tokenBucket),
+// NewRateLimiter creates a new rate limiter
+// limit: requests per second
+// burst: maximum burst size
+func NewRateLimiter(limit rate.Limit, burst int) *RateLimiter {
+	return &RateLimiter{
+		limiters: make(map[int]*rate.Limiter),
+		limit:    limit,
+		burst:    burst,
 	}
-	// Cleanup old buckets every 10 minutes
-	go rl.cleanup()
-	return rl
 }
 
-func (rl *RateLimiter) getBucket(key string, maxTokens, refillRate int) *tokenBucket {
+// getLimiter returns the rate limiter for a specific user, creating one if it doesn't exist
+func (rl *RateLimiter) getLimiter(userID int) *rate.Limiter {
+	rl.mu.RLock()
+	limiter, exists := rl.limiters[userID]
+	rl.mu.RUnlock()
+
+	if exists {
+		return limiter
+	}
+
 	rl.mu.Lock()
 	defer rl.mu.Unlock()
 
-	bucket, exists := rl.buckets[key]
-	if !exists {
-		bucket = &tokenBucket{
-			tokens:     maxTokens,
-			maxTokens:  maxTokens,
-			refillRate: refillRate,
-			lastRefill: time.Now(),
-		}
-		rl.buckets[key] = bucket
+	// Double-check after acquiring write lock
+	if limiter, exists := rl.limiters[userID]; exists {
+		return limiter
 	}
 
-	return bucket
+	// Create new limiter for this user
+	limiter = rate.NewLimiter(rl.limit, rl.burst)
+	rl.limiters[userID] = limiter
+
+	return limiter
 }
 
-func (b *tokenBucket) tryConsume() bool {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-
-	// Refill tokens based on time elapsed
-	now := time.Now()
-	elapsed := now.Sub(b.lastRefill)
-	tokensToAdd := int(elapsed.Minutes()) * b.refillRate
-	if tokensToAdd > 0 {
-		b.tokens = min(b.tokens+tokensToAdd, b.maxTokens)
-		b.lastRefill = now
-	}
-
-	// Try to consume a token
-	if b.tokens > 0 {
-		b.tokens--
-		return true
-	}
-
-	return false
-}
-
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}
-
-func (rl *RateLimiter) cleanup() {
-	ticker := time.NewTicker(10 * time.Minute)
-	defer ticker.Stop()
-
-	for range ticker.C {
-		rl.mu.Lock()
-		now := time.Now()
-		for key, bucket := range rl.buckets {
-			bucket.mu.Lock()
-			if now.Sub(bucket.lastRefill) > 30*time.Minute {
-				delete(rl.buckets, key)
-			}
-			bucket.mu.Unlock()
-		}
-		rl.mu.Unlock()
-	}
-}
-
-// RateLimit creates a rate limiting middleware
-// maxRequests: maximum requests allowed
-// perMinutes: time window in minutes
-func RateLimit(maxRequests, perMinutes int) gin.HandlerFunc {
-	limiter := NewRateLimiter()
-	refillRate := maxRequests / perMinutes
-
+// Middleware returns a Gin middleware function for rate limiting
+func (rl *RateLimiter) Middleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// Use user ID if authenticated, otherwise use IP
-		var key string
-		if userID, exists := c.Get("user_id"); exists {
-			key = "user:" + string(rune(userID.(int)))
-		} else {
-			key = "ip:" + c.ClientIP()
+		// Get user ID from context (set by AuthRequired middleware)
+		userID, exists := c.Get("user_id")
+		if !exists {
+			// If no user ID, skip rate limiting (public endpoints)
+			c.Next()
+			return
 		}
 
-		bucket := limiter.getBucket(key, maxRequests, refillRate)
-		if !bucket.tryConsume() {
+		limiter := rl.getLimiter(userID.(int))
+
+		if !limiter.Allow() {
 			c.JSON(http.StatusTooManyRequests, gin.H{
 				"error": "Rate limit exceeded. Please try again later.",
 			})
@@ -125,4 +75,11 @@ func RateLimit(maxRequests, perMinutes int) gin.HandlerFunc {
 
 		c.Next()
 	}
+}
+
+// UploadRateLimiter creates a rate limiter specifically for media uploads
+// Allows 10 uploads per minute (10 requests / 60 seconds = ~0.167 requests/second)
+func UploadRateLimiter() *RateLimiter {
+	// 10 uploads per minute with burst of 3 (allows small bursts)
+	return NewRateLimiter(rate.Limit(10.0/60.0), 3)
 }
