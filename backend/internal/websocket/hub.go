@@ -109,3 +109,14 @@ func (h *Hub) GetOnlineUsers() []int {
 	}
 	return users
 }
+
+// BroadcastToUsers sends the same message to multiple users
+func (h *Hub) BroadcastToUsers(userIDs []int, msgType string, payload interface{}) {
+	for _, userID := range userIDs {
+		h.Broadcast(&Message{
+			RecipientID: userID,
+			Type:        msgType,
+			Payload:     payload,
+		})
+	}
+}
