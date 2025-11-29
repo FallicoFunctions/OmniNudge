@@ -50,14 +50,22 @@ func (h *Hub) Run() {
 			h.mu.Unlock()
 			log.Printf("Client registered: user_id=%d", client.UserID)
 
+			// Broadcast user_online event to all other connected users
+			h.broadcastUserStatus(client.UserID, true)
+
 		case client := <-h.unregister:
 			h.mu.Lock()
 			if _, ok := h.clients[client.UserID]; ok {
 				delete(h.clients, client.UserID)
 				close(client.Send)
 				log.Printf("Client unregistered: user_id=%d", client.UserID)
+
+				// Broadcast user_offline event to all other connected users
+				h.mu.Unlock()
+				h.broadcastUserStatus(client.UserID, false)
+			} else {
+				h.mu.Unlock()
 			}
-			h.mu.Unlock()
 
 		case message := <-h.broadcast:
 			h.mu.RLock()
@@ -118,5 +126,34 @@ func (h *Hub) BroadcastToUsers(userIDs []int, msgType string, payload interface{
 			Type:        msgType,
 			Payload:     payload,
 		})
+	}
+}
+
+// broadcastUserStatus broadcasts user online/offline status to all connected users
+func (h *Hub) broadcastUserStatus(userID int, isOnline bool) {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+
+	eventType := "user_offline"
+	if isOnline {
+		eventType = "user_online"
+	}
+
+	// Broadcast to all connected users except the user whose status changed
+	for id, client := range h.clients {
+		if id != userID {
+			select {
+			case client.Send <- &Message{
+				RecipientID: id,
+				Type:        eventType,
+				Payload: map[string]interface{}{
+					"user_id": userID,
+				},
+			}:
+				// Message sent successfully
+			default:
+				// Client's send channel is full, skip
+			}
+		}
 	}
 }

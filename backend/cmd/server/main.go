@@ -105,7 +105,7 @@ func main() {
 	commentsHandler := handlers.NewCommentsHandler(commentRepo, postRepo, hubModRepo)
 	redditHandler := handlers.NewRedditHandler(redditClient, redditPostRepo)
 	conversationsHandler := handlers.NewConversationsHandler(conversationRepo, messageRepo, userRepo)
-	messagesHandler := handlers.NewMessagesHandler(messageRepo, conversationRepo, hub)
+	messagesHandler := handlers.NewMessagesHandler(db.Pool, messageRepo, conversationRepo, hub)
 	usersHandler := handlers.NewUsersHandler(userRepo, postRepo, commentRepo, authService)
 	mediaHandler := handlers.NewMediaHandler(mediaRepo)
 	hubsHandler := handlers.NewHubsHandler(hubRepo, postRepo, hubModRepo)
@@ -117,6 +117,7 @@ func main() {
 	blockingHandler := handlers.NewBlockingHandler(db.Pool, userRepo)
 	slideshowHandler := handlers.NewSlideshowHandler(db.Pool, slideshowRepo, conversationRepo, hub)
 	mediaGalleryHandler := handlers.NewMediaGalleryHandler(db.Pool)
+	userStatusHandler := handlers.NewUserStatusHandler(hub)
 
 	// Inject notification service into handlers
 	postsHandler.SetNotificationService(notificationService)
@@ -207,6 +208,7 @@ func main() {
 		// Public user profile routes
 		users := api.Group("/users")
 		{
+			users.GET("/status", userStatusHandler.GetUsersStatus)
 			users.GET("/:username", usersHandler.GetUserProfile)
 			users.GET("/:username/posts", usersHandler.GetUserPosts)
 			users.GET("/:username/comments", usersHandler.GetUserComments)
@@ -256,6 +258,7 @@ func main() {
 			protected.POST("/messages", messagesHandler.SendMessage)
 			protected.GET("/conversations/:id/messages", messagesHandler.GetMessages)
 			protected.POST("/conversations/:id/read", messagesHandler.MarkAsRead)
+			protected.POST("/messages/:id/read", messagesHandler.MarkSingleMessageAsRead)
 			protected.DELETE("/messages/:id", messagesHandler.DeleteMessage)
 
 			// Slideshow routes
