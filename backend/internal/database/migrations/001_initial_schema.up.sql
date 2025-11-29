@@ -1,4 +1,4 @@
--- ChatReddit Initial Schema
+-- OmniNudge Initial Schema
 -- Migration: 001_initial_schema
 
 -- Users table - username/password authentication (email optional)

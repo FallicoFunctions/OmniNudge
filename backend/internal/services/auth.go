@@ -11,8 +11,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/chatreddit/backend/internal/models"
-	"github.com/chatreddit/backend/internal/utils"
+	"github.com/omninudge/backend/internal/models"
+	"github.com/omninudge/backend/internal/utils"
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/oauth2"
 )
@@ -124,7 +124,7 @@ func (s *AuthService) GenerateJWT(userID int, redditID, username, role string) (
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(7 * 24 * time.Hour)), // 7 days
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
-			Issuer:    "chatreddit",
+			Issuer:    "OmniNudge",
 		},
 	}
 

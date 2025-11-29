@@ -54,7 +54,7 @@ package main
 import "fmt"
 
 func main() {
-    name := "ChatReddit Developer"
+    name := "OmniNudge Developer"
     fmt.Printf("Hello, %s!\n", name)
     fmt.Println("Learning Go to build something awesome!")
 }
@@ -498,7 +498,7 @@ go run http-server/main.go
 
 # In another terminal:
 curl http://localhost:8080/
-curl http://localhost:8080/api/hello?name=ChatReddit
+curl http://localhost:8080/api/hello?name=OmniNudge
 curl http://localhost:8080/api/user
 ```
 
@@ -533,7 +533,7 @@ func main() {
     // Encoding (Go struct -> JSON string)
     msg := Message{
         ID:        1,
-        Text:      "Hello ChatReddit!",
+        Text:      "Hello OmniNudge!",
         Sender:    "alice",
         Encrypted: true,
     }
@@ -601,7 +601,7 @@ func main() {
     // Routes
     router.GET("/", func(c *gin.Context) {
         c.JSON(http.StatusOK, gin.H{
-            "message": "Welcome to ChatReddit API",
+            "message": "Welcome to OmniNudge API",
         })
     })
 
@@ -686,7 +686,7 @@ type User struct {
 
 func main() {
     // Connection string
-    connStr := "host=localhost port=5432 user=postgres dbname=chatreddit_dev sslmode=disable"
+    connStr := "host=localhost port=5432 user=postgres dbname=omninudge_dev sslmode=disable"
 
     db, err := sql.Open("postgres", connStr)
     if err != nil {
@@ -1117,9 +1117,9 @@ Create `.env`:
 ```
 DB_HOST=localhost
 DB_PORT=5432
-DB_USER=chatreddit_user
+DB_USER=omninudge_user
 DB_PASSWORD=your_password
-DB_NAME=chatreddit_dev
+DB_NAME=omninudge_dev
 ```
 
 Create `config/main.go`:
@@ -1153,7 +1153,7 @@ func loadConfig() *Config {
         DBPort:     getEnv("DB_PORT", "5432"),
         DBUser:     getEnv("DB_USER", "postgres"),
         DBPassword: getEnv("DB_PASSWORD", ""),
-        DBName:     getEnv("DB_NAME", "chatreddit_dev"),
+        DBName:     getEnv("DB_NAME", "omninudge_dev"),
     }
 }
 
@@ -1348,4 +1348,4 @@ You've completed Month 0! You now know enough Go to start building the real proj
 - Take breaks - 2 hours/day is sustainable
 - Have fun! You're building something awesome.
 
-Let's start building ChatReddit! 🚀
+Let's start building OmniNudge! 🚀

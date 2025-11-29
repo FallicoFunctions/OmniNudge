@@ -11,9 +11,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/chatreddit/backend/internal/database"
-	"github.com/chatreddit/backend/internal/models"
-	"github.com/chatreddit/backend/internal/websocket"
+	"github.com/omninudge/backend/internal/database"
+	"github.com/omninudge/backend/internal/models"
+	"github.com/omninudge/backend/internal/websocket"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

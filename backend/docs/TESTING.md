@@ -2,7 +2,7 @@
 
 ## Test Coverage
 
-The ChatReddit backend has comprehensive test coverage across all major systems:
+The OmniNudge backend has comprehensive test coverage across all major systems:
 
 **Total Tests: 135** ✅
 
@@ -41,12 +41,12 @@ The ChatReddit backend has comprehensive test coverage across all major systems:
 
 1. **PostgreSQL Database**
    ```bash
-   createdb chatreddit_test
+   createdb omninudge_test
    ```
 
 2. **Environment Variable**
    ```bash
-   export TEST_DATABASE_URL="postgres://<your-username>@localhost:5432/chatreddit_test?sslmode=disable"
+   export TEST_DATABASE_URL="postgres://<your-username>@localhost:5432/omninudge_test?sslmode=disable"
    ```
 
 ### Run All Tests
@@ -236,9 +236,9 @@ This allows running `go test ./...` multiple times on the same database without 
 
 ### Database Cleanup
 
-Tests use a dedicated `chatreddit_test` database:
+Tests use a dedicated `omninudge_test` database:
 - Separate from development data
-- Can be reset with `dropdb chatreddit_test && createdb chatreddit_test`
+- Can be reset with `dropdb omninudge_test && createdb omninudge_test`
 - Migrations run automatically in each test
 
 ### Background Goroutines
@@ -281,7 +281,7 @@ func setupNotificationsHandlerTest(t *testing.T) (*Handler, *database.Database, 
 
 1. Checks `TEST_DATABASE_URL`
 2. Falls back to `DATABASE_URL`
-3. Uses default: `postgres://postgres:postgres@localhost:5432/chatreddit_test?sslmode=disable`
+3. Uses default: `postgres://postgres:postgres@localhost:5432/omninudge_test?sslmode=disable`
 
 ## Continuous Integration
 
@@ -291,9 +291,9 @@ For CI/CD pipelines:
 # Example GitHub Actions
 - name: Run tests
   env:
-    TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/chatreddit_test?sslmode=disable
+    TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/omninudge_test?sslmode=disable
   run: |
-    createdb chatreddit_test
+    createdb omninudge_test
     cd backend
     go test ./... -v
 ```
@@ -356,15 +356,15 @@ When adding new features:
 
 2. **Check database state:**
    ```bash
-   psql chatreddit_test
+   psql omninudge_test
    \dt  # List tables
    SELECT * FROM notifications LIMIT 10;
    ```
 
 3. **Reset test database:**
    ```bash
-   dropdb chatreddit_test
-   createdb chatreddit_test
+   dropdb omninudge_test
+   createdb omninudge_test
    ```
 
 4. **Check environment:**

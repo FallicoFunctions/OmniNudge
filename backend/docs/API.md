@@ -1,4 +1,4 @@
-# ChatReddit API Documentation
+# OmniNudge API Documentation
 
 ## Base URL
 ```
