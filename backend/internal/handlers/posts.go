@@ -11,18 +11,20 @@ import (
 
 // PostsHandler handles HTTP requests for platform posts
 type PostsHandler struct {
-	postRepo        *models.PlatformPostRepository
-	hubRepo         *models.HubRepository
-	modRepo         *models.HubModeratorRepository
-	notifService    *services.NotificationService
+	postRepo     *models.PlatformPostRepository
+	hubRepo      *models.HubRepository
+	modRepo      *models.HubModeratorRepository
+	feedRepo     *models.FeedRepository
+	notifService *services.NotificationService
 }
 
 // NewPostsHandler creates a new posts handler
-func NewPostsHandler(postRepo *models.PlatformPostRepository, hubRepo *models.HubRepository, modRepo *models.HubModeratorRepository) *PostsHandler {
+func NewPostsHandler(postRepo *models.PlatformPostRepository, hubRepo *models.HubRepository, modRepo *models.HubModeratorRepository, feedRepo *models.FeedRepository) *PostsHandler {
 	return &PostsHandler{
 		postRepo: postRepo,
 		hubRepo:  hubRepo,
 		modRepo:  modRepo,
+		feedRepo: feedRepo,
 	}
 }
 
@@ -149,13 +151,23 @@ func (h *PostsHandler) GetFeed(c *gin.Context) {
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "25"))
 	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
 	hubName := c.Query("hub") // optional filter by hub name
+	sourceFilter := c.Query("source")
 
 	// Validate limit
 	if limit < 1 || limit > 100 {
 		limit = 25
 	}
 
+	if sourceFilter != "" && sourceFilter != "platform" && sourceFilter != "reddit" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid source filter. Must be 'platform' or 'reddit'"})
+		return
+	}
+
 	if hubName != "" {
+		if sourceFilter == "reddit" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Cannot filter by hub when requesting Reddit-only feed"})
+			return
+		}
 		sr, err := h.hubRepo.GetByName(c.Request.Context(), hubName)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch hub", "details": err.Error()})
@@ -180,17 +192,18 @@ func (h *PostsHandler) GetFeed(c *gin.Context) {
 		return
 	}
 
-	posts, err := h.postRepo.GetFeed(c.Request.Context(), sortBy, limit, offset)
+	items, err := h.feedRepo.GetUnifiedFeed(c.Request.Context(), sortBy, limit, offset, sourceFilter)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get feed", "details": err.Error()})
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"posts":  posts,
+		"posts":  items,
 		"limit":  limit,
 		"offset": offset,
 		"sort":   sortBy,
+		"source": sourceFilter,
 	})
 }
 

@@ -65,7 +65,7 @@ func TestRedditFrontpageMockCaching(t *testing.T) {
 
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
-	handler := handlers.NewRedditHandler(client)
+	handler := handlers.NewRedditHandler(client, nil)
 	router.GET("/api/v1/reddit/frontpage", handler.GetFrontPage)
 
 	// First call hits upstream
