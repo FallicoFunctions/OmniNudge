@@ -59,6 +59,17 @@ func (h *SlideshowHandler) StartSlideshow(c *gin.Context) {
 		return
 	}
 
+	// Check if slideshow already exists
+	existingSlideshow, err := h.slideshowRepo.GetByConversationID(c.Request.Context(), conversationID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check existing slideshow"})
+		return
+	}
+	if existingSlideshow != nil {
+		c.JSON(http.StatusConflict, gin.H{"error": "A slideshow is already active for this conversation"})
+		return
+	}
+
 	// Parse request body
 	var req struct {
 		SlideshowType       string   `json:"slideshow_type" binding:"required"`
@@ -159,7 +170,7 @@ func (h *SlideshowHandler) StartSlideshow(c *gin.Context) {
 		"auto_advance_interval":  session.AutoAdvanceInterval,
 	})
 
-	c.JSON(http.StatusOK, session)
+	c.JSON(http.StatusCreated, session)
 }
 
 // NavigateSlideshow handles POST /api/v1/slideshows/:id/navigate
@@ -444,11 +455,11 @@ func (h *SlideshowHandler) GetSlideshow(c *gin.Context) {
 	// Get slideshow session
 	session, err := h.slideshowRepo.GetByConversationID(c.Request.Context(), conversationID)
 	if err != nil {
-		if err == pgx.ErrNoRows {
-			c.JSON(http.StatusNotFound, gin.H{"error": "No active slideshow"})
-			return
-		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch slideshow"})
+		return
+	}
+	if session == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "No active slideshow"})
 		return
 	}
 

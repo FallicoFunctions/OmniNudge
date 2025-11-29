@@ -19,14 +19,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var (
-	slideshowTestCounter   int64
-	slideshowTestRunSuffix = time.Now().UnixNano()
-)
+var slideshowTestCounter int64
 
 func uniqueSlideshowUsername(base string) string {
 	id := atomic.AddInt64(&slideshowTestCounter, 1)
-	return fmt.Sprintf("%s_%d_%d", base, slideshowTestRunSuffix, id)
+	return fmt.Sprintf("%s_slideshow_%d_%d", base, time.Now().UnixNano(), id)
 }
 
 func setupSlideshowHandlerTest(t *testing.T) (*SlideshowHandler, *database.Database, int, int, int, func()) {
@@ -58,10 +55,10 @@ func setupSlideshowHandlerTest(t *testing.T) (*SlideshowHandler, *database.Datab
 	conv, err := convRepo.Create(ctx, user1.ID, user2.ID)
 	require.NoError(t, err)
 
-	// Create handler with mock hub
+	// Create handler with hub (don't run it in tests to avoid blocking)
 	slideshowRepo := models.NewSlideshowRepository(db.Pool)
-	mockHub := &websocket.Hub{}
-	handler := NewSlideshowHandler(db.Pool, slideshowRepo, convRepo, mockHub)
+	hub := websocket.NewHub()
+	handler := NewSlideshowHandler(db.Pool, slideshowRepo, convRepo, hub)
 
 	cleanup := func() {
 		db.Close()
@@ -414,8 +411,9 @@ func TestStopSlideshow(t *testing.T) {
 	assert.Equal(t, http.StatusOK, w.Code)
 
 	// Verify slideshow was deleted
-	_, err = slideshowRepo.GetByID(ctx, session.ID)
-	assert.Error(t, err)
+	deletedSession, err := slideshowRepo.GetByID(ctx, session.ID)
+	require.NoError(t, err)
+	assert.Nil(t, deletedSession)
 }
 
 func strPtr(s string) *string {
