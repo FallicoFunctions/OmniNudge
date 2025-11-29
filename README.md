@@ -83,9 +83,10 @@ chatreddit/
 - User blocking system
 - Profile management
 - Rate limiting
+- Reddit public API integration with caching
+- Media filtering for slideshow features
 
 🚧 In Development:
-- Reddit public API integration
 - Messaging system
 - Frontend application
 

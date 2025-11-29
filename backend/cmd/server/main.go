@@ -186,6 +186,7 @@ func main() {
 		{
 			reddit.GET("/frontpage", redditHandler.GetFrontPage)
 			reddit.GET("/r/:subreddit", redditHandler.GetSubredditPosts)
+			reddit.GET("/r/:subreddit/media", redditHandler.GetSubredditMedia)
 			reddit.GET("/r/:subreddit/comments/:postId", redditHandler.GetPostComments)
 			reddit.GET("/search", redditHandler.SearchPosts)
 		}
