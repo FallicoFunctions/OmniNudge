@@ -4,15 +4,17 @@
 
 The ChatReddit backend has comprehensive test coverage across all major systems:
 
-**Total Tests: 93** ✅
+**Total Tests: 113** ✅
 
 ### Test Distribution
 
-- **Handlers (39 tests)**: HTTP endpoint tests for all REST API handlers
+- **Handlers (59 tests)**: HTTP endpoint tests for all REST API handlers
   - Reddit: 12 tests
   - Notifications: 7 tests
   - Search: 6 tests
   - Blocking: 6 tests
+  - Slideshow: 9 tests
+  - Media Gallery: 11 tests
   - Profile: Tests in integration suite
   - Rate limiting: Tests in middleware
 
