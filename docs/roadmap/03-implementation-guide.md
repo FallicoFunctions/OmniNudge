@@ -1002,7 +1002,7 @@ export const CallbackPage: React.FC = () => {
 ```bash
 git add .
 git commit -m "feat: Reddit OAuth authentication complete"
-git push origin claude/plan-mode-011CV5X5dP4Q7Jm72AVdr95f
+git push origin main
 ```
 
 ---
