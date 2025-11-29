@@ -27,7 +27,10 @@ type UserSettings struct {
 	NotifyCommentVelocity  bool `json:"notify_comment_velocity"`
 	DailyDigest            bool `json:"daily_digest"`
 
-	UpdatedAt            time.Time `json:"updated_at"`
+	// Media gallery preferences
+	MediaGalleryFilter string `json:"media_gallery_filter"` // 'all', 'mine', 'theirs'
+
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
 // UserSettingsRepository handles CRUD for user_settings.
@@ -47,7 +50,7 @@ func (r *UserSettingsRepository) GetByUserID(ctx context.Context, userID int) (*
 		       auto_append_invitation, theme,
 		       notify_comment_replies, notify_post_milestone, notify_post_velocity,
 		       notify_comment_milestone, notify_comment_velocity, daily_digest,
-		       updated_at
+		       media_gallery_filter, updated_at
 		FROM user_settings
 		WHERE user_id = $1
 	`
@@ -66,6 +69,7 @@ func (r *UserSettingsRepository) GetByUserID(ctx context.Context, userID int) (*
 		&settings.NotifyCommentMilestone,
 		&settings.NotifyCommentVelocity,
 		&settings.DailyDigest,
+		&settings.MediaGalleryFilter,
 		&settings.UpdatedAt,
 	)
 	if err != nil {
@@ -88,7 +92,7 @@ func (r *UserSettingsRepository) CreateDefault(ctx context.Context, userID int) 
 		          auto_append_invitation, theme,
 		          notify_comment_replies, notify_post_milestone, notify_post_velocity,
 		          notify_comment_milestone, notify_comment_velocity, daily_digest,
-		          updated_at
+		          media_gallery_filter, updated_at
 	`
 
 	settings := &UserSettings{}
@@ -105,6 +109,7 @@ func (r *UserSettingsRepository) CreateDefault(ctx context.Context, userID int) 
 		&settings.NotifyCommentMilestone,
 		&settings.NotifyCommentVelocity,
 		&settings.DailyDigest,
+		&settings.MediaGalleryFilter,
 		&settings.UpdatedAt,
 	)
 
@@ -134,13 +139,14 @@ func (r *UserSettingsRepository) Update(ctx context.Context, settings *UserSetti
 		    notify_comment_milestone = $10,
 		    notify_comment_velocity = $11,
 		    daily_digest = $12,
+		    media_gallery_filter = $13,
 		    updated_at = CURRENT_TIMESTAMP
 		WHERE user_id = $1
 		RETURNING user_id, notification_sound, show_read_receipts, show_typing_indicators,
 		          auto_append_invitation, theme,
 		          notify_comment_replies, notify_post_milestone, notify_post_velocity,
 		          notify_comment_milestone, notify_comment_velocity, daily_digest,
-		          updated_at
+		          media_gallery_filter, updated_at
 	`
 
 	updated := &UserSettings{}
@@ -157,6 +163,7 @@ func (r *UserSettingsRepository) Update(ctx context.Context, settings *UserSetti
 		settings.NotifyCommentMilestone,
 		settings.NotifyCommentVelocity,
 		settings.DailyDigest,
+		settings.MediaGalleryFilter,
 	).Scan(
 		&updated.UserID,
 		&updated.NotificationSound,
@@ -170,6 +177,7 @@ func (r *UserSettingsRepository) Update(ctx context.Context, settings *UserSetti
 		&updated.NotifyCommentMilestone,
 		&updated.NotifyCommentVelocity,
 		&updated.DailyDigest,
+		&updated.MediaGalleryFilter,
 		&updated.UpdatedAt,
 	)
 	if err != nil {

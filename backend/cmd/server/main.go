@@ -114,6 +114,7 @@ func main() {
 	searchHandler := handlers.NewSearchHandler(db.Pool)
 	blockingHandler := handlers.NewBlockingHandler(db.Pool, userRepo)
 	slideshowHandler := handlers.NewSlideshowHandler(db.Pool, slideshowRepo, conversationRepo, hub)
+	mediaGalleryHandler := handlers.NewMediaGalleryHandler(db.Pool)
 
 	// Inject notification service into handlers
 	postsHandler.SetNotificationService(notificationService)
@@ -262,6 +263,10 @@ func main() {
 			protected.POST("/slideshows/:id/transfer-control", slideshowHandler.TransferControl)
 			protected.PUT("/slideshows/:id/auto-advance", slideshowHandler.UpdateAutoAdvance)
 			protected.DELETE("/slideshows/:id", slideshowHandler.StopSlideshow)
+
+			// Media gallery routes
+			protected.GET("/conversations/:id/media", mediaGalleryHandler.GetConversationMedia)
+			protected.GET("/conversations/:id/media/:messageId/index", mediaGalleryHandler.FindMediaIndex)
 
 			// Media upload
 			protected.POST("/media/upload", mediaHandler.UploadMedia)
