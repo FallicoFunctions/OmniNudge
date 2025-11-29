@@ -2,9 +2,9 @@ package models
 
 import (
 	"context"
-	"database/sql"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -90,7 +90,7 @@ func (r *ConversationRepository) GetByID(ctx context.Context, id int) (*Conversa
 	)
 
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if err == pgx.ErrNoRows {
 			return nil, nil
 		}
 		return nil, err
@@ -129,7 +129,7 @@ func (r *ConversationRepository) GetByUsers(ctx context.Context, user1ID, user2I
 	)
 
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if err == pgx.ErrNoRows {
 			return nil, nil
 		}
 		return nil, err

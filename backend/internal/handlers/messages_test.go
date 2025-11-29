@@ -19,14 +19,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var (
-	messagesTestCounter   int64
-	messagesTestRunSuffix = time.Now().UnixNano()
-)
+var messagesTestCounter int64
 
 func uniqueMessagesUsername(base string) string {
 	id := atomic.AddInt64(&messagesTestCounter, 1)
-	return fmt.Sprintf("%s_%d_%d", base, messagesTestRunSuffix, id)
+	return fmt.Sprintf("%s_messages_%d_%d", base, time.Now().UnixNano(), id)
 }
 
 type mockHub struct {

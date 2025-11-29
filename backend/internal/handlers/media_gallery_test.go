@@ -17,14 +17,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var (
-	mediaGalleryTestCounter   int64
-	mediaGalleryTestRunSuffix = time.Now().UnixNano()
-)
+var mediaGalleryTestCounter int64
 
 func uniqueMediaGalleryUsername(base string) string {
 	id := atomic.AddInt64(&mediaGalleryTestCounter, 1)
-	return fmt.Sprintf("%s_%d_%d", base, mediaGalleryTestRunSuffix, id)
+	return fmt.Sprintf("%s_media_gallery_%d_%d", base, time.Now().UnixNano(), id)
 }
 
 func setupMediaGalleryHandlerTest(t *testing.T) (*MediaGalleryHandler, *database.Database, int, int, int, func()) {
