@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -102,6 +103,9 @@ func (r *SlideshowRepository) GetByConversationID(ctx context.Context, conversat
 	)
 
 	if err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, nil
+		}
 		return nil, fmt.Errorf("failed to get slideshow session: %w", err)
 	}
 
@@ -135,6 +139,9 @@ func (r *SlideshowRepository) GetByID(ctx context.Context, id int) (*SlideshowSe
 	)
 
 	if err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, nil
+		}
 		return nil, fmt.Errorf("failed to get slideshow session: %w", err)
 	}
 

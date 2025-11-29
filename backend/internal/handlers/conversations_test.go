@@ -18,14 +18,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var (
-	conversationsTestCounter   int64
-	conversationsTestRunSuffix = time.Now().UnixNano()
-)
+var conversationsTestCounter int64
 
 func uniqueConversationsUsername(base string) string {
 	id := atomic.AddInt64(&conversationsTestCounter, 1)
-	return fmt.Sprintf("%s_%d_%d", base, conversationsTestRunSuffix, id)
+	return fmt.Sprintf("%s_conversations_%d_%d", base, time.Now().UnixNano(), id)
 }
 
 func setupConversationsHandlerTest(t *testing.T) (*ConversationsHandler, *database.Database, int, int, func()) {
@@ -456,7 +453,7 @@ func TestDeleteConversation(t *testing.T) {
 
 	// Verify conversation is deleted
 	deleted, err := convRepo.GetByID(ctx, conv.ID)
-	assert.Error(t, err)
+	require.NoError(t, err)
 	assert.Nil(t, deleted)
 }
 
