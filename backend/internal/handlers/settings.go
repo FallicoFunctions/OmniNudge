@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/chatreddit/backend/internal/models"
+	"github.com/omninudge/backend/internal/models"
 	"github.com/gin-gonic/gin"
 )
 

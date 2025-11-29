@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/chatreddit/backend/internal/handlers"
-	"github.com/chatreddit/backend/internal/services"
+	"github.com/omninudge/backend/internal/handlers"
+	"github.com/omninudge/backend/internal/services"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
 )

@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/chatreddit/backend/internal/models"
+	"github.com/omninudge/backend/internal/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

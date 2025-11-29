@@ -1040,7 +1040,7 @@ VACUUM ANALYZE conversations;
 
 ### Development
 - Manual backups before major changes
-- `pg_dump chatreddit_dev > backup.sql`
+- `pg_dump omninudge_dev > backup.sql`
 
 ### Production
 - Automated daily backups
@@ -1050,12 +1050,12 @@ VACUUM ANALYZE conversations;
 
 **Backup Command:**
 ```bash
-pg_dump -h localhost -U chatreddit_user -d chatreddit_prod | gzip > backup_$(date +%Y%m%d).sql.gz
+pg_dump -h localhost -U omninudge_user -d omninudge_prod | gzip > backup_$(date +%Y%m%d).sql.gz
 ```
 
 **Restore Command:**
 ```bash
-gunzip < backup_20250101.sql.gz | psql -h localhost -U chatreddit_user -d chatreddit_prod
+gunzip < backup_20250101.sql.gz | psql -h localhost -U omninudge_user -d omninudge_prod
 ```
 
 ---

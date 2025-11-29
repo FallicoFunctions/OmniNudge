@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/chatreddit/backend/internal/database"
-	"github.com/chatreddit/backend/internal/models"
+	"github.com/omninudge/backend/internal/database"
+	"github.com/omninudge/backend/internal/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

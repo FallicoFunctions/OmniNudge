@@ -177,7 +177,7 @@ Create a post on Reddit (via user's Reddit account).
 {
   "subreddit": "Yorkies",
   "title": "Looking to chat about Yorkies!",
-  "body": "DM me if you want to chat!\n\n---\n💬 Posted from ChatReddit.com",
+  "body": "DM me if you want to chat!\n\n---\n💬 Posted from OmniNudge.com",
   "append_signature": true
 }
 ```
@@ -1096,7 +1096,7 @@ curl -X POST \
 ### Using Thunder Client (VS Code)
 
 1. Install Thunder Client extension
-2. Create collection "ChatReddit API"
+2. Create collection "OmniNudge API"
 3. Add environment variables:
    - `base_url`: http://localhost:8080/api/v1
    - `token`: your_jwt_token

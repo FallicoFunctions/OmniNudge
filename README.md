@@ -1,10 +1,10 @@
-# ChatReddit
+# OmniNudge
 
 A social platform combining Reddit browsing with encrypted multimedia chat, designed to be the foundation of a universal social media platform.
 
 ## Overview
 
-ChatReddit allows users to browse Reddit content, discuss it with a growing community, and connect through end-to-end encrypted chat with multimedia features. Users can create their own posts and comments visible to the platform community while exploring Reddit's vast content library.
+OmniNudge allows users to browse Reddit content, discuss it with a growing community, and connect through end-to-end encrypted chat with multimedia features. Users can create their own posts and comments visible to the platform community while exploring Reddit's vast content library.
 
 ## Core Features (Phase 1 MVP)
 
@@ -56,7 +56,7 @@ ChatReddit allows users to browse Reddit content, discuss it with a growing comm
 ## Project Structure
 
 ```
-chatreddit/
+omninudge/
 ├── backend/
 │   ├── cmd/server/          # Application entry point
 │   ├── internal/
@@ -105,12 +105,12 @@ chatreddit/
 1. Clone the repository
 ```bash
 git clone <repository-url>
-cd chatreddit
+cd omninudge
 ```
 
 2. Set up PostgreSQL
 ```bash
-createdb chatreddit_dev
+createdb omninudge_dev
 ```
 
 3. Run the backend
@@ -123,17 +123,17 @@ The server will start on `http://localhost:8080`
 
 ### Running Tests
 
-Several packages spin up their own PostgreSQL connection during tests, so make sure a **separate** database exists for them (recommended name: `chatreddit_test`).
+Several packages spin up their own PostgreSQL connection during tests, so make sure a **separate** database exists for them (recommended name: `omninudge_test`).
 
 ```bash
-createdb chatreddit_test
+createdb omninudge_test
 ```
 
 Then point the tests at that database using `TEST_DATABASE_URL` before running `go test`:
 
 ```bash
 cd backend
-export TEST_DATABASE_URL="postgres://<db-user>@localhost:5432/chatreddit_test?sslmode=disable"
+export TEST_DATABASE_URL="postgres://<db-user>@localhost:5432/omninudge_test?sslmode=disable"
 go test ./...
 ```
 
@@ -152,7 +152,7 @@ DB_HOST=localhost
 DB_PORT=5432
 DB_USER=your_user
 DB_PASSWORD=your_password
-DB_NAME=chatreddit_dev
+DB_NAME=omninudge_dev
 
 # JWT
 JWT_SECRET=your-secret-key-here
@@ -228,7 +228,7 @@ Comprehensive documentation available in `/docs`:
 
 ## Long-Term Vision
 
-ChatReddit is designed to evolve into a comprehensive social platform:
+OmniNudge is designed to evolve into a comprehensive social platform:
 
 **Phase 1 (Year 1):** Reddit browser + encrypted chat + multimedia
 **Phase 2 (Year 2):** Content creation (videos, images, stories)

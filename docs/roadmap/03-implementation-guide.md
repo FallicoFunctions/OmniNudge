@@ -28,7 +28,7 @@ This guide walks you through building the entire Phase 1 platform chronologicall
 ### Step 1: Create Project Structure
 
 ```bash
-cd ~/projects/chatreddit
+cd ~/projects/omninudge
 
 # Backend structure
 mkdir -p backend/{cmd/server,internal/{api/{handlers,middleware},models,services,database/migrations,config},pkg/utils}
@@ -47,7 +47,7 @@ touch frontend/package.json
 
 ```bash
 cd backend
-go mod init github.com/yourusername/chatreddit-backend
+go mod init github.com/yourusername/omninudge-backend
 
 # Install initial dependencies
 go get github.com/gin-gonic/gin
@@ -81,9 +81,9 @@ ENV=development
 
 DB_HOST=localhost
 DB_PORT=5432
-DB_USER=chatreddit_user
+DB_USER=omninudge_user
 DB_PASSWORD=your_password
-DB_NAME=chatreddit_dev
+DB_NAME=omninudge_dev
 
 REDIS_HOST=localhost
 REDIS_PORT=6379
@@ -91,7 +91,7 @@ REDIS_PORT=6379
 REDDIT_CLIENT_ID=
 REDDIT_CLIENT_SECRET=
 REDDIT_REDIRECT_URI=http://localhost:3000/auth/reddit/callback
-REDDIT_USER_AGENT=chatreddit:v1.0
+REDDIT_USER_AGENT=OmniNudge:v1.0
 
 JWT_SECRET=your_very_long_random_secret_key_here
 ```
@@ -150,7 +150,7 @@ func Load() *Config {
         DBPort:             getEnv("DB_PORT", "5432"),
         DBUser:             getEnv("DB_USER", "postgres"),
         DBPassword:         getEnv("DB_PASSWORD", ""),
-        DBName:             getEnv("DB_NAME", "chatreddit_dev"),
+        DBName:             getEnv("DB_NAME", "omninudge_dev"),
         RedisHost:          getEnv("REDIS_HOST", "localhost"),
         RedisPort:          getEnv("REDIS_PORT", "6379"),
         RedditClientID:     getEnv("REDDIT_CLIENT_ID", ""),
@@ -339,7 +339,7 @@ CREATE INDEX idx_media_files_user ON media_files(user_id, uploaded_at DESC);
 
 Run migration:
 ```bash
-psql -U chatreddit_user -d chatreddit_dev -f backend/internal/database/migrations/001_initial_schema.sql
+psql -U omninudge_user -d omninudge_dev -f backend/internal/database/migrations/001_initial_schema.sql
 ```
 
 ### Backend: Reddit OAuth Implementation
@@ -348,7 +348,7 @@ psql -U chatreddit_user -d chatreddit_dev -f backend/internal/database/migration
 1. Go to https://www.reddit.com/prefs/apps
 2. Click "Create App" or "Create Another App"
 3. Select "web app"
-4. Name: "ChatReddit"
+4. Name: "OmniNudge"
 5. Redirect URI: `http://localhost:3000/auth/reddit/callback`
 6. Create app
 7. Copy Client ID and Client Secret to `.env`
@@ -411,7 +411,7 @@ func (s *AuthService) GetRedditUser(ctx context.Context, token *oauth2.Token) (*
     client := s.oauthConfig.Client(ctx, token)
 
     req, _ := http.NewRequest("GET", "https://oauth.reddit.com/api/v1/me", nil)
-    req.Header.Set("User-Agent", "chatreddit:v1.0")
+    req.Header.Set("User-Agent", "OmniNudge:v1.0")
 
     resp, err := client.Do(req)
     if err != nil {
@@ -591,8 +591,8 @@ package handlers
 import (
     "net/http"
     "github.com/gin-gonic/gin"
-    "yourusername/chatreddit-backend/internal/services"
-    "yourusername/chatreddit-backend/internal/models"
+    "yourusername/omninudge-backend/internal/services"
+    "yourusername/omninudge-backend/internal/models"
     "time"
 )
 
@@ -692,7 +692,7 @@ import (
     "strings"
 
     "github.com/gin-gonic/gin"
-    "yourusername/chatreddit-backend/internal/services"
+    "yourusername/omninudge-backend/internal/services"
 )
 
 func AuthRequired(authService *services.AuthService) gin.HandlerFunc {
@@ -740,12 +740,12 @@ import (
     "log"
 
     "github.com/gin-gonic/gin"
-    "yourusername/chatreddit-backend/internal/api/handlers"
-    "yourusername/chatreddit-backend/internal/api/middleware"
-    "yourusername/chatreddit-backend/internal/config"
-    "yourusername/chatreddit-backend/internal/database"
-    "yourusername/chatreddit-backend/internal/models"
-    "yourusername/chatreddit-backend/internal/services"
+    "yourusername/omninudge-backend/internal/api/handlers"
+    "yourusername/omninudge-backend/internal/api/middleware"
+    "yourusername/omninudge-backend/internal/config"
+    "yourusername/omninudge-backend/internal/database"
+    "yourusername/omninudge-backend/internal/models"
+    "yourusername/omninudge-backend/internal/services"
 )
 
 func main() {
@@ -930,7 +930,7 @@ export const LoginPage: React.FC = () => {
     <div className="min-h-screen flex items-center justify-center bg-gray-900">
       <div className="bg-gray-800 p-8 rounded-lg shadow-lg text-center">
         <h1 className="text-3xl font-bold text-white mb-4">
-          Welcome to ChatReddit
+          Welcome to OmniNudge
         </h1>
         <p className="text-gray-400 mb-8">
           Browse Reddit posts and chat with multimedia features

@@ -9,8 +9,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/chatreddit/backend/internal/models"
-	"github.com/chatreddit/backend/internal/services"
+	"github.com/omninudge/backend/internal/models"
+	"github.com/omninudge/backend/internal/services"
 	"github.com/gin-gonic/gin"
 )
 

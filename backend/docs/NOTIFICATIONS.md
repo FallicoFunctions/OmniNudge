@@ -2,7 +2,7 @@
 
 ## Overview
 
-The ChatReddit notification system is designed to keep users informed about important activity on their content while avoiding notification spam. It uses an ML-ready architecture with adaptive baselines, intelligent batching, and real-time delivery for viral content.
+The OmniNudge notification system is designed to keep users informed about important activity on their content while avoiding notification spam. It uses an ML-ready architecture with adaptive baselines, intelligent batching, and real-time delivery for viral content.
 
 ## Core Principles
 
@@ -340,10 +340,10 @@ End-to-end tests with real database:
 **Total:** 4 integration tests
 
 ### Test Database
-Tests use separate `chatreddit_test` database to avoid polluting development data.
+Tests use separate `omninudge_test` database to avoid polluting development data.
 
 ```bash
-export TEST_DATABASE_URL="postgres://user@localhost:5432/chatreddit_test?sslmode=disable"
+export TEST_DATABASE_URL="postgres://user@localhost:5432/omninudge_test?sslmode=disable"
 go test ./...
 ```
 

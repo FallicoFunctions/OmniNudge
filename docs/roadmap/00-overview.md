@@ -1,6 +1,6 @@
 # Project Overview & Roadmap
 
-**Project Name:** ChatReddit (working title)
+**Project Name:** OmniNudge (working title)
 **Project Type:** Universal Social Platform - Starting with Reddit Browser + Encrypted Chat
 **Target Phase 1 Launch:** 12 months from start
 **Development Approach:** Solo developer, part-time (~2 hours/day)

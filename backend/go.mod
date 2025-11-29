@@ -1,4 +1,4 @@
-module github.com/chatreddit/backend
+module github.com/omninudge/backend
 
 go 1.25.4
 

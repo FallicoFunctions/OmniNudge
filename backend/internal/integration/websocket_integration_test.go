@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/chatreddit/backend/internal/models"
+	"github.com/omninudge/backend/internal/models"
 	"github.com/gorilla/websocket"
 	"github.com/stretchr/testify/require"
 )

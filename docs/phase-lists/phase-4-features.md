@@ -8,7 +8,7 @@
 
 ## Overview
 
-Phase 4 transforms ChatReddit from a Reddit integration platform into a **full-fledged content creation platform**. This is where creators can build audiences, monetize content, and earn real coins (not yet cash - that's Phase 5).
+Phase 4 transforms OmniNudge from a Reddit integration platform into a **full-fledged content creation platform**. This is where creators can build audiences, monetize content, and earn real coins (not yet cash - that's Phase 5).
 
 **Key Difference from Earlier Phases:**
 - Phases 1-3: Platform for Reddit users to chat and share

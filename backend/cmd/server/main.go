@@ -9,14 +9,14 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/chatreddit/backend/internal/api/middleware"
-	"github.com/chatreddit/backend/internal/config"
-	"github.com/chatreddit/backend/internal/database"
-	"github.com/chatreddit/backend/internal/handlers"
-	"github.com/chatreddit/backend/internal/models"
-	"github.com/chatreddit/backend/internal/services"
-	"github.com/chatreddit/backend/internal/websocket"
-	"github.com/chatreddit/backend/internal/workers"
+	"github.com/omninudge/backend/internal/api/middleware"
+	"github.com/omninudge/backend/internal/config"
+	"github.com/omninudge/backend/internal/database"
+	"github.com/omninudge/backend/internal/handlers"
+	"github.com/omninudge/backend/internal/models"
+	"github.com/omninudge/backend/internal/services"
+	"github.com/omninudge/backend/internal/websocket"
+	"github.com/omninudge/backend/internal/workers"
 	"github.com/gin-gonic/gin"
 )
 
@@ -27,7 +27,7 @@ func main() {
 		log.Fatalf("Failed to load config: %v", err)
 	}
 
-	log.Printf("Starting ChatReddit server...")
+	log.Printf("Starting OmniNudge server...")
 
 	// Connect to database
 	db, err := database.New(cfg.Database.DatabaseURL())

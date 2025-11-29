@@ -8,7 +8,7 @@ import (
 // database.Database instead of database.DB.
 type Database = DB
 
-const defaultTestDSN = "postgres://postgres:postgres@localhost:5432/chatreddit_test?sslmode=disable"
+const defaultTestDSN = "postgres://postgres:postgres@localhost:5432/omninudge_test?sslmode=disable"
 
 // NewTest creates a database connection that can be used inside tests.
 // It prefers TEST_DATABASE_URL if set, falls back to DATABASE_URL, and

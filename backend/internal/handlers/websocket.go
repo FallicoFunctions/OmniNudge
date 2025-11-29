@@ -4,7 +4,7 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/chatreddit/backend/internal/websocket"
+	"github.com/omninudge/backend/internal/websocket"
 	"github.com/gin-gonic/gin"
 	ws "github.com/gorilla/websocket"
 )

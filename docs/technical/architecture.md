@@ -1,6 +1,6 @@
 # Technical Architecture
 
-**Project:** ChatReddit Platform
+**Project:** OmniNudge Platform
 **Architecture Type:** Client-Server with WebSocket Real-Time Communication
 **Deployment:** Monolithic initially, microservices in Phase 3
 
@@ -648,10 +648,10 @@ Production Server:
 3. Build frontend: `npm run build`
 4. Build backend: `go build`
 5. SSH to server
-6. Stop service: `systemctl stop chatreddit`
+6. Stop service: `systemctl stop omninudge`
 7. Upload new binary and static files
 8. Run migrations if needed
-9. Start service: `systemctl start chatreddit`
+9. Start service: `systemctl start omninudge`
 10. Verify health check
 11. Monitor logs for errors
 
