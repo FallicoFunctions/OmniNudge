@@ -58,6 +58,7 @@ func main() {
 	notificationRepo := models.NewNotificationRepository(db.Pool)
 	baselineRepo := models.NewUserBaselineRepository(db.Pool)
 	batchRepo := models.NewNotificationBatchRepository(db.Pool)
+	slideshowRepo := models.NewSlideshowRepository(db.Pool)
 
 	// Initialize WebSocket hub
 	hub := websocket.NewHub()
@@ -112,6 +113,7 @@ func main() {
 	notificationsHandler := handlers.NewNotificationsHandler(notificationRepo)
 	searchHandler := handlers.NewSearchHandler(db.Pool)
 	blockingHandler := handlers.NewBlockingHandler(db.Pool, userRepo)
+	slideshowHandler := handlers.NewSlideshowHandler(db.Pool, slideshowRepo, conversationRepo, hub)
 
 	// Inject notification service into handlers
 	postsHandler.SetNotificationService(notificationService)
@@ -252,6 +254,14 @@ func main() {
 			protected.GET("/conversations/:id/messages", messagesHandler.GetMessages)
 			protected.POST("/conversations/:id/read", messagesHandler.MarkAsRead)
 			protected.DELETE("/messages/:id", messagesHandler.DeleteMessage)
+
+			// Slideshow routes
+			protected.POST("/conversations/:id/slideshow", slideshowHandler.StartSlideshow)
+			protected.GET("/conversations/:id/slideshow", slideshowHandler.GetSlideshow)
+			protected.POST("/slideshows/:id/navigate", slideshowHandler.NavigateSlideshow)
+			protected.POST("/slideshows/:id/transfer-control", slideshowHandler.TransferControl)
+			protected.PUT("/slideshows/:id/auto-advance", slideshowHandler.UpdateAutoAdvance)
+			protected.DELETE("/slideshows/:id", slideshowHandler.StopSlideshow)
 
 			// Media upload
 			protected.POST("/media/upload", mediaHandler.UploadMedia)
