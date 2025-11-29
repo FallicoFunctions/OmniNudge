@@ -1,22 +1,32 @@
 package handlers
 
 import (
+	"context"
+	"fmt"
+	"log"
 	"net/http"
 	"strconv"
+	"strings"
+	"time"
 
+	"github.com/chatreddit/backend/internal/models"
 	"github.com/chatreddit/backend/internal/services"
 	"github.com/gin-gonic/gin"
 )
 
+const redditCacheTTL = 15 * time.Minute
+
 // RedditHandler handles HTTP requests for browsing Reddit content
 type RedditHandler struct {
 	redditClient *services.RedditClient
+	redditRepo   *models.RedditPostRepository
 }
 
 // NewRedditHandler creates a new Reddit handler
-func NewRedditHandler(redditClient *services.RedditClient) *RedditHandler {
+func NewRedditHandler(redditClient *services.RedditClient, redditRepo *models.RedditPostRepository) *RedditHandler {
 	return &RedditHandler{
 		redditClient: redditClient,
+		redditRepo:   redditRepo,
 	}
 }
 
@@ -34,10 +44,10 @@ func (h *RedditHandler) GetSubredditPosts(c *gin.Context) {
 	}
 
 	// Parse query parameters
-	sort := c.DefaultQuery("sort", "hot")      // hot, new, top, rising, controversial
-	timeFilter := c.DefaultQuery("t", "")       // hour, day, week, month, year, all (for top/controversial)
+	sort := c.DefaultQuery("sort", "hot") // hot, new, top, rising, controversial
+	timeFilter := c.DefaultQuery("t", "") // hour, day, week, month, year, all (for top/controversial)
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "25"))
-	after := c.DefaultQuery("after", "")        // Pagination cursor
+	after := c.DefaultQuery("after", "") // Pagination cursor
 
 	// Validate limit
 	if limit < 1 || limit > 100 {
@@ -50,6 +60,8 @@ func (h *RedditHandler) GetSubredditPosts(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch subreddit posts", "details": err.Error()})
 		return
 	}
+	cacheKey := fmt.Sprintf("sr:%s:%s:%s:%d:%s", strings.ToLower(subreddit), sort, timeFilter, limit, after)
+	h.cacheListing(c.Request.Context(), listing, cacheKey)
 
 	// Extract posts from listing
 	posts := make([]services.RedditPost, 0, len(listing.Data.Children))
@@ -87,6 +99,8 @@ func (h *RedditHandler) GetFrontPage(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch front page", "details": err.Error()})
 		return
 	}
+	cacheKey := fmt.Sprintf("front:%s:%s:%d:%s", sort, timeFilter, limit, after)
+	h.cacheListing(c.Request.Context(), listing, cacheKey)
 
 	// Extract posts from listing
 	posts := make([]services.RedditPost, 0, len(listing.Data.Children))
@@ -143,9 +157,9 @@ func (h *RedditHandler) SearchPosts(c *gin.Context) {
 	}
 
 	// Parse query parameters
-	subreddit := c.Query("subreddit")              // Optional: restrict to subreddit
-	sort := c.DefaultQuery("sort", "relevance")    // relevance, hot, top, new, comments
-	timeFilter := c.DefaultQuery("t", "")          // hour, day, week, month, year, all (for top)
+	subreddit := c.Query("subreddit")           // Optional: restrict to subreddit
+	sort := c.DefaultQuery("sort", "relevance") // relevance, hot, top, new, comments
+	timeFilter := c.DefaultQuery("t", "")       // hour, day, week, month, year, all (for top)
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "25"))
 	after := c.DefaultQuery("after", "")
 
@@ -205,6 +219,8 @@ func (h *RedditHandler) GetSubredditMedia(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch subreddit posts", "details": err.Error()})
 		return
 	}
+	cacheKey := fmt.Sprintf("media:%s:%s:%s:%s", strings.ToLower(subreddit), sort, timeFilter, after)
+	h.cacheListing(c.Request.Context(), listing, cacheKey)
 
 	// Filter for media posts only
 	mediaPosts := make([]gin.H, 0)
@@ -260,4 +276,90 @@ func (h *RedditHandler) GetSubredditMedia(c *gin.Context) {
 		"media_posts": mediaPosts,
 		"after":       listing.Data.After,
 	})
+}
+
+func (h *RedditHandler) cacheListing(ctx context.Context, listing *services.RedditListing, cacheKey string) {
+	if h.redditRepo == nil || listing == nil {
+		return
+	}
+
+	now := time.Now().UTC()
+	expires := now.Add(redditCacheTTL)
+	posts := make([]*models.CachedRedditPost, 0, len(listing.Data.Children))
+
+	for _, child := range listing.Data.Children {
+		posts = append(posts, toCachedRedditPost(child.Data, cacheKey, now, expires))
+	}
+
+	if len(posts) == 0 {
+		return
+	}
+
+	if err := h.redditRepo.UpsertPosts(ctx, posts); err != nil {
+		log.Printf("failed to cache reddit posts: %v", err)
+	}
+}
+
+func toCachedRedditPost(post services.RedditPost, cacheKey string, cachedAt, expiresAt time.Time) *models.CachedRedditPost {
+	entry := &models.CachedRedditPost{
+		RedditPostID: post.ID,
+		Subreddit:    strings.ToLower(post.Subreddit),
+		Title:        post.Title,
+		Score:        post.Score,
+		NumComments:  post.NumComments,
+		CreatedUTC:   time.Unix(int64(post.CreatedUTC), 0).UTC(),
+		CacheKey:     cacheKey,
+		CachedAt:     cachedAt,
+		ExpiresAt:    expiresAt,
+	}
+
+	if post.Author != "" {
+		author := post.Author
+		entry.Author = &author
+	}
+	if post.Selftext != "" {
+		body := post.Selftext
+		entry.Body = &body
+	}
+	if post.URL != "" {
+		url := post.URL
+		entry.URL = &url
+	}
+	if thumb := sanitizeThumbnail(post.Thumbnail); thumb != "" {
+		entry.ThumbnailURL = &thumb
+	}
+	if mediaType, mediaURL := deriveMedia(post); mediaType != "" {
+		entry.MediaType = &mediaType
+		if mediaURL != "" {
+			entry.MediaURL = &mediaURL
+		}
+	}
+
+	return entry
+}
+
+func deriveMedia(post services.RedditPost) (string, string) {
+	switch {
+	case post.IsVideo:
+		return "video", post.URL
+	case post.PostHint == "image":
+		return "image", post.URL
+	case strings.HasPrefix(post.PostHint, "rich:video"):
+		return "video", post.URL
+	case post.PostHint == "link" && post.URL != "":
+		return "link", post.URL
+	}
+
+	if !post.IsSelf && post.URL != "" {
+		return "link", post.URL
+	}
+
+	return "", ""
+}
+
+func sanitizeThumbnail(thumbnail string) string {
+	if strings.HasPrefix(thumbnail, "http://") || strings.HasPrefix(thumbnail, "https://") {
+		return thumbnail
+	}
+	return ""
 }

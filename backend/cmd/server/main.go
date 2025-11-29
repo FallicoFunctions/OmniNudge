@@ -59,6 +59,8 @@ func main() {
 	baselineRepo := models.NewUserBaselineRepository(db.Pool)
 	batchRepo := models.NewNotificationBatchRepository(db.Pool)
 	slideshowRepo := models.NewSlideshowRepository(db.Pool)
+	redditPostRepo := models.NewRedditPostRepository(db.Pool)
+	feedRepo := models.NewFeedRepository(db.Pool)
 
 	// Initialize WebSocket hub
 	hub := websocket.NewHub()
@@ -99,9 +101,9 @@ func main() {
 	// Initialize handlers
 	authHandler := handlers.NewAuthHandler(authService, userRepo)
 	settingsHandler := handlers.NewSettingsHandler(userSettingsRepo)
-	postsHandler := handlers.NewPostsHandler(postRepo, hubRepo, hubModRepo)
+	postsHandler := handlers.NewPostsHandler(postRepo, hubRepo, hubModRepo, feedRepo)
 	commentsHandler := handlers.NewCommentsHandler(commentRepo, postRepo, hubModRepo)
-	redditHandler := handlers.NewRedditHandler(redditClient)
+	redditHandler := handlers.NewRedditHandler(redditClient, redditPostRepo)
 	conversationsHandler := handlers.NewConversationsHandler(conversationRepo, messageRepo, userRepo)
 	messagesHandler := handlers.NewMessagesHandler(messageRepo, conversationRepo, hub)
 	usersHandler := handlers.NewUsersHandler(userRepo, postRepo, commentRepo, authService)
