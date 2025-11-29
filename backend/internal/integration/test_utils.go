@@ -94,6 +94,8 @@ func newTestDeps(t *testing.T) *TestDeps {
 	hubRepo := models.NewHubRepository(db.Pool)
 	reportRepo := models.NewReportRepository(db.Pool)
 	modRepo := models.NewHubModeratorRepository(db.Pool)
+	redditPostRepo := models.NewRedditPostRepository(db.Pool)
+	feedRepo := models.NewFeedRepository(db.Pool)
 	hub := websocket.NewHub()
 	go hub.Run()
 
@@ -107,9 +109,9 @@ func newTestDeps(t *testing.T) *TestDeps {
 
 	// Handlers
 	authHandler := handlers.NewAuthHandler(authService, userRepo)
-	postsHandler := handlers.NewPostsHandler(postRepo, hubRepo, modRepo)
+	postsHandler := handlers.NewPostsHandler(postRepo, hubRepo, modRepo, feedRepo)
 	commentsHandler := handlers.NewCommentsHandler(commentRepo, postRepo, modRepo)
-	redditHandler := handlers.NewRedditHandler(services.NewRedditClient(cfg.Reddit.UserAgent, services.NoopCache{}, 0))
+	redditHandler := handlers.NewRedditHandler(services.NewRedditClient(cfg.Reddit.UserAgent, services.NoopCache{}, 0), redditPostRepo)
 	conversationsHandler := handlers.NewConversationsHandler(conversationRepo, messageRepo, userRepo)
 	messagesHandler := handlers.NewMessagesHandler(messageRepo, conversationRepo, hub)
 	usersHandler := handlers.NewUsersHandler(userRepo, postRepo, commentRepo, nil)
