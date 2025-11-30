@@ -1,5 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { HexColorPicker } from 'react-colorful';
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTheme } from '../../hooks/useTheme';
 import { themeService } from '../../services/themeService';
 import type { UserTheme } from '../../types/theme';
@@ -12,6 +11,11 @@ import CSSVariableEditor from './CSSVariableEditor';
 import ThemePreview from './ThemePreview';
 import { cssVariablesSchema, themeInfoSchema } from '../../validation/themeSchemas';
 import { isValidHexColor, looksLikeHexColor, normalizeHexColor } from '../../utils/color';
+
+const ColorPicker = lazy(async () => {
+  const module = await import('react-colorful');
+  return { default: module.HexColorPicker };
+});
 
 const steps = [
   { id: 'base', title: 'Choose Base Theme', description: 'Start from a predefined or existing theme.' },
@@ -528,10 +532,18 @@ const ThemeEditor = ({ isOpen, onClose, initialTheme = null }: ThemeEditorProps)
                     'Use the color picker to adjust the value.'}
                 </p>
                 <div className="mt-4">
-                  <HexColorPicker
-                    color={activeVariableValue}
-                    onChange={(value) => updateVariable(selectedVariableName, value)}
-                  />
+                  <Suspense
+                    fallback={
+                      <div className="text-xs text-[var(--color-text-secondary)]">
+                        Loading color picker…
+                      </div>
+                    }
+                  >
+                    <ColorPicker
+                      color={activeVariableValue}
+                      onChange={(value) => updateVariable(selectedVariableName, value)}
+                    />
+                  </Suspense>
                 </div>
               </div>
               <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
