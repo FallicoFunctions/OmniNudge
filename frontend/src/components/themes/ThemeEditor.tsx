@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { HexColorPicker } from 'react-colorful';
 import { useTheme } from '../../hooks/useTheme';
 import { themeService } from '../../services/themeService';
@@ -57,6 +57,7 @@ const ThemeEditor = ({ isOpen, onClose, initialTheme = null }: ThemeEditorProps)
   const [statusMessage, setStatusMessage] = useState<{ type: 'success'; text: string } | null>(null);
   const [infoErrors, setInfoErrors] = useState<{ name?: string; description?: string }>({});
   const [variableErrors, setVariableErrors] = useState<Record<string, string>>({});
+  const cssVariableHistory = useRef<Record<string, string>[]>([]);
 
   const availableThemes = useMemo(
     () => [...predefinedThemes, ...customThemes],
@@ -81,6 +82,7 @@ const ThemeEditor = ({ isOpen, onClose, initialTheme = null }: ThemeEditorProps)
       setCssVariables(cloneVariables(firstTheme?.css_variables));
       setSetAsActive(true);
     }
+    cssVariableHistory.current = [];
     setCurrentStep(0);
     setError(null);
     setInfoErrors({});
@@ -111,6 +113,7 @@ const ThemeEditor = ({ isOpen, onClose, initialTheme = null }: ThemeEditorProps)
     setSelectedBaseThemeId(themeId);
     const baseTheme = availableThemes.find((theme) => theme.id === themeId);
     setCssVariables(cloneVariables(baseTheme?.css_variables));
+    cssVariableHistory.current = [];
   };
 
   const handleStartFromScratch = () => {
@@ -118,6 +121,7 @@ const ThemeEditor = ({ isOpen, onClose, initialTheme = null }: ThemeEditorProps)
     setStartFromScratch(true);
     setSelectedBaseThemeId(null);
     setCssVariables(cloneVariables({}));
+    cssVariableHistory.current = [];
   };
 
   const setVariableError = (variableName: string, message?: string) => {
@@ -183,6 +187,10 @@ const ThemeEditor = ({ isOpen, onClose, initialTheme = null }: ThemeEditorProps)
   };
 
   const updateVariable = (variableName: string, value: string) => {
+    cssVariableHistory.current = [
+      ...cssVariableHistory.current.slice(-24),
+      { ...cssVariables },
+    ];
     setCssVariables((prev) => ({
       ...prev,
       [variableName]: value,
@@ -197,6 +205,13 @@ const ThemeEditor = ({ isOpen, onClose, initialTheme = null }: ThemeEditorProps)
     }
     return value.trim();
   };
+
+  const handleUndo = useCallback(() => {
+    const previous = cssVariableHistory.current.pop();
+    if (previous) {
+      setCssVariables(previous);
+    }
+  }, []);
 
   const validateInfoDetails = () => {
     const result = themeInfoSchema.safeParse({
@@ -293,7 +308,7 @@ const ThemeEditor = ({ isOpen, onClose, initialTheme = null }: ThemeEditorProps)
     setCurrentStep((prev) => Math.max(prev - 1, 0));
   };
 
-  const handleSubmit = async () => {
+  const handleSubmit = useCallback(async () => {
     if (!validateInfoDetails()) {
       setCurrentStep(1);
       return;
@@ -345,7 +360,39 @@ const ThemeEditor = ({ isOpen, onClose, initialTheme = null }: ThemeEditorProps)
     } finally {
       setIsSubmitting(false);
     }
-  };
+  }, [
+    cssVariables,
+    initialTheme,
+    refreshThemes,
+    selectTheme,
+    setAsActive,
+    themeDescription,
+    themeName,
+    validateInfoDetails,
+    validateVariableSet,
+    onClose,
+  ]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      const isModifier = event.metaKey || event.ctrlKey;
+      if (isModifier && event.key.toLowerCase() === 's') {
+        event.preventDefault();
+        handleSubmit();
+      } else if (isModifier && event.key.toLowerCase() === 'z') {
+        event.preventDefault();
+        handleUndo();
+      } else if (event.key === 'Escape') {
+        event.preventDefault();
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [handleSubmit, handleUndo, isOpen, onClose]);
 
   const renderStepContent = () => {
     const step = steps[currentStep];
