@@ -1,10 +1,30 @@
+import { useState } from 'react';
 import ThemeSelector from './components/themes/ThemeSelector';
 import ThemeGallery from './components/themes/ThemeGallery';
+import ThemeEditor from './components/themes/ThemeEditor';
 import { useTheme } from './hooks/useTheme';
+import type { UserTheme } from './types/theme';
 import './App.css';
 
 function App() {
   const { activeTheme, isLoading, cssVariables } = useTheme();
+  const [isEditorOpen, setIsEditorOpen] = useState(false);
+  const [editingTheme, setEditingTheme] = useState<UserTheme | null>(null);
+
+  const handleOpenCreate = () => {
+    setEditingTheme(null);
+    setIsEditorOpen(true);
+  };
+
+  const handleEditTheme = (theme: UserTheme) => {
+    setEditingTheme(theme);
+    setIsEditorOpen(true);
+  };
+
+  const handleCloseEditor = () => {
+    setIsEditorOpen(false);
+    setEditingTheme(null);
+  };
 
   return (
     <div className="min-h-screen bg-[var(--color-background)] px-4 py-10 text-[var(--color-text-primary)]">
@@ -23,7 +43,7 @@ function App() {
                   'Choose a theme to see the UI update in real-time.'}
               </p>
             </div>
-            <ThemeSelector />
+            <ThemeSelector onCreateNewTheme={handleOpenCreate} />
           </header>
 
           <div className="grid gap-4 md:grid-cols-2">
@@ -72,7 +92,7 @@ function App() {
           </div>
         </section>
 
-        <ThemeGallery />
+        <ThemeGallery onCreateNewTheme={handleOpenCreate} onEditTheme={handleEditTheme} />
 
         <section className="rounded-2xl border border-dashed border-[var(--color-border)] bg-[var(--color-surface)] p-6">
           <p className="text-sm uppercase tracking-wide text-[var(--color-text-secondary)]">
@@ -100,6 +120,13 @@ function App() {
           )}
         </section>
       </main>
+      {isEditorOpen && (
+        <ThemeEditor
+          isOpen={isEditorOpen}
+          onClose={handleCloseEditor}
+          initialTheme={editingTheme}
+        />
+      )}
     </div>
   );
 }
