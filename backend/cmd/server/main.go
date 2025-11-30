@@ -61,6 +61,9 @@ func main() {
 	slideshowRepo := models.NewSlideshowRepository(db.Pool)
 	redditPostRepo := models.NewRedditPostRepository(db.Pool)
 	feedRepo := models.NewFeedRepository(db.Pool)
+	themeRepo := models.NewUserThemeRepository(db.Pool)
+	themeOverrideRepo := models.NewUserThemeOverrideRepository(db.Pool)
+	installedThemeRepo := models.NewUserInstalledThemeRepository(db.Pool)
 
 	// Initialize WebSocket hub
 	hub := websocket.NewHub()
@@ -108,6 +111,9 @@ func main() {
 	// Initialize thumbnail service
 	thumbnailService := services.NewThumbnailService()
 
+	// Initialize CSS sanitizer
+	cssSanitizer := services.NewCSSSanitizer()
+
 	messagesHandler := handlers.NewMessagesHandler(db.Pool, messageRepo, conversationRepo, hub)
 	usersHandler := handlers.NewUsersHandler(userRepo, postRepo, commentRepo, authService)
 	mediaHandler := handlers.NewMediaHandler(mediaRepo, thumbnailService)
@@ -121,6 +127,7 @@ func main() {
 	slideshowHandler := handlers.NewSlideshowHandler(db.Pool, slideshowRepo, conversationRepo, hub)
 	mediaGalleryHandler := handlers.NewMediaGalleryHandler(db.Pool)
 	userStatusHandler := handlers.NewUserStatusHandler(hub)
+	themesHandler := handlers.NewThemesHandler(themeRepo, themeOverrideRepo, installedThemeRepo, userSettingsRepo, cssSanitizer)
 
 	// Inject notification service into handlers
 	postsHandler.SetNotificationService(notificationService)
@@ -235,6 +242,38 @@ func main() {
 
 			protected.GET("/settings", settingsHandler.GetSettings)
 			protected.PUT("/settings", settingsHandler.UpdateSettings)
+
+			// Theme customization routes
+			// Predefined themes (public access within protected routes)
+			protected.GET("/themes/predefined", themesHandler.GetPredefinedThemes)
+
+			// Browse public themes
+			protected.GET("/themes/browse", themesHandler.BrowseThemes)
+
+			// User's own themes
+			protected.POST("/themes", themesHandler.CreateTheme)
+			protected.GET("/themes/my", themesHandler.GetMyThemes)
+			protected.GET("/themes/:id", themesHandler.GetTheme)
+			protected.PUT("/themes/:id", themesHandler.UpdateTheme)
+			protected.DELETE("/themes/:id", themesHandler.DeleteTheme)
+
+			// Theme installation & activation
+			protected.POST("/themes/install", themesHandler.InstallTheme)
+			protected.DELETE("/themes/install/:themeId", themesHandler.UninstallTheme)
+			protected.POST("/themes/active", themesHandler.SetActiveTheme)
+			protected.GET("/themes/installed", themesHandler.GetInstalledThemes)
+
+			// Per-page theme overrides (Level 4)
+			protected.POST("/themes/overrides", themesHandler.SetPageOverride)
+			protected.GET("/themes/overrides", themesHandler.GetAllOverrides)
+			protected.GET("/themes/overrides/:pageName", themesHandler.GetPageOverride)
+			protected.DELETE("/themes/overrides/:pageName", themesHandler.DeletePageOverride)
+
+			// Advanced mode toggle
+			protected.POST("/themes/advanced-mode", themesHandler.SetAdvancedMode)
+
+			// Theme rating & reviews (Phase 2c)
+			protected.POST("/themes/rate", themesHandler.RateTheme)
 
 			// Protected posts routes (auth required for creating/editing)
 			protected.POST("/posts", postsHandler.CreatePost)
