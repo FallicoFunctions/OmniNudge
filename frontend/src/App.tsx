@@ -2,6 +2,7 @@ import { useState } from 'react';
 import ThemeSelector from './components/themes/ThemeSelector';
 import ThemeGallery from './components/themes/ThemeGallery';
 import ThemeEditor from './components/themes/ThemeEditor';
+import ThemePreview from './components/themes/ThemePreview';
 import { useTheme } from './hooks/useTheme';
 import type { UserTheme } from './types/theme';
 import './App.css';
@@ -90,6 +91,23 @@ function App() {
               </div>
             </article>
           </div>
+        </section>
+
+        <section className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6 shadow-md">
+          <header className="mb-4 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+            <div>
+              <p className="text-sm uppercase tracking-wide text-[var(--color-text-secondary)]">
+                Live Preview
+              </p>
+              <h2 className="text-2xl font-bold text-[var(--color-text-primary)]">
+                Visualize Theme Across Pages
+              </h2>
+              <p className="text-sm text-[var(--color-text-secondary)]">
+                Toggle between feed, profile, and messages while switching between desktop and mobile modes.
+              </p>
+            </div>
+          </header>
+          <ThemePreview variables={cssVariables} />
         </section>
 
         <ThemeGallery onCreateNewTheme={handleOpenCreate} onEditTheme={handleEditTheme} />
