@@ -6,6 +6,8 @@ import type { UserTheme } from '../../types/theme';
 import { DEFAULT_THEME_VARIABLES, THEME_VARIABLE_GROUPS } from '../../data/themeVariables';
 import CSSVariableEditor from './CSSVariableEditor';
 import ThemePreview from './ThemePreview';
+import { cssVariablesSchema, themeInfoSchema } from '../../validation/themeSchemas';
+import { isValidHexColor, looksLikeHexColor, normalizeHexColor } from '../../utils/color';
 
 const steps = [
   { id: 'base', title: 'Choose Base Theme', description: 'Start from a predefined or existing theme.' },
@@ -44,6 +46,8 @@ const ThemeEditor = ({ isOpen, onClose, initialTheme = null }: ThemeEditorProps)
   const [setAsActive, setSetAsActive] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [infoErrors, setInfoErrors] = useState<{ name?: string; description?: string }>({});
+  const [variableErrors, setVariableErrors] = useState<Record<string, string>>({});
 
   const availableThemes = useMemo(
     () => [...predefinedThemes, ...customThemes],
@@ -68,6 +72,8 @@ const ThemeEditor = ({ isOpen, onClose, initialTheme = null }: ThemeEditorProps)
     }
     setCurrentStep(0);
     setError(null);
+    setInfoErrors({});
+    setVariableErrors({});
   }, [initialTheme, isOpen, predefinedThemes, availableThemes]);
 
   if (!isOpen) {
@@ -94,28 +100,110 @@ const ThemeEditor = ({ isOpen, onClose, initialTheme = null }: ThemeEditorProps)
     setCssVariables(cloneVariables(baseTheme?.css_variables));
   };
 
+  const setVariableError = (variableName: string, message?: string) => {
+    setVariableErrors((prev) => {
+      if (!message) {
+        const { [variableName]: _, ...rest } = prev;
+        return rest;
+      }
+      return { ...prev, [variableName]: message };
+    });
+  };
+
+  const validateVariableValue = (variableName: string, value: string) => {
+    if (!value.trim()) {
+      setVariableError(variableName, 'Value is required.');
+      return false;
+    }
+
+    const normalized = normalizeHexColor(value);
+
+    if (!looksLikeHexColor(value)) {
+      setVariableError(variableName, 'Use a hex color like #1a1a1a.');
+      return false;
+    }
+
+    if (!isValidHexColor(normalized)) {
+      setVariableError(variableName, 'Hex colors must be 3 or 6 characters.');
+      return false;
+    }
+
+    setVariableError(variableName, undefined);
+    return true;
+  };
+
   const updateVariable = (variableName: string, value: string) => {
     setCssVariables((prev) => ({
       ...prev,
       [variableName]: value,
     }));
+    validateVariableValue(variableName, value);
+  };
+
+  const validateInfoDetails = () => {
+    const result = themeInfoSchema.safeParse({
+      theme_name: themeName,
+      theme_description: themeDescription,
+    });
+
+    if (!result.success) {
+      const issues: { name?: string; description?: string } = {};
+      result.error.issues.forEach((issue) => {
+        const field = issue.path[0];
+        if (field === 'theme_name') {
+          issues.name = issue.message;
+        }
+        if (field === 'theme_description') {
+          issues.description = issue.message;
+        }
+      });
+      setInfoErrors(issues);
+      setError('Fix the highlighted fields to continue.');
+      return false;
+    }
+
+    setInfoErrors({});
+    setError(null);
+    return true;
+  };
+
+  const validateVariableSet = () => {
+    const result = cssVariablesSchema.safeParse(cssVariables);
+    if (!result.success) {
+      const nextErrors: Record<string, string> = {};
+      let generalMessage: string | null = null;
+      result.error.issues.forEach((issue) => {
+        const key = issue.path[0];
+        if (typeof key === 'string') {
+          nextErrors[key] = issue.message;
+        } else {
+          generalMessage = issue.message;
+        }
+      });
+      setVariableErrors(nextErrors);
+      setError(generalMessage ?? 'Fix invalid color values before continuing.');
+      return false;
+    }
+
+    setVariableErrors({});
+    setCssVariables(result.data);
+    setError(null);
+    return true;
   };
 
   const validateStep = () => {
-    if (steps[currentStep].id === 'base' && !selectedBaseThemeId) {
+    const stepId = steps[currentStep].id;
+    if (stepId === 'base' && !selectedBaseThemeId) {
       setError('Please choose a base theme to continue.');
       return false;
     }
 
-    if (steps[currentStep].id === 'info') {
-      if (!themeName.trim()) {
-        setError('Theme name is required.');
-        return false;
-      }
-      if (themeName.trim().length > 100) {
-        setError('Theme name must be 100 characters or fewer.');
-        return false;
-      }
+    if (stepId === 'info') {
+      return validateInfoDetails();
+    }
+
+    if (stepId === 'variables') {
+      return validateVariableSet();
     }
 
     setError(null);
@@ -133,13 +221,13 @@ const ThemeEditor = ({ isOpen, onClose, initialTheme = null }: ThemeEditorProps)
   };
 
   const handleSubmit = async () => {
-    if (!themeName.trim()) {
-      setError('Theme name is required.');
+    if (!validateInfoDetails()) {
+      setCurrentStep(1);
       return;
     }
 
-    if (Object.keys(cssVariables).length > 200) {
-      setError('You can only define up to 200 CSS variables.');
+    if (!validateVariableSet()) {
+      setCurrentStep(2);
       return;
     }
 
@@ -227,12 +315,20 @@ const ThemeEditor = ({ isOpen, onClose, initialTheme = null }: ThemeEditorProps)
                 type="text"
                 className="mt-1 w-full rounded-lg border border-[var(--color-border)] px-4 py-2 text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
                 value={themeName}
-                onChange={(event) => setThemeName(event.target.value)}
+                onChange={(event) => {
+                  setThemeName(event.target.value);
+                  if (infoErrors.name) {
+                    setInfoErrors((prev) => ({ ...prev, name: undefined }));
+                  }
+                }}
                 maxLength={100}
               />
               <p className="mt-1 text-xs text-[var(--color-text-secondary)]">
                 Max 100 characters.
               </p>
+              {infoErrors.name && (
+                <p className="text-xs text-red-500">{infoErrors.name}</p>
+              )}
             </div>
             <div>
               <label className="text-sm font-semibold text-[var(--color-text-primary)]">
@@ -242,8 +338,16 @@ const ThemeEditor = ({ isOpen, onClose, initialTheme = null }: ThemeEditorProps)
                 className="mt-1 w-full rounded-lg border border-[var(--color-border)] px-4 py-2 text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
                 rows={3}
                 value={themeDescription}
-                onChange={(event) => setThemeDescription(event.target.value)}
+                onChange={(event) => {
+                  setThemeDescription(event.target.value);
+                  if (infoErrors.description) {
+                    setInfoErrors((prev) => ({ ...prev, description: undefined }));
+                  }
+                }}
               />
+              {infoErrors.description && (
+                <p className="text-xs text-red-500">{infoErrors.description}</p>
+              )}
             </div>
             <label className="flex items-center gap-2 text-sm text-[var(--color-text-primary)]">
               <input
@@ -263,6 +367,7 @@ const ThemeEditor = ({ isOpen, onClose, initialTheme = null }: ThemeEditorProps)
               groups={THEME_VARIABLE_GROUPS}
               variables={cssVariables}
               selectedVariable={selectedVariableName}
+              variableErrors={variableErrors}
               onSelectVariable={setSelectedVariableName}
               onChangeVariable={updateVariable}
             />
