@@ -154,7 +154,7 @@ All 17 backend endpoints ready:
 ```bash
 URL: http://localhost:8080
 Status: ✅ Running
-Database: chatreddit_dev
+Database: omninudge_dev
 Themes Seeded: 8 predefined themes
 ```
 
@@ -233,7 +233,7 @@ Follow the [FRONTEND_PHASE_2A_CHECKLIST.md](FRONTEND_PHASE_2A_CHECKLIST.md) to b
 ```bash
 # Backend (if not running)
 cd backend
-DB_NAME=chatreddit_dev go run ./cmd/server
+DB_NAME=omninudge_dev go run ./cmd/server
 
 # Frontend (if not running)
 cd frontend
