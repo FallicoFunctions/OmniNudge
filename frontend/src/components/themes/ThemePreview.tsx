@@ -180,7 +180,7 @@ const ThemePreview = ({
 
   const renderCommonSections = () => (
     <div className="mt-6 space-y-4">
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid gap-4 lg:grid-cols-2" role="region" aria-label="Common component samples">
         {renderButtonSamples()}
         {renderFormSamples()}
       </div>
@@ -210,7 +210,7 @@ const ThemePreview = ({
         }}
       >
         <div>
-          <p className="text-xs uppercase tracking-wide text-[var(--color-text-secondary)]">
+          <p className="text-xs uppercase tracking-wide text-[var(--color-text-secondary)]" aria-label="Theme preview section heading">
             OmniNudge
           </p>
           <p
@@ -220,7 +220,7 @@ const ThemePreview = ({
             {selectedPage.charAt(0).toUpperCase() + selectedPage.slice(1)}
           </p>
         </div>
-        <div className="flex gap-2" style={{ gap: 'var(--spacing-sm)' }}>
+        <div className="flex gap-2" style={{ gap: 'var(--spacing-sm)' }} aria-label="Avatar indicators">
           <span
             className="h-8 w-8 rounded-full bg-[var(--color-primary)]/20"
             style={{ borderRadius: 'var(--border-radius-lg)' }}
@@ -259,16 +259,17 @@ const ThemePreview = ({
                     2h ago · Boosted
                   </p>
                 </div>
-                <button
-                  type="button"
-                  className="rounded-full bg-[var(--color-primary)] text-xs font-semibold text-white"
-                  style={{
-                    padding: 'var(--spacing-xs) var(--spacing-sm)',
-                    borderRadius: 'var(--border-radius-2xl)',
-                  }}
-                >
-                  Follow
-                </button>
+            <button
+              type="button"
+              className="rounded-full bg-[var(--color-primary)] text-xs font-semibold text-white"
+              style={{
+                padding: 'var(--spacing-xs) var(--spacing-sm)',
+                borderRadius: 'var(--border-radius-2xl)',
+              }}
+              aria-label={`Follow Creator ${item}`}
+            >
+              Follow
+            </button>
               </div>
               <p
                 className="text-[var(--color-text-primary)]"
@@ -313,6 +314,7 @@ const ThemePreview = ({
               borderRadius: 'var(--border-radius-2xl)',
               boxShadow: 'var(--shadow-md)',
             }}
+            aria-label="Profile summary"
           >
             <div className="flex items-center" style={{ gap: 'var(--spacing-sm)' }}>
               <span
