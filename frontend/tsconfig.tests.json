@@ -15,6 +15,7 @@
     "src/utils/**/*.ts",
     "src/validation/**/*.ts",
     "src/hooks/useDebouncedValue.ts",
+    "src/components/themes/ThemeSelector.tsx",
     "src/types/**/*.ts",
     "tests/**/*.ts"
   ]
