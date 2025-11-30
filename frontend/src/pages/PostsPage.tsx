@@ -202,6 +202,16 @@ export default function PostsPage() {
                     <span>{post.comment_count} comments</span>
                     <button className="hover:text-[var(--color-primary)]">Share</button>
                     <button className="hover:text-[var(--color-primary)]">Save</button>
+                    <button
+                      onClick={() => {
+                        // TODO: Implement report modal/form
+                        // This would send a report to the moderators of the hub
+                        console.log('Report post', post.id, 'to moderators of', post.hub_name);
+                      }}
+                      className="hover:text-red-500"
+                    >
+                      Report
+                    </button>
                   </div>
                 </div>
               </div>

@@ -7,6 +7,7 @@ import RegisterPage from './pages/RegisterPage';
 import HomePage from './pages/HomePage';
 import ThemesPage from './pages/ThemesPage';
 import RedditPage from './pages/RedditPage';
+import RedditPostPage from './pages/RedditPostPage';
 import PostsPage from './pages/PostsPage';
 import MessagesPage from './pages/MessagesPage';
 import './App.css';
@@ -31,6 +32,7 @@ function App() {
             <Route path="/" element={<HomePage />} />
             <Route path="/themes" element={<ThemesPage />} />
             <Route path="/reddit" element={<RedditPage />} />
+            <Route path="/reddit/r/:subreddit/comments/:postId" element={<RedditPostPage />} />
             <Route path="/posts" element={<PostsPage />} />
             <Route path="/messages" element={<MessagesPage />} />
           </Route>
