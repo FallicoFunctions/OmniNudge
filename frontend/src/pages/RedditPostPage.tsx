@@ -52,8 +52,11 @@ function decodeHtml(html: string): string {
   const txt = document.createElement('textarea');
   txt.innerHTML = html;
   const decoded = txt.value;
-  // Strip HTML tags but preserve line breaks
-  return decoded.replace(/<[^>]*>/g, '').trim();
+  // Strip HTML tags and clean up spacing
+  return decoded
+    .replace(/<[^>]*>/g, '') // Remove HTML tags
+    .replace(/\n\n+/g, '\n\n') // Replace multiple newlines with double newline
+    .trim();
 }
 
 
@@ -102,8 +105,13 @@ function RedditCommentView({ comment, depth = 0 }: { comment: RedditComment; dep
 
         {!collapsed && (
           <>
-            <div className="mt-1 text-sm text-[var(--color-text-primary)] whitespace-pre-wrap">
-              {decodeHtml(comment.data.body_html || comment.data.body || '')}
+            <div className="mt-1 text-sm text-[var(--color-text-primary)] text-left">
+              {decodeHtml(comment.data.body_html || comment.data.body || '').split('\n').map((line, i) => (
+                <span key={i}>
+                  {line}
+                  {i < decodeHtml(comment.data.body_html || comment.data.body || '').split('\n').length - 1 && <br />}
+                </span>
+              ))}
             </div>
 
             {hasReplies && (
@@ -231,8 +239,13 @@ export default function RedditPostPage() {
           )}
 
           {post.is_self && post.selftext && (
-            <div className="mb-4 text-sm text-[var(--color-text-primary)] whitespace-pre-wrap">
-              {decodeHtml(post.selftext_html || post.selftext)}
+            <div className="mb-4 text-sm text-[var(--color-text-primary)] text-left">
+              {decodeHtml(post.selftext_html || post.selftext).split('\n').map((line, i) => (
+                <span key={i}>
+                  {line}
+                  {i < decodeHtml(post.selftext_html || post.selftext).split('\n').length - 1 && <br />}
+                </span>
+              ))}
             </div>
           )}
 
