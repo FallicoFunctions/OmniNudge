@@ -3,7 +3,11 @@ import { HexColorPicker } from 'react-colorful';
 import { useTheme } from '../../hooks/useTheme';
 import { themeService } from '../../services/themeService';
 import type { UserTheme } from '../../types/theme';
-import { DEFAULT_THEME_VARIABLES, THEME_VARIABLE_GROUPS } from '../../data/themeVariables';
+import {
+  DEFAULT_THEME_VARIABLES,
+  THEME_VARIABLE_GROUPS,
+  getVariableDefinition,
+} from '../../data/themeVariables';
 import CSSVariableEditor from './CSSVariableEditor';
 import ThemePreview from './ThemePreview';
 import { cssVariablesSchema, themeInfoSchema } from '../../validation/themeSchemas';
@@ -15,6 +19,9 @@ const steps = [
   { id: 'variables', title: 'Customize Variables', description: 'Tweak colors with live preview.' },
   { id: 'review', title: 'Review & Save', description: 'Double-check details before publishing.' },
 ];
+
+const SIZE_VALUE_REGEX = /^-?\d+(\.\d+)?(px|rem|em|%)$/i;
+const MAX_STRING_LENGTH = 200;
 
 const cloneVariables = (source?: Record<string, string>) => ({
   ...DEFAULT_THEME_VARIABLES,
@@ -111,20 +118,50 @@ const ThemeEditor = ({ isOpen, onClose, initialTheme = null }: ThemeEditorProps)
   };
 
   const validateVariableValue = (variableName: string, value: string) => {
-    if (!value.trim()) {
+    const trimmed = value.trim();
+    const definition = getVariableDefinition(variableName);
+    const type = definition?.type ?? 'string';
+
+    if (!trimmed) {
       setVariableError(variableName, 'Value is required.');
       return false;
     }
 
-    const normalized = normalizeHexColor(value);
-
-    if (!looksLikeHexColor(value)) {
-      setVariableError(variableName, 'Use a hex color like #1a1a1a.');
-      return false;
+    if (type === 'color') {
+      const normalized = normalizeHexColor(trimmed);
+      if (!looksLikeHexColor(trimmed)) {
+        setVariableError(variableName, 'Use a hex color like #1a1a1a.');
+        return false;
+      }
+      if (!isValidHexColor(normalized)) {
+        setVariableError(variableName, 'Hex colors must be 3 or 6 characters.');
+        return false;
+      }
+      setVariableError(variableName, undefined);
+      return true;
     }
 
-    if (!isValidHexColor(normalized)) {
-      setVariableError(variableName, 'Hex colors must be 3 or 6 characters.');
+    if (type === 'size') {
+      if (!SIZE_VALUE_REGEX.test(trimmed)) {
+        setVariableError(variableName, 'Use units like px, rem, em, or %.');
+        return false;
+      }
+      setVariableError(variableName, undefined);
+      return true;
+    }
+
+    if (type === 'number') {
+      const numeric = Number(trimmed);
+      if (Number.isNaN(numeric)) {
+        setVariableError(variableName, 'Value must be a valid number.');
+        return false;
+      }
+      setVariableError(variableName, undefined);
+      return true;
+    }
+
+    if (trimmed.length > MAX_STRING_LENGTH) {
+      setVariableError(variableName, `Keep this value under ${MAX_STRING_LENGTH} characters.`);
       return false;
     }
 
@@ -138,6 +175,14 @@ const ThemeEditor = ({ isOpen, onClose, initialTheme = null }: ThemeEditorProps)
       [variableName]: value,
     }));
     validateVariableValue(variableName, value);
+  };
+
+  const sanitizeVariableValueForSave = (variableName: string, value: string) => {
+    const definition = getVariableDefinition(variableName);
+    if (definition?.type === 'color') {
+      return normalizeHexColor(value);
+    }
+    return value.trim();
   };
 
   const validateInfoDetails = () => {
@@ -167,7 +212,7 @@ const ThemeEditor = ({ isOpen, onClose, initialTheme = null }: ThemeEditorProps)
     return true;
   };
 
-  const validateVariableSet = () => {
+  const validateVariableSet = (): Record<string, string> | null => {
     const result = cssVariablesSchema.safeParse(cssVariables);
     if (!result.success) {
       const nextErrors: Record<string, string> = {};
@@ -181,14 +226,29 @@ const ThemeEditor = ({ isOpen, onClose, initialTheme = null }: ThemeEditorProps)
         }
       });
       setVariableErrors(nextErrors);
-      setError(generalMessage ?? 'Fix invalid color values before continuing.');
-      return false;
+      setError(generalMessage ?? 'Fix invalid values before continuing.');
+      return null;
+    }
+
+    let isValid = true;
+    const sanitizedEntries: Record<string, string> = {};
+
+    Object.entries(result.data).forEach(([name, value]) => {
+      const valid = validateVariableValue(name, value);
+      if (!valid) {
+        isValid = false;
+      }
+      sanitizedEntries[name] = sanitizeVariableValueForSave(name, value);
+    });
+
+    if (!isValid) {
+      return null;
     }
 
     setVariableErrors({});
-    setCssVariables(result.data);
+    setCssVariables(sanitizedEntries);
     setError(null);
-    return true;
+    return sanitizedEntries;
   };
 
   const validateStep = () => {
@@ -203,7 +263,7 @@ const ThemeEditor = ({ isOpen, onClose, initialTheme = null }: ThemeEditorProps)
     }
 
     if (stepId === 'variables') {
-      return validateVariableSet();
+      return Boolean(validateVariableSet());
     }
 
     setError(null);
@@ -226,7 +286,8 @@ const ThemeEditor = ({ isOpen, onClose, initialTheme = null }: ThemeEditorProps)
       return;
     }
 
-    if (!validateVariableSet()) {
+    const sanitizedVariables = validateVariableSet();
+    if (!sanitizedVariables) {
       setCurrentStep(2);
       return;
     }
@@ -239,7 +300,7 @@ const ThemeEditor = ({ isOpen, onClose, initialTheme = null }: ThemeEditorProps)
         result = await themeService.updateTheme(initialTheme.id, {
           theme_name: themeName.trim(),
           theme_description: themeDescription.trim(),
-          css_variables: cssVariables,
+          css_variables: sanitizedVariables,
         });
       } else {
         result = await themeService.createTheme({
@@ -247,7 +308,7 @@ const ThemeEditor = ({ isOpen, onClose, initialTheme = null }: ThemeEditorProps)
           theme_description: themeDescription.trim(),
           theme_type: 'variable_customization',
           scope_type: 'global',
-          css_variables: cssVariables,
+          css_variables: sanitizedVariables,
           is_public: false,
         });
       }
