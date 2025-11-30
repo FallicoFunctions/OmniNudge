@@ -7,6 +7,7 @@ import {
   useRef,
   useState,
 } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { themeService } from '../services/themeService';
 import type { UserSettings, UserTheme } from '../types/theme';
 import {
@@ -44,10 +45,43 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
   const [customThemes, setCustomThemes] = useState<UserTheme[]>([]);
   const [activeTheme, setActiveTheme] = useState<UserTheme | null>(null);
   const [cssVariables, setCssVariables] = useState<Record<string, string>>({});
-  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [userSettings, setUserSettings] = useState<UserSettings | null>(null);
   const selectionRequestId = useRef(0);
+  const hasInitializedTheme = useRef(false);
+  const queryClient = useQueryClient();
+  const {
+    data: themeLists,
+    isLoading: isThemesLoading,
+    isFetching: isFetchingThemes,
+    refetch: refetchThemeLists,
+    error: themeError,
+  } = useQuery({
+    queryKey: ['themes', 'lists'],
+    queryFn: async () => {
+      const [predefined, myThemesResponse] = await Promise.all([
+        themeService.getPredefinedThemes(),
+        themeService
+          .getMyThemes()
+          .then((response) => response.themes)
+          .catch(() => [] as UserTheme[]),
+      ]);
+      return { predefined, custom: myThemesResponse ?? [] };
+    },
+    staleTime: 1000 * 60 * 5,
+  });
+
+  const {
+    data: settingsData,
+    isLoading: isSettingsLoading,
+    refetch: refetchSettingsQuery,
+  } = useQuery({
+    queryKey: ['user', 'settings'],
+    queryFn: () => themeService.getUserSettings(),
+    staleTime: 1000 * 60,
+  });
+
+  const isLoading = isThemesLoading || isSettingsLoading || isFetchingThemes;
 
   // Hydrate immediately with cached CSS variables to avoid flashes
   useEffect(() => {
@@ -80,6 +114,10 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
             setUserSettings((prev) =>
               prev ? { ...prev, active_theme_id: theme.id } : prev
             );
+            queryClient.setQueryData<UserSettings | undefined>(
+              ['user', 'settings'],
+              (prev) => (prev ? { ...prev, active_theme_id: theme.id } : prev)
+            );
           }
         } catch (err) {
           console.error('Failed to sync theme selection', err);
@@ -87,52 +125,49 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
         }
       }
     },
-    []
+    [queryClient]
   );
 
-  const loadThemes = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      const [predefined, myThemesResponse, settings] = await Promise.all([
-        themeService.getPredefinedThemes(),
-        themeService
-          .getMyThemes()
-          .then((response) => response.themes)
-          .catch(() => [] as UserTheme[]),
-        themeService.getUserSettings().catch(() => null),
-      ]);
-
-      const myThemes = myThemesResponse ?? [];
-      setPredefinedThemes(predefined);
-      setCustomThemes(myThemes);
-      if (settings) {
-        setUserSettings(settings);
-      }
-
-      const storedThemeId = getStoredThemeId();
-      const targetId = settings?.active_theme_id ?? storedThemeId ?? null;
-      const mergedThemes = [...predefined, ...myThemes];
-      const targetTheme =
-        (targetId ? mergedThemes.find((theme) => theme.id === targetId) : null) ??
-        mergedThemes[0] ??
-        null;
-
-      if (targetTheme) {
-        await selectTheme(targetTheme, { notifyServer: false });
-      }
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Unable to load themes.';
-      setError(message);
-    } finally {
-      setIsLoading(false);
+  useEffect(() => {
+    if (themeLists) {
+      setPredefinedThemes(themeLists.predefined);
+      setCustomThemes(themeLists.custom);
     }
-  }, [selectTheme]);
+  }, [themeLists]);
 
   useEffect(() => {
-    loadThemes();
-  }, [loadThemes]);
+    if (settingsData) {
+      setUserSettings(settingsData);
+    }
+  }, [settingsData]);
+
+  useEffect(() => {
+    if (hasInitializedTheme.current) return;
+    if (!themeLists) return;
+
+    const mergedThemes = [...themeLists.predefined, ...themeLists.custom];
+    if (mergedThemes.length === 0) return;
+
+    const storedThemeId = getStoredThemeId();
+    const targetId = userSettings?.active_theme_id ?? storedThemeId ?? null;
+    const targetTheme =
+      (targetId ? mergedThemes.find((theme) => theme.id === targetId) : null) ??
+      mergedThemes[0] ??
+      null;
+
+    if (targetTheme) {
+      hasInitializedTheme.current = true;
+      selectTheme(targetTheme, { notifyServer: false });
+    }
+  }, [themeLists, userSettings, selectTheme]);
+
+  useEffect(() => {
+    if (themeError instanceof Error) {
+      setError(themeError.message);
+    } else if (!themeError) {
+      setError(null);
+    }
+  }, [themeError]);
 
   const selectThemeById = useCallback(
     async (themeId: number) => {
@@ -148,17 +183,12 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
   );
 
   const refreshThemes = useCallback(async () => {
-    await loadThemes();
-  }, [loadThemes]);
+    await refetchThemeLists();
+  }, [refetchThemeLists]);
 
   const refreshSettings = useCallback(async () => {
-    try {
-      const settings = await themeService.getUserSettings();
-      setUserSettings(settings);
-    } catch (err) {
-      console.error('Failed to refresh user settings', err);
-    }
-  }, []);
+    await refetchSettingsQuery();
+  }, [refetchSettingsQuery]);
 
   const setAdvancedMode = useCallback(
     async (enabled: boolean) => {
@@ -167,12 +197,15 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
         setUserSettings((prev) =>
           prev ? { ...prev, advanced_mode_enabled: enabled } : prev
         );
+        queryClient.setQueryData<UserSettings | undefined>(['user', 'settings'], (prev) =>
+          prev ? { ...prev, advanced_mode_enabled: enabled } : prev
+        );
       } catch (err) {
         console.error('Failed to update advanced mode', err);
         throw err;
       }
     },
-    []
+    [queryClient]
   );
 
   const value = useMemo<ThemeContextValue>(

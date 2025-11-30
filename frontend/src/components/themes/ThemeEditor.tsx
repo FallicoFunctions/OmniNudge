@@ -11,6 +11,7 @@ import CSSVariableEditor from './CSSVariableEditor';
 import ThemePreview from './ThemePreview';
 import { cssVariablesSchema, themeInfoSchema } from '../../validation/themeSchemas';
 import { isValidHexColor, looksLikeHexColor, normalizeHexColor } from '../../utils/color';
+import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 
 const ColorPicker = lazy(async () => {
   const module = await import('react-colorful');
@@ -52,6 +53,7 @@ const ThemeEditor = ({ isOpen, onClose, initialTheme = null }: ThemeEditorProps)
   const [themeName, setThemeName] = useState('');
   const [themeDescription, setThemeDescription] = useState('');
   const [cssVariables, setCssVariables] = useState<Record<string, string>>(cloneVariables());
+  const debouncedCssVariables = useDebouncedValue(cssVariables, 200);
   const [selectedVariableName, setSelectedVariableName] = useState(
     THEME_VARIABLE_GROUPS[0]?.variables[0]?.name ?? '--color-primary'
   );
@@ -547,7 +549,7 @@ const ThemeEditor = ({ isOpen, onClose, initialTheme = null }: ThemeEditorProps)
                 </div>
               </div>
               <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
-                <ThemePreview variables={cssVariables} />
+                <ThemePreview variables={debouncedCssVariables} />
               </div>
             </div>
           </div>
@@ -597,7 +599,7 @@ const ThemeEditor = ({ isOpen, onClose, initialTheme = null }: ThemeEditorProps)
               </div>
             </div>
             <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
-              <ThemePreview variables={cssVariables} showControls={false} />
+              <ThemePreview variables={debouncedCssVariables} showControls={false} />
             </div>
           </div>
         );

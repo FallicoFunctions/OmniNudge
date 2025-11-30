@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import type { CSSProperties } from 'react';
 import type { PageName } from '../../types/theme';
 import { DEFAULT_THEME_VARIABLES } from '../../data/themeVariables';
+import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 
 type DeviceMode = 'desktop' | 'mobile';
 
@@ -32,10 +33,11 @@ const ThemePreview = ({
   const [selectedPage, setSelectedPage] = useState<PageName>(initialPage);
   const [deviceMode, setDeviceMode] = useState<DeviceMode>(initialDevice);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const debouncedVariables = useDebouncedValue(variables, 250);
 
   const mergedVariables = useMemo(
-    () => ({ ...DEFAULT_THEME_VARIABLES, ...variables }),
-    [variables]
+    () => ({ ...DEFAULT_THEME_VARIABLES, ...debouncedVariables }),
+    [debouncedVariables]
   );
 
   const previewStyle = useMemo(() => {
