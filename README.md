@@ -161,6 +161,24 @@ DB_NAME=omninudge_dev
 JWT_SECRET=your-secret-key-here
 ```
 
+### Frontend Environment Files
+
+The React app reads configuration from `import.meta.env.*`. Copy the example file to get started:
+
+```bash
+cd frontend
+cp .env.example .env.development
+```
+
+Update the values to match your backend host. For production builds, create `.env.production` (already included) and set:
+
+```env
+VITE_API_URL=https://api.omninudge.com/api/v1
+VITE_WS_URL=wss://api.omninudge.com/ws
+```
+
+Vite automatically picks the correct file based on the `mode` you build with (`npm run dev`, `vite build --mode production`, etc.).
+
 ## API Features
 
 ### Notifications
