@@ -1,14 +1,13 @@
-import test from 'node:test';
-import assert from 'node:assert/strict';
+import { describe, expect, it } from 'vitest';
 import { getContrastRatio } from '../../src/utils/contrast';
 
-test('contrast ratio matches expected values', () => {
-  const ratio = getContrastRatio('#000000', '#ffffff');
-  assert(ratio);
-  assert.equal(Number(ratio?.toFixed(2)), 21);
-});
+describe('getContrastRatio', () => {
+  it('returns correct ratio for black/white', () => {
+    const ratio = getContrastRatio('#000000', '#ffffff');
+    expect(ratio && Number(ratio.toFixed(2))).toBe(21);
+  });
 
-test('contrast ratio handles identical colors', () => {
-  const ratio = getContrastRatio('#ffffff', '#ffffff');
-  assert.equal(ratio, 1);
+  it('handles identical colors', () => {
+    expect(getContrastRatio('#ffffff', '#ffffff')).toBe(1);
+  });
 });
