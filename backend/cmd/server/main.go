@@ -64,6 +64,7 @@ func main() {
 	themeRepo := models.NewUserThemeRepository(db.Pool)
 	themeOverrideRepo := models.NewUserThemeOverrideRepository(db.Pool)
 	installedThemeRepo := models.NewUserInstalledThemeRepository(db.Pool)
+	redditCommentRepo := models.NewRedditPostCommentRepository(db.Pool)
 
 	// Initialize WebSocket hub
 	hub := websocket.NewHub()
@@ -128,6 +129,7 @@ func main() {
 	mediaGalleryHandler := handlers.NewMediaGalleryHandler(db.Pool)
 	userStatusHandler := handlers.NewUserStatusHandler(hub)
 	themesHandler := handlers.NewThemesHandler(themeRepo, themeOverrideRepo, installedThemeRepo, userSettingsRepo, cssSanitizer)
+	redditCommentsHandler := handlers.NewRedditCommentsHandler(redditCommentRepo)
 
 	// Inject notification service into handlers
 	postsHandler.SetNotificationService(notificationService)
@@ -205,6 +207,9 @@ func main() {
 			reddit.GET("/r/:subreddit/media", redditHandler.GetSubredditMedia)
 			reddit.GET("/r/:subreddit/comments/:postId", redditHandler.GetPostComments)
 			reddit.GET("/search", redditHandler.SearchPosts)
+
+			// Local comments on Reddit posts (site-only comments)
+			reddit.GET("/posts/:subreddit/:postId/comments", redditCommentsHandler.GetRedditPostComments)
 		}
 
 		// Local hub routes
@@ -290,6 +295,9 @@ func main() {
 			protected.PUT("/comments/:id", commentsHandler.UpdateComment)
 			protected.DELETE("/comments/:id", commentsHandler.DeleteComment)
 			protected.POST("/comments/:id/vote", commentsHandler.VoteComment)
+
+			// Protected Reddit post comments routes (site-only comments on Reddit posts)
+			protected.POST("/reddit/posts/:subreddit/:postId/comments", redditCommentsHandler.CreateRedditPostComment)
 
 			// Protected hub creation
 			protected.POST("/hubs", hubsHandler.Create)
