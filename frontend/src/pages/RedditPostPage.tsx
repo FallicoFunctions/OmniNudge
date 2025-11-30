@@ -136,19 +136,27 @@ function LocalCommentView({
   comment,
   subreddit,
   postId,
-  isReplying,
+  replyingTo,
   onReply,
   onCancelReply,
+  allComments,
 }: {
   comment: LocalComment;
   subreddit: string;
   postId: string;
-  isReplying: boolean;
+  replyingTo: number | null;
   onReply: (commentId: number) => void;
   onCancelReply: () => void;
+  allComments: LocalComment[];
 }) {
   const queryClient = useQueryClient();
   const [replyText, setReplyText] = useState('');
+
+  // Get direct replies to this comment
+  const replies = allComments.filter(c => c.parent_comment_id === comment.id);
+
+  // Check if THIS specific comment is being replied to
+  const isReplying = replyingTo === comment.id;
 
   const voteMutation = useMutation({
     mutationFn: async (delta: 1 | -1) => {
@@ -182,73 +190,93 @@ function LocalCommentView({
   };
 
   return (
-    <div className="rounded border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-3">
-      <div className="text-xs text-[var(--color-text-secondary)]">
-        u/{comment.username} • {new Date(comment.created_at).toLocaleString()}
-      </div>
-      <div className="mt-2 text-sm text-[var(--color-text-primary)]">
-        {comment.content}
-      </div>
-
-      {/* Voting and Reply Controls */}
-      <div className="mt-2 flex items-center gap-3 text-xs">
-        <div className="flex items-center gap-1">
-          <button
-            onClick={() => voteMutation.mutate(1)}
-            disabled={voteMutation.isPending}
-            className="text-[var(--color-text-secondary)] hover:text-orange-500 disabled:opacity-50"
-            title="Upvote"
-          >
-            ▲
-          </button>
-          <span className="min-w-[20px] text-center font-semibold text-[var(--color-text-primary)]">
-            {comment.score}
-          </span>
-          <button
-            onClick={() => voteMutation.mutate(-1)}
-            disabled={voteMutation.isPending}
-            className="text-[var(--color-text-secondary)] hover:text-blue-500 disabled:opacity-50"
-            title="Downvote"
-          >
-            ▼
-          </button>
+    <div>
+      <div className="rounded border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-3">
+        <div className="text-xs text-[var(--color-text-secondary)]">
+          u/{comment.username} • {new Date(comment.created_at).toLocaleString()}
         </div>
-        <button
-          onClick={() => onReply(comment.id)}
-          className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
-        >
-          Reply
-        </button>
-      </div>
+        <div className="mt-2 text-sm text-[var(--color-text-primary)]">
+          {comment.content}
+        </div>
 
-      {/* Inline Reply Form */}
-      {isReplying && (
-        <form onSubmit={handleSubmitReply} className="mt-3">
-          <textarea
-            value={replyText}
-            onChange={(e) => setReplyText(e.target.value)}
-            placeholder="Write your reply..."
-            rows={3}
-            autoFocus
-            className="w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
-          />
-          <div className="mt-2 flex gap-2">
+        {/* Voting and Reply Controls */}
+        <div className="mt-2 flex items-center gap-3 text-xs">
+          <div className="flex items-center gap-1">
             <button
-              type="submit"
-              disabled={createReplyMutation.isPending || !replyText.trim()}
-              className="rounded-md bg-[var(--color-primary)] px-3 py-1 text-xs font-semibold text-white hover:bg-[var(--color-primary-dark)] disabled:opacity-50"
+              onClick={() => voteMutation.mutate(1)}
+              disabled={voteMutation.isPending}
+              className="text-[var(--color-text-secondary)] hover:text-orange-500 disabled:opacity-50"
+              title="Upvote"
             >
-              {createReplyMutation.isPending ? 'Posting...' : 'Post Reply'}
+              ▲
             </button>
+            <span className="min-w-[20px] text-center font-semibold text-[var(--color-text-primary)]">
+              {comment.score}
+            </span>
             <button
-              type="button"
-              onClick={onCancelReply}
-              className="rounded-md border border-[var(--color-border)] px-3 py-1 text-xs font-semibold text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-elevated)]"
+              onClick={() => voteMutation.mutate(-1)}
+              disabled={voteMutation.isPending}
+              className="text-[var(--color-text-secondary)] hover:text-blue-500 disabled:opacity-50"
+              title="Downvote"
             >
-              Cancel
+              ▼
             </button>
           </div>
-        </form>
+          <button
+            onClick={() => onReply(comment.id)}
+            className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+          >
+            Reply
+          </button>
+        </div>
+
+        {/* Inline Reply Form */}
+        {isReplying && (
+          <form onSubmit={handleSubmitReply} className="mt-3">
+            <textarea
+              value={replyText}
+              onChange={(e) => setReplyText(e.target.value)}
+              placeholder="Write your reply..."
+              rows={3}
+              autoFocus
+              className="w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
+            />
+            <div className="mt-2 flex gap-2">
+              <button
+                type="submit"
+                disabled={createReplyMutation.isPending || !replyText.trim()}
+                className="rounded-md bg-[var(--color-primary)] px-3 py-1 text-xs font-semibold text-white hover:bg-[var(--color-primary-dark)] disabled:opacity-50"
+              >
+                {createReplyMutation.isPending ? 'Posting...' : 'Post Reply'}
+              </button>
+              <button
+                type="button"
+                onClick={onCancelReply}
+                className="rounded-md border border-[var(--color-border)] px-3 py-1 text-xs font-semibold text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-elevated)]"
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        )}
+      </div>
+
+      {/* Nested Replies */}
+      {replies.length > 0 && (
+        <div className="ml-6 mt-3 space-y-3 border-l-2 border-[var(--color-border)] pl-4">
+          {replies.map((reply) => (
+            <LocalCommentView
+              key={reply.id}
+              comment={reply}
+              subreddit={subreddit}
+              postId={postId}
+              replyingTo={replyingTo}
+              onReply={onReply}
+              onCancelReply={onCancelReply}
+              allComments={allComments}
+            />
+          ))}
+        </div>
       )}
     </div>
   );
@@ -442,21 +470,27 @@ export default function RedditPostPage() {
           </div>
         )}
 
-        {localCommentsData && localCommentsData.length > 0 && (
-          <div className="space-y-4">
-            {localCommentsData.map((comment) => (
-              <LocalCommentView
-                key={comment.id}
-                comment={comment}
-                subreddit={subreddit}
-                postId={postId}
-                isReplying={replyingTo === comment.id}
-                onReply={(commentId) => setReplyingTo(commentId)}
-                onCancelReply={() => setReplyingTo(null)}
-              />
-            ))}
-          </div>
-        )}
+        {localCommentsData && localCommentsData.length > 0 && (() => {
+          // Filter only top-level comments (no parent)
+          const topLevelComments = localCommentsData.filter(c => c.parent_comment_id === null);
+
+          return (
+            <div className="space-y-4">
+              {topLevelComments.map((comment) => (
+                <LocalCommentView
+                  key={comment.id}
+                  comment={comment}
+                  subreddit={subreddit}
+                  postId={postId}
+                  replyingTo={replyingTo}
+                  onReply={(commentId) => setReplyingTo(commentId)}
+                  onCancelReply={() => setReplyingTo(null)}
+                  allComments={localCommentsData}
+                />
+              ))}
+            </div>
+          );
+        })()}
       </div>
 
       {/* Reddit Comments Section (Read-only from Reddit API) */}
