@@ -50,6 +50,10 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
   const selectionRequestId = useRef(0);
   const hasInitializedTheme = useRef(false);
   const queryClient = useQueryClient();
+
+  // Only fetch themes if user is authenticated
+  const isAuthenticated = !!localStorage.getItem('auth_token');
+
   const {
     data: themeLists,
     isLoading: isThemesLoading,
@@ -69,6 +73,8 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
       return { predefined, custom: myThemesResponse ?? [] };
     },
     staleTime: 1000 * 60 * 5,
+    enabled: isAuthenticated,
+    retry: false,
   });
 
   const {
@@ -79,6 +85,8 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
     queryKey: ['user', 'settings'],
     queryFn: () => themeService.getUserSettings(),
     staleTime: 1000 * 60,
+    enabled: isAuthenticated,
+    retry: false,
   });
 
   const isLoading = isThemesLoading || isSettingsLoading || isFetchingThemes;
