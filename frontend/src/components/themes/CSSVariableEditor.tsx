@@ -5,6 +5,7 @@ interface CSSVariableEditorProps {
   groups: ThemeCategory[];
   variables: Record<string, string>;
   selectedVariable: string;
+  variableErrors?: Record<string, string>;
   onSelectVariable: (name: string) => void;
   onChangeVariable: (name: string, value: string) => void;
 }
@@ -13,6 +14,7 @@ const CSSVariableEditor = ({
   groups,
   variables,
   selectedVariable,
+  variableErrors = {},
   onSelectVariable,
   onChangeVariable,
 }: CSSVariableEditorProps) => {
@@ -31,6 +33,7 @@ const CSSVariableEditor = ({
                 variable.value ??
                 '#000000';
               const isSelected = selectedVariable === variable.name;
+              const errorMessage = variableErrors[variable.name];
               return (
                 <button
                   key={variable.name}
@@ -50,6 +53,9 @@ const CSSVariableEditor = ({
                       <p className="text-xs text-[var(--color-text-secondary)]">
                         {variable.description}
                       </p>
+                    )}
+                    {errorMessage && (
+                      <p className="text-xs text-red-500">{errorMessage}</p>
                     )}
                   </div>
                   <div className="flex items-center gap-3">
