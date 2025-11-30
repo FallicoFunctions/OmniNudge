@@ -26,7 +26,7 @@ const createMockStorage = () => {
 };
 
 const createTheme = (overrides: Partial<UserTheme> = {}): UserTheme => ({
-  id: 42,
+  id: overrides.id ?? 1,
   user_id: 1,
   theme_name: 'Mock Theme',
   theme_type: 'predefined',
@@ -46,26 +46,26 @@ const createTheme = (overrides: Partial<UserTheme> = {}): UserTheme => ({
 });
 
 test('applyCSSVariables normalizes keys and sets values', () => {
-  const calls: Array<{ key: string; value: string }> = [];
+  const setCalls: Array<{ key: string; value: string }> = [];
   global.document = {
     documentElement: {
       style: {
         setProperty: (key: string, value: string) => {
-          calls.push({ key, value });
+          setCalls.push({ key, value });
         },
       },
     },
   } as unknown as Document;
 
-  applyCSSVariables({ 'color-background': '#111111', '--color-primary': '#222222' });
+  applyCSSVariables({ 'color-background': '#000', '--color-primary': '#fff' });
 
-  assert.deepStrictEqual(calls, [
-    { key: '--color-background', value: '#111111' },
-    { key: '--color-primary', value: '#222222' },
+  assert.deepEqual(setCalls, [
+    { key: '--color-background', value: '#000' },
+    { key: '--color-primary', value: '#fff' },
   ]);
 });
 
-test('persistThemeSelection + hydrateThemeFromStorage round trip snapshot', () => {
+test('persistThemeSelection + hydrateThemeFromStorage round trip', () => {
   const storage = createMockStorage();
   global.window = { localStorage: storage } as unknown as Window & typeof globalThis;
   global.document = {
@@ -79,7 +79,6 @@ test('persistThemeSelection + hydrateThemeFromStorage round trip snapshot', () =
   const theme = createTheme();
   persistThemeSelection(theme);
   const snapshot = hydrateThemeFromStorage();
-
   assert(snapshot);
   assert.equal(snapshot?.id, theme.id);
   assert.equal(snapshot?.variables?.['--color-primary'], '#ff0000');
