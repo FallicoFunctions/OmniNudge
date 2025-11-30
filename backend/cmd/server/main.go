@@ -243,37 +243,41 @@ func main() {
 			protected.GET("/settings", settingsHandler.GetSettings)
 			protected.PUT("/settings", settingsHandler.UpdateSettings)
 
-			// Theme customization routes
-			// Predefined themes (public access within protected routes)
-			protected.GET("/themes/predefined", themesHandler.GetPredefinedThemes)
+			// Theme customization routes with rate limiting
+			themeCreationLimiter := middleware.ThemeCreationRateLimiter()
+			themePreviewLimiter := middleware.ThemePreviewRateLimiter()
+			generalLimiter := middleware.GeneralAPIRateLimiter()
 
-			// Browse public themes
-			protected.GET("/themes/browse", themesHandler.BrowseThemes)
+			// Predefined themes (public access within protected routes, general rate limit)
+			protected.GET("/themes/predefined", generalLimiter.Middleware(), themesHandler.GetPredefinedThemes)
 
-			// User's own themes
-			protected.POST("/themes", themesHandler.CreateTheme)
-			protected.GET("/themes/my", themesHandler.GetMyThemes)
-			protected.GET("/themes/:id", themesHandler.GetTheme)
-			protected.PUT("/themes/:id", themesHandler.UpdateTheme)
-			protected.DELETE("/themes/:id", themesHandler.DeleteTheme)
+			// Browse public themes (preview rate limit)
+			protected.GET("/themes/browse", themePreviewLimiter.Middleware(), themesHandler.BrowseThemes)
 
-			// Theme installation & activation
-			protected.POST("/themes/install", themesHandler.InstallTheme)
-			protected.DELETE("/themes/install/:themeId", themesHandler.UninstallTheme)
-			protected.POST("/themes/active", themesHandler.SetActiveTheme)
-			protected.GET("/themes/installed", themesHandler.GetInstalledThemes)
+			// User's own themes (creation/write operations use stricter limit)
+			protected.POST("/themes", themeCreationLimiter.Middleware(), themesHandler.CreateTheme)
+			protected.GET("/themes/my", generalLimiter.Middleware(), themesHandler.GetMyThemes)
+			protected.GET("/themes/:id", themePreviewLimiter.Middleware(), themesHandler.GetTheme)
+			protected.PUT("/themes/:id", themeCreationLimiter.Middleware(), themesHandler.UpdateTheme)
+			protected.DELETE("/themes/:id", themeCreationLimiter.Middleware(), themesHandler.DeleteTheme)
 
-			// Per-page theme overrides (Level 4)
-			protected.POST("/themes/overrides", themesHandler.SetPageOverride)
-			protected.GET("/themes/overrides", themesHandler.GetAllOverrides)
-			protected.GET("/themes/overrides/:pageName", themesHandler.GetPageOverride)
-			protected.DELETE("/themes/overrides/:pageName", themesHandler.DeletePageOverride)
+			// Theme installation & activation (general rate limit)
+			protected.POST("/themes/install", generalLimiter.Middleware(), themesHandler.InstallTheme)
+			protected.DELETE("/themes/install/:themeId", generalLimiter.Middleware(), themesHandler.UninstallTheme)
+			protected.POST("/themes/active", generalLimiter.Middleware(), themesHandler.SetActiveTheme)
+			protected.GET("/themes/installed", generalLimiter.Middleware(), themesHandler.GetInstalledThemes)
 
-			// Advanced mode toggle
-			protected.POST("/themes/advanced-mode", themesHandler.SetAdvancedMode)
+			// Per-page theme overrides (Level 4, creation limit for writes)
+			protected.POST("/themes/overrides", themeCreationLimiter.Middleware(), themesHandler.SetPageOverride)
+			protected.GET("/themes/overrides", generalLimiter.Middleware(), themesHandler.GetAllOverrides)
+			protected.GET("/themes/overrides/:pageName", generalLimiter.Middleware(), themesHandler.GetPageOverride)
+			protected.DELETE("/themes/overrides/:pageName", themeCreationLimiter.Middleware(), themesHandler.DeletePageOverride)
 
-			// Theme rating & reviews (Phase 2c)
-			protected.POST("/themes/rate", themesHandler.RateTheme)
+			// Advanced mode toggle (general rate limit)
+			protected.POST("/themes/advanced-mode", generalLimiter.Middleware(), themesHandler.SetAdvancedMode)
+
+			// Theme rating & reviews (Phase 2c, general rate limit)
+			protected.POST("/themes/rate", generalLimiter.Middleware(), themesHandler.RateTheme)
 
 			// Protected posts routes (auth required for creating/editing)
 			protected.POST("/posts", postsHandler.CreatePost)
