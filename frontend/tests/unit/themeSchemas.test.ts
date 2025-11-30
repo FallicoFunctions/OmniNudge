@@ -2,21 +2,21 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { themeInfoSchema, cssVariablesSchema } from '../../src/validation/themeSchemas';
 
-test('themeInfoSchema accepts valid payloads', () => {
+test('themeInfoSchema accepts valid data', () => {
   const parsed = themeInfoSchema.parse({
-    theme_name: 'My Theme',
+    theme_name: 'My theme',
     theme_description: 'Looks great',
   });
-  assert.equal(parsed.theme_name, 'My Theme');
+  assert.equal(parsed.theme_name, 'My theme');
 });
 
-test('themeInfoSchema rejects empty name', () => {
+test('themeInfoSchema rejects blank names', () => {
   assert.throws(() => {
-    themeInfoSchema.parse({ theme_name: '  ', theme_description: '' });
+    themeInfoSchema.parse({ theme_name: '   ', theme_description: '' });
   }, /Theme name is required/);
 });
 
-test('cssVariablesSchema enforces max variables and values', () => {
+test('cssVariablesSchema enforces max count and non-empty values', () => {
   const parsed = cssVariablesSchema.parse({
     '--color-primary': '#fff',
     '--color-background': '#000',
