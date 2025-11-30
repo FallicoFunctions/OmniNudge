@@ -558,26 +558,130 @@
 - Only your messages (can't export other user's data)
 - Encrypted conversations exported as encrypted (optionally decrypt)
 
-### Custom Themes
+### MySpace-Style Theme Customization System
 
 **Phase 1:** Dark/light only
-**Phase 2:** Multiple color themes
+**Phase 2:** Comprehensive customization system with 5 progressive levels
 
-**Theme Options:**
-- Ocean Blue
-- Forest Green
-- Sunset Orange
-- Purple Night
-- Rose Gold
-- Cyberpunk Neon
-- Minimal Gray
-- High Contrast
+See complete specification: [/docs/COMPONENT_REFERENCE.md](../COMPONENT_REFERENCE.md), [/docs/CSS_VARIABLES.md](../CSS_VARIABLES.md), [/docs/THEME_CREATION_GUIDE.md](../THEME_CREATION_GUIDE.md)
 
-**Customization:**
-- Accent color selection
-- Font size options
-- Message bubble style
-- Background patterns (optional)
+**Level 1: Predefined Themes**
+- 8 professionally designed themes:
+  - OmniNudge Light
+  - OmniNudge Dark
+  - Midnight (deep blue dark)
+  - Sunset (warm orange/pink gradients)
+  - Forest (green nature-inspired)
+  - Ocean (blue aquatic)
+  - Lavender (soft purple)
+  - Monochrome (black & white)
+- One-click installation
+- Apply globally across all pages
+
+**Level 2: Advanced Mode - CSS Variable Customization**
+- Toggle "Advanced Mode" in settings
+- Customize 100+ CSS variables:
+  - Colors (primary, background, text, borders, semantic)
+  - Typography (fonts, sizes, weights, line heights)
+  - Spacing (8-tier scale from xs to 3xl)
+  - Border radius and shadows
+  - Component-specific variables
+- Visual controls (color pickers, sliders, number inputs)
+- Real-time preview before applying
+- All variables available (no tier limits in Phase 2)
+
+**Level 3: Advanced Mode - Full Custom CSS**
+- Raw CSS editor with syntax highlighting (Monaco Editor or CodeMirror)
+- Target specific components:
+  - `.feed-post-card` - Post cards
+  - `.navigation-bar` - Navigation
+  - `.sidebar-container` - Sidebar
+  - `.message-bubble` - Messages
+  - `.profile-header` - Profile
+  - And 50+ more components
+- Server-side CSS sanitization (blocks XSS patterns)
+- Live preview in real-time
+- Share themes with community
+
+**Level 4: Advanced Mode - Per-Page Themes**
+- Different theme for each page:
+  - Feed theme
+  - Profile theme
+  - Settings theme
+  - Messages theme
+  - Notifications theme
+  - Search theme
+- Page-specific CSS using data attributes:
+  - `[data-page="feed"]` - Target feed page
+  - `[data-page="profile"]` - Target profile page
+- Fallback to global theme when no page override
+- Component-specific styling per page
+
+**Level 5: Component Rearrangement (CSS-based)**
+- Use CSS Grid/Flexbox to restructure layouts:
+  - Move sidebar left/right
+  - Reorder feed sections
+  - Change component visibility
+  - Create custom layouts (3-column, centered, magazine-style)
+- No drag-and-drop UI (pure CSS control)
+- Maximum customization within security constraints
+
+**Database Tables:**
+- `user_themes` - Custom theme storage
+- `user_theme_overrides` - Per-page customizations
+- `user_installed_themes` - Marketplace theme tracking (Phase 3)
+- `marketplace_items` - General marketplace (Phase 3+)
+
+**Security:**
+- CSS sanitization blocks:
+  - `url()` function (prevents external resource loading)
+  - `@import` statements
+  - JavaScript execution patterns (`javascript:`, `expression()`)
+  - HTML injection attempts
+- Content Security Policy headers
+- Rate limiting (10 saves/hour, 50 previews/hour)
+- See [/docs/SECURITY_GUIDELINES.md](../SECURITY_GUIDELINES.md)
+
+**Phase 2 Implementation Timeline:**
+
+**Phase 2a: Foundation (Months 1-2)**
+- Predefined themes + CSS variable customization
+- Advanced Mode toggle
+- Theme persistence across devices
+- Live preview component
+- CSS sanitization service
+- 8 predefined themes seeded
+
+**Phase 2b: Per-Page & Component Targeting (Months 3-4)**
+- Per-page theme overrides
+- Component-specific styling
+- Component reference documentation
+- Page data attributes in routing
+- CSS editor with autocomplete
+
+**Phase 2c: Full CSS & Sharing (Months 5-6)**
+- Full CSS editor (Monaco/CodeMirror)
+- Theme sharing (publish/browse/install)
+- Public theme browser with ratings
+- Theme preview before installation
+- All features remain free
+
+**Phase 3: Marketplace & Monetization**
+- Theme marketplace with purchases
+- In-site currency (credits)
+- Creator earnings (70/30 split)
+- HTML + CSS customization (sandboxed)
+- Premium tiers (optional)
+- See [/docs/MARKETPLACE_SPEC.md](../MARKETPLACE_SPEC.md)
+
+**Deliverables:**
+- Users select from 8 predefined themes
+- Advanced users customize every visual aspect
+- CSS-only customization (safe, Phase 2)
+- HTML + CSS customization (sandboxed, Phase 3)
+- Share and install community themes (free in Phase 2)
+- Full marketplace ecosystem (Phase 3)
+- Maximum customization = maximum engagement
 
 ### Profile Enhancement
 
@@ -726,15 +830,46 @@
 
 ## Timeline for Phase 2
 
-**Month 1-2:** Voice/video calling + screen sharing
-**Month 3:** Audio messages + voice notes + transcription
-**Month 4:** Pseudonym system + auto-delete
-**Month 5-6:** Comprehensive reward system + Stripe payments + leaderboards
-**Month 7:** Friend system + multiple chat windows
-**Month 8:** Enhanced media features + link previews
-**Month 9:** Message search, editing, deletion, pinning, archiving, etc.
+**Month 1-2: Theme Foundation (Phase 2a)**
+- Predefined themes system (8 themes)
+- CSS variable customization
+- Advanced Mode toggle
+- Live preview component
+- CSS sanitization service
+- Theme persistence & cross-device sync
 
-**Total: 6-9 months**
+**Month 3-4: Per-Page Themes (Phase 2b)**
+- Per-page theme overrides
+- Component-specific styling
+- Component reference documentation
+- Page data attributes
+- CSS editor with autocomplete
+- Voice/video calling + screen sharing
+
+**Month 5-6: Full CSS & Sharing (Phase 2c)**
+- Full CSS editor (Monaco/CodeMirror)
+- Theme sharing (publish/browse/install)
+- Public theme browser with ratings
+- Audio messages + voice notes + transcription
+- Pseudonym system + auto-delete
+
+**Month 7-8: Rewards & Social**
+- Comprehensive reward system
+- Stripe payments + coin purchases
+- Leaderboards (karma, awards, invites)
+- Friend system + multiple chat windows
+- Enhanced media features + link previews
+
+**Month 9: Polish & Additional Features**
+- Message search, editing, deletion, pinning, archiving
+- Full emoji picker + GIF integration
+- Drag-and-drop upload
+- Advanced typing indicators
+- Chat history export
+
+**Total: 9 months**
+
+**Note:** Theme customization system is integrated throughout Phase 2a-2c. Marketplace and monetization deferred to Phase 3.
 
 ---
 
@@ -747,6 +882,20 @@
 - [ ] Leaderboards updating in real-time
 - [ ] Pseudonyms applied retroactively
 - [ ] Auto-delete cron job running properly
+- [ ] CSS sanitization blocks all XSS patterns
+- [ ] Theme system persists across devices
+- [ ] Per-page theme overrides work correctly
+- [ ] Live preview shows changes in real-time
+
+**Theme System:**
+- [ ] Users can select from 8 predefined themes
+- [ ] Advanced Mode users can customize 100+ CSS variables
+- [ ] Full CSS editor with syntax highlighting functional
+- [ ] Users can publish and share themes
+- [ ] Public theme browser displays community themes
+- [ ] One-click theme installation works
+- [ ] Theme ratings and reviews functional
+- [ ] All theme features remain free in Phase 2
 
 **User Engagement:**
 - [ ] 30% of users have purchased coins
@@ -754,12 +903,16 @@
 - [ ] 50% of users have earned karma
 - [ ] Voice/video calls happen regularly
 - [ ] Invitation rate increases with reward system
+- [ ] 40% of users customize their theme beyond defaults
+- [ ] 10% of users publish themes to community
+- [ ] Average user installs 2-3 community themes
 
 **Revenue (if 1000 active users):**
 - [ ] $500-1000/month from coin purchases
 - [ ] Covers hosting costs
 - [ ] Some profit for continued development
+- [ ] Foundation built for Phase 3 marketplace revenue
 
 ---
 
-**Phase 2 transforms the platform from functional MVP to feature-rich social platform.**
+**Phase 2 transforms the platform from functional MVP to feature-rich, highly customizable social platform with MySpace-level personalization.**
