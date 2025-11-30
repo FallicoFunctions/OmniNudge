@@ -1,8 +1,124 @@
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { redditService } from '../services/redditService';
 import { api } from '../lib/api';
+
+interface RedditComment {
+  kind: string;
+  data: {
+    id: string;
+    author: string;
+    body?: string;
+    body_html?: string;
+    created_utc: number;
+    score: number;
+    replies?: {
+      kind: string;
+      data: {
+        children: RedditComment[];
+      };
+    } | string;
+    depth?: number;
+  };
+}
+
+interface RedditPostData {
+  id: string;
+  title: string;
+  author: string;
+  subreddit: string;
+  created_utc: number;
+  score: number;
+  num_comments: number;
+  url?: string;
+  selftext?: string;
+  selftext_html?: string;
+  thumbnail?: string;
+  preview?: any;
+  is_self: boolean;
+  post_hint?: string;
+}
+
+interface LocalComment {
+  id: number;
+  username: string;
+  content: string;
+  created_at: string;
+  parent_comment_id: number | null;
+}
+
+// Helper function to decode HTML entities and strip tags
+function decodeHtml(html: string): string {
+  const txt = document.createElement('textarea');
+  txt.innerHTML = html;
+  const decoded = txt.value;
+  // Strip HTML tags but preserve line breaks
+  return decoded.replace(/<[^>]*>/g, '').trim();
+}
+
+
+// Component to render a single Reddit comment with replies
+function RedditCommentView({ comment, depth = 0 }: { comment: RedditComment; depth?: number }) {
+  if (comment.kind === 'more') return null;
+  if (!comment.data || !comment.data.body) return null;
+
+  const [collapsed, setCollapsed] = useState(false);
+  const hasReplies = comment.data.replies && typeof comment.data.replies !== 'string';
+  const replies = hasReplies ? (comment.data.replies as any).data.children : [];
+
+  return (
+    <div className={`${depth > 0 ? 'ml-4 border-l-2 border-[var(--color-border)] pl-4' : ''}`}>
+      <div className="mb-2">
+        <div className="flex items-center gap-2 text-xs text-[var(--color-text-secondary)]">
+          <button
+            onClick={() => setCollapsed(!collapsed)}
+            className="font-semibold hover:underline"
+          >
+            {comment.data.author}
+          </button>
+          <span>•</span>
+          <span>{comment.data.score} points</span>
+          <span>•</span>
+          <span>
+            {new Date(comment.data.created_utc * 1000).toLocaleString('en-US', {
+              month: 'short',
+              day: 'numeric',
+              hour: 'numeric',
+              minute: '2-digit',
+            })}
+          </span>
+          {hasReplies && (
+            <>
+              <span>•</span>
+              <button
+                onClick={() => setCollapsed(!collapsed)}
+                className="text-[var(--color-primary)] hover:underline"
+              >
+                {collapsed ? '[+]' : '[-]'}
+              </button>
+            </>
+          )}
+        </div>
+
+        {!collapsed && (
+          <>
+            <div className="mt-1 text-sm text-[var(--color-text-primary)] whitespace-pre-wrap">
+              {decodeHtml(comment.data.body_html || comment.data.body || '')}
+            </div>
+
+            {hasReplies && (
+              <div className="mt-3">
+                {replies.map((reply: RedditComment, index: number) => (
+                  <RedditCommentView key={reply.data?.id || index} comment={reply} depth={depth + 1} />
+                ))}
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
 
 export default function RedditPostPage() {
   const { subreddit, postId } = useParams<{ subreddit: string; postId: string }>();
@@ -11,10 +127,20 @@ export default function RedditPostPage() {
   const [commentText, setCommentText] = useState('');
   const [replyingTo, setReplyingTo] = useState<number | null>(null);
 
-  // Fetch Reddit post comments from Reddit API
-  const { data: redditComments, isLoading: loadingReddit } = useQuery({
-    queryKey: ['reddit', 'comments', subreddit, postId],
-    queryFn: () => redditService.getPostComments(subreddit!, postId!),
+  // Fetch Reddit post and comments from Reddit API
+  const { data: redditData, isLoading: loadingReddit } = useQuery({
+    queryKey: ['reddit', 'post', subreddit, postId],
+    queryFn: async () => {
+      const response = await api.get<any>(`/reddit/r/${subreddit}/comments/${postId}`);
+      // Reddit API returns [postListing, commentsListing]
+      const postListing = response[0];
+      const commentsListing = response[1];
+
+      const post: RedditPostData = postListing.data.children[0]?.data;
+      const comments: RedditComment[] = commentsListing.data.children || [];
+
+      return { post, comments };
+    },
     enabled: !!subreddit && !!postId,
   });
 
@@ -22,7 +148,7 @@ export default function RedditPostPage() {
   const { data: localCommentsData, isLoading: loadingLocal } = useQuery({
     queryKey: ['reddit', 'posts', subreddit, postId, 'localComments'],
     queryFn: async () => {
-      const response = await api.get<{ comments: any[] }>(
+      const response = await api.get<{ comments: LocalComment[] }>(
         `/reddit/posts/${subreddit}/${postId}/comments`
       );
       return response.comments || [];
@@ -58,6 +184,17 @@ export default function RedditPostPage() {
     );
   }
 
+  if (loadingReddit) {
+    return (
+      <div className="mx-auto max-w-4xl px-4 py-8">
+        <div className="text-[var(--color-text-secondary)]">Loading post...</div>
+      </div>
+    );
+  }
+
+  const post = redditData?.post;
+  const redditComments = redditData?.comments || [];
+
   return (
     <div className="mx-auto max-w-4xl px-4 py-8">
       {/* Back Button */}
@@ -69,29 +206,68 @@ export default function RedditPostPage() {
       </button>
 
       {/* Post Content Section */}
-      <div className="mb-6 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-6">
-        <div className="mb-4">
-          <h1 className="text-2xl font-bold text-[var(--color-text-primary)]">
-            Reddit Post from r/{subreddit}
-          </h1>
-          <p className="mt-2 text-sm text-[var(--color-text-secondary)]">
-            Post ID: {postId}
-          </p>
-        </div>
+      {post && (
+        <div className="mb-6 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-6">
+          {/* Post Header */}
+          <div className="mb-4">
+            <div className="mb-2 text-xs text-[var(--color-text-secondary)]">
+              r/{post.subreddit} • Posted by u/{post.author} •{' '}
+              {new Date(post.created_utc * 1000).toLocaleString()}
+            </div>
+            <h1 className="text-2xl font-bold text-[var(--color-text-primary)]">
+              {post.title}
+            </h1>
+          </div>
 
-        {/* Note about Reddit comments vs local comments */}
-        <div className="mb-4 rounded-md border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800 dark:border-blue-800 dark:bg-blue-900/20 dark:text-blue-300">
-          <strong>Note:</strong> This page shows the Reddit post content. Comments you see below
-          are from Reddit. Any comments you add here are <strong>only visible on this site</strong>{' '}
-          and will not appear on Reddit.
+          {/* Post Media/Content */}
+          {post.post_hint === 'image' && post.url && (
+            <div className="mb-4">
+              <img
+                src={post.url}
+                alt={post.title}
+                className="max-h-[600px] w-full rounded object-contain"
+              />
+            </div>
+          )}
+
+          {post.is_self && post.selftext && (
+            <div className="mb-4 text-sm text-[var(--color-text-primary)] whitespace-pre-wrap">
+              {decodeHtml(post.selftext_html || post.selftext)}
+            </div>
+          )}
+
+          {!post.is_self && post.url && post.post_hint !== 'image' && (
+            <div className="mb-4">
+              <a
+                href={post.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm text-[var(--color-primary)] hover:underline"
+              >
+                {post.url} ↗
+              </a>
+            </div>
+          )}
+
+          {/* Post Stats */}
+          <div className="flex gap-4 text-xs text-[var(--color-text-secondary)]">
+            <span>{post.score} points</span>
+            <span>•</span>
+            <span>{post.num_comments} comments</span>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Local Comments Section (Comments made on your platform) */}
       <div className="mb-8 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-6">
         <h2 className="mb-4 text-xl font-semibold text-[var(--color-text-primary)]">
           Community Discussion (Site-Only)
         </h2>
+
+        <div className="mb-4 rounded-md border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800 dark:border-blue-800 dark:bg-blue-900/20 dark:text-blue-300">
+          <strong>Note:</strong> Comments you add here are <strong>only visible on this site</strong>{' '}
+          and will not appear on Reddit.
+        </div>
 
         {/* Comment Form */}
         <form onSubmit={handleSubmitComment} className="mb-6">
@@ -124,7 +300,7 @@ export default function RedditPostPage() {
 
         {localCommentsData && localCommentsData.length > 0 && (
           <div className="space-y-4">
-            {localCommentsData.map((comment: any) => (
+            {localCommentsData.map((comment) => (
               <div
                 key={comment.id}
                 className="rounded border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-3"
@@ -161,19 +337,8 @@ export default function RedditPostPage() {
 
         {redditComments && redditComments.length > 0 && (
           <div className="space-y-4">
-            {redditComments.map((comment) => (
-              <div
-                key={comment.id}
-                className="rounded border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-3"
-              >
-                <div className="text-xs text-[var(--color-text-secondary)]">
-                  u/{comment.author} on Reddit • {comment.score} points •{' '}
-                  {new Date(comment.created_utc * 1000).toLocaleString()}
-                </div>
-                <div className="mt-2 text-sm text-[var(--color-text-primary)]">
-                  {comment.body}
-                </div>
-              </div>
+            {redditComments.map((comment, index) => (
+              <RedditCommentView key={comment.data?.id || index} comment={comment} />
             ))}
           </div>
         )}
