@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { postsService } from '../services/postsService';
+import { savedService } from '../services/savedService';
 import type { CreatePostRequest } from '../types/posts';
 
 export default function PostsPage() {
@@ -14,6 +15,16 @@ export default function PostsPage() {
     queryKey: ['posts', 'feed'],
     queryFn: () => postsService.getFeed(),
   });
+
+  const savedPostsKey = ['saved-items', 'posts'] as const;
+  const { data: savedPostsData } = useQuery({
+    queryKey: savedPostsKey,
+    queryFn: () => savedService.getSavedItems('posts'),
+  });
+  const savedPostIds = useMemo(
+    () => new Set(savedPostsData?.saved_posts?.map((post) => post.id) ?? []),
+    [savedPostsData]
+  );
 
   const createPostMutation = useMutation({
     mutationFn: (newPost: CreatePostRequest) => postsService.createPost(newPost),
@@ -33,6 +44,18 @@ export default function PostsPage() {
       queryClient.invalidateQueries({ queryKey: ['posts', 'feed'] });
     },
   });
+
+  const savePostMutation = useMutation({
+    mutationFn: ({ postId, shouldSave }: { postId: number; shouldSave: boolean }) =>
+      shouldSave ? savedService.savePost(postId) : savedService.unsavePost(postId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: savedPostsKey });
+    },
+  });
+
+  const handleToggleSave = (postId: number, currentlySaved: boolean) => {
+    savePostMutation.mutate({ postId, shouldSave: !currentlySaved });
+  };
 
   const handleCreatePost = (e: React.FormEvent) => {
     e.preventDefault();
@@ -201,7 +224,13 @@ export default function PostsPage() {
                   <div className="mt-3 flex gap-4 text-xs text-[var(--color-text-secondary)]">
                     <span>{post.comment_count} comments</span>
                     <button className="hover:text-[var(--color-primary)]">Share</button>
-                    <button className="hover:text-[var(--color-primary)]">Save</button>
+                    <button
+                      onClick={() => handleToggleSave(post.id, savedPostIds.has(post.id))}
+                      disabled={savePostMutation.isPending}
+                      className={`hover:text-[var(--color-primary)] ${savedPostIds.has(post.id) ? 'text-[var(--color-primary)] font-semibold' : ''} disabled:opacity-50`}
+                    >
+                      {savedPostIds.has(post.id) ? 'Saved' : 'Save'}
+                    </button>
                     <button
                       onClick={() => {
                         // TODO: Implement report modal/form

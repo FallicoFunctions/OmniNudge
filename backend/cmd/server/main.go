@@ -9,6 +9,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/gin-gonic/gin"
 	"github.com/omninudge/backend/internal/api/middleware"
 	"github.com/omninudge/backend/internal/config"
 	"github.com/omninudge/backend/internal/database"
@@ -17,7 +18,6 @@ import (
 	"github.com/omninudge/backend/internal/services"
 	"github.com/omninudge/backend/internal/websocket"
 	"github.com/omninudge/backend/internal/workers"
-	"github.com/gin-gonic/gin"
 )
 
 func main() {
@@ -65,6 +65,7 @@ func main() {
 	themeOverrideRepo := models.NewUserThemeOverrideRepository(db.Pool)
 	installedThemeRepo := models.NewUserInstalledThemeRepository(db.Pool)
 	redditCommentRepo := models.NewRedditPostCommentRepository(db.Pool)
+	savedItemsRepo := models.NewSavedItemsRepository(db.Pool)
 
 	// Initialize WebSocket hub
 	hub := websocket.NewHub()
@@ -130,6 +131,7 @@ func main() {
 	userStatusHandler := handlers.NewUserStatusHandler(hub)
 	themesHandler := handlers.NewThemesHandler(themeRepo, themeOverrideRepo, installedThemeRepo, userSettingsRepo, cssSanitizer)
 	redditCommentsHandler := handlers.NewRedditCommentsHandler(redditCommentRepo)
+	savedItemsHandler := handlers.NewSavedItemsHandler(savedItemsRepo, postRepo, redditCommentRepo)
 
 	// Inject notification service into handlers
 	postsHandler.SetNotificationService(notificationService)
@@ -247,6 +249,7 @@ func main() {
 
 			protected.GET("/settings", settingsHandler.GetSettings)
 			protected.PUT("/settings", settingsHandler.UpdateSettings)
+			protected.GET("/users/me/saved", savedItemsHandler.GetSavedItems)
 
 			// Theme customization routes with rate limiting
 			themeCreationLimiter := middleware.ThemeCreationRateLimiter()
@@ -289,6 +292,8 @@ func main() {
 			protected.PUT("/posts/:id", postsHandler.UpdatePost)
 			protected.DELETE("/posts/:id", postsHandler.DeletePost)
 			protected.POST("/posts/:id/vote", postsHandler.VotePost)
+			protected.POST("/posts/:id/save", savedItemsHandler.SavePost)
+			protected.DELETE("/posts/:id/save", savedItemsHandler.UnsavePost)
 
 			// Protected comments routes (auth required for creating/editing)
 			protected.POST("/posts/:id/comments", commentsHandler.CreateComment)
@@ -298,7 +303,12 @@ func main() {
 
 			// Protected Reddit post comments routes (site-only comments on Reddit posts)
 			protected.POST("/reddit/posts/:subreddit/:postId/comments", redditCommentsHandler.CreateRedditPostComment)
-		protected.POST("/reddit/posts/:subreddit/:postId/comments/:commentId/vote", redditCommentsHandler.VoteRedditPostComment)
+			protected.PUT("/reddit/posts/:subreddit/:postId/comments/:commentId", redditCommentsHandler.UpdateRedditPostComment)
+			protected.DELETE("/reddit/posts/:subreddit/:postId/comments/:commentId", redditCommentsHandler.DeleteRedditPostComment)
+			protected.POST("/reddit/posts/:subreddit/:postId/comments/:commentId/preferences", redditCommentsHandler.UpdateRedditPostCommentPreferences)
+			protected.POST("/reddit/posts/:subreddit/:postId/comments/:commentId/vote", redditCommentsHandler.VoteRedditPostComment)
+			protected.POST("/reddit/posts/:subreddit/:postId/comments/:commentId/save", savedItemsHandler.SaveRedditComment)
+			protected.DELETE("/reddit/posts/:subreddit/:postId/comments/:commentId/save", savedItemsHandler.UnsaveRedditComment)
 
 			// Protected hub creation
 			protected.POST("/hubs", hubsHandler.Create)

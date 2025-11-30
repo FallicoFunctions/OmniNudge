@@ -3,6 +3,7 @@ package handlers
 import (
 	"fmt"
 	"net/http"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/omninudge/backend/internal/models"
@@ -142,6 +143,161 @@ func (h *RedditCommentsHandler) CreateRedditPostComment(c *gin.Context) {
 	fullComment.UserVote = intPtr(1)
 
 	c.JSON(http.StatusCreated, fullComment)
+}
+
+// UpdateRedditCommentRequest represents payload for editing site-only Reddit comments
+type UpdateRedditCommentRequest struct {
+	Content string `json:"content" binding:"required,min=1"`
+}
+
+// UpdateRedditPostComment allows users to edit their site-only Reddit comments
+func (h *RedditCommentsHandler) UpdateRedditPostComment(c *gin.Context) {
+	userID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
+
+	commentID, err := strconv.Atoi(c.Param("commentId"))
+	if err != nil || commentID <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid comment ID"})
+		return
+	}
+
+	comment, err := h.redditCommentRepo.GetByID(c.Request.Context(), commentID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch comment", "details": err.Error()})
+		return
+	}
+
+	if comment == nil || comment.DeletedAt != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Comment not found"})
+		return
+	}
+
+	if comment.Subreddit != c.Param("subreddit") || comment.RedditPostID != c.Param("postId") {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Comment does not belong to this Reddit post"})
+		return
+	}
+
+	if comment.UserID != userID.(int) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "You can only edit your own comments"})
+		return
+	}
+
+	var req UpdateRedditCommentRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body", "details": err.Error()})
+		return
+	}
+
+	if err := h.redditCommentRepo.Update(c.Request.Context(), commentID, req.Content); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update comment", "details": err.Error()})
+		return
+	}
+
+	updated, err := h.redditCommentRepo.GetByID(c.Request.Context(), commentID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load updated comment", "details": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, updated)
+}
+
+// DeleteRedditPostComment handles DELETE requests for user comments
+func (h *RedditCommentsHandler) DeleteRedditPostComment(c *gin.Context) {
+	userID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
+
+	commentID, err := strconv.Atoi(c.Param("commentId"))
+	if err != nil || commentID <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid comment ID"})
+		return
+	}
+
+	comment, err := h.redditCommentRepo.GetByID(c.Request.Context(), commentID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch comment", "details": err.Error()})
+		return
+	}
+	if comment == nil || comment.DeletedAt != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Comment not found"})
+		return
+	}
+
+	if comment.Subreddit != c.Param("subreddit") || comment.RedditPostID != c.Param("postId") {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Comment does not belong to this Reddit post"})
+		return
+	}
+
+	if comment.UserID != userID.(int) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "You can only delete your own comments"})
+		return
+	}
+
+	if err := h.redditCommentRepo.Delete(c.Request.Context(), commentID); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete comment", "details": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"deleted": true})
+}
+
+// UpdateRedditCommentPreferencesRequest toggles inbox reply notifications
+type UpdateRedditCommentPreferencesRequest struct {
+	DisableInboxReplies bool `json:"disable_inbox_replies"`
+}
+
+// UpdateRedditPostCommentPreferences handles preference changes for a comment
+func (h *RedditCommentsHandler) UpdateRedditPostCommentPreferences(c *gin.Context) {
+	userID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
+
+	commentID, err := strconv.Atoi(c.Param("commentId"))
+	if err != nil || commentID <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid comment ID"})
+		return
+	}
+
+	comment, err := h.redditCommentRepo.GetByID(c.Request.Context(), commentID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch comment", "details": err.Error()})
+		return
+	}
+	if comment == nil || comment.DeletedAt != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Comment not found"})
+		return
+	}
+
+	if comment.Subreddit != c.Param("subreddit") || comment.RedditPostID != c.Param("postId") {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Comment does not belong to this Reddit post"})
+		return
+	}
+
+	if comment.UserID != userID.(int) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "You can only update your own comments"})
+		return
+	}
+
+	var req UpdateRedditCommentPreferencesRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body", "details": err.Error()})
+		return
+	}
+
+	if err := h.redditCommentRepo.SetInboxRepliesDisabled(c.Request.Context(), commentID, userID.(int), req.DisableInboxReplies); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update preferences", "details": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"disable_inbox_replies": req.DisableInboxReplies})
 }
 
 // VoteRedditCommentRequest represents the request body for voting on a comment
