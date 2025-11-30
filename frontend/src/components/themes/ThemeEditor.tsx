@@ -44,6 +44,7 @@ const ThemeEditor = ({ isOpen, onClose, initialTheme = null }: ThemeEditorProps)
 
   const [currentStep, setCurrentStep] = useState(0);
   const [selectedBaseThemeId, setSelectedBaseThemeId] = useState<number | null>(null);
+  const [startFromScratch, setStartFromScratch] = useState(false);
   const [themeName, setThemeName] = useState('');
   const [themeDescription, setThemeDescription] = useState('');
   const [cssVariables, setCssVariables] = useState<Record<string, string>>(cloneVariables());
@@ -53,6 +54,7 @@ const ThemeEditor = ({ isOpen, onClose, initialTheme = null }: ThemeEditorProps)
   const [setAsActive, setSetAsActive] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [statusMessage, setStatusMessage] = useState<{ type: 'success'; text: string } | null>(null);
   const [infoErrors, setInfoErrors] = useState<{ name?: string; description?: string }>({});
   const [variableErrors, setVariableErrors] = useState<Record<string, string>>({});
 
@@ -65,6 +67,7 @@ const ThemeEditor = ({ isOpen, onClose, initialTheme = null }: ThemeEditorProps)
     if (!isOpen) return;
     if (initialTheme) {
       setSelectedBaseThemeId(initialTheme.id);
+      setStartFromScratch(false);
       setThemeName(initialTheme.theme_name);
       setThemeDescription(initialTheme.theme_description ?? '');
       setCssVariables(cloneVariables(initialTheme.css_variables));
@@ -72,6 +75,7 @@ const ThemeEditor = ({ isOpen, onClose, initialTheme = null }: ThemeEditorProps)
     } else {
       const firstTheme = predefinedThemes[0] ?? availableThemes[0] ?? null;
       setSelectedBaseThemeId(firstTheme?.id ?? null);
+      setStartFromScratch(!firstTheme);
       setThemeName('');
       setThemeDescription('');
       setCssVariables(cloneVariables(firstTheme?.css_variables));
@@ -81,6 +85,7 @@ const ThemeEditor = ({ isOpen, onClose, initialTheme = null }: ThemeEditorProps)
     setError(null);
     setInfoErrors({});
     setVariableErrors({});
+    setStatusMessage(null);
   }, [initialTheme, isOpen, predefinedThemes, availableThemes]);
 
   if (!isOpen) {
@@ -102,9 +107,17 @@ const ThemeEditor = ({ isOpen, onClose, initialTheme = null }: ThemeEditorProps)
 
   const handleBaseThemeSelect = (themeId: number) => {
     if (initialTheme) return;
+    setStartFromScratch(false);
     setSelectedBaseThemeId(themeId);
     const baseTheme = availableThemes.find((theme) => theme.id === themeId);
     setCssVariables(cloneVariables(baseTheme?.css_variables));
+  };
+
+  const handleStartFromScratch = () => {
+    if (initialTheme) return;
+    setStartFromScratch(true);
+    setSelectedBaseThemeId(null);
+    setCssVariables(cloneVariables({}));
   };
 
   const setVariableError = (variableName: string, message?: string) => {
@@ -253,8 +266,8 @@ const ThemeEditor = ({ isOpen, onClose, initialTheme = null }: ThemeEditorProps)
 
   const validateStep = () => {
     const stepId = steps[currentStep].id;
-    if (stepId === 'base' && !selectedBaseThemeId) {
-      setError('Please choose a base theme to continue.');
+    if (stepId === 'base' && !startFromScratch && !selectedBaseThemeId) {
+      setError('Please choose a base theme or start from scratch to continue.');
       return false;
     }
 
@@ -317,7 +330,14 @@ const ThemeEditor = ({ isOpen, onClose, initialTheme = null }: ThemeEditorProps)
       if (setAsActive) {
         await selectTheme(result);
       }
-      onClose();
+      setStatusMessage({
+        type: 'success',
+        text: initialTheme ? 'Theme updated successfully!' : 'Theme created successfully!',
+      });
+      setTimeout(() => {
+        setStatusMessage(null);
+        onClose();
+      }, 900);
     } catch (submitError) {
       const message =
         submitError instanceof Error ? submitError.message : 'Unable to save theme.';
@@ -334,9 +354,28 @@ const ThemeEditor = ({ isOpen, onClose, initialTheme = null }: ThemeEditorProps)
         return (
           <div className="space-y-4">
             <p className="text-sm text-[var(--color-text-secondary)]">
-              Choose a predefined theme as your starting point. You can tweak every value later.
+              Choose a predefined theme as your starting point or begin from a clean slate. You can tweak
+              every value later.
             </p>
             <div className="grid gap-4 md:grid-cols-2">
+              {!initialTheme && (
+                <button
+                  type="button"
+                  className={`rounded-xl border p-4 text-left transition ${
+                    startFromScratch
+                      ? 'border-[var(--color-primary)] bg-[var(--color-primary)]/5'
+                      : 'border-[var(--color-border)] hover:border-[var(--color-primary)]/60'
+                  }`}
+                  onClick={handleStartFromScratch}
+                >
+                  <p className="text-base font-semibold text-[var(--color-text-primary)]">
+                    Start from Scratch
+                  </p>
+                  <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+                    Apply default variables and customize everything yourself.
+                  </p>
+                </button>
+              )}
               {availableThemes.map((theme) => {
                 const isSelected = selectedBaseThemeId === theme.id;
                 return (
@@ -551,6 +590,11 @@ const ThemeEditor = ({ isOpen, onClose, initialTheme = null }: ThemeEditorProps)
           </div>
 
           <div className="flex-1 overflow-y-auto px-6 py-4">
+            {statusMessage && (
+              <p className="mb-4 rounded-lg bg-green-50 px-4 py-3 text-sm text-green-700" role="alert">
+                {statusMessage.text}
+              </p>
+            )}
             {error && (
               <p className="mb-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-600" role="alert">
                 {error}
