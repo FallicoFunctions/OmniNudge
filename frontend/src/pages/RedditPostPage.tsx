@@ -52,22 +52,6 @@ interface LocalComment {
   parent_comment_id: number | null;
 }
 
-// Helper function to decode HTML entities and strip tags
-function decodeHtml(html: string): string {
-  // First decode HTML entities
-  const textarea = document.createElement('textarea');
-  textarea.innerHTML = html;
-  let decoded = textarea.value;
-  
-  // Remove HTML tags
-  decoded = decoded.replace(/<[^>]+>/g, '');
-  
-  // Clean up spacing - normalize multiple newlines
-  decoded = decoded.replace(/\n{3,}/g, '\n\n');
-  
-  return decoded.trim();
-}
-
 
 // Component to render a single Reddit comment with replies
 function RedditCommentView({ comment, depth = 0 }: { comment: RedditComment; depth?: number }) {
@@ -120,7 +104,7 @@ function RedditCommentView({ comment, depth = 0 }: { comment: RedditComment; dep
         {!collapsed && (
           <>
             <div className="mt-1 text-sm text-[var(--color-text-primary)] text-left leading-normal">
-              {decodeHtml(comment.data.body_html || comment.data.body || '').split('\n\n').map((paragraph, i, arr) => (
+              {comment.data.body || ''.split('\n\n').map((paragraph, i, arr) => (
                 <p key={i} className={i < arr.length - 1 ? 'mb-3' : ''}>
                   {paragraph.split('\n').map((line, j, lineArr) => (
                     <span key={j}>
@@ -260,7 +244,7 @@ export default function RedditPostPage() {
 
           {post.is_self && post.selftext && (
             <div className="mb-4 text-sm text-[var(--color-text-primary)] text-left leading-normal">
-              {decodeHtml(post.selftext_html || post.selftext).split('\n\n').map((paragraph, i, arr) => (
+              {post.selftext.split('\n\n').map((paragraph, i, arr) => (
                 <p key={i} className={i < arr.length - 1 ? 'mb-3' : ''}>
                   {paragraph.split('\n').map((line, j, lineArr) => (
                     <span key={j}>
