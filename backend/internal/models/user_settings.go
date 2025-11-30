@@ -30,6 +30,10 @@ type UserSettings struct {
 	// Media gallery preferences
 	MediaGalleryFilter string `json:"media_gallery_filter"` // 'all', 'mine', 'theirs'
 
+	// Theme customization preferences (Phase 2)
+	ActiveThemeID       *int `json:"active_theme_id,omitempty"`
+	AdvancedModeEnabled bool `json:"advanced_mode_enabled"`
+
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
@@ -50,7 +54,7 @@ func (r *UserSettingsRepository) GetByUserID(ctx context.Context, userID int) (*
 		       auto_append_invitation, theme,
 		       notify_comment_replies, notify_post_milestone, notify_post_velocity,
 		       notify_comment_milestone, notify_comment_velocity, daily_digest,
-		       media_gallery_filter, updated_at
+		       media_gallery_filter, active_theme_id, advanced_mode_enabled, updated_at
 		FROM user_settings
 		WHERE user_id = $1
 	`
@@ -70,6 +74,8 @@ func (r *UserSettingsRepository) GetByUserID(ctx context.Context, userID int) (*
 		&settings.NotifyCommentVelocity,
 		&settings.DailyDigest,
 		&settings.MediaGalleryFilter,
+		&settings.ActiveThemeID,
+		&settings.AdvancedModeEnabled,
 		&settings.UpdatedAt,
 	)
 	if err != nil {
@@ -92,7 +98,7 @@ func (r *UserSettingsRepository) CreateDefault(ctx context.Context, userID int) 
 		          auto_append_invitation, theme,
 		          notify_comment_replies, notify_post_milestone, notify_post_velocity,
 		          notify_comment_milestone, notify_comment_velocity, daily_digest,
-		          media_gallery_filter, updated_at
+		          media_gallery_filter, active_theme_id, advanced_mode_enabled, updated_at
 	`
 
 	settings := &UserSettings{}
@@ -110,6 +116,8 @@ func (r *UserSettingsRepository) CreateDefault(ctx context.Context, userID int) 
 		&settings.NotifyCommentVelocity,
 		&settings.DailyDigest,
 		&settings.MediaGalleryFilter,
+		&settings.ActiveThemeID,
+		&settings.AdvancedModeEnabled,
 		&settings.UpdatedAt,
 	)
 
@@ -140,13 +148,15 @@ func (r *UserSettingsRepository) Update(ctx context.Context, settings *UserSetti
 		    notify_comment_velocity = $11,
 		    daily_digest = $12,
 		    media_gallery_filter = $13,
+		    active_theme_id = $14,
+		    advanced_mode_enabled = $15,
 		    updated_at = CURRENT_TIMESTAMP
 		WHERE user_id = $1
 		RETURNING user_id, notification_sound, show_read_receipts, show_typing_indicators,
 		          auto_append_invitation, theme,
 		          notify_comment_replies, notify_post_milestone, notify_post_velocity,
 		          notify_comment_milestone, notify_comment_velocity, daily_digest,
-		          media_gallery_filter, updated_at
+		          media_gallery_filter, active_theme_id, advanced_mode_enabled, updated_at
 	`
 
 	updated := &UserSettings{}
@@ -164,6 +174,8 @@ func (r *UserSettingsRepository) Update(ctx context.Context, settings *UserSetti
 		settings.NotifyCommentVelocity,
 		settings.DailyDigest,
 		settings.MediaGalleryFilter,
+		settings.ActiveThemeID,
+		settings.AdvancedModeEnabled,
 	).Scan(
 		&updated.UserID,
 		&updated.NotificationSound,
@@ -178,6 +190,8 @@ func (r *UserSettingsRepository) Update(ctx context.Context, settings *UserSetti
 		&updated.NotifyCommentVelocity,
 		&updated.DailyDigest,
 		&updated.MediaGalleryFilter,
+		&updated.ActiveThemeID,
+		&updated.AdvancedModeEnabled,
 		&updated.UpdatedAt,
 	)
 	if err != nil {
