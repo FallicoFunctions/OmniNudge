@@ -239,7 +239,14 @@ const ThemeEditor = ({ isOpen, onClose, initialTheme = null }: ThemeEditorProps)
     if (definition?.type === 'color') {
       return normalizeHexColor(value);
     }
-    return value.trim();
+    const trimmed = value.trim();
+    if (definition?.type === 'size') {
+      const match = trimmed.match(/^(-?\d+(?:\.\d+)?)(px|rem|em|%)$/i);
+      if (match) {
+        return `${Number.parseFloat(match[1]).toString()}${match[2].toLowerCase()}`;
+      }
+    }
+    return trimmed;
   };
 
   const handleUndo = useCallback(() => {
