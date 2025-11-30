@@ -1,12 +1,13 @@
-import { useRef, useState } from 'react';
+import { Suspense, lazy, useRef, useState } from 'react';
 import ThemeSelector from './components/themes/ThemeSelector';
-import ThemeGallery from './components/themes/ThemeGallery';
-import ThemeEditor from './components/themes/ThemeEditor';
 import ThemePreview from './components/themes/ThemePreview';
 import ThemeSettingsSection from './components/settings/ThemeSettingsSection';
 import { useTheme } from './hooks/useTheme';
 import type { UserTheme } from './types/theme';
 import './App.css';
+
+const ThemeGallery = lazy(() => import('./components/themes/ThemeGallery'));
+const ThemeEditor = lazy(() => import('./components/themes/ThemeEditor'));
 
 function App() {
   const { activeTheme, isLoading, cssVariables } = useTheme();
@@ -119,7 +120,15 @@ function App() {
         </section>
 
         <div ref={galleryRef}>
-          <ThemeGallery onCreateNewTheme={handleOpenCreate} onEditTheme={handleEditTheme} />
+          <Suspense
+            fallback={
+              <section className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6 text-sm text-[var(--color-text-secondary)]">
+                Loading gallery…
+              </section>
+            }
+          >
+            <ThemeGallery onCreateNewTheme={handleOpenCreate} onEditTheme={handleEditTheme} />
+          </Suspense>
         </div>
 
         <section className="rounded-2xl border border-dashed border-[var(--color-border)] bg-[var(--color-surface)] p-6">
@@ -149,11 +158,19 @@ function App() {
         </section>
       </main>
       {isEditorOpen && (
-        <ThemeEditor
-          isOpen={isEditorOpen}
-          onClose={handleCloseEditor}
-          initialTheme={editingTheme}
-        />
+        <Suspense
+          fallback={
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 text-white">
+              Loading editor…
+            </div>
+          }
+        >
+          <ThemeEditor
+            isOpen={isEditorOpen}
+            onClose={handleCloseEditor}
+            initialTheme={editingTheme}
+          />
+        </Suspense>
       )}
     </div>
   );
