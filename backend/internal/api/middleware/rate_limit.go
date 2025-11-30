@@ -83,3 +83,25 @@ func UploadRateLimiter() *RateLimiter {
 	// 10 uploads per minute with burst of 3 (allows small bursts)
 	return NewRateLimiter(rate.Limit(10.0/60.0), 3)
 }
+
+// ThemeCreationRateLimiter creates a rate limiter for theme creation/updates
+// Allows 10 theme saves per hour (10 requests / 3600 seconds = ~0.00278 requests/second)
+func ThemeCreationRateLimiter() *RateLimiter {
+	// 10 theme saves per hour with burst of 2
+	return NewRateLimiter(rate.Limit(10.0/3600.0), 2)
+}
+
+// ThemePreviewRateLimiter creates a rate limiter for theme previews
+// Allows 50 previews per hour (50 requests / 3600 seconds = ~0.0139 requests/second)
+// This is more permissive since previews are read-only operations
+func ThemePreviewRateLimiter() *RateLimiter {
+	// 50 previews per hour with burst of 10
+	return NewRateLimiter(rate.Limit(50.0/3600.0), 10)
+}
+
+// GeneralAPIRateLimiter creates a general rate limiter for standard API operations
+// Allows 100 requests per minute (100 requests / 60 seconds = ~1.67 requests/second)
+func GeneralAPIRateLimiter() *RateLimiter {
+	// 100 requests per minute with burst of 20
+	return NewRateLimiter(rate.Limit(100.0/60.0), 20)
+}

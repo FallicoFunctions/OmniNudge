@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -37,6 +38,82 @@ func NewThemesHandler(
 }
 
 // ============================================================================
+// Validation Helpers
+// ============================================================================
+
+// validThemeTypes are the allowed theme types
+var validThemeTypes = map[string]bool{
+	"predefined":             true,
+	"variable_customization": true,
+	"full_css":               true,
+}
+
+// validScopeTypes are the allowed scope types
+var validScopeTypes = map[string]bool{
+	"global":   true,
+	"per_page": true,
+}
+
+// validPageNames are the allowed page names for overrides
+var validPageNames = map[string]bool{
+	"feed":          true,
+	"profile":       true,
+	"settings":      true,
+	"messages":      true,
+	"notifications": true,
+	"search":        true,
+}
+
+// validateThemeName validates a theme name
+func (h *ThemesHandler) validateThemeName(name string) error {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return gin.Error{Err: nil, Type: gin.ErrorTypeBind, Meta: "Theme name cannot be empty"}
+	}
+	if len(name) > 100 {
+		return gin.Error{Err: nil, Type: gin.ErrorTypeBind, Meta: "Theme name must be 100 characters or less"}
+	}
+	return nil
+}
+
+// validateCSSVariables validates CSS variable map
+func (h *ThemesHandler) validateCSSVariables(vars map[string]interface{}) error {
+	if vars == nil {
+		return nil
+	}
+	// Basic validation - check for reasonable size
+	if len(vars) > 200 {
+		return gin.Error{Err: nil, Type: gin.ErrorTypeBind, Meta: "Too many CSS variables (max 200)"}
+	}
+	// Validate each key/value pair
+	for key, value := range vars {
+		// Keys should be valid CSS variable names (lowercase, hyphens)
+		if !isValidCSSVariableName(key) {
+			return gin.Error{Err: nil, Type: gin.ErrorTypeBind, Meta: "Invalid CSS variable name: " + key}
+		}
+		// Values should be strings
+		if _, ok := value.(string); !ok {
+			return gin.Error{Err: nil, Type: gin.ErrorTypeBind, Meta: "CSS variable values must be strings"}
+		}
+	}
+	return nil
+}
+
+// isValidCSSVariableName checks if a CSS variable name is valid
+func isValidCSSVariableName(name string) bool {
+	if len(name) == 0 || len(name) > 100 {
+		return false
+	}
+	// CSS variable names should only contain lowercase letters, numbers, and hyphens
+	for _, char := range name {
+		if !((char >= 'a' && char <= 'z') || (char >= '0' && char <= '9') || char == '-') {
+			return false
+		}
+	}
+	return true
+}
+
+// ============================================================================
 // Theme CRUD Operations
 // ============================================================================
 
@@ -64,22 +141,19 @@ func (h *ThemesHandler) CreateTheme(c *gin.Context) {
 		return
 	}
 
-	// Validate theme type
-	validThemeTypes := map[string]bool{
-		"predefined":              true,
-		"variable_customization":  true,
-		"full_css":                true,
+	// Validate theme name
+	if err := h.validateThemeName(req.ThemeName); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
 	}
+
+	// Validate theme type
 	if !validThemeTypes[req.ThemeType] {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid theme_type. Must be: predefined, variable_customization, or full_css"})
 		return
 	}
 
 	// Validate scope type
-	validScopeTypes := map[string]bool{
-		"global":   true,
-		"per_page": true,
-	}
 	if !validScopeTypes[req.ScopeType] {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid scope_type. Must be: global or per_page"})
 		return
@@ -93,32 +167,25 @@ func (h *ThemesHandler) CreateTheme(c *gin.Context) {
 
 	// Validate target page if provided
 	if req.TargetPage != nil {
-		validPages := map[string]bool{
-			"feed":          true,
-			"profile":       true,
-			"settings":      true,
-			"messages":      true,
-			"notifications": true,
-			"search":        true,
-		}
-		if !validPages[*req.TargetPage] {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid target_page"})
+		if !validPageNames[*req.TargetPage] {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid target_page. Must be: feed, profile, settings, messages, notifications, or search"})
 			return
 		}
+	}
+
+	// Validate CSS variables
+	if err := h.validateCSSVariables(req.CSSVariables); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
 	}
 
 	// Sanitize custom CSS if provided
 	if req.CustomCSS != nil && *req.CustomCSS != "" {
 		if err := h.sanitizer.Sanitize(*req.CustomCSS); err != nil {
+			log.Printf("CSS sanitization failed for user %d: %v", userID, err)
 			c.JSON(http.StatusBadRequest, gin.H{"error": "CSS validation failed", "details": err.Error()})
 			return
 		}
-	}
-
-	// Validate theme name length
-	if len(req.ThemeName) > 100 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Theme name must be 100 characters or less"})
-		return
 	}
 
 	// Create theme
@@ -142,10 +209,12 @@ func (h *ThemesHandler) CreateTheme(c *gin.Context) {
 
 	created, err := h.themeRepo.Create(c.Request.Context(), theme)
 	if err != nil {
+		log.Printf("Failed to create theme for user %d: %v", userID, err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create theme", "details": err.Error()})
 		return
 	}
 
+	log.Printf("User %d created theme: %s (ID: %d)", userID, created.ThemeName, created.ID)
 	c.JSON(http.StatusCreated, created)
 }
 
