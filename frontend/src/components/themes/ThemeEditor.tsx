@@ -12,6 +12,7 @@ import ThemePreview from './ThemePreview';
 import { cssVariablesSchema, themeInfoSchema } from '../../validation/themeSchemas';
 import { isValidHexColor, looksLikeHexColor, normalizeHexColor } from '../../utils/color';
 import { useDebouncedValue } from '../../hooks/useDebouncedValue';
+import { getContrastRatio } from '../../utils/contrast';
 
 const ColorPicker = lazy(async () => {
   const module = await import('react-colorful');
@@ -64,6 +65,35 @@ const ThemeEditor = ({ isOpen, onClose, initialTheme = null }: ThemeEditorProps)
   const [infoErrors, setInfoErrors] = useState<{ name?: string; description?: string }>({});
   const [variableErrors, setVariableErrors] = useState<Record<string, string>>({});
   const cssVariableHistory = useRef<Record<string, string>[]>([]);
+  const colorPickerLabelId = useMemo(
+    () => `color-picker-label-${selectedVariableName.replace(/[^a-z0-9]/gi, '')}`,
+    [selectedVariableName]
+  );
+  const contrastWarnings = useMemo(() => {
+    const background =
+      cssVariables['--color-background'] ?? DEFAULT_THEME_VARIABLES['--color-background'];
+    const surface =
+      cssVariables['--color-surface'] ?? DEFAULT_THEME_VARIABLES['--color-surface'];
+    const textPrimary =
+      cssVariables['--color-text-primary'] ?? DEFAULT_THEME_VARIABLES['--color-text-primary'];
+    const textSecondary =
+      cssVariables['--color-text-secondary'] ?? DEFAULT_THEME_VARIABLES['--color-text-secondary'];
+
+    const combos = [
+      { label: 'Primary text on background', fg: textPrimary, bg: background },
+      { label: 'Secondary text on surface', fg: textSecondary, bg: surface },
+      { label: 'Primary text on surface', fg: textPrimary, bg: surface },
+    ];
+
+    return combos
+      .map((combo) => {
+        const ratio = getContrastRatio(combo.fg, combo.bg);
+        return ratio !== null && ratio < 4.5
+          ? { ...combo, ratio: Number(ratio.toFixed(2)) }
+          : null;
+      })
+      .filter(Boolean) as { label: string; ratio: number }[];
+  }, [cssVariables]);
 
   const availableThemes = useMemo(
     () => [...predefinedThemes, ...customThemes],
@@ -526,7 +556,10 @@ const ThemeEditor = ({ isOpen, onClose, initialTheme = null }: ThemeEditorProps)
             />
             <div className="space-y-4">
               <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4">
-                <p className="text-sm font-semibold text-[var(--color-text-primary)]">
+                <p
+                  id={colorPickerLabelId}
+                  className="text-sm font-semibold text-[var(--color-text-primary)]"
+                >
                   {activeVariableDefinition?.label ?? 'Variable'}
                 </p>
                 <p className="text-xs text-[var(--color-text-secondary)]">
@@ -542,6 +575,8 @@ const ThemeEditor = ({ isOpen, onClose, initialTheme = null }: ThemeEditorProps)
                     }
                   >
                     <ColorPicker
+                      aria-label={`Color picker for ${activeVariableDefinition?.label ?? 'variable'}`}
+                      aria-describedby={colorPickerLabelId}
                       color={activeVariableValue}
                       onChange={(value) => updateVariable(selectedVariableName, value)}
                     />
@@ -596,6 +631,18 @@ const ThemeEditor = ({ isOpen, onClose, initialTheme = null }: ThemeEditorProps)
                     )
                   )}
                 </div>
+                {contrastWarnings.length > 0 && (
+                  <div className="mt-4 rounded-lg border border-yellow-400 bg-yellow-50 p-3 text-xs text-yellow-800">
+                    <p className="font-semibold">Accessibility warnings</p>
+                    <ul className="mt-1 list-disc pl-4">
+                      {contrastWarnings.map((warning) => (
+                        <li key={warning.label}>
+                          {warning.label} contrast ratio {warning.ratio}:1 is below 4.5:1.
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </div>
             </div>
             <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
@@ -652,7 +699,11 @@ const ThemeEditor = ({ isOpen, onClose, initialTheme = null }: ThemeEditorProps)
 
           <div className="flex-1 overflow-y-auto px-6 py-4">
             {statusMessage && (
-              <p className="mb-4 rounded-lg bg-green-50 px-4 py-3 text-sm text-green-700" role="alert">
+              <p
+                className="mb-4 rounded-lg bg-green-50 px-4 py-3 text-sm text-green-700"
+                role="status"
+                aria-live="polite"
+              >
                 {statusMessage.text}
               </p>
             )}

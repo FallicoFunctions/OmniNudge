@@ -37,6 +37,9 @@ function App() {
   return (
     <div className="min-h-screen bg-[var(--color-background)] px-4 py-10 text-[var(--color-text-primary)]">
       <main className="mx-auto flex max-w-5xl flex-col gap-8">
+        <div className="sr-only" aria-live="polite">
+          {activeTheme ? `Active theme ${activeTheme.theme_name}` : 'No active theme selected'}
+        </div>
         <section className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6 shadow-md">
           <header className="mb-6 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
             <div>
