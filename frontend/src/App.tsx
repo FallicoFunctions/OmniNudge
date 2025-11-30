@@ -10,6 +10,7 @@ import RedditPage from './pages/RedditPage';
 import RedditPostPage from './pages/RedditPostPage';
 import PostsPage from './pages/PostsPage';
 import MessagesPage from './pages/MessagesPage';
+import SavedPage from './pages/SavedPage';
 import './App.css';
 
 function App() {
@@ -33,8 +34,10 @@ function App() {
             <Route path="/themes" element={<ThemesPage />} />
             <Route path="/reddit" element={<RedditPage />} />
             <Route path="/reddit/r/:subreddit/comments/:postId" element={<RedditPostPage />} />
+            <Route path="/reddit/r/:subreddit/comments/:postId/:commentId" element={<RedditPostPage />} />
             <Route path="/posts" element={<PostsPage />} />
             <Route path="/messages" element={<MessagesPage />} />
+            <Route path="/saved" element={<SavedPage />} />
           </Route>
 
           {/* Catch all */}
