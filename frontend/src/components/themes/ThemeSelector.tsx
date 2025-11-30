@@ -202,6 +202,8 @@ const ThemeSelector = ({ onCreateNewTheme }: ThemeSelectorProps) => {
         type="button"
         className="flex w-full items-center justify-between rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3 text-left shadow-sm"
         onClick={() => setIsOpen((prev) => !prev)}
+        aria-expanded={isOpen}
+        aria-haspopup="dialog"
       >
         <div>
           <p className="text-sm text-[var(--color-text-secondary)]">Active Theme</p>
