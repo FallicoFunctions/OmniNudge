@@ -4,6 +4,8 @@ import { useTheme } from '../../hooks/useTheme';
 import { themeService } from '../../services/themeService';
 import type { UserTheme } from '../../types/theme';
 import { DEFAULT_THEME_VARIABLES, THEME_VARIABLE_GROUPS } from '../../data/themeVariables';
+import CSSVariableEditor from './CSSVariableEditor';
+import ThemePreview from './ThemePreview';
 
 const steps = [
   { id: 'base', title: 'Choose Base Theme', description: 'Start from a predefined or existing theme.' },
@@ -256,117 +258,82 @@ const ThemeEditor = ({ isOpen, onClose, initialTheme = null }: ThemeEditorProps)
         );
       case 'variables':
         return (
-          <div className="grid gap-6 lg:grid-cols-[1.5fr_1fr]">
-            <div className="space-y-5">
-              {THEME_VARIABLE_GROUPS.map((group) => (
-                <div key={group.id}>
-                  <h4 className="text-sm font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
-                    {group.name}
-                  </h4>
-                  <div className="mt-3 space-y-2 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-3">
-                    {group.variables.map((variable) => {
-                      const value =
-                        cssVariables[variable.name] ??
-                        DEFAULT_THEME_VARIABLES[variable.name] ??
-                        '#000000';
-                      const isSelected = selectedVariableName === variable.name;
-                      return (
-                        <button
-                          key={variable.name}
-                          type="button"
-                          className={`flex w-full items-center justify-between rounded-lg border px-3 py-2 text-left ${
-                            isSelected
-                              ? 'border-[var(--color-primary)] bg-[var(--color-primary)]/5'
-                              : 'border-transparent hover:bg-white/50'
-                          }`}
-                          onClick={() => setSelectedVariableName(variable.name)}
-                        >
-                          <div>
-                            <p className="text-sm font-semibold text-[var(--color-text-primary)]">
-                              {variable.label}
-                            </p>
-                            {variable.description && (
-                              <p className="text-xs text-[var(--color-text-secondary)]">
-                                {variable.description}
-                              </p>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-3">
-                            <span
-                              className="h-8 w-8 rounded-full border border-[var(--color-border)]"
-                              style={{ backgroundColor: value }}
-                            />
-                            <input
-                              type="text"
-                              className="w-28 rounded-md border border-[var(--color-border)] px-2 py-1 text-sm uppercase text-[var(--color-text-primary)]"
-                              value={value}
-                              onChange={(event) => updateVariable(variable.name, event.target.value)}
-                            />
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
+          <div className="grid gap-6 xl:grid-cols-[1.4fr_0.8fr]">
+            <CSSVariableEditor
+              groups={THEME_VARIABLE_GROUPS}
+              variables={cssVariables}
+              selectedVariable={selectedVariableName}
+              onSelectVariable={setSelectedVariableName}
+              onChangeVariable={updateVariable}
+            />
+            <div className="space-y-4">
+              <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4">
+                <p className="text-sm font-semibold text-[var(--color-text-primary)]">
+                  {activeVariableDefinition?.label ?? 'Variable'}
+                </p>
+                <p className="text-xs text-[var(--color-text-secondary)]">
+                  {activeVariableDefinition?.description ??
+                    'Use the color picker to adjust the value.'}
+                </p>
+                <div className="mt-4">
+                  <HexColorPicker
+                    color={activeVariableValue}
+                    onChange={(value) => updateVariable(selectedVariableName, value)}
+                  />
                 </div>
-              ))}
-            </div>
-            <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4">
-              <p className="text-sm font-semibold text-[var(--color-text-primary)]">
-                {activeVariableDefinition?.label ?? 'Variable'}
-              </p>
-              <p className="text-xs text-[var(--color-text-secondary)]">
-                {activeVariableDefinition?.description ?? 'Use the color picker to adjust the value.'}
-              </p>
-              <div className="mt-4">
-                <HexColorPicker
-                  color={activeVariableValue}
-                  onChange={(value) => updateVariable(selectedVariableName, value)}
-                />
+              </div>
+              <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
+                <ThemePreview variables={cssVariables} />
               </div>
             </div>
           </div>
         );
       case 'review':
         return (
-          <div className="space-y-4">
-            <div className="rounded-xl border border-[var(--color-border)] p-4">
-              <h4 className="text-sm font-semibold text-[var(--color-text-primary)]">Summary</h4>
-              <p className="mt-2 text-sm text-[var(--color-text-secondary)]">
-                <span className="font-semibold text-[var(--color-text-primary)]">Name:</span>{' '}
-                {themeName || 'Untitled Theme'}
-              </p>
-              <p className="text-sm text-[var(--color-text-secondary)]">
-                <span className="font-semibold text-[var(--color-text-primary)]">
-                  Description:
-                </span>{' '}
-                {themeDescription || 'No description'}
-              </p>
-              <p className="text-sm text-[var(--color-text-secondary)]">
-                <span className="font-semibold text-[var(--color-text-primary)]">
-                  Variables:
-                </span>{' '}
-                {Object.keys(cssVariables).length} defined
-              </p>
-            </div>
-            <div className="rounded-xl border border-[var(--color-border)] p-4">
-              <h4 className="text-sm font-semibold text-[var(--color-text-primary)]">
-                Preview Palette
-              </h4>
-              <div className="mt-3 flex flex-wrap gap-3">
-                {['--color-primary', '--color-background', '--color-surface', '--color-success'].map(
-                  (variable) => (
-                    <div key={variable} className="flex flex-col items-center gap-1 text-center">
-                      <span
-                        className="h-10 w-10 rounded-full border border-[var(--color-border)]"
-                        style={{ backgroundColor: cssVariables[variable] ?? '#000000' }}
-                      />
-                      <span className="text-[10px] uppercase tracking-wide text-[var(--color-text-muted)]">
-                        {variable.replace('--color-', '')}
-                      </span>
-                    </div>
-                  )
-                )}
+          <div className="grid gap-6 lg:grid-cols-[1fr_1.2fr]">
+            <div className="space-y-4">
+              <div className="rounded-xl border border-[var(--color-border)] p-4">
+                <h4 className="text-sm font-semibold text-[var(--color-text-primary)]">Summary</h4>
+                <p className="mt-2 text-sm text-[var(--color-text-secondary)]">
+                  <span className="font-semibold text-[var(--color-text-primary)]">Name:</span>{' '}
+                  {themeName || 'Untitled Theme'}
+                </p>
+                <p className="text-sm text-[var(--color-text-secondary)]">
+                  <span className="font-semibold text-[var(--color-text-primary)]">
+                    Description:
+                  </span>{' '}
+                  {themeDescription || 'No description'}
+                </p>
+                <p className="text-sm text-[var(--color-text-secondary)]">
+                  <span className="font-semibold text-[var(--color-text-primary)]">
+                    Variables:
+                  </span>{' '}
+                  {Object.keys(cssVariables).length} defined
+                </p>
               </div>
+              <div className="rounded-xl border border-[var(--color-border)] p-4">
+                <h4 className="text-sm font-semibold text-[var(--color-text-primary)]">
+                  Preview Palette
+                </h4>
+                <div className="mt-3 flex flex-wrap gap-3">
+                  {['--color-primary', '--color-background', '--color-surface', '--color-success'].map(
+                    (variable) => (
+                      <div key={variable} className="flex flex-col items-center gap-1 text-center">
+                        <span
+                          className="h-10 w-10 rounded-full border border-[var(--color-border)]"
+                          style={{ backgroundColor: cssVariables[variable] ?? '#000000' }}
+                        />
+                        <span className="text-[10px] uppercase tracking-wide text-[var(--color-text-muted)]">
+                          {variable.replace('--color-', '')}
+                        </span>
+                      </div>
+                    )
+                  )}
+                </div>
+              </div>
+            </div>
+            <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
+              <ThemePreview variables={cssVariables} showControls={false} />
             </div>
           </div>
         );
