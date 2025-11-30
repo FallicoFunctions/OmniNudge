@@ -224,10 +224,12 @@ const ThemePreview = ({
           <span
             className="h-8 w-8 rounded-full bg-[var(--color-primary)]/20"
             style={{ borderRadius: 'var(--border-radius-lg)' }}
+            aria-hidden="true"
           />
           <span
             className="h-8 w-8 rounded-full bg-[var(--color-success)]/20"
             style={{ borderRadius: 'var(--border-radius-lg)' }}
+            aria-hidden="true"
           />
         </div>
       </header>
