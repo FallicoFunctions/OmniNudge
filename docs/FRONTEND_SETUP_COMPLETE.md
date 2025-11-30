@@ -28,7 +28,7 @@
 - `@hookform/resolvers` - Form + Zod integration
 
 **Styling:**
-- `tailwindcss` - Utility-first CSS
+- `tailwindcss@3.4.18` - Utility-first CSS (stable v3)
 - `postcss` - CSS processing
 - `autoprefixer` - Browser prefixes
 
