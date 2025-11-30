@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import { redditService } from '../services/redditService';
 
 export default function RedditPage() {
+  const navigate = useNavigate();
   const [subreddit, setSubreddit] = useState('popular');
   const [sort, setSort] = useState<'hot' | 'new' | 'top' | 'rising'>('hot');
   const [inputValue, setInputValue] = useState('');
@@ -106,9 +108,12 @@ export default function RedditPage() {
           {data.posts.map((post) => (
             <article
               key={post.id}
-              className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-sm transition-shadow hover:shadow-md"
+              className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] shadow-sm transition-shadow hover:shadow-md"
             >
-              <div className="flex gap-4">
+              <div
+                onClick={() => navigate(`/reddit/r/${post.subreddit}/comments/${post.id}`)}
+                className="flex cursor-pointer gap-4 p-4"
+              >
                 {/* Thumbnail */}
                 {post.thumbnail && post.thumbnail !== 'self' && post.thumbnail !== 'default' && (
                   <img
@@ -120,7 +125,7 @@ export default function RedditPage() {
 
                 {/* Content */}
                 <div className="flex-1">
-                  <h2 className="text-lg font-semibold text-[var(--color-text-primary)]">
+                  <h2 className="text-lg font-semibold text-[var(--color-text-primary)] hover:text-[var(--color-primary)]">
                     {post.title}
                   </h2>
 
@@ -141,28 +146,71 @@ export default function RedditPage() {
                       {post.selftext}
                     </p>
                   )}
-
-                  <div className="mt-3 flex gap-2">
-                    <a
-                      href={`https://reddit.com${post.permalink}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="rounded-md bg-[var(--color-surface-elevated)] px-3 py-1 text-xs font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-border)]"
-                    >
-                      View on Reddit
-                    </a>
-                    {!post.is_self && (
-                      <a
-                        href={post.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="rounded-md bg-[var(--color-surface-elevated)] px-3 py-1 text-xs font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-border)]"
-                      >
-                        Open Link
-                      </a>
-                    )}
-                  </div>
                 </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex gap-3 border-t border-[var(--color-border)] px-4 py-2 text-xs">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigate(`/reddit/r/${post.subreddit}/comments/${post.id}`);
+                  }}
+                  className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+                >
+                  {post.num_comments} Comments
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    // TODO: Implement share functionality
+                    console.log('Share post', post.id);
+                  }}
+                  className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+                >
+                  Share
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    // TODO: Implement save functionality
+                    console.log('Save post', post.id);
+                  }}
+                  className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+                >
+                  Save
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    // TODO: Implement hide functionality
+                    console.log('Hide post', post.id);
+                  }}
+                  className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+                >
+                  Hide
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    // TODO: Implement crosspost functionality
+                    console.log('Crosspost', post.id);
+                  }}
+                  className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+                >
+                  Crosspost
+                </button>
+                {!post.is_self && (
+                  <a
+                    href={post.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+                  >
+                    Open Link ↗
+                  </a>
+                )}
               </div>
             </article>
           ))}
