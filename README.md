@@ -47,11 +47,13 @@ OmniNudge allows users to browse Reddit content, discuss it with a growing commu
 - **Real-time:** WebSocket (Gorilla)
 - **Authentication:** JWT
 
-### Frontend (Planned)
-- **Framework:** React + TypeScript
-- **Build Tool:** Vite
-- **State:** TanStack Query
-- **Encryption:** Web Crypto API
+### Frontend
+- **Framework:** React 19 + TypeScript
+- **Build Tool:** Vite 7
+- **Styling:** Tailwind CSS 3 + CSS variables bound to the theme system
+- **State/Data:** React Context + TanStack Query 5
+- **Testing:** Vitest 3 with Testing Library + jsdom
+- **Utilities:** react-hook-form, zod, zustand (editor helpers), react-colorful, clsx
 
 ## Project Structure
 
@@ -68,7 +70,7 @@ omninudge/
 │   │   ├── database/        # DB connection & migrations
 │   │   └── config/          # Configuration
 │   └── go.mod
-├── frontend/                # (To be built)
+├── frontend/                # React + Vite app (Theme context, editor, selector, tests)
 └── docs/                    # Full documentation
 ```
 
@@ -93,8 +95,16 @@ omninudge/
 - **Real-time WebSocket events (messages, read receipts, online/offline status)**
 - **Conversation management with read receipts**
 
+✅ **Frontend Phase 2a – Theme System:**
+- Theme context + hooks hydrate CSS variables across the app with localStorage + server persistence
+- Theme selector modal lists predefined + custom themes, supports refresh, keyboard usage, and accessible announcements
+- Theme editor wizard covers base selection, metadata, CSS variable editing with debounce, preview, and WCAG contrast warnings
+- Theme preview + preview cards render responsive mock UI bound to CSS variables
+- Vitest test suite (unit, integration, e2e, visual snapshots) covers ThemeContext, selector/editor flows, and theme persistence
+- Documentation under `docs/user/` and `docs/technical/` explains customization, APIs, and future extensibility
+
 🚧 In Development:
-- Frontend application (React + TypeScript)
+- Frontend Phase 2b – theme marketplace polish, onboarding flows, Storybook documentation, and production hardening
 
 ## Getting Started
 
@@ -142,6 +152,32 @@ go test ./...
 
 This ensures unit, service, and integration tests all connect cleanly without interfering with your dev data.
 
+### Frontend Development
+
+1. Install dependencies once:
+   ```bash
+   cd frontend
+   npm install
+   ```
+2. Start the Vite dev server (listens on `http://localhost:5173` by default):
+   ```bash
+   npm run dev
+   ```
+3. The frontend expects the backend at `http://localhost:8080/api/v1`; adjust `.env.development` if needed.
+
+### Frontend Tests
+
+Vitest runs unit, integration, e2e, and visual regression suites:
+
+```bash
+cd frontend
+npm run test        # watch mode
+# or
+npm run test -- run # single run
+```
+
+Snapshot fixtures live under `frontend/tests/visual/__snapshots__`.
+
 ### Configuration
 
 Environment variables (optional - defaults provided):
@@ -178,6 +214,11 @@ VITE_WS_URL=wss://api.omninudge.com/ws
 ```
 
 Vite automatically picks the correct file based on the `mode` you build with (`npm run dev`, `vite build --mode production`, etc.).
+
+Additional references:
+- `docs/user/how-to-customize-your-theme.md`
+- `docs/user/creating-your-first-custom-theme.md`
+- `docs/technical/theme-system-architecture.md`
 
 ## API Features
 
