@@ -266,7 +266,7 @@ Classic black and white theme for maximum contrast and minimal distraction
 ### Option 1: SQL Script
 
 ```bash
-psql -d chatreddit -f backend/scripts/seed_predefined_themes.sql
+psql -d omninudge_dev -f backend/scripts/seed_predefined_themes.sql
 ```
 
 ### Option 2: Go Program

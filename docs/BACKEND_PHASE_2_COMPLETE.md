@@ -2,7 +2,7 @@
 
 **Status:** ✅ **PRODUCTION READY**
 **Date:** November 29, 2025
-**Database:** chatreddit_dev
+**Database:** omninudge_dev
 
 ---
 
@@ -187,7 +187,7 @@ $ go build ./cmd/server
 ### Server Status
 ```bash
 ✅ Server started on http://localhost:8080
-✅ Database connection: chatreddit_dev
+✅ Database connection: omninudge_dev
 ✅ WebSocket handler initialized
 ✅ All routes registered (17 theme endpoints)
 ```
@@ -506,7 +506,7 @@ DB_HOST=localhost
 DB_PORT=5432
 DB_USER=derrf
 DB_PASSWORD=drummer
-DB_NAME=chatreddit_dev
+DB_NAME=omninudge_dev
 DB_SSLMODE=disable
 ```
 
@@ -524,13 +524,13 @@ JWT_SECRET=dev-secret-change-in-production
 ### Running the Server
 ```bash
 cd backend
-DB_NAME=chatreddit_dev go run ./cmd/server
+DB_NAME=omninudge_dev go run ./cmd/server
 ```
 
 ### Seeding Themes
 ```bash
 # Option 1: SQL Script
-psql -d chatreddit_dev -f backend/scripts/seed_predefined_themes.sql
+psql -d omninudge_dev -f backend/scripts/seed_predefined_themes.sql
 
 # Option 2: Go Program
 cd backend
@@ -562,7 +562,7 @@ All backend requirements for Phase 2 (Levels 1-4) are complete and production-re
 ### For Frontend Developers
 1. **Start Here:** [THEME_HANDLER_IMPLEMENTATION.md](THEME_HANDLER_IMPLEMENTATION.md)
 2. **API Reference:** All 17 endpoints documented with examples
-3. **Test Server:** `DB_NAME=chatreddit_dev go run ./cmd/server`
+3. **Test Server:** `DB_NAME=omninudge_dev go run ./cmd/server`
 4. **Authentication:** Use JWT token from `/api/v1/auth/register` or `/api/v1/auth/login`
 5. **Theme Variables:** See [CSS_VARIABLES.md](CSS_VARIABLES.md) for 100+ available variables
 6. **Components:** See [COMPONENT_REFERENCE.md](COMPONENT_REFERENCE.md) for all BEM classes

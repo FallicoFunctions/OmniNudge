@@ -6,7 +6,7 @@ This guide will help you test all Phase 1 features locally before deployment.
 
 - Backend server running on `http://localhost:8080`
 - Frontend dev server running on `http://localhost:5176`
-- PostgreSQL database running with `chatreddit_dev` database
+- PostgreSQL database running with `omninudge_dev` database
 
 ## Testing Checklist
 

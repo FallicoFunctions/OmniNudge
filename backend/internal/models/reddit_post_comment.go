@@ -18,6 +18,7 @@ type RedditPostComment struct {
 	ParentCommentID *int       `json:"parent_comment_id"`
 	Content         string     `json:"content"`
 	Score           int        `json:"score"`
+	UserVote        *int       `json:"user_vote,omitempty"` // -1, 0, or 1 representing current user's vote
 	CreatedAt       time.Time  `json:"created_at"`
 	UpdatedAt       *time.Time `json:"updated_at,omitempty"`
 	DeletedAt       *time.Time `json:"deleted_at,omitempty"`
@@ -33,15 +34,23 @@ func NewRedditPostCommentRepository(pool *pgxpool.Pool) *RedditPostCommentReposi
 	return &RedditPostCommentRepository{pool: pool}
 }
 
-// Create creates a new comment on a Reddit post
+// Create creates a new comment on a Reddit post and auto-upvotes it
 func (r *RedditPostCommentRepository) Create(ctx context.Context, comment *RedditPostComment) error {
+	// Start transaction
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	// Insert comment with score of 1 (auto-upvoted)
 	query := `
 		INSERT INTO reddit_post_comments (
-			subreddit, reddit_post_id, reddit_post_title, user_id, parent_comment_id, content
-		) VALUES ($1, $2, $3, $4, $5, $6)
+			subreddit, reddit_post_id, reddit_post_title, user_id, parent_comment_id, content, score
+		) VALUES ($1, $2, $3, $4, $5, $6, 1)
 		RETURNING id, created_at, score
 	`
-	return r.pool.QueryRow(ctx, query,
+	err = tx.QueryRow(ctx, query,
 		comment.Subreddit,
 		comment.RedditPostID,
 		comment.RedditPostTitle,
@@ -49,6 +58,59 @@ func (r *RedditPostCommentRepository) Create(ctx context.Context, comment *Reddi
 		comment.ParentCommentID,
 		comment.Content,
 	).Scan(&comment.ID, &comment.CreatedAt, &comment.Score)
+	if err != nil {
+		return err
+	}
+
+	// Auto-upvote the comment
+	_, err = tx.Exec(ctx,
+		`INSERT INTO reddit_comment_votes (comment_id, user_id, vote_type) VALUES ($1, $2, 1)`,
+		comment.ID, comment.UserID,
+	)
+	if err != nil {
+		return err
+	}
+
+	return tx.Commit(ctx)
+}
+
+// GetByRedditPostWithUserVotes retrieves all comments for a specific Reddit post including the user's votes
+func (r *RedditPostCommentRepository) GetByRedditPostWithUserVotes(ctx context.Context, subreddit, postID string, userID int) ([]*RedditPostComment, error) {
+	query := `
+		SELECT
+			rc.id, rc.subreddit, rc.reddit_post_id, rc.reddit_post_title, rc.user_id, u.username,
+			rc.parent_comment_id, rc.content, rc.score, rc.created_at, rc.updated_at, rc.deleted_at,
+			COALESCE(v.vote_type, 0) as user_vote
+		FROM reddit_post_comments rc
+		JOIN users u ON u.id = rc.user_id
+		LEFT JOIN reddit_comment_votes v ON v.comment_id = rc.id AND v.user_id = $3
+		WHERE rc.subreddit = $1 AND rc.reddit_post_id = $2 AND rc.deleted_at IS NULL
+		ORDER BY rc.created_at ASC
+	`
+	rows, err := r.pool.Query(ctx, query, subreddit, postID, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var comments []*RedditPostComment
+	for rows.Next() {
+		var comment RedditPostComment
+		var userVote int
+		if err := rows.Scan(
+			&comment.ID, &comment.Subreddit, &comment.RedditPostID, &comment.RedditPostTitle,
+			&comment.UserID, &comment.Username,
+			&comment.ParentCommentID, &comment.Content, &comment.Score,
+			&comment.CreatedAt, &comment.UpdatedAt, &comment.DeletedAt,
+			&userVote,
+		); err != nil {
+			return nil, err
+		}
+		userVoteCopy := userVote
+		comment.UserVote = &userVoteCopy
+		comments = append(comments, &comment)
+	}
+	return comments, rows.Err()
 }
 
 // GetByRedditPost retrieves all comments for a specific Reddit post
@@ -129,13 +191,92 @@ func (r *RedditPostCommentRepository) Delete(ctx context.Context, id int) error 
 	return err
 }
 
-// Vote updates the score of a comment (for future voting feature)
-func (r *RedditPostCommentRepository) Vote(ctx context.Context, id int, delta int) error {
-	query := `
-		UPDATE reddit_post_comments
-		SET score = score + $1
-		WHERE id = $2 AND deleted_at IS NULL
-	`
-	_, err := r.pool.Exec(ctx, query, delta, id)
-	return err
+// GetUserVote returns the user's vote on a comment (-1, 0, or 1)
+func (r *RedditPostCommentRepository) GetUserVote(ctx context.Context, commentID, userID int) (int, error) {
+	query := `SELECT vote_type FROM reddit_comment_votes WHERE comment_id = $1 AND user_id = $2`
+	var voteType int
+	err := r.pool.QueryRow(ctx, query, commentID, userID).Scan(&voteType)
+	if err != nil {
+		// No vote found
+		if err.Error() == "no rows in result set" {
+			return 0, nil
+		}
+		return 0, err
+	}
+	return voteType, nil
+}
+
+// SetVote sets or updates a user's vote on a comment
+// voteType should be -1 (downvote), 0 (remove vote), or 1 (upvote)
+func (r *RedditPostCommentRepository) SetVote(ctx context.Context, commentID, userID, voteType int) error {
+	// Start transaction
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	// Get current vote if exists
+	var currentVote int
+	err = tx.QueryRow(ctx,
+		`SELECT vote_type FROM reddit_comment_votes WHERE comment_id = $1 AND user_id = $2`,
+		commentID, userID,
+	).Scan(&currentVote)
+
+	hasVote := err == nil
+
+	if voteType == 0 {
+		// Remove vote
+		if hasVote {
+			_, err = tx.Exec(ctx,
+				`DELETE FROM reddit_comment_votes WHERE comment_id = $1 AND user_id = $2`,
+				commentID, userID,
+			)
+			if err != nil {
+				return err
+			}
+
+			// Update score
+			_, err = tx.Exec(ctx,
+				`UPDATE reddit_post_comments SET score = score - $1 WHERE id = $2`,
+				currentVote, commentID,
+			)
+			if err != nil {
+				return err
+			}
+		}
+	} else {
+		// Add or update vote
+		scoreDelta := voteType
+		if hasVote {
+			scoreDelta = voteType - currentVote
+
+			_, err = tx.Exec(ctx,
+				`UPDATE reddit_comment_votes SET vote_type = $1, updated_at = NOW()
+				 WHERE comment_id = $2 AND user_id = $3`,
+				voteType, commentID, userID,
+			)
+		} else {
+			_, err = tx.Exec(ctx,
+				`INSERT INTO reddit_comment_votes (comment_id, user_id, vote_type) VALUES ($1, $2, $3)`,
+				commentID, userID, voteType,
+			)
+		}
+		if err != nil {
+			return err
+		}
+
+		// Update score
+		if scoreDelta != 0 {
+			_, err = tx.Exec(ctx,
+				`UPDATE reddit_post_comments SET score = score + $1 WHERE id = $2`,
+				scoreDelta, commentID,
+			)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	return tx.Commit(ctx)
 }

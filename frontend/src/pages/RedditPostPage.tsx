@@ -51,6 +51,7 @@ interface LocalComment {
   created_at: string;
   parent_comment_id: number | null;
   score: number;
+  user_vote?: number; // -1, 0, or 1
 }
 
 
@@ -159,9 +160,9 @@ function LocalCommentView({
   const isReplying = replyingTo === comment.id;
 
   const voteMutation = useMutation({
-    mutationFn: async (delta: 1 | -1) => {
+    mutationFn: async (vote: 1 | -1) => {
       return api.post(`/reddit/posts/${subreddit}/${postId}/comments/${comment.id}/vote`, {
-        delta,
+        vote,
       });
     },
     onSuccess: () => {
@@ -205,18 +206,32 @@ function LocalCommentView({
             <button
               onClick={() => voteMutation.mutate(1)}
               disabled={voteMutation.isPending}
-              className="text-[var(--color-text-secondary)] hover:text-orange-500 disabled:opacity-50"
+              className={`${
+                comment.user_vote === 1
+                  ? 'text-orange-500'
+                  : 'text-[var(--color-text-secondary)] hover:text-orange-500'
+              } disabled:opacity-50`}
               title="Upvote"
             >
               ▲
             </button>
-            <span className="min-w-[20px] text-center font-semibold text-[var(--color-text-primary)]">
+            <span className={`min-w-[20px] text-center font-semibold ${
+              comment.user_vote === 1
+                ? 'text-orange-500'
+                : comment.user_vote === -1
+                ? 'text-blue-500'
+                : 'text-[var(--color-text-primary)]'
+            }`}>
               {comment.score}
             </span>
             <button
               onClick={() => voteMutation.mutate(-1)}
               disabled={voteMutation.isPending}
-              className="text-[var(--color-text-secondary)] hover:text-blue-500 disabled:opacity-50"
+              className={`${
+                comment.user_vote === -1
+                  ? 'text-blue-500'
+                  : 'text-[var(--color-text-secondary)] hover:text-blue-500'
+              } disabled:opacity-50`}
               title="Downvote"
             >
               ▼

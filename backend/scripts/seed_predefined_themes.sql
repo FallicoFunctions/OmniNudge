@@ -1,6 +1,6 @@
 -- Seed script for 8 predefined themes
 -- These themes are installed during migration 016 or can be run separately
--- Run with: psql -d chatreddit -f scripts/seed_predefined_themes.sql
+-- Run with: psql -d omninudge_dev -f scripts/seed_predefined_themes.sql
 
 -- First, create a system user (user_id = 0) to own predefined themes
 -- This is a special system account that owns all predefined themes
