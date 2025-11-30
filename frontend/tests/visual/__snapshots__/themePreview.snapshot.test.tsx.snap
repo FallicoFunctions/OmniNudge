@@ -1,0 +1,849 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`ThemePreview snapshots > matches snapshot for default desktop feed view 1`] = `
+<div
+  class="space-y-4"
+>
+  <div
+    class="relative "
+  >
+    <div
+      class="w-full max-w-3xl transition-all"
+    >
+      <div
+        class="rounded-3xl border border-[var(--color-border)] bg-[var(--color-background)] p-6 shadow-lg transition-all scale-100"
+        style="--color-primary: #3b82f6; --color-primary-dark: #2563eb; --color-primary-light: #60a5fa; --color-background: #ffffff; --color-surface: #f9fafb; --color-surface-elevated: #ffffff; --color-text-primary: #111827; --color-text-secondary: #6b7280; --color-text-muted: #9ca3af; --color-border: #e5e7eb; --color-border-hover: #d1d5db; --color-success: #10b981; --color-warning: #f59e0b; --color-error: #ef4444; --color-info: #3b82f6; --font-family-base: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; --font-size-xs: 0.75rem; --font-size-sm: 0.875rem; --font-size-base: 1rem; --font-size-lg: 1.125rem; --font-size-xl: 1.25rem; --font-size-2xl: 1.5rem; --font-size-3xl: 1.875rem; --spacing-xs: 0.25rem; --spacing-sm: 0.5rem; --spacing-md: 1rem; --spacing-lg: 1.5rem; --spacing-xl: 2rem; --spacing-2xl: 3rem; --border-radius-sm: 0.25rem; --border-radius-md: 0.375rem; --border-radius-lg: 0.5rem; --border-radius-xl: 0.75rem; --border-radius-2xl: 1rem; --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05); --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1); --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1); --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1); --transition-fast: 150ms ease; --transition-base: 200ms ease; --transition-slow: 300ms ease; font-family: var(--font-family-base); padding: var(--spacing-xl); border-radius: var(--border-radius-2xl); box-shadow: var(--shadow-lg);"
+      >
+        <header
+          class="mb-4 flex items-center justify-between rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)]"
+          style="padding: var(--spacing-md); border-radius: var(--border-radius-xl); box-shadow: var(--shadow-sm);"
+        >
+          <div>
+            <p
+              aria-label="Theme preview section heading"
+              class="text-xs uppercase tracking-wide text-[var(--color-text-secondary)]"
+            >
+              OmniNudge
+            </p>
+            <p
+              class="font-semibold text-[var(--color-text-primary)]"
+              style="font-size: var(--font-size-lg);"
+            >
+              Feed
+            </p>
+          </div>
+          <div
+            aria-label="Avatar indicators"
+            class="flex gap-2"
+            style="gap: var(--spacing-sm);"
+          >
+            <span
+              aria-hidden="true"
+              class="h-8 w-8 rounded-full bg-[var(--color-primary)]/20"
+              style="border-radius: var(--border-radius-lg);"
+            />
+            <span
+              aria-hidden="true"
+              class="h-8 w-8 rounded-full bg-[var(--color-success)]/20"
+              style="border-radius: var(--border-radius-lg);"
+            />
+          </div>
+        </header>
+        <div
+          class="flex flex-col"
+          style="gap: var(--spacing-md);"
+        >
+          <article
+            class="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-sm"
+            style="padding: var(--spacing-lg); border-radius: var(--border-radius-xl); box-shadow: var(--shadow-sm);"
+          >
+            <div
+              class="flex items-center justify-between"
+            >
+              <div>
+                <p
+                  class="font-semibold text-[var(--color-text-primary)]"
+                  style="font-size: var(--font-size-base);"
+                >
+                  Creator 
+                  1
+                </p>
+                <p
+                  class="text-[var(--color-text-secondary)]"
+                  style="font-size: var(--font-size-sm);"
+                >
+                  2h ago · Boosted
+                </p>
+              </div>
+              <button
+                aria-label="Follow Creator 1"
+                class="rounded-full bg-[var(--color-primary)] text-xs font-semibold text-white"
+                style="padding: var(--spacing-xs) var(--spacing-sm); border-radius: var(--border-radius-2xl);"
+                type="button"
+              >
+                Follow
+              </button>
+            </div>
+            <p
+              class="text-[var(--color-text-primary)]"
+              style="margin-top: var(--spacing-sm); font-size: var(--font-size-base);"
+            >
+              "Building theme systems is fun! This preview updates live as you tweak variables."
+            </p>
+            <div
+              class="flex"
+              style="margin-top: var(--spacing-sm); gap: var(--spacing-sm);"
+            >
+              <span
+                class="rounded-full bg-[var(--color-surface-elevated)] text-xs text-[var(--color-text-secondary)]"
+                style="padding: var(--spacing-xs) var(--spacing-sm); border-radius: var(--border-radius-2xl);"
+              >
+                #design
+              </span>
+              <span
+                class="rounded-full bg-[var(--color-surface-elevated)] text-xs text-[var(--color-text-secondary)]"
+                style="padding: var(--spacing-xs) var(--spacing-sm); border-radius: var(--border-radius-2xl);"
+              >
+                #themes
+              </span>
+            </div>
+          </article>
+          <article
+            class="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-sm"
+            style="padding: var(--spacing-lg); border-radius: var(--border-radius-xl); box-shadow: var(--shadow-sm);"
+          >
+            <div
+              class="flex items-center justify-between"
+            >
+              <div>
+                <p
+                  class="font-semibold text-[var(--color-text-primary)]"
+                  style="font-size: var(--font-size-base);"
+                >
+                  Creator 
+                  2
+                </p>
+                <p
+                  class="text-[var(--color-text-secondary)]"
+                  style="font-size: var(--font-size-sm);"
+                >
+                  2h ago · Boosted
+                </p>
+              </div>
+              <button
+                aria-label="Follow Creator 2"
+                class="rounded-full bg-[var(--color-primary)] text-xs font-semibold text-white"
+                style="padding: var(--spacing-xs) var(--spacing-sm); border-radius: var(--border-radius-2xl);"
+                type="button"
+              >
+                Follow
+              </button>
+            </div>
+            <p
+              class="text-[var(--color-text-primary)]"
+              style="margin-top: var(--spacing-sm); font-size: var(--font-size-base);"
+            >
+              "Building theme systems is fun! This preview updates live as you tweak variables."
+            </p>
+            <div
+              class="flex"
+              style="margin-top: var(--spacing-sm); gap: var(--spacing-sm);"
+            >
+              <span
+                class="rounded-full bg-[var(--color-surface-elevated)] text-xs text-[var(--color-text-secondary)]"
+                style="padding: var(--spacing-xs) var(--spacing-sm); border-radius: var(--border-radius-2xl);"
+              >
+                #design
+              </span>
+              <span
+                class="rounded-full bg-[var(--color-surface-elevated)] text-xs text-[var(--color-text-secondary)]"
+                style="padding: var(--spacing-xs) var(--spacing-sm); border-radius: var(--border-radius-2xl);"
+              >
+                #themes
+              </span>
+            </div>
+          </article>
+          <article
+            class="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-sm"
+            style="padding: var(--spacing-lg); border-radius: var(--border-radius-xl); box-shadow: var(--shadow-sm);"
+          >
+            <div
+              class="flex items-center justify-between"
+            >
+              <div>
+                <p
+                  class="font-semibold text-[var(--color-text-primary)]"
+                  style="font-size: var(--font-size-base);"
+                >
+                  Creator 
+                  3
+                </p>
+                <p
+                  class="text-[var(--color-text-secondary)]"
+                  style="font-size: var(--font-size-sm);"
+                >
+                  2h ago · Boosted
+                </p>
+              </div>
+              <button
+                aria-label="Follow Creator 3"
+                class="rounded-full bg-[var(--color-primary)] text-xs font-semibold text-white"
+                style="padding: var(--spacing-xs) var(--spacing-sm); border-radius: var(--border-radius-2xl);"
+                type="button"
+              >
+                Follow
+              </button>
+            </div>
+            <p
+              class="text-[var(--color-text-primary)]"
+              style="margin-top: var(--spacing-sm); font-size: var(--font-size-base);"
+            >
+              "Building theme systems is fun! This preview updates live as you tweak variables."
+            </p>
+            <div
+              class="flex"
+              style="margin-top: var(--spacing-sm); gap: var(--spacing-sm);"
+            >
+              <span
+                class="rounded-full bg-[var(--color-surface-elevated)] text-xs text-[var(--color-text-secondary)]"
+                style="padding: var(--spacing-xs) var(--spacing-sm); border-radius: var(--border-radius-2xl);"
+              >
+                #design
+              </span>
+              <span
+                class="rounded-full bg-[var(--color-surface-elevated)] text-xs text-[var(--color-text-secondary)]"
+                style="padding: var(--spacing-xs) var(--spacing-sm); border-radius: var(--border-radius-2xl);"
+              >
+                #themes
+              </span>
+            </div>
+          </article>
+        </div>
+        <div
+          class="mt-6 space-y-4"
+        >
+          <div
+            aria-label="Common component samples"
+            class="grid gap-4 lg:grid-cols-2"
+            role="region"
+          >
+            <div
+              class="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)]"
+              style="padding: var(--spacing-md); border-radius: var(--border-radius-xl);"
+            >
+              <p
+                class="text-xs uppercase tracking-wide text-[var(--color-text-secondary)]"
+              >
+                Buttons
+              </p>
+              <div
+                class="mt-3 grid gap-2 md:grid-cols-2"
+                style="gap: var(--spacing-sm);"
+              >
+                <button
+                  class="rounded-lg bg-[var(--color-primary)] font-semibold text-white"
+                  style="padding: var(--spacing-sm); border-radius: var(--border-radius-lg);"
+                  type="button"
+                >
+                  Primary Action
+                </button>
+                <button
+                  class="rounded-lg border border-[var(--color-primary)] font-semibold text-[var(--color-primary)]"
+                  style="padding: var(--spacing-sm); border-radius: var(--border-radius-lg);"
+                  type="button"
+                >
+                  Secondary
+                </button>
+                <button
+                  class="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-elevated)] font-semibold text-[var(--color-text-primary)]"
+                  style="padding: var(--spacing-sm); border-radius: var(--border-radius-lg);"
+                  type="button"
+                >
+                  Outline
+                </button>
+                <button
+                  class="rounded-lg bg-[var(--color-error)]/10 font-semibold text-[var(--color-error)]"
+                  style="padding: var(--spacing-sm); border-radius: var(--border-radius-lg);"
+                  type="button"
+                >
+                  Danger
+                </button>
+              </div>
+            </div>
+            <div
+              class="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)]"
+              style="padding: var(--spacing-md); border-radius: var(--border-radius-xl);"
+            >
+              <p
+                class="text-xs uppercase tracking-wide text-[var(--color-text-secondary)]"
+              >
+                Form Elements
+              </p>
+              <div
+                class="mt-3 flex flex-col"
+                style="gap: var(--spacing-sm);"
+              >
+                <label
+                  class="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]"
+                >
+                  Project Name
+                  <input
+                    class="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-background)] text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
+                    style="padding: var(--spacing-xs) var(--spacing-sm);"
+                    type="text"
+                    value="OmniNudge Preview"
+                  />
+                </label>
+                <label
+                  class="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]"
+                >
+                  Category
+                  <select
+                    class="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-background)] text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
+                    style="padding: var(--spacing-xs) var(--spacing-sm);"
+                  >
+                    <option
+                      selected=""
+                      value="design"
+                    >
+                      Design
+                    </option>
+                    <option
+                      value="marketing"
+                    >
+                      Marketing
+                    </option>
+                    <option
+                      value="dev"
+                    >
+                      Development
+                    </option>
+                  </select>
+                </label>
+                <label
+                  class="flex items-center justify-between text-sm text-[var(--color-text-primary)]"
+                >
+                  Enable Beta Access
+                  <span
+                    class="relative inline-flex items-center"
+                  >
+                    <input
+                      checked=""
+                      class="peer sr-only"
+                      type="checkbox"
+                    />
+                    <span
+                      class="h-5 w-10 rounded-full bg-[var(--color-border)] transition-all peer-checked:bg-[var(--color-primary)]"
+                    />
+                    <span
+                      class="absolute left-1 top-1 h-3 w-3 rounded-full bg-white transition-all peer-checked:translate-x-5"
+                    />
+                  </span>
+                </label>
+              </div>
+            </div>
+          </div>
+          <div
+            class="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)]"
+            style="padding: var(--spacing-md); border-radius: var(--border-radius-xl);"
+          >
+            <p
+              class="text-xs uppercase tracking-wide text-[var(--color-text-secondary)]"
+            >
+              Status Indicators
+            </p>
+            <div
+              class="mt-3 grid gap-3 sm:grid-cols-2"
+              style="gap: var(--spacing-sm);"
+            >
+              <div
+                class="flex items-center justify-between rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-elevated)]"
+                style="padding: var(--spacing-sm); border-radius: var(--border-radius-lg);"
+              >
+                <div>
+                  <p
+                    class="text-sm font-semibold text-[var(--color-text-primary)]"
+                  >
+                    Live
+                  </p>
+                  <p
+                    class="text-xs text-[var(--color-text-secondary)]"
+                  >
+                    8 updates
+                  </p>
+                </div>
+                <span
+                  class="h-8 w-8 rounded-full"
+                  style="background-color: var(--color-success); opacity: 0.2;"
+                />
+              </div>
+              <div
+                class="flex items-center justify-between rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-elevated)]"
+                style="padding: var(--spacing-sm); border-radius: var(--border-radius-lg);"
+              >
+                <div>
+                  <p
+                    class="text-sm font-semibold text-[var(--color-text-primary)]"
+                  >
+                    Scheduled
+                  </p>
+                  <p
+                    class="text-xs text-[var(--color-text-secondary)]"
+                  >
+                    8 updates
+                  </p>
+                </div>
+                <span
+                  class="h-8 w-8 rounded-full"
+                  style="background-color: var(--color-info); opacity: 0.2;"
+                />
+              </div>
+              <div
+                class="flex items-center justify-between rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-elevated)]"
+                style="padding: var(--spacing-sm); border-radius: var(--border-radius-lg);"
+              >
+                <div>
+                  <p
+                    class="text-sm font-semibold text-[var(--color-text-primary)]"
+                  >
+                    Needs Review
+                  </p>
+                  <p
+                    class="text-xs text-[var(--color-text-secondary)]"
+                  >
+                    8 updates
+                  </p>
+                </div>
+                <span
+                  class="h-8 w-8 rounded-full"
+                  style="background-color: var(--color-warning); opacity: 0.2;"
+                />
+              </div>
+              <div
+                class="flex items-center justify-between rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-elevated)]"
+                style="padding: var(--spacing-sm); border-radius: var(--border-radius-lg);"
+              >
+                <div>
+                  <p
+                    class="text-sm font-semibold text-[var(--color-text-primary)]"
+                  >
+                    Blocked
+                  </p>
+                  <p
+                    class="text-xs text-[var(--color-text-secondary)]"
+                  >
+                    8 updates
+                  </p>
+                </div>
+                <span
+                  class="h-8 w-8 rounded-full"
+                  style="background-color: var(--color-error); opacity: 0.2;"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+`;
+
+exports[`ThemePreview snapshots > matches snapshot for mobile messages view 1`] = `
+<div
+  class="space-y-4"
+>
+  <div
+    class="relative "
+  >
+    <div
+      class="w-[320px] transition-all"
+    >
+      <div
+        class="rounded-3xl border border-[var(--color-border)] bg-[var(--color-background)] p-6 shadow-lg transition-all mx-auto scale-95"
+        style="--color-primary: #ff6b6b; --color-primary-dark: #2563eb; --color-primary-light: #60a5fa; --color-background: #0f172a; --color-surface: #1e293b; --color-surface-elevated: #ffffff; --color-text-primary: #f8fafc; --color-text-secondary: #cbd5f5; --color-text-muted: #9ca3af; --color-border: #e5e7eb; --color-border-hover: #d1d5db; --color-success: #10b981; --color-warning: #f59e0b; --color-error: #ef4444; --color-info: #3b82f6; --font-family-base: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; --font-size-xs: 0.75rem; --font-size-sm: 0.875rem; --font-size-base: 1rem; --font-size-lg: 1.125rem; --font-size-xl: 1.25rem; --font-size-2xl: 1.5rem; --font-size-3xl: 1.875rem; --spacing-xs: 0.25rem; --spacing-sm: 0.5rem; --spacing-md: 1rem; --spacing-lg: 1.5rem; --spacing-xl: 2rem; --spacing-2xl: 3rem; --border-radius-sm: 0.25rem; --border-radius-md: 0.375rem; --border-radius-lg: 0.5rem; --border-radius-xl: 0.75rem; --border-radius-2xl: 1rem; --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05); --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1); --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1); --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1); --transition-fast: 150ms ease; --transition-base: 200ms ease; --transition-slow: 300ms ease; font-family: var(--font-family-base); padding: var(--spacing-xl); border-radius: var(--border-radius-2xl); box-shadow: var(--shadow-lg);"
+      >
+        <header
+          class="mb-4 flex items-center justify-between rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)]"
+          style="padding: var(--spacing-md); border-radius: var(--border-radius-xl); box-shadow: var(--shadow-sm);"
+        >
+          <div>
+            <p
+              aria-label="Theme preview section heading"
+              class="text-xs uppercase tracking-wide text-[var(--color-text-secondary)]"
+            >
+              OmniNudge
+            </p>
+            <p
+              class="font-semibold text-[var(--color-text-primary)]"
+              style="font-size: var(--font-size-lg);"
+            >
+              Messages
+            </p>
+          </div>
+          <div
+            aria-label="Avatar indicators"
+            class="flex gap-2"
+            style="gap: var(--spacing-sm);"
+          >
+            <span
+              aria-hidden="true"
+              class="h-8 w-8 rounded-full bg-[var(--color-primary)]/20"
+              style="border-radius: var(--border-radius-lg);"
+            />
+            <span
+              aria-hidden="true"
+              class="h-8 w-8 rounded-full bg-[var(--color-success)]/20"
+              style="border-radius: var(--border-radius-lg);"
+            />
+          </div>
+        </header>
+        <div
+          class="grid gap-4 md:grid-cols-[1fr_1.5fr]"
+          style="gap: var(--spacing-md);"
+        >
+          <div
+            class="flex flex-col"
+            style="gap: var(--spacing-sm);"
+          >
+            <div
+              class="rounded-xl border border-[var(--color-primary)] bg-[var(--color-primary)]/10"
+              style="padding: var(--spacing-sm); border-radius: var(--border-radius-lg);"
+            >
+              <p
+                class="font-semibold text-[var(--color-text-primary)]"
+                style="font-size: var(--font-size-base);"
+              >
+                Design Squad
+              </p>
+              <p
+                class="text-[var(--color-text-secondary)]"
+                style="font-size: var(--font-size-sm);"
+              >
+                2 unread messages
+              </p>
+            </div>
+            <div
+              class="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)]"
+              style="padding: var(--spacing-sm); border-radius: var(--border-radius-lg);"
+            >
+              <p
+                class="font-semibold text-[var(--color-text-primary)]"
+                style="font-size: var(--font-size-base);"
+              >
+                Product Crew
+              </p>
+              <p
+                class="text-[var(--color-text-secondary)]"
+                style="font-size: var(--font-size-sm);"
+              >
+                2 unread messages
+              </p>
+            </div>
+            <div
+              class="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)]"
+              style="padding: var(--spacing-sm); border-radius: var(--border-radius-lg);"
+            >
+              <p
+                class="font-semibold text-[var(--color-text-primary)]"
+                style="font-size: var(--font-size-base);"
+              >
+                Ops Updates
+              </p>
+              <p
+                class="text-[var(--color-text-secondary)]"
+                style="font-size: var(--font-size-sm);"
+              >
+                2 unread messages
+              </p>
+            </div>
+          </div>
+          <div
+            class="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)]"
+            style="padding: var(--spacing-lg); border-radius: var(--border-radius-2xl); box-shadow: var(--shadow-md);"
+          >
+            <div
+              class="flex items-center border-b border-[var(--color-border)] pb-3"
+              style="gap: var(--spacing-sm); padding-bottom: var(--spacing-sm);"
+            >
+              <span
+                class="h-10 w-10 rounded-full bg-[var(--color-primary)]/20"
+                style="border-radius: var(--border-radius-2xl);"
+              />
+              <div>
+                <p
+                  class="font-semibold text-[var(--color-text-primary)]"
+                  style="font-size: var(--font-size-base);"
+                >
+                  Design Squad
+                </p>
+                <p
+                  class="text-[var(--color-text-secondary)]"
+                  style="font-size: var(--font-size-sm);"
+                >
+                  Online now
+                </p>
+              </div>
+            </div>
+            <div
+              class="flex flex-col py-4"
+              style="gap: var(--spacing-sm); padding-top: var(--spacing-md); padding-bottom: var(--spacing-md);"
+            >
+              <p
+                class="w-3/4 rounded-2xl rounded-bl-none border border-[var(--color-border)] bg-[var(--color-background)] text-[var(--color-text-primary)]"
+                style="padding: var(--spacing-sm); font-size: var(--font-size-base); box-shadow: var(--shadow-sm);"
+              >
+                Can we brighten the accent color a bit more?
+              </p>
+              <p
+                class="ml-auto w-3/4 rounded-2xl rounded-br-none bg-[var(--color-primary)] text-white"
+                style="padding: var(--spacing-sm); font-size: var(--font-size-base); box-shadow: var(--shadow-sm);"
+              >
+                Absolutely! Adjusting theme variables live now.
+              </p>
+            </div>
+            <div
+              class="flex items-center rounded-full border border-[var(--color-border)]"
+              style="padding: var(--spacing-xs) var(--spacing-md); gap: var(--spacing-xs);"
+            >
+              <span
+                class="h-3 w-3 rounded-full bg-[var(--color-primary)]"
+              />
+              <p
+                class="text-[var(--color-text-secondary)]"
+                style="font-size: var(--font-size-sm);"
+              >
+                Type your message...
+              </p>
+            </div>
+          </div>
+        </div>
+        <div
+          class="mt-6 space-y-4"
+        >
+          <div
+            aria-label="Common component samples"
+            class="grid gap-4 lg:grid-cols-2"
+            role="region"
+          >
+            <div
+              class="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)]"
+              style="padding: var(--spacing-md); border-radius: var(--border-radius-xl);"
+            >
+              <p
+                class="text-xs uppercase tracking-wide text-[var(--color-text-secondary)]"
+              >
+                Buttons
+              </p>
+              <div
+                class="mt-3 grid gap-2 md:grid-cols-2"
+                style="gap: var(--spacing-sm);"
+              >
+                <button
+                  class="rounded-lg bg-[var(--color-primary)] font-semibold text-white"
+                  style="padding: var(--spacing-sm); border-radius: var(--border-radius-lg);"
+                  type="button"
+                >
+                  Primary Action
+                </button>
+                <button
+                  class="rounded-lg border border-[var(--color-primary)] font-semibold text-[var(--color-primary)]"
+                  style="padding: var(--spacing-sm); border-radius: var(--border-radius-lg);"
+                  type="button"
+                >
+                  Secondary
+                </button>
+                <button
+                  class="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-elevated)] font-semibold text-[var(--color-text-primary)]"
+                  style="padding: var(--spacing-sm); border-radius: var(--border-radius-lg);"
+                  type="button"
+                >
+                  Outline
+                </button>
+                <button
+                  class="rounded-lg bg-[var(--color-error)]/10 font-semibold text-[var(--color-error)]"
+                  style="padding: var(--spacing-sm); border-radius: var(--border-radius-lg);"
+                  type="button"
+                >
+                  Danger
+                </button>
+              </div>
+            </div>
+            <div
+              class="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)]"
+              style="padding: var(--spacing-md); border-radius: var(--border-radius-xl);"
+            >
+              <p
+                class="text-xs uppercase tracking-wide text-[var(--color-text-secondary)]"
+              >
+                Form Elements
+              </p>
+              <div
+                class="mt-3 flex flex-col"
+                style="gap: var(--spacing-sm);"
+              >
+                <label
+                  class="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]"
+                >
+                  Project Name
+                  <input
+                    class="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-background)] text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
+                    style="padding: var(--spacing-xs) var(--spacing-sm);"
+                    type="text"
+                    value="OmniNudge Preview"
+                  />
+                </label>
+                <label
+                  class="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]"
+                >
+                  Category
+                  <select
+                    class="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-background)] text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
+                    style="padding: var(--spacing-xs) var(--spacing-sm);"
+                  >
+                    <option
+                      selected=""
+                      value="design"
+                    >
+                      Design
+                    </option>
+                    <option
+                      value="marketing"
+                    >
+                      Marketing
+                    </option>
+                    <option
+                      value="dev"
+                    >
+                      Development
+                    </option>
+                  </select>
+                </label>
+                <label
+                  class="flex items-center justify-between text-sm text-[var(--color-text-primary)]"
+                >
+                  Enable Beta Access
+                  <span
+                    class="relative inline-flex items-center"
+                  >
+                    <input
+                      checked=""
+                      class="peer sr-only"
+                      type="checkbox"
+                    />
+                    <span
+                      class="h-5 w-10 rounded-full bg-[var(--color-border)] transition-all peer-checked:bg-[var(--color-primary)]"
+                    />
+                    <span
+                      class="absolute left-1 top-1 h-3 w-3 rounded-full bg-white transition-all peer-checked:translate-x-5"
+                    />
+                  </span>
+                </label>
+              </div>
+            </div>
+          </div>
+          <div
+            class="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)]"
+            style="padding: var(--spacing-md); border-radius: var(--border-radius-xl);"
+          >
+            <p
+              class="text-xs uppercase tracking-wide text-[var(--color-text-secondary)]"
+            >
+              Status Indicators
+            </p>
+            <div
+              class="mt-3 grid gap-3 sm:grid-cols-2"
+              style="gap: var(--spacing-sm);"
+            >
+              <div
+                class="flex items-center justify-between rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-elevated)]"
+                style="padding: var(--spacing-sm); border-radius: var(--border-radius-lg);"
+              >
+                <div>
+                  <p
+                    class="text-sm font-semibold text-[var(--color-text-primary)]"
+                  >
+                    Live
+                  </p>
+                  <p
+                    class="text-xs text-[var(--color-text-secondary)]"
+                  >
+                    8 updates
+                  </p>
+                </div>
+                <span
+                  class="h-8 w-8 rounded-full"
+                  style="background-color: var(--color-success); opacity: 0.2;"
+                />
+              </div>
+              <div
+                class="flex items-center justify-between rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-elevated)]"
+                style="padding: var(--spacing-sm); border-radius: var(--border-radius-lg);"
+              >
+                <div>
+                  <p
+                    class="text-sm font-semibold text-[var(--color-text-primary)]"
+                  >
+                    Scheduled
+                  </p>
+                  <p
+                    class="text-xs text-[var(--color-text-secondary)]"
+                  >
+                    8 updates
+                  </p>
+                </div>
+                <span
+                  class="h-8 w-8 rounded-full"
+                  style="background-color: var(--color-info); opacity: 0.2;"
+                />
+              </div>
+              <div
+                class="flex items-center justify-between rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-elevated)]"
+                style="padding: var(--spacing-sm); border-radius: var(--border-radius-lg);"
+              >
+                <div>
+                  <p
+                    class="text-sm font-semibold text-[var(--color-text-primary)]"
+                  >
+                    Needs Review
+                  </p>
+                  <p
+                    class="text-xs text-[var(--color-text-secondary)]"
+                  >
+                    8 updates
+                  </p>
+                </div>
+                <span
+                  class="h-8 w-8 rounded-full"
+                  style="background-color: var(--color-warning); opacity: 0.2;"
+                />
+              </div>
+              <div
+                class="flex items-center justify-between rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-elevated)]"
+                style="padding: var(--spacing-sm); border-radius: var(--border-radius-lg);"
+              >
+                <div>
+                  <p
+                    class="text-sm font-semibold text-[var(--color-text-primary)]"
+                  >
+                    Blocked
+                  </p>
+                  <p
+                    class="text-xs text-[var(--color-text-secondary)]"
+                  >
+                    8 updates
+                  </p>
+                </div>
+                <span
+                  class="h-8 w-8 rounded-full"
+                  style="background-color: var(--color-error); opacity: 0.2;"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+`;
