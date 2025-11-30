@@ -6,6 +6,9 @@ import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import HomePage from './pages/HomePage';
 import ThemesPage from './pages/ThemesPage';
+import RedditPage from './pages/RedditPage';
+import PostsPage from './pages/PostsPage';
+import MessagesPage from './pages/MessagesPage';
 import './App.css';
 
 function App() {
@@ -27,10 +30,9 @@ function App() {
           >
             <Route path="/" element={<HomePage />} />
             <Route path="/themes" element={<ThemesPage />} />
-            {/* Placeholder routes for features we'll build */}
-            <Route path="/reddit" element={<div className="p-8 text-center text-[var(--color-text-secondary)]">Reddit feed coming soon...</div>} />
-            <Route path="/posts" element={<div className="p-8 text-center text-[var(--color-text-secondary)]">Posts feed coming soon...</div>} />
-            <Route path="/messages" element={<div className="p-8 text-center text-[var(--color-text-secondary)]">Messages coming soon...</div>} />
+            <Route path="/reddit" element={<RedditPage />} />
+            <Route path="/posts" element={<PostsPage />} />
+            <Route path="/messages" element={<MessagesPage />} />
           </Route>
 
           {/* Catch all */}
