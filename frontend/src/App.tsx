@@ -1,35 +1,104 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
+import ThemeSelector from './components/themes/ThemeSelector';
+import { useTheme } from './hooks/useTheme';
+import './App.css';
 
 function App() {
-  const [count, setCount] = useState(0)
+  const { activeTheme, isLoading, cssVariables } = useTheme();
 
   return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.tsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
-  )
+    <div className="min-h-screen bg-[var(--color-background)] px-4 py-10 text-[var(--color-text-primary)]">
+      <main className="mx-auto flex max-w-4xl flex-col gap-8">
+        <section className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6 shadow-md">
+          <header className="mb-6 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+            <div>
+              <p className="text-sm uppercase tracking-wide text-[var(--color-text-secondary)]">
+                Theme System
+              </p>
+              <h1 className="text-2xl font-bold text-[var(--color-text-primary)]">
+                {activeTheme ? activeTheme.theme_name : 'No theme selected'}
+              </h1>
+              <p className="text-sm text-[var(--color-text-secondary)]">
+                {activeTheme?.theme_description ??
+                  'Choose a theme to see the UI update in real-time.'}
+              </p>
+            </div>
+            <ThemeSelector />
+          </header>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <article className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4 shadow-sm">
+              <p className="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
+                Primary Palette
+              </p>
+              <div className="mt-3 flex gap-3">
+                {['--color-primary', '--color-primary-dark', '--color-primary-light', '--color-success'].map(
+                  (variable) => (
+                    <div key={variable} className="flex flex-col items-center gap-1">
+                      <span
+                        className="h-12 w-12 rounded-full border border-[var(--color-border)]"
+                        style={{ backgroundColor: `var(${variable})` }}
+                      />
+                      <span className="text-[10px] text-[var(--color-text-muted)]">
+                        {variable.replace('--color-', '')}
+                      </span>
+                    </div>
+                  )
+                )}
+              </div>
+            </article>
+
+            <article className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4 shadow-sm">
+              <p className="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
+                Typography Preview
+              </p>
+              <div className="mt-3 flex flex-col gap-2">
+                {[
+                  { label: 'Heading', className: 'text-xl font-semibold' },
+                  { label: 'Body', className: 'text-base' },
+                  { label: 'Caption', className: 'text-sm text-[var(--color-text-secondary)]' },
+                ].map((item) => (
+                  <div key={item.label}>
+                    <p className="text-xs uppercase tracking-wide text-[var(--color-text-muted)]">
+                      {item.label}
+                    </p>
+                    <p className={item.className}>
+                      The quick brown fox jumps over the lazy dog.
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </article>
+          </div>
+        </section>
+
+        <section className="rounded-2xl border border-dashed border-[var(--color-border)] bg-[var(--color-surface)] p-6">
+          <p className="text-sm uppercase tracking-wide text-[var(--color-text-secondary)]">
+            Debug Info
+          </p>
+          {isLoading ? (
+            <p className="mt-2 text-sm text-[var(--color-text-secondary)]">
+              Loading theme data…
+            </p>
+          ) : (
+            <div className="mt-4 space-y-2 text-sm text-[var(--color-text-secondary)]">
+              <p>
+                <span className="font-semibold text-[var(--color-text-primary)]">
+                  Active Theme ID:
+                </span>{' '}
+                {activeTheme?.id ?? 'n/a'}
+              </p>
+              <p>
+                <span className="font-semibold text-[var(--color-text-primary)]">
+                  CSS Variables Loaded:
+                </span>{' '}
+                {Object.keys(cssVariables).length}
+              </p>
+            </div>
+          )}
+        </section>
+      </main>
+    </div>
+  );
 }
 
-export default App
+export default App;
