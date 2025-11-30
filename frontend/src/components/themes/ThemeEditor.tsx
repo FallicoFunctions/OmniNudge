@@ -78,13 +78,11 @@ const ThemeEditor = ({ isOpen, onClose, initialTheme = null }: ThemeEditorProps)
       cssVariables['--color-text-primary'] ?? DEFAULT_THEME_VARIABLES['--color-text-primary'];
     const textSecondary =
       cssVariables['--color-text-secondary'] ?? DEFAULT_THEME_VARIABLES['--color-text-secondary'];
-
     const combos = [
       { label: 'Primary text on background', fg: textPrimary, bg: background },
       { label: 'Secondary text on surface', fg: textSecondary, bg: surface },
       { label: 'Primary text on surface', fg: textPrimary, bg: surface },
     ];
-
     return combos
       .map((combo) => {
         const ratio = getContrastRatio(combo.fg, combo.bg);

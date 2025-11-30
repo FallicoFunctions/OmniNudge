@@ -344,6 +344,7 @@ const ThemePreview = ({
                   padding: 'var(--spacing-xs) var(--spacing-md)',
                   borderRadius: 'var(--border-radius-2xl)',
                 }}
+                aria-label="Message Explorer"
               >
                 Message
               </button>
@@ -355,7 +356,7 @@ const ThemePreview = ({
               Working on OmniNudge theme marketplace. I love vibrant palettes and soft gradients.
             </p>
           </div>
-          <div className="grid md:grid-cols-3" style={{ gap: 'var(--spacing-md)' }}>
+          <div className="grid md:grid-cols-3" style={{ gap: 'var(--spacing-md)' }} aria-label="Profile stats">
             {['Posts', 'Themes', 'Reactions'].map((label) => (
               <div
                 key={label}
