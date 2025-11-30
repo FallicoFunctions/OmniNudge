@@ -4,8 +4,8 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/omninudge/backend/internal/models"
 	"github.com/gin-gonic/gin"
+	"github.com/omninudge/backend/internal/models"
 )
 
 // ModerationHandler handles moderation reports
@@ -44,9 +44,9 @@ func (h *ModerationHandler) CreateReport(c *gin.Context) {
 	}
 
 	switch req.TargetType {
-	case "post", "comment", "user", "message":
+	case "post", "comment", "user", "message", "reddit_comment":
 	default:
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid target_type. Use post, comment, user, or message"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid target_type. Use post, comment, message, user, or reddit_comment"})
 		return
 	}
 

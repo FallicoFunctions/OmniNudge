@@ -9,19 +9,20 @@ import (
 
 // RedditPostComment represents a comment on a Reddit post (stored locally on your platform)
 type RedditPostComment struct {
-	ID              int        `json:"id"`
-	Subreddit       string     `json:"subreddit"`
-	RedditPostID    string     `json:"reddit_post_id"`
-	RedditPostTitle *string    `json:"reddit_post_title,omitempty"`
-	UserID          int        `json:"user_id"`
-	Username        string     `json:"username"`
-	ParentCommentID *int       `json:"parent_comment_id"`
-	Content         string     `json:"content"`
-	Score           int        `json:"score"`
-	UserVote        *int       `json:"user_vote,omitempty"` // -1, 0, or 1 representing current user's vote
-	CreatedAt       time.Time  `json:"created_at"`
-	UpdatedAt       *time.Time `json:"updated_at,omitempty"`
-	DeletedAt       *time.Time `json:"deleted_at,omitempty"`
+	ID                   int        `json:"id"`
+	Subreddit            string     `json:"subreddit"`
+	RedditPostID         string     `json:"reddit_post_id"`
+	RedditPostTitle      *string    `json:"reddit_post_title,omitempty"`
+	UserID               int        `json:"user_id"`
+	Username             string     `json:"username"`
+	ParentCommentID      *int       `json:"parent_comment_id"`
+	Content              string     `json:"content"`
+	Score                int        `json:"score"`
+	InboxRepliesDisabled bool       `json:"inbox_replies_disabled"`
+	UserVote             *int       `json:"user_vote,omitempty"` // -1, 0, or 1 representing current user's vote
+	CreatedAt            time.Time  `json:"created_at"`
+	UpdatedAt            *time.Time `json:"updated_at,omitempty"`
+	DeletedAt            *time.Time `json:"deleted_at,omitempty"`
 }
 
 // RedditPostCommentRepository manages local comments on Reddit posts
@@ -48,7 +49,7 @@ func (r *RedditPostCommentRepository) Create(ctx context.Context, comment *Reddi
 		INSERT INTO reddit_post_comments (
 			subreddit, reddit_post_id, reddit_post_title, user_id, parent_comment_id, content, score
 		) VALUES ($1, $2, $3, $4, $5, $6, 1)
-		RETURNING id, created_at, score
+		RETURNING id, created_at, score, inbox_replies_disabled
 	`
 	err = tx.QueryRow(ctx, query,
 		comment.Subreddit,
@@ -57,7 +58,7 @@ func (r *RedditPostCommentRepository) Create(ctx context.Context, comment *Reddi
 		comment.UserID,
 		comment.ParentCommentID,
 		comment.Content,
-	).Scan(&comment.ID, &comment.CreatedAt, &comment.Score)
+	).Scan(&comment.ID, &comment.CreatedAt, &comment.Score, &comment.InboxRepliesDisabled)
 	if err != nil {
 		return err
 	}
@@ -79,7 +80,8 @@ func (r *RedditPostCommentRepository) GetByRedditPostWithUserVotes(ctx context.C
 	query := `
 		SELECT
 			rc.id, rc.subreddit, rc.reddit_post_id, rc.reddit_post_title, rc.user_id, u.username,
-			rc.parent_comment_id, rc.content, rc.score, rc.created_at, rc.updated_at, rc.deleted_at,
+			rc.parent_comment_id, rc.content, rc.score, rc.inbox_replies_disabled,
+			rc.created_at, rc.updated_at, rc.deleted_at,
 			COALESCE(v.vote_type, 0) as user_vote
 		FROM reddit_post_comments rc
 		JOIN users u ON u.id = rc.user_id
@@ -100,7 +102,7 @@ func (r *RedditPostCommentRepository) GetByRedditPostWithUserVotes(ctx context.C
 		if err := rows.Scan(
 			&comment.ID, &comment.Subreddit, &comment.RedditPostID, &comment.RedditPostTitle,
 			&comment.UserID, &comment.Username,
-			&comment.ParentCommentID, &comment.Content, &comment.Score,
+			&comment.ParentCommentID, &comment.Content, &comment.Score, &comment.InboxRepliesDisabled,
 			&comment.CreatedAt, &comment.UpdatedAt, &comment.DeletedAt,
 			&userVote,
 		); err != nil {
@@ -118,7 +120,8 @@ func (r *RedditPostCommentRepository) GetByRedditPost(ctx context.Context, subre
 	query := `
 		SELECT
 			rc.id, rc.subreddit, rc.reddit_post_id, rc.reddit_post_title, rc.user_id, u.username,
-			rc.parent_comment_id, rc.content, rc.score, rc.created_at, rc.updated_at, rc.deleted_at
+			rc.parent_comment_id, rc.content, rc.score, rc.inbox_replies_disabled,
+			rc.created_at, rc.updated_at, rc.deleted_at
 		FROM reddit_post_comments rc
 		JOIN users u ON u.id = rc.user_id
 		WHERE rc.subreddit = $1 AND rc.reddit_post_id = $2 AND rc.deleted_at IS NULL
@@ -136,7 +139,7 @@ func (r *RedditPostCommentRepository) GetByRedditPost(ctx context.Context, subre
 		if err := rows.Scan(
 			&comment.ID, &comment.Subreddit, &comment.RedditPostID, &comment.RedditPostTitle,
 			&comment.UserID, &comment.Username,
-			&comment.ParentCommentID, &comment.Content, &comment.Score,
+			&comment.ParentCommentID, &comment.Content, &comment.Score, &comment.InboxRepliesDisabled,
 			&comment.CreatedAt, &comment.UpdatedAt, &comment.DeletedAt,
 		); err != nil {
 			return nil, err
@@ -151,7 +154,8 @@ func (r *RedditPostCommentRepository) GetByID(ctx context.Context, id int) (*Red
 	query := `
 		SELECT
 			rc.id, rc.subreddit, rc.reddit_post_id, rc.reddit_post_title, rc.user_id, u.username,
-			rc.parent_comment_id, rc.content, rc.score, rc.created_at, rc.updated_at, rc.deleted_at
+			rc.parent_comment_id, rc.content, rc.score, rc.inbox_replies_disabled,
+			rc.created_at, rc.updated_at, rc.deleted_at
 		FROM reddit_post_comments rc
 		JOIN users u ON u.id = rc.user_id
 		WHERE rc.id = $1
@@ -160,7 +164,7 @@ func (r *RedditPostCommentRepository) GetByID(ctx context.Context, id int) (*Red
 	err := r.pool.QueryRow(ctx, query, id).Scan(
 		&comment.ID, &comment.Subreddit, &comment.RedditPostID, &comment.RedditPostTitle,
 		&comment.UserID, &comment.Username,
-		&comment.ParentCommentID, &comment.Content, &comment.Score,
+		&comment.ParentCommentID, &comment.Content, &comment.Score, &comment.InboxRepliesDisabled,
 		&comment.CreatedAt, &comment.UpdatedAt, &comment.DeletedAt,
 	)
 	if err != nil {
@@ -177,6 +181,17 @@ func (r *RedditPostCommentRepository) Update(ctx context.Context, id int, conten
 		WHERE id = $2 AND deleted_at IS NULL
 	`
 	_, err := r.pool.Exec(ctx, query, content, id)
+	return err
+}
+
+// SetInboxRepliesDisabled toggles inbox reply notifications for a comment owner
+func (r *RedditPostCommentRepository) SetInboxRepliesDisabled(ctx context.Context, id int, userID int, disabled bool) error {
+	query := `
+		UPDATE reddit_post_comments
+		SET inbox_replies_disabled = $1, updated_at = NOW()
+		WHERE id = $2 AND user_id = $3 AND deleted_at IS NULL
+	`
+	_, err := r.pool.Exec(ctx, query, disabled, id, userID)
 	return err
 }
 

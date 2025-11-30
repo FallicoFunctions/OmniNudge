@@ -40,6 +40,12 @@ export default function MainLayout() {
                 >
                   Messages
                 </Link>
+                <Link
+                  to="/saved"
+                  className="rounded-md px-3 py-2 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
+                >
+                  Saved
+                </Link>
               </div>
             </div>
 
