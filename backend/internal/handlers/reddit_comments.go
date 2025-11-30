@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/omninudge/backend/internal/models"
 	"github.com/gin-gonic/gin"
+	"github.com/omninudge/backend/internal/models"
 )
 
 // RedditCommentsHandler handles HTTP requests for local comments on Reddit posts
@@ -37,8 +37,20 @@ func (h *RedditCommentsHandler) GetRedditPostComments(c *gin.Context) {
 		return
 	}
 
-	// Fetch comments from database
-	comments, err := h.redditCommentRepo.GetByRedditPost(c.Request.Context(), subreddit, postID)
+	// Try to get user ID (optional - endpoint works for both authenticated and anonymous users)
+	userID, hasUser := c.Get("user_id")
+
+	var comments []*models.RedditPostComment
+	var err error
+
+	if hasUser {
+		// Fetch comments with user votes
+		comments, err = h.redditCommentRepo.GetByRedditPostWithUserVotes(c.Request.Context(), subreddit, postID, userID.(int))
+	} else {
+		// Fetch comments without user votes
+		comments, err = h.redditCommentRepo.GetByRedditPost(c.Request.Context(), subreddit, postID)
+	}
+
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch comments", "details": err.Error()})
 		return
@@ -113,6 +125,9 @@ func (h *RedditCommentsHandler) CreateRedditPostComment(c *gin.Context) {
 		return
 	}
 
+	// Reflect the auto-upvote applied at creation time
+	comment.UserVote = intPtr(1)
+
 	// Fetch user data to include username in response
 	// The repository Create method doesn't return username, so fetch the full comment
 	fullComment, err := h.redditCommentRepo.GetByID(c.Request.Context(), comment.ID)
@@ -123,23 +138,28 @@ func (h *RedditCommentsHandler) CreateRedditPostComment(c *gin.Context) {
 		return
 	}
 
+	// Ensure response shows the comment already upvoted by the author
+	fullComment.UserVote = intPtr(1)
+
 	c.JSON(http.StatusCreated, fullComment)
 }
 
 // VoteRedditCommentRequest represents the request body for voting on a comment
 type VoteRedditCommentRequest struct {
-	Delta int `json:"delta" binding:"required,oneof=1 -1"`
+	Vote int `json:"vote" binding:"required,oneof=-1 0 1"` // -1 = downvote, 0 = remove vote, 1 = upvote
 }
 
 // VoteRedditPostComment handles POST /api/v1/reddit/posts/:subreddit/:postId/comments/:commentId/vote
-// Allows users to upvote (+1) or downvote (-1) a comment
+// Allows users to upvote (1), downvote (-1), or remove their vote (0)
+// If user clicks same vote twice, it removes the vote
 func (h *RedditCommentsHandler) VoteRedditPostComment(c *gin.Context) {
 	// Get user ID from context (authentication required)
-	_, exists := c.Get("user_id")
+	userIDInterface, exists := c.Get("user_id")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
 		return
 	}
+	userID := userIDInterface.(int)
 
 	// Parse comment ID from URL parameter
 	commentIDStr := c.Param("commentId")
@@ -149,28 +169,42 @@ func (h *RedditCommentsHandler) VoteRedditPostComment(c *gin.Context) {
 		return
 	}
 
-	// Parse vote delta
+	// Parse vote request
 	var req VoteRedditCommentRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body. Delta must be 1 (upvote) or -1 (downvote)", "details": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body. Vote must be -1 (downvote), 0 (remove), or 1 (upvote)", "details": err.Error()})
 		return
 	}
 
-	// Update the comment's score
-	if err := h.redditCommentRepo.Vote(c.Request.Context(), commentID, req.Delta); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to vote on comment", "details": err.Error()})
+	// Get current user's vote
+	currentVote, err := h.redditCommentRepo.GetUserVote(c.Request.Context(), commentID, userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get current vote", "details": err.Error()})
+		return
+	}
+
+	// Determine new vote: if clicking same vote, remove it (toggle behavior)
+	newVote := req.Vote
+	if currentVote == req.Vote && req.Vote != 0 {
+		newVote = 0 // Toggle off
+	}
+
+	// Set the vote
+	if err := h.redditCommentRepo.SetVote(c.Request.Context(), commentID, userID, newVote); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update vote", "details": err.Error()})
 		return
 	}
 
 	// Fetch updated comment
 	comment, err := h.redditCommentRepo.GetByID(c.Request.Context(), commentID)
 	if err != nil {
-		c.JSON(http.StatusOK, gin.H{"success": true})
+		c.JSON(http.StatusOK, gin.H{"success": true, "new_vote": newVote})
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"comment": comment,
+		"success":  true,
+		"comment":  comment,
+		"new_vote": newVote,
 	})
 }
