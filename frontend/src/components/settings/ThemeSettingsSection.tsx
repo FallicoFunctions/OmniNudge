@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import ThemeSelector from '../themes/ThemeSelector';
 import { useTheme } from '../../hooks/useTheme';
 
@@ -7,7 +8,31 @@ interface ThemeSettingsSectionProps {
 }
 
 const ThemeSettingsSection = ({ onCreateTheme, onManageThemes }: ThemeSettingsSectionProps) => {
-  const { activeTheme, isLoading } = useTheme();
+  const { activeTheme, isLoading, userSettings, setAdvancedMode } = useTheme();
+  const [advancedModeEnabled, setAdvancedModeEnabled] = useState(
+    userSettings?.advanced_mode_enabled ?? false
+  );
+  const [advancedModePending, setAdvancedModePending] = useState(false);
+  const [advancedModeError, setAdvancedModeError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setAdvancedModeEnabled(userSettings?.advanced_mode_enabled ?? false);
+  }, [userSettings]);
+
+  const handleAdvancedModeToggle = async (enabled: boolean) => {
+    const previousValue = advancedModeEnabled;
+    setAdvancedModeError(null);
+    setAdvancedModeEnabled(enabled);
+    setAdvancedModePending(true);
+    try {
+      await setAdvancedMode(enabled);
+    } catch {
+      setAdvancedModeError('Unable to update advanced mode. Please try again.');
+      setAdvancedModeEnabled(previousValue);
+    } finally {
+      setAdvancedModePending(false);
+    }
+  };
 
   return (
     <section className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6 shadow-md">
@@ -92,6 +117,51 @@ const ThemeSettingsSection = ({ onCreateTheme, onManageThemes }: ThemeSettingsSe
             </p>
           </div>
         </div>
+      </div>
+
+      <div className="mt-6 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4">
+        <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+          <div>
+            <p className="text-sm font-semibold text-[var(--color-text-primary)]">Advanced Mode</p>
+            <p className="text-xs text-[var(--color-text-secondary)]">
+              Unlock CSS overrides and upcoming power-user controls.
+            </p>
+          </div>
+          <label className="inline-flex items-center gap-3">
+            <span className="text-sm text-[var(--color-text-secondary)]">
+              {advancedModeEnabled ? 'Enabled' : 'Disabled'}
+            </span>
+            <button
+              type="button"
+              className={`relative inline-flex h-6 w-12 items-center rounded-full transition ${
+                advancedModeEnabled ? 'bg-[var(--color-primary)]' : 'bg-[var(--color-border)]'
+              } ${advancedModePending ? 'opacity-50' : ''}`}
+              onClick={() => handleAdvancedModeToggle(!advancedModeEnabled)}
+              disabled={advancedModePending}
+              aria-pressed={advancedModeEnabled}
+            >
+              <span
+                className={`inline-block h-5 w-5 transform rounded-full bg-white transition ${
+                  advancedModeEnabled ? 'translate-x-6' : 'translate-x-1'
+                }`}
+              />
+            </button>
+          </label>
+        </div>
+        {advancedModeError && (
+          <p className="mt-2 text-xs text-red-500" role="alert">
+            {advancedModeError}
+          </p>
+        )}
+        {userSettings?.updated_at && (
+          <p className="mt-2 text-xs text-[var(--color-text-secondary)]">
+            Last synced:{' '}
+            {new Date(userSettings.updated_at).toLocaleString(undefined, {
+              dateStyle: 'medium',
+              timeStyle: 'short',
+            })}
+          </p>
+        )}
       </div>
     </section>
   );
