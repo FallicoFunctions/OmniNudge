@@ -2,6 +2,8 @@ import { useMemo, useState } from 'react';
 import ThemePreviewCard from './ThemePreviewCard';
 import { useTheme } from '../../hooks/useTheme';
 import type { UserTheme } from '../../types/theme';
+import EmptyState from '../ui/EmptyState';
+import LoadingSpinner from '../ui/LoadingSpinner';
 
 const filterOptions = [
   { label: 'All', value: 'all' },
@@ -167,10 +169,25 @@ const ThemeGallery = ({ onCreateNewTheme, onEditTheme }: ThemeGalleryProps) => {
       )}
 
       {isLoading ? (
-        <p className="mt-6 text-sm text-[var(--color-text-secondary)]">Loading themes…</p>
+        <div className="mt-8">
+          <LoadingSpinner size="lg" message="Loading themes…" />
+        </div>
       ) : filteredThemes.length === 0 ? (
-        <div className="mt-8 rounded-2xl border border-dashed border-[var(--color-border)] p-8 text-center text-sm text-[var(--color-text-secondary)]">
-          No themes match your filters. Try adjusting your search or create a new theme.
+        <div className="mt-8">
+          <EmptyState
+            icon="🎨"
+            title={customThemes.length === 0 && filter === 'custom' ? 'No custom themes yet' : 'No themes found'}
+            description={
+              customThemes.length === 0 && filter === 'custom'
+                ? 'Get started by creating your first custom theme. Personalize colors, fonts, and more!'
+                : 'No themes match your filters. Try adjusting your search or create a new theme.'
+            }
+            action={
+              customThemes.length === 0 && filter === 'custom'
+                ? { label: 'Create Your First Theme', onClick: handleCreateTheme }
+                : undefined
+            }
+          />
         </div>
       ) : (
         <div className="mt-8 grid gap-6 md:grid-cols-2">

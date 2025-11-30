@@ -99,9 +99,17 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
       setError(null);
       setActiveTheme(theme);
 
+      // Add smooth transition animation (Section 13.1)
+      document.body.classList.add('theme-transitioning');
+
       const variables = theme.css_variables ?? {};
       applyCSSVariables(variables);
       setCssVariables(variables);
+
+      // Remove transition class after animation completes
+      setTimeout(() => {
+        document.body.classList.remove('theme-transitioning');
+      }, 300);
 
       if (persist) {
         persistThemeSelection(theme);
