@@ -136,14 +136,19 @@ function LocalCommentView({
   comment,
   subreddit,
   postId,
-  onReply
+  isReplying,
+  onReply,
+  onCancelReply,
 }: {
   comment: LocalComment;
   subreddit: string;
   postId: string;
+  isReplying: boolean;
   onReply: (commentId: number) => void;
+  onCancelReply: () => void;
 }) {
   const queryClient = useQueryClient();
+  const [replyText, setReplyText] = useState('');
 
   const voteMutation = useMutation({
     mutationFn: async (delta: 1 | -1) => {
@@ -155,6 +160,26 @@ function LocalCommentView({
       queryClient.invalidateQueries({ queryKey: ['reddit', 'posts', subreddit, postId, 'localComments'] });
     },
   });
+
+  const createReplyMutation = useMutation({
+    mutationFn: async (content: string) => {
+      return api.post(`/reddit/posts/${subreddit}/${postId}/comments`, {
+        content,
+        parent_comment_id: comment.id,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['reddit', 'posts', subreddit, postId, 'localComments'] });
+      setReplyText('');
+      onCancelReply();
+    },
+  });
+
+  const handleSubmitReply = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!replyText.trim()) return;
+    createReplyMutation.mutate(replyText);
+  };
 
   return (
     <div className="rounded border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-3">
@@ -195,6 +220,36 @@ function LocalCommentView({
           Reply
         </button>
       </div>
+
+      {/* Inline Reply Form */}
+      {isReplying && (
+        <form onSubmit={handleSubmitReply} className="mt-3">
+          <textarea
+            value={replyText}
+            onChange={(e) => setReplyText(e.target.value)}
+            placeholder="Write your reply..."
+            rows={3}
+            autoFocus
+            className="w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
+          />
+          <div className="mt-2 flex gap-2">
+            <button
+              type="submit"
+              disabled={createReplyMutation.isPending || !replyText.trim()}
+              className="rounded-md bg-[var(--color-primary)] px-3 py-1 text-xs font-semibold text-white hover:bg-[var(--color-primary-dark)] disabled:opacity-50"
+            >
+              {createReplyMutation.isPending ? 'Posting...' : 'Post Reply'}
+            </button>
+            <button
+              type="button"
+              onClick={onCancelReply}
+              className="rounded-md border border-[var(--color-border)] px-3 py-1 text-xs font-semibold text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-elevated)]"
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
+      )}
     </div>
   );
 }
@@ -241,13 +296,12 @@ export default function RedditPostPage() {
     mutationFn: async (content: string) => {
       return api.post(`/reddit/posts/${subreddit}/${postId}/comments`, {
         content,
-        parent_comment_id: replyingTo,
+        parent_comment_id: null, // Top-level comment only
       });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['reddit', 'posts', subreddit, postId, 'localComments'] });
       setCommentText('');
-      setReplyingTo(null);
     },
   });
 
@@ -361,22 +415,10 @@ export default function RedditPostPage() {
 
         {/* Comment Form */}
         <form onSubmit={handleSubmitComment} className="mb-6">
-          {replyingTo && (
-            <div className="mb-2 flex items-center gap-2 text-xs text-[var(--color-text-secondary)]">
-              <span>Replying to comment #{replyingTo}</span>
-              <button
-                type="button"
-                onClick={() => setReplyingTo(null)}
-                className="text-[var(--color-primary)] hover:underline"
-              >
-                Cancel
-              </button>
-            </div>
-          )}
           <textarea
             value={commentText}
             onChange={(e) => setCommentText(e.target.value)}
-            placeholder={replyingTo ? "Write your reply..." : "Share your thoughts about this Reddit post..."}
+            placeholder="Share your thoughts about this Reddit post..."
             rows={4}
             className="w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-2 text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
           />
@@ -385,7 +427,7 @@ export default function RedditPostPage() {
             disabled={createCommentMutation.isPending || !commentText.trim()}
             className="mt-2 rounded-md bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)] disabled:opacity-50"
           >
-            {createCommentMutation.isPending ? 'Posting...' : replyingTo ? 'Post Reply' : 'Add Comment'}
+            {createCommentMutation.isPending ? 'Posting...' : 'Add Comment'}
           </button>
         </form>
 
@@ -408,10 +450,9 @@ export default function RedditPostPage() {
                 comment={comment}
                 subreddit={subreddit}
                 postId={postId}
-                onReply={(commentId) => {
-                  setReplyingTo(commentId);
-                  window.scrollTo({ top: 0, behavior: 'smooth' });
-                }}
+                isReplying={replyingTo === comment.id}
+                onReply={(commentId) => setReplyingTo(commentId)}
+                onCancelReply={() => setReplyingTo(null)}
               />
             ))}
           </div>
