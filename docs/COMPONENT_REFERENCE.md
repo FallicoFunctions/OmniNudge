@@ -11,6 +11,18 @@ This document lists all themeable components in OmniNudge with their CSS class n
 
 All components in OmniNudge use **stable, semantic class names** following the BEM (Block Element Modifier) naming convention. This ensures your custom CSS will continue to work across updates.
 
+### Theme Components & Storybook Plan
+
+| Component | Purpose | Notes |
+|-----------|---------|-------|
+| `ThemeSelector` | Dropdown/modal for switching themes | Covered by integration + E2E tests; add a Storybook story once Phase 2b begins (controls for predefined/custom lists) |
+| `ThemeEditor` | Multi-step modal for CRUD | Hard to host in Storybook until API mocks land; record short Looms for designers meanwhile |
+| `ThemePreview` | Live mock UI used inside the editor | Snapshot-tested (see `tests/visual/..`); keep props deterministic for visual regression |
+| `ThemePreviewCard` | Cards shown in gallery/selector | Document color swatches + CTAs here; accessible via Storybook once we stub `UserTheme` data |
+| `ThemeGallery` | Grid view + filters | Shares cards with selector; filters rely on React Query data |
+
+> Storybook setup (coming later): mount each component under `stories/theme/` with mocked `ThemeContext`. The same mock factories used in Vitest can be reused to keep fixtures consistent.
+
 **Naming Pattern:**
 ```
 .component-name              // Block
