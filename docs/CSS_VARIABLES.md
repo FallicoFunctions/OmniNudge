@@ -11,6 +11,15 @@ This document lists all CSS custom properties (variables) available in OmniNudge
 
 CSS variables provide a powerful way to customize OmniNudge's appearance without writing complex CSS. By changing a single variable, you can update colors, spacing, typography, and more throughout the entire application.
 
+### Quick Start for Editors
+
+1. Open the **Theme Editor → Variables** tab.
+2. Use the search input to jump to any variable name from this document (e.g., `--color-primary`).
+3. Hover the info icon in the editor to read the same description shown in the tables below.
+4. Resetting a variable in the editor restores the “Default” value listed here.
+
+> **Sync with Components:** Variables map 1:1 to Tailwind tokens in `ThemePreview`, ThemeSelector, and the rest of the UI, so updating the value here propagates everywhere automatically.
+
 **How to use CSS variables:**
 
 ```css
