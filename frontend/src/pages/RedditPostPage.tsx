@@ -12,12 +12,7 @@ interface RedditComment {
     body_html?: string;
     created_utc: number;
     score: number;
-    replies?: {
-      kind: string;
-      data: {
-        children: RedditComment[];
-      };
-    } | string;
+    replies?: RedditListing<RedditComment> | string;
     depth?: number;
   };
 }
@@ -34,10 +29,20 @@ interface RedditPostData {
   selftext?: string;
   selftext_html?: string;
   thumbnail?: string;
-  preview?: any;
+  preview?: unknown;
   is_self: boolean;
   post_hint?: string;
 }
+
+interface RedditListing<T> {
+  kind: string;
+  data: {
+    children: T[];
+  };
+}
+
+type RedditPostListing = RedditListing<{ kind: string; data: RedditPostData }>;
+type RedditCommentsListing = RedditListing<RedditComment>;
 
 interface LocalComment {
   id: number;
@@ -49,25 +54,34 @@ interface LocalComment {
 
 // Helper function to decode HTML entities and strip tags
 function decodeHtml(html: string): string {
-  const txt = document.createElement('textarea');
-  txt.innerHTML = html;
-  const decoded = txt.value;
-  // Strip HTML tags and clean up spacing
-  return decoded
-    .replace(/<[^>]*>/g, '') // Remove HTML tags
-    .replace(/\n\n+/g, '\n\n') // Replace multiple newlines with double newline
-    .trim();
+  // First decode HTML entities
+  const textarea = document.createElement('textarea');
+  textarea.innerHTML = html;
+  let decoded = textarea.value;
+  
+  // Remove HTML tags
+  decoded = decoded.replace(/<[^>]+>/g, '');
+  
+  // Clean up spacing - normalize multiple newlines
+  decoded = decoded.replace(/\n{3,}/g, '\n\n');
+  
+  return decoded.trim();
 }
 
 
 // Component to render a single Reddit comment with replies
 function RedditCommentView({ comment, depth = 0 }: { comment: RedditComment; depth?: number }) {
+  const [collapsed, setCollapsed] = useState(false);
+
   if (comment.kind === 'more') return null;
   if (!comment.data || !comment.data.body) return null;
 
-  const [collapsed, setCollapsed] = useState(false);
-  const hasReplies = comment.data.replies && typeof comment.data.replies !== 'string';
-  const replies = hasReplies ? (comment.data.replies as any).data.children : [];
+  const repliesListing =
+    comment.data.replies && typeof comment.data.replies !== 'string'
+      ? comment.data.replies
+      : undefined;
+  const replies = repliesListing?.data.children ?? [];
+  const hasReplies = replies.length > 0;
 
   return (
     <div className={`${depth > 0 ? 'ml-4 border-l-2 border-[var(--color-border)] pl-4' : ''}`}>
@@ -105,18 +119,22 @@ function RedditCommentView({ comment, depth = 0 }: { comment: RedditComment; dep
 
         {!collapsed && (
           <>
-            <div className="mt-1 text-sm text-[var(--color-text-primary)] text-left">
-              {decodeHtml(comment.data.body_html || comment.data.body || '').split('\n').map((line, i) => (
-                <span key={i}>
-                  {line}
-                  {i < decodeHtml(comment.data.body_html || comment.data.body || '').split('\n').length - 1 && <br />}
-                </span>
+            <div className="mt-1 text-sm text-[var(--color-text-primary)] text-left leading-normal">
+              {decodeHtml(comment.data.body_html || comment.data.body || '').split('\n\n').map((paragraph, i, arr) => (
+                <p key={i} className={i < arr.length - 1 ? 'mb-3' : ''}>
+                  {paragraph.split('\n').map((line, j, lineArr) => (
+                    <span key={j}>
+                      {line}
+                      {j < lineArr.length - 1 && <br />}
+                    </span>
+                  ))}
+                </p>
               ))}
             </div>
 
             {hasReplies && (
               <div className="mt-3">
-                {replies.map((reply: RedditComment, index: number) => (
+                {replies.map((reply, index) => (
                   <RedditCommentView key={reply.data?.id || index} comment={reply} depth={depth + 1} />
                 ))}
               </div>
@@ -139,7 +157,9 @@ export default function RedditPostPage() {
   const { data: redditData, isLoading: loadingReddit } = useQuery({
     queryKey: ['reddit', 'post', subreddit, postId],
     queryFn: async () => {
-      const response = await api.get<any>(`/reddit/r/${subreddit}/comments/${postId}`);
+      const response = await api.get<[RedditPostListing, RedditCommentsListing]>(
+        `/reddit/r/${subreddit}/comments/${postId}`
+      );
       // Reddit API returns [postListing, commentsListing]
       const postListing = response[0];
       const commentsListing = response[1];
@@ -239,12 +259,16 @@ export default function RedditPostPage() {
           )}
 
           {post.is_self && post.selftext && (
-            <div className="mb-4 text-sm text-[var(--color-text-primary)] text-left">
-              {decodeHtml(post.selftext_html || post.selftext).split('\n').map((line, i) => (
-                <span key={i}>
-                  {line}
-                  {i < decodeHtml(post.selftext_html || post.selftext).split('\n').length - 1 && <br />}
-                </span>
+            <div className="mb-4 text-sm text-[var(--color-text-primary)] text-left leading-normal">
+              {decodeHtml(post.selftext_html || post.selftext).split('\n\n').map((paragraph, i, arr) => (
+                <p key={i} className={i < arr.length - 1 ? 'mb-3' : ''}>
+                  {paragraph.split('\n').map((line, j, lineArr) => (
+                    <span key={j}>
+                      {line}
+                      {j < lineArr.length - 1 && <br />}
+                    </span>
+                  ))}
+                </p>
               ))}
             </div>
           )}
