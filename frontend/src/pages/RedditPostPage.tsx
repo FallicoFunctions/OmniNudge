@@ -50,6 +50,7 @@ interface LocalComment {
   content: string;
   created_at: string;
   parent_comment_id: number | null;
+  score: number;
 }
 
 
@@ -125,6 +126,74 @@ function RedditCommentView({ comment, depth = 0 }: { comment: RedditComment; dep
             )}
           </>
         )}
+      </div>
+    </div>
+  );
+}
+
+// Component to render a single local comment with voting and replies
+function LocalCommentView({
+  comment,
+  subreddit,
+  postId,
+  onReply
+}: {
+  comment: LocalComment;
+  subreddit: string;
+  postId: string;
+  onReply: (commentId: number) => void;
+}) {
+  const queryClient = useQueryClient();
+
+  const voteMutation = useMutation({
+    mutationFn: async (delta: 1 | -1) => {
+      return api.post(`/reddit/posts/${subreddit}/${postId}/comments/${comment.id}/vote`, {
+        delta,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['reddit', 'posts', subreddit, postId, 'localComments'] });
+    },
+  });
+
+  return (
+    <div className="rounded border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-3">
+      <div className="text-xs text-[var(--color-text-secondary)]">
+        u/{comment.username} • {new Date(comment.created_at).toLocaleString()}
+      </div>
+      <div className="mt-2 text-sm text-[var(--color-text-primary)]">
+        {comment.content}
+      </div>
+
+      {/* Voting and Reply Controls */}
+      <div className="mt-2 flex items-center gap-3 text-xs">
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => voteMutation.mutate(1)}
+            disabled={voteMutation.isPending}
+            className="text-[var(--color-text-secondary)] hover:text-orange-500 disabled:opacity-50"
+            title="Upvote"
+          >
+            ▲
+          </button>
+          <span className="min-w-[20px] text-center font-semibold text-[var(--color-text-primary)]">
+            {comment.score}
+          </span>
+          <button
+            onClick={() => voteMutation.mutate(-1)}
+            disabled={voteMutation.isPending}
+            className="text-[var(--color-text-secondary)] hover:text-blue-500 disabled:opacity-50"
+            title="Downvote"
+          >
+            ▼
+          </button>
+        </div>
+        <button
+          onClick={() => onReply(comment.id)}
+          className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+        >
+          Reply
+        </button>
       </div>
     </div>
   );
@@ -292,10 +361,22 @@ export default function RedditPostPage() {
 
         {/* Comment Form */}
         <form onSubmit={handleSubmitComment} className="mb-6">
+          {replyingTo && (
+            <div className="mb-2 flex items-center gap-2 text-xs text-[var(--color-text-secondary)]">
+              <span>Replying to comment #{replyingTo}</span>
+              <button
+                type="button"
+                onClick={() => setReplyingTo(null)}
+                className="text-[var(--color-primary)] hover:underline"
+              >
+                Cancel
+              </button>
+            </div>
+          )}
           <textarea
             value={commentText}
             onChange={(e) => setCommentText(e.target.value)}
-            placeholder="Share your thoughts about this Reddit post..."
+            placeholder={replyingTo ? "Write your reply..." : "Share your thoughts about this Reddit post..."}
             rows={4}
             className="w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-2 text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
           />
@@ -304,7 +385,7 @@ export default function RedditPostPage() {
             disabled={createCommentMutation.isPending || !commentText.trim()}
             className="mt-2 rounded-md bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)] disabled:opacity-50"
           >
-            {createCommentMutation.isPending ? 'Posting...' : 'Add Comment'}
+            {createCommentMutation.isPending ? 'Posting...' : replyingTo ? 'Post Reply' : 'Add Comment'}
           </button>
         </form>
 
@@ -322,17 +403,16 @@ export default function RedditPostPage() {
         {localCommentsData && localCommentsData.length > 0 && (
           <div className="space-y-4">
             {localCommentsData.map((comment) => (
-              <div
+              <LocalCommentView
                 key={comment.id}
-                className="rounded border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-3"
-              >
-                <div className="text-xs text-[var(--color-text-secondary)]">
-                  u/{comment.username} • {new Date(comment.created_at).toLocaleString()}
-                </div>
-                <div className="mt-2 text-sm text-[var(--color-text-primary)]">
-                  {comment.content}
-                </div>
-              </div>
+                comment={comment}
+                subreddit={subreddit}
+                postId={postId}
+                onReply={(commentId) => {
+                  setReplyingTo(commentId);
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+              />
             ))}
           </div>
         )}

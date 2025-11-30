@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/omninudge/backend/internal/models"
@@ -123,4 +124,53 @@ func (h *RedditCommentsHandler) CreateRedditPostComment(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusCreated, fullComment)
+}
+
+// VoteRedditCommentRequest represents the request body for voting on a comment
+type VoteRedditCommentRequest struct {
+	Delta int `json:"delta" binding:"required,oneof=1 -1"`
+}
+
+// VoteRedditPostComment handles POST /api/v1/reddit/posts/:subreddit/:postId/comments/:commentId/vote
+// Allows users to upvote (+1) or downvote (-1) a comment
+func (h *RedditCommentsHandler) VoteRedditPostComment(c *gin.Context) {
+	// Get user ID from context (authentication required)
+	_, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
+
+	// Parse comment ID from URL parameter
+	commentIDStr := c.Param("commentId")
+	commentID := 0
+	if _, err := fmt.Sscanf(commentIDStr, "%d", &commentID); err != nil || commentID <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid comment ID"})
+		return
+	}
+
+	// Parse vote delta
+	var req VoteRedditCommentRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body. Delta must be 1 (upvote) or -1 (downvote)", "details": err.Error()})
+		return
+	}
+
+	// Update the comment's score
+	if err := h.redditCommentRepo.Vote(c.Request.Context(), commentID, req.Delta); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to vote on comment", "details": err.Error()})
+		return
+	}
+
+	// Fetch updated comment
+	comment, err := h.redditCommentRepo.GetByID(c.Request.Context(), commentID)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{"success": true})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"comment": comment,
+	})
 }

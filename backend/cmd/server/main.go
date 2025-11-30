@@ -298,6 +298,7 @@ func main() {
 
 			// Protected Reddit post comments routes (site-only comments on Reddit posts)
 			protected.POST("/reddit/posts/:subreddit/:postId/comments", redditCommentsHandler.CreateRedditPostComment)
+		protected.POST("/reddit/posts/:subreddit/:postId/comments/:commentId/vote", redditCommentsHandler.VoteRedditPostComment)
 
 			// Protected hub creation
 			protected.POST("/hubs", hubsHandler.Create)
