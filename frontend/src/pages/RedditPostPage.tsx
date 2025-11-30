@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { redditService } from '../services/redditService';
-import { postsService } from '../services/postsService';
+import { api } from '../lib/api';
 
 export default function RedditPostPage() {
   const { subreddit, postId } = useParams<{ subreddit: string; postId: string }>();
@@ -19,29 +19,26 @@ export default function RedditPostPage() {
   });
 
   // Fetch local comments for this Reddit post (stored on our platform)
-  // Note: We need to create a pseudo-post ID for Reddit posts on our backend
-  // For now, we'll use a convention: "reddit_${subreddit}_${postId}"
-  const localPostId = `reddit_${subreddit}_${postId}`;
-
-  const { data: localComments, isLoading: loadingLocal } = useQuery({
-    queryKey: ['comments', 'local', localPostId],
+  const { data: localCommentsData, isLoading: loadingLocal } = useQuery({
+    queryKey: ['reddit', 'posts', subreddit, postId, 'localComments'],
     queryFn: async () => {
-      // TODO: Implement backend endpoint to fetch local comments for Reddit posts
-      // For now, return empty array
-      return [];
+      const response = await api.get<{ comments: any[] }>(
+        `/reddit/posts/${subreddit}/${postId}/comments`
+      );
+      return response.comments || [];
     },
     enabled: !!subreddit && !!postId,
   });
 
   const createCommentMutation = useMutation({
     mutationFn: async (content: string) => {
-      // TODO: Implement backend endpoint to create local comments on Reddit posts
-      // This would store comments in your database, visible only on your site
-      console.log('Creating local comment:', content);
-      return { id: Date.now(), content };
+      return api.post(`/reddit/posts/${subreddit}/${postId}/comments`, {
+        content,
+        parent_comment_id: replyingTo,
+      });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['comments', 'local', localPostId] });
+      queryClient.invalidateQueries({ queryKey: ['reddit', 'posts', subreddit, postId, 'localComments'] });
       setCommentText('');
       setReplyingTo(null);
     },
@@ -119,21 +116,21 @@ export default function RedditPostPage() {
           <div className="text-sm text-[var(--color-text-secondary)]">Loading comments...</div>
         )}
 
-        {localComments && localComments.length === 0 && (
+        {localCommentsData && localCommentsData.length === 0 && (
           <div className="text-sm text-[var(--color-text-secondary)]">
             No comments yet. Be the first to comment on this post!
           </div>
         )}
 
-        {localComments && localComments.length > 0 && (
+        {localCommentsData && localCommentsData.length > 0 && (
           <div className="space-y-4">
-            {localComments.map((comment: any) => (
+            {localCommentsData.map((comment: any) => (
               <div
                 key={comment.id}
                 className="rounded border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-3"
               >
                 <div className="text-xs text-[var(--color-text-secondary)]">
-                  u/{comment.author_username} • {new Date(comment.created_at).toLocaleString()}
+                  u/{comment.username} • {new Date(comment.created_at).toLocaleString()}
                 </div>
                 <div className="mt-2 text-sm text-[var(--color-text-primary)]">
                   {comment.content}
