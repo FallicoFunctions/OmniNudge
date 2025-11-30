@@ -1,19 +1,11 @@
 import { useMemo, useState } from 'react';
 import { useTheme } from '../../hooks/useTheme';
 import type { UserTheme } from '../../types/theme';
+import { getThemeVariable } from '../../utils/theme';
 
 interface ThemeSelectorProps {
   onCreateNewTheme?: () => void;
 }
-
-const resolveVariable = (
-  theme: UserTheme,
-  key: string,
-  fallback: string
-): string => {
-  const variables = theme.css_variables ?? {};
-  return variables[key] ?? variables[`--${key}`] ?? fallback;
-};
 
 const ThemeSelector = ({ onCreateNewTheme }: ThemeSelectorProps) => {
   const {
@@ -114,17 +106,13 @@ const ThemeSelector = ({ onCreateNewTheme }: ThemeSelectorProps) => {
                   ) : (
                     themes.map((theme) => {
                       const isActive = activeTheme?.id === theme.id;
-                      const primaryColor = resolveVariable(
-                        theme,
-                        '--color-primary',
-                        'var(--color-primary)'
-                      );
-                      const backgroundColor = resolveVariable(
+                      const primaryColor = getThemeVariable(theme, '--color-primary', 'var(--color-primary)');
+                      const backgroundColor = getThemeVariable(
                         theme,
                         '--color-background',
                         'var(--color-background)'
                       );
-                      const surfaceColor = resolveVariable(
+                      const surfaceColor = getThemeVariable(
                         theme,
                         '--color-surface',
                         'var(--color-surface)'

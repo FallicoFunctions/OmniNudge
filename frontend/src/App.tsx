@@ -1,4 +1,5 @@
 import ThemeSelector from './components/themes/ThemeSelector';
+import ThemeGallery from './components/themes/ThemeGallery';
 import { useTheme } from './hooks/useTheme';
 import './App.css';
 
@@ -7,7 +8,7 @@ function App() {
 
   return (
     <div className="min-h-screen bg-[var(--color-background)] px-4 py-10 text-[var(--color-text-primary)]">
-      <main className="mx-auto flex max-w-4xl flex-col gap-8">
+      <main className="mx-auto flex max-w-5xl flex-col gap-8">
         <section className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6 shadow-md">
           <header className="mb-6 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
             <div>
@@ -70,6 +71,8 @@ function App() {
             </article>
           </div>
         </section>
+
+        <ThemeGallery />
 
         <section className="rounded-2xl border border-dashed border-[var(--color-border)] bg-[var(--color-surface)] p-6">
           <p className="text-sm uppercase tracking-wide text-[var(--color-text-secondary)]">

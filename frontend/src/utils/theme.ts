@@ -68,3 +68,26 @@ export const clearStoredTheme = () => {
   if (!isBrowser()) return;
   window.localStorage.removeItem(THEME_STORAGE_KEY);
 };
+
+export const getThemeVariable = (
+  theme: UserTheme | null | undefined,
+  key: string,
+  fallback = ''
+): string => {
+  if (!theme) return fallback;
+
+  const variables = theme.css_variables ?? {};
+  const normalized = normalizeVariableName(key);
+  const normalizedWithoutPrefix = normalized.replace(/^--/, '');
+
+  const directValue = variables[key];
+  if (typeof directValue === 'string') return directValue;
+
+  const normalizedValue = variables[normalized];
+  if (typeof normalizedValue === 'string') return normalizedValue;
+
+  const withoutPrefixValue = variables[normalizedWithoutPrefix];
+  if (typeof withoutPrefixValue === 'string') return withoutPrefixValue;
+
+  return fallback;
+};
