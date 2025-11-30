@@ -1,0 +1,1577 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`Predefined theme snapshots > matches snapshot for Aurora Glow 1`] = `
+<article
+  class="flex flex-col rounded-2xl border p-4 shadow-sm transition border-[var(--color-border)] hover:border-[var(--color-primary)]/50"
+>
+  <header
+    class="flex items-start justify-between gap-4"
+  >
+    <div>
+      <h3
+        class="text-lg font-semibold text-[var(--color-text-primary)]"
+      >
+        Aurora Glow
+      </h3>
+      <p
+        class="text-sm text-[var(--color-text-secondary)]"
+      >
+        Cool gradient inspired by northern lights.
+      </p>
+    </div>
+  </header>
+  <div
+    class="mt-4 rounded-xl border border-[var(--color-border)] bg-white p-4"
+  >
+    <div
+      class="rounded-lg p-3"
+      style="background-color: rgb(15, 23, 42);"
+    >
+      <div
+        class="rounded-lg border p-3"
+        style="background-color: rgb(30, 27, 75); border-color: rgb(49, 46, 129);"
+      >
+        <div
+          class="flex items-center justify-between"
+        >
+          <div>
+            <p
+              class="text-sm font-semibold"
+              style="color: rgb(224, 231, 255);"
+            >
+              Header
+            </p>
+            <p
+              class="text-xs"
+              style="color: rgb(199, 210, 254);"
+            >
+              Navigation · Profile
+            </p>
+          </div>
+          <span
+            class="rounded-full px-3 py-1 text-xs font-semibold"
+            style="background-color: rgb(99, 102, 241); color: rgb(255, 255, 255);"
+          >
+            CTA
+          </span>
+        </div>
+        <div
+          class="mt-4 space-y-2"
+        >
+          <div
+            class="rounded-md border px-3 py-2"
+            style="border-color: rgb(49, 46, 129);"
+          >
+            <div
+              class="text-sm font-medium"
+              style="color: rgb(224, 231, 255);"
+            >
+              Content block 
+              1
+            </div>
+            <div
+              class="mt-1 text-xs"
+              style="color: rgb(199, 210, 254);"
+            >
+              Secondary text preview
+            </div>
+          </div>
+          <div
+            class="rounded-md border px-3 py-2"
+            style="border-color: rgb(49, 46, 129);"
+          >
+            <div
+              class="text-sm font-medium"
+              style="color: rgb(224, 231, 255);"
+            >
+              Content block 
+              2
+            </div>
+            <div
+              class="mt-1 text-xs"
+              style="color: rgb(199, 210, 254);"
+            >
+              Secondary text preview
+            </div>
+          </div>
+          <div
+            class="rounded-md border px-3 py-2"
+            style="border-color: rgb(49, 46, 129);"
+          >
+            <div
+              class="text-sm font-medium"
+              style="color: rgb(224, 231, 255);"
+            >
+              Content block 
+              3
+            </div>
+            <div
+              class="mt-1 text-xs"
+              style="color: rgb(199, 210, 254);"
+            >
+              Secondary text preview
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div
+    class="mt-4 flex flex-wrap items-center gap-3"
+  >
+    <div
+      class="flex flex-col items-center gap-1 text-center"
+    >
+      <span
+        class="h-8 w-8 rounded-full border border-[var(--color-border)]"
+        style="background-color: rgb(99, 102, 241);"
+      />
+      <span
+        class="text-[10px] uppercase tracking-wide text-[var(--color-text-muted)]"
+      >
+        Primary
+      </span>
+    </div>
+    <div
+      class="flex flex-col items-center gap-1 text-center"
+    >
+      <span
+        class="h-8 w-8 rounded-full border border-[var(--color-border)]"
+        style="background-color: rgb(30, 27, 75);"
+      />
+      <span
+        class="text-[10px] uppercase tracking-wide text-[var(--color-text-muted)]"
+      >
+        Surface
+      </span>
+    </div>
+    <div
+      class="flex flex-col items-center gap-1 text-center"
+    >
+      <span
+        class="h-8 w-8 rounded-full border border-[var(--color-border)]"
+        style="background-color: rgb(15, 23, 42);"
+      />
+      <span
+        class="text-[10px] uppercase tracking-wide text-[var(--color-text-muted)]"
+      >
+        Background
+      </span>
+    </div>
+    <div
+      class="flex flex-col items-center gap-1 text-center"
+    >
+      <span
+        class="h-8 w-8 rounded-full border border-[var(--color-border)]"
+        style="background-color: rgb(16, 185, 129);"
+      />
+      <span
+        class="text-[10px] uppercase tracking-wide text-[var(--color-text-muted)]"
+      >
+        Accent
+      </span>
+    </div>
+  </div>
+  <div
+    class="mt-4 flex items-center justify-between text-sm text-[var(--color-text-secondary)]"
+  >
+    <span>
+      ⭐ 
+      4.5
+    </span>
+    <span>
+      0
+       installs
+    </span>
+  </div>
+  <div
+    class="mt-4 flex gap-2"
+  >
+    <button
+      class="flex-1 rounded-lg bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+      type="button"
+    >
+      Use Theme
+    </button>
+  </div>
+</article>
+`;
+
+exports[`Predefined theme snapshots > matches snapshot for Desert Bloom 1`] = `
+<article
+  class="flex flex-col rounded-2xl border p-4 shadow-sm transition border-[var(--color-border)] hover:border-[var(--color-primary)]/50"
+>
+  <header
+    class="flex items-start justify-between gap-4"
+  >
+    <div>
+      <h3
+        class="text-lg font-semibold text-[var(--color-text-primary)]"
+      >
+        Desert Bloom
+      </h3>
+      <p
+        class="text-sm text-[var(--color-text-secondary)]"
+      >
+        Warm desert sunset palette.
+      </p>
+    </div>
+  </header>
+  <div
+    class="mt-4 rounded-xl border border-[var(--color-border)] bg-white p-4"
+  >
+    <div
+      class="rounded-lg p-3"
+      style="background-color: rgb(255, 247, 237);"
+    >
+      <div
+        class="rounded-lg border p-3"
+        style="background-color: rgb(255, 251, 235); border-color: rgb(254, 215, 170);"
+      >
+        <div
+          class="flex items-center justify-between"
+        >
+          <div>
+            <p
+              class="text-sm font-semibold"
+              style="color: rgb(124, 45, 18);"
+            >
+              Header
+            </p>
+            <p
+              class="text-xs"
+              style="color: rgb(154, 52, 18);"
+            >
+              Navigation · Profile
+            </p>
+          </div>
+          <span
+            class="rounded-full px-3 py-1 text-xs font-semibold"
+            style="background-color: rgb(249, 115, 22); color: rgb(255, 255, 255);"
+          >
+            CTA
+          </span>
+        </div>
+        <div
+          class="mt-4 space-y-2"
+        >
+          <div
+            class="rounded-md border px-3 py-2"
+            style="border-color: rgb(254, 215, 170);"
+          >
+            <div
+              class="text-sm font-medium"
+              style="color: rgb(124, 45, 18);"
+            >
+              Content block 
+              1
+            </div>
+            <div
+              class="mt-1 text-xs"
+              style="color: rgb(154, 52, 18);"
+            >
+              Secondary text preview
+            </div>
+          </div>
+          <div
+            class="rounded-md border px-3 py-2"
+            style="border-color: rgb(254, 215, 170);"
+          >
+            <div
+              class="text-sm font-medium"
+              style="color: rgb(124, 45, 18);"
+            >
+              Content block 
+              2
+            </div>
+            <div
+              class="mt-1 text-xs"
+              style="color: rgb(154, 52, 18);"
+            >
+              Secondary text preview
+            </div>
+          </div>
+          <div
+            class="rounded-md border px-3 py-2"
+            style="border-color: rgb(254, 215, 170);"
+          >
+            <div
+              class="text-sm font-medium"
+              style="color: rgb(124, 45, 18);"
+            >
+              Content block 
+              3
+            </div>
+            <div
+              class="mt-1 text-xs"
+              style="color: rgb(154, 52, 18);"
+            >
+              Secondary text preview
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div
+    class="mt-4 flex flex-wrap items-center gap-3"
+  >
+    <div
+      class="flex flex-col items-center gap-1 text-center"
+    >
+      <span
+        class="h-8 w-8 rounded-full border border-[var(--color-border)]"
+        style="background-color: rgb(249, 115, 22);"
+      />
+      <span
+        class="text-[10px] uppercase tracking-wide text-[var(--color-text-muted)]"
+      >
+        Primary
+      </span>
+    </div>
+    <div
+      class="flex flex-col items-center gap-1 text-center"
+    >
+      <span
+        class="h-8 w-8 rounded-full border border-[var(--color-border)]"
+        style="background-color: rgb(255, 251, 235);"
+      />
+      <span
+        class="text-[10px] uppercase tracking-wide text-[var(--color-text-muted)]"
+      >
+        Surface
+      </span>
+    </div>
+    <div
+      class="flex flex-col items-center gap-1 text-center"
+    >
+      <span
+        class="h-8 w-8 rounded-full border border-[var(--color-border)]"
+        style="background-color: rgb(255, 247, 237);"
+      />
+      <span
+        class="text-[10px] uppercase tracking-wide text-[var(--color-text-muted)]"
+      >
+        Background
+      </span>
+    </div>
+    <div
+      class="flex flex-col items-center gap-1 text-center"
+    >
+      <span
+        class="h-8 w-8 rounded-full border border-[var(--color-border)]"
+        style="background-color: rgb(16, 185, 129);"
+      />
+      <span
+        class="text-[10px] uppercase tracking-wide text-[var(--color-text-muted)]"
+      >
+        Accent
+      </span>
+    </div>
+  </div>
+  <div
+    class="mt-4 flex items-center justify-between text-sm text-[var(--color-text-secondary)]"
+  >
+    <span>
+      ⭐ 
+      4.5
+    </span>
+    <span>
+      0
+       installs
+    </span>
+  </div>
+  <div
+    class="mt-4 flex gap-2"
+  >
+    <button
+      class="flex-1 rounded-lg bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+      type="button"
+    >
+      Use Theme
+    </button>
+  </div>
+</article>
+`;
+
+exports[`Predefined theme snapshots > matches snapshot for Forest Whisper 1`] = `
+<article
+  class="flex flex-col rounded-2xl border p-4 shadow-sm transition border-[var(--color-border)] hover:border-[var(--color-primary)]/50"
+>
+  <header
+    class="flex items-start justify-between gap-4"
+  >
+    <div>
+      <h3
+        class="text-lg font-semibold text-[var(--color-text-primary)]"
+      >
+        Forest Whisper
+      </h3>
+      <p
+        class="text-sm text-[var(--color-text-secondary)]"
+      >
+        Organic greens with calming neutrals.
+      </p>
+    </div>
+  </header>
+  <div
+    class="mt-4 rounded-xl border border-[var(--color-border)] bg-white p-4"
+  >
+    <div
+      class="rounded-lg p-3"
+      style="background-color: rgb(241, 245, 249);"
+    >
+      <div
+        class="rounded-lg border p-3"
+        style="background-color: rgb(248, 250, 252); border-color: rgb(187, 247, 208);"
+      >
+        <div
+          class="flex items-center justify-between"
+        >
+          <div>
+            <p
+              class="text-sm font-semibold"
+              style="color: rgb(6, 78, 59);"
+            >
+              Header
+            </p>
+            <p
+              class="text-xs"
+              style="color: rgb(4, 120, 87);"
+            >
+              Navigation · Profile
+            </p>
+          </div>
+          <span
+            class="rounded-full px-3 py-1 text-xs font-semibold"
+            style="background-color: rgb(22, 163, 74); color: rgb(255, 255, 255);"
+          >
+            CTA
+          </span>
+        </div>
+        <div
+          class="mt-4 space-y-2"
+        >
+          <div
+            class="rounded-md border px-3 py-2"
+            style="border-color: rgb(187, 247, 208);"
+          >
+            <div
+              class="text-sm font-medium"
+              style="color: rgb(6, 78, 59);"
+            >
+              Content block 
+              1
+            </div>
+            <div
+              class="mt-1 text-xs"
+              style="color: rgb(4, 120, 87);"
+            >
+              Secondary text preview
+            </div>
+          </div>
+          <div
+            class="rounded-md border px-3 py-2"
+            style="border-color: rgb(187, 247, 208);"
+          >
+            <div
+              class="text-sm font-medium"
+              style="color: rgb(6, 78, 59);"
+            >
+              Content block 
+              2
+            </div>
+            <div
+              class="mt-1 text-xs"
+              style="color: rgb(4, 120, 87);"
+            >
+              Secondary text preview
+            </div>
+          </div>
+          <div
+            class="rounded-md border px-3 py-2"
+            style="border-color: rgb(187, 247, 208);"
+          >
+            <div
+              class="text-sm font-medium"
+              style="color: rgb(6, 78, 59);"
+            >
+              Content block 
+              3
+            </div>
+            <div
+              class="mt-1 text-xs"
+              style="color: rgb(4, 120, 87);"
+            >
+              Secondary text preview
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div
+    class="mt-4 flex flex-wrap items-center gap-3"
+  >
+    <div
+      class="flex flex-col items-center gap-1 text-center"
+    >
+      <span
+        class="h-8 w-8 rounded-full border border-[var(--color-border)]"
+        style="background-color: rgb(22, 163, 74);"
+      />
+      <span
+        class="text-[10px] uppercase tracking-wide text-[var(--color-text-muted)]"
+      >
+        Primary
+      </span>
+    </div>
+    <div
+      class="flex flex-col items-center gap-1 text-center"
+    >
+      <span
+        class="h-8 w-8 rounded-full border border-[var(--color-border)]"
+        style="background-color: rgb(248, 250, 252);"
+      />
+      <span
+        class="text-[10px] uppercase tracking-wide text-[var(--color-text-muted)]"
+      >
+        Surface
+      </span>
+    </div>
+    <div
+      class="flex flex-col items-center gap-1 text-center"
+    >
+      <span
+        class="h-8 w-8 rounded-full border border-[var(--color-border)]"
+        style="background-color: rgb(241, 245, 249);"
+      />
+      <span
+        class="text-[10px] uppercase tracking-wide text-[var(--color-text-muted)]"
+      >
+        Background
+      </span>
+    </div>
+    <div
+      class="flex flex-col items-center gap-1 text-center"
+    >
+      <span
+        class="h-8 w-8 rounded-full border border-[var(--color-border)]"
+        style="background-color: rgb(16, 185, 129);"
+      />
+      <span
+        class="text-[10px] uppercase tracking-wide text-[var(--color-text-muted)]"
+      >
+        Accent
+      </span>
+    </div>
+  </div>
+  <div
+    class="mt-4 flex items-center justify-between text-sm text-[var(--color-text-secondary)]"
+  >
+    <span>
+      ⭐ 
+      4.5
+    </span>
+    <span>
+      0
+       installs
+    </span>
+  </div>
+  <div
+    class="mt-4 flex gap-2"
+  >
+    <button
+      class="flex-1 rounded-lg bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+      type="button"
+    >
+      Use Theme
+    </button>
+  </div>
+</article>
+`;
+
+exports[`Predefined theme snapshots > matches snapshot for Midnight Pulse 1`] = `
+<article
+  class="flex flex-col rounded-2xl border p-4 shadow-sm transition border-[var(--color-border)] hover:border-[var(--color-primary)]/50"
+>
+  <header
+    class="flex items-start justify-between gap-4"
+  >
+    <div>
+      <h3
+        class="text-lg font-semibold text-[var(--color-text-primary)]"
+      >
+        Midnight Pulse
+      </h3>
+      <p
+        class="text-sm text-[var(--color-text-secondary)]"
+      >
+        High-contrast dark UI with neon accents.
+      </p>
+    </div>
+  </header>
+  <div
+    class="mt-4 rounded-xl border border-[var(--color-border)] bg-white p-4"
+  >
+    <div
+      class="rounded-lg p-3"
+      style="background-color: rgb(2, 6, 23);"
+    >
+      <div
+        class="rounded-lg border p-3"
+        style="background-color: rgb(15, 23, 42); border-color: rgb(30, 41, 59);"
+      >
+        <div
+          class="flex items-center justify-between"
+        >
+          <div>
+            <p
+              class="text-sm font-semibold"
+              style="color: rgb(248, 250, 252);"
+            >
+              Header
+            </p>
+            <p
+              class="text-xs"
+              style="color: rgb(148, 163, 184);"
+            >
+              Navigation · Profile
+            </p>
+          </div>
+          <span
+            class="rounded-full px-3 py-1 text-xs font-semibold"
+            style="background-color: rgb(20, 184, 166); color: rgb(255, 255, 255);"
+          >
+            CTA
+          </span>
+        </div>
+        <div
+          class="mt-4 space-y-2"
+        >
+          <div
+            class="rounded-md border px-3 py-2"
+            style="border-color: rgb(30, 41, 59);"
+          >
+            <div
+              class="text-sm font-medium"
+              style="color: rgb(248, 250, 252);"
+            >
+              Content block 
+              1
+            </div>
+            <div
+              class="mt-1 text-xs"
+              style="color: rgb(148, 163, 184);"
+            >
+              Secondary text preview
+            </div>
+          </div>
+          <div
+            class="rounded-md border px-3 py-2"
+            style="border-color: rgb(30, 41, 59);"
+          >
+            <div
+              class="text-sm font-medium"
+              style="color: rgb(248, 250, 252);"
+            >
+              Content block 
+              2
+            </div>
+            <div
+              class="mt-1 text-xs"
+              style="color: rgb(148, 163, 184);"
+            >
+              Secondary text preview
+            </div>
+          </div>
+          <div
+            class="rounded-md border px-3 py-2"
+            style="border-color: rgb(30, 41, 59);"
+          >
+            <div
+              class="text-sm font-medium"
+              style="color: rgb(248, 250, 252);"
+            >
+              Content block 
+              3
+            </div>
+            <div
+              class="mt-1 text-xs"
+              style="color: rgb(148, 163, 184);"
+            >
+              Secondary text preview
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div
+    class="mt-4 flex flex-wrap items-center gap-3"
+  >
+    <div
+      class="flex flex-col items-center gap-1 text-center"
+    >
+      <span
+        class="h-8 w-8 rounded-full border border-[var(--color-border)]"
+        style="background-color: rgb(20, 184, 166);"
+      />
+      <span
+        class="text-[10px] uppercase tracking-wide text-[var(--color-text-muted)]"
+      >
+        Primary
+      </span>
+    </div>
+    <div
+      class="flex flex-col items-center gap-1 text-center"
+    >
+      <span
+        class="h-8 w-8 rounded-full border border-[var(--color-border)]"
+        style="background-color: rgb(15, 23, 42);"
+      />
+      <span
+        class="text-[10px] uppercase tracking-wide text-[var(--color-text-muted)]"
+      >
+        Surface
+      </span>
+    </div>
+    <div
+      class="flex flex-col items-center gap-1 text-center"
+    >
+      <span
+        class="h-8 w-8 rounded-full border border-[var(--color-border)]"
+        style="background-color: rgb(2, 6, 23);"
+      />
+      <span
+        class="text-[10px] uppercase tracking-wide text-[var(--color-text-muted)]"
+      >
+        Background
+      </span>
+    </div>
+    <div
+      class="flex flex-col items-center gap-1 text-center"
+    >
+      <span
+        class="h-8 w-8 rounded-full border border-[var(--color-border)]"
+        style="background-color: rgb(16, 185, 129);"
+      />
+      <span
+        class="text-[10px] uppercase tracking-wide text-[var(--color-text-muted)]"
+      >
+        Accent
+      </span>
+    </div>
+  </div>
+  <div
+    class="mt-4 flex items-center justify-between text-sm text-[var(--color-text-secondary)]"
+  >
+    <span>
+      ⭐ 
+      4.5
+    </span>
+    <span>
+      0
+       installs
+    </span>
+  </div>
+  <div
+    class="mt-4 flex gap-2"
+  >
+    <button
+      class="flex-1 rounded-lg bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+      type="button"
+    >
+      Use Theme
+    </button>
+  </div>
+</article>
+`;
+
+exports[`Predefined theme snapshots > matches snapshot for Neon Circuit 1`] = `
+<article
+  class="flex flex-col rounded-2xl border p-4 shadow-sm transition border-[var(--color-border)] hover:border-[var(--color-primary)]/50"
+>
+  <header
+    class="flex items-start justify-between gap-4"
+  >
+    <div>
+      <h3
+        class="text-lg font-semibold text-[var(--color-text-primary)]"
+      >
+        Neon Circuit
+      </h3>
+      <p
+        class="text-sm text-[var(--color-text-secondary)]"
+      >
+        Electric teal and magenta for futuristic dashboards.
+      </p>
+    </div>
+  </header>
+  <div
+    class="mt-4 rounded-xl border border-[var(--color-border)] bg-white p-4"
+  >
+    <div
+      class="rounded-lg p-3"
+      style="background-color: rgb(10, 10, 15);"
+    >
+      <div
+        class="rounded-lg border p-3"
+        style="background-color: rgb(17, 24, 39); border-color: rgb(31, 41, 55);"
+      >
+        <div
+          class="flex items-center justify-between"
+        >
+          <div>
+            <p
+              class="text-sm font-semibold"
+              style="color: rgb(224, 242, 254);"
+            >
+              Header
+            </p>
+            <p
+              class="text-xs"
+              style="color: rgb(186, 230, 253);"
+            >
+              Navigation · Profile
+            </p>
+          </div>
+          <span
+            class="rounded-full px-3 py-1 text-xs font-semibold"
+            style="background-color: rgb(14, 165, 233); color: rgb(255, 255, 255);"
+          >
+            CTA
+          </span>
+        </div>
+        <div
+          class="mt-4 space-y-2"
+        >
+          <div
+            class="rounded-md border px-3 py-2"
+            style="border-color: rgb(31, 41, 55);"
+          >
+            <div
+              class="text-sm font-medium"
+              style="color: rgb(224, 242, 254);"
+            >
+              Content block 
+              1
+            </div>
+            <div
+              class="mt-1 text-xs"
+              style="color: rgb(186, 230, 253);"
+            >
+              Secondary text preview
+            </div>
+          </div>
+          <div
+            class="rounded-md border px-3 py-2"
+            style="border-color: rgb(31, 41, 55);"
+          >
+            <div
+              class="text-sm font-medium"
+              style="color: rgb(224, 242, 254);"
+            >
+              Content block 
+              2
+            </div>
+            <div
+              class="mt-1 text-xs"
+              style="color: rgb(186, 230, 253);"
+            >
+              Secondary text preview
+            </div>
+          </div>
+          <div
+            class="rounded-md border px-3 py-2"
+            style="border-color: rgb(31, 41, 55);"
+          >
+            <div
+              class="text-sm font-medium"
+              style="color: rgb(224, 242, 254);"
+            >
+              Content block 
+              3
+            </div>
+            <div
+              class="mt-1 text-xs"
+              style="color: rgb(186, 230, 253);"
+            >
+              Secondary text preview
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div
+    class="mt-4 flex flex-wrap items-center gap-3"
+  >
+    <div
+      class="flex flex-col items-center gap-1 text-center"
+    >
+      <span
+        class="h-8 w-8 rounded-full border border-[var(--color-border)]"
+        style="background-color: rgb(14, 165, 233);"
+      />
+      <span
+        class="text-[10px] uppercase tracking-wide text-[var(--color-text-muted)]"
+      >
+        Primary
+      </span>
+    </div>
+    <div
+      class="flex flex-col items-center gap-1 text-center"
+    >
+      <span
+        class="h-8 w-8 rounded-full border border-[var(--color-border)]"
+        style="background-color: rgb(17, 24, 39);"
+      />
+      <span
+        class="text-[10px] uppercase tracking-wide text-[var(--color-text-muted)]"
+      >
+        Surface
+      </span>
+    </div>
+    <div
+      class="flex flex-col items-center gap-1 text-center"
+    >
+      <span
+        class="h-8 w-8 rounded-full border border-[var(--color-border)]"
+        style="background-color: rgb(10, 10, 15);"
+      />
+      <span
+        class="text-[10px] uppercase tracking-wide text-[var(--color-text-muted)]"
+      >
+        Background
+      </span>
+    </div>
+    <div
+      class="flex flex-col items-center gap-1 text-center"
+    >
+      <span
+        class="h-8 w-8 rounded-full border border-[var(--color-border)]"
+        style="background-color: rgb(16, 185, 129);"
+      />
+      <span
+        class="text-[10px] uppercase tracking-wide text-[var(--color-text-muted)]"
+      >
+        Accent
+      </span>
+    </div>
+  </div>
+  <div
+    class="mt-4 flex items-center justify-between text-sm text-[var(--color-text-secondary)]"
+  >
+    <span>
+      ⭐ 
+      4.5
+    </span>
+    <span>
+      0
+       installs
+    </span>
+  </div>
+  <div
+    class="mt-4 flex gap-2"
+  >
+    <button
+      class="flex-1 rounded-lg bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+      type="button"
+    >
+      Use Theme
+    </button>
+  </div>
+</article>
+`;
+
+exports[`Predefined theme snapshots > matches snapshot for Ocean Mist 1`] = `
+<article
+  class="flex flex-col rounded-2xl border p-4 shadow-sm transition border-[var(--color-border)] hover:border-[var(--color-primary)]/50"
+>
+  <header
+    class="flex items-start justify-between gap-4"
+  >
+    <div>
+      <h3
+        class="text-lg font-semibold text-[var(--color-text-primary)]"
+      >
+        Ocean Mist
+      </h3>
+      <p
+        class="text-sm text-[var(--color-text-secondary)]"
+      >
+        Soft teal gradients with airy whites.
+      </p>
+    </div>
+  </header>
+  <div
+    class="mt-4 rounded-xl border border-[var(--color-border)] bg-white p-4"
+  >
+    <div
+      class="rounded-lg p-3"
+      style="background-color: rgb(224, 242, 254);"
+    >
+      <div
+        class="rounded-lg border p-3"
+        style="background-color: rgb(240, 249, 255); border-color: rgb(186, 230, 253);"
+      >
+        <div
+          class="flex items-center justify-between"
+        >
+          <div>
+            <p
+              class="text-sm font-semibold"
+              style="color: rgb(12, 74, 110);"
+            >
+              Header
+            </p>
+            <p
+              class="text-xs"
+              style="color: rgb(2, 132, 199);"
+            >
+              Navigation · Profile
+            </p>
+          </div>
+          <span
+            class="rounded-full px-3 py-1 text-xs font-semibold"
+            style="background-color: rgb(14, 165, 233); color: rgb(255, 255, 255);"
+          >
+            CTA
+          </span>
+        </div>
+        <div
+          class="mt-4 space-y-2"
+        >
+          <div
+            class="rounded-md border px-3 py-2"
+            style="border-color: rgb(186, 230, 253);"
+          >
+            <div
+              class="text-sm font-medium"
+              style="color: rgb(12, 74, 110);"
+            >
+              Content block 
+              1
+            </div>
+            <div
+              class="mt-1 text-xs"
+              style="color: rgb(2, 132, 199);"
+            >
+              Secondary text preview
+            </div>
+          </div>
+          <div
+            class="rounded-md border px-3 py-2"
+            style="border-color: rgb(186, 230, 253);"
+          >
+            <div
+              class="text-sm font-medium"
+              style="color: rgb(12, 74, 110);"
+            >
+              Content block 
+              2
+            </div>
+            <div
+              class="mt-1 text-xs"
+              style="color: rgb(2, 132, 199);"
+            >
+              Secondary text preview
+            </div>
+          </div>
+          <div
+            class="rounded-md border px-3 py-2"
+            style="border-color: rgb(186, 230, 253);"
+          >
+            <div
+              class="text-sm font-medium"
+              style="color: rgb(12, 74, 110);"
+            >
+              Content block 
+              3
+            </div>
+            <div
+              class="mt-1 text-xs"
+              style="color: rgb(2, 132, 199);"
+            >
+              Secondary text preview
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div
+    class="mt-4 flex flex-wrap items-center gap-3"
+  >
+    <div
+      class="flex flex-col items-center gap-1 text-center"
+    >
+      <span
+        class="h-8 w-8 rounded-full border border-[var(--color-border)]"
+        style="background-color: rgb(14, 165, 233);"
+      />
+      <span
+        class="text-[10px] uppercase tracking-wide text-[var(--color-text-muted)]"
+      >
+        Primary
+      </span>
+    </div>
+    <div
+      class="flex flex-col items-center gap-1 text-center"
+    >
+      <span
+        class="h-8 w-8 rounded-full border border-[var(--color-border)]"
+        style="background-color: rgb(240, 249, 255);"
+      />
+      <span
+        class="text-[10px] uppercase tracking-wide text-[var(--color-text-muted)]"
+      >
+        Surface
+      </span>
+    </div>
+    <div
+      class="flex flex-col items-center gap-1 text-center"
+    >
+      <span
+        class="h-8 w-8 rounded-full border border-[var(--color-border)]"
+        style="background-color: rgb(224, 242, 254);"
+      />
+      <span
+        class="text-[10px] uppercase tracking-wide text-[var(--color-text-muted)]"
+      >
+        Background
+      </span>
+    </div>
+    <div
+      class="flex flex-col items-center gap-1 text-center"
+    >
+      <span
+        class="h-8 w-8 rounded-full border border-[var(--color-border)]"
+        style="background-color: rgb(16, 185, 129);"
+      />
+      <span
+        class="text-[10px] uppercase tracking-wide text-[var(--color-text-muted)]"
+      >
+        Accent
+      </span>
+    </div>
+  </div>
+  <div
+    class="mt-4 flex items-center justify-between text-sm text-[var(--color-text-secondary)]"
+  >
+    <span>
+      ⭐ 
+      4.5
+    </span>
+    <span>
+      0
+       installs
+    </span>
+  </div>
+  <div
+    class="mt-4 flex gap-2"
+  >
+    <button
+      class="flex-1 rounded-lg bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+      type="button"
+    >
+      Use Theme
+    </button>
+  </div>
+</article>
+`;
+
+exports[`Predefined theme snapshots > matches snapshot for Solar Flare 1`] = `
+<article
+  class="flex flex-col rounded-2xl border p-4 shadow-sm transition border-[var(--color-border)] hover:border-[var(--color-primary)]/50"
+>
+  <header
+    class="flex items-start justify-between gap-4"
+  >
+    <div>
+      <h3
+        class="text-lg font-semibold text-[var(--color-text-primary)]"
+      >
+        Solar Flare
+      </h3>
+      <p
+        class="text-sm text-[var(--color-text-secondary)]"
+      >
+        Bold oranges with deep charcoal.
+      </p>
+    </div>
+  </header>
+  <div
+    class="mt-4 rounded-xl border border-[var(--color-border)] bg-white p-4"
+  >
+    <div
+      class="rounded-lg p-3"
+      style="background-color: rgb(28, 25, 23);"
+    >
+      <div
+        class="rounded-lg border p-3"
+        style="background-color: rgb(41, 37, 36); border-color: rgb(124, 45, 18);"
+      >
+        <div
+          class="flex items-center justify-between"
+        >
+          <div>
+            <p
+              class="text-sm font-semibold"
+              style="color: rgb(254, 243, 199);"
+            >
+              Header
+            </p>
+            <p
+              class="text-xs"
+              style="color: rgb(252, 211, 77);"
+            >
+              Navigation · Profile
+            </p>
+          </div>
+          <span
+            class="rounded-full px-3 py-1 text-xs font-semibold"
+            style="background-color: rgb(251, 146, 60); color: rgb(255, 255, 255);"
+          >
+            CTA
+          </span>
+        </div>
+        <div
+          class="mt-4 space-y-2"
+        >
+          <div
+            class="rounded-md border px-3 py-2"
+            style="border-color: rgb(124, 45, 18);"
+          >
+            <div
+              class="text-sm font-medium"
+              style="color: rgb(254, 243, 199);"
+            >
+              Content block 
+              1
+            </div>
+            <div
+              class="mt-1 text-xs"
+              style="color: rgb(252, 211, 77);"
+            >
+              Secondary text preview
+            </div>
+          </div>
+          <div
+            class="rounded-md border px-3 py-2"
+            style="border-color: rgb(124, 45, 18);"
+          >
+            <div
+              class="text-sm font-medium"
+              style="color: rgb(254, 243, 199);"
+            >
+              Content block 
+              2
+            </div>
+            <div
+              class="mt-1 text-xs"
+              style="color: rgb(252, 211, 77);"
+            >
+              Secondary text preview
+            </div>
+          </div>
+          <div
+            class="rounded-md border px-3 py-2"
+            style="border-color: rgb(124, 45, 18);"
+          >
+            <div
+              class="text-sm font-medium"
+              style="color: rgb(254, 243, 199);"
+            >
+              Content block 
+              3
+            </div>
+            <div
+              class="mt-1 text-xs"
+              style="color: rgb(252, 211, 77);"
+            >
+              Secondary text preview
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div
+    class="mt-4 flex flex-wrap items-center gap-3"
+  >
+    <div
+      class="flex flex-col items-center gap-1 text-center"
+    >
+      <span
+        class="h-8 w-8 rounded-full border border-[var(--color-border)]"
+        style="background-color: rgb(251, 146, 60);"
+      />
+      <span
+        class="text-[10px] uppercase tracking-wide text-[var(--color-text-muted)]"
+      >
+        Primary
+      </span>
+    </div>
+    <div
+      class="flex flex-col items-center gap-1 text-center"
+    >
+      <span
+        class="h-8 w-8 rounded-full border border-[var(--color-border)]"
+        style="background-color: rgb(41, 37, 36);"
+      />
+      <span
+        class="text-[10px] uppercase tracking-wide text-[var(--color-text-muted)]"
+      >
+        Surface
+      </span>
+    </div>
+    <div
+      class="flex flex-col items-center gap-1 text-center"
+    >
+      <span
+        class="h-8 w-8 rounded-full border border-[var(--color-border)]"
+        style="background-color: rgb(28, 25, 23);"
+      />
+      <span
+        class="text-[10px] uppercase tracking-wide text-[var(--color-text-muted)]"
+      >
+        Background
+      </span>
+    </div>
+    <div
+      class="flex flex-col items-center gap-1 text-center"
+    >
+      <span
+        class="h-8 w-8 rounded-full border border-[var(--color-border)]"
+        style="background-color: rgb(16, 185, 129);"
+      />
+      <span
+        class="text-[10px] uppercase tracking-wide text-[var(--color-text-muted)]"
+      >
+        Accent
+      </span>
+    </div>
+  </div>
+  <div
+    class="mt-4 flex items-center justify-between text-sm text-[var(--color-text-secondary)]"
+  >
+    <span>
+      ⭐ 
+      4.5
+    </span>
+    <span>
+      0
+       installs
+    </span>
+  </div>
+  <div
+    class="mt-4 flex gap-2"
+  >
+    <button
+      class="flex-1 rounded-lg bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+      type="button"
+    >
+      Use Theme
+    </button>
+  </div>
+</article>
+`;
+
+exports[`Predefined theme snapshots > matches snapshot for Velvet Noir 1`] = `
+<article
+  class="flex flex-col rounded-2xl border p-4 shadow-sm transition border-[var(--color-border)] hover:border-[var(--color-primary)]/50"
+>
+  <header
+    class="flex items-start justify-between gap-4"
+  >
+    <div>
+      <h3
+        class="text-lg font-semibold text-[var(--color-text-primary)]"
+      >
+        Velvet Noir
+      </h3>
+      <p
+        class="text-sm text-[var(--color-text-secondary)]"
+      >
+        Luxury purples with gold highlights.
+      </p>
+    </div>
+  </header>
+  <div
+    class="mt-4 rounded-xl border border-[var(--color-border)] bg-white p-4"
+  >
+    <div
+      class="rounded-lg p-3"
+      style="background-color: rgb(15, 10, 31);"
+    >
+      <div
+        class="rounded-lg border p-3"
+        style="background-color: rgb(31, 21, 55); border-color: rgb(76, 29, 149);"
+      >
+        <div
+          class="flex items-center justify-between"
+        >
+          <div>
+            <p
+              class="text-sm font-semibold"
+              style="color: rgb(245, 243, 255);"
+            >
+              Header
+            </p>
+            <p
+              class="text-xs"
+              style="color: rgb(196, 181, 253);"
+            >
+              Navigation · Profile
+            </p>
+          </div>
+          <span
+            class="rounded-full px-3 py-1 text-xs font-semibold"
+            style="background-color: rgb(147, 51, 234); color: rgb(255, 255, 255);"
+          >
+            CTA
+          </span>
+        </div>
+        <div
+          class="mt-4 space-y-2"
+        >
+          <div
+            class="rounded-md border px-3 py-2"
+            style="border-color: rgb(76, 29, 149);"
+          >
+            <div
+              class="text-sm font-medium"
+              style="color: rgb(245, 243, 255);"
+            >
+              Content block 
+              1
+            </div>
+            <div
+              class="mt-1 text-xs"
+              style="color: rgb(196, 181, 253);"
+            >
+              Secondary text preview
+            </div>
+          </div>
+          <div
+            class="rounded-md border px-3 py-2"
+            style="border-color: rgb(76, 29, 149);"
+          >
+            <div
+              class="text-sm font-medium"
+              style="color: rgb(245, 243, 255);"
+            >
+              Content block 
+              2
+            </div>
+            <div
+              class="mt-1 text-xs"
+              style="color: rgb(196, 181, 253);"
+            >
+              Secondary text preview
+            </div>
+          </div>
+          <div
+            class="rounded-md border px-3 py-2"
+            style="border-color: rgb(76, 29, 149);"
+          >
+            <div
+              class="text-sm font-medium"
+              style="color: rgb(245, 243, 255);"
+            >
+              Content block 
+              3
+            </div>
+            <div
+              class="mt-1 text-xs"
+              style="color: rgb(196, 181, 253);"
+            >
+              Secondary text preview
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div
+    class="mt-4 flex flex-wrap items-center gap-3"
+  >
+    <div
+      class="flex flex-col items-center gap-1 text-center"
+    >
+      <span
+        class="h-8 w-8 rounded-full border border-[var(--color-border)]"
+        style="background-color: rgb(147, 51, 234);"
+      />
+      <span
+        class="text-[10px] uppercase tracking-wide text-[var(--color-text-muted)]"
+      >
+        Primary
+      </span>
+    </div>
+    <div
+      class="flex flex-col items-center gap-1 text-center"
+    >
+      <span
+        class="h-8 w-8 rounded-full border border-[var(--color-border)]"
+        style="background-color: rgb(31, 21, 55);"
+      />
+      <span
+        class="text-[10px] uppercase tracking-wide text-[var(--color-text-muted)]"
+      >
+        Surface
+      </span>
+    </div>
+    <div
+      class="flex flex-col items-center gap-1 text-center"
+    >
+      <span
+        class="h-8 w-8 rounded-full border border-[var(--color-border)]"
+        style="background-color: rgb(15, 10, 31);"
+      />
+      <span
+        class="text-[10px] uppercase tracking-wide text-[var(--color-text-muted)]"
+      >
+        Background
+      </span>
+    </div>
+    <div
+      class="flex flex-col items-center gap-1 text-center"
+    >
+      <span
+        class="h-8 w-8 rounded-full border border-[var(--color-border)]"
+        style="background-color: rgb(250, 204, 21);"
+      />
+      <span
+        class="text-[10px] uppercase tracking-wide text-[var(--color-text-muted)]"
+      >
+        Accent
+      </span>
+    </div>
+  </div>
+  <div
+    class="mt-4 flex items-center justify-between text-sm text-[var(--color-text-secondary)]"
+  >
+    <span>
+      ⭐ 
+      4.5
+    </span>
+    <span>
+      0
+       installs
+    </span>
+  </div>
+  <div
+    class="mt-4 flex gap-2"
+  >
+    <button
+      class="flex-1 rounded-lg bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+      type="button"
+    >
+      Use Theme
+    </button>
+  </div>
+</article>
+`;
