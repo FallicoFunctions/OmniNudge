@@ -1,37 +1,35 @@
-import test from 'node:test';
-import assert from 'node:assert/strict';
+import { describe, expect, it } from 'vitest';
 import { themeInfoSchema, cssVariablesSchema } from '../../src/validation/themeSchemas';
 
-test('themeInfoSchema accepts valid data', () => {
-  const parsed = themeInfoSchema.parse({
-    theme_name: 'My theme',
-    theme_description: 'Looks great',
+describe('themeInfoSchema', () => {
+  it('accepts valid data', () => {
+    const parsed = themeInfoSchema.parse({
+      theme_name: 'My Theme',
+      theme_description: 'Looks great',
+    });
+    expect(parsed.theme_name).toBe('My Theme');
   });
-  assert.equal(parsed.theme_name, 'My theme');
+
+  it('rejects empty names', () => {
+    expect(() => {
+      themeInfoSchema.parse({ theme_name: '   ', theme_description: '' });
+    }).toThrow(/Theme name is required/);
+  });
 });
 
-test('themeInfoSchema rejects blank names', () => {
-  assert.throws(() => {
-    themeInfoSchema.parse({ theme_name: '   ', theme_description: '' });
-  }, /Theme name is required/);
-});
+describe('cssVariablesSchema', () => {
+  it('enforces limits and non-empty values', () => {
+    const parsed = cssVariablesSchema.parse({
+      '--color-primary': '#ffffff',
+      '--color-background': '#000000',
+    });
+    expect(Object.keys(parsed)).toHaveLength(2);
 
-test('cssVariablesSchema enforces max count and non-empty values', () => {
-  const parsed = cssVariablesSchema.parse({
-    '--color-primary': '#fff',
-    '--color-background': '#000',
+    const tooMany: Record<string, string> = {};
+    for (let i = 0; i < 201; i += 1) {
+      tooMany[`--var-${i}`] = '#000';
+    }
+    expect(() => cssVariablesSchema.parse(tooMany)).toThrow(/200 CSS variables/);
+    expect(() => cssVariablesSchema.parse({ '--color-primary': '' })).toThrow(/Value is required/);
   });
-  assert.equal(Object.keys(parsed).length, 2);
-
-  const tooMany: Record<string, string> = {};
-  for (let i = 0; i < 201; i += 1) {
-    tooMany[`--var-${i}`] = '#000';
-  }
-  assert.throws(() => {
-    cssVariablesSchema.parse(tooMany);
-  }, /200 CSS variables/);
-
-  assert.throws(() => {
-    cssVariablesSchema.parse({ '--color-primary': '' });
-  }, /Value is required/);
 });
