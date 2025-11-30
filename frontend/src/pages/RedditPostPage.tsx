@@ -122,52 +122,6 @@ function RedditCommentView({ comment, depth = 0 }: { comment: RedditComment; dep
         )}
       </div>
     </div>
-
-      {embedTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
-          <div className="w-full max-w-lg rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-6 shadow-2xl">
-            <div className="mb-3 flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">Embed Comment</h3>
-              <button
-                onClick={() => {
-                  setEmbedTarget(null);
-                  setEmbedCopied(false);
-                }}
-                className="text-xl text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
-                aria-label="Close embed modal"
-              >
-                ×
-              </button>
-            </div>
-            <p className="text-sm text-[var(--color-text-secondary)]">
-              Copy this HTML snippet to share the comment outside OmniNudge.
-            </p>
-            <textarea
-              value={embedCode}
-              readOnly
-              rows={4}
-              className="mt-3 w-full rounded border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-2 text-sm text-[var(--color-text-primary)]"
-            />
-            <div className="mt-4 flex justify-end gap-2">
-              <button
-                onClick={copyEmbedCode}
-                className="rounded bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)]"
-              >
-                {embedCopied ? 'Copied!' : 'Copy embed code'}
-              </button>
-              <button
-                onClick={() => {
-                  setEmbedTarget(null);
-                  setEmbedCopied(false);
-                }}
-                className="rounded border border-[var(--color-border)] px-4 py-2 text-sm font-semibold text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-elevated)]"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
   );
 }
 
