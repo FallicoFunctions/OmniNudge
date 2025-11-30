@@ -51,6 +51,141 @@ const ThemePreview = ({
       ? 'w-[320px]'
       : 'w-full max-w-3xl';
 
+  const renderButtonSamples = () => (
+    <div
+      className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)]"
+      style={{ padding: 'var(--spacing-md)', borderRadius: 'var(--border-radius-xl)' }}
+    >
+      <p className="text-xs uppercase tracking-wide text-[var(--color-text-secondary)]">
+        Buttons
+      </p>
+      <div
+        className="mt-3 grid gap-2 md:grid-cols-2"
+        style={{ gap: 'var(--spacing-sm)' }}
+      >
+        <button
+          type="button"
+          className="rounded-lg bg-[var(--color-primary)] font-semibold text-white"
+          style={{ padding: 'var(--spacing-sm)', borderRadius: 'var(--border-radius-lg)' }}
+        >
+          Primary Action
+        </button>
+        <button
+          type="button"
+          className="rounded-lg border border-[var(--color-primary)] font-semibold text-[var(--color-primary)]"
+          style={{ padding: 'var(--spacing-sm)', borderRadius: 'var(--border-radius-lg)' }}
+        >
+          Secondary
+        </button>
+        <button
+          type="button"
+          className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-elevated)] font-semibold text-[var(--color-text-primary)]"
+          style={{ padding: 'var(--spacing-sm)', borderRadius: 'var(--border-radius-lg)' }}
+        >
+          Outline
+        </button>
+        <button
+          type="button"
+          className="rounded-lg bg-[var(--color-error)]/10 font-semibold text-[var(--color-error)]"
+          style={{ padding: 'var(--spacing-sm)', borderRadius: 'var(--border-radius-lg)' }}
+        >
+          Danger
+        </button>
+      </div>
+    </div>
+  );
+
+  const renderFormSamples = () => (
+    <div
+      className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)]"
+      style={{ padding: 'var(--spacing-md)', borderRadius: 'var(--border-radius-xl)' }}
+    >
+      <p className="text-xs uppercase tracking-wide text-[var(--color-text-secondary)]">
+        Form Elements
+      </p>
+      <div className="mt-3 flex flex-col" style={{ gap: 'var(--spacing-sm)' }}>
+        <label className="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
+          Project Name
+          <input
+            type="text"
+            className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-background)] text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
+            style={{ padding: 'var(--spacing-xs) var(--spacing-sm)' }}
+            defaultValue="OmniNudge Preview"
+          />
+        </label>
+        <label className="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
+          Category
+          <select
+            className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-background)] text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
+            style={{ padding: 'var(--spacing-xs) var(--spacing-sm)' }}
+            defaultValue="design"
+          >
+            <option value="design">Design</option>
+            <option value="marketing">Marketing</option>
+            <option value="dev">Development</option>
+          </select>
+        </label>
+        <label className="flex items-center justify-between text-sm text-[var(--color-text-primary)]">
+          Enable Beta Access
+          <span className="relative inline-flex items-center">
+            <input type="checkbox" defaultChecked className="peer sr-only" />
+            <span className="h-5 w-10 rounded-full bg-[var(--color-border)] transition-all peer-checked:bg-[var(--color-primary)]" />
+            <span className="absolute left-1 top-1 h-3 w-3 rounded-full bg-white transition-all peer-checked:translate-x-5" />
+          </span>
+        </label>
+      </div>
+    </div>
+  );
+
+  const renderStatusBadges = () => (
+    <div
+      className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)]"
+      style={{ padding: 'var(--spacing-md)', borderRadius: 'var(--border-radius-xl)' }}
+    >
+      <p className="text-xs uppercase tracking-wide text-[var(--color-text-secondary)]">
+        Status Indicators
+      </p>
+      <div
+        className="mt-3 grid gap-3 sm:grid-cols-2"
+        style={{ gap: 'var(--spacing-sm)' }}
+      >
+        {[
+          { label: 'Live', color: 'var(--color-success)' },
+          { label: 'Scheduled', color: 'var(--color-info)' },
+          { label: 'Needs Review', color: 'var(--color-warning)' },
+          { label: 'Blocked', color: 'var(--color-error)' },
+        ].map((status) => (
+          <div
+            key={status.label}
+            className="flex items-center justify-between rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-elevated)]"
+            style={{ padding: 'var(--spacing-sm)', borderRadius: 'var(--border-radius-lg)' }}
+          >
+            <div>
+              <p className="text-sm font-semibold text-[var(--color-text-primary)]">
+                {status.label}
+              </p>
+              <p className="text-xs text-[var(--color-text-secondary)]">8 updates</p>
+            </div>
+            <span
+              className="h-8 w-8 rounded-full"
+              style={{ backgroundColor: status.color, opacity: 0.2 }}
+            />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
+  const renderCommonSections = () => (
+    <div className="mt-6 space-y-4">
+      <div className="grid gap-4 lg:grid-cols-2">
+        {renderButtonSamples()}
+        {renderFormSamples()}
+      </div>
+      {renderStatusBadges()}
+    </div>
+  );
+
   const frameContent = (
     <div
       className={`rounded-3xl border border-[var(--color-border)] bg-[var(--color-background)] p-6 shadow-lg transition-all ${
@@ -345,6 +480,7 @@ const ThemePreview = ({
           </div>
         </div>
       )}
+      {renderCommonSections()}
     </div>
   );
 
