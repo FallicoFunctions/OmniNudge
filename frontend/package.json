@@ -8,8 +8,7 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "test:build": "rm -rf .test-dist && tsc -p tsconfig.tests.json && printf '{\"type\":\"commonjs\"}' > .test-dist/package.json",
-    "test": "npm run test:build && node --test .test-dist/tests/**/*.test.js"
+    "test": "vitest"
   },
   "dependencies": {
     "react": "^19.2.0",
@@ -42,6 +41,7 @@
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.46.4",
     "vite": "^7.2.4",
+    "vitest": "^3.2.4",
     "zod": "^4.1.13",
     "zustand": "^5.0.9"
   }
