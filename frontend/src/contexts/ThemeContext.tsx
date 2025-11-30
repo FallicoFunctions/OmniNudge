@@ -4,10 +4,11 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 import { themeService } from '../services/themeService';
-import type { UserTheme } from '../types/theme';
+import type { UserSettings, UserTheme } from '../types/theme';
 import {
   applyCSSVariables,
   getStoredThemeId,
@@ -25,6 +26,9 @@ interface ThemeContextValue {
   selectTheme: (theme: UserTheme) => Promise<void>;
   selectThemeById: (themeId: number) => Promise<void>;
   refreshThemes: () => Promise<void>;
+  userSettings: UserSettings | null;
+  refreshSettings: () => Promise<void>;
+  setAdvancedMode: (enabled: boolean) => Promise<void>;
 }
 
 type ThemeSelectionOptions = {
@@ -42,6 +46,8 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
   const [cssVariables, setCssVariables] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [userSettings, setUserSettings] = useState<UserSettings | null>(null);
+  const selectionRequestId = useRef(0);
 
   // Hydrate immediately with cached CSS variables to avoid flashes
   useEffect(() => {
@@ -54,6 +60,8 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
   const selectTheme = useCallback(
     async (theme: UserTheme, options: ThemeSelectionOptions = {}) => {
       const { notifyServer = true, persist = true } = options;
+      selectionRequestId.current += 1;
+      const currentRequestId = selectionRequestId.current;
       setError(null);
       setActiveTheme(theme);
 
@@ -68,6 +76,11 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
       if (notifyServer) {
         try {
           await themeService.setActiveTheme(theme.id);
+          if (currentRequestId === selectionRequestId.current) {
+            setUserSettings((prev) =>
+              prev ? { ...prev, active_theme_id: theme.id } : prev
+            );
+          }
         } catch (err) {
           console.error('Failed to sync theme selection', err);
           setError('Unable to sync theme selection with the server.');
@@ -94,6 +107,9 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
       const myThemes = myThemesResponse ?? [];
       setPredefinedThemes(predefined);
       setCustomThemes(myThemes);
+      if (settings) {
+        setUserSettings(settings);
+      }
 
       const storedThemeId = getStoredThemeId();
       const targetId = settings?.active_theme_id ?? storedThemeId ?? null;
@@ -135,6 +151,30 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
     await loadThemes();
   }, [loadThemes]);
 
+  const refreshSettings = useCallback(async () => {
+    try {
+      const settings = await themeService.getUserSettings();
+      setUserSettings(settings);
+    } catch (err) {
+      console.error('Failed to refresh user settings', err);
+    }
+  }, []);
+
+  const setAdvancedMode = useCallback(
+    async (enabled: boolean) => {
+      try {
+        await themeService.setAdvancedMode(enabled);
+        setUserSettings((prev) =>
+          prev ? { ...prev, advanced_mode_enabled: enabled } : prev
+        );
+      } catch (err) {
+        console.error('Failed to update advanced mode', err);
+        throw err;
+      }
+    },
+    []
+  );
+
   const value = useMemo<ThemeContextValue>(
     () => ({
       activeTheme,
@@ -143,9 +183,12 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
       cssVariables,
       isLoading,
       error,
+      userSettings,
       selectTheme,
       selectThemeById,
       refreshThemes,
+      refreshSettings,
+      setAdvancedMode,
     }),
     [
       activeTheme,
@@ -154,9 +197,12 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
       cssVariables,
       isLoading,
       error,
+      userSettings,
       selectTheme,
       selectThemeById,
       refreshThemes,
+      refreshSettings,
+      setAdvancedMode,
     ]
   );
 
