@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import { isValidHexColor, normalizeHexColor } from '../utils/color';
 
 export const themeInfoSchema = z.object({
   theme_name: z
@@ -16,15 +15,7 @@ export const themeInfoSchema = z.object({
 });
 
 export const cssVariablesSchema = z
-  .record(
-    z.string(),
-    z
-      .string()
-      .transform((value) => normalizeHexColor(value))
-      .refine((value) => isValidHexColor(value), {
-        message: 'Value must be a valid hex color, e.g. #1a1a1a',
-      })
-  )
+  .record(z.string(), z.string().min(1, 'Value is required.'))
   .refine((variables) => Object.keys(variables).length <= 200, {
     message: 'You can only define up to 200 CSS variables.',
   });

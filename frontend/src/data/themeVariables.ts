@@ -16,6 +16,32 @@ export const DEFAULT_THEME_VARIABLES: Record<string, string> = {
   '--color-warning': '#f59e0b',
   '--color-error': '#ef4444',
   '--color-info': '#3b82f6',
+  '--font-family-base': "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+  '--font-size-xs': '0.75rem',
+  '--font-size-sm': '0.875rem',
+  '--font-size-base': '1rem',
+  '--font-size-lg': '1.125rem',
+  '--font-size-xl': '1.25rem',
+  '--font-size-2xl': '1.5rem',
+  '--font-size-3xl': '1.875rem',
+  '--spacing-xs': '0.25rem',
+  '--spacing-sm': '0.5rem',
+  '--spacing-md': '1rem',
+  '--spacing-lg': '1.5rem',
+  '--spacing-xl': '2rem',
+  '--spacing-2xl': '3rem',
+  '--border-radius-sm': '0.25rem',
+  '--border-radius-md': '0.375rem',
+  '--border-radius-lg': '0.5rem',
+  '--border-radius-xl': '0.75rem',
+  '--border-radius-2xl': '1rem',
+  '--shadow-sm': '0 1px 2px 0 rgb(0 0 0 / 0.05)',
+  '--shadow-md': '0 4px 6px -1px rgb(0 0 0 / 0.1)',
+  '--shadow-lg': '0 10px 15px -3px rgb(0 0 0 / 0.1)',
+  '--shadow-xl': '0 20px 25px -5px rgb(0 0 0 / 0.1)',
+  '--transition-fast': '150ms ease',
+  '--transition-base': '200ms ease',
+  '--transition-slow': '300ms ease',
 };
 
 const colorVariables: CSSVariable[] = [
@@ -141,10 +167,249 @@ const colorVariables: CSSVariable[] = [
   },
 ];
 
+const typographyVariables: CSSVariable[] = [
+  {
+    name: '--font-family-base',
+    label: 'Base Font Family',
+    category: 'typography',
+    type: 'string',
+    description: 'Primary font stack applied across the UI.',
+    value: DEFAULT_THEME_VARIABLES['--font-family-base'],
+  },
+  {
+    name: '--font-size-xs',
+    label: 'Font Size XS',
+    category: 'typography',
+    type: 'size',
+    unit: 'rem',
+    description: 'Caption and helper text size.',
+    value: DEFAULT_THEME_VARIABLES['--font-size-xs'],
+  },
+  {
+    name: '--font-size-sm',
+    label: 'Font Size SM',
+    category: 'typography',
+    type: 'size',
+    unit: 'rem',
+    description: 'Small body text.',
+    value: DEFAULT_THEME_VARIABLES['--font-size-sm'],
+  },
+  {
+    name: '--font-size-base',
+    label: 'Font Size Base',
+    category: 'typography',
+    type: 'size',
+    unit: 'rem',
+    description: 'Default body text size.',
+    value: DEFAULT_THEME_VARIABLES['--font-size-base'],
+  },
+  {
+    name: '--font-size-lg',
+    label: 'Font Size LG',
+    category: 'typography',
+    type: 'size',
+    unit: 'rem',
+    description: 'Large text elements.',
+    value: DEFAULT_THEME_VARIABLES['--font-size-lg'],
+  },
+  {
+    name: '--font-size-xl',
+    label: 'Font Size XL',
+    category: 'typography',
+    type: 'size',
+    unit: 'rem',
+    description: 'Headline text size.',
+    value: DEFAULT_THEME_VARIABLES['--font-size-xl'],
+  },
+  {
+    name: '--font-size-2xl',
+    label: 'Font Size 2XL',
+    category: 'typography',
+    type: 'size',
+    unit: 'rem',
+    description: 'Section headers.',
+    value: DEFAULT_THEME_VARIABLES['--font-size-2xl'],
+  },
+  {
+    name: '--font-size-3xl',
+    label: 'Font Size 3XL',
+    category: 'typography',
+    type: 'size',
+    unit: 'rem',
+    description: 'Hero titles and banners.',
+    value: DEFAULT_THEME_VARIABLES['--font-size-3xl'],
+  },
+];
+
+const spacingVariables: CSSVariable[] = [
+  {
+    name: '--spacing-xs',
+    label: 'Spacing XS',
+    category: 'spacing',
+    type: 'size',
+    unit: 'rem',
+    description: 'Tight spacing for chips and badges.',
+    value: DEFAULT_THEME_VARIABLES['--spacing-xs'],
+  },
+  {
+    name: '--spacing-sm',
+    label: 'Spacing SM',
+    category: 'spacing',
+    type: 'size',
+    unit: 'rem',
+    description: 'Compact spacing for cards and forms.',
+    value: DEFAULT_THEME_VARIABLES['--spacing-sm'],
+  },
+  {
+    name: '--spacing-md',
+    label: 'Spacing MD',
+    category: 'spacing',
+    type: 'size',
+    unit: 'rem',
+    description: 'Default spacing between sections.',
+    value: DEFAULT_THEME_VARIABLES['--spacing-md'],
+  },
+  {
+    name: '--spacing-lg',
+    label: 'Spacing LG',
+    category: 'spacing',
+    type: 'size',
+    unit: 'rem',
+    description: 'Roomy spacing for layouts.',
+    value: DEFAULT_THEME_VARIABLES['--spacing-lg'],
+  },
+  {
+    name: '--spacing-xl',
+    label: 'Spacing XL',
+    category: 'spacing',
+    type: 'size',
+    unit: 'rem',
+    description: 'Wide spacing for hero sections.',
+    value: DEFAULT_THEME_VARIABLES['--spacing-xl'],
+  },
+  {
+    name: '--spacing-2xl',
+    label: 'Spacing 2XL',
+    category: 'spacing',
+    type: 'size',
+    unit: 'rem',
+    description: 'Gutter spacing for immersive layouts.',
+    value: DEFAULT_THEME_VARIABLES['--spacing-2xl'],
+  },
+];
+
+const layoutVariables: CSSVariable[] = [
+  {
+    name: '--border-radius-sm',
+    label: 'Border Radius SM',
+    category: 'layout',
+    type: 'size',
+    unit: 'rem',
+    description: 'Subtle rounding for buttons and inputs.',
+    value: DEFAULT_THEME_VARIABLES['--border-radius-sm'],
+  },
+  {
+    name: '--border-radius-md',
+    label: 'Border Radius MD',
+    category: 'layout',
+    type: 'size',
+    unit: 'rem',
+    description: 'Default rounding for cards.',
+    value: DEFAULT_THEME_VARIABLES['--border-radius-md'],
+  },
+  {
+    name: '--border-radius-lg',
+    label: 'Border Radius LG',
+    category: 'layout',
+    type: 'size',
+    unit: 'rem',
+    description: 'Large rounding for surfaces.',
+    value: DEFAULT_THEME_VARIABLES['--border-radius-lg'],
+  },
+  {
+    name: '--border-radius-xl',
+    label: 'Border Radius XL',
+    category: 'layout',
+    type: 'size',
+    unit: 'rem',
+    description: 'Used for modals or pill buttons.',
+    value: DEFAULT_THEME_VARIABLES['--border-radius-xl'],
+  },
+  {
+    name: '--border-radius-2xl',
+    label: 'Border Radius 2XL',
+    category: 'layout',
+    type: 'size',
+    unit: 'rem',
+    description: 'Max rounding for hero elements.',
+    value: DEFAULT_THEME_VARIABLES['--border-radius-2xl'],
+  },
+  {
+    name: '--shadow-sm',
+    label: 'Shadow SM',
+    category: 'layout',
+    type: 'string',
+    description: 'Subtle elevation.',
+    value: DEFAULT_THEME_VARIABLES['--shadow-sm'],
+  },
+  {
+    name: '--shadow-md',
+    label: 'Shadow MD',
+    category: 'layout',
+    type: 'string',
+    description: 'Default elevation for cards.',
+    value: DEFAULT_THEME_VARIABLES['--shadow-md'],
+  },
+  {
+    name: '--shadow-lg',
+    label: 'Shadow LG',
+    category: 'layout',
+    type: 'string',
+    description: 'Prominent elevation for panels.',
+    value: DEFAULT_THEME_VARIABLES['--shadow-lg'],
+  },
+  {
+    name: '--shadow-xl',
+    label: 'Shadow XL',
+    category: 'layout',
+    type: 'string',
+    description: 'Deep shadow for modals.',
+    value: DEFAULT_THEME_VARIABLES['--shadow-xl'],
+  },
+];
+
 export const THEME_VARIABLE_GROUPS: ThemeCategory[] = [
   {
     id: 'colors',
     name: 'Color Palette',
     variables: colorVariables,
   },
+  {
+    id: 'typography',
+    name: 'Typography',
+    variables: typographyVariables,
+  },
+  {
+    id: 'spacing',
+    name: 'Spacing',
+    variables: spacingVariables,
+  },
+  {
+    id: 'layout',
+    name: 'Layout & Effects',
+    variables: layoutVariables,
+  },
 ];
+
+export const VARIABLE_DEFINITION_MAP: Record<string, CSSVariable> = THEME_VARIABLE_GROUPS.reduce(
+  (acc, group) => {
+    group.variables.forEach((variable) => {
+      acc[variable.name] = variable;
+    });
+    return acc;
+  },
+  {} as Record<string, CSSVariable>
+);
+
+export const getVariableDefinition = (name: string): CSSVariable | undefined =>
+  VARIABLE_DEFINITION_MAP[name];

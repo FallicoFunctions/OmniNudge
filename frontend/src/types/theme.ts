@@ -86,6 +86,7 @@ export interface CSSVariable {
   type: 'color' | 'size' | 'number' | 'string';
   label: string;
   description?: string;
+  unit?: string;
 }
 
 export interface ThemeCategory {

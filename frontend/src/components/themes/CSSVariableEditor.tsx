@@ -34,6 +34,27 @@ const CSSVariableEditor = ({
                 '#000000';
               const isSelected = selectedVariable === variable.name;
               const errorMessage = variableErrors[variable.name];
+              const inputClasses = [
+                'rounded-md border border-[var(--color-border)] px-2 py-1 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none',
+                variable.type === 'color' ? 'uppercase w-28' : '',
+                variable.type === 'string' ? 'w-full max-w-xs' : '',
+                variable.type === 'size' ? 'w-32' : '',
+                variable.type === 'number' ? 'w-24' : '',
+              ]
+                .filter(Boolean)
+                .join(' ') || 'rounded-md border border-[var(--color-border)] px-2 py-1 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none';
+
+              const placeholder =
+                variable.type === 'color'
+                  ? '#000000'
+                  : variable.type === 'size'
+                    ? variable.unit ?? '1rem'
+                    : variable.type === 'number'
+                      ? '1.0'
+                      : variable.type === 'string'
+                        ? 'Font stack'
+                        : '';
+
               return (
                 <button
                   key={variable.name}
@@ -59,15 +80,20 @@ const CSSVariableEditor = ({
                     )}
                   </div>
                   <div className="flex items-center gap-3">
-                    <span
-                      className="h-8 w-8 rounded-full border border-[var(--color-border)]"
-                      style={{ backgroundColor: value }}
-                    />
+                    {variable.type === 'color' && (
+                      <span
+                        className="h-8 w-8 rounded-full border border-[var(--color-border)]"
+                        style={{ backgroundColor: value }}
+                      />
+                    )}
                     <input
-                      type="text"
-                      className="w-28 rounded-md border border-[var(--color-border)] px-2 py-1 text-sm uppercase text-[var(--color-text-primary)]"
+                      type={variable.type === 'number' ? 'number' : 'text'}
+                      spellCheck={false}
+                      className={inputClasses}
+                      placeholder={placeholder}
                       value={value}
                       onChange={(event) => onChangeVariable(variable.name, event.target.value)}
+                      title={variable.unit ? `Unit: ${variable.unit}` : undefined}
                     />
                   </div>
                 </button>
