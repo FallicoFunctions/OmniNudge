@@ -40,6 +40,9 @@ function App() {
         <div className="sr-only" aria-live="polite">
           {activeTheme ? `Active theme ${activeTheme.theme_name}` : 'No active theme selected'}
         </div>
+        <div className="sr-only" aria-live="polite">
+          {activeTheme ? `Active theme ${activeTheme.theme_name}` : 'No active theme selected'}
+        </div>
         <section className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6 shadow-md">
           <header className="mb-6 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
             <div>
