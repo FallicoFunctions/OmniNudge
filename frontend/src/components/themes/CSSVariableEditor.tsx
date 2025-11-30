@@ -34,6 +34,7 @@ const CSSVariableEditor = ({
                 '#000000';
               const isSelected = selectedVariable === variable.name;
               const errorMessage = variableErrors[variable.name];
+              const descriptionId = `${variable.name}-description`;
               const inputClasses = [
                 'rounded-md border border-[var(--color-border)] px-2 py-1 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none',
                 variable.type === 'color' ? 'uppercase w-28' : '',
@@ -71,7 +72,7 @@ const CSSVariableEditor = ({
                       {variable.label}
                     </p>
                     {variable.description && (
-                      <p className="text-xs text-[var(--color-text-secondary)]">
+                      <p id={descriptionId} className="text-xs text-[var(--color-text-secondary)]">
                         {variable.description}
                       </p>
                     )}
@@ -94,6 +95,7 @@ const CSSVariableEditor = ({
                       value={value}
                       onChange={(event) => onChangeVariable(variable.name, event.target.value)}
                       title={variable.unit ? `Unit: ${variable.unit}` : undefined}
+                      aria-describedby={variable.description ? descriptionId : undefined}
                     />
                   </div>
                 </button>

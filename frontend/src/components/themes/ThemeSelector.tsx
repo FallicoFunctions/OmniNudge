@@ -22,6 +22,7 @@ const ThemeSelector = ({ onCreateNewTheme }: ThemeSelectorProps) => {
   const [isOpen, setIsOpen] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [switchingThemeId, setSwitchingThemeId] = useState<number | null>(null);
+  const [announcement, setAnnouncement] = useState('');
   const isMobile = useMediaQuery('(max-width: 640px)');
 
   const themeGroups = useMemo(
@@ -37,12 +38,14 @@ const ThemeSelector = ({ onCreateNewTheme }: ThemeSelectorProps) => {
     await selectTheme(theme);
     setSwitchingThemeId(null);
     setIsOpen(false);
+    setAnnouncement(`Theme ${theme.theme_name} selected`);
   };
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
     await refreshThemes();
     setIsRefreshing(false);
+    setAnnouncement('Theme list refreshed');
   };
 
   const handleCreateTheme = () => {
@@ -198,6 +201,9 @@ const ThemeSelector = ({ onCreateNewTheme }: ThemeSelectorProps) => {
 
   return (
     <div className="relative inline-block w-full max-w-md text-left">
+      <div className="sr-only" aria-live="polite">
+        {announcement}
+      </div>
       <button
         type="button"
         className="flex w-full items-center justify-between rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3 text-left shadow-sm"
