@@ -23,8 +23,9 @@ func NewRedditCommentsHandler(redditCommentRepo *models.RedditPostCommentReposit
 
 // CreateRedditCommentRequest represents the request body for creating a comment on a Reddit post
 type CreateRedditCommentRequest struct {
-	Content         string `json:"content" binding:"required,min=1"`
-	ParentCommentID *int   `json:"parent_comment_id"`
+	Content               string  `json:"content" binding:"required,min=1"`
+	ParentCommentID       *int    `json:"parent_comment_id"`        // Local comment ID to reply to
+	ParentRedditCommentID *string `json:"parent_reddit_comment_id"` // Reddit API comment ID to reply to
 }
 
 // GetRedditPostComments handles GET /api/v1/reddit/posts/:subreddit/:postId/comments
@@ -118,11 +119,12 @@ func (h *RedditCommentsHandler) CreateRedditPostComment(c *gin.Context) {
 
 	// Create the comment
 	comment := &models.RedditPostComment{
-		Subreddit:       subreddit,
-		RedditPostID:    postID,
-		UserID:          userID.(int),
-		ParentCommentID: req.ParentCommentID,
-		Content:         req.Content,
+		Subreddit:             subreddit,
+		RedditPostID:          postID,
+		UserID:                userID.(int),
+		ParentCommentID:       req.ParentCommentID,
+		ParentRedditCommentID: req.ParentRedditCommentID,
+		Content:               req.Content,
 	}
 
 	if err := h.redditCommentRepo.Create(c.Request.Context(), comment); err != nil {
