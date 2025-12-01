@@ -298,36 +298,27 @@ function RedditCommentView({
                 ))}
 
                 {/* Show local comment replies */}
-                {localReplies.length > 0 && (
-                  <div className="ml-4 border-l-2 border-blue-400 pl-4">
-                    <div className="mb-3 text-xs text-blue-600 dark:text-blue-400 font-semibold">
-                      💬 Site-only replies ({localReplies.length})
-                    </div>
-                    <div className="space-y-3">
-                      {localReplies.map((localComment) => (
-                        <LocalCommentView
-                          key={localComment.id}
-                          comment={localComment}
-                          subreddit={subreddit}
-                          postId={postId}
-                          replyingTo={replyingTo}
-                          onReply={onReply}
-                          onCancelReply={onCancelReply}
-                          allComments={localComments}
-                          currentUsername={currentUsername}
-                          onPermalink={onPermalink}
-                          onEmbed={onEmbed}
-                          onToggleSave={onToggleSave}
-                          savedCommentIds={savedCommentIds}
-                          onEdit={onEdit}
-                          onDelete={onDelete}
-                          onToggleInbox={onToggleInbox}
-                          onReport={onReport}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                )}
+                {localReplies.length > 0 && localReplies.map((localComment) => (
+                  <LocalCommentView
+                    key={localComment.id}
+                    comment={localComment}
+                    subreddit={subreddit}
+                    postId={postId}
+                    replyingTo={replyingTo}
+                    onReply={onReply}
+                    onCancelReply={onCancelReply}
+                    allComments={localComments}
+                    currentUsername={currentUsername}
+                    onPermalink={onPermalink}
+                    onEmbed={onEmbed}
+                    onToggleSave={onToggleSave}
+                    savedCommentIds={savedCommentIds}
+                    onEdit={onEdit}
+                    onDelete={onDelete}
+                    onToggleInbox={onToggleInbox}
+                    onReport={onReport}
+                  />
+                ))}
               </div>
             )}
           </>
@@ -510,6 +501,9 @@ function LocalCommentView({
           >
             {comment.username}
           </button>
+          <span className="rounded bg-blue-500 px-1.5 py-0.5 text-[10px] font-bold text-white">
+            Omni
+          </span>
           <span>•</span>
           <span>
             {new Date(comment.created_at).toLocaleString('en-US', {
