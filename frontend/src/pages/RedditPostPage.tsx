@@ -1012,15 +1012,14 @@ export default function RedditPostPage() {
         </div>
       )}
 
-      {/* Local Comments Section (Comments made on your platform) */}
-      <div className="mb-8 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-6">
+      {/* Unified Comments Section */}
+      <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-6">
         <h2 className="mb-4 text-xl font-semibold text-[var(--color-text-primary)]">
-          Community Discussion (Site-Only)
+          Comments
         </h2>
 
         <div className="mb-4 rounded-md border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800 dark:border-blue-800 dark:bg-blue-900/20 dark:text-blue-300">
-          <strong>Note:</strong> Comments you add here are <strong>only visible on this site</strong>{' '}
-          and will not appear on Reddit.
+          <strong>Note:</strong> Comments from Reddit are read-only. You can reply to them, but your replies are <strong>only visible on this site</strong>.
         </div>
 
         {/* Comment Form */}
@@ -1041,12 +1040,13 @@ export default function RedditPostPage() {
           </button>
         </form>
 
-        {/* Local Comments List */}
-        {loadingLocal && (
+        {/* Loading states */}
+        {(loadingLocal || loadingReddit) && (
           <div className="text-sm text-[var(--color-text-secondary)]">Loading comments...</div>
         )}
 
-        {localCommentsData && localCommentsData.length === 0 && !focusedCommentId && (
+        {/* Empty state */}
+        {!loadingLocal && !loadingReddit && localCommentsData && localCommentsData.length === 0 && redditComments && redditComments.length === 0 && !focusedCommentId && (
           <div className="text-sm text-[var(--color-text-secondary)]">
             No comments yet. Be the first to comment on this post!
           </div>
@@ -1070,76 +1070,54 @@ export default function RedditPostPage() {
           </div>
         )}
 
-        {localCommentsData && topLevelComments.length > 0 && (
-          <div className="space-y-4">
-            {topLevelComments.map((comment) => (
-              <LocalCommentView
-                key={comment.id}
-                comment={comment}
-                subreddit={subreddit}
-                postId={postId}
-                replyingTo={replyingTo}
-                onReply={(commentId) => setReplyingTo(commentId)}
-                onCancelReply={() => setReplyingTo(null)}
-                allComments={localCommentsData}
-                currentUsername={user?.username}
-                onPermalink={handlePermalink}
-                onEmbed={handleEmbed}
-                onToggleSave={handleToggleSave}
-                savedCommentIds={savedCommentIds}
-                onEdit={handleEditComment}
-                onDelete={handleDeleteComment}
-                onToggleInbox={handleToggleInbox}
-                onReport={handleReportComment}
-              />
-            ))}
-          </div>
-        )}
-      </div>
+        {/* Combined Comments List */}
+        <div className="space-y-4">
+          {/* Show top-level local comments (only those not replying to Reddit comments) */}
+          {localCommentsData && topLevelComments.length > 0 && topLevelComments.map((comment) => (
+            <LocalCommentView
+              key={comment.id}
+              comment={comment}
+              subreddit={subreddit}
+              postId={postId}
+              replyingTo={replyingTo}
+              onReply={(commentId) => setReplyingTo(commentId)}
+              onCancelReply={() => setReplyingTo(null)}
+              allComments={localCommentsData}
+              currentUsername={user?.username}
+              onPermalink={handlePermalink}
+              onEmbed={handleEmbed}
+              onToggleSave={handleToggleSave}
+              savedCommentIds={savedCommentIds}
+              onEdit={handleEditComment}
+              onDelete={handleDeleteComment}
+              onToggleInbox={handleToggleInbox}
+              onReport={handleReportComment}
+            />
+          ))}
 
-      {/* Reddit Comments Section (Read-only from Reddit API) */}
-      <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-6">
-        <h2 className="mb-4 text-xl font-semibold text-[var(--color-text-primary)]">
-          Reddit Comments (Read-Only)
-        </h2>
-
-        {loadingReddit && (
-          <div className="text-sm text-[var(--color-text-secondary)]">
-            Loading Reddit comments...
-          </div>
-        )}
-
-        {redditComments && redditComments.length === 0 && (
-          <div className="text-sm text-[var(--color-text-secondary)]">
-            No Reddit comments available for this post.
-          </div>
-        )}
-
-        {redditComments && redditComments.length > 0 && (
-          <div className="space-y-4">
-            {redditComments.map((comment, index) => (
-              <RedditCommentView
-                key={comment.data?.id || index}
-                comment={comment}
-                localComments={localCommentsData || []}
-                subreddit={subreddit || ''}
-                postId={postId || ''}
-                replyingTo={replyingTo}
-                onReply={(commentId) => setReplyingTo(commentId)}
-                onCancelReply={() => setReplyingTo(null)}
-                currentUsername={user?.username}
-                onPermalink={handlePermalink}
-                onEmbed={handleEmbed}
-                onToggleSave={handleToggleSave}
-                savedCommentIds={savedCommentIds}
-                onEdit={handleEditComment}
-                onDelete={handleDeleteComment}
-                onToggleInbox={handleToggleInbox}
-                onReport={handleReportComment}
-              />
-            ))}
-          </div>
-        )}
+          {/* Show Reddit comments (which will include site-only replies within them) */}
+          {redditComments && redditComments.length > 0 && redditComments.map((comment, index) => (
+            <RedditCommentView
+              key={comment.data?.id || index}
+              comment={comment}
+              localComments={localCommentsData || []}
+              subreddit={subreddit || ''}
+              postId={postId || ''}
+              replyingTo={replyingTo}
+              onReply={(commentId) => setReplyingTo(commentId)}
+              onCancelReply={() => setReplyingTo(null)}
+              currentUsername={user?.username}
+              onPermalink={handlePermalink}
+              onEmbed={handleEmbed}
+              onToggleSave={handleToggleSave}
+              savedCommentIds={savedCommentIds}
+              onEdit={handleEditComment}
+              onDelete={handleDeleteComment}
+              onToggleInbox={handleToggleInbox}
+              onReport={handleReportComment}
+            />
+          ))}
+        </div>
       </div>
     </div>
   );
