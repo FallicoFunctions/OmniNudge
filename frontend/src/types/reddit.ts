@@ -5,4 +5,5 @@ export interface LocalRedditComment extends LocalCommentBase {
   reddit_post_id: string;
   reddit_post_title?: string;
   user_id: number;
+  parent_reddit_comment_id?: string; // Reddit API comment ID this is replying to
 }

@@ -49,8 +49,62 @@ type RedditCommentsListing = RedditListing<RedditComment>;
 
 
 // Component to render a single Reddit comment with replies
-function RedditCommentView({ comment, depth = 0 }: { comment: RedditComment; depth?: number }) {
+function RedditCommentView({
+  comment,
+  depth = 0,
+  localComments = [],
+  subreddit,
+  postId,
+  replyingTo,
+  onReply,
+  onCancelReply,
+  currentUsername,
+  onPermalink,
+  onEmbed,
+  onToggleSave,
+  savedCommentIds,
+  onEdit,
+  onDelete,
+  onToggleInbox,
+  onReport,
+}: {
+  comment: RedditComment;
+  depth?: number;
+  localComments?: LocalRedditComment[];
+  subreddit: string;
+  postId: string;
+  replyingTo: number | null;
+  onReply: (commentId: number) => void;
+  onCancelReply: () => void;
+  currentUsername?: string | null;
+  onPermalink: (comment: LocalRedditComment) => void;
+  onEmbed: (comment: LocalRedditComment) => void;
+  onToggleSave: (comment: LocalRedditComment, shouldSave: boolean) => Promise<void>;
+  savedCommentIds: Set<number>;
+  onEdit: (commentId: number, content: string) => Promise<void>;
+  onDelete: (commentId: number) => Promise<void>;
+  onToggleInbox: (commentId: number, nextValue: boolean) => Promise<void>;
+  onReport: (commentId: number) => Promise<void>;
+}) {
+  const queryClient = useQueryClient();
   const [collapsed, setCollapsed] = useState(false);
+  const [replyText, setReplyText] = useState('');
+  const [isReplying, setIsReplying] = useState(false);
+
+  const createReplyMutation = useMutation({
+    mutationFn: async (content: string) => {
+      return api.post(`/reddit/posts/${subreddit}/${postId}/comments`, {
+        content,
+        parent_comment_id: null,
+        parent_reddit_comment_id: comment.data.id,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['reddit', 'posts', subreddit, postId, 'localComments'] });
+      setReplyText('');
+      setIsReplying(false);
+    },
+  });
 
   if (comment.kind === 'more') return null;
   if (!comment.data || !comment.data.body) return null;
@@ -60,7 +114,43 @@ function RedditCommentView({ comment, depth = 0 }: { comment: RedditComment; dep
       ? comment.data.replies
       : undefined;
   const replies = repliesListing?.data.children ?? [];
-  const hasReplies = replies.length > 0;
+
+  // Find local comments that reply to this Reddit comment
+  const localReplies = localComments.filter(c => c.parent_reddit_comment_id === comment.data.id);
+
+  const hasReplies = replies.length > 0 || localReplies.length > 0;
+
+  const handleReplyClick = () => {
+    setIsReplying(true);
+  };
+
+  const handleCancelReply = () => {
+    setIsReplying(false);
+    setReplyText('');
+  };
+
+  const handleCopyPermalink = () => {
+    const subreddit = window.location.pathname.split('/')[3];
+    const postId = window.location.pathname.split('/')[5];
+    const url = `https://reddit.com/r/${subreddit}/comments/${postId}/_/${comment.data.id}`;
+    navigator.clipboard.writeText(url);
+    alert('Permalink copied to clipboard!');
+  };
+
+  const handleEmbed = () => {
+    const subreddit = window.location.pathname.split('/')[3];
+    const postId = window.location.pathname.split('/')[5];
+    const embedCode = `<iframe src="https://reddit.com/r/${subreddit}/comments/${postId}/_/${comment.data.id}?embed=true" width="640" height="400"></iframe>`;
+    navigator.clipboard.writeText(embedCode);
+    alert('Embed code copied to clipboard!');
+  };
+
+  const handleSave = () => {
+    // For now, just open Reddit's save feature in new tab
+    const subreddit = window.location.pathname.split('/')[3];
+    const postId = window.location.pathname.split('/')[5];
+    window.open(`https://reddit.com/r/${subreddit}/comments/${postId}/_/${comment.data.id}`, '_blank');
+  };
 
   return (
     <div className={`${depth > 0 ? 'ml-4 border-l-2 border-[var(--color-border)] pl-4' : ''}`}>
@@ -94,7 +184,7 @@ function RedditCommentView({ comment, depth = 0 }: { comment: RedditComment; dep
           </span>
           {collapsed && hasReplies && (
             <span className="ml-2 text-[var(--color-text-muted)]">
-              ({replies.length} {replies.length === 1 ? 'reply' : 'replies'})
+              ({(replies.length + localReplies.length)} {(replies.length + localReplies.length) === 1 ? 'reply' : 'replies'})
             </span>
           )}
         </div>
@@ -114,11 +204,130 @@ function RedditCommentView({ comment, depth = 0 }: { comment: RedditComment; dep
               ))}
             </div>
 
+            {/* Action buttons - left aligned */}
+            <div className="mt-2 flex gap-3 text-xs text-[var(--color-text-secondary)]">
+              <button
+                onClick={handleCopyPermalink}
+                className="hover:text-[var(--color-primary)]"
+              >
+                permalink
+              </button>
+              <button
+                onClick={handleEmbed}
+                className="hover:text-[var(--color-primary)]"
+              >
+                embed
+              </button>
+              <button
+                onClick={handleSave}
+                className="hover:text-[var(--color-primary)]"
+              >
+                save
+              </button>
+              <button
+                onClick={handleReplyClick}
+                className="hover:text-[var(--color-primary)]"
+              >
+                reply
+              </button>
+            </div>
+
+            {/* Inline reply form */}
+            {isReplying && (
+              <div className="mt-3 rounded border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-3">
+                <form onSubmit={(e) => {
+                  e.preventDefault();
+                  if (replyText.trim()) {
+                    createReplyMutation.mutate(replyText.trim());
+                  }
+                }}>
+                  <textarea
+                    value={replyText}
+                    onChange={(e) => setReplyText(e.target.value)}
+                    placeholder="Write your reply..."
+                    className="w-full rounded border border-[var(--color-border)] bg-[var(--color-surface)] p-2 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
+                    rows={4}
+                    disabled={createReplyMutation.isPending}
+                  />
+                  <div className="mt-2 flex gap-2">
+                    <button
+                      type="submit"
+                      disabled={!replyText.trim() || createReplyMutation.isPending}
+                      className="rounded bg-[var(--color-primary)] px-3 py-1 text-xs font-semibold text-white disabled:opacity-50"
+                    >
+                      {createReplyMutation.isPending ? 'Submitting...' : 'Submit'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleCancelReply}
+                      disabled={createReplyMutation.isPending}
+                      className="rounded border border-[var(--color-border)] px-3 py-1 text-xs font-semibold text-[var(--color-text-secondary)] disabled:opacity-50"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </form>
+              </div>
+            )}
+
+            {/* Replies section */}
             {hasReplies && (
-              <div className="mt-3">
+              <div className="mt-3 space-y-3">
+                {/* Show Reddit API replies */}
                 {replies.map((reply, index) => (
-                  <RedditCommentView key={reply.data?.id || index} comment={reply} depth={depth + 1} />
+                  <RedditCommentView
+                    key={reply.data?.id || index}
+                    comment={reply}
+                    depth={depth + 1}
+                    localComments={localComments}
+                    subreddit={subreddit}
+                    postId={postId}
+                    replyingTo={replyingTo}
+                    onReply={onReply}
+                    onCancelReply={onCancelReply}
+                    currentUsername={currentUsername}
+                    onPermalink={onPermalink}
+                    onEmbed={onEmbed}
+                    onToggleSave={onToggleSave}
+                    savedCommentIds={savedCommentIds}
+                    onEdit={onEdit}
+                    onDelete={onDelete}
+                    onToggleInbox={onToggleInbox}
+                    onReport={onReport}
+                  />
                 ))}
+
+                {/* Show local comment replies */}
+                {localReplies.length > 0 && (
+                  <div className="ml-4 border-l-2 border-blue-400 pl-4">
+                    <div className="mb-3 text-xs text-blue-600 dark:text-blue-400 font-semibold">
+                      💬 Site-only replies ({localReplies.length})
+                    </div>
+                    <div className="space-y-3">
+                      {localReplies.map((localComment) => (
+                        <LocalCommentView
+                          key={localComment.id}
+                          comment={localComment}
+                          subreddit={subreddit}
+                          postId={postId}
+                          replyingTo={replyingTo}
+                          onReply={onReply}
+                          onCancelReply={onCancelReply}
+                          allComments={localComments}
+                          currentUsername={currentUsername}
+                          onPermalink={onPermalink}
+                          onEmbed={onEmbed}
+                          onToggleSave={onToggleSave}
+                          savedCommentIds={savedCommentIds}
+                          onEdit={onEdit}
+                          onDelete={onDelete}
+                          onToggleInbox={onToggleInbox}
+                          onReport={onReport}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </>
@@ -515,7 +724,6 @@ export default function RedditPostPage() {
   const [commentText, setCommentText] = useState('');
   const [replyingTo, setReplyingTo] = useState<number | null>(null);
   const [embedTarget, setEmbedTarget] = useState<LocalRedditComment | null>(null);
-  const [embedCopied, setEmbedCopied] = useState(false);
 
   // Fetch Reddit post and comments from Reddit API
   const { data: redditData, isLoading: loadingReddit } = useQuery({
@@ -646,7 +854,6 @@ export default function RedditPostPage() {
   };
 
   const handleEmbed = (commentTarget: LocalRedditComment) => {
-    setEmbedCopied(false);
     setEmbedTarget(commentTarget);
   };
 
@@ -687,10 +894,10 @@ export default function RedditPostPage() {
     try {
       if (typeof navigator !== 'undefined' && navigator.clipboard) {
         await navigator.clipboard.writeText(embedCode);
-        setEmbedCopied(true);
+        alert('Embed code copied to clipboard!');
       }
     } catch {
-      setEmbedCopied(false);
+      alert('Failed to copy embed code.');
     }
   };
 
@@ -699,6 +906,7 @@ export default function RedditPostPage() {
       return api.post(`/reddit/posts/${subreddit}/${postId}/comments`, {
         content,
         parent_comment_id: null, // Top-level comment only
+        parent_reddit_comment_id: null, // Not used here - Reddit replies are handled inline
       });
     },
     onSuccess: () => {
@@ -816,7 +1024,7 @@ export default function RedditPostPage() {
         </div>
 
         {/* Comment Form */}
-        <form onSubmit={handleSubmitComment} className="mb-6">
+        <form id="comment-form" onSubmit={handleSubmitComment} className="mb-6">
           <textarea
             value={commentText}
             onChange={(e) => setCommentText(e.target.value)}
@@ -910,7 +1118,25 @@ export default function RedditPostPage() {
         {redditComments && redditComments.length > 0 && (
           <div className="space-y-4">
             {redditComments.map((comment, index) => (
-              <RedditCommentView key={comment.data?.id || index} comment={comment} />
+              <RedditCommentView
+                key={comment.data?.id || index}
+                comment={comment}
+                localComments={localCommentsData || []}
+                subreddit={subreddit || ''}
+                postId={postId || ''}
+                replyingTo={replyingTo}
+                onReply={(commentId) => setReplyingTo(commentId)}
+                onCancelReply={() => setReplyingTo(null)}
+                currentUsername={user?.username}
+                onPermalink={handlePermalink}
+                onEmbed={handleEmbed}
+                onToggleSave={handleToggleSave}
+                savedCommentIds={savedCommentIds}
+                onEdit={handleEditComment}
+                onDelete={handleDeleteComment}
+                onToggleInbox={handleToggleInbox}
+                onReport={handleReportComment}
+              />
             ))}
           </div>
         )}
