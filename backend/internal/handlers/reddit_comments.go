@@ -62,6 +62,10 @@ func (h *RedditCommentsHandler) GetRedditPostComments(c *gin.Context) {
 		comments = []*models.RedditPostComment{}
 	}
 
+	for _, comment := range comments {
+		comment.SanitizeDeletedPlaceholder()
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"subreddit": subreddit,
 		"post_id":   postID,

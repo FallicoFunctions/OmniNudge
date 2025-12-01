@@ -129,10 +129,10 @@ func (r *SavedItemsRepository) GetSavedRedditComments(ctx context.Context, userI
 		FROM saved_reddit_comments src
 		JOIN reddit_post_comments rc ON rc.id = src.comment_id
 		JOIN users u ON u.id = rc.user_id
-		WHERE src.user_id = $1 AND rc.deleted_at IS NULL
+		WHERE src.user_id = $1 AND (rc.deleted_at IS NULL OR rc.content = $2)
 		ORDER BY src.created_at DESC
 	`
-	rows, err := r.pool.Query(ctx, query, userID)
+	rows, err := r.pool.Query(ctx, query, userID, DeletedCommentPlaceholder)
 	if err != nil {
 		return nil, err
 	}
@@ -158,6 +158,7 @@ func (r *SavedItemsRepository) GetSavedRedditComments(ctx context.Context, userI
 		); err != nil {
 			return nil, err
 		}
+		comment.SanitizeDeletedPlaceholder()
 		comments = append(comments, &comment)
 	}
 	return comments, rows.Err()
