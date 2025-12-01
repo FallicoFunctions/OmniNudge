@@ -68,6 +68,15 @@ function RedditCommentView({ comment, depth = 0 }: { comment: RedditComment; dep
         <div className="flex items-center gap-2 text-xs text-[var(--color-text-secondary)]">
           <button
             onClick={() => setCollapsed(!collapsed)}
+            className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] transition-transform duration-200"
+            style={{ transform: collapsed ? 'rotate(-90deg)' : 'rotate(0deg)' }}
+            title={collapsed ? 'Expand' : 'Collapse'}
+            aria-label={collapsed ? 'Expand comment thread' : 'Collapse comment thread'}
+          >
+            ▼
+          </button>
+          <button
+            onClick={() => setCollapsed(!collapsed)}
             className="font-semibold hover:underline"
           >
             {comment.data.author}
@@ -83,16 +92,10 @@ function RedditCommentView({ comment, depth = 0 }: { comment: RedditComment; dep
               minute: '2-digit',
             })}
           </span>
-          {hasReplies && (
-            <>
-              <span>•</span>
-              <button
-                onClick={() => setCollapsed(!collapsed)}
-                className="text-[var(--color-primary)] hover:underline"
-              >
-                {collapsed ? '[+]' : '[-]'}
-              </button>
-            </>
+          {collapsed && hasReplies && (
+            <span className="ml-2 text-[var(--color-text-muted)]">
+              ({replies.length} {replies.length === 1 ? 'reply' : 'replies'})
+            </span>
           )}
         </div>
 
@@ -165,6 +168,7 @@ function LocalCommentView({
   const queryClient = useQueryClient();
   const [replyText, setReplyText] = useState('');
   const [isEditing, setIsEditing] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(false);
   const [editText, setEditText] = useState(comment.content);
   const [isSavingToggle, setIsSavingToggle] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -281,10 +285,28 @@ function LocalCommentView({
   return (
     <div>
       <div className="rounded border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-3">
-        <div className="text-xs text-[var(--color-text-secondary)]">
-          u/{comment.username} • {new Date(comment.created_at).toLocaleString()}
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setIsCollapsed(!isCollapsed)}
+              className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] transition-transform duration-200"
+              style={{ transform: isCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)' }}
+              title={isCollapsed ? 'Expand' : 'Collapse'}
+              aria-label={isCollapsed ? 'Expand comment thread' : 'Collapse comment thread'}
+            >
+              ▼
+            </button>
+            <div className="text-xs text-[var(--color-text-secondary)]">
+              u/{comment.username} • {new Date(comment.created_at).toLocaleString()}
+              {isCollapsed && replies.length > 0 && (
+                <span className="ml-2 text-[var(--color-text-muted)]">
+                  ({replies.length} {replies.length === 1 ? 'reply' : 'replies'})
+                </span>
+              )}
+            </div>
+          </div>
         </div>
-        {isEditing ? (
+        {!isCollapsed && (isEditing ? (
           <form onSubmit={handleEditSubmit} className="mt-2 space-y-2">
             <textarea
               value={editText}
@@ -316,16 +338,16 @@ function LocalCommentView({
           <div className="mt-2 text-sm text-[var(--color-text-primary)]">
             {comment.content}
           </div>
-        )}
+        ))}
 
-        {actionError && (
+        {!isCollapsed && actionError && (
           <div className="mt-2 rounded border border-red-200 bg-red-50 p-2 text-xs text-red-700">
             {actionError}
           </div>
         )}
 
         {/* Voting Controls */}
-        <div className="mt-2 flex items-center gap-3 text-xs">
+        {!isCollapsed && <div className="mt-2 flex items-center gap-3 text-xs">
           <div className="flex items-center gap-1">
             <button
               onClick={() => voteMutation.mutate(1)}
@@ -361,9 +383,9 @@ function LocalCommentView({
               ▼
             </button>
           </div>
-        </div>
+        </div>}
 
-        <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-[var(--color-text-secondary)]">
+        {!isCollapsed && <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-[var(--color-text-secondary)]">
           <button
             onClick={() => onPermalink(comment)}
             className="hover:text-[var(--color-primary)]"
@@ -421,10 +443,10 @@ function LocalCommentView({
           >
             Reply
           </button>
-        </div>
+        </div>}
 
         {/* Inline Reply Form */}
-        {isReplying && (
+        {!isCollapsed && isReplying && (
           <form onSubmit={handleSubmitReply} className="mt-3">
             <textarea
               value={replyText}
@@ -455,7 +477,7 @@ function LocalCommentView({
       </div>
 
       {/* Nested Replies */}
-      {replies.length > 0 && (
+      {!isCollapsed && replies.length > 0 && (
         <div className="ml-6 mt-3 space-y-3 border-l-2 border-[var(--color-border)] pl-4">
           {replies.map((reply) => (
             <LocalCommentView
