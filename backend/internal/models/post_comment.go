@@ -9,8 +9,6 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-const DeletedCommentPlaceholder = "[DELETED]"
-
 // PostComment represents a comment on a platform post
 type PostComment struct {
 	ID              int    `json:"id"`
