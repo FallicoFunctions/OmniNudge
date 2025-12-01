@@ -7,7 +7,8 @@ import { savedService } from '../services/savedService';
 import { api } from '../lib/api';
 import type { PlatformPost, PostComment } from '../types/posts';
 import type { SavedItemsResponse } from '../types/saved';
-import { CommentItem, CommentActionHandlers } from '../components/comments/CommentItem';
+import { CommentItem } from '../components/comments/CommentItem';
+import type { CommentActionHandlers } from '../components/comments/CommentItem';
 
 export default function PostDetailPage() {
   const { postId, commentId } = useParams<{ postId: string; commentId?: string }>();
