@@ -131,7 +131,7 @@ func main() {
 	userStatusHandler := handlers.NewUserStatusHandler(hub)
 	themesHandler := handlers.NewThemesHandler(themeRepo, themeOverrideRepo, installedThemeRepo, userSettingsRepo, cssSanitizer)
 	redditCommentsHandler := handlers.NewRedditCommentsHandler(redditCommentRepo)
-	savedItemsHandler := handlers.NewSavedItemsHandler(savedItemsRepo, postRepo, redditCommentRepo)
+	savedItemsHandler := handlers.NewSavedItemsHandler(savedItemsRepo, postRepo, commentRepo, redditCommentRepo)
 
 	// Inject notification service into handlers
 	postsHandler.SetNotificationService(notificationService)
@@ -188,6 +188,7 @@ func main() {
 
 		// Public posts routes (no auth required for viewing)
 		posts := api.Group("/posts")
+		posts.Use(middleware.AuthOptional(authService))
 		{
 			posts.GET("/feed", postsHandler.GetFeed)
 			posts.GET("/:id", postsHandler.GetPost)
@@ -196,6 +197,7 @@ func main() {
 
 		// Public comments routes (no auth required for viewing)
 		comments := api.Group("/comments")
+		comments.Use(middleware.AuthOptional(authService))
 		{
 			comments.GET("/:id", commentsHandler.GetComment)
 			comments.GET("/:id/replies", commentsHandler.GetCommentReplies)
@@ -203,6 +205,7 @@ func main() {
 
 		// Public Reddit routes (no auth required - browsing only)
 		reddit := api.Group("/reddit")
+		reddit.Use(middleware.AuthOptional(authService))
 		{
 			reddit.GET("/frontpage", redditHandler.GetFrontPage)
 			reddit.GET("/r/:subreddit", redditHandler.GetSubredditPosts)
@@ -294,12 +297,15 @@ func main() {
 			protected.POST("/posts/:id/vote", postsHandler.VotePost)
 			protected.POST("/posts/:id/save", savedItemsHandler.SavePost)
 			protected.DELETE("/posts/:id/save", savedItemsHandler.UnsavePost)
+			protected.POST("/posts/:id/comments/:commentId/preferences", commentsHandler.UpdateCommentPreferences)
 
 			// Protected comments routes (auth required for creating/editing)
 			protected.POST("/posts/:id/comments", commentsHandler.CreateComment)
 			protected.PUT("/comments/:id", commentsHandler.UpdateComment)
 			protected.DELETE("/comments/:id", commentsHandler.DeleteComment)
 			protected.POST("/comments/:id/vote", commentsHandler.VoteComment)
+			protected.POST("/comments/:commentId/save", savedItemsHandler.SavePostComment)
+			protected.DELETE("/comments/:commentId/save", savedItemsHandler.UnsavePostComment)
 
 			// Protected Reddit post comments routes (site-only comments on Reddit posts)
 			protected.POST("/reddit/posts/:subreddit/:postId/comments", redditCommentsHandler.CreateRedditPostComment)
