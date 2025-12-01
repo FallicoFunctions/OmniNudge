@@ -23,6 +23,18 @@ type SavedPostOverview struct {
 	CreatedAt      time.Time `json:"created_at"`
 }
 
+// SavedPostComment represents a saved comment on a platform post
+type SavedPostComment struct {
+	CommentID int       `json:"comment_id"`
+	PostID    int       `json:"post_id"`
+	PostTitle string    `json:"post_title"`
+	HubName   string    `json:"hub_name"`
+	Username  string    `json:"username"`
+	Content   string    `json:"content"`
+	Score     int       `json:"score"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
 // NewSavedItemsRepository creates a repository for saved content
 func NewSavedItemsRepository(pool *pgxpool.Pool) *SavedItemsRepository {
 	return &SavedItemsRepository{pool: pool}
@@ -57,6 +69,22 @@ func (r *SavedItemsRepository) SaveRedditComment(ctx context.Context, userID, co
 // RemoveRedditComment removes a reddit comment from saved list
 func (r *SavedItemsRepository) RemoveRedditComment(ctx context.Context, userID, commentID int) error {
 	_, err := r.pool.Exec(ctx, `DELETE FROM saved_reddit_comments WHERE user_id = $1 AND comment_id = $2`, userID, commentID)
+	return err
+}
+
+// SavePostComment stores a platform comment in the user's saved list
+func (r *SavedItemsRepository) SavePostComment(ctx context.Context, userID, commentID int) error {
+	_, err := r.pool.Exec(ctx, `
+		INSERT INTO saved_post_comments (user_id, comment_id)
+		VALUES ($1, $2)
+		ON CONFLICT (user_id, comment_id) DO NOTHING
+	`, userID, commentID)
+	return err
+}
+
+// RemovePostComment removes a platform comment from saved list
+func (r *SavedItemsRepository) RemovePostComment(ctx context.Context, userID, commentID int) error {
+	_, err := r.pool.Exec(ctx, `DELETE FROM saved_post_comments WHERE user_id = $1 AND comment_id = $2`, userID, commentID)
 	return err
 }
 
@@ -161,5 +189,59 @@ func (r *SavedItemsRepository) GetSavedRedditComments(ctx context.Context, userI
 		comment.SanitizeDeletedPlaceholder()
 		comments = append(comments, &comment)
 	}
+	return comments, rows.Err()
+}
+
+// GetSavedPostComments returns platform comments saved by the user
+func (r *SavedItemsRepository) GetSavedPostComments(ctx context.Context, userID int) ([]*SavedPostComment, error) {
+	query := `
+		SELECT
+			pc.id,
+			pc.post_id,
+			pp.title AS post_title,
+			h.name AS hub_name,
+			u.username,
+			pc.body,
+			pc.score,
+			pc.created_at,
+			pc.is_deleted
+		FROM saved_post_comments spc
+		JOIN post_comments pc ON pc.id = spc.comment_id
+		JOIN platform_posts pp ON pp.id = pc.post_id
+		JOIN hubs h ON h.id = pp.hub_id
+		JOIN users u ON u.id = pc.user_id
+		WHERE spc.user_id = $1 AND (pc.is_deleted = FALSE OR pc.body = $2)
+		ORDER BY spc.created_at DESC
+	`
+	rows, err := r.pool.Query(ctx, query, userID, DeletedCommentPlaceholder)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var comments []*SavedPostComment
+	for rows.Next() {
+		var comment SavedPostComment
+		var isDeleted bool
+		if err := rows.Scan(
+			&comment.CommentID,
+			&comment.PostID,
+			&comment.PostTitle,
+			&comment.HubName,
+			&comment.Username,
+			&comment.Content,
+			&comment.Score,
+			&comment.CreatedAt,
+			&isDeleted,
+		); err != nil {
+			return nil, err
+		}
+		if isDeleted || comment.Content == DeletedCommentPlaceholder {
+			comment.Content = DeletedCommentPlaceholder
+			comment.Username = DeletedCommentPlaceholder
+		}
+		comments = append(comments, &comment)
+	}
+
 	return comments, rows.Err()
 }

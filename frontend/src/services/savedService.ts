@@ -15,6 +15,14 @@ export const savedService = {
     await api.delete(`/posts/${postId}/save`);
   },
 
+  async savePostComment(commentId: number): Promise<void> {
+    await api.post(`/comments/${commentId}/save`);
+  },
+
+  async unsavePostComment(commentId: number): Promise<void> {
+    await api.delete(`/comments/${commentId}/save`);
+  },
+
   async saveRedditComment(subreddit: string, postId: string, commentId: number): Promise<void> {
     await api.post(`/reddit/posts/${subreddit}/${postId}/comments/${commentId}/save`);
   },
