@@ -544,7 +544,7 @@ function LocalCommentView({
             </div>
           </form>
         ) : (
-          <div className="mt-2 text-sm text-[var(--color-text-primary)]">
+          <div className="mt-2 text-sm text-[var(--color-text-primary)] text-left">
             {comment.content}
           </div>
         ))}
