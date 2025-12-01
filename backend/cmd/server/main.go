@@ -304,8 +304,8 @@ func main() {
 			protected.PUT("/comments/:id", commentsHandler.UpdateComment)
 			protected.DELETE("/comments/:id", commentsHandler.DeleteComment)
 			protected.POST("/comments/:id/vote", commentsHandler.VoteComment)
-			protected.POST("/comments/:commentId/save", savedItemsHandler.SavePostComment)
-			protected.DELETE("/comments/:commentId/save", savedItemsHandler.UnsavePostComment)
+			protected.POST("/saved/comments/:commentId", savedItemsHandler.SavePostComment)
+			protected.DELETE("/saved/comments/:commentId", savedItemsHandler.UnsavePostComment)
 
 			// Protected Reddit post comments routes (site-only comments on Reddit posts)
 			protected.POST("/reddit/posts/:subreddit/:postId/comments", redditCommentsHandler.CreateRedditPostComment)
