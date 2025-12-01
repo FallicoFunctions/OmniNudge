@@ -493,28 +493,49 @@ function LocalCommentView({
 
   return (
     <div>
-      <div className="rounded border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-3">
-        <div className="flex items-start justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setIsCollapsed(!isCollapsed)}
-              className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] transition-transform duration-200"
-              style={{ transform: isCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)' }}
-              title={isCollapsed ? 'Expand' : 'Collapse'}
-              aria-label={isCollapsed ? 'Expand comment thread' : 'Collapse comment thread'}
-            >
-              ▼
-            </button>
-            <div className="text-xs text-[var(--color-text-secondary)]">
-              u/{comment.username} • {new Date(comment.created_at).toLocaleString()}
-              {isCollapsed && replies.length > 0 && (
-                <span className="ml-2 text-[var(--color-text-muted)]">
-                  ({replies.length} {replies.length === 1 ? 'reply' : 'replies'})
-                </span>
-              )}
-            </div>
-          </div>
+      <div className="mb-2">
+        <div className="flex items-center gap-2 text-xs text-[var(--color-text-secondary)]">
+          <button
+            onClick={() => setIsCollapsed(!isCollapsed)}
+            className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] transition-transform duration-200"
+            style={{ transform: isCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)' }}
+            title={isCollapsed ? 'Expand' : 'Collapse'}
+            aria-label={isCollapsed ? 'Expand comment thread' : 'Collapse comment thread'}
+          >
+            ▼
+          </button>
+          <button
+            onClick={() => setIsCollapsed(!isCollapsed)}
+            className="font-semibold hover:underline"
+          >
+            {comment.username}
+          </button>
+          <span>•</span>
+          <span>
+            {new Date(comment.created_at).toLocaleString('en-US', {
+              month: 'short',
+              day: 'numeric',
+              hour: 'numeric',
+              minute: '2-digit',
+            })}
+          </span>
+          <span>•</span>
+          <span className={`font-semibold ${
+            comment.user_vote === 1
+              ? 'text-orange-500'
+              : comment.user_vote === -1
+              ? 'text-blue-500'
+              : 'text-[var(--color-text-primary)]'
+          }`}>
+            {comment.score} {comment.score === 1 ? 'point' : 'points'}
+          </span>
+          {isCollapsed && replies.length > 0 && (
+            <span className="ml-2 text-[var(--color-text-muted)]">
+              ({replies.length} {replies.length === 1 ? 'reply' : 'replies'})
+            </span>
+          )}
         </div>
+
         {!isCollapsed && (isEditing ? (
           <form onSubmit={handleEditSubmit} className="mt-2 space-y-2">
             <textarea
