@@ -1,7 +1,7 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { savedService } from '../services/savedService';
-import type { SavedPost } from '../types/saved';
+import type { SavedPost, SavedPostComment } from '../types/saved';
 import type { LocalRedditComment } from '../types/reddit';
 
 export default function SavedPage() {
@@ -12,7 +12,8 @@ export default function SavedPage() {
   });
 
   const savedPosts = (data?.saved_posts ?? []) as SavedPost[];
-  const savedComments = (data?.saved_reddit_comments ?? []) as LocalRedditComment[];
+  const savedSiteComments = (data?.saved_post_comments ?? []) as SavedPostComment[];
+  const savedRedditComments = (data?.saved_reddit_comments ?? []) as LocalRedditComment[];
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-8">
@@ -80,12 +81,55 @@ export default function SavedPage() {
           </section>
 
           <section>
-            <h2 className="mb-3 text-xl font-semibold text-[var(--color-text-primary)]">Saved Comments</h2>
-            {savedComments.length === 0 ? (
+            <h2 className="mb-3 text-xl font-semibold text-[var(--color-text-primary)]">Saved Site Comments</h2>
+            {savedSiteComments.length === 0 ? (
               <p className="text-sm text-[var(--color-text-secondary)]">No saved comments yet.</p>
             ) : (
               <div className="space-y-3">
-                {savedComments.map((comment) => {
+                {savedSiteComments.map((comment) => (
+                  <div
+                    key={comment.comment_id}
+                    className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4"
+                  >
+                    <div className="text-xs text-[var(--color-text-secondary)]">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-semibold">u/{comment.username}</span>
+                        <span>•</span>
+                        <span>{new Date(comment.created_at).toLocaleString()}</span>
+                      </div>
+                      <div className="mt-1">
+                        <span className="font-semibold">Post:</span>{' '}
+                        <Link
+                          to={`/posts/${comment.post_id}`}
+                          className="text-[var(--color-primary)] hover:underline"
+                        >
+                          {comment.post_title}
+                        </Link>
+                      </div>
+                    </div>
+                    <p className="mt-2 text-sm text-[var(--color-text-primary)]">{comment.content}</p>
+                    <div className="mt-3 flex items-center gap-4 text-xs text-[var(--color-text-secondary)]">
+                      <span>{comment.score} points</span>
+                      <Link
+                        to={`/posts/${comment.post_id}/comments/${comment.comment_id}`}
+                        className="text-[var(--color-primary)] hover:underline"
+                      >
+                        View thread →
+                      </Link>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+
+          <section>
+            <h2 className="mb-3 text-xl font-semibold text-[var(--color-text-primary)]">Saved Comments</h2>
+            {savedRedditComments.length === 0 ? (
+              <p className="text-sm text-[var(--color-text-secondary)]">No saved comments yet.</p>
+            ) : (
+              <div className="space-y-3">
+                {savedRedditComments.map((comment) => {
                   const permalink = `/reddit/r/${comment.subreddit}/comments/${comment.reddit_post_id}/${comment.id}`;
                   return (
                     <div

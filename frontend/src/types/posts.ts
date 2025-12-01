@@ -11,17 +11,11 @@ export interface PlatformPost {
   updated_at?: string;
 }
 
-export interface PostComment {
-  id: number;
+import type { LocalCommentBase } from './comments';
+
+export interface PostComment extends LocalCommentBase {
   post_id: number;
-  author_id: number;
-  author_username: string;
-  content: string;
-  score: number;
-  parent_comment_id?: number;
-  created_at: string;
-  updated_at?: string;
-  replies?: PostComment[];
+  user_id: number;
 }
 
 export interface CreatePostRequest {
@@ -31,7 +25,7 @@ export interface CreatePostRequest {
 }
 
 export interface CreateCommentRequest {
-  content: string;
+  body: string;
   parent_comment_id?: number;
 }
 

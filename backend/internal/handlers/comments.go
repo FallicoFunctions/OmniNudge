@@ -4,9 +4,9 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/gin-gonic/gin"
 	"github.com/omninudge/backend/internal/models"
 	"github.com/omninudge/backend/internal/services"
-	"github.com/gin-gonic/gin"
 )
 
 // CommentsHandler handles HTTP requests for post comments
@@ -120,7 +120,13 @@ func (h *CommentsHandler) CreateComment(c *gin.Context) {
 		}()
 	}
 
-	c.JSON(http.StatusCreated, comment)
+	fullComment, err := h.commentRepo.GetByID(c.Request.Context(), comment.ID)
+	if err != nil || fullComment == nil {
+		c.JSON(http.StatusCreated, comment)
+		return
+	}
+
+	c.JSON(http.StatusCreated, fullComment)
 }
 
 // GetComments handles GET /api/v1/posts/:postId/comments
@@ -141,10 +147,21 @@ func (h *CommentsHandler) GetComments(c *gin.Context) {
 		limit = 50
 	}
 
-	comments, err := h.commentRepo.GetByPostID(c.Request.Context(), postID, sortBy, limit, offset)
+	var userIDPtr *int
+	if userID, ok := c.Get("user_id"); ok {
+		if uid, ok := userID.(int); ok {
+			userIDPtr = &uid
+		}
+	}
+
+	comments, err := h.commentRepo.GetByPostID(c.Request.Context(), postID, sortBy, limit, offset, userIDPtr)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get comments", "details": err.Error()})
 		return
+	}
+
+	for _, comment := range comments {
+		comment.SanitizeDeletedPlaceholder()
 	}
 
 	c.JSON(http.StatusOK, gin.H{
@@ -195,10 +212,21 @@ func (h *CommentsHandler) GetCommentReplies(c *gin.Context) {
 		limit = 50
 	}
 
-	replies, err := h.commentRepo.GetReplies(c.Request.Context(), commentID, sortBy, limit, offset)
+	var userIDPtr *int
+	if userID, ok := c.Get("user_id"); ok {
+		if uid, ok := userID.(int); ok {
+			userIDPtr = &uid
+		}
+	}
+
+	replies, err := h.commentRepo.GetReplies(c.Request.Context(), commentID, sortBy, limit, offset, userIDPtr)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get replies", "details": err.Error()})
 		return
+	}
+
+	for _, reply := range replies {
+		reply.SanitizeDeletedPlaceholder()
 	}
 
 	c.JSON(http.StatusOK, gin.H{
@@ -322,6 +350,60 @@ func (h *CommentsHandler) DeleteComment(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Comment deleted successfully"})
+}
+
+// UpdateCommentPreferencesRequest toggles inbox reply notifications for post comments
+type UpdateCommentPreferencesRequest struct {
+	DisableInboxReplies bool `json:"disable_inbox_replies"`
+}
+
+// UpdateCommentPreferences handles POST /api/v1/posts/:postId/comments/:commentId/preferences
+func (h *CommentsHandler) UpdateCommentPreferences(c *gin.Context) {
+	userID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
+
+	postID, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid post ID"})
+		return
+	}
+
+	commentID, err := strconv.Atoi(c.Param("commentId"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid comment ID"})
+		return
+	}
+
+	comment, err := h.commentRepo.GetByID(c.Request.Context(), commentID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load comment", "details": err.Error()})
+		return
+	}
+	if comment == nil || comment.PostID != postID {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Comment not found"})
+		return
+	}
+
+	if comment.UserID != userID.(int) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "You can only update your own comments"})
+		return
+	}
+
+	var req UpdateCommentPreferencesRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body", "details": err.Error()})
+		return
+	}
+
+	if err := h.commentRepo.SetInboxRepliesDisabled(c.Request.Context(), commentID, userID.(int), req.DisableInboxReplies); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update preferences", "details": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"disable_inbox_replies": req.DisableInboxReplies})
 }
 
 // VoteComment handles POST /api/v1/comments/:id/vote

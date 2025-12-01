@@ -9,6 +9,7 @@ import ThemesPage from './pages/ThemesPage';
 import RedditPage from './pages/RedditPage';
 import RedditPostPage from './pages/RedditPostPage';
 import PostsPage from './pages/PostsPage';
+import PostDetailPage from './pages/PostDetailPage';
 import MessagesPage from './pages/MessagesPage';
 import SavedPage from './pages/SavedPage';
 import './App.css';
@@ -36,6 +37,8 @@ function App() {
             <Route path="/reddit/r/:subreddit/comments/:postId" element={<RedditPostPage />} />
             <Route path="/reddit/r/:subreddit/comments/:postId/:commentId" element={<RedditPostPage />} />
             <Route path="/posts" element={<PostsPage />} />
+            <Route path="/posts/:postId" element={<PostDetailPage />} />
+            <Route path="/posts/:postId/comments/:commentId" element={<PostDetailPage />} />
             <Route path="/messages" element={<MessagesPage />} />
             <Route path="/saved" element={<SavedPage />} />
           </Route>

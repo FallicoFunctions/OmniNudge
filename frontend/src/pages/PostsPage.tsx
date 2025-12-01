@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Link } from 'react-router-dom';
 import { postsService } from '../services/postsService';
 import { savedService } from '../services/savedService';
 import type { CreatePostRequest } from '../types/posts';
@@ -212,7 +213,12 @@ export default function PostsPage() {
                   </div>
 
                   <h2 className="text-lg font-semibold text-[var(--color-text-primary)]">
-                    {post.title}
+                    <Link
+                      to={`/posts/${post.id}`}
+                      className="hover:text-[var(--color-primary)] hover:underline"
+                    >
+                      {post.title}
+                    </Link>
                   </h2>
 
                   {post.content && (
@@ -223,6 +229,12 @@ export default function PostsPage() {
 
                   <div className="mt-3 flex gap-4 text-xs text-[var(--color-text-secondary)]">
                     <span>{post.comment_count} comments</span>
+                    <Link
+                      to={`/posts/${post.id}`}
+                      className="hover:text-[var(--color-primary)]"
+                    >
+                      Open
+                    </Link>
                     <button className="hover:text-[var(--color-primary)]">Share</button>
                     <button
                       onClick={() => handleToggleSave(post.id, savedPostIds.has(post.id))}
