@@ -7,8 +7,6 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-const DeletedCommentPlaceholder = "[DELETED]"
-
 // RedditPostComment represents a comment on a Reddit post (stored locally on your platform)
 type RedditPostComment struct {
 	ID                   int        `json:"id"`
