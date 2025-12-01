@@ -7,6 +7,8 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+const DeletedCommentPlaceholder = "[DELETED]"
+
 // RedditPostComment represents a comment on a Reddit post (stored locally on your platform)
 type RedditPostComment struct {
 	ID                   int        `json:"id"`
@@ -33,6 +35,17 @@ type RedditPostCommentRepository struct {
 // NewRedditPostCommentRepository creates a new RedditPostCommentRepository
 func NewRedditPostCommentRepository(pool *pgxpool.Pool) *RedditPostCommentRepository {
 	return &RedditPostCommentRepository{pool: pool}
+}
+
+// SanitizeDeletedPlaceholder ensures deleted comments display placeholder metadata
+func (c *RedditPostComment) SanitizeDeletedPlaceholder() {
+	if c == nil {
+		return
+	}
+	if c.DeletedAt != nil || c.Content == DeletedCommentPlaceholder {
+		c.Content = DeletedCommentPlaceholder
+		c.Username = DeletedCommentPlaceholder
+	}
 }
 
 // Create creates a new comment on a Reddit post and auto-upvotes it
@@ -86,10 +99,10 @@ func (r *RedditPostCommentRepository) GetByRedditPostWithUserVotes(ctx context.C
 		FROM reddit_post_comments rc
 		JOIN users u ON u.id = rc.user_id
 		LEFT JOIN reddit_comment_votes v ON v.comment_id = rc.id AND v.user_id = $3
-		WHERE rc.subreddit = $1 AND rc.reddit_post_id = $2 AND rc.deleted_at IS NULL
+		WHERE rc.subreddit = $1 AND rc.reddit_post_id = $2 AND (rc.deleted_at IS NULL OR rc.content = $4)
 		ORDER BY rc.created_at ASC
 	`
-	rows, err := r.pool.Query(ctx, query, subreddit, postID, userID)
+	rows, err := r.pool.Query(ctx, query, subreddit, postID, userID, DeletedCommentPlaceholder)
 	if err != nil {
 		return nil, err
 	}
@@ -124,10 +137,10 @@ func (r *RedditPostCommentRepository) GetByRedditPost(ctx context.Context, subre
 			rc.created_at, rc.updated_at, rc.deleted_at
 		FROM reddit_post_comments rc
 		JOIN users u ON u.id = rc.user_id
-		WHERE rc.subreddit = $1 AND rc.reddit_post_id = $2 AND rc.deleted_at IS NULL
+		WHERE rc.subreddit = $1 AND rc.reddit_post_id = $2 AND (rc.deleted_at IS NULL OR rc.content = $3)
 		ORDER BY rc.created_at ASC
 	`
-	rows, err := r.pool.Query(ctx, query, subreddit, postID)
+	rows, err := r.pool.Query(ctx, query, subreddit, postID, DeletedCommentPlaceholder)
 	if err != nil {
 		return nil, err
 	}
@@ -197,13 +210,36 @@ func (r *RedditPostCommentRepository) SetInboxRepliesDisabled(ctx context.Contex
 
 // Delete soft-deletes a comment
 func (r *RedditPostCommentRepository) Delete(ctx context.Context, id int) error {
-	query := `
-		UPDATE reddit_post_comments
-		SET deleted_at = NOW()
-		WHERE id = $1 AND deleted_at IS NULL
-	`
-	_, err := r.pool.Exec(ctx, query, id)
-	return err
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	var childCount int
+	err = tx.QueryRow(ctx, `
+		SELECT COUNT(*)
+		FROM reddit_post_comments
+		WHERE parent_comment_id = $1 AND (deleted_at IS NULL OR content = $2)
+	`, id, DeletedCommentPlaceholder).Scan(&childCount)
+	if err != nil {
+		return err
+	}
+
+	if childCount > 0 {
+		_, err = tx.Exec(ctx, `
+			UPDATE reddit_post_comments
+			SET content = $2, deleted_at = COALESCE(deleted_at, NOW()), updated_at = NOW()
+			WHERE id = $1
+		`, id, DeletedCommentPlaceholder)
+	} else {
+		_, err = tx.Exec(ctx, `DELETE FROM reddit_post_comments WHERE id = $1`, id)
+	}
+	if err != nil {
+		return err
+	}
+
+	return tx.Commit(ctx)
 }
 
 // GetUserVote returns the user's vote on a comment (-1, 0, or 1)
