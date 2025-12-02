@@ -168,6 +168,110 @@ func (h *HubsHandler) AddModerator(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{"message": "Moderator added"})
 }
 
+// GetUserHubs handles GET /api/v1/users/me/hubs - returns hubs user can post to
+func (h *HubsHandler) GetUserHubs(c *gin.Context) {
+	userID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
+
+	// For now, return all hubs - in the future we can filter by membership/permissions
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "100"))
+	if limit < 1 || limit > 100 {
+		limit = 100
+	}
+
+	hubs, err := h.hubRepo.List(c.Request.Context(), limit, 0)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch user hubs", "details": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"hubs": hubs,
+		"user_id": userID,
+	})
+}
+
+// CrosspostRequest represents a crosspost request
+type CrosspostRequest struct {
+	Title             string `json:"title" binding:"required"`
+	SendRepliesToInbox bool  `json:"send_replies_to_inbox"`
+}
+
+// CrosspostToHub handles POST /api/v1/hubs/:name/crosspost
+func (h *HubsHandler) CrosspostToHub(c *gin.Context) {
+	userID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
+
+	hubName := c.Param("name")
+	hub, err := h.hubRepo.GetByName(c.Request.Context(), hubName)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch hub", "details": err.Error()})
+		return
+	}
+	if hub == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Hub not found"})
+		return
+	}
+
+	var req CrosspostRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body", "details": err.Error()})
+		return
+	}
+
+	// Get crosspost source from query params
+	originType := c.Query("origin_type")          // "reddit" or "platform"
+	originSubreddit := c.Query("origin_subreddit") // for Reddit posts
+	originPostID := c.Query("origin_post_id")      // Reddit post ID or platform post ID
+	originalTitle := c.Query("original_title")     // Original title before user edited
+
+	if originType == "" || originPostID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Missing crosspost origin information"})
+		return
+	}
+
+	if originType != "reddit" && originType != "platform" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid origin_type. Must be 'reddit' or 'platform'"})
+		return
+	}
+
+	if originType == "reddit" && originSubreddit == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "origin_subreddit required for Reddit crossposts"})
+		return
+	}
+
+	// Create the crosspost as a new platform post
+	post := &models.PlatformPost{
+		AuthorID:                 userID.(int),
+		HubID:                    hub.ID,
+		Title:                    req.Title,
+		CrosspostOriginType:      &originType,
+		CrosspostOriginSubreddit: stringPtrOrNil(originSubreddit),
+		CrosspostOriginPostID:    &originPostID,
+		CrosspostOriginalTitle:   stringPtrOrNil(originalTitle),
+	}
+
+	if err := h.postRepo.Create(c.Request.Context(), post); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create crosspost", "details": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusCreated, post)
+}
+
 func intPtr(v int) *int {
 	return &v
+}
+
+func stringPtrOrNil(s string) *string {
+	if s == "" {
+		return nil
+	}
+	return &s
 }

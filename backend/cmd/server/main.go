@@ -322,8 +322,10 @@ func main() {
 			protected.POST("/reddit/posts/:subreddit/:postId/hide", savedItemsHandler.HideRedditPost)
 			protected.DELETE("/reddit/posts/:subreddit/:postId/hide", savedItemsHandler.UnhideRedditPost)
 
-			// Protected hub creation
+			// Protected hub creation and crossposting
 			protected.POST("/hubs", hubsHandler.Create)
+			protected.GET("/users/me/hubs", hubsHandler.GetUserHubs)
+			protected.POST("/hubs/:name/crosspost", hubsHandler.CrosspostToHub)
 
 			// Protected conversations routes
 			protected.POST("/conversations", conversationsHandler.CreateConversation)
