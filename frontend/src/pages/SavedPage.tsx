@@ -12,6 +12,7 @@ export default function SavedPage() {
   });
 
   const savedPosts = (data?.saved_posts ?? []) as SavedPost[];
+  const savedRedditPosts = (data?.saved_reddit_posts ?? []) as Array<{subreddit: string, reddit_post_id: string, saved_at: string}>;
   const savedSiteComments = (data?.saved_post_comments ?? []) as SavedPostComment[];
   const savedRedditComments = (data?.saved_reddit_comments ?? []) as LocalRedditComment[];
 
@@ -39,7 +40,7 @@ export default function SavedPage() {
       {!isLoading && !error && (
         <div className="space-y-8">
           <section>
-            <h2 className="mb-3 text-xl font-semibold text-[var(--color-text-primary)]">Saved Posts</h2>
+            <h2 className="mb-3 text-xl font-semibold text-[var(--color-text-primary)]">Saved Omni Posts</h2>
             {savedPosts.length === 0 ? (
               <p className="text-sm text-[var(--color-text-secondary)]">No saved posts yet.</p>
             ) : (
@@ -81,7 +82,42 @@ export default function SavedPage() {
           </section>
 
           <section>
-            <h2 className="mb-3 text-xl font-semibold text-[var(--color-text-primary)]">Saved Site Comments</h2>
+            <h2 className="mb-3 text-xl font-semibold text-[var(--color-text-primary)]">Saved Reddit Posts</h2>
+            {savedRedditPosts.length === 0 ? (
+              <p className="text-sm text-[var(--color-text-secondary)]">No saved Reddit posts yet.</p>
+            ) : (
+              <div className="space-y-3">
+                {savedRedditPosts.map((post) => {
+                  const postUrl = `/reddit/r/${post.subreddit}/comments/${post.reddit_post_id}`;
+                  return (
+                    <article
+                      key={`${post.subreddit}-${post.reddit_post_id}`}
+                      className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4"
+                    >
+                      <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--color-text-secondary)]">
+                        <span className="rounded-full bg-[var(--color-surface-elevated)] px-2 py-1">
+                          r/{post.subreddit}
+                        </span>
+                        <span>•</span>
+                        <span>{new Date(post.saved_at).toLocaleDateString()}</span>
+                      </div>
+                      <div className="mt-3">
+                        <Link
+                          to={postUrl}
+                          className="text-sm font-semibold text-[var(--color-primary)] hover:underline"
+                        >
+                          View post →
+                        </Link>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            )}
+          </section>
+
+          <section>
+            <h2 className="mb-3 text-xl font-semibold text-[var(--color-text-primary)]">Saved Omni Comments</h2>
             {savedSiteComments.length === 0 ? (
               <p className="text-sm text-[var(--color-text-secondary)]">No saved comments yet.</p>
             ) : (
@@ -124,7 +160,7 @@ export default function SavedPage() {
           </section>
 
           <section>
-            <h2 className="mb-3 text-xl font-semibold text-[var(--color-text-primary)]">Saved Comments</h2>
+            <h2 className="mb-3 text-xl font-semibold text-[var(--color-text-primary)]">Saved Reddit Comments</h2>
             {savedRedditComments.length === 0 ? (
               <p className="text-sm text-[var(--color-text-secondary)]">No saved comments yet.</p>
             ) : (
