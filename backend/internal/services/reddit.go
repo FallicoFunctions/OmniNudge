@@ -47,26 +47,27 @@ func (r *RedditClient) SetHTTPClient(client *http.Client) {
 
 // RedditPost represents a post from Reddit's API
 type RedditPost struct {
-	ID               string     `json:"id"`
-	Subreddit        string     `json:"subreddit"`
-	Title            string     `json:"title"`
-	Author           string     `json:"author"`
-	Selftext         string     `json:"selftext"`      // Post body text
-	URL              string     `json:"url"`           // Link or media URL
-	Permalink        string     `json:"permalink"`     // Reddit URL
-	Thumbnail        string     `json:"thumbnail"`     // Thumbnail URL
-	Score            int        `json:"score"`         // Upvotes - downvotes
-	NumComments      int        `json:"num_comments"`  // Comment count
-	CreatedUTC       float64    `json:"created_utc"`   // Unix timestamp
-	Over18           bool       `json:"over_18"`       // NSFW flag
-	PostHint         string     `json:"post_hint"`     // Type hint: image, video, link, etc.
-	IsVideo          bool       `json:"is_video"`      // Is it a video
-	IsSelf           bool       `json:"is_self"`       // Is it a text post
-	Distinguished    *string    `json:"distinguished"` // Mod/admin flag
-	Stickied         bool       `json:"stickied"`      // Pinned post
-	Domain           string     `json:"domain"`        // Source domain
-	MediaEmbed       MediaEmbed `json:"media_embed"`   // Embedded media
-	SecureMediaEmbed MediaEmbed `json:"secure_media_embed"`
+	ID               string         `json:"id"`
+	Subreddit        string         `json:"subreddit"`
+	Title            string         `json:"title"`
+	Author           string         `json:"author"`
+	Selftext         string         `json:"selftext"`      // Post body text
+	URL              string         `json:"url"`           // Link or media URL
+	Permalink        string         `json:"permalink"`     // Reddit URL
+	Thumbnail        string         `json:"thumbnail"`     // Thumbnail URL
+	Score            int            `json:"score"`         // Upvotes - downvotes
+	NumComments      int            `json:"num_comments"`  // Comment count
+	CreatedUTC       float64        `json:"created_utc"`   // Unix timestamp
+	Over18           bool           `json:"over_18"`       // NSFW flag
+	PostHint         string         `json:"post_hint"`     // Type hint: image, video, link, etc.
+	IsVideo          bool           `json:"is_video"`      // Is it a video
+	IsSelf           bool           `json:"is_self"`       // Is it a text post
+	Distinguished    *string        `json:"distinguished"` // Mod/admin flag
+	Stickied         bool           `json:"stickied"`      // Pinned post
+	Domain           string         `json:"domain"`        // Source domain
+	MediaEmbed       MediaEmbed     `json:"media_embed"`   // Embedded media
+	SecureMediaEmbed MediaEmbed     `json:"secure_media_embed"`
+	Preview          *RedditPreview `json:"preview"` // Preview images for link posts
 }
 
 // MediaEmbed represents embedded media from Reddit
@@ -75,6 +76,26 @@ type MediaEmbed struct {
 	Width     int    `json:"width"`
 	Height    int    `json:"height"`
 	Scrolling bool   `json:"scrolling"`
+}
+
+// RedditPreview holds preview image information for a Reddit post
+type RedditPreview struct {
+	Images  []RedditPreviewImage `json:"images"`
+	Enabled bool                 `json:"enabled"`
+}
+
+// RedditPreviewImage represents a single preview image
+type RedditPreviewImage struct {
+	Source      RedditImageSource   `json:"source"`
+	Resolutions []RedditImageSource `json:"resolutions"`
+	ID          string              `json:"id"`
+}
+
+// RedditImageSource describes a preview image asset
+type RedditImageSource struct {
+	URL    string `json:"url"`
+	Width  int    `json:"width"`
+	Height int    `json:"height"`
 }
 
 // RedditListing represents Reddit's listing response
