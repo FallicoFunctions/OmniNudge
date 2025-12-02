@@ -2,6 +2,7 @@ package models
 
 import (
 	"context"
+	"database/sql"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -37,9 +38,27 @@ type SavedPostComment struct {
 
 // SavedRedditPost represents a saved Reddit post
 type SavedRedditPost struct {
-	Subreddit     string    `json:"subreddit"`
-	RedditPostID  string    `json:"reddit_post_id"`
-	SavedAt       time.Time `json:"saved_at"`
+	Subreddit    string    `json:"subreddit"`
+	RedditPostID string    `json:"reddit_post_id"`
+	Title        string    `json:"title,omitempty"`
+	Author       string    `json:"author,omitempty"`
+	Score        int       `json:"score"`
+	NumComments  int       `json:"num_comments"`
+	Thumbnail    *string   `json:"thumbnail,omitempty"`
+	CreatedUTC   *int64    `json:"created_utc,omitempty"`
+	SavedAt      time.Time `json:"saved_at"`
+}
+
+// RedditPostDetails contains the metadata we store for Reddit posts
+type RedditPostDetails struct {
+	Subreddit    string
+	RedditPostID string
+	Title        string
+	Author       string
+	Score        int
+	NumComments  int
+	Thumbnail    *string
+	CreatedUTC   *int64
 }
 
 // NewSavedItemsRepository creates a repository for saved content
@@ -254,12 +273,39 @@ func (r *SavedItemsRepository) GetSavedPostComments(ctx context.Context, userID 
 }
 
 // SaveRedditPost stores a Reddit post in the user's saved list
-func (r *SavedItemsRepository) SaveRedditPost(ctx context.Context, userID int, subreddit, redditPostID string) error {
+func (r *SavedItemsRepository) SaveRedditPost(ctx context.Context, userID int, post *RedditPostDetails) error {
+	if post == nil {
+		return nil
+	}
+	var thumbnail interface{}
+	if post.Thumbnail != nil && *post.Thumbnail != "" {
+		thumbnail = *post.Thumbnail
+	}
+	var createdUTC interface{}
+	if post.CreatedUTC != nil && *post.CreatedUTC > 0 {
+		createdUTC = *post.CreatedUTC
+	}
 	_, err := r.pool.Exec(ctx, `
-		INSERT INTO saved_reddit_posts (user_id, subreddit, reddit_post_id)
-		VALUES ($1, $2, $3)
-		ON CONFLICT (user_id, subreddit, reddit_post_id) DO NOTHING
-	`, userID, subreddit, redditPostID)
+		INSERT INTO saved_reddit_posts (user_id, subreddit, reddit_post_id, title, author, score, num_comments, thumbnail, created_utc)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+		ON CONFLICT (user_id, subreddit, reddit_post_id)
+		DO UPDATE SET
+			title = EXCLUDED.title,
+			author = EXCLUDED.author,
+			score = EXCLUDED.score,
+			num_comments = EXCLUDED.num_comments,
+			thumbnail = EXCLUDED.thumbnail,
+			created_utc = EXCLUDED.created_utc
+	`, userID,
+		post.Subreddit,
+		post.RedditPostID,
+		post.Title,
+		post.Author,
+		post.Score,
+		post.NumComments,
+		thumbnail,
+		createdUTC,
+	)
 	return err
 }
 
@@ -287,7 +333,10 @@ func (r *SavedItemsRepository) IsRedditPostSaved(ctx context.Context, userID int
 // GetSavedRedditPosts returns saved Reddit posts for the user
 func (r *SavedItemsRepository) GetSavedRedditPosts(ctx context.Context, userID int) ([]*SavedRedditPost, error) {
 	query := `
-		SELECT subreddit, reddit_post_id, created_at
+		SELECT subreddit, reddit_post_id, title, author,
+		       COALESCE(score, 0) AS score,
+		       COALESCE(num_comments, 0) AS num_comments,
+		       thumbnail, created_utc, created_at
 		FROM saved_reddit_posts
 		WHERE user_id = $1
 		ORDER BY created_at DESC
@@ -301,8 +350,35 @@ func (r *SavedItemsRepository) GetSavedRedditPosts(ctx context.Context, userID i
 	var posts []*SavedRedditPost
 	for rows.Next() {
 		post := &SavedRedditPost{}
-		if err := rows.Scan(&post.Subreddit, &post.RedditPostID, &post.SavedAt); err != nil {
+		var title, author sql.NullString
+		var thumbnail sql.NullString
+		var createdUTC sql.NullInt64
+		if err := rows.Scan(
+			&post.Subreddit,
+			&post.RedditPostID,
+			&title,
+			&author,
+			&post.Score,
+			&post.NumComments,
+			&thumbnail,
+			&createdUTC,
+			&post.SavedAt,
+		); err != nil {
 			return nil, err
+		}
+		if title.Valid {
+			post.Title = title.String
+		}
+		if author.Valid {
+			post.Author = author.String
+		}
+		if thumbnail.Valid {
+			value := thumbnail.String
+			post.Thumbnail = &value
+		}
+		if createdUTC.Valid {
+			value := createdUTC.Int64
+			post.CreatedUTC = &value
 		}
 		posts = append(posts, post)
 	}
