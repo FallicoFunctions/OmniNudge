@@ -485,8 +485,8 @@ function LocalCommentView({
   };
 
   return (
-    <div className="flex gap-3">
-      <div className="flex flex-col items-center text-sm text-[var(--color-text-secondary)] pt-1">
+    <div className="flex gap-2">
+      <div className="flex flex-col items-center text-sm text-[var(--color-text-secondary)] pt-1 leading-none">
         <button
           onClick={() => voteMutation.mutate(1)}
           disabled={voteMutation.isPending}
@@ -495,11 +495,7 @@ function LocalCommentView({
         >
           ▲
         </button>
-        <span
-          className={`min-w-[24px] text-center text-xs font-semibold ${comment.user_vote === 1 ? 'text-orange-500' : comment.user_vote === -1 ? 'text-blue-500' : 'text-[var(--color-text-primary)]'}`}
-        >
-          {comment.score}
-        </span>
+        <span className="h-1" />
         <button
           onClick={() => voteMutation.mutate(-1)}
           disabled={voteMutation.isPending}
@@ -725,6 +721,7 @@ export default function RedditPostPage() {
   const [replyingTo, setReplyingTo] = useState<number | null>(null);
   const [embedTarget, setEmbedTarget] = useState<LocalRedditComment | null>(null);
   const [sort, setSort] = useState<string>('best');
+  const [imageExpanded, setImageExpanded] = useState(false);
 
   // Fetch Reddit post and comments from Reddit API
   const { data: redditData, isLoading: loadingReddit } = useQuery({
@@ -1050,14 +1047,6 @@ export default function RedditPostPage() {
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-8">
-      {/* Back Button */}
-      <button
-        onClick={() => navigate('/reddit')}
-        className="mb-4 text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
-      >
-        ← Back to Reddit Feed
-      </button>
-
       {/* Post Content Section */}
       {post && (
         <div className="mb-6 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-6">
@@ -1074,12 +1063,32 @@ export default function RedditPostPage() {
 
           {/* Post Media/Content */}
           {post.post_hint === 'image' && post.url && (
-            <div className="mb-4">
-              <img
-                src={post.url}
-                alt={post.title}
-                className="max-h-[600px] w-full rounded object-contain"
-              />
+            <div className="mb-4 flex flex-col items-start gap-2">
+              <div
+                className="cursor-pointer overflow-hidden rounded border border-[var(--color-border)] transition-all duration-200"
+                style={{
+                  maxHeight: imageExpanded ? '700px' : '240px',
+                  maxWidth: imageExpanded ? '100%' : '360px',
+                  width: imageExpanded ? '100%' : '360px',
+                }}
+                onClick={() => setImageExpanded((prev) => !prev)}
+                title={imageExpanded ? 'Click to shrink' : 'Click to enlarge'}
+              >
+                <img
+                  src={post.url}
+                  alt={post.title}
+                  className={`h-full w-full object-contain transition-transform duration-200 ${
+                    imageExpanded ? '' : 'hover:scale-[1.03]'
+                  }`}
+                />
+              </div>
+              <button
+                type="button"
+                onClick={() => setImageExpanded((prev) => !prev)}
+                className="text-xs text-[var(--color-primary)] hover:underline"
+              >
+                {imageExpanded ? 'View smaller' : 'View full size'}
+              </button>
             </div>
           )}
 
