@@ -1,5 +1,5 @@
 import { api } from '../lib/api';
-import type { SavedItemsResponse } from '../types/saved';
+import type { SavedItemsResponse, SaveRedditPostPayload } from '../types/saved';
 
 export const savedService = {
   async getSavedItems(type: 'all' | 'posts' | 'reddit_posts' | 'post_comments' | 'reddit_comments' = 'all'): Promise<SavedItemsResponse> {
@@ -15,8 +15,8 @@ export const savedService = {
     await api.delete(`/posts/${postId}/save`);
   },
 
-  async saveRedditPost(subreddit: string, postId: string): Promise<void> {
-    await api.post(`/reddit/posts/${subreddit}/${postId}/save`);
+  async saveRedditPost(subreddit: string, postId: string, payload?: SaveRedditPostPayload): Promise<void> {
+    await api.post(`/reddit/posts/${subreddit}/${postId}/save`, payload ?? {});
   },
 
   async unsaveRedditPost(subreddit: string, postId: string): Promise<void> {
