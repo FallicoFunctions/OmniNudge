@@ -1,7 +1,8 @@
 export interface PlatformPost {
   id: number;
   title: string;
-  content?: string;
+  body?: string | null;
+  content?: string | null;
   author_id: number;
   author_username: string;
   hub_name: string;
@@ -9,6 +10,11 @@ export interface PlatformPost {
   comment_count: number;
   created_at: string;
   updated_at?: string;
+  media_url?: string | null;
+  media_type?: string | null;
+  thumbnail_url?: string | null;
+  target_subreddit?: string | null;
+  crosspost_origin_subreddit?: string | null;
 }
 
 import type { LocalCommentBase } from './comments';

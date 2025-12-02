@@ -54,6 +54,14 @@ type PlatformPost struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
+const platformPostSelectColumns = `
+	id, author_id, hub_id, title, body, tags, media_url, media_type, thumbnail_url,
+	score, upvotes, downvotes, num_comments, view_count,
+	is_deleted, is_edited, edited_at,
+	crosspost_origin_type, crosspost_origin_subreddit, crosspost_origin_post_id, crosspost_original_title,
+	target_subreddit, created_at
+`
+
 // PlatformPostRepository handles database operations for platform posts
 type PlatformPostRepository struct {
 	pool *pgxpool.Pool
@@ -109,33 +117,12 @@ func (r *PlatformPostRepository) GetByID(ctx context.Context, id int) (*Platform
 	post := &PlatformPost{}
 
 	query := `
-		SELECT id, author_id, hub_id, title, body, tags, media_url, media_type, thumbnail_url,
-			   score, upvotes, downvotes, num_comments, view_count,
-			   is_deleted, is_edited, edited_at, created_at
+		SELECT ` + platformPostSelectColumns + `
 		FROM platform_posts
 		WHERE id = $1 AND is_deleted = FALSE
 	`
 
-	err := r.pool.QueryRow(ctx, query, id).Scan(
-		&post.ID,
-		&post.AuthorID,
-		&post.HubID,
-		&post.Title,
-		&post.Body,
-		&post.Tags,
-		&post.MediaURL,
-		&post.MediaType,
-		&post.ThumbnailURL,
-		&post.Score,
-		&post.Upvotes,
-		&post.Downvotes,
-		&post.NumComments,
-		&post.ViewCount,
-		&post.IsDeleted,
-		&post.IsEdited,
-		&post.EditedAt,
-		&post.CreatedAt,
-	)
+	err := scanPlatformPost(r.pool.QueryRow(ctx, query, id), post)
 
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -160,9 +147,7 @@ func (r *PlatformPostRepository) GetFeed(ctx context.Context, sortBy string, lim
 	}
 
 	query := `
-		SELECT id, author_id, hub_id, title, body, tags, media_url, media_type, thumbnail_url,
-			   score, upvotes, downvotes, num_comments, view_count,
-			   is_deleted, is_edited, edited_at, created_at
+		SELECT ` + platformPostSelectColumns + `
 		FROM platform_posts
 		WHERE is_deleted = FALSE
 		` + orderClause + `
@@ -178,27 +163,7 @@ func (r *PlatformPostRepository) GetFeed(ctx context.Context, sortBy string, lim
 	var posts []*PlatformPost
 	for rows.Next() {
 		post := &PlatformPost{}
-		err := rows.Scan(
-			&post.ID,
-			&post.AuthorID,
-			&post.HubID,
-			&post.Title,
-			&post.Body,
-			&post.Tags,
-			&post.MediaURL,
-			&post.MediaType,
-			&post.ThumbnailURL,
-			&post.Score,
-			&post.Upvotes,
-			&post.Downvotes,
-			&post.NumComments,
-			&post.ViewCount,
-			&post.IsDeleted,
-			&post.IsEdited,
-			&post.EditedAt,
-			&post.CreatedAt,
-		)
-		if err != nil {
+		if err := scanPlatformPost(rows, post); err != nil {
 			return nil, err
 		}
 		posts = append(posts, post)
@@ -210,9 +175,7 @@ func (r *PlatformPostRepository) GetFeed(ctx context.Context, sortBy string, lim
 // GetByAuthor retrieves posts by a specific author
 func (r *PlatformPostRepository) GetByAuthor(ctx context.Context, authorID int, limit, offset int) ([]*PlatformPost, error) {
 	query := `
-		SELECT id, author_id, hub_id, title, body, tags, media_url, media_type, thumbnail_url,
-			   score, upvotes, downvotes, num_comments, view_count,
-			   is_deleted, is_edited, edited_at, created_at
+		SELECT ` + platformPostSelectColumns + `
 		FROM platform_posts
 		WHERE author_id = $1 AND is_deleted = FALSE
 		ORDER BY created_at DESC
@@ -228,27 +191,7 @@ func (r *PlatformPostRepository) GetByAuthor(ctx context.Context, authorID int, 
 	var posts []*PlatformPost
 	for rows.Next() {
 		post := &PlatformPost{}
-		err := rows.Scan(
-			&post.ID,
-			&post.AuthorID,
-			&post.HubID,
-			&post.Title,
-			&post.Body,
-			&post.Tags,
-			&post.MediaURL,
-			&post.MediaType,
-			&post.ThumbnailURL,
-			&post.Score,
-			&post.Upvotes,
-			&post.Downvotes,
-			&post.NumComments,
-			&post.ViewCount,
-			&post.IsDeleted,
-			&post.IsEdited,
-			&post.EditedAt,
-			&post.CreatedAt,
-		)
-		if err != nil {
+		if err := scanPlatformPost(rows, post); err != nil {
 			return nil, err
 		}
 		posts = append(posts, post)
@@ -270,9 +213,7 @@ func (r *PlatformPostRepository) GetByHub(ctx context.Context, hubID int, sortBy
 	}
 
 	query := `
-		SELECT id, author_id, hub_id, title, body, tags, media_url, media_type, thumbnail_url,
-			   score, upvotes, downvotes, num_comments, view_count,
-			   is_deleted, is_edited, edited_at, created_at
+		SELECT ` + platformPostSelectColumns + `
 		FROM platform_posts
 		WHERE hub_id = $1 AND is_deleted = FALSE
 		` + orderClause + `
@@ -288,27 +229,7 @@ func (r *PlatformPostRepository) GetByHub(ctx context.Context, hubID int, sortBy
 	var posts []*PlatformPost
 	for rows.Next() {
 		post := &PlatformPost{}
-		err := rows.Scan(
-			&post.ID,
-			&post.AuthorID,
-			&post.HubID,
-			&post.Title,
-			&post.Body,
-			&post.Tags,
-			&post.MediaURL,
-			&post.MediaType,
-			&post.ThumbnailURL,
-			&post.Score,
-			&post.Upvotes,
-			&post.Downvotes,
-			&post.NumComments,
-			&post.ViewCount,
-			&post.IsDeleted,
-			&post.IsEdited,
-			&post.EditedAt,
-			&post.CreatedAt,
-		)
-		if err != nil {
+		if err := scanPlatformPost(rows, post); err != nil {
 			return nil, err
 		}
 		posts = append(posts, post)
@@ -330,9 +251,7 @@ func (r *PlatformPostRepository) GetBySubreddit(ctx context.Context, subreddit s
 	}
 
 	query := `
-		SELECT id, author_id, hub_id, title, body, tags, media_url, media_type, thumbnail_url,
-			   score, upvotes, downvotes, num_comments, view_count,
-			   is_deleted, is_edited, edited_at, created_at
+		SELECT ` + platformPostSelectColumns + `
 		FROM platform_posts
 		WHERE target_subreddit = $1 AND is_deleted = FALSE
 		` + orderClause + `
@@ -348,27 +267,7 @@ func (r *PlatformPostRepository) GetBySubreddit(ctx context.Context, subreddit s
 	var posts []*PlatformPost
 	for rows.Next() {
 		post := &PlatformPost{}
-		err := rows.Scan(
-			&post.ID,
-			&post.AuthorID,
-			&post.HubID,
-			&post.Title,
-			&post.Body,
-			&post.Tags,
-			&post.MediaURL,
-			&post.MediaType,
-			&post.ThumbnailURL,
-			&post.Score,
-			&post.Upvotes,
-			&post.Downvotes,
-			&post.NumComments,
-			&post.ViewCount,
-			&post.IsDeleted,
-			&post.IsEdited,
-			&post.EditedAt,
-			&post.CreatedAt,
-		)
-		if err != nil {
+		if err := scanPlatformPost(rows, post); err != nil {
 			return nil, err
 		}
 		posts = append(posts, post)
@@ -380,9 +279,7 @@ func (r *PlatformPostRepository) GetBySubreddit(ctx context.Context, subreddit s
 // GetByTags retrieves posts that contain any of the specified tags
 func (r *PlatformPostRepository) GetByTags(ctx context.Context, tags []string, limit, offset int) ([]*PlatformPost, error) {
 	query := `
-		SELECT id, author_id, hub_id, title, body, tags, media_url, media_type, thumbnail_url,
-			   score, upvotes, downvotes, num_comments, view_count,
-			   is_deleted, is_edited, edited_at, created_at
+		SELECT ` + platformPostSelectColumns + `
 		FROM platform_posts
 		WHERE tags && $1 AND is_deleted = FALSE
 		ORDER BY created_at DESC
@@ -398,27 +295,7 @@ func (r *PlatformPostRepository) GetByTags(ctx context.Context, tags []string, l
 	var posts []*PlatformPost
 	for rows.Next() {
 		post := &PlatformPost{}
-		err := rows.Scan(
-			&post.ID,
-			&post.AuthorID,
-			&post.HubID,
-			&post.Title,
-			&post.Body,
-			&post.Tags,
-			&post.MediaURL,
-			&post.MediaType,
-			&post.ThumbnailURL,
-			&post.Score,
-			&post.Upvotes,
-			&post.Downvotes,
-			&post.NumComments,
-			&post.ViewCount,
-			&post.IsDeleted,
-			&post.IsEdited,
-			&post.EditedAt,
-			&post.CreatedAt,
-		)
-		if err != nil {
+		if err := scanPlatformPost(rows, post); err != nil {
 			return nil, err
 		}
 		posts = append(posts, post)
@@ -460,6 +337,34 @@ func (r *PlatformPostRepository) IncrementViewCount(ctx context.Context, postID 
 	query := `UPDATE platform_posts SET view_count = view_count + 1 WHERE id = $1`
 	_, err := r.pool.Exec(ctx, query, postID)
 	return err
+}
+
+func scanPlatformPost(row pgx.Row, post *PlatformPost) error {
+	return row.Scan(
+		&post.ID,
+		&post.AuthorID,
+		&post.HubID,
+		&post.Title,
+		&post.Body,
+		&post.Tags,
+		&post.MediaURL,
+		&post.MediaType,
+		&post.ThumbnailURL,
+		&post.Score,
+		&post.Upvotes,
+		&post.Downvotes,
+		&post.NumComments,
+		&post.ViewCount,
+		&post.IsDeleted,
+		&post.IsEdited,
+		&post.EditedAt,
+		&post.CrosspostOriginType,
+		&post.CrosspostOriginSubreddit,
+		&post.CrosspostOriginPostID,
+		&post.CrosspostOriginalTitle,
+		&post.TargetSubreddit,
+		&post.CreatedAt,
+	)
 }
 
 // Vote records a user's vote and updates aggregate counts, preventing duplicates.
