@@ -48,6 +48,20 @@ export default function RedditPage() {
     enabled: !!user,
   });
 
+  const savedRedditPostsKey = ['saved-items', 'reddit_posts'] as const;
+  const { data: savedRedditPostsData } = useQuery({
+    queryKey: savedRedditPostsKey,
+    queryFn: () => savedService.getSavedItems('reddit_posts'),
+    enabled: !!user,
+  });
+
+  const savedRedditPostIds = useMemo(() => {
+    const ids = savedRedditPostsData?.saved_reddit_posts?.map(
+      (post) => `${post.subreddit}-${post.reddit_post_id}`
+    );
+    return new Set(ids ?? []);
+  }, [savedRedditPostsData]);
+
   // Filter out hidden posts
   const visiblePosts = useMemo(() => {
     if (!data?.posts) return [];
@@ -63,24 +77,32 @@ export default function RedditPage() {
       (post) => !hiddenPostIds.has(`${post.subreddit}-${post.id}`)
     );
   }, [data?.posts, hiddenPostsData?.hidden_reddit_posts]);
-  const saveRedditPostMutation = useMutation<void, Error, FeedRedditPost>({
-    mutationFn: async (post) => {
-      const thumbnail =
-        post.thumbnail && post.thumbnail.startsWith('http') ? post.thumbnail : null;
-      await savedService.saveRedditPost(post.subreddit, post.id, {
-        title: post.title,
-        author: post.author,
-        score: post.score,
-        num_comments: post.num_comments,
-        thumbnail,
-        created_utc: post.created_utc ?? null,
-      });
+  const toggleSaveRedditPostMutation = useMutation<
+    void,
+    Error,
+    { post: FeedRedditPost; shouldSave: boolean }
+  >({
+    mutationFn: async ({ post, shouldSave }) => {
+      if (shouldSave) {
+        const thumbnail =
+          post.thumbnail && post.thumbnail.startsWith('http') ? post.thumbnail : null;
+        await savedService.saveRedditPost(post.subreddit, post.id, {
+          title: post.title,
+          author: post.author,
+          score: post.score,
+          num_comments: post.num_comments,
+          thumbnail,
+          created_utc: post.created_utc ?? null,
+        });
+        return;
+      }
+      await savedService.unsaveRedditPost(post.subreddit, post.id);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['saved-items', 'reddit_posts'] });
+      queryClient.invalidateQueries({ queryKey: savedRedditPostsKey });
     },
     onError: (saveError) => {
-      alert(`Failed to save post: ${saveError.message}`);
+      alert(`Failed to update save status: ${saveError.message}`);
     },
   });
 
@@ -117,6 +139,14 @@ export default function RedditPage() {
       navigateToSubreddit(inputValue.trim());
       setInputValue('');
     }
+  };
+
+  const handleShareRedditPost = (post: FeedRedditPost) => {
+    const shareUrl = `${window.location.origin}/reddit/r/${post.subreddit}/comments/${post.id}`;
+    navigator.clipboard
+      .writeText(shareUrl)
+      .then(() => alert('Post link copied to clipboard!'))
+      .catch(() => alert('Unable to copy link. Please try again.'));
   };
 
   return (
@@ -197,129 +227,118 @@ export default function RedditPage() {
       )}
 
       {visiblePosts && (
-        <div className="space-y-4">
-          {visiblePosts.map((post) => (
-            <article
-              key={post.id}
-              className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] shadow-sm transition-shadow hover:shadow-md"
-            >
-              <div
-                onClick={() => navigate(`/reddit/r/${post.subreddit}/comments/${post.id}`)}
-                className="flex cursor-pointer gap-4 p-4"
+        <div className="space-y-3">
+          {visiblePosts.map((post) => {
+            const postUrl = `/reddit/r/${post.subreddit}/comments/${post.id}`;
+            const thumbnail =
+              post.thumbnail && post.thumbnail.startsWith('http')
+                ? post.thumbnail
+                : null;
+            const commentLabel = `${post.num_comments.toLocaleString()} Comments`;
+            const isSaved = savedRedditPostIds.has(`${post.subreddit}-${post.id}`);
+            const isSaveActionPending =
+              toggleSaveRedditPostMutation.isPending &&
+              toggleSaveRedditPostMutation.variables?.post.id === post.id;
+            const pendingShouldSave = toggleSaveRedditPostMutation.variables?.shouldSave;
+
+            return (
+              <article
+                key={post.id}
+                className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)]"
               >
-                {/* Thumbnail */}
-                {post.thumbnail && post.thumbnail !== 'self' && post.thumbnail !== 'default' && (
-                  <img
-                    src={post.thumbnail}
-                    alt=""
-                    className="h-20 w-20 flex-shrink-0 rounded object-cover"
-                  />
-                )}
-
-                {/* Content */}
-                <div className="flex-1">
-                  <h2 className="text-lg font-semibold text-[var(--color-text-primary)] hover:text-[var(--color-primary)]">
-                    {post.title}
-                  </h2>
-
-                  <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-[var(--color-text-secondary)]">
-                    <Link
-                      to={`/reddit/r/${post.subreddit}`}
-                      onClick={(event) => event.stopPropagation()}
-                      className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
-                    >
-                      r/{post.subreddit}
-                    </Link>
-                    <span>•</span>
-                    <Link
-                      to={`/reddit/user/${post.author}`}
-                      onClick={(event) => event.stopPropagation()}
-                      className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
-                    >
-                      u/{post.author}
-                    </Link>
-                    <span>•</span>
-                    <span>{post.score} points</span>
-                    <span>•</span>
-                    <span>{post.num_comments} comments</span>
-                    <span>•</span>
-                    <span>{new Date(post.created_utc * 1000).toLocaleDateString()}</span>
-                  </div>
-
-                  {post.selftext && (
-                    <p className="mt-2 line-clamp-3 text-sm text-[var(--color-text-secondary)]">
-                      {post.selftext}
-                    </p>
+                <div className="flex gap-3 p-3">
+                  {thumbnail && (
+                    <img
+                      src={thumbnail}
+                      alt=""
+                      className="h-14 w-14 flex-shrink-0 rounded object-cover"
+                    />
                   )}
+                  <div className="flex-1 text-left">
+                    <Link to={postUrl}>
+                      <h3 className="text-base font-semibold text-[var(--color-text-primary)] hover:text-[var(--color-primary)]">
+                        {post.title}
+                      </h3>
+                    </Link>
+                    <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-[var(--color-text-secondary)]">
+                      <Link
+                        to={`/reddit/r/${post.subreddit}`}
+                        className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+                      >
+                        r/{post.subreddit}
+                      </Link>
+                      <span>•</span>
+                      <Link
+                        to={`/reddit/user/${post.author}`}
+                        className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+                      >
+                        u/{post.author}
+                      </Link>
+                      <span>•</span>
+                      <span>{post.score.toLocaleString()} points</span>
+                      <span>•</span>
+                      <span>{new Date(post.created_utc * 1000).toLocaleDateString()}</span>
+                    </div>
+                    <div className="mt-1 flex flex-wrap items-center gap-3 text-[11px] text-[var(--color-text-secondary)]">
+                      <Link
+                        to={postUrl}
+                        className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+                      >
+                        {commentLabel}
+                      </Link>
+                      <button
+                        type="button"
+                        onClick={() => handleShareRedditPost(post)}
+                        className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+                      >
+                        Share
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          toggleSaveRedditPostMutation.mutate({
+                            post,
+                            shouldSave: !isSaved,
+                          })
+                        }
+                        disabled={isSaveActionPending}
+                        className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] disabled:opacity-50"
+                      >
+                        {isSaveActionPending
+                          ? pendingShouldSave
+                            ? 'Saving...'
+                            : 'Unsaving...'
+                          : isSaved
+                          ? 'Unsave'
+                          : 'Save'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => hideRedditPostMutation.mutate(post)}
+                        disabled={
+                          hideRedditPostMutation.isPending &&
+                          hideRedditPostMutation.variables?.id === post.id
+                        }
+                        className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] disabled:opacity-50"
+                      >
+                        {hideRedditPostMutation.isPending &&
+                        hideRedditPostMutation.variables?.id === post.id
+                          ? 'Hiding...'
+                          : 'Hide'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => navigate(postUrl)}
+                        className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+                      >
+                        Crosspost
+                      </button>
+                    </div>
+                  </div>
                 </div>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="flex gap-3 border-t border-[var(--color-border)] px-4 py-2 text-xs">
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    navigate(`/reddit/r/${post.subreddit}/comments/${post.id}`);
-                  }}
-                  className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
-                >
-                  {post.num_comments} Comments
-                </button>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    // TODO: Implement share functionality
-                    console.log('Share post', post.id);
-                  }}
-                  className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
-                >
-                  Share
-                </button>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    saveRedditPostMutation.mutate(post);
-                  }}
-                  disabled={
-                    saveRedditPostMutation.isPending &&
-                    saveRedditPostMutation.variables?.id === post.id
-                  }
-                  className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
-                >
-                  {saveRedditPostMutation.isPending &&
-                  saveRedditPostMutation.variables?.id === post.id
-                    ? 'Saving...'
-                    : 'Save'}
-                </button>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    hideRedditPostMutation.mutate(post);
-                  }}
-                  disabled={
-                    hideRedditPostMutation.isPending &&
-                    hideRedditPostMutation.variables?.id === post.id
-                  }
-                  className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
-                >
-                  {hideRedditPostMutation.isPending &&
-                  hideRedditPostMutation.variables?.id === post.id
-                    ? 'Hiding...'
-                    : 'Hide'}
-                </button>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    // TODO: Implement crosspost functionality
-                    console.log('Crosspost', post.id);
-                  }}
-                  className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
-                >
-                  Crosspost
-                </button>
-              </div>
-            </article>
-          ))}
+              </article>
+            );
+          })}
         </div>
       )}
 
