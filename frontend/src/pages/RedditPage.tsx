@@ -4,6 +4,8 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { redditService } from '../services/redditService';
 import { savedService } from '../services/savedService';
 import { useAuth } from '../contexts/AuthContext';
+import { useSettings } from '../contexts/SettingsContext';
+import { formatTimestamp } from '../utils/timeFormat';
 
 interface FeedRedditPost {
   id: string;
@@ -28,6 +30,7 @@ export default function RedditPage() {
   const { subreddit: routeSubreddit } = useParams<{ subreddit?: string }>();
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const { useRelativeTime } = useSettings();
   const [subreddit, setSubreddit] = useState(routeSubreddit ?? 'popular');
   const [sort, setSort] = useState<'hot' | 'new' | 'top' | 'rising'>('hot');
   const [inputValue, setInputValue] = useState('');
@@ -279,7 +282,7 @@ export default function RedditPage() {
                       <span>•</span>
                       <span>{post.score.toLocaleString()} points</span>
                       <span>•</span>
-                      <span>{new Date(post.created_utc * 1000).toLocaleDateString()}</span>
+                      <span>submitted {formatTimestamp(post.created_utc, useRelativeTime)}</span>
                     </div>
                     <div className="mt-1 flex flex-wrap items-center gap-3 text-[11px] text-[var(--color-text-secondary)]">
                       <Link

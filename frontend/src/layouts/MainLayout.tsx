@@ -65,6 +65,12 @@ export default function MainLayout() {
                   >
                     {user.username}
                   </Link>
+                  <Link
+                    to="/settings"
+                    className="rounded-md bg-[var(--color-surface-elevated)] px-3 py-2 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-border)]"
+                  >
+                    Settings
+                  </Link>
                   <button
                     onClick={handleLogout}
                     className="rounded-md bg-[var(--color-surface-elevated)] px-3 py-2 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-border)]"

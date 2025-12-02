@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
+import { SettingsProvider } from './contexts/SettingsContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import MainLayout from './layouts/MainLayout';
 import LoginPage from './pages/LoginPage';
@@ -14,13 +15,15 @@ import PostDetailPage from './pages/PostDetailPage';
 import MessagesPage from './pages/MessagesPage';
 import SavedPage from './pages/SavedPage';
 import HiddenPage from './pages/HiddenPage';
+import SettingsPage from './pages/SettingsPage';
 import './App.css';
 
 function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <Routes>
+        <SettingsProvider>
+          <Routes>
           {/* Public routes */}
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
@@ -46,11 +49,13 @@ function App() {
             <Route path="/messages" element={<MessagesPage />} />
             <Route path="/saved" element={<SavedPage />} />
             <Route path="/hidden" element={<HiddenPage />} />
+            <Route path="/settings" element={<SettingsPage />} />
           </Route>
 
           {/* Catch all */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
+        </SettingsProvider>
       </AuthProvider>
     </BrowserRouter>
   );

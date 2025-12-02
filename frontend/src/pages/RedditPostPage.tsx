@@ -3,9 +3,11 @@ import { Link, useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
+import { useSettings } from '../contexts/SettingsContext';
 import { savedService } from '../services/savedService';
 import { hubsService } from '../services/hubsService';
 import type { LocalRedditComment } from '../types/reddit';
+import { formatTimestamp } from '../utils/timeFormat';
 
 interface RedditComment {
   kind: string;
@@ -737,6 +739,7 @@ export default function RedditPostPage() {
   const { subreddit, postId, commentId } = useParams<{ subreddit: string; postId: string; commentId?: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { useRelativeTime } = useSettings();
   const queryClient = useQueryClient();
   const focusedCommentId = commentId ? Number(commentId) : null;
   const [commentText, setCommentText] = useState('');
@@ -1206,7 +1209,7 @@ export default function RedditPostPage() {
                 </Link>
               </span>
               <span>•</span>
-              <span>{new Date(post.created_utc * 1000).toLocaleString()}</span>
+              <span>submitted {formatTimestamp(post.created_utc, useRelativeTime)}</span>
             </div>
           </div>
 
