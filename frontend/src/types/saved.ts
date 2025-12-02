@@ -21,7 +21,22 @@ export interface SavedPostComment extends LocalCommentBase {
 export interface SavedRedditPost {
   subreddit: string;
   reddit_post_id: string;
+  title?: string;
+  author?: string;
+  score?: number;
+  num_comments?: number;
+  thumbnail?: string | null;
+  created_utc?: number | null;
   saved_at: string;
+}
+
+export interface SaveRedditPostPayload {
+  title?: string;
+  author?: string;
+  score?: number;
+  num_comments?: number;
+  thumbnail?: string | null;
+  created_utc?: number | null;
 }
 
 export interface SavedItemsResponse {

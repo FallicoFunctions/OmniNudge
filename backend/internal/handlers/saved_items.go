@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"errors"
+	"io"
 	"net/http"
 	"strconv"
 
@@ -14,6 +16,15 @@ type SavedItemsHandler struct {
 	postRepo          *models.PlatformPostRepository
 	postCommentRepo   *models.PostCommentRepository
 	redditCommentRepo *models.RedditPostCommentRepository
+}
+
+type saveRedditPostRequest struct {
+	Title       string  `json:"title"`
+	Author      string  `json:"author"`
+	Score       int     `json:"score"`
+	NumComments int     `json:"num_comments"`
+	Thumbnail   *string `json:"thumbnail"`
+	CreatedUTC  *int64  `json:"created_utc"`
 }
 
 // NewSavedItemsHandler constructs the handler
@@ -268,7 +279,22 @@ func (h *SavedItemsHandler) SaveRedditPost(c *gin.Context) {
 		return
 	}
 
-	if err := h.savedRepo.SaveRedditPost(c.Request.Context(), userID.(int), subreddit, postId); err != nil {
+	var req saveRedditPostRequest
+	if err := c.ShouldBindJSON(&req); err != nil && !errors.Is(err, io.EOF) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body", "details": err.Error()})
+		return
+	}
+
+	if err := h.savedRepo.SaveRedditPost(c.Request.Context(), userID.(int), &models.RedditPostDetails{
+		Subreddit:    subreddit,
+		RedditPostID: postId,
+		Title:        req.Title,
+		Author:       req.Author,
+		Score:        req.Score,
+		NumComments:  req.NumComments,
+		Thumbnail:    req.Thumbnail,
+		CreatedUTC:   req.CreatedUTC,
+	}); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save Reddit post", "details": err.Error()})
 		return
 	}

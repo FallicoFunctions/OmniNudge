@@ -920,7 +920,19 @@ export default function RedditPostPage() {
         throw new Error('Missing post context');
       }
       if (shouldSave) {
-        await savedService.saveRedditPost(subreddit, postId);
+        if (!post) {
+          throw new Error('Post data not loaded yet');
+        }
+        const thumbnail =
+          post.thumbnail && post.thumbnail.startsWith('http') ? post.thumbnail : undefined;
+        await savedService.saveRedditPost(subreddit, postId, {
+          title: post.title,
+          author: post.author,
+          score: post.score,
+          num_comments: post.num_comments,
+          thumbnail: thumbnail ?? null,
+          created_utc: post.created_utc ?? null,
+        });
       } else {
         await savedService.unsaveRedditPost(subreddit, postId);
       }

@@ -1,21 +1,61 @@
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { redditService } from '../services/redditService';
+import { savedService } from '../services/savedService';
+
+interface FeedRedditPost {
+  id: string;
+  title: string;
+  author: string;
+  subreddit: string;
+  score: number;
+  num_comments: number;
+  created_utc: number;
+  thumbnail?: string;
+  url?: string;
+  selftext?: string;
+  is_self: boolean;
+}
+
+interface FeedRedditPostsResponse {
+  posts: FeedRedditPost[];
+}
 
 export default function RedditPage() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [subreddit, setSubreddit] = useState('popular');
   const [sort, setSort] = useState<'hot' | 'new' | 'top' | 'rising'>('hot');
   const [inputValue, setInputValue] = useState('');
 
-  const { data, isLoading, error } = useQuery({
+  const { data, isLoading, error } = useQuery<FeedRedditPostsResponse>({
     queryKey: ['reddit', subreddit, sort],
     queryFn: () =>
       subreddit === 'frontpage'
         ? redditService.getFrontPage()
         : redditService.getSubredditPosts(subreddit, sort),
     staleTime: 1000 * 60 * 5, // 5 minutes
+  });
+  const saveRedditPostMutation = useMutation<void, Error, FeedRedditPost>({
+    mutationFn: async (post) => {
+      const thumbnail =
+        post.thumbnail && post.thumbnail.startsWith('http') ? post.thumbnail : null;
+      await savedService.saveRedditPost(post.subreddit, post.id, {
+        title: post.title,
+        author: post.author,
+        score: post.score,
+        num_comments: post.num_comments,
+        thumbnail,
+        created_utc: post.created_utc ?? null,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['saved-items', 'reddit_posts'] });
+    },
+    onError: (saveError) => {
+      alert(`Failed to save post: ${saveError.message}`);
+    },
   });
 
   const handleSubredditSubmit = (e: React.FormEvent) => {
@@ -173,12 +213,18 @@ export default function RedditPage() {
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
-                    // TODO: Implement save functionality
-                    console.log('Save post', post.id);
+                    saveRedditPostMutation.mutate(post);
                   }}
+                  disabled={
+                    saveRedditPostMutation.isPending &&
+                    saveRedditPostMutation.variables?.id === post.id
+                  }
                   className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
                 >
-                  Save
+                  {saveRedditPostMutation.isPending &&
+                  saveRedditPostMutation.variables?.id === post.id
+                    ? 'Saving...'
+                    : 'Save'}
                 </button>
                 <button
                   onClick={(e) => {
