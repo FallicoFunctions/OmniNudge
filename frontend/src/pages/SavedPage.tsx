@@ -208,7 +208,6 @@ export default function SavedPage() {
                   const mergedPost = { ...post, ...(postDetails[postKey] ?? {}) };
                   const hasDetails = Boolean(mergedPost.title);
                   const postUrl = `/reddit/r/${post.subreddit}/comments/${post.reddit_post_id}`;
-                  const redditUrl = `https://www.reddit.com/r/${post.subreddit}/comments/${post.reddit_post_id}`;
                   const displayDate = mergedPost.created_utc
                     ? new Date(mergedPost.created_utc * 1000).toLocaleDateString()
                     : new Date(post.saved_at).toLocaleDateString();
@@ -322,14 +321,6 @@ export default function SavedPage() {
                             >
                               Crosspost
                             </button>
-                            <a
-                              href={redditUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
-                            >
-                              Open Link ↗
-                            </a>
                           </div>
                         </div>
                       </div>
