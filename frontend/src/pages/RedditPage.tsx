@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useParams } from 'react-router-dom';
 import { redditService } from '../services/redditService';
 import { savedService } from '../services/savedService';
+import { useAuth } from '../contexts/AuthContext';
 
 interface FeedRedditPost {
   id: string;
@@ -26,6 +27,7 @@ export default function RedditPage() {
   const navigate = useNavigate();
   const { subreddit: routeSubreddit } = useParams<{ subreddit?: string }>();
   const queryClient = useQueryClient();
+  const { user } = useAuth();
   const [subreddit, setSubreddit] = useState(routeSubreddit ?? 'popular');
   const [sort, setSort] = useState<'hot' | 'new' | 'top' | 'rising'>('hot');
   const [inputValue, setInputValue] = useState('');
@@ -38,6 +40,29 @@ export default function RedditPage() {
         : redditService.getSubredditPosts(subreddit, sort),
     staleTime: 1000 * 60 * 5, // 5 minutes
   });
+
+  // Fetch hidden Reddit posts
+  const { data: hiddenPostsData } = useQuery({
+    queryKey: ['hidden-items', 'reddit_posts'],
+    queryFn: () => savedService.getHiddenItems('reddit_posts'),
+    enabled: !!user,
+  });
+
+  // Filter out hidden posts
+  const visiblePosts = useMemo(() => {
+    if (!data?.posts) return [];
+    if (!hiddenPostsData?.hidden_reddit_posts) return data.posts;
+
+    const hiddenPostIds = new Set(
+      hiddenPostsData.hidden_reddit_posts.map(
+        (p) => `${p.subreddit}-${p.reddit_post_id}`
+      )
+    );
+
+    return data.posts.filter(
+      (post) => !hiddenPostIds.has(`${post.subreddit}-${post.id}`)
+    );
+  }, [data?.posts, hiddenPostsData?.hidden_reddit_posts]);
   const saveRedditPostMutation = useMutation<void, Error, FeedRedditPost>({
     mutationFn: async (post) => {
       const thumbnail =
@@ -56,6 +81,18 @@ export default function RedditPage() {
     },
     onError: (saveError) => {
       alert(`Failed to save post: ${saveError.message}`);
+    },
+  });
+
+  const hideRedditPostMutation = useMutation<void, Error, FeedRedditPost>({
+    mutationFn: async (post) => {
+      await savedService.hideRedditPost(post.subreddit, post.id);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['hidden-items', 'reddit_posts'] });
+    },
+    onError: (hideError) => {
+      alert(`Failed to hide post: ${hideError.message}`);
     },
   });
 
@@ -159,9 +196,9 @@ export default function RedditPage() {
         </div>
       )}
 
-      {data?.posts && (
+      {visiblePosts && (
         <div className="space-y-4">
-          {data.posts.map((post) => (
+          {visiblePosts.map((post) => (
             <article
               key={post.id}
               className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] shadow-sm transition-shadow hover:shadow-md"
@@ -245,12 +282,18 @@ export default function RedditPage() {
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
-                    // TODO: Implement hide functionality
-                    console.log('Hide post', post.id);
+                    hideRedditPostMutation.mutate(post);
                   }}
+                  disabled={
+                    hideRedditPostMutation.isPending &&
+                    hideRedditPostMutation.variables?.id === post.id
+                  }
                   className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
                 >
-                  Hide
+                  {hideRedditPostMutation.isPending &&
+                  hideRedditPostMutation.variables?.id === post.id
+                    ? 'Hiding...'
+                    : 'Hide'}
                 </button>
                 <button
                   onClick={(e) => {
@@ -268,7 +311,7 @@ export default function RedditPage() {
         </div>
       )}
 
-      {data?.posts && data.posts.length === 0 && (
+      {visiblePosts && visiblePosts.length === 0 && !isLoading && (
         <div className="text-center text-[var(--color-text-secondary)]">
           No posts found in r/{subreddit}
         </div>

@@ -1,6 +1,9 @@
+import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate, useParams } from 'react-router-dom';
 import { redditService } from '../services/redditService';
+import { savedService } from '../services/savedService';
+import { useAuth } from '../contexts/AuthContext';
 
 interface RedditUserPost {
   id: string;
@@ -22,12 +25,36 @@ interface RedditUserPostsResponse {
 export default function RedditUserPage() {
   const { username } = useParams<{ username: string }>();
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   const { data, isLoading, error } = useQuery<RedditUserPostsResponse>({
     queryKey: ['reddit-user', username],
     queryFn: () => redditService.searchPosts(`author:${username}`),
     enabled: !!username,
   });
+
+  // Fetch hidden Reddit posts
+  const { data: hiddenPostsData } = useQuery({
+    queryKey: ['hidden-items', 'reddit_posts'],
+    queryFn: () => savedService.getHiddenItems('reddit_posts'),
+    enabled: !!user,
+  });
+
+  // Filter out hidden posts
+  const visiblePosts = useMemo(() => {
+    if (!data?.posts) return [];
+    if (!hiddenPostsData?.hidden_reddit_posts) return data.posts;
+
+    const hiddenPostIds = new Set(
+      hiddenPostsData.hidden_reddit_posts.map(
+        (p) => `${p.subreddit}-${p.reddit_post_id}`
+      )
+    );
+
+    return data.posts.filter(
+      (post) => !hiddenPostIds.has(`${post.subreddit}-${post.id}`)
+    );
+  }, [data?.posts, hiddenPostsData?.hidden_reddit_posts]);
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-8">
@@ -56,15 +83,15 @@ export default function RedditUserPage() {
         </div>
       )}
 
-      {!isLoading && !error && data?.posts && data.posts.length === 0 && (
+      {!isLoading && !error && visiblePosts && visiblePosts.length === 0 && (
         <div className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] p-4 text-sm text-[var(--color-text-secondary)]">
           No posts found for this user.
         </div>
       )}
 
-      {data?.posts && data.posts.length > 0 && (
+      {visiblePosts && visiblePosts.length > 0 && (
         <div className="space-y-4">
-          {data.posts.map((post) => (
+          {visiblePosts.map((post) => (
             <article
               key={post.id}
               className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] shadow-sm transition-shadow hover:shadow-md"
