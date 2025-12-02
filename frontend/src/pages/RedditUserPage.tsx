@@ -4,6 +4,8 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { redditService } from '../services/redditService';
 import { savedService } from '../services/savedService';
 import { useAuth } from '../contexts/AuthContext';
+import { useSettings } from '../contexts/SettingsContext';
+import { formatTimestamp } from '../utils/timeFormat';
 
 interface RedditUserPost {
   id: string;
@@ -27,6 +29,7 @@ export default function RedditUserPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const { useRelativeTime } = useSettings();
   const [hideTargetPost, setHideTargetPost] = useState<RedditUserPost | null>(null);
 
   const { data, isLoading, error } = useQuery<RedditUserPostsResponse>({
@@ -197,7 +200,7 @@ export default function RedditUserPage() {
                       <span>•</span>
                       <span>{post.score.toLocaleString()} points</span>
                       <span>•</span>
-                      <span>{new Date(post.created_utc * 1000).toLocaleDateString()}</span>
+                      <span>submitted {formatTimestamp(post.created_utc, useRelativeTime)}</span>
                     </div>
                     <div className="mt-1 flex flex-wrap items-center gap-3 text-[11px] text-[var(--color-text-secondary)]">
                       <Link

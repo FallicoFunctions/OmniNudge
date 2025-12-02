@@ -5,6 +5,8 @@ import { savedService } from '../services/savedService';
 import type { SavedPost, SavedPostComment, SavedRedditPost } from '../types/saved';
 import type { LocalRedditComment } from '../types/reddit';
 import { api } from '../lib/api';
+import { useSettings } from '../contexts/SettingsContext';
+import { formatTimestamp } from '../utils/timeFormat';
 
 type RedditListingData = {
   data?: {
@@ -24,6 +26,7 @@ type RedditListingData = {
 export default function SavedPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { useRelativeTime } = useSettings();
   const { data, isLoading, error } = useQuery({
     queryKey: ['saved-items', 'all'],
     queryFn: () => savedService.getSavedItems(),
@@ -178,7 +181,7 @@ export default function SavedPage() {
                       <span>•</span>
                       <span>u/{post.author_username}</span>
                       <span>•</span>
-                      <span>{new Date(post.created_at).toLocaleDateString()}</span>
+                      <span>submitted {formatTimestamp(post.created_at, useRelativeTime)}</span>
                     </div>
                     <h3 className="mt-2 text-lg font-semibold text-[var(--color-text-primary)]">
                       {post.title}
@@ -214,8 +217,8 @@ export default function SavedPage() {
                   const hasDetails = Boolean(mergedPost.title);
                   const postUrl = `/reddit/r/${post.subreddit}/comments/${post.reddit_post_id}`;
                   const displayDate = mergedPost.created_utc
-                    ? new Date(mergedPost.created_utc * 1000).toLocaleDateString()
-                    : new Date(post.saved_at).toLocaleDateString();
+                    ? formatTimestamp(mergedPost.created_utc, useRelativeTime)
+                    : formatTimestamp(post.saved_at, useRelativeTime);
                   const thumbnail =
                     mergedPost.thumbnail && mergedPost.thumbnail.startsWith('http')
                       ? mergedPost.thumbnail
@@ -238,7 +241,7 @@ export default function SavedPage() {
                   if (!hasDetails) {
                     metaItems.push({ label: 'Fetching latest details…' });
                   }
-                  metaItems.push({ label: displayDate });
+                  metaItems.push({ label: `submitted ${displayDate}` });
                   const commentLinkLabel =
                     hasDetails && typeof mergedPost.num_comments === 'number'
                       ? `${mergedPost.num_comments.toLocaleString()} Comments`
