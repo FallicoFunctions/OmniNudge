@@ -327,6 +327,7 @@ func main() {
 			protected.POST("/hubs", hubsHandler.Create)
 			protected.GET("/users/me/hubs", hubsHandler.GetUserHubs)
 			protected.POST("/hubs/:name/crosspost", hubsHandler.CrosspostToHub)
+			protected.POST("/subreddits/:name/crosspost", hubsHandler.CrosspostToSubreddit)
 
 			// Protected conversations routes
 			protected.POST("/conversations", conversationsHandler.CreateConversation)

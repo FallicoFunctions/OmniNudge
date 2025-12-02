@@ -275,3 +275,77 @@ func stringPtrOrNil(s string) *string {
 	}
 	return &s
 }
+
+// CrosspostToSubreddit handles POST /api/v1/subreddits/:name/crosspost
+// Creates a local platform post associated with a subreddit context
+func (h *HubsHandler) CrosspostToSubreddit(c *gin.Context) {
+	userID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
+
+	subredditName := c.Param("name")
+	if subredditName == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Subreddit name is required"})
+		return
+	}
+
+	var req CrosspostRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body", "details": err.Error()})
+		return
+	}
+
+	// Get crosspost source from query params
+	originType := c.Query("origin_type")          // "reddit" or "platform"
+	originSubreddit := c.Query("origin_subreddit") // for Reddit posts
+	originPostID := c.Query("origin_post_id")      // Reddit post ID or platform post ID
+	originalTitle := c.Query("original_title")     // Original title before user edited
+
+	if originType == "" || originPostID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Missing crosspost origin information"})
+		return
+	}
+
+	if originType != "reddit" && originType != "platform" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid origin_type. Must be 'reddit' or 'platform'"})
+		return
+	}
+
+	if originType == "reddit" && originSubreddit == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "origin_subreddit required for Reddit crossposts"})
+		return
+	}
+
+	// Get or create a default hub for subreddit posts
+	// Use "general" hub as the default storage location
+	hub, err := h.hubRepo.GetByName(c.Request.Context(), "general")
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch default hub", "details": err.Error()})
+		return
+	}
+	if hub == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Default hub 'general' not found. Please create it first."})
+		return
+	}
+
+	// Create the crosspost as a new platform post with target_subreddit set
+	post := &models.PlatformPost{
+		AuthorID:                 userID.(int),
+		HubID:                    hub.ID, // Store in general hub
+		Title:                    req.Title,
+		TargetSubreddit:          &subredditName, // Associate with subreddit
+		CrosspostOriginType:      &originType,
+		CrosspostOriginSubreddit: stringPtrOrNil(originSubreddit),
+		CrosspostOriginPostID:    &originPostID,
+		CrosspostOriginalTitle:   stringPtrOrNil(originalTitle),
+	}
+
+	if err := h.postRepo.Create(c.Request.Context(), post); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create crosspost", "details": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusCreated, post)
+}
