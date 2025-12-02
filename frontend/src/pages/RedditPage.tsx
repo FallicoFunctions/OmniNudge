@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { redditService } from '../services/redditService';
 import { savedService } from '../services/savedService';
 import { useAuth } from '../contexts/AuthContext';
@@ -223,9 +223,21 @@ export default function RedditPage() {
                   </h2>
 
                   <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-[var(--color-text-secondary)]">
-                    <span>r/{post.subreddit}</span>
+                    <Link
+                      to={`/reddit/r/${post.subreddit}`}
+                      onClick={(event) => event.stopPropagation()}
+                      className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+                    >
+                      r/{post.subreddit}
+                    </Link>
                     <span>•</span>
-                    <span>u/{post.author}</span>
+                    <Link
+                      to={`/reddit/user/${post.author}`}
+                      onClick={(event) => event.stopPropagation()}
+                      className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+                    >
+                      u/{post.author}
+                    </Link>
                     <span>•</span>
                     <span>{post.score} points</span>
                     <span>•</span>
