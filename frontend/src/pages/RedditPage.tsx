@@ -31,6 +31,7 @@ export default function RedditPage() {
   const [subreddit, setSubreddit] = useState(routeSubreddit ?? 'popular');
   const [sort, setSort] = useState<'hot' | 'new' | 'top' | 'rising'>('hot');
   const [inputValue, setInputValue] = useState('');
+  const [hideTargetPost, setHideTargetPost] = useState<FeedRedditPost | null>(null);
 
   const { data, isLoading, error } = useQuery<FeedRedditPostsResponse>({
     queryKey: ['reddit', subreddit, sort],
@@ -112,6 +113,7 @@ export default function RedditPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['hidden-items', 'reddit_posts'] });
+      setHideTargetPost(null);
     },
     onError: (hideError) => {
       alert(`Failed to hide post: ${hideError.message}`);
@@ -314,17 +316,10 @@ export default function RedditPage() {
                       </button>
                       <button
                         type="button"
-                        onClick={() => hideRedditPostMutation.mutate(post)}
-                        disabled={
-                          hideRedditPostMutation.isPending &&
-                          hideRedditPostMutation.variables?.id === post.id
-                        }
-                        className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] disabled:opacity-50"
+                        onClick={() => setHideTargetPost(post)}
+                        className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
                       >
-                        {hideRedditPostMutation.isPending &&
-                        hideRedditPostMutation.variables?.id === post.id
-                          ? 'Hiding...'
-                          : 'Hide'}
+                        Hide
                       </button>
                       <button
                         type="button"
@@ -345,6 +340,35 @@ export default function RedditPage() {
       {visiblePosts && visiblePosts.length === 0 && !isLoading && (
         <div className="text-center text-[var(--color-text-secondary)]">
           No posts found in r/{subreddit}
+        </div>
+      )}
+
+      {hideTargetPost && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 px-4">
+          <div className="w-full max-w-md rounded-lg bg-white p-4 shadow-lg">
+            <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">Hide this post?</h3>
+            <p className="mt-2 text-sm text-[var(--color-text-secondary)]">
+              Are you sure? Hidden posts can be found at{' '}
+              <Link to="/hidden" className="text-[var(--color-primary)] hover:underline">
+                your hidden posts page
+              </Link>.
+            </p>
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                onClick={() => setHideTargetPost(null)}
+                className="rounded border border-[var(--color-border)] px-3 py-1 text-sm hover:bg-[var(--color-surface-elevated)]"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => hideTargetPost && hideRedditPostMutation.mutate(hideTargetPost)}
+                disabled={hideRedditPostMutation.isPending}
+                className="rounded bg-[var(--color-primary)] px-3 py-1 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)] disabled:opacity-50"
+              >
+                {hideRedditPostMutation.isPending ? 'Hiding...' : 'Hide Post'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
