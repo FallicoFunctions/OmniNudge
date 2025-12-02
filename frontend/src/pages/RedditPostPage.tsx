@@ -744,6 +744,13 @@ export default function RedditPostPage() {
   const [sort, setSort] = useState<string>('best');
   const [imageExpanded, setImageExpanded] = useState(false);
 
+  // Post action states
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [showHideConfirm, setShowHideConfirm] = useState(false);
+  const [showCrosspostModal, setShowCrosspostModal] = useState(false);
+  const [isPostSaved, setIsPostSaved] = useState(false);
+  const [isPostHidden, setIsPostHidden] = useState(false);
+
   // Fetch Reddit post and comments from Reddit API
   const { data: redditData, isLoading: loadingReddit } = useQuery({
     queryKey: ['reddit', 'post', subreddit, postId],
@@ -1136,6 +1143,22 @@ export default function RedditPostPage() {
             <span>{post.score} points</span>
             <span>•</span>
             <span>{post.num_comments} comments</span>
+            <span>•</span>
+            <button onClick={() => setShowShareModal(true)} className="hover:underline">
+              share
+            </button>
+            <span>•</span>
+            <button onClick={() => setIsPostSaved(!isPostSaved)} className="hover:underline">
+              {isPostSaved ? 'unsave' : 'save'}
+            </button>
+            <span>•</span>
+            <button onClick={() => setShowHideConfirm(true)} className="hover:underline">
+              hide
+            </button>
+            <span>•</span>
+            <button onClick={() => setShowCrosspostModal(true)} className="hover:underline">
+              crosspost
+            </button>
           </div>
         </div>
       )}
@@ -1314,6 +1337,126 @@ export default function RedditPostPage() {
                   Copy Embed Code
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Share Modal */}
+      {showShareModal && post && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+          <div className="w-full max-w-md rounded-lg bg-white p-4 shadow-lg">
+            <div className="flex items-start justify-between">
+              <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">Share Post</h3>
+              <button
+                onClick={() => setShowShareModal(false)}
+                className="text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+              >
+                Close
+              </button>
+            </div>
+            <div className="mt-3">
+              <div className="mb-1 text-xs text-[var(--color-text-secondary)]">Copy Link</div>
+              <input
+                readOnly
+                type="text"
+                value={window.location.href}
+                className="w-full rounded border border-[var(--color-border)] bg-[var(--color-surface)] p-2 text-sm"
+                onClick={(e) => e.currentTarget.select()}
+              />
+              <button
+                onClick={async () => {
+                  try {
+                    await navigator.clipboard.writeText(window.location.href);
+                    alert('Link copied to clipboard!');
+                  } catch {
+                    alert('Failed to copy link.');
+                  }
+                }}
+                className="mt-2 rounded bg-[var(--color-primary)] px-3 py-1 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)]"
+              >
+                Copy Link
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Hide Confirmation Modal */}
+      {showHideConfirm && post && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+          <div className="w-full max-w-md rounded-lg bg-white p-4 shadow-lg">
+            <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">Hide this post?</h3>
+            <p className="mt-2 text-sm text-[var(--color-text-secondary)]">
+              Are you sure? Hidden posts can be found at <a href="/saved" className="text-[var(--color-primary)] hover:underline">your hidden posts page</a>.
+            </p>
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                onClick={() => setShowHideConfirm(false)}
+                className="rounded border border-[var(--color-border)] px-3 py-1 text-sm hover:bg-[var(--color-surface-elevated)]"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  setIsPostHidden(true);
+                  setShowHideConfirm(false);
+                  // TODO: Call API to hide post
+                  alert('Post hidden (API call pending)');
+                }}
+                className="rounded bg-[var(--color-primary)] px-3 py-1 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)]"
+              >
+                Hide Post
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Crosspost Modal */}
+      {showCrosspostModal && post && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+          <div className="w-full max-w-md rounded-lg bg-white p-4 shadow-lg">
+            <div className="flex items-start justify-between">
+              <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">Crosspost to Hub</h3>
+              <button
+                onClick={() => setShowCrosspostModal(false)}
+                className="text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+              >
+                Close
+              </button>
+            </div>
+            <div className="mt-3 space-y-3">
+              <div>
+                <label className="mb-1 block text-xs text-[var(--color-text-secondary)]">Select Hub</label>
+                <select className="w-full rounded border border-[var(--color-border)] bg-[var(--color-surface)] p-2 text-sm">
+                  <option>Loading hubs...</option>
+                </select>
+              </div>
+              <div>
+                <label className="mb-1 block text-xs text-[var(--color-text-secondary)]">Title</label>
+                <input
+                  type="text"
+                  defaultValue={post.title}
+                  className="w-full rounded border border-[var(--color-border)] bg-[var(--color-surface)] p-2 text-sm"
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <input type="checkbox" id="send-replies" />
+                <label htmlFor="send-replies" className="text-sm text-[var(--color-text-primary)]">
+                  Send replies to my inbox
+                </label>
+              </div>
+              <button
+                onClick={() => {
+                  setShowCrosspostModal(false);
+                  // TODO: Call API to crosspost
+                  alert('Crosspost created (API call pending)');
+                }}
+                className="w-full rounded bg-[var(--color-primary)] px-3 py-2 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)]"
+              >
+                Create Crosspost
+              </button>
             </div>
           </div>
         </div>
