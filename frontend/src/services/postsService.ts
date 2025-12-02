@@ -20,6 +20,10 @@ export const postsService = {
     return api.post<PlatformPost>('/posts', data);
   },
 
+  async deletePost(id: number): Promise<void> {
+    await api.delete(`/posts/${id}`);
+  },
+
   async votePost(id: number, value: number): Promise<void> {
     await api.post(`/posts/${id}/vote`, { value });
   },
