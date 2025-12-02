@@ -215,20 +215,25 @@ export default function SavedPage() {
                     mergedPost.thumbnail && mergedPost.thumbnail.startsWith('http')
                       ? mergedPost.thumbnail
                       : null;
-                  const metaItems: string[] = [`r/${post.subreddit}`];
+                  const metaItems: Array<{ label: string; to?: string }> = [
+                    {
+                      label: `r/${post.subreddit}`,
+                      to: `/reddit/r/${post.subreddit}`,
+                    },
+                  ];
                   if (hasDetails && mergedPost.author) {
-                    metaItems.push(`u/${mergedPost.author}`);
+                    metaItems.push({
+                      label: `u/${mergedPost.author}`,
+                      to: `/reddit/user/${mergedPost.author}`,
+                    });
                   }
                   if (hasDetails && typeof mergedPost.score === 'number') {
-                    metaItems.push(`${mergedPost.score.toLocaleString()} points`);
-                  }
-                  if (hasDetails && typeof mergedPost.num_comments === 'number') {
-                    metaItems.push(`${mergedPost.num_comments.toLocaleString()} comments`);
+                    metaItems.push({ label: `${mergedPost.score.toLocaleString()} points` });
                   }
                   if (!hasDetails) {
-                    metaItems.push('Fetching latest details…');
+                    metaItems.push({ label: 'Fetching latest details…' });
                   }
-                  metaItems.push(displayDate);
+                  metaItems.push({ label: displayDate });
                   const commentLinkLabel =
                     hasDetails && typeof mergedPost.num_comments === 'number'
                       ? `${mergedPost.num_comments.toLocaleString()} Comments`
@@ -260,17 +265,26 @@ export default function SavedPage() {
                           )}
                           <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-[var(--color-text-secondary)]">
                             {metaItems.map((item, index) => (
-                              <Fragment key={`${postKey}-meta-${item}-${index}`}>
+                              <Fragment key={`${postKey}-meta-${item.label}-${index}`}>
                                 {index > 0 && <span>•</span>}
-                                <span
-                                  className={
-                                    item === 'Fetching latest details…'
-                                      ? 'italic text-[var(--color-text-muted)]'
-                                      : undefined
-                                  }
-                                >
-                                  {item}
-                                </span>
+                                {item.to ? (
+                                  <Link
+                                    to={item.to}
+                                    className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+                                  >
+                                    {item.label}
+                                  </Link>
+                                ) : (
+                                  <span
+                                    className={
+                                      item.label === 'Fetching latest details…'
+                                        ? 'italic text-[var(--color-text-muted)]'
+                                        : undefined
+                                    }
+                                  >
+                                    {item.label}
+                                  </span>
+                                )}
                               </Fragment>
                             ))}
                           </div>

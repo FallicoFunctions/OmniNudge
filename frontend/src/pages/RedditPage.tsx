@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { redditService } from '../services/redditService';
 import { savedService } from '../services/savedService';
 
@@ -24,8 +24,9 @@ interface FeedRedditPostsResponse {
 
 export default function RedditPage() {
   const navigate = useNavigate();
+  const { subreddit: routeSubreddit } = useParams<{ subreddit?: string }>();
   const queryClient = useQueryClient();
-  const [subreddit, setSubreddit] = useState('popular');
+  const [subreddit, setSubreddit] = useState(routeSubreddit ?? 'popular');
   const [sort, setSort] = useState<'hot' | 'new' | 'top' | 'rising'>('hot');
   const [inputValue, setInputValue] = useState('');
 
@@ -58,10 +59,25 @@ export default function RedditPage() {
     },
   });
 
+  useEffect(() => {
+    if (routeSubreddit && routeSubreddit !== subreddit) {
+      setSubreddit(routeSubreddit);
+    } else if (!routeSubreddit && subreddit !== 'popular') {
+      setSubreddit('popular');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [routeSubreddit]);
+
+  const navigateToSubreddit = (value: string) => {
+    const normalized = value.trim() || 'popular';
+    setSubreddit(normalized);
+    navigate(`/reddit/r/${normalized}`);
+  };
+
   const handleSubredditSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (inputValue.trim()) {
-      setSubreddit(inputValue.trim());
+      navigateToSubreddit(inputValue.trim());
       setInputValue('');
     }
   };
@@ -119,7 +135,7 @@ export default function RedditPage() {
           (sub) => (
             <button
               key={sub}
-              onClick={() => setSubreddit(sub)}
+              onClick={() => navigateToSubreddit(sub)}
               className={`rounded-full px-3 py-1 text-xs font-medium ${
                 subreddit === sub
                   ? 'bg-[var(--color-primary)] text-white'
