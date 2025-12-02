@@ -2,7 +2,7 @@ import { api } from '../lib/api';
 import type { SavedItemsResponse } from '../types/saved';
 
 export const savedService = {
-  async getSavedItems(type: 'all' | 'posts' | 'reddit_comments' = 'all'): Promise<SavedItemsResponse> {
+  async getSavedItems(type: 'all' | 'posts' | 'reddit_posts' | 'post_comments' | 'reddit_comments' = 'all'): Promise<SavedItemsResponse> {
     const query = type ? `?type=${type}` : '';
     return api.get<SavedItemsResponse>(`/users/me/saved${query}`);
   },
@@ -13,6 +13,14 @@ export const savedService = {
 
   async unsavePost(postId: number): Promise<void> {
     await api.delete(`/posts/${postId}/save`);
+  },
+
+  async saveRedditPost(subreddit: string, postId: string): Promise<void> {
+    await api.post(`/reddit/posts/${subreddit}/${postId}/save`);
+  },
+
+  async unsaveRedditPost(subreddit: string, postId: string): Promise<void> {
+    await api.delete(`/reddit/posts/${subreddit}/${postId}/save`);
   },
 
   async savePostComment(commentId: number): Promise<void> {
@@ -29,5 +37,21 @@ export const savedService = {
 
   async unsaveRedditComment(subreddit: string, postId: string, commentId: number): Promise<void> {
     await api.delete(`/reddit/posts/${subreddit}/${postId}/comments/${commentId}/save`);
+  },
+
+  async hidePost(postId: number): Promise<void> {
+    await api.post(`/posts/${postId}/hide`);
+  },
+
+  async unhidePost(postId: number): Promise<void> {
+    await api.delete(`/posts/${postId}/hide`);
+  },
+
+  async hideRedditPost(subreddit: string, postId: string): Promise<void> {
+    await api.post(`/reddit/posts/${subreddit}/${postId}/hide`);
+  },
+
+  async unhideRedditPost(subreddit: string, postId: string): Promise<void> {
+    await api.delete(`/reddit/posts/${subreddit}/${postId}/hide`);
   },
 };
