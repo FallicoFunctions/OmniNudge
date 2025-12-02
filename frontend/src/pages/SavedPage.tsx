@@ -35,6 +35,7 @@ export default function SavedPage() {
   const savedRedditComments = (data?.saved_reddit_comments ?? []) as LocalRedditComment[];
   const [postDetails, setPostDetails] = useState<Record<string, Partial<SavedRedditPost>>>({});
   const fetchingDetailsRef = useRef<Set<string>>(new Set());
+  const [hideTargetPost, setHideTargetPost] = useState<SavedRedditPost | null>(null);
 
   const postsNeedingDetails = useMemo(
     () =>
@@ -113,13 +114,16 @@ export default function SavedPage() {
 
   const hideRedditPostMutation = useMutation({
     mutationFn: async ({ subreddit, reddit_post_id }: { subreddit: string; reddit_post_id: string }) => {
+      // First unsave the post, then hide it
+      await savedService.unsaveRedditPost(subreddit, reddit_post_id);
       await savedService.hideRedditPost(subreddit, reddit_post_id);
     },
     onSuccess: () => {
       invalidateSavedQueries();
-      alert('Post hidden. You can manage hidden posts from the Hidden tab.');
+      queryClient.invalidateQueries({ queryKey: ['hidden-items', 'reddit_posts'] });
+      setHideTargetPost(null);
     },
-    onError: (mutationError: Error) => {
+    onError: (mutationError) => {
       alert(`Failed to hide post: ${mutationError.message}`);
     },
   });
@@ -133,7 +137,8 @@ export default function SavedPage() {
   };
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-8">
+    <>
+      <div className="mx-auto max-w-4xl px-4 py-8">
       <div className="mb-6">
         <h1 className="text-3xl font-bold text-[var(--color-text-primary)]">Saved Items</h1>
         <p className="mt-2 text-sm text-[var(--color-text-secondary)]">
@@ -317,16 +322,10 @@ export default function SavedPage() {
                             </button>
                             <button
                               type="button"
-                              onClick={() =>
-                                hideRedditPostMutation.mutate({
-                                  subreddit: post.subreddit,
-                                  reddit_post_id: post.reddit_post_id,
-                                })
-                              }
-                              disabled={hideRedditPostMutation.isPending}
-                              className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] disabled:opacity-50"
+                              onClick={() => setHideTargetPost(post)}
+                              className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
                             >
-                              {hideRedditPostMutation.isPending ? 'Hiding...' : 'Hide'}
+                              Hide
                             </button>
                             <button
                               type="button"
@@ -429,6 +428,40 @@ export default function SavedPage() {
           </section>
         </div>
       )}
-    </div>
+      </div>
+
+      {hideTargetPost && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 px-4">
+          <div className="w-full max-w-md rounded-lg bg-white p-4 shadow-lg">
+            <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">Hide this post?</h3>
+            <p className="mt-2 text-sm text-[var(--color-text-secondary)]">
+              Hiding a saved post removes it from your Saved list and sends it to the Hidden tab. Are
+              you sure you want to continue?
+            </p>
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                onClick={() => setHideTargetPost(null)}
+                className="rounded border border-[var(--color-border)] px-3 py-1 text-sm hover:bg-[var(--color-surface-elevated)]"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() =>
+                  hideTargetPost &&
+                  hideRedditPostMutation.mutate({
+                    subreddit: hideTargetPost.subreddit,
+                    reddit_post_id: hideTargetPost.reddit_post_id,
+                  })
+                }
+                disabled={hideRedditPostMutation.isPending}
+                className="rounded bg-[var(--color-primary)] px-3 py-1 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)] disabled:opacity-50"
+              >
+                {hideRedditPostMutation.isPending ? 'Hiding...' : 'Hide Post'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
