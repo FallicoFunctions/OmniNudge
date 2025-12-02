@@ -246,17 +246,6 @@ export default function RedditPage() {
                 >
                   Crosspost
                 </button>
-                {!post.is_self && (
-                  <a
-                    href={post.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={(e) => e.stopPropagation()}
-                    className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
-                  >
-                    Open Link ↗
-                  </a>
-                )}
               </div>
             </article>
           ))}
