@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import { savedService } from '../services/savedService';
+import { hubsService } from '../services/hubsService';
 import type { LocalRedditComment } from '../types/reddit';
 
 interface RedditComment {
@@ -751,6 +752,18 @@ export default function RedditPostPage() {
   const [isPostSaved, setIsPostSaved] = useState(false);
   const [isPostHidden, setIsPostHidden] = useState(false);
 
+  // Crosspost form state
+  const [crosspostTitle, setCrosspostTitle] = useState('');
+  const [selectedHub, setSelectedHub] = useState('');
+  const [sendRepliesToInbox, setSendRepliesToInbox] = useState(false);
+
+  // Fetch user's hubs for crossposting
+  const { data: hubsData } = useQuery({
+    queryKey: ['user-hubs'],
+    queryFn: () => hubsService.getUserHubs(),
+    enabled: !!user,
+  });
+
   // Fetch Reddit post and comments from Reddit API
   const { data: redditData, isLoading: loadingReddit } = useQuery({
     queryKey: ['reddit', 'post', subreddit, postId],
@@ -802,7 +815,8 @@ export default function RedditPostPage() {
     const escapeHtml = (value: string) =>
       value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     const body = escapeHtml(data.body);
-    return `<blockquote class="reddit-card" data-card-created="${Date.now()}"><p>${body}</p><a href="${data.permalink}">Comment by u/${data.author}</a></blockquote><script async src="https://embed.redditmedia.com/widgets/platform.js" charset="UTF-8"></script>`;
+    const timestamp = Math.floor(new Date(data.createdAt).getTime() / 1000);
+    return `<blockquote class="reddit-card" data-card-created="${timestamp}"><p>${body}</p><a href="${data.permalink}">Comment by u/${data.author}</a></blockquote><script async src="https://embed.redditmedia.com/widgets/platform.js" charset="UTF-8"></script>`;
   };
 
   const editCommentMutation = useMutation({
@@ -881,6 +895,64 @@ export default function RedditPostPage() {
         target_id: redditCommentId,
         reason,
       });
+    },
+  });
+
+  const savePostMutation = useMutation({
+    mutationFn: async (shouldSave: boolean) => {
+      if (!subreddit || !postId) {
+        throw new Error('Missing post context');
+      }
+      if (shouldSave) {
+        await savedService.saveRedditPost(subreddit, postId);
+      } else {
+        await savedService.unsaveRedditPost(subreddit, postId);
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['saved-items'] });
+    },
+  });
+
+  const hidePostMutation = useMutation({
+    mutationFn: async () => {
+      if (!subreddit || !postId) {
+        throw new Error('Missing post context');
+      }
+      await savedService.hideRedditPost(subreddit, postId);
+    },
+    onSuccess: () => {
+      setIsPostHidden(true);
+      setShowHideConfirm(false);
+    },
+  });
+
+  const crosspostMutation = useMutation({
+    mutationFn: async () => {
+      if (!subreddit || !postId || !selectedHub || !post) {
+        throw new Error('Missing required data for crosspost');
+      }
+      await hubsService.crosspostToHub(
+        selectedHub,
+        {
+          title: crosspostTitle,
+          send_replies_to_inbox: sendRepliesToInbox,
+        },
+        'reddit',
+        postId,
+        subreddit,
+        post.title
+      );
+    },
+    onSuccess: () => {
+      setShowCrosspostModal(false);
+      setCrosspostTitle('');
+      setSelectedHub('');
+      setSendRepliesToInbox(false);
+      alert('Crosspost created successfully!');
+    },
+    onError: (error) => {
+      alert(`Failed to create crosspost: ${error.message}`);
     },
   });
 
@@ -1066,7 +1138,7 @@ export default function RedditPostPage() {
   return (
     <div className="w-full max-w-5xl px-4 py-8">
       {/* Post Content Section */}
-      {post && (
+      {post && !isPostHidden && (
         <div className="mb-6 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-6 text-left">
           {/* Post Header */}
           <div className="mb-4 text-left">
@@ -1148,7 +1220,14 @@ export default function RedditPostPage() {
               share
             </button>
             <span>•</span>
-            <button onClick={() => setIsPostSaved(!isPostSaved)} className="hover:underline">
+            <button
+              onClick={() => {
+                const newSavedState = !isPostSaved;
+                setIsPostSaved(newSavedState);
+                savePostMutation.mutate(newSavedState);
+              }}
+              className="hover:underline"
+            >
               {isPostSaved ? 'unsave' : 'save'}
             </button>
             <span>•</span>
@@ -1398,12 +1477,7 @@ export default function RedditPostPage() {
                 Cancel
               </button>
               <button
-                onClick={() => {
-                  setIsPostHidden(true);
-                  setShowHideConfirm(false);
-                  // TODO: Call API to hide post
-                  alert('Post hidden (API call pending)');
-                }}
+                onClick={() => hidePostMutation.mutate()}
                 className="rounded bg-[var(--color-primary)] px-3 py-1 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)]"
               >
                 Hide Post
@@ -1429,33 +1503,47 @@ export default function RedditPostPage() {
             <div className="mt-3 space-y-3">
               <div>
                 <label className="mb-1 block text-xs text-[var(--color-text-secondary)]">Select Hub</label>
-                <select className="w-full rounded border border-[var(--color-border)] bg-[var(--color-surface)] p-2 text-sm">
-                  <option>Loading hubs...</option>
+                <select
+                  value={selectedHub}
+                  onChange={(e) => setSelectedHub(e.target.value)}
+                  className="w-full rounded border border-[var(--color-border)] bg-[var(--color-surface)] p-2 text-sm"
+                >
+                  <option value="">
+                    {hubsData?.hubs ? 'Choose a hub...' : 'Loading hubs...'}
+                  </option>
+                  {hubsData?.hubs?.map((hub) => (
+                    <option key={hub.id} value={hub.name}>
+                      h/{hub.name}
+                    </option>
+                  ))}
                 </select>
               </div>
               <div>
                 <label className="mb-1 block text-xs text-[var(--color-text-secondary)]">Title</label>
                 <input
                   type="text"
-                  defaultValue={post.title}
+                  value={crosspostTitle || post.title}
+                  onChange={(e) => setCrosspostTitle(e.target.value)}
                   className="w-full rounded border border-[var(--color-border)] bg-[var(--color-surface)] p-2 text-sm"
                 />
               </div>
               <div className="flex items-center gap-2">
-                <input type="checkbox" id="send-replies" />
+                <input
+                  type="checkbox"
+                  id="send-replies"
+                  checked={sendRepliesToInbox}
+                  onChange={(e) => setSendRepliesToInbox(e.target.checked)}
+                />
                 <label htmlFor="send-replies" className="text-sm text-[var(--color-text-primary)]">
                   Send replies to my inbox
                 </label>
               </div>
               <button
-                onClick={() => {
-                  setShowCrosspostModal(false);
-                  // TODO: Call API to crosspost
-                  alert('Crosspost created (API call pending)');
-                }}
-                className="w-full rounded bg-[var(--color-primary)] px-3 py-2 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)]"
+                onClick={() => crosspostMutation.mutate()}
+                disabled={!selectedHub || crosspostMutation.isPending}
+                className="w-full rounded bg-[var(--color-primary)] px-3 py-2 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)] disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Create Crosspost
+                {crosspostMutation.isPending ? 'Creating...' : 'Create Crosspost'}
               </button>
             </div>
           </div>
