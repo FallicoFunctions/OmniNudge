@@ -238,3 +238,143 @@ func (h *SavedItemsHandler) UnsavePostComment(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"saved": false})
 }
+
+// SaveRedditPost handles POST /api/v1/reddit/posts/:subreddit/:postId/save
+func (h *SavedItemsHandler) SaveRedditPost(c *gin.Context) {
+	userID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
+
+	subreddit := c.Param("subreddit")
+	postId := c.Param("postId")
+
+	if subreddit == "" || postId == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid subreddit or post ID"})
+		return
+	}
+
+	if err := h.savedRepo.SaveRedditPost(c.Request.Context(), userID.(int), subreddit, postId); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save Reddit post", "details": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"saved": true})
+}
+
+// UnsaveRedditPost handles DELETE /api/v1/reddit/posts/:subreddit/:postId/save
+func (h *SavedItemsHandler) UnsaveRedditPost(c *gin.Context) {
+	userID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
+
+	subreddit := c.Param("subreddit")
+	postId := c.Param("postId")
+
+	if subreddit == "" || postId == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid subreddit or post ID"})
+		return
+	}
+
+	if err := h.savedRepo.RemoveRedditPost(c.Request.Context(), userID.(int), subreddit, postId); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to unsave Reddit post", "details": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"saved": false})
+}
+
+// HidePost handles POST /api/v1/posts/:id/hide
+func (h *SavedItemsHandler) HidePost(c *gin.Context) {
+	userID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
+
+	postID, err := strconv.Atoi(c.Param("id"))
+	if err != nil || postID <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid post ID"})
+		return
+	}
+
+	if err := h.savedRepo.HidePost(c.Request.Context(), userID.(int), postID); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to hide post", "details": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"hidden": true})
+}
+
+// UnhidePost handles DELETE /api/v1/posts/:id/hide
+func (h *SavedItemsHandler) UnhidePost(c *gin.Context) {
+	userID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
+
+	postID, err := strconv.Atoi(c.Param("id"))
+	if err != nil || postID <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid post ID"})
+		return
+	}
+
+	if err := h.savedRepo.UnhidePost(c.Request.Context(), userID.(int), postID); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to unhide post", "details": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"hidden": false})
+}
+
+// HideRedditPost handles POST /api/v1/reddit/posts/:subreddit/:postId/hide
+func (h *SavedItemsHandler) HideRedditPost(c *gin.Context) {
+	userID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
+
+	subreddit := c.Param("subreddit")
+	postId := c.Param("postId")
+
+	if subreddit == "" || postId == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid subreddit or post ID"})
+		return
+	}
+
+	if err := h.savedRepo.HideRedditPost(c.Request.Context(), userID.(int), subreddit, postId); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to hide Reddit post", "details": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"hidden": true})
+}
+
+// UnhideRedditPost handles DELETE /api/v1/reddit/posts/:subreddit/:postId/hide
+func (h *SavedItemsHandler) UnhideRedditPost(c *gin.Context) {
+	userID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
+
+	subreddit := c.Param("subreddit")
+	postId := c.Param("postId")
+
+	if subreddit == "" || postId == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid subreddit or post ID"})
+		return
+	}
+
+	if err := h.savedRepo.UnhideRedditPost(c.Request.Context(), userID.(int), subreddit, postId); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to unhide Reddit post", "details": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"hidden": false})
+}

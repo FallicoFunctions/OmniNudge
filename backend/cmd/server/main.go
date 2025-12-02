@@ -297,6 +297,8 @@ func main() {
 			protected.POST("/posts/:id/vote", postsHandler.VotePost)
 			protected.POST("/posts/:id/save", savedItemsHandler.SavePost)
 			protected.DELETE("/posts/:id/save", savedItemsHandler.UnsavePost)
+			protected.POST("/posts/:id/hide", savedItemsHandler.HidePost)
+			protected.DELETE("/posts/:id/hide", savedItemsHandler.UnhidePost)
 			protected.POST("/posts/:id/comments/:commentId/preferences", commentsHandler.UpdateCommentPreferences)
 
 			// Protected comments routes (auth required for creating/editing)
@@ -315,6 +317,10 @@ func main() {
 			protected.POST("/reddit/posts/:subreddit/:postId/comments/:commentId/vote", redditCommentsHandler.VoteRedditPostComment)
 			protected.POST("/reddit/posts/:subreddit/:postId/comments/:commentId/save", savedItemsHandler.SaveRedditComment)
 			protected.DELETE("/reddit/posts/:subreddit/:postId/comments/:commentId/save", savedItemsHandler.UnsaveRedditComment)
+			protected.POST("/reddit/posts/:subreddit/:postId/save", savedItemsHandler.SaveRedditPost)
+			protected.DELETE("/reddit/posts/:subreddit/:postId/save", savedItemsHandler.UnsaveRedditPost)
+			protected.POST("/reddit/posts/:subreddit/:postId/hide", savedItemsHandler.HideRedditPost)
+			protected.DELETE("/reddit/posts/:subreddit/:postId/hide", savedItemsHandler.UnhideRedditPost)
 
 			// Protected hub creation
 			protected.POST("/hubs", hubsHandler.Create)
