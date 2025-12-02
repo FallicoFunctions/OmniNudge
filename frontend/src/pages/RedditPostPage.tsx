@@ -1046,13 +1046,13 @@ export default function RedditPostPage() {
   }
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-8">
+    <div className="w-full max-w-5xl px-4 py-8">
       {/* Post Content Section */}
       {post && (
-        <div className="mb-6 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-6">
+        <div className="mb-6 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-6 text-left">
           {/* Post Header */}
           <div className="mb-4 text-left">
-            <h1 className="text-2xl font-bold text-[var(--color-text-primary)]">
+            <h1 className="text-left text-2xl font-bold text-[var(--color-text-primary)]">
               {post.title}
             </h1>
             <div className="mt-1 text-xs text-[var(--color-text-secondary)]">
@@ -1130,7 +1130,7 @@ export default function RedditPostPage() {
       )}
 
       {/* Unified Comments Section */}
-      <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-6">
+      <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-6 text-left">
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <h2 className="text-xl font-semibold text-[var(--color-text-primary)]">
             Comments
