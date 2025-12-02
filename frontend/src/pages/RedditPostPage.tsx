@@ -749,7 +749,6 @@ export default function RedditPostPage() {
   const [showShareModal, setShowShareModal] = useState(false);
   const [showHideConfirm, setShowHideConfirm] = useState(false);
   const [showCrosspostModal, setShowCrosspostModal] = useState(false);
-  const [isPostSaved, setIsPostSaved] = useState(false);
   const [isPostHidden, setIsPostHidden] = useState(false);
 
   // Crosspost form state
@@ -763,6 +762,23 @@ export default function RedditPostPage() {
     queryFn: () => hubsService.getUserHubs(),
     enabled: !!user,
   });
+
+  // Fetch saved Reddit posts to check if current post is saved
+  const { data: savedPostsData } = useQuery({
+    queryKey: ['saved-items', 'reddit_posts'],
+    queryFn: () => savedService.getSavedItems('reddit_posts'),
+    enabled: !!user,
+  });
+
+  // Derive saved status from query data
+  const isPostSavedFromBackend = useMemo(() => {
+    if (!savedPostsData?.saved_reddit_posts || !subreddit || !postId) {
+      return false;
+    }
+    return savedPostsData.saved_reddit_posts.some(
+      (p) => p.subreddit === subreddit && p.reddit_post_id === postId
+    );
+  }, [savedPostsData, subreddit, postId]);
 
   // Fetch Reddit post and comments from Reddit API
   const { data: redditData, isLoading: loadingReddit } = useQuery({
@@ -911,6 +927,10 @@ export default function RedditPostPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['saved-items'] });
+    },
+    onError: (error) => {
+      console.error('Failed to save/unsave post:', error);
+      alert(`Failed to ${isPostSavedFromBackend ? 'unsave' : 'save'} post: ${error.message}`);
     },
   });
 
@@ -1222,13 +1242,14 @@ export default function RedditPostPage() {
             <span>•</span>
             <button
               onClick={() => {
-                const newSavedState = !isPostSaved;
-                setIsPostSaved(newSavedState);
-                savePostMutation.mutate(newSavedState);
+                console.log('Save button clicked. Current saved state:', isPostSavedFromBackend);
+                console.log('Subreddit:', subreddit, 'PostId:', postId);
+                savePostMutation.mutate(!isPostSavedFromBackend);
               }}
               className="hover:underline"
+              disabled={savePostMutation.isPending}
             >
-              {isPostSaved ? 'unsave' : 'save'}
+              {savePostMutation.isPending ? 'saving...' : (isPostSavedFromBackend ? 'unsave' : 'save')}
             </button>
             <span>•</span>
             <button onClick={() => setShowHideConfirm(true)} className="hover:underline">
