@@ -43,9 +43,12 @@ type PlatformPost struct {
 
 	// Crosspost information (if this post is a crosspost)
 	CrosspostOriginType      *string `json:"crosspost_origin_type,omitempty"`      // "reddit" or "platform"
-	CrosspostOriginSubreddit *string `json:"crosspost_origin_subreddit,omitempty"` // For Reddit crossposts
+	CrosspostOriginSubreddit *string `json:"crosspost_origin_subreddit,omitempty"` // For Reddit crossposts (source subreddit)
 	CrosspostOriginPostID    *string `json:"crosspost_origin_post_id,omitempty"`   // Reddit post ID or platform post ID
 	CrosspostOriginalTitle   *string `json:"crosspost_original_title,omitempty"`   // Original title before editing
+
+	// Subreddit association (for posts that belong to a subreddit context)
+	TargetSubreddit *string `json:"target_subreddit,omitempty"` // Subreddit this post is posted to
 
 	// Timestamps
 	CreatedAt time.Time `json:"created_at"`
@@ -66,9 +69,10 @@ func (r *PlatformPostRepository) Create(ctx context.Context, post *PlatformPost)
 	query := `
 		INSERT INTO platform_posts (
 			author_id, hub_id, title, body, tags, media_url, media_type, thumbnail_url,
-			crosspost_origin_type, crosspost_origin_subreddit, crosspost_origin_post_id, crosspost_original_title
+			crosspost_origin_type, crosspost_origin_subreddit, crosspost_origin_post_id, crosspost_original_title,
+			target_subreddit
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
 		RETURNING id, score, upvotes, downvotes, num_comments, view_count, is_deleted, is_edited, edited_at, created_at
 	`
 
@@ -85,6 +89,7 @@ func (r *PlatformPostRepository) Create(ctx context.Context, post *PlatformPost)
 		post.CrosspostOriginSubreddit,
 		post.CrosspostOriginPostID,
 		post.CrosspostOriginalTitle,
+		post.TargetSubreddit,
 	).Scan(
 		&post.ID,
 		&post.Score,
@@ -275,6 +280,66 @@ func (r *PlatformPostRepository) GetByHub(ctx context.Context, hubID int, sortBy
 	`
 
 	rows, err := r.pool.Query(ctx, query, hubID, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var posts []*PlatformPost
+	for rows.Next() {
+		post := &PlatformPost{}
+		err := rows.Scan(
+			&post.ID,
+			&post.AuthorID,
+			&post.HubID,
+			&post.Title,
+			&post.Body,
+			&post.Tags,
+			&post.MediaURL,
+			&post.MediaType,
+			&post.ThumbnailURL,
+			&post.Score,
+			&post.Upvotes,
+			&post.Downvotes,
+			&post.NumComments,
+			&post.ViewCount,
+			&post.IsDeleted,
+			&post.IsEdited,
+			&post.EditedAt,
+			&post.CreatedAt,
+		)
+		if err != nil {
+			return nil, err
+		}
+		posts = append(posts, post)
+	}
+
+	return posts, rows.Err()
+}
+
+// GetBySubreddit retrieves posts by target subreddit
+func (r *PlatformPostRepository) GetBySubreddit(ctx context.Context, subreddit string, sortBy string, limit, offset int) ([]*PlatformPost, error) {
+	var orderClause string
+	switch sortBy {
+	case "hot", "score":
+		orderClause = "ORDER BY score DESC, created_at DESC"
+	case "new":
+		orderClause = "ORDER BY created_at DESC"
+	default:
+		orderClause = "ORDER BY created_at DESC"
+	}
+
+	query := `
+		SELECT id, author_id, hub_id, title, body, tags, media_url, media_type, thumbnail_url,
+			   score, upvotes, downvotes, num_comments, view_count,
+			   is_deleted, is_edited, edited_at, created_at
+		FROM platform_posts
+		WHERE target_subreddit = $1 AND is_deleted = FALSE
+		` + orderClause + `
+		LIMIT $2 OFFSET $3
+	`
+
+	rows, err := r.pool.Query(ctx, query, subreddit, limit, offset)
 	if err != nil {
 		return nil, err
 	}
