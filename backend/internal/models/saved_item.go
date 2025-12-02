@@ -35,6 +35,13 @@ type SavedPostComment struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
+// SavedRedditPost represents a saved Reddit post
+type SavedRedditPost struct {
+	Subreddit     string    `json:"subreddit"`
+	RedditPostID  string    `json:"reddit_post_id"`
+	SavedAt       time.Time `json:"saved_at"`
+}
+
 // NewSavedItemsRepository creates a repository for saved content
 func NewSavedItemsRepository(pool *pgxpool.Pool) *SavedItemsRepository {
 	return &SavedItemsRepository{pool: pool}
@@ -244,4 +251,184 @@ func (r *SavedItemsRepository) GetSavedPostComments(ctx context.Context, userID 
 	}
 
 	return comments, rows.Err()
+}
+
+// SaveRedditPost stores a Reddit post in the user's saved list
+func (r *SavedItemsRepository) SaveRedditPost(ctx context.Context, userID int, subreddit, redditPostID string) error {
+	_, err := r.pool.Exec(ctx, `
+		INSERT INTO saved_reddit_posts (user_id, subreddit, reddit_post_id)
+		VALUES ($1, $2, $3)
+		ON CONFLICT (user_id, subreddit, reddit_post_id) DO NOTHING
+	`, userID, subreddit, redditPostID)
+	return err
+}
+
+// RemoveRedditPost removes a Reddit post from the user's saved list
+func (r *SavedItemsRepository) RemoveRedditPost(ctx context.Context, userID int, subreddit, redditPostID string) error {
+	_, err := r.pool.Exec(ctx, `
+		DELETE FROM saved_reddit_posts
+		WHERE user_id = $1 AND subreddit = $2 AND reddit_post_id = $3
+	`, userID, subreddit, redditPostID)
+	return err
+}
+
+// IsRedditPostSaved checks if a Reddit post is saved by the user
+func (r *SavedItemsRepository) IsRedditPostSaved(ctx context.Context, userID int, subreddit, redditPostID string) (bool, error) {
+	var exists bool
+	err := r.pool.QueryRow(ctx, `
+		SELECT EXISTS (
+			SELECT 1 FROM saved_reddit_posts
+			WHERE user_id = $1 AND subreddit = $2 AND reddit_post_id = $3
+		)
+	`, userID, subreddit, redditPostID).Scan(&exists)
+	return exists, err
+}
+
+// GetSavedRedditPosts returns saved Reddit posts for the user
+func (r *SavedItemsRepository) GetSavedRedditPosts(ctx context.Context, userID int) ([]*SavedRedditPost, error) {
+	query := `
+		SELECT subreddit, reddit_post_id, created_at
+		FROM saved_reddit_posts
+		WHERE user_id = $1
+		ORDER BY created_at DESC
+	`
+	rows, err := r.pool.Query(ctx, query, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var posts []*SavedRedditPost
+	for rows.Next() {
+		post := &SavedRedditPost{}
+		if err := rows.Scan(&post.Subreddit, &post.RedditPostID, &post.SavedAt); err != nil {
+			return nil, err
+		}
+		posts = append(posts, post)
+	}
+	return posts, rows.Err()
+}
+
+// HidePost hides a platform post for the user
+func (r *SavedItemsRepository) HidePost(ctx context.Context, userID, postID int) error {
+	_, err := r.pool.Exec(ctx, `
+		INSERT INTO hidden_posts (user_id, post_id)
+		VALUES ($1, $2)
+		ON CONFLICT (user_id, post_id) DO NOTHING
+	`, userID, postID)
+	return err
+}
+
+// UnhidePost unhides a platform post for the user
+func (r *SavedItemsRepository) UnhidePost(ctx context.Context, userID, postID int) error {
+	_, err := r.pool.Exec(ctx, `
+		DELETE FROM hidden_posts
+		WHERE user_id = $1 AND post_id = $2
+	`, userID, postID)
+	return err
+}
+
+// IsPostHidden checks if a platform post is hidden by the user
+func (r *SavedItemsRepository) IsPostHidden(ctx context.Context, userID, postID int) (bool, error) {
+	var exists bool
+	err := r.pool.QueryRow(ctx, `
+		SELECT EXISTS (
+			SELECT 1 FROM hidden_posts
+			WHERE user_id = $1 AND post_id = $2
+		)
+	`, userID, postID).Scan(&exists)
+	return exists, err
+}
+
+// GetHiddenPosts returns hidden platform posts for the user
+func (r *SavedItemsRepository) GetHiddenPosts(ctx context.Context, userID int) ([]*SavedPostOverview, error) {
+	query := `
+		SELECT p.id, p.title, h.name AS hub_name, u.username AS author_username,
+		       p.score, p.num_comments, p.created_at
+		FROM hidden_posts hp
+		JOIN platform_posts p ON p.id = hp.post_id AND p.is_deleted = FALSE
+		JOIN hubs h ON h.id = p.hub_id
+		JOIN users u ON u.id = p.author_id
+		WHERE hp.user_id = $1 AND p.is_deleted = FALSE
+		ORDER BY hp.created_at DESC
+	`
+	rows, err := r.pool.Query(ctx, query, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var posts []*SavedPostOverview
+	for rows.Next() {
+		post := &SavedPostOverview{}
+		if err := rows.Scan(
+			&post.ID,
+			&post.Title,
+			&post.HubName,
+			&post.AuthorUsername,
+			&post.Score,
+			&post.CommentCount,
+			&post.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		posts = append(posts, post)
+	}
+	return posts, rows.Err()
+}
+
+// HideRedditPost hides a Reddit post for the user
+func (r *SavedItemsRepository) HideRedditPost(ctx context.Context, userID int, subreddit, redditPostID string) error {
+	_, err := r.pool.Exec(ctx, `
+		INSERT INTO hidden_reddit_posts (user_id, subreddit, reddit_post_id)
+		VALUES ($1, $2, $3)
+		ON CONFLICT (user_id, subreddit, reddit_post_id) DO NOTHING
+	`, userID, subreddit, redditPostID)
+	return err
+}
+
+// UnhideRedditPost unhides a Reddit post for the user
+func (r *SavedItemsRepository) UnhideRedditPost(ctx context.Context, userID int, subreddit, redditPostID string) error {
+	_, err := r.pool.Exec(ctx, `
+		DELETE FROM hidden_reddit_posts
+		WHERE user_id = $1 AND subreddit = $2 AND reddit_post_id = $3
+	`, userID, subreddit, redditPostID)
+	return err
+}
+
+// IsRedditPostHidden checks if a Reddit post is hidden by the user
+func (r *SavedItemsRepository) IsRedditPostHidden(ctx context.Context, userID int, subreddit, redditPostID string) (bool, error) {
+	var exists bool
+	err := r.pool.QueryRow(ctx, `
+		SELECT EXISTS (
+			SELECT 1 FROM hidden_reddit_posts
+			WHERE user_id = $1 AND subreddit = $2 AND reddit_post_id = $3
+		)
+	`, userID, subreddit, redditPostID).Scan(&exists)
+	return exists, err
+}
+
+// GetHiddenRedditPosts returns hidden Reddit posts for the user
+func (r *SavedItemsRepository) GetHiddenRedditPosts(ctx context.Context, userID int) ([]*SavedRedditPost, error) {
+	query := `
+		SELECT subreddit, reddit_post_id, created_at
+		FROM hidden_reddit_posts
+		WHERE user_id = $1
+		ORDER BY created_at DESC
+	`
+	rows, err := r.pool.Query(ctx, query, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var posts []*SavedRedditPost
+	for rows.Next() {
+		post := &SavedRedditPost{}
+		if err := rows.Scan(&post.Subreddit, &post.RedditPostID, &post.SavedAt); err != nil {
+			return nil, err
+		}
+		posts = append(posts, post)
+	}
+	return posts, rows.Err()
 }
