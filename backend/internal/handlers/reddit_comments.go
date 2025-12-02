@@ -1,21 +1,35 @@
 package handlers
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/omninudge/backend/internal/models"
+	"github.com/omninudge/backend/internal/ranking"
 )
+
+type redditCommentRepository interface {
+	Create(ctx context.Context, comment *models.RedditPostComment) error
+	GetByID(ctx context.Context, id int) (*models.RedditPostComment, error)
+	GetByRedditPostWithUserVotes(ctx context.Context, subreddit, postID string, userID int) ([]*models.RedditPostComment, error)
+	GetByRedditPost(ctx context.Context, subreddit, postID string) ([]*models.RedditPostComment, error)
+	Update(ctx context.Context, id int, content string) error
+	Delete(ctx context.Context, id int) error
+	SetInboxRepliesDisabled(ctx context.Context, id int, userID int, disabled bool) error
+	GetUserVote(ctx context.Context, commentID, userID int) (int, error)
+	SetVote(ctx context.Context, commentID, userID, voteType int) error
+}
 
 // RedditCommentsHandler handles HTTP requests for local comments on Reddit posts
 type RedditCommentsHandler struct {
-	redditCommentRepo *models.RedditPostCommentRepository
+	redditCommentRepo redditCommentRepository
 }
 
 // NewRedditCommentsHandler creates a new Reddit comments handler
-func NewRedditCommentsHandler(redditCommentRepo *models.RedditPostCommentRepository) *RedditCommentsHandler {
+func NewRedditCommentsHandler(redditCommentRepo redditCommentRepository) *RedditCommentsHandler {
 	return &RedditCommentsHandler{
 		redditCommentRepo: redditCommentRepo,
 	}
@@ -33,6 +47,7 @@ type CreateRedditCommentRequest struct {
 func (h *RedditCommentsHandler) GetRedditPostComments(c *gin.Context) {
 	subreddit := c.Param("subreddit")
 	postID := c.Param("postId")
+	sortBy := c.Query("sort")
 
 	if subreddit == "" || postID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Subreddit and post ID are required"})
@@ -62,6 +77,30 @@ func (h *RedditCommentsHandler) GetRedditPostComments(c *gin.Context) {
 	if comments == nil {
 		comments = []*models.RedditPostComment{}
 	}
+
+	rankInputs := make([]ranking.Comment, 0, len(comments))
+	commentsByID := make(map[int64]*models.RedditPostComment, len(comments))
+
+	for _, comment := range comments {
+		commentsByID[int64(comment.ID)] = comment
+		rankInputs = append(rankInputs, ranking.Comment{
+			ID:        int64(comment.ID),
+			Ups:       comment.Ups,
+			Downs:     comment.Downs,
+			Body:      comment.Content,
+			CreatedAt: comment.CreatedAt,
+		})
+	}
+
+	sorted := ranking.SortComments(rankInputs, sortBy)
+
+	ordered := make([]*models.RedditPostComment, 0, len(sorted))
+	for _, rc := range sorted {
+		if comment, ok := commentsByID[rc.ID]; ok {
+			ordered = append(ordered, comment)
+		}
+	}
+	comments = ordered
 
 	for _, comment := range comments {
 		comment.SanitizeDeletedPlaceholder()
