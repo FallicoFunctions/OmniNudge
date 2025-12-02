@@ -8,6 +8,7 @@ import HomePage from './pages/HomePage';
 import ThemesPage from './pages/ThemesPage';
 import RedditPage from './pages/RedditPage';
 import RedditPostPage from './pages/RedditPostPage';
+import RedditUserPage from './pages/RedditUserPage';
 import PostsPage from './pages/PostsPage';
 import PostDetailPage from './pages/PostDetailPage';
 import MessagesPage from './pages/MessagesPage';
@@ -34,8 +35,10 @@ function App() {
             <Route path="/" element={<HomePage />} />
             <Route path="/themes" element={<ThemesPage />} />
             <Route path="/reddit" element={<RedditPage />} />
+            <Route path="/reddit/r/:subreddit" element={<RedditPage />} />
             <Route path="/reddit/r/:subreddit/comments/:postId" element={<RedditPostPage />} />
             <Route path="/reddit/r/:subreddit/comments/:postId/:commentId" element={<RedditPostPage />} />
+            <Route path="/reddit/user/:username" element={<RedditUserPage />} />
             <Route path="/posts" element={<PostsPage />} />
             <Route path="/posts/:postId" element={<PostDetailPage />} />
             <Route path="/posts/:postId/comments/:commentId" element={<PostDetailPage />} />
