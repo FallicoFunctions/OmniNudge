@@ -23,9 +23,21 @@ type RedditListingData = {
 export default function HiddenPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { data, isLoading, error } = useQuery<HiddenItemsResponse>({
+  const emptyData: HiddenItemsResponse = { type: 'all', hidden_posts: [], hidden_reddit_posts: [] };
+  const [loadError, setLoadError] = useState<Error | null>(null);
+  const { data = emptyData, isLoading } = useQuery<HiddenItemsResponse>({
     queryKey: ['hidden-items', 'all'],
-    queryFn: () => savedService.getHiddenItems(),
+    queryFn: async () => {
+      try {
+        const response = await savedService.getHiddenItems();
+        setLoadError(null);
+        return response;
+      } catch (err) {
+        console.error('Failed to load hidden items', err);
+        setLoadError(err as Error);
+        return emptyData;
+      }
+    },
   });
 
   const hiddenPosts = (data?.hidden_posts ?? []) as SavedPost[];
@@ -135,16 +147,16 @@ export default function HiddenPage() {
         </div>
       )}
 
-      {error && (
-        <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800">
-          Unable to load hidden items.
+      {loadError && (
+        <div className="rounded-md border border-yellow-200 bg-yellow-50 p-4 text-sm text-yellow-800">
+          Unable to load hidden items right now. Showing the latest cached data.
         </div>
       )}
 
-      {!isLoading && !error && (
+      {!isLoading && (
         <div className="space-y-8">
           <section>
-            <h2 className="mb-3 text-xl font-semibold text-[var(--color-text-primary)]">Saved Omni Posts</h2>
+            <h2 className="mb-3 text-xl font-semibold text-[var(--color-text-primary)]">Hidden Omni Posts</h2>
             {hiddenPosts.length === 0 ? (
               <p className="text-sm text-[var(--color-text-secondary)]">No hidden posts yet.</p>
             ) : (
@@ -193,7 +205,7 @@ export default function HiddenPage() {
           </section>
 
           <section>
-            <h2 className="mb-3 text-xl font-semibold text-[var(--color-text-primary)]">Saved Reddit Posts</h2>
+            <h2 className="mb-3 text-xl font-semibold text-[var(--color-text-primary)]">Hidden Reddit Posts</h2>
             {hiddenRedditPosts.length === 0 ? (
               <p className="text-sm text-[var(--color-text-secondary)]">No hidden Reddit posts yet.</p>
             ) : (
@@ -317,12 +329,12 @@ export default function HiddenPage() {
           </section>
 
           <section>
-            <h2 className="mb-3 text-xl font-semibold text-[var(--color-text-primary)]">Saved Omni Comments</h2>
+            <h2 className="mb-3 text-xl font-semibold text-[var(--color-text-primary)]">Hidden Omni Comments</h2>
             <p className="text-sm text-[var(--color-text-secondary)]">Hidden comments are not yet supported.</p>
           </section>
 
           <section>
-            <h2 className="mb-3 text-xl font-semibold text-[var(--color-text-primary)]">Saved Reddit Comments</h2>
+            <h2 className="mb-3 text-xl font-semibold text-[var(--color-text-primary)]">Hidden Reddit Comments</h2>
             <p className="text-sm text-[var(--color-text-secondary)]">Hidden Reddit comments are not yet supported.</p>
           </section>
         </div>
