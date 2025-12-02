@@ -124,6 +124,11 @@ export default function PostDetailPage() {
     ? `<iframe src="${embedPermalink}" width="600" height="250" frameborder="0"></iframe>`
     : '';
 
+  const bodyText = postData?.body ?? postData?.content ?? undefined;
+  const mediaUrl = postData?.media_url ?? undefined;
+  const thumbnailUrl = postData?.thumbnail_url ?? undefined;
+  const isVideoMedia = (postData?.media_type ?? '').toLowerCase() === 'video';
+
   const copyEmbedCode = async () => {
     if (!embedCode) return;
     try {
@@ -168,8 +173,33 @@ export default function PostDetailPage() {
             </div>
             <h1 className="text-2xl font-bold text-[var(--color-text-primary)]">{postData.title}</h1>
           </div>
-          {postData.content && (
-            <div className="whitespace-pre-wrap text-sm text-[var(--color-text-primary)]">{postData.content}</div>
+          {(mediaUrl || thumbnailUrl) && (
+            <div className="mb-4">
+              {mediaUrl ? (
+                isVideoMedia ? (
+                  <video
+                    controls
+                    className="max-h-[480px] w-full rounded-md"
+                    src={mediaUrl}
+                  />
+                ) : (
+                  <img
+                    src={mediaUrl}
+                    alt={postData.title}
+                    className="w-full rounded-md object-contain"
+                  />
+                )
+              ) : (
+                <img
+                  src={thumbnailUrl ?? ''}
+                  alt={postData.title}
+                  className="w-full rounded-md object-contain"
+                />
+              )}
+            </div>
+          )}
+          {bodyText && (
+            <div className="whitespace-pre-wrap text-sm text-[var(--color-text-primary)]">{bodyText}</div>
           )}
         </div>
       )}

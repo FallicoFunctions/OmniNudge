@@ -4,8 +4,8 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/omninudge/backend/internal/models"
 	"github.com/gin-gonic/gin"
+	"github.com/omninudge/backend/internal/models"
 )
 
 // HubsHandler handles hub CRUD
@@ -189,15 +189,19 @@ func (h *HubsHandler) GetUserHubs(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"hubs": hubs,
+		"hubs":    hubs,
 		"user_id": userID,
 	})
 }
 
 // CrosspostRequest represents a crosspost request
 type CrosspostRequest struct {
-	Title             string `json:"title" binding:"required"`
-	SendRepliesToInbox bool  `json:"send_replies_to_inbox"`
+	Title              string  `json:"title" binding:"required"`
+	SendRepliesToInbox bool    `json:"send_replies_to_inbox"`
+	Body               *string `json:"body"`
+	MediaURL           *string `json:"media_url"`
+	MediaType          *string `json:"media_type"`
+	ThumbnailURL       *string `json:"thumbnail_url"`
 }
 
 // CrosspostToHub handles POST /api/v1/hubs/:name/crosspost
@@ -226,7 +230,7 @@ func (h *HubsHandler) CrosspostToHub(c *gin.Context) {
 	}
 
 	// Get crosspost source from query params
-	originType := c.Query("origin_type")          // "reddit" or "platform"
+	originType := c.Query("origin_type")           // "reddit" or "platform"
 	originSubreddit := c.Query("origin_subreddit") // for Reddit posts
 	originPostID := c.Query("origin_post_id")      // Reddit post ID or platform post ID
 	originalTitle := c.Query("original_title")     // Original title before user edited
@@ -251,6 +255,10 @@ func (h *HubsHandler) CrosspostToHub(c *gin.Context) {
 		AuthorID:                 userID.(int),
 		HubID:                    hub.ID,
 		Title:                    req.Title,
+		Body:                     req.Body,
+		MediaURL:                 req.MediaURL,
+		MediaType:                req.MediaType,
+		ThumbnailURL:             req.ThumbnailURL,
 		CrosspostOriginType:      &originType,
 		CrosspostOriginSubreddit: stringPtrOrNil(originSubreddit),
 		CrosspostOriginPostID:    &originPostID,
@@ -298,7 +306,7 @@ func (h *HubsHandler) CrosspostToSubreddit(c *gin.Context) {
 	}
 
 	// Get crosspost source from query params
-	originType := c.Query("origin_type")          // "reddit" or "platform"
+	originType := c.Query("origin_type")           // "reddit" or "platform"
 	originSubreddit := c.Query("origin_subreddit") // for Reddit posts
 	originPostID := c.Query("origin_post_id")      // Reddit post ID or platform post ID
 	originalTitle := c.Query("original_title")     // Original title before user edited
@@ -335,6 +343,10 @@ func (h *HubsHandler) CrosspostToSubreddit(c *gin.Context) {
 		AuthorID:                 userID.(int),
 		HubID:                    hub.ID, // Store in general hub
 		Title:                    req.Title,
+		Body:                     req.Body,
+		MediaURL:                 req.MediaURL,
+		MediaType:                req.MediaType,
+		ThumbnailURL:             req.ThumbnailURL,
 		TargetSubreddit:          &subredditName, // Associate with subreddit
 		CrosspostOriginType:      &originType,
 		CrosspostOriginSubreddit: stringPtrOrNil(originSubreddit),
