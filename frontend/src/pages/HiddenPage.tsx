@@ -2,8 +2,7 @@ import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { savedService } from '../services/savedService';
-import type { SavedPost, SavedPostComment, SavedRedditPost } from '../types/saved';
-import type { LocalRedditComment } from '../types/reddit';
+import type { HiddenItemsResponse, SavedPost, SavedRedditPost } from '../types/saved';
 import { api } from '../lib/api';
 
 type RedditListingData = {
@@ -21,31 +20,29 @@ type RedditListingData = {
   };
 };
 
-export default function SavedPage() {
+export default function HiddenPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { data, isLoading, error } = useQuery({
-    queryKey: ['saved-items', 'all'],
-    queryFn: () => savedService.getSavedItems(),
+  const { data, isLoading, error } = useQuery<HiddenItemsResponse>({
+    queryKey: ['hidden-items', 'all'],
+    queryFn: () => savedService.getHiddenItems(),
   });
 
-  const savedPosts = (data?.saved_posts ?? []) as SavedPost[];
-  const savedRedditPosts = (data?.saved_reddit_posts ?? []) as SavedRedditPost[];
-  const savedSiteComments = (data?.saved_post_comments ?? []) as SavedPostComment[];
-  const savedRedditComments = (data?.saved_reddit_comments ?? []) as LocalRedditComment[];
+  const hiddenPosts = (data?.hidden_posts ?? []) as SavedPost[];
+  const hiddenRedditPosts = (data?.hidden_reddit_posts ?? []) as SavedRedditPost[];
   const [postDetails, setPostDetails] = useState<Record<string, Partial<SavedRedditPost>>>({});
   const fetchingDetailsRef = useRef<Set<string>>(new Set());
 
   const postsNeedingDetails = useMemo(
     () =>
-      savedRedditPosts.filter((post) => {
+      hiddenRedditPosts.filter((post) => {
         const titleValue = (post.title ?? '').trim();
         const missingTitle = titleValue.length === 0;
         const missingCounts =
           typeof post.score !== 'number' && typeof post.num_comments !== 'number';
         return missingTitle || missingCounts;
       }),
-    [savedRedditPosts]
+    [hiddenRedditPosts]
   );
 
   useEffect(() => {
@@ -56,9 +53,7 @@ export default function SavedPage() {
       }
       fetchingDetailsRef.current.add(postKey);
       api
-        .get<[RedditListingData, unknown]>(
-          `/reddit/r/${post.subreddit}/comments/${post.reddit_post_id}`
-        )
+        .get<[RedditListingData, unknown]>(`/reddit/r/${post.subreddit}/comments/${post.reddit_post_id}`)
         .then((response) => {
           const listing = response[0];
           const remotePost = listing?.data?.children?.[0]?.data;
@@ -85,8 +80,8 @@ export default function SavedPage() {
             },
           }));
         })
-        .catch((fetchError) => {
-          console.error('Failed to refresh saved Reddit post details', fetchError);
+        .catch(() => {
+          // Swallow errors; the fallback UI will still show basic info
         })
         .finally(() => {
           fetchingDetailsRef.current.delete(postKey);
@@ -94,33 +89,28 @@ export default function SavedPage() {
     });
   }, [postsNeedingDetails, postDetails]);
 
-  const invalidateSavedQueries = () => {
-    queryClient.invalidateQueries({ queryKey: ['saved-items', 'all'] });
-    queryClient.invalidateQueries({ queryKey: ['saved-items', 'reddit_posts'] });
+  const invalidateHiddenQueries = () => {
+    queryClient.invalidateQueries({ queryKey: ['hidden-items', 'all'] });
+    queryClient.invalidateQueries({ queryKey: ['hidden-items', 'reddit_posts'] });
   };
 
-  const unsaveRedditPostMutation = useMutation({
-    mutationFn: async ({ subreddit, reddit_post_id }: { subreddit: string; reddit_post_id: string }) => {
-      await savedService.unsaveRedditPost(subreddit, reddit_post_id);
+  const unhidePostMutation = useMutation({
+    mutationFn: async (postId: number) => {
+      await savedService.unhidePost(postId);
     },
-    onSuccess: () => {
-      invalidateSavedQueries();
-    },
+    onSuccess: () => invalidateHiddenQueries(),
     onError: (mutationError: Error) => {
-      alert(`Failed to unsave post: ${mutationError.message}`);
+      alert(`Failed to unhide post: ${mutationError.message}`);
     },
   });
 
-  const hideRedditPostMutation = useMutation({
+  const unhideRedditPostMutation = useMutation({
     mutationFn: async ({ subreddit, reddit_post_id }: { subreddit: string; reddit_post_id: string }) => {
-      await savedService.hideRedditPost(subreddit, reddit_post_id);
+      await savedService.unhideRedditPost(subreddit, reddit_post_id);
     },
-    onSuccess: () => {
-      invalidateSavedQueries();
-      alert('Post hidden. You can manage hidden posts from the Hidden tab.');
-    },
+    onSuccess: () => invalidateHiddenQueries(),
     onError: (mutationError: Error) => {
-      alert(`Failed to hide post: ${mutationError.message}`);
+      alert(`Failed to unhide Reddit post: ${mutationError.message}`);
     },
   });
 
@@ -135,21 +125,19 @@ export default function SavedPage() {
   return (
     <div className="mx-auto max-w-4xl px-4 py-8">
       <div className="mb-6">
-        <h1 className="text-3xl font-bold text-[var(--color-text-primary)]">Saved Items</h1>
-        <p className="mt-2 text-sm text-[var(--color-text-secondary)]">
-          Posts, comments, and replies you&apos;ve saved across OmniNudge.
-        </p>
+        <h1 className="text-3xl font-bold text-[var(--color-text-primary)]">Hidden Items</h1>
+        <p className="mt-2 text-sm text-[var(--color-text-secondary)]">Posts you&apos;ve hidden across OmniNudge.</p>
       </div>
 
       {isLoading && (
         <div className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] p-4 text-sm text-[var(--color-text-secondary)]">
-          Loading saved content...
+          Loading hidden content...
         </div>
       )}
 
       {error && (
         <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800">
-          Unable to load saved items.
+          Unable to load hidden items.
         </div>
       )}
 
@@ -157,11 +145,11 @@ export default function SavedPage() {
         <div className="space-y-8">
           <section>
             <h2 className="mb-3 text-xl font-semibold text-[var(--color-text-primary)]">Saved Omni Posts</h2>
-            {savedPosts.length === 0 ? (
-              <p className="text-sm text-[var(--color-text-secondary)]">No saved posts yet.</p>
+            {hiddenPosts.length === 0 ? (
+              <p className="text-sm text-[var(--color-text-secondary)]">No hidden posts yet.</p>
             ) : (
               <div className="space-y-3">
-                {savedPosts.map((post) => (
+                {hiddenPosts.map((post) => (
                   <article
                     key={post.id}
                     className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4"
@@ -183,12 +171,19 @@ export default function SavedPage() {
                       <span>•</span>
                       <span>{post.comment_count} comments</span>
                     </div>
-                    <div className="mt-3">
+                    <div className="mt-3 flex gap-3">
                       <button
                         onClick={() => navigate('/posts')}
                         className="text-sm font-semibold text-[var(--color-primary)] hover:underline"
                       >
                         View posts feed →
+                      </button>
+                      <button
+                        onClick={() => unhidePostMutation.mutate(post.id)}
+                        className="text-sm font-semibold text-[var(--color-primary)] hover:underline"
+                        disabled={unhidePostMutation.isPending}
+                      >
+                        {unhidePostMutation.isPending ? 'Unhiding…' : 'Unhide'}
                       </button>
                     </div>
                   </article>
@@ -199,11 +194,11 @@ export default function SavedPage() {
 
           <section>
             <h2 className="mb-3 text-xl font-semibold text-[var(--color-text-primary)]">Saved Reddit Posts</h2>
-            {savedRedditPosts.length === 0 ? (
-              <p className="text-sm text-[var(--color-text-secondary)]">No saved Reddit posts yet.</p>
+            {hiddenRedditPosts.length === 0 ? (
+              <p className="text-sm text-[var(--color-text-secondary)]">No hidden Reddit posts yet.</p>
             ) : (
               <div className="space-y-3">
-                {savedRedditPosts.map((post) => {
+                {hiddenRedditPosts.map((post) => {
                   const postKey = `${post.subreddit}-${post.reddit_post_id}`;
                   const mergedPost = { ...post, ...(postDetails[postKey] ?? {}) };
                   const hasDetails = Boolean(mergedPost.title);
@@ -216,16 +211,10 @@ export default function SavedPage() {
                       ? mergedPost.thumbnail
                       : null;
                   const metaItems: Array<{ label: string; to?: string }> = [
-                    {
-                      label: `r/${post.subreddit}`,
-                      to: `/reddit/r/${post.subreddit}`,
-                    },
+                    { label: `r/${post.subreddit}`, to: `/reddit/r/${post.subreddit}` },
                   ];
                   if (hasDetails && mergedPost.author) {
-                    metaItems.push({
-                      label: `u/${mergedPost.author}`,
-                      to: `/reddit/user/${mergedPost.author}`,
-                    });
+                    metaItems.push({ label: `u/${mergedPost.author}`, to: `/reddit/user/${mergedPost.author}` });
                   }
                   if (hasDetails && typeof mergedPost.score === 'number') {
                     metaItems.push({ label: `${mergedPost.score.toLocaleString()} points` });
@@ -259,9 +248,7 @@ export default function SavedPage() {
                             </h3>
                           </Link>
                           {!hasDetails && (
-                            <p className="text-xs text-[var(--color-text-muted)]">
-                              Fetching latest Reddit data...
-                            </p>
+                            <p className="text-xs text-[var(--color-text-muted)]">Fetching latest Reddit data...</p>
                           )}
                           <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-[var(--color-text-secondary)]">
                             {metaItems.map((item, index) => (
@@ -289,10 +276,7 @@ export default function SavedPage() {
                             ))}
                           </div>
                           <div className="mt-1 flex flex-wrap items-center gap-3 text-[11px] text-[var(--color-text-secondary)]">
-                            <Link
-                              to={postUrl}
-                              className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
-                            >
+                            <Link to={postUrl} className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]">
                               {commentLinkLabel}
                             </Link>
                             <button
@@ -305,28 +289,15 @@ export default function SavedPage() {
                             <button
                               type="button"
                               onClick={() =>
-                                unsaveRedditPostMutation.mutate({
+                                unhideRedditPostMutation.mutate({
                                   subreddit: post.subreddit,
                                   reddit_post_id: post.reddit_post_id,
                                 })
                               }
-                              disabled={unsaveRedditPostMutation.isPending}
+                              disabled={unhideRedditPostMutation.isPending}
                               className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] disabled:opacity-50"
                             >
-                              {unsaveRedditPostMutation.isPending ? 'Unsaving...' : 'Unsave'}
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() =>
-                                hideRedditPostMutation.mutate({
-                                  subreddit: post.subreddit,
-                                  reddit_post_id: post.reddit_post_id,
-                                })
-                              }
-                              disabled={hideRedditPostMutation.isPending}
-                              className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] disabled:opacity-50"
-                            >
-                              {hideRedditPostMutation.isPending ? 'Hiding...' : 'Hide'}
+                              {unhideRedditPostMutation.isPending ? 'Unhiding…' : 'Unhide'}
                             </button>
                             <button
                               type="button"
@@ -347,85 +318,12 @@ export default function SavedPage() {
 
           <section>
             <h2 className="mb-3 text-xl font-semibold text-[var(--color-text-primary)]">Saved Omni Comments</h2>
-            {savedSiteComments.length === 0 ? (
-              <p className="text-sm text-[var(--color-text-secondary)]">No saved comments yet.</p>
-            ) : (
-              <div className="space-y-3">
-                {savedSiteComments.map((comment) => (
-                  <div
-                    key={comment.comment_id}
-                    className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4"
-                  >
-                    <div className="text-xs text-[var(--color-text-secondary)]">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="font-semibold">u/{comment.username}</span>
-                        <span>•</span>
-                        <span>{new Date(comment.created_at).toLocaleString()}</span>
-                      </div>
-                      <div className="mt-1">
-                        <span className="font-semibold">Post:</span>{' '}
-                        <Link
-                          to={`/posts/${comment.post_id}`}
-                          className="text-[var(--color-primary)] hover:underline"
-                        >
-                          {comment.post_title}
-                        </Link>
-                      </div>
-                    </div>
-                    <p className="mt-2 text-sm text-[var(--color-text-primary)]">{comment.content}</p>
-                    <div className="mt-3 flex items-center gap-4 text-xs text-[var(--color-text-secondary)]">
-                      <span>{comment.score} points</span>
-                      <Link
-                        to={`/posts/${comment.post_id}/comments/${comment.comment_id}`}
-                        className="text-[var(--color-primary)] hover:underline"
-                      >
-                        View thread →
-                      </Link>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
+            <p className="text-sm text-[var(--color-text-secondary)]">Hidden comments are not yet supported.</p>
           </section>
 
           <section>
             <h2 className="mb-3 text-xl font-semibold text-[var(--color-text-primary)]">Saved Reddit Comments</h2>
-            {savedRedditComments.length === 0 ? (
-              <p className="text-sm text-[var(--color-text-secondary)]">No saved comments yet.</p>
-            ) : (
-              <div className="space-y-3">
-                {savedRedditComments.map((comment) => {
-                  const permalink = `/reddit/r/${comment.subreddit}/comments/${comment.reddit_post_id}/${comment.id}`;
-                  return (
-                    <div
-                      key={comment.id}
-                      className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4"
-                    >
-                      <div className="text-xs text-[var(--color-text-secondary)]">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="font-semibold">u/{comment.username}</span>
-                          <span>•</span>
-                          <span>{new Date(comment.created_at).toLocaleString()}</span>
-                        </div>
-                        {comment.reddit_post_title && (
-                          <div className="mt-1">
-                            <span className="font-semibold">Post:</span>{' '}
-                            <span>{comment.reddit_post_title}</span>
-                          </div>
-                        )}
-                      </div>
-                      <p className="mt-2 text-sm text-[var(--color-text-primary)]">{comment.content}</p>
-                      <div className="mt-3 flex items-center gap-4 text-xs text-[var(--color-text-secondary)]">
-                        <span>{comment.score} points</span>
-                        <Link to={permalink} className="text-[var(--color-primary)] hover:underline">
-                          View thread →
-                        </Link>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+            <p className="text-sm text-[var(--color-text-secondary)]">Hidden Reddit comments are not yet supported.</p>
           </section>
         </div>
       )}

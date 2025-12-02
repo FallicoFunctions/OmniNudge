@@ -1,10 +1,15 @@
 import { api } from '../lib/api';
-import type { SavedItemsResponse, SaveRedditPostPayload } from '../types/saved';
+import type { HiddenItemsResponse, SavedItemsResponse, SaveRedditPostPayload } from '../types/saved';
 
 export const savedService = {
   async getSavedItems(type: 'all' | 'posts' | 'reddit_posts' | 'post_comments' | 'reddit_comments' = 'all'): Promise<SavedItemsResponse> {
     const query = type ? `?type=${type}` : '';
     return api.get<SavedItemsResponse>(`/users/me/saved${query}`);
+  },
+
+  async getHiddenItems(type: 'all' | 'posts' | 'reddit_posts' = 'all'): Promise<HiddenItemsResponse> {
+    const query = type ? `?type=${type}` : '';
+    return api.get<HiddenItemsResponse>(`/users/me/hidden${query}`);
   },
 
   async savePost(postId: number): Promise<void> {
