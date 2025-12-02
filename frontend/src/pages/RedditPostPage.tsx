@@ -1051,14 +1051,14 @@ export default function RedditPostPage() {
       {post && (
         <div className="mb-6 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-6">
           {/* Post Header */}
-          <div className="mb-4">
-            <div className="mb-2 text-xs text-[var(--color-text-secondary)]">
-              r/{post.subreddit} • Posted by u/{post.author} •{' '}
-              {new Date(post.created_utc * 1000).toLocaleString()}
-            </div>
+          <div className="mb-4 text-left">
             <h1 className="text-2xl font-bold text-[var(--color-text-primary)]">
               {post.title}
             </h1>
+            <div className="mt-1 text-xs text-[var(--color-text-secondary)]">
+              r/{post.subreddit} • Posted by u/{post.author} •{' '}
+              {new Date(post.created_utc * 1000).toLocaleString()}
+            </div>
           </div>
 
           {/* Post Media/Content */}
