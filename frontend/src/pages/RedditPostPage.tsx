@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { Link, useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
@@ -1188,9 +1188,25 @@ export default function RedditPostPage() {
             <h1 className="text-left text-2xl font-bold text-[var(--color-text-primary)]">
               {post.title}
             </h1>
-            <div className="mt-1 text-xs text-[var(--color-text-secondary)]">
-              r/{post.subreddit} • Posted by u/{post.author} •{' '}
-              {new Date(post.created_utc * 1000).toLocaleString()}
+            <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-[var(--color-text-secondary)]">
+              <Link
+                to={`/reddit/r/${post.subreddit}`}
+                className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+              >
+                r/{post.subreddit}
+              </Link>
+              <span>•</span>
+              <span>
+                Posted by{' '}
+                <Link
+                  to={`/reddit/user/${post.author}`}
+                  className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+                >
+                  u/{post.author}
+                </Link>
+              </span>
+              <span>•</span>
+              <span>{new Date(post.created_utc * 1000).toLocaleString()}</span>
             </div>
           </div>
 
