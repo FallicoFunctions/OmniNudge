@@ -962,6 +962,8 @@ export default function RedditPostPage() {
       await savedService.hideRedditPost(subreddit, postId);
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['hidden-items', 'reddit_posts'] });
+      queryClient.invalidateQueries({ queryKey: ['reddit'], exact: false });
       setIsPostHidden(true);
       setShowHideConfirm(false);
       redirectAfterHide();
