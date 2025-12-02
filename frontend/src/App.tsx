@@ -13,6 +13,7 @@ import PostsPage from './pages/PostsPage';
 import PostDetailPage from './pages/PostDetailPage';
 import MessagesPage from './pages/MessagesPage';
 import SavedPage from './pages/SavedPage';
+import HiddenPage from './pages/HiddenPage';
 import './App.css';
 
 function App() {
@@ -44,6 +45,7 @@ function App() {
             <Route path="/posts/:postId/comments/:commentId" element={<PostDetailPage />} />
             <Route path="/messages" element={<MessagesPage />} />
             <Route path="/saved" element={<SavedPage />} />
+            <Route path="/hidden" element={<HiddenPage />} />
           </Route>
 
           {/* Catch all */}

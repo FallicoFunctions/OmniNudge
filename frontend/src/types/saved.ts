@@ -46,3 +46,9 @@ export interface SavedItemsResponse {
   saved_post_comments?: SavedPostComment[];
   saved_reddit_comments?: LocalRedditComment[];
 }
+
+export interface HiddenItemsResponse {
+  type: 'all' | 'posts' | 'reddit_posts';
+  hidden_posts?: SavedPost[];
+  hidden_reddit_posts?: SavedRedditPost[];
+}

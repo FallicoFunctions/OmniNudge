@@ -95,6 +95,46 @@ func (h *SavedItemsHandler) GetSavedItems(c *gin.Context) {
 	c.JSON(http.StatusOK, response)
 }
 
+// GetHiddenItems handles GET /api/v1/users/me/hidden
+func (h *SavedItemsHandler) GetHiddenItems(c *gin.Context) {
+	userID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
+
+	filterType := c.DefaultQuery("type", "all")
+	validTypes := map[string]bool{
+		"all": true, "posts": true, "reddit_posts": true,
+	}
+	if !validTypes[filterType] {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid type filter. Use all, posts, or reddit_posts"})
+		return
+	}
+
+	response := gin.H{}
+	if filterType == "all" || filterType == "posts" {
+		posts, err := h.savedRepo.GetHiddenPosts(c.Request.Context(), userID.(int))
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch hidden posts", "details": err.Error()})
+			return
+		}
+		response["hidden_posts"] = posts
+	}
+
+	if filterType == "all" || filterType == "reddit_posts" {
+		redditPosts, err := h.savedRepo.GetHiddenRedditPosts(c.Request.Context(), userID.(int))
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch hidden Reddit posts", "details": err.Error()})
+			return
+		}
+		response["hidden_reddit_posts"] = redditPosts
+	}
+
+	response["type"] = filterType
+	c.JSON(http.StatusOK, response)
+}
+
 // SavePost handles POST /api/v1/posts/:id/save
 func (h *SavedItemsHandler) SavePost(c *gin.Context) {
 	userID, exists := c.Get("user_id")

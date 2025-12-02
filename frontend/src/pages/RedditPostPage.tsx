@@ -1500,7 +1500,7 @@ export default function RedditPostPage() {
           <div className="w-full max-w-md rounded-lg bg-white p-4 shadow-lg">
             <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">Hide this post?</h3>
             <p className="mt-2 text-sm text-[var(--color-text-secondary)]">
-              Are you sure? Hidden posts can be found at <a href="/saved" className="text-[var(--color-primary)] hover:underline">your hidden posts page</a>.
+              Are you sure? Hidden posts can be found at <a href="/hidden" className="text-[var(--color-primary)] hover:underline">your hidden posts page</a>.
             </p>
             <div className="mt-4 flex justify-end gap-2">
               <button

@@ -253,6 +253,7 @@ func main() {
 			protected.GET("/settings", settingsHandler.GetSettings)
 			protected.PUT("/settings", settingsHandler.UpdateSettings)
 			protected.GET("/users/me/saved", savedItemsHandler.GetSavedItems)
+			protected.GET("/users/me/hidden", savedItemsHandler.GetHiddenItems)
 
 			// Theme customization routes with rate limiting
 			themeCreationLimiter := middleware.ThemeCreationRateLimiter()
