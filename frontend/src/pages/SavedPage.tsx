@@ -238,26 +238,28 @@ export default function SavedPage() {
                   return (
                     <article
                       key={postKey}
-                      className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] shadow-sm transition-shadow hover:shadow-md"
+                      className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)]"
                     >
-                      <Link to={postUrl} className="flex gap-4 p-4">
+                      <div className="flex gap-3 p-3">
                         {thumbnail && (
                           <img
                             src={thumbnail}
                             alt=""
-                            className="h-20 w-20 flex-shrink-0 rounded object-cover"
+                            className="h-14 w-14 flex-shrink-0 rounded object-cover"
                           />
                         )}
                         <div className="flex-1">
-                          <h3 className="text-lg font-semibold text-[var(--color-text-primary)] hover:text-[var(--color-primary)]">
-                            {hasDetails ? mergedPost.title : `r/${post.subreddit}`}
-                          </h3>
+                          <Link to={postUrl}>
+                            <h3 className="text-base font-semibold text-[var(--color-text-primary)] hover:text-[var(--color-primary)] text-left">
+                              {hasDetails ? mergedPost.title : `r/${post.subreddit}`}
+                            </h3>
+                          </Link>
                           {!hasDetails && (
                             <p className="text-xs text-[var(--color-text-muted)]">
                               Fetching latest Reddit data...
                             </p>
                           )}
-                          <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-[var(--color-text-secondary)]">
+                          <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-[var(--color-text-secondary)]">
                             {metaItems.map((item, index) => (
                               <Fragment key={`${postKey}-meta-${item}-${index}`}>
                                 {index > 0 && <span>•</span>}
@@ -273,63 +275,63 @@ export default function SavedPage() {
                               </Fragment>
                             ))}
                           </div>
+                          <div className="mt-1 flex flex-wrap items-center gap-3 text-[11px] text-[var(--color-text-secondary)]">
+                            <Link
+                              to={postUrl}
+                              className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+                            >
+                              {commentLinkLabel}
+                            </Link>
+                            <button
+                              type="button"
+                              onClick={() => handleShareRedditPost(mergedPost)}
+                              className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+                            >
+                              Share
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                unsaveRedditPostMutation.mutate({
+                                  subreddit: post.subreddit,
+                                  reddit_post_id: post.reddit_post_id,
+                                })
+                              }
+                              disabled={unsaveRedditPostMutation.isPending}
+                              className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] disabled:opacity-50"
+                            >
+                              {unsaveRedditPostMutation.isPending ? 'Unsaving...' : 'Unsave'}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                hideRedditPostMutation.mutate({
+                                  subreddit: post.subreddit,
+                                  reddit_post_id: post.reddit_post_id,
+                                })
+                              }
+                              disabled={hideRedditPostMutation.isPending}
+                              className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] disabled:opacity-50"
+                            >
+                              {hideRedditPostMutation.isPending ? 'Hiding...' : 'Hide'}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => navigate(postUrl)}
+                              className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+                            >
+                              Crosspost
+                            </button>
+                            <a
+                              href={redditUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+                            >
+                              Open Link ↗
+                            </a>
+                          </div>
                         </div>
-                      </Link>
-                      <div className="flex flex-wrap gap-3 border-t border-[var(--color-border)] px-4 py-2 text-xs">
-                        <Link
-                          to={postUrl}
-                          className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
-                        >
-                          {commentLinkLabel}
-                        </Link>
-                        <button
-                          type="button"
-                          onClick={() => handleShareRedditPost(mergedPost)}
-                          className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
-                        >
-                          Share
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            unsaveRedditPostMutation.mutate({
-                              subreddit: post.subreddit,
-                              reddit_post_id: post.reddit_post_id,
-                            })
-                          }
-                          disabled={unsaveRedditPostMutation.isPending}
-                          className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] disabled:opacity-50"
-                        >
-                          {unsaveRedditPostMutation.isPending ? 'Unsaving...' : 'Unsave'}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            hideRedditPostMutation.mutate({
-                              subreddit: post.subreddit,
-                              reddit_post_id: post.reddit_post_id,
-                            })
-                          }
-                          disabled={hideRedditPostMutation.isPending}
-                          className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] disabled:opacity-50"
-                        >
-                          {hideRedditPostMutation.isPending ? 'Hiding...' : 'Hide'}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => navigate(postUrl)}
-                          className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
-                        >
-                          Crosspost
-                        </button>
-                        <a
-                          href={redditUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
-                        >
-                          Open Link ↗
-                        </a>
                       </div>
                     </article>
                   );
