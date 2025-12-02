@@ -49,6 +49,14 @@ type RedditCommentsListing = RedditListing<RedditComment>;
 
 
 // Component to render a single Reddit comment with replies
+type EmbedPayload = {
+  author: string;
+  body: string;
+  permalink: string;
+  createdAt: string;
+  score?: number;
+};
+
 function RedditCommentView({
   comment,
   depth = 0,
@@ -78,7 +86,7 @@ function RedditCommentView({
   onCancelReply: () => void;
   currentUsername?: string | null;
   onPermalink: (comment: LocalRedditComment) => void;
-  onEmbed: (comment: LocalRedditComment) => void;
+  onEmbed: (data: EmbedPayload) => void;
   onToggleSave: (comment: LocalRedditComment, shouldSave: boolean) => Promise<void>;
   savedCommentIds: Set<number>;
   onEdit: (commentId: number, content: string) => Promise<void>;
@@ -142,9 +150,14 @@ function RedditCommentView({
   const handleEmbed = () => {
     const subreddit = window.location.pathname.split('/')[3];
     const postId = window.location.pathname.split('/')[5];
-    const embedCode = `<iframe src="https://reddit.com/r/${subreddit}/comments/${postId}/_/${comment.data.id}?embed=true" width="640" height="400"></iframe>`;
-    navigator.clipboard.writeText(embedCode);
-    alert('Embed code copied to clipboard!');
+    const permalink = `https://www.reddit.com/r/${subreddit}/comments/${postId}/_/${comment.data.id}`;
+    onEmbed({
+      author: comment.data.author,
+      body: comment.data.body ?? '',
+      permalink,
+      createdAt: new Date(comment.data.created_utc * 1000).toISOString(),
+      score: comment.data.score,
+    });
   };
 
   const handleSave = () => {
@@ -340,7 +353,7 @@ interface LocalCommentViewProps {
   allComments: LocalRedditComment[];
   currentUsername?: string | null;
   onPermalink: (comment: LocalRedditComment) => void;
-  onEmbed: (comment: LocalRedditComment) => void;
+  onEmbed: (data: EmbedPayload) => void;
   onToggleSave: (comment: LocalRedditComment, shouldSave: boolean) => Promise<void>;
   savedCommentIds: Set<number>;
   onEdit: (commentId: number, content: string) => Promise<void>;
@@ -598,7 +611,15 @@ function LocalCommentView({
                 permalink
               </button>
               <button
-                onClick={() => onEmbed(comment)}
+                onClick={() =>
+                  onEmbed({
+                    author: comment.username,
+                    body: comment.content,
+                    permalink: `${window.location.origin}/reddit/r/${subreddit}/comments/${postId}/${comment.id}`,
+                    createdAt: comment.created_at,
+                    score: comment.score,
+                  })
+                }
                 className="hover:text-[var(--color-primary)]"
               >
                 embed
@@ -719,7 +740,7 @@ export default function RedditPostPage() {
   const focusedCommentId = commentId ? Number(commentId) : null;
   const [commentText, setCommentText] = useState('');
   const [replyingTo, setReplyingTo] = useState<number | null>(null);
-  const [embedTarget, setEmbedTarget] = useState<LocalRedditComment | null>(null);
+  const [embedTarget, setEmbedTarget] = useState<EmbedPayload | null>(null);
   const [sort, setSort] = useState<string>('best');
   const [imageExpanded, setImageExpanded] = useState(false);
 
@@ -770,6 +791,13 @@ export default function RedditPostPage() {
     const ids = savedCommentsData?.saved_reddit_comments?.map((c) => c.id) ?? [];
     return new Set(ids);
   }, [savedCommentsData]);
+
+  const buildEmbedHtml = (data: EmbedPayload) => {
+    const escapeHtml = (value: string) =>
+      value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const body = escapeHtml(data.body);
+    return `<blockquote class="reddit-card" data-card-created="${Date.now()}"><p>${body}</p><a href="${data.permalink}">Comment by u/${data.author}</a></blockquote><script async src="https://embed.redditmedia.com/widgets/platform.js" charset="UTF-8"></script>`;
+  };
 
   const editCommentMutation = useMutation({
     mutationFn: async ({ commentId: redditCommentId, content }: { commentId: number; content: string }) => {
@@ -856,7 +884,14 @@ export default function RedditPostPage() {
   };
 
   const handleEmbed = (commentTarget: LocalRedditComment) => {
-    setEmbedTarget(commentTarget);
+    const permalink = `${window.location.origin}/reddit/r/${subreddit}/comments/${postId}/${commentTarget.id}`;
+    setEmbedTarget({
+      author: commentTarget.username,
+      body: commentTarget.content,
+      permalink,
+      createdAt: commentTarget.created_at,
+      score: commentTarget.score,
+    });
   };
 
   const handleToggleSave = (commentTarget: LocalRedditComment, shouldSave: boolean) =>
@@ -888,22 +923,6 @@ export default function RedditPostPage() {
   }, [localCommentsData, focusedCommentId]);
 
   const commentNotFound = Boolean(focusedCommentId && localCommentsData && topLevelComments.length === 0);
-  const embedOrigin = typeof window !== 'undefined' ? window.location.origin : '';
-  const embedPermalink =
-    embedTarget && subreddit && postId ? `${embedOrigin}/reddit/r/${subreddit}/comments/${postId}/${embedTarget.id}` : '';
-  const embedCode = embedTarget ? `<iframe src="${embedPermalink}" width="600" height="250" frameborder="0"></iframe>` : '';
-  const copyEmbedCode = async () => {
-    if (!embedCode) return;
-    try {
-      if (typeof navigator !== 'undefined' && navigator.clipboard) {
-        await navigator.clipboard.writeText(embedCode);
-        alert('Embed code copied to clipboard!');
-      }
-    } catch {
-      alert('Failed to copy embed code.');
-    }
-  };
-
   type CombinedComment =
     | {
         type: 'local';
@@ -1255,5 +1274,56 @@ export default function RedditPostPage() {
         </div>
       </div>
     </div>
+      {embedTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+          <div className="w-full max-w-2xl rounded-lg bg-white p-4 shadow-lg">
+            <div className="flex items-start justify-between">
+              <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">Embed Comment</h3>
+              <button
+                onClick={() => setEmbedTarget(null)}
+                className="text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+              >
+                Close
+              </button>
+            </div>
+            <div className="mt-3 rounded border border-[var(--color-border)] bg-[var(--color-surface)] p-3 text-sm text-[var(--color-text-primary)]">
+              <div className="mb-1 text-xs text-[var(--color-text-secondary)]">Preview</div>
+              <div className="font-semibold">u/{embedTarget.author}</div>
+              <div className="text-[var(--color-text-primary)]">{embedTarget.body}</div>
+              <a
+                href={embedTarget.permalink}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-1 inline-block text-xs text-[var(--color-primary)] hover:underline"
+              >
+                View on Reddit
+              </a>
+            </div>
+            <div className="mt-3">
+              <div className="mb-1 text-xs text-[var(--color-text-secondary)]">Embed HTML</div>
+              <textarea
+                readOnly
+                className="h-32 w-full rounded border border-[var(--color-border)] bg-[var(--color-surface)] p-2 text-xs text-[var(--color-text-primary)]"
+                value={buildEmbedHtml(embedTarget)}
+              />
+              <div className="mt-2 flex justify-end gap-2">
+                <button
+                  onClick={async () => {
+                    try {
+                      await navigator.clipboard.writeText(buildEmbedHtml(embedTarget));
+                      alert('Embed code copied to clipboard!');
+                    } catch {
+                      alert('Failed to copy embed code.');
+                    }
+                  }}
+                  className="rounded bg-[var(--color-primary)] px-3 py-1 text-xs font-semibold text-white hover:bg-[var(--color-primary-dark)]"
+                >
+                  Copy Embed Code
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
   );
 }
