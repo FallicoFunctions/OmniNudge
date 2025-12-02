@@ -18,9 +18,21 @@ export interface CrosspostRequest {
   send_replies_to_inbox: boolean;
 }
 
+export interface SubredditPostsResponse {
+  posts: any[]; // Platform posts
+  subreddit: string;
+  sort: string;
+  limit: number;
+  offset: number;
+}
+
 export const hubsService = {
   async getUserHubs(): Promise<UserHubsResponse> {
     return api.get<UserHubsResponse>('/users/me/hubs');
+  },
+
+  async getSubredditPosts(subredditName: string, sort: string = 'new'): Promise<SubredditPostsResponse> {
+    return api.get<SubredditPostsResponse>(`/subreddits/${subredditName}/posts?sort=${sort}`);
   },
 
   async crosspostToHub(

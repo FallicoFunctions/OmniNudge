@@ -33,6 +33,46 @@ func (h *PostsHandler) SetNotificationService(notifService *services.Notificatio
 	h.notifService = notifService
 }
 
+// GetSubredditPosts handles GET /api/v1/subreddits/:name/posts
+// Returns local platform posts that have been crossposted to a subreddit
+func (h *PostsHandler) GetSubredditPosts(c *gin.Context) {
+	subredditName := c.Param("name")
+	if subredditName == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Subreddit name is required"})
+		return
+	}
+
+	// Parse query parameters
+	sortBy := c.DefaultQuery("sort", "new") // "new", "hot", "score"
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "25"))
+	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
+
+	// Validate limit
+	if limit < 1 || limit > 100 {
+		limit = 25
+	}
+
+	// Get posts by subreddit
+	posts, err := h.postRepo.GetBySubreddit(c.Request.Context(), subredditName, sortBy, limit, offset)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch posts", "details": err.Error()})
+		return
+	}
+
+	// Return empty array if no posts
+	if posts == nil {
+		posts = []*models.PlatformPost{}
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"posts":     posts,
+		"subreddit": subredditName,
+		"sort":      sortBy,
+		"limit":     limit,
+		"offset":    offset,
+	})
+}
+
 // CreatePostRequest represents the request body for creating a post
 type CreatePostRequest struct {
 	Title        string   `json:"title" binding:"required,min=1,max=300"`

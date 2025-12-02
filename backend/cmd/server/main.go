@@ -225,6 +225,13 @@ func main() {
 			hubs.GET("/:name/posts", hubsHandler.GetPosts)
 		}
 
+		// Local subreddit crosspost feeds (no auth required to view, optional auth for context)
+		subreddits := api.Group("/subreddits")
+		subreddits.Use(middleware.AuthOptional(authService))
+		{
+			subreddits.GET("/:name/posts", postsHandler.GetSubredditPosts)
+		}
+
 		// Public user profile routes
 		users := api.Group("/users")
 		{
