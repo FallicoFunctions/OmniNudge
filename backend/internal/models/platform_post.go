@@ -41,6 +41,12 @@ type PlatformPost struct {
 	IsEdited  bool       `json:"is_edited"`
 	EditedAt  *time.Time `json:"edited_at,omitempty"`
 
+	// Crosspost information (if this post is a crosspost)
+	CrosspostOriginType      *string `json:"crosspost_origin_type,omitempty"`      // "reddit" or "platform"
+	CrosspostOriginSubreddit *string `json:"crosspost_origin_subreddit,omitempty"` // For Reddit crossposts
+	CrosspostOriginPostID    *string `json:"crosspost_origin_post_id,omitempty"`   // Reddit post ID or platform post ID
+	CrosspostOriginalTitle   *string `json:"crosspost_original_title,omitempty"`   // Original title before editing
+
 	// Timestamps
 	CreatedAt time.Time `json:"created_at"`
 }
@@ -58,8 +64,11 @@ func NewPlatformPostRepository(pool *pgxpool.Pool) *PlatformPostRepository {
 // Create creates a new platform post
 func (r *PlatformPostRepository) Create(ctx context.Context, post *PlatformPost) error {
 	query := `
-		INSERT INTO platform_posts (author_id, hub_id, title, body, tags, media_url, media_type, thumbnail_url)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		INSERT INTO platform_posts (
+			author_id, hub_id, title, body, tags, media_url, media_type, thumbnail_url,
+			crosspost_origin_type, crosspost_origin_subreddit, crosspost_origin_post_id, crosspost_original_title
+		)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
 		RETURNING id, score, upvotes, downvotes, num_comments, view_count, is_deleted, is_edited, edited_at, created_at
 	`
 
@@ -72,6 +81,10 @@ func (r *PlatformPostRepository) Create(ctx context.Context, post *PlatformPost)
 		post.MediaURL,
 		post.MediaType,
 		post.ThumbnailURL,
+		post.CrosspostOriginType,
+		post.CrosspostOriginSubreddit,
+		post.CrosspostOriginPostID,
+		post.CrosspostOriginalTitle,
 	).Scan(
 		&post.ID,
 		&post.Score,

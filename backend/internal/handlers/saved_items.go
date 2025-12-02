@@ -34,8 +34,12 @@ func (h *SavedItemsHandler) GetSavedItems(c *gin.Context) {
 		return
 	}
 	filterType := c.DefaultQuery("type", "all")
-	if filterType != "all" && filterType != "posts" && filterType != "reddit_comments" && filterType != "post_comments" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid type filter. Use all, posts, post_comments, or reddit_comments"})
+	validTypes := map[string]bool{
+		"all": true, "posts": true, "reddit_posts": true,
+		"post_comments": true, "reddit_comments": true,
+	}
+	if !validTypes[filterType] {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid type filter. Use all, posts, reddit_posts, post_comments, or reddit_comments"})
 		return
 	}
 
@@ -47,6 +51,15 @@ func (h *SavedItemsHandler) GetSavedItems(c *gin.Context) {
 			return
 		}
 		response["saved_posts"] = posts
+	}
+
+	if filterType == "all" || filterType == "reddit_posts" {
+		redditPosts, err := h.savedRepo.GetSavedRedditPosts(c.Request.Context(), userID.(int))
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch saved Reddit posts", "details": err.Error()})
+			return
+		}
+		response["saved_reddit_posts"] = redditPosts
 	}
 
 	if filterType == "all" || filterType == "post_comments" {
