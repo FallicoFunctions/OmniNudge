@@ -772,8 +772,7 @@ export default function RedditPostPage() {
     queryKey: commentsQueryKey,
     queryFn: async () => {
       const response = await api.get<{ comments: LocalRedditComment[] }>(
-        `/reddit/posts/${subreddit}/${postId}/comments`,
-        { params: { sort } }
+        `/reddit/posts/${subreddit}/${postId}/comments?sort=${sort}`
       );
       return response.comments || [];
     },
@@ -883,15 +882,8 @@ export default function RedditPostPage() {
     navigate(`/reddit/r/${subreddit}/comments/${postId}/${commentTarget.id}`);
   };
 
-  const handleEmbed = (commentTarget: LocalRedditComment) => {
-    const permalink = `${window.location.origin}/reddit/r/${subreddit}/comments/${postId}/${commentTarget.id}`;
-    setEmbedTarget({
-      author: commentTarget.username,
-      body: commentTarget.content,
-      permalink,
-      createdAt: commentTarget.created_at,
-      score: commentTarget.score,
-    });
+  const handleEmbed = (data: EmbedPayload) => {
+    setEmbedTarget(data);
   };
 
   const handleToggleSave = (commentTarget: LocalRedditComment, shouldSave: boolean) =>
@@ -1273,7 +1265,8 @@ export default function RedditPostPage() {
           })}
         </div>
       </div>
-    </div>
+
+      {/* Embed Modal */}
       {embedTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
           <div className="w-full max-w-2xl rounded-lg bg-white p-4 shadow-lg">
@@ -1325,5 +1318,6 @@ export default function RedditPostPage() {
           </div>
         </div>
       )}
+    </div>
   );
 }
