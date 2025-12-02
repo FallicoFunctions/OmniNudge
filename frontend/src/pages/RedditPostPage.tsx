@@ -914,6 +914,14 @@ export default function RedditPostPage() {
     },
   });
 
+  const redirectAfterHide = () => {
+    if (window.history.length > 1) {
+      navigate(-1);
+    } else {
+      navigate('/reddit');
+    }
+  };
+
   const savePostMutation = useMutation({
     mutationFn: async (shouldSave: boolean) => {
       if (!subreddit || !postId) {
@@ -956,6 +964,7 @@ export default function RedditPostPage() {
     onSuccess: () => {
       setIsPostHidden(true);
       setShowHideConfirm(false);
+      redirectAfterHide();
     },
   });
 
