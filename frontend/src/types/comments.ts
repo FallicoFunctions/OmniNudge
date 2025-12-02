@@ -5,6 +5,8 @@ export interface LocalCommentBase {
   created_at: string;
   parent_comment_id: number | null;
   score: number;
+  ups?: number;
+  downs?: number;
   user_vote?: number;
   inbox_replies_disabled?: boolean;
 }
