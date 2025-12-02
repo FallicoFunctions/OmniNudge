@@ -18,9 +18,16 @@ export interface SavedPostComment extends LocalCommentBase {
   hub_name: string;
 }
 
+export interface SavedRedditPost {
+  subreddit: string;
+  reddit_post_id: string;
+  saved_at: string;
+}
+
 export interface SavedItemsResponse {
-  type: 'all' | 'posts' | 'reddit_comments' | 'post_comments';
+  type: 'all' | 'posts' | 'reddit_posts' | 'reddit_comments' | 'post_comments';
   saved_posts?: SavedPost[];
+  saved_reddit_posts?: SavedRedditPost[];
   saved_post_comments?: SavedPostComment[];
   saved_reddit_comments?: LocalRedditComment[];
 }
