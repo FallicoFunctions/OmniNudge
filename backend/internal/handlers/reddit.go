@@ -3,15 +3,16 @@ package handlers
 import (
 	"context"
 	"fmt"
+	"html"
 	"log"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/gin-gonic/gin"
 	"github.com/omninudge/backend/internal/models"
 	"github.com/omninudge/backend/internal/services"
-	"github.com/gin-gonic/gin"
 )
 
 const redditCacheTTL = 15 * time.Minute
@@ -66,7 +67,7 @@ func (h *RedditHandler) GetSubredditPosts(c *gin.Context) {
 	// Extract posts from listing
 	posts := make([]services.RedditPost, 0, len(listing.Data.Children))
 	for _, child := range listing.Data.Children {
-		posts = append(posts, child.Data)
+		posts = append(posts, normalizeRedditPost(child.Data))
 	}
 
 	c.JSON(http.StatusOK, gin.H{
@@ -105,7 +106,7 @@ func (h *RedditHandler) GetFrontPage(c *gin.Context) {
 	// Extract posts from listing
 	posts := make([]services.RedditPost, 0, len(listing.Data.Children))
 	for _, child := range listing.Data.Children {
-		posts = append(posts, child.Data)
+		posts = append(posts, normalizeRedditPost(child.Data))
 	}
 
 	c.JSON(http.StatusOK, gin.H{
@@ -178,7 +179,7 @@ func (h *RedditHandler) SearchPosts(c *gin.Context) {
 	// Extract posts from listing
 	posts := make([]services.RedditPost, 0, len(listing.Data.Children))
 	for _, child := range listing.Data.Children {
-		posts = append(posts, child.Data)
+		posts = append(posts, normalizeRedditPost(child.Data))
 	}
 
 	c.JSON(http.StatusOK, gin.H{
@@ -225,7 +226,7 @@ func (h *RedditHandler) GetSubredditMedia(c *gin.Context) {
 	// Filter for media posts only
 	mediaPosts := make([]gin.H, 0)
 	for _, child := range listing.Data.Children {
-		post := child.Data
+		post := normalizeRedditPost(child.Data)
 
 		// Check if post has media
 		isMedia := false
@@ -288,7 +289,8 @@ func (h *RedditHandler) cacheListing(ctx context.Context, listing *services.Redd
 	posts := make([]*models.CachedRedditPost, 0, len(listing.Data.Children))
 
 	for _, child := range listing.Data.Children {
-		posts = append(posts, toCachedRedditPost(child.Data, cacheKey, now, expires))
+		post := normalizeRedditPost(child.Data)
+		posts = append(posts, toCachedRedditPost(post, cacheKey, now, expires))
 	}
 
 	if len(posts) == 0 {
@@ -357,9 +359,46 @@ func deriveMedia(post services.RedditPost) (string, string) {
 	return "", ""
 }
 
+func normalizeRedditPost(post services.RedditPost) services.RedditPost {
+	if thumb := sanitizeThumbnail(post.Thumbnail); thumb != "" {
+		post.Thumbnail = thumb
+		return post
+	}
+
+	if preview := extractPreviewThumbnail(post); preview != "" {
+		post.Thumbnail = preview
+	} else {
+		post.Thumbnail = ""
+	}
+	return post
+}
+
+func extractPreviewThumbnail(post services.RedditPost) string {
+	if post.Preview == nil {
+		return ""
+	}
+
+	for _, image := range post.Preview.Images {
+		if url := sanitizeThumbnail(image.Source.URL); url != "" {
+			return url
+		}
+		for i := len(image.Resolutions) - 1; i >= 0; i-- {
+			if url := sanitizeThumbnail(image.Resolutions[i].URL); url != "" {
+				return url
+			}
+		}
+	}
+	return ""
+}
+
 func sanitizeThumbnail(thumbnail string) string {
-	if strings.HasPrefix(thumbnail, "http://") || strings.HasPrefix(thumbnail, "https://") {
-		return thumbnail
+	if thumbnail == "" {
+		return ""
+	}
+
+	clean := html.UnescapeString(strings.TrimSpace(thumbnail))
+	if strings.HasPrefix(clean, "http://") || strings.HasPrefix(clean, "https://") {
+		return clean
 	}
 	return ""
 }
