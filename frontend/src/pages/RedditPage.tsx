@@ -65,6 +65,14 @@ export default function RedditPage() {
     enabled: !!user,
   });
 
+  // Fetch local platform posts for this subreddit
+  const { data: localPostsData } = useQuery({
+    queryKey: ['subreddit-posts', subreddit, sort],
+    queryFn: () => hubsService.getSubredditPosts(subreddit, sort),
+    enabled: !!user && subreddit !== 'popular' && subreddit !== 'frontpage',
+    staleTime: 1000 * 60 * 5, // 5 minutes
+  });
+
   const savedRedditPostsKey = ['saved-items', 'reddit_posts'] as const;
   const { data: savedRedditPostsData } = useQuery({
     queryKey: savedRedditPostsKey,
@@ -302,6 +310,41 @@ export default function RedditPage() {
       {error && (
         <div className="rounded-md bg-red-50 p-4 text-sm text-red-800 dark:bg-red-900/20 dark:text-red-400">
           Failed to load posts: {error instanceof Error ? error.message : 'Unknown error'}
+        </div>
+      )}
+
+      {/* Local OmniNudge Posts */}
+      {localPostsData && localPostsData.posts && localPostsData.posts.length > 0 && (
+        <div className="mb-4 space-y-3">
+          <div className="rounded-md bg-blue-50 p-3 text-sm font-medium text-blue-900">
+            📌 Local OmniNudge Posts in r/{subreddit}
+          </div>
+          {localPostsData.posts.map((post: any) => (
+            <article
+              key={`local-${post.id}`}
+              className="rounded-md border-2 border-blue-400 bg-[var(--color-surface)]"
+            >
+              <div className="flex gap-3 p-3">
+                <div className="flex-1 text-left">
+                  <div className="mb-1 inline-block rounded bg-blue-600 px-2 py-0.5 text-[10px] font-bold uppercase text-white">
+                    OmniNudge
+                  </div>
+                  <Link to={`/posts/${post.id}`}>
+                    <h3 className="text-base font-semibold text-[var(--color-text-primary)] hover:text-[var(--color-primary)]">
+                      {post.title}
+                    </h3>
+                  </Link>
+                  <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-[var(--color-text-secondary)]">
+                    <span className="font-medium text-blue-600">Local Post</span>
+                    <span>•</span>
+                    <span>{post.score} points</span>
+                    <span>•</span>
+                    <span>{post.num_comments} comments</span>
+                  </div>
+                </div>
+              </div>
+            </article>
+          ))}
         </div>
       )}
 
