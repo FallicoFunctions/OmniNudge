@@ -9,21 +9,23 @@ import (
 
 // RedditPostComment represents a comment on a Reddit post (stored locally on your platform)
 type RedditPostComment struct {
-	ID                      int        `json:"id"`
-	Subreddit               string     `json:"subreddit"`
-	RedditPostID            string     `json:"reddit_post_id"`
-	RedditPostTitle         *string    `json:"reddit_post_title,omitempty"`
-	UserID                  int        `json:"user_id"`
-	Username                string     `json:"username"`
-	ParentCommentID         *int       `json:"parent_comment_id"`
-	ParentRedditCommentID   *string    `json:"parent_reddit_comment_id,omitempty"` // Reddit API comment ID this is replying to
-	Content                 string     `json:"content"`
-	Score                   int        `json:"score"`
-	InboxRepliesDisabled    bool       `json:"inbox_replies_disabled"`
-	UserVote                *int       `json:"user_vote,omitempty"` // -1, 0, or 1 representing current user's vote
-	CreatedAt               time.Time  `json:"created_at"`
-	UpdatedAt               *time.Time `json:"updated_at,omitempty"`
-	DeletedAt               *time.Time `json:"deleted_at,omitempty"`
+	ID                    int        `json:"id"`
+	Subreddit             string     `json:"subreddit"`
+	RedditPostID          string     `json:"reddit_post_id"`
+	RedditPostTitle       *string    `json:"reddit_post_title,omitempty"`
+	UserID                int        `json:"user_id"`
+	Username              string     `json:"username"`
+	ParentCommentID       *int       `json:"parent_comment_id"`
+	ParentRedditCommentID *string    `json:"parent_reddit_comment_id,omitempty"` // Reddit API comment ID this is replying to
+	Content               string     `json:"content"`
+	Score                 int        `json:"score"`
+	Ups                   int        `json:"ups"`
+	Downs                 int        `json:"downs"`
+	InboxRepliesDisabled  bool       `json:"inbox_replies_disabled"`
+	UserVote              *int       `json:"user_vote,omitempty"` // -1, 0, or 1 representing current user's vote
+	CreatedAt             time.Time  `json:"created_at"`
+	UpdatedAt             *time.Time `json:"updated_at,omitempty"`
+	DeletedAt             *time.Time `json:"deleted_at,omitempty"`
 }
 
 // RedditPostCommentRepository manages local comments on Reddit posts
@@ -93,14 +95,17 @@ func (r *RedditPostCommentRepository) GetByRedditPostWithUserVotes(ctx context.C
 	query := `
 		SELECT
 			rc.id, rc.subreddit, rc.reddit_post_id, rc.reddit_post_title, rc.user_id, u.username,
-			rc.parent_comment_id, rc.parent_reddit_comment_id, rc.content, rc.score, rc.inbox_replies_disabled,
+			rc.parent_comment_id, rc.parent_reddit_comment_id, rc.content, rc.score,
+			(SELECT COUNT(*) FROM reddit_comment_votes v2 WHERE v2.comment_id = rc.id AND v2.vote_type = 1) AS ups,
+			(SELECT COUNT(*) FROM reddit_comment_votes v2 WHERE v2.comment_id = rc.id AND v2.vote_type = -1) AS downs,
+			rc.inbox_replies_disabled,
 			rc.created_at, rc.updated_at, rc.deleted_at,
 			COALESCE(v.vote_type, 0) as user_vote
 		FROM reddit_post_comments rc
 		JOIN users u ON u.id = rc.user_id
 		LEFT JOIN reddit_comment_votes v ON v.comment_id = rc.id AND v.user_id = $3
 		WHERE rc.subreddit = $1 AND rc.reddit_post_id = $2 AND (rc.deleted_at IS NULL OR rc.content = $4)
-		ORDER BY rc.created_at ASC
+		ORDER BY rc.created_at DESC
 	`
 	rows, err := r.pool.Query(ctx, query, subreddit, postID, userID, DeletedCommentPlaceholder)
 	if err != nil {
@@ -115,7 +120,7 @@ func (r *RedditPostCommentRepository) GetByRedditPostWithUserVotes(ctx context.C
 		if err := rows.Scan(
 			&comment.ID, &comment.Subreddit, &comment.RedditPostID, &comment.RedditPostTitle,
 			&comment.UserID, &comment.Username,
-			&comment.ParentCommentID, &comment.ParentRedditCommentID, &comment.Content, &comment.Score, &comment.InboxRepliesDisabled,
+			&comment.ParentCommentID, &comment.ParentRedditCommentID, &comment.Content, &comment.Score, &comment.Ups, &comment.Downs, &comment.InboxRepliesDisabled,
 			&comment.CreatedAt, &comment.UpdatedAt, &comment.DeletedAt,
 			&userVote,
 		); err != nil {
@@ -133,12 +138,15 @@ func (r *RedditPostCommentRepository) GetByRedditPost(ctx context.Context, subre
 	query := `
 		SELECT
 			rc.id, rc.subreddit, rc.reddit_post_id, rc.reddit_post_title, rc.user_id, u.username,
-			rc.parent_comment_id, rc.parent_reddit_comment_id, rc.content, rc.score, rc.inbox_replies_disabled,
+			rc.parent_comment_id, rc.parent_reddit_comment_id, rc.content, rc.score,
+			(SELECT COUNT(*) FROM reddit_comment_votes v2 WHERE v2.comment_id = rc.id AND v2.vote_type = 1) AS ups,
+			(SELECT COUNT(*) FROM reddit_comment_votes v2 WHERE v2.comment_id = rc.id AND v2.vote_type = -1) AS downs,
+			rc.inbox_replies_disabled,
 			rc.created_at, rc.updated_at, rc.deleted_at
 		FROM reddit_post_comments rc
 		JOIN users u ON u.id = rc.user_id
 		WHERE rc.subreddit = $1 AND rc.reddit_post_id = $2 AND (rc.deleted_at IS NULL OR rc.content = $3)
-		ORDER BY rc.created_at ASC
+		ORDER BY rc.created_at DESC
 	`
 	rows, err := r.pool.Query(ctx, query, subreddit, postID, DeletedCommentPlaceholder)
 	if err != nil {
@@ -152,7 +160,7 @@ func (r *RedditPostCommentRepository) GetByRedditPost(ctx context.Context, subre
 		if err := rows.Scan(
 			&comment.ID, &comment.Subreddit, &comment.RedditPostID, &comment.RedditPostTitle,
 			&comment.UserID, &comment.Username,
-			&comment.ParentCommentID, &comment.ParentRedditCommentID, &comment.Content, &comment.Score, &comment.InboxRepliesDisabled,
+			&comment.ParentCommentID, &comment.ParentRedditCommentID, &comment.Content, &comment.Score, &comment.Ups, &comment.Downs, &comment.InboxRepliesDisabled,
 			&comment.CreatedAt, &comment.UpdatedAt, &comment.DeletedAt,
 		); err != nil {
 			return nil, err
@@ -167,7 +175,10 @@ func (r *RedditPostCommentRepository) GetByID(ctx context.Context, id int) (*Red
 	query := `
 		SELECT
 			rc.id, rc.subreddit, rc.reddit_post_id, rc.reddit_post_title, rc.user_id, u.username,
-			rc.parent_comment_id, rc.parent_reddit_comment_id, rc.content, rc.score, rc.inbox_replies_disabled,
+			rc.parent_comment_id, rc.parent_reddit_comment_id, rc.content, rc.score,
+			(SELECT COUNT(*) FROM reddit_comment_votes v2 WHERE v2.comment_id = rc.id AND v2.vote_type = 1) AS ups,
+			(SELECT COUNT(*) FROM reddit_comment_votes v2 WHERE v2.comment_id = rc.id AND v2.vote_type = -1) AS downs,
+			rc.inbox_replies_disabled,
 			rc.created_at, rc.updated_at, rc.deleted_at
 		FROM reddit_post_comments rc
 		JOIN users u ON u.id = rc.user_id
@@ -177,7 +188,7 @@ func (r *RedditPostCommentRepository) GetByID(ctx context.Context, id int) (*Red
 	err := r.pool.QueryRow(ctx, query, id).Scan(
 		&comment.ID, &comment.Subreddit, &comment.RedditPostID, &comment.RedditPostTitle,
 		&comment.UserID, &comment.Username,
-		&comment.ParentCommentID, &comment.ParentRedditCommentID, &comment.Content, &comment.Score, &comment.InboxRepliesDisabled,
+		&comment.ParentCommentID, &comment.ParentRedditCommentID, &comment.Content, &comment.Score, &comment.Ups, &comment.Downs, &comment.InboxRepliesDisabled,
 		&comment.CreatedAt, &comment.UpdatedAt, &comment.DeletedAt,
 	)
 	if err != nil {

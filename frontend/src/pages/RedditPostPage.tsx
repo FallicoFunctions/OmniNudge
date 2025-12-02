@@ -115,8 +115,10 @@ function RedditCommentView({
       : undefined;
   const replies = repliesListing?.data.children ?? [];
 
-  // Find local comments that reply to this Reddit comment
-  const localReplies = localComments.filter(c => c.parent_reddit_comment_id === comment.data.id);
+  // Find local comments that reply to this Reddit comment, sorted by oldest first (chronological order)
+  const localReplies = localComments
+    .filter(c => c.parent_reddit_comment_id === comment.data.id)
+    .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
 
   const hasReplies = replies.length > 0 || localReplies.length > 0;
 
@@ -380,8 +382,10 @@ function LocalCommentView({
     setEditText(comment.content);
   }, [comment.content]);
 
-  // Get direct replies to this comment
-  const replies = allComments.filter(c => c.parent_comment_id === comment.id);
+  // Get direct replies to this comment, sorted by oldest first (chronological order)
+  const replies = allComments
+    .filter(c => c.parent_comment_id === comment.id)
+    .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
 
   // Check if THIS specific comment is being replied to
   const isReplying = replyingTo === comment.id;
@@ -739,6 +743,7 @@ export default function RedditPostPage() {
   const [commentText, setCommentText] = useState('');
   const [replyingTo, setReplyingTo] = useState<number | null>(null);
   const [embedTarget, setEmbedTarget] = useState<LocalRedditComment | null>(null);
+  const [sort, setSort] = useState<string>('best');
 
   // Fetch Reddit post and comments from Reddit API
   const { data: redditData, isLoading: loadingReddit } = useQuery({
@@ -760,12 +765,13 @@ export default function RedditPostPage() {
   });
 
   // Fetch local comments for this Reddit post (stored on our platform)
-  const commentsQueryKey = ['reddit', 'posts', subreddit, postId, 'localComments'] as const;
+  const commentsQueryKey = ['reddit', 'posts', subreddit, postId, 'localComments', sort] as const;
   const { data: localCommentsData, isLoading: loadingLocal } = useQuery({
     queryKey: commentsQueryKey,
     queryFn: async () => {
       const response = await api.get<{ comments: LocalRedditComment[] }>(
-        `/reddit/posts/${subreddit}/${postId}/comments`
+        `/reddit/posts/${subreddit}/${postId}/comments`,
+        { params: { sort } }
       );
       return response.comments || [];
     },
@@ -896,7 +902,8 @@ export default function RedditPostPage() {
       const target = localCommentsData.find((c) => c.id === focusedCommentId);
       return target ? [target] : [];
     }
-    return localCommentsData.filter((c) => c.parent_comment_id === null);
+    // Only include comments that are not replies to anything (neither local comments nor Reddit comments)
+    return localCommentsData.filter((c) => c.parent_comment_id === null && !c.parent_reddit_comment_id);
   }, [localCommentsData, focusedCommentId]);
 
   const commentNotFound = Boolean(focusedCommentId && localCommentsData && topLevelComments.length === 0);
@@ -1029,9 +1036,26 @@ export default function RedditPostPage() {
 
       {/* Unified Comments Section */}
       <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-6">
-        <h2 className="mb-4 text-xl font-semibold text-[var(--color-text-primary)]">
-          Comments
-        </h2>
+        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <h2 className="text-xl font-semibold text-[var(--color-text-primary)]">
+            Comments
+          </h2>
+          <div className="flex items-center gap-2 text-sm text-[var(--color-text-secondary)]">
+            <span>Sort by</span>
+            <select
+              className="rounded border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-1 text-[var(--color-text-primary)]"
+              value={sort}
+              onChange={(e) => setSort(e.target.value)}
+            >
+              <option value="best">Best</option>
+              <option value="new">New</option>
+              <option value="old">Old</option>
+              <option value="top">Top</option>
+              <option value="controversial">Controversial</option>
+              <option value="qa">Q&A</option>
+            </select>
+          </div>
+        </div>
 
         <div className="mb-4 rounded-md border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800 dark:border-blue-800 dark:bg-blue-900/20 dark:text-blue-300">
           <strong>Note:</strong> Comments from Reddit are read-only. You can reply to them, but your replies are <strong>only visible on this site</strong>.
