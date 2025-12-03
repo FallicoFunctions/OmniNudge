@@ -16,6 +16,7 @@ import { formatTimestamp } from '../utils/timeFormat';
 import {
   createLocalCrosspostPayload,
   createRedditCrosspostPayload,
+  sanitizeHttpUrl,
   type RedditCrosspostSource,
 } from '../utils/crosspostHelpers';
 import type { SubredditSuggestion } from '../types/reddit';
@@ -49,6 +50,26 @@ type HideTarget =
   | { type: 'platform'; post: LocalSubredditPost };
 
 const SUBREDDIT_AUTOCOMPLETE_MIN_LENGTH = 2;
+const IMAGE_URL_REGEX = /\.(jpe?g|png|gif|webp)$/i;
+
+function getExpandableImageUrl(post: FeedRedditPost): string | undefined {
+  const previewUrl = post.preview?.images?.[0]?.source?.url;
+  const sanitizedPreview = sanitizeHttpUrl(previewUrl);
+  if (sanitizedPreview) {
+    return sanitizedPreview;
+  }
+
+  const sanitizedPostUrl = sanitizeHttpUrl(post.url);
+  if (!sanitizedPostUrl) {
+    return undefined;
+  }
+
+  if (post.post_hint === 'image' || IMAGE_URL_REGEX.test(sanitizedPostUrl.toLowerCase())) {
+    return sanitizedPostUrl;
+  }
+
+  return undefined;
+}
 
 export default function RedditPage() {
   const navigate = useNavigate();
@@ -67,6 +88,7 @@ export default function RedditPage() {
   const [sendRepliesToInbox, setSendRepliesToInbox] = useState(true);
   const [showOmniOnly, setShowOmniOnly] = useState(false);
   const [isAutocompleteOpen, setIsAutocompleteOpen] = useState(false);
+  const [expandedImageMap, setExpandedImageMap] = useState<Record<string, boolean>>({});
 
   const { data, isLoading, error } = useQuery<FeedRedditPostsResponse>({
     queryKey: ['reddit', subreddit, sort],
@@ -400,6 +422,13 @@ export default function RedditPage() {
       .catch(() => alert('Unable to copy link. Please try again.'));
   };
 
+  const toggleInlinePreview = (postId: string) => {
+    setExpandedImageMap((prev) => ({
+      ...prev,
+      [postId]: !prev[postId],
+    }));
+  };
+
   const trimmedInputValue = inputValue.trim();
 
   const {
@@ -711,6 +740,8 @@ export default function RedditPage() {
               toggleSaveRedditPostMutation.isPending &&
               toggleSaveRedditPostMutation.variables?.post.id === post.id;
             const pendingShouldSave = toggleSaveRedditPostMutation.variables?.shouldSave;
+            const previewImageUrl = getExpandableImageUrl(post);
+            const isInlinePreviewOpen = !!(previewImageUrl && expandedImageMap[post.id]);
 
             return (
               <article
@@ -731,72 +762,122 @@ export default function RedditPage() {
                         {post.title}
                       </h3>
                     </Link>
-                    <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-[var(--color-text-secondary)]">
-                      <Link
-                        to={`/reddit/r/${post.subreddit}`}
-                        className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
-                      >
-                        r/{post.subreddit}
-                      </Link>
-                      <span>•</span>
-                      <Link
-                        to={`/reddit/user/${post.author}`}
-                        className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
-                      >
-                        u/{post.author}
-                      </Link>
-                      <span>•</span>
-                      <span>{post.score.toLocaleString()} points</span>
-                      <span>•</span>
-                      <span>submitted {formatTimestamp(post.created_utc, useRelativeTime)}</span>
-                    </div>
-                    <div className="mt-1 flex flex-wrap items-center gap-3 text-[11px] text-[var(--color-text-secondary)]">
-                      <Link
-                        to={postUrl}
-                        className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
-                      >
-                        {commentLabel}
-                      </Link>
-                      <button
-                        type="button"
-                        onClick={() => handleShareRedditPost(post)}
-                        className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
-                      >
-                        Share
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          toggleSaveRedditPostMutation.mutate({
-                            post,
-                            shouldSave: !isSaved,
-                          })
-                        }
-                        disabled={isSaveActionPending}
-                        className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] disabled:opacity-50"
-                      >
-                        {isSaveActionPending
-                          ? pendingShouldSave
-                            ? 'Saving...'
-                            : 'Unsaving...'
-                          : isSaved
-                          ? 'Unsave'
-                          : 'Save'}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleSetHideTarget({ type: 'reddit', post })}
-                        className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
-                      >
-                        Hide
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleCrosspostSelection({ type: 'reddit', post })}
-                        className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
-                      >
-                        Crosspost
-                      </button>
+                    <div className="mt-1 flex items-start gap-3 text-[11px] text-[var(--color-text-secondary)]">
+                      {previewImageUrl && (
+                        <button
+                          type="button"
+                          onClick={() => toggleInlinePreview(post.id)}
+                          aria-pressed={isInlinePreviewOpen}
+                          aria-label={isInlinePreviewOpen ? 'Hide image preview' : 'Show image preview'}
+                          className="flex h-7 w-7 items-center justify-center rounded border border-[var(--color-border)] bg-[var(--color-surface-elevated)] text-[var(--color-text-secondary)] hover:border-[var(--color-primary)] hover:text-[var(--color-primary)]"
+                        >
+                          <span className="sr-only">
+                            {isInlinePreviewOpen ? 'Hide image preview' : 'Show image preview'}
+                          </span>
+                          {isInlinePreviewOpen ? (
+                            <svg
+                              className="h-4 w-4"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              aria-hidden="true"
+                            >
+                              <line x1="6" y1="6" x2="18" y2="18" />
+                              <line x1="6" y1="18" x2="18" y2="6" />
+                            </svg>
+                          ) : (
+                            <svg
+                              className="h-4 w-4"
+                              viewBox="0 0 24 24"
+                              fill="currentColor"
+                              aria-hidden="true"
+                            >
+                              <path d="M8 5.5v13l10.5-6.5L8 5.5Z" />
+                            </svg>
+                          )}
+                        </button>
+                      )}
+                      <div className="flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Link
+                            to={`/reddit/r/${post.subreddit}`}
+                            className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+                          >
+                            r/{post.subreddit}
+                          </Link>
+                          <span>•</span>
+                          <Link
+                            to={`/reddit/user/${post.author}`}
+                            className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+                          >
+                            u/{post.author}
+                          </Link>
+                          <span>•</span>
+                          <span>{post.score.toLocaleString()} points</span>
+                          <span>•</span>
+                          <span>submitted {formatTimestamp(post.created_utc, useRelativeTime)}</span>
+                        </div>
+                        {isInlinePreviewOpen && previewImageUrl && (
+                          <div className="mt-3 overflow-hidden rounded border border-[var(--color-border)] bg-[var(--color-surface-elevated)]">
+                            <img
+                              src={previewImageUrl}
+                              alt={post.title}
+                              className="max-h-[70vh] w-full object-contain"
+                            />
+                          </div>
+                        )}
+                        <div className="mt-1 flex flex-wrap items-center gap-3">
+                          <Link
+                            to={postUrl}
+                            className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+                          >
+                            {commentLabel}
+                          </Link>
+                          <button
+                            type="button"
+                            onClick={() => handleShareRedditPost(post)}
+                            className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+                          >
+                            Share
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              toggleSaveRedditPostMutation.mutate({
+                                post,
+                                shouldSave: !isSaved,
+                              })
+                            }
+                            disabled={isSaveActionPending}
+                            className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] disabled:opacity-50"
+                          >
+                            {isSaveActionPending
+                              ? pendingShouldSave
+                                ? 'Saving...'
+                                : 'Unsaving...'
+                              : isSaved
+                              ? 'Unsave'
+                              : 'Save'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleSetHideTarget({ type: 'reddit', post })}
+                            className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+                          >
+                            Hide
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleCrosspostSelection({ type: 'reddit', post })}
+                            className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+                          >
+                            Crosspost
+                          </button>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
