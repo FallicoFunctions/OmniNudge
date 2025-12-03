@@ -173,7 +173,9 @@ export default function HiddenPage() {
                       <span>•</span>
                       <span>u/{post.author_username}</span>
                       <span>•</span>
-                      <span>{new Date(post.created_at).toLocaleDateString()}</span>
+                      <span>
+                        {new Date(post.crossposted_at ?? post.created_at).toLocaleDateString()}
+                      </span>
                     </div>
                     <h3 className="mt-2 text-lg font-semibold text-[var(--color-text-primary)]">
                       {post.title}

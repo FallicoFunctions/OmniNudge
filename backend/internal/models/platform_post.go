@@ -51,7 +51,8 @@ type PlatformPost struct {
 	TargetSubreddit *string `json:"target_subreddit,omitempty"` // Subreddit this post is posted to
 
 	// Timestamps
-	CreatedAt time.Time `json:"created_at"`
+	CrosspostedAt *time.Time `json:"crossposted_at,omitempty"`
+	CreatedAt     time.Time  `json:"created_at"`
 }
 
 const platformPostSelectColumns = `
@@ -59,7 +60,7 @@ const platformPostSelectColumns = `
 	score, upvotes, downvotes, num_comments, view_count,
 	is_deleted, is_edited, edited_at,
 	crosspost_origin_type, crosspost_origin_subreddit, crosspost_origin_post_id, crosspost_original_title,
-	target_subreddit, created_at
+	target_subreddit, crossposted_at, created_at
 `
 
 // PlatformPostRepository handles database operations for platform posts
@@ -78,10 +79,10 @@ func (r *PlatformPostRepository) Create(ctx context.Context, post *PlatformPost)
 		INSERT INTO platform_posts (
 			author_id, hub_id, title, body, tags, media_url, media_type, thumbnail_url,
 			crosspost_origin_type, crosspost_origin_subreddit, crosspost_origin_post_id, crosspost_original_title,
-			target_subreddit
+			target_subreddit, crossposted_at
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
-		RETURNING id, score, upvotes, downvotes, num_comments, view_count, is_deleted, is_edited, edited_at, created_at
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+		RETURNING id, score, upvotes, downvotes, num_comments, view_count, is_deleted, is_edited, edited_at, crossposted_at, created_at
 	`
 
 	return r.pool.QueryRow(ctx, query,
@@ -98,6 +99,7 @@ func (r *PlatformPostRepository) Create(ctx context.Context, post *PlatformPost)
 		post.CrosspostOriginPostID,
 		post.CrosspostOriginalTitle,
 		post.TargetSubreddit,
+		post.CrosspostedAt,
 	).Scan(
 		&post.ID,
 		&post.Score,
@@ -108,6 +110,7 @@ func (r *PlatformPostRepository) Create(ctx context.Context, post *PlatformPost)
 		&post.IsDeleted,
 		&post.IsEdited,
 		&post.EditedAt,
+		&post.CrosspostedAt,
 		&post.CreatedAt,
 	)
 }
@@ -339,6 +342,12 @@ func (r *PlatformPostRepository) IncrementViewCount(ctx context.Context, postID 
 	return err
 }
 
+// UpdateCreatedAt overrides the stored created_at timestamp for a post.
+func (r *PlatformPostRepository) UpdateCreatedAt(ctx context.Context, postID int, createdAt time.Time) error {
+	_, err := r.pool.Exec(ctx, `UPDATE platform_posts SET created_at = $1 WHERE id = $2`, createdAt, postID)
+	return err
+}
+
 func scanPlatformPost(row pgx.Row, post *PlatformPost) error {
 	return row.Scan(
 		&post.ID,
@@ -363,6 +372,7 @@ func scanPlatformPost(row pgx.Row, post *PlatformPost) error {
 		&post.CrosspostOriginPostID,
 		&post.CrosspostOriginalTitle,
 		&post.TargetSubreddit,
+		&post.CrosspostedAt,
 		&post.CreatedAt,
 	)
 }

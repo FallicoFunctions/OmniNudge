@@ -8,6 +8,7 @@ export interface PlatformPost {
   hub_name: string;
   score: number;
   comment_count: number;
+  crossposted_at?: string | null;
   created_at: string;
   updated_at?: string;
   media_url?: string | null;

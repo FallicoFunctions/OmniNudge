@@ -37,12 +37,15 @@ func main() {
 	defer db.Close()
 	log.Printf("Connected to PostgreSQL database: %s", cfg.Database.DBName)
 
-	// Run database migrations
-	log.Println("Running database migrations...")
-	if err := db.Migrate(context.Background()); err != nil {
-		log.Fatalf("Failed to run migrations: %v", err)
+	if cfg.Database.AutoMigrate {
+		log.Println("Running database migrations...")
+		if err := db.Migrate(context.Background()); err != nil {
+			log.Fatalf("Failed to run migrations: %v", err)
+		}
+		log.Println("Migrations complete")
+	} else {
+		log.Println("Skipping embedded database migrations (DB_AUTO_MIGRATE=false)")
 	}
-	log.Println("Migrations complete")
 
 	// Initialize repositories
 	userRepo := models.NewUserRepository(db.Pool)

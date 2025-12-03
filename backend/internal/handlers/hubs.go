@@ -3,6 +3,7 @@ package handlers
 import (
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/omninudge/backend/internal/models"
@@ -264,10 +265,22 @@ func (h *HubsHandler) CrosspostToHub(c *gin.Context) {
 		CrosspostOriginPostID:    &originPostID,
 		CrosspostOriginalTitle:   stringPtrOrNil(originalTitle),
 	}
+	crosspostedAt := time.Now().UTC()
+	post.CrosspostedAt = &crosspostedAt
 
 	if err := h.postRepo.Create(c.Request.Context(), post); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create crosspost", "details": err.Error()})
 		return
+	}
+
+	if post.CrosspostedAt != nil {
+		normalized := post.CrosspostedAt.UTC()
+		if err := h.postRepo.UpdateCreatedAt(c.Request.Context(), post.ID, normalized); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to finalize crosspost timestamp", "details": err.Error()})
+			return
+		}
+		post.CreatedAt = normalized
+		post.CrosspostedAt = &normalized
 	}
 
 	c.JSON(http.StatusCreated, post)
@@ -353,10 +366,22 @@ func (h *HubsHandler) CrosspostToSubreddit(c *gin.Context) {
 		CrosspostOriginPostID:    &originPostID,
 		CrosspostOriginalTitle:   stringPtrOrNil(originalTitle),
 	}
+	crosspostedAt := time.Now().UTC()
+	post.CrosspostedAt = &crosspostedAt
 
 	if err := h.postRepo.Create(c.Request.Context(), post); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create crosspost", "details": err.Error()})
 		return
+	}
+
+	if post.CrosspostedAt != nil {
+		normalized := post.CrosspostedAt.UTC()
+		if err := h.postRepo.UpdateCreatedAt(c.Request.Context(), post.ID, normalized); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to finalize crosspost timestamp", "details": err.Error()})
+			return
+		}
+		post.CreatedAt = normalized
+		post.CrosspostedAt = &normalized
 	}
 
 	c.JSON(http.StatusCreated, post)

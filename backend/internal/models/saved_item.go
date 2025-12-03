@@ -15,13 +15,14 @@ type SavedItemsRepository struct {
 
 // SavedPostOverview represents a lightweight saved post entry
 type SavedPostOverview struct {
-	ID             int       `json:"id"`
-	Title          string    `json:"title"`
-	HubName        string    `json:"hub_name"`
-	AuthorUsername string    `json:"author_username"`
-	Score          int       `json:"score"`
-	CommentCount   int       `json:"comment_count"`
-	CreatedAt      time.Time `json:"created_at"`
+	ID             int        `json:"id"`
+	Title          string     `json:"title"`
+	HubName        string     `json:"hub_name"`
+	AuthorUsername string     `json:"author_username"`
+	Score          int        `json:"score"`
+	CommentCount   int        `json:"comment_count"`
+	CrosspostedAt  *time.Time `json:"crossposted_at,omitempty"`
+	CreatedAt      time.Time  `json:"created_at"`
 }
 
 // SavedPostComment represents a saved comment on a platform post
@@ -140,7 +141,7 @@ func (r *SavedItemsRepository) IsRedditCommentSaved(ctx context.Context, userID,
 func (r *SavedItemsRepository) GetSavedPosts(ctx context.Context, userID int) ([]*SavedPostOverview, error) {
 	query := `
 		SELECT p.id, p.title, h.name AS hub_name, u.username AS author_username,
-		       p.score, p.num_comments, p.created_at
+		       p.score, p.num_comments, p.created_at, p.crossposted_at
 		FROM saved_posts sp
 		JOIN platform_posts p ON p.id = sp.post_id AND p.is_deleted = FALSE
 		JOIN hubs h ON h.id = p.hub_id
@@ -165,6 +166,7 @@ func (r *SavedItemsRepository) GetSavedPosts(ctx context.Context, userID int) ([
 			&post.Score,
 			&post.CommentCount,
 			&post.CreatedAt,
+			&post.CrosspostedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -420,7 +422,7 @@ func (r *SavedItemsRepository) IsPostHidden(ctx context.Context, userID, postID 
 func (r *SavedItemsRepository) GetHiddenPosts(ctx context.Context, userID int) ([]*SavedPostOverview, error) {
 	query := `
 		SELECT p.id, p.title, h.name AS hub_name, u.username AS author_username,
-		       p.score, p.num_comments, p.created_at
+		       p.score, p.num_comments, p.created_at, p.crossposted_at
 		FROM hidden_posts hp
 		JOIN platform_posts p ON p.id = hp.post_id AND p.is_deleted = FALSE
 		JOIN hubs h ON h.id = p.hub_id
@@ -445,6 +447,7 @@ func (r *SavedItemsRepository) GetHiddenPosts(ctx context.Context, userID int) (
 			&post.Score,
 			&post.CommentCount,
 			&post.CreatedAt,
+			&post.CrosspostedAt,
 		); err != nil {
 			return nil, err
 		}

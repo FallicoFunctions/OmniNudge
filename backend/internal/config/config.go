@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 )
 
 // Config holds all configuration for the application
@@ -42,6 +43,7 @@ type DatabaseConfig struct {
 	Password string
 	DBName   string
 	SSLMode  string
+	AutoMigrate bool
 }
 
 // RedisConfig holds redis caching configuration
@@ -61,12 +63,13 @@ func Load() (*Config, error) {
 			Host: getEnv("SERVER_HOST", "localhost"),
 		},
 		Database: DatabaseConfig{
-			Host:     getEnv("DB_HOST", "localhost"),
-			Port:     getEnvAsInt("DB_PORT", 5432),
-			User:     getEnv("DB_USER", "derrf"),
-			Password: getEnv("DB_PASSWORD", "drummer"),
-			DBName:   getEnv("DB_NAME", "omninudge_dev"),
-			SSLMode:  getEnv("DB_SSLMODE", "disable"),
+			Host:        getEnv("DB_HOST", "localhost"),
+			Port:        getEnvAsInt("DB_PORT", 5432),
+			User:        getEnv("DB_USER", "derrf"),
+			Password:    getEnv("DB_PASSWORD", "drummer"),
+			DBName:      getEnv("DB_NAME", "omninudge_dev"),
+			SSLMode:     getEnv("DB_SSLMODE", "disable"),
+			AutoMigrate: getEnvAsBool("DB_AUTO_MIGRATE", true),
 		},
 		Reddit: RedditConfig{
 			ClientID:     getEnv("REDDIT_CLIENT_ID", ""),
@@ -106,6 +109,21 @@ func getEnv(key, defaultValue string) string {
 		return value
 	}
 	return defaultValue
+}
+
+func getEnvAsBool(key string, defaultValue bool) bool {
+	valueStr := getEnv(key, "")
+	if valueStr == "" {
+		return defaultValue
+	}
+	switch strings.ToLower(valueStr) {
+	case "1", "true", "yes", "y":
+		return true
+	case "0", "false", "no", "n":
+		return false
+	default:
+		return defaultValue
+	}
 }
 
 // getEnvAsInt reads an environment variable as an integer or returns a default value
