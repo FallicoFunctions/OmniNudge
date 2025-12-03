@@ -9,6 +9,7 @@ import { hubsService } from '../services/hubsService';
 import type { LocalRedditComment } from '../types/reddit';
 import { formatTimestamp } from '../utils/timeFormat';
 import { createRedditCrosspostPayload } from '../utils/crosspostHelpers';
+import { MarkdownRenderer } from '../components/common/MarkdownRenderer';
 
 interface RedditComment {
   kind: string;
@@ -56,6 +57,20 @@ interface RedditListing<T> {
 
 type RedditPostListing = RedditListing<{ kind: string; data: RedditPostData }>;
 type RedditCommentsListing = RedditListing<RedditComment>;
+
+const FORMATTING_EXAMPLES = [
+  { input: '*italics*', output: '*italics*' },
+  { input: '**bold**', output: '**bold**' },
+  { input: '[OmniNudge!](https://omninudge.com)', output: '[OmniNudge!](https://omninudge.com)' },
+  { input: '* item 1\n* item 2\n* item 3', output: '* item 1\n* item 2\n* item 3' },
+  { input: '> quoted text', output: '> quoted text' },
+  {
+    input: 'Lines starting with four spaces are treated like code:\n\n    if 1 * 2 < 3:\n    print "hello, world!"',
+    output: 'Lines starting with four spaces are treated like code:\n\n    if 1 * 2 < 3:\n    print "hello, world!"',
+  },
+  { input: '~~strikethrough~~', output: '~~strikethrough~~' },
+  { input: 'super^script', output: 'super^script' },
+] as const;
 
 
 // Component to render a single Reddit comment with replies
@@ -216,18 +231,7 @@ function RedditCommentView({
 
         {!collapsed && (
           <>
-            <div className="mt-1 text-sm text-[var(--color-text-primary)] text-left leading-normal">
-              {comment.data.body || ''.split('\n\n').map((paragraph, i, arr) => (
-                <p key={i} className={i < arr.length - 1 ? 'mb-3' : ''}>
-                  {paragraph.split('\n').map((line, j, lineArr) => (
-                    <span key={j}>
-                      {line}
-                      {j < lineArr.length - 1 && <br />}
-                    </span>
-                  ))}
-                </p>
-              ))}
-            </div>
+            <MarkdownRenderer content={comment.data.body ?? ''} className="mt-1" />
 
             {/* Action buttons - left aligned */}
             <div className="mt-2 flex gap-3 text-xs text-[var(--color-text-secondary)]">
@@ -601,9 +605,7 @@ function LocalCommentView({
               </div>
             </form>
           ) : (
-            <div className="mt-2 text-sm text-[var(--color-text-primary)] text-left">
-              {comment.content}
-            </div>
+            <MarkdownRenderer content={comment.content} className="mt-2" />
           ))}
 
           {!isCollapsed && actionError && (
@@ -750,13 +752,13 @@ export default function RedditPostPage() {
   const queryClient = useQueryClient();
   const focusedCommentId = commentId ? Number(commentId) : null;
   const [commentText, setCommentText] = useState('');
+  const [showFormattingHelp, setShowFormattingHelp] = useState(false);
   const [replyingTo, setReplyingTo] = useState<number | null>(null);
   const [embedTarget, setEmbedTarget] = useState<EmbedPayload | null>(null);
   const [sort, setSort] = useState<string>('best');
   const [imageExpanded, setImageExpanded] = useState(false);
 
   // Post action states
-  const [showShareModal, setShowShareModal] = useState(false);
   const [showHideConfirm, setShowHideConfirm] = useState(false);
   const [showCrosspostModal, setShowCrosspostModal] = useState(false);
   const [isPostHidden, setIsPostHidden] = useState(false);
@@ -782,6 +784,16 @@ export default function RedditPostPage() {
     setSelectedCrosspostSubreddit('');
     setSendRepliesToInbox(true);
     setShowCrosspostModal(true);
+  };
+
+  const handleSharePost = async () => {
+    if (!post) return;
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      alert('Post link copied to clipboard!');
+    } catch {
+      alert('Unable to copy link. Please try again.');
+    }
   };
 
   // Fetch user's hubs for crossposting
@@ -1324,7 +1336,7 @@ export default function RedditPostPage() {
             <span>•</span>
             <span>{post.num_comments} comments</span>
             <span>•</span>
-            <button onClick={() => setShowShareModal(true)} className="hover:underline">
+            <button onClick={handleSharePost} className="hover:underline">
               share
             </button>
             <span>•</span>
@@ -1387,6 +1399,59 @@ export default function RedditPostPage() {
             rows={4}
             className="w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-2 text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
           />
+          <div className="mt-2 flex justify-start text-xs text-[var(--color-text-secondary)]">
+            <button
+              type="button"
+              onClick={() => setShowFormattingHelp((prev) => !prev)}
+              className="hover:text-[var(--color-primary)]"
+            >
+              {showFormattingHelp ? 'hide formatting' : 'formatting help'}
+            </button>
+          </div>
+          {showFormattingHelp && (
+            <div className="mt-2 w-[70%] rounded border border-[var(--color-border)] bg-[var(--color-surface)] p-2 text-[13px] text-[var(--color-text-primary)] shadow-sm">
+              <p className="text-sm text-[var(--color-text-primary)]">
+                OmniNudge uses a slightly-customized version of{' '}
+                <a
+                  href="https://www.markdownguide.org/basic-syntax/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[var(--color-primary)] underline"
+                >
+                  Markdown
+                </a>{' '}
+                for formatting. See below for formatting help.
+              </p>
+              <div className="mt-2">
+                <table className="w-full border-collapse text-[13px]">
+                  <thead>
+                    <tr className="bg-[#fff9c4] text-[var(--color-text-primary)]">
+                      <th className="border border-[var(--color-border)] px-1 py-1 text-left font-semibold italic">
+                        you type:
+                      </th>
+                      <th className="border border-[var(--color-border)] px-1 py-1 text-left font-semibold italic">
+                        you see:
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {FORMATTING_EXAMPLES.map((example, index) => (
+                      <tr key={index} className="align-top">
+                        <td className="border border-[var(--color-border)] bg-white px-1 py-1 font-mono text-[11px] text-[var(--color-text-primary)]">
+                          <pre className="m-0 whitespace-pre-wrap text-[11px] leading-tight">
+                            {example.input}
+                          </pre>
+                        </td>
+                        <td className="border border-[var(--color-border)] bg-white px-1 py-1">
+                          <MarkdownRenderer content={example.output} className="leading-tight" />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
           <button
             type="submit"
             disabled={createCommentMutation.isPending || !commentText.trim()}
@@ -1525,46 +1590,6 @@ export default function RedditPostPage() {
                   Copy Embed Code
                 </button>
               </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Share Modal */}
-      {showShareModal && post && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
-          <div className="w-full max-w-md rounded-lg bg-white p-4 shadow-lg">
-            <div className="flex items-start justify-between">
-              <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">Share Post</h3>
-              <button
-                onClick={() => setShowShareModal(false)}
-                className="text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
-              >
-                Close
-              </button>
-            </div>
-            <div className="mt-3">
-              <div className="mb-1 text-xs text-[var(--color-text-secondary)]">Copy Link</div>
-              <input
-                readOnly
-                type="text"
-                value={window.location.href}
-                className="w-full rounded border border-[var(--color-border)] bg-[var(--color-surface)] p-2 text-sm"
-                onClick={(e) => e.currentTarget.select()}
-              />
-              <button
-                onClick={async () => {
-                  try {
-                    await navigator.clipboard.writeText(window.location.href);
-                    alert('Link copied to clipboard!');
-                  } catch {
-                    alert('Failed to copy link.');
-                  }
-                }}
-                className="mt-2 rounded bg-[var(--color-primary)] px-3 py-1 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)]"
-              >
-                Copy Link
-              </button>
             </div>
           </div>
         </div>
