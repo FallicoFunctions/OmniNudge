@@ -452,94 +452,96 @@ export default function RedditPage() {
   }, [visiblePosts, visibleLocalPosts, showOmniOnly, sort]);
 
   return (
-    <div className="mx-auto w-full max-w-5xl px-4 py-8">
+    <div className="mx-auto w-full max-w-7xl px-4 py-8">
       {/* Header */}
-      <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-        <div className="text-left md:self-start">
-          <h1 className="text-3xl font-bold text-[var(--color-text-primary)]">
-            Currently viewing: r/{subreddit} subreddit
-          </h1>
-        </div>
+      <div className="mb-6">
+        <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+          <div className="text-left md:self-start">
+            <h1 className="text-3xl font-bold text-[var(--color-text-primary)]">
+              Currently viewing: r/{subreddit} subreddit
+            </h1>
+          </div>
 
-        {/* Subreddit Input */}
-        <form
-          onSubmit={handleSubredditSubmit}
-          className="flex flex-col gap-2 md:w-80 md:items-end lg:w-96"
-        >
-          <div className="relative w-full">
-            <input
-              type="text"
-              value={inputValue}
-              onFocus={() => setIsAutocompleteOpen(true)}
-              onBlur={() => setIsAutocompleteOpen(false)}
-              onChange={(e) => handleInputChange(e.target.value)}
-              placeholder="Enter subreddit..."
-              className="w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-2 text-sm text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
-            />
-            {shouldShowSuggestions && (
-              <div className="absolute left-0 right-0 top-full z-30 mt-1 overflow-hidden rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] shadow-lg">
-                {isAutocompleteLoading ? (
-                  <div className="px-3 py-2 text-sm text-[var(--color-text-secondary)]">Searching...</div>
-                ) : suggestionItems.length === 0 ? (
-                  <div className="px-3 py-2 text-sm text-[var(--color-text-secondary)]">
-                    No subreddits found
-                  </div>
-                ) : (
-                  <ul>
-                    {suggestionItems.map((suggestion) => (
-                      <li key={suggestion.name}>
-                        <button
-                          type="button"
-                          onMouseDown={(event) => event.preventDefault()}
-                          onClick={() => handleSelectSubredditSuggestion(suggestion.name)}
-                          className="flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-[var(--color-surface-elevated)]"
-                        >
-                          {suggestion.icon_url ? (
-                            <img
-                              src={suggestion.icon_url}
-                              alt=""
-                              className="h-6 w-6 flex-shrink-0 rounded-full object-cover"
-                            />
-                          ) : (
-                            <div className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-[var(--color-border)] text-[10px] font-semibold text-[var(--color-text-secondary)]">
-                              r/
+          {/* Subreddit Input */}
+          <form
+            onSubmit={handleSubredditSubmit}
+            className="flex gap-2 md:w-80 md:items-center lg:w-96"
+          >
+            <div className="relative flex-1 md:flex-initial md:w-full">
+              <input
+                type="text"
+                value={inputValue}
+                onFocus={() => setIsAutocompleteOpen(true)}
+                onBlur={() => setIsAutocompleteOpen(false)}
+                onChange={(e) => handleInputChange(e.target.value)}
+                placeholder="Enter subreddit..."
+                className="w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-2 text-sm text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
+              />
+              {shouldShowSuggestions && (
+                <div className="absolute left-0 right-0 top-full z-30 mt-1 overflow-hidden rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] shadow-lg">
+                  {isAutocompleteLoading ? (
+                    <div className="px-3 py-2 text-sm text-[var(--color-text-secondary)]">Searching...</div>
+                  ) : suggestionItems.length === 0 ? (
+                    <div className="px-3 py-2 text-sm text-[var(--color-text-secondary)]">
+                      No subreddits found
+                    </div>
+                  ) : (
+                    <ul>
+                      {suggestionItems.map((suggestion) => (
+                        <li key={suggestion.name}>
+                          <button
+                            type="button"
+                            onMouseDown={(event) => event.preventDefault()}
+                            onClick={() => handleSelectSubredditSuggestion(suggestion.name)}
+                            className="flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-[var(--color-surface-elevated)]"
+                          >
+                            {suggestion.icon_url ? (
+                              <img
+                                src={suggestion.icon_url}
+                                alt=""
+                                className="h-6 w-6 flex-shrink-0 rounded-full object-cover"
+                              />
+                            ) : (
+                              <div className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-[var(--color-border)] text-[10px] font-semibold text-[var(--color-text-secondary)]">
+                                r/
+                              </div>
+                            )}
+                            <div className="flex min-w-0 flex-col">
+                              <span className="truncate text-sm font-medium text-[var(--color-text-primary)]">
+                                r/{suggestion.name}
+                              </span>
+                              {suggestion.title && (
+                                <span className="truncate text-[11px] text-[var(--color-text-secondary)]">
+                                  {suggestion.title}
+                                </span>
+                              )}
                             </div>
-                          )}
-                          <div className="flex min-w-0 flex-col">
-                            <span className="truncate text-sm font-medium text-[var(--color-text-primary)]">
-                              r/{suggestion.name}
-                            </span>
-                            {suggestion.title && (
-                              <span className="truncate text-[11px] text-[var(--color-text-secondary)]">
-                                {suggestion.title}
+                            {typeof suggestion.subscribers === 'number' && suggestion.subscribers > 0 && (
+                              <span className="ml-auto text-[11px] text-[var(--color-text-secondary)]">
+                                {suggestion.subscribers.toLocaleString()} subs
                               </span>
                             )}
-                          </div>
-                          {typeof suggestion.subscribers === 'number' && suggestion.subscribers > 0 && (
-                            <span className="ml-auto text-[11px] text-[var(--color-text-secondary)]">
-                              {suggestion.subscribers.toLocaleString()} subs
-                            </span>
-                          )}
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            )}
-          </div>
-          <button
-            type="submit"
-            className="self-end rounded-md bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)]"
-          >
-            Go
-          </button>
-        </form>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
+            </div>
+            <button
+              type="submit"
+              className="rounded-md bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)]"
+            >
+              Go
+            </button>
+          </form>
+        </div>
       </div>
 
       {/* Controls */}
       <div className="mb-6 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {(['hot', 'new', 'top', 'rising'] as const).map((sortOption) => (
             <button
               key={sortOption}
@@ -553,6 +555,9 @@ export default function RedditPage() {
               {sortOption}
             </button>
           ))}
+          <span className="ml-2 text-xs font-semibold uppercase text-[var(--color-text-secondary)]">
+            Show only Omni posts:
+          </span>
           <button
             type="button"
             onClick={() => setShowOmniOnly((prev) => !prev)}
