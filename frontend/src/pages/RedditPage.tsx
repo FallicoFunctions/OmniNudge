@@ -452,22 +452,21 @@ export default function RedditPage() {
   }, [visiblePosts, visibleLocalPosts, showOmniOnly, sort]);
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-8">
+    <div className="mx-auto w-full max-w-5xl px-4 py-8">
       {/* Header */}
-      <div className="mb-6 text-left">
-        <h1 className="text-3xl font-bold text-[var(--color-text-primary)]">
-          Currently viewing: r/{subreddit} subreddit
-        </h1>
-      </div>
+      <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+        <div className="text-left md:self-start">
+          <h1 className="text-3xl font-bold text-[var(--color-text-primary)]">
+            Currently viewing: r/{subreddit} subreddit
+          </h1>
+        </div>
 
-      {/* Controls */}
-      <div className="mb-6 flex flex-col gap-4 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4 md:flex-row md:items-center md:justify-between">
         {/* Subreddit Input */}
         <form
           onSubmit={handleSubredditSubmit}
-          className="flex w-full flex-col gap-2 sm:flex-row sm:items-stretch"
+          className="flex flex-col gap-2 md:w-80 md:items-end lg:w-96"
         >
-          <div className="relative flex-1">
+          <div className="relative w-full">
             <input
               type="text"
               value={inputValue}
@@ -531,13 +530,15 @@ export default function RedditPage() {
           </div>
           <button
             type="submit"
-            className="rounded-md bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)] sm:flex-none"
+            className="self-end rounded-md bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)]"
           >
             Go
           </button>
         </form>
+      </div>
 
-        {/* Sort Options */}
+      {/* Controls */}
+      <div className="mb-6 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
         <div className="flex flex-wrap gap-2">
           {(['hot', 'new', 'top', 'rising'] as const).map((sortOption) => (
             <button
