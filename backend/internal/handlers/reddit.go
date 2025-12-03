@@ -194,6 +194,30 @@ func (h *RedditHandler) SearchPosts(c *gin.Context) {
 	})
 }
 
+// AutocompleteSubreddits handles GET /api/v1/reddit/subreddits/autocomplete
+func (h *RedditHandler) AutocompleteSubreddits(c *gin.Context) {
+	query := strings.TrimSpace(c.Query("q"))
+	if query == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Query is required"})
+		return
+	}
+
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
+	if limit < 1 || limit > 50 {
+		limit = 10
+	}
+
+	suggestions, err := h.redditClient.AutocompleteSubreddits(c.Request.Context(), query, limit)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch subreddit suggestions", "details": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"suggestions": suggestions,
+	})
+}
+
 // GetSubredditMedia handles GET /api/v1/reddit/r/:subreddit/media
 // Returns only posts with media (images/videos) for slideshow feature
 func (h *RedditHandler) GetSubredditMedia(c *gin.Context) {

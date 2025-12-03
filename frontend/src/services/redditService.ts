@@ -1,5 +1,5 @@
 import { api } from '../lib/api';
-import type { RedditPost, RedditPostsResponse, RedditComment } from '../types/reddit';
+import type { RedditPostsResponse, RedditComment, SubredditSuggestion } from '../types/reddit';
 
 export const redditService = {
   async getFrontPage(limit = 25): Promise<RedditPostsResponse> {
@@ -18,5 +18,13 @@ export const redditService = {
     const params = new URLSearchParams({ q: query, limit: String(limit) });
     if (subreddit) params.append('subreddit', subreddit);
     return api.get<RedditPostsResponse>(`/reddit/search?${params}`);
+  },
+
+  async autocompleteSubreddits(query: string, limit = 10): Promise<SubredditSuggestion[]> {
+    const params = new URLSearchParams({ q: query, limit: String(limit) });
+    const response = await api.get<{ suggestions: SubredditSuggestion[] }>(
+      `/reddit/subreddits/autocomplete?${params.toString()}`
+    );
+    return response.suggestions ?? [];
   },
 };

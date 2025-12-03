@@ -4,7 +4,11 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { redditService } from '../services/redditService';
 import { savedService } from '../services/savedService';
 import { hubsService } from '../services/hubsService';
-import type { CrosspostRequest, LocalSubredditPost, SubredditPostsResponse } from '../services/hubsService';
+import type {
+  CrosspostRequest,
+  LocalSubredditPost,
+  SubredditPostsResponse,
+} from '../services/hubsService';
 import { postsService } from '../services/postsService';
 import { useAuth } from '../contexts/AuthContext';
 import { useSettings } from '../contexts/SettingsContext';
@@ -14,6 +18,7 @@ import {
   createRedditCrosspostPayload,
   type RedditCrosspostSource,
 } from '../utils/crosspostHelpers';
+import type { SubredditSuggestion } from '../types/reddit';
 
 interface FeedRedditPost extends RedditCrosspostSource {
   id: string;
@@ -43,6 +48,8 @@ type HideTarget =
   | { type: 'reddit'; post: FeedRedditPost }
   | { type: 'platform'; post: LocalSubredditPost };
 
+const SUBREDDIT_AUTOCOMPLETE_MIN_LENGTH = 2;
+
 export default function RedditPage() {
   const navigate = useNavigate();
   const { subreddit: routeSubreddit } = useParams<{ subreddit?: string }>();
@@ -59,6 +66,7 @@ export default function RedditPage() {
   const [selectedSubreddit, setSelectedSubreddit] = useState('');
   const [sendRepliesToInbox, setSendRepliesToInbox] = useState(true);
   const [showOmniOnly, setShowOmniOnly] = useState(false);
+  const [isAutocompleteOpen, setIsAutocompleteOpen] = useState(false);
 
   const { data, isLoading, error } = useQuery<FeedRedditPostsResponse>({
     queryKey: ['reddit', subreddit, sort],
@@ -366,13 +374,21 @@ export default function RedditPage() {
     const normalized = value.trim() || 'popular';
     setSubreddit(normalized);
     navigate(`/reddit/r/${normalized}`);
+    setIsAutocompleteOpen(false);
   };
 
   const handleSubredditSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (inputValue.trim()) {
-      navigateToSubreddit(inputValue.trim());
+    if (trimmedInputValue) {
+      navigateToSubreddit(trimmedInputValue);
       setInputValue('');
+    }
+  };
+
+  const handleInputChange = (value: string) => {
+    setInputValue(value);
+    if (!isAutocompleteOpen) {
+      setIsAutocompleteOpen(true);
     }
   };
 
@@ -382,6 +398,27 @@ export default function RedditPage() {
       .writeText(shareUrl)
       .then(() => alert('Post link copied to clipboard!'))
       .catch(() => alert('Unable to copy link. Please try again.'));
+  };
+
+  const trimmedInputValue = inputValue.trim();
+
+  const {
+    data: subredditSuggestions,
+    isFetching: isAutocompleteLoading,
+  } = useQuery<SubredditSuggestion[]>({
+    queryKey: ['subreddit-autocomplete', trimmedInputValue],
+    queryFn: () => redditService.autocompleteSubreddits(trimmedInputValue),
+    enabled: isAutocompleteOpen && trimmedInputValue.length >= SUBREDDIT_AUTOCOMPLETE_MIN_LENGTH,
+    staleTime: 1000 * 60 * 10,
+  });
+  const suggestionItems = subredditSuggestions ?? [];
+  const shouldShowSuggestions =
+    isAutocompleteOpen && trimmedInputValue.length >= SUBREDDIT_AUTOCOMPLETE_MIN_LENGTH;
+
+  const handleSelectSubredditSuggestion = (name: string) => {
+    navigateToSubreddit(name);
+    setInputValue('');
+    setIsAutocompleteOpen(false);
   };
 
   const combinedPosts = useMemo(() => {
@@ -426,17 +463,75 @@ export default function RedditPage() {
       {/* Controls */}
       <div className="mb-6 flex flex-col gap-4 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4 md:flex-row md:items-center md:justify-between">
         {/* Subreddit Input */}
-        <form onSubmit={handleSubredditSubmit} className="flex gap-2">
-          <input
-            type="text"
-            value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
-            placeholder="Enter subreddit..."
-            className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-2 text-sm text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
-          />
+        <form
+          onSubmit={handleSubredditSubmit}
+          className="flex w-full flex-col gap-2 sm:flex-row sm:items-stretch"
+        >
+          <div className="relative flex-1">
+            <input
+              type="text"
+              value={inputValue}
+              onFocus={() => setIsAutocompleteOpen(true)}
+              onBlur={() => setIsAutocompleteOpen(false)}
+              onChange={(e) => handleInputChange(e.target.value)}
+              placeholder="Enter subreddit..."
+              className="w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-2 text-sm text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
+            />
+            {shouldShowSuggestions && (
+              <div className="absolute left-0 right-0 top-full z-30 mt-1 overflow-hidden rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] shadow-lg">
+                {isAutocompleteLoading ? (
+                  <div className="px-3 py-2 text-sm text-[var(--color-text-secondary)]">Searching...</div>
+                ) : suggestionItems.length === 0 ? (
+                  <div className="px-3 py-2 text-sm text-[var(--color-text-secondary)]">
+                    No subreddits found
+                  </div>
+                ) : (
+                  <ul>
+                    {suggestionItems.map((suggestion) => (
+                      <li key={suggestion.name}>
+                        <button
+                          type="button"
+                          onMouseDown={(event) => event.preventDefault()}
+                          onClick={() => handleSelectSubredditSuggestion(suggestion.name)}
+                          className="flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-[var(--color-surface-elevated)]"
+                        >
+                          {suggestion.icon_url ? (
+                            <img
+                              src={suggestion.icon_url}
+                              alt=""
+                              className="h-6 w-6 flex-shrink-0 rounded-full object-cover"
+                            />
+                          ) : (
+                            <div className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-[var(--color-border)] text-[10px] font-semibold text-[var(--color-text-secondary)]">
+                              r/
+                            </div>
+                          )}
+                          <div className="flex min-w-0 flex-col">
+                            <span className="truncate text-sm font-medium text-[var(--color-text-primary)]">
+                              r/{suggestion.name}
+                            </span>
+                            {suggestion.title && (
+                              <span className="truncate text-[11px] text-[var(--color-text-secondary)]">
+                                {suggestion.title}
+                              </span>
+                            )}
+                          </div>
+                          {typeof suggestion.subscribers === 'number' && suggestion.subscribers > 0 && (
+                            <span className="ml-auto text-[11px] text-[var(--color-text-secondary)]">
+                              {suggestion.subscribers.toLocaleString()} subs
+                            </span>
+                          )}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
+          </div>
           <button
             type="submit"
-            className="rounded-md bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)]"
+            className="rounded-md bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)] sm:flex-none"
           >
             Go
           </button>

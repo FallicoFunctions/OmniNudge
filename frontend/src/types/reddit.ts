@@ -7,3 +7,11 @@ export interface LocalRedditComment extends LocalCommentBase {
   user_id: number;
   parent_reddit_comment_id?: string; // Reddit API comment ID this is replying to
 }
+
+export interface SubredditSuggestion {
+  name: string;
+  title?: string;
+  subscribers?: number;
+  icon_url?: string;
+  over_18?: boolean;
+}

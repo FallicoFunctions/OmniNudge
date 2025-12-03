@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/omninudge/backend/internal/services"
 	"github.com/gin-gonic/gin"
+	"github.com/omninudge/backend/internal/services"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -283,6 +283,64 @@ func TestGetPostCommentsMissingParams(t *testing.T) {
 	}
 }
 
+func TestAutocompleteSubreddits(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"data": map[string]interface{}{
+				"children": []map[string]interface{}{
+					{
+						"data": map[string]interface{}{
+							"display_name":   "golang",
+							"title":          "Go Programming",
+							"subscribers":    123456,
+							"icon_img":       "https://example.com/icon.png",
+							"community_icon": "",
+							"over18":         false,
+						},
+					},
+				},
+			},
+		})
+	}))
+	defer ts.Close()
+
+	client := services.NewRedditClient("test-agent", nil, time.Minute)
+	client.SetHTTPClient(&http.Client{Transport: &hostRewriteTransport{target: ts}})
+	handler := NewRedditHandlerForTest(client)
+
+	router := gin.Default()
+	router.GET("/subreddits/autocomplete", handler.AutocompleteSubreddits)
+
+	req := httptest.NewRequest("GET", "/subreddits/autocomplete?q=go", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusOK, w.Code)
+
+	var response struct {
+		Suggestions []services.SubredditSuggestion `json:"suggestions"`
+	}
+	err := json.Unmarshal(w.Body.Bytes(), &response)
+	require.NoError(t, err)
+	require.Len(t, response.Suggestions, 1)
+	assert.Equal(t, "golang", response.Suggestions[0].Name)
+}
+
+func TestAutocompleteSubredditsRequiresQuery(t *testing.T) {
+	client := services.NewRedditClient("test-agent", nil, time.Minute)
+	handler := NewRedditHandlerForTest(client)
+
+	router := gin.Default()
+	router.GET("/subreddits/autocomplete", handler.AutocompleteSubreddits)
+
+	req := httptest.NewRequest("GET", "/subreddits/autocomplete", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusBadRequest, w.Code)
+}
+
 func TestRedditSearchPosts(t *testing.T) {
 	handler, ts, handlerCalls := setupRedditHandlerTest(t)
 	defer ts.Close()
@@ -383,7 +441,7 @@ func TestGetSubredditMediaValidatesLimit(t *testing.T) {
 		expectError bool
 	}{
 		{"Valid limit", "25", false},
-		{"Too low", "0", false}, // Will default to 50
+		{"Too low", "0", false},    // Will default to 50
 		{"Too high", "200", false}, // Will default to 50
 	}
 
