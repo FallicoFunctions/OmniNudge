@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/omninudge/backend/internal/database"
@@ -487,6 +488,52 @@ func TestCrosspostToSubreddit(t *testing.T) {
 
 		assert.Equal(t, http.StatusBadRequest, w.Code)
 	})
+}
+
+func TestCrosspostTimestampUsesCreationTime(t *testing.T) {
+	handler, _, postRepo, cleanup := setupHubsTest(t)
+	defer cleanup()
+
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	userID := 1
+	router.POST("/subreddits/:name/posts", mockAuthMiddleware(userID), handler.CrosspostToSubreddit)
+
+	reqBody := CrosspostRequest{
+		Title:              "Timestamp test",
+		Body:               ptr("body"),
+		SendRepliesToInbox: true,
+	}
+	bodyBytes, _ := json.Marshal(reqBody)
+	req := httptest.NewRequest(
+		"POST",
+		"/subreddits/test/posts?origin_type=reddit&origin_post_id=abc123&origin_subreddit=test",
+		bytes.NewReader(bodyBytes),
+	)
+	req.Header.Set("Content-Type", "application/json")
+	resp := httptest.NewRecorder()
+	router.ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d", resp.Code)
+	}
+
+	posts, err := postRepo.GetBySubreddit(context.Background(), "test", "new", 5, 0)
+	require.NoError(t, err)
+	require.NotEmpty(t, posts)
+
+	// CreatedAt reflects when the record was persisted (original post time), but crossposted_at must reflect now.
+	if posts[0].CrosspostedAt == nil {
+		t.Fatalf("expected crossposted_at to be set")
+	}
+	crosspostedUTC := posts[0].CrosspostedAt.In(time.UTC)
+	if time.Since(crosspostedUTC) > 2*time.Second {
+		t.Fatalf("expected crossposted_at to be recent, got %s", posts[0].CrosspostedAt)
+	}
+	diff := posts[0].CreatedAt.Sub(crosspostedUTC)
+	if diff < -time.Second || diff > time.Second {
+		t.Fatalf("expected created_at to match crossposted_at, got created_at=%s crossposted_at=%s", posts[0].CreatedAt, posts[0].CrosspostedAt)
+	}
 }
 
 func TestGetPlatformSubredditPosts(t *testing.T) {
