@@ -46,6 +46,7 @@ export interface LocalSubredditPost {
   crosspost_origin_post_id?: string | null;
   crosspost_original_title?: string | null;
   target_subreddit?: string | null;
+  crossposted_at?: string | null;
   created_at: string;
 }
 

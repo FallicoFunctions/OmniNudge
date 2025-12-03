@@ -181,7 +181,10 @@ export default function SavedPage() {
                       <span>•</span>
                       <span>u/{post.author_username}</span>
                       <span>•</span>
-                      <span>submitted {formatTimestamp(post.created_at, useRelativeTime)}</span>
+                      <span>
+                        submitted{' '}
+                        {formatTimestamp(post.crossposted_at ?? post.created_at, useRelativeTime)}
+                      </span>
                     </div>
                     <h3 className="mt-2 text-lg font-semibold text-[var(--color-text-primary)]">
                       {post.title}

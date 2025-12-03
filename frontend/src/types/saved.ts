@@ -8,6 +8,7 @@ export interface SavedPost {
   author_username: string;
   score: number;
   comment_count: number;
+  crossposted_at?: string | null;
   created_at: string;
 }
 

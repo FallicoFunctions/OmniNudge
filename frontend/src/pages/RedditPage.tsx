@@ -460,10 +460,13 @@ export default function RedditPage() {
       ? allPosts.filter((post) => post.type === 'platform')
       : allPosts;
 
-    const getCreatedTimestamp = (post: CrosspostSource) =>
-      post.type === 'reddit'
-        ? post.post.created_utc * 1000
-        : new Date(post.post.created_at).getTime();
+    const getCreatedTimestamp = (post: CrosspostSource) => {
+      if (post.type === 'reddit') {
+        return post.post.created_utc * 1000;
+      }
+      const timestamp = post.post.crossposted_at ?? post.post.created_at;
+      return timestamp ? new Date(timestamp).getTime() : 0;
+    };
 
     const getSortValue = (post: CrosspostSource) => {
       if (sort === 'new') {
@@ -627,7 +630,10 @@ export default function RedditPage() {
                 post.author?.username ||
                 (post.author_id === user?.id ? user?.username : undefined) ||
                 'unknown';
-              const createdLabel = formatTimestamp(post.created_at, useRelativeTime);
+              const createdTimestamp = post.crossposted_at ?? post.created_at;
+              const createdLabel = createdTimestamp
+                ? formatTimestamp(createdTimestamp, useRelativeTime)
+                : 'unknown time';
               const commentLabel = `${post.num_comments.toLocaleString()} Comments`;
               const pointsLabel = `${post.score.toLocaleString()} points`;
               const canDelete = user?.id === post.author_id;

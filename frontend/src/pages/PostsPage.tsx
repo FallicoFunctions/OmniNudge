@@ -209,7 +209,9 @@ export default function PostsPage() {
                     <span>•</span>
                     <span>Posted by u/{post.author_username}</span>
                     <span>•</span>
-                    <span>{new Date(post.created_at).toLocaleDateString()}</span>
+                    <span>
+                      {new Date(post.crossposted_at ?? post.created_at).toLocaleDateString()}
+                    </span>
                   </div>
 
                   <h2 className="text-lg font-semibold text-[var(--color-text-primary)]">

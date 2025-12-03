@@ -169,7 +169,7 @@ export default function PostDetailPage() {
           <div className="mb-4">
             <div className="mb-2 text-xs text-[var(--color-text-secondary)]">
               h/{postData.hub_name} • Posted by u/{postData.author_username} •{' '}
-              {new Date(postData.created_at).toLocaleString()}
+              {new Date(postData.crossposted_at ?? postData.created_at).toLocaleString()}
             </div>
             <h1 className="text-2xl font-bold text-[var(--color-text-primary)]">{postData.title}</h1>
           </div>
