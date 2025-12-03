@@ -76,7 +76,7 @@ omninudge/
 
 ## Current Status
 
-✅ **Backend Phase 1 COMPLETE:**
+✅ **Backend - Phase 1 COMPLETE:**
 - PostgreSQL database with migrations
 - User authentication (JWT)
 - User settings endpoints
@@ -90,22 +90,36 @@ omninudge/
 - Reddit public API integration with caching
 - Synchronized slideshow coordination (personal & Reddit media)
 - Media gallery navigation with filtering
-- **End-to-end encrypted messaging system**
-- **Media upload with thumbnail generation (images & videos)**
-- **Real-time WebSocket events (messages, read receipts, online/offline status)**
-- **Conversation management with read receipts**
+- End-to-end encrypted messaging system
+- Media upload with thumbnail generation (images & videos)
+- Real-time WebSocket events (messages, read receipts, online/offline status)
+- Conversation management with read receipts
+- All 91 handler tests passing
 
-✅ **Frontend Recent Work – Theme System:**
+✅ **Frontend - Recent Development:**
+
+**Theme System (Complete):**
 - Theme context + hooks hydrate CSS variables across the app with localStorage + server persistence
 - Theme selector modal lists predefined + custom themes, supports refresh, keyboard usage, and accessible announcements
 - Theme editor wizard covers base selection, metadata, CSS variable editing with debounce, preview, and WCAG contrast warnings
 - Theme preview + preview cards render responsive mock UI bound to CSS variables
-- Vitest test suite (unit, integration, e2e, visual snapshots) covers ThemeContext, selector/editor flows, and theme persistence
+- 52 tests passing (unit, integration, e2e, visual snapshots)
 - Documentation under `docs/user/` and `docs/technical/` explains customization, APIs, and future extensibility
 
-🚧 In Development:
-- Completing Phase 1 core features (messaging UI, slideshows, unified feed)
-- Reddit integration features (posts, comments, saved/hidden items)
+**Reddit Integration (Implemented):**
+- Reddit feed browsing with subreddit selection and sorting
+- Reddit post detail pages with comments
+- Saved and hidden items management
+- Crossposting from Reddit to platform hubs or subreddits
+- User settings for Reddit preferences
+- 40+ components and 7 major pages
+
+🚧 **Phase 1 - Still In Progress:**
+- E2E encrypted messaging UI (backend complete, frontend pending)
+- Personal slideshow creation and sharing UI
+- Reddit subreddit slideshow viewer UI
+- Full unified feed implementation
+- Additional core Phase 1 features from [phase-1-features.md](docs/phase-lists/phase-1-features.md)
 
 ## Getting Started
 
