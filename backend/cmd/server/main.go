@@ -208,6 +208,7 @@ func main() {
 		reddit.Use(middleware.AuthOptional(authService))
 		{
 			reddit.GET("/frontpage", redditHandler.GetFrontPage)
+			reddit.GET("/subreddits/autocomplete", redditHandler.AutocompleteSubreddits)
 			reddit.GET("/r/:subreddit", redditHandler.GetSubredditPosts)
 			reddit.GET("/r/:subreddit/media", redditHandler.GetSubredditMedia)
 			reddit.GET("/r/:subreddit/comments/:postId", redditHandler.GetPostComments)
