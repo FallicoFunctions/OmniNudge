@@ -95,7 +95,7 @@ omninudge/
 - **Real-time WebSocket events (messages, read receipts, online/offline status)**
 - **Conversation management with read receipts**
 
-✅ **Frontend Phase 2a – Theme System:**
+✅ **Frontend Recent Work – Theme System:**
 - Theme context + hooks hydrate CSS variables across the app with localStorage + server persistence
 - Theme selector modal lists predefined + custom themes, supports refresh, keyboard usage, and accessible announcements
 - Theme editor wizard covers base selection, metadata, CSS variable editing with debounce, preview, and WCAG contrast warnings
@@ -104,7 +104,8 @@ omninudge/
 - Documentation under `docs/user/` and `docs/technical/` explains customization, APIs, and future extensibility
 
 🚧 In Development:
-- Frontend Phase 2b – theme marketplace polish, onboarding flows, Storybook documentation, and production hardening
+- Completing Phase 1 core features (messaging UI, slideshows, unified feed)
+- Reddit integration features (posts, comments, saved/hidden items)
 
 ## Getting Started
 
