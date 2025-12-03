@@ -190,6 +190,89 @@ body.theme-transitioning {
   border: 0;
 }
 
+.markdown-content {
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.markdown-content p {
+  margin: 0 0 0.75rem;
+}
+
+.markdown-content ul,
+.markdown-content ol {
+  margin: 0.5rem 0 0.75rem 1.5rem;
+  padding: 0;
+}
+
+.markdown-content blockquote {
+  border-left: 3px solid var(--color-border);
+  margin: 0.5rem 0;
+  padding-left: 0.75rem;
+  color: var(--color-text-secondary);
+}
+
+.markdown-content code {
+  font-family: SFMono-Regular, Consolas, 'Liberation Mono', Menlo, monospace;
+  background-color: var(--color-surface);
+  padding: 0.1rem 0.25rem;
+  border-radius: 0.25rem;
+  font-size: 0.85em;
+}
+
+.markdown-content pre {
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 0.375rem;
+  padding: 0.75rem;
+  overflow-x: auto;
+  font-size: 0.85em;
+}
+
+/* Remove extra spacing in table cells */
+td .markdown-content p,
+td .markdown-content p:last-child {
+  margin: 0;
+}
+
+td .markdown-content ul,
+td .markdown-content ol {
+  margin: 0 0 0 1.5rem;
+}
+
+td .markdown-content blockquote {
+  margin: 0;
+}
+
+td .markdown-content pre {
+  margin: 0;
+  padding: 0.25rem;
+}
+
+.markdown-content a {
+  color: var(--color-primary);
+  text-decoration: underline;
+}
+
+.markdown-content table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 0.75rem 0;
+  font-size: 0.85rem;
+}
+
+.markdown-content table th,
+.markdown-content table td {
+  border: 1px solid var(--color-border);
+  padding: 0.5rem;
+  text-align: left;
+}
+
+.markdown-content table th {
+  background-color: #fef9c3;
+  font-weight: 600;
+}
+
 .sr-only {
   position: absolute;
   width: 1px;
