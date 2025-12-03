@@ -8,6 +8,7 @@ import { savedService } from '../services/savedService';
 import { hubsService } from '../services/hubsService';
 import type { LocalRedditComment } from '../types/reddit';
 import { formatTimestamp } from '../utils/timeFormat';
+import { createRedditCrosspostPayload } from '../utils/crosspostHelpers';
 
 interface RedditComment {
   kind: string;
@@ -35,9 +36,15 @@ interface RedditPostData {
   selftext?: string;
   selftext_html?: string;
   thumbnail?: string;
-  preview?: unknown;
+  preview?: {
+    images?: Array<{
+      source?: { url?: string };
+      resolutions?: Array<{ url?: string }>;
+    }>;
+  };
   is_self: boolean;
   post_hint?: string;
+  is_video?: boolean;
 }
 
 interface RedditListing<T> {
@@ -757,7 +764,25 @@ export default function RedditPostPage() {
   // Crosspost form state
   const [crosspostTitle, setCrosspostTitle] = useState('');
   const [selectedHub, setSelectedHub] = useState('');
-  const [sendRepliesToInbox, setSendRepliesToInbox] = useState(false);
+  const [selectedCrosspostSubreddit, setSelectedCrosspostSubreddit] = useState('');
+  const [sendRepliesToInbox, setSendRepliesToInbox] = useState(true);
+
+  const resetCrosspostState = () => {
+    setShowCrosspostModal(false);
+    setCrosspostTitle('');
+    setSelectedHub('');
+    setSelectedCrosspostSubreddit('');
+    setSendRepliesToInbox(true);
+  };
+
+  const openCrosspostModal = () => {
+    if (!post) return;
+    setCrosspostTitle(post.title);
+    setSelectedHub('');
+    setSelectedCrosspostSubreddit('');
+    setSendRepliesToInbox(true);
+    setShowCrosspostModal(true);
+  };
 
   // Fetch user's hubs for crossposting
   const { data: hubsData } = useQuery({
@@ -975,26 +1000,47 @@ export default function RedditPostPage() {
 
   const crosspostMutation = useMutation({
     mutationFn: async () => {
-      if (!subreddit || !postId || !selectedHub || !post) {
+      if (!subreddit || !postId || !post) {
         throw new Error('Missing required data for crosspost');
       }
-      await hubsService.crosspostToHub(
-        selectedHub,
-        {
-          title: crosspostTitle,
-          send_replies_to_inbox: sendRepliesToInbox,
-        },
-        'reddit',
-        postId,
-        subreddit,
-        post.title
-      );
+      if (!selectedHub && !selectedCrosspostSubreddit) {
+        throw new Error('Please select at least one destination (hub or subreddit)');
+      }
+
+      const title = crosspostTitle || post.title;
+      const payload = createRedditCrosspostPayload(post, title, sendRepliesToInbox);
+      const tasks = [];
+
+      if (selectedHub) {
+        tasks.push(
+          hubsService.crosspostToHub(
+            selectedHub,
+            { ...payload },
+            'reddit',
+            postId,
+            subreddit,
+            post.title
+          )
+        );
+      }
+
+      if (selectedCrosspostSubreddit) {
+        tasks.push(
+          hubsService.crosspostToSubreddit(
+            selectedCrosspostSubreddit,
+            { ...payload },
+            'reddit',
+            postId,
+            subreddit,
+            post.title
+          )
+        );
+      }
+
+      await Promise.all(tasks);
     },
     onSuccess: () => {
-      setShowCrosspostModal(false);
-      setCrosspostTitle('');
-      setSelectedHub('');
-      setSendRepliesToInbox(false);
+      resetCrosspostState();
       alert('Crosspost created successfully!');
     },
     onError: (error) => {
@@ -1298,7 +1344,7 @@ export default function RedditPostPage() {
               hide
             </button>
             <span>•</span>
-            <button onClick={() => setShowCrosspostModal(true)} className="hover:underline">
+            <button onClick={openCrosspostModal} className="hover:underline">
               crosspost
             </button>
           </div>
@@ -1555,25 +1601,28 @@ export default function RedditPostPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
           <div className="w-full max-w-md rounded-lg bg-white p-4 shadow-lg">
             <div className="flex items-start justify-between">
-              <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">Crosspost to Hub</h3>
+              <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">Submit a Crosspost</h3>
               <button
-                onClick={() => setShowCrosspostModal(false)}
+                onClick={resetCrosspostState}
                 className="text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
               >
-                Close
+                ✕
               </button>
             </div>
-            <div className="mt-3 space-y-3">
+            <div className="mt-3 rounded border border-yellow-200 bg-yellow-50 p-3 text-sm text-yellow-800">
+              <p>You can crosspost to an OmniHub, a subreddit, or both. At least one destination is required.</p>
+            </div>
+            <div className="mt-4 space-y-3">
               <div>
-                <label className="mb-1 block text-xs text-[var(--color-text-secondary)]">Select Hub</label>
+                <label className="mb-1 block text-xs font-medium text-[var(--color-text-secondary)]">
+                  Crosspost to OmniHub (optional)
+                </label>
                 <select
                   value={selectedHub}
                   onChange={(e) => setSelectedHub(e.target.value)}
-                  className="w-full rounded border border-[var(--color-border)] bg-[var(--color-surface)] p-2 text-sm"
+                  className="w-full rounded border border-[var(--color-border)] bg-[var(--color-surface)] p-2 text-sm text-[var(--color-text-primary)]"
                 >
-                  <option value="">
-                    {hubsData?.hubs ? 'Choose a hub...' : 'Loading hubs...'}
-                  </option>
+                  <option value="">Select a hub...</option>
                   {hubsData?.hubs?.map((hub) => (
                     <option key={hub.id} value={hub.name}>
                       h/{hub.name}
@@ -1582,32 +1631,56 @@ export default function RedditPostPage() {
                 </select>
               </div>
               <div>
-                <label className="mb-1 block text-xs text-[var(--color-text-secondary)]">Title</label>
+                <label className="mb-1 block text-xs font-medium text-[var(--color-text-secondary)]">
+                  Crosspost to subreddit (optional)
+                </label>
                 <input
                   type="text"
-                  value={crosspostTitle || post.title}
-                  onChange={(e) => setCrosspostTitle(e.target.value)}
-                  className="w-full rounded border border-[var(--color-border)] bg-[var(--color-surface)] p-2 text-sm"
+                  value={selectedCrosspostSubreddit}
+                  onChange={(e) => setSelectedCrosspostSubreddit(e.target.value)}
+                  placeholder="e.g., cats, technology, AskReddit"
+                  className="w-full rounded border border-[var(--color-border)] bg-[var(--color-surface)] p-2 text-sm text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)]"
                 />
               </div>
-              <div className="flex items-center gap-2">
+              <div>
+                <label className="mb-1 block text-xs font-medium text-[var(--color-text-secondary)]">
+                  Choose a title <span className="text-red-500">*required</span>
+                </label>
+                <input
+                  type="text"
+                  value={crosspostTitle}
+                  onChange={(e) => setCrosspostTitle(e.target.value)}
+                  className="w-full rounded border border-[var(--color-border)] bg-[var(--color-surface)] p-2 text-sm text-[var(--color-text-primary)]"
+                  placeholder="Enter title..."
+                />
+              </div>
+              <div className="flex items-start gap-2">
                 <input
                   type="checkbox"
-                  id="send-replies"
+                  id="post-send-replies"
                   checked={sendRepliesToInbox}
                   onChange={(e) => setSendRepliesToInbox(e.target.checked)}
+                  className="mt-0.5"
                 />
-                <label htmlFor="send-replies" className="text-sm text-[var(--color-text-primary)]">
-                  Send replies to my inbox
+                <label htmlFor="post-send-replies" className="text-sm text-[var(--color-text-primary)]">
+                  Send replies to this post to my inbox
                 </label>
               </div>
-              <button
-                onClick={() => crosspostMutation.mutate()}
-                disabled={!selectedHub || crosspostMutation.isPending}
-                className="w-full rounded bg-[var(--color-primary)] px-3 py-2 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)] disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {crosspostMutation.isPending ? 'Creating...' : 'Create Crosspost'}
-              </button>
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  onClick={resetCrosspostState}
+                  className="rounded border border-[var(--color-border)] px-4 py-2 text-sm font-semibold text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-elevated)]"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => crosspostMutation.mutate()}
+                  disabled={(!selectedHub && !selectedCrosspostSubreddit) || !crosspostTitle.trim() || crosspostMutation.isPending}
+                  className="rounded bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)] disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {crosspostMutation.isPending ? 'Submitting...' : 'Submit'}
+                </button>
+              </div>
             </div>
           </div>
         </div>
