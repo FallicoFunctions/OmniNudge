@@ -291,32 +291,171 @@ This is a condensed reference of all available backend endpoints for frontend de
 ### Subreddit Posts
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/r/:subreddit` | Get posts from subreddit |
-| GET | `/frontpage` | Get Reddit front page |
-| GET | `/r/:subreddit/media` | Get media-only posts |
+| GET | `/reddit/r/:subreddit` | Get posts from subreddit |
+| GET | `/reddit/frontpage` | Get Reddit front page |
+| GET | `/reddit/user/:username/posts` | Get posts by Reddit user |
 
 **Query Params:**
-- `sort`: `hot`, `new`, `top`, `rising`, `controversial`
+- `sort`: `hot`, `new`, `top`, `rising`
 - `limit`: 1-100 (default: 25)
-- `after`: pagination token
 
 ### Comments
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/r/:subreddit/comments/:postId` | Get Reddit post comments |
+| GET | `/reddit/r/:subreddit/comments/:postId` | Get Reddit post + comments |
+| POST | `/reddit/posts/:subreddit/:postId/comments` | Create platform comment on Reddit post |
+| GET | `/reddit/posts/:subreddit/:postId/local-comments` | Get platform comments for Reddit post |
+| PUT | `/reddit/posts/:subreddit/:postId/comments/:id` | Update platform comment |
+| DELETE | `/reddit/posts/:subreddit/:postId/comments/:id` | Delete platform comment |
+| POST | `/reddit/posts/:subreddit/:postId/comments/:id/vote` | Vote on platform comment |
 
-**Query Params:**
-- `sort`: `top`, `new`, `controversial`, `old`
+**Create Comment Request:**
+```json
+{
+  "content": "string",
+  "parent_comment_id": 123,                   // Platform comment parent (optional)
+  "parent_reddit_comment_id": "reddit_id",    // Reddit comment parent (optional)
+  "send_replies_to_inbox": true
+}
+```
 
-### Search
+### Search & Autocomplete
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/search` | Search Reddit posts |
+| GET | `/reddit/search` | Search Reddit posts |
+| GET | `/reddit/subreddits/autocomplete` | Subreddit autocomplete |
 
-**Query Params:**
+**Search Query Params:**
 - `q`: search query (required)
-- `sort`: `relevance`, `hot`, `top`, `new`, `comments`
+- `subreddit`: limit to subreddit (optional)
 - `limit`: 1-100
+
+**Autocomplete Query Params:**
+- `query`: search query (required, min 2 chars)
+- `limit`: 1-100 (default: 10)
+
+---
+
+## 💾 Saved & Hidden Items
+
+### Saved Items
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/saved` | Get all saved items |
+| POST | `/posts/:id/save` | Save platform post |
+| DELETE | `/posts/:id/save` | Unsave platform post |
+| POST | `/reddit/posts/:subreddit/:postId/save` | Save Reddit post |
+| DELETE | `/reddit/posts/:subreddit/:postId/save` | Unsave Reddit post |
+| POST | `/reddit/posts/:subreddit/:postId/comments/:id/save` | Save Reddit comment |
+| DELETE | `/reddit/posts/:subreddit/:postId/comments/:id/save` | Unsave Reddit comment |
+
+**Get Saved Query Params:**
+- `type`: `all`, `posts`, `reddit_posts`, `post_comments`, `reddit_comments` (default: `all`)
+
+**Save Reddit Post Request:**
+```json
+{
+  "title": "string",
+  "author": "string",
+  "score": 5420,
+  "num_comments": 342,
+  "thumbnail": "https://...",
+  "created_utc": 1701234567
+}
+```
+
+**Response:**
+```json
+{
+  "saved_posts": [...],
+  "saved_reddit_posts": [
+    {
+      "id": 123,
+      "subreddit": "funny",
+      "reddit_post_id": "abc123",
+      "title": "Post title",
+      "author": "username",
+      "score": 5420,
+      "num_comments": 342,
+      "created_at": "2025-12-03T10:00:00Z"
+    }
+  ],
+  "saved_post_comments": [...],
+  "saved_reddit_comments": [...]
+}
+```
+
+### Hidden Items
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/hidden` | Get all hidden items |
+| POST | `/posts/:id/hide` | Hide platform post |
+| DELETE | `/posts/:id/hide` | Unhide platform post |
+| POST | `/reddit/posts/:subreddit/:postId/hide` | Hide Reddit post |
+| DELETE | `/reddit/posts/:subreddit/:postId/hide` | Unhide Reddit post |
+
+**Get Hidden Query Params:**
+- `type`: `all`, `posts`, `reddit_posts` (default: `all`)
+
+**Response:**
+```json
+{
+  "hidden_posts": [
+    {
+      "id": 456,
+      "user_id": 1,
+      "post_id": 789,
+      "created_at": "2025-12-03T10:00:00Z"
+    }
+  ],
+  "hidden_reddit_posts": [
+    {
+      "id": 123,
+      "subreddit": "funny",
+      "reddit_post_id": "abc123",
+      "created_at": "2025-12-03T10:00:00Z"
+    }
+  ]
+}
+```
+
+---
+
+## 🔗 Crossposting
+
+### Hub Crossposting
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/hubs/:hubName/posts` | Crosspost to hub |
+
+**Request Body:**
+```json
+{
+  "title": "string",
+  "body": "string (optional)",
+  "media_url": "https://... (optional)",
+  "media_type": "image|video (optional)",
+  "thumbnail_url": "https://... (optional)",
+  "send_replies_to_inbox": true
+}
+```
+
+**Query Params (Crosspost Metadata):**
+- `origin_type`: `reddit` or `platform` (required for tracking)
+- `origin_post_id`: Source post ID (required)
+- `origin_subreddit`: Source subreddit (optional)
+- `original_title`: Original title before crosspost (optional)
+
+### Subreddit Crossposting
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/subreddits/:subredditName/posts` | Crosspost to subreddit |
+| GET | `/subreddits/:subredditName/posts` | Get posts for subreddit |
+
+**Request/Response:** Same as hub crossposting
+
+**Get Posts Query Params:**
+- `sort`: `hot`, `new`, `top`, `rising` (default: `hot`)
 
 ---
 
