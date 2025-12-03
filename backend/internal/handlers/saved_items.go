@@ -159,12 +159,25 @@ func (h *SavedItemsHandler) SavePost(c *gin.Context) {
 		return
 	}
 
+	alreadySaved, err := h.savedRepo.IsPostSaved(c.Request.Context(), userID.(int), postID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check saved status", "details": err.Error()})
+		return
+	}
+	if alreadySaved {
+		c.JSON(http.StatusConflict, gin.H{"error": "Post already saved"})
+		return
+	}
+
 	if err := h.savedRepo.SavePost(c.Request.Context(), userID.(int), postID); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save post", "details": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"saved": true})
+	c.JSON(http.StatusOK, gin.H{
+		"saved":   true,
+		"message": "Post saved successfully",
+	})
 }
 
 // UnsavePost handles DELETE /api/v1/posts/:id/save
@@ -186,7 +199,10 @@ func (h *SavedItemsHandler) UnsavePost(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"saved": false})
+	c.JSON(http.StatusOK, gin.H{
+		"saved":   false,
+		"message": "Post unsaved successfully",
+	})
 }
 
 // SaveRedditComment handles POST /api/v1/reddit/posts/:subreddit/:postId/comments/:commentId/save
