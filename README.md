@@ -14,10 +14,10 @@ OmniNudge allows users to browse Reddit content, discuss it with a growing commu
 - Filter by subreddit topics
 - View Reddit media in slideshows while chatting
 
-### Platform Social Layer
-- Create posts and comments in custom hubs
+### OmniNudge Platform Social Layer
+- Create posts and comments in custom OmniNudge hubs
 - Upvote/downvote posts and comments
-- Unified feed showing both Reddit posts and platform posts
+- Unified feed showing both Reddit posts and OmniNudge posts
 - Full-text search across posts, comments, users, and hubs
 - Real-time notifications for milestones, velocity, and replies
 - User blocking to filter unwanted content
@@ -106,7 +106,7 @@ omninudge/
 - 52 tests passing (unit, integration, e2e, visual snapshots)
 - Documentation under `docs/user/` and `docs/technical/` explains customization, APIs, and future extensibility
 
-**Reddit Integration (Implemented):**
+**Reddit Integration (Implemented the below but still in progress overall):**
 - Reddit feed browsing with subreddit selection and sorting
 - Reddit post detail pages with comments
 - Saved and hidden items management
