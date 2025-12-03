@@ -4,8 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"html"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -107,6 +109,30 @@ type RedditListing struct {
 		Children []struct {
 			Kind string     `json:"kind"`
 			Data RedditPost `json:"data"`
+		} `json:"children"`
+	} `json:"data"`
+}
+
+// SubredditSuggestion represents a subreddit returned from the autocomplete endpoint
+type SubredditSuggestion struct {
+	Name        string `json:"name"`
+	Title       string `json:"title"`
+	Subscribers int    `json:"subscribers"`
+	IconURL     string `json:"icon_url,omitempty"`
+	Over18      bool   `json:"over_18"`
+}
+
+type subredditAutocompleteListing struct {
+	Data struct {
+		Children []struct {
+			Data struct {
+				DisplayName   string `json:"display_name"`
+				Title         string `json:"title"`
+				Subscribers   int    `json:"subscribers"`
+				IconImg       string `json:"icon_img"`
+				CommunityIcon string `json:"community_icon"`
+				Over18        bool   `json:"over18"`
+			} `json:"data"`
 		} `json:"children"`
 	} `json:"data"`
 }
@@ -338,6 +364,65 @@ func (r *RedditClient) SearchPosts(ctx context.Context, query string, subreddit 
 
 	_ = r.setCachedListing(ctx, cacheKey, listing)
 	return &listing, nil
+}
+
+// AutocompleteSubreddits fetches subreddit suggestions for a given query
+func (r *RedditClient) AutocompleteSubreddits(ctx context.Context, query string, limit int) ([]SubredditSuggestion, error) {
+	query = strings.TrimSpace(query)
+	if query == "" {
+		return nil, fmt.Errorf("query is required")
+	}
+	if limit < 1 || limit > 50 {
+		limit = 10
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "GET", "https://www.reddit.com/api/subreddit_autocomplete_v2.json", nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("User-Agent", r.userAgent)
+
+	q := req.URL.Query()
+	q.Set("query", query)
+	q.Set("limit", fmt.Sprintf("%d", limit))
+	q.Set("include_profiles", "false")
+	req.URL.RawQuery = q.Encode()
+
+	resp, err := r.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch subreddit suggestions: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("reddit API returned status %d: %s", resp.StatusCode, string(body))
+	}
+
+	var listing subredditAutocompleteListing
+	if err := json.NewDecoder(resp.Body).Decode(&listing); err != nil {
+		return nil, fmt.Errorf("failed to decode autocomplete response: %w", err)
+	}
+
+	suggestions := make([]SubredditSuggestion, 0, len(listing.Data.Children))
+	for _, child := range listing.Data.Children {
+		data := child.Data
+		icon := data.CommunityIcon
+		if icon == "" {
+			icon = data.IconImg
+		}
+		icon = html.UnescapeString(icon)
+		suggestions = append(suggestions, SubredditSuggestion{
+			Name:        data.DisplayName,
+			Title:       data.Title,
+			Subscribers: data.Subscribers,
+			IconURL:     strings.TrimSpace(icon),
+			Over18:      data.Over18,
+		})
+	}
+
+	return suggestions, nil
 }
 
 func (r *RedditClient) getCachedListing(ctx context.Context, key string) (*RedditListing, bool, error) {
