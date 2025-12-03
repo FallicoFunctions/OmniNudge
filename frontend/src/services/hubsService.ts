@@ -25,6 +25,10 @@ export interface CrosspostRequest {
 export interface LocalSubredditPost {
   id: number;
   author_id: number;
+  author_username?: string | null;
+  author?: {
+    username?: string | null;
+  } | null;
   hub_id: number;
   title: string;
   body?: string | null;

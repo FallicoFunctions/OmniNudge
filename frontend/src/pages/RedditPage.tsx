@@ -9,8 +9,13 @@ import { postsService } from '../services/postsService';
 import { useAuth } from '../contexts/AuthContext';
 import { useSettings } from '../contexts/SettingsContext';
 import { formatTimestamp } from '../utils/timeFormat';
+import {
+  createLocalCrosspostPayload,
+  createRedditCrosspostPayload,
+  type RedditCrosspostSource,
+} from '../utils/crosspostHelpers';
 
-interface FeedRedditPost {
+interface FeedRedditPost extends RedditCrosspostSource {
   id: string;
   title: string;
   author: string;
@@ -24,12 +29,6 @@ interface FeedRedditPost {
   is_self: boolean;
   post_hint?: string;
   is_video?: boolean;
-  preview?: {
-    images?: Array<{
-      source?: { url?: string };
-      resolutions?: Array<{ url?: string }>;
-    }>;
-  };
 }
 
 interface FeedRedditPostsResponse {
@@ -43,93 +42,6 @@ type CrosspostSource =
 type HideTarget =
   | { type: 'reddit'; post: FeedRedditPost }
   | { type: 'platform'; post: LocalSubredditPost };
-
-const imageExtensionRegex = /\.(jpe?g|png|gif|webp)$/i;
-
-function sanitizeHttpUrl(url?: string | null): string | undefined {
-  if (!url) return undefined;
-  const normalized = url.trim().replace(/&amp;/g, '&');
-  if (normalized.startsWith('http://') || normalized.startsWith('https://')) {
-    return normalized;
-  }
-  return undefined;
-}
-
-function extractPreviewImageUrl(post: FeedRedditPost): string | undefined {
-  const previewUrl = post.preview?.images?.[0]?.source?.url;
-  if (previewUrl) {
-    return sanitizeHttpUrl(previewUrl);
-  }
-  return undefined;
-}
-
-function createCrosspostPayload(
-  post: FeedRedditPost,
-  title: string,
-  sendReplies: boolean
-): CrosspostRequest {
-  const payload: CrosspostRequest = {
-    title,
-    send_replies_to_inbox: sendReplies,
-  };
-
-  const body = post.selftext?.trim();
-  if (body) {
-    payload.body = body;
-  }
-
-  const thumbnailUrl = sanitizeHttpUrl(post.thumbnail);
-  if (thumbnailUrl) {
-    payload.thumbnail_url = thumbnailUrl;
-  }
-
-  const previewImageUrl = extractPreviewImageUrl(post);
-  if (previewImageUrl && !payload.thumbnail_url) {
-    payload.thumbnail_url = previewImageUrl;
-  }
-
-  const mediaUrl = sanitizeHttpUrl(post.url);
-  if (mediaUrl) {
-    if (post.is_video) {
-      payload.media_url = mediaUrl;
-      payload.media_type = 'video';
-    } else if (post.post_hint === 'image' || imageExtensionRegex.test(mediaUrl.toLowerCase())) {
-      payload.media_url = mediaUrl;
-      payload.media_type = 'image';
-    }
-  }
-
-  if (!payload.media_url && previewImageUrl) {
-    payload.media_url = previewImageUrl;
-    payload.media_type = 'image';
-  }
-
-  if (!payload.media_url && mediaUrl) {
-    payload.media_url = mediaUrl;
-  }
-
-  if (!payload.thumbnail_url && payload.media_url && payload.media_type === 'image') {
-    payload.thumbnail_url = payload.media_url;
-  }
-
-  return payload;
-}
-
-function createLocalCrosspostPayload(
-  post: LocalSubredditPost,
-  title: string,
-  sendReplies: boolean
-): CrosspostRequest {
-  const thumbnail = post.thumbnail_url ?? post.media_url ?? undefined;
-  return {
-    title,
-    send_replies_to_inbox: sendReplies,
-    body: post.body ?? undefined,
-    media_url: post.media_url ?? undefined,
-    media_type: post.media_type ?? undefined,
-    thumbnail_url: thumbnail,
-  };
-}
 
 export default function RedditPage() {
   const navigate = useNavigate();
@@ -146,6 +58,7 @@ export default function RedditPage() {
   const [selectedHub, setSelectedHub] = useState('');
   const [selectedSubreddit, setSelectedSubreddit] = useState('');
   const [sendRepliesToInbox, setSendRepliesToInbox] = useState(true);
+  const [showOmniOnly, setShowOmniOnly] = useState(false);
 
   const { data, isLoading, error } = useQuery<FeedRedditPostsResponse>({
     queryKey: ['reddit', subreddit, sort],
@@ -385,7 +298,7 @@ export default function RedditPage() {
 
       if (crosspostTarget.type === 'reddit') {
         const source = crosspostTarget.post;
-        payload = createCrosspostPayload(source, title, sendRepliesToInbox);
+        payload = createRedditCrosspostPayload(source, title, sendRepliesToInbox);
         originType = 'reddit';
         originPostId = source.id;
         originSubreddit = source.subreddit;
@@ -471,6 +384,36 @@ export default function RedditPage() {
       .catch(() => alert('Unable to copy link. Please try again.'));
   };
 
+  const combinedPosts = useMemo(() => {
+    const allPosts: CrosspostSource[] = [
+      ...visiblePosts.map((post) => ({ type: 'reddit' as const, post })),
+      ...visibleLocalPosts.map((post) => ({ type: 'platform' as const, post })),
+    ];
+
+    const filteredPosts = showOmniOnly
+      ? allPosts.filter((post) => post.type === 'platform')
+      : allPosts;
+
+    const getCreatedTimestamp = (post: CrosspostSource) =>
+      post.type === 'reddit'
+        ? post.post.created_utc * 1000
+        : new Date(post.post.created_at).getTime();
+
+    const getSortValue = (post: CrosspostSource) => {
+      if (sort === 'new') {
+        return getCreatedTimestamp(post);
+      }
+      if (sort === 'top') {
+        return post.post.score ?? 0;
+      }
+
+      const recency = getCreatedTimestamp(post);
+      return (post.post.score ?? 0) * 1_000_000 + recency;
+    };
+
+    return filteredPosts.sort((a, b) => getSortValue(b) - getSortValue(a));
+  }, [visiblePosts, visibleLocalPosts, showOmniOnly, sort]);
+
   return (
     <div className="mx-auto max-w-4xl px-4 py-8">
       {/* Header */}
@@ -501,7 +444,7 @@ export default function RedditPage() {
         </form>
 
         {/* Sort Options */}
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           {(['hot', 'new', 'top', 'rising'] as const).map((sortOption) => (
             <button
               key={sortOption}
@@ -515,6 +458,17 @@ export default function RedditPage() {
               {sortOption}
             </button>
           ))}
+          <button
+            type="button"
+            onClick={() => setShowOmniOnly((prev) => !prev)}
+            className={`rounded-md px-3 py-2 text-sm font-medium ${
+              showOmniOnly
+                ? 'bg-[var(--color-primary)] text-white'
+                : 'bg-[var(--color-surface-elevated)] text-[var(--color-text-primary)] hover:bg-[var(--color-border)]'
+            }`}
+          >
+            Omni
+          </button>
         </div>
       </div>
 
@@ -548,125 +502,121 @@ export default function RedditPage() {
         </div>
       )}
 
-      {/* Local OmniNudge Posts */}
-      {visibleLocalPosts.length > 0 ? (
-        <div className="mb-4 space-y-3">
-          <div className="rounded-md bg-blue-50 p-3 text-sm font-medium text-blue-900">
-            📌 Local OmniNudge Posts in r/{subreddit}
-          </div>
-          {visibleLocalPosts.map((post: LocalSubredditPost) => {
-            const previewImage = post.thumbnail_url || post.media_url;
-            const displaySubreddit =
-              post.target_subreddit || post.crosspost_origin_subreddit || subreddit;
-            const displayAuthor =
-              (post as any).author_username ||
-              (post as any).author?.username ||
-              (post.author_id === user?.id ? user?.username : undefined) ||
-              'unknown';
-            const createdLabel = formatTimestamp(post.created_at, useRelativeTime);
-            const commentLabel = `${post.num_comments.toLocaleString()} Comments`;
-            const pointsLabel = `${post.score.toLocaleString()} points`;
-            const canDelete = user?.id === post.author_id;
-            const isDeleting =
-              deleteLocalPostMutation.isPending && deleteLocalPostMutation.variables === post.id;
-            const isSavedLocal = savedLocalPostIds.has(post.id);
-            const isSavePendingLocal =
-              savedLocalToggleMutation.isPending &&
-              savedLocalToggleMutation.variables?.postId === post.id;
+      {combinedPosts.length > 0 ? (
+        <div className="space-y-3">
+          {combinedPosts.map((item) => {
+            if (item.type === 'platform') {
+              const post = item.post;
+              const previewImage = post.thumbnail_url || post.media_url;
+              const displaySubreddit =
+                post.target_subreddit || post.crosspost_origin_subreddit || subreddit;
+              const displayAuthor =
+                post.author_username ||
+                post.author?.username ||
+                (post.author_id === user?.id ? user?.username : undefined) ||
+                'unknown';
+              const createdLabel = formatTimestamp(post.created_at, useRelativeTime);
+              const commentLabel = `${post.num_comments.toLocaleString()} Comments`;
+              const pointsLabel = `${post.score.toLocaleString()} points`;
+              const canDelete = user?.id === post.author_id;
+              const isDeleting =
+                deleteLocalPostMutation.isPending &&
+                deleteLocalPostMutation.variables === post.id;
+              const isSavedLocal = savedLocalPostIds.has(post.id);
+              const isSavePendingLocal =
+                savedLocalToggleMutation.isPending &&
+                savedLocalToggleMutation.variables?.postId === post.id;
 
-            return (
-              <article
-                key={`local-${post.id}`}
-                className="rounded-md border-2 border-blue-400 bg-[var(--color-surface)]"
-              >
-                <div className="flex gap-3 p-3">
-                  {previewImage && (
-                    <img
-                      src={previewImage}
-                      alt=""
-                      className="h-16 w-16 flex-shrink-0 rounded object-cover"
-                    />
-                  )}
-                  <div className="flex-1 text-left">
-                    <div className="mb-1 inline-block rounded bg-blue-600 px-2 py-0.5 text-[10px] font-bold uppercase text-white">
-                      OmniNudge
-                    </div>
-                    <Link to={`/posts/${post.id}`}>
-                      <h3 className="text-base font-semibold text-[var(--color-text-primary)] hover:text-[var(--color-primary)]">
-                        {post.title}
-                      </h3>
-                    </Link>
-                    <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-[var(--color-text-secondary)]">
-                      {displaySubreddit && (
-                        <>
-                          <span>r/{displaySubreddit}</span>
-                          <span>•</span>
-                        </>
-                      )}
-                      <span>u/{displayAuthor}</span>
-                      <span>•</span>
-                      <span>{pointsLabel}</span>
-                      <span>•</span>
-                      <span>submitted {createdLabel}</span>
-                    </div>
-                    <div className="mt-1 flex flex-wrap items-center gap-3 text-[11px] text-[var(--color-text-secondary)]">
-                      <Link
-                        to={`/posts/${post.id}`}
-                        className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
-                      >
-                        {commentLabel}
+              return (
+                <article
+                  key={`local-${post.id}`}
+                  className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)]"
+                >
+                  <div className="flex gap-3 p-3">
+                    {previewImage && (
+                      <img
+                        src={previewImage}
+                        alt=""
+                        className="h-16 w-16 flex-shrink-0 rounded object-cover"
+                      />
+                    )}
+                    <div className="flex-1 text-left">
+                      <div className="mb-1 inline-flex items-center gap-2">
+                        <span className="inline-block rounded bg-blue-600 px-2 py-0.5 text-[10px] font-bold uppercase text-white">
+                          Omni
+                        </span>
+                        {displaySubreddit && (
+                          <span className="text-[11px] font-medium text-[var(--color-text-secondary)]">
+                            r/{displaySubreddit}
+                          </span>
+                        )}
+                      </div>
+                      <Link to={`/posts/${post.id}`}>
+                        <h3 className="text-base font-semibold text-[var(--color-text-primary)] hover:text-[var(--color-primary)]">
+                          {post.title}
+                        </h3>
                       </Link>
-                      <button
-                        type="button"
-                        onClick={() => handleShareLocalPost(post.id)}
-                        className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
-                      >
-                        Share
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleToggleSaveLocalPost(post.id, isSavedLocal)}
-                        disabled={isSavePendingLocal}
-                        className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] disabled:opacity-50"
-                      >
-                        {isSavePendingLocal ? 'Saving...' : isSavedLocal ? 'Unsave' : 'Save'}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleSetHideTarget({ type: 'platform', post })}
-                        className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
-                      >
-                        Hide
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleCrosspostSelection({ type: 'platform', post })}
-                        className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
-                      >
-                        Crosspost
-                      </button>
-                      {canDelete && (
+                      <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-[var(--color-text-secondary)]">
+                        <span>u/{displayAuthor}</span>
+                        <span>•</span>
+                        <span>{pointsLabel}</span>
+                        <span>•</span>
+                        <span>submitted {createdLabel}</span>
+                      </div>
+                      <div className="mt-1 flex flex-wrap items-center gap-3 text-[11px] text-[var(--color-text-secondary)]">
+                        <Link
+                          to={`/posts/${post.id}`}
+                          className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+                        >
+                          {commentLabel}
+                        </Link>
                         <button
                           type="button"
-                          onClick={() => handleDeleteLocalPost(post.id)}
-                          disabled={isDeleting}
-                          className="text-red-600 hover:text-red-500 disabled:opacity-60"
+                          onClick={() => handleShareLocalPost(post.id)}
+                          className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
                         >
-                          {isDeleting ? 'Deleting...' : 'Delete'}
+                          Share
                         </button>
-                      )}
+                        <button
+                          type="button"
+                          onClick={() => handleToggleSaveLocalPost(post.id, isSavedLocal)}
+                          disabled={isSavePendingLocal}
+                          className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] disabled:opacity-50"
+                        >
+                          {isSavePendingLocal ? 'Saving...' : isSavedLocal ? 'Unsave' : 'Save'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleSetHideTarget({ type: 'platform', post })}
+                          className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+                        >
+                          Hide
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleCrosspostSelection({ type: 'platform', post })}
+                          className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+                        >
+                          Crosspost
+                        </button>
+                        {canDelete && (
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteLocalPost(post.id)}
+                            disabled={isDeleting}
+                            className="text-red-600 hover:text-red-500 disabled:opacity-60"
+                          >
+                            {isDeleting ? 'Deleting...' : 'Delete'}
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
-              </article>
-            );
-          })}
-        </div>
-      ) : null}
+                </article>
+              );
+            }
 
-      {visiblePosts && (
-        <div className="space-y-3">
-          {visiblePosts.map((post) => {
+            const post = item.post;
             const postUrl = `/reddit/r/${post.subreddit}/comments/${post.id}`;
             const thumbnail =
               post.thumbnail && post.thumbnail.startsWith('http')
@@ -681,7 +631,7 @@ export default function RedditPage() {
 
             return (
               <article
-                key={post.id}
+                key={`reddit-${post.id}`}
                 className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)]"
               >
                 <div className="flex gap-3 p-3">
@@ -771,11 +721,11 @@ export default function RedditPage() {
             );
           })}
         </div>
-      )}
+      ) : null}
 
-      {visiblePosts && visiblePosts.length === 0 && !isLoading && (
+      {combinedPosts.length === 0 && !isLoading && (
         <div className="text-center text-[var(--color-text-secondary)]">
-          No posts found in r/{subreddit}
+          {showOmniOnly ? `No Omni posts found in r/${subreddit}` : `No posts found in r/${subreddit}`}
         </div>
       )}
 
