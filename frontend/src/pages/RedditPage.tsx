@@ -555,20 +555,22 @@ export default function RedditPage() {
               {sortOption}
             </button>
           ))}
-          <span className="ml-2 text-xs font-semibold uppercase text-[var(--color-text-secondary)]">
-            Show only Omni posts:
-          </span>
-          <button
-            type="button"
-            onClick={() => setShowOmniOnly((prev) => !prev)}
-            className={`rounded-md px-3 py-2 text-sm font-medium ${
-              showOmniOnly
-                ? 'bg-[var(--color-primary)] text-white'
-                : 'bg-[var(--color-surface-elevated)] text-[var(--color-text-primary)] hover:bg-[var(--color-border)]'
-            }`}
-          >
-            Omni
-          </button>
+          <div className="ml-auto flex items-center gap-2">
+            <span className="text-xs font-semibold uppercase text-[var(--color-text-secondary)]">
+              Show only Omni posts:
+            </span>
+            <button
+              type="button"
+              onClick={() => setShowOmniOnly((prev) => !prev)}
+              className={`rounded-md px-3 py-2 text-sm font-medium ${
+                showOmniOnly
+                  ? 'bg-[var(--color-primary)] text-white'
+                  : 'bg-[var(--color-surface-elevated)] text-[var(--color-text-primary)] hover:bg-[var(--color-border)]'
+              }`}
+            >
+              Omni
+            </button>
+          </div>
         </div>
       </div>
 
