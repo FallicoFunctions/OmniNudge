@@ -417,11 +417,10 @@ export default function RedditPage() {
   return (
     <div className="mx-auto max-w-4xl px-4 py-8">
       {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold text-[var(--color-text-primary)]">Reddit Browser</h1>
-        <p className="mt-2 text-sm text-[var(--color-text-secondary)]">
-          Currently viewing: r/{subreddit}
-        </p>
+      <div className="mb-6 text-left">
+        <h1 className="text-3xl font-bold text-[var(--color-text-primary)]">
+          Currently viewing: r/{subreddit} subreddit
+        </h1>
       </div>
 
       {/* Controls */}
@@ -470,25 +469,6 @@ export default function RedditPage() {
             Omni
           </button>
         </div>
-      </div>
-
-      {/* Popular Subreddits */}
-      <div className="mb-6 flex flex-wrap gap-2">
-        {['popular', 'all', 'programming', 'technology', 'news', 'worldnews', 'science'].map(
-          (sub) => (
-            <button
-              key={sub}
-              onClick={() => navigateToSubreddit(sub)}
-              className={`rounded-full px-3 py-1 text-xs font-medium ${
-                subreddit === sub
-                  ? 'bg-[var(--color-primary)] text-white'
-                  : 'border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-elevated)]'
-              }`}
-            >
-              r/{sub}
-            </button>
-          )
-        )}
       </div>
 
       {/* Posts List */}
