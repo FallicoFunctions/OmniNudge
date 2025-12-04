@@ -16,7 +16,7 @@ OmniNudge allows users to browse Reddit content, discuss it with a growing commu
 
 ### OmniNudge Platform Social Layer
 - Create posts and comments in custom OmniNudge hubs
-- Upvote/downvote posts and comments
+- Upvote/downvote OmniNudge posts and comments
 - Unified feed showing both Reddit posts and OmniNudge posts
 - Full-text search across posts, comments, users, and hubs
 - Real-time notifications for milestones, velocity, and replies
