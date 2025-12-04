@@ -64,6 +64,14 @@ const platformPostSelectColumns = `
 	target_subreddit, crossposted_at, created_at, hot_score
 `
 
+const platformPostSelectColumnsPrefixed = `
+	p.id, p.author_id, p.hub_id, p.title, p.body, p.tags, p.media_url, p.media_type, p.thumbnail_url,
+	p.score, p.upvotes, p.downvotes, p.num_comments, p.view_count,
+	p.is_deleted, p.is_edited, p.edited_at,
+	p.crosspost_origin_type, p.crosspost_origin_subreddit, p.crosspost_origin_post_id, p.crosspost_original_title,
+	p.target_subreddit, p.crossposted_at, p.created_at, p.hot_score
+`
+
 // PlatformPostRepository handles database operations for platform posts
 type PlatformPostRepository struct {
 	pool *pgxpool.Pool
@@ -532,7 +540,7 @@ func (r *PlatformPostRepository) GetPopularFeed(
 	}
 
 	query := `
-		SELECT ` + platformPostSelectColumns + `
+		SELECT ` + platformPostSelectColumnsPrefixed + `
 		FROM platform_posts p
 		JOIN hubs h ON p.hub_id = h.id
 		` + whereClause + `
