@@ -7,9 +7,10 @@ import { useMediaQuery } from '../../hooks/useMediaQuery';
 
 interface ThemeSelectorProps {
   onCreateNewTheme?: () => void;
+  variant?: 'card' | 'toolbar';
 }
 
-const ThemeSelector = ({ onCreateNewTheme }: ThemeSelectorProps) => {
+const ThemeSelector = ({ onCreateNewTheme, variant = 'card' }: ThemeSelectorProps) => {
   const {
     activeTheme,
     predefinedThemes,
@@ -199,14 +200,18 @@ const ThemeSelector = ({ onCreateNewTheme }: ThemeSelectorProps) => {
 
   const menu = isMobile ? createPortal(menuContent, document.body) : menuContent;
 
+  const isToolbarVariant = variant === 'toolbar';
+
   return (
-    <div className="relative inline-block w-full max-w-md text-left">
+    <div
+      className={`relative inline-block text-left ${isToolbarVariant ? 'min-w-[14rem] self-stretch' : 'w-full max-w-md'}`}
+    >
       <div className="sr-only" aria-live="polite">
         {announcement}
       </div>
       <button
         type="button"
-        className="flex w-full items-center justify-between rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3 text-left shadow-sm"
+        className={`flex w-full items-center justify-between text-left transition ${isToolbarVariant ? 'box-border h-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-1.5 shadow-none hover:bg-[var(--color-surface-elevated)]' : 'rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3 shadow-sm'}`}
         onClick={() => setIsOpen((prev) => !prev)}
         aria-expanded={isOpen}
         aria-haspopup="dialog"
