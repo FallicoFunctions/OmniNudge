@@ -30,11 +30,12 @@ type PlatformPost struct {
 	ThumbnailURL *string `json:"thumbnail_url,omitempty"`
 
 	// Engagement metrics
-	Score       int `json:"score"`
-	Upvotes     int `json:"upvotes"`
-	Downvotes   int `json:"downvotes"`
-	NumComments int `json:"num_comments"`
-	ViewCount   int `json:"view_count"`
+	Score       int     `json:"score"`
+	Upvotes     int     `json:"upvotes"`
+	Downvotes   int     `json:"downvotes"`
+	NumComments int     `json:"num_comments"`
+	ViewCount   int     `json:"view_count"`
+	HotScore    float64 `json:"hot_score"` // Reddit-style hot ranking score
 
 	// Status
 	IsDeleted bool       `json:"is_deleted"`
@@ -60,7 +61,7 @@ const platformPostSelectColumns = `
 	score, upvotes, downvotes, num_comments, view_count,
 	is_deleted, is_edited, edited_at,
 	crosspost_origin_type, crosspost_origin_subreddit, crosspost_origin_post_id, crosspost_original_title,
-	target_subreddit, crossposted_at, created_at
+	target_subreddit, crossposted_at, created_at, hot_score
 `
 
 // PlatformPostRepository handles database operations for platform posts
@@ -207,12 +208,17 @@ func (r *PlatformPostRepository) GetByAuthor(ctx context.Context, authorID int, 
 func (r *PlatformPostRepository) GetByHub(ctx context.Context, hubID int, sortBy string, limit, offset int) ([]*PlatformPost, error) {
 	var orderClause string
 	switch sortBy {
-	case "hot", "score":
-		orderClause = "ORDER BY score DESC, created_at DESC"
+	case "hot":
+		orderClause = "ORDER BY hot_score DESC, created_at DESC"
 	case "new":
 		orderClause = "ORDER BY created_at DESC"
+	case "top":
+		orderClause = "ORDER BY score DESC, created_at DESC"
+	case "rising":
+		// Rising sort: score divided by age in hours
+		orderClause = `ORDER BY (score::float / GREATEST(EXTRACT(EPOCH FROM (NOW() - created_at)) / 3600, 1)) DESC`
 	default:
-		orderClause = "ORDER BY created_at DESC"
+		orderClause = "ORDER BY hot_score DESC, created_at DESC"
 	}
 
 	query := `
@@ -245,12 +251,16 @@ func (r *PlatformPostRepository) GetByHub(ctx context.Context, hubID int, sortBy
 func (r *PlatformPostRepository) GetBySubreddit(ctx context.Context, subreddit string, sortBy string, limit, offset int) ([]*PlatformPost, error) {
 	var orderClause string
 	switch sortBy {
-	case "hot", "score":
-		orderClause = "ORDER BY score DESC, created_at DESC"
+	case "hot":
+		orderClause = "ORDER BY hot_score DESC, created_at DESC"
 	case "new":
 		orderClause = "ORDER BY created_at DESC"
+	case "top":
+		orderClause = "ORDER BY score DESC, created_at DESC"
+	case "rising":
+		orderClause = `ORDER BY (score::float / GREATEST(EXTRACT(EPOCH FROM (NOW() - created_at)) / 3600, 1)) DESC`
 	default:
-		orderClause = "ORDER BY created_at DESC"
+		orderClause = "ORDER BY hot_score DESC, created_at DESC"
 	}
 
 	query := `
@@ -374,6 +384,7 @@ func scanPlatformPost(row pgx.Row, post *PlatformPost) error {
 		&post.TargetSubreddit,
 		&post.CrosspostedAt,
 		&post.CreatedAt,
+		&post.HotScore,
 	)
 }
 
@@ -486,4 +497,124 @@ func (r *PlatformPostRepository) Vote(ctx context.Context, postID int, userID in
 	}
 
 	return tx.Commit(ctx)
+}
+
+// GetPopularFeed returns filtered, personalized feed (h/popular)
+// Excludes quarantined hubs
+// Filters by user's subscribed hubs if hasSubscriptions=true
+// Sorts by hot_score DESC
+func (r *PlatformPostRepository) GetPopularFeed(
+	ctx context.Context,
+	userID int,
+	hasSubscriptions bool,
+	subscribedHubIDs []int,
+	sort string,
+	limit, offset int,
+) ([]*PlatformPost, error) {
+	var orderClause string
+	switch sort {
+	case "hot":
+		orderClause = "ORDER BY p.hot_score DESC, p.created_at DESC"
+	case "new":
+		orderClause = "ORDER BY p.created_at DESC"
+	case "top":
+		orderClause = "ORDER BY p.score DESC, p.created_at DESC"
+	case "rising":
+		orderClause = `ORDER BY (p.score::float / GREATEST(EXTRACT(EPOCH FROM (NOW() - p.created_at)) / 3600, 1)) DESC`
+	default:
+		orderClause = "ORDER BY p.hot_score DESC, p.created_at DESC"
+	}
+
+	// Build WHERE clause for subscription filtering
+	whereClause := `WHERE p.is_deleted = FALSE AND h.is_quarantined = FALSE`
+	if hasSubscriptions && len(subscribedHubIDs) > 0 {
+		whereClause += ` AND p.hub_id = ANY($1)`
+	}
+
+	query := `
+		SELECT ` + platformPostSelectColumns + `
+		FROM platform_posts p
+		JOIN hubs h ON p.hub_id = h.id
+		` + whereClause + `
+		` + orderClause
+
+	if hasSubscriptions && len(subscribedHubIDs) > 0 {
+		query += ` LIMIT $2 OFFSET $3`
+	} else {
+		query += ` LIMIT $1 OFFSET $2`
+	}
+
+	var rows pgx.Rows
+	var err error
+
+	if hasSubscriptions && len(subscribedHubIDs) > 0 {
+		rows, err = r.pool.Query(ctx, query, subscribedHubIDs, limit, offset)
+	} else {
+		rows, err = r.pool.Query(ctx, query, limit, offset)
+	}
+
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var posts []*PlatformPost
+	for rows.Next() {
+		post := &PlatformPost{}
+		if err := scanPlatformPost(rows, post); err != nil {
+			return nil, err
+		}
+		posts = append(posts, post)
+	}
+
+	return posts, rows.Err()
+}
+
+// GetAllFeed returns global firehose (h/all)
+// Includes quarantined hubs (unless user opts out)
+// No subscription filtering
+// Sorts by hot_score DESC
+func (r *PlatformPostRepository) GetAllFeed(
+	ctx context.Context,
+	sort string,
+	limit, offset int,
+) ([]*PlatformPost, error) {
+	var orderClause string
+	switch sort {
+	case "hot":
+		orderClause = "ORDER BY hot_score DESC, created_at DESC"
+	case "new":
+		orderClause = "ORDER BY created_at DESC"
+	case "top":
+		orderClause = "ORDER BY score DESC, created_at DESC"
+	case "rising":
+		orderClause = `ORDER BY (score::float / GREATEST(EXTRACT(EPOCH FROM (NOW() - created_at)) / 3600, 1)) DESC`
+	default:
+		orderClause = "ORDER BY hot_score DESC, created_at DESC"
+	}
+
+	query := `
+		SELECT ` + platformPostSelectColumns + `
+		FROM platform_posts
+		WHERE is_deleted = FALSE
+		` + orderClause + `
+		LIMIT $1 OFFSET $2
+	`
+
+	rows, err := r.pool.Query(ctx, query, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var posts []*PlatformPost
+	for rows.Next() {
+		post := &PlatformPost{}
+		if err := scanPlatformPost(rows, post); err != nil {
+			return nil, err
+		}
+		posts = append(posts, post)
+	}
+
+	return posts, rows.Err()
 }
