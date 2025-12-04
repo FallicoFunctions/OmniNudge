@@ -4,8 +4,35 @@ export interface Hub {
   id: number;
   name: string;
   description?: string;
+  title?: string;
+  type: string; // 'public' or 'private'
+  content_options: string; // 'any', 'links_only', or 'text_only'
+  is_quarantined: boolean;
+  subscriber_count: number;
   created_by?: number;
   created_at: string;
+}
+
+export interface CreateHubRequest {
+  name: string;
+  title?: string;
+  description?: string;
+  type: 'public' | 'private';
+  content_options: 'any' | 'links_only' | 'text_only';
+}
+
+export interface HubsResponse {
+  hubs: Hub[];
+  limit: number;
+  offset: number;
+}
+
+export interface HubPostsResponse {
+  posts: LocalSubredditPost[];
+  hub?: string;
+  sort: string;
+  limit: number;
+  offset: number;
 }
 
 export interface UserHubsResponse {
@@ -59,6 +86,42 @@ export interface SubredditPostsResponse {
 }
 
 export const hubsService = {
+  // Hub browsing
+  async getAllHubs(limit: number = 25, offset: number = 0): Promise<HubsResponse> {
+    return api.get<HubsResponse>(`/hubs?limit=${limit}&offset=${offset}`);
+  },
+
+  async getHub(hubName: string): Promise<Hub> {
+    return api.get<Hub>(`/hubs/${hubName}`);
+  },
+
+  async getHubPosts(hubName: string, sort: string = 'hot', limit: number = 25, offset: number = 0): Promise<HubPostsResponse> {
+    return api.get<HubPostsResponse>(`/hubs/${hubName}/posts?sort=${sort}&limit=${limit}&offset=${offset}`);
+  },
+
+  async getPopularFeed(sort: string = 'hot', limit: number = 25, offset: number = 0): Promise<HubPostsResponse> {
+    return api.get<HubPostsResponse>(`/hubs/h/popular?sort=${sort}&limit=${limit}&offset=${offset}`);
+  },
+
+  async getAllFeed(sort: string = 'hot', limit: number = 25, offset: number = 0): Promise<HubPostsResponse> {
+    return api.get<HubPostsResponse>(`/hubs/h/all?sort=${sort}&limit=${limit}&offset=${offset}`);
+  },
+
+  async searchHubs(query: string, limit: number = 10): Promise<Hub[]> {
+    const response = await api.get<{ hubs: Hub[] }>(`/hubs/search?q=${encodeURIComponent(query)}&limit=${limit}`);
+    return response.hubs || [];
+  },
+
+  async getTrendingHubs(limit: number = 10): Promise<Hub[]> {
+    const response = await api.get<{ hubs: Hub[] }>(`/hubs/trending?limit=${limit}`);
+    return response.hubs || [];
+  },
+
+  // Hub creation
+  async createHub(data: CreateHubRequest): Promise<Hub> {
+    return api.post<Hub>('/hubs', data);
+  },
+
   async getUserHubs(): Promise<UserHubsResponse> {
     return api.get<UserHubsResponse>('/users/me/hubs');
   },

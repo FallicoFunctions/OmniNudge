@@ -27,8 +27,15 @@ export interface PostComment extends LocalCommentBase {
 
 export interface CreatePostRequest {
   title: string;
-  content?: string;
-  hub_name: string;
+  body?: string;
+  tags?: string[];
+  media_url?: string;
+  media_type?: string;
+  thumbnail_url?: string;
+  hub_id?: number;
+  target_subreddit?: string;
+  send_replies_to_inbox?: boolean;
+  post_type: 'link' | 'text';
 }
 
 export interface CreateCommentRequest {
