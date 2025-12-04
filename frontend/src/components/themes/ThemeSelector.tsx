@@ -136,6 +136,7 @@ const ThemeSelector = ({ onCreateNewTheme, variant = 'card' }: ThemeSelectorProp
                       '--color-surface',
                       'var(--color-surface)'
                     );
+                    const previewBackground = `linear-gradient(135deg, ${backgroundColor}, ${surfaceColor})`;
 
                     const activeStyles = isActive
                       ? { boxShadow: '0 0 0 2px var(--color-primary)' }
@@ -154,23 +155,18 @@ const ThemeSelector = ({ onCreateNewTheme, variant = 'card' }: ThemeSelectorProp
                         onClick={() => handleSelect(theme)}
                         disabled={switchingThemeId === theme.id}
                       >
-                        <div className="flex w-full justify-center">
-                          <div className="mx-auto flex h-12 w-20 items-center justify-center rounded-md border border-[var(--color-border)] bg-white">
-                            <div
-                              className="h-10 w-8 rounded-md shadow-inner"
-                              style={{
-                                background: `linear-gradient(135deg, ${backgroundColor}, ${surfaceColor})`,
-                                border: `2px solid ${primaryColor}`,
-                              }}
-                            />
-                          </div>
-                        </div>
-                        <div className="w-full">
+                        <div
+                          className="w-full rounded-lg border px-4 py-3 shadow-inner"
+                          style={{
+                            background: previewBackground,
+                            borderColor: primaryColor,
+                          }}
+                        >
                           <p className="text-left text-base font-semibold text-[var(--color-text-primary)]">
                             {theme.theme_name}
                           </p>
                           {theme.theme_description && (
-                            <p className="text-left text-sm text-[var(--color-text-secondary)]">
+                            <p className="text-left text-sm text-[var(--color-text-primary)]">
                               {theme.theme_description}
                             </p>
                           )}
