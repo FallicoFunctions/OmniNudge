@@ -29,6 +29,12 @@ export default function MainLayout() {
                   Reddit
                 </Link>
                 <Link
+                  to="/hubs"
+                  className="rounded-md px-3 py-2 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
+                >
+                  Hubs
+                </Link>
+                <Link
                   to="/posts"
                   className="rounded-md px-3 py-2 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
                 >
