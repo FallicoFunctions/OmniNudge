@@ -145,7 +145,7 @@ const ThemeSelector = ({ onCreateNewTheme, variant = 'card' }: ThemeSelectorProp
                       <button
                         key={theme.id}
                         type="button"
-                        className={`flex w-full items-center gap-3 rounded-lg border px-3 py-3 text-left transition ${
+                        className={`flex w-full flex-col gap-3 rounded-lg border px-3 py-4 text-left transition ${
                           isActive
                             ? 'border-[var(--color-primary)]'
                             : 'border-transparent hover:bg-[var(--color-surface-elevated)]'
@@ -154,31 +154,26 @@ const ThemeSelector = ({ onCreateNewTheme, variant = 'card' }: ThemeSelectorProp
                         onClick={() => handleSelect(theme)}
                         disabled={switchingThemeId === theme.id}
                       >
-                        <div className="flex h-10 w-16 items-center justify-center rounded-md border border-[var(--color-border)] bg-white">
-                          <div
-                            className="h-8 w-6 rounded-md shadow-inner"
-                            style={{
-                              background: `linear-gradient(135deg, ${backgroundColor}, ${surfaceColor})`,
-                              border: `2px solid ${primaryColor}`,
-                            }}
-                          />
+                        <div className="flex w-full justify-center">
+                          <div className="mx-auto flex h-12 w-20 items-center justify-center rounded-md border border-[var(--color-border)] bg-white">
+                            <div
+                              className="h-10 w-8 rounded-md shadow-inner"
+                              style={{
+                                background: `linear-gradient(135deg, ${backgroundColor}, ${surfaceColor})`,
+                                border: `2px solid ${primaryColor}`,
+                              }}
+                            />
+                          </div>
                         </div>
-                        <div className="flex-1">
-                          <p className="text-sm font-semibold text-[var(--color-text-primary)]">
+                        <div className="w-full">
+                          <p className="text-left text-base font-semibold text-[var(--color-text-primary)]">
                             {theme.theme_name}
                           </p>
                           {theme.theme_description && (
-                            <p className="text-xs text-[var(--color-text-secondary)]">
+                            <p className="text-left text-sm text-[var(--color-text-secondary)]">
                               {theme.theme_description}
                             </p>
                           )}
-                        </div>
-                        <div className="text-xs text-[var(--color-text-muted)]">
-                          {isActive
-                            ? 'Active'
-                            : switchingThemeId === theme.id
-                              ? 'Updating…'
-                              : 'Select'}
                         </div>
                       </button>
                     );
