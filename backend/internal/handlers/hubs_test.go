@@ -642,6 +642,5 @@ func TestHubAuthRequired(t *testing.T) {
 			require.NoError(t, err)
 			assert.Contains(t, response["error"], "not authenticated")
 		})
-}
 	}
 }
