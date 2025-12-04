@@ -1,7 +1,12 @@
 import { useSettings } from '../contexts/SettingsContext';
 
 export default function SettingsPage() {
-  const { useRelativeTime, setUseRelativeTime } = useSettings();
+  const {
+    useRelativeTime,
+    setUseRelativeTime,
+    autoCloseThemeSelector,
+    setAutoCloseThemeSelector,
+  } = useSettings();
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-8">
@@ -74,14 +79,72 @@ export default function SettingsPage() {
           </div>
         </section>
 
-        {/* Future settings sections can go here */}
         <section className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-6">
           <h2 className="mb-4 text-xl font-semibold text-[var(--color-text-primary)]">
-            More Settings Coming Soon
+            Theme Selector Behavior
           </h2>
           <p className="text-sm text-[var(--color-text-secondary)]">
-            Additional customization options will be added in future updates.
+            Choose whether the theme dropdown should stay open after you pick a theme or close
+            automatically.
           </p>
+
+          <div className="mt-4 grid gap-4 sm:grid-cols-2">
+            <label
+              htmlFor="theme-selector-stay-open"
+              className={`flex cursor-pointer flex-col rounded-lg border p-4 ${
+                !autoCloseThemeSelector
+                  ? 'border-[var(--color-primary)] bg-[var(--color-surface-elevated)] shadow-sm'
+                  : 'border-[var(--color-border)]'
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-base font-semibold text-[var(--color-text-primary)]">
+                    Stay Open (Default)
+                  </p>
+                  <p className="text-sm text-[var(--color-text-secondary)]">
+                    Keep browsing other themes without reopening the dropdown.
+                  </p>
+                </div>
+                <input
+                  id="theme-selector-stay-open"
+                  type="radio"
+                  name="theme-selector-behavior"
+                  className="h-4 w-4 text-[var(--color-primary)] focus:ring-[var(--color-primary)]"
+                  checked={!autoCloseThemeSelector}
+                  onChange={() => setAutoCloseThemeSelector(false)}
+                />
+              </div>
+            </label>
+
+            <label
+              htmlFor="theme-selector-auto-close"
+              className={`flex cursor-pointer flex-col rounded-lg border p-4 ${
+                autoCloseThemeSelector
+                  ? 'border-[var(--color-primary)] bg-[var(--color-surface-elevated)] shadow-sm'
+                  : 'border-[var(--color-border)]'
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-base font-semibold text-[var(--color-text-primary)]">
+                    Auto-Close After Selection
+                  </p>
+                  <p className="text-sm text-[var(--color-text-secondary)]">
+                    Close the dropdown as soon as you activate a theme.
+                  </p>
+                </div>
+                <input
+                  id="theme-selector-auto-close"
+                  type="radio"
+                  name="theme-selector-behavior"
+                  className="h-4 w-4 text-[var(--color-primary)] focus:ring-[var(--color-primary)]"
+                  checked={autoCloseThemeSelector}
+                  onChange={() => setAutoCloseThemeSelector(true)}
+                />
+              </div>
+            </label>
+          </div>
         </section>
       </div>
     </div>
