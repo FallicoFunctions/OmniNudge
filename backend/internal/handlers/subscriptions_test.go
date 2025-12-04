@@ -3,9 +3,11 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/omninudge/backend/internal/database"
@@ -20,6 +22,15 @@ func setupSubscriptionsTest(t *testing.T) (*SubscriptionsHandler, *models.HubSub
 
 	ctx := context.Background()
 	err = db.Migrate(ctx)
+	require.NoError(t, err)
+
+	// Seed default user so FK references (user_id=1) are valid in tests
+	userRepo := models.NewUserRepository(db.Pool)
+	testUser := &models.User{
+		Username:     fmt.Sprintf("subtester_%d", time.Now().UnixNano()),
+		PasswordHash: "test_hash",
+	}
+	err = userRepo.Create(ctx, testUser)
 	require.NoError(t, err)
 
 	hubSubRepo := models.NewHubSubscriptionRepository(db.Pool)

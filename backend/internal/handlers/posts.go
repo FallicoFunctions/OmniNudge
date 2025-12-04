@@ -4,9 +4,9 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/gin-gonic/gin"
 	"github.com/omninudge/backend/internal/models"
 	"github.com/omninudge/backend/internal/services"
-	"github.com/gin-gonic/gin"
 )
 
 // PostsHandler handles HTTP requests for platform posts
@@ -81,10 +81,10 @@ type CreatePostRequest struct {
 	MediaURL           *string  `json:"media_url"`
 	MediaType          *string  `json:"media_type"`
 	ThumbnailURL       *string  `json:"thumbnail_url"`
-	HubID              *int     `json:"hub_id"`              // Optional: post to specific hub
-	TargetSubreddit    *string  `json:"target_subreddit"`    // Optional: associate with subreddit
+	HubID              *int     `json:"hub_id"`                // Optional: post to specific hub
+	TargetSubreddit    *string  `json:"target_subreddit"`      // Optional: associate with subreddit
 	SendRepliesToInbox bool     `json:"send_replies_to_inbox"` // Notification preference
-	PostType           string   `json:"post_type"`           // "link" or "text"
+	PostType           string   `json:"post_type"`             // "link" or "text"
 }
 
 // UpdatePostRequest represents the request body for updating a post
@@ -123,7 +123,8 @@ func (h *PostsHandler) CreatePost(c *gin.Context) {
 	var hub *models.Hub
 	var err error
 
-	if req.HubID != nil {
+	switch {
+	case req.HubID != nil:
 		// Direct hub posting
 		hubID = *req.HubID
 		hub, err = h.hubRepo.GetByID(c.Request.Context(), hubID)
@@ -135,7 +136,7 @@ func (h *PostsHandler) CreatePost(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Hub not found"})
 			return
 		}
-	} else if req.TargetSubreddit != nil {
+	case req.TargetSubreddit != nil:
 		// Posting to subreddit: use "general" hub for storage
 		hub, err = h.hubRepo.GetByName(c.Request.Context(), "general")
 		if err != nil {
