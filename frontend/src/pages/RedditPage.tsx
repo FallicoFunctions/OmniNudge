@@ -4,6 +4,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { redditService } from '../services/redditService';
 import { savedService } from '../services/savedService';
 import { hubsService } from '../services/hubsService';
+import { subscriptionService } from '../services/subscriptionService';
 import type {
   CrosspostRequest,
   LocalSubredditPost,
@@ -106,10 +107,17 @@ export default function RedditPage() {
     enabled: !!user,
   });
 
-  // Fetch user's hubs for crossposting
-  const { data: hubsData } = useQuery({
-    queryKey: ['user-hubs'],
-    queryFn: () => hubsService.getUserHubs(),
+  // Fetch user's subscribed hubs for crossposting
+  const { data: subscribedHubs } = useQuery({
+    queryKey: ['user-subscriptions', 'hubs'],
+    queryFn: () => subscriptionService.getUserHubSubscriptions(),
+    enabled: !!user,
+  });
+
+  // Fetch user's subscribed subreddits for crossposting
+  const { data: subscribedSubreddits } = useQuery({
+    queryKey: ['user-subscriptions', 'subreddits'],
+    queryFn: () => subscriptionService.getUserSubredditSubscriptions(),
     enabled: !!user,
   });
 
@@ -955,9 +963,9 @@ export default function RedditPage() {
                   className="w-full rounded border border-[var(--color-border)] bg-[var(--color-surface)] p-2 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
                 >
                   <option value="">Select a hub...</option>
-                  {hubsData?.hubs?.map((hub) => (
-                    <option key={hub.id} value={hub.name}>
-                      h/{hub.name}
+                  {subscribedHubs?.map((sub) => (
+                    <option key={sub.hub_id} value={sub.hub_name}>
+                      h/{sub.hub_name}
                     </option>
                   ))}
                 </select>
@@ -966,13 +974,18 @@ export default function RedditPage() {
                 <label className="mb-1 block text-xs font-medium text-[var(--color-text-secondary)]">
                   Crosspost to subreddit (optional)
                 </label>
-                <input
-                  type="text"
+                <select
                   value={selectedSubreddit}
                   onChange={(e) => setSelectedSubreddit(e.target.value)}
-                  placeholder="e.g., cats, technology, AskReddit"
-                  className="w-full rounded border border-[var(--color-border)] bg-[var(--color-surface)] p-2 text-sm text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
-                />
+                  className="w-full rounded border border-[var(--color-border)] bg-[var(--color-surface)] p-2 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
+                >
+                  <option value="">Select a subreddit...</option>
+                  {subscribedSubreddits?.map((sub) => (
+                    <option key={sub.id} value={sub.subreddit_name}>
+                      r/{sub.subreddit_name}
+                    </option>
+                  ))}
+                </select>
               </div>
               <div>
                 <label className="mb-1 block text-xs font-medium text-[var(--color-text-secondary)]">
