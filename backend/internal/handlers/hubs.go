@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"net/http"
+	"regexp"
 	"strconv"
 	"time"
 
@@ -11,24 +12,29 @@ import (
 
 // HubsHandler handles hub CRUD
 type HubsHandler struct {
-	hubRepo  *models.HubRepository
-	postRepo *models.PlatformPostRepository
-	modRepo  *models.HubModeratorRepository
+	hubRepo    *models.HubRepository
+	postRepo   *models.PlatformPostRepository
+	modRepo    *models.HubModeratorRepository
+	hubSubRepo *models.HubSubscriptionRepository
 }
 
 // NewHubsHandler creates a new handler
-func NewHubsHandler(hubRepo *models.HubRepository, postRepo *models.PlatformPostRepository, modRepo *models.HubModeratorRepository) *HubsHandler {
+func NewHubsHandler(hubRepo *models.HubRepository, postRepo *models.PlatformPostRepository, modRepo *models.HubModeratorRepository, hubSubRepo *models.HubSubscriptionRepository) *HubsHandler {
 	return &HubsHandler{
-		hubRepo:  hubRepo,
-		postRepo: postRepo,
-		modRepo:  modRepo,
+		hubRepo:    hubRepo,
+		postRepo:   postRepo,
+		modRepo:    modRepo,
+		hubSubRepo: hubSubRepo,
 	}
 }
 
 // CreateHubRequest payload
 type CreateHubRequest struct {
-	Name        string  `json:"name" binding:"required,min=3,max=100"`
-	Description *string `json:"description"`
+	Name           string  `json:"name" binding:"required,min=3,max=100"`
+	Title          *string `json:"title"`
+	Description    *string `json:"description"`
+	Type           string  `json:"type"`            // public or private
+	ContentOptions string  `json:"content_options"` // any, links_only, text_only
 }
 
 // Create handles POST /api/v1/hubs
@@ -45,10 +51,44 @@ func (h *HubsHandler) Create(c *gin.Context) {
 		return
 	}
 
+	// Validate hub name: no spaces, alphanumeric + underscore only, lowercase
+	namePattern := regexp.MustCompile(`^[a-z0-9_]+$`)
+	if !namePattern.MatchString(req.Name) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Hub name must be lowercase alphanumeric with underscores only, no spaces"})
+		return
+	}
+
+	// Validate description length (max 500 chars)
+	if req.Description != nil && len(*req.Description) > 500 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Description must be 500 characters or less"})
+		return
+	}
+
+	// Validate type
+	if req.Type == "" {
+		req.Type = "public"
+	}
+	if req.Type != "public" && req.Type != "private" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Type must be 'public' or 'private'"})
+		return
+	}
+
+	// Validate content_options
+	if req.ContentOptions == "" {
+		req.ContentOptions = "any"
+	}
+	if req.ContentOptions != "any" && req.ContentOptions != "links_only" && req.ContentOptions != "text_only" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Content options must be 'any', 'links_only', or 'text_only'"})
+		return
+	}
+
 	hub := &models.Hub{
-		Name:        req.Name,
-		Description: req.Description,
-		CreatedBy:   intPtr(userID.(int)),
+		Name:           req.Name,
+		Title:          req.Title,
+		Description:    req.Description,
+		Type:           req.Type,
+		ContentOptions: req.ContentOptions,
+		CreatedBy:      intPtr(userID.(int)),
 	}
 
 	if err := h.hubRepo.Create(c.Request.Context(), hub); err != nil {
@@ -385,4 +425,120 @@ func (h *HubsHandler) CrosspostToSubreddit(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusCreated, post)
+}
+
+// GetPopularFeed handles GET /api/v1/hubs/h/popular (auth required)
+// Returns filtered, personalized feed (excludes quarantined, filters by subscriptions)
+func (h *HubsHandler) GetPopularFeed(c *gin.Context) {
+	userID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
+
+	sortBy := c.DefaultQuery("sort", "hot")
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "25"))
+	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
+	if limit < 1 || limit > 100 {
+		limit = 25
+	}
+
+	// Get user's subscribed hub IDs
+	subscribedHubIDs, err := h.hubSubRepo.GetSubscribedHubIDs(c.Request.Context(), userID.(int))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch subscriptions", "details": err.Error()})
+		return
+	}
+
+	hasSubscriptions := len(subscribedHubIDs) > 0
+
+	posts, err := h.postRepo.GetPopularFeed(
+		c.Request.Context(),
+		userID.(int),
+		hasSubscriptions,
+		subscribedHubIDs,
+		sortBy,
+		limit,
+		offset,
+	)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch feed", "details": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"posts":  posts,
+		"limit":  limit,
+		"offset": offset,
+		"sort":   sortBy,
+	})
+}
+
+// GetAllFeed handles GET /api/v1/hubs/h/all (public)
+// Returns global firehose (includes everything, no filtering)
+func (h *HubsHandler) GetAllFeed(c *gin.Context) {
+	sortBy := c.DefaultQuery("sort", "hot")
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "25"))
+	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
+	if limit < 1 || limit > 100 {
+		limit = 25
+	}
+
+	posts, err := h.postRepo.GetAllFeed(c.Request.Context(), sortBy, limit, offset)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch feed", "details": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"posts":  posts,
+		"limit":  limit,
+		"offset": offset,
+		"sort":   sortBy,
+	})
+}
+
+// SearchHubs handles GET /api/v1/hubs/search?q=cats (autocomplete)
+func (h *HubsHandler) SearchHubs(c *gin.Context) {
+	query := c.Query("q")
+	if query == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Query parameter 'q' is required"})
+		return
+	}
+
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
+	if limit < 1 || limit > 50 {
+		limit = 10
+	}
+
+	hubs, err := h.hubRepo.SearchHubs(c.Request.Context(), query, limit)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to search hubs", "details": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"hubs":  hubs,
+		"query": query,
+		"count": len(hubs),
+	})
+}
+
+// GetTrendingHubs handles GET /api/v1/hubs/trending (popular hubs)
+func (h *HubsHandler) GetTrendingHubs(c *gin.Context) {
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
+	if limit < 1 || limit > 50 {
+		limit = 10
+	}
+
+	hubs, err := h.hubRepo.GetTrendingHubs(c.Request.Context(), limit)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch trending hubs", "details": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"hubs":  hubs,
+		"count": len(hubs),
+	})
 }
