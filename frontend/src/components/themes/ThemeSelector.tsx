@@ -4,6 +4,7 @@ import { useTheme } from '../../hooks/useTheme';
 import type { UserTheme } from '../../types/theme';
 import { getThemeVariable } from '../../utils/theme';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
+import { useSettings } from '../../contexts/SettingsContext';
 
 interface ThemeSelectorProps {
   onCreateNewTheme?: () => void;
@@ -20,6 +21,7 @@ const ThemeSelector = ({ onCreateNewTheme, variant = 'card' }: ThemeSelectorProp
     selectTheme,
     refreshThemes,
   } = useTheme();
+  const { autoCloseThemeSelector } = useSettings();
   const [isOpen, setIsOpen] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [switchingThemeId, setSwitchingThemeId] = useState<number | null>(null);
@@ -38,7 +40,9 @@ const ThemeSelector = ({ onCreateNewTheme, variant = 'card' }: ThemeSelectorProp
     setSwitchingThemeId(theme.id);
     await selectTheme(theme);
     setSwitchingThemeId(null);
-    setIsOpen(false);
+    if (autoCloseThemeSelector) {
+      setIsOpen(false);
+    }
     setAnnouncement(`Theme ${theme.theme_name} selected`);
   };
 
