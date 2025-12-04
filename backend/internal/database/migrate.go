@@ -41,6 +41,11 @@ func (db *DB) Migrate(ctx context.Context) error {
 		applied[version] = true
 	}
 
+	// Check for errors during iteration
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("error iterating migration rows: %w", err)
+	}
+
 	// Get all up migration files
 	files, err := fs.ReadDir(migrationsFS, "migrations")
 	if err != nil {
