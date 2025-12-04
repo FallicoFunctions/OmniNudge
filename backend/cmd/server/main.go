@@ -69,6 +69,8 @@ func main() {
 	installedThemeRepo := models.NewUserInstalledThemeRepository(db.Pool)
 	redditCommentRepo := models.NewRedditPostCommentRepository(db.Pool)
 	savedItemsRepo := models.NewSavedItemsRepository(db.Pool)
+	hubSubRepo := models.NewHubSubscriptionRepository(db.Pool)
+	subredditSubRepo := models.NewSubredditSubscriptionRepository(db.Pool)
 
 	// Initialize WebSocket hub
 	hub := websocket.NewHub()
@@ -122,7 +124,8 @@ func main() {
 	messagesHandler := handlers.NewMessagesHandler(db.Pool, messageRepo, conversationRepo, hub)
 	usersHandler := handlers.NewUsersHandler(userRepo, postRepo, commentRepo, authService)
 	mediaHandler := handlers.NewMediaHandler(mediaRepo, thumbnailService)
-	hubsHandler := handlers.NewHubsHandler(hubRepo, postRepo, hubModRepo)
+	hubsHandler := handlers.NewHubsHandler(hubRepo, postRepo, hubModRepo, hubSubRepo)
+	subscriptionsHandler := handlers.NewSubscriptionsHandler(hubSubRepo, subredditSubRepo, hubRepo)
 	moderationHandler := handlers.NewModerationHandler(reportRepo, hubModRepo)
 	adminHandler := handlers.NewAdminHandler(userRepo)
 	wsHandler := handlers.NewWebSocketHandler(hub)
@@ -221,12 +224,22 @@ func main() {
 			reddit.GET("/posts/:subreddit/:postId/comments", redditCommentsHandler.GetRedditPostComments)
 		}
 
-		// Local hub routes
+		// Local hub routes (public feeds)
 		hubs := api.Group("/hubs")
 		{
 			hubs.GET("", hubsHandler.List)
+			hubs.GET("/h/all", hubsHandler.GetAllFeed)
+			hubs.GET("/search", hubsHandler.SearchHubs)
+			hubs.GET("/trending", hubsHandler.GetTrendingHubs)
 			hubs.GET("/:name", hubsHandler.Get)
 			hubs.GET("/:name/posts", hubsHandler.GetPosts)
+		}
+
+		// Hub subscription check (optional auth)
+		hubsOptAuth := api.Group("/hubs")
+		hubsOptAuth.Use(middleware.AuthOptional(authService))
+		{
+			hubsOptAuth.GET("/:name/subscription", subscriptionsHandler.CheckHubSubscription)
 		}
 
 		// Local subreddit crosspost feeds (no auth required to view, optional auth for context)
@@ -234,6 +247,7 @@ func main() {
 		subreddits.Use(middleware.AuthOptional(authService))
 		{
 			subreddits.GET("/:name/posts", postsHandler.GetSubredditPosts)
+			subreddits.GET("/:name/subscription", subscriptionsHandler.CheckSubredditSubscription)
 		}
 
 		// Public user profile routes
@@ -339,6 +353,19 @@ func main() {
 			protected.GET("/users/me/hubs", hubsHandler.GetUserHubs)
 			protected.POST("/hubs/:name/crosspost", hubsHandler.CrosspostToHub)
 			protected.POST("/subreddits/:name/crosspost", hubsHandler.CrosspostToSubreddit)
+
+			// Protected hub feed (personalized/subscriptions)
+			protected.GET("/hubs/h/popular", hubsHandler.GetPopularFeed)
+
+			// Hub subscription routes (auth required)
+			protected.POST("/hubs/:name/subscribe", subscriptionsHandler.SubscribeToHub)
+			protected.DELETE("/hubs/:name/unsubscribe", subscriptionsHandler.UnsubscribeFromHub)
+			protected.GET("/users/me/subscriptions/hubs", subscriptionsHandler.GetUserHubSubscriptions)
+
+			// Subreddit subscription routes (auth required)
+			protected.POST("/subreddits/:name/subscribe", subscriptionsHandler.SubscribeToSubreddit)
+			protected.DELETE("/subreddits/:name/unsubscribe", subscriptionsHandler.UnsubscribeFromSubreddit)
+			protected.GET("/users/me/subscriptions/subreddits", subscriptionsHandler.GetUserSubredditSubscriptions)
 
 			// Protected conversations routes
 			protected.POST("/conversations", conversationsHandler.CreateConversation)
