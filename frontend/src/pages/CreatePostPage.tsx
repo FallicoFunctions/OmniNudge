@@ -2,8 +2,13 @@ import { useState, useEffect } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { postsService } from '../services/postsService';
-import { subscriptionService } from '../services/subscriptionService';
+import { hubsService, type Hub } from '../services/hubsService';
+import { redditService } from '../services/redditService';
 import type { CreatePostRequest } from '../types/posts';
+import type { SubredditSuggestion } from '../types/reddit';
+
+const HUB_AUTOCOMPLETE_MIN_LENGTH = 2;
+const SUBREDDIT_AUTOCOMPLETE_MIN_LENGTH = 2;
 
 export default function CreatePostPage() {
   const navigate = useNavigate();
@@ -13,36 +18,83 @@ export default function CreatePostPage() {
   const [body, setBody] = useState('');
   const [mediaUrl, setMediaUrl] = useState('');
   const [destination, setDestination] = useState<'profile' | 'hub' | 'subreddit'>('hub');
-  const [selectedHubId, setSelectedHubId] = useState<number | undefined>();
-  const [selectedSubreddit, setSelectedSubreddit] = useState<string | undefined>();
+  const [selectedHub, setSelectedHub] = useState<{ id: number; name: string } | null>(null);
+  const [hubInputValue, setHubInputValue] = useState('');
+  const [isHubAutocompleteOpen, setIsHubAutocompleteOpen] = useState(false);
+  const [subredditInputValue, setSubredditInputValue] = useState('');
+  const [isSubredditAutocompleteOpen, setIsSubredditAutocompleteOpen] = useState(false);
   const [sendRepliesToInbox, setSendRepliesToInbox] = useState(true);
-
-  // Get user's hub subscriptions
-  const { data: hubSubscriptions } = useQuery({
-    queryKey: ['user-subscriptions', 'hubs'],
-    queryFn: () => subscriptionService.getUserHubSubscriptions(),
-  });
-
-  // Get user's subreddit subscriptions
-  const { data: subredditSubscriptions } = useQuery({
-    queryKey: ['user-subscriptions', 'subreddits'],
-    queryFn: () => subscriptionService.getUserSubredditSubscriptions(),
-  });
 
   // Pre-fill destination from location state
   useEffect(() => {
+    let isMounted = true;
     const state = location.state as { defaultHub?: string; defaultSubreddit?: string } | null;
-    if (state?.defaultHub && hubSubscriptions) {
-      const hub = hubSubscriptions.find((h) => h.hub_id);
-      if (hub) {
-        setDestination('hub');
-        setSelectedHubId(hub.hub_id);
-      }
+
+    if (state?.defaultHub) {
+      setDestination('hub');
+      setHubInputValue(state.defaultHub);
+      (async () => {
+        try {
+          const hub = await hubsService.getHub(state.defaultHub);
+          if (isMounted) {
+            setSelectedHub({ id: hub.id, name: hub.name });
+            setHubInputValue(hub.name);
+          }
+        } catch {
+          if (isMounted) {
+            setSelectedHub(null);
+          }
+        }
+      })();
     } else if (state?.defaultSubreddit) {
       setDestination('subreddit');
-      setSelectedSubreddit(state.defaultSubreddit);
+      setSubredditInputValue(state.defaultSubreddit);
     }
-  }, [location.state, hubSubscriptions]);
+
+    return () => {
+      isMounted = false;
+    };
+  }, [location.state]);
+
+  const trimmedHubInput = (hubInputValue ?? '').trim();
+  const trimmedSubredditInput = (subredditInputValue ?? '').trim();
+
+  const {
+    data: hubSuggestions = [],
+    isFetching: isHubAutocompleteLoading,
+  } = useQuery<Hub[]>({
+    queryKey: ['hub-autocomplete', trimmedHubInput],
+    queryFn: () => hubsService.searchHubs(trimmedHubInput),
+    enabled:
+      destination === 'hub' &&
+      isHubAutocompleteOpen &&
+      trimmedHubInput.length >= HUB_AUTOCOMPLETE_MIN_LENGTH,
+    staleTime: 1000 * 60 * 5,
+  });
+
+  const {
+    data: subredditSuggestions = [],
+    isFetching: isSubredditAutocompleteLoading,
+  } = useQuery<SubredditSuggestion[]>({
+    queryKey: ['subreddit-autocomplete', trimmedSubredditInput],
+    queryFn: () => redditService.autocompleteSubreddits(trimmedSubredditInput),
+    enabled:
+      destination === 'subreddit' &&
+      isSubredditAutocompleteOpen &&
+      trimmedSubredditInput.length >= SUBREDDIT_AUTOCOMPLETE_MIN_LENGTH,
+    staleTime: 1000 * 60 * 5,
+  });
+
+  const handleSelectHubSuggestion = (hub: Hub) => {
+    setSelectedHub({ id: hub.id, name: hub.name });
+    setHubInputValue(hub.name);
+    setIsHubAutocompleteOpen(false);
+  };
+
+  const handleSelectSubredditSuggestion = (name: string) => {
+    setSubredditInputValue(name);
+    setIsSubredditAutocompleteOpen(false);
+  };
 
   const createPostMutation = useMutation({
     mutationFn: (data: CreatePostRequest) => postsService.createPost(data),
@@ -51,7 +103,7 @@ export default function CreatePostPage() {
     },
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!title.trim()) {
@@ -64,22 +116,43 @@ export default function CreatePostPage() {
       return;
     }
 
-    if (destination === 'hub' && !selectedHubId) {
-      alert('Please select a hub');
-      return;
+    let hubId: number | undefined;
+    if (destination === 'hub') {
+      if (!trimmedHubInput) {
+        alert('Please enter a hub name');
+        return;
+      }
+
+      if (selectedHub && selectedHub.name === trimmedHubInput) {
+        hubId = selectedHub.id;
+      } else {
+        try {
+          const hub = await hubsService.getHub(trimmedHubInput);
+          hubId = hub.id;
+          setSelectedHub({ id: hub.id, name: hub.name });
+          setHubInputValue(hub.name);
+        } catch {
+          alert('Please select a valid hub from the suggestions');
+          return;
+        }
+      }
     }
 
-    if (destination === 'subreddit' && !selectedSubreddit) {
-      alert('Please select a subreddit');
-      return;
+    let targetSubreddit: string | undefined;
+    if (destination === 'subreddit') {
+      if (!trimmedSubredditInput) {
+        alert('Please enter a subreddit');
+        return;
+      }
+      targetSubreddit = trimmedSubredditInput.replace(/^r\//i, '');
     }
 
     const data: CreatePostRequest = {
       title,
       body: body || undefined,
       media_url: activeTab === 'link' ? mediaUrl || undefined : undefined,
-      hub_id: destination === 'hub' ? selectedHubId : undefined,
-      target_subreddit: destination === 'subreddit' ? selectedSubreddit : undefined,
+      hub_id: destination === 'hub' ? hubId : undefined,
+      target_subreddit: destination === 'subreddit' ? targetSubreddit : undefined,
       send_replies_to_inbox: sendRepliesToInbox,
       post_type: activeTab,
     };
@@ -229,36 +302,133 @@ export default function CreatePostPage() {
 
                 {/* Hub selector */}
                 {destination === 'hub' && (
-                  <select
-                    value={selectedHubId || ''}
-                    onChange={(e) => setSelectedHubId(Number(e.target.value))}
-                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-                    required
-                  >
-                    <option value="">Select a hub...</option>
-                    {hubSubscriptions?.map((sub) => (
-                      <option key={sub.id} value={sub.hub_id}>
-                        h/{sub.hub_id}
-                      </option>
-                    ))}
-                  </select>
+                  <div>
+                    <label className="block text-sm text-gray-600 mb-1">Enter a hub</label>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        value={hubInputValue}
+                        onChange={(e) => {
+                          setHubInputValue(e.target.value);
+                          setSelectedHub(null);
+                        }}
+                        onFocus={() => setIsHubAutocompleteOpen(true)}
+                        onBlur={() => setIsHubAutocompleteOpen(false)}
+                        placeholder="Search for a hub..."
+                        className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                        required
+                      />
+                      {destination === 'hub' &&
+                        isHubAutocompleteOpen &&
+                        trimmedHubInput.length >= HUB_AUTOCOMPLETE_MIN_LENGTH && (
+                          <div className="absolute left-0 right-0 top-full z-20 mt-1 rounded-lg border bg-white shadow-lg">
+                            {isHubAutocompleteLoading ? (
+                              <div className="px-3 py-2 text-sm text-gray-500">Searching...</div>
+                            ) : hubSuggestions.length === 0 ? (
+                              <div className="px-3 py-2 text-sm text-gray-500">No hubs found</div>
+                            ) : (
+                              <ul>
+                                {hubSuggestions.map((hub) => (
+                                  <li key={hub.id}>
+                                    <button
+                                      type="button"
+                                      onMouseDown={(event) => event.preventDefault()}
+                                      onClick={() => handleSelectHubSuggestion(hub)}
+                                      className="flex w-full items-center justify-between px-3 py-2 text-left hover:bg-gray-50"
+                                    >
+                                      <div className="min-w-0 pr-2">
+                                        <p className="text-sm font-medium text-gray-900 truncate">
+                                          h/{hub.name}
+                                        </p>
+                                        {hub.title && (
+                                          <p className="text-xs text-gray-500 truncate">{hub.title}</p>
+                                        )}
+                                      </div>
+                                      {typeof hub.subscriber_count === 'number' && (
+                                        <span className="text-xs text-gray-500">
+                                          {hub.subscriber_count.toLocaleString()} subs
+                                        </span>
+                                      )}
+                                    </button>
+                                  </li>
+                                ))}
+                              </ul>
+                            )}
+                          </div>
+                        )}
+                    </div>
+                  </div>
                 )}
 
                 {/* Subreddit selector */}
                 {destination === 'subreddit' && (
-                  <select
-                    value={selectedSubreddit || ''}
-                    onChange={(e) => setSelectedSubreddit(e.target.value)}
-                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-                    required
-                  >
-                    <option value="">Select a subreddit...</option>
-                    {subredditSubscriptions?.map((sub) => (
-                      <option key={sub.id} value={sub.subreddit_name}>
-                        r/{sub.subreddit_name}
-                      </option>
-                    ))}
-                  </select>
+                  <div>
+                    <label className="block text-sm text-gray-600 mb-1">Enter a subreddit</label>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        value={subredditInputValue}
+                        onChange={(e) => setSubredditInputValue(e.target.value)}
+                        onFocus={() => setIsSubredditAutocompleteOpen(true)}
+                        onBlur={() => setIsSubredditAutocompleteOpen(false)}
+                        placeholder="Search for a subreddit..."
+                        className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                        required
+                      />
+                      {destination === 'subreddit' &&
+                        isSubredditAutocompleteOpen &&
+                        trimmedSubredditInput.length >= SUBREDDIT_AUTOCOMPLETE_MIN_LENGTH && (
+                          <div className="absolute left-0 right-0 top-full z-20 mt-1 rounded-lg border bg-white shadow-lg">
+                            {isSubredditAutocompleteLoading ? (
+                              <div className="px-3 py-2 text-sm text-gray-500">Searching...</div>
+                            ) : subredditSuggestions.length === 0 ? (
+                              <div className="px-3 py-2 text-sm text-gray-500">No subreddits found</div>
+                            ) : (
+                              <ul>
+                                {subredditSuggestions.map((suggestion) => (
+                                  <li key={suggestion.name}>
+                                    <button
+                                      type="button"
+                                      onMouseDown={(event) => event.preventDefault()}
+                                      onClick={() => handleSelectSubredditSuggestion(suggestion.name)}
+                                      className="flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-gray-50"
+                                    >
+                                      {suggestion.icon_url ? (
+                                        <img
+                                          src={suggestion.icon_url}
+                                          alt=""
+                                          className="h-6 w-6 rounded-full object-cover"
+                                        />
+                                      ) : (
+                                        <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gray-200 text-xs text-gray-600">
+                                          r/
+                                        </div>
+                                      )}
+                                      <div className="flex min-w-0 flex-col">
+                                        <span className="truncate text-sm font-medium text-gray-900">
+                                          r/{suggestion.name}
+                                        </span>
+                                        {suggestion.title && (
+                                          <span className="truncate text-xs text-gray-500">
+                                            {suggestion.title}
+                                          </span>
+                                        )}
+                                      </div>
+                                      {typeof suggestion.subscribers === 'number' &&
+                                        suggestion.subscribers > 0 && (
+                                          <span className="ml-auto text-xs text-gray-500">
+                                            {suggestion.subscribers.toLocaleString()} subs
+                                          </span>
+                                        )}
+                                    </button>
+                                  </li>
+                                ))}
+                              </ul>
+                            )}
+                          </div>
+                        )}
+                    </div>
+                  </div>
                 )}
               </div>
             )}
