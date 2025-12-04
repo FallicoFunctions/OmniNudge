@@ -29,8 +29,9 @@ func setupHubsTest(t *testing.T) (*HubsHandler, *models.HubRepository, *models.P
 	hubRepo := models.NewHubRepository(db.Pool)
 	postRepo := models.NewPlatformPostRepository(db.Pool)
 	modRepo := models.NewHubModeratorRepository(db.Pool)
+	hubSubRepo := models.NewHubSubscriptionRepository(db.Pool)
 
-	handler := NewHubsHandler(hubRepo, postRepo, modRepo)
+	handler := NewHubsHandler(hubRepo, postRepo, modRepo, hubSubRepo)
 
 	cleanup := func() {
 		db.Close()
@@ -641,5 +642,6 @@ func TestHubAuthRequired(t *testing.T) {
 			require.NoError(t, err)
 			assert.Contains(t, response["error"], "not authenticated")
 		})
+}
 	}
 }

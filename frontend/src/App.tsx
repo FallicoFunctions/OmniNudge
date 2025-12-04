@@ -10,6 +10,9 @@ import ThemesPage from './pages/ThemesPage';
 import RedditPage from './pages/RedditPage';
 import RedditPostPage from './pages/RedditPostPage';
 import RedditUserPage from './pages/RedditUserPage';
+import HubsPage from './pages/HubsPage';
+import CreateHubPage from './pages/CreateHubPage';
+import CreatePostPage from './pages/CreatePostPage';
 import PostsPage from './pages/PostsPage';
 import PostDetailPage from './pages/PostDetailPage';
 import MessagesPage from './pages/MessagesPage';
@@ -43,9 +46,13 @@ function App() {
             <Route path="/reddit/r/:subreddit/comments/:postId" element={<RedditPostPage />} />
             <Route path="/reddit/r/:subreddit/comments/:postId/:commentId" element={<RedditPostPage />} />
             <Route path="/reddit/user/:username" element={<RedditUserPage />} />
+            <Route path="/hubs" element={<HubsPage />} />
+            <Route path="/hubs/h/:hubname" element={<HubsPage />} />
+            <Route path="/hubs/create" element={<CreateHubPage />} />
             <Route path="/posts" element={<PostsPage />} />
             <Route path="/posts/:postId" element={<PostDetailPage />} />
             <Route path="/posts/:postId/comments/:commentId" element={<PostDetailPage />} />
+            <Route path="/posts/create" element={<CreatePostPage />} />
             <Route path="/messages" element={<MessagesPage />} />
             <Route path="/saved" element={<SavedPage />} />
             <Route path="/hidden" element={<HiddenPage />} />
