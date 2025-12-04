@@ -26,6 +26,15 @@ func setupHubsTest(t *testing.T) (*HubsHandler, *models.HubRepository, *models.P
 	err = db.Migrate(ctx)
 	require.NoError(t, err)
 
+	// Ensure a default user exists for FK constraints (tests use user ID 1)
+	userRepo := models.NewUserRepository(db.Pool)
+	testUser := &models.User{
+		Username:     fmt.Sprintf("hubtester_%d", time.Now().UnixNano()),
+		PasswordHash: "test_hash",
+	}
+	err = userRepo.Create(ctx, testUser)
+	require.NoError(t, err)
+
 	hubRepo := models.NewHubRepository(db.Pool)
 	postRepo := models.NewPlatformPostRepository(db.Pool)
 	modRepo := models.NewHubModeratorRepository(db.Pool)

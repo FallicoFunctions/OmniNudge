@@ -8,7 +8,10 @@ import (
 // database.Database instead of database.DB.
 type Database = DB
 
-const defaultTestDSN = "postgres://postgres:postgres@localhost:5432/omninudge_test?sslmode=disable"
+const (
+	defaultTestDSN      = "postgres://postgres:postgres@localhost:5432/omninudge_test?sslmode=disable"
+	testAdvisoryLockKey = int64(0x6f6d6e69) // 'omni'
+)
 
 // NewTest creates a database connection that can be used inside tests.
 // It prefers TEST_DATABASE_URL if set, falls back to DATABASE_URL, and
@@ -23,5 +26,15 @@ func NewTest() (*Database, error) {
 		dsn = defaultTestDSN
 	}
 
-	return New(dsn)
+	db, err := New(dsn)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := db.acquireTestLock(testAdvisoryLockKey); err != nil {
+		db.Close()
+		return nil, err
+	}
+
+	return db, nil
 }

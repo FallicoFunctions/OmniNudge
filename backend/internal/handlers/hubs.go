@@ -30,7 +30,7 @@ func NewHubsHandler(hubRepo *models.HubRepository, postRepo *models.PlatformPost
 
 // CreateHubRequest payload
 type CreateHubRequest struct {
-	Name           string  `json:"name" binding:"required,min=3,max=100"`
+	Name           string  `json:"name" binding:"required,max=100"`
 	Title          *string `json:"title"`
 	Description    *string `json:"description"`
 	Type           string  `json:"type"`            // public or private
@@ -51,6 +51,11 @@ func (h *HubsHandler) Create(c *gin.Context) {
 		return
 	}
 
+	if len(req.Name) < 3 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Hub name must be at least 3 characters"})
+		return
+	}
+
 	// Validate hub name: no spaces, alphanumeric + underscore only, lowercase
 	namePattern := regexp.MustCompile(`^[a-z0-9_]+$`)
 	if !namePattern.MatchString(req.Name) {
@@ -60,7 +65,7 @@ func (h *HubsHandler) Create(c *gin.Context) {
 
 	// Validate description length (max 500 chars)
 	if req.Description != nil && len(*req.Description) > 500 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Description must be 500 characters or less"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Description must be less than 500 characters"})
 		return
 	}
 
@@ -101,7 +106,7 @@ func (h *HubsHandler) Create(c *gin.Context) {
 		_ = h.modRepo.AddModerator(c.Request.Context(), hub.ID, userID.(int))
 	}
 
-	c.JSON(http.StatusCreated, hub)
+	c.JSON(http.StatusCreated, gin.H{"hub": hubResponse(hub)})
 }
 
 // Get handles GET /api/v1/hubs/:name
@@ -116,7 +121,7 @@ func (h *HubsHandler) Get(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Hub not found"})
 		return
 	}
-	c.JSON(http.StatusOK, hub)
+	c.JSON(http.StatusOK, gin.H{"hub": hubResponse(hub)})
 }
 
 // List handles GET /api/v1/hubs
@@ -134,7 +139,7 @@ func (h *HubsHandler) List(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"hubs":   hubs,
+		"hubs":   hubsResponse(hubs),
 		"limit":  limit,
 		"offset": offset,
 	})
@@ -230,7 +235,7 @@ func (h *HubsHandler) GetUserHubs(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"hubs":    hubs,
+		"hubs":    hubsResponse(hubs),
 		"user_id": userID,
 	})
 }
@@ -323,7 +328,7 @@ func (h *HubsHandler) CrosspostToHub(c *gin.Context) {
 		post.CrosspostedAt = &normalized
 	}
 
-	c.JSON(http.StatusCreated, post)
+	c.JSON(http.StatusCreated, gin.H{"post": post})
 }
 
 func intPtr(v int) *int {
@@ -335,6 +340,38 @@ func stringPtrOrNil(s string) *string {
 		return nil
 	}
 	return &s
+}
+
+func hubResponse(h *models.Hub) gin.H {
+	response := gin.H{
+		"id":               h.ID,
+		"name":             h.Name,
+		"type":             h.Type,
+		"content_options":  h.ContentOptions,
+		"is_quarantined":   h.IsQuarantined,
+		"subscriber_count": h.SubscriberCount,
+		"created_at":       h.CreatedAt,
+	}
+
+	if h.Description != nil {
+		response["description"] = *h.Description
+	}
+	if h.Title != nil {
+		response["title"] = *h.Title
+	}
+	if h.CreatedBy != nil {
+		response["owner_id"] = *h.CreatedBy
+	}
+
+	return response
+}
+
+func hubsResponse(hubs []*models.Hub) []gin.H {
+	out := make([]gin.H, len(hubs))
+	for i, hub := range hubs {
+		out[i] = hubResponse(hub)
+	}
+	return out
 }
 
 // CrosspostToSubreddit handles POST /api/v1/subreddits/:name/crosspost
@@ -424,7 +461,7 @@ func (h *HubsHandler) CrosspostToSubreddit(c *gin.Context) {
 		post.CrosspostedAt = &normalized
 	}
 
-	c.JSON(http.StatusCreated, post)
+	c.JSON(http.StatusCreated, gin.H{"post": post})
 }
 
 // GetPopularFeed handles GET /api/v1/hubs/h/popular (auth required)

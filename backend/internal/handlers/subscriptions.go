@@ -61,7 +61,7 @@ func (h *SubscriptionsHandler) SubscribeToHub(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"message":          "Successfully subscribed",
-		"subscribed":       true,
+		"is_subscribed":    true,
 		"subscriber_count": subscriberCount,
 	})
 }
@@ -100,7 +100,7 @@ func (h *SubscriptionsHandler) UnsubscribeFromHub(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"message":          "Successfully unsubscribed",
-		"subscribed":       false,
+		"is_subscribed":    false,
 		"subscriber_count": subscriberCount,
 	})
 }
@@ -131,13 +131,13 @@ func (h *SubscriptionsHandler) CheckHubSubscription(c *gin.Context) {
 		}
 
 		c.JSON(http.StatusOK, gin.H{
-			"subscribed":       isSubscribed,
+			"is_subscribed":    isSubscribed,
 			"subscriber_count": hub.SubscriberCount,
 		})
 	} else {
 		// Just return public info
 		c.JSON(http.StatusOK, gin.H{
-			"subscribed":       false,
+			"is_subscribed":    false,
 			"subscriber_count": hub.SubscriberCount,
 		})
 	}
@@ -159,11 +159,11 @@ func (h *SubscriptionsHandler) GetUserHubSubscriptions(c *gin.Context) {
 
 	// Fetch hub details for each subscription
 	type SubscriptionWithHub struct {
-		ID           int          `json:"id"`
-		UserID       int          `json:"user_id"`
-		HubID        int          `json:"hub_id"`
-		Hub          *models.Hub  `json:"hub"`
-		SubscribedAt string       `json:"subscribed_at"`
+		ID           int         `json:"id"`
+		UserID       int         `json:"user_id"`
+		HubID        int         `json:"hub_id"`
+		Hub          *models.Hub `json:"hub"`
+		SubscribedAt string      `json:"subscribed_at"`
 	}
 
 	var result []SubscriptionWithHub
@@ -205,9 +205,9 @@ func (h *SubscriptionsHandler) SubscribeToSubreddit(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"message":    "Successfully subscribed",
-		"subscribed": true,
-		"subreddit":  subredditName,
+		"message":       "Successfully subscribed",
+		"is_subscribed": true,
+		"subreddit":     subredditName,
 	})
 }
 
@@ -232,9 +232,9 @@ func (h *SubscriptionsHandler) UnsubscribeFromSubreddit(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"message":    "Successfully unsubscribed",
-		"subscribed": false,
-		"subreddit":  subredditName,
+		"message":       "Successfully unsubscribed",
+		"is_subscribed": false,
+		"subreddit":     subredditName,
 	})
 }
 
