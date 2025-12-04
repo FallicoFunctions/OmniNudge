@@ -2,8 +2,9 @@ package models
 
 import (
 	"context"
-	"database/sql"
 	"time"
+
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // HubSubscription represents a user's subscription to a hub
@@ -16,26 +17,26 @@ type HubSubscription struct {
 
 // HubSubscriptionRepository handles hub subscription database operations
 type HubSubscriptionRepository struct {
-	db *sql.DB
+	pool *pgxpool.Pool
 }
 
 // NewHubSubscriptionRepository creates a new hub subscription repository
-func NewHubSubscriptionRepository(db *sql.DB) *HubSubscriptionRepository {
-	return &HubSubscriptionRepository{db: db}
+func NewHubSubscriptionRepository(pool *pgxpool.Pool) *HubSubscriptionRepository {
+	return &HubSubscriptionRepository{pool: pool}
 }
 
 // Subscribe subscribes a user to a hub
 // Uses ON CONFLICT DO NOTHING to handle duplicate subscriptions
 // Increments hub subscriber_count atomically
 func (r *HubSubscriptionRepository) Subscribe(ctx context.Context, userID, hubID int) error {
-	tx, err := r.db.BeginTx(ctx, nil)
+	tx, err := r.pool.Begin(ctx)
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer tx.Rollback(ctx)
 
 	// Insert subscription (ignore if already exists)
-	_, err = tx.ExecContext(ctx, `
+	_, err = tx.Exec(ctx, `
 		INSERT INTO hub_subscriptions (user_id, hub_id)
 		VALUES ($1, $2)
 		ON CONFLICT (user_id, hub_id) DO NOTHING
@@ -45,7 +46,7 @@ func (r *HubSubscriptionRepository) Subscribe(ctx context.Context, userID, hubID
 	}
 
 	// Increment subscriber count
-	_, err = tx.ExecContext(ctx, `
+	_, err = tx.Exec(ctx, `
 		UPDATE hubs
 		SET subscriber_count = subscriber_count + 1
 		WHERE id = $1
@@ -59,20 +60,20 @@ func (r *HubSubscriptionRepository) Subscribe(ctx context.Context, userID, hubID
 		return err
 	}
 
-	return tx.Commit()
+	return tx.Commit(ctx)
 }
 
 // Unsubscribe unsubscribes a user from a hub
 // Decrements hub subscriber_count atomically
 func (r *HubSubscriptionRepository) Unsubscribe(ctx context.Context, userID, hubID int) error {
-	tx, err := r.db.BeginTx(ctx, nil)
+	tx, err := r.pool.Begin(ctx)
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer tx.Rollback(ctx)
 
 	// Delete subscription
-	result, err := tx.ExecContext(ctx, `
+	cmdTag, err := tx.Exec(ctx, `
 		DELETE FROM hub_subscriptions
 		WHERE user_id = $1 AND hub_id = $2
 	`, userID, hubID)
@@ -80,14 +81,9 @@ func (r *HubSubscriptionRepository) Unsubscribe(ctx context.Context, userID, hub
 		return err
 	}
 
-	rowsAffected, err := result.RowsAffected()
-	if err != nil {
-		return err
-	}
-
 	// Only decrement if a row was actually deleted
-	if rowsAffected > 0 {
-		_, err = tx.ExecContext(ctx, `
+	if cmdTag.RowsAffected() > 0 {
+		_, err = tx.Exec(ctx, `
 			UPDATE hubs
 			SET subscriber_count = GREATEST(subscriber_count - 1, 0)
 			WHERE id = $1
@@ -97,13 +93,13 @@ func (r *HubSubscriptionRepository) Unsubscribe(ctx context.Context, userID, hub
 		}
 	}
 
-	return tx.Commit()
+	return tx.Commit(ctx)
 }
 
 // IsSubscribed checks if a user is subscribed to a hub
 func (r *HubSubscriptionRepository) IsSubscribed(ctx context.Context, userID, hubID int) (bool, error) {
 	var exists bool
-	err := r.db.QueryRowContext(ctx, `
+	err := r.pool.QueryRow(ctx, `
 		SELECT EXISTS(
 			SELECT 1 FROM hub_subscriptions
 			WHERE user_id = $1 AND hub_id = $2
@@ -114,7 +110,7 @@ func (r *HubSubscriptionRepository) IsSubscribed(ctx context.Context, userID, hu
 
 // GetUserSubscriptions returns all hubs a user is subscribed to
 func (r *HubSubscriptionRepository) GetUserSubscriptions(ctx context.Context, userID int) ([]*HubSubscription, error) {
-	rows, err := r.db.QueryContext(ctx, `
+	rows, err := r.pool.Query(ctx, `
 		SELECT id, user_id, hub_id, subscribed_at
 		FROM hub_subscriptions
 		WHERE user_id = $1
@@ -141,7 +137,7 @@ func (r *HubSubscriptionRepository) GetUserSubscriptions(ctx context.Context, us
 // GetSubscriberCount returns the number of subscribers for a hub
 func (r *HubSubscriptionRepository) GetSubscriberCount(ctx context.Context, hubID int) (int, error) {
 	var count int
-	err := r.db.QueryRowContext(ctx, `
+	err := r.pool.QueryRow(ctx, `
 		SELECT COUNT(*)
 		FROM hub_subscriptions
 		WHERE hub_id = $1
@@ -152,7 +148,7 @@ func (r *HubSubscriptionRepository) GetSubscriberCount(ctx context.Context, hubI
 // GetSubscribedHubIDs returns a list of hub IDs that a user is subscribed to
 // Useful for filtering feeds
 func (r *HubSubscriptionRepository) GetSubscribedHubIDs(ctx context.Context, userID int) ([]int, error) {
-	rows, err := r.db.QueryContext(ctx, `
+	rows, err := r.pool.Query(ctx, `
 		SELECT hub_id
 		FROM hub_subscriptions
 		WHERE user_id = $1

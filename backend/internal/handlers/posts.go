@@ -75,13 +75,16 @@ func (h *PostsHandler) GetSubredditPosts(c *gin.Context) {
 
 // CreatePostRequest represents the request body for creating a post
 type CreatePostRequest struct {
-	Title        string   `json:"title" binding:"required,min=1,max=300"`
-	Body         *string  `json:"body"`
-	Tags         []string `json:"tags"`
-	MediaURL     *string  `json:"media_url"`
-	MediaType    *string  `json:"media_type"`
-	ThumbnailURL *string  `json:"thumbnail_url"`
-	HubID        *int     `json:"hub_id"`
+	Title              string   `json:"title" binding:"required,min=1,max=300"`
+	Body               *string  `json:"body"`
+	Tags               []string `json:"tags"`
+	MediaURL           *string  `json:"media_url"`
+	MediaType          *string  `json:"media_type"`
+	ThumbnailURL       *string  `json:"thumbnail_url"`
+	HubID              *int     `json:"hub_id"`              // Optional: post to specific hub
+	TargetSubreddit    *string  `json:"target_subreddit"`    // Optional: associate with subreddit
+	SendRepliesToInbox bool     `json:"send_replies_to_inbox"` // Notification preference
+	PostType           string   `json:"post_type"`           // "link" or "text"
 }
 
 // UpdatePostRequest represents the request body for updating a post
@@ -109,40 +112,63 @@ func (h *PostsHandler) CreatePost(c *gin.Context) {
 		return
 	}
 
-	// Resolve hub (default to "general" if none provided)
-	var hubID int
-	if req.HubID != nil {
-		hubID = *req.HubID
-	} else {
-		// fallback to general
-		sr, err := h.hubRepo.GetByName(c.Request.Context(), "general")
-		if err != nil || sr == nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid hub"})
-			return
-		}
-		hubID = sr.ID
-	}
-
-	// Validate hub exists
-	sr, err := h.hubRepo.GetByID(c.Request.Context(), hubID)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch hub", "details": err.Error()})
+	// Validate: must have hub_id OR target_subreddit
+	if req.HubID == nil && req.TargetSubreddit == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Must provide either hub_id or target_subreddit"})
 		return
 	}
-	if sr == nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Hub not found"})
+
+	// Resolve hub
+	var hubID int
+	var hub *models.Hub
+	var err error
+
+	if req.HubID != nil {
+		// Direct hub posting
+		hubID = *req.HubID
+		hub, err = h.hubRepo.GetByID(c.Request.Context(), hubID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch hub", "details": err.Error()})
+			return
+		}
+		if hub == nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Hub not found"})
+			return
+		}
+	} else if req.TargetSubreddit != nil {
+		// Posting to subreddit: use "general" hub for storage
+		hub, err = h.hubRepo.GetByName(c.Request.Context(), "general")
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch default hub", "details": err.Error()})
+			return
+		}
+		if hub == nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Default hub 'general' not found. Please create it first."})
+			return
+		}
+		hubID = hub.ID
+	}
+
+	// Validate content_options
+	if hub.ContentOptions == "links_only" && req.PostType == "text" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "This hub only accepts link posts"})
+		return
+	}
+	if hub.ContentOptions == "text_only" && req.PostType == "link" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "This hub only accepts text posts"})
 		return
 	}
 
 	post := &models.PlatformPost{
-		AuthorID:     userID.(int),
-		HubID:        hubID,
-		Title:        req.Title,
-		Body:         req.Body,
-		Tags:         req.Tags,
-		MediaURL:     req.MediaURL,
-		MediaType:    req.MediaType,
-		ThumbnailURL: req.ThumbnailURL,
+		AuthorID:        userID.(int),
+		HubID:           hubID,
+		Title:           req.Title,
+		Body:            req.Body,
+		Tags:            req.Tags,
+		MediaURL:        req.MediaURL,
+		MediaType:       req.MediaType,
+		ThumbnailURL:    req.ThumbnailURL,
+		TargetSubreddit: req.TargetSubreddit,
 	}
 
 	if err := h.postRepo.Create(c.Request.Context(), post); err != nil {
