@@ -1,5 +1,7 @@
 import { useMemo, useState } from 'react';
 import type { LocalCommentBase } from '../../types/comments';
+import { useSettings } from '../../contexts/SettingsContext';
+import { formatRelativeTime } from '../../utils/timeFormat';
 
 export interface CommentActionHandlers<T extends LocalCommentBase> {
   vote: (comment: T, value: 1 | -1) => Promise<void>;
@@ -55,6 +57,19 @@ export function CommentItem<T extends LocalCommentBase>({
   const isOwner = currentUsername && comment.username === currentUsername;
   const inboxDisabled = comment.inbox_replies_disabled ?? false;
   const isSaved = savedCommentIds.has(comment.id);
+  const { useRelativeTime } = useSettings();
+
+  const formattedTimestamp = useMemo(() => {
+    if (useRelativeTime) {
+      return formatRelativeTime(comment.created_at);
+    }
+    return new Date(comment.created_at).toLocaleString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+    });
+  }, [comment.created_at, useRelativeTime]);
 
   const handleVote = async (value: 1 | -1) => {
     setActionError(null);
@@ -214,14 +229,7 @@ export function CommentItem<T extends LocalCommentBase>({
               {comment.score} {comment.score === 1 ? 'point' : 'points'}
             </span>
             <span>•</span>
-            <span>
-              {new Date(comment.created_at).toLocaleString('en-US', {
-                month: 'short',
-                day: 'numeric',
-                hour: 'numeric',
-                minute: '2-digit',
-              })}
-            </span>
+            <span>{formattedTimestamp}</span>
             {isCollapsed && replies.length > 0 && (
               <span className="ml-2 text-[var(--color-text-muted)]">
                 ({replies.length} {replies.length === 1 ? 'reply' : 'replies'})
