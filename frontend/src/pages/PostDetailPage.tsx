@@ -63,7 +63,11 @@ export default function PostDetailPage() {
   const commentsQueryKey = ['posts', parsedPostId, 'comments'] as const;
   const { data: postComments, isLoading: loadingComments } = useQuery<PostComment[]>({
     queryKey: commentsQueryKey,
-    queryFn: () => postsService.getComments(parsedPostId),
+    queryFn: async () => {
+      const response = await postsService.getComments(parsedPostId);
+      console.log('[PostDetailPage] Comments response:', response);
+      return response;
+    },
     enabled: Number.isFinite(parsedPostId),
   });
 
@@ -136,13 +140,23 @@ export default function PostDetailPage() {
   };
 
   const commentsList = postComments ?? [];
+  console.log('[PostDetailPage] commentsList:', commentsList);
+  console.log('[PostDetailPage] commentsList.length:', commentsList.length);
+
   const topLevelComments = useMemo(() => {
+    console.log('[PostDetailPage] Computing topLevelComments, commentsList:', commentsList);
+    console.log('[PostDetailPage] focusedCommentId:', focusedCommentId);
     if (!commentsList) return [];
     if (focusedCommentId) {
       const target = commentsList.find((c) => c.id === focusedCommentId);
       return target ? [target] : [];
     }
-    return commentsList.filter((c) => c.parent_comment_id === null);
+    const filtered = commentsList.filter((c) => {
+      console.log('[PostDetailPage] Filtering comment:', c.id, 'parent_comment_id:', c.parent_comment_id);
+      return c.parent_comment_id === null || c.parent_comment_id === undefined;
+    });
+    console.log('[PostDetailPage] topLevelComments filtered result:', filtered);
+    return filtered;
   }, [commentsList, focusedCommentId]);
 
   const commentNotFound = Boolean(focusedCommentId && commentsList.length > 0 && topLevelComments.length === 0);
