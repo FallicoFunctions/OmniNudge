@@ -1354,65 +1354,66 @@ const isPostAuthorBlocked = post ? isRedditUserBlocked(post.author) : false;
               )}
 
               {post.is_self && post.selftext && (
-            <div className="mb-4 text-sm text-[var(--color-text-primary)] text-left leading-normal">
-              {post.selftext.split('\n\n').map((paragraph, i, arr) => (
-                <p key={i} className={i < arr.length - 1 ? 'mb-3' : ''}>
-                  {paragraph.split('\n').map((line, j, lineArr) => (
-                    <span key={j}>
-                      {line}
-                      {j < lineArr.length - 1 && <br />}
-                    </span>
+                <div className="mb-4 text-sm text-[var(--color-text-primary)] text-left leading-normal">
+                  {post.selftext.split('\n\n').map((paragraph, i, arr) => (
+                    <p key={i} className={i < arr.length - 1 ? 'mb-3' : ''}>
+                      {paragraph.split('\n').map((line, j, lineArr) => (
+                        <span key={j}>
+                          {line}
+                          {j < lineArr.length - 1 && <br />}
+                        </span>
+                      ))}
+                    </p>
                   ))}
-                </p>
-              ))}
-            </div>
-          )}
+                </div>
+              )}
 
-          {!post.is_self && post.url && post.post_hint !== 'image' && (
-            <div className="mb-4">
-              <a
-                href={post.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-sm text-[var(--color-primary)] hover:underline"
-              >
-                {post.url} ↗
-              </a>
-            </div>
-          )}
+              {!post.is_self && post.url && post.post_hint !== 'image' && (
+                <div className="mb-4">
+                  <a
+                    href={post.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sm text-[var(--color-primary)] hover:underline"
+                  >
+                    {post.url} ↗
+                  </a>
+                </div>
+              )}
 
-          {/* Post Stats */}
-          <div className="flex gap-4 text-xs text-[var(--color-text-secondary)]">
-            <span>{post.score} points</span>
-            <span>•</span>
-            <span>{post.num_comments} comments</span>
-            <span>•</span>
-            <button onClick={handleSharePost} className="hover:underline">
-              share
-            </button>
-            <span>•</span>
-            <button
-              onClick={() => {
-                console.log('Save button clicked. Current saved state:', isPostSavedFromBackend);
-                console.log('Subreddit:', subreddit, 'PostId:', postId);
-                savePostMutation.mutate(!isPostSavedFromBackend);
-              }}
-              className="hover:underline"
-              disabled={savePostMutation.isPending}
-            >
-              {savePostMutation.isPending ? 'saving...' : isPostSavedFromBackend ? 'unsave' : 'save'}
-            </button>
-            <span>•</span>
-            <button onClick={() => setShowHideConfirm(true)} className="hover:underline">
-              hide
-            </button>
-            <span>•</span>
-            <button onClick={openCrosspostModal} className="hover:underline">
-              crosspost
-            </button>
-          </div>
-        </>
-      </div>
+              {/* Post Stats */}
+              <div className="flex gap-4 text-xs text-[var(--color-text-secondary)]">
+                <span>{post.score} points</span>
+                <span>•</span>
+                <span>{post.num_comments} comments</span>
+                <span>•</span>
+                <button onClick={handleSharePost} className="hover:underline">
+                  share
+                </button>
+                <span>•</span>
+                <button
+                  onClick={() => {
+                    console.log('Save button clicked. Current saved state:', isPostSavedFromBackend);
+                    console.log('Subreddit:', subreddit, 'PostId:', postId);
+                    savePostMutation.mutate(!isPostSavedFromBackend);
+                  }}
+                  className="hover:underline"
+                  disabled={savePostMutation.isPending}
+                >
+                  {savePostMutation.isPending ? 'saving...' : isPostSavedFromBackend ? 'unsave' : 'save'}
+                </button>
+                <span>•</span>
+                <button onClick={() => setShowHideConfirm(true)} className="hover:underline">
+                  hide
+                </button>
+                <span>•</span>
+                <button onClick={openCrosspostModal} className="hover:underline">
+                  crosspost
+                </button>
+              </div>
+            </>
+          )}
+        </div>
       )}
 
       {/* Unified Comments Section */}
@@ -1566,6 +1567,7 @@ const isPostAuthorBlocked = post ? isRedditUserBlocked(post.author) : false;
                   onDelete={handleDeleteComment}
                   onToggleInbox={handleToggleInbox}
                   onReport={handleReportComment}
+                  useRelativeTime={useRelativeTime}
                 />
               );
             }

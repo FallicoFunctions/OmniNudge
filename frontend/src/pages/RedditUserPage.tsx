@@ -17,6 +17,7 @@ import type {
   RedditModeratedSubreddit,
 } from '../types/reddit';
 import { formatTimestamp } from '../utils/timeFormat';
+import { sanitizeHttpUrl } from '../utils/crosspostHelpers';
 
 const TAB_OPTIONS = [
   { key: 'overview', label: 'Overview' },
@@ -25,6 +26,27 @@ const TAB_OPTIONS = [
 ] as const;
 
 const SORT_OPTIONS = ['new', 'hot', 'top', 'controversial'] as const;
+
+const IMAGE_URL_REGEX = /\.(jpe?g|png|gif|webp)$/i;
+
+function getExpandableImageUrl(post: RedditApiPost): string | undefined {
+  const previewUrl = post.preview?.images?.[0]?.source?.url;
+  const sanitizedPreview = sanitizeHttpUrl(previewUrl);
+  if (sanitizedPreview) {
+    return sanitizedPreview;
+  }
+
+  const sanitizedPostUrl = sanitizeHttpUrl(post.url);
+  if (!sanitizedPostUrl) {
+    return undefined;
+  }
+
+  if (post.post_hint === 'image' || IMAGE_URL_REGEX.test(sanitizedPostUrl.toLowerCase())) {
+    return sanitizedPostUrl;
+  }
+
+  return undefined;
+}
 
 type TabKey = (typeof TAB_OPTIONS)[number]['key'];
 type SortKey = (typeof SORT_OPTIONS)[number];
@@ -50,8 +72,16 @@ export default function RedditUserPage() {
   const { blockRedditUser, unblockRedditUser, isRedditUserBlocked } = useRedditBlocklist();
   const [activeTab, setActiveTab] = useState<TabKey>('overview');
   const [activeSort, setActiveSort] = useState<SortKey>('new');
+  const [expandedImageMap, setExpandedImageMap] = useState<Record<string, boolean>>({});
 
   const isProfileBlocked = isRedditUserBlocked(username);
+
+  const toggleInlinePreview = (postId: string) => {
+    setExpandedImageMap((prev) => ({
+      ...prev,
+      [postId]: !prev[postId],
+    }));
+  };
 
   const listingQuery = useQuery<RedditUserListingResponse>({
     queryKey: ['reddit-user-listing', username, activeTab, activeSort],
@@ -183,17 +213,71 @@ export default function RedditUserPage() {
     const shareDisabled =
       hideRedditPostMutation.isPending && hideRedditPostMutation.variables?.id === post.id;
 
+    const hasThumbnail = post.thumbnail && post.thumbnail.startsWith('http');
+    const previewImageUrl = getExpandableImageUrl(post);
+    const isInlinePreviewOpen = !!(previewImageUrl && expandedImageMap[post.id]);
+
     return (
       <article
         key={`post-${post.id}`}
-        className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] p-4"
+        className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] p-4 text-left"
       >
-        <Link to={`/reddit/r/${post.subreddit}/comments/${post.id}`}>
-          <h3 className="text-base font-semibold text-[var(--color-text-primary)] hover:text-[var(--color-primary)]">
-            {post.title}
-          </h3>
-        </Link>
-        <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-[var(--color-text-secondary)]">
+        <div className="flex gap-3">
+          {hasThumbnail && (
+            <Link to={`/reddit/r/${post.subreddit}/comments/${post.id}`} className="shrink-0">
+              <img
+                src={post.thumbnail}
+                alt=""
+                className="h-16 w-16 rounded object-cover"
+              />
+            </Link>
+          )}
+          <div className="flex-1">
+            <Link to={`/reddit/r/${post.subreddit}/comments/${post.id}`}>
+              <h3 className="text-left text-base font-semibold text-[var(--color-text-primary)] hover:text-[var(--color-primary)]">
+                {post.title}
+              </h3>
+            </Link>
+            <div className="mt-1 flex items-start gap-3 text-[11px] text-[var(--color-text-secondary)]">
+              {previewImageUrl && (
+                <button
+                  type="button"
+                  onClick={() => toggleInlinePreview(post.id)}
+                  aria-pressed={isInlinePreviewOpen}
+                  aria-label={isInlinePreviewOpen ? 'Hide image preview' : 'Show image preview'}
+                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded border border-[var(--color-border)] bg-[var(--color-surface-elevated)] text-[var(--color-text-secondary)] hover:border-[var(--color-primary)] hover:text-[var(--color-primary)]"
+                >
+                  <span className="sr-only">
+                    {isInlinePreviewOpen ? 'Hide image preview' : 'Show image preview'}
+                  </span>
+                  {isInlinePreviewOpen ? (
+                    <svg
+                      className="h-4 w-4"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                    >
+                      <line x1="6" y1="6" x2="18" y2="18" />
+                      <line x1="6" y1="18" x2="18" y2="6" />
+                    </svg>
+                  ) : (
+                    <svg
+                      className="h-4 w-4"
+                      viewBox="0 0 24 24"
+                      fill="currentColor"
+                      aria-hidden="true"
+                    >
+                      <path d="M8 5.5v13l10.5-6.5L8 5.5Z" />
+                    </svg>
+                  )}
+                </button>
+              )}
+              <div className="flex-1">
+                <div className="flex flex-wrap items-center gap-2">
           <Link
             to={`/reddit/r/${post.subreddit}`}
             className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
@@ -205,6 +289,15 @@ export default function RedditUserPage() {
           <span>•</span>
           <span>submitted {formatTimestamp(post.created_utc, useRelativeTime)}</span>
         </div>
+        {isInlinePreviewOpen && previewImageUrl && (
+          <div className="mt-3 overflow-hidden rounded border border-[var(--color-border)] bg-[var(--color-surface-elevated)]">
+            <img
+              src={previewImageUrl}
+              alt={post.title}
+              className="max-h-[70vh] w-full object-contain"
+            />
+          </div>
+        )}
         <div className="mt-2 flex flex-wrap items-center gap-3 text-[11px] text-[var(--color-text-secondary)]">
           <Link
             to={`/reddit/r/${post.subreddit}/comments/${post.id}`}
@@ -244,6 +337,10 @@ export default function RedditUserPage() {
             {hideRedditPostMutation.isPending ? 'Hiding...' : 'Hide'}
           </button>
         </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </article>
     );
   };
@@ -257,13 +354,13 @@ export default function RedditUserPage() {
     return (
       <article
         key={`comment-${comment.id}`}
-        className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] p-4"
+        className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] p-4 text-left"
       >
         {isProfileBlocked ? (
           <div className="text-sm italic text-[var(--color-text-muted)]">[BLOCKED]</div>
         ) : (
           <>
-            <div className="mb-1 text-[11px] text-[var(--color-text-secondary)]">
+            <div className="mb-1 text-left text-[11px] text-[var(--color-text-secondary)]">
               Commented on{' '}
               {comment.link_title ? (
                 <Link to={localPermalink} className="font-semibold hover:text-[var(--color-primary)]">
@@ -273,7 +370,7 @@ export default function RedditUserPage() {
                 <span className="font-semibold">r/{comment.subreddit}</span>
               )}
             </div>
-            <MarkdownRenderer content={comment.body} className="text-sm" />
+            <MarkdownRenderer content={comment.body} className="text-left text-sm" />
             <div className="mt-2 flex flex-wrap items-center gap-3 text-[11px] text-[var(--color-text-secondary)]">
               <span>{comment.score.toLocaleString()} points</span>
               <span>•</span>
@@ -310,15 +407,29 @@ export default function RedditUserPage() {
   };
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-8">
-      <div className="grid gap-8 lg:grid-cols-[2fr,1fr]">
-        <div className="space-y-4">
-          <header className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
-            <h1 className="text-3xl font-bold text-[var(--color-text-primary)]">u/{username}</h1>
-            <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
-              Recent activity from this Reddit user.
-            </p>
-            <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
+    <div className="w-full px-4 py-8">
+      <div className="mx-auto flex max-w-[1400px] gap-8">
+        <div className="flex-1 space-y-4">
+          <div className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)]">
+            <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[var(--color-border)] p-4">
+              <div className="flex items-center gap-4">
+                <h1 className="text-2xl font-bold text-[var(--color-text-primary)]">u/{username}</h1>
+                <div className="flex gap-2 text-sm font-semibold uppercase">
+                  {TAB_OPTIONS.map((tab) => (
+                    <button
+                      key={tab.key}
+                      onClick={() => setActiveTab(tab.key)}
+                      className={`${
+                        activeTab === tab.key
+                          ? 'text-[var(--color-primary)]'
+                          : 'text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]'
+                      }`}
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
               <button
                 type="button"
                 onClick={handleBlockToggle}
@@ -330,29 +441,6 @@ export default function RedditUserPage() {
               >
                 {isProfileBlocked ? 'Unblock user' : 'Block user'}
               </button>
-              {isProfileBlocked && (
-                <span className="text-sm text-[var(--color-text-secondary)]">
-                  Content from this user is hidden across OmniNudge.
-                </span>
-              )}
-            </div>
-          </header>
-
-          <div className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)]">
-            <div className="flex flex-wrap gap-2 border-b border-[var(--color-border)] p-4 text-sm font-semibold uppercase">
-              {TAB_OPTIONS.map((tab) => (
-                <button
-                  key={tab.key}
-                  onClick={() => setActiveTab(tab.key)}
-                  className={`${
-                    activeTab === tab.key
-                      ? 'text-[var(--color-primary)]'
-                      : 'text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]'
-                  }`}
-                >
-                  {tab.label}
-                </button>
-              ))}
             </div>
             <div className="flex flex-wrap items-center gap-2 border-b border-[var(--color-border)] px-4 py-3 text-sm text-[var(--color-text-secondary)]">
               <span>Sorted by:</span>
@@ -401,7 +489,7 @@ export default function RedditUserPage() {
           </div>
         </div>
 
-        <aside className="space-y-4">
+        <aside className="w-80 shrink-0 space-y-4">
           <div className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
             <div className="text-lg font-semibold text-[var(--color-text-primary)]">User Details</div>
             <div className="mt-3 space-y-2 text-sm text-[var(--color-text-secondary)]">
@@ -418,7 +506,7 @@ export default function RedditUserPage() {
                 </span>
               </div>
               <div className="flex justify-between">
-                <span>Account age</span>
+                <span>Reddit age</span>
                 <span className="font-semibold text-[var(--color-text-primary)]">
                   {formatAccountAge(aboutData?.created_utc)}
                 </span>
