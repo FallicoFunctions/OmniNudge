@@ -218,6 +218,95 @@ func (h *RedditHandler) AutocompleteSubreddits(c *gin.Context) {
 	})
 }
 
+// GetRedditUserListing handles GET /api/v1/reddit/user/:username/:section
+
+func (h *RedditHandler) GetRedditUserListing(c *gin.Context) {
+	username := c.Param("username")
+	section := strings.ToLower(c.Param("section"))
+	if username == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Username is required"})
+		return
+	}
+	if section == "" {
+		section = "overview"
+	}
+	switch section {
+	case "overview", "comments", "submitted":
+	default:
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid section"})
+		return
+	}
+	sort := c.DefaultQuery("sort", "new")
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "25"))
+	after := c.DefaultQuery("after", "")
+
+	listing, err := h.redditClient.GetUserListing(c.Request.Context(), username, section, sort, limit, after)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch user activity", "details": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"username": username,
+		"section":  section,
+		"sort":     sort,
+		"after":    listing.After,
+		"before":   listing.Before,
+		"items":    listing.Items,
+	})
+}
+
+// GetRedditUserAbout handles GET /api/v1/reddit/user/:username/about
+func (h *RedditHandler) GetRedditUserAbout(c *gin.Context) {
+	username := c.Param("username")
+	if username == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Username is required"})
+		return
+	}
+
+	about, err := h.redditClient.GetUserAbout(c.Request.Context(), username)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch user", "details": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"user": about})
+}
+
+// GetRedditUserTrophies handles GET /api/v1/reddit/user/:username/trophies
+func (h *RedditHandler) GetRedditUserTrophies(c *gin.Context) {
+	username := c.Param("username")
+	if username == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Username is required"})
+		return
+	}
+
+	trophies, err := h.redditClient.GetUserTrophies(c.Request.Context(), username)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch trophies", "details": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"trophies": trophies})
+}
+
+// GetRedditUserModerated handles GET /api/v1/reddit/user/:username/moderated
+func (h *RedditHandler) GetRedditUserModerated(c *gin.Context) {
+	username := c.Param("username")
+	if username == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Username is required"})
+		return
+	}
+
+	subs, err := h.redditClient.GetUserModeratedSubreddits(c.Request.Context(), username)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch moderated subreddits", "details": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"moderated": subs})
+}
+
 // GetSubredditMedia handles GET /api/v1/reddit/r/:subreddit/media
 // Returns only posts with media (images/videos) for slideshow feature
 func (h *RedditHandler) GetSubredditMedia(c *gin.Context) {

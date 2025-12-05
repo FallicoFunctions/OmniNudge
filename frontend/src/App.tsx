@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import { SettingsProvider } from './contexts/SettingsContext';
+import { RedditBlockProvider } from './contexts/RedditBlockContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import MainLayout from './layouts/MainLayout';
 import LoginPage from './pages/LoginPage';
@@ -26,7 +27,8 @@ function App() {
     <BrowserRouter>
       <AuthProvider>
         <SettingsProvider>
-          <Routes>
+          <RedditBlockProvider>
+            <Routes>
           {/* Public routes */}
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
@@ -61,7 +63,8 @@ function App() {
 
           {/* Catch all */}
           <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
+            </Routes>
+          </RedditBlockProvider>
         </SettingsProvider>
       </AuthProvider>
     </BrowserRouter>
