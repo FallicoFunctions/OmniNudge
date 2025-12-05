@@ -13,15 +13,19 @@ const SUBREDDIT_AUTOCOMPLETE_MIN_LENGTH = 2;
 export default function CreatePostPage() {
   const navigate = useNavigate();
   const location = useLocation();
+
+  console.log('[CreatePostPage] Component rendering, location:', location);
+  console.log('[CreatePostPage] location.state:', location.state);
+
   const [activeTab, setActiveTab] = useState<'link' | 'text'>('link');
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [mediaUrl, setMediaUrl] = useState('');
   const [destination, setDestination] = useState<'profile' | 'hub' | 'subreddit'>('hub');
-  const [selectedHub, setSelectedHub] = useState<{ id: number; name: string } | null>(null);
-  const [hubInputValue, setHubInputValue] = useState('');
+  const [selectedHub, setSelectedHub] = useState<{ id?: number; name?: string } | null>(null);
+  const [hubInputValue, setHubInputValue] = useState<string>('');
   const [isHubAutocompleteOpen, setIsHubAutocompleteOpen] = useState(false);
-  const [subredditInputValue, setSubredditInputValue] = useState('');
+  const [subredditInputValue, setSubredditInputValue] = useState<string>('');
   const [isSubredditAutocompleteOpen, setIsSubredditAutocompleteOpen] = useState(false);
   const [sendRepliesToInbox, setSendRepliesToInbox] = useState(true);
 
@@ -30,17 +34,29 @@ export default function CreatePostPage() {
     let isMounted = true;
     const state = location.state as { defaultHub?: string; defaultSubreddit?: string } | null;
 
+    console.log('[useEffect] Running with location.state:', state);
+
     if (state?.defaultHub) {
+      const hubName = state.defaultHub;
+      console.log('[useEffect] Setting hub destination with hubName:', hubName);
       setDestination('hub');
-      setHubInputValue(state.defaultHub);
+      setHubInputValue(hubName);
       (async () => {
         try {
-          const hub = await hubsService.getHub(state.defaultHub);
+          console.log('[useEffect] Fetching hub:', hubName);
+          const response = await hubsService.getHub(hubName) as any;
+          console.log('[useEffect] Hub fetched:', response);
+          // Backend returns {hub: {...}}, so we need to unwrap it
+          const hub = response.hub || response;
           if (isMounted) {
+            console.log('[useEffect] Setting selectedHub to:', { id: hub.id, name: hub.name });
             setSelectedHub({ id: hub.id, name: hub.name });
             setHubInputValue(hub.name);
+          } else {
+            console.log('[useEffect] Component unmounted, skipping state update');
           }
-        } catch {
+        } catch (error) {
+          console.error('[useEffect] Error fetching hub:', error);
           if (isMounted) {
             setSelectedHub(null);
           }
@@ -49,9 +65,12 @@ export default function CreatePostPage() {
     } else if (state?.defaultSubreddit) {
       setDestination('subreddit');
       setSubredditInputValue(state.defaultSubreddit);
+    } else {
+      console.log('[useEffect] No defaultHub or defaultSubreddit in state');
     }
 
     return () => {
+      console.log('[useEffect] Cleanup - setting isMounted = false');
       isMounted = false;
     };
   }, [location.state]);
@@ -118,16 +137,34 @@ export default function CreatePostPage() {
 
     let hubId: number | undefined;
     if (destination === 'hub') {
-      if (!trimmedHubInput) {
-        alert('Please enter a hub name');
-        return;
-      }
+      console.log('Submit - selectedHub:', selectedHub);
+      console.log('Submit - hubInputValue:', hubInputValue);
+      console.log('Submit - trimmedHubInput:', trimmedHubInput);
 
-      if (selectedHub && selectedHub.name === trimmedHubInput) {
+      // If we already have a selected hub with ID, use it directly
+      if (selectedHub?.id && selectedHub?.name) {
+        console.log('Using selectedHub ID:', selectedHub.id);
         hubId = selectedHub.id;
       } else {
+        console.log('Falling back to input validation');
+        // Fall back to text input validation
+        let normalizedHubInput = trimmedHubInput;
+
+        if (!normalizedHubInput && selectedHub?.name) {
+          normalizedHubInput = selectedHub.name;
+          setHubInputValue(selectedHub.name);
+        }
+
+        if (!normalizedHubInput) {
+          console.log('ERROR: normalizedHubInput is empty!');
+          alert('Please enter a hub name');
+          return;
+        }
+
         try {
-          const hub = await hubsService.getHub(trimmedHubInput);
+          const response = await hubsService.getHub(normalizedHubInput) as any;
+          // Backend returns {hub: {...}}, so we need to unwrap it
+          const hub = response.hub || response;
           hubId = hub.id;
           setSelectedHub({ id: hub.id, name: hub.name });
           setHubInputValue(hub.name);
@@ -307,16 +344,19 @@ export default function CreatePostPage() {
                     <div className="relative">
                       <input
                         type="text"
-                        value={hubInputValue}
+                        value={hubInputValue || ''}
                         onChange={(e) => {
-                          setHubInputValue(e.target.value);
-                          setSelectedHub(null);
+                          const newValue = e.target.value;
+                          setHubInputValue(newValue || '');
+                          // Only clear selectedHub if the user actually changed the value
+                          if (newValue !== selectedHub?.name) {
+                            setSelectedHub(null);
+                          }
                         }}
                         onFocus={() => setIsHubAutocompleteOpen(true)}
                         onBlur={() => setIsHubAutocompleteOpen(false)}
                         placeholder="Search for a hub..."
                         className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-                        required
                       />
                       {destination === 'hub' &&
                         isHubAutocompleteOpen &&
@@ -373,7 +413,6 @@ export default function CreatePostPage() {
                         onBlur={() => setIsSubredditAutocompleteOpen(false)}
                         placeholder="Search for a subreddit..."
                         className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-                        required
                       />
                       {destination === 'subreddit' &&
                         isSubredditAutocompleteOpen &&
