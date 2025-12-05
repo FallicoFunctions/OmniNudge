@@ -1,5 +1,13 @@
 import { api } from '../lib/api';
-import type { RedditPostsResponse, RedditComment, SubredditSuggestion } from '../types/reddit';
+import type {
+  RedditPostsResponse,
+  RedditComment,
+  SubredditSuggestion,
+  RedditUserListingResponse,
+  RedditUserAbout,
+  RedditUserTrophy,
+  RedditModeratedSubreddit,
+} from '../types/reddit';
 
 export const redditService = {
   async getFrontPage(limit = 25): Promise<RedditPostsResponse> {
@@ -26,5 +34,42 @@ export const redditService = {
       `/reddit/subreddits/autocomplete?${params.toString()}`
     );
     return response.suggestions ?? [];
+  },
+
+  async getUserListing(
+    username: string,
+    section: 'overview' | 'comments' | 'submitted',
+    sort: 'new' | 'hot' | 'top' | 'controversial',
+    limit = 25,
+    after?: string
+  ): Promise<RedditUserListingResponse> {
+    const params = new URLSearchParams({ sort, limit: String(limit) });
+    if (after) {
+      params.append('after', after);
+    }
+    return api.get<RedditUserListingResponse>(
+      `/reddit/user/${encodeURIComponent(username)}/${section}?${params.toString()}`
+    );
+  },
+
+  async getUserAbout(username: string): Promise<RedditUserAbout> {
+    const response = await api.get<{ user: RedditUserAbout }>(
+      `/reddit/user/${encodeURIComponent(username)}/about`
+    );
+    return response.user;
+  },
+
+  async getUserTrophies(username: string): Promise<RedditUserTrophy[]> {
+    const response = await api.get<{ trophies: RedditUserTrophy[] }>(
+      `/reddit/user/${encodeURIComponent(username)}/trophies`
+    );
+    return response.trophies ?? [];
+  },
+
+  async getUserModerated(username: string): Promise<RedditModeratedSubreddit[]> {
+    const response = await api.get<{ moderated: RedditModeratedSubreddit[] }>(
+      `/reddit/user/${encodeURIComponent(username)}/moderated`
+    );
+    return response.moderated ?? [];
   },
 };

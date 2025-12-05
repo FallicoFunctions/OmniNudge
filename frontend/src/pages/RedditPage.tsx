@@ -13,6 +13,7 @@ import type {
 import { postsService } from '../services/postsService';
 import { useAuth } from '../contexts/AuthContext';
 import { useSettings } from '../contexts/SettingsContext';
+import { useRedditBlocklist } from '../contexts/RedditBlockContext';
 import { formatTimestamp } from '../utils/timeFormat';
 import {
   createLocalCrosspostPayload,
@@ -78,6 +79,7 @@ export default function RedditPage() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const { useRelativeTime } = useSettings();
+  const { blockedUsers } = useRedditBlocklist();
   const [subreddit, setSubreddit] = useState(routeSubreddit ?? 'popular');
   const [sort, setSort] = useState<'hot' | 'new' | 'top' | 'rising'>('hot');
   const [inputValue, setInputValue] = useState('');
@@ -174,18 +176,22 @@ export default function RedditPage() {
   // Filter out hidden posts
   const visiblePosts = useMemo(() => {
     if (!data?.posts) return [];
-    if (!hiddenPostsData?.hidden_reddit_posts) return data.posts;
+    const hiddenPostIds = hiddenPostsData?.hidden_reddit_posts
+      ? new Set(
+          hiddenPostsData.hidden_reddit_posts.map(
+            (p) => `${p.subreddit}-${p.reddit_post_id}`
+          )
+        )
+      : null;
 
-    const hiddenPostIds = new Set(
-      hiddenPostsData.hidden_reddit_posts.map(
-        (p) => `${p.subreddit}-${p.reddit_post_id}`
-      )
-    );
-
-    return data.posts.filter(
-      (post) => !hiddenPostIds.has(`${post.subreddit}-${post.id}`)
-    );
-  }, [data?.posts, hiddenPostsData?.hidden_reddit_posts]);
+    return data.posts.filter((post) => {
+      const hiddenKey = `${post.subreddit}-${post.id}`;
+      const isHidden = hiddenPostIds?.has(hiddenKey);
+      if (isHidden) return false;
+      const authorKey = post.author ? post.author.toLowerCase() : '';
+      return authorKey ? !blockedUsers.has(authorKey) : true;
+    });
+  }, [data?.posts, hiddenPostsData?.hidden_reddit_posts, blockedUsers]);
   const toggleSaveRedditPostMutation = useMutation<
     void,
     Error,

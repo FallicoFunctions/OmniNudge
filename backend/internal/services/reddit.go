@@ -113,6 +113,73 @@ type RedditListing struct {
 	} `json:"data"`
 }
 
+// redditGenericListing models generic Reddit listing responses that may include posts or comments
+type redditGenericListing struct {
+	Kind string `json:"kind"`
+	Data struct {
+		After    string `json:"after"`
+		Before   string `json:"before"`
+		Children []struct {
+			Kind string          `json:"kind"`
+			Data json.RawMessage `json:"data"`
+		} `json:"children"`
+	} `json:"data"`
+}
+
+// RedditUserComment represents a Reddit comment returned from a user listing
+type RedditUserComment struct {
+	ID            string  `json:"id"`
+	Body          string  `json:"body"`
+	Author        string  `json:"author"`
+	Subreddit     string  `json:"subreddit"`
+	Score         int     `json:"score"`
+	CreatedUTC    float64 `json:"created_utc"`
+	Permalink     string  `json:"permalink"`
+	ParentID      string  `json:"parent_id"`
+	LinkID        string  `json:"link_id"`
+	LinkTitle     string  `json:"link_title"`
+	LinkPermalink string  `json:"link_permalink"`
+	LinkAuthor    string  `json:"link_author"`
+}
+
+// RedditUserItem represents either a post or comment in a user listing
+type RedditUserItem struct {
+	Kind    string             `json:"kind"`
+	Post    *RedditPost        `json:"post,omitempty"`
+	Comment *RedditUserComment `json:"comment,omitempty"`
+}
+
+// RedditUserListing wraps user listing results
+type RedditUserListing struct {
+	After  string           `json:"after"`
+	Before string           `json:"before"`
+	Items  []RedditUserItem `json:"items"`
+}
+
+// RedditUserAbout contains profile metadata for a Reddit user
+type RedditUserAbout struct {
+	Name         string  `json:"name"`
+	IconImg      string  `json:"icon_img"`
+	CreatedUTC   float64 `json:"created_utc"`
+	TotalKarma   int     `json:"total_karma"`
+	CommentKarma int     `json:"comment_karma"`
+	LinkKarma    int     `json:"link_karma"`
+}
+
+// RedditUserTrophy represents a single trophy entry from Reddit
+type RedditUserTrophy struct {
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	IconURL     string `json:"icon_url"`
+}
+
+// RedditModeratedSubreddit represents a subreddit a user moderates
+type RedditModeratedSubreddit struct {
+	Name        string `json:"name"`
+	Title       string `json:"title"`
+	Subscribers int    `json:"subscribers"`
+}
+
 // SubredditSuggestion represents a subreddit returned from the autocomplete endpoint
 type SubredditSuggestion struct {
 	Name        string `json:"name"`
@@ -423,6 +490,283 @@ func (r *RedditClient) AutocompleteSubreddits(ctx context.Context, query string,
 	}
 
 	return suggestions, nil
+}
+
+// GetUserListing fetches a Reddit user's overview/submitted/comments listing
+func (r *RedditClient) GetUserListing(ctx context.Context, username, section, sort string, limit int, after string) (*RedditUserListing, error) {
+	username = strings.TrimSpace(username)
+	if username == "" {
+		return nil, fmt.Errorf("username is required")
+	}
+	if section == "" {
+		section = "overview"
+	}
+	if sort == "" {
+		sort = "new"
+	}
+	if limit < 1 || limit > 100 {
+		limit = 25
+	}
+
+	cacheKey := fmt.Sprintf("user:%s:%s:%s:%d:%s", strings.ToLower(username), section, sort, limit, after)
+	if cached, ok, err := r.cache.Get(ctx, cacheKey); err == nil && ok {
+		var listing RedditUserListing
+		if err := json.Unmarshal([]byte(cached), &listing); err == nil {
+			return &listing, nil
+		}
+	}
+
+	url := fmt.Sprintf("https://www.reddit.com/user/%s/%s.json", username, section)
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+	req.Header.Set("User-Agent", r.userAgent)
+	q := req.URL.Query()
+	if sort != "" {
+		q.Add("sort", sort)
+	}
+	if limit > 0 {
+		q.Add("limit", fmt.Sprintf("%d", limit))
+	}
+	if after != "" {
+		q.Add("after", after)
+	}
+	req.URL.RawQuery = q.Encode()
+
+	resp, err := r.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch user listing: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("reddit API returned status %d: %s", resp.StatusCode, string(body))
+	}
+
+	var raw redditGenericListing
+	if err := json.NewDecoder(resp.Body).Decode(&raw); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	items := make([]RedditUserItem, 0, len(raw.Data.Children))
+	for _, child := range raw.Data.Children {
+		switch child.Kind {
+		case "t3":
+			var post RedditPost
+			if err := json.Unmarshal(child.Data, &post); err == nil {
+				items = append(items, RedditUserItem{Kind: "post", Post: &post})
+			}
+		case "t1":
+			var comment RedditUserComment
+			if err := json.Unmarshal(child.Data, &comment); err == nil {
+				items = append(items, RedditUserItem{Kind: "comment", Comment: &comment})
+			}
+		}
+	}
+
+	listing := RedditUserListing{
+		After:  raw.Data.After,
+		Before: raw.Data.Before,
+		Items:  items,
+	}
+
+	if data, err := json.Marshal(listing); err == nil {
+		_ = r.cache.Set(ctx, cacheKey, string(data), r.cacheTTL)
+	}
+
+	return &listing, nil
+}
+
+// GetUserAbout fetches profile metadata for a Reddit user
+func (r *RedditClient) GetUserAbout(ctx context.Context, username string) (*RedditUserAbout, error) {
+	username = strings.TrimSpace(username)
+	if username == "" {
+		return nil, fmt.Errorf("username is required")
+	}
+	cacheKey := fmt.Sprintf("user:about:%s", strings.ToLower(username))
+	if cached, ok, err := r.cache.Get(ctx, cacheKey); err == nil && ok {
+		var about RedditUserAbout
+		if err := json.Unmarshal([]byte(cached), &about); err == nil {
+			return &about, nil
+		}
+	}
+
+	url := fmt.Sprintf("https://www.reddit.com/user/%s/about.json", username)
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+	req.Header.Set("User-Agent", r.userAgent)
+
+	resp, err := r.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch user: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("reddit API returned status %d: %s", resp.StatusCode, string(body))
+	}
+
+	var raw struct {
+		Data struct {
+			Name         string  `json:"name"`
+			IconImg      string  `json:"icon_img"`
+			CreatedUTC   float64 `json:"created_utc"`
+			TotalKarma   int     `json:"total_karma"`
+			CommentKarma int     `json:"comment_karma"`
+			LinkKarma    int     `json:"link_karma"`
+		} `json:"data"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&raw); err != nil {
+		return nil, fmt.Errorf("failed to decode user response: %w", err)
+	}
+
+	about := RedditUserAbout{
+		Name:         raw.Data.Name,
+		IconImg:      raw.Data.IconImg,
+		CreatedUTC:   raw.Data.CreatedUTC,
+		TotalKarma:   raw.Data.TotalKarma,
+		CommentKarma: raw.Data.CommentKarma,
+		LinkKarma:    raw.Data.LinkKarma,
+	}
+
+	if data, err := json.Marshal(about); err == nil {
+		_ = r.cache.Set(ctx, cacheKey, string(data), r.cacheTTL)
+	}
+
+	return &about, nil
+}
+
+// GetUserTrophies fetches the trophy case for a Reddit user
+func (r *RedditClient) GetUserTrophies(ctx context.Context, username string) ([]RedditUserTrophy, error) {
+	username = strings.TrimSpace(username)
+	if username == "" {
+		return nil, fmt.Errorf("username is required")
+	}
+	cacheKey := fmt.Sprintf("user:trophies:%s", strings.ToLower(username))
+	if cached, ok, err := r.cache.Get(ctx, cacheKey); err == nil && ok {
+		var trophies []RedditUserTrophy
+		if err := json.Unmarshal([]byte(cached), &trophies); err == nil {
+			return trophies, nil
+		}
+	}
+
+	url := fmt.Sprintf("https://www.reddit.com/user/%s/trophies.json", username)
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+	req.Header.Set("User-Agent", r.userAgent)
+
+	resp, err := r.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch trophies: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("reddit API returned status %d: %s", resp.StatusCode, string(body))
+	}
+
+	var raw struct {
+		Data struct {
+			Trophies []struct {
+				Data struct {
+					Name        string `json:"name"`
+					Description string `json:"description"`
+					Icon70      string `json:"icon_70"`
+					IconURL     string `json:"icon_url"`
+				} `json:"data"`
+			} `json:"trophies"`
+		} `json:"data"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&raw); err != nil {
+		return nil, fmt.Errorf("failed to decode trophies: %w", err)
+	}
+
+	trophies := make([]RedditUserTrophy, 0, len(raw.Data.Trophies))
+	for _, trophy := range raw.Data.Trophies {
+		icon := trophy.Data.Icon70
+		if icon == "" {
+			icon = trophy.Data.IconURL
+		}
+		trophies = append(trophies, RedditUserTrophy{
+			Name:        trophy.Data.Name,
+			Description: trophy.Data.Description,
+			IconURL:     icon,
+		})
+	}
+
+	if data, err := json.Marshal(trophies); err == nil {
+		_ = r.cache.Set(ctx, cacheKey, string(data), r.cacheTTL)
+	}
+
+	return trophies, nil
+}
+
+// GetUserModeratedSubreddits fetches a list of subreddits a user moderates
+func (r *RedditClient) GetUserModeratedSubreddits(ctx context.Context, username string) ([]RedditModeratedSubreddit, error) {
+	username = strings.TrimSpace(username)
+	if username == "" {
+		return nil, fmt.Errorf("username is required")
+	}
+
+	cacheKey := fmt.Sprintf("user:moderated:%s", strings.ToLower(username))
+	if cached, ok, err := r.cache.Get(ctx, cacheKey); err == nil && ok {
+		var subs []RedditModeratedSubreddit
+		if err := json.Unmarshal([]byte(cached), &subs); err == nil {
+			return subs, nil
+		}
+	}
+
+	url := fmt.Sprintf("https://www.reddit.com/user/%s/moderated_subreddits.json", username)
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+	req.Header.Set("User-Agent", r.userAgent)
+
+	resp, err := r.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch moderated subreddits: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("reddit API returned status %d: %s", resp.StatusCode, string(body))
+	}
+
+	var raw struct {
+		Data []struct {
+			Name        string `json:"name"`
+			Title       string `json:"title"`
+			Subscribers int    `json:"subscribers"`
+		} `json:"data"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&raw); err != nil {
+		return nil, fmt.Errorf("failed to decode moderated subreddits: %w", err)
+	}
+
+	subs := make([]RedditModeratedSubreddit, 0, len(raw.Data))
+	for _, sub := range raw.Data {
+		subs = append(subs, RedditModeratedSubreddit{
+			Name:        sub.Name,
+			Title:       sub.Title,
+			Subscribers: sub.Subscribers,
+		})
+	}
+
+	if data, err := json.Marshal(subs); err == nil {
+		_ = r.cache.Set(ctx, cacheKey, string(data), r.cacheTTL)
+	}
+
+	return subs, nil
 }
 
 func (r *RedditClient) getCachedListing(ctx context.Context, key string) (*RedditListing, bool, error) {
