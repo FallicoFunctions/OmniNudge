@@ -7,7 +7,7 @@ import { useSettings } from '../contexts/SettingsContext';
 import { savedService } from '../services/savedService';
 import { hubsService } from '../services/hubsService';
 import type { LocalRedditComment } from '../types/reddit';
-import { formatTimestamp } from '../utils/timeFormat';
+import { formatTimestamp, formatRelativeTime } from '../utils/timeFormat';
 import { createRedditCrosspostPayload } from '../utils/crosspostHelpers';
 import { MarkdownRenderer } from '../components/common/MarkdownRenderer';
 
@@ -100,6 +100,7 @@ function RedditCommentView({
   onDelete,
   onToggleInbox,
   onReport,
+  useRelativeTime,
 }: {
   comment: RedditComment;
   depth?: number;
@@ -118,11 +119,23 @@ function RedditCommentView({
   onDelete: (commentId: number) => Promise<void>;
   onToggleInbox: (commentId: number, nextValue: boolean) => Promise<void>;
   onReport: (commentId: number) => Promise<void>;
+  useRelativeTime: boolean;
 }) {
   const queryClient = useQueryClient();
   const [collapsed, setCollapsed] = useState(false);
   const [replyText, setReplyText] = useState('');
   const [isReplying, setIsReplying] = useState(false);
+  const formattedTimestamp = useMemo(() => {
+    if (useRelativeTime) {
+      return formatRelativeTime(comment.data.created_utc);
+    }
+    return new Date(comment.data.created_utc * 1000).toLocaleString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+    });
+  }, [comment.data.created_utc, useRelativeTime]);
 
   const createReplyMutation = useMutation({
     mutationFn: async (content: string) => {
@@ -214,14 +227,7 @@ function RedditCommentView({
           <span>•</span>
           <span>{comment.data.score} points</span>
           <span>•</span>
-          <span>
-            {new Date(comment.data.created_utc * 1000).toLocaleString('en-US', {
-              month: 'short',
-              day: 'numeric',
-              hour: 'numeric',
-              minute: '2-digit',
-            })}
-          </span>
+          <span>{formattedTimestamp}</span>
           {collapsed && hasReplies && (
             <span className="ml-2 text-[var(--color-text-muted)]">
               ({(replies.length + localReplies.length)} {(replies.length + localReplies.length) === 1 ? 'reply' : 'replies'})
@@ -323,6 +329,7 @@ function RedditCommentView({
                     onDelete={onDelete}
                     onToggleInbox={onToggleInbox}
                     onReport={onReport}
+                    useRelativeTime={useRelativeTime}
                   />
                 ))}
 
@@ -346,6 +353,7 @@ function RedditCommentView({
                     onDelete={onDelete}
                     onToggleInbox={onToggleInbox}
                     onReport={onReport}
+                    useRelativeTime={useRelativeTime}
                   />
                 ))}
               </div>
@@ -374,6 +382,7 @@ interface LocalCommentViewProps {
   onDelete: (commentId: number) => Promise<void>;
   onToggleInbox: (commentId: number, nextValue: boolean) => Promise<void>;
   onReport: (commentId: number) => Promise<void>;
+  useRelativeTime: boolean;
 }
 
 function LocalCommentView({
@@ -393,6 +402,7 @@ function LocalCommentView({
   onDelete,
   onToggleInbox,
   onReport,
+  useRelativeTime,
 }: LocalCommentViewProps) {
   const queryClient = useQueryClient();
   const [replyText, setReplyText] = useState('');
@@ -417,6 +427,17 @@ function LocalCommentView({
   const isOwner = currentUsername && comment.username === currentUsername;
   const isSaved = savedCommentIds.has(comment.id);
   const inboxDisabled = comment.inbox_replies_disabled ?? false;
+  const formattedTimestamp = useMemo(() => {
+    if (useRelativeTime) {
+      return formatRelativeTime(comment.created_at);
+    }
+    return new Date(comment.created_at).toLocaleString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+    });
+  }, [comment.created_at, useRelativeTime]);
 
   const voteMutation = useMutation({
     mutationFn: async (vote: 1 | -1) => {
@@ -561,14 +582,7 @@ function LocalCommentView({
               {comment.score} {comment.score === 1 ? 'point' : 'points'}
             </span>
             <span>•</span>
-            <span>
-              {new Date(comment.created_at).toLocaleString('en-US', {
-                month: 'short',
-                day: 'numeric',
-                hour: 'numeric',
-                minute: '2-digit',
-              })}
-            </span>
+            <span>{formattedTimestamp}</span>
             {isCollapsed && replies.length > 0 && (
               <span className="ml-2 text-[var(--color-text-muted)]">
                 ({replies.length} {replies.length === 1 ? 'reply' : 'replies'})
@@ -735,6 +749,7 @@ function LocalCommentView({
                 onDelete={onDelete}
                 onToggleInbox={onToggleInbox}
                 onReport={onReport}
+                useRelativeTime={useRelativeTime}
               />
             ))}
           </div>
@@ -1536,6 +1551,7 @@ export default function RedditPostPage() {
                 onDelete={handleDeleteComment}
                 onToggleInbox={handleToggleInbox}
                 onReport={handleReportComment}
+                useRelativeTime={useRelativeTime}
               />
             );
           })}
