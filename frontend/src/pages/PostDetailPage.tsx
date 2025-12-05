@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../contexts/AuthContext';
 import { postsService } from '../services/postsService';
@@ -9,6 +9,21 @@ import type { PlatformPost, PostComment } from '../types/posts';
 import type { SavedItemsResponse } from '../types/saved';
 import { CommentItem } from '../components/comments/CommentItem';
 import type { CommentActionHandlers } from '../components/comments/CommentItem';
+import { MarkdownRenderer } from '../components/common/MarkdownRenderer';
+
+const FORMATTING_EXAMPLES = [
+  { input: '*italics*', output: '*italics*' },
+  { input: '**bold**', output: '**bold**' },
+  { input: '[OmniNudge!](https://omninudge.com)', output: '[OmniNudge!](https://omninudge.com)' },
+  { input: '* item 1\n* item 2\n* item 3', output: '* item 1\n* item 2\n* item 3' },
+  { input: '> quoted text', output: '> quoted text' },
+  {
+    input: 'Lines starting with four spaces are treated like code:\n\n    if 1 * 2 < 3:\n    print "hello, world!"',
+    output: 'Lines starting with four spaces are treated like code:\n\n    if 1 * 2 < 3:\n    print "hello, world!"',
+  },
+  { input: '~~strikethrough~~', output: '~~strikethrough~~' },
+  { input: 'super^script', output: 'super^script' },
+] as const;
 
 export default function PostDetailPage() {
   const { postId, commentId } = useParams<{ postId: string; commentId?: string }>();
@@ -17,18 +32,33 @@ export default function PostDetailPage() {
   const { user } = useAuth();
 
   const [commentText, setCommentText] = useState('');
+  const [showFormattingHelp, setShowFormattingHelp] = useState(false);
   const [replyingTo, setReplyingTo] = useState<number | null>(null);
   const [embedTarget, setEmbedTarget] = useState<PostComment | null>(null);
   const [embedCopied, setEmbedCopied] = useState(false);
+  const [imageExpanded, setImageExpanded] = useState(false);
 
   const parsedPostId = postId ? Number(postId) : NaN;
   const focusedCommentId = commentId ? Number(commentId) : null;
 
-  const { data: postData, isLoading: loadingPost } = useQuery<PlatformPost>({
+  const { data: postDataRaw, isLoading: loadingPost } = useQuery<any>({
     queryKey: ['posts', parsedPostId],
-    queryFn: () => postsService.getPost(parsedPostId),
+    queryFn: async () => {
+      const response = await postsService.getPost(parsedPostId);
+      console.log('[PostDetailPage] Raw post response:', response);
+      return response;
+    },
     enabled: Number.isFinite(parsedPostId),
   });
+
+  // Unwrap the response if it's wrapped in a "post" property
+  const postData = useMemo(() => {
+    if (!postDataRaw) return null;
+    // Check if the response is wrapped
+    const unwrapped = (postDataRaw as any).post || postDataRaw;
+    console.log('[PostDetailPage] Unwrapped post data:', unwrapped);
+    return unwrapped as PlatformPost;
+  }, [postDataRaw]);
 
   const commentsQueryKey = ['posts', parsedPostId, 'comments'] as const;
   const { data: postComments, isLoading: loadingComments } = useQuery<PostComment[]>({
@@ -139,6 +169,33 @@ export default function PostDetailPage() {
     }
   };
 
+  const handleSharePost = async () => {
+    if (!postData) return;
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      alert('Post link copied to clipboard!');
+    } catch {
+      alert('Unable to copy link. Please try again.');
+    }
+  };
+
+  const handleSavePost = async () => {
+    // TODO: Implement save post functionality
+    alert('Save post functionality coming soon!');
+  };
+
+  const handleHidePost = async () => {
+    // TODO: Implement hide post functionality
+    if (window.confirm('Hide this post?')) {
+      alert('Hide post functionality coming soon!');
+    }
+  };
+
+  const handleCrosspost = async () => {
+    // TODO: Implement crosspost functionality
+    alert('Crosspost functionality coming soon!');
+  };
+
   if (!postId || Number.isNaN(parsedPostId)) {
     return (
       <div className="mx-auto max-w-4xl px-4 py-8">
@@ -156,56 +213,115 @@ export default function PostDetailPage() {
   }
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-8">
-      <button
-        onClick={() => navigate('/posts')}
-        className="mb-4 text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
-      >
-        ← Back to Posts Feed
-      </button>
-
+    <div className="w-full max-w-5xl px-4 py-8">
       {postData && (
         <div className="mb-6 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-6">
+          {/* Post Header */}
           <div className="mb-4">
-            <div className="mb-2 text-xs text-[var(--color-text-secondary)]">
-              h/{postData.hub_name} • Posted by u/{postData.author_username} •{' '}
-              {new Date(postData.crossposted_at ?? postData.created_at).toLocaleString()}
-            </div>
             <h1 className="text-2xl font-bold text-[var(--color-text-primary)]">{postData.title}</h1>
+            <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-[var(--color-text-secondary)]">
+              <Link
+                to={`/hubs/h/${(postData as any).hub?.name || postData.hub_name}`}
+                className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+              >
+                h/{(postData as any).hub?.name || postData.hub_name}
+              </Link>
+              <span>•</span>
+              <span>
+                Posted by{' '}
+                <Link
+                  to={`/users/${(postData as any).author?.username || postData.author_username}`}
+                  className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+                >
+                  {(postData as any).author?.username || postData.author_username}
+                </Link>
+              </span>
+              <span>•</span>
+              <span>submitted {new Date(postData.crossposted_at ?? postData.created_at).toLocaleString()}</span>
+            </div>
           </div>
+
+          {/* Post Media */}
           {(mediaUrl || thumbnailUrl) && (
-            <div className="mb-4">
-              {mediaUrl ? (
-                isVideoMedia ? (
-                  <video
-                    controls
-                    className="max-h-[480px] w-full rounded-md"
-                    src={mediaUrl}
-                  />
+            <div className="mb-4 flex flex-col items-start gap-2">
+              <div
+                className="cursor-pointer overflow-hidden rounded border border-[var(--color-border)] transition-all duration-200"
+                style={{
+                  maxHeight: imageExpanded ? '700px' : '240px',
+                  maxWidth: imageExpanded ? '100%' : '360px',
+                  width: imageExpanded ? '100%' : '360px',
+                }}
+                onClick={() => setImageExpanded((prev) => !prev)}
+                title={imageExpanded ? 'Click to shrink' : 'Click to enlarge'}
+              >
+                {mediaUrl ? (
+                  isVideoMedia ? (
+                    <video
+                      controls
+                      className="h-full w-full object-contain"
+                      src={mediaUrl}
+                    />
+                  ) : (
+                    <img
+                      src={mediaUrl}
+                      alt={postData.title}
+                      className={`h-full w-full object-contain transition-transform duration-200 ${
+                        imageExpanded ? '' : 'hover:scale-[1.03]'
+                      }`}
+                    />
+                  )
                 ) : (
                   <img
-                    src={mediaUrl}
+                    src={thumbnailUrl ?? ''}
                     alt={postData.title}
-                    className="w-full rounded-md object-contain"
+                    className={`h-full w-full object-contain transition-transform duration-200 ${
+                      imageExpanded ? '' : 'hover:scale-[1.03]'
+                    }`}
                   />
-                )
-              ) : (
-                <img
-                  src={thumbnailUrl ?? ''}
-                  alt={postData.title}
-                  className="w-full rounded-md object-contain"
-                />
-              )}
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => setImageExpanded((prev) => !prev)}
+                className="text-xs text-[var(--color-primary)] hover:underline"
+              >
+                {imageExpanded ? 'View smaller' : 'View full size'}
+              </button>
             </div>
           )}
+
+          {/* Post Body */}
           {bodyText && (
-            <div className="whitespace-pre-wrap text-sm text-[var(--color-text-primary)]">{bodyText}</div>
+            <div className="mb-4 whitespace-pre-wrap text-sm text-[var(--color-text-primary)]">{bodyText}</div>
           )}
+
+          {/* Post Stats */}
+          <div className="flex gap-4 text-xs text-[var(--color-text-secondary)]">
+            <span>{postData.score} points</span>
+            <span>•</span>
+            <span>{postData.comment_count} comments</span>
+            <span>•</span>
+            <button onClick={handleSharePost} className="hover:underline">
+              share
+            </button>
+            <span>•</span>
+            <button onClick={handleSavePost} className="hover:underline">
+              save
+            </button>
+            <span>•</span>
+            <button onClick={handleHidePost} className="hover:underline">
+              hide
+            </button>
+            <span>•</span>
+            <button onClick={handleCrosspost} className="hover:underline">
+              crosspost
+            </button>
+          </div>
         </div>
       )}
 
-      <div className="mb-8 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-6">
-        <h2 className="mb-4 text-xl font-semibold text-[var(--color-text-primary)]">Discussion</h2>
+      <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-6">
+        <h2 className="mb-4 text-xl font-semibold text-[var(--color-text-primary)]">Comments</h2>
         <form
           onSubmit={(e) => {
             e.preventDefault();
@@ -221,6 +337,59 @@ export default function PostDetailPage() {
             rows={4}
             className="w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-2 text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
           />
+          <div className="mt-2 flex justify-start text-xs text-[var(--color-text-secondary)]">
+            <button
+              type="button"
+              onClick={() => setShowFormattingHelp((prev) => !prev)}
+              className="hover:text-[var(--color-primary)]"
+            >
+              {showFormattingHelp ? 'hide formatting' : 'formatting help'}
+            </button>
+          </div>
+          {showFormattingHelp && (
+            <div className="mt-2 w-[70%] rounded border border-[var(--color-border)] bg-[var(--color-surface)] p-2 text-[13px] text-[var(--color-text-primary)] shadow-sm">
+              <p className="text-sm text-[var(--color-text-primary)]">
+                OmniNudge uses a slightly-customized version of{' '}
+                <a
+                  href="https://www.markdownguide.org/basic-syntax/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[var(--color-primary)] underline"
+                >
+                  Markdown
+                </a>{' '}
+                for formatting. See below for formatting help.
+              </p>
+              <div className="mt-2">
+                <table className="w-full border-collapse text-[13px]">
+                  <thead>
+                    <tr className="bg-[#fff9c4] text-[var(--color-text-primary)]">
+                      <th className="border border-[var(--color-border)] px-1 py-1 text-left font-semibold italic">
+                        you type:
+                      </th>
+                      <th className="border border-[var(--color-border)] px-1 py-1 text-left font-semibold italic">
+                        you see:
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {FORMATTING_EXAMPLES.map((example, index) => (
+                      <tr key={index} className="align-top">
+                        <td className="border border-[var(--color-border)] bg-white px-1 py-1 font-mono text-[11px] text-[var(--color-text-primary)]">
+                          <pre className="m-0 whitespace-pre-wrap text-[11px] leading-tight">
+                            {example.input}
+                          </pre>
+                        </td>
+                        <td className="border border-[var(--color-border)] bg-white px-1 py-1">
+                          <MarkdownRenderer content={example.output} className="leading-tight" />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
           <button
             type="submit"
             disabled={handleCreateComment.isPending || !commentText.trim()}

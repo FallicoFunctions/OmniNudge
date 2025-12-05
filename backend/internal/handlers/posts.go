@@ -13,16 +13,18 @@ import (
 type PostsHandler struct {
 	postRepo     *models.PlatformPostRepository
 	hubRepo      *models.HubRepository
+	userRepo     *models.UserRepository
 	modRepo      *models.HubModeratorRepository
 	feedRepo     *models.FeedRepository
 	notifService *services.NotificationService
 }
 
 // NewPostsHandler creates a new posts handler
-func NewPostsHandler(postRepo *models.PlatformPostRepository, hubRepo *models.HubRepository, modRepo *models.HubModeratorRepository, feedRepo *models.FeedRepository) *PostsHandler {
+func NewPostsHandler(postRepo *models.PlatformPostRepository, hubRepo *models.HubRepository, userRepo *models.UserRepository, modRepo *models.HubModeratorRepository, feedRepo *models.FeedRepository) *PostsHandler {
 	return &PostsHandler{
 		postRepo: postRepo,
 		hubRepo:  hubRepo,
+		userRepo: userRepo,
 		modRepo:  modRepo,
 		feedRepo: feedRepo,
 	}
@@ -207,6 +209,18 @@ func (h *PostsHandler) GetPost(c *gin.Context) {
 
 	// Increment view count
 	_ = h.postRepo.IncrementViewCount(c.Request.Context(), postID)
+
+	// Fetch author username
+	author, err := h.userRepo.GetByID(c.Request.Context(), post.AuthorID)
+	if err == nil && author != nil {
+		post.Author = author
+	}
+
+	// Fetch hub name
+	hub, err := h.hubRepo.GetByID(c.Request.Context(), post.HubID)
+	if err == nil && hub != nil {
+		post.Hub = hub
+	}
 
 	c.JSON(http.StatusOK, post)
 }
