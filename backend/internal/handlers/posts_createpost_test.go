@@ -25,10 +25,11 @@ func setupPostsCreateTest(t *testing.T) (*PostsHandler, *models.HubRepository, *
 
 	hubRepo := models.NewHubRepository(db.Pool)
 	postRepo := models.NewPlatformPostRepository(db.Pool)
+	userRepo := models.NewUserRepository(db.Pool)
 	modRepo := models.NewHubModeratorRepository(db.Pool)
 	feedRepo := models.NewFeedRepository(db.Pool)
 
-	handler := NewPostsHandler(postRepo, hubRepo, modRepo, feedRepo)
+	handler := NewPostsHandler(postRepo, hubRepo, userRepo, modRepo, feedRepo)
 
 	cleanup := func() {
 		db.Close()

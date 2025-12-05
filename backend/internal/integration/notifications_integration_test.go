@@ -34,6 +34,7 @@ func setupNotificationIntegrationTest(t *testing.T) (*gin.Engine, *database.Data
 
 	// Initialize repositories
 	hubRepo := models.NewHubRepository(db.Pool)
+	userRepo := models.NewUserRepository(db.Pool)
 	postRepo := models.NewPlatformPostRepository(db.Pool)
 	commentRepo := models.NewPostCommentRepository(db.Pool)
 	hubModRepo := models.NewHubModeratorRepository(db.Pool)
@@ -60,7 +61,7 @@ func setupNotificationIntegrationTest(t *testing.T) (*gin.Engine, *database.Data
 	feedRepo := models.NewFeedRepository(db.Pool)
 
 	// Initialize handlers
-	postsHandler := handlers.NewPostsHandler(postRepo, hubRepo, hubModRepo, feedRepo)
+	postsHandler := handlers.NewPostsHandler(postRepo, hubRepo, userRepo, hubModRepo, feedRepo)
 	commentsHandler := handlers.NewCommentsHandler(commentRepo, postRepo, hubModRepo)
 	notificationsHandler := handlers.NewNotificationsHandler(notifRepo)
 
@@ -176,7 +177,7 @@ func TestEndToEndPostVoteNotification(t *testing.T) {
 	hubRepo := models.NewHubRepository(db.Pool)
 	userRepo := models.NewUserRepository(db.Pool)
 	anotherFeedRepo := models.NewFeedRepository(db.Pool)
-	postsHandler := handlers.NewPostsHandler(postRepo, hubRepo, nil, anotherFeedRepo)
+	postsHandler := handlers.NewPostsHandler(postRepo, hubRepo, userRepo, nil, anotherFeedRepo)
 	postsHandler.SetNotificationService(notifService)
 
 	postIDStr := strconv.Itoa(postID)

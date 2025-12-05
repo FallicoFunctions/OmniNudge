@@ -111,7 +111,7 @@ func main() {
 	// Initialize handlers
 	authHandler := handlers.NewAuthHandler(authService, userRepo)
 	settingsHandler := handlers.NewSettingsHandler(userSettingsRepo)
-	postsHandler := handlers.NewPostsHandler(postRepo, hubRepo, hubModRepo, feedRepo)
+	postsHandler := handlers.NewPostsHandler(postRepo, hubRepo, userRepo, hubModRepo, feedRepo)
 	commentsHandler := handlers.NewCommentsHandler(commentRepo, postRepo, hubModRepo)
 	redditHandler := handlers.NewRedditHandler(redditClient, redditPostRepo)
 	conversationsHandler := handlers.NewConversationsHandler(conversationRepo, messageRepo, userRepo)
