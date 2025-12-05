@@ -150,9 +150,39 @@ export function CommentItem<T extends LocalCommentBase>({
 
   return (
     <div>
-      <div className="rounded border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-3">
-        <div className="flex items-start justify-between gap-2">
-          <div className="flex items-center gap-2">
+      <div className="flex gap-2">
+        {/* Left column: Voting */}
+        <div className="flex flex-col items-center gap-1 text-sm text-[var(--color-text-secondary)] leading-none pt-1">
+          <button
+            onClick={() => handleVote(1)}
+            disabled={votePending}
+            className={`${
+              comment.user_vote === 1
+                ? 'text-orange-500'
+                : 'text-[var(--color-text-secondary)] hover:text-orange-500'
+            } disabled:opacity-50`}
+            title="Upvote"
+          >
+            ▲
+          </button>
+          <span className="h-1" />
+          <button
+            onClick={() => handleVote(-1)}
+            disabled={votePending}
+            className={`${
+              comment.user_vote === -1
+                ? 'text-blue-500'
+                : 'text-[var(--color-text-secondary)] hover:text-blue-500'
+            } disabled:opacity-50`}
+            title="Downvote"
+          >
+            ▼
+          </button>
+        </div>
+
+        {/* Right column: Content */}
+        <div className="flex-1 text-left">
+          <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--color-text-secondary)]">
             <button
               onClick={() => setIsCollapsed(!isCollapsed)}
               className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] transition-transform duration-200"
@@ -162,70 +192,18 @@ export function CommentItem<T extends LocalCommentBase>({
             >
               ▼
             </button>
-            <div className="text-xs text-[var(--color-text-secondary)]">
-              u/{comment.username} • {new Date(comment.created_at).toLocaleString()}
-              {isCollapsed && replies.length > 0 && (
-                <span className="ml-2 text-[var(--color-text-muted)]">
-                  ({replies.length} {replies.length === 1 ? 'reply' : 'replies'})
-                </span>
-              )}
-            </div>
-          </div>
-        </div>
-        {!isCollapsed && (isEditing ? (
-          <form onSubmit={handleEditSubmit} className="mt-2 space-y-2">
-            <textarea
-              value={editText}
-              onChange={(e) => setEditText(e.target.value)}
-              rows={4}
-              className="w-full rounded border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-[var(--color-text-primary)]"
-            />
-            <div className="flex gap-2">
-              <button
-                type="submit"
-                disabled={editPending || !editText.trim()}
-                className="rounded bg-[var(--color-primary)] px-3 py-1 text-xs font-semibold text-white disabled:opacity-50"
-              >
-                {editPending ? 'Saving...' : 'Save'}
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setIsEditing(false);
-                  setEditText(comment.content);
-                }}
-                className="rounded border border-[var(--color-border)] px-3 py-1 text-xs font-semibold text-[var(--color-text-secondary)]"
-              >
-                Cancel
-              </button>
-            </div>
-          </form>
-        ) : (
-          <div className="mt-2 text-sm text-[var(--color-text-primary)]">{comment.content}</div>
-        ))}
-
-        {!isCollapsed && actionError && (
-          <div className="mt-2 rounded border border-red-200 bg-red-50 p-2 text-xs text-red-700">
-            {actionError}
-          </div>
-        )}
-
-        {!isCollapsed && <div className="mt-2 flex items-center gap-3 text-xs">
-          <div className="flex items-center gap-1">
             <button
-              onClick={() => handleVote(1)}
-              disabled={votePending}
-              className={`${
-                comment.user_vote === 1
-                  ? 'text-orange-500'
-                  : 'text-[var(--color-text-secondary)] hover:text-orange-500'
-              } disabled:opacity-50`}
-              title="Upvote"
+              onClick={() => setIsCollapsed(!isCollapsed)}
+              className="font-semibold text-[var(--color-text-primary)] hover:underline"
             >
-              ▲
+              {comment.username}
             </button>
+            <span className="rounded bg-blue-500 px-1.5 py-0.5 text-[10px] font-bold text-white">
+              Omni
+            </span>
+            <span>•</span>
             <span
-              className={`min-w-[20px] text-center font-semibold ${
+              className={`font-semibold ${
                 comment.user_vote === 1
                   ? 'text-orange-500'
                   : comment.user_vote === -1
@@ -233,104 +211,144 @@ export function CommentItem<T extends LocalCommentBase>({
                   : 'text-[var(--color-text-primary)]'
               }`}
             >
-              {comment.score}
+              {comment.score} {comment.score === 1 ? 'point' : 'points'}
             </span>
-            <button
-              onClick={() => handleVote(-1)}
-              disabled={votePending}
-              className={`${
-                comment.user_vote === -1
-                  ? 'text-blue-500'
-                  : 'text-[var(--color-text-secondary)] hover:text-blue-500'
-              } disabled:opacity-50`}
-              title="Downvote"
-            >
-              ▼
-            </button>
+            <span>•</span>
+            <span>
+              {new Date(comment.created_at).toLocaleString('en-US', {
+                month: 'short',
+                day: 'numeric',
+                hour: 'numeric',
+                minute: '2-digit',
+              })}
+            </span>
+            {isCollapsed && replies.length > 0 && (
+              <span className="ml-2 text-[var(--color-text-muted)]">
+                ({replies.length} {replies.length === 1 ? 'reply' : 'replies'})
+              </span>
+            )}
           </div>
-        </div>}
 
-        {!isCollapsed && <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-[var(--color-text-secondary)]">
-          <button onClick={() => handlers.permalink(comment)} className="hover:text-[var(--color-primary)]">
-            permalink
-          </button>
-          {handlers.embed && (
-            <button onClick={() => handlers.embed?.(comment)} className="hover:text-[var(--color-primary)]">
-              embed
-            </button>
+          {!isCollapsed && (isEditing ? (
+            <form onSubmit={handleEditSubmit} className="mt-1 space-y-2">
+              <textarea
+                value={editText}
+                onChange={(e) => setEditText(e.target.value)}
+                rows={4}
+                className="w-full rounded border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-[var(--color-text-primary)]"
+              />
+              <div className="flex gap-2">
+                <button
+                  type="submit"
+                  disabled={editPending || !editText.trim()}
+                  className="rounded bg-[var(--color-primary)] px-3 py-1 text-xs font-semibold text-white disabled:opacity-50"
+                >
+                  {editPending ? 'Saving...' : 'Save'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsEditing(false);
+                    setEditText(comment.content);
+                  }}
+                  className="rounded border border-[var(--color-border)] px-3 py-1 text-xs font-semibold text-[var(--color-text-secondary)]"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          ) : (
+            <div className="mt-1 text-left text-sm text-[var(--color-text-primary)]">{comment.content}</div>
+          ))}
+
+          {!isCollapsed && actionError && (
+            <div className="mt-2 rounded border border-red-200 bg-red-50 p-2 text-xs text-red-700">
+              {actionError}
+            </div>
           )}
-          <button
-            onClick={handleToggleSave}
-            disabled={savePending}
-            className="hover:text-[var(--color-primary)] disabled:opacity-50"
-          >
-            {isSaved ? 'unsave' : 'save'}
-          </button>
-          {isOwner ? (
-            <>
-              <button onClick={() => setIsEditing(true)} className="hover:text-[var(--color-primary)]">
-                edit
+
+          {!isCollapsed && <div className="mt-2 flex flex-wrap items-center gap-3 text-left text-xs text-[var(--color-text-secondary)]">
+            <button onClick={() => handlers.permalink(comment)} className="hover:text-[var(--color-primary)]">
+              permalink
+            </button>
+            {handlers.embed && (
+              <button onClick={() => handlers.embed?.(comment)} className="hover:text-[var(--color-primary)]">
+                embed
               </button>
+            )}
+            <button
+              onClick={handleToggleSave}
+              disabled={savePending}
+              className="hover:text-[var(--color-primary)] disabled:opacity-50"
+            >
+              {isSaved ? 'unsave' : 'save'}
+            </button>
+            {isOwner ? (
+              <>
+                <button onClick={() => setIsEditing(true)} className="hover:text-[var(--color-primary)]">
+                  edit
+                </button>
+                <button
+                  onClick={handleInboxToggle}
+                  disabled={inboxPending}
+                  className="hover:text-[var(--color-primary)] disabled:opacity-50"
+                >
+                  {inboxDisabled ? 'enable inbox replies' : 'disable inbox replies'}
+                </button>
+                <button
+                  onClick={handleDelete}
+                  disabled={deletePending}
+                  className="text-red-500 hover:text-red-600 disabled:opacity-50"
+                >
+                  delete
+                </button>
+              </>
+            ) : (
               <button
-                onClick={handleInboxToggle}
-                disabled={inboxPending}
-                className="hover:text-[var(--color-primary)] disabled:opacity-50"
-              >
-                {inboxDisabled ? 'enable inbox replies' : 'disable inbox replies'}
-              </button>
-              <button
-                onClick={handleDelete}
-                disabled={deletePending}
+                onClick={handleReport}
+                disabled={reportPending}
                 className="text-red-500 hover:text-red-600 disabled:opacity-50"
               >
-                delete
+                report
               </button>
-            </>
-          ) : (
+            )}
             <button
-              onClick={handleReport}
-              disabled={reportPending}
-              className="text-red-500 hover:text-red-600 disabled:opacity-50"
+              onClick={() => onReplySelect(comment.id)}
+              className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
             >
-              report
+              Reply
             </button>
-          )}
-          <button
-            onClick={() => onReplySelect(comment.id)}
-            className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
-          >
-            Reply
-          </button>
-        </div>}
+          </div>}
 
-        {!isCollapsed && isReplying && (
-          <form onSubmit={handleReplySubmit} className="mt-3">
-            <textarea
-              value={replyText}
-              onChange={(e) => setReplyText(e.target.value)}
-              placeholder="Write your reply..."
-              rows={3}
-              autoFocus
-              className="w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
-            />
-            <div className="mt-2 flex gap-2">
-              <button
-                type="submit"
-                disabled={replyPending || !replyText.trim()}
-                className="rounded-md bg-[var(--color-primary)] px-3 py-1 text-xs font-semibold text-white hover:bg-[var(--color-primary-dark)] disabled:opacity-50"
-              >
-                {replyPending ? 'Posting...' : 'Post Reply'}
-              </button>
-              <button
-                type="button"
-                onClick={onCancelReply}
-                className="rounded-md border border-[var(--color-border)] px-3 py-1 text-xs font-semibold text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-elevated)]"
-              >
-                Cancel
-              </button>
-            </div>
-          </form>
-        )}
+          {!isCollapsed && isReplying && (
+            <form onSubmit={handleReplySubmit} className="mt-3">
+              <textarea
+                value={replyText}
+                onChange={(e) => setReplyText(e.target.value)}
+                placeholder="Write your reply..."
+                rows={3}
+                autoFocus
+                className="w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
+              />
+              <div className="mt-2 flex gap-2">
+                <button
+                  type="submit"
+                  disabled={replyPending || !replyText.trim()}
+                  className="rounded-md bg-[var(--color-primary)] px-3 py-1 text-xs font-semibold text-white hover:bg-[var(--color-primary-dark)] disabled:opacity-50"
+                >
+                  {replyPending ? 'Posting...' : 'Post Reply'}
+                </button>
+                <button
+                  type="button"
+                  onClick={onCancelReply}
+                  className="rounded-md border border-[var(--color-border)] px-3 py-1 text-xs font-semibold text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-elevated)]"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          )}
+        </div>
       </div>
 
       {!isCollapsed && replies.length > 0 && (
