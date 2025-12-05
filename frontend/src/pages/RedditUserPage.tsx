@@ -127,19 +127,11 @@ export default function RedditUserPage() {
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-8">
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-[var(--color-text-primary)]">u/{username}</h1>
-          <p className="mt-2 text-sm text-[var(--color-text-secondary)]">
-            Recent posts shared by this Reddit user.
-          </p>
-        </div>
-        <button
-          onClick={() => navigate(-1)}
-          className="rounded-md border border-[var(--color-border)] px-3 py-1 text-sm text-[var(--color-text-primary)] hover:border-[var(--color-primary)]"
-        >
-          Go back
-        </button>
+      <div className="mb-6">
+        <h1 className="text-3xl font-bold text-[var(--color-text-primary)]">u/{username}</h1>
+        <p className="mt-2 text-sm text-[var(--color-text-secondary)]">
+          Recent posts shared by this Reddit user.
+        </p>
       </div>
 
       {isLoading && (
