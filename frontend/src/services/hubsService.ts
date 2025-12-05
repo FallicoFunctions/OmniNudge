@@ -57,6 +57,10 @@ export interface LocalSubredditPost {
     username?: string | null;
   } | null;
   hub_id: number;
+  hub_name?: string | null;
+  hub?: {
+    name?: string | null;
+  } | null;
   title: string;
   body?: string | null;
   tags?: string[] | null;

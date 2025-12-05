@@ -5,6 +5,11 @@ export interface HubSubscription {
   user_id: number;
   hub_id: number;
   subscribed_at: string;
+  hub_name?: string;
+  hub?: {
+    name?: string | null;
+    title?: string | null;
+  } | null;
 }
 
 export interface SubredditSubscription {
