@@ -10,6 +10,7 @@ import type { LocalRedditComment } from '../types/reddit';
 import { formatTimestamp, formatRelativeTime } from '../utils/timeFormat';
 import { createRedditCrosspostPayload } from '../utils/crosspostHelpers';
 import { MarkdownRenderer } from '../components/common/MarkdownRenderer';
+import { useRedditBlocklist } from '../contexts/RedditBlockContext';
 
 interface RedditComment {
   kind: string;
@@ -101,6 +102,7 @@ function RedditCommentView({
   onToggleInbox,
   onReport,
   useRelativeTime,
+  isRedditUserBlocked,
 }: {
   comment: RedditComment;
   depth?: number;
@@ -120,6 +122,7 @@ function RedditCommentView({
   onToggleInbox: (commentId: number, nextValue: boolean) => Promise<void>;
   onReport: (commentId: number) => Promise<void>;
   useRelativeTime: boolean;
+  isRedditUserBlocked: (username?: string | null) => boolean;
 }) {
   const queryClient = useQueryClient();
   const [collapsed, setCollapsed] = useState(false);
@@ -136,6 +139,7 @@ function RedditCommentView({
       minute: '2-digit',
     });
   }, [comment.data.created_utc, useRelativeTime]);
+  const authorBlocked = isRedditUserBlocked(comment.data.author);
 
   const createReplyMutation = useMutation({
     mutationFn: async (content: string) => {
@@ -237,7 +241,11 @@ function RedditCommentView({
 
         {!collapsed && (
           <>
-            <MarkdownRenderer content={comment.data.body ?? ''} className="mt-1" />
+            {authorBlocked ? (
+              <div className="mt-1 text-sm italic text-[var(--color-text-muted)]">[BLOCKED]</div>
+            ) : (
+              <MarkdownRenderer content={comment.data.body ?? ''} className="mt-1" />
+            )}
 
             {/* Action buttons - left aligned */}
             <div className="mt-2 flex gap-3 text-xs text-[var(--color-text-secondary)]">
@@ -310,27 +318,28 @@ function RedditCommentView({
               <div className="mt-3 space-y-3">
                 {/* Show Reddit API replies */}
                 {replies.map((reply, index) => (
-                  <RedditCommentView
-                    key={reply.data?.id || index}
-                    comment={reply}
-                    depth={depth + 1}
-                    localComments={localComments}
-                    subreddit={subreddit}
-                    postId={postId}
-                    replyingTo={replyingTo}
-                    onReply={onReply}
-                    onCancelReply={onCancelReply}
-                    currentUsername={currentUsername}
-                    onPermalink={onPermalink}
-                    onEmbed={onEmbed}
-                    onToggleSave={onToggleSave}
-                    savedCommentIds={savedCommentIds}
-                    onEdit={onEdit}
-                    onDelete={onDelete}
-                    onToggleInbox={onToggleInbox}
-                    onReport={onReport}
-                    useRelativeTime={useRelativeTime}
-                  />
+                <RedditCommentView
+                  key={reply.data?.id || index}
+                  comment={reply}
+                  depth={depth + 1}
+                  localComments={localComments}
+                  subreddit={subreddit}
+                  postId={postId}
+                  replyingTo={replyingTo}
+                  onReply={onReply}
+                  onCancelReply={onCancelReply}
+                  currentUsername={currentUsername}
+                  onPermalink={onPermalink}
+                  onEmbed={onEmbed}
+                  onToggleSave={onToggleSave}
+                  savedCommentIds={savedCommentIds}
+                  onEdit={onEdit}
+                  onDelete={onDelete}
+                  onToggleInbox={onToggleInbox}
+                  onReport={onReport}
+                  isRedditUserBlocked={isRedditUserBlocked}
+                  useRelativeTime={useRelativeTime}
+                />
                 ))}
 
                 {/* Show local comment replies */}
@@ -760,10 +769,11 @@ function LocalCommentView({
 }
 
 export default function RedditPostPage() {
-  const { subreddit, postId, commentId } = useParams<{ subreddit: string; postId: string; commentId?: string }>();
-  const navigate = useNavigate();
-  const { user } = useAuth();
-  const { useRelativeTime } = useSettings();
+const { subreddit, postId, commentId } = useParams<{ subreddit: string; postId: string; commentId?: string }>();
+const navigate = useNavigate();
+const { user } = useAuth();
+const { useRelativeTime } = useSettings();
+const { isRedditUserBlocked, blockRedditUser, unblockRedditUser } = useRedditBlocklist();
   const queryClient = useQueryClient();
   const focusedCommentId = commentId ? Number(commentId) : null;
   const [commentText, setCommentText] = useState('');
@@ -854,7 +864,8 @@ export default function RedditPostPage() {
     enabled: !!subreddit && !!postId,
   });
 
-  const post = redditData?.post;
+const post = redditData?.post;
+const isPostAuthorBlocked = post ? isRedditUserBlocked(post.author) : false;
   const redditComments = redditData?.comments || [];
 
   // Fetch local comments for this Reddit post (stored on our platform)
@@ -1259,65 +1270,90 @@ export default function RedditPostPage() {
       {/* Post Content Section */}
       {post && !isPostHidden && (
         <div className="mb-6 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-6 text-left">
-          {/* Post Header */}
-          <div className="mb-4 text-left">
-            <h1 className="text-left text-2xl font-bold text-[var(--color-text-primary)]">
-              {post.title}
-            </h1>
-            <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-[var(--color-text-secondary)]">
-              <Link
-                to={`/reddit/r/${post.subreddit}`}
-                className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
-              >
-                r/{post.subreddit}
-              </Link>
-              <span>•</span>
-              <span>
-                Posted by{' '}
-                <Link
-                  to={`/reddit/user/${post.author}`}
-                  className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
-                >
-                  u/{post.author}
-                </Link>
-              </span>
-              <span>•</span>
-              <span>submitted {formatTimestamp(post.created_utc, useRelativeTime)}</span>
-            </div>
-          </div>
-
-          {/* Post Media/Content */}
-          {post.post_hint === 'image' && post.url && (
-            <div className="mb-4 flex flex-col items-start gap-2">
-              <div
-                className="cursor-pointer overflow-hidden rounded border border-[var(--color-border)] transition-all duration-200"
-                style={{
-                  maxHeight: imageExpanded ? '700px' : '240px',
-                  maxWidth: imageExpanded ? '100%' : '360px',
-                  width: imageExpanded ? '100%' : '360px',
-                }}
-                onClick={() => setImageExpanded((prev) => !prev)}
-                title={imageExpanded ? 'Click to shrink' : 'Click to enlarge'}
-              >
-                <img
-                  src={post.url}
-                  alt={post.title}
-                  className={`h-full w-full object-contain transition-transform duration-200 ${
-                    imageExpanded ? '' : 'hover:scale-[1.03]'
-                  }`}
-                />
-              </div>
+          {isPostAuthorBlocked ? (
+            <div className="text-sm text-[var(--color-text-secondary)]">
+              You blocked u/{post.author}. This post is hidden.
               <button
                 type="button"
-                onClick={() => setImageExpanded((prev) => !prev)}
-                className="text-xs text-[var(--color-primary)] hover:underline"
+                onClick={() => unblockRedditUser(post.author)}
+                className="ml-3 text-[var(--color-primary)] hover:underline"
               >
-                {imageExpanded ? 'View smaller' : 'View full size'}
+                Unblock user
               </button>
             </div>
-          )}
+          ) : (
+            <>
+              {/* Post Header */}
+              <div className="mb-4 text-left">
+                <h1 className="text-left text-2xl font-bold text-[var(--color-text-primary)]">
+                  {post.title}
+                </h1>
+                <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-[var(--color-text-secondary)]">
+                  <Link
+                    to={`/reddit/r/${post.subreddit}`}
+                    className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+                  >
+                    r/{post.subreddit}
+                  </Link>
+                  <span>•</span>
+                  <span>
+                    Posted by{' '}
+                    <Link
+                      to={`/reddit/user/${post.author}`}
+                      className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+                    >
+                      u/{post.author}
+                    </Link>
+                  </span>
+                  <span>•</span>
+                  <span>submitted {formatTimestamp(post.created_utc, useRelativeTime)}</span>
+                  {!isPostAuthorBlocked && (
+                    <>
+                      <span>•</span>
+                      <button
+                        type="button"
+                        onClick={() => blockRedditUser(post.author)}
+                        className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+                      >
+                        block user
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
 
-          {post.is_self && post.selftext && (
+              {/* Post Media/Content */}
+              {post.post_hint === 'image' && post.url && (
+                <div className="mb-4 flex flex-col items-start gap-2">
+                  <div
+                    className="cursor-pointer overflow-hidden rounded border border-[var(--color-border)] transition-all duration-200"
+                    style={{
+                      maxHeight: imageExpanded ? '700px' : '240px',
+                      maxWidth: imageExpanded ? '100%' : '360px',
+                      width: imageExpanded ? '100%' : '360px',
+                    }}
+                    onClick={() => setImageExpanded((prev) => !prev)}
+                    title={imageExpanded ? 'Click to shrink' : 'Click to enlarge'}
+                  >
+                    <img
+                      src={post.url}
+                      alt={post.title}
+                      className={`h-full w-full object-contain transition-transform duration-200 ${
+                        imageExpanded ? '' : 'hover:scale-[1.03]'
+                      }`}
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setImageExpanded((prev) => !prev)}
+                    className="text-xs text-[var(--color-primary)] hover:underline"
+                  >
+                    {imageExpanded ? 'View smaller' : 'View full size'}
+                  </button>
+                </div>
+              )}
+
+              {post.is_self && post.selftext && (
             <div className="mb-4 text-sm text-[var(--color-text-primary)] text-left leading-normal">
               {post.selftext.split('\n\n').map((paragraph, i, arr) => (
                 <p key={i} className={i < arr.length - 1 ? 'mb-3' : ''}>
@@ -1364,7 +1400,7 @@ export default function RedditPostPage() {
               className="hover:underline"
               disabled={savePostMutation.isPending}
             >
-              {savePostMutation.isPending ? 'saving...' : (isPostSavedFromBackend ? 'unsave' : 'save')}
+              {savePostMutation.isPending ? 'saving...' : isPostSavedFromBackend ? 'unsave' : 'save'}
             </button>
             <span>•</span>
             <button onClick={() => setShowHideConfirm(true)} className="hover:underline">
@@ -1375,7 +1411,8 @@ export default function RedditPostPage() {
               crosspost
             </button>
           </div>
-        </div>
+        </>
+      </div>
       )}
 
       {/* Unified Comments Section */}
@@ -1551,6 +1588,7 @@ export default function RedditPostPage() {
                 onDelete={handleDeleteComment}
                 onToggleInbox={handleToggleInbox}
                 onReport={handleReportComment}
+                isRedditUserBlocked={isRedditUserBlocked}
                 useRelativeTime={useRelativeTime}
               />
             );

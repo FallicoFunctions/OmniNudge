@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { savedService } from '../services/savedService';
 import type { HiddenItemsResponse, SavedPost, SavedRedditPost } from '../types/saved';
 import { api } from '../lib/api';
+import { useRedditBlocklist } from '../contexts/RedditBlockContext';
 
 type RedditListingData = {
   data?: {
@@ -25,6 +26,7 @@ type TabKey = 'omni' | 'reddit';
 export default function HiddenPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { isRedditUserBlocked, unblockRedditUser } = useRedditBlocklist();
   const emptyData: HiddenItemsResponse = { type: 'all', hidden_posts: [], hidden_reddit_posts: [] };
   const [loadError, setLoadError] = useState<Error | null>(null);
   const [activeTab, setActiveTab] = useState<TabKey>('omni');
@@ -221,59 +223,24 @@ export default function HiddenPage() {
           hasDetails && typeof mergedPost.num_comments === 'number'
             ? `${mergedPost.num_comments.toLocaleString()} Comments`
             : 'View Comments';
+        const mergedAuthorName = (mergedPost.author ?? '').trim();
+        const isAuthorBlocked = mergedAuthorName ? isRedditUserBlocked(mergedAuthorName) : false;
 
         return (
           <article className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)]">
-            <div className="flex gap-3 p-3">
-              <div className="flex flex-col items-start gap-2">
-                <span className="rounded-full bg-[var(--color-surface-elevated)] px-2 py-0.5 text-[11px] font-semibold uppercase text-[var(--color-text-muted)]">
-                  Reddit Post
-                </span>
-                {thumbnail && (
-                  <img src={thumbnail} alt="" className="h-14 w-14 flex-shrink-0 rounded object-cover" />
-                )}
-              </div>
-              <div className="flex-1">
-                <Link to={postUrl}>
-                  <h3 className="text-base font-semibold text-[var(--color-text-primary)] hover:text-[var(--color-primary)] text-left">
-                    {hasDetails ? mergedPost.title : `r/${post.subreddit}`}
-                  </h3>
-                </Link>
-                {!hasDetails && (
-                  <p className="text-xs text-[var(--color-text-muted)]">Fetching latest Reddit data...</p>
-                )}
-                <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-[var(--color-text-secondary)]">
-                  {metaItems.map((item, index) => (
-                    <Fragment key={`${postKey}-meta-${item.label}-${index}`}>
-                      {index > 0 && <span>•</span>}
-                      {item.to ? (
-                        <Link to={item.to} className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]">
-                          {item.label}
-                        </Link>
-                      ) : (
-                        <span
-                          className={
-                            item.label === 'Fetching latest details…'
-                              ? 'italic text-[var(--color-text-muted)]'
-                              : undefined
-                          }
-                        >
-                          {item.label}
-                        </span>
-                      )}
-                    </Fragment>
-                  ))}
-                </div>
-                <div className="mt-1 flex flex-wrap items-center gap-3 text-[11px] text-[var(--color-text-secondary)]">
-                  <Link to={postUrl} className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]">
-                    {commentLinkLabel}
-                  </Link>
+            {isAuthorBlocked ? (
+              <div className="space-y-3 p-3 text-[11px] text-[var(--color-text-secondary)]">
+                <div className="text-sm font-semibold text-[var(--color-text-primary)]">Reddit Post (blocked)</div>
+                <p className="text-sm text-[var(--color-text-secondary)]">
+                  Content from u/{mergedAuthorName} is hidden because you blocked this Reddit user.
+                </p>
+                <div className="flex flex-wrap items-center gap-3">
                   <button
                     type="button"
-                    onClick={() => handleShareRedditPost(mergedPost)}
-                    className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+                    onClick={() => unblockRedditUser(mergedAuthorName)}
+                    className="text-[var(--color-primary)] hover:underline"
                   >
-                    Share
+                    Unblock user
                   </button>
                   <button
                     type="button"
@@ -288,16 +255,84 @@ export default function HiddenPage() {
                   >
                     {unhideRedditPostMutation.isPending ? 'Unhiding…' : 'Unhide'}
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => navigate(postUrl)}
-                    className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
-                  >
-                    Crosspost
-                  </button>
                 </div>
               </div>
-            </div>
+            ) : (
+              <div className="flex gap-3 p-3">
+                <div className="flex flex-col items-start gap-2">
+                  <span className="rounded-full bg-[var(--color-surface-elevated)] px-2 py-0.5 text-[11px] font-semibold uppercase text-[var(--color-text-muted)]">
+                    Reddit Post
+                  </span>
+                  {thumbnail && (
+                    <img src={thumbnail} alt="" className="h-14 w-14 flex-shrink-0 rounded object-cover" />
+                  )}
+                </div>
+                <div className="flex-1">
+                  <Link to={postUrl}>
+                    <h3 className="text-base font-semibold text-[var(--color-text-primary)] hover:text-[var(--color-primary)] text-left">
+                      {hasDetails ? mergedPost.title : `r/${post.subreddit}`}
+                    </h3>
+                  </Link>
+                  {!hasDetails && (
+                    <p className="text-xs text-[var(--color-text-muted)]">Fetching latest Reddit data...</p>
+                  )}
+                  <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-[var(--color-text-secondary)]">
+                    {metaItems.map((item, index) => (
+                      <Fragment key={`${postKey}-meta-${item.label}-${index}`}>
+                        {index > 0 && <span>•</span>}
+                        {item.to ? (
+                          <Link to={item.to} className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]">
+                            {item.label}
+                          </Link>
+                        ) : (
+                          <span
+                            className={
+                              item.label === 'Fetching latest details…'
+                                ? 'italic text-[var(--color-text-muted)]'
+                                : undefined
+                            }
+                          >
+                            {item.label}
+                          </span>
+                        )}
+                      </Fragment>
+                    ))}
+                  </div>
+                  <div className="mt-1 flex flex-wrap items-center gap-3 text-[11px] text-[var(--color-text-secondary)]">
+                    <Link to={postUrl} className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]">
+                      {commentLinkLabel}
+                    </Link>
+                    <button
+                      type="button"
+                      onClick={() => handleShareRedditPost(mergedPost)}
+                      className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+                    >
+                      Share
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        unhideRedditPostMutation.mutate({
+                          subreddit: post.subreddit,
+                          reddit_post_id: post.reddit_post_id,
+                        })
+                      }
+                      disabled={unhideRedditPostMutation.isPending}
+                      className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] disabled:opacity-50"
+                    >
+                      {unhideRedditPostMutation.isPending ? 'Unhiding…' : 'Unhide'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => navigate(postUrl)}
+                      className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+                    >
+                      Crosspost
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </article>
         );
       })(),

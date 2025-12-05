@@ -219,6 +219,10 @@ func main() {
 			reddit.GET("/r/:subreddit/media", redditHandler.GetSubredditMedia)
 			reddit.GET("/r/:subreddit/comments/:postId", redditHandler.GetPostComments)
 			reddit.GET("/search", redditHandler.SearchPosts)
+			reddit.GET("/user/:username/about", redditHandler.GetRedditUserAbout)
+			reddit.GET("/user/:username/trophies", redditHandler.GetRedditUserTrophies)
+			reddit.GET("/user/:username/moderated", redditHandler.GetRedditUserModerated)
+			reddit.GET("/user/:username/:section", redditHandler.GetRedditUserListing)
 
 			// Local comments on Reddit posts (site-only comments)
 			reddit.GET("/posts/:subreddit/:postId/comments", redditCommentsHandler.GetRedditPostComments)
