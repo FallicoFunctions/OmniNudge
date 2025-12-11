@@ -262,12 +262,18 @@ td .markdown-content pre {
 
 .markdown-content img {
   display: block;
-  max-width: 100%;
+  max-width: 120px;
   height: auto;
   border-radius: 0.375rem;
   margin: 0.75rem 0;
   border: 1px solid var(--color-border);
   background-color: var(--color-surface);
+  cursor: pointer;
+  transition: max-width 0.2s ease;
+}
+
+.markdown-content img.expanded {
+  max-width: 100%;
 }
 
 .markdown-content table {
