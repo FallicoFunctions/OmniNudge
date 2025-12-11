@@ -11,6 +11,8 @@ const boldRegex = /\*\*(.+?)\*\*/g;
 const italicsRegex = /\*(.+?)\*/g;
 const strikeRegex = /~~(.+?)~~/g;
 const superscriptRegex = /(\S+)\^(\S+)/g;
+const subredditRegex = /(?:^|\s)(r\/[A-Za-z0-9_]+)/g;
+const userRegex = /(?:^|\s)(u\/[A-Za-z0-9_-]+)/g;
 const IMAGE_URL_REGEX = /\.(jpe?g|png|gif|webp)(?:\?.*)?$/i;
 const REDDIT_IMAGE_HOSTS = new Set(['preview.redd.it', 'i.redd.it', 'i.imgur.com']);
 
@@ -97,6 +99,16 @@ function formatInline(text: string): string {
         label
       )}</a>`
   );
+  // Replace r/subreddit with links
+  result = result.replace(subredditRegex, (match, subreddit) => {
+    const prefix = match.startsWith(' ') ? ' ' : '';
+    return `${prefix}<a href="/reddit/${subreddit}" class="text-[var(--color-primary)] hover:underline">${subreddit}</a>`;
+  });
+  // Replace u/username with links
+  result = result.replace(userRegex, (match, username) => {
+    const prefix = match.startsWith(' ') ? ' ' : '';
+    return `${prefix}<a href="/reddit/${username}" class="text-[var(--color-primary)] hover:underline">${username}</a>`;
+  });
   return result;
 }
 
