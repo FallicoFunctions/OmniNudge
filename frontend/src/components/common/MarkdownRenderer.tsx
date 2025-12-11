@@ -14,6 +14,15 @@ const superscriptRegex = /(\S+)\^(\S+)/g;
 const IMAGE_URL_REGEX = /\.(jpe?g|png|gif|webp)(?:\?.*)?$/i;
 const REDDIT_IMAGE_HOSTS = new Set(['preview.redd.it', 'i.redd.it', 'i.imgur.com']);
 
+function decodeHtmlEntities(value: string): string {
+  return value
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&amp;/g, '&');
+}
+
 function escapeHtml(value: string): string {
   return value
     .replace(/&/g, '&amp;')
@@ -93,7 +102,9 @@ function formatInline(text: string): string {
 
 function convertMarkdown(markdown?: string | null): string {
   if (!markdown) return '';
-  const lines = markdown.replaceAll('\r\n', '\n').split('\n');
+  // Decode HTML entities first (Reddit comments often come with encoded entities)
+  const decoded = decodeHtmlEntities(markdown);
+  const lines = decoded.replaceAll('\r\n', '\n').split('\n');
   const html: string[] = [];
 
   let inList = false;
