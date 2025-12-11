@@ -15,9 +15,39 @@ export interface RedditCrosspostSource {
       resolutions?: Array<{ url?: string }>;
     }>;
   };
+  media?: {
+    reddit_video?: {
+      fallback_url?: string;
+      dash_url?: string;
+      hls_url?: string;
+      height?: number;
+      width?: number;
+    };
+    oembed?: {
+      thumbnail_url?: string;
+      thumbnail_width?: number;
+      thumbnail_height?: number;
+    };
+  };
+  secure_media?: {
+    reddit_video?: {
+      fallback_url?: string;
+      dash_url?: string;
+      hls_url?: string;
+      height?: number;
+      width?: number;
+    };
+    oembed?: {
+      thumbnail_url?: string;
+      thumbnail_width?: number;
+      thumbnail_height?: number;
+    };
+  };
 }
 
 const imageExtensionRegex = /\.(jpe?g|png|gif|webp)$/i;
+const REDDIT_DOMAIN_PATTERN = /(?:^|\.)reddit\.com$/i;
+const REDDIT_SHORT_DOMAIN_PATTERN = /(?:^|\.)redd\.it$/i;
 
 export function sanitizeHttpUrl(url?: string | null): string | undefined {
   if (!url) return undefined;
@@ -34,6 +64,34 @@ function extractPreviewImageUrl(post: RedditCrosspostSource): string | undefined
     return sanitizeHttpUrl(previewUrl);
   }
   return undefined;
+}
+
+function extractHostname(value?: string | null): string | null {
+  if (!value) return null;
+  try {
+    const url = new URL(value);
+    return url.hostname;
+  } catch {
+    return null;
+  }
+}
+
+export function getDisplayDomain(value?: string | null): string | null {
+  const hostname = extractHostname(value);
+  return hostname ? hostname.replace(/^www\./i, '') : null;
+}
+
+export function isRedditDomain(value?: string | null): boolean {
+  if (!value) return false;
+  const hostname = value.includes('/') ? extractHostname(value) : value;
+  if (!hostname) return false;
+  const normalized = hostname.toLowerCase();
+  return (
+    normalized === 'redd.it' ||
+    normalized.endsWith('.redd.it') ||
+    normalized === 'reddit.com' ||
+    normalized.endsWith('.reddit.com')
+  );
 }
 
 export function createRedditCrosspostPayload(
