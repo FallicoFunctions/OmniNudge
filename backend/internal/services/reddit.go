@@ -49,27 +49,30 @@ func (r *RedditClient) SetHTTPClient(client *http.Client) {
 
 // RedditPost represents a post from Reddit's API
 type RedditPost struct {
-	ID               string         `json:"id"`
-	Subreddit        string         `json:"subreddit"`
-	Title            string         `json:"title"`
-	Author           string         `json:"author"`
-	Selftext         string         `json:"selftext"`      // Post body text
-	URL              string         `json:"url"`           // Link or media URL
-	Permalink        string         `json:"permalink"`     // Reddit URL
-	Thumbnail        string         `json:"thumbnail"`     // Thumbnail URL
-	Score            int            `json:"score"`         // Upvotes - downvotes
-	NumComments      int            `json:"num_comments"`  // Comment count
-	CreatedUTC       float64        `json:"created_utc"`   // Unix timestamp
-	Over18           bool           `json:"over_18"`       // NSFW flag
-	PostHint         string         `json:"post_hint"`     // Type hint: image, video, link, etc.
-	IsVideo          bool           `json:"is_video"`      // Is it a video
-	IsSelf           bool           `json:"is_self"`       // Is it a text post
-	Distinguished    *string        `json:"distinguished"` // Mod/admin flag
-	Stickied         bool           `json:"stickied"`      // Pinned post
-	Domain           string         `json:"domain"`        // Source domain
-	MediaEmbed       MediaEmbed     `json:"media_embed"`   // Embedded media
-	SecureMediaEmbed MediaEmbed     `json:"secure_media_embed"`
-	Preview          *RedditPreview `json:"preview"` // Preview images for link posts
+	ID                       string         `json:"id"`
+	Subreddit                string         `json:"subreddit"`
+	Title                    string         `json:"title"`
+	Author                   string         `json:"author"`
+	Selftext                 string         `json:"selftext"`     // Post body text
+	URL                      string         `json:"url"`          // Link or media URL
+	Permalink                string         `json:"permalink"`    // Reddit URL
+	Thumbnail                string         `json:"thumbnail"`    // Thumbnail URL
+	Score                    int            `json:"score"`        // Upvotes - downvotes
+	NumComments              int            `json:"num_comments"` // Comment count
+	CreatedUTC               float64        `json:"created_utc"`  // Unix timestamp
+	Over18                   bool           `json:"over_18"`      // NSFW flag
+	PostHint                 string         `json:"post_hint"`    // Type hint: image, video, link, etc.
+	IsVideo                  bool           `json:"is_video"`     // Is it a video
+	IsSelf                   bool           `json:"is_self"`      // Is it a text post
+	LinkFlairText            string         `json:"link_flair_text"`
+	LinkFlairBackgroundColor string         `json:"link_flair_background_color"`
+	LinkFlairTextColor       string         `json:"link_flair_text_color"`
+	Distinguished            *string        `json:"distinguished"` // Mod/admin flag
+	Stickied                 bool           `json:"stickied"`      // Pinned post
+	Domain                   string         `json:"domain"`        // Source domain
+	MediaEmbed               MediaEmbed     `json:"media_embed"`   // Embedded media
+	SecureMediaEmbed         MediaEmbed     `json:"secure_media_embed"`
+	Preview                  *RedditPreview `json:"preview"` // Preview images for link posts
 }
 
 // MediaEmbed represents embedded media from Reddit
@@ -128,19 +131,19 @@ type redditGenericListing struct {
 
 // RedditUserComment represents a Reddit comment returned from a user listing
 type RedditUserComment struct {
-	ID            string  `json:"id"`
-	Body          string  `json:"body"`
-	Author        string  `json:"author"`
-	Subreddit     string  `json:"subreddit"`
-	Score         int     `json:"score"`
-	CreatedUTC    float64 `json:"created_utc"`
-	Permalink     string  `json:"permalink"`
-	ParentID      string  `json:"parent_id"`
-	LinkID        string  `json:"link_id"`
-	LinkTitle     string  `json:"link_title"`
-	LinkPermalink string  `json:"link_permalink"`
-	LinkAuthor    string  `json:"link_author"`
-	LinkNumComments int   `json:"link_num_comments"`
+	ID              string  `json:"id"`
+	Body            string  `json:"body"`
+	Author          string  `json:"author"`
+	Subreddit       string  `json:"subreddit"`
+	Score           int     `json:"score"`
+	CreatedUTC      float64 `json:"created_utc"`
+	Permalink       string  `json:"permalink"`
+	ParentID        string  `json:"parent_id"`
+	LinkID          string  `json:"link_id"`
+	LinkTitle       string  `json:"link_title"`
+	LinkPermalink   string  `json:"link_permalink"`
+	LinkAuthor      string  `json:"link_author"`
+	LinkNumComments int     `json:"link_num_comments"`
 }
 
 // RedditUserItem represents either a post or comment in a user listing

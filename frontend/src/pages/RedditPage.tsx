@@ -24,6 +24,7 @@ import {
   type RedditCrosspostSource,
 } from '../utils/crosspostHelpers';
 import type { SubredditSuggestion } from '../types/reddit';
+import { FlairBadge } from '../components/reddit/FlairBadge';
 
 interface FeedRedditPost extends RedditCrosspostSource {
   id: string;
@@ -815,6 +816,11 @@ export default function RedditPage() {
                           {post.title}
                         </Link>
                       )}
+                      <FlairBadge
+                        text={post.link_flair_text}
+                        backgroundColor={post.link_flair_background_color}
+                        textColor={post.link_flair_text_color}
+                      />
                       {isExternalLink && (
                         <a
                           href={sanitizedExternalUrl}
