@@ -5,11 +5,14 @@ interface MarkdownRendererProps {
   className?: string;
 }
 
+const imageRegex = /!\[([^\]]*)]\(([^)]+)\)/g;
 const linkRegex = /\[([^\]]+)]\((https?:\/\/[^\s)]+)\)/g;
 const boldRegex = /\*\*(.+?)\*\*/g;
 const italicsRegex = /\*(.+?)\*/g;
 const strikeRegex = /~~(.+?)~~/g;
 const superscriptRegex = /(\S+)\^(\S+)/g;
+const IMAGE_URL_REGEX = /\.(jpe?g|png|gif|webp)(?:\?.*)?$/i;
+const REDDIT_IMAGE_HOSTS = new Set(['preview.redd.it', 'i.redd.it', 'i.imgur.com']);
 
 function escapeHtml(value: string): string {
   return value
@@ -29,12 +32,55 @@ function escapeAttribute(value: string): string {
   }
 }
 
+function sanitizeImageSource(value: string): string | null {
+  if (!value) {
+    return null;
+  }
+  const trimmed = value.trim();
+  const giphyMatch = trimmed.match(/^giphy\|([A-Za-z0-9_-]+)/i);
+  if (giphyMatch) {
+    const id = giphyMatch[1];
+    return `https://i.giphy.com/media/${id}/giphy.gif`;
+  }
+  const normalized = trimmed.replace(/&amp;/g, '&');
+  try {
+    const url = new URL(normalized);
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+      return null;
+    }
+    return url.toString();
+  } catch {
+    return null;
+  }
+}
+
+function isLikelyImageUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    if (IMAGE_URL_REGEX.test(url.pathname)) {
+      return true;
+    }
+    return REDDIT_IMAGE_HOSTS.has(url.hostname);
+  } catch {
+    return false;
+  }
+}
+
 function formatInline(text: string): string {
   let result = escapeHtml(text);
   result = result.replace(boldRegex, '<strong>$1</strong>');
   result = result.replace(italicsRegex, '<em>$1</em>');
   result = result.replace(strikeRegex, '<del>$1</del>');
   result = result.replace(superscriptRegex, '$1<sup>$2</sup>');
+  result = result.replace(imageRegex, (_, altText, source) => {
+    const sanitizedSource = sanitizeImageSource(source);
+    if (!sanitizedSource) {
+      return altText ? escapeHtml(altText) : '';
+    }
+    return `<img src="${escapeAttribute(sanitizedSource)}" alt="${escapeHtml(
+      altText ?? ''
+    )}" loading="lazy" />`;
+  });
   result = result.replace(
     linkRegex,
     (_, label, url) =>
@@ -124,6 +170,16 @@ function convertMarkdown(markdown?: string | null): string {
       continue;
     } else {
       closeList();
+    }
+
+    if (/^https?:\/\/\S+$/.test(trimmed) && isLikelyImageUrl(trimmed)) {
+      closeCode();
+      html.push(
+        `<p><a class="inline-image-placeholder" href="${escapeAttribute(
+          trimmed
+        )}" target="_blank" rel="noopener noreferrer">&lt;image&gt;</a></p>`
+      );
+      continue;
     }
 
     closeCode();
