@@ -183,6 +183,22 @@ export default function RedditUserPage() {
     [savedRedditPostsData]
   );
 
+  const { data: savedRedditCommentsData } = useQuery({
+    queryKey: ['saved-items', 'reddit_comments'],
+    queryFn: () => savedService.getSavedItems('reddit_comments'),
+    enabled: !!user,
+  });
+
+  const savedRedditCommentIds = useMemo(
+    () =>
+      new Set(
+        savedRedditCommentsData?.saved_reddit_comments?.map(
+          (comment) => `${comment.subreddit}-${comment.reddit_post_id}-${comment.id}`
+        ) ?? []
+      ),
+    [savedRedditCommentsData]
+  );
+
   const toggleSaveRedditPostMutation = useMutation<void, Error, { post: RedditApiPost; shouldSave: boolean }>({
     mutationFn: ({ post, shouldSave }) =>
       shouldSave
@@ -210,6 +226,23 @@ export default function RedditUserPage() {
     },
     onError: (err: Error) => {
       alert(`Failed to hide post: ${err.message}`);
+    },
+  });
+
+  const toggleSaveRedditCommentMutation = useMutation<void, Error, { comment: RedditUserComment; shouldSave: boolean }>({
+    mutationFn: ({ comment, shouldSave }) => {
+      const linkedPostId = comment.link_id?.replace('t3_', '') ?? '';
+      // Note: The API expects a numeric ID, but we only have string IDs from Reddit
+      // This may need backend adjustment to accept string IDs
+      return shouldSave
+        ? savedService.saveRedditComment(comment.subreddit, linkedPostId, parseInt(comment.id, 36))
+        : savedService.unsaveRedditComment(comment.subreddit, linkedPostId, parseInt(comment.id, 36));
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['saved-items', 'reddit_comments'] });
+    },
+    onError: (err: Error) => {
+      alert(`Failed to update comment save status: ${err.message}`);
     },
   });
 
@@ -466,6 +499,12 @@ export default function RedditUserPage() {
     const localPermalink = linkedPostId
       ? `/reddit/r/${comment.subreddit}/comments/${linkedPostId}/${comment.id}`
       : `/reddit/r/${comment.subreddit}`;
+    const fullCommentsLink = linkedPostId
+      ? `/reddit/r/${comment.subreddit}/comments/${linkedPostId}`
+      : `/reddit/r/${comment.subreddit}`;
+
+    const commentKey = `${comment.subreddit}-${linkedPostId}-${comment.id}`;
+    const isSaved = savedRedditCommentIds.has(commentKey);
 
     return (
       <article
@@ -479,7 +518,7 @@ export default function RedditUserPage() {
             <div className="mb-1 text-left text-[11px] text-[var(--color-text-secondary)]">
               Commented on{' '}
               {comment.link_title ? (
-                <Link to={localPermalink} className="font-semibold hover:text-[var(--color-primary)]">
+                <Link to={fullCommentsLink} className="font-semibold hover:text-[var(--color-primary)]">
                   {comment.link_title}
                 </Link>
               ) : (
@@ -488,24 +527,49 @@ export default function RedditUserPage() {
             </div>
             <MarkdownRenderer content={comment.body} className="text-left text-sm" />
             <div className="mt-2 flex flex-wrap items-center gap-3 text-[11px] text-[var(--color-text-secondary)]">
-              <span>{comment.score.toLocaleString()} points</span>
-              <span>•</span>
-              <span>submitted {formatTimestamp(comment.created_utc, useRelativeTime)}</span>
+              <Link
+                to={localPermalink}
+                className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+              >
+                permalink
+              </Link>
+              <Link
+                to={fullCommentsLink}
+                className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+              >
+                context
+              </Link>
+              <Link
+                to={fullCommentsLink}
+                className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+              >
+                full comments {comment.link_num_comments != null ? `(${comment.link_num_comments})` : ''}
+              </Link>
               <button
                 type="button"
                 onClick={() => handleShareComment(comment)}
                 className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
               >
-                Share
+                share
               </button>
-              <a
-                href={`https://reddit.com${comment.permalink}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+              <button
+                type="button"
+                onClick={() => toggleSaveRedditCommentMutation.mutate({ comment, shouldSave: !isSaved })}
+                disabled={toggleSaveRedditCommentMutation.isPending}
+                className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] disabled:opacity-60"
               >
-                Permalink ↗
-              </a>
+                {toggleSaveRedditCommentMutation.isPending &&
+                toggleSaveRedditCommentMutation.variables?.comment.id === comment.id
+                  ? 'saving...'
+                  : isSaved
+                  ? 'unsave'
+                  : 'save'}
+              </button>
+            </div>
+            <div className="mt-1 text-[11px] text-[var(--color-text-secondary)]">
+              <span>{comment.score.toLocaleString()} points</span>
+              <span> • </span>
+              <span>submitted {formatTimestamp(comment.created_utc, useRelativeTime)}</span>
             </div>
           </>
         )}

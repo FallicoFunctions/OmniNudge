@@ -102,6 +102,7 @@ export interface RedditUserComment {
   link_title?: string;
   link_permalink?: string;
   link_author?: string;
+  link_num_comments?: number;
 }
 
 export interface RedditUserItem {
