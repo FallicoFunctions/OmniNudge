@@ -48,6 +48,22 @@ function getExpandableImageUrl(post: RedditApiPost): string | undefined {
   return undefined;
 }
 
+function getGalleryImages(post: RedditApiPost): string[] {
+  if (!post.gallery_data?.items || !post.media_metadata) {
+    return [];
+  }
+
+  const images: string[] = [];
+  for (const item of post.gallery_data.items) {
+    const metadata = post.media_metadata[item.media_id];
+    if (metadata?.s?.u) {
+      const url = sanitizeHttpUrl(metadata.s.u);
+      if (url) images.push(url);
+    }
+  }
+  return images;
+}
+
 type TabKey = (typeof TAB_OPTIONS)[number]['key'];
 type SortKey = (typeof SORT_OPTIONS)[number];
 
@@ -73,6 +89,7 @@ export default function RedditUserPage() {
   const [activeTab, setActiveTab] = useState<TabKey>('overview');
   const [activeSort, setActiveSort] = useState<SortKey>('new');
   const [expandedImageMap, setExpandedImageMap] = useState<Record<string, boolean>>({});
+  const [galleryIndexMap, setGalleryIndexMap] = useState<Record<string, number>>({});
 
   const isProfileBlocked = isRedditUserBlocked(username);
 
@@ -81,6 +98,26 @@ export default function RedditUserPage() {
       ...prev,
       [postId]: !prev[postId],
     }));
+    // Reset gallery index when opening
+    if (!expandedImageMap[postId]) {
+      setGalleryIndexMap((prev) => ({
+        ...prev,
+        [postId]: 0,
+      }));
+    }
+  };
+
+  const navigateGallery = (postId: string, direction: 'prev' | 'next', maxIndex: number) => {
+    setGalleryIndexMap((prev) => {
+      const currentIndex = prev[postId] || 0;
+      let newIndex = direction === 'next' ? currentIndex + 1 : currentIndex - 1;
+      if (newIndex < 0) newIndex = maxIndex;
+      if (newIndex > maxIndex) newIndex = 0;
+      return {
+        ...prev,
+        [postId]: newIndex,
+      };
+    });
   };
 
   const listingQuery = useQuery<RedditUserListingResponse>({
@@ -214,8 +251,12 @@ export default function RedditUserPage() {
       hideRedditPostMutation.isPending && hideRedditPostMutation.variables?.id === post.id;
 
     const hasThumbnail = post.thumbnail && post.thumbnail.startsWith('http');
-    const previewImageUrl = getExpandableImageUrl(post);
+    const galleryImages = getGalleryImages(post);
+    const hasGallery = galleryImages.length > 0;
+    const previewImageUrl = hasGallery ? galleryImages[0] : getExpandableImageUrl(post);
     const isInlinePreviewOpen = !!(previewImageUrl && expandedImageMap[post.id]);
+    const currentGalleryIndex = galleryIndexMap[post.id] || 0;
+    const currentGalleryImage = hasGallery ? galleryImages[currentGalleryIndex] : previewImageUrl;
 
     return (
       <article
@@ -289,13 +330,42 @@ export default function RedditUserPage() {
           <span>•</span>
           <span>submitted {formatTimestamp(post.created_utc, useRelativeTime)}</span>
         </div>
-        {isInlinePreviewOpen && previewImageUrl && (
+        {isInlinePreviewOpen && currentGalleryImage && (
           <div className="mt-3 overflow-hidden rounded border border-[var(--color-border)] bg-[var(--color-surface-elevated)]">
-            <img
-              src={previewImageUrl}
-              alt={post.title}
-              className="max-h-[70vh] w-full object-contain"
-            />
+            <div className="relative">
+              <img
+                src={currentGalleryImage}
+                alt={hasGallery ? `${post.title} (${currentGalleryIndex + 1}/${galleryImages.length})` : post.title}
+                className="max-h-[70vh] w-full object-contain"
+              />
+              {hasGallery && galleryImages.length > 1 && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => navigateGallery(post.id, 'prev', galleryImages.length - 1)}
+                    className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-black/50 p-2 text-white hover:bg-black/70"
+                    aria-label="Previous image"
+                  >
+                    <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                    </svg>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => navigateGallery(post.id, 'next', galleryImages.length - 1)}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-black/50 p-2 text-white hover:bg-black/70"
+                    aria-label="Next image"
+                  >
+                    <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </button>
+                  <div className="absolute bottom-2 left-1/2 -translate-x-1/2 rounded-full bg-black/50 px-3 py-1 text-sm text-white">
+                    {currentGalleryIndex + 1} / {galleryImages.length}
+                  </div>
+                </>
+              )}
+            </div>
           </div>
         )}
         <div className="mt-2 flex flex-wrap items-center gap-3 text-[11px] text-[var(--color-text-secondary)]">
