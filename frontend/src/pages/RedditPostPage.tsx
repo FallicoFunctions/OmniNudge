@@ -8,7 +8,12 @@ import { savedService } from '../services/savedService';
 import { hubsService } from '../services/hubsService';
 import type { LocalRedditComment } from '../types/reddit';
 import { formatTimestamp, formatRelativeTime } from '../utils/timeFormat';
-import { createRedditCrosspostPayload, sanitizeHttpUrl } from '../utils/crosspostHelpers';
+import {
+  createRedditCrosspostPayload,
+  getDisplayDomain,
+  isRedditDomain,
+  sanitizeHttpUrl,
+} from '../utils/crosspostHelpers';
 import { MarkdownRenderer } from '../components/common/MarkdownRenderer';
 import { useRedditBlocklist } from '../contexts/RedditBlockContext';
 
@@ -76,6 +81,11 @@ interface RedditPostData {
       height?: number;
       width?: number;
     };
+    oembed?: {
+      thumbnail_url?: string;
+      thumbnail_width?: number;
+      thumbnail_height?: number;
+    };
   };
   secure_media?: {
     reddit_video?: {
@@ -84,6 +94,11 @@ interface RedditPostData {
       hls_url?: string;
       height?: number;
       width?: number;
+    };
+    oembed?: {
+      thumbnail_url?: string;
+      thumbnail_width?: number;
+      thumbnail_height?: number;
     };
   };
 }
@@ -938,9 +953,40 @@ const { isRedditUserBlocked, blockRedditUser, unblockRedditUser } = useRedditBlo
     enabled: !!subreddit && !!postId,
   });
 
-const post = redditData?.post;
-const isPostAuthorBlocked = post ? isRedditUserBlocked(post.author) : false;
+  const post = redditData?.post;
+  const isPostAuthorBlocked = post ? isRedditUserBlocked(post.author) : false;
   const redditComments = redditData?.comments || [];
+  const galleryImages = post ? getGalleryImages(post) : [];
+  const hasGallery = galleryImages.length > 0;
+  const videoData = post ? getVideoUrl(post) : undefined;
+  const hasVideo = Boolean(videoData);
+  const previewSource = post?.preview?.images?.[0]?.source?.url
+    ? sanitizeHttpUrl(post.preview.images[0].source.url)
+    : undefined;
+  const sanitizedThumbnail = post?.thumbnail ? sanitizeHttpUrl(post.thumbnail) : undefined;
+  const posterUrl = previewSource ?? sanitizedThumbnail;
+  const oembedThumbnail =
+    post
+      ? sanitizeHttpUrl(post.media?.oembed?.thumbnail_url) ??
+        sanitizeHttpUrl(post.secure_media?.oembed?.thumbnail_url)
+      : undefined;
+  const sanitizedExternalLink = post?.url ? sanitizeHttpUrl(post.url) : undefined;
+  const sanitizedPostImage =
+    post?.post_hint === 'image' ? sanitizedExternalLink : undefined;
+  const externalDomain = getDisplayDomain(sanitizedExternalLink);
+  const isExternalLink =
+    Boolean(sanitizedExternalLink && externalDomain && !isRedditDomain(externalDomain));
+  let inlineImage: string | null = null;
+  if (post) {
+    if (hasGallery) {
+      inlineImage = galleryImages[galleryIndex] ?? null;
+    } else if (sanitizedPostImage) {
+      inlineImage = sanitizedPostImage;
+    } else if (!post.is_video) {
+      inlineImage = previewSource ?? sanitizedThumbnail ?? oembedThumbnail ?? null;
+    }
+  }
+  const hasInlineImage = Boolean(inlineImage);
 
   // Fetch local comments for this Reddit post (stored on our platform)
   const commentsQueryKey = ['reddit', 'posts', subreddit, postId, 'localComments', sort] as const;
@@ -1359,9 +1405,36 @@ const isPostAuthorBlocked = post ? isRedditUserBlocked(post.author) : false;
             <>
               {/* Post Header */}
               <div className="mb-4 text-left">
-                <h1 className="text-left text-2xl font-bold text-[var(--color-text-primary)]">
-                  {post.title}
-                </h1>
+                <div className="flex flex-wrap items-start gap-2">
+                  <h1 className="flex-1 text-left text-2xl font-bold text-[var(--color-text-primary)]">
+                    {isExternalLink ? (
+                      <a
+                        href={sanitizedExternalLink}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="hover:text-[var(--color-primary)]"
+                      >
+                        {post.title}
+                      </a>
+                    ) : (
+                      post.title
+                    )}
+                  </h1>
+                  {isExternalLink && (
+                    <a
+                      href={sanitizedExternalLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 rounded border border-[var(--color-border)] px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary)] hover:border-[var(--color-primary)] hover:text-[var(--color-primary)]"
+                    >
+                      {externalDomain ?? 'external'}
+                      <svg className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                        <path d="M11.293 3H16a1 1 0 0 1 1 1v4.707a1 1 0 1 1-2 0V6.414l-7.293 7.293a1 1 0 0 1-1.414-1.414L13.586 5H11.293a1 1 0 1 1 0-2Z" />
+                        <path d="M5 5h3a1 1 0 1 1 0 2H6v7h7v-2a1 1 0 1 1 2 0v3a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1Z" />
+                      </svg>
+                    </a>
+                  )}
+                </div>
                 <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-[var(--color-text-secondary)]">
                   <Link
                     to={`/reddit/r/${post.subreddit}`}
@@ -1397,116 +1470,102 @@ const isPostAuthorBlocked = post ? isRedditUserBlocked(post.author) : false;
               </div>
 
               {/* Post Media/Content */}
-              {(() => {
-                const galleryImages = getGalleryImages(post);
-                const hasGallery = galleryImages.length > 0;
-                const displayImage = hasGallery ? galleryImages[galleryIndex] : (post.post_hint === 'image' ? post.url : null);
-
-                if (!displayImage) return null;
-
-                return (
-                  <div className="mb-4 flex flex-col items-start gap-2">
-                    <div className="relative">
-                      <div
-                        className="cursor-pointer overflow-hidden rounded border border-[var(--color-border)] transition-all duration-200"
-                        style={{
-                          maxHeight: imageExpanded ? '700px' : '240px',
-                          maxWidth: imageExpanded ? '100%' : '360px',
-                          width: imageExpanded ? '100%' : '360px',
-                        }}
-                        onClick={() => setImageExpanded((prev) => !prev)}
-                        title={imageExpanded ? 'Click to shrink' : 'Click to enlarge'}
-                      >
-                        <img
-                          src={displayImage}
-                          alt={hasGallery ? `${post.title} (${galleryIndex + 1}/${galleryImages.length})` : post.title}
-                          className={`h-full w-full object-contain transition-transform duration-200 ${
-                            imageExpanded ? '' : 'hover:scale-[1.03]'
-                          }`}
-                        />
-                      </div>
-                      {hasGallery && galleryImages.length > 1 && (
-                        <>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setGalleryIndex((prev) => (prev === 0 ? galleryImages.length - 1 : prev - 1));
-                            }}
-                            className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-black/50 p-2 text-white hover:bg-black/70"
-                            aria-label="Previous image"
-                          >
-                            <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                            </svg>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setGalleryIndex((prev) => (prev === galleryImages.length - 1 ? 0 : prev + 1));
-                            }}
-                            className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-black/50 p-2 text-white hover:bg-black/70"
-                            aria-label="Next image"
-                          >
-                            <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                            </svg>
-                          </button>
-                          <div className="absolute bottom-2 left-1/2 -translate-x-1/2 rounded-full bg-black/50 px-3 py-1 text-sm text-white">
-                            {galleryIndex + 1} / {galleryImages.length}
-                          </div>
-                        </>
-                      )}
-                    </div>
-                    <button
-                      type="button"
+              {post && inlineImage ? (
+                <div className="mb-4 flex flex-col items-start gap-2">
+                  <div className="relative">
+                    <div
+                      className="cursor-pointer overflow-hidden rounded border border-[var(--color-border)] transition-all duration-200"
+                      style={{
+                        maxHeight: imageExpanded ? '700px' : '240px',
+                        maxWidth: imageExpanded ? '100%' : '360px',
+                        width: imageExpanded ? '100%' : '360px',
+                      }}
                       onClick={() => setImageExpanded((prev) => !prev)}
-                      className="text-xs text-[var(--color-primary)] hover:underline"
+                      title={imageExpanded ? 'Click to shrink' : 'Click to enlarge'}
                     >
-                      {imageExpanded ? 'View smaller' : 'View full size'}
-                    </button>
-                  </div>
-                );
-              })()}
-
-              {/* Video Content */}
-              {(() => {
-                const videoData = getVideoUrl(post);
-                if (!videoData) return null;
-
-                // Get poster image from preview or thumbnail
-                const posterUrl = post.preview?.images?.[0]?.source?.url
-                  ? sanitizeHttpUrl(post.preview.images[0].source.url)
-                  : (post.thumbnail && post.thumbnail.startsWith('http') ? post.thumbnail : undefined);
-
-                return (
-                  <div className="mb-4">
-                    <video
-                      controls
-                      className="w-full max-h-[600px] rounded border border-[var(--color-border)]"
-                      preload="metadata"
-                      poster={posterUrl}
-                    >
-                      <source src={videoData.url} type="video/mp4" />
-                      Your browser does not support the video tag.
-                    </video>
-                    {!videoData.hasAudio && (
-                      <div className="mt-2 text-xs text-[var(--color-text-muted)] italic">
-                        Note: This video may not have audio. Reddit serves audio separately.{' '}
-                        <a
-                          href={`https://reddit.com${post.permalink}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-[var(--color-primary)] hover:underline"
+                      <img
+                        src={inlineImage}
+                        alt={
+                          hasGallery
+                            ? `${post.title} (${galleryIndex + 1}/${galleryImages.length})`
+                            : post.title
+                        }
+                        className={`h-full w-full object-contain transition-transform duration-200 ${
+                          imageExpanded ? '' : 'hover:scale-[1.03]'
+                        }`}
+                      />
+                    </div>
+                    {hasGallery && galleryImages.length > 1 && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setGalleryIndex((prev) => (prev === 0 ? galleryImages.length - 1 : prev - 1));
+                          }}
+                          className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-black/50 p-2 text-white hover:bg-black/70"
+                          aria-label="Previous image"
                         >
-                          Watch on Reddit
-                        </a>
-                      </div>
+                          <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                          </svg>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setGalleryIndex((prev) => (prev === galleryImages.length - 1 ? 0 : prev + 1));
+                          }}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-black/50 p-2 text-white hover:bg-black/70"
+                          aria-label="Next image"
+                        >
+                          <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                          </svg>
+                        </button>
+                        <div className="absolute bottom-2 left-1/2 -translate-x-1/2 rounded-full bg-black/50 px-3 py-1 text-sm text-white">
+                          {galleryIndex + 1} / {galleryImages.length}
+                        </div>
+                      </>
                     )}
                   </div>
-                );
-              })()}
+                  <button
+                    type="button"
+                    onClick={() => setImageExpanded((prev) => !prev)}
+                    className="text-xs text-[var(--color-primary)] hover:underline"
+                  >
+                    {imageExpanded ? 'View smaller' : 'View full size'}
+                  </button>
+                </div>
+              ) : null}
+
+              {/* Video Content */}
+              {videoData ? (
+                <div className="mb-4">
+                  <video
+                    controls
+                    className="w-full max-h-[600px] rounded border border-[var(--color-border)]"
+                    preload="metadata"
+                    poster={posterUrl}
+                  >
+                    <source src={videoData.url} type="video/mp4" />
+                    Your browser does not support the video tag.
+                  </video>
+                  {!videoData.hasAudio && (
+                    <div className="mt-2 text-xs text-[var(--color-text-muted)] italic">
+                      Note: This video may not have audio. Reddit serves audio separately.{' '}
+                      <a
+                        href={`https://reddit.com${post.permalink}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[var(--color-primary)] hover:underline"
+                      >
+                        Watch on Reddit
+                      </a>
+                    </div>
+                  )}
+                </div>
+              ) : null}
 
               {post.is_self && post.selftext && (
                 <div className="mb-4 text-sm text-[var(--color-text-primary)] text-left leading-normal">
@@ -1524,23 +1583,25 @@ const isPostAuthorBlocked = post ? isRedditUserBlocked(post.author) : false;
               )}
 
               {(() => {
-                // Don't show URL if it's a gallery (images are already displayed) or video
-                const hasGallery = getGalleryImages(post).length > 0;
-                const videoData = getVideoUrl(post);
-                const hasVideo = !!videoData;
-                if (post.is_self || !post.url || post.post_hint === 'image' || hasGallery || hasVideo) {
+                if (
+                  isExternalLink ||
+                  post.is_self ||
+                  !sanitizedExternalLink ||
+                  hasInlineImage ||
+                  hasVideo
+                ) {
                   return null;
                 }
 
                 return (
                   <div className="mb-4">
                     <a
-                      href={post.url}
+                      href={sanitizedExternalLink}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-sm text-[var(--color-primary)] hover:underline"
                     >
-                      {post.url} ↗
+                      {sanitizedExternalLink} ↗
                     </a>
                   </div>
                 );

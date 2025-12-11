@@ -17,7 +17,7 @@ import type {
   RedditModeratedSubreddit,
 } from '../types/reddit';
 import { formatTimestamp } from '../utils/timeFormat';
-import { sanitizeHttpUrl } from '../utils/crosspostHelpers';
+import { getDisplayDomain, isRedditDomain, sanitizeHttpUrl } from '../utils/crosspostHelpers';
 
 const TAB_OPTIONS = [
   { key: 'overview', label: 'Overview' },
@@ -321,6 +321,10 @@ export default function RedditUserPage() {
     const isInlinePreviewOpen = !!(previewImageUrl && expandedImageMap[post.id]);
     const currentGalleryIndex = galleryIndexMap[post.id] || 0;
     const currentGalleryImage = hasGallery ? galleryImages[currentGalleryIndex] : previewImageUrl;
+    const sanitizedExternalUrl = sanitizeHttpUrl(post.url);
+    const externalDomain = getDisplayDomain(sanitizedExternalUrl);
+    const isExternalLink =
+      Boolean(sanitizedExternalUrl && externalDomain && !isRedditDomain(externalDomain));
 
     // Use thumbnail if available, otherwise fall back to preview image
     let thumbnailUrl: string | null = hasThumbnail ? sanitizedThumbnail ?? null : null;
@@ -353,11 +357,39 @@ export default function RedditUserPage() {
             </Link>
           )}
           <div className="flex-1">
-            <Link to={`/reddit/r/${post.subreddit}/comments/${post.id}`}>
-              <h3 className="text-left text-base font-semibold text-[var(--color-text-primary)] hover:text-[var(--color-primary)]">
-                {post.title}
-              </h3>
-            </Link>
+            <div className="flex flex-wrap items-center gap-2">
+              {isExternalLink ? (
+                <a
+                  href={sanitizedExternalUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex-1 text-left text-base font-semibold text-[var(--color-text-primary)] hover:text-[var(--color-primary)]"
+                >
+                  {post.title}
+                </a>
+              ) : (
+                <Link
+                  to={`/reddit/r/${post.subreddit}/comments/${post.id}`}
+                  className="flex-1 text-left text-base font-semibold text-[var(--color-text-primary)] hover:text-[var(--color-primary)]"
+                >
+                  {post.title}
+                </Link>
+              )}
+              {isExternalLink && (
+                <a
+                  href={sanitizedExternalUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 rounded border border-[var(--color-border)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary)] hover:border-[var(--color-primary)] hover:text-[var(--color-primary)]"
+                >
+                  {externalDomain ?? 'external'}
+                  <svg className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                    <path d="M11.293 3H16a1 1 0 0 1 1 1v4.707a1 1 0 1 1-2 0V6.414l-7.293 7.293a1 1 0 0 1-1.414-1.414L13.586 5H11.293a1 1 0 1 1 0-2Z" />
+                    <path d="M5 5h3a1 1 0 1 1 0 2H6v7h7v-2a1 1 0 1 1 2 0v3a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1Z" />
+                  </svg>
+                </a>
+              )}
+            </div>
             <div className="mt-1 flex items-start gap-3 text-[11px] text-[var(--color-text-secondary)]">
               {previewImageUrl && (
                 <button

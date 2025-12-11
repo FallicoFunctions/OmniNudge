@@ -18,6 +18,8 @@ import { formatTimestamp } from '../utils/timeFormat';
 import {
   createLocalCrosspostPayload,
   createRedditCrosspostPayload,
+  getDisplayDomain,
+  isRedditDomain,
   sanitizeHttpUrl,
   type RedditCrosspostSource,
 } from '../utils/crosspostHelpers';
@@ -71,6 +73,24 @@ function getExpandableImageUrl(post: FeedRedditPost): string | undefined {
   }
 
   return undefined;
+}
+
+function getThumbnailUrl(post: FeedRedditPost): string | null {
+  const sanitizedThumbnail = sanitizeHttpUrl(post.thumbnail);
+  if (sanitizedThumbnail) {
+    return sanitizedThumbnail;
+  }
+
+  const previewUrl = post.preview?.images?.[0]?.source?.url;
+  const sanitizedPreview = sanitizeHttpUrl(previewUrl);
+  if (sanitizedPreview) {
+    return sanitizedPreview;
+  }
+
+  const oembedThumbnail =
+    sanitizeHttpUrl(post.media?.oembed?.thumbnail_url) ??
+    sanitizeHttpUrl(post.secure_media?.oembed?.thumbnail_url);
+  return oembedThumbnail ?? null;
 }
 
 export default function RedditPage() {
@@ -199,8 +219,7 @@ export default function RedditPage() {
   >({
     mutationFn: async ({ post, shouldSave }) => {
       if (shouldSave) {
-        const thumbnail =
-          post.thumbnail && post.thumbnail.startsWith('http') ? post.thumbnail : null;
+        const thumbnail = getThumbnailUrl(post);
         await savedService.saveRedditPost(post.subreddit, post.id, {
           title: post.title,
           author: post.author,
@@ -750,10 +769,11 @@ export default function RedditPage() {
 
             const post = item.post;
             const postUrl = `/reddit/r/${post.subreddit}/comments/${post.id}`;
-            const thumbnail =
-              post.thumbnail && post.thumbnail.startsWith('http')
-                ? post.thumbnail
-                : null;
+            const thumbnail = getThumbnailUrl(post);
+            const sanitizedExternalUrl = sanitizeHttpUrl(post.url);
+            const externalDomain = getDisplayDomain(sanitizedExternalUrl);
+            const isExternalLink =
+              Boolean(sanitizedExternalUrl && externalDomain && !isRedditDomain(externalDomain));
             const commentLabel = `${post.num_comments.toLocaleString()} Comments`;
             const isSaved = savedRedditPostIds.has(`${post.subreddit}-${post.id}`);
             const isSaveActionPending =
@@ -777,11 +797,39 @@ export default function RedditPage() {
                     />
                   )}
                   <div className="flex-1 text-left">
-                    <Link to={postUrl}>
-                      <h3 className="text-base font-semibold text-[var(--color-text-primary)] hover:text-[var(--color-primary)]">
-                        {post.title}
-                      </h3>
-                    </Link>
+                    <div className="flex flex-wrap items-center gap-2">
+                      {isExternalLink ? (
+                        <a
+                          href={sanitizedExternalUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex-1 text-base font-semibold text-[var(--color-text-primary)] hover:text-[var(--color-primary)]"
+                        >
+                          {post.title}
+                        </a>
+                      ) : (
+                        <Link
+                          to={postUrl}
+                          className="flex-1 text-base font-semibold text-[var(--color-text-primary)] hover:text-[var(--color-primary)]"
+                        >
+                          {post.title}
+                        </Link>
+                      )}
+                      {isExternalLink && (
+                        <a
+                          href={sanitizedExternalUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 rounded border border-[var(--color-border)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary)] hover:border-[var(--color-primary)] hover:text-[var(--color-primary)]"
+                        >
+                          {externalDomain ?? 'external'}
+                          <svg className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                            <path d="M11.293 3H16a1 1 0 0 1 1 1v4.707a1 1 0 1 1-2 0V6.414l-7.293 7.293a1 1 0 0 1-1.414-1.414L13.586 5H11.293a1 1 0 1 1 0-2Z" />
+                            <path d="M5 5h3a1 1 0 1 1 0 2H6v7h7v-2a1 1 0 1 1 2 0v3a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1Z" />
+                          </svg>
+                        </a>
+                      )}
+                    </div>
                     <div className="mt-1 flex items-start gap-3 text-[11px] text-[var(--color-text-secondary)]">
                       {previewImageUrl && (
                         <button
