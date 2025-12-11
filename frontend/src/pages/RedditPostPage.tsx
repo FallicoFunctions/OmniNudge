@@ -68,6 +68,24 @@ interface RedditPostData {
       u?: string;
     }>;
   }>;
+  media?: {
+    reddit_video?: {
+      fallback_url?: string;
+      dash_url?: string;
+      hls_url?: string;
+      height?: number;
+      width?: number;
+    };
+  };
+  secure_media?: {
+    reddit_video?: {
+      fallback_url?: string;
+      dash_url?: string;
+      hls_url?: string;
+      height?: number;
+      width?: number;
+    };
+  };
 }
 
 interface RedditListing<T> {
@@ -108,6 +126,25 @@ function getGalleryImages(post: RedditPostData): string[] {
     }
   }
   return images;
+}
+
+function getVideoUrl(post: RedditPostData): { url: string; hasAudio: boolean } | undefined {
+  // Try secure_media first, then media
+  const videoData = post.secure_media?.reddit_video || post.media?.reddit_video;
+  if (!videoData) return undefined;
+
+  // HLS and DASH URLs might have audio, fallback_url typically doesn't
+  if (videoData.hls_url) {
+    return { url: videoData.hls_url, hasAudio: true };
+  }
+  if (videoData.dash_url) {
+    return { url: videoData.dash_url, hasAudio: true };
+  }
+  if (videoData.fallback_url) {
+    return { url: videoData.fallback_url, hasAudio: false };
+  }
+
+  return undefined;
 }
 
 // Component to render a single Reddit comment with replies
@@ -1433,6 +1470,44 @@ const isPostAuthorBlocked = post ? isRedditUserBlocked(post.author) : false;
                 );
               })()}
 
+              {/* Video Content */}
+              {(() => {
+                const videoData = getVideoUrl(post);
+                if (!videoData) return null;
+
+                // Get poster image from preview or thumbnail
+                const posterUrl = post.preview?.images?.[0]?.source?.url
+                  ? sanitizeHttpUrl(post.preview.images[0].source.url)
+                  : (post.thumbnail && post.thumbnail.startsWith('http') ? post.thumbnail : undefined);
+
+                return (
+                  <div className="mb-4">
+                    <video
+                      controls
+                      className="w-full max-h-[600px] rounded border border-[var(--color-border)]"
+                      preload="metadata"
+                      poster={posterUrl}
+                    >
+                      <source src={videoData.url} type="video/mp4" />
+                      Your browser does not support the video tag.
+                    </video>
+                    {!videoData.hasAudio && (
+                      <div className="mt-2 text-xs text-[var(--color-text-muted)] italic">
+                        Note: This video may not have audio. Reddit serves audio separately.{' '}
+                        <a
+                          href={`https://reddit.com${post.permalink}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-[var(--color-primary)] hover:underline"
+                        >
+                          Watch on Reddit
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+
               {post.is_self && post.selftext && (
                 <div className="mb-4 text-sm text-[var(--color-text-primary)] text-left leading-normal">
                   {post.selftext.split('\n\n').map((paragraph, i, arr) => (
@@ -1449,9 +1524,11 @@ const isPostAuthorBlocked = post ? isRedditUserBlocked(post.author) : false;
               )}
 
               {(() => {
-                // Don't show URL if it's a gallery (images are already displayed)
+                // Don't show URL if it's a gallery (images are already displayed) or video
                 const hasGallery = getGalleryImages(post).length > 0;
-                if (post.is_self || !post.url || post.post_hint === 'image' || hasGallery) {
+                const videoData = getVideoUrl(post);
+                const hasVideo = !!videoData;
+                if (post.is_self || !post.url || post.post_hint === 'image' || hasGallery || hasVideo) {
                   return null;
                 }
 

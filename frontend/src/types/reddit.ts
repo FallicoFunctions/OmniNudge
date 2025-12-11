@@ -59,6 +59,24 @@ export interface RedditApiPost {
       u?: string;
     }>;
   }>;
+  media?: {
+    reddit_video?: {
+      fallback_url?: string;
+      dash_url?: string;
+      hls_url?: string;
+      height?: number;
+      width?: number;
+    };
+  };
+  secure_media?: {
+    reddit_video?: {
+      fallback_url?: string;
+      dash_url?: string;
+      hls_url?: string;
+      height?: number;
+      width?: number;
+    };
+  };
 }
 
 export interface RedditUserComment {
