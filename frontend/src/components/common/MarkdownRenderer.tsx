@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useRef, useEffect } from 'react';
 
 interface MarkdownRendererProps {
   content?: string | null;
@@ -198,9 +198,7 @@ function convertMarkdown(markdown?: string | null): string {
     if (/^https?:\/\/\S+$/.test(trimmed) && isLikelyImageUrl(trimmed)) {
       closeCode();
       html.push(
-        `<p><a class="inline-image-placeholder text-[var(--color-primary)] hover:underline" href="${escapeAttribute(
-          trimmed
-        )}" target="_blank" rel="noopener noreferrer">&lt;image&gt;</a></p>`
+        `<p><img src="${escapeAttribute(trimmed)}" alt="Image" loading="lazy" /></p>`
       );
       continue;
     }
@@ -218,6 +216,22 @@ function convertMarkdown(markdown?: string | null): string {
 
 export function MarkdownRenderer({ content, className = '' }: MarkdownRendererProps) {
   const renderedHtml = useMemo(() => convertMarkdown(content), [content]);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const handleImageClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (target.tagName === 'IMG') {
+        target.classList.toggle('expanded');
+      }
+    };
+
+    container.addEventListener('click', handleImageClick);
+    return () => container.removeEventListener('click', handleImageClick);
+  }, [renderedHtml]);
 
   if (!renderedHtml) {
     return null;
@@ -225,6 +239,7 @@ export function MarkdownRenderer({ content, className = '' }: MarkdownRendererPr
 
   return (
     <div
+      ref={containerRef}
       className={`markdown-content text-left text-sm text-[var(--color-text-primary)] ${className}`}
       dangerouslySetInnerHTML={{ __html: renderedHtml }}
     />
