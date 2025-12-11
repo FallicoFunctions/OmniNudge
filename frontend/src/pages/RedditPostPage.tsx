@@ -8,7 +8,7 @@ import { savedService } from '../services/savedService';
 import { hubsService } from '../services/hubsService';
 import type { LocalRedditComment } from '../types/reddit';
 import { formatTimestamp, formatRelativeTime } from '../utils/timeFormat';
-import { createRedditCrosspostPayload } from '../utils/crosspostHelpers';
+import { createRedditCrosspostPayload, sanitizeHttpUrl } from '../utils/crosspostHelpers';
 import { MarkdownRenderer } from '../components/common/MarkdownRenderer';
 import { useRedditBlocklist } from '../contexts/RedditBlockContext';
 
@@ -47,6 +47,27 @@ interface RedditPostData {
   is_self: boolean;
   post_hint?: string;
   is_video?: boolean;
+  gallery_data?: {
+    items?: Array<{
+      media_id: string;
+      id: number;
+    }>;
+  };
+  media_metadata?: Record<string, {
+    status: string;
+    e: string;
+    m?: string;
+    s?: {
+      y: number;
+      x: number;
+      u?: string;
+    };
+    p?: Array<{
+      y: number;
+      x: number;
+      u?: string;
+    }>;
+  }>;
 }
 
 interface RedditListing<T> {
@@ -73,6 +94,21 @@ const FORMATTING_EXAMPLES = [
   { input: 'super^script', output: 'super^script' },
 ] as const;
 
+function getGalleryImages(post: RedditPostData): string[] {
+  if (!post.gallery_data?.items || !post.media_metadata) {
+    return [];
+  }
+
+  const images: string[] = [];
+  for (const item of post.gallery_data.items) {
+    const metadata = post.media_metadata[item.media_id];
+    if (metadata?.s?.u) {
+      const url = sanitizeHttpUrl(metadata.s.u);
+      if (url) images.push(url);
+    }
+  }
+  return images;
+}
 
 // Component to render a single Reddit comment with replies
 type EmbedPayload = {
@@ -782,6 +818,7 @@ const { isRedditUserBlocked, blockRedditUser, unblockRedditUser } = useRedditBlo
   const [embedTarget, setEmbedTarget] = useState<EmbedPayload | null>(null);
   const [sort, setSort] = useState<string>('best');
   const [imageExpanded, setImageExpanded] = useState(false);
+  const [galleryIndex, setGalleryIndex] = useState(0);
 
   // Post action states
   const [showHideConfirm, setShowHideConfirm] = useState(false);
@@ -1323,35 +1360,78 @@ const isPostAuthorBlocked = post ? isRedditUserBlocked(post.author) : false;
               </div>
 
               {/* Post Media/Content */}
-              {post.post_hint === 'image' && post.url && (
-                <div className="mb-4 flex flex-col items-start gap-2">
-                  <div
-                    className="cursor-pointer overflow-hidden rounded border border-[var(--color-border)] transition-all duration-200"
-                    style={{
-                      maxHeight: imageExpanded ? '700px' : '240px',
-                      maxWidth: imageExpanded ? '100%' : '360px',
-                      width: imageExpanded ? '100%' : '360px',
-                    }}
-                    onClick={() => setImageExpanded((prev) => !prev)}
-                    title={imageExpanded ? 'Click to shrink' : 'Click to enlarge'}
-                  >
-                    <img
-                      src={post.url}
-                      alt={post.title}
-                      className={`h-full w-full object-contain transition-transform duration-200 ${
-                        imageExpanded ? '' : 'hover:scale-[1.03]'
-                      }`}
-                    />
+              {(() => {
+                const galleryImages = getGalleryImages(post);
+                const hasGallery = galleryImages.length > 0;
+                const displayImage = hasGallery ? galleryImages[galleryIndex] : (post.post_hint === 'image' ? post.url : null);
+
+                if (!displayImage) return null;
+
+                return (
+                  <div className="mb-4 flex flex-col items-start gap-2">
+                    <div className="relative">
+                      <div
+                        className="cursor-pointer overflow-hidden rounded border border-[var(--color-border)] transition-all duration-200"
+                        style={{
+                          maxHeight: imageExpanded ? '700px' : '240px',
+                          maxWidth: imageExpanded ? '100%' : '360px',
+                          width: imageExpanded ? '100%' : '360px',
+                        }}
+                        onClick={() => setImageExpanded((prev) => !prev)}
+                        title={imageExpanded ? 'Click to shrink' : 'Click to enlarge'}
+                      >
+                        <img
+                          src={displayImage}
+                          alt={hasGallery ? `${post.title} (${galleryIndex + 1}/${galleryImages.length})` : post.title}
+                          className={`h-full w-full object-contain transition-transform duration-200 ${
+                            imageExpanded ? '' : 'hover:scale-[1.03]'
+                          }`}
+                        />
+                      </div>
+                      {hasGallery && galleryImages.length > 1 && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setGalleryIndex((prev) => (prev === 0 ? galleryImages.length - 1 : prev - 1));
+                            }}
+                            className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-black/50 p-2 text-white hover:bg-black/70"
+                            aria-label="Previous image"
+                          >
+                            <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                            </svg>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setGalleryIndex((prev) => (prev === galleryImages.length - 1 ? 0 : prev + 1));
+                            }}
+                            className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-black/50 p-2 text-white hover:bg-black/70"
+                            aria-label="Next image"
+                          >
+                            <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                            </svg>
+                          </button>
+                          <div className="absolute bottom-2 left-1/2 -translate-x-1/2 rounded-full bg-black/50 px-3 py-1 text-sm text-white">
+                            {galleryIndex + 1} / {galleryImages.length}
+                          </div>
+                        </>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setImageExpanded((prev) => !prev)}
+                      className="text-xs text-[var(--color-primary)] hover:underline"
+                    >
+                      {imageExpanded ? 'View smaller' : 'View full size'}
+                    </button>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setImageExpanded((prev) => !prev)}
-                    className="text-xs text-[var(--color-primary)] hover:underline"
-                  >
-                    {imageExpanded ? 'View smaller' : 'View full size'}
-                  </button>
-                </div>
-              )}
+                );
+              })()}
 
               {post.is_self && post.selftext && (
                 <div className="mb-4 text-sm text-[var(--color-text-primary)] text-left leading-normal">
@@ -1368,18 +1448,26 @@ const isPostAuthorBlocked = post ? isRedditUserBlocked(post.author) : false;
                 </div>
               )}
 
-              {!post.is_self && post.url && post.post_hint !== 'image' && (
-                <div className="mb-4">
-                  <a
-                    href={post.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-sm text-[var(--color-primary)] hover:underline"
-                  >
-                    {post.url} ↗
-                  </a>
-                </div>
-              )}
+              {(() => {
+                // Don't show URL if it's a gallery (images are already displayed)
+                const hasGallery = getGalleryImages(post).length > 0;
+                if (post.is_self || !post.url || post.post_hint === 'image' || hasGallery) {
+                  return null;
+                }
+
+                return (
+                  <div className="mb-4">
+                    <a
+                      href={post.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-sm text-[var(--color-primary)] hover:underline"
+                    >
+                      {post.url} ↗
+                    </a>
+                  </div>
+                );
+              })()}
 
               {/* Post Stats */}
               <div className="flex gap-4 text-xs text-[var(--color-text-secondary)]">
