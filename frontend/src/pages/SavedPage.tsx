@@ -8,6 +8,7 @@ import { api } from '../lib/api';
 import { useSettings } from '../contexts/SettingsContext';
 import { useRedditBlocklist } from '../contexts/RedditBlockContext';
 import { formatTimestamp } from '../utils/timeFormat';
+import { FlairBadge } from '../components/reddit/FlairBadge';
 
 type RedditListingData = {
   data?: {
@@ -19,6 +20,9 @@ type RedditListingData = {
         num_comments?: number;
         thumbnail?: string;
         created_utc?: number;
+        link_flair_text?: string;
+        link_flair_background_color?: string;
+        link_flair_text_color?: string;
       };
     }>;
   };
@@ -91,6 +95,13 @@ export default function SavedPage() {
                   : prev[postKey]?.num_comments,
               thumbnail: normalizedThumbnail,
               created_utc: remotePost.created_utc ?? prev[postKey]?.created_utc ?? null,
+              link_flair_text: remotePost.link_flair_text ?? prev[postKey]?.link_flair_text ?? null,
+              link_flair_background_color:
+                remotePost.link_flair_background_color ??
+                prev[postKey]?.link_flair_background_color ??
+                null,
+              link_flair_text_color:
+                remotePost.link_flair_text_color ?? prev[postKey]?.link_flair_text_color ?? null,
             },
           }));
         })
@@ -317,11 +328,18 @@ export default function SavedPage() {
                   )}
                 </div>
                 <div className="flex-1">
-                  <Link to={postUrl}>
-                    <h3 className="text-base font-semibold text-[var(--color-text-primary)] hover:text-[var(--color-primary)] text-left">
-                      {hasDetails ? mergedPost.title : `r/${post.subreddit}`}
-                    </h3>
-                  </Link>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Link to={postUrl} className="flex-1">
+                      <h3 className="text-base font-semibold text-[var(--color-text-primary)] hover:text-[var(--color-primary)] text-left">
+                        {hasDetails ? mergedPost.title : `r/${post.subreddit}`}
+                      </h3>
+                    </Link>
+                    <FlairBadge
+                      text={mergedPost.link_flair_text}
+                      backgroundColor={mergedPost.link_flair_background_color}
+                      textColor={mergedPost.link_flair_text_color}
+                    />
+                  </div>
                   {!hasDetails && (
                     <p className="text-xs text-[var(--color-text-muted)]">Fetching latest Reddit data...</p>
                   )}

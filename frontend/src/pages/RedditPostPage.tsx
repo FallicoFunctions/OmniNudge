@@ -15,6 +15,7 @@ import {
   sanitizeHttpUrl,
 } from '../utils/crosspostHelpers';
 import { MarkdownRenderer } from '../components/common/MarkdownRenderer';
+import { FlairBadge } from '../components/reddit/FlairBadge';
 import { useRedditBlocklist } from '../contexts/RedditBlockContext';
 
 interface RedditComment {
@@ -1434,6 +1435,11 @@ const { isRedditUserBlocked, blockRedditUser, unblockRedditUser } = useRedditBlo
                       </svg>
                     </a>
                   )}
+                  <FlairBadge
+                    text={post.link_flair_text}
+                    backgroundColor={post.link_flair_background_color}
+                    textColor={post.link_flair_text_color}
+                  />
                 </div>
                 <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-[var(--color-text-secondary)]">
                   <Link
