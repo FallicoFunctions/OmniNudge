@@ -198,7 +198,7 @@ function convertMarkdown(markdown?: string | null): string {
     if (/^https?:\/\/\S+$/.test(trimmed) && isLikelyImageUrl(trimmed)) {
       closeCode();
       html.push(
-        `<p><a class="inline-image-placeholder" href="${escapeAttribute(
+        `<p><a class="inline-image-placeholder text-[var(--color-primary)] hover:underline" href="${escapeAttribute(
           trimmed
         )}" target="_blank" rel="noopener noreferrer">&lt;image&gt;</a></p>`
       );

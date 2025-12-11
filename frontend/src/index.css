@@ -255,7 +255,7 @@ td .markdown-content pre {
 }
 
 .markdown-content a.inline-image-placeholder {
-  color: var(--color-text-primary);
+  color: var(--color-primary);
   text-decoration: none;
   font-weight: 500;
 }
