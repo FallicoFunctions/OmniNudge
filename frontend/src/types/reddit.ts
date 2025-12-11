@@ -67,6 +67,11 @@ export interface RedditApiPost {
       height?: number;
       width?: number;
     };
+    oembed?: {
+      thumbnail_url?: string;
+      thumbnail_width?: number;
+      thumbnail_height?: number;
+    };
   };
   secure_media?: {
     reddit_video?: {
@@ -75,6 +80,11 @@ export interface RedditApiPost {
       hls_url?: string;
       height?: number;
       width?: number;
+    };
+    oembed?: {
+      thumbnail_url?: string;
+      thumbnail_width?: number;
+      thumbnail_height?: number;
     };
   };
 }

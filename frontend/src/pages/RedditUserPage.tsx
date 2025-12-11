@@ -250,7 +250,8 @@ export default function RedditUserPage() {
     const shareDisabled =
       hideRedditPostMutation.isPending && hideRedditPostMutation.variables?.id === post.id;
 
-    const hasThumbnail = post.thumbnail && post.thumbnail.startsWith('http');
+    const sanitizedThumbnail = sanitizeHttpUrl(post.thumbnail);
+    const hasThumbnail = Boolean(sanitizedThumbnail);
     const galleryImages = getGalleryImages(post);
     const hasGallery = galleryImages.length > 0;
     const previewImageUrl = hasGallery ? galleryImages[0] : getExpandableImageUrl(post);
@@ -258,16 +259,31 @@ export default function RedditUserPage() {
     const currentGalleryIndex = galleryIndexMap[post.id] || 0;
     const currentGalleryImage = hasGallery ? galleryImages[currentGalleryIndex] : previewImageUrl;
 
+    // Use thumbnail if available, otherwise fall back to preview image
+    let thumbnailUrl: string | null = hasThumbnail ? sanitizedThumbnail ?? null : null;
+    if (!thumbnailUrl && hasGallery && galleryImages[0]) {
+      thumbnailUrl = galleryImages[0] ?? null;
+    }
+    if (!thumbnailUrl && post.preview?.images?.[0]?.source?.url) {
+      thumbnailUrl = sanitizeHttpUrl(post.preview.images[0].source.url) ?? null;
+    }
+    if (!thumbnailUrl) {
+      thumbnailUrl =
+        sanitizeHttpUrl(post.media?.oembed?.thumbnail_url) ??
+        sanitizeHttpUrl(post.secure_media?.oembed?.thumbnail_url) ??
+        null;
+    }
+
     return (
       <article
         key={`post-${post.id}`}
         className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] p-4 text-left"
       >
         <div className="flex gap-3">
-          {hasThumbnail && (
+          {thumbnailUrl && (
             <Link to={`/reddit/r/${post.subreddit}/comments/${post.id}`} className="shrink-0">
               <img
-                src={post.thumbnail}
+                src={thumbnailUrl}
                 alt=""
                 className="h-16 w-16 rounded object-cover"
               />
