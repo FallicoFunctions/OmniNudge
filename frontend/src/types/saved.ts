@@ -28,6 +28,9 @@ export interface SavedRedditPost {
   num_comments?: number;
   thumbnail?: string | null;
   created_utc?: number | null;
+  link_flair_text?: string | null;
+  link_flair_background_color?: string | null;
+  link_flair_text_color?: string | null;
   saved_at: string;
 }
 
@@ -38,6 +41,9 @@ export interface SaveRedditPostPayload {
   num_comments?: number;
   thumbnail?: string | null;
   created_utc?: number | null;
+  link_flair_text?: string | null;
+  link_flair_background_color?: string | null;
+  link_flair_text_color?: string | null;
 }
 
 export interface SavedItemsResponse {

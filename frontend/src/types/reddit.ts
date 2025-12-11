@@ -32,6 +32,9 @@ export interface RedditApiPost {
   post_hint?: string;
   is_video?: boolean;
   is_self?: boolean;
+  link_flair_text?: string;
+  link_flair_background_color?: string;
+  link_flair_text_color?: 'light' | 'dark' | string;
   preview?: {
     images?: Array<{
       source?: { url?: string };

@@ -7,6 +7,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useSettings } from '../contexts/SettingsContext';
 import { useRedditBlocklist } from '../contexts/RedditBlockContext';
 import { MarkdownRenderer } from '../components/common/MarkdownRenderer';
+import { FlairBadge } from '../components/reddit/FlairBadge';
 import type {
   RedditApiPost,
   RedditUserAbout,
@@ -389,6 +390,11 @@ export default function RedditUserPage() {
                   </svg>
                 </a>
               )}
+              <FlairBadge
+                text={post.link_flair_text}
+                backgroundColor={post.link_flair_background_color}
+                textColor={post.link_flair_text_color}
+              />
             </div>
             <div className="mt-1 flex items-start gap-3 text-[11px] text-[var(--color-text-secondary)]">
               {previewImageUrl && (
