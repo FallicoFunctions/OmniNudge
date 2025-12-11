@@ -254,6 +254,22 @@ td .markdown-content pre {
   text-decoration: underline;
 }
 
+.markdown-content a.inline-image-placeholder {
+  color: var(--color-text-primary);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.markdown-content img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  border-radius: 0.375rem;
+  margin: 0.75rem 0;
+  border: 1px solid var(--color-border);
+  background-color: var(--color-surface);
+}
+
 .markdown-content table {
   border-collapse: collapse;
   width: 100%;
