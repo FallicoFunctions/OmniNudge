@@ -140,6 +140,7 @@ type RedditUserComment struct {
 	LinkTitle     string  `json:"link_title"`
 	LinkPermalink string  `json:"link_permalink"`
 	LinkAuthor    string  `json:"link_author"`
+	LinkNumComments int   `json:"link_num_comments"`
 }
 
 // RedditUserItem represents either a post or comment in a user listing
