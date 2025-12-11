@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { redditService } from '../services/redditService';
@@ -90,6 +90,8 @@ export default function RedditUserPage() {
   const [activeSort, setActiveSort] = useState<SortKey>('new');
   const [expandedImageMap, setExpandedImageMap] = useState<Record<string, boolean>>({});
   const [galleryIndexMap, setGalleryIndexMap] = useState<Record<string, number>>({});
+  const [currentAfter, setCurrentAfter] = useState<string | undefined>(undefined);
+  const [pageHistory, setPageHistory] = useState<(string | undefined)[]>([undefined]);
 
   const isProfileBlocked = isRedditUserBlocked(username);
 
@@ -121,8 +123,8 @@ export default function RedditUserPage() {
   };
 
   const listingQuery = useQuery<RedditUserListingResponse>({
-    queryKey: ['reddit-user-listing', username, activeTab, activeSort],
-    queryFn: () => redditService.getUserListing(username!, activeTab, activeSort, 50),
+    queryKey: ['reddit-user-listing', username, activeTab, activeSort, currentAfter],
+    queryFn: () => redditService.getUserListing(username!, activeTab, activeSort, 50, currentAfter),
     enabled: !!username,
     staleTime: 1000 * 60 * 5,
   });
@@ -228,6 +230,34 @@ export default function RedditUserPage() {
   };
 
   const listingItems: RedditUserItem[] = listingQuery.data?.items ?? [];
+
+  const handleNextPage = () => {
+    if (listingQuery.data?.after) {
+      setPageHistory((prev) => [...prev, currentAfter]);
+      setCurrentAfter(listingQuery.data.after);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
+  const handlePrevPage = () => {
+    if (pageHistory.length > 1) {
+      const newHistory = [...pageHistory];
+      newHistory.pop();
+      setPageHistory(newHistory);
+      setCurrentAfter(newHistory[newHistory.length - 1]);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
+  const resetPagination = () => {
+    setCurrentAfter(undefined);
+    setPageHistory([undefined]);
+  };
+
+  // Reset pagination when tab or sort changes
+  useEffect(() => {
+    resetPagination();
+  }, [activeTab, activeSort]);
 
   const renderPostCard = (post: RedditApiPost) => {
     const postKey = `${post.subreddit}-${post.id}`;
@@ -559,17 +589,40 @@ export default function RedditUserPage() {
                 </div>
               )}
               {!listingQuery.isLoading && !listingQuery.isError && listingItems.length > 0 && (
-                <div className="space-y-3">
-                  {listingItems.map((item) => {
-                    if (item.kind === 'post' && item.post) {
-                      return renderPostCard(item.post);
-                    }
-                    if (item.kind === 'comment' && item.comment) {
-                      return renderCommentCard(item.comment);
-                    }
-                    return null;
-                  })}
-                </div>
+                <>
+                  <div className="space-y-3">
+                    {listingItems.map((item) => {
+                      if (item.kind === 'post' && item.post) {
+                        return renderPostCard(item.post);
+                      }
+                      if (item.kind === 'comment' && item.comment) {
+                        return renderCommentCard(item.comment);
+                      }
+                      return null;
+                    })}
+                  </div>
+                  <div className="mt-4 flex items-center justify-between border-t border-[var(--color-border)] pt-4">
+                    <button
+                      type="button"
+                      onClick={handlePrevPage}
+                      disabled={pageHistory.length <= 1 || listingQuery.isFetching}
+                      className="rounded bg-[var(--color-primary)] px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      ← Previous
+                    </button>
+                    <span className="text-sm text-[var(--color-text-secondary)]">
+                      Page {pageHistory.length}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={handleNextPage}
+                      disabled={!listingQuery.data?.after || listingQuery.isFetching}
+                      className="rounded bg-[var(--color-primary)] px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      Next →
+                    </button>
+                  </div>
+                </>
               )}
             </div>
           </div>
