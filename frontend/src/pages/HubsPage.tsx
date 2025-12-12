@@ -10,6 +10,7 @@ import { useSettings } from '../contexts/SettingsContext';
 import { formatTimestamp } from '../utils/timeFormat';
 import { savedService } from '../services/savedService';
 import { createLocalCrosspostPayload, type CrosspostRequest } from '../utils/crosspostHelpers';
+import { getPostUrl } from '../utils/postUrl';
 
 export default function HubsPage() {
   const navigate = useNavigate();
@@ -412,7 +413,7 @@ export default function HubsPage() {
                     <span>submitted {submittedLabel}</span>
                   </div>
 
-                  <Link to={`/posts/${post.id}`}>
+                  <Link to={getPostUrl(post)}>
                     <h3 className="mt-1 text-lg font-semibold text-[var(--color-text-primary)] hover:text-[var(--color-primary)]">
                       {post.title}
                     </h3>
@@ -420,7 +421,7 @@ export default function HubsPage() {
 
                   <div className="mt-2 flex flex-wrap items-center gap-3 text-[11px] text-[var(--color-text-secondary)]">
                     <Link
-                      to={`/posts/${post.id}`}
+                      to={getPostUrl(post)}
                       className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
                     >
                       {commentsLabel}

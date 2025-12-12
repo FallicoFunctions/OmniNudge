@@ -12,6 +12,7 @@ import { FlairBadge } from '../reddit/FlairBadge';
 import { usePagination } from '../../hooks/usePagination';
 import { PaginationControls } from '../common/PaginationControls';
 import { sanitizeHttpUrl } from '../../utils/crosspostHelpers';
+import { getPostUrl, getPostCommentUrl } from '../../utils/postUrl';
 
 type RedditListingData = {
   data?: {
@@ -258,10 +259,10 @@ export function SavedItemsView({
           </div>
           <div className="mt-3">
             <button
-              onClick={() => navigate('/posts')}
+              onClick={() => navigate(getPostUrl(post))}
               className="text-sm font-semibold text-[var(--color-primary)] hover:underline"
             >
-              View posts feed →
+              View post →
             </button>
           </div>
         </article>
@@ -283,7 +284,7 @@ export function SavedItemsView({
             </div>
             <div className="mt-1">
               <span className="font-semibold">Post:</span>{' '}
-              <Link to={`/posts/${comment.post_id}`} className="text-[var(--color-primary)] hover:underline">
+              <Link to={getPostUrl({ id: comment.post_id, target_subreddit: null })} className="text-[var(--color-primary)] hover:underline">
                 {comment.post_title}
               </Link>
             </div>
@@ -292,7 +293,7 @@ export function SavedItemsView({
           <div className="mt-3 flex items-center gap-4 text-xs text-[var(--color-text-secondary)]">
             <span>{comment.score} points</span>
             <Link
-              to={`/posts/${comment.post_id}/comments/${comment.comment_id}`}
+              to={getPostCommentUrl({ id: comment.post_id, target_subreddit: null }, comment.comment_id)}
               className="text-[var(--color-primary)] hover:underline"
             >
               View thread →
