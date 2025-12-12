@@ -6,6 +6,7 @@ import { hubsService, type Hub } from '../services/hubsService';
 import { redditService } from '../services/redditService';
 import type { CreatePostRequest } from '../types/posts';
 import type { SubredditSuggestion } from '../types/reddit';
+import { getPostUrl } from '../utils/postUrl';
 
 const HUB_AUTOCOMPLETE_MIN_LENGTH = 2;
 const SUBREDDIT_AUTOCOMPLETE_MIN_LENGTH = 2;
@@ -118,7 +119,7 @@ export default function CreatePostPage() {
   const createPostMutation = useMutation({
     mutationFn: (data: CreatePostRequest) => postsService.createPost(data),
     onSuccess: (post) => {
-      navigate(`/posts/${post.id}`);
+      navigate(getPostUrl(post));
     },
   });
 
