@@ -230,7 +230,9 @@ export default function PostsPage() {
                   )}
 
                   <div className="mt-3 flex gap-4 text-xs text-[var(--color-text-secondary)]">
-                    <span>{post.comment_count} comments</span>
+                    <span>
+                      {(post.comment_count ?? post.num_comments ?? 0).toLocaleString()} comments
+                    </span>
                     <Link
                       to={`/posts/${post.id}`}
                       className="hover:text-[var(--color-primary)]"

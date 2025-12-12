@@ -7,7 +7,8 @@ export interface PlatformPost {
   author_username: string;
   hub_name: string;
   score: number;
-  comment_count: number;
+  comment_count?: number;
+  num_comments?: number;
   crossposted_at?: string | null;
   created_at: string;
   updated_at?: string;
