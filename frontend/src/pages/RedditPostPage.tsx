@@ -17,6 +17,7 @@ import {
 import { MarkdownRenderer } from '../components/common/MarkdownRenderer';
 import { FlairBadge } from '../components/reddit/FlairBadge';
 import { useRedditBlocklist } from '../contexts/RedditBlockContext';
+import PostDetailPage from './PostDetailPage';
 
 interface RedditComment {
   kind: string;
@@ -858,12 +859,22 @@ function LocalCommentView({
 }
 
 export default function RedditPostPage() {
-const { subreddit, postId, commentId } = useParams<{ subreddit: string; postId: string; commentId?: string }>();
-const navigate = useNavigate();
-const { user } = useAuth();
-const { useRelativeTime } = useSettings();
-const { isRedditUserBlocked, blockRedditUser, unblockRedditUser } = useRedditBlocklist();
+  const { subreddit, postId, commentId } = useParams<{
+    subreddit: string;
+    postId: string;
+    commentId?: string;
+  }>();
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const { useRelativeTime } = useSettings();
+  const { isRedditUserBlocked, blockRedditUser, unblockRedditUser } = useRedditBlocklist();
   const queryClient = useQueryClient();
+
+  const isPlatformPost = postId ? /^\d+$/.test(postId) : false;
+  if (isPlatformPost) {
+    return <PostDetailPage />;
+  }
+
   const focusedCommentId = commentId ? Number(commentId) : null;
   const [commentText, setCommentText] = useState('');
   const [showFormattingHelp, setShowFormattingHelp] = useState(false);
@@ -951,7 +962,7 @@ const { isRedditUserBlocked, blockRedditUser, unblockRedditUser } = useRedditBlo
 
       return { post, comments };
     },
-    enabled: !!subreddit && !!postId,
+    enabled: !!subreddit && !!postId && !isPlatformPost,
   });
 
   const post = redditData?.post;

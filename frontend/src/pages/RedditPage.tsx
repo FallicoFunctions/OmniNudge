@@ -58,6 +58,11 @@ type HideTarget =
 const SUBREDDIT_AUTOCOMPLETE_MIN_LENGTH = 2;
 const IMAGE_URL_REGEX = /\.(jpe?g|png|gif|webp)$/i;
 
+function getLocalPostUrl(post: LocalSubredditPost): string {
+  const subredditSlug = post.target_subreddit ?? post.crosspost_origin_subreddit ?? null;
+  return subredditSlug ? `/reddit/r/${subredditSlug}/comments/${post.id}` : `/posts/${post.id}`;
+}
+
 function getExpandableImageUrl(post: FeedRedditPost): string | undefined {
   const previewUrl = post.preview?.images?.[0]?.source?.url;
   const sanitizedPreview = sanitizeHttpUrl(previewUrl);
@@ -310,8 +315,8 @@ export default function RedditPage() {
     savedLocalToggleMutation.mutate({ postId, shouldSave: !currentlySaved });
   };
 
-  const handleShareLocalPost = (postId: number) => {
-    const shareUrl = `${window.location.origin}/posts/${postId}`;
+  const handleShareLocalPost = (post: LocalSubredditPost) => {
+    const shareUrl = `${window.location.origin}${getLocalPostUrl(post)}`;
     navigator.clipboard
       .writeText(shareUrl)
       .then(() => alert('Post link copied to clipboard!'))
@@ -709,6 +714,7 @@ export default function RedditPage() {
                 : 'unknown time';
               const commentLabel = `${post.num_comments.toLocaleString()} Comments`;
               const pointsLabel = `${post.score.toLocaleString()} points`;
+              const postUrl = getLocalPostUrl(post);
               const canDelete = user?.id === post.author_id;
               const isDeleting =
                 deleteLocalPostMutation.isPending &&
@@ -742,7 +748,7 @@ export default function RedditPage() {
                           </span>
                         )}
                       </div>
-                      <Link to={`/posts/${post.id}`}>
+                      <Link to={postUrl}>
                         <h3 className="text-base font-semibold text-[var(--color-text-primary)] hover:text-[var(--color-primary)]">
                           {post.title}
                         </h3>
@@ -756,14 +762,14 @@ export default function RedditPage() {
                       </div>
                       <div className="mt-1 flex flex-wrap items-center gap-3 text-[11px] text-[var(--color-text-secondary)]">
                         <Link
-                          to={`/posts/${post.id}`}
+                          to={postUrl}
                           className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
                         >
                           {commentLabel}
                         </Link>
                         <button
                           type="button"
-                          onClick={() => handleShareLocalPost(post.id)}
+                          onClick={() => handleShareLocalPost(post)}
                           className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
                         >
                           Share
