@@ -155,9 +155,10 @@ func createIntegrationTestData(t *testing.T, db *database.Database) (authorID, v
 
 	// Create post
 	postRepo := models.NewPlatformPostRepository(db.Pool)
+	hubIDVal := hub.ID
 	post := &models.PlatformPost{
 		AuthorID: author.ID,
-		HubID:    hub.ID,
+		HubID:    &hubIDVal,
 		Title:    fmt.Sprintf("Test Post %s", uniqueName("post")),
 	}
 	err = postRepo.Create(ctx, post)

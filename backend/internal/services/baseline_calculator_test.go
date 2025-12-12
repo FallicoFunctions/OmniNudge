@@ -93,10 +93,11 @@ func createUserWithContent(t *testing.T, db *database.Database, username string,
 	var commentPostID int
 
 	// Create posts
+	hubIDVal := hub.ID
 	for i := 0; i < numPosts; i++ {
 		post := &models.PlatformPost{
 			AuthorID: user.ID,
-			HubID:    hub.ID,
+			HubID:    &hubIDVal,
 			Title:    "Test Post",
 		}
 		err = postRepo.Create(ctx, post)
@@ -115,7 +116,7 @@ func createUserWithContent(t *testing.T, db *database.Database, username string,
 		if commentPostID == 0 {
 			post := &models.PlatformPost{
 				AuthorID: user.ID,
-				HubID:    hub.ID,
+				HubID:    &hubIDVal,
 				Title:    "Comment Test Post",
 			}
 			err = postRepo.Create(ctx, post)
@@ -269,9 +270,10 @@ func TestBaselineWithOldContent(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create recent post
+	hubIDVal2 := hub.ID
 	post := &models.PlatformPost{
 		AuthorID: user.ID,
-		HubID:    hub.ID,
+		HubID:    &hubIDVal2,
 		Title:    "Recent Post",
 	}
 	err = postRepo.Create(ctx, post)
