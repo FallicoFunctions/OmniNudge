@@ -152,7 +152,7 @@ export default function RedditPage() {
 
   // Check subscription status for current subreddit
   const { data: subscriptionStatus } = useQuery({
-    queryKey: ['subreddit-subscription-status', subreddit],
+    queryKey: ['subreddit-subscription', subreddit],
     queryFn: () => subscriptionService.checkSubredditSubscription(subreddit),
     enabled: !!user && subreddit !== 'popular' && subreddit !== 'frontpage',
     staleTime: 1000 * 60 * 5, // 5 minutes
