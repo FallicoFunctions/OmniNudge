@@ -654,8 +654,8 @@ export function SavedItemsView({
           <div className="w-full max-w-md rounded-lg bg-white p-4 shadow-lg">
             <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">Hide this post?</h3>
             <p className="mt-2 text-sm text-[var(--color-text-secondary)]">
-              Hiding a saved post removes it from your Saved list and sends it to the Hidden tab. Are
-              you sure you want to continue?
+              Hiding this post will remove it from your Saved list and add it to your Hidden items. Are you
+              sure you want to continue?
             </p>
             <div className="mt-4 flex justify-end gap-2">
               <button
