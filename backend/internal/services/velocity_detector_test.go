@@ -174,9 +174,10 @@ func TestExponentialGrowthDetection(t *testing.T) {
 	require.NoError(t, err)
 
 	postRepo := models.NewPlatformPostRepository(db.Pool)
+	hubIDVal := hub.ID
 	post := &models.PlatformPost{
 		AuthorID: user.ID,
-		HubID:    hub.ID,
+		HubID:    &hubIDVal,
 		Title:    "Test Post",
 	}
 	err = postRepo.Create(ctx, post)
@@ -286,9 +287,10 @@ func TestExponentialGrowthWithInsufficientData(t *testing.T) {
 	require.NoError(t, err)
 
 	postRepo := models.NewPlatformPostRepository(db.Pool)
+	hubIDVal2 := hub.ID
 	post := &models.PlatformPost{
 		AuthorID: user.ID,
-		HubID:    hub.ID,
+		HubID:    &hubIDVal2,
 		Title:    "Test Post",
 	}
 	err = postRepo.Create(ctx, post)
