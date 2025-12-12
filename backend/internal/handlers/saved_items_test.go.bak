@@ -82,7 +82,7 @@ func TestGetSavedItems(t *testing.T) {
 	postBody := "Test body"
 	post := &models.PlatformPost{
 		AuthorID: userID,
-		HubID:    &hubID,
+		HubID:    hubID,
 		Title:    "Test Post",
 		Body:     &postBody,
 	}
@@ -196,7 +196,7 @@ func TestGetHiddenItems(t *testing.T) {
 	postBody := "Test body"
 	post := &models.PlatformPost{
 		AuthorID: userID,
-		HubID:    &hubID,
+		HubID:    hubID,
 		Title:    "Test Post",
 		Body:     &postBody,
 	}
@@ -296,7 +296,7 @@ func TestSavePost(t *testing.T) {
 	postBody := "Test body"
 	post := &models.PlatformPost{
 		AuthorID: 2, // Different user
-		HubID:    &hubID,
+		HubID:    hubID,
 		Title:    "Test Post",
 		Body:     &postBody,
 	}
@@ -381,7 +381,7 @@ func TestUnsavePost(t *testing.T) {
 	postBody := "Test body"
 	post := &models.PlatformPost{
 		AuthorID: 2,
-		HubID:    &hubID,
+		HubID:    hubID,
 		Title:    "Test Post",
 		Body:     &postBody,
 	}
@@ -495,7 +495,7 @@ func TestHidePost(t *testing.T) {
 	postBody := "Test body"
 	post := &models.PlatformPost{
 		AuthorID: 2,
-		HubID:    &hubID,
+		HubID:    hubID,
 		Title:    "Test Post",
 		Body:     &postBody,
 	}
@@ -544,7 +544,7 @@ func TestUnhidePost(t *testing.T) {
 	postBody := "Test body"
 	post := &models.PlatformPost{
 		AuthorID: 2,
-		HubID:    &hubID,
+		HubID:    hubID,
 		Title:    "Test Post",
 		Body:     &postBody,
 	}

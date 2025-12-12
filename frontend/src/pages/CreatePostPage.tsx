@@ -194,6 +194,11 @@ export default function CreatePostPage() {
       post_type: activeTab,
     };
 
+    console.log('[CreatePostPage] Submitting post with data:', data);
+    console.log('[CreatePostPage] Current destination:', destination);
+    console.log('[CreatePostPage] hubId:', hubId);
+    console.log('[CreatePostPage] targetSubreddit:', targetSubreddit);
+
     createPostMutation.mutate(data);
   };
 

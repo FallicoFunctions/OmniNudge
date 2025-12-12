@@ -14,7 +14,7 @@ type PlatformPost struct {
 	ID       int   `json:"id"`
 	AuthorID int   `json:"author_id"`
 	Author   *User `json:"author,omitempty"` // Optional populated user info
-	HubID    int   `json:"hub_id"`
+	HubID    *int  `json:"hub_id,omitempty"` // Optional: only set for hub posts
 	Hub      *Hub  `json:"hub,omitempty"`
 
 	// Post content
@@ -232,7 +232,7 @@ func (r *PlatformPostRepository) GetByHub(ctx context.Context, hubID int, sortBy
 	query := `
 		SELECT ` + platformPostSelectColumns + `
 		FROM platform_posts
-		WHERE hub_id = $1 AND is_deleted = FALSE
+		WHERE hub_id = $1 AND is_deleted = FALSE AND (target_subreddit IS NULL OR target_subreddit = '')
 		` + orderClause + `
 		LIMIT $2 OFFSET $3
 	`
@@ -534,7 +534,7 @@ func (r *PlatformPostRepository) GetPopularFeed(
 	}
 
 	// Build WHERE clause for subscription filtering
-	whereClause := `WHERE p.is_deleted = FALSE AND h.is_quarantined = FALSE`
+	whereClause := `WHERE p.is_deleted = FALSE AND h.is_quarantined = FALSE AND p.target_subreddit IS NULL`
 	if hasSubscriptions && len(subscribedHubIDs) > 0 {
 		whereClause += ` AND p.hub_id = ANY($1)`
 	}
@@ -604,7 +604,7 @@ func (r *PlatformPostRepository) GetAllFeed(
 	query := `
 		SELECT ` + platformPostSelectColumns + `
 		FROM platform_posts
-		WHERE is_deleted = FALSE
+		WHERE is_deleted = FALSE AND target_subreddit IS NULL
 		` + orderClause + `
 		LIMIT $1 OFFSET $2
 	`
