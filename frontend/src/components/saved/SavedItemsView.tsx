@@ -54,6 +54,10 @@ export function SavedItemsView({
     queryKey: ['saved-items', 'all'],
     queryFn: () => savedService.getSavedItems(),
   });
+  const { data: hiddenPostsData } = useQuery({
+    queryKey: ['hidden-items', 'reddit_posts'],
+    queryFn: () => savedService.getHiddenItems('reddit_posts'),
+  });
 
   const savedPosts = useMemo(
     () => (data?.saved_posts ?? []) as SavedPost[],
@@ -70,6 +74,15 @@ export function SavedItemsView({
   const savedRedditComments = useMemo(
     () => (data?.saved_reddit_comments ?? []) as LocalRedditComment[],
     [data?.saved_reddit_comments]
+  );
+  const hiddenRedditPostIds = useMemo(
+    () =>
+      new Set(
+        hiddenPostsData?.hidden_reddit_posts?.map(
+          (post) => `${post.subreddit}-${post.reddit_post_id}`
+        ) ?? []
+      ),
+    [hiddenPostsData?.hidden_reddit_posts]
   );
   const [postDetails, setPostDetails] = useState<Record<string, Partial<SavedRedditPost>>>({});
   const fetchingDetailsRef = useRef<Set<string>>(new Set());
@@ -173,6 +186,15 @@ export function SavedItemsView({
     },
   });
 
+  const visibleSavedRedditPosts = useMemo(
+    () =>
+      savedRedditPosts.filter((post) => {
+        const postKey = `${post.subreddit}-${post.reddit_post_id}`;
+        return !hiddenRedditPostIds.has(postKey);
+      }),
+    [savedRedditPosts, hiddenRedditPostIds]
+  );
+
   const handleShareRedditPost = (post: SavedRedditPost) => {
     const shareUrl = `${window.location.origin}/reddit/r/${post.subreddit}/comments/${post.reddit_post_id}`;
     navigator.clipboard
@@ -214,7 +236,7 @@ export function SavedItemsView({
           <div className="mt-2 flex gap-4 text-xs text-[var(--color-text-secondary)]">
             <span>{post.score} points</span>
             <span>•</span>
-            <span>{(post.comment_count ?? post.num_comments ?? 0).toLocaleString()} comments</span>
+            <span>{(post.comment_count ?? 0).toLocaleString()} comments</span>
           </div>
           <div className="mt-3">
             <button
@@ -275,7 +297,7 @@ export function SavedItemsView({
   } = usePagination(omniItems, PAGE_SIZE);
 
   const redditItems = [
-    ...savedRedditPosts.map((post) => ({
+    ...visibleSavedRedditPosts.map((post) => ({
       key: `reddit-post-${post.subreddit}-${post.reddit_post_id}`,
       timestamp: toTimestamp(post.saved_at),
       node: (() => {

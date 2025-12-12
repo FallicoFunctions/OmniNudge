@@ -257,6 +257,7 @@ export function HiddenItemsView({
         const mergedAuthorName = (mergedPost.author ?? '').trim();
         const isAuthorBlocked = mergedAuthorName ? isRedditUserBlocked(mergedAuthorName) : false;
 
+        const hiddenLinkState = { isHidden: true };
         return (
           <article className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)]">
             {isAuthorBlocked ? (
@@ -299,7 +300,7 @@ export function HiddenItemsView({
                   )}
                 </div>
                 <div className="flex-1">
-                  <Link to={postUrl}>
+                  <Link to={postUrl} state={hiddenLinkState}>
                     <h3 className="text-base font-semibold text-[var(--color-text-primary)] hover:text-[var(--color-primary)] text-left">
                       {hasDetails ? mergedPost.title : `r/${post.subreddit}`}
                     </h3>
@@ -330,7 +331,11 @@ export function HiddenItemsView({
                     ))}
                   </div>
                   <div className="mt-1 flex flex-wrap items-center gap-3 text-[11px] text-[var(--color-text-secondary)]">
-                    <Link to={postUrl} className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]">
+                    <Link
+                      to={postUrl}
+                      state={hiddenLinkState}
+                      className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+                    >
                       {commentLinkLabel}
                     </Link>
                     <button
@@ -355,7 +360,7 @@ export function HiddenItemsView({
                     </button>
                     <button
                       type="button"
-                      onClick={() => navigate(postUrl)}
+                      onClick={() => navigate(postUrl, { state: hiddenLinkState })}
                       className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
                     >
                       Crosspost

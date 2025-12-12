@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useParams, useNavigate } from 'react-router-dom';
+import { Link, useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
@@ -865,6 +865,7 @@ export default function RedditPostPage() {
     commentId?: string;
   }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useAuth();
   const { useRelativeTime } = useSettings();
   const { isRedditUserBlocked, blockRedditUser, unblockRedditUser } = useRedditBlocklist();
@@ -887,7 +888,10 @@ export default function RedditPostPage() {
   // Post action states
   const [showHideConfirm, setShowHideConfirm] = useState(false);
   const [showCrosspostModal, setShowCrosspostModal] = useState(false);
-  const [isPostHidden, setIsPostHidden] = useState(false);
+  const initialHiddenState = Boolean(
+    ((location.state as { isHidden?: boolean } | null)?.isHidden) ?? false
+  );
+  const [isPostHidden, setIsPostHidden] = useState(initialHiddenState);
 
   // Crosspost form state
   const [crosspostTitle, setCrosspostTitle] = useState('');
@@ -936,6 +940,12 @@ export default function RedditPostPage() {
     enabled: !!user,
   });
 
+  const { data: hiddenPostsData } = useQuery({
+    queryKey: ['hidden-items', 'reddit_posts'],
+    queryFn: () => savedService.getHiddenItems('reddit_posts'),
+    enabled: !!user,
+  });
+
   // Derive saved status from query data
   const isPostSavedFromBackend = useMemo(() => {
     if (!savedPostsData?.saved_reddit_posts || !subreddit || !postId) {
@@ -945,6 +955,16 @@ export default function RedditPostPage() {
       (p) => p.subreddit === subreddit && p.reddit_post_id === postId
     );
   }, [savedPostsData, subreddit, postId]);
+
+  const isPostHiddenFromBackend = useMemo(() => {
+    if (!hiddenPostsData?.hidden_reddit_posts || !subreddit || !postId) {
+      return false;
+    }
+    return hiddenPostsData.hidden_reddit_posts.some(
+      (p) => p.subreddit === subreddit && p.reddit_post_id === postId
+    );
+  }, [hiddenPostsData, subreddit, postId]);
+  const isPostHiddenOverall = isPostHidden || isPostHiddenFromBackend;
 
   // Fetch Reddit post and comments from Reddit API
   const { data: redditData, isLoading: loadingReddit } = useQuery({
@@ -1165,6 +1185,19 @@ export default function RedditPostPage() {
       setIsPostHidden(true);
       setShowHideConfirm(false);
       redirectAfterHide();
+    },
+  });
+
+  const unhidePostMutation = useMutation({
+    mutationFn: async () => {
+      if (!subreddit || !postId) {
+        throw new Error('Missing post context');
+      }
+      await savedService.unhideRedditPost(subreddit, postId);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['hidden-items', 'reddit_posts'] });
+      setIsPostHidden(false);
     },
   });
 
@@ -1646,9 +1679,24 @@ export default function RedditPostPage() {
                   {savePostMutation.isPending ? 'saving...' : isPostSavedFromBackend ? 'unsave' : 'save'}
                 </button>
                 <span>•</span>
-                <button onClick={() => setShowHideConfirm(true)} className="hover:underline">
-                  hide
-                </button>
+                {isPostHiddenOverall ? (
+                  <button
+                    type="button"
+                    onClick={() => unhidePostMutation.mutate()}
+                    className="hover:underline"
+                    disabled={unhidePostMutation.isPending}
+                  >
+                    {unhidePostMutation.isPending ? 'unhiding...' : 'unhide'}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setShowHideConfirm(true)}
+                    className="hover:underline"
+                  >
+                    hide
+                  </button>
+                )}
                 <span>•</span>
                 <button onClick={openCrosspostModal} className="hover:underline">
                   crosspost
@@ -1911,9 +1959,10 @@ export default function RedditPostPage() {
               </button>
               <button
                 onClick={() => hidePostMutation.mutate()}
-                className="rounded bg-[var(--color-primary)] px-3 py-1 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)]"
+                disabled={hidePostMutation.isPending}
+                className="rounded bg-[var(--color-primary)] px-3 py-1 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)] disabled:opacity-50"
               >
-                Hide Post
+                {hidePostMutation.isPending ? 'Hiding…' : 'Hide Post'}
               </button>
             </div>
           </div>
