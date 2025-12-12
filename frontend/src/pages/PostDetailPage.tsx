@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../contexts/AuthContext';
+import { useSettings } from '../contexts/SettingsContext';
 import { postsService } from '../services/postsService';
 import { savedService } from '../services/savedService';
 import { api } from '../lib/api';
@@ -10,6 +11,7 @@ import type { SavedItemsResponse } from '../types/saved';
 import { CommentItem } from '../components/comments/CommentItem';
 import type { CommentActionHandlers } from '../components/comments/CommentItem';
 import { MarkdownRenderer } from '../components/common/MarkdownRenderer';
+import { formatTimestamp } from '../utils/timeFormat';
 
 const FORMATTING_EXAMPLES = [
   { input: '*italics*', output: '*italics*' },
@@ -30,6 +32,7 @@ export default function PostDetailPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const { useRelativeTime } = useSettings();
 
   const [commentText, setCommentText] = useState('');
   const [showFormattingHelp, setShowFormattingHelp] = useState(false);
@@ -269,7 +272,7 @@ export default function PostDetailPage() {
                 </Link>
               </span>
               <span>•</span>
-              <span>submitted {new Date(postData.crossposted_at ?? postData.created_at).toLocaleString()}</span>
+              <span>submitted {formatTimestamp(postData.crossposted_at ?? postData.created_at, useRelativeTime)}</span>
             </div>
           </div>
 

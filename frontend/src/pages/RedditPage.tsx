@@ -698,6 +698,12 @@ export default function RedditPage() {
                 (post.author_id === user?.id ? user?.username : undefined) ||
                 'unknown';
               const createdTimestamp = post.crossposted_at ?? post.created_at;
+              console.log('[RedditPage] Local post timestamp:', {
+                postId: post.id,
+                createdTimestamp,
+                useRelativeTime,
+                type: typeof createdTimestamp
+              });
               const createdLabel = createdTimestamp
                 ? formatTimestamp(createdTimestamp, useRelativeTime)
                 : 'unknown time';
