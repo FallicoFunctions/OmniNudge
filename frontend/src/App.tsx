@@ -18,8 +18,6 @@ import CreatePostPage from './pages/CreatePostPage';
 import PostsPage from './pages/PostsPage';
 import PostDetailPage from './pages/PostDetailPage';
 import MessagesPage from './pages/MessagesPage';
-import SavedPage from './pages/SavedPage';
-import HiddenPage from './pages/HiddenPage';
 import SettingsPage from './pages/SettingsPage';
 import './App.css';
 
@@ -58,8 +56,6 @@ function App() {
             <Route path="/posts/:postId/comments/:commentId" element={<PostDetailPage />} />
             <Route path="/posts/create" element={<CreatePostPage />} />
             <Route path="/messages" element={<MessagesPage />} />
-            <Route path="/saved" element={<SavedPage />} />
-            <Route path="/hidden" element={<HiddenPage />} />
             <Route path="/settings" element={<SettingsPage />} />
           </Route>
 
