@@ -25,6 +25,7 @@ import {
 } from '../utils/crosspostHelpers';
 import type { SubredditSuggestion } from '../types/reddit';
 import { FlairBadge } from '../components/reddit/FlairBadge';
+import { SubscribeButton } from '../components/common/SubscribeButton';
 
 interface FeedRedditPost extends RedditCrosspostSource {
   id: string;
@@ -142,6 +143,14 @@ export default function RedditPage() {
     queryKey: ['user-subscriptions', 'subreddits'],
     queryFn: () => subscriptionService.getUserSubredditSubscriptions(),
     enabled: !!user,
+  });
+
+  // Check subscription status for current subreddit
+  const { data: subscriptionStatus } = useQuery({
+    queryKey: ['subreddit-subscription-status', subreddit],
+    queryFn: () => subscriptionService.checkSubredditSubscription(subreddit),
+    enabled: !!user && subreddit !== 'popular' && subreddit !== 'frontpage',
+    staleTime: 1000 * 60 * 5, // 5 minutes
   });
 
   const localPostsQueryKey = ['subreddit-posts', subreddit, sort] as const;
@@ -524,15 +533,16 @@ export default function RedditPage() {
         <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
           <div className="text-left md:self-start">
             <h1 className="text-3xl font-bold text-[var(--color-text-primary)]">
-              Currently viewing: r/{subreddit} subreddit
+              r/{subreddit} subreddit
             </h1>
           </div>
 
-          {/* Subreddit Input */}
-          <form
-            onSubmit={handleSubredditSubmit}
-            className="flex gap-2 md:w-80 md:items-center lg:w-96"
-          >
+          <div className="flex flex-col gap-3">
+            {/* Subreddit Input */}
+            <form
+              onSubmit={handleSubredditSubmit}
+              className="flex gap-2 md:w-80 lg:w-96"
+            >
             <div className="relative flex-1 md:flex-initial md:w-full">
               <input
                 type="text"
@@ -602,6 +612,25 @@ export default function RedditPage() {
               Go
             </button>
           </form>
+
+          {/* Subscribe and Create Post Buttons */}
+          {user && subreddit !== 'popular' && subreddit !== 'frontpage' && (
+            <div className="flex w-full items-center gap-2 md:w-auto md:justify-end md:self-end">
+              <SubscribeButton
+                type="subreddit"
+                name={subreddit}
+                initialSubscribed={subscriptionStatus?.is_subscribed ?? false}
+              />
+              <button
+                type="button"
+                onClick={() => navigate(`/submit?subreddit=${subreddit}`)}
+                className="rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+              >
+                Create Post
+              </button>
+            </div>
+          )}
+          </div>
         </div>
       </div>
 
