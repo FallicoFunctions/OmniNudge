@@ -334,7 +334,7 @@ export default function PostDetailPage() {
           <div className="flex gap-4 text-xs text-[var(--color-text-secondary)]">
             <span>{postData.score} points</span>
             <span>•</span>
-            <span>{postData.comment_count} comments</span>
+            <span>{(postData.comment_count ?? postData.num_comments ?? 0).toLocaleString()} comments</span>
             <span>•</span>
             <button onClick={handleSharePost} className="hover:underline">
               share

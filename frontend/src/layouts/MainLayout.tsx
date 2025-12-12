@@ -1,15 +1,50 @@
-import { Link, Outlet, useNavigate } from 'react-router-dom';
+import { useEffect } from 'react';
+import { Link, Outlet, useNavigate, useLocation } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../contexts/AuthContext';
 import ThemeSelector from '../components/themes/ThemeSelector';
+import { usersService } from '../services/usersService';
+import type { UserProfile } from '../types/users';
 
 export default function MainLayout() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const queryClient = useQueryClient();
 
   const handleLogout = () => {
     logout();
     navigate('/login');
   };
+
+  useEffect(() => {
+    if (!user) {
+      return;
+    }
+
+    const ping = async () => {
+      try {
+        const lastSeen = await usersService.ping();
+        if (lastSeen) {
+          queryClient.setQueryData<UserProfile | undefined>(
+            ['user-profile', user.username],
+            (previous) =>
+              previous
+                ? {
+                    ...previous,
+                    last_seen: lastSeen,
+                  }
+                : previous
+          );
+        }
+        queryClient.invalidateQueries({ queryKey: ['user-profile', user.username] });
+      } catch (err) {
+        console.error('Presence ping failed:', err);
+      }
+    };
+
+    ping();
+  }, [user?.id, user?.username, location.pathname, queryClient]);
 
   return (
     <div className="min-h-screen bg-[var(--color-background)]">
@@ -66,7 +101,7 @@ export default function MainLayout() {
               {user && (
                 <>
                   <Link
-                    to={`/profile/${user.username}`}
+                    to={`/users/${user.username}`}
                     className="text-sm font-medium text-[var(--color-text-primary)]"
                   >
                     {user.username}
