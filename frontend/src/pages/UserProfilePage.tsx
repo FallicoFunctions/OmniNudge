@@ -8,14 +8,21 @@ import { formatTimestamp } from '../utils/timeFormat';
 import type { PlatformPost, PostComment } from '../types/posts';
 import type { UserProfile } from '../types/users';
 import { MarkdownRenderer } from '../components/common/MarkdownRenderer';
+import SavedItemsView from '../components/saved/SavedItemsView';
+import HiddenItemsView from '../components/saved/HiddenItemsView';
 
-const TABS = [
+const BASE_TABS = [
   { key: 'overview', label: 'Overview' },
   { key: 'posts', label: 'Posts' },
   { key: 'comments', label: 'Comments' },
 ] as const;
 
-type TabKey = (typeof TABS)[number]['key'];
+const PRIVATE_TABS = [
+  { key: 'saved', label: 'Saved' },
+  { key: 'hidden', label: 'Hidden' },
+] as const;
+
+type TabKey = (typeof BASE_TABS)[number]['key'] | (typeof PRIVATE_TABS)[number]['key'];
 
 function PostsSection({
   posts,
@@ -119,6 +126,19 @@ export default function UserProfilePage() {
   const { user } = useAuth();
   const { useRelativeTime } = useSettings();
   const [activeTab, setActiveTab] = useState<TabKey>('overview');
+  const canViewPrivateTabs = user?.username === username;
+
+  const visibleTabs = useMemo(() => {
+    const baseTabs = [...BASE_TABS];
+    if (canViewPrivateTabs) {
+      baseTabs.push(...PRIVATE_TABS);
+    }
+    return baseTabs;
+  }, [canViewPrivateTabs]);
+  const resolvedActiveTab =
+    !canViewPrivateTabs && (activeTab === 'saved' || activeTab === 'hidden')
+      ? 'overview'
+      : activeTab;
 
   const profileQuery = useQuery<UserProfile>({
     queryKey: ['user-profile', username],
@@ -172,12 +192,30 @@ export default function UserProfilePage() {
   const lastSeenLabel = profile ? formatTimestamp(profile.last_seen, useRelativeTime) : '';
 
   const renderActiveTab = () => {
-    if (activeTab === 'posts') {
+    if (resolvedActiveTab === 'posts') {
       return <PostsSection posts={posts} useRelativeTime={useRelativeTime} />;
     }
 
-    if (activeTab === 'comments') {
+    if (resolvedActiveTab === 'comments') {
       return <CommentsSection comments={comments} useRelativeTime={useRelativeTime} />;
+    }
+
+    if (resolvedActiveTab === 'saved') {
+      if (!canViewPrivateTabs) {
+        return <p className="text-sm text-[var(--color-text-secondary)]">Saved items are private.</p>;
+      }
+      return (
+        <SavedItemsView withContainer={false} showHeading={false} className="space-y-6" />
+      );
+    }
+
+    if (resolvedActiveTab === 'hidden') {
+      if (!canViewPrivateTabs) {
+        return <p className="text-sm text-[var(--color-text-secondary)]">Hidden items are private.</p>;
+      }
+      return (
+        <HiddenItemsView withContainer={false} showHeading={false} className="space-y-6" />
+      );
     }
 
     return (
@@ -284,13 +322,13 @@ export default function UserProfilePage() {
 
       <div className="mt-6 border-b border-[var(--color-border)]">
         <div className="-mb-px flex gap-4">
-          {TABS.map((tab) => (
+          {visibleTabs.map((tab) => (
             <button
               key={tab.key}
               type="button"
               onClick={() => setActiveTab(tab.key)}
               className={`border-b-2 px-4 py-2 text-sm font-semibold ${
-                activeTab === tab.key
+                resolvedActiveTab === tab.key
                   ? 'border-[var(--color-primary)] text-[var(--color-primary)]'
                   : 'border-transparent text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
               }`}
