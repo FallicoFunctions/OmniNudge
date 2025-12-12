@@ -85,6 +85,7 @@ export function HiddenItemsView({
   );
   const [postDetails, setPostDetails] = useState<Record<string, Partial<SavedRedditPost>>>({});
   const fetchingDetailsRef = useRef<Set<string>>(new Set());
+  const [saveConfirmTarget, setSaveConfirmTarget] = useState<SavedRedditPost | null>(null);
 
   const postsNeedingDetails = useMemo(
     () =>
@@ -166,6 +167,21 @@ export function HiddenItemsView({
     onSuccess: () => invalidateHiddenQueries(),
     onError: (mutationError: Error) => {
       alert(`Failed to unhide Reddit post: ${mutationError.message}`);
+    },
+  });
+
+  const resaveRedditPostMutation = useMutation({
+    mutationFn: async ({ subreddit, reddit_post_id }: { subreddit: string; reddit_post_id: string }) => {
+      await savedService.unhideRedditPost(subreddit, reddit_post_id);
+      await savedService.saveRedditPost(subreddit, reddit_post_id);
+    },
+    onSuccess: () => {
+      invalidateHiddenQueries();
+      queryClient.invalidateQueries({ queryKey: ['saved-items', 'reddit_posts'] });
+      setSaveConfirmTarget(null);
+    },
+    onError: (mutationError: Error) => {
+      alert(`Failed to save post: ${mutationError.message}`);
     },
   });
 
@@ -368,6 +384,13 @@ export function HiddenItemsView({
                     </button>
                     <button
                       type="button"
+                      onClick={() => setSaveConfirmTarget(post)}
+                      className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+                    >
+                      Save
+                    </button>
+                    <button
+                      type="button"
                       onClick={() =>
                         unhideRedditPostMutation.mutate({
                           subreddit: post.subreddit,
@@ -510,6 +533,39 @@ export function HiddenItemsView({
       )}
 
       {!isLoading && renderActiveTab()}
+
+      {saveConfirmTarget && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 px-4">
+          <div className="w-full max-w-md rounded-lg bg-white p-4 shadow-lg">
+            <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">Save this post?</h3>
+            <p className="mt-2 text-sm text-[var(--color-text-secondary)]">
+              Saving this post will remove it from your Hidden list and add it to your Saved items. Are you
+              sure you want to continue?
+            </p>
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                onClick={() => setSaveConfirmTarget(null)}
+                className="rounded border border-[var(--color-border)] px-3 py-1 text-sm hover:bg-[var(--color-surface-elevated)]"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() =>
+                  saveConfirmTarget &&
+                  resaveRedditPostMutation.mutate({
+                    subreddit: saveConfirmTarget.subreddit,
+                    reddit_post_id: saveConfirmTarget.reddit_post_id,
+                  })
+                }
+                disabled={resaveRedditPostMutation.isPending}
+                className="rounded bg-[var(--color-primary)] px-3 py-1 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)] disabled:opacity-50"
+              >
+                {resaveRedditPostMutation.isPending ? 'Saving…' : 'Move to Saved'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 
