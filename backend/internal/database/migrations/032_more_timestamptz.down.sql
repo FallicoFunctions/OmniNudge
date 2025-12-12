@@ -1,165 +1,165 @@
 -- Revert TIMESTAMPTZ columns back to TIMESTAMP (for rollback only)
 
-ALTER TABLE reddit_post_comments
+ALTER TABLE IF EXISTS reddit_post_comments
   ALTER COLUMN created_at TYPE TIMESTAMP USING created_at AT TIME ZONE 'UTC',
   ALTER COLUMN updated_at TYPE TIMESTAMP USING updated_at AT TIME ZONE 'UTC',
   ALTER COLUMN deleted_at TYPE TIMESTAMP USING deleted_at AT TIME ZONE 'UTC';
-ALTER TABLE reddit_post_comments
+ALTER TABLE IF EXISTS reddit_post_comments
   ALTER COLUMN created_at SET DEFAULT CURRENT_TIMESTAMP;
 
-ALTER TABLE theme_ratings
+ALTER TABLE IF EXISTS theme_ratings
   ALTER COLUMN reviewed_at TYPE TIMESTAMP USING reviewed_at AT TIME ZONE 'UTC';
 
-ALTER TABLE user_installed_themes
+ALTER TABLE IF EXISTS user_installed_themes
   ALTER COLUMN installed_at TYPE TIMESTAMP USING installed_at AT TIME ZONE 'UTC',
   ALTER COLUMN last_used_at TYPE TIMESTAMP USING last_used_at AT TIME ZONE 'UTC';
-ALTER TABLE user_installed_themes
+ALTER TABLE IF EXISTS user_installed_themes
   ALTER COLUMN installed_at SET DEFAULT CURRENT_TIMESTAMP;
 
-ALTER TABLE user_theme_purchases
+ALTER TABLE IF EXISTS user_theme_purchases
   ALTER COLUMN purchased_at TYPE TIMESTAMP USING purchased_at AT TIME ZONE 'UTC';
-ALTER TABLE user_theme_purchases
+ALTER TABLE IF EXISTS user_theme_purchases
   ALTER COLUMN purchased_at SET DEFAULT CURRENT_TIMESTAMP;
 
-ALTER TABLE user_theme_variants
+ALTER TABLE IF EXISTS user_theme_variants
   ALTER COLUMN created_at TYPE TIMESTAMP USING created_at AT TIME ZONE 'UTC',
   ALTER COLUMN updated_at TYPE TIMESTAMP USING updated_at AT TIME ZONE 'UTC';
-ALTER TABLE user_theme_variants
+ALTER TABLE IF EXISTS user_theme_variants
   ALTER COLUMN created_at SET DEFAULT CURRENT_TIMESTAMP,
   ALTER COLUMN updated_at SET DEFAULT CURRENT_TIMESTAMP;
 
-ALTER TABLE user_theme_edits
+ALTER TABLE IF EXISTS user_theme_edits
   ALTER COLUMN created_at TYPE TIMESTAMP USING created_at AT TIME ZONE 'UTC',
   ALTER COLUMN updated_at TYPE TIMESTAMP USING updated_at AT TIME ZONE 'UTC';
-ALTER TABLE user_theme_edits
+ALTER TABLE IF EXISTS user_theme_edits
   ALTER COLUMN created_at SET DEFAULT CURRENT_TIMESTAMP,
   ALTER COLUMN updated_at SET DEFAULT CURRENT_TIMESTAMP;
 
-ALTER TABLE predefined_themes
+ALTER TABLE IF EXISTS predefined_themes
   ALTER COLUMN created_at TYPE TIMESTAMP USING created_at AT TIME ZONE 'UTC',
   ALTER COLUMN updated_at TYPE TIMESTAMP USING updated_at AT TIME ZONE 'UTC';
-ALTER TABLE predefined_themes
+ALTER TABLE IF EXISTS predefined_themes
   ALTER COLUMN created_at SET DEFAULT CURRENT_TIMESTAMP,
   ALTER COLUMN updated_at SET DEFAULT CURRENT_TIMESTAMP;
 
-ALTER TABLE slideshow_media_items
+ALTER TABLE IF EXISTS slideshow_media_items
   ALTER COLUMN created_at TYPE TIMESTAMP USING created_at AT TIME ZONE 'UTC';
-ALTER TABLE slideshow_media_items
+ALTER TABLE IF EXISTS slideshow_media_items
   ALTER COLUMN created_at SET DEFAULT CURRENT_TIMESTAMP;
 
-ALTER TABLE slideshow_sessions
+ALTER TABLE IF EXISTS slideshow_sessions
   ALTER COLUMN created_at TYPE TIMESTAMP USING created_at AT TIME ZONE 'UTC',
   ALTER COLUMN updated_at TYPE TIMESTAMP USING updated_at AT TIME ZONE 'UTC';
-ALTER TABLE slideshow_sessions
+ALTER TABLE IF EXISTS slideshow_sessions
   ALTER COLUMN created_at SET DEFAULT CURRENT_TIMESTAMP,
   ALTER COLUMN updated_at SET DEFAULT CURRENT_TIMESTAMP;
 
-ALTER TABLE reddit_posts
+ALTER TABLE IF EXISTS reddit_posts
   ALTER COLUMN created_utc TYPE TIMESTAMP USING created_utc AT TIME ZONE 'UTC',
   ALTER COLUMN cached_at TYPE TIMESTAMP USING cached_at AT TIME ZONE 'UTC',
   ALTER COLUMN expires_at TYPE TIMESTAMP USING expires_at AT TIME ZONE 'UTC';
-ALTER TABLE reddit_posts
+ALTER TABLE IF EXISTS reddit_posts
   ALTER COLUMN cached_at SET DEFAULT CURRENT_TIMESTAMP;
 
-ALTER TABLE invitations
+ALTER TABLE IF EXISTS invitations
   ALTER COLUMN created_at TYPE TIMESTAMP USING created_at AT TIME ZONE 'UTC',
   ALTER COLUMN accepted_at TYPE TIMESTAMP USING accepted_at AT TIME ZONE 'UTC',
   ALTER COLUMN expires_at TYPE TIMESTAMP USING expires_at AT TIME ZONE 'UTC';
-ALTER TABLE invitations
+ALTER TABLE IF EXISTS invitations
   ALTER COLUMN created_at SET DEFAULT CURRENT_TIMESTAMP;
 
-ALTER TABLE media_files
+ALTER TABLE IF EXISTS media_files
   ALTER COLUMN uploaded_at TYPE TIMESTAMP USING uploaded_at AT TIME ZONE 'UTC';
-ALTER TABLE media_files
+ALTER TABLE IF EXISTS media_files
   ALTER COLUMN uploaded_at SET DEFAULT CURRENT_TIMESTAMP;
 
-ALTER TABLE reports
+ALTER TABLE IF EXISTS reports
   ALTER COLUMN created_at TYPE TIMESTAMP USING created_at AT TIME ZONE 'UTC';
-ALTER TABLE reports
+ALTER TABLE IF EXISTS reports
   ALTER COLUMN created_at SET DEFAULT CURRENT_TIMESTAMP;
 
-ALTER TABLE user_baselines
+ALTER TABLE IF EXISTS user_baselines
   ALTER COLUMN last_calculated_at TYPE TIMESTAMP USING last_calculated_at AT TIME ZONE 'UTC';
-ALTER TABLE user_baselines
+ALTER TABLE IF EXISTS user_baselines
   ALTER COLUMN last_calculated_at SET DEFAULT CURRENT_TIMESTAMP;
 
-ALTER TABLE vote_activity
+ALTER TABLE IF EXISTS vote_activity
   ALTER COLUMN hour_bucket TYPE TIMESTAMP USING hour_bucket AT TIME ZONE 'UTC',
   ALTER COLUMN created_at TYPE TIMESTAMP USING created_at AT TIME ZONE 'UTC';
-ALTER TABLE vote_activity
+ALTER TABLE IF EXISTS vote_activity
   ALTER COLUMN created_at SET DEFAULT CURRENT_TIMESTAMP;
 
-ALTER TABLE subreddit_subscriptions
+ALTER TABLE IF EXISTS subreddit_subscriptions
   ALTER COLUMN subscribed_at TYPE TIMESTAMP USING subscribed_at AT TIME ZONE 'UTC';
-ALTER TABLE subreddit_subscriptions
+ALTER TABLE IF EXISTS subreddit_subscriptions
   ALTER COLUMN subscribed_at SET DEFAULT CURRENT_TIMESTAMP;
 
-ALTER TABLE hub_subscriptions
+ALTER TABLE IF EXISTS hub_subscriptions
   ALTER COLUMN subscribed_at TYPE TIMESTAMP USING subscribed_at AT TIME ZONE 'UTC';
-ALTER TABLE hub_subscriptions
+ALTER TABLE IF EXISTS hub_subscriptions
   ALTER COLUMN subscribed_at SET DEFAULT CURRENT_TIMESTAMP;
 
-ALTER TABLE hidden_reddit_posts
+ALTER TABLE IF EXISTS hidden_reddit_posts
   ALTER COLUMN created_at TYPE TIMESTAMP USING created_at AT TIME ZONE 'UTC';
-ALTER TABLE hidden_reddit_posts
+ALTER TABLE IF EXISTS hidden_reddit_posts
   ALTER COLUMN created_at SET DEFAULT CURRENT_TIMESTAMP;
 
-ALTER TABLE hidden_posts
+ALTER TABLE IF EXISTS hidden_posts
   ALTER COLUMN created_at TYPE TIMESTAMP USING created_at AT TIME ZONE 'UTC';
-ALTER TABLE hidden_posts
+ALTER TABLE IF EXISTS hidden_posts
   ALTER COLUMN created_at SET DEFAULT CURRENT_TIMESTAMP;
 
-ALTER TABLE saved_reddit_posts
+ALTER TABLE IF EXISTS saved_reddit_posts
   ALTER COLUMN created_at TYPE TIMESTAMP USING created_at AT TIME ZONE 'UTC';
-ALTER TABLE saved_reddit_posts
+ALTER TABLE IF EXISTS saved_reddit_posts
   ALTER COLUMN created_at SET DEFAULT CURRENT_TIMESTAMP;
 
-ALTER TABLE saved_reddit_comments
+ALTER TABLE IF EXISTS saved_reddit_comments
   ALTER COLUMN created_at TYPE TIMESTAMP USING created_at AT TIME ZONE 'UTC';
-ALTER TABLE saved_reddit_comments
+ALTER TABLE IF EXISTS saved_reddit_comments
   ALTER COLUMN created_at SET DEFAULT CURRENT_TIMESTAMP;
 
-ALTER TABLE saved_posts
+ALTER TABLE IF EXISTS saved_posts
   ALTER COLUMN created_at TYPE TIMESTAMP USING created_at AT TIME ZONE 'UTC';
-ALTER TABLE saved_posts
+ALTER TABLE IF EXISTS saved_posts
   ALTER COLUMN created_at SET DEFAULT CURRENT_TIMESTAMP;
 
-ALTER TABLE notification_batches
+ALTER TABLE IF EXISTS notification_batches
   ALTER COLUMN scheduled_for TYPE TIMESTAMP USING scheduled_for AT TIME ZONE 'UTC',
   ALTER COLUMN created_at TYPE TIMESTAMP USING created_at AT TIME ZONE 'UTC',
   ALTER COLUMN processed_at TYPE TIMESTAMP USING processed_at AT TIME ZONE 'UTC';
-ALTER TABLE notification_batches
+ALTER TABLE IF EXISTS notification_batches
   ALTER COLUMN created_at SET DEFAULT CURRENT_TIMESTAMP;
 
-ALTER TABLE notifications
+ALTER TABLE IF EXISTS notifications
   ALTER COLUMN created_at TYPE TIMESTAMP USING created_at AT TIME ZONE 'UTC';
-ALTER TABLE notifications
+ALTER TABLE IF EXISTS notifications
   ALTER COLUMN created_at SET DEFAULT CURRENT_TIMESTAMP;
 
-ALTER TABLE blocked_users
+ALTER TABLE IF EXISTS blocked_users
   ALTER COLUMN blocked_at TYPE TIMESTAMP USING blocked_at AT TIME ZONE 'UTC';
-ALTER TABLE blocked_users
+ALTER TABLE IF EXISTS blocked_users
   ALTER COLUMN blocked_at SET DEFAULT CURRENT_TIMESTAMP;
 
-ALTER TABLE messages
+ALTER TABLE IF EXISTS messages
   ALTER COLUMN sent_at TYPE TIMESTAMP USING sent_at AT TIME ZONE 'UTC',
   ALTER COLUMN delivered_at TYPE TIMESTAMP USING delivered_at AT TIME ZONE 'UTC',
   ALTER COLUMN read_at TYPE TIMESTAMP USING read_at AT TIME ZONE 'UTC';
-ALTER TABLE messages
+ALTER TABLE IF EXISTS messages
   ALTER COLUMN sent_at SET DEFAULT CURRENT_TIMESTAMP;
 
-ALTER TABLE conversations
+ALTER TABLE IF EXISTS conversations
   ALTER COLUMN created_at TYPE TIMESTAMP USING created_at AT TIME ZONE 'UTC',
   ALTER COLUMN last_message_at TYPE TIMESTAMP USING last_message_at AT TIME ZONE 'UTC';
-ALTER TABLE conversations
+ALTER TABLE IF EXISTS conversations
   ALTER COLUMN created_at SET DEFAULT CURRENT_TIMESTAMP,
   ALTER COLUMN last_message_at SET DEFAULT CURRENT_TIMESTAMP;
 
-ALTER TABLE post_comments
+ALTER TABLE IF EXISTS post_comments
   ALTER COLUMN created_at TYPE TIMESTAMP USING created_at AT TIME ZONE 'UTC',
   ALTER COLUMN edited_at TYPE TIMESTAMP USING edited_at AT TIME ZONE 'UTC';
-ALTER TABLE post_comments
+ALTER TABLE IF EXISTS post_comments
   ALTER COLUMN created_at SET DEFAULT CURRENT_TIMESTAMP;
 
-ALTER TABLE users
+ALTER TABLE IF EXISTS users
   ALTER COLUMN token_expires_at TYPE TIMESTAMP USING token_expires_at AT TIME ZONE 'UTC';
