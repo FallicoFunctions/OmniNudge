@@ -7,6 +7,7 @@ import { api } from '../../lib/api';
 import { useRedditBlocklist } from '../../contexts/RedditBlockContext';
 import { usePagination } from '../../hooks/usePagination';
 import { PaginationControls } from '../common/PaginationControls';
+import { sanitizeHttpUrl } from '../../utils/crosspostHelpers';
 
 type RedditListingData = {
   data?: {
@@ -18,6 +19,21 @@ type RedditListingData = {
         num_comments?: number;
         thumbnail?: string;
         created_utc?: number;
+        preview?: {
+          images?: Array<{
+            source?: { url?: string };
+          }>;
+        };
+        media?: {
+          oembed?: {
+            thumbnail_url?: string;
+          };
+        };
+        secure_media?: {
+          oembed?: {
+            thumbnail_url?: string;
+          };
+        };
       };
     }>;
   };
@@ -98,9 +114,11 @@ export function HiddenItemsView({
             return;
           }
           const normalizedThumbnail =
-            remotePost.thumbnail && remotePost.thumbnail.startsWith('http')
-              ? remotePost.thumbnail
-              : null;
+            sanitizeHttpUrl(remotePost.thumbnail) ??
+            sanitizeHttpUrl(remotePost.preview?.images?.[0]?.source?.url) ??
+            sanitizeHttpUrl(remotePost.media?.oembed?.thumbnail_url) ??
+            sanitizeHttpUrl(remotePost.secure_media?.oembed?.thumbnail_url) ??
+            null;
           setPostDetails((prev) => ({
             ...prev,
             [postKey]: {
@@ -233,10 +251,13 @@ export function HiddenItemsView({
         const displayDate = mergedPost.created_utc
           ? new Date(mergedPost.created_utc * 1000).toLocaleDateString()
           : new Date(post.saved_at).toLocaleDateString();
-        const thumbnail =
-          mergedPost.thumbnail && mergedPost.thumbnail.startsWith('http')
-            ? mergedPost.thumbnail
-            : null;
+        let thumbnail: string | null = null;
+        if (mergedPost.thumbnail) {
+          const sanitized = sanitizeHttpUrl(mergedPost.thumbnail);
+          if (sanitized) {
+            thumbnail = sanitized;
+          }
+        }
         const metaItems: Array<{ label: string; to?: string }> = [
           { label: `r/${post.subreddit}`, to: `/reddit/r/${post.subreddit}` },
         ];
