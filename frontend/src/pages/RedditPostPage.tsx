@@ -1433,8 +1433,22 @@ export default function RedditPostPage() {
   return (
     <div className="w-full max-w-5xl px-4 py-8">
       {/* Post Content Section */}
-      {post && !isPostHidden && (
+      {post && (
         <div className="mb-6 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-6 text-left">
+          {isPostHiddenOverall && (
+            <div className="mb-4 rounded border border-yellow-200 bg-yellow-50 p-3 text-sm text-yellow-900">
+              This post is hidden from your main feeds. You can unhide it to make it reappear in Reddit
+              listings.
+              <button
+                type="button"
+                onClick={() => unhidePostMutation.mutate()}
+                disabled={unhidePostMutation.isPending}
+                className="ml-3 font-semibold text-[var(--color-primary)] hover:underline disabled:opacity-60"
+              >
+                {unhidePostMutation.isPending ? 'Unhiding…' : 'Unhide'}
+              </button>
+            </div>
+          )}
           {isPostAuthorBlocked ? (
             <div className="text-sm text-[var(--color-text-secondary)]">
               You blocked u/{post.author}. This post is hidden.
