@@ -35,14 +35,27 @@ class ApiClient {
       headers,
     });
 
+    const parseJson = async () => {
+      const text = await response.text();
+      if (!text) {
+        return undefined;
+      }
+      return JSON.parse(text);
+    };
+
     if (!response.ok) {
-      const error: ApiError = await response.json().catch(() => ({
-        error: 'Unknown error',
-      }));
+      const error: ApiError =
+        (await parseJson().catch(() => ({ error: 'Unknown error' }))) || {
+          error: 'Unknown error',
+        };
       throw new Error(error.message || error.error);
     }
 
-    return response.json();
+    if (response.status === 204) {
+      return undefined as T;
+    }
+
+    return (await parseJson()) as T;
   }
 
   async get<T>(endpoint: string): Promise<T> {

@@ -11,6 +11,7 @@ import ThemesPage from './pages/ThemesPage';
 import RedditPage from './pages/RedditPage';
 import RedditPostPage from './pages/RedditPostPage';
 import RedditUserPage from './pages/RedditUserPage';
+import UserProfilePage from './pages/UserProfilePage';
 import HubsPage from './pages/HubsPage';
 import CreateHubPage from './pages/CreateHubPage';
 import CreatePostPage from './pages/CreatePostPage';
@@ -48,6 +49,7 @@ function App() {
             <Route path="/reddit/r/:subreddit/comments/:postId" element={<RedditPostPage />} />
             <Route path="/reddit/r/:subreddit/comments/:postId/:commentId" element={<RedditPostPage />} />
             <Route path="/reddit/user/:username" element={<RedditUserPage />} />
+            <Route path="/users/:username" element={<UserProfilePage />} />
             <Route path="/hubs" element={<HubsPage />} />
             <Route path="/hubs/h/:hubname" element={<HubsPage />} />
             <Route path="/hubs/create" element={<CreateHubPage />} />

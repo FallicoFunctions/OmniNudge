@@ -403,6 +403,7 @@ func main() {
 			// User profile management
 			protected.PUT("/users/profile", usersHandler.UpdateProfile)
 			protected.POST("/users/change-password", usersHandler.ChangePassword)
+			protected.POST("/users/me/ping", usersHandler.Ping)
 
 			// User blocking
 			protected.POST("/users/block", blockingHandler.BlockUser)

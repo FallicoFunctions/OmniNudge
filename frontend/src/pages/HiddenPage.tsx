@@ -168,7 +168,7 @@ export default function HiddenPage() {
           <div className="mt-2 flex gap-4 text-xs text-[var(--color-text-secondary)]">
             <span>{post.score} points</span>
             <span>•</span>
-            <span>{post.comment_count} comments</span>
+            <span>{(post.comment_count ?? post.num_comments ?? 0).toLocaleString()} comments</span>
           </div>
           <div className="mt-3 flex gap-3">
             <button

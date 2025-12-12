@@ -1,0 +1,9 @@
+-- Convert users.created_at and users.last_seen to TIMESTAMPTZ so we always store UTC timestamps
+
+ALTER TABLE users
+  ALTER COLUMN created_at TYPE TIMESTAMP WITH TIME ZONE USING created_at AT TIME ZONE 'UTC',
+  ALTER COLUMN last_seen TYPE TIMESTAMP WITH TIME ZONE USING last_seen AT TIME ZONE 'UTC';
+
+ALTER TABLE users
+  ALTER COLUMN created_at SET DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'UTC'),
+  ALTER COLUMN last_seen SET DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'UTC');
