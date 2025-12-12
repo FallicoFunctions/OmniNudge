@@ -18,9 +18,10 @@ func TestPostVoteLifecycle(t *testing.T) {
 
 	user := createUser(t, userRepo, "alice", "user")
 
+	hubID := 1 // default "general" seeded by migration
 	post := &models.PlatformPost{
 		AuthorID: user.ID,
-		HubID:    1, // default "general" seeded by migration
+		HubID:    &hubID,
 		Title:    "hello",
 	}
 	require.NoError(t, postRepo.Create(context.Background(), post))
@@ -68,9 +69,10 @@ func TestCommentVoteLifecycle(t *testing.T) {
 
 	user := createUser(t, userRepo, "bob", "user")
 
+	hubID2 := 1
 	post := &models.PlatformPost{
 		AuthorID: user.ID,
-		HubID:    1,
+		HubID:    &hubID2,
 		Title:    "post",
 	}
 	require.NoError(t, postRepo.Create(context.Background(), post))

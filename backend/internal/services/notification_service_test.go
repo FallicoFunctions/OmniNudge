@@ -82,9 +82,10 @@ func createTestHub(t *testing.T, db *database.Database, name string, creatorID i
 
 func createTestPost(t *testing.T, db *database.Database, authorID, hubID int) int {
 	postRepo := models.NewPlatformPostRepository(db.Pool)
+	hubIDVal := hubID
 	post := &models.PlatformPost{
 		AuthorID: authorID,
-		HubID:    hubID,
+		HubID:    &hubIDVal,
 		Title:    "Test Post",
 		Body:     strPtr("Test body"),
 	}
