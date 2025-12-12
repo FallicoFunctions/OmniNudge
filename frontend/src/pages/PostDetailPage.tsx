@@ -226,6 +226,9 @@ export default function PostDetailPage() {
     );
   }
 
+  const hubName = (postData as any)?.hub?.name || postData?.hub_name;
+  const targetSubreddit = postData?.target_subreddit ?? postData?.crosspost_origin_subreddit ?? null;
+
   return (
     <div className="w-full max-w-5xl px-4 py-8">
       {postData && (
@@ -234,13 +237,28 @@ export default function PostDetailPage() {
           <div className="mb-4">
             <h1 className="text-2xl font-bold text-[var(--color-text-primary)]">{postData.title}</h1>
             <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-[var(--color-text-secondary)]">
-              <Link
-                to={`/hubs/h/${(postData as any).hub?.name || postData.hub_name}`}
-                className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
-              >
-                h/{(postData as any).hub?.name || postData.hub_name}
-              </Link>
-              <span>•</span>
+              {targetSubreddit && (
+                <>
+                  <Link
+                    to={`/reddit/r/${targetSubreddit}`}
+                    className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+                  >
+                    r/{targetSubreddit}
+                  </Link>
+                  <span>•</span>
+                </>
+              )}
+              {hubName && (
+                <>
+                  <Link
+                    to={`/hubs/h/${hubName}`}
+                    className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+                  >
+                    h/{hubName}
+                  </Link>
+                  <span>•</span>
+                </>
+              )}
               <span>
                 Posted by{' '}
                 <Link

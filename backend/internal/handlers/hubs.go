@@ -297,9 +297,10 @@ func (h *HubsHandler) CrosspostToHub(c *gin.Context) {
 	}
 
 	// Create the crosspost as a new platform post
+	hubIDPtr := &hub.ID
 	post := &models.PlatformPost{
 		AuthorID:                 userID.(int),
-		HubID:                    hub.ID,
+		HubID:                    hubIDPtr,
 		Title:                    req.Title,
 		Body:                     req.Body,
 		MediaURL:                 req.MediaURL,
@@ -416,22 +417,11 @@ func (h *HubsHandler) CrosspostToSubreddit(c *gin.Context) {
 		return
 	}
 
-	// Get or create a default hub for subreddit posts
-	// Use "general" hub as the default storage location
-	hub, err := h.hubRepo.GetByName(c.Request.Context(), "general")
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch default hub", "details": err.Error()})
-		return
-	}
-	if hub == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Default hub 'general' not found. Please create it first."})
-		return
-	}
-
 	// Create the crosspost as a new platform post with target_subreddit set
+	// No hub association - this post belongs to the subreddit only
 	post := &models.PlatformPost{
 		AuthorID:                 userID.(int),
-		HubID:                    hub.ID, // Store in general hub
+		HubID:                    nil, // No hub for subreddit-only posts
 		Title:                    req.Title,
 		Body:                     req.Body,
 		MediaURL:                 req.MediaURL,

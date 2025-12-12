@@ -269,8 +269,8 @@ func (h *CommentsHandler) UpdateComment(c *gin.Context) {
 	// Hub mod check
 	isHubMod := false
 	if h.modRepo != nil {
-		if post, _ := h.postRepo.GetByID(c.Request.Context(), existingComment.PostID); post != nil {
-			if ok, err := h.modRepo.IsModerator(c.Request.Context(), post.HubID, userID.(int)); err == nil {
+		if post, _ := h.postRepo.GetByID(c.Request.Context(), existingComment.PostID); post != nil && post.HubID != nil {
+			if ok, err := h.modRepo.IsModerator(c.Request.Context(), *post.HubID, userID.(int)); err == nil {
 				isHubMod = ok
 			}
 		}
@@ -331,8 +331,8 @@ func (h *CommentsHandler) DeleteComment(c *gin.Context) {
 	// Hub mod check
 	isHubMod := false
 	if h.modRepo != nil {
-		if post, _ := h.postRepo.GetByID(c.Request.Context(), existingComment.PostID); post != nil {
-			if ok, err := h.modRepo.IsModerator(c.Request.Context(), post.HubID, userID.(int)); err == nil {
+		if post, _ := h.postRepo.GetByID(c.Request.Context(), existingComment.PostID); post != nil && post.HubID != nil {
+			if ok, err := h.modRepo.IsModerator(c.Request.Context(), *post.HubID, userID.(int)); err == nil {
 				isHubMod = ok
 			}
 		}

@@ -120,16 +120,14 @@ func (h *PostsHandler) CreatePost(c *gin.Context) {
 		return
 	}
 
-	// Resolve hub
-	var hubID int
+	// Resolve hub (only for hub posts)
+	var hubID *int
 	var hub *models.Hub
 	var err error
 
-	switch {
-	case req.HubID != nil:
+	if req.HubID != nil {
 		// Direct hub posting
-		hubID = *req.HubID
-		hub, err = h.hubRepo.GetByID(c.Request.Context(), hubID)
+		hub, err = h.hubRepo.GetByID(c.Request.Context(), *req.HubID)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch hub", "details": err.Error()})
 			return
@@ -138,29 +136,19 @@ func (h *PostsHandler) CreatePost(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Hub not found"})
 			return
 		}
-	case req.TargetSubreddit != nil:
-		// Posting to subreddit: use "general" hub for storage
-		hub, err = h.hubRepo.GetByName(c.Request.Context(), "general")
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch default hub", "details": err.Error()})
-			return
-		}
-		if hub == nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Default hub 'general' not found. Please create it first."})
-			return
-		}
-		hubID = hub.ID
-	}
+		hubID = req.HubID
 
-	// Validate content_options
-	if hub.ContentOptions == "links_only" && req.PostType == "text" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "This hub only accepts link posts"})
-		return
+		// Validate content_options
+		if hub.ContentOptions == "links_only" && req.PostType == "text" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "This hub only accepts link posts"})
+			return
+		}
+		if hub.ContentOptions == "text_only" && req.PostType == "link" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "This hub only accepts text posts"})
+			return
+		}
 	}
-	if hub.ContentOptions == "text_only" && req.PostType == "link" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "This hub only accepts text posts"})
-		return
-	}
+	// If posting to subreddit only, hubID remains nil
 
 	post := &models.PlatformPost{
 		AuthorID:        userID.(int),
@@ -216,10 +204,12 @@ func (h *PostsHandler) GetPost(c *gin.Context) {
 		post.Author = author
 	}
 
-	// Fetch hub name
-	hub, err := h.hubRepo.GetByID(c.Request.Context(), post.HubID)
-	if err == nil && hub != nil {
-		post.Hub = hub
+	// Fetch hub name (if post has a hub)
+	if post.HubID != nil {
+		hub, err := h.hubRepo.GetByID(c.Request.Context(), *post.HubID)
+		if err == nil && hub != nil {
+			post.Hub = hub
+		}
 	}
 
 	c.JSON(http.StatusOK, post)
@@ -326,8 +316,8 @@ func (h *PostsHandler) UpdatePost(c *gin.Context) {
 
 	// Verify user owns this post or is a global moderator/admin or hub moderator
 	isHubMod := false
-	if h.modRepo != nil {
-		if ok, err := h.modRepo.IsModerator(c.Request.Context(), existingPost.HubID, userID.(int)); err == nil {
+	if h.modRepo != nil && existingPost.HubID != nil {
+		if ok, err := h.modRepo.IsModerator(c.Request.Context(), *existingPost.HubID, userID.(int)); err == nil {
 			isHubMod = ok
 		}
 	}
@@ -390,8 +380,8 @@ func (h *PostsHandler) DeletePost(c *gin.Context) {
 
 	// Verify user owns this post or is global mod/admin or hub mod
 	isHubMod := false
-	if h.modRepo != nil {
-		if ok, err := h.modRepo.IsModerator(c.Request.Context(), existingPost.HubID, userID.(int)); err == nil {
+	if h.modRepo != nil && existingPost.HubID != nil {
+		if ok, err := h.modRepo.IsModerator(c.Request.Context(), *existingPost.HubID, userID.(int)); err == nil {
 			isHubMod = ok
 		}
 	}
