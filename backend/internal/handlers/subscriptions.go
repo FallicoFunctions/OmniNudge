@@ -249,6 +249,12 @@ func (h *SubscriptionsHandler) CheckSubredditSubscription(c *gin.Context) {
 	// Check if user is authenticated
 	userID, authenticated := c.Get("user_id")
 
+	response := gin.H{
+		"subreddit":     subredditName,
+		"is_subscribed": false,
+		"subscribed":    false,
+	}
+
 	if authenticated {
 		isSubscribed, err := h.subredditSubRepo.IsSubscribed(c.Request.Context(), userID.(int), subredditName)
 		if err != nil {
@@ -256,16 +262,11 @@ func (h *SubscriptionsHandler) CheckSubredditSubscription(c *gin.Context) {
 			return
 		}
 
-		c.JSON(http.StatusOK, gin.H{
-			"subscribed": isSubscribed,
-			"subreddit":  subredditName,
-		})
-	} else {
-		c.JSON(http.StatusOK, gin.H{
-			"subscribed": false,
-			"subreddit":  subredditName,
-		})
+		response["is_subscribed"] = isSubscribed
+		response["subscribed"] = isSubscribed
 	}
+
+	c.JSON(http.StatusOK, response)
 }
 
 // GetUserSubredditSubscriptions handles GET /api/v1/users/me/subscriptions/subreddits
