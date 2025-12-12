@@ -10,6 +10,7 @@ import type { UserProfile } from '../types/users';
 import { MarkdownRenderer } from '../components/common/MarkdownRenderer';
 import SavedItemsView from '../components/saved/SavedItemsView';
 import HiddenItemsView from '../components/saved/HiddenItemsView';
+import { getPostUrl } from '../utils/postUrl';
 
 const BASE_TABS = [
   { key: 'overview', label: 'Overview' },
@@ -63,7 +64,7 @@ function PostsSection({
                 <span>•</span>
                 <span>posted {formatTimestamp(post.created_at, useRelativeTime)}</span>
               </div>
-              <Link to={`/posts/${post.id}`}>
+              <Link to={getPostUrl(post)}>
                 <h3 className="mt-1 text-lg font-semibold text-[var(--color-text-primary)] hover:text-[var(--color-primary)]">
                   {post.title}
                 </h3>
@@ -129,11 +130,10 @@ export default function UserProfilePage() {
   const canViewPrivateTabs = user?.username === username;
 
   const visibleTabs = useMemo(() => {
-    const baseTabs = [...BASE_TABS];
     if (canViewPrivateTabs) {
-      baseTabs.push(...PRIVATE_TABS);
+      return [...BASE_TABS, ...PRIVATE_TABS];
     }
-    return baseTabs;
+    return BASE_TABS;
   }, [canViewPrivateTabs]);
   const resolvedActiveTab =
     !canViewPrivateTabs && (activeTab === 'saved' || activeTab === 'hidden')

@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { postsService } from '../services/postsService';
 import { savedService } from '../services/savedService';
 import type { CreatePostRequest } from '../types/posts';
+import { getPostUrl } from '../utils/postUrl';
 
 export default function PostsPage() {
   const [isCreating, setIsCreating] = useState(false);
@@ -216,7 +217,7 @@ export default function PostsPage() {
 
                   <h2 className="text-lg font-semibold text-[var(--color-text-primary)]">
                     <Link
-                      to={`/posts/${post.id}`}
+                      to={getPostUrl(post)}
                       className="hover:text-[var(--color-primary)] hover:underline"
                     >
                       {post.title}
@@ -234,7 +235,7 @@ export default function PostsPage() {
                       {(post.comment_count ?? post.num_comments ?? 0).toLocaleString()} comments
                     </span>
                     <Link
-                      to={`/posts/${post.id}`}
+                      to={getPostUrl(post)}
                       className="hover:text-[var(--color-primary)]"
                     >
                       Open
