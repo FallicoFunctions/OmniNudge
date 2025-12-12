@@ -71,7 +71,7 @@ func TestSearchPosts(t *testing.T) {
 	bodyText := "This post contains golang programming content"
 	post := &models.PlatformPost{
 		AuthorID: user.ID,
-		HubID:    &hub.ID,
+		HubID:    hub.ID,
 		Title:    "Golang Tutorial",
 		Body:     &bodyText,
 	}
@@ -123,7 +123,7 @@ func TestSearchComments(t *testing.T) {
 	postRepo := models.NewPlatformPostRepository(db.Pool)
 	post := &models.PlatformPost{
 		AuthorID: user.ID,
-		HubID:    &hub.ID,
+		HubID:    hub.ID,
 		Title:    "Test Post",
 	}
 	err = postRepo.Create(ctx, post)
@@ -281,7 +281,7 @@ func TestSearchPagination(t *testing.T) {
 		bodyText := "Test programming content"
 		post := &models.PlatformPost{
 			AuthorID: user.ID,
-			HubID:    &hub.ID,
+			HubID:    hub.ID,
 			Title:    "Programming Post",
 			Body:     &bodyText,
 		}

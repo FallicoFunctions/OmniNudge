@@ -623,7 +623,11 @@ export default function RedditPage() {
               />
               <button
                 type="button"
-                onClick={() => navigate(`/submit?subreddit=${subreddit}`)}
+                onClick={() =>
+                  navigate('/posts/create', {
+                    state: { defaultSubreddit: subreddit },
+                  })
+                }
                 className="rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
               >
                 Create Post
