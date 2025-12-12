@@ -31,14 +31,14 @@ export function formatRelativeTime(timestamp: number | string | Date): string {
 }
 
 /**
- * Format a timestamp as an absolute date string
+ * Format a timestamp as an absolute date string with time
  */
 export function formatAbsoluteDate(timestamp: number | string | Date): string {
   const date = typeof timestamp === 'number'
     ? new Date(timestamp * 1000) // Assuming Unix timestamp in seconds
     : new Date(timestamp);
 
-  return date.toLocaleDateString();
+  return date.toLocaleString();
 }
 
 /**
