@@ -72,6 +72,7 @@ export interface LocalSubredditPost {
   downvotes: number;
   num_comments: number;
   view_count: number;
+  user_vote?: number | null;
   crosspost_origin_type?: string | null;
   crosspost_origin_subreddit?: string | null;
   crosspost_origin_post_id?: string | null;

@@ -24,8 +24,16 @@ export const postsService = {
     await api.delete(`/posts/${id}`);
   },
 
-  async votePost(id: number, value: number): Promise<void> {
-    await api.post(`/posts/${id}/vote`, { value });
+  async votePost(id: number, value: 1 | -1 | 0): Promise<void> {
+    let isUpvote: boolean | null;
+    if (value === 1) {
+      isUpvote = true;
+    } else if (value === -1) {
+      isUpvote = false;
+    } else {
+      isUpvote = null;
+    }
+    await api.post(`/posts/${id}/vote`, { is_upvote: isUpvote });
   },
 
   async getComments(postId: number): Promise<PostComment[]> {

@@ -9,8 +9,10 @@ import { postsService } from '../services/postsService';
 import { useSettings } from '../contexts/SettingsContext';
 import { formatTimestamp } from '../utils/timeFormat';
 import { savedService } from '../services/savedService';
-import { createLocalCrosspostPayload, type CrosspostRequest } from '../utils/crosspostHelpers';
+import { createLocalCrosspostPayload } from '../utils/crosspostHelpers';
+import type { CrosspostRequest } from '../services/hubsService';
 import { getPostUrl } from '../utils/postUrl';
+import { VoteButtons } from '../components/VoteButtons';
 
 export default function HubsPage() {
   const navigate = useNavigate();
@@ -386,6 +388,14 @@ export default function HubsPage() {
                 className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)]"
               >
                 <div className="flex gap-3 p-3">
+                  {/* Vote buttons */}
+                  <VoteButtons
+                    postId={post.id}
+                    initialScore={post.score}
+                    initialUserVote={post.user_vote ?? null}
+                    layout="vertical"
+                    size="medium"
+                  />
                   {post.thumbnail_url && (
                     <img
                       src={post.thumbnail_url}

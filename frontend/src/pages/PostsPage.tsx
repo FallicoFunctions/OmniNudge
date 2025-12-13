@@ -40,7 +40,7 @@ export default function PostsPage() {
   });
 
   const voteMutation = useMutation({
-    mutationFn: ({ postId, value }: { postId: number; value: number }) =>
+    mutationFn: ({ postId, value }: { postId: number; value: 1 | -1 | 0 }) =>
       postsService.votePost(postId, value),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['posts', 'feed'] });
@@ -65,8 +65,9 @@ export default function PostsPage() {
 
     createPostMutation.mutate({
       title: title.trim(),
-      content: content.trim() || undefined,
-      hub_name: hubName,
+      body: content.trim() || undefined,
+      hub_id: undefined, // Will be resolved from hub_name
+      post_type: 'text',
     });
   };
 

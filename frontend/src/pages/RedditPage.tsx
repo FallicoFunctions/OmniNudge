@@ -15,6 +15,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useSettings } from '../contexts/SettingsContext';
 import { useRedditBlocklist } from '../contexts/RedditBlockContext';
 import { formatTimestamp } from '../utils/timeFormat';
+import { VoteButtons } from '../components/VoteButtons';
 import {
   createLocalCrosspostPayload,
   createRedditCrosspostPayload,
@@ -730,6 +731,14 @@ export default function RedditPage() {
                   className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)]"
                 >
                   <div className="flex gap-3 p-3">
+                    {/* Vote buttons */}
+                    <VoteButtons
+                      postId={post.id}
+                      initialScore={post.score}
+                      initialUserVote={post.user_vote ?? null}
+                      layout="vertical"
+                      size="small"
+                    />
                     {previewImage && (
                       <img
                         src={previewImage}

@@ -37,6 +37,9 @@ type PlatformPost struct {
 	ViewCount   int     `json:"view_count"`
 	HotScore    float64 `json:"hot_score"` // Reddit-style hot ranking score
 
+	// User interaction (only populated when user is authenticated)
+	UserVote *int `json:"user_vote,omitempty"` // -1 (downvote), 0 (no vote), 1 (upvote), or null if not authenticated
+
 	// Status
 	IsDeleted bool       `json:"is_deleted"`
 	IsEdited  bool       `json:"is_edited"`

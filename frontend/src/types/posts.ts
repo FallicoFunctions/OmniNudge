@@ -9,6 +9,7 @@ export interface PlatformPost {
   score: number;
   comment_count?: number;
   num_comments?: number;
+  user_vote?: number | null;
   crossposted_at?: string | null;
   created_at: string;
   updated_at?: string;
