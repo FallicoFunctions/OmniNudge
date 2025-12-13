@@ -12,6 +12,7 @@ import { CommentItem } from '../components/comments/CommentItem';
 import type { CommentActionHandlers } from '../components/comments/CommentItem';
 import { MarkdownRenderer } from '../components/common/MarkdownRenderer';
 import { formatTimestamp } from '../utils/timeFormat';
+import { VoteButtons } from '../components/VoteButtons';
 
 const FORMATTING_EXAMPLES = [
   { input: '*italics*', output: '*italics*' },
@@ -88,7 +89,7 @@ export default function PostDetailPage() {
 
   const handleCreateComment = useMutation({
     mutationFn: (content: string) =>
-      postsService.createComment(parsedPostId, { body: content, parent_comment_id: null }),
+      postsService.createComment(parsedPostId, { body: content, parent_comment_id: undefined }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: commentsQueryKey });
       setCommentText('');
@@ -330,27 +331,34 @@ export default function PostDetailPage() {
             <div className="mb-4 whitespace-pre-wrap text-sm text-[var(--color-text-primary)]">{bodyText}</div>
           )}
 
-          {/* Post Stats */}
-          <div className="flex gap-4 text-xs text-[var(--color-text-secondary)]">
-            <span>{postData.score} points</span>
-            <span>•</span>
-            <span>{(postData.comment_count ?? postData.num_comments ?? 0).toLocaleString()} comments</span>
-            <span>•</span>
-            <button onClick={handleSharePost} className="hover:underline">
-              share
-            </button>
-            <span>•</span>
-            <button onClick={handleSavePost} className="hover:underline">
-              save
-            </button>
-            <span>•</span>
-            <button onClick={handleHidePost} className="hover:underline">
-              hide
-            </button>
-            <span>•</span>
-            <button onClick={handleCrosspost} className="hover:underline">
-              crosspost
-            </button>
+          {/* Vote Buttons and Post Stats */}
+          <div className="flex items-center gap-4">
+            <VoteButtons
+              postId={postData.id}
+              initialScore={postData.score}
+              initialUserVote={postData.user_vote}
+              layout="horizontal"
+              size="medium"
+            />
+            <div className="flex gap-4 text-xs text-[var(--color-text-secondary)]">
+              <span>{(postData.comment_count ?? postData.num_comments ?? 0).toLocaleString()} comments</span>
+              <span>•</span>
+              <button onClick={handleSharePost} className="hover:underline">
+                share
+              </button>
+              <span>•</span>
+              <button onClick={handleSavePost} className="hover:underline">
+                save
+              </button>
+              <span>•</span>
+              <button onClick={handleHidePost} className="hover:underline">
+                hide
+              </button>
+              <span>•</span>
+              <button onClick={handleCrosspost} className="hover:underline">
+                crosspost
+              </button>
+            </div>
           </div>
         </div>
       )}
