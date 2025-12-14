@@ -93,12 +93,9 @@ export default function HubsPage() {
     if (!routeHubname) {
       return;
     }
-    if (routeHubname === 'popular' || routeHubname === 'all') {
-      navigate('/404', { replace: true });
-      return;
-    }
+    // Accept popular/all as valid hub names
     setHubname(routeHubname);
-  }, [routeHubname, navigate]);
+  }, [routeHubname]);
 
   // Fetch posts based on current hub
   const postsQueryKey = ['hub-posts', hubname, sort] as const;
