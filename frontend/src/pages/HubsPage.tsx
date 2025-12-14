@@ -83,19 +83,22 @@ export default function HubsPage() {
       // If user has subscriptions, default to popular (filtered), otherwise all
       if (subscribedHubs.length > 0) {
         setHubname('popular');
-        navigate('/hubs/h/popular', { replace: true });
       } else {
         setHubname('all');
-        navigate('/hubs/h/all', { replace: true });
       }
     }
-  }, [routeHubname, subscribedHubs, navigate]);
+  }, [routeHubname, subscribedHubs]);
 
   useEffect(() => {
-    if (routeHubname) {
-      setHubname(routeHubname);
+    if (!routeHubname) {
+      return;
     }
-  }, [routeHubname]);
+    if (routeHubname === 'popular' || routeHubname === 'all') {
+      navigate('/404', { replace: true });
+      return;
+    }
+    setHubname(routeHubname);
+  }, [routeHubname, navigate]);
 
   // Fetch posts based on current hub
   const postsQueryKey = ['hub-posts', hubname, sort] as const;
