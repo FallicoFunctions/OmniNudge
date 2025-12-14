@@ -165,7 +165,14 @@ func (h *HubsHandler) GetPosts(c *gin.Context) {
 		limit = 25
 	}
 
-	posts, err := h.postRepo.GetByHub(c.Request.Context(), hub.ID, sortBy, limit, offset)
+	// Get optional user ID for vote information
+	var userID *int
+	if uid, exists := c.Get("user_id"); exists {
+		uidInt := uid.(int)
+		userID = &uidInt
+	}
+
+	posts, err := h.postRepo.GetByHubWithUser(c.Request.Context(), hub.ID, sortBy, limit, offset, userID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch posts", "details": err.Error()})
 		return

@@ -228,8 +228,9 @@ func main() {
 			reddit.GET("/posts/:subreddit/:postId/comments", redditCommentsHandler.GetRedditPostComments)
 		}
 
-		// Local hub routes (public feeds)
+		// Local hub routes (public feeds, optional auth for user context)
 		hubs := api.Group("/hubs")
+		hubs.Use(middleware.AuthOptional(authService))
 		{
 			hubs.GET("", hubsHandler.List)
 			hubs.GET("/h/all", hubsHandler.GetAllFeed)

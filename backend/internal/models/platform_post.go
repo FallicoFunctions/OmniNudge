@@ -149,6 +149,39 @@ func (r *PlatformPostRepository) GetByID(ctx context.Context, id int) (*Platform
 	return post, nil
 }
 
+// GetByIDWithUser retrieves a single post by ID with user vote information
+func (r *PlatformPostRepository) GetByIDWithUser(ctx context.Context, id int, userID *int) (*PlatformPost, error) {
+	post := &PlatformPost{}
+
+	query := `
+		SELECT ` + platformPostSelectColumnsPrefixed + `,
+		CASE
+			WHEN pv.is_upvote IS NULL THEN NULL
+			WHEN pv.is_upvote = TRUE THEN 1
+			ELSE -1
+		END as user_vote
+		FROM platform_posts p
+		LEFT JOIN post_votes pv ON pv.post_id = p.id AND pv.user_id = $2
+		WHERE p.id = $1 AND p.is_deleted = FALSE
+	`
+
+	var err error
+	if userID != nil {
+		err = scanPlatformPostWithVote(r.pool.QueryRow(ctx, query, id, *userID), post)
+	} else {
+		err = scanPlatformPostWithVote(r.pool.QueryRow(ctx, query, id, nil), post)
+	}
+
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	return post, nil
+}
+
 // GetFeed retrieves a feed of posts ordered by creation time or score
 func (r *PlatformPostRepository) GetFeed(ctx context.Context, sortBy string, limit, offset int) ([]*PlatformPost, error) {
 	var orderClause string
@@ -217,30 +250,48 @@ func (r *PlatformPostRepository) GetByAuthor(ctx context.Context, authorID int, 
 
 // GetByHub retrieves posts by hub
 func (r *PlatformPostRepository) GetByHub(ctx context.Context, hubID int, sortBy string, limit, offset int) ([]*PlatformPost, error) {
+	return r.GetByHubWithUser(ctx, hubID, sortBy, limit, offset, nil)
+}
+
+// GetByHubWithUser retrieves posts by hub with optional user vote information
+func (r *PlatformPostRepository) GetByHubWithUser(ctx context.Context, hubID int, sortBy string, limit, offset int, userID *int) ([]*PlatformPost, error) {
 	var orderClause string
 	switch sortBy {
 	case "hot":
-		orderClause = "ORDER BY hot_score DESC, created_at DESC"
+		orderClause = "ORDER BY p.hot_score DESC, p.created_at DESC"
 	case "new":
-		orderClause = "ORDER BY created_at DESC"
+		orderClause = "ORDER BY p.created_at DESC"
 	case "top":
-		orderClause = "ORDER BY score DESC, created_at DESC"
+		orderClause = "ORDER BY p.score DESC, p.created_at DESC"
 	case "rising":
 		// Rising sort: score divided by age in hours
-		orderClause = `ORDER BY (score::float / GREATEST(EXTRACT(EPOCH FROM (NOW() - created_at)) / 3600, 1)) DESC`
+		orderClause = `ORDER BY (p.score::float / GREATEST(EXTRACT(EPOCH FROM (NOW() - p.created_at)) / 3600, 1)) DESC`
 	default:
-		orderClause = "ORDER BY hot_score DESC, created_at DESC"
+		orderClause = "ORDER BY p.hot_score DESC, p.created_at DESC"
 	}
 
 	query := `
-		SELECT ` + platformPostSelectColumns + `
-		FROM platform_posts
-		WHERE hub_id = $1 AND is_deleted = FALSE AND (target_subreddit IS NULL OR target_subreddit = '')
+		SELECT ` + platformPostSelectColumnsPrefixed + `,
+		CASE
+			WHEN pv.is_upvote IS NULL THEN NULL
+			WHEN pv.is_upvote = TRUE THEN 1
+			ELSE -1
+		END as user_vote
+		FROM platform_posts p
+		LEFT JOIN post_votes pv ON pv.post_id = p.id AND pv.user_id = $4
+		WHERE p.hub_id = $1 AND p.is_deleted = FALSE AND (p.target_subreddit IS NULL OR p.target_subreddit = '')
 		` + orderClause + `
 		LIMIT $2 OFFSET $3
 	`
 
-	rows, err := r.pool.Query(ctx, query, hubID, limit, offset)
+	var rows pgx.Rows
+	var err error
+	if userID != nil {
+		rows, err = r.pool.Query(ctx, query, hubID, limit, offset, *userID)
+	} else {
+		// When no user, still need to pass a placeholder for the LEFT JOIN
+		rows, err = r.pool.Query(ctx, query, hubID, limit, offset, nil)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -249,7 +300,7 @@ func (r *PlatformPostRepository) GetByHub(ctx context.Context, hubID int, sortBy
 	var posts []*PlatformPost
 	for rows.Next() {
 		post := &PlatformPost{}
-		if err := scanPlatformPost(rows, post); err != nil {
+		if err := scanPlatformPostWithVote(rows, post); err != nil {
 			return nil, err
 		}
 		posts = append(posts, post)
@@ -260,29 +311,46 @@ func (r *PlatformPostRepository) GetByHub(ctx context.Context, hubID int, sortBy
 
 // GetBySubreddit retrieves posts by target subreddit
 func (r *PlatformPostRepository) GetBySubreddit(ctx context.Context, subreddit string, sortBy string, limit, offset int) ([]*PlatformPost, error) {
+	return r.GetBySubredditWithUser(ctx, subreddit, sortBy, limit, offset, nil)
+}
+
+// GetBySubredditWithUser retrieves posts by target subreddit with optional user vote information
+func (r *PlatformPostRepository) GetBySubredditWithUser(ctx context.Context, subreddit string, sortBy string, limit, offset int, userID *int) ([]*PlatformPost, error) {
 	var orderClause string
 	switch sortBy {
 	case "hot":
-		orderClause = "ORDER BY hot_score DESC, created_at DESC"
+		orderClause = "ORDER BY p.hot_score DESC, p.created_at DESC"
 	case "new":
-		orderClause = "ORDER BY created_at DESC"
+		orderClause = "ORDER BY p.created_at DESC"
 	case "top":
-		orderClause = "ORDER BY score DESC, created_at DESC"
+		orderClause = "ORDER BY p.score DESC, p.created_at DESC"
 	case "rising":
-		orderClause = `ORDER BY (score::float / GREATEST(EXTRACT(EPOCH FROM (NOW() - created_at)) / 3600, 1)) DESC`
+		orderClause = `ORDER BY (p.score::float / GREATEST(EXTRACT(EPOCH FROM (NOW() - p.created_at)) / 3600, 1)) DESC`
 	default:
-		orderClause = "ORDER BY hot_score DESC, created_at DESC"
+		orderClause = "ORDER BY p.hot_score DESC, p.created_at DESC"
 	}
 
 	query := `
-		SELECT ` + platformPostSelectColumns + `
-		FROM platform_posts
-		WHERE target_subreddit = $1 AND is_deleted = FALSE
+		SELECT ` + platformPostSelectColumnsPrefixed + `,
+		CASE
+			WHEN pv.is_upvote IS NULL THEN NULL
+			WHEN pv.is_upvote = TRUE THEN 1
+			ELSE -1
+		END as user_vote
+		FROM platform_posts p
+		LEFT JOIN post_votes pv ON pv.post_id = p.id AND pv.user_id = $4
+		WHERE p.target_subreddit = $1 AND p.is_deleted = FALSE
 		` + orderClause + `
 		LIMIT $2 OFFSET $3
 	`
 
-	rows, err := r.pool.Query(ctx, query, subreddit, limit, offset)
+	var rows pgx.Rows
+	var err error
+	if userID != nil {
+		rows, err = r.pool.Query(ctx, query, subreddit, limit, offset, *userID)
+	} else {
+		rows, err = r.pool.Query(ctx, query, subreddit, limit, offset, nil)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -291,7 +359,7 @@ func (r *PlatformPostRepository) GetBySubreddit(ctx context.Context, subreddit s
 	var posts []*PlatformPost
 	for rows.Next() {
 		post := &PlatformPost{}
-		if err := scanPlatformPost(rows, post); err != nil {
+		if err := scanPlatformPostWithVote(rows, post); err != nil {
 			return nil, err
 		}
 		posts = append(posts, post)
@@ -396,6 +464,37 @@ func scanPlatformPost(row pgx.Row, post *PlatformPost) error {
 		&post.CrosspostedAt,
 		&post.CreatedAt,
 		&post.HotScore,
+	)
+}
+
+func scanPlatformPostWithVote(row pgx.Row, post *PlatformPost) error {
+	return row.Scan(
+		&post.ID,
+		&post.AuthorID,
+		&post.HubID,
+		&post.Title,
+		&post.Body,
+		&post.Tags,
+		&post.MediaURL,
+		&post.MediaType,
+		&post.ThumbnailURL,
+		&post.Score,
+		&post.Upvotes,
+		&post.Downvotes,
+		&post.NumComments,
+		&post.ViewCount,
+		&post.IsDeleted,
+		&post.IsEdited,
+		&post.EditedAt,
+		&post.CrosspostOriginType,
+		&post.CrosspostOriginSubreddit,
+		&post.CrosspostOriginPostID,
+		&post.CrosspostOriginalTitle,
+		&post.TargetSubreddit,
+		&post.CrosspostedAt,
+		&post.CreatedAt,
+		&post.HotScore,
+		&post.UserVote,
 	)
 }
 
