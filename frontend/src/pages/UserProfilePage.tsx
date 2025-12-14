@@ -10,6 +10,7 @@ import type { UserProfile } from '../types/users';
 import { MarkdownRenderer } from '../components/common/MarkdownRenderer';
 import SavedItemsView from '../components/saved/SavedItemsView';
 import HiddenItemsView from '../components/saved/HiddenItemsView';
+import SubscribedView from '../components/subscriptions/SubscribedView';
 import { getPostUrl } from '../utils/postUrl';
 
 const BASE_TABS = [
@@ -21,6 +22,7 @@ const BASE_TABS = [
 const PRIVATE_TABS = [
   { key: 'saved', label: 'Saved' },
   { key: 'hidden', label: 'Hidden' },
+  { key: 'subscribed', label: 'Subscribed' },
 ] as const;
 
 type TabKey = (typeof BASE_TABS)[number]['key'] | (typeof PRIVATE_TABS)[number]['key'];
@@ -136,7 +138,7 @@ export default function UserProfilePage() {
     return BASE_TABS;
   }, [canViewPrivateTabs]);
   const resolvedActiveTab =
-    !canViewPrivateTabs && (activeTab === 'saved' || activeTab === 'hidden')
+    !canViewPrivateTabs && (activeTab === 'saved' || activeTab === 'hidden' || activeTab === 'subscribed')
       ? 'overview'
       : activeTab;
 
@@ -215,6 +217,15 @@ export default function UserProfilePage() {
       }
       return (
         <HiddenItemsView withContainer={false} showHeading={false} className="space-y-6" />
+      );
+    }
+
+    if (resolvedActiveTab === 'subscribed') {
+      if (!canViewPrivateTabs) {
+        return <p className="text-sm text-[var(--color-text-secondary)]">Subscriptions are private.</p>;
+      }
+      return (
+        <SubscribedView withContainer={false} showHeading={false} className="space-y-6" />
       );
     }
 
