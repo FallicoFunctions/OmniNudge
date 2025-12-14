@@ -138,6 +138,7 @@ func main() {
 	themesHandler := handlers.NewThemesHandler(themeRepo, themeOverrideRepo, installedThemeRepo, userSettingsRepo, cssSanitizer)
 	redditCommentsHandler := handlers.NewRedditCommentsHandler(redditCommentRepo)
 	savedItemsHandler := handlers.NewSavedItemsHandler(savedItemsRepo, postRepo, commentRepo, redditCommentRepo)
+	feedHandler := handlers.NewFeedHandler(postRepo, hubSubRepo, subredditSubRepo, redditClient)
 
 	// Inject notification service into handlers
 	postsHandler.SetNotificationService(notificationService)
@@ -192,6 +193,13 @@ func main() {
 			auth.GET("/reddit/callback", authHandler.RedditCallback)
 		}
 
+		// Combined feed routes (optional auth)
+		feed := api.Group("/feed")
+		feed.Use(middleware.AuthOptional(authService))
+		{
+			feed.GET("/home", feedHandler.GetHomeFeed)
+		}
+
 		// Public posts routes (no auth required for viewing)
 		posts := api.Group("/posts")
 		posts.Use(middleware.AuthOptional(authService))
@@ -234,6 +242,7 @@ func main() {
 		{
 			hubs.GET("", hubsHandler.List)
 			hubs.GET("/h/all", hubsHandler.GetAllFeed)
+			hubs.GET("/h/popular", hubsHandler.GetPopularFeed)
 			hubs.GET("/search", hubsHandler.SearchHubs)
 			hubs.GET("/trending", hubsHandler.GetTrendingHubs)
 			hubs.GET("/:name", hubsHandler.Get)
@@ -358,9 +367,6 @@ func main() {
 			protected.GET("/users/me/hubs", hubsHandler.GetUserHubs)
 			protected.POST("/hubs/:name/crosspost", hubsHandler.CrosspostToHub)
 			protected.POST("/subreddits/:name/crosspost", hubsHandler.CrosspostToSubreddit)
-
-			// Protected hub feed (personalized/subscriptions)
-			protected.GET("/hubs/h/popular", hubsHandler.GetPopularFeed)
 
 			// Hub subscription routes (auth required)
 			protected.POST("/hubs/:name/subscribe", subscriptionsHandler.SubscribeToHub)

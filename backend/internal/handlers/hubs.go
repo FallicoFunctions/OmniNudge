@@ -461,15 +461,9 @@ func (h *HubsHandler) CrosspostToSubreddit(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{"post": post})
 }
 
-// GetPopularFeed handles GET /api/v1/hubs/h/popular (auth required)
-// Returns filtered, personalized feed (excludes quarantined, filters by subscriptions)
+// GetPopularFeed handles GET /api/v1/hubs/h/popular (auth optional)
+// Returns filtered, personalized feed (excludes quarantined, filters by subscriptions if authenticated)
 func (h *HubsHandler) GetPopularFeed(c *gin.Context) {
-	userID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
-		return
-	}
-
 	sortBy := c.DefaultQuery("sort", "hot")
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "25"))
 	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
@@ -477,19 +471,23 @@ func (h *HubsHandler) GetPopularFeed(c *gin.Context) {
 		limit = 25
 	}
 
-	// Get user's subscribed hub IDs
-	subscribedHubIDs, err := h.hubSubRepo.GetSubscribedHubIDs(c.Request.Context(), userID.(int))
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch subscriptions", "details": err.Error()})
-		return
-	}
+	var subscribedHubIDs []int
 
-	hasSubscriptions := len(subscribedHubIDs) > 0
+	// Check if user is authenticated
+	userID, authenticated := c.Get("user_id")
+	if authenticated {
+		// Get user's subscribed hub IDs
+		var err error
+		subscribedHubIDs, err = h.hubSubRepo.GetSubscribedHubIDs(c.Request.Context(), userID.(int))
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch subscriptions", "details": err.Error()})
+			return
+		}
+	}
+	// If not authenticated, subscribedHubIDs remains empty slice
 
 	posts, err := h.postRepo.GetPopularFeed(
 		c.Request.Context(),
-		userID.(int),
-		hasSubscriptions,
 		subscribedHubIDs,
 		sortBy,
 		limit,
