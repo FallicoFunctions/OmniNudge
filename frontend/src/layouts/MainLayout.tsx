@@ -75,18 +75,28 @@ export default function MainLayout() {
                 >
                   Posts
                 </Link>
-                <Link
-                  to="/messages"
-                  className="rounded-md px-3 py-2 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
-                >
-                  Messages
-                </Link>
+                {user && (
+                  <>
+                    <Link
+                      to="/posts/create"
+                      className="rounded-md px-3 py-2 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
+                    >
+                      Create Post
+                    </Link>
+                    <Link
+                      to="/messages"
+                      className="rounded-md px-3 py-2 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
+                    >
+                      Messages
+                    </Link>
+                  </>
+                )}
               </div>
             </div>
 
             <div className="flex items-center gap-4">
               <ThemeSelector variant="toolbar" />
-              {user && (
+              {user ? (
                 <>
                   <Link
                     to={`/users/${user.username}`}
@@ -106,6 +116,21 @@ export default function MainLayout() {
                   >
                     Logout
                   </button>
+                </>
+              ) : (
+                <>
+                  <Link
+                    to="/login"
+                    className="rounded-md px-3 py-2 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
+                  >
+                    Login
+                  </Link>
+                  <Link
+                    to="/register"
+                    className="rounded-md bg-[var(--color-primary)] px-3 py-2 text-sm font-medium text-white hover:opacity-90"
+                  >
+                    Sign Up
+                  </Link>
                 </>
               )}
             </div>

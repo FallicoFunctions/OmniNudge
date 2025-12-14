@@ -29,11 +29,27 @@ function App() {
         <SettingsProvider>
           <RedditBlockProvider>
             <Routes>
-          {/* Public routes */}
+          {/* Auth routes - no layout */}
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
 
-          {/* Protected routes */}
+          {/* PUBLIC routes - accessible without auth */}
+          <Route element={<MainLayout />}>
+            <Route path="/" element={<HomePage />} />
+            <Route path="/reddit" element={<RedditPage />} />
+            <Route path="/reddit/r/:subreddit" element={<RedditPage />} />
+            <Route path="/reddit/r/:subreddit/comments/:postId" element={<RedditPostPage />} />
+            <Route path="/reddit/r/:subreddit/comments/:postId/:commentId" element={<RedditPostPage />} />
+            <Route path="/reddit/user/:username" element={<RedditUserPage />} />
+            <Route path="/hubs" element={<HubsPage />} />
+            <Route path="/hubs/h/:hubname" element={<HubsPage />} />
+            <Route path="/posts" element={<PostsPage />} />
+            <Route path="/posts/:postId" element={<PostDetailPage />} />
+            <Route path="/posts/:postId/comments/:commentId" element={<PostDetailPage />} />
+            <Route path="/users/:username" element={<UserProfilePage />} />
+          </Route>
+
+          {/* PROTECTED routes - require auth */}
           <Route
             element={
               <ProtectedRoute>
@@ -41,23 +57,11 @@ function App() {
               </ProtectedRoute>
             }
           >
-            <Route path="/" element={<HomePage />} />
-            <Route path="/themes" element={<ThemesPage />} />
-            <Route path="/reddit" element={<RedditPage />} />
-            <Route path="/reddit/r/:subreddit" element={<RedditPage />} />
-            <Route path="/reddit/r/:subreddit/comments/:postId" element={<RedditPostPage />} />
-            <Route path="/reddit/r/:subreddit/comments/:postId/:commentId" element={<RedditPostPage />} />
-            <Route path="/reddit/user/:username" element={<RedditUserPage />} />
-            <Route path="/users/:username" element={<UserProfilePage />} />
-            <Route path="/hubs" element={<HubsPage />} />
-            <Route path="/hubs/h/:hubname" element={<HubsPage />} />
-            <Route path="/hubs/create" element={<CreateHubPage />} />
-            <Route path="/posts" element={<PostsPage />} />
-            <Route path="/posts/:postId" element={<PostDetailPage />} />
-            <Route path="/posts/:postId/comments/:commentId" element={<PostDetailPage />} />
             <Route path="/posts/create" element={<CreatePostPage />} />
+            <Route path="/hubs/create" element={<CreateHubPage />} />
             <Route path="/messages" element={<MessagesPage />} />
             <Route path="/settings" element={<SettingsPage />} />
+            <Route path="/themes" element={<ThemesPage />} />
           </Route>
 
           {/* 404 */}

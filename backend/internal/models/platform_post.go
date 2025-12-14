@@ -611,12 +611,10 @@ func (r *PlatformPostRepository) Vote(ctx context.Context, postID int, userID in
 
 // GetPopularFeed returns filtered, personalized feed (h/popular)
 // Excludes quarantined hubs
-// Filters by user's subscribed hubs if hasSubscriptions=true
-// Sorts by hot_score DESC
+// Optionally filters by subscribed hub IDs if provided
+// Sorts by hot_score DESC (or other sort option)
 func (r *PlatformPostRepository) GetPopularFeed(
 	ctx context.Context,
-	userID int,
-	hasSubscriptions bool,
 	subscribedHubIDs []int,
 	sort string,
 	limit, offset int,
@@ -635,31 +633,34 @@ func (r *PlatformPostRepository) GetPopularFeed(
 		orderClause = "ORDER BY p.hot_score DESC, p.created_at DESC"
 	}
 
-	// Build WHERE clause for subscription filtering
+	// Base WHERE clause excludes deleted posts, quarantined hubs, and crossposted posts
 	whereClause := `WHERE p.is_deleted = FALSE AND h.is_quarantined = FALSE AND p.target_subreddit IS NULL`
-	if hasSubscriptions && len(subscribedHubIDs) > 0 {
-		whereClause += ` AND p.hub_id = ANY($1)`
-	}
-
-	query := `
-		SELECT ` + platformPostSelectColumnsPrefixed + `
-		FROM platform_posts p
-		JOIN hubs h ON p.hub_id = h.id
-		` + whereClause + `
-		` + orderClause
-
-	if hasSubscriptions && len(subscribedHubIDs) > 0 {
-		query += ` LIMIT $2 OFFSET $3`
-	} else {
-		query += ` LIMIT $1 OFFSET $2`
-	}
 
 	var rows pgx.Rows
 	var err error
 
-	if hasSubscriptions && len(subscribedHubIDs) > 0 {
+	if len(subscribedHubIDs) > 0 {
+		// Filter by subscribed hubs
+		whereClause += ` AND p.hub_id = ANY($1)`
+		query := `
+			SELECT ` + platformPostSelectColumnsPrefixed + `
+			FROM platform_posts p
+			JOIN hubs h ON p.hub_id = h.id
+			` + whereClause + `
+			` + orderClause + `
+			LIMIT $2 OFFSET $3`
+
 		rows, err = r.pool.Query(ctx, query, subscribedHubIDs, limit, offset)
 	} else {
+		// No subscription filter - return popular from all non-quarantined hubs
+		query := `
+			SELECT ` + platformPostSelectColumnsPrefixed + `
+			FROM platform_posts p
+			JOIN hubs h ON p.hub_id = h.id
+			` + whereClause + `
+			` + orderClause + `
+			LIMIT $1 OFFSET $2`
+
 		rows, err = r.pool.Query(ctx, query, limit, offset)
 	}
 
