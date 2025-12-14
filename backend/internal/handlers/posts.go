@@ -54,8 +54,15 @@ func (h *PostsHandler) GetSubredditPosts(c *gin.Context) {
 		limit = 25
 	}
 
+	// Get optional user ID for vote information
+	var userID *int
+	if uid, exists := c.Get("user_id"); exists {
+		uidInt := uid.(int)
+		userID = &uidInt
+	}
+
 	// Get posts by subreddit
-	posts, err := h.postRepo.GetBySubreddit(c.Request.Context(), subredditName, sortBy, limit, offset)
+	posts, err := h.postRepo.GetBySubredditWithUser(c.Request.Context(), subredditName, sortBy, limit, offset, userID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch posts", "details": err.Error()})
 		return
@@ -184,7 +191,14 @@ func (h *PostsHandler) GetPost(c *gin.Context) {
 		return
 	}
 
-	post, err := h.postRepo.GetByID(c.Request.Context(), postID)
+	// Get optional user ID for vote information
+	var userID *int
+	if uid, exists := c.Get("user_id"); exists {
+		uidInt := uid.(int)
+		userID = &uidInt
+	}
+
+	post, err := h.postRepo.GetByIDWithUser(c.Request.Context(), postID, userID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get post", "details": err.Error()})
 		return

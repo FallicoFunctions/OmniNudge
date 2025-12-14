@@ -1,6 +1,9 @@
 -- Fix calculate_hot_score function to accept TIMESTAMP WITH TIME ZONE
 -- This fixes the type mismatch caused by migration 030
 
+-- Drop the old version if it exists
+DROP FUNCTION IF EXISTS calculate_hot_score(INTEGER, INTEGER, TIMESTAMP WITHOUT TIME ZONE);
+
 CREATE OR REPLACE FUNCTION calculate_hot_score(
     ups INTEGER,
     downs INTEGER,
