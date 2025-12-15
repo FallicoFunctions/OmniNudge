@@ -37,7 +37,10 @@ export function HubPostCard({
   onDelete,
 }: HubPostCardProps) {
   const resolvedHubName =
-    post.hub_name || post.hub?.name || (hubNameMap && hubNameMap.get(post.hub_id!)) || currentHubName;
+    currentHubName ||
+    post.hub_name ||
+    post.hub?.name ||
+    (post.hub_id ? hubNameMap?.get(post.hub_id) : undefined);
 
   const displayAuthor =
     post.author_username ||
@@ -59,7 +62,7 @@ export function HubPostCard({
 
   return (
     <article className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)]">
-      <div className="flex gap-3 p-3">
+      <div className="flex items-start gap-3 p-3">
         {/* Vote buttons */}
         <VoteButtons
           postId={post.id}
@@ -72,11 +75,17 @@ export function HubPostCard({
           <img
             src={post.thumbnail_url}
             alt=""
-            className="h-16 w-16 flex-shrink-0 rounded object-cover"
+            className="h-14 w-14 flex-shrink-0 rounded object-cover"
           />
         )}
-        <div className="flex-1 text-left">
-          <div className="flex flex-wrap items-center gap-2 text-[11px] text-[var(--color-text-secondary)]">
+        <div className="flex-1 space-y-1 text-left">
+          <Link to={postUrl}>
+            <h3 className="text-lg font-semibold leading-snug text-[var(--color-text-primary)] hover:text-[var(--color-primary)]">
+              {post.title}
+            </h3>
+          </Link>
+
+          <div className="flex flex-wrap items-center gap-2 text-[11px] leading-tight text-[var(--color-text-secondary)]">
             {resolvedHubName ? (
               <Link
                 to={`/hubs/h/${resolvedHubName}`}
@@ -95,13 +104,7 @@ export function HubPostCard({
             <span>submitted {submittedLabel}</span>
           </div>
 
-          <Link to={postUrl}>
-            <h3 className="mt-1 text-lg font-semibold text-[var(--color-text-primary)] hover:text-[var(--color-primary)]">
-              {post.title}
-            </h3>
-          </Link>
-
-          <div className="mt-2 flex flex-wrap items-center gap-3 text-[11px] text-[var(--color-text-secondary)]">
+          <div className="mt-1 flex flex-wrap items-center gap-3 text-[11px] leading-tight text-[var(--color-text-secondary)]">
             <Link
               to={postUrl}
               className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"

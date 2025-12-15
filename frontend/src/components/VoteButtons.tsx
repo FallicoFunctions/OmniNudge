@@ -80,19 +80,19 @@ export function VoteButtons({
 
   const sizeClasses = {
     small: 'text-sm gap-0.5',
-    medium: 'text-base gap-1',
+    medium: 'text-base gap-0',
     large: 'text-lg gap-1.5',
   };
 
   const buttonSizeClasses = {
     small: 'p-0.5 text-base',
-    medium: 'p-1 text-lg',
+    medium: 'p-0 text-base',
     large: 'p-1.5 text-xl',
   };
 
   const scoreSizeClasses = {
     small: 'text-xs font-medium',
-    medium: 'text-sm font-semibold',
+    medium: 'text-xs font-semibold',
     large: 'text-base font-bold',
   };
 

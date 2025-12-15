@@ -11,11 +11,13 @@ import (
 
 // PlatformPost represents a native post created by users
 type PlatformPost struct {
-	ID       int   `json:"id"`
-	AuthorID int   `json:"author_id"`
-	Author   *User `json:"author,omitempty"` // Optional populated user info
-	HubID    *int  `json:"hub_id,omitempty"` // Optional: only set for hub posts
-	Hub      *Hub  `json:"hub,omitempty"`
+	ID             int    `json:"id"`
+	AuthorID       int    `json:"author_id"`
+	Author         *User  `json:"author,omitempty"`   // Optional populated user info
+	AuthorUsername string `json:"author_username,omitempty"` // Author's username
+	HubID          *int   `json:"hub_id,omitempty"`   // Optional: only set for hub posts
+	Hub            *Hub   `json:"hub,omitempty"`
+	HubName        string `json:"hub_name,omitempty"`
 
 	// Post content
 	Title string  `json:"title"`
@@ -437,8 +439,8 @@ func (r *PlatformPostRepository) UpdateCreatedAt(ctx context.Context, postID int
 	return err
 }
 
-func scanPlatformPost(row pgx.Row, post *PlatformPost) error {
-	return row.Scan(
+func scanPlatformPost(row pgx.Row, post *PlatformPost, extraDest ...interface{}) error {
+	dests := []interface{}{
 		&post.ID,
 		&post.AuthorID,
 		&post.HubID,
@@ -464,11 +466,13 @@ func scanPlatformPost(row pgx.Row, post *PlatformPost) error {
 		&post.CrosspostedAt,
 		&post.CreatedAt,
 		&post.HotScore,
-	)
+	}
+	dests = append(dests, extraDest...)
+	return row.Scan(dests...)
 }
 
-func scanPlatformPostWithVote(row pgx.Row, post *PlatformPost) error {
-	return row.Scan(
+func scanPlatformPostWithVote(row pgx.Row, post *PlatformPost, extraDest ...interface{}) error {
+	dests := []interface{}{
 		&post.ID,
 		&post.AuthorID,
 		&post.HubID,
@@ -495,7 +499,9 @@ func scanPlatformPostWithVote(row pgx.Row, post *PlatformPost) error {
 		&post.CreatedAt,
 		&post.HotScore,
 		&post.UserVote,
-	)
+	}
+	dests = append(dests, extraDest...)
+	return row.Scan(dests...)
 }
 
 // Vote records a user's vote and updates aggregate counts, preventing duplicates.
@@ -643,9 +649,10 @@ func (r *PlatformPostRepository) GetPopularFeed(
 		// Filter by subscribed hubs
 		whereClause += ` AND p.hub_id = ANY($1)`
 		query := `
-			SELECT ` + platformPostSelectColumnsPrefixed + `
+			SELECT ` + platformPostSelectColumnsPrefixed + `, h.name as hub_name, u.username as author_username
 			FROM platform_posts p
 			JOIN hubs h ON p.hub_id = h.id
+			JOIN users u ON p.author_id = u.id
 			` + whereClause + `
 			` + orderClause + `
 			LIMIT $2 OFFSET $3`
@@ -654,9 +661,10 @@ func (r *PlatformPostRepository) GetPopularFeed(
 	} else {
 		// No subscription filter - return popular from all non-quarantined hubs
 		query := `
-			SELECT ` + platformPostSelectColumnsPrefixed + `
+			SELECT ` + platformPostSelectColumnsPrefixed + `, h.name as hub_name, u.username as author_username
 			FROM platform_posts p
 			JOIN hubs h ON p.hub_id = h.id
+			JOIN users u ON p.author_id = u.id
 			` + whereClause + `
 			` + orderClause + `
 			LIMIT $1 OFFSET $2`
@@ -672,8 +680,24 @@ func (r *PlatformPostRepository) GetPopularFeed(
 	var posts []*PlatformPost
 	for rows.Next() {
 		post := &PlatformPost{}
-		if err := scanPlatformPost(rows, post); err != nil {
+		var hubName sql.NullString
+		var authorUsername sql.NullString
+		if err := scanPlatformPost(rows, post, &hubName, &authorUsername); err != nil {
 			return nil, err
+		}
+		if hubName.Valid {
+			post.HubName = hubName.String
+			if post.Hub == nil {
+				post.Hub = &Hub{}
+			}
+			post.Hub.Name = hubName.String
+		}
+		if authorUsername.Valid {
+			post.AuthorUsername = authorUsername.String
+			if post.Author == nil {
+				post.Author = &User{}
+			}
+			post.Author.Username = authorUsername.String
 		}
 		posts = append(posts, post)
 	}

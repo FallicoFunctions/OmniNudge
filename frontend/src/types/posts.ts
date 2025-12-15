@@ -6,6 +6,7 @@ export interface PlatformPost {
   author_id: number;
   author_username: string;
   hub_name: string;
+  hub_id?: number | null;
   score: number;
   comment_count?: number;
   num_comments?: number;
