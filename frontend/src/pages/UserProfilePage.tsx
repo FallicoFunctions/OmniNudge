@@ -169,6 +169,7 @@ export default function UserProfilePage() {
     () => commentsQuery.data?.comments ?? [],
     [commentsQuery.data?.comments]
   );
+  const canMessageUser = user && profile && user.username !== profile.username;
 
   useEffect(() => {
     if (!user || !username || user.username !== username) {
@@ -309,7 +310,7 @@ export default function UserProfilePage() {
               </p>
             </div>
           </div>
-          <div className="flex flex-col gap-2 text-sm text-[var(--color-text-secondary)] md:text-right">
+          <div className="flex flex-col gap-2 text-sm text-[var(--color-text-secondary)] md:items-end md:text-right">
             <div>
               <span className="font-semibold text-[var(--color-text-primary)]">
                 {profile.karma.toLocaleString()}
@@ -321,6 +322,14 @@ export default function UserProfilePage() {
                 <span className="font-semibold text-[var(--color-text-primary)]">Public key:</span>{' '}
                 {profile.public_key}
               </div>
+            )}
+            {canMessageUser && (
+              <Link
+                to={`/messages?to=${encodeURIComponent(profile.username)}`}
+                className="inline-flex items-center justify-center rounded-md border border-[var(--color-border)] px-4 py-2 text-sm font-semibold text-[var(--color-text-primary)] hover:border-[var(--color-primary)] hover:text-[var(--color-primary)]"
+              >
+                Message
+              </Link>
             )}
           </div>
         </div>

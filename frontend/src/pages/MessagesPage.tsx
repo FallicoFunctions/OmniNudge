@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { messagesService } from '../services/messagesService';
 import { useAuth } from '../contexts/AuthContext';
@@ -11,6 +12,8 @@ export default function MessagesPage() {
   const [newChatUsername, setNewChatUsername] = useState('');
   const [isCreatingChat, setIsCreatingChat] = useState(false);
   const queryClient = useQueryClient();
+  const [searchParams] = useSearchParams();
+  const toUsernameParam = searchParams.get('to');
 
   const { data: conversations, isLoading: loadingConversations } = useQuery({
     queryKey: ['conversations'],
@@ -54,6 +57,14 @@ export default function MessagesPage() {
   };
 
   const selectedConversation = conversations?.find((c) => c.id === selectedConversationId);
+
+  useEffect(() => {
+    if (toUsernameParam) {
+      setIsCreatingChat(true);
+      setSelectedConversationId(null);
+      setNewChatUsername(toUsernameParam);
+    }
+  }, [toUsernameParam]);
 
   return (
     <div className="mx-auto flex h-[calc(100vh-8rem)] max-w-6xl gap-4 px-4 py-8">

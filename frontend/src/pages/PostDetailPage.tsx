@@ -74,6 +74,7 @@ export default function PostDetailPage() {
     },
     enabled: Number.isFinite(parsedPostId),
   });
+  const commentsList = useMemo(() => postComments ?? [], [postComments]);
 
   const savedSiteCommentsKey = ['saved-items', 'post_comments'] as const;
   const { data: savedSiteCommentsData } = useQuery<SavedItemsResponse>({
@@ -144,7 +145,6 @@ export default function PostDetailPage() {
   };
 
   const topLevelComments = useMemo(() => {
-    const commentsList = postComments ?? [];
     console.log('[PostDetailPage] Computing topLevelComments, commentsList:', commentsList);
     console.log('[PostDetailPage] focusedCommentId:', focusedCommentId);
     if (focusedCommentId) {
@@ -157,9 +157,9 @@ export default function PostDetailPage() {
     });
     console.log('[PostDetailPage] topLevelComments filtered result:', filtered);
     return filtered;
-  }, [postComments, focusedCommentId]);
+  }, [commentsList, focusedCommentId]);
 
-  const totalCommentsCount = postComments?.length ?? 0;
+  const totalCommentsCount = commentsList.length;
   const commentNotFound = Boolean(
     focusedCommentId && totalCommentsCount > 0 && topLevelComments.length === 0
   );
