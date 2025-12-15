@@ -76,12 +76,26 @@ export default function PostDetailPage() {
   });
   const commentsList = useMemo(() => postComments ?? [], [postComments]);
 
+  const savedPostsKey = ['saved-items', 'posts'] as const;
   const savedSiteCommentsKey = ['saved-items', 'post_comments'] as const;
+  const { data: savedPostsData } = useQuery<SavedItemsResponse>({
+    queryKey: savedPostsKey,
+    queryFn: () => savedService.getSavedItems('posts'),
+    enabled: !!user,
+    staleTime: 1000 * 60 * 5,
+  });
   const { data: savedSiteCommentsData } = useQuery<SavedItemsResponse>({
     queryKey: savedSiteCommentsKey,
     queryFn: () => savedService.getSavedItems('post_comments'),
     enabled: !!user,
   });
+
+  const isPostSaved = useMemo(() => {
+    if (!savedPostsData?.saved_posts || !Number.isFinite(parsedPostId)) {
+      return false;
+    }
+    return savedPostsData.saved_posts.some((post) => post.id === parsedPostId);
+  }, [savedPostsData, parsedPostId]);
 
   const savedCommentIds = useMemo(() => {
     const entries = savedSiteCommentsData?.saved_post_comments ?? [];
@@ -94,6 +108,25 @@ export default function PostDetailPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: commentsQueryKey });
       setCommentText('');
+    },
+  });
+
+  const savePostMutation = useMutation({
+    mutationFn: async (shouldSave: boolean) => {
+      if (!user) {
+        throw new Error('You must be signed in to save posts.');
+      }
+      if (!Number.isFinite(parsedPostId)) {
+        throw new Error('Invalid post');
+      }
+      if (shouldSave) {
+        await savedService.savePost(parsedPostId);
+      } else {
+        await savedService.unsavePost(parsedPostId);
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: savedPostsKey });
     },
   });
 
@@ -197,8 +230,12 @@ export default function PostDetailPage() {
   };
 
   const handleSavePost = async () => {
-    // TODO: Implement save post functionality
-    alert('Save post functionality coming soon!');
+    try {
+      await savePostMutation.mutateAsync(!isPostSaved);
+    } catch (error) {
+      const err = error as Error;
+      alert(`Failed to ${isPostSaved ? 'unsave' : 'save'} post: ${err.message}`);
+    }
   };
 
   const handleHidePost = async () => {
@@ -346,8 +383,16 @@ export default function PostDetailPage() {
                 share
               </button>
               <span>•</span>
-              <button onClick={handleSavePost} className="hover:underline">
-                save
+              <button
+                onClick={handleSavePost}
+                disabled={savePostMutation.isPending}
+                className="hover:underline disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {savePostMutation.isPending
+                  ? 'saving...'
+                  : isPostSaved
+                    ? 'unsave'
+                    : 'save'}
               </button>
               <span>•</span>
               <button onClick={handleHidePost} className="hover:underline">
