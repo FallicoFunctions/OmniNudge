@@ -6,9 +6,8 @@ import type { SavedPost, SavedPostComment, SavedRedditPost } from '../../types/s
 import type { LocalRedditComment } from '../../types/reddit';
 import { api } from '../../lib/api';
 import { useSettings } from '../../contexts/SettingsContext';
-import { useRedditBlocklist } from '../../contexts/RedditBlockContext';
 import { formatTimestamp } from '../../utils/timeFormat';
-import { FlairBadge } from '../reddit/FlairBadge';
+import { RedditPostCard } from '../reddit/RedditPostCard';
 import { usePagination } from '../../hooks/usePagination';
 import { PaginationControls } from '../common/PaginationControls';
 import { sanitizeHttpUrl } from '../../utils/crosspostHelpers';
@@ -65,7 +64,6 @@ export function SavedItemsView({
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { useRelativeTime } = useSettings();
-  const { isRedditUserBlocked, unblockRedditUser } = useRedditBlocklist();
   const [activeTab, setActiveTab] = useState<TabKey>('omni');
   const { data, isLoading, error } = useQuery({
     queryKey: ['saved-items', 'all'],
@@ -322,173 +320,46 @@ export function SavedItemsView({
       node: (() => {
         const postKey = `${post.subreddit}-${post.reddit_post_id}`;
         const mergedPost = { ...post, ...(postDetails[postKey] ?? {}) };
-        const hasDetails = Boolean(mergedPost.title);
-        const postUrl = `/reddit/r/${post.subreddit}/comments/${post.reddit_post_id}`;
-        const displayDate = mergedPost.created_utc
-          ? formatTimestamp(mergedPost.created_utc, useRelativeTime)
-          : formatTimestamp(post.saved_at, useRelativeTime);
-        let thumbnail: string | null = null;
-        if (mergedPost.thumbnail) {
-          const sanitized = sanitizeHttpUrl(mergedPost.thumbnail);
-          if (sanitized) {
-            thumbnail = sanitized;
-          }
-        }
-        const metaItems: Array<{ label: string; to?: string }> = [
-          {
-            label: `r/${post.subreddit}`,
-            to: `/reddit/r/${post.subreddit}`,
-          },
-        ];
-        if (hasDetails && mergedPost.author) {
-          metaItems.push({
-            label: `u/${mergedPost.author}`,
-            to: `/reddit/user/${mergedPost.author}`,
-          });
-        }
-        if (hasDetails && typeof mergedPost.score === 'number') {
-          metaItems.push({ label: `${mergedPost.score.toLocaleString()} points` });
-        }
-        if (!hasDetails) {
-          metaItems.push({ label: 'Fetching latest details…' });
-        }
-        metaItems.push({ label: `submitted ${displayDate}` });
-        const commentLinkLabel =
-          hasDetails && typeof mergedPost.num_comments === 'number'
-            ? `${mergedPost.num_comments.toLocaleString()} Comments`
-            : 'View Comments';
-        const mergedAuthorName = (mergedPost.author ?? '').trim();
-        const isAuthorBlocked = mergedAuthorName ? isRedditUserBlocked(mergedAuthorName) : false;
+        const isSaved = true; // Always saved in this view
+        const isSaveActionPending = unsaveRedditPostMutation.isPending &&
+          unsaveRedditPostMutation.variables?.subreddit === post.subreddit &&
+          unsaveRedditPostMutation.variables?.reddit_post_id === post.reddit_post_id;
+
+        // Transform SavedRedditPost to match RedditPostCard's expected shape
+        const redditPost = {
+          id: post.reddit_post_id,
+          title: mergedPost.title || `r/${post.subreddit}`,
+          author: mergedPost.author || 'unknown',
+          subreddit: post.subreddit,
+          score: mergedPost.score ?? 0,
+          num_comments: mergedPost.num_comments ?? 0,
+          created_utc: mergedPost.created_utc ?? Date.parse(post.saved_at) / 1000,
+          thumbnail: mergedPost.thumbnail ?? undefined,
+          url: undefined,
+          selftext: undefined,
+          is_self: false,
+          post_hint: undefined,
+          is_video: false,
+          link_flair_text: mergedPost.link_flair_text ?? undefined,
+          link_flair_background_color: mergedPost.link_flair_background_color ?? undefined,
+          link_flair_text_color: mergedPost.link_flair_text_color ?? undefined,
+        };
 
         return (
-          <article className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)]">
-            {isAuthorBlocked ? (
-              <div className="space-y-3 p-3 text-[11px] text-[var(--color-text-secondary)]">
-                <div className="text-sm font-semibold text-[var(--color-text-primary)]">Reddit Post (blocked)</div>
-                <p className="text-sm text-[var(--color-text-secondary)]">
-                  Content from u/{mergedAuthorName} is hidden because you blocked this Reddit user.
-                </p>
-                <div className="flex flex-wrap items-center gap-3">
-                  <button
-                    type="button"
-                    onClick={() => unblockRedditUser(mergedAuthorName)}
-                    className="text-[var(--color-primary)] hover:underline"
-                  >
-                    Unblock user
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      unsaveRedditPostMutation.mutate({
-                        subreddit: post.subreddit,
-                        reddit_post_id: post.reddit_post_id,
-                      })
-                    }
-                    disabled={unsaveRedditPostMutation.isPending}
-                    className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] disabled:opacity-50"
-                  >
-                    {unsaveRedditPostMutation.isPending ? 'Unsaving...' : 'Unsave'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setHideTargetPost(post)}
-                    className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
-                  >
-                    Hide
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div className="flex gap-3 p-3">
-                <div className="flex flex-col items-start gap-2">
-                  <span className="rounded-full bg-[var(--color-surface-elevated)] px-2 py-0.5 text-[11px] font-semibold uppercase text-[var(--color-text-muted)]">
-                    Reddit Post
-                  </span>
-                  {thumbnail && (
-                    <img src={thumbnail} alt="" className="h-14 w-14 flex-shrink-0 rounded object-cover" />
-                  )}
-                </div>
-                <div className="flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Link to={postUrl} className="flex-1">
-                      <h3 className="text-base font-semibold text-[var(--color-text-primary)] hover:text-[var(--color-primary)] text-left">
-                        {hasDetails ? mergedPost.title : `r/${post.subreddit}`}
-                      </h3>
-                    </Link>
-                    <FlairBadge
-                      text={mergedPost.link_flair_text}
-                      backgroundColor={mergedPost.link_flair_background_color}
-                      textColor={mergedPost.link_flair_text_color}
-                    />
-                  </div>
-                  {!hasDetails && (
-                    <p className="text-xs text-[var(--color-text-muted)]">Fetching latest Reddit data...</p>
-                  )}
-                  <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-[var(--color-text-secondary)]">
-                    {metaItems.map((item, index) => (
-                      <Fragment key={`${postKey}-meta-${item.label}-${index}`}>
-                        {index > 0 && <span>•</span>}
-                        {item.to ? (
-                          <Link to={item.to} className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]">
-                            {item.label}
-                          </Link>
-                        ) : (
-                          <span
-                            className={
-                              item.label === 'Fetching latest details…'
-                                ? 'italic text-[var(--color-text-muted)]'
-                                : undefined
-                            }
-                          >
-                            {item.label}
-                          </span>
-                        )}
-                      </Fragment>
-                    ))}
-                  </div>
-                  <div className="mt-1 flex flex-wrap items-center gap-3 text-[11px] text-[var(--color-text-secondary)]">
-                    <Link to={postUrl} className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]">
-                      {commentLinkLabel}
-                    </Link>
-                    <button
-                      type="button"
-                      onClick={() => handleShareRedditPost(mergedPost)}
-                      className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
-                    >
-                      Share
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        unsaveRedditPostMutation.mutate({
-                          subreddit: post.subreddit,
-                          reddit_post_id: post.reddit_post_id,
-                        })
-                      }
-                      disabled={unsaveRedditPostMutation.isPending}
-                      className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] disabled:opacity-50"
-                    >
-                      {unsaveRedditPostMutation.isPending ? 'Unsaving...' : 'Unsave'}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setHideTargetPost(post)}
-                      className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
-                    >
-                      Hide
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => navigate(postUrl)}
-                      className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
-                    >
-                      Crosspost
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
-          </article>
+          <RedditPostCard
+            post={redditPost}
+            useRelativeTime={useRelativeTime}
+            isSaved={isSaved}
+            isSaveActionPending={isSaveActionPending}
+            pendingShouldSave={false}
+            onShare={() => handleShareRedditPost(mergedPost)}
+            onToggleSave={() => unsaveRedditPostMutation.mutate({
+              subreddit: post.subreddit,
+              reddit_post_id: post.reddit_post_id,
+            })}
+            onHide={() => setHideTargetPost(post)}
+            onCrosspost={() => navigate(`/reddit/r/${post.subreddit}/comments/${post.reddit_post_id}`)}
+          />
         );
       })(),
     })),
