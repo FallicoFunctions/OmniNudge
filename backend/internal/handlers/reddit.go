@@ -473,16 +473,23 @@ func deriveMedia(post services.RedditPost) (string, string) {
 }
 
 func normalizeRedditPost(post services.RedditPost) services.RedditPost {
+	post.Title = html.UnescapeString(post.Title)
+	post.Selftext = html.UnescapeString(post.Selftext)
+	post.Subreddit = html.UnescapeString(post.Subreddit)
+	post.Author = html.UnescapeString(post.Author)
+	post.LinkFlairText = html.UnescapeString(post.LinkFlairText)
+	post.URL = html.UnescapeString(post.URL)
+	post.Permalink = html.UnescapeString(post.Permalink)
+	post.Domain = html.UnescapeString(post.Domain)
+
 	if thumb := sanitizeThumbnail(post.Thumbnail); thumb != "" {
 		post.Thumbnail = thumb
-		return post
-	}
-
-	if preview := extractPreviewThumbnail(post); preview != "" {
+	} else if preview := extractPreviewThumbnail(post); preview != "" {
 		post.Thumbnail = preview
 	} else {
 		post.Thumbnail = ""
 	}
+
 	return post
 }
 

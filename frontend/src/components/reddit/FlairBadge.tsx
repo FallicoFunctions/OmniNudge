@@ -1,3 +1,5 @@
+import { decodeHtmlEntities } from '../../utils/text';
+
 interface FlairBadgeProps {
   text?: string | null;
   backgroundColor?: string | null;
@@ -27,7 +29,7 @@ const resolveTextColor = (value?: string | null) => {
 };
 
 export function FlairBadge({ text, backgroundColor, textColor, className = '' }: FlairBadgeProps) {
-  const trimmed = text?.trim();
+  const trimmed = decodeHtmlEntities(text)?.trim();
   if (!trimmed) {
     return null;
   }
