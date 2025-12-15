@@ -8,6 +8,7 @@ import {
   sanitizeHttpUrl,
   type RedditCrosspostSource,
 } from '../../utils/crosspostHelpers';
+import { decodeHtmlEntities } from '../../utils/text';
 
 interface RedditPostCardProps {
   post: RedditCrosspostSource & {
@@ -124,18 +125,18 @@ export function RedditPostCard({
                 rel="noopener noreferrer"
                 className="flex-1 text-base font-semibold text-[var(--color-text-primary)] hover:text-[var(--color-primary)]"
               >
-                {post.title}
+                {decodeHtmlEntities(post.title)}
               </a>
             ) : (
               <Link
                 to={postUrl}
                 className="flex-1 text-base font-semibold text-[var(--color-text-primary)] hover:text-[var(--color-primary)]"
               >
-                {post.title}
-              </Link>
-            )}
-            <FlairBadge
-              text={post.link_flair_text}
+                {decodeHtmlEntities(post.title)}
+          </Link>
+        )}
+        <FlairBadge
+          text={decodeHtmlEntities(post.link_flair_text)}
               backgroundColor={post.link_flair_background_color}
               textColor={post.link_flair_text_color}
             />
