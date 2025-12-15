@@ -34,6 +34,7 @@ interface RedditPostCardProps {
   onToggleSave?: (shouldSave: boolean) => void;
   onHide?: () => void;
   onCrosspost?: () => void;
+  hideLabel?: string;
 }
 
 const IMAGE_URL_REGEX = /\.(jpe?g|png|gif|webp)$/i;
@@ -89,6 +90,7 @@ export function RedditPostCard({
   onToggleSave,
   onHide,
   onCrosspost,
+  hideLabel = 'Hide',
 }: RedditPostCardProps) {
   const [expandedImageMap, setExpandedImageMap] = useState<Record<string, boolean>>({});
 
@@ -265,7 +267,7 @@ export function RedditPostCard({
                     onClick={onHide}
                     className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
                   >
-                    Hide
+                    {hideLabel}
                   </button>
                 )}
                 {onCrosspost && (

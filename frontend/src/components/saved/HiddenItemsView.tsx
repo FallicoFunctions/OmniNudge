@@ -309,6 +309,7 @@ export function HiddenItemsView({
               reddit_post_id: post.reddit_post_id,
             })}
             onCrosspost={() => navigate(`/reddit/r/${post.subreddit}/comments/${post.reddit_post_id}`, { state: { isHidden: true } })}
+            hideLabel="Unhide"
           />
         );
       })(),
