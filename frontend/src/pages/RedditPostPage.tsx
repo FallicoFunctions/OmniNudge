@@ -908,6 +908,7 @@ export default function RedditPostPage() {
     postId: string;
     commentId?: string;
   }>();
+  const isPlatformPost = postId ? /^\d+$/.test(postId) : false;
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuth();
