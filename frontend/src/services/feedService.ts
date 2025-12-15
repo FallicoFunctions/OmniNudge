@@ -52,7 +52,9 @@ export interface HomeFeedResponse {
 }
 
 export const feedService = {
-  async getHomeFeed(sort = 'hot', limit = 50): Promise<HomeFeedResponse> {
-    return api.get<HomeFeedResponse>(`/feed/home?sort=${sort}&limit=${limit}`);
+  async getHomeFeed(sort = 'hot', limit = 50, omniOnly = false): Promise<HomeFeedResponse> {
+    const params = new URLSearchParams({ sort, limit: String(limit) });
+    params.set('omni_only', omniOnly ? 'true' : 'false');
+    return api.get<HomeFeedResponse>(`/feed/home?${params.toString()}`);
   },
 };
