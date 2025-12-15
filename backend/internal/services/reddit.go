@@ -47,12 +47,20 @@ func (r *RedditClient) SetHTTPClient(client *http.Client) {
 	r.httpClient = client
 }
 
+// normalizeRemovedIndicator lowercases and trims markers used for removal/deletion.
+func normalizeRemovedIndicator(value string) string {
+	return strings.ToLower(strings.TrimSpace(value))
+}
+
 // RedditPost represents a post from Reddit's API
 type RedditPost struct {
 	ID                       string         `json:"id"`
 	Subreddit                string         `json:"subreddit"`
 	Title                    string         `json:"title"`
 	Author                   string         `json:"author"`
+	RemovedByCategory        string         `json:"removed_by_category"`
+	RemovedBy                *string        `json:"removed_by"`
+	BannedBy                 *string        `json:"banned_by"`
 	Selftext                 string         `json:"selftext"`     // Post body text
 	URL                      string         `json:"url"`          // Link or media URL
 	Permalink                string         `json:"permalink"`    // Reddit URL
@@ -316,6 +324,49 @@ func (r *RedditClient) GetFrontPage(ctx context.Context, sort string, timeFilter
 	return &listing, nil
 }
 
+// GetPostInfo fetches metadata for a single Reddit post by its ID.
+func (r *RedditClient) GetPostInfo(ctx context.Context, subreddit string, redditPostID string) (*RedditPost, error) {
+	if redditPostID == "" {
+		return nil, fmt.Errorf("reddit post id required")
+	}
+	_ = subreddit
+
+	url := fmt.Sprintf("https://www.reddit.com/api/info.json?id=t3_%s", redditPostID)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create info request: %w", err)
+	}
+	req.Header.Set("User-Agent", r.userAgent)
+
+	resp, err := r.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch post info: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, nil
+	}
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("reddit API returned status %d: %s", resp.StatusCode, string(body))
+	}
+
+	var listing redditGenericListing
+	if err := json.NewDecoder(resp.Body).Decode(&listing); err != nil {
+		return nil, fmt.Errorf("failed to decode post info: %w", err)
+	}
+	if len(listing.Data.Children) == 0 {
+		return nil, nil
+	}
+
+	var post RedditPost
+	if err := json.Unmarshal(listing.Data.Children[0].Data, &post); err != nil {
+		return nil, fmt.Errorf("failed to parse post info: %w", err)
+	}
+	return &post, nil
+}
+
 // GetPostComments fetches comments for a specific Reddit post
 func (r *RedditClient) GetPostComments(ctx context.Context, subreddit string, postID string, sort string, limit int) (interface{}, error) {
 	cacheKey := fmt.Sprintf("cm:%s:%s:%s:%d", subreddit, postID, sort, limit)
@@ -435,6 +486,35 @@ func (r *RedditClient) SearchPosts(ctx context.Context, query string, subreddit 
 
 	_ = r.setCachedListing(ctx, cacheKey, listing)
 	return &listing, nil
+}
+
+// IsRedditPostRemoved returns true if the Reddit post has been removed or deleted.
+func IsRedditPostRemoved(post *RedditPost) bool {
+	if post == nil {
+		return true
+	}
+	if post.RemovedByCategory != "" {
+		return true
+	}
+	if post.RemovedBy != nil && normalizeRemovedIndicator(*post.RemovedBy) != "" {
+		return true
+	}
+	if post.BannedBy != nil && normalizeRemovedIndicator(*post.BannedBy) != "" {
+		return true
+	}
+
+	title := normalizeRemovedIndicator(post.Title)
+	if title == "[removed]" || title == "[deleted]" || strings.Contains(title, "removed by moderator") {
+		return true
+	}
+	body := normalizeRemovedIndicator(post.Selftext)
+	if body == "[removed]" || body == "[deleted]" {
+		return true
+	}
+	if normalizeRemovedIndicator(post.Author) == "[deleted]" {
+		return true
+	}
+	return false
 }
 
 // AutocompleteSubreddits fetches subreddit suggestions for a given query

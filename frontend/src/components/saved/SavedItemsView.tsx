@@ -50,6 +50,26 @@ type TabKey = 'omni' | 'reddit';
 
 const PAGE_SIZE = 25;
 
+const normalizeRemovedLabel = (value?: string) => value?.trim().toLowerCase() ?? '';
+
+const isRedditPostLikelyRemoved = (post: SavedRedditPost) => {
+  const title = normalizeRemovedLabel(post.title);
+  if (
+    title === '[removed]' ||
+    title === '[deleted]' ||
+    title.includes('removed by moderator')
+  ) {
+    return true;
+  }
+
+  const author = normalizeRemovedLabel(post.author);
+  if (author === '[deleted]') {
+    return true;
+  }
+
+  return false;
+};
+
 type SavedItemsViewProps = {
   withContainer?: boolean;
   showHeading?: boolean;
@@ -63,8 +83,9 @@ export function SavedItemsView({
 }: SavedItemsViewProps) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { useRelativeTime } = useSettings();
+  const { useRelativeTime, notifyRemovedSavedPosts } = useSettings();
   const [activeTab, setActiveTab] = useState<TabKey>('omni');
+  const [removedNoticeDismissed, setRemovedNoticeDismissed] = useState(false);
   const { data, isLoading, error } = useQuery({
     queryKey: ['saved-items', 'all'],
     queryFn: () => savedService.getSavedItems(),
@@ -78,9 +99,13 @@ export function SavedItemsView({
     () => (data?.saved_posts ?? []) as SavedPost[],
     [data?.saved_posts]
   );
-  const savedRedditPosts = useMemo(
+  const rawSavedRedditPosts = useMemo(
     () => (data?.saved_reddit_posts ?? []) as SavedRedditPost[],
     [data?.saved_reddit_posts]
+  );
+  const savedRedditPosts = useMemo(
+    () => rawSavedRedditPosts.filter((post) => !isRedditPostLikelyRemoved(post)),
+    [rawSavedRedditPosts]
   );
   const savedSiteComments = useMemo(
     () => (data?.saved_post_comments ?? []) as SavedPostComment[],
@@ -99,6 +124,11 @@ export function SavedItemsView({
       ),
     [hiddenPostsData?.hidden_reddit_posts]
   );
+  const autoRemovedRedditPosts = data?.auto_removed_reddit_posts ?? [];
+
+  useEffect(() => {
+    setRemovedNoticeDismissed(false);
+  }, [autoRemovedRedditPosts.length]);
   const [postDetails, setPostDetails] = useState<Record<string, Partial<SavedRedditPost>>>({});
   const fetchingDetailsRef = useRef<Set<string>>(new Set());
   const [hideTargetPost, setHideTargetPost] = useState<SavedRedditPost | null>(null);
@@ -510,6 +540,34 @@ export function SavedItemsView({
       {error && (
         <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800">
           Unable to load saved items.
+        </div>
+      )}
+
+      {!isLoading && !error && notifyRemovedSavedPosts && !removedNoticeDismissed && autoRemovedRedditPosts.length > 0 && (
+        <div className="mb-4 rounded-md border border-yellow-200 bg-yellow-50 p-4 text-sm text-yellow-900">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              {autoRemovedRedditPosts.length === 1 ? (
+                <span>1 saved Reddit post was removed by moderators and has been cleaned up.</span>
+              ) : (
+                <span>
+                  {autoRemovedRedditPosts.length} saved Reddit posts were removed by moderators and have been cleaned up.
+                </span>
+              )}
+              <div className="mt-1 text-xs">
+                <Link to="/settings" className="text-[var(--color-primary)] hover:underline">
+                  Manage this alert in Settings
+                </Link>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setRemovedNoticeDismissed(true)}
+              className="rounded border border-yellow-400 px-2 py-1 text-xs font-semibold text-yellow-900 hover:bg-yellow-100"
+            >
+              Dismiss
+            </button>
+          </div>
         </div>
       )}
 
