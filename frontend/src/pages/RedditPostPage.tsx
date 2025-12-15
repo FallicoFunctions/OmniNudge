@@ -17,7 +17,6 @@ import {
 import { MarkdownRenderer } from '../components/common/MarkdownRenderer';
 import { FlairBadge } from '../components/reddit/FlairBadge';
 import { useRedditBlocklist } from '../contexts/RedditBlockContext';
-import PostDetailPage from './PostDetailPage';
 
 interface RedditComment {
   kind: string;
@@ -870,11 +869,6 @@ export default function RedditPostPage() {
   const { useRelativeTime } = useSettings();
   const { isRedditUserBlocked, blockRedditUser, unblockRedditUser } = useRedditBlocklist();
   const queryClient = useQueryClient();
-
-  const isPlatformPost = postId ? /^\d+$/.test(postId) : false;
-  if (isPlatformPost) {
-    return <PostDetailPage />;
-  }
 
   const focusedCommentId = commentId ? Number(commentId) : null;
   const [commentText, setCommentText] = useState('');

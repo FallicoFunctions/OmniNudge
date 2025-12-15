@@ -97,7 +97,8 @@ export const hubsService = {
   },
 
   async getHub(hubName: string): Promise<Hub> {
-    return api.get<Hub>(`/hubs/${hubName}`);
+    const response = await api.get<Hub | { hub: Hub }>(`/hubs/${hubName}`);
+    return 'hub' in response ? response.hub : response;
   },
 
   async getHubPosts(hubName: string, sort: string = 'hot', limit: number = 25, offset: number = 0): Promise<HubPostsResponse> {

@@ -124,10 +124,6 @@ const ThemeEditor = ({ isOpen, onClose, initialTheme = null }: ThemeEditorProps)
     setStatusMessage(null);
   }, [initialTheme, isOpen, predefinedThemes, availableThemes]);
 
-  if (!isOpen) {
-    return null;
-  }
-
   const activeVariableDefinition = useMemo(() => {
     for (const group of THEME_VARIABLE_GROUPS) {
       const match = group.variables.find((variable) => variable.name === selectedVariableName);
@@ -161,8 +157,9 @@ const ThemeEditor = ({ isOpen, onClose, initialTheme = null }: ThemeEditorProps)
   const setVariableError = (variableName: string, message?: string) => {
     setVariableErrors((prev) => {
       if (!message) {
-        const { [variableName]: _, ...rest } = prev;
-        return rest;
+        const next = { ...prev };
+        delete next[variableName];
+        return next;
       }
       return { ...prev, [variableName]: message };
     });
@@ -659,6 +656,10 @@ const ThemeEditor = ({ isOpen, onClose, initialTheme = null }: ThemeEditorProps)
         return null;
     }
   };
+
+  if (!isOpen) {
+    return null;
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">

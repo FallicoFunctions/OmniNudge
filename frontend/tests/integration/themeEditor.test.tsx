@@ -1,4 +1,5 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
+import type { Mock } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import React from 'react';
 import ThemeEditor from '../../src/components/themes/ThemeEditor';
@@ -22,7 +23,16 @@ const createTheme = (overrides: Partial<UserTheme> = {}): UserTheme => ({
   ...overrides,
 });
 
-let mockContextValue: any;
+type AsyncMock = Mock<[], Promise<void>>;
+
+type ThemeContextMockValue = {
+  predefinedThemes: UserTheme[];
+  customThemes: UserTheme[];
+  refreshThemes: AsyncMock;
+  selectTheme: AsyncMock;
+};
+
+let mockContextValue: ThemeContextMockValue;
 
 vi.mock('../../src/hooks/useTheme', () => ({
   useTheme: () => mockContextValue,
@@ -45,8 +55,8 @@ describe('ThemeEditor integration', () => {
     mockContextValue = {
       predefinedThemes: [createTheme({ id: 1 })],
       customThemes: [],
-      refreshThemes: vi.fn().mockResolvedValue(undefined),
-      selectTheme: vi.fn().mockResolvedValue(undefined),
+      refreshThemes: vi.fn<[], Promise<void>>().mockResolvedValue(undefined),
+      selectTheme: vi.fn<[], Promise<void>>().mockResolvedValue(undefined),
     };
     vi.spyOn(themeService, 'createTheme').mockResolvedValue(createTheme({ id: 5 }));
     vi.spyOn(themeService, 'updateTheme').mockResolvedValue(createTheme({ id: 5 }));

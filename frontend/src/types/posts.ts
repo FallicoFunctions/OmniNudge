@@ -18,6 +18,12 @@ export interface PlatformPost {
   thumbnail_url?: string | null;
   target_subreddit?: string | null;
   crosspost_origin_subreddit?: string | null;
+  hub?: {
+    name?: string | null;
+  } | null;
+  author?: {
+    username?: string | null;
+  } | null;
 }
 
 import type { LocalCommentBase } from './comments';
