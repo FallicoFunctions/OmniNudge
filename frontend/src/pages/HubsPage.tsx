@@ -7,12 +7,11 @@ import { useAuth } from '../contexts/AuthContext';
 import { SubscribeButton } from '../components/common/SubscribeButton';
 import { postsService } from '../services/postsService';
 import { useSettings } from '../contexts/SettingsContext';
-import { formatTimestamp } from '../utils/timeFormat';
 import { savedService } from '../services/savedService';
 import { createLocalCrosspostPayload } from '../utils/crosspostHelpers';
 import type { CrosspostRequest } from '../services/hubsService';
 import { getPostUrl } from '../utils/postUrl';
-import { VoteButtons } from '../components/VoteButtons';
+import { HubPostCard } from '../components/hubs/HubPostCard';
 
 export default function HubsPage() {
   const navigate = useNavigate();
@@ -359,128 +358,31 @@ export default function HubsPage() {
       <div className="space-y-3">
         {visiblePosts.length > 0 ? (
           visiblePosts.map((post: LocalSubredditPost) => {
-            const resolvedHubName =
-              post.hub_name || post.hub?.name || hubNameMap.get(post.hub_id) || data?.hub || hubname;
-            const displayAuthor =
-              post.author_username ||
-              post.author?.username ||
-              (post.author_id === user?.id ? user?.username : undefined) ||
-              'Unknown';
-            const pointsLabel = `${post.score.toLocaleString()} point${post.score === 1 ? '' : 's'}`;
-            const submittedLabel = formatTimestamp(
-              post.crossposted_at ?? post.created_at,
-              useRelativeTime
-            );
-            const commentsLabel = `${post.num_comments.toLocaleString()} Comment${
-              post.num_comments === 1 ? '' : 's'
-            }`;
-            const canDelete = user?.id === post.author_id;
-            const isDeleting =
-              deletePostMutation.isPending && deletePostMutation.variables === post.id;
             const isSaved = savedPostIds.has(post.id);
             const isSavePending =
               savedToggleMutation.isPending && savedToggleMutation.variables?.postId === post.id;
             const isHiding = hidePostMutation.isPending && hidePostMutation.variables === post.id;
+            const isDeleting =
+              deletePostMutation.isPending && deletePostMutation.variables === post.id;
 
             return (
-              <article
+              <HubPostCard
                 key={post.id}
-                className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)]"
-              >
-                <div className="flex gap-3 p-3">
-                  {/* Vote buttons */}
-                  <VoteButtons
-                    postId={post.id}
-                    initialScore={post.score}
-                    initialUserVote={post.user_vote ?? null}
-                    layout="vertical"
-                    size="medium"
-                  />
-                  {post.thumbnail_url && (
-                    <img
-                      src={post.thumbnail_url}
-                      alt=""
-                    className="h-16 w-16 flex-shrink-0 rounded object-cover"
-                  />
-                )}
-                <div className="flex-1 text-left">
-                  <div className="flex flex-wrap items-center gap-2 text-[11px] text-[var(--color-text-secondary)]">
-                    {resolvedHubName ? (
-                      <Link
-                        to={`/hubs/h/${resolvedHubName}`}
-                        className="font-semibold text-[var(--color-text-primary)] hover:text-[var(--color-primary)]"
-                      >
-                        h/{resolvedHubName}
-                      </Link>
-                    ) : (
-                      <span className="font-semibold text-[var(--color-text-primary)]">h/unknown</span>
-                    )}
-                    <span>•</span>
-                    <span>{displayAuthor}</span>
-                    <span>•</span>
-                    <span>{pointsLabel}</span>
-                    <span>•</span>
-                    <span>submitted {submittedLabel}</span>
-                  </div>
-
-                  <Link to={getPostUrl(post)}>
-                    <h3 className="mt-1 text-lg font-semibold text-[var(--color-text-primary)] hover:text-[var(--color-primary)]">
-                      {post.title}
-                    </h3>
-                  </Link>
-
-                  <div className="mt-2 flex flex-wrap items-center gap-3 text-[11px] text-[var(--color-text-secondary)]">
-                    <Link
-                      to={getPostUrl(post)}
-                      className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
-                    >
-                      {commentsLabel}
-                    </Link>
-                    <button
-                      type="button"
-                      onClick={() => handleSharePost(post.id)}
-                      className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
-                    >
-                      Share
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleToggleSavePost(post.id, isSaved)}
-                      disabled={!user || isSavePending}
-                      className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] disabled:opacity-60"
-                    >
-                      {isSavePending ? 'Saving...' : isSaved ? 'Unsave' : 'Save'}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleHidePost(post.id)}
-                      disabled={!user || isHiding}
-                      className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] disabled:opacity-60"
-                    >
-                      {isHiding ? 'Hiding...' : 'Hide'}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleCrosspostSelection(post)}
-                      disabled={!user}
-                      className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] disabled:opacity-60"
-                    >
-                      Crosspost
-                    </button>
-                    {canDelete && (
-                      <button
-                        type="button"
-                        onClick={() => handleDeletePost(post.id)}
-                        disabled={isDeleting}
-                        className="text-red-600 hover:text-red-500 disabled:opacity-60"
-                      >
-                        {isDeleting ? 'Deleting...' : 'Delete'}
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </div>
-              </article>
+                post={post}
+                useRelativeTime={useRelativeTime}
+                currentUserId={user?.id}
+                hubNameMap={hubNameMap}
+                currentHubName={hubname}
+                isSaved={isSaved}
+                isSavePending={isSavePending}
+                isHiding={isHiding}
+                isDeleting={isDeleting}
+                onShare={() => handleSharePost(post.id)}
+                onToggleSave={(shouldSave) => handleToggleSavePost(post.id, !shouldSave)}
+                onHide={() => handleHidePost(post.id)}
+                onCrosspost={() => handleCrosspostSelection(post)}
+                onDelete={() => handleDeletePost(post.id)}
+              />
             );
           })
         ) : (

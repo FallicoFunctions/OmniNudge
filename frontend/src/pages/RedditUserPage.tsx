@@ -7,7 +7,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useSettings } from '../contexts/SettingsContext';
 import { useRedditBlocklist } from '../contexts/RedditBlockContext';
 import { MarkdownRenderer } from '../components/common/MarkdownRenderer';
-import { FlairBadge } from '../components/reddit/FlairBadge';
+import { RedditPostCard } from '../components/reddit/RedditPostCard';
 import type {
   RedditApiPost,
   RedditUserAbout,
@@ -18,7 +18,6 @@ import type {
   RedditModeratedSubreddit,
 } from '../types/reddit';
 import { formatTimestamp } from '../utils/timeFormat';
-import { getDisplayDomain, isRedditDomain, sanitizeHttpUrl } from '../utils/crosspostHelpers';
 
 const TAB_OPTIONS = [
   { key: 'overview', label: 'Overview' },
@@ -27,43 +26,6 @@ const TAB_OPTIONS = [
 ] as const;
 
 const SORT_OPTIONS = ['new', 'hot', 'top', 'controversial'] as const;
-
-const IMAGE_URL_REGEX = /\.(jpe?g|png|gif|webp)$/i;
-
-function getExpandableImageUrl(post: RedditApiPost): string | undefined {
-  const previewUrl = post.preview?.images?.[0]?.source?.url;
-  const sanitizedPreview = sanitizeHttpUrl(previewUrl);
-  if (sanitizedPreview) {
-    return sanitizedPreview;
-  }
-
-  const sanitizedPostUrl = sanitizeHttpUrl(post.url);
-  if (!sanitizedPostUrl) {
-    return undefined;
-  }
-
-  if (post.post_hint === 'image' || IMAGE_URL_REGEX.test(sanitizedPostUrl.toLowerCase())) {
-    return sanitizedPostUrl;
-  }
-
-  return undefined;
-}
-
-function getGalleryImages(post: RedditApiPost): string[] {
-  if (!post.gallery_data?.items || !post.media_metadata) {
-    return [];
-  }
-
-  const images: string[] = [];
-  for (const item of post.gallery_data.items) {
-    const metadata = post.media_metadata[item.media_id];
-    if (metadata?.s?.u) {
-      const url = sanitizeHttpUrl(metadata.s.u);
-      if (url) images.push(url);
-    }
-  }
-  return images;
-}
 
 type TabKey = (typeof TAB_OPTIONS)[number]['key'];
 type SortKey = (typeof SORT_OPTIONS)[number];
@@ -89,39 +51,10 @@ export default function RedditUserPage() {
   const { blockRedditUser, unblockRedditUser, isRedditUserBlocked } = useRedditBlocklist();
   const [activeTab, setActiveTab] = useState<TabKey>('overview');
   const [activeSort, setActiveSort] = useState<SortKey>('new');
-  const [expandedImageMap, setExpandedImageMap] = useState<Record<string, boolean>>({});
-  const [galleryIndexMap, setGalleryIndexMap] = useState<Record<string, number>>({});
   const [currentAfter, setCurrentAfter] = useState<string | undefined>(undefined);
   const [pageHistory, setPageHistory] = useState<(string | undefined)[]>([undefined]);
 
   const isProfileBlocked = isRedditUserBlocked(username);
-
-  const toggleInlinePreview = (postId: string) => {
-    setExpandedImageMap((prev) => ({
-      ...prev,
-      [postId]: !prev[postId],
-    }));
-    // Reset gallery index when opening
-    if (!expandedImageMap[postId]) {
-      setGalleryIndexMap((prev) => ({
-        ...prev,
-        [postId]: 0,
-      }));
-    }
-  };
-
-  const navigateGallery = (postId: string, direction: 'prev' | 'next', maxIndex: number) => {
-    setGalleryIndexMap((prev) => {
-      const currentIndex = prev[postId] || 0;
-      let newIndex = direction === 'next' ? currentIndex + 1 : currentIndex - 1;
-      if (newIndex < 0) newIndex = maxIndex;
-      if (newIndex > maxIndex) newIndex = 0;
-      return {
-        ...prev,
-        [postId]: newIndex,
-      };
-    });
-  };
 
   const listingQuery = useQuery<RedditUserListingResponse>({
     queryKey: ['reddit-user-listing', username, activeTab, activeSort, currentAfter],
@@ -311,224 +244,22 @@ export default function RedditUserPage() {
     }
 
     const isSaved = savedRedditPostIds.has(postKey);
-    const shareDisabled =
-      hideRedditPostMutation.isPending && hideRedditPostMutation.variables?.id === post.id;
-
-    const sanitizedThumbnail = sanitizeHttpUrl(post.thumbnail);
-    const hasThumbnail = Boolean(sanitizedThumbnail);
-    const galleryImages = getGalleryImages(post);
-    const hasGallery = galleryImages.length > 0;
-    const previewImageUrl = hasGallery ? galleryImages[0] : getExpandableImageUrl(post);
-    const isInlinePreviewOpen = !!(previewImageUrl && expandedImageMap[post.id]);
-    const currentGalleryIndex = galleryIndexMap[post.id] || 0;
-    const currentGalleryImage = hasGallery ? galleryImages[currentGalleryIndex] : previewImageUrl;
-    const sanitizedExternalUrl = sanitizeHttpUrl(post.url);
-    const externalDomain = getDisplayDomain(sanitizedExternalUrl);
-    const isExternalLink =
-      Boolean(sanitizedExternalUrl && externalDomain && !isRedditDomain(externalDomain));
-
-    // Use thumbnail if available, otherwise fall back to preview image
-    let thumbnailUrl: string | null = hasThumbnail ? sanitizedThumbnail ?? null : null;
-    if (!thumbnailUrl && hasGallery && galleryImages[0]) {
-      thumbnailUrl = galleryImages[0] ?? null;
-    }
-    if (!thumbnailUrl && post.preview?.images?.[0]?.source?.url) {
-      thumbnailUrl = sanitizeHttpUrl(post.preview.images[0].source.url) ?? null;
-    }
-    if (!thumbnailUrl) {
-      thumbnailUrl =
-        sanitizeHttpUrl(post.media?.oembed?.thumbnail_url) ??
-        sanitizeHttpUrl(post.secure_media?.oembed?.thumbnail_url) ??
-        null;
-    }
+    const isSaveActionPending = toggleSaveRedditPostMutation.isPending &&
+      toggleSaveRedditPostMutation.variables?.post.id === post.id;
+    const pendingShouldSave = toggleSaveRedditPostMutation.variables?.shouldSave ?? false;
 
     return (
-      <article
+      <RedditPostCard
         key={`post-${post.id}`}
-        className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] p-4 text-left"
-      >
-        <div className="flex gap-3">
-          {thumbnailUrl && (
-            <Link to={`/reddit/r/${post.subreddit}/comments/${post.id}`} className="shrink-0">
-              <img
-                src={thumbnailUrl}
-                alt=""
-                className="h-16 w-16 rounded object-cover"
-              />
-            </Link>
-          )}
-          <div className="flex-1">
-            <div className="flex flex-wrap items-center gap-2">
-              {isExternalLink ? (
-                <a
-                  href={sanitizedExternalUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex-1 text-left text-base font-semibold text-[var(--color-text-primary)] hover:text-[var(--color-primary)]"
-                >
-                  {post.title}
-                </a>
-              ) : (
-                <Link
-                  to={`/reddit/r/${post.subreddit}/comments/${post.id}`}
-                  className="flex-1 text-left text-base font-semibold text-[var(--color-text-primary)] hover:text-[var(--color-primary)]"
-                >
-                  {post.title}
-                </Link>
-              )}
-              {isExternalLink && (
-                <a
-                  href={sanitizedExternalUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 rounded border border-[var(--color-border)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary)] hover:border-[var(--color-primary)] hover:text-[var(--color-primary)]"
-                >
-                  {externalDomain ?? 'external'}
-                  <svg className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                    <path d="M11.293 3H16a1 1 0 0 1 1 1v4.707a1 1 0 1 1-2 0V6.414l-7.293 7.293a1 1 0 0 1-1.414-1.414L13.586 5H11.293a1 1 0 1 1 0-2Z" />
-                    <path d="M5 5h3a1 1 0 1 1 0 2H6v7h7v-2a1 1 0 1 1 2 0v3a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1Z" />
-                  </svg>
-                </a>
-              )}
-              <FlairBadge
-                text={post.link_flair_text}
-                backgroundColor={post.link_flair_background_color}
-                textColor={post.link_flair_text_color}
-              />
-            </div>
-            <div className="mt-1 flex items-start gap-3 text-[11px] text-[var(--color-text-secondary)]">
-              {previewImageUrl && (
-                <button
-                  type="button"
-                  onClick={() => toggleInlinePreview(post.id)}
-                  aria-pressed={isInlinePreviewOpen}
-                  aria-label={isInlinePreviewOpen ? 'Hide image preview' : 'Show image preview'}
-                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded border border-[var(--color-border)] bg-[var(--color-surface-elevated)] text-[var(--color-text-secondary)] hover:border-[var(--color-primary)] hover:text-[var(--color-primary)]"
-                >
-                  <span className="sr-only">
-                    {isInlinePreviewOpen ? 'Hide image preview' : 'Show image preview'}
-                  </span>
-                  {isInlinePreviewOpen ? (
-                    <svg
-                      className="h-4 w-4"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      aria-hidden="true"
-                    >
-                      <line x1="6" y1="6" x2="18" y2="18" />
-                      <line x1="6" y1="18" x2="18" y2="6" />
-                    </svg>
-                  ) : (
-                    <svg
-                      className="h-4 w-4"
-                      viewBox="0 0 24 24"
-                      fill="currentColor"
-                      aria-hidden="true"
-                    >
-                      <path d="M8 5.5v13l10.5-6.5L8 5.5Z" />
-                    </svg>
-                  )}
-                </button>
-              )}
-              <div className="flex-1">
-                <div className="flex flex-wrap items-center gap-2">
-          <Link
-            to={`/reddit/r/${post.subreddit}`}
-            className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
-          >
-            r/{post.subreddit}
-          </Link>
-          <span>•</span>
-          <span>{post.score.toLocaleString()} points</span>
-          <span>•</span>
-          <span>submitted {formatTimestamp(post.created_utc, useRelativeTime)}</span>
-        </div>
-        {isInlinePreviewOpen && currentGalleryImage && (
-          <div className="mt-3 overflow-hidden rounded border border-[var(--color-border)] bg-[var(--color-surface-elevated)]">
-            <div className="relative">
-              <img
-                src={currentGalleryImage}
-                alt={hasGallery ? `${post.title} (${currentGalleryIndex + 1}/${galleryImages.length})` : post.title}
-                className="max-h-[70vh] w-full object-contain"
-              />
-              {hasGallery && galleryImages.length > 1 && (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => navigateGallery(post.id, 'prev', galleryImages.length - 1)}
-                    className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-black/50 p-2 text-white hover:bg-black/70"
-                    aria-label="Previous image"
-                  >
-                    <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                    </svg>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => navigateGallery(post.id, 'next', galleryImages.length - 1)}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-black/50 p-2 text-white hover:bg-black/70"
-                    aria-label="Next image"
-                  >
-                    <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                    </svg>
-                  </button>
-                  <div className="absolute bottom-2 left-1/2 -translate-x-1/2 rounded-full bg-black/50 px-3 py-1 text-sm text-white">
-                    {currentGalleryIndex + 1} / {galleryImages.length}
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
-        )}
-        <div className="mt-2 flex flex-wrap items-center gap-3 text-[11px] text-[var(--color-text-secondary)]">
-          <Link
-            to={`/reddit/r/${post.subreddit}/comments/${post.id}`}
-            className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
-          >
-            {post.num_comments.toLocaleString()} comments
-          </Link>
-          <button
-            type="button"
-            onClick={() => handleShareRedditPost(post)}
-            className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
-            disabled={shareDisabled}
-          >
-            Share
-          </button>
-          <button
-            type="button"
-            onClick={() =>
-              toggleSaveRedditPostMutation.mutate({ post, shouldSave: !isSaved })
-            }
-            disabled={toggleSaveRedditPostMutation.isPending}
-            className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] disabled:opacity-60"
-          >
-            {toggleSaveRedditPostMutation.isPending &&
-            toggleSaveRedditPostMutation.variables?.post.id === post.id
-              ? 'Saving...'
-              : isSaved
-              ? 'Unsave'
-              : 'Save'}
-          </button>
-          <button
-            type="button"
-            onClick={() => hideRedditPostMutation.mutate(post)}
-            disabled={hideRedditPostMutation.isPending}
-            className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] disabled:opacity-60"
-          >
-            {hideRedditPostMutation.isPending ? 'Hiding...' : 'Hide'}
-          </button>
-        </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </article>
+        post={post}
+        useRelativeTime={useRelativeTime}
+        isSaved={isSaved}
+        isSaveActionPending={isSaveActionPending}
+        pendingShouldSave={pendingShouldSave}
+        onShare={() => handleShareRedditPost(post)}
+        onToggleSave={(shouldSave) => toggleSaveRedditPostMutation.mutate({ post, shouldSave })}
+        onHide={() => hideRedditPostMutation.mutate(post)}
+      />
     );
   };
 
