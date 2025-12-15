@@ -912,7 +912,7 @@ export default function RedditPostPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuth();
-  const { useRelativeTime } = useSettings();
+  const { useRelativeTime, stayOnPostAfterHide } = useSettings();
   const { isRedditUserBlocked, blockRedditUser, unblockRedditUser } = useRedditBlocklist();
   const queryClient = useQueryClient();
 
@@ -1172,7 +1172,16 @@ export default function RedditPostPage() {
     },
   });
 
+  const originPathFromState = (location.state as { originPath?: string } | undefined)?.originPath;
+
   const redirectAfterHide = () => {
+    if (stayOnPostAfterHide) {
+      return;
+    }
+    if (originPathFromState) {
+      navigate(originPathFromState, { replace: true });
+      return;
+    }
     if (window.history.length > 1) {
       navigate(-1);
     } else {
