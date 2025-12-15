@@ -208,7 +208,7 @@ func extractRedditPosts(listing *services.RedditListing) []services.RedditPost {
 
 	posts := make([]services.RedditPost, 0, len(listing.Data.Children))
 	for _, child := range listing.Data.Children {
-		posts = append(posts, child.Data)
+		posts = append(posts, normalizeRedditPost(child.Data))
 	}
 	return posts
 }
