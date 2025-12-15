@@ -11,6 +11,9 @@ import { savedService } from '../services/savedService';
 import { createLocalCrosspostPayload } from '../utils/crosspostHelpers';
 import type { CrosspostRequest } from '../services/hubsService';
 import { HubPostCard } from '../components/hubs/HubPostCard';
+import type { PlatformPost } from '../types/posts';
+
+const EMPTY_POSTS: LocalSubredditPost[] = [];
 
 export default function HubsPage() {
   const navigate = useNavigate();
@@ -111,7 +114,7 @@ export default function HubsPage() {
     enabled: !!hubname && hubname !== '',
     staleTime: 1000 * 60 * 5,
   });
-  const postsList = data?.posts ?? [];
+  const postsList = data?.posts ?? EMPTY_POSTS;
   const visiblePosts = useMemo(
     () => postsList.filter((post) => !hiddenPostIds.has(post.id)),
     [postsList, hiddenPostIds]
@@ -363,11 +366,23 @@ export default function HubsPage() {
             const isHiding = hidePostMutation.isPending && hidePostMutation.variables === post.id;
             const isDeleting =
               deletePostMutation.isPending && deletePostMutation.variables === post.id;
+            const normalizedPost: PlatformPost = {
+              ...post,
+              author_username:
+                post.author_username ??
+                post.author?.username ??
+                (post.author_id === user?.id ? user?.username ?? 'You' : 'Unknown'),
+              hub_name:
+                post.hub_name ??
+                post.hub?.name ??
+                hubNameMap.get(post.hub_id) ??
+                (hubname !== 'popular' && hubname !== 'all' ? hubname : 'unknown'),
+            };
 
             return (
               <HubPostCard
                 key={post.id}
-                post={post}
+                post={normalizedPost}
                 useRelativeTime={useRelativeTime}
                 currentUserId={user?.id}
                 hubNameMap={hubNameMap}

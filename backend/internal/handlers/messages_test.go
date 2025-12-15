@@ -390,9 +390,10 @@ func TestMarkMessagesAsRead(t *testing.T) {
 	conversationReadCount := 0
 	for _, call := range hub.broadcastCalls {
 		assert.Equal(t, user1ID, call.RecipientID)
-		if call.Type == "message_read" {
+		switch call.Type {
+		case "message_read":
 			messageReadCount++
-		} else if call.Type == "conversation_read" {
+		case "conversation_read":
 			conversationReadCount++
 		}
 	}
@@ -722,12 +723,13 @@ func TestMarkMessagesAsRead_SendsIndividualEvents(t *testing.T) {
 	readEvents := 0
 	conversationReadEvents := 0
 	for _, call := range hub.broadcastCalls {
-		if call.Type == "message_read" {
+		switch call.Type {
+		case "message_read":
 			readEvents++
 			assert.Equal(t, user1ID, call.RecipientID)
 			payload := call.Payload.(gin.H)
 			assert.Contains(t, messageIDs, payload["message_id"])
-		} else if call.Type == "conversation_read" {
+		case "conversation_read":
 			conversationReadEvents++
 			assert.Equal(t, user1ID, call.RecipientID)
 		}

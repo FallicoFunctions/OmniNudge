@@ -188,7 +188,7 @@ export default function UserProfilePage() {
     return () => {
       isActive = false;
     };
-  }, [user?.username, username, refetchProfile]);
+  }, [user, username, refetchProfile]);
 
   const createdLabel = profile ? formatTimestamp(profile.created_at, useRelativeTime) : '';
   const lastSeenLabel = profile ? formatTimestamp(profile.last_seen, useRelativeTime) : '';

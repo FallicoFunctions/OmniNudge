@@ -44,7 +44,7 @@ export default function MainLayout() {
     };
 
     ping();
-  }, [user?.id, user?.username, location.pathname, queryClient]);
+  }, [user, location.pathname, queryClient]);
 
   return (
     <div className="min-h-screen bg-[var(--color-background)]">

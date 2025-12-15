@@ -48,6 +48,7 @@ func (t *hostRewriteTransport) RoundTrip(req *http.Request) (*http.Response, err
 }
 
 func setupRedditHandlerTest(t *testing.T) (*RedditHandler, *httptest.Server, *int32) {
+	t.Helper()
 	handlerCalls := int32(0)
 
 	// Create mock Reddit server
