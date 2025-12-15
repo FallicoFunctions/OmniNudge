@@ -143,14 +143,10 @@ export default function PostDetailPage() {
     },
   };
 
-  const commentsList = postComments ?? [];
-  console.log('[PostDetailPage] commentsList:', commentsList);
-  console.log('[PostDetailPage] commentsList.length:', commentsList.length);
-
   const topLevelComments = useMemo(() => {
+    const commentsList = postComments ?? [];
     console.log('[PostDetailPage] Computing topLevelComments, commentsList:', commentsList);
     console.log('[PostDetailPage] focusedCommentId:', focusedCommentId);
-    if (!commentsList) return [];
     if (focusedCommentId) {
       const target = commentsList.find((c) => c.id === focusedCommentId);
       return target ? [target] : [];
@@ -161,9 +157,12 @@ export default function PostDetailPage() {
     });
     console.log('[PostDetailPage] topLevelComments filtered result:', filtered);
     return filtered;
-  }, [commentsList, focusedCommentId]);
+  }, [postComments, focusedCommentId]);
 
-  const commentNotFound = Boolean(focusedCommentId && commentsList.length > 0 && topLevelComments.length === 0);
+  const totalCommentsCount = postComments?.length ?? 0;
+  const commentNotFound = Boolean(
+    focusedCommentId && totalCommentsCount > 0 && topLevelComments.length === 0
+  );
 
   const embedOrigin = typeof window !== 'undefined' ? window.location.origin : '';
   const embedPermalink =

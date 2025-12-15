@@ -857,6 +857,51 @@ function LocalCommentView({
   );
 }
 
+type CombinedComment =
+  | {
+      type: 'local';
+      local: LocalRedditComment;
+      createdAt: Date;
+      ups: number;
+      downs: number;
+      body: string;
+    }
+  | {
+      type: 'reddit';
+      reddit: RedditComment;
+      createdAt: Date;
+      ups: number;
+      downs: number;
+      body: string;
+    };
+
+const wilsonScore = (ups: number, downs: number) => {
+  const n = ups + downs;
+  if (n === 0) return 0;
+  const z = 1.96;
+  const p = ups / n;
+  const numerator = p + (z * z) / (2 * n) - z * Math.sqrt((p * (1 - p) + (z * z) / (4 * n)) / n);
+  const denominator = 1 + (z * z) / n;
+  return numerator / denominator;
+};
+
+const controversialScore = (ups: number, downs: number) => {
+  const n = ups + downs;
+  if (n === 0) return 0;
+  const p = ups / n;
+  const balance = 1 - Math.abs(p - 0.5) * 2;
+  const volume = Math.log10(n + 1);
+  return balance * volume;
+};
+
+const qaScore = (comment: CombinedComment) => {
+  const base = wilsonScore(comment.ups, comment.downs);
+  const lengthBonus = Math.min(comment.body.length / 1000, 0.3);
+  return base + lengthBonus;
+};
+
+const EMPTY_REDDIT_COMMENTS: RedditComment[] = [];
+
 export default function RedditPostPage() {
   const { subreddit, postId, commentId } = useParams<{
     subreddit: string;
@@ -981,7 +1026,7 @@ export default function RedditPostPage() {
 
   const post = redditData?.post;
   const isPostAuthorBlocked = post ? isRedditUserBlocked(post.author) : false;
-  const redditComments = redditData?.comments || [];
+  const redditComments = redditData?.comments ?? EMPTY_REDDIT_COMMENTS;
   const galleryImages = post ? getGalleryImages(post) : [];
   const hasGallery = galleryImages.length > 0;
   const videoData = post ? getVideoUrl(post) : undefined;
@@ -1283,49 +1328,6 @@ export default function RedditPostPage() {
   }, [localCommentsData, focusedCommentId]);
 
   const commentNotFound = Boolean(focusedCommentId && localCommentsData && topLevelComments.length === 0);
-  type CombinedComment =
-    | {
-        type: 'local';
-        local: LocalRedditComment;
-        createdAt: Date;
-        ups: number;
-        downs: number;
-        body: string;
-      }
-    | {
-        type: 'reddit';
-        reddit: RedditComment;
-        createdAt: Date;
-        ups: number;
-        downs: number;
-        body: string;
-      };
-
-  const wilsonScore = (ups: number, downs: number) => {
-    const n = ups + downs;
-    if (n === 0) return 0;
-    const z = 1.96;
-    const p = ups / n;
-    const numerator = p + (z * z) / (2 * n) - z * Math.sqrt((p * (1 - p) + (z * z) / (4 * n)) / n);
-    const denominator = 1 + (z * z) / n;
-    return numerator / denominator;
-  };
-
-  const controversialScore = (ups: number, downs: number) => {
-    const n = ups + downs;
-    if (n === 0) return 0;
-    const p = ups / n;
-    const balance = 1 - Math.abs(p - 0.5) * 2;
-    const volume = Math.log10(n + 1);
-    return balance * volume;
-  };
-
-  const qaScore = (comment: CombinedComment) => {
-    const base = wilsonScore(comment.ups, comment.downs);
-    const lengthBonus = Math.min(comment.body.length / 1000, 0.3);
-    return base + lengthBonus;
-  };
-
   const combinedTopLevel = useMemo<CombinedComment[]>(() => {
     const locals =
       topLevelComments?.map((c) => ({
