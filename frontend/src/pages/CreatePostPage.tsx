@@ -45,10 +45,8 @@ export default function CreatePostPage() {
       (async () => {
         try {
           console.log('[useEffect] Fetching hub:', hubName);
-          const response = await hubsService.getHub(hubName) as any;
-          console.log('[useEffect] Hub fetched:', response);
-          // Backend returns {hub: {...}}, so we need to unwrap it
-          const hub = response.hub || response;
+          const hub = await hubsService.getHub(hubName);
+          console.log('[useEffect] Hub fetched:', hub);
           if (isMounted) {
             console.log('[useEffect] Setting selectedHub to:', { id: hub.id, name: hub.name });
             setSelectedHub({ id: hub.id, name: hub.name });
@@ -163,9 +161,7 @@ export default function CreatePostPage() {
         }
 
         try {
-          const response = await hubsService.getHub(normalizedHubInput) as any;
-          // Backend returns {hub: {...}}, so we need to unwrap it
-          const hub = response.hub || response;
+          const hub = await hubsService.getHub(normalizedHubInput);
           hubId = hub.id;
           setSelectedHub({ id: hub.id, name: hub.name });
           setHubInputValue(hub.name);
