@@ -45,7 +45,8 @@ export default function PostDetailPage() {
   const parsedPostId = postId ? Number(postId) : NaN;
   const focusedCommentId = commentId ? Number(commentId) : null;
 
-  const { data: postDataRaw, isLoading: loadingPost } = useQuery<any>({
+  type PostResponse = PlatformPost | { post: PlatformPost };
+  const { data: postDataRaw, isLoading: loadingPost } = useQuery<PostResponse>({
     queryKey: ['posts', parsedPostId],
     queryFn: async () => {
       const response = await postsService.getPost(parsedPostId);
@@ -56,12 +57,11 @@ export default function PostDetailPage() {
   });
 
   // Unwrap the response if it's wrapped in a "post" property
-  const postData = useMemo(() => {
+  const postData = useMemo<PlatformPost | null>(() => {
     if (!postDataRaw) return null;
-    // Check if the response is wrapped
-    const unwrapped = (postDataRaw as any).post || postDataRaw;
+    const unwrapped = 'post' in postDataRaw ? postDataRaw.post : postDataRaw;
     console.log('[PostDetailPage] Unwrapped post data:', unwrapped);
-    return unwrapped as PlatformPost;
+    return unwrapped;
   }, [postDataRaw]);
 
   const commentsQueryKey = ['posts', parsedPostId, 'comments'] as const;
@@ -230,7 +230,7 @@ export default function PostDetailPage() {
     );
   }
 
-  const hubName = (postData as any)?.hub?.name || postData?.hub_name;
+  const hubName = postData?.hub?.name ?? postData?.hub_name;
   const targetSubreddit = postData?.target_subreddit ?? postData?.crosspost_origin_subreddit ?? null;
 
   return (
@@ -266,10 +266,10 @@ export default function PostDetailPage() {
               <span>
                 Posted by{' '}
                 <Link
-                  to={`/users/${(postData as any).author?.username || postData.author_username}`}
+                  to={`/users/${postData?.author?.username ?? postData?.author_username}`}
                   className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
                 >
-                  {(postData as any).author?.username || postData.author_username}
+                  {postData?.author?.username ?? postData?.author_username}
                 </Link>
               </span>
               <span>•</span>

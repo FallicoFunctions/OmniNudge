@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { hubsService, type HubPostsResponse, type LocalSubredditPost } from '../services/hubsService';
 import { subscriptionService } from '../services/subscriptionService';
 import { useAuth } from '../contexts/AuthContext';
@@ -10,7 +10,6 @@ import { useSettings } from '../contexts/SettingsContext';
 import { savedService } from '../services/savedService';
 import { createLocalCrosspostPayload } from '../utils/crosspostHelpers';
 import type { CrosspostRequest } from '../services/hubsService';
-import { getPostUrl } from '../utils/postUrl';
 import { HubPostCard } from '../components/hubs/HubPostCard';
 
 export default function HubsPage() {

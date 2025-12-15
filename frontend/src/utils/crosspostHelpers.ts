@@ -49,9 +49,6 @@ export interface RedditCrosspostSource {
 }
 
 const imageExtensionRegex = /\.(jpe?g|png|gif|webp)$/i;
-const REDDIT_DOMAIN_PATTERN = /(?:^|\.)reddit\.com$/i;
-const REDDIT_SHORT_DOMAIN_PATTERN = /(?:^|\.)redd\.it$/i;
-
 export function sanitizeHttpUrl(url?: string | null): string | undefined {
   if (!url) return undefined;
   const normalized = url.trim().replace(/&amp;/g, '&');

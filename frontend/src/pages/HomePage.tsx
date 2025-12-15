@@ -10,7 +10,7 @@ import { HubPostCard } from '../components/hubs/HubPostCard';
 import { savedService } from '../services/savedService';
 import { postsService } from '../services/postsService';
 import { subscriptionService } from '../services/subscriptionService';
-import { hubsService, type CrosspostRequest } from '../services/hubsService';
+import { hubsService } from '../services/hubsService';
 import { createRedditCrosspostPayload } from '../utils/crosspostHelpers';
 
 type SortOption = 'hot' | 'new' | 'top' | 'rising';
