@@ -137,7 +137,7 @@ func main() {
 	userStatusHandler := handlers.NewUserStatusHandler(hub)
 	themesHandler := handlers.NewThemesHandler(themeRepo, themeOverrideRepo, installedThemeRepo, userSettingsRepo, cssSanitizer)
 	redditCommentsHandler := handlers.NewRedditCommentsHandler(redditCommentRepo)
-	savedItemsHandler := handlers.NewSavedItemsHandler(savedItemsRepo, postRepo, commentRepo, redditCommentRepo)
+	savedItemsHandler := handlers.NewSavedItemsHandler(savedItemsRepo, postRepo, commentRepo, redditCommentRepo, redditClient)
 	feedHandler := handlers.NewFeedHandler(postRepo, hubSubRepo, subredditSubRepo, redditClient)
 
 	// Inject notification service into handlers

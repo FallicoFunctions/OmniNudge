@@ -5,6 +5,8 @@ interface SettingsContextType {
   setUseRelativeTime: (value: boolean) => void;
   autoCloseThemeSelector: boolean;
   setAutoCloseThemeSelector: (value: boolean) => void;
+  notifyRemovedSavedPosts: boolean;
+  setNotifyRemovedSavedPosts: (value: boolean) => void;
 }
 
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
@@ -14,6 +16,7 @@ const SETTINGS_STORAGE_KEY = 'omninudge-settings';
 interface StoredSettings {
   useRelativeTime?: boolean;
   autoCloseThemeSelector?: boolean;
+  notifyRemovedSavedPosts?: boolean;
 }
 
 const getStoredSettings = (): StoredSettings => {
@@ -40,6 +43,10 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     const settings = getStoredSettings();
     return settings.autoCloseThemeSelector ?? false; // Default to keeping the dropdown open
   });
+  const [notifyRemovedSavedPosts, setNotifyRemovedSavedPostsState] = useState<boolean>(() => {
+    const settings = getStoredSettings();
+    return settings.notifyRemovedSavedPosts ?? true;
+  });
 
   // Persist to localStorage whenever settings change
   useEffect(() => {
@@ -47,12 +54,13 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       const settings: StoredSettings = {
         useRelativeTime,
         autoCloseThemeSelector,
+        notifyRemovedSavedPosts,
       };
       localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings));
     } catch (error) {
       console.error('Failed to save settings to localStorage:', error);
     }
-  }, [useRelativeTime, autoCloseThemeSelector]);
+  }, [useRelativeTime, autoCloseThemeSelector, notifyRemovedSavedPosts]);
 
   const setUseRelativeTime = (value: boolean) => {
     setUseRelativeTimeState(value);
@@ -62,6 +70,10 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     setAutoCloseThemeSelectorState(value);
   };
 
+  const setNotifyRemovedSavedPosts = (value: boolean) => {
+    setNotifyRemovedSavedPostsState(value);
+  };
+
   return (
     <SettingsContext.Provider
       value={{
@@ -69,6 +81,8 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         setUseRelativeTime,
         autoCloseThemeSelector,
         setAutoCloseThemeSelector,
+        notifyRemovedSavedPosts,
+        setNotifyRemovedSavedPosts,
       }}
     >
       {children}

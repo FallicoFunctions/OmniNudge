@@ -52,6 +52,10 @@ export interface SavedItemsResponse {
   saved_reddit_posts?: SavedRedditPost[];
   saved_post_comments?: SavedPostComment[];
   saved_reddit_comments?: LocalRedditComment[];
+  auto_removed_reddit_posts?: Array<{
+    subreddit: string;
+    reddit_post_id: string;
+  }>;
 }
 
 export interface HiddenItemsResponse {

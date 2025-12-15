@@ -13,12 +13,27 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/omninudge/backend/internal/database"
 	"github.com/omninudge/backend/internal/models"
+	"github.com/omninudge/backend/internal/services"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
+type fakeRedditClient struct {
+	posts map[string]*services.RedditPost
+}
+
+func (f *fakeRedditClient) GetPostInfo(ctx context.Context, subreddit string, redditPostID string) (*services.RedditPost, error) {
+	if f.posts == nil {
+		return nil, nil
+	}
+	if post, ok := f.posts[redditPostID]; ok {
+		return post, nil
+	}
+	return nil, nil
+}
+
 // setupSavedItemsTest creates a test setup with database and handler
-func setupSavedItemsTest(t *testing.T) (*SavedItemsHandler, *models.SavedItemsRepository, *models.PlatformPostRepository, int, int, func()) {
+func setupSavedItemsTest(t *testing.T) (*SavedItemsHandler, *models.SavedItemsRepository, *models.PlatformPostRepository, *fakeRedditClient, int, int, func()) {
 	db, err := database.NewTest()
 	require.NoError(t, err)
 
@@ -50,14 +65,17 @@ func setupSavedItemsTest(t *testing.T) (*SavedItemsHandler, *models.SavedItemsRe
 	postRepo := models.NewPlatformPostRepository(db.Pool)
 	commentRepo := models.NewPostCommentRepository(db.Pool)
 	redditCommentRepo := models.NewRedditPostCommentRepository(db.Pool)
+	redditClient := &fakeRedditClient{
+		posts: make(map[string]*services.RedditPost),
+	}
 
-	handler := NewSavedItemsHandler(savedRepo, postRepo, commentRepo, redditCommentRepo)
+	handler := NewSavedItemsHandler(savedRepo, postRepo, commentRepo, redditCommentRepo, redditClient)
 
 	cleanup := func() {
 		db.Close()
 	}
 
-	return handler, savedRepo, postRepo, user.ID, hub.ID, cleanup
+	return handler, savedRepo, postRepo, redditClient, user.ID, hub.ID, cleanup
 }
 
 // mockAuth middleware for testing
@@ -69,7 +87,7 @@ func mockAuthMiddleware(userID int) gin.HandlerFunc {
 }
 
 func TestGetSavedItems(t *testing.T) {
-	handler, savedRepo, postRepo, userID, hubID, cleanup := setupSavedItemsTest(t)
+	handler, savedRepo, postRepo, _, userID, hubID, cleanup := setupSavedItemsTest(t)
 	defer cleanup()
 
 	gin.SetMode(gin.TestMode)
@@ -182,8 +200,59 @@ func TestGetSavedItems(t *testing.T) {
 	}
 }
 
+func TestGetSavedItems_RemovesModeratorDeletedRedditPosts(t *testing.T) {
+	handler, savedRepo, _, redditClient, userID, _, cleanup := setupSavedItemsTest(t)
+	defer cleanup()
+
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	router.GET("/saved", mockAuthMiddleware(userID), handler.GetSavedItems)
+
+	ctx := context.Background()
+	err := savedRepo.SaveRedditPost(ctx, userID, &models.RedditPostDetails{
+		Subreddit:    "funny",
+		RedditPostID: "abc123",
+		Title:        "Removed by moderator",
+		Author:       "poster",
+		Score:        10,
+		NumComments:  5,
+	})
+	require.NoError(t, err)
+
+	redditClient.posts["abc123"] = &services.RedditPost{
+		ID:                "abc123",
+		Subreddit:         "funny",
+		Title:             "[ Removed by moderator ]",
+		Author:            "poster",
+		RemovedByCategory: "moderator",
+	}
+
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("GET", "/saved?type=reddit_posts", nil)
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	var response map[string]interface{}
+	err = json.Unmarshal(w.Body.Bytes(), &response)
+	require.NoError(t, err)
+
+	assert.Equal(t, "reddit_posts", response["type"])
+	assert.NotNil(t, response["saved_reddit_posts"])
+	redditPosts := response["saved_reddit_posts"].([]interface{})
+	assert.Len(t, redditPosts, 0, "Removed posts should be pruned from response")
+
+	autoRemoved, ok := response["auto_removed_reddit_posts"].([]interface{})
+	require.True(t, ok)
+	assert.Len(t, autoRemoved, 1)
+
+	remaining, err := savedRepo.GetSavedRedditPosts(ctx, userID)
+	require.NoError(t, err)
+	assert.Len(t, remaining, 0, "Removed posts should be unsaved in storage")
+}
+
 func TestGetHiddenItems(t *testing.T) {
-	handler, savedRepo, postRepo, userID, hubID, cleanup := setupSavedItemsTest(t)
+	handler, savedRepo, postRepo, _, userID, hubID, cleanup := setupSavedItemsTest(t)
 	defer cleanup()
 
 	gin.SetMode(gin.TestMode)
@@ -283,7 +352,7 @@ func TestGetHiddenItems(t *testing.T) {
 }
 
 func TestSavePost(t *testing.T) {
-	handler, savedRepo, postRepo, userID, hubID, cleanup := setupSavedItemsTest(t)
+	handler, savedRepo, postRepo, _, userID, hubID, cleanup := setupSavedItemsTest(t)
 	defer cleanup()
 
 	gin.SetMode(gin.TestMode)
@@ -368,7 +437,7 @@ func TestSavePost(t *testing.T) {
 }
 
 func TestUnsavePost(t *testing.T) {
-	handler, savedRepo, postRepo, userID, hubID, cleanup := setupSavedItemsTest(t)
+	handler, savedRepo, postRepo, _, userID, hubID, cleanup := setupSavedItemsTest(t)
 	defer cleanup()
 
 	gin.SetMode(gin.TestMode)
@@ -420,7 +489,7 @@ func TestUnsavePost(t *testing.T) {
 }
 
 func TestSaveRedditPost(t *testing.T) {
-	handler, savedRepo, _, userID, _, cleanup := setupSavedItemsTest(t)
+	handler, savedRepo, _, _, userID, _, cleanup := setupSavedItemsTest(t)
 	defer cleanup()
 
 	gin.SetMode(gin.TestMode)
@@ -482,7 +551,7 @@ func TestSaveRedditPost(t *testing.T) {
 }
 
 func TestHidePost(t *testing.T) {
-	handler, savedRepo, postRepo, userID, hubID, cleanup := setupSavedItemsTest(t)
+	handler, savedRepo, postRepo, _, userID, hubID, cleanup := setupSavedItemsTest(t)
 	defer cleanup()
 
 	gin.SetMode(gin.TestMode)
@@ -531,7 +600,7 @@ func TestHidePost(t *testing.T) {
 }
 
 func TestUnhidePost(t *testing.T) {
-	handler, savedRepo, postRepo, userID, hubID, cleanup := setupSavedItemsTest(t)
+	handler, savedRepo, postRepo, _, userID, hubID, cleanup := setupSavedItemsTest(t)
 	defer cleanup()
 
 	gin.SetMode(gin.TestMode)
@@ -574,7 +643,7 @@ func TestUnhidePost(t *testing.T) {
 }
 
 func TestHideRedditPost(t *testing.T) {
-	handler, savedRepo, _, userID, _, cleanup := setupSavedItemsTest(t)
+	handler, savedRepo, _, _, userID, _, cleanup := setupSavedItemsTest(t)
 	defer cleanup()
 
 	gin.SetMode(gin.TestMode)
@@ -612,7 +681,7 @@ func TestHideRedditPost(t *testing.T) {
 }
 
 func TestUnhideRedditPost(t *testing.T) {
-	handler, savedRepo, _, userID, _, cleanup := setupSavedItemsTest(t)
+	handler, savedRepo, _, _, userID, _, cleanup := setupSavedItemsTest(t)
 	defer cleanup()
 
 	gin.SetMode(gin.TestMode)
@@ -645,7 +714,7 @@ func TestUnhideRedditPost(t *testing.T) {
 }
 
 func TestSavedItemsAuthRequired(t *testing.T) {
-	handler, _, _, _, _, cleanup := setupSavedItemsTest(t)
+	handler, _, _, _, _, _, cleanup := setupSavedItemsTest(t)
 	defer cleanup()
 
 	gin.SetMode(gin.TestMode)

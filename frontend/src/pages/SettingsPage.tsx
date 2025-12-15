@@ -6,6 +6,8 @@ export default function SettingsPage() {
     setUseRelativeTime,
     autoCloseThemeSelector,
     setAutoCloseThemeSelector,
+    notifyRemovedSavedPosts,
+    setNotifyRemovedSavedPosts,
   } = useSettings();
 
   return (
@@ -144,6 +146,42 @@ export default function SettingsPage() {
                 />
               </div>
             </label>
+          </div>
+        </section>
+
+        <section className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-6">
+          <h2 className="mb-4 text-xl font-semibold text-[var(--color-text-primary)]">Saved Items Alerts</h2>
+          <p className="text-sm text-[var(--color-text-secondary)]">
+            When Reddit moderators remove a post you’ve saved, OmniNudge automatically cleans it from your Saved tab.
+            You can choose whether to see a reminder the next time you open Saved Items.
+          </p>
+
+          <div className="mt-4 flex items-center justify-between rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4">
+            <div className="pr-4">
+              <p className="text-base font-semibold text-[var(--color-text-primary)]">
+                Notify me about removed Reddit posts
+              </p>
+              <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+                When enabled, you’ll see a one-time banner letting you know how many removed posts were cleaned up.
+              </p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={notifyRemovedSavedPosts}
+              onClick={() => setNotifyRemovedSavedPosts(!notifyRemovedSavedPosts)}
+              className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${
+                notifyRemovedSavedPosts ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
+              }`}
+            >
+              <span className="sr-only">Toggle saved item alerts</span>
+              <span
+                aria-hidden="true"
+                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                  notifyRemovedSavedPosts ? 'translate-x-5' : 'translate-x-0'
+                }`}
+              />
+            </button>
           </div>
         </section>
       </div>
