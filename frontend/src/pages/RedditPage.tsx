@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useLocation } from 'react-router-dom';
 import { redditService } from '../services/redditService';
 import { savedService } from '../services/savedService';
 import { hubsService } from '../services/hubsService';
@@ -81,6 +81,7 @@ function getThumbnailUrl(post: FeedRedditPost): string | null {
 
 export default function RedditPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { subreddit: routeSubreddit } = useParams<{ subreddit?: string }>();
   const queryClient = useQueryClient();
   const { user } = useAuth();
@@ -97,6 +98,10 @@ export default function RedditPage() {
   const [sendRepliesToInbox, setSendRepliesToInbox] = useState(true);
   const [showOmniOnly, setShowOmniOnly] = useState(false);
   const [isAutocompleteOpen, setIsAutocompleteOpen] = useState(false);
+  const originState = useMemo(
+    () => ({ originPath: `${location.pathname}${location.search}` }),
+    [location.pathname, location.search]
+  );
 
   const { data, isLoading, error } = useQuery<FeedRedditPostsResponse>({
     queryKey: ['reddit', subreddit, sort],
@@ -813,6 +818,7 @@ export default function RedditPage() {
                 }
                 onHide={() => handleSetHideTarget({ type: 'reddit', post })}
                 onCrosspost={() => handleCrosspostSelection({ type: 'reddit', post })}
+                linkState={originState}
               />
             );
           })}

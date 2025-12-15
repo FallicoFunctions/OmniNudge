@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { savedService } from '../../services/savedService';
 import type { SavedPost, SavedPostComment, SavedRedditPost } from '../../types/saved';
@@ -82,8 +82,13 @@ export function SavedItemsView({
   className = '',
 }: SavedItemsViewProps) {
   const navigate = useNavigate();
+  const location = useLocation();
   const queryClient = useQueryClient();
   const { useRelativeTime, notifyRemovedSavedPosts } = useSettings();
+  const originState = useMemo(
+    () => ({ originPath: `${location.pathname}${location.search}` }),
+    [location.pathname, location.search]
+  );
   const [activeTab, setActiveTab] = useState<TabKey>('omni');
   const [removedNoticeDismissed, setRemovedNoticeDismissed] = useState(false);
   const { data, isLoading, error } = useQuery({
@@ -389,6 +394,7 @@ export function SavedItemsView({
             })}
             onHide={() => setHideTargetPost(post)}
             onCrosspost={() => navigate(`/reddit/r/${post.subreddit}/comments/${post.reddit_post_id}`)}
+            linkState={originState}
           />
         );
       })(),
