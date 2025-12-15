@@ -1,4 +1,5 @@
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
+import { useMemo } from 'react';
 import { formatTimestamp } from '../../utils/timeFormat';
 import { VoteButtons } from '../VoteButtons';
 import type { PlatformPost } from '../../types/posts';
@@ -36,6 +37,11 @@ export function HubPostCard({
   onCrosspost,
   onDelete,
 }: HubPostCardProps) {
+  const location = useLocation();
+  const originState = useMemo(
+    () => ({ originPath: `${location.pathname}${location.search}` }),
+    [location.pathname, location.search]
+  );
   const resolvedHubName =
     currentHubName ||
     post.hub_name ||
@@ -79,7 +85,7 @@ export function HubPostCard({
           />
         )}
         <div className="flex-1 space-y-1 text-left">
-          <Link to={postUrl}>
+          <Link to={postUrl} state={originState}>
             <h3 className="text-lg font-semibold leading-snug text-[var(--color-text-primary)] hover:text-[var(--color-primary)]">
               {post.title}
             </h3>
@@ -107,6 +113,7 @@ export function HubPostCard({
           <div className="mt-1 flex flex-wrap items-center gap-3 text-[11px] leading-tight text-[var(--color-text-secondary)]">
             <Link
               to={postUrl}
+              state={originState}
               className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
             >
               {commentsLabel}

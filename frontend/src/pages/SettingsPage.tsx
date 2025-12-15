@@ -10,6 +10,8 @@ export default function SettingsPage() {
     setNotifyRemovedSavedPosts,
     defaultOmniPostsOnly,
     setDefaultOmniPostsOnly,
+    stayOnPostAfterHide,
+    setStayOnPostAfterHide,
   } = useSettings();
 
   return (
@@ -221,6 +223,41 @@ export default function SettingsPage() {
                 }`}
               />
             </button>
+          </div>
+
+          <div className="mt-4 border-t border-[var(--color-border)] pt-4">
+            <p className="text-sm text-[var(--color-text-secondary)]">
+              When you hide an Omni post while viewing it, you can either jump back to where you came from
+              or stay on the post. Pick the default behavior below.
+            </p>
+            <div className="mt-3 flex items-center justify-between rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4">
+              <div className="pr-4">
+                <p className="text-base font-semibold text-[var(--color-text-primary)]">
+                  Stay on post after hiding
+                </p>
+                <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+                  When enabled, hiding a post keeps you on the detail view. When disabled, you’ll be sent
+                  back to the feed or hub you came from.
+                </p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={stayOnPostAfterHide}
+                onClick={() => setStayOnPostAfterHide(!stayOnPostAfterHide)}
+                className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${
+                  stayOnPostAfterHide ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
+                }`}
+              >
+                <span className="sr-only">Toggle stay-on-post behavior</span>
+                <span
+                  aria-hidden="true"
+                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                    stayOnPostAfterHide ? 'translate-x-5' : 'translate-x-0'
+                  }`}
+                />
+              </button>
+            </div>
           </div>
         </section>
       </div>

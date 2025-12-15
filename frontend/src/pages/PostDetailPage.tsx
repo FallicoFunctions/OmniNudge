@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../contexts/AuthContext';
 import { useSettings } from '../contexts/SettingsContext';
@@ -31,9 +31,10 @@ const FORMATTING_EXAMPLES = [
 export default function PostDetailPage() {
   const { postId, commentId } = useParams<{ postId: string; commentId?: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const queryClient = useQueryClient();
   const { user } = useAuth();
-  const { useRelativeTime } = useSettings();
+  const { useRelativeTime, stayOnPostAfterHide } = useSettings();
 
   const [commentText, setCommentText] = useState('');
   const [showFormattingHelp, setShowFormattingHelp] = useState(false);
@@ -82,12 +83,6 @@ export default function PostDetailPage() {
   const { data: savedPostsData } = useQuery<SavedItemsResponse>({
     queryKey: savedPostsKey,
     queryFn: () => savedService.getSavedItems('posts'),
-    enabled: !!user,
-    staleTime: 1000 * 60 * 5,
-  });
-  useQuery<HiddenItemsResponse>({
-    queryKey: hiddenPostsKey,
-    queryFn: () => savedService.getHiddenItems('posts'),
     enabled: !!user,
     staleTime: 1000 * 60 * 5,
   });
@@ -150,7 +145,6 @@ export default function PostDetailPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: hiddenPostsKey });
-      navigate('/hidden');
     },
   });
 
@@ -262,6 +256,8 @@ export default function PostDetailPage() {
     }
   };
 
+  const originPathFromState = (location.state as { originPath?: string } | undefined)?.originPath;
+
   const handleHidePost = async () => {
     if (!user) {
       alert('You need to be signed in to hide posts.');
@@ -278,6 +274,9 @@ export default function PostDetailPage() {
     }
     try {
       await hidePostMutation.mutateAsync();
+      if (!stayOnPostAfterHide) {
+        navigate(originPathFromState ?? '/hidden', { replace: true });
+      }
     } catch (error) {
       const err = error as Error;
       alert(`Failed to hide post: ${err.message}`);
