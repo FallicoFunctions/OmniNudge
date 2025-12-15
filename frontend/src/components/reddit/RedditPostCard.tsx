@@ -35,6 +35,7 @@ interface RedditPostCardProps {
   onHide?: () => void;
   onCrosspost?: () => void;
   hideLabel?: string;
+  linkState?: unknown;
 }
 
 const IMAGE_URL_REGEX = /\.(jpe?g|png|gif|webp)$/i;
@@ -91,6 +92,7 @@ export function RedditPostCard({
   onHide,
   onCrosspost,
   hideLabel = 'Hide',
+  linkState,
 }: RedditPostCardProps) {
   const [expandedImageMap, setExpandedImageMap] = useState<Record<string, boolean>>({});
 
@@ -132,11 +134,12 @@ export function RedditPostCard({
             ) : (
               <Link
                 to={postUrl}
+                state={linkState}
                 className="flex-1 text-base font-semibold text-[var(--color-text-primary)] hover:text-[var(--color-primary)]"
               >
                 {decodeHtmlEntities(post.title)}
-          </Link>
-        )}
+              </Link>
+            )}
         <FlairBadge
           text={decodeHtmlEntities(post.link_flair_text)}
               backgroundColor={post.link_flair_background_color}
@@ -230,12 +233,13 @@ export function RedditPostCard({
                 </div>
               )}
               <div className="mt-1 flex flex-wrap items-center gap-3">
-                <Link
-                  to={postUrl}
-                  className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
-                >
-                  {commentLabel}
-                </Link>
+            <Link
+              to={postUrl}
+              state={linkState}
+              className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+            >
+              {commentLabel}
+            </Link>
                 {onShare && (
                   <button
                     type="button"

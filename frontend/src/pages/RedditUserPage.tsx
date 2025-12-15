@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams, useLocation } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { redditService } from '../services/redditService';
 import { savedService } from '../services/savedService';
@@ -45,11 +45,16 @@ const formatNumber = (value?: number) => new Intl.NumberFormat('en-US').format(v
 
 export default function RedditUserPage() {
   const { username } = useParams<{ username: string }>();
+  const location = useLocation();
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const { useRelativeTime } = useSettings();
   const { blockRedditUser, unblockRedditUser, isRedditUserBlocked } = useRedditBlocklist();
   const [activeTab, setActiveTab] = useState<TabKey>('overview');
+  const originState = useMemo(
+    () => ({ originPath: `${location.pathname}${location.search}` }),
+    [location.pathname, location.search]
+  );
   const [activeSort, setActiveSort] = useState<SortKey>('new');
   const [currentAfter, setCurrentAfter] = useState<string | undefined>(undefined);
   const [pageHistory, setPageHistory] = useState<(string | undefined)[]>([undefined]);
@@ -259,6 +264,7 @@ export default function RedditUserPage() {
         onShare={() => handleShareRedditPost(post)}
         onToggleSave={(shouldSave) => toggleSaveRedditPostMutation.mutate({ post, shouldSave })}
         onHide={() => hideRedditPostMutation.mutate(post)}
+        linkState={originState}
       />
     );
   };
@@ -287,7 +293,11 @@ export default function RedditUserPage() {
             <div className="mb-1 text-left text-[11px] text-[var(--color-text-secondary)]">
               Commented on{' '}
               {comment.link_title ? (
-                <Link to={fullCommentsLink} className="font-semibold hover:text-[var(--color-primary)]">
+                <Link
+                  to={fullCommentsLink}
+                  state={originState}
+                  className="font-semibold hover:text-[var(--color-primary)]"
+                >
                   {comment.link_title}
                 </Link>
               ) : (
@@ -298,18 +308,21 @@ export default function RedditUserPage() {
             <div className="mt-2 flex flex-wrap items-center gap-3 text-[11px] text-[var(--color-text-secondary)]">
               <Link
                 to={localPermalink}
+                state={originState}
                 className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
               >
                 permalink
               </Link>
               <Link
                 to={fullCommentsLink}
+                state={originState}
                 className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
               >
                 context
               </Link>
               <Link
                 to={fullCommentsLink}
+                state={originState}
                 className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
               >
                 full comments {comment.link_num_comments != null ? `(${comment.link_num_comments})` : ''}

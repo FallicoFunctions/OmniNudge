@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { feedService, type CombinedFeedItem, type RedditPost } from '../services/feedService';
 import { useAuth } from '../contexts/AuthContext';
@@ -59,7 +59,8 @@ const persistOmniOnlyState = (userId: number | null | undefined, value: boolean)
 export default function HomePage() {
   const { user } = useAuth();
   const { useRelativeTime, defaultOmniPostsOnly } = useSettings();
-  const [sort, setSort] = useState<SortOption>('hot');
+  const location = useLocation();
+  const navigate = useNavigate();
   const [hideTarget, setHideTarget] = useState<HideTarget | null>(null);
   const [crosspostTarget, setCrosspostTarget] = useState<CrosspostTarget | null>(null);
   const [crosspostTitle, setCrosspostTitle] = useState('');
@@ -70,6 +71,32 @@ export default function HomePage() {
     getStoredOmniOnlyState(user?.id ?? null, defaultOmniPostsOnly)
   );
   const queryClient = useQueryClient();
+  const sort = useMemo<SortOption>(() => {
+    const params = new URLSearchParams(location.search);
+    const sortParam = params.get('sort');
+    if (sortParam === 'hot' || sortParam === 'new' || sortParam === 'top' || sortParam === 'rising') {
+      return sortParam;
+    }
+    return 'hot';
+  }, [location.search]);
+  const originState = useMemo(
+    () => ({ originPath: `${location.pathname}${location.search}` }),
+    [location.pathname, location.search]
+  );
+
+  const handleSortChange = (nextSort: SortOption) => {
+    if (nextSort === sort) {
+      return;
+    }
+    const params = new URLSearchParams(location.search);
+    if (nextSort === 'hot') {
+      params.delete('sort');
+    } else {
+      params.set('sort', nextSort);
+    }
+    const search = params.toString();
+    navigate(`${location.pathname}${search ? `?${search}` : ''}`);
+  };
 
   useEffect(() => {
     setOmniOnly(getStoredOmniOnlyState(user?.id ?? null, defaultOmniPostsOnly));
@@ -378,7 +405,7 @@ export default function HomePage() {
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
-            onClick={() => setSort('hot')}
+            onClick={() => handleSortChange('hot')}
             className={`px-4 py-2 text-sm font-semibold ${
               sort === 'hot'
                 ? 'text-[var(--color-primary)]'
@@ -389,7 +416,7 @@ export default function HomePage() {
           </button>
           <button
             type="button"
-            onClick={() => setSort('new')}
+            onClick={() => handleSortChange('new')}
             className={`px-4 py-2 text-sm font-semibold ${
               sort === 'new'
                 ? 'text-[var(--color-primary)]'
@@ -400,7 +427,7 @@ export default function HomePage() {
           </button>
           <button
             type="button"
-            onClick={() => setSort('top')}
+            onClick={() => handleSortChange('top')}
             className={`px-4 py-2 text-sm font-semibold ${
               sort === 'top'
                 ? 'text-[var(--color-primary)]'
@@ -411,7 +438,7 @@ export default function HomePage() {
           </button>
           <button
             type="button"
-            onClick={() => setSort('rising')}
+            onClick={() => handleSortChange('rising')}
             className={`px-4 py-2 text-sm font-semibold ${
               sort === 'rising'
                 ? 'text-[var(--color-primary)]'
@@ -528,6 +555,7 @@ export default function HomePage() {
                   }
                   onHide={() => handleHideRedditPost(post)}
                   onCrosspost={() => handleCrosspostRedditPost(post)}
+                  linkState={originState}
                 />
               );
             }
