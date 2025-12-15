@@ -17,6 +17,7 @@ import {
 import { MarkdownRenderer } from '../components/common/MarkdownRenderer';
 import { FlairBadge } from '../components/reddit/FlairBadge';
 import { useRedditBlocklist } from '../contexts/RedditBlockContext';
+import { decodeHtmlEntities } from '../utils/text';
 
 interface RedditComment {
   kind: string;
@@ -1026,6 +1027,7 @@ export default function RedditPostPage() {
   });
 
   const post = redditData?.post;
+  const decodedTitle = post ? decodeHtmlEntities(post.title) : '';
   const isPostAuthorBlocked = post ? isRedditUserBlocked(post.author) : false;
   const redditComments = redditData?.comments ?? EMPTY_REDDIT_COMMENTS;
   const galleryImages = post ? getGalleryImages(post) : [];
@@ -1479,10 +1481,10 @@ export default function RedditPostPage() {
                         rel="noopener noreferrer"
                         className="hover:text-[var(--color-primary)]"
                       >
-                        {post.title}
+                        {decodedTitle}
                       </a>
                     ) : (
-                      post.title
+                      decodedTitle
                     )}
                   </h1>
                   {isExternalLink && (
@@ -1552,8 +1554,8 @@ export default function RedditPostPage() {
                         src={inlineImage}
                         alt={
                           hasGallery
-                            ? `${post.title} (${galleryIndex + 1}/${galleryImages.length})`
-                            : post.title
+                            ? `${decodedTitle} (${galleryIndex + 1}/${galleryImages.length})`
+                            : decodedTitle
                         }
                         className={`w-full object-contain transition-transform duration-200 ${
                           imageExpanded ? 'max-h-[80vh]' : 'max-h-[320px] hover:scale-[1.03]'
