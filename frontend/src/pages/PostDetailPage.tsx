@@ -12,6 +12,7 @@ import { CommentItem } from '../components/comments/CommentItem';
 import type { CommentActionHandlers } from '../components/comments/CommentItem';
 import { MarkdownRenderer } from '../components/common/MarkdownRenderer';
 import { formatTimestamp } from '../utils/timeFormat';
+import { decodeHtmlEntities } from '../utils/text';
 import { VoteButtons } from '../components/VoteButtons';
 
 const FORMATTING_EXAMPLES = [
@@ -64,6 +65,7 @@ export default function PostDetailPage() {
     console.log('[PostDetailPage] Unwrapped post data:', unwrapped);
     return unwrapped;
   }, [postDataRaw]);
+  const decodedTitle = postData ? decodeHtmlEntities(postData.title) : '';
 
   const commentsQueryKey = ['posts', parsedPostId, 'comments'] as const;
   const { data: postComments, isLoading: loadingComments } = useQuery<PostComment[]>({
@@ -313,7 +315,7 @@ export default function PostDetailPage() {
         <div className="mb-6 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-6">
           {/* Post Header */}
           <div className="mb-4">
-            <h1 className="text-2xl font-bold text-[var(--color-text-primary)]">{postData.title}</h1>
+            <h1 className="text-2xl font-bold text-[var(--color-text-primary)]">{decodedTitle}</h1>
             <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-[var(--color-text-secondary)]">
               {targetSubreddit && (
                 <>
@@ -369,7 +371,7 @@ export default function PostDetailPage() {
                   ) : (
                     <img
                       src={mediaUrl}
-                      alt={postData.title}
+                      alt={decodedTitle}
                       className={`w-full object-contain transition-transform duration-200 ${
                         imageExpanded ? 'max-h-[80vh]' : 'max-h-[320px] hover:scale-[1.03]'
                       }`}
@@ -378,7 +380,7 @@ export default function PostDetailPage() {
                 ) : (
                   <img
                     src={thumbnailUrl ?? ''}
-                    alt={postData.title}
+                    alt={decodedTitle}
                     className={`w-full object-contain transition-transform duration-200 ${
                       imageExpanded ? 'max-h-[80vh]' : 'max-h-[320px] hover:scale-[1.03]'
                     }`}
