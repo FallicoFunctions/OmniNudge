@@ -8,6 +8,8 @@ export default function SettingsPage() {
     setAutoCloseThemeSelector,
     notifyRemovedSavedPosts,
     setNotifyRemovedSavedPosts,
+    defaultOmniPostsOnly,
+    setDefaultOmniPostsOnly,
   } = useSettings();
 
   return (
@@ -179,6 +181,43 @@ export default function SettingsPage() {
                 aria-hidden="true"
                 className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
                   notifyRemovedSavedPosts ? 'translate-x-5' : 'translate-x-0'
+                }`}
+              />
+            </button>
+          </div>
+        </section>
+
+        <section className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-6">
+          <h2 className="mb-4 text-xl font-semibold text-[var(--color-text-primary)]">Omni Feed Defaults</h2>
+          <p className="text-sm text-[var(--color-text-secondary)]">
+            Decide whether your Omni feed should automatically start in “Omni posts only” mode every time
+            you sign in. You can still toggle it on the fly from the feed toolbar.
+          </p>
+
+          <div className="mt-4 flex items-center justify-between rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4">
+            <div className="pr-4">
+              <p className="text-base font-semibold text-[var(--color-text-primary)]">
+                Default to Omni posts only
+              </p>
+              <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+                When enabled, the Omni feed filter starts in Omni-only mode on login instead of blending
+                Reddit items.
+              </p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={defaultOmniPostsOnly}
+              onClick={() => setDefaultOmniPostsOnly(!defaultOmniPostsOnly)}
+              className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${
+                defaultOmniPostsOnly ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
+              }`}
+            >
+              <span className="sr-only">Toggle Omni feed default</span>
+              <span
+                aria-hidden="true"
+                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                  defaultOmniPostsOnly ? 'translate-x-5' : 'translate-x-0'
                 }`}
               />
             </button>

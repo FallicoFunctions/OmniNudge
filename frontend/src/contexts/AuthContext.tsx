@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { api } from '../lib/api';
 import type { User, LoginRequest, RegisterRequest, AuthResponse } from '../types/auth';
+import { OMNI_FEED_STORAGE_KEY, SETTINGS_STORAGE_KEY } from '../constants/storageKeys';
 
 interface AuthContextType {
   user: User | null;
@@ -38,16 +39,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const response = await api.post<AuthResponse>('/auth/login', credentials);
     localStorage.setItem('auth_token', response.token);
     setUser(response.user);
+    persistOmniFeedStateForUser(response.user.id, resolveDefaultOmniFeedState());
   };
 
   const register = async (data: RegisterRequest) => {
     const response = await api.post<AuthResponse>('/auth/register', data);
     localStorage.setItem('auth_token', response.token);
     setUser(response.user);
+    persistOmniFeedStateForUser(response.user.id, resolveDefaultOmniFeedState());
   };
 
   const logout = () => {
     localStorage.removeItem('auth_token');
+    localStorage.removeItem(OMNI_FEED_STORAGE_KEY);
     setUser(null);
     // Optionally call backend logout endpoint
     api.post('/auth/logout').catch(() => {
@@ -78,3 +82,25 @@ export function useAuth() {
   }
   return context;
 }
+const resolveDefaultOmniFeedState = () => {
+  try {
+    const raw = localStorage.getItem(SETTINGS_STORAGE_KEY);
+    if (!raw) {
+      return false;
+    }
+    const parsed = JSON.parse(raw) as { defaultOmniPostsOnly?: boolean };
+    return parsed.defaultOmniPostsOnly ?? false;
+  } catch (error) {
+    console.error('Failed to read Omni feed default from settings:', error);
+    return false;
+  }
+};
+
+const persistOmniFeedStateForUser = (userId: number | null, value: boolean) => {
+  try {
+    const payload = JSON.stringify({ userId, value });
+    localStorage.setItem(OMNI_FEED_STORAGE_KEY, payload);
+  } catch (error) {
+    console.error('Failed to persist Omni feed toggle state:', error);
+  }
+};

@@ -51,6 +51,13 @@ func (h *FeedHandler) GetHomeFeed(c *gin.Context) {
 		limit = 50
 	}
 
+	omniOnly := false
+	if omniOnlyParam := c.Query("omni_only"); omniOnlyParam != "" {
+		if parsed, err := strconv.ParseBool(omniOnlyParam); err == nil {
+			omniOnly = parsed
+		}
+	}
+
 	// Check if user is authenticated
 	userID, authenticated := c.Get("user_id")
 
@@ -58,13 +65,14 @@ func (h *FeedHandler) GetHomeFeed(c *gin.Context) {
 	var redditPosts []services.RedditPost
 	var err error
 
+	includeReddit := !omniOnly
 	if authenticated {
 		// Authenticated: fetch from subscribed sources
 		uidInt := userID.(int)
-		hubPosts, redditPosts, err = h.fetchSubscribedFeeds(c.Request.Context(), uidInt, sortBy, limit)
+		hubPosts, redditPosts, err = h.fetchSubscribedFeeds(c.Request.Context(), uidInt, sortBy, limit, includeReddit)
 	} else {
 		// Unauthenticated: fetch popular posts
-		hubPosts, redditPosts, err = h.fetchPopularFeeds(c.Request.Context(), sortBy, limit)
+		hubPosts, redditPosts, err = h.fetchPopularFeeds(c.Request.Context(), sortBy, limit, includeReddit)
 	}
 
 	if err != nil {
@@ -76,14 +84,15 @@ func (h *FeedHandler) GetHomeFeed(c *gin.Context) {
 	combined := h.mergeAndSortPosts(hubPosts, redditPosts, limit)
 
 	c.JSON(http.StatusOK, gin.H{
-		"posts": combined,
-		"sort":  sortBy,
-		"limit": limit,
+		"posts":     combined,
+		"sort":      sortBy,
+		"limit":     limit,
+		"omni_only": omniOnly,
 	})
 }
 
 // fetchSubscribedFeeds fetches posts from subscribed hubs and subreddits
-func (h *FeedHandler) fetchSubscribedFeeds(ctx context.Context, userID int, sortBy string, limit int) ([]*models.PlatformPost, []services.RedditPost, error) {
+func (h *FeedHandler) fetchSubscribedFeeds(ctx context.Context, userID int, sortBy string, limit int, includeReddit bool) ([]*models.PlatformPost, []services.RedditPost, error) {
 	// Fetch subscribed hub IDs
 	subscribedHubIDs, err := h.hubSubRepo.GetSubscribedHubIDs(ctx, userID)
 	if err != nil {
@@ -94,6 +103,10 @@ func (h *FeedHandler) fetchSubscribedFeeds(ctx context.Context, userID int, sort
 	hubPosts, err := h.postRepo.GetPopularFeed(ctx, subscribedHubIDs, sortBy, limit, 0)
 	if err != nil {
 		return nil, nil, err
+	}
+
+	if !includeReddit {
+		return hubPosts, []services.RedditPost{}, nil
 	}
 
 	// Fetch subscribed subreddits
@@ -126,11 +139,15 @@ func (h *FeedHandler) fetchSubscribedFeeds(ctx context.Context, userID int, sort
 }
 
 // fetchPopularFeeds fetches popular posts from all hubs and r/popular
-func (h *FeedHandler) fetchPopularFeeds(ctx context.Context, sortBy string, limit int) ([]*models.PlatformPost, []services.RedditPost, error) {
+func (h *FeedHandler) fetchPopularFeeds(ctx context.Context, sortBy string, limit int, includeReddit bool) ([]*models.PlatformPost, []services.RedditPost, error) {
 	// Fetch popular hub posts (empty subscribedHubIDs returns all popular)
 	hubPosts, err := h.postRepo.GetPopularFeed(ctx, []int{}, sortBy, limit, 0)
 	if err != nil {
 		return nil, nil, err
+	}
+
+	if !includeReddit {
+		return hubPosts, []services.RedditPost{}, nil
 	}
 
 	// Fetch r/popular

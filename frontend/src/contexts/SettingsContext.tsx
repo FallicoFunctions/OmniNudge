@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
+import { SETTINGS_STORAGE_KEY } from '../constants/storageKeys';
 
 interface SettingsContextType {
   useRelativeTime: boolean;
@@ -7,16 +8,17 @@ interface SettingsContextType {
   setAutoCloseThemeSelector: (value: boolean) => void;
   notifyRemovedSavedPosts: boolean;
   setNotifyRemovedSavedPosts: (value: boolean) => void;
+  defaultOmniPostsOnly: boolean;
+  setDefaultOmniPostsOnly: (value: boolean) => void;
 }
 
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
-
-const SETTINGS_STORAGE_KEY = 'omninudge-settings';
 
 interface StoredSettings {
   useRelativeTime?: boolean;
   autoCloseThemeSelector?: boolean;
   notifyRemovedSavedPosts?: boolean;
+  defaultOmniPostsOnly?: boolean;
 }
 
 const getStoredSettings = (): StoredSettings => {
@@ -47,6 +49,10 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     const settings = getStoredSettings();
     return settings.notifyRemovedSavedPosts ?? true;
   });
+  const [defaultOmniPostsOnly, setDefaultOmniPostsOnlyState] = useState<boolean>(() => {
+    const settings = getStoredSettings();
+    return settings.defaultOmniPostsOnly ?? false;
+  });
 
   // Persist to localStorage whenever settings change
   useEffect(() => {
@@ -55,12 +61,13 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         useRelativeTime,
         autoCloseThemeSelector,
         notifyRemovedSavedPosts,
+        defaultOmniPostsOnly,
       };
       localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings));
     } catch (error) {
       console.error('Failed to save settings to localStorage:', error);
     }
-  }, [useRelativeTime, autoCloseThemeSelector, notifyRemovedSavedPosts]);
+  }, [useRelativeTime, autoCloseThemeSelector, notifyRemovedSavedPosts, defaultOmniPostsOnly]);
 
   const setUseRelativeTime = (value: boolean) => {
     setUseRelativeTimeState(value);
@@ -74,6 +81,10 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     setNotifyRemovedSavedPostsState(value);
   };
 
+  const setDefaultOmniPostsOnly = (value: boolean) => {
+    setDefaultOmniPostsOnlyState(value);
+  };
+
   return (
     <SettingsContext.Provider
       value={{
@@ -83,6 +94,8 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         setAutoCloseThemeSelector,
         notifyRemovedSavedPosts,
         setNotifyRemovedSavedPosts,
+        defaultOmniPostsOnly,
+        setDefaultOmniPostsOnly,
       }}
     >
       {children}

@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { feedService, type CombinedFeedItem, type RedditPost } from '../services/feedService';
@@ -12,15 +12,53 @@ import { postsService } from '../services/postsService';
 import { subscriptionService } from '../services/subscriptionService';
 import { hubsService } from '../services/hubsService';
 import { createRedditCrosspostPayload } from '../utils/crosspostHelpers';
+import { OMNI_FEED_STORAGE_KEY } from '../constants/storageKeys';
 
 type SortOption = 'hot' | 'new' | 'top' | 'rising';
 
 type HideTarget = { post: RedditPost };
 type CrosspostTarget = { post: RedditPost };
 
+const getStoredOmniOnlyState = (userId: number | null | undefined, fallback: boolean) => {
+  if (typeof window === 'undefined' || !window.localStorage) {
+    return fallback;
+  }
+  try {
+    const raw = localStorage.getItem(OMNI_FEED_STORAGE_KEY);
+    if (!raw) {
+      return fallback;
+    }
+    const parsed = JSON.parse(raw) as { userId?: number | null; value?: boolean };
+    if (typeof parsed.value === 'boolean') {
+      const storedUserId = parsed.userId ?? null;
+      const normalizedUserId = userId ?? null;
+      if (storedUserId === normalizedUserId) {
+        return parsed.value;
+      }
+    }
+  } catch (error) {
+    console.error('Failed to read Omni feed toggle state:', error);
+  }
+  return fallback;
+};
+
+const persistOmniOnlyState = (userId: number | null | undefined, value: boolean) => {
+  if (typeof window === 'undefined' || !window.localStorage) {
+    return;
+  }
+  try {
+    localStorage.setItem(
+      OMNI_FEED_STORAGE_KEY,
+      JSON.stringify({ userId: userId ?? null, value })
+    );
+  } catch (error) {
+    console.error('Failed to save Omni feed toggle state:', error);
+  }
+};
+
 export default function HomePage() {
   const { user } = useAuth();
-  const { useRelativeTime } = useSettings();
+  const { useRelativeTime, defaultOmniPostsOnly } = useSettings();
   const [sort, setSort] = useState<SortOption>('hot');
   const [hideTarget, setHideTarget] = useState<HideTarget | null>(null);
   const [crosspostTarget, setCrosspostTarget] = useState<CrosspostTarget | null>(null);
@@ -28,15 +66,33 @@ export default function HomePage() {
   const [selectedHub, setSelectedHub] = useState('');
   const [selectedSubreddit, setSelectedSubreddit] = useState('');
   const [sendRepliesToInbox, setSendRepliesToInbox] = useState(true);
+  const [omniOnly, setOmniOnly] = useState(() =>
+    getStoredOmniOnlyState(user?.id ?? null, defaultOmniPostsOnly)
+  );
   const queryClient = useQueryClient();
 
+  useEffect(() => {
+    setOmniOnly(getStoredOmniOnlyState(user?.id ?? null, defaultOmniPostsOnly));
+  }, [user?.id, defaultOmniPostsOnly]);
+
+  useEffect(() => {
+    persistOmniOnlyState(user?.id ?? null, omniOnly);
+  }, [omniOnly, user?.id]);
+
+  const homeFeedQueryKey = ['home-feed', sort, omniOnly] as const;
   const { data, isLoading } = useQuery({
-    queryKey: ['home-feed', sort],
-    queryFn: () => feedService.getHomeFeed(sort, 50),
+    queryKey: homeFeedQueryKey,
+    queryFn: () => feedService.getHomeFeed(sort, 50, omniOnly),
     staleTime: 1000 * 60 * 5,
   });
 
-  const posts = data?.posts ?? [];
+  const displayedPosts = useMemo(() => {
+    const basePosts = data?.posts ?? [];
+    if (!omniOnly) {
+      return basePosts;
+    }
+    return basePosts.filter((item) => item.source === 'hub');
+  }, [data?.posts, omniOnly]);
 
   // Saved posts state
   const savedPostsKey = ['saved-items', 'posts'] as const;
@@ -95,7 +151,7 @@ export default function HomePage() {
   const deletePostMutation = useMutation<void, Error, number>({
     mutationFn: async (postId: number) => postsService.deletePost(postId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['home-feed', sort] });
+      queryClient.invalidateQueries({ queryKey: ['home-feed'] });
     },
     onError: (err) => {
       alert(`Failed to delete post: ${err.message}`);
@@ -129,7 +185,7 @@ export default function HomePage() {
       await savedService.hidePost(postId);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['home-feed', sort] });
+      queryClient.invalidateQueries({ queryKey: ['home-feed'] });
     },
     onError: (err) => {
       alert(`Failed to hide post: ${err.message}`);
@@ -168,7 +224,7 @@ export default function HomePage() {
       await savedService.hideRedditPost(post.subreddit, post.id);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['home-feed', sort] });
+      queryClient.invalidateQueries({ queryKey: ['home-feed'] });
       setHideTarget(null);
     },
     onError: (err) => {
@@ -224,7 +280,7 @@ export default function HomePage() {
       setSelectedHub('');
       setSelectedSubreddit('');
       setSendRepliesToInbox(true);
-      queryClient.invalidateQueries({ queryKey: ['home-feed', sort] });
+      queryClient.invalidateQueries({ queryKey: ['home-feed'] });
       alert('Crosspost created successfully!');
     },
     onError: (error) => {
@@ -308,67 +364,99 @@ export default function HomePage() {
         </h1>
         <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
           {user
-            ? 'Posts from your subscribed hubs and subreddits'
-            : 'Popular posts from all hubs and subreddits'}
+            ? omniOnly
+              ? 'Posts from your Omni hubs (Reddit is filtered out)'
+              : 'Posts from your subscribed hubs and subreddits'
+            : omniOnly
+              ? 'Popular posts shared within Omni hubs'
+              : 'Popular posts from all hubs and subreddits'}
         </p>
       </div>
 
       {/* Sort controls */}
-      <div className="mb-4 flex gap-2 border-b border-[var(--color-border)] pb-2">
-        <button
-          type="button"
-          onClick={() => setSort('hot')}
-          className={`px-4 py-2 text-sm font-semibold ${
-            sort === 'hot'
-              ? 'text-[var(--color-primary)]'
-              : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
-          }`}
-        >
-          Hot
-        </button>
-        <button
-          type="button"
-          onClick={() => setSort('new')}
-          className={`px-4 py-2 text-sm font-semibold ${
-            sort === 'new'
-              ? 'text-[var(--color-primary)]'
-              : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
-          }`}
-        >
-          New
-        </button>
-        <button
-          type="button"
-          onClick={() => setSort('top')}
-          className={`px-4 py-2 text-sm font-semibold ${
-            sort === 'top'
-              ? 'text-[var(--color-primary)]'
-              : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
-          }`}
-        >
-          Top
-        </button>
-        <button
-          type="button"
-          onClick={() => setSort('rising')}
-          className={`px-4 py-2 text-sm font-semibold ${
-            sort === 'rising'
-              ? 'text-[var(--color-primary)]'
-              : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
-          }`}
-        >
-          Rising
-        </button>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-4 border-b border-[var(--color-border)] pb-2">
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => setSort('hot')}
+            className={`px-4 py-2 text-sm font-semibold ${
+              sort === 'hot'
+                ? 'text-[var(--color-primary)]'
+                : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
+            }`}
+          >
+            Hot
+          </button>
+          <button
+            type="button"
+            onClick={() => setSort('new')}
+            className={`px-4 py-2 text-sm font-semibold ${
+              sort === 'new'
+                ? 'text-[var(--color-primary)]'
+                : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
+            }`}
+          >
+            New
+          </button>
+          <button
+            type="button"
+            onClick={() => setSort('top')}
+            className={`px-4 py-2 text-sm font-semibold ${
+              sort === 'top'
+                ? 'text-[var(--color-primary)]'
+                : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
+            }`}
+          >
+            Top
+          </button>
+          <button
+            type="button"
+            onClick={() => setSort('rising')}
+            className={`px-4 py-2 text-sm font-semibold ${
+              sort === 'rising'
+                ? 'text-[var(--color-primary)]'
+                : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
+            }`}
+          >
+            Rising
+          </button>
+        </div>
+        <div className="flex items-center gap-3 rounded-full border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-1 text-sm">
+          <span className="text-xs font-semibold uppercase text-[var(--color-text-secondary)]">
+            Omni posts only
+          </span>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={omniOnly}
+            onClick={() => setOmniOnly((prev) => !prev)}
+            className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-1 ${
+              omniOnly ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
+            }`}
+          >
+            <span className="sr-only">Toggle Omni posts filter</span>
+            <span
+              aria-hidden="true"
+              className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                omniOnly ? 'translate-x-5' : 'translate-x-0'
+              }`}
+            />
+          </button>
+        </div>
       </div>
 
       {/* Posts */}
       {isLoading ? (
         <div className="text-center text-[var(--color-text-secondary)]">Loading feed...</div>
-      ) : posts.length === 0 ? (
+      ) : displayedPosts.length === 0 ? (
         <div className="text-center text-[var(--color-text-secondary)]">
           {user ? (
             <div>
-              <p className="mb-4">No posts from your subscriptions yet.</p>
+              <p className="mb-4">
+                {omniOnly
+                  ? 'No Omni posts from your subscriptions yet.'
+                  : 'No posts from your subscriptions yet.'}
+              </p>
               <p className="text-sm">
                 <Link
                   to="/hubs"
@@ -387,12 +475,12 @@ export default function HomePage() {
               </p>
             </div>
           ) : (
-            <p>No posts available.</p>
+            <p>{omniOnly ? 'No Omni posts available.' : 'No posts available.'}</p>
           )}
         </div>
       ) : (
         <div className="space-y-4">
-          {posts.map((item: CombinedFeedItem) => {
+          {displayedPosts.map((item: CombinedFeedItem) => {
             if (item.source === 'hub') {
               const post = item.post as PlatformPost;
               const isSaved = savedPostIds.has(post.id);
