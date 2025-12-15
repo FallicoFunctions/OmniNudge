@@ -10,6 +10,8 @@ interface SettingsContextType {
   setNotifyRemovedSavedPosts: (value: boolean) => void;
   defaultOmniPostsOnly: boolean;
   setDefaultOmniPostsOnly: (value: boolean) => void;
+  stayOnPostAfterHide: boolean;
+  setStayOnPostAfterHide: (value: boolean) => void;
 }
 
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
@@ -19,6 +21,7 @@ interface StoredSettings {
   autoCloseThemeSelector?: boolean;
   notifyRemovedSavedPosts?: boolean;
   defaultOmniPostsOnly?: boolean;
+  stayOnPostAfterHide?: boolean;
 }
 
 const getStoredSettings = (): StoredSettings => {
@@ -53,6 +56,10 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     const settings = getStoredSettings();
     return settings.defaultOmniPostsOnly ?? false;
   });
+  const [stayOnPostAfterHide, setStayOnPostAfterHideState] = useState<boolean>(() => {
+    const settings = getStoredSettings();
+    return settings.stayOnPostAfterHide ?? false;
+  });
 
   // Persist to localStorage whenever settings change
   useEffect(() => {
@@ -62,12 +69,13 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         autoCloseThemeSelector,
         notifyRemovedSavedPosts,
         defaultOmniPostsOnly,
+        stayOnPostAfterHide,
       };
       localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings));
     } catch (error) {
       console.error('Failed to save settings to localStorage:', error);
     }
-  }, [useRelativeTime, autoCloseThemeSelector, notifyRemovedSavedPosts, defaultOmniPostsOnly]);
+  }, [useRelativeTime, autoCloseThemeSelector, notifyRemovedSavedPosts, defaultOmniPostsOnly, stayOnPostAfterHide]);
 
   const setUseRelativeTime = (value: boolean) => {
     setUseRelativeTimeState(value);
@@ -85,6 +93,10 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     setDefaultOmniPostsOnlyState(value);
   };
 
+  const setStayOnPostAfterHide = (value: boolean) => {
+    setStayOnPostAfterHideState(value);
+  };
+
   return (
     <SettingsContext.Provider
       value={{
@@ -96,6 +108,8 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         setNotifyRemovedSavedPosts,
         defaultOmniPostsOnly,
         setDefaultOmniPostsOnly,
+        stayOnPostAfterHide,
+        setStayOnPostAfterHide,
       }}
     >
       {children}

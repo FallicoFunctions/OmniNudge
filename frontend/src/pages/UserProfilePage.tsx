@@ -27,12 +27,18 @@ const PRIVATE_TABS = [
 
 type TabKey = (typeof BASE_TABS)[number]['key'] | (typeof PRIVATE_TABS)[number]['key'];
 
+interface PostNavigationState {
+  originPath: string;
+}
+
 function PostsSection({
   posts,
   useRelativeTime,
+  linkState,
 }: {
   posts: PlatformPost[];
   useRelativeTime: boolean;
+  linkState: PostNavigationState;
 }) {
   if (!posts.length) {
     return <p className="text-sm text-[var(--color-text-secondary)]">No posts yet.</p>;
@@ -57,6 +63,7 @@ function PostsSection({
               <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--color-text-secondary)]">
                 <Link
                   to={`/hubs/h/${post.hub_name}`}
+                  state={linkState}
                   className="font-semibold text-[var(--color-text-primary)] hover:text-[var(--color-primary)]"
                 >
                   h/{post.hub_name}
@@ -66,7 +73,7 @@ function PostsSection({
                 <span>•</span>
                 <span>posted {formatTimestamp(post.created_at, useRelativeTime)}</span>
               </div>
-              <Link to={getPostUrl(post)}>
+              <Link to={getPostUrl(post)} state={linkState}>
                 <h3 className="mt-1 text-lg font-semibold text-[var(--color-text-primary)] hover:text-[var(--color-primary)]">
                   {post.title}
                 </h3>
@@ -88,9 +95,11 @@ function PostsSection({
 function CommentsSection({
   comments,
   useRelativeTime,
+  linkState,
 }: {
   comments: PostComment[];
   useRelativeTime: boolean;
+  linkState: PostNavigationState;
 }) {
   if (!comments.length) {
     return <p className="text-sm text-[var(--color-text-secondary)]">No comments yet.</p>;
@@ -108,6 +117,7 @@ function CommentsSection({
               Commented {formatTimestamp(comment.created_at, useRelativeTime)} on{' '}
               <Link
                 to={`/posts/${comment.post_id}`}
+                state={linkState}
                 className="font-medium text-[var(--color-text-primary)] hover:text-[var(--color-primary)]"
               >
                 post #{comment.post_id}
@@ -125,11 +135,16 @@ function CommentsSection({
 }
 
 export default function UserProfilePage() {
+  const location = useLocation();
   const { username } = useParams<{ username: string }>();
   const { user } = useAuth();
   const { useRelativeTime } = useSettings();
   const [activeTab, setActiveTab] = useState<TabKey>('overview');
   const canViewPrivateTabs = user?.username === username;
+  const originState = useMemo(
+    () => ({ originPath: `${location.pathname}${location.search}` }),
+    [location.pathname, location.search]
+  );
 
   const visibleTabs = useMemo(() => {
     if (canViewPrivateTabs) {
@@ -196,11 +211,17 @@ export default function UserProfilePage() {
 
   const renderActiveTab = () => {
     if (resolvedActiveTab === 'posts') {
-      return <PostsSection posts={posts} useRelativeTime={useRelativeTime} />;
+      return <PostsSection posts={posts} useRelativeTime={useRelativeTime} linkState={originState} />;
     }
 
     if (resolvedActiveTab === 'comments') {
-      return <CommentsSection comments={comments} useRelativeTime={useRelativeTime} />;
+      return (
+        <CommentsSection
+          comments={comments}
+          useRelativeTime={useRelativeTime}
+          linkState={originState}
+        />
+      );
     }
 
     if (resolvedActiveTab === 'saved') {
@@ -245,7 +266,11 @@ export default function UserProfilePage() {
               </button>
             )}
           </div>
-          <PostsSection posts={posts.slice(0, 5)} useRelativeTime={useRelativeTime} />
+          <PostsSection
+            posts={posts.slice(0, 5)}
+            useRelativeTime={useRelativeTime}
+            linkState={originState}
+          />
         </section>
         <section>
           <div className="mb-2 flex items-center justify-between">
@@ -262,7 +287,11 @@ export default function UserProfilePage() {
               </button>
             )}
           </div>
-          <CommentsSection comments={comments.slice(0, 5)} useRelativeTime={useRelativeTime} />
+          <CommentsSection
+            comments={comments.slice(0, 5)}
+            useRelativeTime={useRelativeTime}
+            linkState={originState}
+          />
         </section>
       </div>
     );
