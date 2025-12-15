@@ -2,12 +2,15 @@ package handlers
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/omninudge/backend/internal/models"
+	"github.com/omninudge/backend/internal/services"
 )
 
 // SavedItemsHandler manages saved posts and comments
@@ -16,6 +19,16 @@ type SavedItemsHandler struct {
 	postRepo          *models.PlatformPostRepository
 	postCommentRepo   *models.PostCommentRepository
 	redditCommentRepo *models.RedditPostCommentRepository
+	redditClient      redditPostFetcher
+}
+
+type redditPostFetcher interface {
+	GetPostInfo(ctx context.Context, subreddit string, redditPostID string) (*services.RedditPost, error)
+}
+
+type removedRedditPost struct {
+	Subreddit    string `json:"subreddit"`
+	RedditPostID string `json:"reddit_post_id"`
 }
 
 type saveRedditPostRequest struct {
@@ -28,12 +41,13 @@ type saveRedditPostRequest struct {
 }
 
 // NewSavedItemsHandler constructs the handler
-func NewSavedItemsHandler(savedRepo *models.SavedItemsRepository, postRepo *models.PlatformPostRepository, postCommentRepo *models.PostCommentRepository, redditCommentRepo *models.RedditPostCommentRepository) *SavedItemsHandler {
+func NewSavedItemsHandler(savedRepo *models.SavedItemsRepository, postRepo *models.PlatformPostRepository, postCommentRepo *models.PostCommentRepository, redditCommentRepo *models.RedditPostCommentRepository, redditClient redditPostFetcher) *SavedItemsHandler {
 	return &SavedItemsHandler{
 		savedRepo:         savedRepo,
 		postRepo:          postRepo,
 		postCommentRepo:   postCommentRepo,
 		redditCommentRepo: redditCommentRepo,
+		redditClient:      redditClient,
 	}
 }
 
@@ -44,6 +58,7 @@ func (h *SavedItemsHandler) GetSavedItems(c *gin.Context) {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
 		return
 	}
+	intUserID := userID.(int)
 	filterType := c.DefaultQuery("type", "all")
 	validTypes := map[string]bool{
 		"all": true, "posts": true, "reddit_posts": true,
@@ -56,7 +71,7 @@ func (h *SavedItemsHandler) GetSavedItems(c *gin.Context) {
 
 	response := gin.H{}
 	if filterType == "all" || filterType == "posts" {
-		posts, err := h.savedRepo.GetSavedPosts(c.Request.Context(), userID.(int))
+		posts, err := h.savedRepo.GetSavedPosts(c.Request.Context(), intUserID)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch saved posts", "details": err.Error()})
 			return
@@ -65,16 +80,20 @@ func (h *SavedItemsHandler) GetSavedItems(c *gin.Context) {
 	}
 
 	if filterType == "all" || filterType == "reddit_posts" {
-		redditPosts, err := h.savedRepo.GetSavedRedditPosts(c.Request.Context(), userID.(int))
+		redditPosts, err := h.savedRepo.GetSavedRedditPosts(c.Request.Context(), intUserID)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch saved Reddit posts", "details": err.Error()})
 			return
 		}
-		response["saved_reddit_posts"] = redditPosts
+		filteredPosts, removed := h.pruneRemovedRedditPosts(c, intUserID, redditPosts)
+		response["saved_reddit_posts"] = filteredPosts
+		if len(removed) > 0 {
+			response["auto_removed_reddit_posts"] = removed
+		}
 	}
 
 	if filterType == "all" || filterType == "post_comments" {
-		comments, err := h.savedRepo.GetSavedPostComments(c.Request.Context(), userID.(int))
+		comments, err := h.savedRepo.GetSavedPostComments(c.Request.Context(), intUserID)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch saved site comments", "details": err.Error()})
 			return
@@ -83,7 +102,7 @@ func (h *SavedItemsHandler) GetSavedItems(c *gin.Context) {
 	}
 
 	if filterType == "all" || filterType == "reddit_comments" {
-		comments, err := h.savedRepo.GetSavedRedditComments(c.Request.Context(), userID.(int))
+		comments, err := h.savedRepo.GetSavedRedditComments(c.Request.Context(), intUserID)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch saved comments", "details": err.Error()})
 			return
@@ -91,8 +110,65 @@ func (h *SavedItemsHandler) GetSavedItems(c *gin.Context) {
 		response["saved_reddit_comments"] = comments
 	}
 
-	response["type"] = filterType
-	c.JSON(http.StatusOK, response)
+response["type"] = filterType
+c.JSON(http.StatusOK, response)
+}
+
+func (h *SavedItemsHandler) pruneRemovedRedditPosts(c *gin.Context, userID int, posts []*models.SavedRedditPost) ([]*models.SavedRedditPost, []removedRedditPost) {
+	if len(posts) == 0 {
+		return posts, nil
+	}
+
+	ctx := c.Request.Context()
+	var filtered []*models.SavedRedditPost
+	var removed []removedRedditPost
+
+	for _, post := range posts {
+		isRemoved := isLocallyRemovedRedditPost(post)
+
+		if !isRemoved && h.redditClient != nil {
+			apiPost, err := h.redditClient.GetPostInfo(ctx, post.Subreddit, post.RedditPostID)
+			if err != nil {
+				c.Error(fmt.Errorf("failed to fetch reddit post info for %s/%s: %w", post.Subreddit, post.RedditPostID, err))
+			} else if services.IsRedditPostRemoved(apiPost) || apiPost == nil {
+				isRemoved = true
+			}
+		}
+
+		if isRemoved {
+			if err := h.savedRepo.RemoveRedditPost(ctx, userID, post.Subreddit, post.RedditPostID); err != nil {
+				c.Error(fmt.Errorf("failed to remove stale reddit post %s/%s: %w", post.Subreddit, post.RedditPostID, err))
+				filtered = append(filtered, post)
+				continue
+			}
+			removed = append(removed, removedRedditPost{
+				Subreddit:    post.Subreddit,
+				RedditPostID: post.RedditPostID,
+			})
+			continue
+		}
+		filtered = append(filtered, post)
+	}
+
+	return filtered, removed
+}
+
+func isLocallyRemovedRedditPost(post *models.SavedRedditPost) bool {
+	title := normalizeSavedText(post.Title)
+	if title == "[removed]" || title == "[deleted]" || strings.Contains(title, "removed by moderator") {
+		return true
+	}
+
+	author := normalizeSavedText(post.Author)
+	if author == "[deleted]" {
+		return true
+	}
+
+	return false
+}
+
+func normalizeSavedText(value string) string {
+	return strings.ToLower(strings.TrimSpace(value))
 }
 
 // GetHiddenItems handles GET /api/v1/users/me/hidden
