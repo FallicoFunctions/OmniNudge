@@ -355,12 +355,7 @@ export default function PostDetailPage() {
           {(mediaUrl || thumbnailUrl) && (
             <div className="mb-4 flex flex-col items-start gap-2">
               <div
-                className="cursor-pointer overflow-hidden rounded border border-[var(--color-border)] transition-all duration-200"
-                style={{
-                  maxHeight: imageExpanded ? '700px' : '240px',
-                  maxWidth: imageExpanded ? '100%' : '360px',
-                  width: imageExpanded ? '100%' : '360px',
-                }}
+                className="w-full cursor-pointer overflow-hidden rounded border border-[var(--color-border)] transition-all duration-200"
                 onClick={() => setImageExpanded((prev) => !prev)}
                 title={imageExpanded ? 'Click to shrink' : 'Click to enlarge'}
               >
@@ -368,15 +363,15 @@ export default function PostDetailPage() {
                   isVideoMedia ? (
                     <video
                       controls
-                      className="h-full w-full object-contain"
+                      className={`w-full object-contain ${imageExpanded ? 'max-h-[80vh]' : 'max-h-[320px]'}`}
                       src={mediaUrl}
                     />
                   ) : (
                     <img
                       src={mediaUrl}
                       alt={postData.title}
-                      className={`h-full w-full object-contain transition-transform duration-200 ${
-                        imageExpanded ? '' : 'hover:scale-[1.03]'
+                      className={`w-full object-contain transition-transform duration-200 ${
+                        imageExpanded ? 'max-h-[80vh]' : 'max-h-[320px] hover:scale-[1.03]'
                       }`}
                     />
                   )
@@ -384,8 +379,8 @@ export default function PostDetailPage() {
                   <img
                     src={thumbnailUrl ?? ''}
                     alt={postData.title}
-                    className={`h-full w-full object-contain transition-transform duration-200 ${
-                      imageExpanded ? '' : 'hover:scale-[1.03]'
+                    className={`w-full object-contain transition-transform duration-200 ${
+                      imageExpanded ? 'max-h-[80vh]' : 'max-h-[320px] hover:scale-[1.03]'
                     }`}
                   />
                 )}

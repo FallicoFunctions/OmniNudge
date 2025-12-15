@@ -1542,14 +1542,9 @@ export default function RedditPostPage() {
               {/* Post Media/Content */}
               {post && inlineImage ? (
                 <div className="mb-4 flex flex-col items-start gap-2">
-                  <div className="relative">
+                  <div className="relative w-full">
                     <div
                       className="cursor-pointer overflow-hidden rounded border border-[var(--color-border)] transition-all duration-200"
-                      style={{
-                        maxHeight: imageExpanded ? '700px' : '240px',
-                        maxWidth: imageExpanded ? '100%' : '360px',
-                        width: imageExpanded ? '100%' : '360px',
-                      }}
                       onClick={() => setImageExpanded((prev) => !prev)}
                       title={imageExpanded ? 'Click to shrink' : 'Click to enlarge'}
                     >
@@ -1560,8 +1555,8 @@ export default function RedditPostPage() {
                             ? `${post.title} (${galleryIndex + 1}/${galleryImages.length})`
                             : post.title
                         }
-                        className={`h-full w-full object-contain transition-transform duration-200 ${
-                          imageExpanded ? '' : 'hover:scale-[1.03]'
+                        className={`w-full object-contain transition-transform duration-200 ${
+                          imageExpanded ? 'max-h-[80vh]' : 'max-h-[320px] hover:scale-[1.03]'
                         }`}
                       />
                     </div>
