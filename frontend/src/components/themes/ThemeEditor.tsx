@@ -154,7 +154,7 @@ const ThemeEditor = ({ isOpen, onClose, initialTheme = null }: ThemeEditorProps)
     cssVariableHistory.current = [];
   };
 
-  const setVariableError = (variableName: string, message?: string) => {
+  const setVariableError = useCallback((variableName: string, message?: string) => {
     setVariableErrors((prev) => {
       if (!message) {
         const next = { ...prev };
@@ -163,9 +163,9 @@ const ThemeEditor = ({ isOpen, onClose, initialTheme = null }: ThemeEditorProps)
       }
       return { ...prev, [variableName]: message };
     });
-  };
+  }, []);
 
-  const validateVariableValue = (variableName: string, value: string) => {
+  const validateVariableValue = useCallback((variableName: string, value: string) => {
     const trimmed = value.trim();
     const definition = getVariableDefinition(variableName);
     const type = definition?.type ?? 'string';
@@ -215,7 +215,7 @@ const ThemeEditor = ({ isOpen, onClose, initialTheme = null }: ThemeEditorProps)
 
     setVariableError(variableName, undefined);
     return true;
-  };
+  }, [setVariableError]);
 
   const updateVariable = (variableName: string, value: string) => {
     cssVariableHistory.current = [
@@ -251,7 +251,7 @@ const ThemeEditor = ({ isOpen, onClose, initialTheme = null }: ThemeEditorProps)
     }
   }, []);
 
-  const validateInfoDetails = () => {
+  const validateInfoDetails = useCallback(() => {
     const result = themeInfoSchema.safeParse({
       theme_name: themeName,
       theme_description: themeDescription,
@@ -276,9 +276,9 @@ const ThemeEditor = ({ isOpen, onClose, initialTheme = null }: ThemeEditorProps)
     setInfoErrors({});
     setError(null);
     return true;
-  };
+  }, [themeDescription, themeName, setError, setInfoErrors]);
 
-  const validateVariableSet = (): Record<string, string> | null => {
+  const validateVariableSet = useCallback((): Record<string, string> | null => {
     const result = cssVariablesSchema.safeParse(cssVariables);
     if (!result.success) {
       const nextErrors: Record<string, string> = {};
@@ -315,7 +315,7 @@ const ThemeEditor = ({ isOpen, onClose, initialTheme = null }: ThemeEditorProps)
     setCssVariables(sanitizedEntries);
     setError(null);
     return sanitizedEntries;
-  };
+  }, [cssVariables, setCssVariables, setError, setVariableErrors, validateVariableValue]);
 
   const validateStep = () => {
     const stepId = steps[currentStep].id;
@@ -399,7 +399,6 @@ const ThemeEditor = ({ isOpen, onClose, initialTheme = null }: ThemeEditorProps)
       setIsSubmitting(false);
     }
   }, [
-    cssVariables,
     initialTheme,
     refreshThemes,
     selectTheme,
