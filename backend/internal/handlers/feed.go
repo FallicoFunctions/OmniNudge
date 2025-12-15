@@ -81,7 +81,7 @@ func (h *FeedHandler) GetHomeFeed(c *gin.Context) {
 	}
 
 	// Merge and sort by score
-	combined := h.mergeAndSortPosts(hubPosts, redditPosts, limit)
+	combined := h.mergeAndSortPosts(hubPosts, redditPosts, sortBy, limit)
 
 	c.JSON(http.StatusOK, gin.H{
 		"posts":     combined,
@@ -162,7 +162,7 @@ func (h *FeedHandler) fetchPopularFeeds(ctx context.Context, sortBy string, limi
 }
 
 // mergeAndSortPosts combines hub and reddit posts and sorts by score
-func (h *FeedHandler) mergeAndSortPosts(hubPosts []*models.PlatformPost, redditPosts []services.RedditPost, limit int) []CombinedFeedItem {
+func (h *FeedHandler) mergeAndSortPosts(hubPosts []*models.PlatformPost, redditPosts []services.RedditPost, sortBy string, limit int) []CombinedFeedItem {
 	var combined []CombinedFeedItem
 
 	// Add hub posts
@@ -183,9 +183,14 @@ func (h *FeedHandler) mergeAndSortPosts(hubPosts []*models.PlatformPost, redditP
 		})
 	}
 
-	// Sort by score descending
+	// Sort based on requested mode
 	sort.Slice(combined, func(i, j int) bool {
-		return combined[i].Score > combined[j].Score
+		switch sortBy {
+		case "new":
+			return getItemCreatedAt(combined[i]) > getItemCreatedAt(combined[j])
+		default:
+			return combined[i].Score > combined[j].Score
+		}
 	})
 
 	// Return top N
@@ -206,4 +211,15 @@ func extractRedditPosts(listing *services.RedditListing) []services.RedditPost {
 		posts = append(posts, child.Data)
 	}
 	return posts
+}
+
+func getItemCreatedAt(item CombinedFeedItem) int64 {
+	switch post := item.Post.(type) {
+	case *models.PlatformPost:
+		return post.CreatedAt.Unix()
+	case services.RedditPost:
+		return int64(post.CreatedUTC)
+	default:
+		return 0
+	}
 }
