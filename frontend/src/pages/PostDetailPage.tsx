@@ -77,10 +77,17 @@ export default function PostDetailPage() {
   const commentsList = useMemo(() => postComments ?? [], [postComments]);
 
   const savedPostsKey = ['saved-items', 'posts'] as const;
+  const hiddenPostsKey = ['hidden-items', 'posts'] as const;
   const savedSiteCommentsKey = ['saved-items', 'post_comments'] as const;
   const { data: savedPostsData } = useQuery<SavedItemsResponse>({
     queryKey: savedPostsKey,
     queryFn: () => savedService.getSavedItems('posts'),
+    enabled: !!user,
+    staleTime: 1000 * 60 * 5,
+  });
+  useQuery<HiddenItemsResponse>({
+    queryKey: hiddenPostsKey,
+    queryFn: () => savedService.getHiddenItems('posts'),
     enabled: !!user,
     staleTime: 1000 * 60 * 5,
   });
@@ -127,6 +134,23 @@ export default function PostDetailPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: savedPostsKey });
+    },
+  });
+
+  const hidePostMutation = useMutation({
+    mutationFn: async () => {
+      if (!user) {
+        throw new Error('You must be signed in to hide posts.');
+      }
+      if (!Number.isFinite(parsedPostId)) {
+        throw new Error('Invalid post');
+      }
+      await savedService.hidePost(parsedPostId);
+      await queryClient.invalidateQueries({ queryKey: savedPostsKey });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: hiddenPostsKey });
+      navigate('/hidden');
     },
   });
 
@@ -239,9 +263,24 @@ export default function PostDetailPage() {
   };
 
   const handleHidePost = async () => {
-    // TODO: Implement hide post functionality
-    if (window.confirm('Hide this post?')) {
-      alert('Hide post functionality coming soon!');
+    if (!user) {
+      alert('You need to be signed in to hide posts.');
+      return;
+    }
+    const shouldWarn = isPostSaved;
+    const confirmed = shouldWarn
+      ? window.confirm(
+          'Hiding this post will remove it from your Saved list and add it to your Hidden items. Are you sure you want to continue?'
+        )
+      : window.confirm('Hide this post?');
+    if (!confirmed) {
+      return;
+    }
+    try {
+      await hidePostMutation.mutateAsync();
+    } catch (error) {
+      const err = error as Error;
+      alert(`Failed to hide post: ${err.message}`);
     }
   };
 
