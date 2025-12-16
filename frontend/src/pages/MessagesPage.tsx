@@ -1,9 +1,9 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { messagesService } from '../services/messagesService';
 import { useAuth } from '../contexts/AuthContext';
-import type { Message, SendMessageRequest } from '../types/messages';
+import type { Conversation, Message, SendMessageRequest } from '../types/messages';
 import { API_BASE_URL } from '../lib/api';
 
 export default function MessagesPage() {
@@ -26,13 +26,25 @@ export default function MessagesPage() {
     queryKey: ['messages', selectedConversationId],
     queryFn: () => messagesService.getMessages(selectedConversationId!),
     enabled: !!selectedConversationId,
+    refetchOnWindowFocus: false,
   });
 
   const sendMessageMutation = useMutation({
     mutationFn: (data: SendMessageRequest) => messagesService.sendMessage(data),
     onSuccess: (message, variables) => {
       queryClient.invalidateQueries({ queryKey: ['messages', message.conversation_id] });
-      queryClient.invalidateQueries({ queryKey: ['conversations'] });
+      queryClient.setQueryData<Conversation[] | undefined>(['conversations'], (prev) => {
+        if (!prev) return prev;
+        return prev.map((conv) =>
+          conv.id === message.conversation_id
+            ? {
+                ...conv,
+                unread_count: 0,
+                latest_message: message,
+              }
+            : conv
+        );
+      });
       setMessageText('');
       if (!variables.conversation_id && variables.recipient_username) {
         setSelectedConversationId(message.conversation_id);
@@ -68,6 +80,24 @@ export default function MessagesPage() {
   const selectedConversation = conversations?.find((c) => c.id === selectedConversationId);
   const orderedMessages = messages ? [...messages].reverse() : [];
 
+  const markConversationAsRead = useCallback(
+    async (conversationId: number) => {
+      try {
+        await messagesService.markAsRead(conversationId);
+        queryClient.setQueryData<Conversation[] | undefined>(['conversations'], (prev) => {
+          if (!prev) return prev;
+          return prev.map((conv) =>
+            conv.id === conversationId ? { ...conv, unread_count: 0 } : conv
+          );
+        });
+        queryClient.invalidateQueries({ queryKey: ['conversations'] });
+      } catch (error) {
+        console.error('Failed to mark conversation as read', error);
+      }
+    },
+    [queryClient]
+  );
+
   useEffect(() => {
     if (!user) return;
 
@@ -98,7 +128,20 @@ export default function MessagesPage() {
                 return [payload, ...prev];
               }
             );
-            queryClient.invalidateQueries({ queryKey: ['conversations'] });
+            queryClient.setQueryData<Conversation[] | undefined>(['conversations'], (prev) => {
+              if (!prev) return prev;
+              return prev.map((conv) =>
+                conv.id === payload.conversation_id
+                  ? { ...conv, unread_count: 0, latest_message: payload }
+                  : conv
+              );
+            });
+            if (
+              selectedConversationId === payload.conversation_id &&
+              payload.recipient_id === user?.id
+            ) {
+              markConversationAsRead(payload.conversation_id);
+            }
           }
         } catch (err) {
           console.error('Failed to process WebSocket message', err);
@@ -125,7 +168,13 @@ export default function MessagesPage() {
         clearTimeout(reconnectTimer);
       }
     };
-  }, [user?.id, queryClient]);
+  }, [user?.id, queryClient, markConversationAsRead, selectedConversationId]);
+
+  useEffect(() => {
+    if (selectedConversationId && !isCreatingChat) {
+      markConversationAsRead(selectedConversationId);
+    }
+  }, [selectedConversationId, isCreatingChat, markConversationAsRead]);
 
   useEffect(() => {
     if (toUsernameParam) {
@@ -181,7 +230,7 @@ export default function MessagesPage() {
                 <span className="font-medium text-[var(--color-text-primary)]">
                   {conversation.other_user?.username || 'Unknown'}
                 </span>
-                {conversation.unread_count > 0 && (
+                {conversation.unread_count > 0 && conversation.id !== selectedConversationId && (
                   <span className="rounded-full bg-[var(--color-primary)] px-2 py-0.5 text-xs text-white">
                     {conversation.unread_count}
                   </span>
