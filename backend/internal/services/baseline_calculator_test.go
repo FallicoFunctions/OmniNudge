@@ -307,6 +307,7 @@ func TestBaselineUpdateIdempotence(t *testing.T) {
 	baselineRepo := models.NewUserBaselineRepository(db.Pool)
 	baseline1, err := baselineRepo.GetByUserID(ctx, userID)
 	require.NoError(t, err)
+	require.NotNil(t, baseline1)
 
 	// Wait a moment
 	time.Sleep(100 * time.Millisecond)
@@ -331,6 +332,7 @@ func TestGetExperienceLevel(t *testing.T) {
 
 	ctx := context.Background()
 	baselineRepo := models.NewUserBaselineRepository(db.Pool)
+	userRepo := models.NewUserRepository(db.Pool)
 
 	tests := []struct {
 		name          string
@@ -343,19 +345,26 @@ func TestGetExperienceLevel(t *testing.T) {
 		{"Power user", 400, 200, "power"},
 	}
 
-	for i, tt := range tests {
+	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			userID := i + 1
+			// Create actual user first to satisfy foreign key constraint
+			user := &models.User{
+				Username:     uniqueBaselineName(tt.name),
+				PasswordHash: "test_hash",
+			}
+			err := userRepo.Create(ctx, user)
+			require.NoError(t, err)
+
 			baseline := &models.UserBaseline{
-				UserID:           userID,
+				UserID:           user.ID,
 				TotalPosts:       tt.totalPosts,
 				TotalComments:    tt.totalComments,
 				LastCalculatedAt: time.Now(),
 			}
-			err := baselineRepo.CreateOrUpdate(ctx, baseline)
+			err = baselineRepo.CreateOrUpdate(ctx, baseline)
 			require.NoError(t, err)
 
-			level, err := baselineRepo.GetExperienceLevel(ctx, userID)
+			level, err := baselineRepo.GetExperienceLevel(ctx, user.ID)
 			require.NoError(t, err)
 			assert.Equal(t, tt.expectedLevel, level)
 		})
