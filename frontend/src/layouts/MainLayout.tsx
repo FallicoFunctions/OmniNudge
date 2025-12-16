@@ -1,10 +1,12 @@
 import { useEffect } from 'react';
 import { Link, Outlet, useNavigate, useLocation } from 'react-router-dom';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../contexts/AuthContext';
 import ThemeSelector from '../components/themes/ThemeSelector';
 import { usersService } from '../services/usersService';
+import { messagesService } from '../services/messagesService';
 import type { UserProfile } from '../types/users';
+import type { Conversation } from '../types/messages';
 
 export default function MainLayout() {
   const { user, logout } = useAuth();
@@ -16,6 +18,15 @@ export default function MainLayout() {
     logout();
     navigate('/login');
   };
+
+  const { data: conversations } = useQuery({
+    queryKey: ['conversations'],
+    queryFn: () => messagesService.getConversations(),
+    enabled: !!user,
+  });
+
+  const unreadTotal =
+    conversations?.reduce((total, conv) => total + (conv.unread_count ?? 0), 0) ?? 0;
 
   useEffect(() => {
     if (!user) {
@@ -66,9 +77,14 @@ export default function MainLayout() {
                   </Link>
                   <Link
                     to="/messages"
-                    className="rounded-md px-3 py-2 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
+                    className="relative rounded-md px-3 py-2 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
                   >
                     Messages
+                    {unreadTotal > 0 && (
+                      <span className="absolute -right-2 -top-1 rounded-full bg-[var(--color-primary)] px-2 py-0.5 text-xs text-white">
+                        {unreadTotal}
+                      </span>
+                    )}
                   </Link>
                 </div>
               )}
