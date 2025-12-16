@@ -45,6 +45,10 @@ interface RedditPostData {
   selftext?: string;
   selftext_html?: string;
   thumbnail?: string;
+  permalink?: string;
+  link_flair_text?: string;
+  link_flair_background_color?: string;
+  link_flair_text_color?: string;
   preview?: {
     images?: Array<{
       source?: { url?: string };
@@ -1012,7 +1016,7 @@ export default function RedditPostPage() {
     queryKey: ['reddit', 'post', subreddit, postId],
     queryFn: async () => {
       const response = await api.get<[RedditPostListing, RedditCommentsListing]>(
-        `/r/${subreddit}/comments/${postId}`
+        `/reddit/r/${subreddit}/comments/${postId}`
       );
       // Reddit API returns [postListing, commentsListing]
       const postListing = response[0];

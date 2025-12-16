@@ -103,7 +103,7 @@ export function RedditPostCard({
     }));
   };
 
-  const postUrl = `/reddit/r/${post.subreddit}/comments/${post.id}`;
+  const postUrl = `/r/${post.subreddit}/comments/${post.id}`;
   const thumbnail = getThumbnailUrl(post);
   const sanitizedExternalUrl = sanitizeHttpUrl(post.url);
   const externalDomain = getDisplayDomain(sanitizedExternalUrl);
@@ -206,7 +206,7 @@ export function RedditPostCard({
             <div className="flex-1">
               <div className="flex flex-wrap items-center gap-2">
                 <Link
-                  to={`/reddit/r/${post.subreddit}`}
+                  to={`/r/${post.subreddit}`}
                   className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
                 >
                   r/{post.subreddit}
