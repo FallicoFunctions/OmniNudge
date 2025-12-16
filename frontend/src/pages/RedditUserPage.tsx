@@ -186,7 +186,7 @@ export default function RedditUserPage() {
   });
 
   const handleShareRedditPost = (post: RedditApiPost) => {
-    const shareUrl = `${window.location.origin}/reddit/r/${post.subreddit}/comments/${post.id}`;
+    const shareUrl = `${window.location.origin}/r/${post.subreddit}/comments/${post.id}`;
     navigator.clipboard
       .writeText(shareUrl)
       .then(() => alert('Post link copied to clipboard!'))
@@ -272,11 +272,11 @@ export default function RedditUserPage() {
   const renderCommentCard = (comment: RedditUserComment) => {
     const linkedPostId = comment.link_id?.replace('t3_', '') ?? '';
     const localPermalink = linkedPostId
-      ? `/reddit/r/${comment.subreddit}/comments/${linkedPostId}/${comment.id}`
-      : `/reddit/r/${comment.subreddit}`;
+      ? `/r/${comment.subreddit}/comments/${linkedPostId}/${comment.id}`
+      : `/r/${comment.subreddit}`;
     const fullCommentsLink = linkedPostId
-      ? `/reddit/r/${comment.subreddit}/comments/${linkedPostId}`
-      : `/reddit/r/${comment.subreddit}`;
+      ? `/r/${comment.subreddit}/comments/${linkedPostId}`
+      : `/r/${comment.subreddit}`;
 
     const commentKey = `${comment.subreddit}-${linkedPostId}-${comment.id}`;
     const isSaved = savedRedditCommentIds.has(commentKey);
@@ -506,7 +506,7 @@ export default function RedditUserPage() {
                 {moderatedData.map((sub) => (
                   <li key={sub.name}>
                     <Link
-                      to={`/reddit/r/${sub.name}`}
+                      to={`/r/${sub.name}`}
                       className="font-semibold text-[var(--color-primary)] hover:underline"
                     >
                       r/{sub.name}

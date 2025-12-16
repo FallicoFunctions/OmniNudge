@@ -8,14 +8,13 @@ import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import HomePage from './pages/HomePage';
 import ThemesPage from './pages/ThemesPage';
-import RedditPage from './pages/RedditPage';
+import SubredditPage from './pages/SubredditPage';
 import RedditPostWrapper from './pages/RedditPostWrapper';
 import RedditUserPage from './pages/RedditUserPage';
 import UserProfilePage from './pages/UserProfilePage';
-import HubsPage from './pages/HubsPage';
+import HubPage from './pages/HubPage';
 import CreateHubPage from './pages/CreateHubPage';
 import CreatePostPage from './pages/CreatePostPage';
-import PostsPage from './pages/PostsPage';
 import PostDetailPage from './pages/PostDetailPage';
 import MessagesPage from './pages/MessagesPage';
 import SettingsPage from './pages/SettingsPage';
@@ -36,17 +35,14 @@ function App() {
           {/* PUBLIC routes - accessible without auth */}
           <Route element={<MainLayout />}>
             <Route path="/" element={<HomePage />} />
-            <Route path="/reddit" element={<RedditPage />} />
-            <Route path="/reddit/r/:subreddit" element={<RedditPage />} />
-            <Route path="/reddit/r/:subreddit/comments/:postId" element={<RedditPostWrapper />} />
+            <Route path="/r/:subreddit" element={<SubredditPage />} />
+            <Route path="/r/:subreddit/comments/:postId" element={<RedditPostWrapper />} />
             <Route
-              path="/reddit/r/:subreddit/comments/:postId/:commentId"
+              path="/r/:subreddit/comments/:postId/:commentId"
               element={<RedditPostWrapper />}
             />
             <Route path="/reddit/user/:username" element={<RedditUserPage />} />
-            <Route path="/hubs" element={<HubsPage />} />
-            <Route path="/hubs/h/:hubname" element={<HubsPage />} />
-            <Route path="/posts" element={<PostsPage />} />
+            <Route path="/h/:hubname" element={<HubPage />} />
             <Route path="/posts/:postId" element={<PostDetailPage />} />
             <Route path="/posts/:postId/comments/:commentId" element={<PostDetailPage />} />
             <Route path="/users/:username" element={<UserProfilePage />} />

@@ -60,7 +60,7 @@ const SUBREDDIT_AUTOCOMPLETE_MIN_LENGTH = 2;
 
 function getLocalPostUrl(post: LocalSubredditPost): string {
   const subredditSlug = post.target_subreddit ?? post.crosspost_origin_subreddit ?? null;
-  return subredditSlug ? `/reddit/r/${subredditSlug}/comments/${post.id}` : `/posts/${post.id}`;
+  return subredditSlug ? `/r/${subredditSlug}/comments/${post.id}` : `/posts/${post.id}`;
 }
 
 function getThumbnailUrl(post: FeedRedditPost): string | null {
