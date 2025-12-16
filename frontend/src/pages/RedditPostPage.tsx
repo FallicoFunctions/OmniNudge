@@ -740,7 +740,7 @@ function LocalCommentView({
                   onEmbed({
                     author: comment.username,
                     body: comment.content,
-                    permalink: `${window.location.origin}/reddit/r/${subreddit}/comments/${postId}/${comment.id}`,
+                    permalink: `${window.location.origin}/r/${subreddit}/comments/${postId}/${comment.id}`,
                     createdAt: comment.created_at,
                     score: comment.score,
                   })
@@ -1012,7 +1012,7 @@ export default function RedditPostPage() {
     queryKey: ['reddit', 'post', subreddit, postId],
     queryFn: async () => {
       const response = await api.get<[RedditPostListing, RedditCommentsListing]>(
-        `/reddit/r/${subreddit}/comments/${postId}`
+        `/r/${subreddit}/comments/${postId}`
       );
       // Reddit API returns [postListing, commentsListing]
       const postListing = response[0];
@@ -1304,7 +1304,7 @@ export default function RedditPostPage() {
 
   const handlePermalink = (commentTarget: LocalRedditComment) => {
     if (!subreddit || !postId) return;
-    navigate(`/reddit/r/${subreddit}/comments/${postId}/${commentTarget.id}`);
+    navigate(`/r/${subreddit}/comments/${postId}/${commentTarget.id}`);
   };
 
   const handleEmbed = (data: EmbedPayload) => {
@@ -1509,7 +1509,7 @@ export default function RedditPostPage() {
                 </div>
                 <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-[var(--color-text-secondary)]">
                   <Link
-                    to={`/reddit/r/${post.subreddit}`}
+                    to={`/r/${post.subreddit}`}
                     className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
                   >
                     r/{post.subreddit}
@@ -1844,7 +1844,7 @@ export default function RedditPostPage() {
           <div className="mb-4 rounded border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800">
             <div>You are viewing a single comment&apos;s thread.</div>
             <button
-              onClick={() => navigate(`/reddit/r/${subreddit}/comments/${postId}`)}
+              onClick={() => navigate(`/r/${subreddit}/comments/${postId}`)}
               className="mt-1 font-semibold text-[var(--color-primary)] hover:underline"
             >
               View the rest of the comments →
