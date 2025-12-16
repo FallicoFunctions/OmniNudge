@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import { SettingsProvider } from './contexts/SettingsContext';
 import { RedditBlockProvider } from './contexts/RedditBlockContext';
+import { MessagingProvider } from './contexts/MessagingContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import MainLayout from './layouts/MainLayout';
 import LoginPage from './pages/LoginPage';
@@ -27,7 +28,8 @@ function App() {
       <AuthProvider>
         <SettingsProvider>
           <RedditBlockProvider>
-            <Routes>
+            <MessagingProvider>
+              <Routes>
           {/* Auth routes - no layout */}
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
@@ -66,7 +68,8 @@ function App() {
           {/* 404 */}
           <Route path="/404" element={<NotFoundPage />} />
           <Route path="*" element={<Navigate to="/404" replace />} />
-            </Routes>
+              </Routes>
+            </MessagingProvider>
           </RedditBlockProvider>
         </SettingsProvider>
       </AuthProvider>

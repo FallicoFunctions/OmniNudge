@@ -2,17 +2,25 @@ import { useEffect } from 'react';
 import { Link, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../contexts/AuthContext';
+import { useMessagingContext } from '../contexts/MessagingContext';
 import ThemeSelector from '../components/themes/ThemeSelector';
 import { usersService } from '../services/usersService';
 import { messagesService } from '../services/messagesService';
+import { useMessagingWebSocket } from '../hooks/useMessagingWebSocket';
 import type { UserProfile } from '../types/users';
 import type { Conversation } from '../types/messages';
 
 export default function MainLayout() {
   const { user, logout } = useAuth();
+  const { activeConversationId } = useMessagingContext();
   const navigate = useNavigate();
   const location = useLocation();
   const queryClient = useQueryClient();
+
+  console.log('[MainLayout] activeConversationId from context:', activeConversationId);
+
+  // Initialize WebSocket connection for real-time messaging
+  useMessagingWebSocket({ activeConversationId });
 
   const handleLogout = () => {
     logout();
