@@ -28,35 +28,43 @@ export default function MessagesPage() {
 
   const sendMessageMutation = useMutation({
     mutationFn: (data: SendMessageRequest) => messagesService.sendMessage(data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['messages', selectedConversationId] });
+    onSuccess: (message, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['messages', message.conversation_id] });
       queryClient.invalidateQueries({ queryKey: ['conversations'] });
       setMessageText('');
+      if (!variables.conversation_id && variables.recipient_username) {
+        setSelectedConversationId(message.conversation_id);
+        setIsCreatingChat(false);
+        setNewChatUsername('');
+      }
     },
   });
 
   const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!messageText.trim()) return;
+    const trimmedMessage = messageText.trim();
+    if (!trimmedMessage) return;
 
-    if (isCreatingChat && newChatUsername.trim()) {
-      // Create new conversation
+    if (isCreatingChat) {
+      const recipient = newChatUsername.trim();
+      if (!recipient) return;
       sendMessageMutation.mutate({
-        recipient_username: newChatUsername.trim(),
-        content: messageText.trim(),
+        recipient_username: recipient,
+        content: trimmedMessage,
       });
-      setNewChatUsername('');
-      setIsCreatingChat(false);
-    } else if (selectedConversationId) {
-      // Send to existing conversation
+      return;
+    }
+
+    if (selectedConversationId) {
       sendMessageMutation.mutate({
         conversation_id: selectedConversationId,
-        content: messageText.trim(),
+        content: trimmedMessage,
       });
     }
   };
 
   const selectedConversation = conversations?.find((c) => c.id === selectedConversationId);
+  const orderedMessages = messages ? [...messages].reverse() : [];
 
   useEffect(() => {
     if (toUsernameParam) {
@@ -74,7 +82,12 @@ export default function MessagesPage() {
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold text-[var(--color-text-primary)]">Messages</h2>
             <button
-              onClick={() => setIsCreatingChat(true)}
+              onClick={() => {
+                setIsCreatingChat(true);
+                setSelectedConversationId(null);
+                setNewChatUsername('');
+                setMessageText('');
+              }}
               className="rounded-md bg-[var(--color-primary)] px-3 py-1 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)]"
             >
               New Chat
@@ -95,6 +108,7 @@ export default function MessagesPage() {
               onClick={() => {
                 setSelectedConversationId(conversation.id);
                 setIsCreatingChat(false);
+                setNewChatUsername('');
               }}
               className={`w-full border-b border-[var(--color-border)] p-4 text-left transition-colors ${
                 selectedConversationId === conversation.id
@@ -104,7 +118,7 @@ export default function MessagesPage() {
             >
               <div className="flex items-center justify-between">
                 <span className="font-medium text-[var(--color-text-primary)]">
-                  {conversation.participant_username}
+                  {conversation.other_user?.username || 'Unknown'}
                 </span>
                 {conversation.unread_count > 0 && (
                   <span className="rounded-full bg-[var(--color-primary)] px-2 py-0.5 text-xs text-white">
@@ -112,9 +126,9 @@ export default function MessagesPage() {
                   </span>
                 )}
               </div>
-              {conversation.last_message && (
+              {conversation.latest_message && (
                 <p className="mt-1 truncate text-sm text-[var(--color-text-secondary)]">
-                  {conversation.last_message}
+                  {conversation.latest_message?.encrypted_content}
                 </p>
               )}
             </button>
@@ -137,7 +151,7 @@ export default function MessagesPage() {
               <h3 className="font-semibold text-[var(--color-text-primary)]">
                 {isCreatingChat
                   ? 'New Chat'
-                  : selectedConversation?.participant_username || 'Unknown'}
+                  : selectedConversation?.other_user?.username || 'Unknown'}
               </h3>
             </div>
 
@@ -153,7 +167,7 @@ export default function MessagesPage() {
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {messages?.map((message) => (
+                  {orderedMessages.map((message) => (
                     <div
                       key={message.id}
                       className={`flex ${message.sender_id === user?.id ? 'justify-end' : 'justify-start'}`}
@@ -165,7 +179,7 @@ export default function MessagesPage() {
                             : 'bg-[var(--color-surface-elevated)] text-[var(--color-text-primary)]'
                         }`}
                       >
-                        <p className="text-sm">{message.content}</p>
+                        <p className="text-sm">{message.encrypted_content}</p>
                         <span
                           className={`mt-1 block text-xs ${
                             message.sender_id === user?.id
@@ -173,13 +187,13 @@ export default function MessagesPage() {
                               : 'text-[var(--color-text-muted)]'
                           }`}
                         >
-                          {new Date(message.created_at).toLocaleTimeString()}
+                          {new Date(message.sent_at).toLocaleTimeString()}
                         </span>
                       </div>
                     </div>
                   ))}
 
-                  {messages?.length === 0 && (
+                  {orderedMessages.length === 0 && (
                     <div className="text-center text-sm text-[var(--color-text-secondary)]">
                       No messages yet. Send the first message!
                     </div>
@@ -210,7 +224,9 @@ export default function MessagesPage() {
                 />
                 <button
                   type="submit"
-                  disabled={sendMessageMutation.isPending}
+                  disabled={
+                    sendMessageMutation.isPending || (isCreatingChat && !newChatUsername.trim())
+                  }
                   className="rounded-md bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)] disabled:opacity-50"
                 >
                   Send
