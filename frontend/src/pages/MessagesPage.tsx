@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { messagesService } from '../services/messagesService';
 import { useAuth } from '../contexts/AuthContext';
-import type { SendMessageRequest } from '../types/messages';
+import type { Message, SendMessageRequest } from '../types/messages';
+import { API_BASE_URL } from '../lib/api';
 
 export default function MessagesPage() {
   const { user } = useAuth();
@@ -11,6 +12,7 @@ export default function MessagesPage() {
   const [messageText, setMessageText] = useState('');
   const [newChatUsername, setNewChatUsername] = useState('');
   const [isCreatingChat, setIsCreatingChat] = useState(false);
+  const wsRef = useRef<WebSocket | null>(null);
   const queryClient = useQueryClient();
   const [searchParams] = useSearchParams();
   const toUsernameParam = searchParams.get('to');
@@ -65,6 +67,65 @@ export default function MessagesPage() {
 
   const selectedConversation = conversations?.find((c) => c.id === selectedConversationId);
   const orderedMessages = messages ? [...messages].reverse() : [];
+
+  useEffect(() => {
+    if (!user) return;
+
+    const token = localStorage.getItem('auth_token');
+    if (!token) return;
+
+    let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
+
+    const connect = () => {
+      const url = new URL(API_BASE_URL);
+      url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
+      url.pathname = `${url.pathname.replace(/\/$/, '')}/ws`;
+      url.searchParams.set('token', token);
+
+      const socket = new WebSocket(url.toString());
+      wsRef.current = socket;
+
+      socket.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data) as { type: string; payload: Message };
+          if (data.type === 'new_message' && data.payload) {
+            const payload = data.payload;
+            queryClient.setQueryData<Message[] | undefined>(
+              ['messages', payload.conversation_id],
+              (prev) => {
+                if (!prev) return [payload];
+                if (prev.some((msg) => msg.id === payload.id)) return prev;
+                return [payload, ...prev];
+              }
+            );
+            queryClient.invalidateQueries({ queryKey: ['conversations'] });
+          }
+        } catch (err) {
+          console.error('Failed to process WebSocket message', err);
+        }
+      };
+
+      socket.onclose = () => {
+        reconnectTimer = setTimeout(connect, 5000);
+      };
+
+      socket.onerror = () => {
+        socket.close();
+      };
+    };
+
+    connect();
+
+    return () => {
+      if (wsRef.current) {
+        wsRef.current.close();
+        wsRef.current = null;
+      }
+      if (reconnectTimer) {
+        clearTimeout(reconnectTimer);
+      }
+    };
+  }, [user?.id, queryClient]);
 
   useEffect(() => {
     if (toUsernameParam) {

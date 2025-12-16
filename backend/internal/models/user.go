@@ -128,14 +128,29 @@ func (r *UserRepository) GetByID(ctx context.Context, id int) (*User, error) {
 
 // GetByUsername retrieves a user by their username
 func (r *UserRepository) GetByUsername(ctx context.Context, username string) (*User, error) {
-	user := &User{}
+	if username == "" {
+		return nil, nil
+	}
 
-	query := `
+	// Prefer exact match to avoid collisions between usernames that only differ by case.
+	if user, err := r.queryUser(ctx, `
 		SELECT id, username, email, password_hash, reddit_id, reddit_username, public_key, avatar_url, bio, karma, role, created_at, last_seen
 		FROM users WHERE username = $1
-	`
+	`, username); err != nil || user != nil {
+		return user, err
+	}
 
-	err := r.pool.QueryRow(ctx, query, username).Scan(
+	// Fallback to case-insensitive/trimmed lookup for legacy data that may contain inconsistent casing/spacing.
+	return r.queryUser(ctx, `
+		SELECT id, username, email, password_hash, reddit_id, reddit_username, public_key, avatar_url, bio, karma, role, created_at, last_seen
+		FROM users WHERE LOWER(TRIM(username)) = LOWER(TRIM($1))
+	`, username)
+}
+
+func (r *UserRepository) queryUser(ctx context.Context, query string, arg interface{}) (*User, error) {
+	user := &User{}
+
+	err := r.pool.QueryRow(ctx, query, arg).Scan(
 		&user.ID,
 		&user.Username,
 		&user.Email,

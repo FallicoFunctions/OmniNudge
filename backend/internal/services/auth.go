@@ -8,12 +8,14 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
+	"strings"
 	"time"
 
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/omninudge/backend/internal/models"
 	"github.com/omninudge/backend/internal/utils"
-	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/oauth2"
 )
 
@@ -167,8 +169,10 @@ type LoginRequest struct {
 
 // Register creates a new user with username/password
 func (s *AuthService) Register(ctx context.Context, userRepo *models.UserRepository, req *RegisterRequest) (*models.User, string, error) {
+	username := strings.TrimSpace(req.Username)
+
 	// Validate input
-	if len(req.Username) < 3 || len(req.Username) > 50 {
+	if len(username) < 3 || len(username) > 50 {
 		return nil, "", errors.New("username must be between 3 and 50 characters")
 	}
 
@@ -177,7 +181,7 @@ func (s *AuthService) Register(ctx context.Context, userRepo *models.UserReposit
 	}
 
 	// Check if username already exists
-	existingUser, _ := userRepo.GetByUsername(ctx, req.Username)
+	existingUser, _ := userRepo.GetByUsername(ctx, username)
 	if existingUser != nil {
 		return nil, "", errors.New("username already taken")
 	}
@@ -190,7 +194,7 @@ func (s *AuthService) Register(ctx context.Context, userRepo *models.UserReposit
 
 	// Create user
 	user := &models.User{
-		Username:     req.Username,
+		Username:     username,
 		Email:        req.Email,
 		PasswordHash: hashedPassword,
 	}
@@ -210,14 +214,22 @@ func (s *AuthService) Register(ctx context.Context, userRepo *models.UserReposit
 
 // Login authenticates a user with username/password
 func (s *AuthService) Login(ctx context.Context, userRepo *models.UserRepository, req *LoginRequest) (*models.User, string, error) {
+	username := strings.TrimSpace(req.Username)
+
 	// Get user by username
-	user, _ := userRepo.GetByUsername(ctx, req.Username)
+	user, err := userRepo.GetByUsername(ctx, username)
+	if err != nil {
+		log.Printf("Login lookup error for username=%q: %v", username, err)
+		return nil, "", errors.New("invalid username or password")
+	}
 	if user == nil {
+		log.Printf("Login failed: user not found for username=%q", username)
 		return nil, "", errors.New("invalid username or password")
 	}
 
 	// Check password
 	if err := utils.CheckPassword(user.PasswordHash, req.Password); err != nil {
+		log.Printf("Login failed: password mismatch for user_id=%d username=%q", user.ID, user.Username)
 		return nil, "", errors.New("invalid username or password")
 	}
 

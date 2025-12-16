@@ -4,28 +4,36 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/omninudge/backend/internal/services"
 	"github.com/gin-gonic/gin"
+	"github.com/omninudge/backend/internal/services"
 )
 
 // AuthRequired middleware validates JWT tokens and sets user info in context
 func AuthRequired(authService *services.AuthService) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		var tokenString string
+
 		authHeader := c.GetHeader("Authorization")
-		if authHeader == "" {
+		if authHeader != "" {
+			parts := strings.Split(authHeader, " ")
+			if len(parts) != 2 || strings.ToLower(parts[0]) != "bearer" {
+				c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid authorization format. Use: Bearer <token>"})
+				c.Abort()
+				return
+			}
+			tokenString = parts[1]
+		}
+
+		if tokenString == "" {
+			tokenString = c.Query("token")
+		}
+
+		if tokenString == "" {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Authorization header required"})
 			c.Abort()
 			return
 		}
 
-		parts := strings.Split(authHeader, " ")
-		if len(parts) != 2 || strings.ToLower(parts[0]) != "bearer" {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid authorization format. Use: Bearer <token>"})
-			c.Abort()
-			return
-		}
-
-		tokenString := parts[1]
 		claims, err := authService.ValidateJWT(tokenString)
 		if err != nil {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid or expired token"})
