@@ -1,4 +1,8 @@
 import { api } from '../lib/api';
+import {
+  appendTimeRangeParams,
+  type FeedTimeRangeOptions,
+} from '../utils/timeRangeParams';
 
 export interface Hub {
   id: number;
@@ -101,16 +105,50 @@ export const hubsService = {
     return 'hub' in response ? response.hub : response;
   },
 
-  async getHubPosts(hubName: string, sort: string = 'hot', limit: number = 25, offset: number = 0): Promise<HubPostsResponse> {
-    return api.get<HubPostsResponse>(`/hubs/${hubName}/posts?sort=${sort}&limit=${limit}&offset=${offset}`);
+  async getHubPosts(
+    hubName: string,
+    sort: string = 'hot',
+    limit: number = 25,
+    offset: number = 0,
+    options?: FeedTimeRangeOptions
+  ): Promise<HubPostsResponse> {
+    const params = new URLSearchParams({
+      sort,
+      limit: String(limit),
+      offset: String(offset),
+    });
+    appendTimeRangeParams(params, options);
+    return api.get<HubPostsResponse>(`/hubs/${hubName}/posts?${params.toString()}`);
   },
 
-  async getPopularFeed(sort: string = 'hot', limit: number = 25, offset: number = 0): Promise<HubPostsResponse> {
-    return api.get<HubPostsResponse>(`/hubs/h/popular?sort=${sort}&limit=${limit}&offset=${offset}`);
+  async getPopularFeed(
+    sort: string = 'hot',
+    limit: number = 25,
+    offset: number = 0,
+    options?: FeedTimeRangeOptions
+  ): Promise<HubPostsResponse> {
+    const params = new URLSearchParams({
+      sort,
+      limit: String(limit),
+      offset: String(offset),
+    });
+    appendTimeRangeParams(params, options);
+    return api.get<HubPostsResponse>(`/hubs/h/popular?${params.toString()}`);
   },
 
-  async getAllFeed(sort: string = 'hot', limit: number = 25, offset: number = 0): Promise<HubPostsResponse> {
-    return api.get<HubPostsResponse>(`/hubs/h/all?sort=${sort}&limit=${limit}&offset=${offset}`);
+  async getAllFeed(
+    sort: string = 'hot',
+    limit: number = 25,
+    offset: number = 0,
+    options?: FeedTimeRangeOptions
+  ): Promise<HubPostsResponse> {
+    const params = new URLSearchParams({
+      sort,
+      limit: String(limit),
+      offset: String(offset),
+    });
+    appendTimeRangeParams(params, options);
+    return api.get<HubPostsResponse>(`/hubs/h/all?${params.toString()}`);
   },
 
   async searchHubs(query: string, limit: number = 10): Promise<Hub[]> {
@@ -132,8 +170,20 @@ export const hubsService = {
     return api.get<UserHubsResponse>('/users/me/hubs');
   },
 
-  async getSubredditPosts(subredditName: string, sort: string = 'new'): Promise<SubredditPostsResponse> {
-    return api.get<SubredditPostsResponse>(`/subreddits/${subredditName}/posts?sort=${sort}`);
+  async getSubredditPosts(
+    subredditName: string,
+    sort: string = 'new',
+    limit: number = 25,
+    offset: number = 0,
+    options?: FeedTimeRangeOptions
+  ): Promise<SubredditPostsResponse> {
+    const params = new URLSearchParams({
+      sort,
+      limit: String(limit),
+      offset: String(offset),
+    });
+    appendTimeRangeParams(params, options);
+    return api.get<SubredditPostsResponse>(`/subreddits/${subredditName}/posts?${params.toString()}`);
   },
 
   async crosspostToHub(

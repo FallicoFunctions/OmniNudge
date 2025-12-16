@@ -172,19 +172,30 @@ func (h *HubsHandler) GetPosts(c *gin.Context) {
 		userID = &uidInt
 	}
 
-	posts, err := h.postRepo.GetByHubWithUser(c.Request.Context(), hub.ID, sortBy, limit, offset, userID)
+	startTime, endTime, timeRangeKey, err := parseTopTimeRange(c, sortBy)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	posts, err := h.postRepo.GetByHubWithUser(c.Request.Context(), hub.ID, sortBy, limit, offset, userID, startTime, endTime)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch posts", "details": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
+	response := gin.H{
 		"hub":    name,
 		"posts":  posts,
 		"limit":  limit,
 		"offset": offset,
 		"sort":   sortBy,
-	})
+	}
+	if timeRangeKey != "" {
+		response["time_range"] = timeRangeKey
+	}
+
+	c.JSON(http.StatusOK, response)
 }
 
 // AddModerator handles POST /api/v1/hubs/:name/moderators
@@ -486,24 +497,37 @@ func (h *HubsHandler) GetPopularFeed(c *gin.Context) {
 	}
 	// If not authenticated, subscribedHubIDs remains empty slice
 
+	startTime, endTime, timeRangeKey, err := parseTopTimeRange(c, sortBy)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
 	posts, err := h.postRepo.GetPopularFeed(
 		c.Request.Context(),
 		subscribedHubIDs,
 		sortBy,
 		limit,
 		offset,
+		startTime,
+		endTime,
 	)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch feed", "details": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
+	response := gin.H{
 		"posts":  posts,
 		"limit":  limit,
 		"offset": offset,
 		"sort":   sortBy,
-	})
+	}
+	if timeRangeKey != "" {
+		response["time_range"] = timeRangeKey
+	}
+
+	c.JSON(http.StatusOK, response)
 }
 
 // GetAllFeed handles GET /api/v1/hubs/h/all (public)
@@ -516,18 +540,29 @@ func (h *HubsHandler) GetAllFeed(c *gin.Context) {
 		limit = 25
 	}
 
-	posts, err := h.postRepo.GetAllFeed(c.Request.Context(), sortBy, limit, offset)
+	startTime, endTime, timeRangeKey, err := parseTopTimeRange(c, sortBy)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	posts, err := h.postRepo.GetAllFeed(c.Request.Context(), sortBy, limit, offset, startTime, endTime)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch feed", "details": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
+	response := gin.H{
 		"posts":  posts,
 		"limit":  limit,
 		"offset": offset,
 		"sort":   sortBy,
-	})
+	}
+	if timeRangeKey != "" {
+		response["time_range"] = timeRangeKey
+	}
+
+	c.JSON(http.StatusOK, response)
 }
 
 // SearchHubs handles GET /api/v1/hubs/search?q=cats (autocomplete)

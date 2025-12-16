@@ -61,8 +61,14 @@ func (h *PostsHandler) GetSubredditPosts(c *gin.Context) {
 		userID = &uidInt
 	}
 
+	startTime, endTime, timeRangeKey, err := parseTopTimeRange(c, sortBy)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
 	// Get posts by subreddit
-	posts, err := h.postRepo.GetBySubredditWithUser(c.Request.Context(), subredditName, sortBy, limit, offset, userID)
+	posts, err := h.postRepo.GetBySubredditWithUser(c.Request.Context(), subredditName, sortBy, limit, offset, userID, startTime, endTime)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch posts", "details": err.Error()})
 		return
@@ -73,13 +79,17 @@ func (h *PostsHandler) GetSubredditPosts(c *gin.Context) {
 		posts = []*models.PlatformPost{}
 	}
 
-	c.JSON(http.StatusOK, gin.H{
+	response := gin.H{
 		"posts":     posts,
 		"subreddit": subredditName,
 		"sort":      sortBy,
 		"limit":     limit,
 		"offset":    offset,
-	})
+	}
+	if timeRangeKey != "" {
+		response["time_range"] = timeRangeKey
+	}
+	c.JSON(http.StatusOK, response)
 }
 
 // CreatePostRequest represents the request body for creating a post

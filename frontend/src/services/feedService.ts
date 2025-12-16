@@ -1,5 +1,9 @@
 import { api } from '../lib/api';
 import type { PlatformPost } from '../types/posts';
+import {
+  appendTimeRangeParams,
+  type FeedTimeRangeOptions,
+} from '../utils/timeRangeParams';
 
 export interface RedditPost {
   id: string;
@@ -52,9 +56,19 @@ export interface HomeFeedResponse {
 }
 
 export const feedService = {
-  async getHomeFeed(sort = 'hot', limit = 50, omniOnly = false): Promise<HomeFeedResponse> {
+  async getHomeFeed(
+    sort = 'hot',
+    limit = 50,
+    omniOnly = false,
+    forcePopular = false,
+    options?: FeedTimeRangeOptions
+  ): Promise<HomeFeedResponse> {
     const params = new URLSearchParams({ sort, limit: String(limit) });
     params.set('omni_only', omniOnly ? 'true' : 'false');
+    if (forcePopular) {
+      params.set('force_popular', 'true');
+    }
+    appendTimeRangeParams(params, options);
     return api.get<HomeFeedResponse>(`/feed/home?${params.toString()}`);
   },
 };

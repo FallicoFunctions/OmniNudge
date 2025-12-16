@@ -10,12 +10,25 @@ import type {
 } from '../types/reddit';
 
 export const redditService = {
-  async getFrontPage(limit = 25): Promise<RedditPostsResponse> {
-    return api.get<RedditPostsResponse>(`/reddit/frontpage?limit=${limit}`);
+  async getFrontPage(sort = 'hot', limit = 25, timeFilter?: string): Promise<RedditPostsResponse> {
+    const params = new URLSearchParams({ sort, limit: String(limit) });
+    if (timeFilter) {
+      params.append('t', timeFilter);
+    }
+    return api.get<RedditPostsResponse>(`/reddit/frontpage?${params.toString()}`);
   },
 
-  async getSubredditPosts(subreddit: string, sort = 'hot', limit = 25): Promise<RedditPostsResponse> {
-    return api.get<RedditPostsResponse>(`/reddit/r/${subreddit}?sort=${sort}&limit=${limit}`);
+  async getSubredditPosts(
+    subreddit: string,
+    sort = 'hot',
+    limit = 25,
+    timeFilter?: string
+  ): Promise<RedditPostsResponse> {
+    const params = new URLSearchParams({ sort, limit: String(limit) });
+    if (timeFilter) {
+      params.append('t', timeFilter);
+    }
+    return api.get<RedditPostsResponse>(`/reddit/r/${subreddit}?${params.toString()}`);
   },
 
   async getPostComments(subreddit: string, postId: string): Promise<RedditComment[]> {

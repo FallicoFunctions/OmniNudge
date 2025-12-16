@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"sort"
 	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/omninudge/backend/internal/models"
@@ -58,21 +59,66 @@ func (h *FeedHandler) GetHomeFeed(c *gin.Context) {
 		}
 	}
 
+	forcePopular := false
+	if forceParam := c.Query("force_popular"); forceParam != "" {
+		if parsed, err := strconv.ParseBool(forceParam); err == nil {
+			forcePopular = parsed
+		}
+	}
+
+	startTime, endTime, timeRangeKey, err := parseTopTimeRange(c, sortBy)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	redditTimeFilter := ""
+	if sortBy == "top" {
+		redditTimeFilter = mapTimeRangeKeyToReddit(timeRangeKey)
+	}
+
 	// Check if user is authenticated
 	userID, authenticated := c.Get("user_id")
 
 	var hubPosts []*models.PlatformPost
 	var redditPosts []services.RedditPost
-	var err error
 
 	includeReddit := !omniOnly
 	if authenticated {
 		// Authenticated: fetch from subscribed sources
 		uidInt := userID.(int)
-		hubPosts, redditPosts, err = h.fetchSubscribedFeeds(c.Request.Context(), uidInt, sortBy, limit, includeReddit)
+		if forcePopular {
+			hubPosts, redditPosts, err = h.fetchPopularFeeds(
+				c.Request.Context(),
+				sortBy,
+				limit,
+				includeReddit,
+				startTime,
+				endTime,
+				redditTimeFilter,
+			)
+		} else {
+			hubPosts, redditPosts, err = h.fetchSubscribedFeeds(
+				c.Request.Context(),
+				uidInt,
+				sortBy,
+				limit,
+				includeReddit,
+				startTime,
+				endTime,
+				redditTimeFilter,
+			)
+		}
 	} else {
 		// Unauthenticated: fetch popular posts
-		hubPosts, redditPosts, err = h.fetchPopularFeeds(c.Request.Context(), sortBy, limit, includeReddit)
+		hubPosts, redditPosts, err = h.fetchPopularFeeds(
+			c.Request.Context(),
+			sortBy,
+			limit,
+			includeReddit,
+			startTime,
+			endTime,
+			redditTimeFilter,
+		)
 	}
 
 	if err != nil {
@@ -83,16 +129,35 @@ func (h *FeedHandler) GetHomeFeed(c *gin.Context) {
 	// Merge and sort by score
 	combined := h.mergeAndSortPosts(hubPosts, redditPosts, sortBy, limit)
 
-	c.JSON(http.StatusOK, gin.H{
+	response := gin.H{
 		"posts":     combined,
 		"sort":      sortBy,
 		"limit":     limit,
 		"omni_only": omniOnly,
-	})
+	}
+	if timeRangeKey != "" {
+		response["time_range"] = timeRangeKey
+		if startTime != nil {
+			response["time_range_start"] = startTime
+		}
+		if endTime != nil {
+			response["time_range_end"] = endTime
+		}
+	}
+
+	c.JSON(http.StatusOK, response)
 }
 
 // fetchSubscribedFeeds fetches posts from subscribed hubs and subreddits
-func (h *FeedHandler) fetchSubscribedFeeds(ctx context.Context, userID int, sortBy string, limit int, includeReddit bool) ([]*models.PlatformPost, []services.RedditPost, error) {
+func (h *FeedHandler) fetchSubscribedFeeds(
+	ctx context.Context,
+	userID int,
+	sortBy string,
+	limit int,
+	includeReddit bool,
+	startTime, endTime *time.Time,
+	redditTimeFilter string,
+) ([]*models.PlatformPost, []services.RedditPost, error) {
 	// Fetch subscribed hub IDs
 	subscribedHubIDs, err := h.hubSubRepo.GetSubscribedHubIDs(ctx, userID)
 	if err != nil {
@@ -100,9 +165,14 @@ func (h *FeedHandler) fetchSubscribedFeeds(ctx context.Context, userID int, sort
 	}
 
 	// Fetch posts from subscribed hubs (or popular if no subscriptions)
-	hubPosts, err := h.postRepo.GetPopularFeed(ctx, subscribedHubIDs, sortBy, limit, 0)
-	if err != nil {
-		return nil, nil, err
+	var hubPosts []*models.PlatformPost
+	if len(subscribedHubIDs) > 0 {
+		hubPosts, err = h.postRepo.GetPopularFeed(ctx, subscribedHubIDs, sortBy, limit, 0, startTime, endTime)
+		if err != nil {
+			return nil, nil, err
+		}
+	} else {
+		hubPosts = []*models.PlatformPost{}
 	}
 
 	if !includeReddit {
@@ -117,31 +187,33 @@ func (h *FeedHandler) fetchSubscribedFeeds(ctx context.Context, userID int, sort
 
 	var redditPosts []services.RedditPost
 	if len(subredditSubs) == 0 {
-		// No subreddit subscriptions - fetch from r/popular
-		listing, err := h.redditClient.GetSubredditPosts(ctx, "popular", sortBy, "", limit, "")
-		if err != nil {
-			// Non-fatal: continue with hub posts only
-			return hubPosts, []services.RedditPost{}, nil
-		}
-		redditPosts = extractRedditPosts(listing)
+		return hubPosts, []services.RedditPost{}, nil
 	} else {
 		// Fetch from subscribed subreddits
 		// For now, fetch from first subscribed subreddit (TODO: implement multi-subreddit fetch)
-		listing, err := h.redditClient.GetSubredditPosts(ctx, subredditSubs[0].SubredditName, sortBy, "", limit, "")
+		listing, err := h.redditClient.GetSubredditPosts(ctx, subredditSubs[0].SubredditName, sortBy, redditTimeFilter, limit, "")
 		if err != nil {
 			// Non-fatal: continue with hub posts only
 			return hubPosts, []services.RedditPost{}, nil
 		}
 		redditPosts = extractRedditPosts(listing)
+		redditPosts = filterRedditPostsByTimeRange(redditPosts, startTime, endTime)
 	}
 
 	return hubPosts, redditPosts, nil
 }
 
 // fetchPopularFeeds fetches popular posts from all hubs and r/popular
-func (h *FeedHandler) fetchPopularFeeds(ctx context.Context, sortBy string, limit int, includeReddit bool) ([]*models.PlatformPost, []services.RedditPost, error) {
+func (h *FeedHandler) fetchPopularFeeds(
+	ctx context.Context,
+	sortBy string,
+	limit int,
+	includeReddit bool,
+	startTime, endTime *time.Time,
+	redditTimeFilter string,
+) ([]*models.PlatformPost, []services.RedditPost, error) {
 	// Fetch popular hub posts (empty subscribedHubIDs returns all popular)
-	hubPosts, err := h.postRepo.GetPopularFeed(ctx, []int{}, sortBy, limit, 0)
+	hubPosts, err := h.postRepo.GetPopularFeed(ctx, []int{}, sortBy, limit, 0, startTime, endTime)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -151,13 +223,14 @@ func (h *FeedHandler) fetchPopularFeeds(ctx context.Context, sortBy string, limi
 	}
 
 	// Fetch r/popular
-	listing, err := h.redditClient.GetSubredditPosts(ctx, "popular", sortBy, "", limit, "")
+	listing, err := h.redditClient.GetSubredditPosts(ctx, "popular", sortBy, redditTimeFilter, limit, "")
 	if err != nil {
 		// Non-fatal: continue with hub posts only
 		return hubPosts, []services.RedditPost{}, nil
 	}
 
 	redditPosts := extractRedditPosts(listing)
+	redditPosts = filterRedditPostsByTimeRange(redditPosts, startTime, endTime)
 	return hubPosts, redditPosts, nil
 }
 
@@ -211,6 +284,42 @@ func extractRedditPosts(listing *services.RedditListing) []services.RedditPost {
 		posts = append(posts, normalizeRedditPost(child.Data))
 	}
 	return posts
+}
+
+func mapTimeRangeKeyToReddit(key string) string {
+	switch key {
+	case "hour":
+		return "hour"
+	case "day":
+		return "day"
+	case "week":
+		return "week"
+	case "year":
+		return "year"
+	case "all":
+		return "all"
+	default:
+		return ""
+	}
+}
+
+func filterRedditPostsByTimeRange(posts []services.RedditPost, startTime, endTime *time.Time) []services.RedditPost {
+	if (startTime == nil && endTime == nil) || len(posts) == 0 {
+		return posts
+	}
+
+	filtered := make([]services.RedditPost, 0, len(posts))
+	for _, post := range posts {
+		createdAt := time.Unix(int64(post.CreatedUTC), 0).UTC()
+		if startTime != nil && createdAt.Before(*startTime) {
+			continue
+		}
+		if endTime != nil && createdAt.After(*endTime) {
+			continue
+		}
+		filtered = append(filtered, post)
+	}
+	return filtered
 }
 
 func getItemCreatedAt(item CombinedFeedItem) int64 {

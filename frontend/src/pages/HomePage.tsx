@@ -13,6 +13,8 @@ import { subscriptionService } from '../services/subscriptionService';
 import { hubsService } from '../services/hubsService';
 import { createRedditCrosspostPayload } from '../utils/crosspostHelpers';
 import { OMNI_FEED_STORAGE_KEY } from '../constants/storageKeys';
+import { TOP_TIME_OPTIONS } from '../constants/topTimeRange';
+import type { TopTimeRange } from '../constants/topTimeRange';
 
 type SortOption = 'hot' | 'new' | 'top' | 'rising';
 
@@ -70,6 +72,20 @@ export default function HomePage() {
   const [omniOnly, setOmniOnly] = useState(() =>
     getStoredOmniOnlyState(user?.id ?? null, defaultOmniPostsOnly)
   );
+  const [showPopularFallback, setShowPopularFallback] = useState(false);
+  const convertInputToISO = (value: string) => {
+    if (!value) {
+      return undefined;
+    }
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) {
+      return undefined;
+    }
+    return parsed.toISOString();
+  };
+  const [topTimeRange, setTopTimeRange] = useState<TopTimeRange>('day');
+  const [customTopStart, setCustomTopStart] = useState('');
+  const [customTopEnd, setCustomTopEnd] = useState('');
   const queryClient = useQueryClient();
   const sort = useMemo<SortOption>(() => {
     const params = new URLSearchParams(location.search);
@@ -79,6 +95,19 @@ export default function HomePage() {
     }
     return 'hot';
   }, [location.search]);
+  const isTopSort = sort === 'top';
+  const isCustomTopRange = isTopSort && topTimeRange === 'custom';
+  const customStartISO = isCustomTopRange ? convertInputToISO(customTopStart) : undefined;
+  const customEndISO = isCustomTopRange ? convertInputToISO(customTopEnd) : undefined;
+  const isCustomRangeValid = Boolean(customStartISO && customEndISO);
+  const timeRangeKey = isTopSort
+    ? topTimeRange === 'custom'
+      ? isCustomRangeValid
+        ? `custom-${customTopStart}-${customTopEnd}`
+        : 'custom-pending'
+      : topTimeRange
+    : 'none';
+  const requiresValidCustomRange = isTopSort && topTimeRange === 'custom' && !isCustomRangeValid;
   const originState = useMemo(
     () => ({ originPath: `${location.pathname}${location.search}` }),
     [location.pathname, location.search]
@@ -106,10 +135,25 @@ export default function HomePage() {
     persistOmniOnlyState(user?.id ?? null, omniOnly);
   }, [omniOnly, user?.id]);
 
-  const homeFeedQueryKey = ['home-feed', sort, omniOnly] as const;
+  const homeFeedQueryKey = ['home-feed', sort, omniOnly, showPopularFallback, timeRangeKey] as const;
   const { data, isLoading } = useQuery({
     queryKey: homeFeedQueryKey,
-    queryFn: () => feedService.getHomeFeed(sort, 50, omniOnly),
+    queryFn: () => {
+      const timeOptions =
+        isTopSort && topTimeRange === 'custom'
+          ? isCustomRangeValid
+            ? {
+                timeRange: 'custom' as const,
+                startDate: customStartISO as string,
+                endDate: customEndISO as string,
+              }
+            : undefined
+          : isTopSort
+          ? { timeRange: topTimeRange }
+          : undefined;
+      return feedService.getHomeFeed(sort, 50, omniOnly, showPopularFallback, timeOptions);
+    },
+    enabled: !isCustomTopRange || isCustomRangeValid,
     staleTime: 1000 * 60 * 5,
   });
 
@@ -173,6 +217,14 @@ export default function HomePage() {
     queryFn: () => subscriptionService.getUserSubredditSubscriptions(),
     enabled: !!user,
   });
+  const hasAnySubscriptions =
+    (subscribedHubs?.length ?? 0) > 0 || (subscribedSubreddits?.length ?? 0) > 0;
+
+  useEffect(() => {
+    if (hasAnySubscriptions && showPopularFallback) {
+      setShowPopularFallback(false);
+    }
+  }, [hasAnySubscriptions, showPopularFallback]);
 
   // Hub post mutations
   const deletePostMutation = useMutation<void, Error, number>({
@@ -399,6 +451,18 @@ export default function HomePage() {
               : 'Popular posts from all hubs and subreddits'}
         </p>
       </div>
+      {user && showPopularFallback && !hasAnySubscriptions && (
+        <div className="mb-4 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] p-4 text-sm text-[var(--color-text-secondary)]">
+          Currently showing popular Omni content.{' '}
+          <button
+            type="button"
+            onClick={() => setShowPopularFallback(false)}
+            className="font-semibold text-[var(--color-primary)] hover:underline"
+          >
+            Hide popular content
+          </button>
+        </div>
+      )}
 
       {/* Sort controls */}
       <div className="mb-4 flex flex-wrap items-center justify-between gap-4 border-b border-[var(--color-border)] pb-2">
@@ -471,6 +535,48 @@ export default function HomePage() {
           </button>
         </div>
       </div>
+      {isTopSort && (
+        <div className="mb-4 space-y-2 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
+              Top time range
+            </span>
+            <select
+              value={topTimeRange}
+              onChange={(event) => setTopTimeRange(event.target.value as TopTimeRange)}
+              className="rounded border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-1 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
+            >
+              {TOP_TIME_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          {topTimeRange === 'custom' && (
+            <div className="flex flex-wrap items-center gap-2 pl-1">
+              <input
+                type="datetime-local"
+                value={customTopStart}
+                onChange={(event) => setCustomTopStart(event.target.value)}
+                className="rounded border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-2 py-1 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
+              />
+              <span className="text-xs text-[var(--color-text-secondary)]">to</span>
+              <input
+                type="datetime-local"
+                value={customTopEnd}
+                onChange={(event) => setCustomTopEnd(event.target.value)}
+                className="rounded border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-2 py-1 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
+              />
+              {requiresValidCustomRange && (
+                <span className="text-xs text-[var(--color-error)]">
+                  Select both start and end dates to apply this filter.
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Posts */}
       {isLoading ? (
@@ -478,29 +584,48 @@ export default function HomePage() {
       ) : displayedPosts.length === 0 ? (
         <div className="text-center text-[var(--color-text-secondary)]">
           {user ? (
-            <div>
-              <p className="mb-4">
-                {omniOnly
-                  ? 'No Omni posts from your subscriptions yet.'
-                  : 'No posts from your subscriptions yet.'}
-              </p>
-              <p className="text-sm">
-                <Link
-                  to="/hubs"
-                  className="font-medium text-[var(--color-primary)] hover:underline"
+            !hasAnySubscriptions ? (
+              <div>
+                <p className="mb-4">
+                  You have zero subscriptions. Posts from your subscriptions will appear here. Click
+                  the button below to view the current popular content.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setShowPopularFallback(true)}
+                  disabled={requiresValidCustomRange}
+                  className={`rounded-md bg-[var(--color-primary)] px-4 py-2 text-white transition hover:opacity-90 ${
+                    requiresValidCustomRange ? 'cursor-not-allowed opacity-60' : ''
+                  }`}
                 >
-                  Browse hubs
-                </Link>{' '}
-                or{' '}
-                <Link
-                  to="/reddit"
-                  className="font-medium text-[var(--color-primary)] hover:underline"
-                >
-                  browse subreddits
-                </Link>{' '}
-                to get started.
-              </p>
-            </div>
+                  View current popular content
+                </button>
+              </div>
+            ) : (
+              <div>
+                <p className="mb-4">
+                  {omniOnly
+                    ? 'No Omni posts from your subscriptions yet.'
+                    : 'No posts from your subscriptions yet.'}
+                </p>
+                <p className="text-sm">
+                  <Link
+                    to="/hubs"
+                    className="font-medium text-[var(--color-primary)] hover:underline"
+                  >
+                    Browse hubs
+                  </Link>{' '}
+                  or{' '}
+                  <Link
+                    to="/reddit"
+                    className="font-medium text-[var(--color-primary)] hover:underline"
+                  >
+                    browse subreddits
+                  </Link>{' '}
+                  to get started.
+                </p>
+              </div>
+            )
           ) : (
             <p>{omniOnly ? 'No Omni posts available.' : 'No posts available.'}</p>
           )}
