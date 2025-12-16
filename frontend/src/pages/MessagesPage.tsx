@@ -130,11 +130,23 @@ export default function MessagesPage() {
             );
             queryClient.setQueryData<Conversation[] | undefined>(['conversations'], (prev) => {
               if (!prev) return prev;
-              return prev.map((conv) =>
-                conv.id === payload.conversation_id
-                  ? { ...conv, unread_count: 0, latest_message: payload }
-                  : conv
-              );
+              return prev.map((conv) => {
+                if (conv.id !== payload.conversation_id) {
+                  return conv;
+                }
+                const isRecipient = payload.recipient_id === user?.id;
+                const isActive = isRecipient && selectedConversationId === payload.conversation_id;
+                const nextUnread = isRecipient
+                  ? isActive
+                    ? 0
+                    : conv.unread_count + 1
+                  : conv.unread_count;
+                return {
+                  ...conv,
+                  latest_message: payload,
+                  unread_count: nextUnread,
+                };
+              });
             });
             if (
               selectedConversationId === payload.conversation_id &&
