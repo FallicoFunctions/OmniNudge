@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { feedService, type CombinedFeedItem, type RedditPost } from '../services/feedService';
 import { useAuth } from '../contexts/AuthContext';
@@ -404,7 +404,7 @@ export default function HomePage() {
 
   // Reddit post handlers
   const handleShareRedditPost = (post: RedditPost) => {
-    const shareUrl = `${window.location.origin}/reddit${post.permalink}`;
+    const shareUrl = `${window.location.origin}${post.permalink}`;
     navigator.clipboard
       .writeText(shareUrl)
       .then(() => alert('Post link copied to clipboard!'))
@@ -609,20 +609,7 @@ export default function HomePage() {
                     : 'No posts from your subscriptions yet.'}
                 </p>
                 <p className="text-sm">
-                  <Link
-                    to="/hubs"
-                    className="font-medium text-[var(--color-primary)] hover:underline"
-                  >
-                    Browse hubs
-                  </Link>{' '}
-                  or{' '}
-                  <Link
-                    to="/reddit"
-                    className="font-medium text-[var(--color-primary)] hover:underline"
-                  >
-                    browse subreddits
-                  </Link>{' '}
-                  to get started.
+                  Subscribe to hubs and subreddits to see posts from them here.
                 </p>
               </div>
             )

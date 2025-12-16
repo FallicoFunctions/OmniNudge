@@ -15,7 +15,7 @@ export default function CreateHubPage() {
   const createHubMutation = useMutation({
     mutationFn: (data: CreateHubRequest) => hubsService.createHub(data),
     onSuccess: (hub) => {
-      navigate(`/hubs/h/${hub.name}`);
+      navigate(`/h/${hub.name}`);
     },
   });
 

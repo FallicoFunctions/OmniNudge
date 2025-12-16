@@ -56,42 +56,22 @@ export default function MainLayout() {
               <Link to="/" className="text-xl font-bold text-[var(--color-primary)]">
                 OmniNudge
               </Link>
-              <div className="hidden space-x-4 md:flex">
-                <Link
-                  to="/reddit"
-                  className="rounded-md px-3 py-2 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
-                >
-                  Reddit
-                </Link>
-                <Link
-                  to="/hubs"
-                  className="rounded-md px-3 py-2 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
-                >
-                  Hubs
-                </Link>
-                <Link
-                  to="/posts"
-                  className="rounded-md px-3 py-2 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
-                >
-                  Posts
-                </Link>
-                {user && (
-                  <>
-                    <Link
-                      to="/posts/create"
-                      className="rounded-md px-3 py-2 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
-                    >
-                      Create Post
-                    </Link>
-                    <Link
-                      to="/messages"
-                      className="rounded-md px-3 py-2 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
-                    >
-                      Messages
-                    </Link>
-                  </>
-                )}
-              </div>
+              {user && (
+                <div className="hidden space-x-4 md:flex">
+                  <Link
+                    to="/posts/create"
+                    className="rounded-md px-3 py-2 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
+                  >
+                    Create Post
+                  </Link>
+                  <Link
+                    to="/messages"
+                    className="rounded-md px-3 py-2 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
+                  >
+                    Messages
+                  </Link>
+                </div>
+              )}
             </div>
 
             <div className="flex items-center gap-4">

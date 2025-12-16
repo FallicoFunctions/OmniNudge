@@ -62,7 +62,7 @@ function PostsSection({
             <div className="flex-1">
               <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--color-text-secondary)]">
                 <Link
-                  to={`/hubs/h/${post.hub_name}`}
+                  to={`/h/${post.hub_name}`}
                   state={linkState}
                   className="font-semibold text-[var(--color-text-primary)] hover:text-[var(--color-primary)]"
                 >

@@ -16,12 +16,6 @@ export default function NotFoundPage() {
           >
             Go to Home
           </Link>
-          <Link
-            to="/hubs"
-            className="inline-flex items-center justify-center rounded-md border border-gray-300 px-6 py-3 text-gray-700 font-medium hover:bg-gray-100"
-          >
-            Browse Hubs
-          </Link>
         </div>
       </div>
     </div>

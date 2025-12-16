@@ -320,7 +320,7 @@ export default function PostDetailPage() {
               {targetSubreddit && (
                 <>
                   <Link
-                    to={`/reddit/r/${targetSubreddit}`}
+                    to={`/r/${targetSubreddit}`}
                     className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
                   >
                     r/{targetSubreddit}
@@ -331,7 +331,7 @@ export default function PostDetailPage() {
               {hubName && (
                 <>
                   <Link
-                    to={`/hubs/h/${hubName}`}
+                    to={`/h/${hubName}`}
                     className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
                   >
                     h/{hubName}
