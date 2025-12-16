@@ -25,6 +25,8 @@ import {
 import type { SubredditSuggestion } from '../types/reddit';
 import { SubscribeButton } from '../components/common/SubscribeButton';
 import { RedditPostCard } from '../components/reddit/RedditPostCard';
+import { TOP_TIME_OPTIONS } from '../constants/topTimeRange';
+import type { TopTimeRange } from '../constants/topTimeRange';
 
 interface FeedRedditPost extends RedditCrosspostSource {
   id: string;
@@ -89,6 +91,9 @@ export default function RedditPage() {
   const { blockedUsers } = useRedditBlocklist();
   const [subreddit, setSubreddit] = useState(routeSubreddit ?? 'popular');
   const [sort, setSort] = useState<'hot' | 'new' | 'top' | 'rising'>('hot');
+  const [topTimeRange, setTopTimeRange] = useState<TopTimeRange>('day');
+  const [customTopStart, setCustomTopStart] = useState('');
+  const [customTopEnd, setCustomTopEnd] = useState('');
   const [inputValue, setInputValue] = useState('');
   const [hideTarget, setHideTarget] = useState<HideTarget | null>(null);
   const [crosspostTarget, setCrosspostTarget] = useState<CrosspostSource | null>(null);
@@ -98,18 +103,50 @@ export default function RedditPage() {
   const [sendRepliesToInbox, setSendRepliesToInbox] = useState(true);
   const [showOmniOnly, setShowOmniOnly] = useState(false);
   const [isAutocompleteOpen, setIsAutocompleteOpen] = useState(false);
+  const convertInputToISO = (value: string) => {
+    if (!value) {
+      return undefined;
+    }
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) {
+      return undefined;
+    }
+    return parsed.toISOString();
+  };
+  const isTopSort = sort === 'top';
+  const isCustomTopRange = isTopSort && topTimeRange === 'custom';
+  const customStartISO = isCustomTopRange ? convertInputToISO(customTopStart) : undefined;
+  const customEndISO = isCustomTopRange ? convertInputToISO(customTopEnd) : undefined;
+  const isCustomRangeValid = Boolean(customStartISO && customEndISO);
+  const topRangeKey = isTopSort
+    ? topTimeRange === 'custom'
+      ? isCustomRangeValid
+        ? `custom-${customTopStart}-${customTopEnd}`
+        : 'custom-pending'
+      : topTimeRange
+    : 'none';
+  const redditTimeFilter =
+    isTopSort && topTimeRange !== 'custom'
+      ? topTimeRange
+      : isTopSort && topTimeRange === 'custom'
+      ? 'all'
+      : undefined;
   const originState = useMemo(
     () => ({ originPath: `${location.pathname}${location.search}` }),
     [location.pathname, location.search]
   );
 
   const { data, isLoading, error } = useQuery<FeedRedditPostsResponse>({
-    queryKey: ['reddit', subreddit, sort],
-    queryFn: () =>
-      subreddit === 'frontpage'
-        ? redditService.getFrontPage()
-        : redditService.getSubredditPosts(subreddit, sort),
+    queryKey: ['reddit', subreddit, sort, topRangeKey],
+    queryFn: () => {
+      const limit = isTopSort ? 100 : 25;
+      if (subreddit === 'frontpage') {
+        return redditService.getFrontPage(sort, limit, redditTimeFilter);
+      }
+      return redditService.getSubredditPosts(subreddit, sort, limit, redditTimeFilter);
+    },
     staleTime: 1000 * 60 * 5, // 5 minutes
+    enabled: !isCustomTopRange || isCustomRangeValid,
   });
 
   // Fetch hidden Reddit posts
@@ -141,12 +178,30 @@ export default function RedditPage() {
     staleTime: 1000 * 60 * 5, // 5 minutes
   });
 
-  const localPostsQueryKey = ['subreddit-posts', subreddit, sort] as const;
+  const localPostsQueryKey = ['subreddit-posts', subreddit, sort, topRangeKey] as const;
   // Fetch local platform posts for this subreddit
   const { data: localPostsData } = useQuery<SubredditPostsResponse>({
     queryKey: localPostsQueryKey,
-    queryFn: () => hubsService.getSubredditPosts(subreddit, sort),
-    enabled: !!user && subreddit !== 'popular' && subreddit !== 'frontpage',
+    queryFn: () => {
+      const options =
+        isTopSort && topTimeRange === 'custom'
+          ? isCustomRangeValid
+            ? {
+                timeRange: 'custom' as const,
+                startDate: customStartISO as string,
+                endDate: customEndISO as string,
+              }
+            : undefined
+          : isTopSort
+          ? { timeRange: topTimeRange }
+          : undefined;
+      return hubsService.getSubredditPosts(subreddit, sort, 25, 0, options);
+    },
+    enabled:
+      !!user &&
+      subreddit !== 'popular' &&
+      subreddit !== 'frontpage' &&
+      (!isCustomTopRange || isCustomRangeValid),
     staleTime: 1000 * 60 * 5, // 5 minutes
   });
 
@@ -191,9 +246,27 @@ export default function RedditPage() {
     return new Set(ids ?? []);
   }, [savedRedditPostsData]);
 
+  const filteredRedditPosts = useMemo(() => {
+    if (!data?.posts) {
+      return [];
+    }
+    if (!isTopSort) {
+      return data.posts;
+    }
+    if (topTimeRange === 'custom' && isCustomRangeValid && customStartISO && customEndISO) {
+      const startMs = new Date(customStartISO).getTime();
+      const endMs = new Date(customEndISO).getTime();
+      return data.posts.filter((post) => {
+        const createdMs = post.created_utc * 1000;
+        return createdMs >= startMs && createdMs <= endMs;
+      });
+    }
+    return data.posts;
+  }, [data?.posts, isTopSort, topTimeRange, isCustomRangeValid, customStartISO, customEndISO]);
+
   // Filter out hidden posts
   const visiblePosts = useMemo(() => {
-    if (!data?.posts) return [];
+    if (!filteredRedditPosts.length) return [];
     const hiddenPostIds = hiddenPostsData?.hidden_reddit_posts
       ? new Set(
           hiddenPostsData.hidden_reddit_posts.map(
@@ -202,14 +275,14 @@ export default function RedditPage() {
         )
       : null;
 
-    return data.posts.filter((post) => {
+    return filteredRedditPosts.filter((post) => {
       const hiddenKey = `${post.subreddit}-${post.id}`;
       const isHidden = hiddenPostIds?.has(hiddenKey);
       if (isHidden) return false;
       const authorKey = post.author ? post.author.toLowerCase() : '';
       return authorKey ? !blockedUsers.has(authorKey) : true;
     });
-  }, [data?.posts, hiddenPostsData?.hidden_reddit_posts, blockedUsers]);
+  }, [filteredRedditPosts, hiddenPostsData?.hidden_reddit_posts, blockedUsers]);
   const toggleSaveRedditPostMutation = useMutation<
     void,
     Error,
@@ -635,6 +708,48 @@ export default function RedditPage() {
               {sortOption}
             </button>
           ))}
+          {isTopSort && (
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-semibold uppercase text-[var(--color-text-secondary)]">
+                  Time range
+                </span>
+                <select
+                  value={topTimeRange}
+                  onChange={(event) => setTopTimeRange(event.target.value as TopTimeRange)}
+                  className="rounded border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-1 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
+                >
+                  {TOP_TIME_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              {topTimeRange === 'custom' && (
+                <div className="flex flex-wrap items-center gap-2">
+                  <input
+                    type="datetime-local"
+                    value={customTopStart}
+                    onChange={(event) => setCustomTopStart(event.target.value)}
+                    className="rounded border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-2 py-1 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
+                  />
+                  <span className="text-xs text-[var(--color-text-secondary)]">to</span>
+                  <input
+                    type="datetime-local"
+                    value={customTopEnd}
+                    onChange={(event) => setCustomTopEnd(event.target.value)}
+                    className="rounded border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-2 py-1 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
+                  />
+                  {!isCustomRangeValid && (
+                    <span className="text-xs text-[var(--color-error)]">
+                      Select both start and end dates to apply this filter.
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
           <div className="ml-auto flex items-center gap-2">
             <span className="text-xs font-semibold uppercase text-[var(--color-text-secondary)]">
               Show only Omni posts:

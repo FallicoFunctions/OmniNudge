@@ -3,6 +3,7 @@ package models
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -13,9 +14,9 @@ import (
 type PlatformPost struct {
 	ID             int    `json:"id"`
 	AuthorID       int    `json:"author_id"`
-	Author         *User  `json:"author,omitempty"`   // Optional populated user info
+	Author         *User  `json:"author,omitempty"`          // Optional populated user info
 	AuthorUsername string `json:"author_username,omitempty"` // Author's username
-	HubID          *int   `json:"hub_id,omitempty"`   // Optional: only set for hub posts
+	HubID          *int   `json:"hub_id,omitempty"`          // Optional: only set for hub posts
 	Hub            *Hub   `json:"hub,omitempty"`
 	HubName        string `json:"hub_name,omitempty"`
 
@@ -59,6 +60,25 @@ type PlatformPost struct {
 	// Timestamps
 	CrosspostedAt *time.Time `json:"crossposted_at,omitempty"`
 	CreatedAt     time.Time  `json:"created_at"`
+}
+
+func buildTimeRangeClause(start, end *time.Time, startingIndex int) (string, []interface{}) {
+	clause := ""
+	args := []interface{}{}
+	idx := startingIndex
+
+	if start != nil {
+		clause += fmt.Sprintf(" AND p.created_at >= $%d", idx)
+		args = append(args, *start)
+		idx++
+	}
+
+	if end != nil {
+		clause += fmt.Sprintf(" AND p.created_at <= $%d", idx)
+		args = append(args, *end)
+	}
+
+	return clause, args
 }
 
 const platformPostSelectColumns = `
@@ -252,11 +272,18 @@ func (r *PlatformPostRepository) GetByAuthor(ctx context.Context, authorID int, 
 
 // GetByHub retrieves posts by hub
 func (r *PlatformPostRepository) GetByHub(ctx context.Context, hubID int, sortBy string, limit, offset int) ([]*PlatformPost, error) {
-	return r.GetByHubWithUser(ctx, hubID, sortBy, limit, offset, nil)
+	return r.GetByHubWithUser(ctx, hubID, sortBy, limit, offset, nil, nil, nil)
 }
 
 // GetByHubWithUser retrieves posts by hub with optional user vote information
-func (r *PlatformPostRepository) GetByHubWithUser(ctx context.Context, hubID int, sortBy string, limit, offset int, userID *int) ([]*PlatformPost, error) {
+func (r *PlatformPostRepository) GetByHubWithUser(
+	ctx context.Context,
+	hubID int,
+	sortBy string,
+	limit, offset int,
+	userID *int,
+	startTime, endTime *time.Time,
+) ([]*PlatformPost, error) {
 	var orderClause string
 	switch sortBy {
 	case "hot":
@@ -272,6 +299,8 @@ func (r *PlatformPostRepository) GetByHubWithUser(ctx context.Context, hubID int
 		orderClause = "ORDER BY p.hot_score DESC, p.created_at DESC"
 	}
 
+	timeClause, timeArgs := buildTimeRangeClause(startTime, endTime, 5)
+
 	query := `
 		SELECT ` + platformPostSelectColumnsPrefixed + `,
 		CASE
@@ -281,19 +310,20 @@ func (r *PlatformPostRepository) GetByHubWithUser(ctx context.Context, hubID int
 		END as user_vote
 		FROM platform_posts p
 		LEFT JOIN post_votes pv ON pv.post_id = p.id AND pv.user_id = $4
-		WHERE p.hub_id = $1 AND p.is_deleted = FALSE AND (p.target_subreddit IS NULL OR p.target_subreddit = '')
+		WHERE p.hub_id = $1 AND p.is_deleted = FALSE AND (p.target_subreddit IS NULL OR p.target_subreddit = '')` + timeClause + `
 		` + orderClause + `
 		LIMIT $2 OFFSET $3
 	`
 
-	var rows pgx.Rows
-	var err error
+	args := []interface{}{hubID, limit, offset}
 	if userID != nil {
-		rows, err = r.pool.Query(ctx, query, hubID, limit, offset, *userID)
+		args = append(args, *userID)
 	} else {
-		// When no user, still need to pass a placeholder for the LEFT JOIN
-		rows, err = r.pool.Query(ctx, query, hubID, limit, offset, nil)
+		args = append(args, nil)
 	}
+	args = append(args, timeArgs...)
+
+	rows, err := r.pool.Query(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -313,11 +343,18 @@ func (r *PlatformPostRepository) GetByHubWithUser(ctx context.Context, hubID int
 
 // GetBySubreddit retrieves posts by target subreddit
 func (r *PlatformPostRepository) GetBySubreddit(ctx context.Context, subreddit string, sortBy string, limit, offset int) ([]*PlatformPost, error) {
-	return r.GetBySubredditWithUser(ctx, subreddit, sortBy, limit, offset, nil)
+	return r.GetBySubredditWithUser(ctx, subreddit, sortBy, limit, offset, nil, nil, nil)
 }
 
 // GetBySubredditWithUser retrieves posts by target subreddit with optional user vote information
-func (r *PlatformPostRepository) GetBySubredditWithUser(ctx context.Context, subreddit string, sortBy string, limit, offset int, userID *int) ([]*PlatformPost, error) {
+func (r *PlatformPostRepository) GetBySubredditWithUser(
+	ctx context.Context,
+	subreddit string,
+	sortBy string,
+	limit, offset int,
+	userID *int,
+	startTime, endTime *time.Time,
+) ([]*PlatformPost, error) {
 	var orderClause string
 	switch sortBy {
 	case "hot":
@@ -332,6 +369,8 @@ func (r *PlatformPostRepository) GetBySubredditWithUser(ctx context.Context, sub
 		orderClause = "ORDER BY p.hot_score DESC, p.created_at DESC"
 	}
 
+	timeClause, timeArgs := buildTimeRangeClause(startTime, endTime, 5)
+
 	query := `
 		SELECT ` + platformPostSelectColumnsPrefixed + `,
 		CASE
@@ -341,18 +380,20 @@ func (r *PlatformPostRepository) GetBySubredditWithUser(ctx context.Context, sub
 		END as user_vote
 		FROM platform_posts p
 		LEFT JOIN post_votes pv ON pv.post_id = p.id AND pv.user_id = $4
-		WHERE p.target_subreddit = $1 AND p.is_deleted = FALSE
+		WHERE p.target_subreddit = $1 AND p.is_deleted = FALSE` + timeClause + `
 		` + orderClause + `
 		LIMIT $2 OFFSET $3
 	`
 
-	var rows pgx.Rows
-	var err error
+	args := []interface{}{subreddit, limit, offset}
 	if userID != nil {
-		rows, err = r.pool.Query(ctx, query, subreddit, limit, offset, *userID)
+		args = append(args, *userID)
 	} else {
-		rows, err = r.pool.Query(ctx, query, subreddit, limit, offset, nil)
+		args = append(args, nil)
 	}
+	args = append(args, timeArgs...)
+
+	rows, err := r.pool.Query(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -624,6 +665,7 @@ func (r *PlatformPostRepository) GetPopularFeed(
 	subscribedHubIDs []int,
 	sort string,
 	limit, offset int,
+	startTime, endTime *time.Time,
 ) ([]*PlatformPost, error) {
 	var orderClause string
 	switch sort {
@@ -642,35 +684,34 @@ func (r *PlatformPostRepository) GetPopularFeed(
 	// Base WHERE clause excludes deleted posts, quarantined hubs, and crossposted posts
 	whereClause := `WHERE p.is_deleted = FALSE AND h.is_quarantined = FALSE AND p.target_subreddit IS NULL`
 
-	var rows pgx.Rows
-	var err error
+	args := []interface{}{}
+	paramIndex := 1
 
 	if len(subscribedHubIDs) > 0 {
-		// Filter by subscribed hubs
-		whereClause += ` AND p.hub_id = ANY($1)`
-		query := `
-			SELECT ` + platformPostSelectColumnsPrefixed + `, h.name as hub_name, u.username as author_username
-			FROM platform_posts p
-			JOIN hubs h ON p.hub_id = h.id
-			JOIN users u ON p.author_id = u.id
-			` + whereClause + `
-			` + orderClause + `
-			LIMIT $2 OFFSET $3`
-
-		rows, err = r.pool.Query(ctx, query, subscribedHubIDs, limit, offset)
-	} else {
-		// No subscription filter - return popular from all non-quarantined hubs
-		query := `
-			SELECT ` + platformPostSelectColumnsPrefixed + `, h.name as hub_name, u.username as author_username
-			FROM platform_posts p
-			JOIN hubs h ON p.hub_id = h.id
-			JOIN users u ON p.author_id = u.id
-			` + whereClause + `
-			` + orderClause + `
-			LIMIT $1 OFFSET $2`
-
-		rows, err = r.pool.Query(ctx, query, limit, offset)
+		whereClause += fmt.Sprintf(" AND p.hub_id = ANY($%d)", paramIndex)
+		args = append(args, subscribedHubIDs)
+		paramIndex++
 	}
+
+	timeClause, timeArgs := buildTimeRangeClause(startTime, endTime, paramIndex)
+	whereClause += timeClause
+	args = append(args, timeArgs...)
+	paramIndex += len(timeArgs)
+
+	limitIdx := paramIndex
+	offsetIdx := paramIndex + 1
+	args = append(args, limit, offset)
+
+	query := fmt.Sprintf(`
+			SELECT %s, h.name as hub_name, u.username as author_username
+			FROM platform_posts p
+			JOIN hubs h ON p.hub_id = h.id
+			JOIN users u ON p.author_id = u.id
+			%s
+			%s
+			LIMIT $%d OFFSET $%d`, platformPostSelectColumnsPrefixed, whereClause, orderClause, limitIdx, offsetIdx)
+
+	rows, err := r.pool.Query(ctx, query, args...)
 
 	if err != nil {
 		return nil, err
@@ -713,6 +754,7 @@ func (r *PlatformPostRepository) GetAllFeed(
 	ctx context.Context,
 	sort string,
 	limit, offset int,
+	startTime, endTime *time.Time,
 ) ([]*PlatformPost, error) {
 	var orderClause string
 	switch sort {
@@ -728,15 +770,20 @@ func (r *PlatformPostRepository) GetAllFeed(
 		orderClause = "ORDER BY hot_score DESC, created_at DESC"
 	}
 
+	timeClause, timeArgs := buildTimeRangeClause(startTime, endTime, 3)
+
 	query := `
 		SELECT ` + platformPostSelectColumns + `
 		FROM platform_posts
-		WHERE is_deleted = FALSE AND target_subreddit IS NULL
+		WHERE is_deleted = FALSE AND target_subreddit IS NULL` + timeClause + `
 		` + orderClause + `
 		LIMIT $1 OFFSET $2
 	`
 
-	rows, err := r.pool.Query(ctx, query, limit, offset)
+	args := []interface{}{limit, offset}
+	args = append(args, timeArgs...)
+
+	rows, err := r.pool.Query(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}
