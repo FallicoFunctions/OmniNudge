@@ -14,9 +14,10 @@ export default function LoginPage() {
     e.preventDefault();
     setError('');
     setIsLoading(true);
+    const normalizedUsername = username.trim();
 
     try {
-      await login({ username, password });
+      await login({ username: normalizedUsername, password });
       navigate('/');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed');
@@ -58,6 +59,10 @@ export default function LoginPage() {
                 onChange={(e) => setUsername(e.target.value)}
                 className="mt-1 block w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-2 text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
                 placeholder="Enter your username"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                autoComplete="username"
               />
             </div>
 

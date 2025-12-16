@@ -3,22 +3,47 @@ package handlers
 import (
 	"log"
 	"net/http"
+	"net/url"
+	"strings"
 
-	"github.com/omninudge/backend/internal/websocket"
 	"github.com/gin-gonic/gin"
 	ws "github.com/gorilla/websocket"
+	"github.com/omninudge/backend/internal/websocket"
 )
+
+var allowedDevPorts = map[string]struct{}{
+	"":     {},
+	"80":   {},
+	"3000": {},
+	"5173": {},
+	"5174": {},
+	"5175": {},
+	"5176": {},
+	"8080": {},
+}
 
 var upgrader = ws.Upgrader{
 	ReadBufferSize:  1024,
 	WriteBufferSize: 1024,
 	CheckOrigin: func(r *http.Request) bool {
-		// Allow connections from localhost (development)
-		// In production, you should check the origin more carefully
 		origin := r.Header.Get("Origin")
-		return origin == "http://localhost:3000" ||
-			origin == "http://localhost:5173" ||
-			origin == "http://localhost:8080"
+		if origin == "" {
+			return true
+		}
+
+		parsed, err := url.Parse(origin)
+		if err != nil {
+			return false
+		}
+
+		host := strings.ToLower(parsed.Hostname())
+		if host == "localhost" || host == "127.0.0.1" || host == "::1" {
+			if _, ok := allowedDevPorts[parsed.Port()]; ok {
+				return true
+			}
+		}
+
+		return false
 	},
 }
 
