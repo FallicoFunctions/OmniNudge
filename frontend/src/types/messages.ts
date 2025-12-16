@@ -1,27 +1,42 @@
+export interface ConversationUser {
+  id: number;
+  username: string;
+  avatar_url?: string | null;
+  bio?: string | null;
+  karma?: number;
+}
+
 export interface Conversation {
   id: number;
-  participant_id: number;
-  participant_username: string;
-  last_message?: string;
-  last_message_at?: string;
-  unread_count: number;
+  user1_id: number;
+  user2_id: number;
   created_at: string;
+  last_message_at: string;
+  other_user?: ConversationUser;
+  latest_message?: Message;
+  unread_count: number;
 }
 
 export interface Message {
   id: number;
   conversation_id: number;
   sender_id: number;
-  sender_username: string;
-  content: string; // Encrypted content
-  media_url?: string;
-  created_at: string;
+  recipient_id: number;
+  encrypted_content: string;
+  message_type: 'text' | 'image' | 'video' | 'audio';
+  sent_at: string;
+  delivered_at?: string;
   read_at?: string;
+  deleted_for_sender?: boolean;
+  deleted_for_recipient?: boolean;
+  media_url?: string | null;
+  media_type?: string | null;
+  media_size?: number | null;
+  encryption_version: string;
 }
 
 export interface SendMessageRequest {
   conversation_id?: number;
   recipient_username?: string;
   content: string;
-  media_file_id?: number;
 }
