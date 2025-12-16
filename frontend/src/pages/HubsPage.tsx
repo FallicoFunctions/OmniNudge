@@ -12,6 +12,8 @@ import { createLocalCrosspostPayload } from '../utils/crosspostHelpers';
 import type { CrosspostRequest } from '../services/hubsService';
 import { HubPostCard } from '../components/hubs/HubPostCard';
 import type { PlatformPost } from '../types/posts';
+import { TOP_TIME_OPTIONS } from '../constants/topTimeRange';
+import type { TopTimeRange } from '../constants/topTimeRange';
 
 const EMPTY_POSTS: LocalSubredditPost[] = [];
 
@@ -23,11 +25,36 @@ export default function HubsPage() {
   const { useRelativeTime } = useSettings();
   const [hubname, setHubname] = useState(routeHubname ?? 'popular');
   const [sort, setSort] = useState<'hot' | 'new' | 'top' | 'rising'>('hot');
+  const [topTimeRange, setTopTimeRange] = useState<TopTimeRange>('day');
+  const [customTopStart, setCustomTopStart] = useState('');
+  const [customTopEnd, setCustomTopEnd] = useState('');
   const [crosspostTarget, setCrosspostTarget] = useState<LocalSubredditPost | null>(null);
   const [crosspostTitle, setCrosspostTitle] = useState('');
   const [selectedHub, setSelectedHub] = useState('');
   const [selectedSubreddit, setSelectedSubreddit] = useState('');
   const [sendRepliesToInbox, setSendRepliesToInbox] = useState(true);
+  const convertInputToISO = (value: string) => {
+    if (!value) {
+      return undefined;
+    }
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) {
+      return undefined;
+    }
+    return parsed.toISOString();
+  };
+  const isTopSort = sort === 'top';
+  const isCustomTopRange = isTopSort && topTimeRange === 'custom';
+  const customStartISO = isCustomTopRange ? convertInputToISO(customTopStart) : undefined;
+  const customEndISO = isCustomTopRange ? convertInputToISO(customTopEnd) : undefined;
+  const isCustomRangeValid = Boolean(customStartISO && customEndISO);
+  const timeRangeKey = isTopSort
+    ? topTimeRange === 'custom'
+      ? isCustomRangeValid
+        ? `custom-${customTopStart}-${customTopEnd}`
+        : 'custom-pending'
+      : topTimeRange
+    : 'none';
 
   // Check if user has hub subscriptions to determine default view
   const { data: subscribedHubs } = useQuery({
@@ -99,19 +126,31 @@ export default function HubsPage() {
   }, [routeHubname]);
 
   // Fetch posts based on current hub
-  const postsQueryKey = ['hub-posts', hubname, sort] as const;
+  const postsQueryKey = ['hub-posts', hubname, sort, timeRangeKey] as const;
   const { data, isLoading, error } = useQuery<HubPostsResponse>({
     queryKey: postsQueryKey,
     queryFn: () => {
+      const feedOptions =
+        isTopSort && topTimeRange === 'custom'
+          ? isCustomRangeValid
+            ? {
+                timeRange: 'custom' as const,
+                startDate: customStartISO as string,
+                endDate: customEndISO as string,
+              }
+            : undefined
+          : isTopSort
+          ? { timeRange: topTimeRange }
+          : undefined;
       if (hubname === 'popular') {
-        return hubsService.getPopularFeed(sort);
+        return hubsService.getPopularFeed(sort, 25, 0, feedOptions);
       }
       if (hubname === 'all') {
-        return hubsService.getAllFeed(sort);
+        return hubsService.getAllFeed(sort, 25, 0, feedOptions);
       }
-      return hubsService.getHubPosts(hubname, sort);
+      return hubsService.getHubPosts(hubname, sort, 25, 0, feedOptions);
     },
-    enabled: !!hubname && hubname !== '',
+    enabled: !!hubname && hubname !== '' && (!isCustomTopRange || isCustomRangeValid),
     staleTime: 1000 * 60 * 5,
   });
   const postsList = data?.posts ?? EMPTY_POSTS;
@@ -340,7 +379,7 @@ export default function HubsPage() {
       </div>
 
       {/* Sort Controls */}
-      <div className="mb-4 flex gap-2">
+      <div className="mb-2 flex gap-2">
         {(['hot', 'new', 'top', 'rising'] as const).map((sortOption) => (
           <button
             key={sortOption}
@@ -355,6 +394,48 @@ export default function HubsPage() {
           </button>
         ))}
       </div>
+      {isTopSort && (
+        <div className="mb-4 space-y-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
+              Time range
+            </span>
+            <select
+              value={topTimeRange}
+              onChange={(event) => setTopTimeRange(event.target.value as TopTimeRange)}
+              className="rounded border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-1 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
+            >
+              {TOP_TIME_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          {topTimeRange === 'custom' && (
+            <div className="flex flex-wrap items-center gap-2 pl-1">
+              <input
+                type="datetime-local"
+                value={customTopStart}
+                onChange={(event) => setCustomTopStart(event.target.value)}
+                className="rounded border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-2 py-1 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
+              />
+              <span className="text-xs text-[var(--color-text-secondary)]">to</span>
+              <input
+                type="datetime-local"
+                value={customTopEnd}
+                onChange={(event) => setCustomTopEnd(event.target.value)}
+                className="rounded border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-2 py-1 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
+              />
+              {!isCustomRangeValid && (
+                <span className="text-xs text-[var(--color-error)]">
+                  Select both start and end dates to apply this filter.
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Posts List */}
       <div className="space-y-3">
