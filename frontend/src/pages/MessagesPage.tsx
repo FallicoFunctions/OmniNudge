@@ -5,7 +5,7 @@ import { messagesService } from '../services/messagesService';
 import { mediaService } from '../services/mediaService';
 import { useAuth } from '../contexts/AuthContext';
 import { useMessagingContext } from '../contexts/MessagingContext';
-import type { Conversation, Message, SendMessageRequest } from '../types/messages';
+import type { Conversation, SendMessageRequest } from '../types/messages';
 
 export default function MessagesPage() {
   const { user } = useAuth();
