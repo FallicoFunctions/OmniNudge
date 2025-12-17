@@ -312,6 +312,7 @@ OmniNudge is designed to evolve into a comprehensive social platform:
 **Phase 3 (Year 3):** Creator monetization (subscriptions, tipping, ads)
 **Phase 4 (Year 4):** Communities (groups, live streaming, forums)
 **Phase 5 (Year 5):** Professional network (portfolios, jobs, B2B)
+**Phase 6 (Year 6):** Omni Email + Productivity Cloud (native email addresses, unified multi-account inbox, folder rules, first-party editors + external document integrations)
 
 Core principle: **Anonymity-first** with optional professional identity
 
