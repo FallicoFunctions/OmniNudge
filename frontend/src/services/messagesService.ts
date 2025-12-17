@@ -47,7 +47,7 @@ export const messagesService = {
 
     return api.post<Message>('/messages', {
       conversation_id: conversationId,
-      encrypted_content: data.content,
+      encrypted_content: data.content ?? '',
       message_type: messageType,
       media_file_id: data.media_file_id,
       media_url: data.media_url,
