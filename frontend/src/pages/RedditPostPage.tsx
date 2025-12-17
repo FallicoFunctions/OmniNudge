@@ -1500,8 +1500,16 @@ export default function RedditPostPage() {
                     >
                       {externalDomain ?? 'external'}
                       <svg className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                        <path d="M11.293 3H16a1 1 0 0 1 1 1v4.707a1 1 0 1 1-2 0V6.414l-7.293 7.293a1 1 0 0 1-1.414-1.414L13.586 5H11.293a1 1 0 1 1 0-2Z" />
-                        <path d="M5 5h3a1 1 0 1 1 0 2H6v7h7v-2a1 1 0 1 1 2 0v3a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1Z" />
+                        <path
+                          fillRule="evenodd"
+                          d="M4.25 5.5a.75.75 0 00-.75.75v8.5c0 .414.336.75.75.75h8.5a.75.75 0 00.75-.75v-4a.75.75 0 011.5 0v4A2.25 2.25 0 0112.75 17h-8.5A2.25 2.25 0 012 14.75v-8.5A2.25 2.25 0 014.25 4h5a.75.75 0 010 1.5h-5z"
+                          clipRule="evenodd"
+                        />
+                        <path
+                          fillRule="evenodd"
+                          d="M6.194 12.753a.75.75 0 001.06.053L16.5 4.44v2.81a.75.75 0 001.5 0v-4.5a.75.75 0 00-.75-.75h-4.5a.75.75 0 000 1.5h2.553l-9.056 8.194a.75.75 0 00-.053 1.06z"
+                          clipRule="evenodd"
+                        />
                       </svg>
                     </a>
                   )}

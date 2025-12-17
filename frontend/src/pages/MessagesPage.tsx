@@ -107,10 +107,8 @@ export default function MessagesPage() {
 
   // Sync selected conversation with global messaging context
   useEffect(() => {
-    console.log('[MessagesPage] Setting activeConversationId to:', selectedConversationId);
     setActiveConversationId(selectedConversationId);
     return () => {
-      console.log('[MessagesPage] Cleanup: Clearing activeConversationId');
       setActiveConversationId(null);
     };
   }, [selectedConversationId, setActiveConversationId]);
