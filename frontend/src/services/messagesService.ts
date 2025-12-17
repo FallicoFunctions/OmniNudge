@@ -46,7 +46,8 @@ export const messagesService = {
     return api.post<Message>('/messages', {
       conversation_id: conversationId,
       encrypted_content: data.content,
-      message_type: 'text',
+      message_type: data.media_file_id ? 'image' : 'text',
+      media_file_id: data.media_file_id,
       encryption_version: 'v1',
     });
   },

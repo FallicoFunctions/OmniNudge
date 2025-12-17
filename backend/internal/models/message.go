@@ -20,6 +20,7 @@ type Message struct {
 	ReadAt              *time.Time `json:"read_at,omitempty"`
 	DeletedForSender    bool       `json:"deleted_for_sender"`
 	DeletedForRecipient bool       `json:"deleted_for_recipient"`
+	MediaFileID         *int       `json:"media_file_id,omitempty"` // References media_files table
 	MediaURL            *string    `json:"media_url,omitempty"`
 	MediaType           *string    `json:"media_type,omitempty"`
 	MediaSize           *int       `json:"media_size,omitempty"`
@@ -47,9 +48,9 @@ func (r *MessageRepository) Create(ctx context.Context, message *Message) error 
 	query := `
 		INSERT INTO messages (
 			conversation_id, sender_id, recipient_id, encrypted_content,
-			message_type, media_url, media_type, media_size, encryption_version
+			message_type, media_file_id, media_url, media_type, media_size, encryption_version
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 		RETURNING id, sent_at
 	`
 
@@ -60,6 +61,7 @@ func (r *MessageRepository) Create(ctx context.Context, message *Message) error 
 		message.RecipientID,
 		message.EncryptedContent,
 		message.MessageType,
+		message.MediaFileID,
 		message.MediaURL,
 		message.MediaType,
 		message.MediaSize,
@@ -77,7 +79,7 @@ func (r *MessageRepository) GetByID(ctx context.Context, id int) (*Message, erro
 		SELECT id, conversation_id, sender_id, recipient_id, encrypted_content,
 		       message_type, sent_at, delivered_at, read_at,
 		       deleted_for_sender, deleted_for_recipient,
-		       media_url, media_type, media_size, encryption_version
+		       media_file_id, media_url, media_type, media_size, encryption_version
 		FROM messages
 		WHERE id = $1
 	`
@@ -94,6 +96,7 @@ func (r *MessageRepository) GetByID(ctx context.Context, id int) (*Message, erro
 		&message.ReadAt,
 		&message.DeletedForSender,
 		&message.DeletedForRecipient,
+		&message.MediaFileID,
 		&message.MediaURL,
 		&message.MediaType,
 		&message.MediaSize,
@@ -114,7 +117,7 @@ func (r *MessageRepository) GetByConversationID(ctx context.Context, conversatio
 		SELECT id, conversation_id, sender_id, recipient_id, encrypted_content,
 		       message_type, sent_at, delivered_at, read_at,
 		       deleted_for_sender, deleted_for_recipient,
-		       media_url, media_type, media_size, encryption_version
+		       media_file_id, media_url, media_type, media_size, encryption_version
 		FROM messages
 		WHERE conversation_id = $1
 		  AND (
@@ -146,6 +149,7 @@ func (r *MessageRepository) GetByConversationID(ctx context.Context, conversatio
 			&message.ReadAt,
 			&message.DeletedForSender,
 			&message.DeletedForRecipient,
+			&message.MediaFileID,
 			&message.MediaURL,
 			&message.MediaType,
 			&message.MediaSize,
@@ -280,7 +284,7 @@ func (r *MessageRepository) GetLatestMessage(ctx context.Context, conversationID
 		SELECT id, conversation_id, sender_id, recipient_id, encrypted_content,
 		       message_type, sent_at, delivered_at, read_at,
 		       deleted_for_sender, deleted_for_recipient,
-		       media_url, media_type, media_size, encryption_version
+		       media_file_id, media_url, media_type, media_size, encryption_version
 		FROM messages
 		WHERE conversation_id = $1
 		ORDER BY sent_at DESC
@@ -299,6 +303,7 @@ func (r *MessageRepository) GetLatestMessage(ctx context.Context, conversationID
 		&message.ReadAt,
 		&message.DeletedForSender,
 		&message.DeletedForRecipient,
+		&message.MediaFileID,
 		&message.MediaURL,
 		&message.MediaType,
 		&message.MediaSize,
