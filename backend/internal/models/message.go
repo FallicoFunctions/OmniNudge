@@ -76,12 +76,17 @@ func (r *MessageRepository) GetByID(ctx context.Context, id int) (*Message, erro
 	message := &Message{}
 
 	query := `
-		SELECT id, conversation_id, sender_id, recipient_id, encrypted_content,
-		       message_type, sent_at, delivered_at, read_at,
-		       deleted_for_sender, deleted_for_recipient,
-		       media_file_id, media_url, media_type, media_size, encryption_version
-		FROM messages
-		WHERE id = $1
+		SELECT m.id, m.conversation_id, m.sender_id, m.recipient_id, m.encrypted_content,
+		       m.message_type, m.sent_at, m.delivered_at, m.read_at,
+		       m.deleted_for_sender, m.deleted_for_recipient,
+		       m.media_file_id,
+		       COALESCE(mf.storage_url, m.media_url) as media_url,
+		       COALESCE(mf.file_type, m.media_type) as media_type,
+		       COALESCE(mf.file_size, m.media_size) as media_size,
+		       m.encryption_version
+		FROM messages m
+		LEFT JOIN media_files mf ON m.media_file_id = mf.id
+		WHERE m.id = $1
 	`
 
 	err := r.pool.QueryRow(ctx, query, id).Scan(
@@ -114,17 +119,22 @@ func (r *MessageRepository) GetByID(ctx context.Context, id int) (*Message, erro
 // Filters based on who is requesting (sender or recipient)
 func (r *MessageRepository) GetByConversationID(ctx context.Context, conversationID int, userID int, limit int, offset int) ([]*Message, error) {
 	query := `
-		SELECT id, conversation_id, sender_id, recipient_id, encrypted_content,
-		       message_type, sent_at, delivered_at, read_at,
-		       deleted_for_sender, deleted_for_recipient,
-		       media_file_id, media_url, media_type, media_size, encryption_version
-		FROM messages
-		WHERE conversation_id = $1
+		SELECT m.id, m.conversation_id, m.sender_id, m.recipient_id, m.encrypted_content,
+		       m.message_type, m.sent_at, m.delivered_at, m.read_at,
+		       m.deleted_for_sender, m.deleted_for_recipient,
+		       m.media_file_id,
+		       COALESCE(mf.storage_url, m.media_url) as media_url,
+		       COALESCE(mf.file_type, m.media_type) as media_type,
+		       COALESCE(mf.file_size, m.media_size) as media_size,
+		       m.encryption_version
+		FROM messages m
+		LEFT JOIN media_files mf ON m.media_file_id = mf.id
+		WHERE m.conversation_id = $1
 		  AND (
-		    (sender_id = $2 AND deleted_for_sender = false) OR
-		    (recipient_id = $2 AND deleted_for_recipient = false)
+		    (m.sender_id = $2 AND m.deleted_for_sender = false) OR
+		    (m.recipient_id = $2 AND m.deleted_for_recipient = false)
 		  )
-		ORDER BY sent_at DESC
+		ORDER BY m.sent_at DESC
 		LIMIT $3 OFFSET $4
 	`
 
@@ -281,13 +291,18 @@ func (r *MessageRepository) GetLatestMessage(ctx context.Context, conversationID
 	message := &Message{}
 
 	query := `
-		SELECT id, conversation_id, sender_id, recipient_id, encrypted_content,
-		       message_type, sent_at, delivered_at, read_at,
-		       deleted_for_sender, deleted_for_recipient,
-		       media_file_id, media_url, media_type, media_size, encryption_version
-		FROM messages
-		WHERE conversation_id = $1
-		ORDER BY sent_at DESC
+		SELECT m.id, m.conversation_id, m.sender_id, m.recipient_id, m.encrypted_content,
+		       m.message_type, m.sent_at, m.delivered_at, m.read_at,
+		       m.deleted_for_sender, m.deleted_for_recipient,
+		       m.media_file_id,
+		       COALESCE(mf.storage_url, m.media_url) as media_url,
+		       COALESCE(mf.file_type, m.media_type) as media_type,
+		       COALESCE(mf.file_size, m.media_size) as media_size,
+		       m.encryption_version
+		FROM messages m
+		LEFT JOIN media_files mf ON m.media_file_id = mf.id
+		WHERE m.conversation_id = $1
+		ORDER BY m.sent_at DESC
 		LIMIT 1
 	`
 

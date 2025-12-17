@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { messagesService } from '../services/messagesService';
+import { mediaService } from '../services/mediaService';
 import { useAuth } from '../contexts/AuthContext';
 import { useMessagingContext } from '../contexts/MessagingContext';
 import type { Conversation, Message, SendMessageRequest } from '../types/messages';
@@ -13,9 +14,12 @@ export default function MessagesPage() {
   const [messageText, setMessageText] = useState('');
   const [newChatUsername, setNewChatUsername] = useState('');
   const [isCreatingChat, setIsCreatingChat] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [uploadingMedia, setUploadingMedia] = useState(false);
   const queryClient = useQueryClient();
   const [searchParams] = useSearchParams();
   const toUsernameParam = searchParams.get('to');
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: conversations, isLoading: loadingConversations } = useQuery({
     queryKey: ['conversations'],
@@ -27,6 +31,10 @@ export default function MessagesPage() {
     queryFn: () => messagesService.getMessages(selectedConversationId!),
     enabled: !!selectedConversationId,
     refetchOnWindowFocus: false,
+  });
+
+  const uploadMediaMutation = useMutation({
+    mutationFn: (file: File) => mediaService.uploadMedia(file),
   });
 
   const sendMessageMutation = useMutation({
@@ -46,6 +54,7 @@ export default function MessagesPage() {
         );
       });
       setMessageText('');
+      setSelectedFile(null);
       if (!variables.conversation_id && variables.recipient_username) {
         setSelectedConversationId(message.conversation_id);
         setIsCreatingChat(false);
@@ -54,26 +63,62 @@ export default function MessagesPage() {
     },
   });
 
-  const handleSendMessage = (e: React.FormEvent) => {
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // Validate file type
+      const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'video/mp4', 'video/quicktime', 'video/webm'];
+      if (!validTypes.includes(file.type)) {
+        alert('Invalid file type. Please select an image or video.');
+        return;
+      }
+      // Validate file size (25MB)
+      if (file.size > 25 * 1024 * 1024) {
+        alert('File too large. Maximum size is 25MB.');
+        return;
+      }
+      setSelectedFile(file);
+    }
+  };
+
+  const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     const trimmedMessage = messageText.trim();
-    if (!trimmedMessage) return;
+    if (!trimmedMessage && !selectedFile) return;
 
-    if (isCreatingChat) {
-      const recipient = newChatUsername.trim();
-      if (!recipient) return;
-      sendMessageMutation.mutate({
-        recipient_username: recipient,
-        content: trimmedMessage,
-      });
-      return;
-    }
+    try {
+      let mediaFileId: number | undefined;
 
-    if (selectedConversationId) {
-      sendMessageMutation.mutate({
-        conversation_id: selectedConversationId,
-        content: trimmedMessage,
-      });
+      // Upload media first if selected
+      if (selectedFile) {
+        setUploadingMedia(true);
+        const uploadedMedia = await uploadMediaMutation.mutateAsync(selectedFile);
+        mediaFileId = uploadedMedia.id;
+        setUploadingMedia(false);
+      }
+
+      if (isCreatingChat) {
+        const recipient = newChatUsername.trim();
+        if (!recipient) return;
+        sendMessageMutation.mutate({
+          recipient_username: recipient,
+          content: trimmedMessage || '📎 Media',
+          media_file_id: mediaFileId,
+        });
+        return;
+      }
+
+      if (selectedConversationId) {
+        sendMessageMutation.mutate({
+          conversation_id: selectedConversationId,
+          content: trimmedMessage || '📎 Media',
+          media_file_id: mediaFileId,
+        });
+      }
+    } catch (error) {
+      setUploadingMedia(false);
+      console.error('Failed to send message:', error);
+      alert('Failed to upload media. Please try again.');
     }
   };
 
@@ -145,6 +190,7 @@ export default function MessagesPage() {
                 setSelectedConversationId(null);
                 setNewChatUsername('');
                 setMessageText('');
+                setSelectedFile(null);
               }}
               className="rounded-md bg-[var(--color-primary)] px-3 py-1 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)]"
             >
@@ -167,6 +213,7 @@ export default function MessagesPage() {
                 setSelectedConversationId(conversation.id);
                 setIsCreatingChat(false);
                 setNewChatUsername('');
+                setSelectedFile(null);
               }}
               className={`w-full border-b border-[var(--color-border)] p-4 text-left transition-colors ${
                 selectedConversationId === conversation.id
@@ -237,7 +284,27 @@ export default function MessagesPage() {
                             : 'bg-[var(--color-surface-elevated)] text-[var(--color-text-primary)]'
                         }`}
                       >
-                        <p className="text-sm">{message.encrypted_content}</p>
+                        {message.media_file_id && message.media_url && (
+                          <div className="mb-2">
+                            {message.message_type === 'image' ? (
+                              <img
+                                src={`http://localhost:8080${message.media_url}`}
+                                alt="Shared media"
+                                className="max-w-full rounded cursor-pointer"
+                                onClick={() => window.open(`http://localhost:8080${message.media_url}`, '_blank')}
+                              />
+                            ) : message.message_type === 'video' ? (
+                              <video
+                                src={`http://localhost:8080${message.media_url}`}
+                                controls
+                                className="max-w-full rounded"
+                              />
+                            ) : null}
+                          </div>
+                        )}
+                        {message.encrypted_content !== '📎 Media' && (
+                          <p className="text-sm">{message.encrypted_content}</p>
+                        )}
                         <span
                           className={`mt-1 block text-xs ${
                             message.sender_id === user?.id
@@ -272,7 +339,36 @@ export default function MessagesPage() {
                 />
               )}
 
+              {selectedFile && (
+                <div className="mb-2 flex items-center gap-2 rounded-md bg-[var(--color-surface-elevated)] p-2">
+                  <span className="text-sm text-[var(--color-text-secondary)]">
+                    📎 {selectedFile.name}
+                  </span>
+                  <button
+                    onClick={() => setSelectedFile(null)}
+                    className="ml-auto text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
+                  >
+                    ✕
+                  </button>
+                </div>
+              )}
+
               <form onSubmit={handleSendMessage} className="flex gap-2">
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={handleFileSelect}
+                  accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/quicktime,video/webm"
+                  className="hidden"
+                />
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-2 text-sm text-[var(--color-text-primary)] hover:bg-[var(--color-surface)]"
+                  title="Attach image or video"
+                >
+                  📎
+                </button>
                 <input
                   type="text"
                   value={messageText}
@@ -283,11 +379,11 @@ export default function MessagesPage() {
                 <button
                   type="submit"
                   disabled={
-                    sendMessageMutation.isPending || (isCreatingChat && !newChatUsername.trim())
+                    sendMessageMutation.isPending || uploadingMedia || (isCreatingChat && !newChatUsername.trim())
                   }
                   className="rounded-md bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)] disabled:opacity-50"
                 >
-                  Send
+                  {uploadingMedia ? 'Uploading...' : 'Send'}
                 </button>
               </form>
             </div>
