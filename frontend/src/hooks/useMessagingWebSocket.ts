@@ -25,14 +25,11 @@ export function useMessagingWebSocket(options: UseMessagingWebSocketOptions = {}
 
   // Use ref to avoid stale closure in WebSocket handler
   const activeConversationIdRef = useRef<number | null>(activeConversationId ?? null);
-
-  // DEBUG: Log when activeConversationId changes
-  console.log('[WebSocket Hook] activeConversationId changed:', activeConversationId);
+  const isCleanupRef = useRef<boolean>(false);
 
   // Update ref whenever activeConversationId changes
   useEffect(() => {
     activeConversationIdRef.current = activeConversationId ?? null;
-    console.log('[WebSocket Hook] Updated ref to:', activeConversationIdRef.current);
   }, [activeConversationId]);
 
   useEffect(() => {
@@ -42,6 +39,7 @@ export function useMessagingWebSocket(options: UseMessagingWebSocketOptions = {}
     if (!token) return;
 
     let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
+    isCleanupRef.current = false;
 
     const connect = () => {
       const url = new URL(API_BASE_URL);
@@ -58,13 +56,6 @@ export function useMessagingWebSocket(options: UseMessagingWebSocketOptions = {}
           if (data.type === 'new_message' && data.payload) {
             const payload = data.payload;
 
-            console.log('[WebSocket] New message received:', {
-              messageId: payload.id,
-              conversationId: payload.conversation_id,
-              senderId: payload.sender_id,
-              recipientId: payload.recipient_id,
-            });
-
             // Update messages cache if we have it loaded
             queryClient.setQueryData<Message[] | undefined>(
               ['messages', payload.conversation_id],
@@ -77,7 +68,11 @@ export function useMessagingWebSocket(options: UseMessagingWebSocketOptions = {}
 
             // Update conversations list - this is the key part for the notification count
             queryClient.setQueryData<Conversation[] | undefined>(['conversations'], (prev) => {
-              if (!prev) return prev;
+              if (!prev) {
+                // If no conversations cached, invalidate to fetch fresh data
+                queryClient.invalidateQueries({ queryKey: ['conversations'] });
+                return prev;
+              }
 
               return prev.map((conv) => {
                 if (conv.id !== payload.conversation_id) {
@@ -91,22 +86,11 @@ export function useMessagingWebSocket(options: UseMessagingWebSocketOptions = {}
                 const currentActiveConvId = activeConversationIdRef.current;
                 const isActiveConversation = currentActiveConvId === payload.conversation_id;
 
-                console.log('[WebSocket] Processing conversation update:', {
-                  conversationId: conv.id,
-                  currentUnreadCount: conv.unread_count,
-                  activeConversationId: currentActiveConvId,
-                  isActiveConversation,
-                  isRecipient,
-                  userId: user?.id,
-                });
-
                 // If viewing active conversation, always set unread to 0
                 // Otherwise, increment only if user is recipient
                 const nextUnread = isActiveConversation
                   ? 0
                   : (isRecipient ? conv.unread_count + 1 : conv.unread_count);
-
-                console.log('[WebSocket] Setting nextUnread to:', nextUnread);
 
                 return {
                   ...conv,
@@ -134,11 +118,16 @@ export function useMessagingWebSocket(options: UseMessagingWebSocketOptions = {}
       };
 
       socket.onclose = () => {
+        if (isCleanupRef.current) return;
         console.log('WebSocket closed, reconnecting in 5s...');
         reconnectTimer = setTimeout(connect, 5000);
       };
 
       socket.onerror = (error) => {
+        // Don't log errors if we're cleaning up or if socket is already closing/closed
+        if (isCleanupRef.current || socket.readyState === WebSocket.CLOSING || socket.readyState === WebSocket.CLOSED) {
+          return;
+        }
         console.error('WebSocket error:', error);
         socket.close();
       };
@@ -151,13 +140,14 @@ export function useMessagingWebSocket(options: UseMessagingWebSocketOptions = {}
     connect();
 
     return () => {
-      if (wsRef.current) {
-        wsRef.current.close();
-        wsRef.current = null;
-      }
+      isCleanupRef.current = true;
       if (reconnectTimer) {
         clearTimeout(reconnectTimer);
       }
+      if (wsRef.current && wsRef.current.readyState !== WebSocket.CLOSED) {
+        wsRef.current.close();
+      }
+      wsRef.current = null;
     };
   }, [user?.id, queryClient, onMessageReceived]); // Don't include activeConversationId - we use ref to avoid recreation
 
