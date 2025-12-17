@@ -23,7 +23,7 @@ export interface Message {
   sender_id: number;
   recipient_id: number;
   encrypted_content: string;
-  message_type: 'text' | 'image' | 'video' | 'audio';
+  message_type: 'text' | 'image' | 'video' | 'audio' | 'file';
   sent_at: string;
   delivered_at?: string;
   read_at?: string;
@@ -41,4 +41,8 @@ export interface SendMessageRequest {
   recipient_username?: string;
   content: string;
   media_file_id?: number;
+  message_type?: Message['message_type'];
+  media_url?: string;
+  media_type?: string;
+  media_size?: number;
 }

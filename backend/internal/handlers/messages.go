@@ -43,7 +43,7 @@ func NewMessagesHandler(
 type SendMessageRequest struct {
 	ConversationID    int     `json:"conversation_id" binding:"required"`
 	EncryptedContent  string  `json:"encrypted_content" binding:"required"` // Base64 encoded encrypted blob
-	MessageType       string  `json:"message_type" binding:"required"`      // "text", "image", "video", "audio"
+	MessageType       string  `json:"message_type" binding:"required"`      // "text", "image", "video", "audio", "file"
 	MediaFileID       *int    `json:"media_file_id,omitempty"`              // References media_files table
 	MediaURL          *string `json:"media_url,omitempty"`
 	MediaType         *string `json:"media_type,omitempty"`
@@ -67,9 +67,9 @@ func (h *MessagesHandler) SendMessage(c *gin.Context) {
 	}
 
 	// Validate message type
-	validTypes := map[string]bool{"text": true, "image": true, "video": true, "audio": true}
+	validTypes := map[string]bool{"text": true, "image": true, "video": true, "audio": true, "file": true}
 	if !validTypes[req.MessageType] {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid message type. Must be: text, image, video, or audio"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid message type. Must be: text, image, video, audio, or file"})
 		return
 	}
 
@@ -133,6 +133,12 @@ func (h *MessagesHandler) SendMessage(c *gin.Context) {
 	if err := h.messageRepo.Create(c.Request.Context(), message); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to send message", "details": err.Error()})
 		return
+	}
+
+	// Reload message to include joined media data (URLs, types, etc.)
+	fullMessage, err := h.messageRepo.GetByID(c.Request.Context(), message.ID)
+	if err == nil {
+		message = fullMessage
 	}
 
 	// Update conversation's last_message_at timestamp
