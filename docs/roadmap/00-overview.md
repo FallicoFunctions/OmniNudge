@@ -12,7 +12,7 @@
 1. [Vision & Goals](#vision--goals)
 2. [Core Value Proposition](#core-value-proposition)
 3. [The New Strategy](#the-new-strategy)
-4. [Five-Phase Roadmap](#five-phase-roadmap)
+4. [Six-Phase Roadmap](#six-phase-roadmap)
 5. [Technology Stack](#technology-stack)
 6. [Timeline Overview](#timeline-overview)
 7. [Cost Estimates](#cost-estimates)
@@ -143,7 +143,7 @@ To: "Social network with Reddit browsing + encrypted chat"
 
 ---
 
-## Five-Phase Roadmap
+## Six-Phase Roadmap
 
 ### Phase 1: Reddit Browser + Chat (Year 1)
 
@@ -255,6 +255,21 @@ To: "Social network with Reddit browsing + encrypted chat"
 **Note:** This is **opt-in** only. Users can remain fully anonymous.
 
 **Target:** 200,000+ active users, sustainable profitable business
+
+### Phase 6: Omni Email + Productivity Cloud (Year 6)
+
+**Goal:** Make OmniNudge the primary communications and productivity hub users rely on daily.
+
+**New Features:**
+- **Native Omni email service** that issues `username@omninudge.com` mailboxes while the long-term hosting/provider decision remains open.
+- **Bring-your-own email connectors** for Gmail, Outlook, custom IMAP/SMTP, etc. Users can both receive and send using any linked identity from a single composer.
+- **Unified inbox with Outlook-style folders** plus color labels, favorites, pinning, and deep search across all connected accounts.
+- **Unlimited custom rule engine** (filters, forwarding, auto-label, folder routing, reminders, snooze) so power users can automate every workflow.
+- **Productivity suite of first-party editors** (documents, spreadsheets, slide decks, diagrams) with import/export for CSV, Excel, PowerPoint, Visio/Lucidchart, and enhanced embeds from Google Workspace or Microsoft 365 files.
+- **Cross-platform integrations** so users can attach Google Drive, OneDrive, Dropbox, or other storage for seamless opening/saving beside native Omni files.
+- **Collaboration fundamentals**: multi-user editing, inline comments, presence indicators, granular version history, and offline-first clients that resync safely once connectivity returns.
+
+**Target:** Daily active users rely on OmniNudge email/productivity for personal and professional work, with at least 25% of total MAU linking an external email provider and 10% collaborating inside native editors every week.
 
 ---
 
