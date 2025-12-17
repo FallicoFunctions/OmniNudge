@@ -159,7 +159,7 @@ export function useMessagingWebSocket(options: UseMessagingWebSocketOptions = {}
         clearTimeout(reconnectTimer);
       }
     };
-  }, [user?.id, queryClient, activeConversationId, onMessageReceived]);
+  }, [user?.id, queryClient, onMessageReceived]); // Don't include activeConversationId - we use ref to avoid recreation
 
   return wsRef;
 }
