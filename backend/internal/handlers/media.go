@@ -18,16 +18,6 @@ const (
 	maxUploadSize = 25 * 1024 * 1024 // 25MB hard cap
 )
 
-var allowedContentTypes = map[string]bool{
-	"image/jpeg":       true,
-	"image/png":        true,
-	"image/webp":       true,
-	"image/gif":        true,
-	"video/mp4":        true,
-	"video/quicktime":  true,
-	"video/webm":       true,
-}
-
 // MediaHandler handles media uploads
 type MediaHandler struct {
 	mediaRepo        *models.MediaFileRepository
@@ -88,11 +78,7 @@ func (h *MediaHandler) UploadMedia(c *gin.Context) {
 	if detected := http.DetectContentType(sniff[:n]); detected != "" {
 		contentType = detected
 	}
-	if !allowedContentTypes[contentType] {
-		_ = os.Remove(storagePath)
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Unsupported file type", "content_type": contentType})
-		return
-	}
+	// Content type restriction removed - allow all file types
 
 	if n > 0 {
 		if _, err := dst.Write(sniff[:n]); err != nil {
