@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { messagesService } from '../services/messagesService';
@@ -78,7 +78,14 @@ export default function MessagesPage() {
   };
 
   const selectedConversation = conversations?.find((c) => c.id === selectedConversationId);
-  const orderedMessages = messages ? [...messages].reverse() : [];
+  const orderedMessages = useMemo(() => (messages ? [...messages].reverse() : []), [messages]);
+  const messagesContainerRef = useRef<HTMLDivElement | null>(null);
+  const scrollToLatestMessage = useCallback(() => {
+    const container = messagesContainerRef.current;
+    if (container) {
+      container.scrollTop = container.scrollHeight;
+    }
+  }, []);
 
   const markConversationAsRead = useCallback(
     async (conversationId: number) => {
@@ -121,6 +128,11 @@ export default function MessagesPage() {
       setNewChatUsername(toUsernameParam);
     }
   }, [toUsernameParam]);
+
+  useEffect(() => {
+    if (!selectedConversationId || isCreatingChat || loadingMessages) return;
+    scrollToLatestMessage();
+  }, [selectedConversationId, isCreatingChat, loadingMessages, scrollToLatestMessage, messages]);
 
   return (
     <div className="mx-auto flex h-[calc(100vh-8rem)] max-w-6xl gap-4 px-4 py-8">
@@ -204,7 +216,7 @@ export default function MessagesPage() {
             </div>
 
             {/* Messages */}
-            <div className="flex-1 overflow-y-auto p-4">
+            <div ref={messagesContainerRef} className="flex-1 overflow-y-auto p-4">
               {isCreatingChat ? (
                 <div className="text-center text-sm text-[var(--color-text-secondary)]">
                   Enter a username and message to start a conversation
