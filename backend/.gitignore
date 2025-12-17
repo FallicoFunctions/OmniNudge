@@ -37,3 +37,6 @@ go.work
 Thumbs.db
 .cache
 .gocache
+
+# Media files
+backend/uploads/
