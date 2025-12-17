@@ -29,6 +29,7 @@ export interface Message {
   read_at?: string;
   deleted_for_sender?: boolean;
   deleted_for_recipient?: boolean;
+  media_file_id?: number | null;
   media_url?: string | null;
   media_type?: string | null;
   media_size?: number | null;
@@ -39,4 +40,5 @@ export interface SendMessageRequest {
   conversation_id?: number;
   recipient_username?: string;
   content: string;
+  media_file_id?: number;
 }
