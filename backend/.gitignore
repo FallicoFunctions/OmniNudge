@@ -39,4 +39,4 @@ Thumbs.db
 .gocache
 
 # Media files
-backend/uploads/
+uploads/
