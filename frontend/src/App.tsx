@@ -30,44 +30,72 @@ function App() {
           <RedditBlockProvider>
             <MessagingProvider>
               <Routes>
-          {/* Auth routes - no layout */}
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/register" element={<RegisterPage />} />
+                {/* Auth routes - no layout */}
+                <Route path="/login" element={<LoginPage />} />
+                <Route path="/register" element={<RegisterPage />} />
 
-          {/* PUBLIC routes - accessible without auth */}
-          <Route element={<MainLayout />}>
-            <Route path="/" element={<HomePage />} />
-            <Route path="/r/:subreddit" element={<SubredditPage />} />
-            <Route path="/r/:subreddit/comments/:postId" element={<RedditPostWrapper />} />
-            <Route
-              path="/r/:subreddit/comments/:postId/:commentId"
-              element={<RedditPostWrapper />}
-            />
-            <Route path="/reddit/user/:username" element={<RedditUserPage />} />
-            <Route path="/h/:hubname" element={<HubPage />} />
-            <Route path="/posts/:postId" element={<PostDetailPage />} />
-            <Route path="/posts/:postId/comments/:commentId" element={<PostDetailPage />} />
-            <Route path="/users/:username" element={<UserProfilePage />} />
-          </Route>
+                {/* Main layout for public + protected pages */}
+                <Route element={<MainLayout />}>
+                  {/* PUBLIC routes - accessible without auth */}
+                  <Route path="/" element={<HomePage />} />
+                  <Route path="/r/:subreddit" element={<SubredditPage />} />
+                  <Route path="/r/:subreddit/comments/:postId" element={<RedditPostWrapper />} />
+                  <Route
+                    path="/r/:subreddit/comments/:postId/:commentId"
+                    element={<RedditPostWrapper />}
+                  />
+                  <Route path="/reddit/user/:username" element={<RedditUserPage />} />
+                  <Route path="/h/:hubname" element={<HubPage />} />
+                  <Route path="/posts/:postId" element={<PostDetailPage />} />
+                  <Route path="/posts/:postId/comments/:commentId" element={<PostDetailPage />} />
+                  <Route path="/users/:username" element={<UserProfilePage />} />
 
-          {/* PROTECTED routes - require auth */}
-          <Route
-            element={
-              <ProtectedRoute>
-                <MainLayout />
-              </ProtectedRoute>
-            }
-          >
-            <Route path="/posts/create" element={<CreatePostPage />} />
-            <Route path="/hubs/create" element={<CreateHubPage />} />
-            <Route path="/messages" element={<MessagesPage />} />
-            <Route path="/settings" element={<SettingsPage />} />
-            <Route path="/themes" element={<ThemesPage />} />
-          </Route>
+                  {/* PROTECTED routes - require auth */}
+                  <Route
+                    path="/posts/create"
+                    element={
+                      <ProtectedRoute>
+                        <CreatePostPage />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/hubs/create"
+                    element={
+                      <ProtectedRoute>
+                        <CreateHubPage />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/messages"
+                    element={
+                      <ProtectedRoute>
+                        <MessagesPage />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/settings"
+                    element={
+                      <ProtectedRoute>
+                        <SettingsPage />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/themes"
+                    element={
+                      <ProtectedRoute>
+                        <ThemesPage />
+                      </ProtectedRoute>
+                    }
+                  />
+                </Route>
 
-          {/* 404 */}
-          <Route path="/404" element={<NotFoundPage />} />
-          <Route path="*" element={<Navigate to="/404" replace />} />
+                {/* 404 */}
+                <Route path="/404" element={<NotFoundPage />} />
+                <Route path="*" element={<Navigate to="/404" replace />} />
               </Routes>
             </MessagingProvider>
           </RedditBlockProvider>

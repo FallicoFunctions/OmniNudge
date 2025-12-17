@@ -17,8 +17,6 @@ export default function MainLayout() {
   const location = useLocation();
   const queryClient = useQueryClient();
 
-  console.log('[MainLayout] activeConversationId from context:', activeConversationId);
-
   // Initialize WebSocket connection for real-time messaging
   useMessagingWebSocket({ activeConversationId });
 
