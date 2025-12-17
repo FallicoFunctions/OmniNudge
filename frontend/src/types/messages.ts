@@ -39,7 +39,7 @@ export interface Message {
 export interface SendMessageRequest {
   conversation_id?: number;
   recipient_username?: string;
-  content: string;
+  content?: string;
   media_file_id?: number;
   message_type?: Message['message_type'];
   media_url?: string;
