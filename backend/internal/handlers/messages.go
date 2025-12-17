@@ -44,6 +44,7 @@ type SendMessageRequest struct {
 	ConversationID    int     `json:"conversation_id" binding:"required"`
 	EncryptedContent  string  `json:"encrypted_content" binding:"required"` // Base64 encoded encrypted blob
 	MessageType       string  `json:"message_type" binding:"required"`      // "text", "image", "video", "audio"
+	MediaFileID       *int    `json:"media_file_id,omitempty"`              // References media_files table
 	MediaURL          *string `json:"media_url,omitempty"`
 	MediaType         *string `json:"media_type,omitempty"`
 	MediaSize         *int    `json:"media_size,omitempty"`
@@ -122,6 +123,7 @@ func (h *MessagesHandler) SendMessage(c *gin.Context) {
 		RecipientID:       recipientID,
 		EncryptedContent:  req.EncryptedContent,
 		MessageType:       req.MessageType,
+		MediaFileID:       req.MediaFileID,
 		MediaURL:          req.MediaURL,
 		MediaType:         req.MediaType,
 		MediaSize:         req.MediaSize,
