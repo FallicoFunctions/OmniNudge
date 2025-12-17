@@ -5,7 +5,98 @@ import { messagesService } from '../services/messagesService';
 import { mediaService } from '../services/mediaService';
 import { useAuth } from '../contexts/AuthContext';
 import { useMessagingContext } from '../contexts/MessagingContext';
-import type { Conversation, SendMessageRequest } from '../types/messages';
+import type { Conversation, Message, SendMessageRequest } from '../types/messages';
+import { API_BASE_URL } from '../lib/api';
+
+const MAX_UPLOAD_SIZE = 25 * 1024 * 1024; // 25MB
+
+function inferMessageTypeFromFile(file: File): Message['message_type'] {
+  if (file.type.startsWith('video/')) {
+    return 'video';
+  }
+  if (file.type.startsWith('image/')) {
+    return 'image';
+  }
+  if (file.type.startsWith('audio/')) {
+    return 'audio';
+  }
+  return 'file';
+}
+
+interface MessageMediaPreviewProps {
+  message: Message;
+}
+
+const API_ORIGIN = new URL(API_BASE_URL).origin;
+
+function inferMessageTypeFromMessage(message: Message): Message['message_type'] {
+  if (message.message_type && message.message_type !== 'text') {
+    return message.message_type;
+  }
+
+  const mime = message.media_type ?? '';
+  if (mime.startsWith('video/')) return 'video';
+  if (mime.startsWith('image/')) return 'image';
+  if (mime.startsWith('audio/')) return 'audio';
+  return 'file';
+}
+
+const MessageMediaPreview = ({ message }: MessageMediaPreviewProps) => {
+  const mediaSrc = message.media_url
+    ? message.media_url.startsWith('http')
+      ? message.media_url
+      : `${API_ORIGIN}${message.media_url.startsWith('/') ? '' : '/'}${message.media_url}`
+    : '';
+  const filename = message.media_url?.split('/').pop() ?? 'attachment';
+
+  const resolvedType = inferMessageTypeFromMessage(message);
+
+  if (resolvedType === 'image') {
+    return (
+      <div className="mb-2">
+        <img
+          src={mediaSrc}
+          alt="Shared media"
+          className="max-w-full rounded cursor-pointer"
+          onClick={() => window.open(mediaSrc, '_blank')}
+        />
+      </div>
+    );
+  }
+
+  if (resolvedType === 'video') {
+    return (
+      <div className="mb-2">
+        <video src={mediaSrc} controls className="max-w-full rounded" />
+      </div>
+    );
+  }
+
+  if (resolvedType === 'audio') {
+    return (
+      <div className="mb-2">
+        <audio controls className="w-full">
+          <source src={mediaSrc} type={message.media_type ?? 'audio/mpeg'} />
+          Your browser does not support the audio element.
+        </audio>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mb-2">
+      <a
+        href={mediaSrc}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="inline-flex items-center gap-1 text-sm underline hover:text-[var(--color-primary-light)]"
+        download={filename}
+      >
+        📎 {filename}
+      </a>
+    </div>
+  );
+};
 
 export default function MessagesPage() {
   const { user } = useAuth();
@@ -66,14 +157,7 @@ export default function MessagesPage() {
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      // Validate file type
-      const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'video/mp4', 'video/quicktime', 'video/webm'];
-      if (!validTypes.includes(file.type)) {
-        alert('Invalid file type. Please select an image or video.');
-        return;
-      }
-      // Validate file size (25MB)
-      if (file.size > 25 * 1024 * 1024) {
+      if (file.size > MAX_UPLOAD_SIZE) {
         alert('File too large. Maximum size is 25MB.');
         return;
       }
@@ -88,12 +172,32 @@ export default function MessagesPage() {
 
     try {
       let mediaFileId: number | undefined;
+      let mediaUrl: string | undefined;
+      let mediaMimeType: string | undefined;
+      let mediaSize: number | undefined;
+      let messageType: Message['message_type'] = 'text';
 
       // Upload media first if selected
       if (selectedFile) {
         setUploadingMedia(true);
         const uploadedMedia = await uploadMediaMutation.mutateAsync(selectedFile);
         mediaFileId = uploadedMedia.id;
+        if (uploadedMedia.storage_url) {
+          if (uploadedMedia.storage_url.startsWith('http')) {
+            const urlObj = new URL(uploadedMedia.storage_url);
+            mediaUrl = urlObj.pathname;
+          } else {
+            mediaUrl = uploadedMedia.storage_url.startsWith('/')
+              ? uploadedMedia.storage_url
+              : `/${uploadedMedia.storage_url}`;
+          }
+        } else if (uploadedMedia.storage_path) {
+          const normalizedPath = uploadedMedia.storage_path.replace(/^\/?uploads\/?/, '');
+          mediaUrl = `/uploads/${normalizedPath}`;
+        }
+        mediaMimeType = uploadedMedia.file_type;
+        mediaSize = uploadedMedia.file_size;
+        messageType = inferMessageTypeFromFile(selectedFile);
         setUploadingMedia(false);
       }
 
@@ -104,6 +208,10 @@ export default function MessagesPage() {
           recipient_username: recipient,
           content: trimmedMessage || '📎 Media',
           media_file_id: mediaFileId,
+          media_url: mediaUrl,
+          media_type: mediaMimeType,
+          media_size: mediaSize,
+          message_type: messageType,
         });
         return;
       }
@@ -113,6 +221,10 @@ export default function MessagesPage() {
           conversation_id: selectedConversationId,
           content: trimmedMessage || '📎 Media',
           media_file_id: mediaFileId,
+          media_url: mediaUrl,
+          media_type: mediaMimeType,
+          media_size: mediaSize,
+          message_type: messageType,
         });
       }
     } catch (error) {
@@ -284,23 +396,8 @@ export default function MessagesPage() {
                             : 'bg-[var(--color-surface-elevated)] text-[var(--color-text-primary)]'
                         }`}
                       >
-                        {message.media_file_id && message.media_url && (
-                          <div className="mb-2">
-                            {message.message_type === 'image' ? (
-                              <img
-                                src={`http://localhost:8080${message.media_url}`}
-                                alt="Shared media"
-                                className="max-w-full rounded cursor-pointer"
-                                onClick={() => window.open(`http://localhost:8080${message.media_url}`, '_blank')}
-                              />
-                            ) : message.message_type === 'video' ? (
-                              <video
-                                src={`http://localhost:8080${message.media_url}`}
-                                controls
-                                className="max-w-full rounded"
-                              />
-                            ) : null}
-                          </div>
+                        {message.media_url && (
+                          <MessageMediaPreview message={message} />
                         )}
                         {message.encrypted_content !== '📎 Media' && (
                           <p className="text-sm">{message.encrypted_content}</p>
@@ -358,14 +455,13 @@ export default function MessagesPage() {
                   type="file"
                   ref={fileInputRef}
                   onChange={handleFileSelect}
-                  accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/quicktime,video/webm"
                   className="hidden"
                 />
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
                   className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-2 text-sm text-[var(--color-text-primary)] hover:bg-[var(--color-surface)]"
-                  title="Attach image or video"
+                  title="Attach file"
                 >
                   📎
                 </button>

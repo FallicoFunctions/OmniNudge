@@ -42,12 +42,17 @@ export const messagesService = {
 
   async sendMessage(data: SendMessageRequest): Promise<Message> {
     const conversationId = await ensureConversationId(data);
+    const messageType =
+      data.message_type ?? (data.media_file_id ? ('image' as Message['message_type']) : 'text');
 
     return api.post<Message>('/messages', {
       conversation_id: conversationId,
       encrypted_content: data.content,
-      message_type: data.media_file_id ? 'image' : 'text',
+      message_type: messageType,
       media_file_id: data.media_file_id,
+      media_url: data.media_url,
+      media_type: data.media_type,
+      media_size: data.media_size,
       encryption_version: 'v1',
     });
   },
