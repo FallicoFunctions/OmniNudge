@@ -1,7 +1,9 @@
 package handlers
 
 import (
+	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/omninudge/backend/internal/models"
 	"github.com/omninudge/backend/internal/services"
@@ -185,4 +187,65 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		"token": token,
 		"user":  user,
 	})
+}
+
+// UpdatePublicKey handles updating user's public encryption key
+func (h *AuthHandler) UpdatePublicKey(c *gin.Context) {
+	// Get user ID from context
+	userID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
+
+	var req struct {
+		PublicKey string `json:"public_key" binding:"required"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body", "details": err.Error()})
+		return
+	}
+
+	// Update public key in database
+	if err := h.userRepo.UpdatePublicKey(c.Request.Context(), userID.(int), req.PublicKey); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update public key", "details": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Public key updated successfully"})
+}
+
+// GetPublicKeys handles fetching public keys for multiple users
+func (h *AuthHandler) GetPublicKeys(c *gin.Context) {
+	userIDsParam := c.Query("user_ids")
+	if userIDsParam == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "user_ids parameter is required"})
+		return
+	}
+
+	// Parse comma-separated user IDs
+	var userIDs []int
+	for _, idStr := range strings.Split(userIDsParam, ",") {
+		var id int
+		if _, err := fmt.Sscanf(idStr, "%d", &id); err == nil {
+			userIDs = append(userIDs, id)
+		}
+	}
+
+	if len(userIDs) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "No valid user IDs provided"})
+		return
+	}
+
+	// Fetch public keys for all users
+	publicKeys := make(map[int]string)
+	for _, userID := range userIDs {
+		user, err := h.userRepo.GetByID(c.Request.Context(), userID)
+		if err == nil && user != nil && user.PublicKey != nil {
+			publicKeys[userID] = *user.PublicKey
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{"public_keys": publicKeys})
 }
