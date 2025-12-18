@@ -172,27 +172,61 @@ function useDecryptedMedia(message: Message, isOwnMessage: boolean): string | nu
           return;
         }
 
-        const response = await fetch(originalUrl);
+        console.log('[Media Decryption] Starting decryption for:', originalUrl);
+        console.log('[Media Decryption] Attempting fetch...');
+
+        const token = localStorage.getItem('auth_token');
+        const response = await fetch(originalUrl, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+        console.log('[Media Decryption] Fetch response status:', response.status, response.statusText);
+
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+
         const encryptedData = await response.arrayBuffer();
+
+        console.log('[Media Decryption] Fetched encrypted data, size:', encryptedData.byteLength);
+
+        // Infer original MIME type from filename extension
+        const filename = message.media_url?.split('/').pop() ?? 'attachment';
+        const ext = filename.split('.').pop()?.toLowerCase();
+        let originalMimeType = 'application/octet-stream';
+
+        if (ext === 'jpg' || ext === 'jpeg') originalMimeType = 'image/jpeg';
+        else if (ext === 'png') originalMimeType = 'image/png';
+        else if (ext === 'gif') originalMimeType = 'image/gif';
+        else if (ext === 'webp') originalMimeType = 'image/webp';
+        else if (ext === 'mp4') originalMimeType = 'video/mp4';
+        else if (ext === 'webm') originalMimeType = 'video/webm';
+        else if (ext === 'mp3') originalMimeType = 'audio/mpeg';
+        else if (ext === 'wav') originalMimeType = 'audio/wav';
+        else if (ext === 'ogg') originalMimeType = 'audio/ogg';
+
+        console.log('[Media Decryption] Inferred MIME type from extension:', originalMimeType);
 
         const decryptedBlob = await decryptFile(
           {
             encryptedData,
             encryptedKey,
             iv: message.media_encryption_iv,
-            originalName: message.media_url?.split('/').pop() ?? 'attachment',
-            mimeType: message.media_type ?? 'application/octet-stream',
+            originalName: filename,
+            mimeType: originalMimeType,
           },
           keys.privateKey
         );
+
+        console.log('[Media Decryption] Decryption successful, blob size:', decryptedBlob.size);
 
         const blobUrl = URL.createObjectURL(decryptedBlob);
         cleanup = () => URL.revokeObjectURL(blobUrl);
         if (isMounted) {
           setMediaSrc(blobUrl);
         }
+        console.log('[Media Decryption] Blob URL created:', blobUrl.substring(0, 50));
       } catch (error) {
-        console.error('Failed to decrypt media file:', error);
+        console.error('[Media Decryption] Failed to decrypt media file:', error);
         if (isMounted) {
           setMediaSrc(originalUrl);
         }
@@ -483,7 +517,7 @@ export default function MessagesPage() {
           const normalizedPath = uploadedMedia.storage_path.replace(/^\/?uploads\/?/, '');
           mediaUrl = `/uploads/${normalizedPath}`;
         }
-        mediaMimeType = uploadedMedia.file_type;
+        mediaMimeType = selectedFile.type || uploadedMedia.file_type;
         mediaSize = uploadedMedia.file_size;
         messageType = inferMessageTypeFromFile(selectedFile);
         setUploadingMedia(false);

@@ -146,10 +146,12 @@ func main() {
 
 	// Setup Gin router
 	router := gin.Default()
-	router.Static("/uploads", "./uploads")
 
-	// Apply CORS middleware
+	// Apply CORS middleware BEFORE static files
 	router.Use(middleware.CORS())
+
+	// Serve static files with CORS headers
+	router.Static("/uploads", "./uploads")
 
 	// Health check endpoint
 	router.GET("/health", func(c *gin.Context) {
