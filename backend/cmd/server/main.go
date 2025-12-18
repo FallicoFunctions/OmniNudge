@@ -288,6 +288,8 @@ func main() {
 		{
 			protected.GET("/auth/me", authHandler.GetMe)
 			protected.POST("/auth/logout", authHandler.Logout)
+			protected.PUT("/auth/public-key", authHandler.UpdatePublicKey)
+			protected.GET("/auth/public-keys", authHandler.GetPublicKeys)
 
 			protected.GET("/settings", settingsHandler.GetSettings)
 			protected.PUT("/settings", settingsHandler.UpdateSettings)
