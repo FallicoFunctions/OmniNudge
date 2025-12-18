@@ -91,6 +91,12 @@ export default function MainLayout() {
                       </span>
                     )}
                   </Link>
+                  <Link
+                    to="/hubs/create"
+                    className="rounded-md px-3 py-2 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
+                  >
+                    Create Hub
+                  </Link>
                 </div>
               )}
             </div>
