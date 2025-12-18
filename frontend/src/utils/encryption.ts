@@ -142,7 +142,7 @@ export async function decryptMessage(
 /**
  * Helper: Convert ArrayBuffer to Base64
  */
-function arrayBufferToBase64(buffer: ArrayBuffer): string {
+export function arrayBufferToBase64(buffer: ArrayBuffer): string {
   const bytes = new Uint8Array(buffer);
   let binary = '';
   for (let i = 0; i < bytes.byteLength; i++) {
@@ -154,7 +154,7 @@ function arrayBufferToBase64(buffer: ArrayBuffer): string {
 /**
  * Helper: Convert Base64 to ArrayBuffer
  */
-function base64ToArrayBuffer(base64: string): ArrayBuffer {
+export function base64ToArrayBuffer(base64: string): ArrayBuffer {
   const binary = window.atob(base64);
   const bytes = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i++) {
@@ -166,10 +166,10 @@ function base64ToArrayBuffer(base64: string): ArrayBuffer {
 /**
  * Encrypted file metadata
  */
-export interface EncryptedFile {
+export interface EncryptedFilePayload {
   encryptedData: ArrayBuffer; // AES-encrypted file data
-  encryptedKey: string; // RSA-encrypted AES key (Base64)
-  iv: string; // Initialization vector (Base64)
+  rawKey: ArrayBuffer; // Raw AES key material
+  iv: Uint8Array; // Initialization vector bytes
   originalName: string;
   mimeType: string;
 }
@@ -180,10 +180,7 @@ export interface EncryptedFile {
  * 2. Encrypt file with AES-GCM
  * 3. Encrypt AES key with recipient's RSA public key
  */
-export async function encryptFile(
-  file: File,
-  recipientPublicKey: CryptoKey
-): Promise<EncryptedFile> {
+export async function encryptFile(file: File): Promise<EncryptedFilePayload> {
   // Read file as ArrayBuffer
   const fileData = await file.arrayBuffer();
 
@@ -213,22 +210,28 @@ export async function encryptFile(
   // Export AES key to encrypt it with RSA
   const aesKeyBuffer = await window.crypto.subtle.exportKey('raw', aesKey);
 
-  // Encrypt AES key with recipient's RSA public key
+  return {
+    encryptedData,
+    rawKey: aesKeyBuffer,
+    iv,
+    originalName: file.name,
+    mimeType: file.type,
+  };
+}
+
+export async function encryptKeyWithPublicKey(
+  rawKey: ArrayBuffer,
+  publicKey: CryptoKey
+): Promise<string> {
   const encryptedKeyBuffer = await window.crypto.subtle.encrypt(
     {
       name: 'RSA-OAEP',
     },
-    recipientPublicKey,
-    aesKeyBuffer
+    publicKey,
+    rawKey
   );
 
-  return {
-    encryptedData,
-    encryptedKey: arrayBufferToBase64(encryptedKeyBuffer),
-    iv: arrayBufferToBase64(iv.buffer),
-    originalName: file.name,
-    mimeType: file.type,
-  };
+  return arrayBufferToBase64(encryptedKeyBuffer);
 }
 
 /**
@@ -237,7 +240,13 @@ export async function encryptFile(
  * 2. Decrypt file data using AES key
  */
 export async function decryptFile(
-  encryptedFile: EncryptedFile,
+  encryptedFile: {
+    encryptedData: ArrayBuffer;
+    encryptedKey: string;
+    iv: string;
+    originalName: string;
+    mimeType: string;
+  },
   privateKey: CryptoKey
 ): Promise<Blob> {
   // Decrypt AES key with RSA private key
