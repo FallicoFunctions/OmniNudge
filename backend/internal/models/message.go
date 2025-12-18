@@ -284,6 +284,18 @@ func (r *MessageRepository) SoftDeleteForUser(ctx context.Context, messageID int
 	return err
 }
 
+// SoftDeleteForBoth marks a message as deleted for both sender and recipient
+func (r *MessageRepository) SoftDeleteForBoth(ctx context.Context, messageID int) error {
+	query := `
+		UPDATE messages
+		SET deleted_for_sender = true,
+		    deleted_for_recipient = true
+		WHERE id = $1
+	`
+	_, err := r.pool.Exec(ctx, query, messageID)
+	return err
+}
+
 // HardDelete permanently deletes a message if both users have soft deleted it
 func (r *MessageRepository) HardDelete(ctx context.Context, messageID int) error {
 	query := `

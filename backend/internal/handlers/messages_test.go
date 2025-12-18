@@ -11,10 +11,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gin-gonic/gin"
 	"github.com/omninudge/backend/internal/database"
 	"github.com/omninudge/backend/internal/models"
 	"github.com/omninudge/backend/internal/websocket"
-	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -494,6 +494,71 @@ func TestDeleteMessage_NotParticipant(t *testing.T) {
 	})
 
 	req := httptest.NewRequest("DELETE", fmt.Sprintf("/messages/%d", msg.ID), nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusForbidden, w.Code)
+}
+
+func TestDeleteMessage_DeleteForBothAsSender(t *testing.T) {
+	handler, db, user1ID, user2ID, convID, _, cleanup := setupMessagesHandlerTest(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	messageRepo := models.NewMessageRepository(db.Pool)
+	msg := &models.Message{
+		ConversationID:    convID,
+		SenderID:          user1ID,
+		RecipientID:       user2ID,
+		EncryptedContent:  "test message",
+		MessageType:       "text",
+		EncryptionVersion: "v1",
+	}
+	err := messageRepo.Create(ctx, msg)
+	require.NoError(t, err)
+
+	router := gin.Default()
+	router.DELETE("/messages/:id", func(c *gin.Context) {
+		c.Set("user_id", user1ID)
+		handler.DeleteMessage(c)
+	})
+
+	req := httptest.NewRequest("DELETE", fmt.Sprintf("/messages/%d?delete_for=both", msg.ID), nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	var exists bool
+	err = db.Pool.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM messages WHERE id = $1)", msg.ID).Scan(&exists)
+	require.NoError(t, err)
+	assert.False(t, exists, "message should be hard deleted when both parties delete")
+}
+
+func TestDeleteMessage_DeleteForBothAsRecipient(t *testing.T) {
+	handler, db, user1ID, user2ID, convID, _, cleanup := setupMessagesHandlerTest(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	messageRepo := models.NewMessageRepository(db.Pool)
+	msg := &models.Message{
+		ConversationID:    convID,
+		SenderID:          user1ID,
+		RecipientID:       user2ID,
+		EncryptedContent:  "test message",
+		MessageType:       "text",
+		EncryptionVersion: "v1",
+	}
+	err := messageRepo.Create(ctx, msg)
+	require.NoError(t, err)
+
+	router := gin.Default()
+	router.DELETE("/messages/:id", func(c *gin.Context) {
+		c.Set("user_id", user2ID)
+		handler.DeleteMessage(c)
+	})
+
+	req := httptest.NewRequest("DELETE", fmt.Sprintf("/messages/%d?delete_for=both", msg.ID), nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 

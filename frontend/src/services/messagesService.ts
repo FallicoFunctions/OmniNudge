@@ -126,4 +126,13 @@ export const messagesService = {
   async markAsRead(conversationId: number): Promise<void> {
     await api.post(`/conversations/${conversationId}/read`, {});
   },
+
+  async deleteMessage(
+    messageId: number,
+    options?: { deleteFor?: 'self' | 'both' }
+  ): Promise<void> {
+    const scope = options?.deleteFor && options.deleteFor !== 'self' ? options.deleteFor : undefined;
+    const query = scope ? `?delete_for=${scope}` : '';
+    await api.delete(`/messages/${messageId}${query}`);
+  },
 };
