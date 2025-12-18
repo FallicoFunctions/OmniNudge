@@ -9,7 +9,6 @@ import {
   importKeyPair,
   importPublicKey,
   type KeyPair,
-  type ExportedKeyPair,
 } from '../utils/encryption';
 
 const PRIVATE_KEY_STORAGE_KEY = 'omninudge_private_key';
@@ -87,7 +86,7 @@ export async function getUserPublicKey(
   userId: number,
   publicKeyBase64?: string
 ): Promise<CryptoKey | null> {
-  let keyBase64 = publicKeyBase64;
+  let keyBase64: string | null = publicKeyBase64 ?? null;
 
   if (!keyBase64) {
     keyBase64 = getCachedPublicKeyBase64(userId);

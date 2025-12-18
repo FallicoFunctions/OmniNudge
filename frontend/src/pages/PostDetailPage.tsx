@@ -7,7 +7,7 @@ import { postsService } from '../services/postsService';
 import { savedService } from '../services/savedService';
 import { api } from '../lib/api';
 import type { PlatformPost, PostComment } from '../types/posts';
-import type { HiddenItemsResponse, SavedItemsResponse } from '../types/saved';
+import type { SavedItemsResponse } from '../types/saved';
 import { CommentItem } from '../components/comments/CommentItem';
 import type { CommentActionHandlers } from '../components/comments/CommentItem';
 import { MarkdownRenderer } from '../components/common/MarkdownRenderer';

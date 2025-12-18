@@ -482,7 +482,8 @@ export default function MessagesPage() {
                 // Encrypt the file
                 console.log('[Media Encryption] Encrypting file...');
                 const encryptedFile = await encryptFile(selectedFile);
-                const ivBase64 = arrayBufferToBase64(encryptedFile.iv.buffer);
+                const ivCopy = encryptedFile.iv.slice();
+                const ivBase64 = arrayBufferToBase64(ivCopy.buffer);
                 const encryptedKeyForRecipient = await encryptKeyWithPublicKey(
                   encryptedFile.rawKey,
                   recipientPublicKey
