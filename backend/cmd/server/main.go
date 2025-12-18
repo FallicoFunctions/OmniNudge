@@ -122,7 +122,7 @@ func main() {
 	cssSanitizer := services.NewCSSSanitizer()
 
 	messagesHandler := handlers.NewMessagesHandler(db.Pool, messageRepo, conversationRepo, hub)
-	usersHandler := handlers.NewUsersHandler(userRepo, postRepo, commentRepo, authService)
+	usersHandler := handlers.NewUsersHandler(userRepo, postRepo, commentRepo, authService, hubModRepo)
 	mediaHandler := handlers.NewMediaHandler(mediaRepo, thumbnailService)
 	hubsHandler := handlers.NewHubsHandler(hubRepo, postRepo, hubModRepo, hubSubRepo)
 	subscriptionsHandler := handlers.NewSubscriptionsHandler(hubSubRepo, subredditSubRepo, hubRepo)

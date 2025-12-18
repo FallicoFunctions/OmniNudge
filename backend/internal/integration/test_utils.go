@@ -7,6 +7,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/gin-gonic/gin"
 	"github.com/omninudge/backend/internal/api/middleware"
 	"github.com/omninudge/backend/internal/config"
 	"github.com/omninudge/backend/internal/database"
@@ -15,7 +16,6 @@ import (
 	"github.com/omninudge/backend/internal/services"
 	"github.com/omninudge/backend/internal/utils"
 	"github.com/omninudge/backend/internal/websocket"
-	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
 )
 
@@ -114,7 +114,7 @@ func newTestDeps(t *testing.T) *TestDeps {
 	redditHandler := handlers.NewRedditHandler(services.NewRedditClient(cfg.Reddit.UserAgent, services.NoopCache{}, 0), redditPostRepo)
 	conversationsHandler := handlers.NewConversationsHandler(conversationRepo, messageRepo, userRepo)
 	messagesHandler := handlers.NewMessagesHandler(db.Pool, messageRepo, conversationRepo, hub)
-	usersHandler := handlers.NewUsersHandler(userRepo, postRepo, commentRepo, nil)
+	usersHandler := handlers.NewUsersHandler(userRepo, postRepo, commentRepo, nil, modRepo)
 	thumbnailService := services.NewThumbnailService()
 	mediaHandler := handlers.NewMediaHandler(models.NewMediaFileRepository(db.Pool), thumbnailService)
 	hubSubRepo := models.NewHubSubscriptionRepository(db.Pool)

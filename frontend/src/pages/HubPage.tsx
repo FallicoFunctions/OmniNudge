@@ -1,7 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useNavigate, useParams } from 'react-router-dom';
-import { hubsService, type HubPostsResponse, type LocalSubredditPost } from '../services/hubsService';
+import { Link, useNavigate, useParams } from 'react-router-dom';
+import {
+  hubsService,
+  type Hub,
+  type HubPostsResponse,
+  type LocalSubredditPost,
+} from '../services/hubsService';
 import { subscriptionService } from '../services/subscriptionService';
 import { useAuth } from '../contexts/AuthContext';
 import { SubscribeButton } from '../components/common/SubscribeButton';
@@ -124,6 +129,19 @@ export default function HubsPage() {
     // Accept popular/all as valid hub names
     setHubname(routeHubname);
   }, [routeHubname]);
+
+  const showHubSidebar = hubname !== 'popular' && hubname !== 'all';
+
+  const {
+    data: hubDetails,
+    isLoading: loadingHubDetails,
+    isError: hubDetailsError,
+  } = useQuery<Hub>({
+    queryKey: ['hub-details', hubname],
+    queryFn: () => hubsService.getHub(hubname),
+    enabled: showHubSidebar && !!hubname,
+    staleTime: 1000 * 60 * 5,
+  });
 
   // Fetch posts based on current hub
   const postsQueryKey = ['hub-posts', hubname, sort, timeRangeKey] as const;
@@ -378,112 +396,200 @@ export default function HubsPage() {
         </div>
       </div>
 
-      {/* Sort Controls */}
-      <div className="mb-2 flex gap-2">
-        {(['hot', 'new', 'top', 'rising'] as const).map((sortOption) => (
-          <button
-            key={sortOption}
-            onClick={() => handleSortChange(sortOption)}
-            className={`px-3 py-1 rounded ${
-              sort === sortOption
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-            }`}
-          >
-            {sortOption.charAt(0).toUpperCase() + sortOption.slice(1)}
-          </button>
-        ))}
-      </div>
-      {isTopSort && (
-        <div className="mb-4 space-y-2">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
-              Time range
-            </span>
-            <select
-              value={topTimeRange}
-              onChange={(event) => setTopTimeRange(event.target.value as TopTimeRange)}
-              className="rounded border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-1 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
-            >
-              {TOP_TIME_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
+      <div className="mt-4 grid gap-6 lg:grid-cols-[minmax(0,1fr)_300px]">
+        <div>
+          {/* Sort Controls */}
+          <div className="mb-2 flex gap-2">
+            {(['hot', 'new', 'top', 'rising'] as const).map((sortOption) => (
+              <button
+                key={sortOption}
+                onClick={() => handleSortChange(sortOption)}
+                className={`px-3 py-1 rounded ${
+                  sort === sortOption
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                }`}
+              >
+                {sortOption.charAt(0).toUpperCase() + sortOption.slice(1)}
+              </button>
+            ))}
           </div>
-          {topTimeRange === 'custom' && (
-            <div className="flex flex-wrap items-center gap-2 pl-1">
-              <input
-                type="datetime-local"
-                value={customTopStart}
-                onChange={(event) => setCustomTopStart(event.target.value)}
-                className="rounded border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-2 py-1 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
-              />
-              <span className="text-xs text-[var(--color-text-secondary)]">to</span>
-              <input
-                type="datetime-local"
-                value={customTopEnd}
-                onChange={(event) => setCustomTopEnd(event.target.value)}
-                className="rounded border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-2 py-1 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
-              />
-              {!isCustomRangeValid && (
-                <span className="text-xs text-[var(--color-error)]">
-                  Select both start and end dates to apply this filter.
+          {isTopSort && (
+            <div className="mb-4 space-y-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
+                  Time range
                 </span>
+                <select
+                  value={topTimeRange}
+                  onChange={(event) => setTopTimeRange(event.target.value as TopTimeRange)}
+                  className="rounded border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-1 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
+                >
+                  {TOP_TIME_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              {topTimeRange === 'custom' && (
+                <div className="flex flex-wrap items-center gap-2 pl-1">
+                  <input
+                    type="datetime-local"
+                    value={customTopStart}
+                    onChange={(event) => setCustomTopStart(event.target.value)}
+                    className="rounded border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-2 py-1 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
+                  />
+                  <span className="text-xs text-[var(--color-text-secondary)]">to</span>
+                  <input
+                    type="datetime-local"
+                    value={customTopEnd}
+                    onChange={(event) => setCustomTopEnd(event.target.value)}
+                    className="rounded border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-2 py-1 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
+                  />
+                  {!isCustomRangeValid && (
+                    <span className="text-xs text-[var(--color-error)]">
+                      Select both start and end dates to apply this filter.
+                    </span>
+                  )}
+                </div>
               )}
             </div>
           )}
-        </div>
-      )}
 
-      {/* Posts List */}
-      <div className="space-y-3">
-        {visiblePosts.length > 0 ? (
-          visiblePosts.map((post: LocalSubredditPost) => {
-            const isSaved = savedPostIds.has(post.id);
-            const isSavePending =
-              savedToggleMutation.isPending && savedToggleMutation.variables?.postId === post.id;
-            const isHiding = hidePostMutation.isPending && hidePostMutation.variables === post.id;
-            const isDeleting =
-              deletePostMutation.isPending && deletePostMutation.variables === post.id;
-            const normalizedPost: PlatformPost = {
-              ...post,
-              author_username:
-                post.author_username ??
-                post.author?.username ??
-                (post.author_id === user?.id ? user?.username ?? 'You' : 'Unknown'),
-              hub_name:
-                post.hub_name ??
-                post.hub?.name ??
-                hubNameMap.get(post.hub_id) ??
-                (hubname !== 'popular' && hubname !== 'all' ? hubname : 'unknown'),
-            };
+          {/* Posts List */}
+          <div className="space-y-3">
+            {visiblePosts.length > 0 ? (
+              visiblePosts.map((post: LocalSubredditPost) => {
+                const isSaved = savedPostIds.has(post.id);
+                const isSavePending =
+                  savedToggleMutation.isPending && savedToggleMutation.variables?.postId === post.id;
+                const isHiding = hidePostMutation.isPending && hidePostMutation.variables === post.id;
+                const isDeleting =
+                  deletePostMutation.isPending && deletePostMutation.variables === post.id;
+                const normalizedPost: PlatformPost = {
+                  ...post,
+                  author_username:
+                    post.author_username ??
+                    post.author?.username ??
+                    (post.author_id === user?.id ? user?.username ?? 'You' : 'Unknown'),
+                  hub_name:
+                    post.hub_name ??
+                    post.hub?.name ??
+                    hubNameMap.get(post.hub_id) ??
+                    (hubname !== 'popular' && hubname !== 'all' ? hubname : 'unknown'),
+                };
 
-            return (
-              <HubPostCard
-                key={post.id}
-                post={normalizedPost}
-                useRelativeTime={useRelativeTime}
-                currentUserId={user?.id}
-                hubNameMap={hubNameMap}
-                currentHubName={hubname}
-                isSaved={isSaved}
-                isSavePending={isSavePending}
-                isHiding={isHiding}
-                isDeleting={isDeleting}
-                onShare={() => handleSharePost(post.id)}
-                onToggleSave={(shouldSave) => handleToggleSavePost(post.id, !shouldSave)}
-                onHide={() => handleHidePost(post.id)}
-                onCrosspost={() => handleCrosspostSelection(post)}
-                onDelete={() => handleDeletePost(post.id)}
-              />
-            );
-          })
-        ) : (
-          <div className="text-center py-12 text-gray-500">
-            No posts found in this hub
+                return (
+                  <HubPostCard
+                    key={post.id}
+                    post={normalizedPost}
+                    useRelativeTime={useRelativeTime}
+                    currentUserId={user?.id}
+                    hubNameMap={hubNameMap}
+                    currentHubName={hubname}
+                    isSaved={isSaved}
+                    isSavePending={isSavePending}
+                    isHiding={isHiding}
+                    isDeleting={isDeleting}
+                    onShare={() => handleSharePost(post.id)}
+                    onToggleSave={(shouldSave) => handleToggleSavePost(post.id, !shouldSave)}
+                    onHide={() => handleHidePost(post.id)}
+                    onCrosspost={() => handleCrosspostSelection(post)}
+                    onDelete={() => handleDeletePost(post.id)}
+                  />
+                );
+              })
+            ) : (
+              <div className="py-12 text-center text-gray-500">No posts found in this hub</div>
+            )}
           </div>
+        </div>
+
+        {showHubSidebar && (
+          <aside className="space-y-4">
+            <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
+              <h3 className="text-sm font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
+                About this hub
+              </h3>
+              {loadingHubDetails ? (
+                <p className="mt-3 text-sm text-[var(--color-text-secondary)]">Loading details…</p>
+              ) : hubDetailsError ? (
+                <p className="mt-3 text-sm text-[var(--color-text-secondary)]">
+                  Unable to load hub details.
+                </p>
+              ) : hubDetails ? (
+                <>
+                  {hubDetails.description ? (
+                    <p className="mt-3 text-sm text-[var(--color-text-primary)] whitespace-pre-line">
+                      {hubDetails.description}
+                    </p>
+                  ) : (
+                    <p className="mt-3 text-sm text-[var(--color-text-secondary)]">
+                      No description has been added yet.
+                    </p>
+                  )}
+                  {hubDetails.title && (
+                    <p className="mt-3 text-xs text-[var(--color-text-secondary)]">
+                      Display title: {hubDetails.title}
+                    </p>
+                  )}
+                </>
+              ) : (
+                <p className="mt-3 text-sm text-[var(--color-text-secondary)]">
+                  Hub details unavailable.
+                </p>
+              )}
+            </div>
+
+            <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
+                  Moderators
+                </h3>
+                {hubDetails?.moderators && hubDetails.moderators.length > 0 && (
+                  <span className="text-xs text-[var(--color-text-secondary)]">
+                    {hubDetails.moderators.length}
+                  </span>
+                )}
+              </div>
+              {loadingHubDetails ? (
+                <p className="mt-3 text-sm text-[var(--color-text-secondary)]">Loading moderators…</p>
+              ) : hubDetailsError ? (
+                <p className="mt-3 text-sm text-[var(--color-text-secondary)]">
+                  Unable to load moderators.
+                </p>
+              ) : hubDetails?.moderators && hubDetails.moderators.length > 0 ? (
+                <ul className="mt-3 space-y-2">
+                  {hubDetails.moderators.map((moderator) => (
+                    <li key={moderator.id} className="flex items-center gap-3">
+                      {moderator.avatar_url ? (
+                        <img
+                          src={moderator.avatar_url}
+                          alt={moderator.username}
+                          className="h-8 w-8 rounded-full object-cover"
+                        />
+                      ) : (
+                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--color-border)] text-sm font-semibold text-[var(--color-text-secondary)]">
+                          {moderator.username.charAt(0).toUpperCase()}
+                        </div>
+                      )}
+                      <Link
+                        to={`/users/${moderator.username}`}
+                        className="text-sm font-medium text-[var(--color-text-primary)] hover:text-[var(--color-primary)]"
+                      >
+                        {moderator.username}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="mt-3 text-sm text-[var(--color-text-secondary)]">
+                  No moderators listed yet.
+                </p>
+              )}
+            </div>
+          </aside>
         )}
       </div>
 
