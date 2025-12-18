@@ -9,24 +9,26 @@ import (
 
 // Message represents an encrypted message in a conversation
 type Message struct {
-	ID                   int        `json:"id"`
-	ConversationID       int        `json:"conversation_id"`
-	SenderID             int        `json:"sender_id"`
-	RecipientID          int        `json:"recipient_id"`
-	EncryptedContent     string     `json:"encrypted_content"` // Base64 encoded encrypted blob
-	MessageType          string     `json:"message_type"`      // "text", "image", "video", "audio"
-	SentAt               time.Time  `json:"sent_at"`
-	DeliveredAt          *time.Time `json:"delivered_at,omitempty"`
-	ReadAt               *time.Time `json:"read_at,omitempty"`
-	DeletedForSender     bool       `json:"deleted_for_sender"`
-	DeletedForRecipient  bool       `json:"deleted_for_recipient"`
-	MediaFileID          *int       `json:"media_file_id,omitempty"` // References media_files table
-	MediaURL             *string    `json:"media_url,omitempty"`
-	MediaType            *string    `json:"media_type,omitempty"`
-	MediaSize            *int       `json:"media_size,omitempty"`
-	EncryptionVersion    string     `json:"encryption_version"`    // For future encryption updates, e.g., "v1"
-	MediaEncryptionKey   *string    `json:"media_encryption_key,omitempty"`   // RSA-encrypted AES key (Base64)
-	MediaEncryptionIV    *string    `json:"media_encryption_iv,omitempty"`    // AES-GCM initialization vector (Base64)
+	ID                       int        `json:"id"`
+	ConversationID           int        `json:"conversation_id"`
+	SenderID                 int        `json:"sender_id"`
+	RecipientID              int        `json:"recipient_id"`
+	EncryptedContent         string     `json:"encrypted_content"` // Base64 encoded encrypted blob (recipient copy or plaintext)
+	SenderEncryptedContent   *string    `json:"sender_encrypted_content,omitempty"`
+	MessageType              string     `json:"message_type"` // "text", "image", "video", "audio"
+	SentAt                   time.Time  `json:"sent_at"`
+	DeliveredAt              *time.Time `json:"delivered_at,omitempty"`
+	ReadAt                   *time.Time `json:"read_at,omitempty"`
+	DeletedForSender         bool       `json:"deleted_for_sender"`
+	DeletedForRecipient      bool       `json:"deleted_for_recipient"`
+	MediaFileID              *int       `json:"media_file_id,omitempty"` // References media_files table
+	MediaURL                 *string    `json:"media_url,omitempty"`
+	MediaType                *string    `json:"media_type,omitempty"`
+	MediaSize                *int       `json:"media_size,omitempty"`
+	EncryptionVersion        string     `json:"encryption_version"`             // For future encryption updates, e.g., "v1"
+	MediaEncryptionKey       *string    `json:"media_encryption_key,omitempty"` // RSA-encrypted AES key (Base64) for recipient
+	MediaEncryptionIV        *string    `json:"media_encryption_iv,omitempty"`  // AES-GCM initialization vector (Base64)
+	SenderMediaEncryptionKey *string    `json:"sender_media_encryption_key,omitempty"`
 }
 
 // MessageRepository handles database operations for messages
@@ -49,11 +51,11 @@ type DeliveredMessage struct {
 func (r *MessageRepository) Create(ctx context.Context, message *Message) error {
 	query := `
 		INSERT INTO messages (
-			conversation_id, sender_id, recipient_id, encrypted_content,
+			conversation_id, sender_id, recipient_id, encrypted_content, sender_encrypted_content,
 			message_type, media_file_id, media_url, media_type, media_size, encryption_version,
-			media_encryption_key, media_encryption_iv
+			media_encryption_key, media_encryption_iv, sender_media_encryption_key
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
 		RETURNING id, sent_at
 	`
 
@@ -63,6 +65,7 @@ func (r *MessageRepository) Create(ctx context.Context, message *Message) error 
 		message.SenderID,
 		message.RecipientID,
 		message.EncryptedContent,
+		message.SenderEncryptedContent,
 		message.MessageType,
 		message.MediaFileID,
 		message.MediaURL,
@@ -71,6 +74,7 @@ func (r *MessageRepository) Create(ctx context.Context, message *Message) error 
 		message.EncryptionVersion,
 		message.MediaEncryptionKey,
 		message.MediaEncryptionIV,
+		message.SenderMediaEncryptionKey,
 	).Scan(&message.ID, &message.SentAt)
 
 	return err
@@ -82,6 +86,7 @@ func (r *MessageRepository) GetByID(ctx context.Context, id int) (*Message, erro
 
 	query := `
 		SELECT m.id, m.conversation_id, m.sender_id, m.recipient_id, m.encrypted_content,
+		       m.sender_encrypted_content,
 		       m.message_type, m.sent_at, m.delivered_at, m.read_at,
 		       m.deleted_for_sender, m.deleted_for_recipient,
 		       m.media_file_id,
@@ -90,7 +95,8 @@ func (r *MessageRepository) GetByID(ctx context.Context, id int) (*Message, erro
 		       COALESCE(mf.file_size, m.media_size) as media_size,
 		       m.encryption_version,
 		       m.media_encryption_key,
-		       m.media_encryption_iv
+		       m.media_encryption_iv,
+		       m.sender_media_encryption_key
 		FROM messages m
 		LEFT JOIN media_files mf ON m.media_file_id = mf.id
 		WHERE m.id = $1
@@ -102,6 +108,7 @@ func (r *MessageRepository) GetByID(ctx context.Context, id int) (*Message, erro
 		&message.SenderID,
 		&message.RecipientID,
 		&message.EncryptedContent,
+		&message.SenderEncryptedContent,
 		&message.MessageType,
 		&message.SentAt,
 		&message.DeliveredAt,
@@ -115,6 +122,7 @@ func (r *MessageRepository) GetByID(ctx context.Context, id int) (*Message, erro
 		&message.EncryptionVersion,
 		&message.MediaEncryptionKey,
 		&message.MediaEncryptionIV,
+		&message.SenderMediaEncryptionKey,
 	)
 
 	if err != nil {
@@ -129,13 +137,17 @@ func (r *MessageRepository) GetByID(ctx context.Context, id int) (*Message, erro
 func (r *MessageRepository) GetByConversationID(ctx context.Context, conversationID int, userID int, limit int, offset int) ([]*Message, error) {
 	query := `
 		SELECT m.id, m.conversation_id, m.sender_id, m.recipient_id, m.encrypted_content,
+		       m.sender_encrypted_content,
 		       m.message_type, m.sent_at, m.delivered_at, m.read_at,
 		       m.deleted_for_sender, m.deleted_for_recipient,
 		       m.media_file_id,
 		       COALESCE(mf.storage_url, m.media_url) as media_url,
 		       COALESCE(mf.file_type, m.media_type) as media_type,
 		       COALESCE(mf.file_size, m.media_size) as media_size,
-		       m.encryption_version
+		       m.encryption_version,
+		       m.media_encryption_key,
+		       m.media_encryption_iv,
+		       m.sender_media_encryption_key
 		FROM messages m
 		LEFT JOIN media_files mf ON m.media_file_id = mf.id
 		WHERE m.conversation_id = $1
@@ -162,6 +174,7 @@ func (r *MessageRepository) GetByConversationID(ctx context.Context, conversatio
 			&message.SenderID,
 			&message.RecipientID,
 			&message.EncryptedContent,
+			&message.SenderEncryptedContent,
 			&message.MessageType,
 			&message.SentAt,
 			&message.DeliveredAt,
@@ -173,6 +186,9 @@ func (r *MessageRepository) GetByConversationID(ctx context.Context, conversatio
 			&message.MediaType,
 			&message.MediaSize,
 			&message.EncryptionVersion,
+			&message.MediaEncryptionKey,
+			&message.MediaEncryptionIV,
+			&message.SenderMediaEncryptionKey,
 		)
 		if err != nil {
 			return nil, err
@@ -301,13 +317,17 @@ func (r *MessageRepository) GetLatestMessage(ctx context.Context, conversationID
 
 	query := `
 		SELECT m.id, m.conversation_id, m.sender_id, m.recipient_id, m.encrypted_content,
+		       m.sender_encrypted_content,
 		       m.message_type, m.sent_at, m.delivered_at, m.read_at,
 		       m.deleted_for_sender, m.deleted_for_recipient,
 		       m.media_file_id,
 		       COALESCE(mf.storage_url, m.media_url) as media_url,
 		       COALESCE(mf.file_type, m.media_type) as media_type,
 		       COALESCE(mf.file_size, m.media_size) as media_size,
-		       m.encryption_version
+		       m.encryption_version,
+		       m.media_encryption_key,
+		       m.media_encryption_iv,
+		       m.sender_media_encryption_key
 		FROM messages m
 		LEFT JOIN media_files mf ON m.media_file_id = mf.id
 		WHERE m.conversation_id = $1
@@ -321,6 +341,7 @@ func (r *MessageRepository) GetLatestMessage(ctx context.Context, conversationID
 		&message.SenderID,
 		&message.RecipientID,
 		&message.EncryptedContent,
+		&message.SenderEncryptedContent,
 		&message.MessageType,
 		&message.SentAt,
 		&message.DeliveredAt,
@@ -334,6 +355,7 @@ func (r *MessageRepository) GetLatestMessage(ctx context.Context, conversationID
 		&message.EncryptionVersion,
 		&message.MediaEncryptionKey,
 		&message.MediaEncryptionIV,
+		&message.SenderMediaEncryptionKey,
 	)
 
 	if err != nil {

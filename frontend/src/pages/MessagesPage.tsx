@@ -7,7 +7,13 @@ import { useAuth } from '../contexts/AuthContext';
 import { useMessagingContext } from '../contexts/MessagingContext';
 import type { Conversation, Message, SendMessageRequest } from '../types/messages';
 import { API_BASE_URL } from '../lib/api';
-import { decryptMessage, encryptFile, decryptFile } from '../utils/encryption';
+import {
+  decryptMessage,
+  encryptFile,
+  decryptFile,
+  encryptKeyWithPublicKey,
+  arrayBufferToBase64,
+} from '../utils/encryption';
 import { getOwnKeys, getUserPublicKey } from '../services/keyManagementService';
 import { encryptionService } from '../services/encryptionService';
 
@@ -28,6 +34,7 @@ function inferMessageTypeFromFile(file: File): Message['message_type'] {
 
 interface MessageMediaPreviewProps {
   message: Message;
+  isOwnMessage: boolean;
 }
 
 const API_ORIGIN = new URL(API_BASE_URL).origin;
@@ -51,15 +58,23 @@ function inferMessageTypeFromMessage(message: Message): Message['message_type'] 
 }
 
 /**
- * Hook to decrypt a message's encrypted_content
- * Returns the decrypted content or the original content if decryption fails
+ * Hook to decrypt a message's encrypted content (if necessary)
+ * Returns decrypted plaintext or the original content when encryption isn't applied
  */
-function useDecryptedContent(encryptedContent: string | undefined): string {
+function useDecryptedContent(
+  encryptedContent: string | undefined,
+  shouldAttemptDecrypt: boolean
+): string {
   const [decryptedContent, setDecryptedContent] = useState<string>('');
 
   useEffect(() => {
     if (!encryptedContent) {
       setDecryptedContent('');
+      return;
+    }
+
+    if (!shouldAttemptDecrypt) {
+      setDecryptedContent(encryptedContent);
       return;
     }
 
@@ -82,7 +97,7 @@ function useDecryptedContent(encryptedContent: string | undefined): string {
     };
 
     attemptDecryption();
-  }, [encryptedContent]);
+  }, [encryptedContent, shouldAttemptDecrypt]);
 
   return decryptedContent;
 }
@@ -90,8 +105,26 @@ function useDecryptedContent(encryptedContent: string | undefined): string {
 /**
  * Component to display decrypted message content
  */
-function DecryptedMessageContent({ content, className }: { content: string | undefined; className?: string }) {
-  const decryptedContent = useDecryptedContent(content);
+function DecryptedMessageContent({
+  message,
+  isOwnMessage,
+  className,
+}: {
+  message: Message;
+  isOwnMessage: boolean;
+  className?: string;
+}) {
+  const cipherText = isOwnMessage
+    ? message.sender_encrypted_content ?? message.encrypted_content
+    : message.encrypted_content;
+
+  if (!cipherText) return null;
+
+  const shouldDecrypt = Boolean(
+    (isOwnMessage && message.sender_encrypted_content) || (!isOwnMessage && message.encryption_version === 'v1')
+  );
+
+  const decryptedContent = useDecryptedContent(cipherText, shouldDecrypt);
 
   if (!decryptedContent) return null;
 
@@ -102,42 +135,50 @@ function DecryptedMessageContent({ content, className }: { content: string | und
  * Hook to decrypt media files
  * Returns a blob URL to the decrypted media, or the original URL if not encrypted
  */
-function useDecryptedMedia(message: Message): string {
-  const [mediaSrc, setMediaSrc] = useState<string>('');
+function useDecryptedMedia(message: Message, isOwnMessage: boolean): string | null {
+  const [mediaSrc, setMediaSrc] = useState<string | null>(null);
 
   useEffect(() => {
+    let isMounted = true;
+    let cleanup: (() => void) | undefined;
+
     const decryptMedia = async () => {
-      // Build the media URL
       const originalUrl = message.media_url
         ? message.media_url.startsWith('http')
           ? message.media_url
           : `${API_ORIGIN}${message.media_url.startsWith('/') ? '' : '/'}${message.media_url}`
-        : '';
+        : null;
 
-      // If no encryption metadata, return original URL
-      if (!message.media_encryption_key || !message.media_encryption_iv) {
-        setMediaSrc(originalUrl);
+      if (!originalUrl) {
+        if (isMounted) setMediaSrc(null);
+        return;
+      }
+
+      const encryptedKey = isOwnMessage
+        ? message.sender_media_encryption_key ?? message.media_encryption_key
+        : message.media_encryption_key;
+
+      // If no encryption metadata, fall back to the stored URL
+      if (!encryptedKey || !message.media_encryption_iv) {
+        if (isMounted) setMediaSrc(originalUrl);
         return;
       }
 
       try {
-        // Get own private key
         const keys = await getOwnKeys();
         if (!keys) {
           console.warn('No encryption keys available, displaying encrypted file as-is');
-          setMediaSrc(originalUrl);
+          if (isMounted) setMediaSrc(originalUrl);
           return;
         }
 
-        // Fetch the encrypted file
         const response = await fetch(originalUrl);
         const encryptedData = await response.arrayBuffer();
 
-        // Decrypt the file
         const decryptedBlob = await decryptFile(
           {
             encryptedData,
-            encryptedKey: message.media_encryption_key,
+            encryptedKey,
             iv: message.media_encryption_iv,
             originalName: message.media_url?.split('/').pop() ?? 'attachment',
             mimeType: message.media_type ?? 'application/octet-stream',
@@ -145,32 +186,52 @@ function useDecryptedMedia(message: Message): string {
           keys.privateKey
         );
 
-        // Create blob URL
         const blobUrl = URL.createObjectURL(decryptedBlob);
-        setMediaSrc(blobUrl);
-
-        // Cleanup blob URL on unmount
-        return () => {
-          URL.revokeObjectURL(blobUrl);
-        };
+        cleanup = () => URL.revokeObjectURL(blobUrl);
+        if (isMounted) {
+          setMediaSrc(blobUrl);
+        }
       } catch (error) {
         console.error('Failed to decrypt media file:', error);
-        // Fallback to original URL
-        setMediaSrc(originalUrl);
+        if (isMounted) {
+          setMediaSrc(originalUrl);
+        }
       }
     };
 
     decryptMedia();
-  }, [message.media_url, message.media_encryption_key, message.media_encryption_iv, message.media_type]);
+
+    return () => {
+      isMounted = false;
+      if (cleanup) {
+        cleanup();
+      }
+    };
+  }, [
+    message.media_url,
+    message.media_encryption_key,
+    message.sender_media_encryption_key,
+    message.media_encryption_iv,
+    message.media_type,
+    isOwnMessage,
+  ]);
 
   return mediaSrc;
 }
 
-const MessageMediaPreview = ({ message }: MessageMediaPreviewProps) => {
-  const mediaSrc = useDecryptedMedia(message);
+const MessageMediaPreview = ({ message, isOwnMessage }: MessageMediaPreviewProps) => {
+  const mediaSrc = useDecryptedMedia(message, isOwnMessage);
   const filename = message.media_url?.split('/').pop() ?? 'attachment';
 
   const resolvedType = inferMessageTypeFromMessage(message);
+
+  if (!mediaSrc) {
+    return (
+      <div className="mb-2 text-xs text-[var(--color-text-secondary)]">
+        {message.media_encryption_key ? 'Decrypting media…' : 'Preparing media…'}
+      </div>
+    );
+  }
 
   if (resolvedType === 'image') {
     return (
@@ -179,7 +240,7 @@ const MessageMediaPreview = ({ message }: MessageMediaPreviewProps) => {
           src={mediaSrc}
           alt="Shared media"
           className="max-w-full rounded cursor-pointer"
-          onClick={() => window.open(mediaSrc, '_blank')}
+          onClick={() => mediaSrc && window.open(mediaSrc, '_blank')}
         />
       </div>
     );
@@ -299,16 +360,19 @@ export default function MessagesPage() {
       let messageType: Message['message_type'] = 'text';
       let mediaEncryptionKey: string | undefined;
       let mediaEncryptionIv: string | undefined;
+      let senderMediaEncryptionKey: string | undefined;
 
       // Upload media first if selected
       if (selectedFile) {
         setUploadingMedia(true);
+        console.log('[Media Encryption] Starting media upload flow for file:', selectedFile.name);
 
         // Get recipient's ID to fetch their public key
         let recipientId: number | undefined;
         if (isCreatingChat) {
           // For new chats, we need to fetch the user by username
           const recipient = newChatUsername.trim();
+          console.log('[Media Encryption] New chat mode, fetching user:', recipient);
           if (recipient) {
             try {
               const user = await fetch(`${API_BASE_URL}/users/${recipient}`, {
@@ -317,51 +381,90 @@ export default function MessagesPage() {
                 },
               }).then((res) => res.json());
               recipientId = user.id;
+              console.log('[Media Encryption] Fetched recipient ID:', recipientId);
             } catch (error) {
-              console.warn('Failed to fetch recipient user:', error);
+              console.warn('[Media Encryption] Failed to fetch recipient user:', error);
             }
           }
         } else if (selectedConversationId) {
           // For existing conversations, get recipient from conversation
           recipientId = selectedConversation?.other_user?.id;
+          console.log('[Media Encryption] Existing conversation, recipient ID:', recipientId);
         }
 
         // Encrypt the file if we have a recipient ID
         let fileToUpload = selectedFile;
+        const ownKeys = await getOwnKeys();
         if (recipientId) {
+          console.log('[Media Encryption] Have recipient ID, attempting to encrypt file...');
           try {
             // Fetch recipient's public key
+            console.log('[Media Encryption] Fetching public keys for recipient:', recipientId);
             const publicKeys = await encryptionService.getPublicKeys([recipientId]);
+            console.log('[Media Encryption] Public keys response:', publicKeys);
             const recipientPublicKeyBase64 = publicKeys[recipientId];
+            console.log('[Media Encryption] Recipient public key (Base64):', recipientPublicKeyBase64 ? `${recipientPublicKeyBase64.substring(0, 50)}...` : 'null');
 
             if (recipientPublicKeyBase64) {
               // Import recipient's public key
+              console.log('[Media Encryption] Importing recipient public key...');
               const recipientPublicKey = await getUserPublicKey(recipientId, recipientPublicKeyBase64);
+              console.log('[Media Encryption] Recipient public key imported:', recipientPublicKey ? 'SUCCESS' : 'FAILED');
 
               if (recipientPublicKey) {
                 // Encrypt the file
-                const encryptedFile = await encryptFile(selectedFile, recipientPublicKey);
+                console.log('[Media Encryption] Encrypting file...');
+                const encryptedFile = await encryptFile(selectedFile);
+                const ivBase64 = arrayBufferToBase64(encryptedFile.iv.buffer);
+                const encryptedKeyForRecipient = await encryptKeyWithPublicKey(
+                  encryptedFile.rawKey,
+                  recipientPublicKey
+                );
 
-                // Store encryption metadata
-                mediaEncryptionKey = encryptedFile.encryptedKey;
-                mediaEncryptionIv = encryptedFile.iv;
+                let encryptedKeyForSender: string | undefined;
+                if (ownKeys?.publicKey) {
+                  encryptedKeyForSender = await encryptKeyWithPublicKey(
+                    encryptedFile.rawKey,
+                    ownKeys.publicKey
+                  );
+                }
 
-                // Create a new File from encrypted data
-                const encryptedBlob = new Blob([encryptedFile.encryptedData], {
-                  type: 'application/octet-stream',
-                });
-                fileToUpload = new File([encryptedBlob], selectedFile.name, {
-                  type: 'application/octet-stream',
-                });
+                if (encryptedKeyForRecipient) {
+                  mediaEncryptionKey = encryptedKeyForRecipient;
+                  mediaEncryptionIv = ivBase64;
+                  senderMediaEncryptionKey = encryptedKeyForSender;
+
+                  console.log(
+                    '[Media Encryption] File encrypted successfully. Key:',
+                    mediaEncryptionKey.substring(0, 50) + '...',
+                    'IV:',
+                    mediaEncryptionIv?.substring(0, 30) + '...'
+                  );
+
+                  const encryptedBlob = new Blob([encryptedFile.encryptedData], {
+                    type: 'application/octet-stream',
+                  });
+                  fileToUpload = new File([encryptedBlob], selectedFile.name, {
+                    type: 'application/octet-stream',
+                  });
+                  console.log('[Media Encryption] Created encrypted file blob, ready to upload');
+                } else {
+                  console.warn('[Media Encryption] Failed to encrypt AES key for recipient, uploading plain file');
+                  mediaEncryptionKey = undefined;
+                  mediaEncryptionIv = undefined;
+                  senderMediaEncryptionKey = undefined;
+                }
               } else {
-                console.warn('Failed to import recipient public key, uploading unencrypted');
+                console.warn('[Media Encryption] Failed to import recipient public key, uploading unencrypted');
               }
             } else {
-              console.warn('Recipient has no public key, uploading unencrypted');
+              console.warn('[Media Encryption] Recipient has no public key, uploading unencrypted');
             }
           } catch (error) {
-            console.error('File encryption failed, uploading unencrypted:', error);
+            console.error('[Media Encryption] File encryption failed, uploading unencrypted:', error);
           }
+        } else {
+          console.warn('[Media Encryption] No recipient ID found, uploading unencrypted');
         }
 
         // Upload the file (encrypted or original)
@@ -389,6 +492,13 @@ export default function MessagesPage() {
       if (isCreatingChat) {
         const recipient = newChatUsername.trim();
         if (!recipient) return;
+        console.log('[Media Encryption] Sending message to new chat with encryption metadata:', {
+          hasEncryptionKey: !!mediaEncryptionKey,
+          hasSenderKey: !!senderMediaEncryptionKey,
+          hasEncryptionIv: !!mediaEncryptionIv,
+          keyPreview: mediaEncryptionKey?.substring(0, 30),
+          ivPreview: mediaEncryptionIv?.substring(0, 20),
+        });
         sendMessageMutation.mutate({
           recipient_username: recipient,
           content: trimmedMessage || undefined,
@@ -399,11 +509,19 @@ export default function MessagesPage() {
           message_type: messageType,
           media_encryption_key: mediaEncryptionKey,
           media_encryption_iv: mediaEncryptionIv,
+          sender_media_encryption_key: senderMediaEncryptionKey,
         });
         return;
       }
 
       if (selectedConversationId) {
+        console.log('[Media Encryption] Sending message to existing conversation with encryption metadata:', {
+          hasEncryptionKey: !!mediaEncryptionKey,
+          hasSenderKey: !!senderMediaEncryptionKey,
+          hasEncryptionIv: !!mediaEncryptionIv,
+          keyPreview: mediaEncryptionKey?.substring(0, 30),
+          ivPreview: mediaEncryptionIv?.substring(0, 20),
+        });
         sendMessageMutation.mutate({
           conversation_id: selectedConversationId,
           content: trimmedMessage || undefined,
@@ -414,6 +532,7 @@ export default function MessagesPage() {
           message_type: messageType,
           media_encryption_key: mediaEncryptionKey,
           media_encryption_iv: mediaEncryptionIv,
+          sender_media_encryption_key: senderMediaEncryptionKey,
         });
       }
     } catch (error) {
@@ -536,7 +655,8 @@ export default function MessagesPage() {
                 conversation.latest_message.encrypted_content &&
                 !isAutoGeneratedMediaCaption(conversation.latest_message) && (
                   <DecryptedMessageContent
-                    content={conversation.latest_message.encrypted_content}
+                    message={conversation.latest_message}
+                    isOwnMessage={conversation.latest_message.sender_id === user?.id}
                     className="mt-1 truncate text-sm text-[var(--color-text-secondary)]"
                   />
                 )}
@@ -589,10 +709,17 @@ export default function MessagesPage() {
                         }`}
                       >
                         {message.media_url && (
-                          <MessageMediaPreview message={message} />
+                          <MessageMediaPreview
+                            message={message}
+                            isOwnMessage={message.sender_id === user?.id}
+                          />
                         )}
                         {message.encrypted_content && !isAutoGeneratedMediaCaption(message) && (
-                          <DecryptedMessageContent content={message.encrypted_content} className="text-sm" />
+                          <DecryptedMessageContent
+                            message={message}
+                            isOwnMessage={message.sender_id === user?.id}
+                            className="text-sm"
+                          />
                         )}
                         <span
                           className={`mt-1 block text-xs ${

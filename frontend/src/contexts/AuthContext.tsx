@@ -20,23 +20,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Check if user is already authenticated on mount
-  useEffect(() => {
-    const token = localStorage.getItem('auth_token');
-    if (token) {
-      api
-        .get<User>('/auth/me')
-        .then((userData) => setUser(userData))
-        .catch(() => {
-          // Invalid token
-          localStorage.removeItem('auth_token');
-        })
-        .finally(() => setIsLoading(false));
-    } else {
-      setIsLoading(false);
-    }
-  }, []);
-
   const initializeEncryptionKeys = async () => {
     try {
       // Generate or retrieve encryption keys
@@ -52,6 +35,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Don't block auth flow if encryption fails
     }
   };
+
+  // Check if user is already authenticated on mount
+  useEffect(() => {
+    const token = localStorage.getItem('auth_token');
+    if (token) {
+      api
+        .get<User>('/auth/me')
+        .then(async (userData) => {
+          setUser(userData);
+          await initializeEncryptionKeys();
+        })
+        .catch(() => {
+          // Invalid token
+          localStorage.removeItem('auth_token');
+        })
+        .finally(() => setIsLoading(false));
+    } else {
+      setIsLoading(false);
+    }
+  }, []);
 
   const login = async (credentials: LoginRequest) => {
     const response = await api.post<AuthResponse>('/auth/login', credentials);

@@ -23,6 +23,7 @@ export interface Message {
   sender_id: number;
   recipient_id: number;
   encrypted_content: string;
+  sender_encrypted_content?: string | null;
   message_type: 'text' | 'image' | 'video' | 'audio' | 'file';
   sent_at: string;
   delivered_at?: string;
@@ -36,6 +37,7 @@ export interface Message {
   encryption_version: string;
   media_encryption_key?: string | null; // RSA-encrypted AES key (Base64)
   media_encryption_iv?: string | null; // AES-GCM IV (Base64)
+  sender_media_encryption_key?: string | null;
 }
 
 export interface SendMessageRequest {
@@ -49,4 +51,7 @@ export interface SendMessageRequest {
   media_size?: number;
   media_encryption_key?: string; // For encrypted media files
   media_encryption_iv?: string; // For encrypted media files
+  encryption_version?: string;
+  sender_encrypted_content?: string;
+  sender_media_encryption_key?: string;
 }

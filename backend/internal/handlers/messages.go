@@ -42,14 +42,18 @@ func NewMessagesHandler(
 
 // SendMessageRequest represents the request body for sending a message
 type SendMessageRequest struct {
-	ConversationID    int     `json:"conversation_id" binding:"required"`
-	EncryptedContent  string  `json:"encrypted_content,omitempty"`     // Base64 encoded encrypted blob
-	MessageType       string  `json:"message_type" binding:"required"` // "text", "image", "video", "audio", "file"
-	MediaFileID       *int    `json:"media_file_id,omitempty"`         // References media_files table
-	MediaURL          *string `json:"media_url,omitempty"`
-	MediaType         *string `json:"media_type,omitempty"`
-	MediaSize         *int    `json:"media_size,omitempty"`
-	EncryptionVersion string  `json:"encryption_version" binding:"required"` // Default: v1
+	ConversationID           int     `json:"conversation_id" binding:"required"`
+	EncryptedContent         string  `json:"encrypted_content,omitempty"` // Base64 encoded encrypted blob
+	SenderEncryptedContent   *string `json:"sender_encrypted_content,omitempty"`
+	MessageType              string  `json:"message_type" binding:"required"` // "text", "image", "video", "audio", "file"
+	MediaFileID              *int    `json:"media_file_id,omitempty"`         // References media_files table
+	MediaURL                 *string `json:"media_url,omitempty"`
+	MediaType                *string `json:"media_type,omitempty"`
+	MediaSize                *int    `json:"media_size,omitempty"`
+	EncryptionVersion        string  `json:"encryption_version" binding:"required"` // Default: v1
+	MediaEncryptionKey       *string `json:"media_encryption_key,omitempty"`        // RSA-encrypted AES key (Base64)
+	MediaEncryptionIV        *string `json:"media_encryption_iv,omitempty"`         // AES-GCM IV (Base64)
+	SenderMediaEncryptionKey *string `json:"sender_media_encryption_key,omitempty"`
 }
 
 // SendMessage handles POST /api/v1/messages
@@ -129,16 +133,20 @@ func (h *MessagesHandler) SendMessage(c *gin.Context) {
 
 	// Create message
 	message := &models.Message{
-		ConversationID:    req.ConversationID,
-		SenderID:          userID.(int),
-		RecipientID:       recipientID,
-		EncryptedContent:  req.EncryptedContent,
-		MessageType:       req.MessageType,
-		MediaFileID:       req.MediaFileID,
-		MediaURL:          req.MediaURL,
-		MediaType:         req.MediaType,
-		MediaSize:         req.MediaSize,
-		EncryptionVersion: req.EncryptionVersion,
+		ConversationID:           req.ConversationID,
+		SenderID:                 userID.(int),
+		RecipientID:              recipientID,
+		EncryptedContent:         req.EncryptedContent,
+		SenderEncryptedContent:   req.SenderEncryptedContent,
+		MessageType:              req.MessageType,
+		MediaFileID:              req.MediaFileID,
+		MediaURL:                 req.MediaURL,
+		MediaType:                req.MediaType,
+		MediaSize:                req.MediaSize,
+		EncryptionVersion:        req.EncryptionVersion,
+		MediaEncryptionKey:       req.MediaEncryptionKey,
+		MediaEncryptionIV:        req.MediaEncryptionIV,
+		SenderMediaEncryptionKey: req.SenderMediaEncryptionKey,
 	}
 
 	if err := h.messageRepo.Create(c.Request.Context(), message); err != nil {
