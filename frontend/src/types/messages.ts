@@ -34,6 +34,8 @@ export interface Message {
   media_type?: string | null;
   media_size?: number | null;
   encryption_version: string;
+  media_encryption_key?: string | null; // RSA-encrypted AES key (Base64)
+  media_encryption_iv?: string | null; // AES-GCM IV (Base64)
 }
 
 export interface SendMessageRequest {
@@ -45,4 +47,6 @@ export interface SendMessageRequest {
   media_url?: string;
   media_type?: string;
   media_size?: number;
+  media_encryption_key?: string; // For encrypted media files
+  media_encryption_iv?: string; // For encrypted media files
 }

@@ -7,6 +7,9 @@ import { useAuth } from '../contexts/AuthContext';
 import { useMessagingContext } from '../contexts/MessagingContext';
 import type { Conversation, Message, SendMessageRequest } from '../types/messages';
 import { API_BASE_URL } from '../lib/api';
+import { decryptMessage, encryptFile, decryptFile } from '../utils/encryption';
+import { getOwnKeys, getUserPublicKey } from '../services/keyManagementService';
+import { encryptionService } from '../services/encryptionService';
 
 const MAX_UPLOAD_SIZE = 25 * 1024 * 1024; // 25MB
 
@@ -47,12 +50,124 @@ function inferMessageTypeFromMessage(message: Message): Message['message_type'] 
   return 'file';
 }
 
+/**
+ * Hook to decrypt a message's encrypted_content
+ * Returns the decrypted content or the original content if decryption fails
+ */
+function useDecryptedContent(encryptedContent: string | undefined): string {
+  const [decryptedContent, setDecryptedContent] = useState<string>('');
+
+  useEffect(() => {
+    if (!encryptedContent) {
+      setDecryptedContent('');
+      return;
+    }
+
+    const attemptDecryption = async () => {
+      try {
+        const keys = await getOwnKeys();
+        if (!keys) {
+          // No keys available, return plaintext
+          setDecryptedContent(encryptedContent);
+          return;
+        }
+
+        const decrypted = await decryptMessage(encryptedContent, keys.privateKey);
+        setDecryptedContent(decrypted);
+      } catch (error) {
+        // Decryption failed, content might be plaintext
+        console.warn('Failed to decrypt message, displaying as plaintext:', error);
+        setDecryptedContent(encryptedContent);
+      }
+    };
+
+    attemptDecryption();
+  }, [encryptedContent]);
+
+  return decryptedContent;
+}
+
+/**
+ * Component to display decrypted message content
+ */
+function DecryptedMessageContent({ content, className }: { content: string | undefined; className?: string }) {
+  const decryptedContent = useDecryptedContent(content);
+
+  if (!decryptedContent) return null;
+
+  return <p className={className}>{decryptedContent}</p>;
+}
+
+/**
+ * Hook to decrypt media files
+ * Returns a blob URL to the decrypted media, or the original URL if not encrypted
+ */
+function useDecryptedMedia(message: Message): string {
+  const [mediaSrc, setMediaSrc] = useState<string>('');
+
+  useEffect(() => {
+    const decryptMedia = async () => {
+      // Build the media URL
+      const originalUrl = message.media_url
+        ? message.media_url.startsWith('http')
+          ? message.media_url
+          : `${API_ORIGIN}${message.media_url.startsWith('/') ? '' : '/'}${message.media_url}`
+        : '';
+
+      // If no encryption metadata, return original URL
+      if (!message.media_encryption_key || !message.media_encryption_iv) {
+        setMediaSrc(originalUrl);
+        return;
+      }
+
+      try {
+        // Get own private key
+        const keys = await getOwnKeys();
+        if (!keys) {
+          console.warn('No encryption keys available, displaying encrypted file as-is');
+          setMediaSrc(originalUrl);
+          return;
+        }
+
+        // Fetch the encrypted file
+        const response = await fetch(originalUrl);
+        const encryptedData = await response.arrayBuffer();
+
+        // Decrypt the file
+        const decryptedBlob = await decryptFile(
+          {
+            encryptedData,
+            encryptedKey: message.media_encryption_key,
+            iv: message.media_encryption_iv,
+            originalName: message.media_url?.split('/').pop() ?? 'attachment',
+            mimeType: message.media_type ?? 'application/octet-stream',
+          },
+          keys.privateKey
+        );
+
+        // Create blob URL
+        const blobUrl = URL.createObjectURL(decryptedBlob);
+        setMediaSrc(blobUrl);
+
+        // Cleanup blob URL on unmount
+        return () => {
+          URL.revokeObjectURL(blobUrl);
+        };
+      } catch (error) {
+        console.error('Failed to decrypt media file:', error);
+        // Fallback to original URL
+        setMediaSrc(originalUrl);
+      }
+    };
+
+    decryptMedia();
+  }, [message.media_url, message.media_encryption_key, message.media_encryption_iv, message.media_type]);
+
+  return mediaSrc;
+}
+
 const MessageMediaPreview = ({ message }: MessageMediaPreviewProps) => {
-  const mediaSrc = message.media_url
-    ? message.media_url.startsWith('http')
-      ? message.media_url
-      : `${API_ORIGIN}${message.media_url.startsWith('/') ? '' : '/'}${message.media_url}`
-    : '';
+  const mediaSrc = useDecryptedMedia(message);
   const filename = message.media_url?.split('/').pop() ?? 'attachment';
 
   const resolvedType = inferMessageTypeFromMessage(message);
@@ -182,11 +297,75 @@ export default function MessagesPage() {
       let mediaMimeType: string | undefined;
       let mediaSize: number | undefined;
       let messageType: Message['message_type'] = 'text';
+      let mediaEncryptionKey: string | undefined;
+      let mediaEncryptionIv: string | undefined;
 
       // Upload media first if selected
       if (selectedFile) {
         setUploadingMedia(true);
-        const uploadedMedia = await uploadMediaMutation.mutateAsync(selectedFile);
+
+        // Get recipient's ID to fetch their public key
+        let recipientId: number | undefined;
+        if (isCreatingChat) {
+          // For new chats, we need to fetch the user by username
+          const recipient = newChatUsername.trim();
+          if (recipient) {
+            try {
+              const user = await fetch(`${API_BASE_URL}/users/${recipient}`, {
+                headers: {
+                  Authorization: `Bearer ${localStorage.getItem('auth_token')}`,
+                },
+              }).then((res) => res.json());
+              recipientId = user.id;
+            } catch (error) {
+              console.warn('Failed to fetch recipient user:', error);
+            }
+          }
+        } else if (selectedConversationId) {
+          // For existing conversations, get recipient from conversation
+          recipientId = selectedConversation?.other_user?.id;
+        }
+
+        // Encrypt the file if we have a recipient ID
+        let fileToUpload = selectedFile;
+        if (recipientId) {
+          try {
+            // Fetch recipient's public key
+            const publicKeys = await encryptionService.getPublicKeys([recipientId]);
+            const recipientPublicKeyBase64 = publicKeys[recipientId];
+
+            if (recipientPublicKeyBase64) {
+              // Import recipient's public key
+              const recipientPublicKey = await getUserPublicKey(recipientId, recipientPublicKeyBase64);
+
+              if (recipientPublicKey) {
+                // Encrypt the file
+                const encryptedFile = await encryptFile(selectedFile, recipientPublicKey);
+
+                // Store encryption metadata
+                mediaEncryptionKey = encryptedFile.encryptedKey;
+                mediaEncryptionIv = encryptedFile.iv;
+
+                // Create a new File from encrypted data
+                const encryptedBlob = new Blob([encryptedFile.encryptedData], {
+                  type: 'application/octet-stream',
+                });
+                fileToUpload = new File([encryptedBlob], selectedFile.name, {
+                  type: 'application/octet-stream',
+                });
+              } else {
+                console.warn('Failed to import recipient public key, uploading unencrypted');
+              }
+            } else {
+              console.warn('Recipient has no public key, uploading unencrypted');
+            }
+          } catch (error) {
+            console.error('File encryption failed, uploading unencrypted:', error);
+          }
+        }
+
+        // Upload the file (encrypted or original)
+        const uploadedMedia = await uploadMediaMutation.mutateAsync(fileToUpload);
         mediaFileId = uploadedMedia.id;
         if (uploadedMedia.storage_url) {
           if (uploadedMedia.storage_url.startsWith('http')) {
@@ -218,6 +397,8 @@ export default function MessagesPage() {
           media_type: mediaMimeType,
           media_size: mediaSize,
           message_type: messageType,
+          media_encryption_key: mediaEncryptionKey,
+          media_encryption_iv: mediaEncryptionIv,
         });
         return;
       }
@@ -231,6 +412,8 @@ export default function MessagesPage() {
           media_type: mediaMimeType,
           media_size: mediaSize,
           message_type: messageType,
+          media_encryption_key: mediaEncryptionKey,
+          media_encryption_iv: mediaEncryptionIv,
         });
       }
     } catch (error) {
@@ -352,9 +535,10 @@ export default function MessagesPage() {
               {conversation.latest_message &&
                 conversation.latest_message.encrypted_content &&
                 !isAutoGeneratedMediaCaption(conversation.latest_message) && (
-                  <p className="mt-1 truncate text-sm text-[var(--color-text-secondary)]">
-                    {conversation.latest_message.encrypted_content}
-                  </p>
+                  <DecryptedMessageContent
+                    content={conversation.latest_message.encrypted_content}
+                    className="mt-1 truncate text-sm text-[var(--color-text-secondary)]"
+                  />
                 )}
             </button>
           ))}
@@ -408,7 +592,7 @@ export default function MessagesPage() {
                           <MessageMediaPreview message={message} />
                         )}
                         {message.encrypted_content && !isAutoGeneratedMediaCaption(message) && (
-                          <p className="text-sm">{message.encrypted_content}</p>
+                          <DecryptedMessageContent content={message.encrypted_content} className="text-sm" />
                         )}
                         <span
                           className={`mt-1 block text-xs ${

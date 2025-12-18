@@ -2,6 +2,8 @@ import { createContext, useContext, useState, useEffect, ReactNode } from 'react
 import { api } from '../lib/api';
 import type { User, LoginRequest, RegisterRequest, AuthResponse } from '../types/auth';
 import { OMNI_FEED_STORAGE_KEY, SETTINGS_STORAGE_KEY } from '../constants/storageKeys';
+import { initializeKeys, getOwnPublicKeyBase64, clearKeys } from '../services/keyManagementService';
+import { encryptionService } from '../services/encryptionService';
 
 interface AuthContextType {
   user: User | null;
@@ -35,11 +37,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const initializeEncryptionKeys = async () => {
+    try {
+      // Generate or retrieve encryption keys
+      await initializeKeys();
+
+      // Get public key and upload to server
+      const publicKeyBase64 = getOwnPublicKeyBase64();
+      if (publicKeyBase64) {
+        await encryptionService.uploadPublicKey(publicKeyBase64);
+      }
+    } catch (error) {
+      console.error('Failed to initialize encryption keys:', error);
+      // Don't block auth flow if encryption fails
+    }
+  };
+
   const login = async (credentials: LoginRequest) => {
     const response = await api.post<AuthResponse>('/auth/login', credentials);
     localStorage.setItem('auth_token', response.token);
     setUser(response.user);
     persistOmniFeedStateForUser(response.user.id, resolveDefaultOmniFeedState());
+
+    // Initialize encryption keys
+    await initializeEncryptionKeys();
   };
 
   const register = async (data: RegisterRequest) => {
@@ -47,12 +68,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.setItem('auth_token', response.token);
     setUser(response.user);
     persistOmniFeedStateForUser(response.user.id, resolveDefaultOmniFeedState());
+
+    // Initialize encryption keys
+    await initializeEncryptionKeys();
   };
 
   const logout = () => {
     localStorage.removeItem('auth_token');
     localStorage.removeItem(OMNI_FEED_STORAGE_KEY);
     setUser(null);
+
+    // Clear encryption keys
+    clearKeys();
+
     // Optionally call backend logout endpoint
     api.post('/auth/logout').catch(() => {
       // Ignore errors on logout
