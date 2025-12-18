@@ -8,7 +8,6 @@ import { usersService } from '../services/usersService';
 import { messagesService } from '../services/messagesService';
 import { useMessagingWebSocket } from '../hooks/useMessagingWebSocket';
 import type { UserProfile } from '../types/users';
-import type { Conversation } from '../types/messages';
 
 export default function MainLayout() {
   const { user, logout } = useAuth();

@@ -31,7 +31,7 @@ export interface RedditApiPost {
   over_18?: boolean;
   post_hint?: string;
   is_video?: boolean;
-  is_self?: boolean;
+  is_self: boolean;
   link_flair_text?: string;
   link_flair_background_color?: string;
   link_flair_text_color?: 'light' | 'dark' | string;
@@ -90,6 +90,24 @@ export interface RedditApiPost {
       thumbnail_height?: number;
     };
   };
+}
+
+export interface RedditPostsResponse {
+  posts: RedditApiPost[];
+  after?: string | null;
+  before?: string | null;
+}
+
+export interface RedditComment {
+  id: string;
+  author: string;
+  body: string;
+  created_utc: number;
+  score: number;
+  parent_id?: string;
+  permalink?: string;
+  depth?: number;
+  replies?: RedditComment[] | string | null;
 }
 
 export interface RedditUserComment {
