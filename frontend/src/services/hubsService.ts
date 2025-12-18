@@ -4,6 +4,12 @@ import {
   type FeedTimeRangeOptions,
 } from '../utils/timeRangeParams';
 
+export interface HubModerator {
+  id: number;
+  username: string;
+  avatar_url?: string | null;
+}
+
 export interface Hub {
   id: number;
   name: string;
@@ -15,6 +21,7 @@ export interface Hub {
   subscriber_count: number;
   created_by?: number;
   created_at: string;
+  moderators?: HubModerator[];
 }
 
 export interface CreateHubRequest {
@@ -163,7 +170,8 @@ export const hubsService = {
 
   // Hub creation
   async createHub(data: CreateHubRequest): Promise<Hub> {
-    return api.post<Hub>('/hubs', data);
+    const response = await api.post<Hub | { hub: Hub }>('/hubs', data);
+    return 'hub' in response ? response.hub : response;
   },
 
   async getUserHubs(): Promise<UserHubsResponse> {

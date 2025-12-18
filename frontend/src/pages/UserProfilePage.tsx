@@ -369,6 +369,30 @@ export default function UserProfilePage() {
         )}
       </div>
 
+      {profile.moderated_hubs && profile.moderated_hubs.length > 0 && (
+        <div className="mt-6 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
+          <h3 className="text-sm font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
+            Moderator of
+          </h3>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {profile.moderated_hubs.map((hub) => (
+              <Link
+                key={hub.id}
+                to={`/h/${hub.name}`}
+                className="inline-flex items-center gap-2 rounded-full border border-[var(--color-border)] px-3 py-1 text-sm font-medium text-[var(--color-text-primary)] hover:border-[var(--color-primary)] hover:text-[var(--color-primary)]"
+              >
+                h/{hub.name}
+                {hub.title && (
+                  <span className="text-xs font-normal text-[var(--color-text-secondary)]">
+                    {hub.title}
+                  </span>
+                )}
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="mt-6 border-b border-[var(--color-border)]">
         <div className="-mb-px flex gap-4">
           {visibleTabs.map((tab) => (
@@ -389,6 +413,7 @@ export default function UserProfilePage() {
       </div>
 
       <div className="mt-6">{renderActiveTab()}</div>
+
     </div>
   );
 }

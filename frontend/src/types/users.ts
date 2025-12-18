@@ -1,5 +1,11 @@
 import type { PlatformPost, PostComment } from './posts';
 
+export interface ModeratedHubSummary {
+  id: number;
+  name: string;
+  title?: string | null;
+}
+
 export interface UserProfile {
   id: number;
   username: string;
@@ -9,6 +15,7 @@ export interface UserProfile {
   public_key?: string | null;
   created_at: string;
   last_seen: string;
+  moderated_hubs?: ModeratedHubSummary[];
 }
 
 export interface UserPostsResponse {

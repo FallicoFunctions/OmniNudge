@@ -121,7 +121,18 @@ func (h *HubsHandler) Get(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Hub not found"})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"hub": hubResponse(hub)})
+	response := hubResponse(hub)
+
+	if h.modRepo != nil {
+		moderators, err := h.modRepo.GetModeratorsForHub(c.Request.Context(), hub.ID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load moderators", "details": err.Error()})
+			return
+		}
+		response["moderators"] = moderatorsResponse(moderators)
+	}
+
+	c.JSON(http.StatusOK, gin.H{"hub": response})
 }
 
 // List handles GET /api/v1/hubs
@@ -389,6 +400,21 @@ func hubsResponse(hubs []*models.Hub) []gin.H {
 	out := make([]gin.H, len(hubs))
 	for i, hub := range hubs {
 		out[i] = hubResponse(hub)
+	}
+	return out
+}
+
+func moderatorsResponse(mods []models.HubModeratorUser) []gin.H {
+	out := make([]gin.H, len(mods))
+	for i, mod := range mods {
+		item := gin.H{
+			"id":       mod.UserID,
+			"username": mod.Username,
+		}
+		if mod.AvatarURL != nil {
+			item["avatar_url"] = *mod.AvatarURL
+		}
+		out[i] = item
 	}
 	return out
 }

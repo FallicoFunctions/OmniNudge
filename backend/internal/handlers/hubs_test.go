@@ -127,6 +127,44 @@ func TestCreateHub(t *testing.T) {
 	}
 }
 
+func TestGetHubIncludesModerators(t *testing.T) {
+	handler, hubRepo, _, cleanup := setupHubsTest(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	hub := &models.Hub{
+		Name:      "modhub",
+		Type:      "public",
+		CreatedBy: intPtr(1),
+	}
+	require.NoError(t, hubRepo.Create(ctx, hub))
+
+	require.NotNil(t, handler.modRepo)
+	require.NoError(t, handler.modRepo.AddModerator(ctx, hub.ID, 1))
+
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	router.GET("/hubs/:name", handler.Get)
+
+	req := httptest.NewRequest(http.MethodGet, "/hubs/modhub", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	var response map[string]map[string]interface{}
+	err := json.Unmarshal(w.Body.Bytes(), &response)
+	require.NoError(t, err)
+
+	hubData := response["hub"]
+	moderators, ok := hubData["moderators"].([]interface{})
+	assert.True(t, ok)
+	assert.Len(t, moderators, 1)
+	first := moderators[0].(map[string]interface{})
+	assert.Equal(t, float64(1), first["id"])
+	assert.NotEmpty(t, first["username"])
+}
+
 func TestGetHub(t *testing.T) {
 	handler, hubRepo, _, cleanup := setupHubsTest(t)
 	defer cleanup()
