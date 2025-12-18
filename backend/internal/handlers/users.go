@@ -18,6 +18,7 @@ type UsersHandler struct {
 	postRepo    *models.PlatformPostRepository
 	commentRepo *models.PostCommentRepository
 	authService *services.AuthService
+	hubModRepo  *models.HubModeratorRepository
 }
 
 // NewUsersHandler creates a new UsersHandler
@@ -26,25 +27,35 @@ func NewUsersHandler(
 	postRepo *models.PlatformPostRepository,
 	commentRepo *models.PostCommentRepository,
 	authService *services.AuthService,
+	hubModRepo *models.HubModeratorRepository,
 ) *UsersHandler {
 	return &UsersHandler{
 		userRepo:    userRepo,
 		postRepo:    postRepo,
 		commentRepo: commentRepo,
 		authService: authService,
+		hubModRepo:  hubModRepo,
 	}
 }
 
 // UserProfileResponse exposes safe profile fields
 type UserProfileResponse struct {
-	ID        int     `json:"id"`
-	Username  string  `json:"username"`
-	AvatarURL *string `json:"avatar_url,omitempty"`
-	Bio       *string `json:"bio,omitempty"`
-	Karma     int     `json:"karma"`
-	PublicKey *string `json:"public_key,omitempty"`
-	CreatedAt string  `json:"created_at"`
-	LastSeen  string  `json:"last_seen"`
+	ID        int                    `json:"id"`
+	Username  string                 `json:"username"`
+	AvatarURL *string                `json:"avatar_url,omitempty"`
+	Bio       *string                `json:"bio,omitempty"`
+	Karma     int                    `json:"karma"`
+	PublicKey *string                `json:"public_key,omitempty"`
+	CreatedAt string                 `json:"created_at"`
+	LastSeen  string                 `json:"last_seen"`
+	Moderated []ModeratedHubResponse `json:"moderated_hubs,omitempty"`
+}
+
+// ModeratedHubResponse describes a hub a user moderates
+type ModeratedHubResponse struct {
+	ID    int     `json:"id"`
+	Name  string  `json:"name"`
+	Title *string `json:"title,omitempty"`
 }
 
 // GetUserProfile handles GET /api/v1/users/:username
@@ -61,7 +72,24 @@ func (h *UsersHandler) GetUserProfile(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, UserProfileResponse{
+	var moderatedHubs []ModeratedHubResponse
+	if h.hubModRepo != nil {
+		hubs, err := h.hubModRepo.GetHubsForModerator(c.Request.Context(), user.ID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch moderated hubs", "details": err.Error()})
+			return
+		}
+		for _, hub := range hubs {
+			hubCopy := hub
+			moderatedHubs = append(moderatedHubs, ModeratedHubResponse{
+				ID:    hubCopy.HubID,
+				Name:  hubCopy.Name,
+				Title: hubCopy.Title,
+			})
+		}
+	}
+
+	response := UserProfileResponse{
 		ID:        user.ID,
 		Username:  user.Username,
 		AvatarURL: user.AvatarURL,
@@ -70,7 +98,12 @@ func (h *UsersHandler) GetUserProfile(c *gin.Context) {
 		PublicKey: user.PublicKey,
 		CreatedAt: user.CreatedAt.Format(time.RFC3339),
 		LastSeen:  user.LastSeen.Format(time.RFC3339),
-	})
+	}
+	if len(moderatedHubs) > 0 {
+		response.Moderated = moderatedHubs
+	}
+
+	c.JSON(http.StatusOK, response)
 }
 
 // GetUserPosts handles GET /api/v1/users/:username/posts
