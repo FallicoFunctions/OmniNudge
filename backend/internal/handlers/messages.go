@@ -433,6 +433,15 @@ func (h *MessagesHandler) DeleteMessage(c *gin.Context) {
 		return
 	}
 
+	deleteScope := strings.ToLower(strings.TrimSpace(c.DefaultQuery("delete_for", "self")))
+	if deleteScope == "" {
+		deleteScope = "self"
+	}
+	if deleteScope != "self" && deleteScope != "both" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid delete_for value. Must be 'self' or 'both'"})
+		return
+	}
+
 	messageID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid message ID"})
@@ -456,15 +465,31 @@ func (h *MessagesHandler) DeleteMessage(c *gin.Context) {
 		return
 	}
 
-	// Soft delete for this user
-	if err := h.messageRepo.SoftDeleteForUser(c.Request.Context(), messageID, userID.(int)); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete message", "details": err.Error()})
-		return
+	if deleteScope == "both" {
+		if message.SenderID != userID.(int) {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Only the message sender can delete for both users"})
+			return
+		}
+
+		if err := h.messageRepo.SoftDeleteForBoth(c.Request.Context(), messageID); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete message for both users", "details": err.Error()})
+			return
+		}
+	} else {
+		// Soft delete for this user
+		if err := h.messageRepo.SoftDeleteForUser(c.Request.Context(), messageID, userID.(int)); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete message", "details": err.Error()})
+			return
+		}
 	}
 
 	// Attempt hard delete if both users have deleted
 	// (This will silently fail if not both deleted, which is fine)
 	_ = h.messageRepo.HardDelete(c.Request.Context(), messageID)
 
-	c.JSON(http.StatusOK, gin.H{"message": "Message deleted successfully"})
+	if deleteScope == "both" {
+		c.JSON(http.StatusOK, gin.H{"message": "Message deleted for both users"})
+	} else {
+		c.JSON(http.StatusOK, gin.H{"message": "Message deleted successfully"})
+	}
 }

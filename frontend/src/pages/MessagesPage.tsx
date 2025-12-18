@@ -323,6 +323,9 @@ export default function MessagesPage() {
   const [isCreatingChat, setIsCreatingChat] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploadingMedia, setUploadingMedia] = useState(false);
+  const [messageMenuOpen, setMessageMenuOpen] = useState<number | null>(null);
+  const [deleteDialogMessage, setDeleteDialogMessage] = useState<Message | null>(null);
+  const [deleteScopeInFlight, setDeleteScopeInFlight] = useState<'self' | 'both' | null>(null);
   const queryClient = useQueryClient();
   const [searchParams] = useSearchParams();
   const toUsernameParam = searchParams.get('to');
@@ -367,6 +370,36 @@ export default function MessagesPage() {
         setIsCreatingChat(false);
         setNewChatUsername('');
       }
+    },
+  });
+
+  const deleteMessageMutation = useMutation({
+    mutationFn: ({
+      messageId,
+      deleteFor,
+    }: {
+      messageId: number;
+      deleteFor: 'self' | 'both';
+      conversationId: number;
+    }) => messagesService.deleteMessage(messageId, { deleteFor }),
+    onMutate: (variables) => {
+      setDeleteScopeInFlight(variables.deleteFor);
+      return variables;
+    },
+    onSuccess: (_, variables) => {
+      queryClient.setQueryData<Message[] | undefined>(
+        ['messages', variables.conversationId],
+        (prev) => (prev ? prev.filter((msg) => msg.id !== variables.messageId) : prev)
+      );
+      queryClient.invalidateQueries({ queryKey: ['conversations'] });
+      setDeleteDialogMessage(null);
+      setMessageMenuOpen(null);
+    },
+    onError: (error) => {
+      alert(error instanceof Error ? error.message : 'Failed to delete message');
+    },
+    onSettled: () => {
+      setDeleteScopeInFlight(null);
     },
   });
 
@@ -576,6 +609,15 @@ export default function MessagesPage() {
     }
   };
 
+  const handleDeleteMessageChoice = (deleteFor: 'self' | 'both') => {
+    if (!deleteDialogMessage) return;
+    deleteMessageMutation.mutate({
+      messageId: deleteDialogMessage.id,
+      conversationId: deleteDialogMessage.conversation_id,
+      deleteFor,
+    });
+  };
+
   const selectedConversation = conversations?.find((c) => c.id === selectedConversationId);
   const orderedMessages = useMemo(() => (messages ? [...messages].reverse() : []), [messages]);
   const messagesContainerRef = useRef<HTMLDivElement | null>(null);
@@ -585,6 +627,7 @@ export default function MessagesPage() {
       container.scrollTop = container.scrollHeight;
     }
   }, []);
+  const canDeleteForBoth = Boolean(deleteDialogMessage && deleteDialogMessage.sender_id === user?.id);
 
   const markConversationAsRead = useCallback(
     async (conversationId: number) => {
@@ -628,11 +671,39 @@ export default function MessagesPage() {
 
   useEffect(() => {
     if (!selectedConversationId || isCreatingChat || loadingMessages) return;
-    scrollToLatestMessage();
+    // Use setTimeout to ensure DOM has updated with new messages
+    const timer = setTimeout(() => {
+      scrollToLatestMessage();
+    }, 100);
+    return () => clearTimeout(timer);
   }, [selectedConversationId, isCreatingChat, loadingMessages, scrollToLatestMessage, messages]);
 
+  useEffect(() => {
+    setMessageMenuOpen(null);
+    setDeleteDialogMessage(null);
+  }, [selectedConversationId]);
+
+  useEffect(() => {
+    if (messageMenuOpen === null) return;
+    const handleClick = (event: MouseEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (!target) {
+        setMessageMenuOpen(null);
+        return;
+      }
+      const container = target.closest('[data-message-menu-container]');
+      if (!container || container.getAttribute('data-message-menu-container') !== String(messageMenuOpen)) {
+        setMessageMenuOpen(null);
+      }
+    };
+
+    document.addEventListener('click', handleClick);
+    return () => document.removeEventListener('click', handleClick);
+  }, [messageMenuOpen]);
+
   return (
-    <div className="mx-auto flex h-[calc(100vh-8rem)] max-w-6xl gap-4 px-4 py-8">
+    <>
+      <div className="mx-auto flex h-[calc(100vh-8rem)] max-w-6xl gap-4 px-4 py-8">
       {/* Conversations List */}
       <div className="w-80 flex-shrink-0 overflow-hidden rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)]">
         <div className="border-b border-[var(--color-border)] p-4">
@@ -730,43 +801,73 @@ export default function MessagesPage() {
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {orderedMessages.map((message) => (
-                    <div
-                      key={message.id}
-                      className={`flex ${message.sender_id === user?.id ? 'justify-end' : 'justify-start'}`}
-                    >
+                  {orderedMessages.map((message) => {
+                    const isOwnMessage = message.sender_id === user?.id;
+                    return (
                       <div
-                        className={`max-w-md rounded-lg px-4 py-2 ${
-                          message.sender_id === user?.id
-                            ? 'bg-[var(--color-primary)] text-white'
-                            : 'bg-[var(--color-surface-elevated)] text-[var(--color-text-primary)]'
-                        }`}
+                        key={message.id}
+                        className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'}`}
+                        data-message-menu-container={message.id}
                       >
-                        {message.media_url && (
-                          <MessageMediaPreview
-                            message={message}
-                            isOwnMessage={message.sender_id === user?.id}
-                          />
-                        )}
-                        {message.encrypted_content && !isAutoGeneratedMediaCaption(message) && (
-                          <DecryptedMessageContent
-                            message={message}
-                            isOwnMessage={message.sender_id === user?.id}
-                            className="text-sm"
-                          />
-                        )}
-                        <span
-                          className={`mt-1 block text-xs ${
-                            message.sender_id === user?.id
-                              ? 'text-white/70'
-                              : 'text-[var(--color-text-muted)]'
-                          }`}
-                        >
-                          {new Date(message.sent_at).toLocaleTimeString()}
-                        </span>
+                        <div className={`flex items-start gap-2 ${isOwnMessage ? 'flex-row-reverse' : ''}`}>
+                          <div
+                            className={`max-w-md rounded-lg px-4 py-2 ${
+                              isOwnMessage
+                                ? 'bg-[var(--color-primary)] text-white'
+                                : 'bg-[var(--color-surface-elevated)] text-[var(--color-text-primary)]'
+                            }`}
+                          >
+                            {message.media_url && (
+                              <MessageMediaPreview message={message} isOwnMessage={isOwnMessage} />
+                            )}
+                            {message.encrypted_content && !isAutoGeneratedMediaCaption(message) && (
+                              <DecryptedMessageContent
+                                message={message}
+                                isOwnMessage={isOwnMessage}
+                                className="text-sm"
+                              />
+                            )}
+                            <span
+                              className={`mt-1 block text-xs ${
+                                isOwnMessage ? 'text-white/70' : 'text-[var(--color-text-muted)]'
+                              }`}
+                            >
+                              {new Date(message.sent_at).toLocaleTimeString()}
+                            </span>
+                          </div>
+                          <div className="relative">
+                            <button
+                              type="button"
+                              aria-label="Message options"
+                              className="rounded-full border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-2 py-1 text-xs font-semibold text-[var(--color-text-secondary)] transition hover:bg-[var(--color-surface)] hover:text-[var(--color-text-primary)]"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                setMessageMenuOpen((prev) => (prev === message.id ? null : message.id));
+                              }}
+                            >
+                              ...
+                            </button>
+                            {messageMenuOpen === message.id && (
+                              <div
+                                className={`absolute ${isOwnMessage ? 'left-0' : 'right-0'} z-20 mt-2 w-44 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] p-2 shadow-lg`}
+                              >
+                                <button
+                                  type="button"
+                                  className="w-full rounded-md px-3 py-2 text-left text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
+                                  onClick={() => {
+                                    setMessageMenuOpen(null);
+                                    setDeleteDialogMessage(message);
+                                  }}
+                                >
+                                  Delete
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
 
                   {orderedMessages.length === 0 && (
                     <div className="text-center text-sm text-[var(--color-text-secondary)]">
@@ -843,6 +944,67 @@ export default function MessagesPage() {
           </div>
         )}
       </div>
-    </div>
+      </div>
+      {deleteDialogMessage && (
+        <div
+          className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4"
+          role="dialog"
+          aria-modal="true"
+          onClick={() => {
+            if (!deleteMessageMutation.isPending) {
+              setDeleteDialogMessage(null);
+            }
+          }}
+        >
+          <div
+            className="w-full max-w-md rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6 shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">Delete message?</h3>
+            <p className="mt-2 text-sm text-[var(--color-text-secondary)]">
+              {canDeleteForBoth
+                ? 'Do you want to remove this message for yourself only or for both participants?'
+                : 'This will remove the message for you only.'}
+            </p>
+            <div className="mt-6 flex flex-col gap-3">
+              <button
+                type="button"
+                className="rounded-md border border-[var(--color-border)] px-4 py-2 text-sm font-semibold text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)] disabled:opacity-50"
+                onClick={() => handleDeleteMessageChoice('self')}
+                disabled={deleteMessageMutation.isPending}
+              >
+                {deleteMessageMutation.isPending && deleteScopeInFlight === 'self'
+                  ? 'Deleting...'
+                  : 'Delete for me'}
+              </button>
+              {canDeleteForBoth && (
+                <button
+                  type="button"
+                  className="rounded-md bg-[var(--color-error)] px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-50"
+                  onClick={() => handleDeleteMessageChoice('both')}
+                  disabled={deleteMessageMutation.isPending}
+                >
+                  {deleteMessageMutation.isPending && deleteScopeInFlight === 'both'
+                    ? 'Deleting for both...'
+                    : 'Delete for both users'}
+                </button>
+              )}
+              <button
+                type="button"
+                className="rounded-md px-4 py-2 text-sm font-semibold text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] disabled:opacity-50"
+                onClick={() => {
+                  if (!deleteMessageMutation.isPending) {
+                    setDeleteDialogMessage(null);
+                  }
+                }}
+                disabled={deleteMessageMutation.isPending}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }

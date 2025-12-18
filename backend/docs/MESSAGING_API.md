@@ -308,6 +308,8 @@ Mark all messages in a conversation as read.
 Delete a message (soft delete for the current user).
 
 **Endpoint:** `DELETE /messages/:id`
+**Query Parameters:**
+- `delete_for` (optional) - `self` (default) to hide for current user only, or `both` to hide for both participants (only allowed for the original sender).
 **Auth Required:** Yes
 
 **Response:** `200 OK`
@@ -319,7 +321,9 @@ Delete a message (soft delete for the current user).
 
 **Error Codes:**
 - `403` - Not a participant in this message
+- `403` - Attempted to delete for both without being the sender
 - `404` - Message not found
+- `400` - Invalid `delete_for` parameter
 
 **Note:** Messages are soft-deleted per user. If both users delete, the message is permanently removed.
 
