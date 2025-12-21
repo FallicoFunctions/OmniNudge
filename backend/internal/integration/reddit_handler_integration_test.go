@@ -11,9 +11,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gin-gonic/gin"
 	"github.com/omninudge/backend/internal/handlers"
 	"github.com/omninudge/backend/internal/services"
-	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
 )
 
@@ -60,7 +60,7 @@ func (t *stubTransport) RoundTrip(_ *http.Request) (*http.Response, error) {
 func TestRedditFrontpageMockCaching(t *testing.T) {
 	var hits int32
 	cache := &mapCache{store: make(map[string]string)}
-	client := services.NewRedditClient("ua", cache, 5*time.Minute)
+	client := services.NewRedditClient("ua", cache, 5*time.Minute, "", "")
 	client.HTTPClientForTest().Transport = &stubTransport{hits: &hits}
 
 	gin.SetMode(gin.TestMode)

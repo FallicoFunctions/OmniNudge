@@ -25,7 +25,6 @@ import {
 import type {
   SubredditSuggestion,
   RedditSubredditAbout,
-  RedditSubredditModerator,
 } from '../types/reddit';
 import { SubscribeButton } from '../components/common/SubscribeButton';
 import { RedditPostCard } from '../components/reddit/RedditPostCard';
@@ -544,16 +543,7 @@ export default function RedditPage() {
     staleTime: 1000 * 60 * 10,
   });
 
-  const {
-    data: subredditModerators,
-    isLoading: loadingSubredditModerators,
-    isError: moderatorsError,
-  } = useQuery<RedditSubredditModerator[]>({
-    queryKey: ['subreddit-moderators', subreddit],
-    queryFn: () => redditService.getSubredditModerators(subreddit),
-    enabled: shouldShowSubredditSidebar,
-    staleTime: 1000 * 60 * 10,
-  });
+  // Reddit's public API does not provide moderator lists without OAuth
 
   const sidebarHtml = useMemo(
     () => sanitizeRedditSidebarHtml(subredditAbout?.description_html),
@@ -1053,47 +1043,12 @@ export default function RedditPage() {
               </div>
 
               <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
-                    Moderators
-                  </h3>
-                  {subredditModerators && subredditModerators.length > 0 && (
-                    <span className="text-xs text-[var(--color-text-secondary)]">
-                      {subredditModerators.length}
-                    </span>
-                  )}
-                </div>
-                {loadingSubredditModerators ? (
-                  <p className="mt-3 text-sm text-[var(--color-text-secondary)]">
-                    Loading moderators…
-                  </p>
-                ) : moderatorsError ? (
-                  <p className="mt-3 text-sm text-[var(--color-text-secondary)]">
-                    Unable to load moderators.
-                  </p>
-                ) : subredditModerators && subredditModerators.length > 0 ? (
-                  <ul className="mt-3 space-y-2">
-                    {subredditModerators.map((moderator) => (
-                      <li key={moderator.id ?? moderator.name} className="text-sm">
-                        <Link
-                          to={`/reddit/user/${moderator.name}`}
-                          className="font-medium text-[var(--color-text-primary)] hover:text-[var(--color-primary)]"
-                        >
-                          u/{moderator.name}
-                        </Link>
-                        {moderator.author_flair_text && (
-                          <span className="ml-2 text-xs text-[var(--color-text-secondary)]">
-                            {moderator.author_flair_text}
-                          </span>
-                        )}
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="mt-3 text-sm text-[var(--color-text-secondary)]">
-                    No moderators listed.
-                  </p>
-                )}
+                <h3 className="text-sm font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
+                  Moderators
+                </h3>
+                <p className="mt-3 text-sm text-[var(--color-text-secondary)]">
+                  Public Reddit API does not provide the moderator list.
+                </p>
               </div>
             </aside>
           )}

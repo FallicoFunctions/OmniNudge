@@ -88,7 +88,13 @@ func main() {
 	if cfg.Redis.Addr != "" {
 		cache = services.NewRedisCache(cfg.Redis.Addr, cfg.Redis.Password, 2*time.Second)
 	}
-	redditClient := services.NewRedditClient(cfg.Reddit.UserAgent, cache, time.Duration(cfg.Redis.TTLSeconds)*time.Second)
+	redditClient := services.NewRedditClient(
+		cfg.Reddit.UserAgent,
+		cache,
+		time.Duration(cfg.Redis.TTLSeconds)*time.Second,
+		cfg.Reddit.ClientID,
+		cfg.Reddit.ClientSecret,
+	)
 
 	// Initialize notification services
 	notificationService := services.NewNotificationService(

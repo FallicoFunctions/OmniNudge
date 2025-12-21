@@ -185,3 +185,8 @@ export interface RedditSubredditModerator {
   author_flair_text?: string | null;
   mod_permissions?: string[];
 }
+
+export interface SubredditModeratorsResponse {
+  moderators: RedditSubredditModerator[];
+  warning?: string;
+}
