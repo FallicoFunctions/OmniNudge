@@ -3,24 +3,52 @@ package services
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"html"
 	"io"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
+
+	"github.com/PuerkitoBio/goquery"
 )
 
 // RedditClient handles interactions with Reddit's public JSON API
 type RedditClient struct {
-	userAgent  string
-	httpClient *http.Client
-	cache      Cache
-	cacheTTL   time.Duration
+	userAgent    string
+	httpClient   *http.Client
+	cache        Cache
+	cacheTTL     time.Duration
+	clientID     string
+	clientSecret string
+	tokenMu      sync.Mutex
+	appToken     *redditAppToken
+}
+
+type redditAppToken struct {
+	value  string
+	expiry time.Time
+}
+
+// ErrRedditModeratorsUnavailable indicates Reddit refused to return the moderators list.
+var ErrRedditModeratorsUnavailable = errors.New("reddit moderators list unavailable without authentication")
+
+type redditHTTPError struct {
+	statusCode int
+	body       string
+}
+
+func (e *redditHTTPError) Error() string {
+	if e == nil {
+		return ""
+	}
+	return fmt.Sprintf("reddit responded with status %d: %s", e.statusCode, strings.TrimSpace(e.body))
 }
 
 // NewRedditClient creates a new Reddit client
-func NewRedditClient(userAgent string, cache Cache, cacheTTL time.Duration) *RedditClient {
+func NewRedditClient(userAgent string, cache Cache, cacheTTL time.Duration, clientID, clientSecret string) *RedditClient {
 	if cache == nil {
 		cache = NoopCache{}
 	}
@@ -32,8 +60,10 @@ func NewRedditClient(userAgent string, cache Cache, cacheTTL time.Duration) *Red
 		httpClient: &http.Client{
 			Timeout: 10 * time.Second,
 		},
-		cache:    cache,
-		cacheTTL: cacheTTL,
+		cache:        cache,
+		cacheTTL:     cacheTTL,
+		clientID:     clientID,
+		clientSecret: clientSecret,
 	}
 }
 
@@ -941,12 +971,54 @@ func (r *RedditClient) GetSubredditModerators(ctx context.Context, subreddit str
 		}
 	}
 
-	url := fmt.Sprintf("https://www.reddit.com/r/%s/about/moderators.json", subreddit)
+	mods, err := r.fetchSubredditModeratorsAPI(ctx, subreddit)
+	if err != nil {
+		var httpErr *redditHTTPError
+		if errors.As(err, &httpErr) && httpErr.statusCode == http.StatusForbidden {
+			if fallbackMods, scrapeErr := r.fetchSubredditModeratorsFromHTML(ctx, subreddit); scrapeErr == nil {
+				mods = fallbackMods
+			} else {
+				if errors.Is(scrapeErr, ErrRedditModeratorsUnavailable) {
+					return nil, ErrRedditModeratorsUnavailable
+				}
+				return nil, scrapeErr
+			}
+		} else {
+			return nil, err
+		}
+	}
+
+	if data, err := json.Marshal(mods); err == nil {
+		_ = r.cache.Set(ctx, cacheKey, string(data), r.cacheTTL)
+	}
+
+	return mods, nil
+}
+
+func (r *RedditClient) fetchSubredditModeratorsAPI(ctx context.Context, subreddit string) ([]RedditSubredditModerator, error) {
+	token := ""
+	if r.clientID != "" && r.clientSecret != "" {
+		var err error
+		token, err = r.getAppAccessToken(ctx)
+		if err != nil {
+			token = ""
+		}
+	}
+
+	var url string
+	if token != "" {
+		url = fmt.Sprintf("https://oauth.reddit.com/r/%s/about/moderators", subreddit)
+	} else {
+		url = fmt.Sprintf("https://www.reddit.com/r/%s/about/moderators.json", subreddit)
+	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create subreddit moderators request: %w", err)
 	}
 	req.Header.Set("User-Agent", r.userAgent)
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
 
 	resp, err := r.httpClient.Do(req)
 	if err != nil {
@@ -956,7 +1028,7 @@ func (r *RedditClient) GetSubredditModerators(ctx context.Context, subreddit str
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("reddit API returned status %d: %s", resp.StatusCode, string(body))
+		return nil, &redditHTTPError{statusCode: resp.StatusCode, body: string(body)}
 	}
 
 	var raw struct {
@@ -982,12 +1054,143 @@ func (r *RedditClient) GetSubredditModerators(ctx context.Context, subreddit str
 			ModPermissions:  mod.ModPermissions,
 		})
 	}
+	return mods, nil
+}
 
-	if data, err := json.Marshal(mods); err == nil {
-		_ = r.cache.Set(ctx, cacheKey, string(data), r.cacheTTL)
+func (r *RedditClient) fetchSubredditModeratorsFromHTML(ctx context.Context, subreddit string) ([]RedditSubredditModerator, error) {
+	url := fmt.Sprintf("https://www.reddit.com/r/%s/about/moderators", subreddit)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create moderators fallback request: %w", err)
+	}
+	req.Header.Set("User-Agent", r.userAgent)
+
+	resp, err := r.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch moderators fallback: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusForbidden {
+		return nil, ErrRedditModeratorsUnavailable
+	}
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("failed to scrape moderators: %w", &redditHTTPError{statusCode: resp.StatusCode, body: string(body)})
+	}
+
+	doc, err := goquery.NewDocumentFromReader(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse moderators page: %w", err)
+	}
+
+	extractName := func(href string) (string, bool) {
+		if href == "" {
+			return "", false
+		}
+		trimmed := href
+		trimmed = strings.TrimPrefix(trimmed, "https://www.reddit.com")
+		trimmed = strings.TrimPrefix(trimmed, "https://old.reddit.com")
+		if !strings.HasPrefix(trimmed, "/user/") {
+			return "", false
+		}
+		name := strings.TrimPrefix(trimmed, "/user/")
+		name = strings.Trim(name, "/")
+		if name == "" || strings.Contains(name, "/") {
+			return "", false
+		}
+		return name, true
+	}
+
+	mods := make([]RedditSubredditModerator, 0, 16)
+	seen := make(map[string]bool)
+
+	doc.Find("a[data-testid='moderator-name']").Each(func(_ int, sel *goquery.Selection) {
+		if name, ok := extractName(sel.AttrOr("href", "")); ok && !seen[name] {
+			seen[name] = true
+			mods = append(mods, RedditSubredditModerator{
+				Name:            name,
+				AuthorFlairText: strings.TrimSpace(sel.Text()),
+			})
+		}
+	})
+
+	if len(mods) == 0 {
+		doc.Find("a[href^='/user/'], a[href^='https://www.reddit.com/user/']").Each(func(_ int, sel *goquery.Selection) {
+			if name, ok := extractName(sel.AttrOr("href", "")); ok && !seen[name] {
+				seen[name] = true
+				mods = append(mods, RedditSubredditModerator{
+					Name:            name,
+					AuthorFlairText: strings.TrimSpace(sel.Text()),
+				})
+			}
+		})
+	}
+
+	if len(mods) == 0 {
+		return nil, ErrRedditModeratorsUnavailable
 	}
 
 	return mods, nil
+}
+
+func (r *RedditClient) getAppAccessToken(ctx context.Context) (string, error) {
+	if r.clientID == "" || r.clientSecret == "" {
+		return "", errors.New("reddit client credentials are not configured")
+	}
+
+	r.tokenMu.Lock()
+	defer r.tokenMu.Unlock()
+
+	if r.appToken != nil && time.Until(r.appToken.expiry) > 30*time.Second {
+		return r.appToken.value, nil
+	}
+
+	form := "grant_type=client_credentials"
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://www.reddit.com/api/v1/access_token", strings.NewReader(form))
+	if err != nil {
+		return "", fmt.Errorf("failed to create reddit token request: %w", err)
+	}
+	req.SetBasicAuth(r.clientID, r.clientSecret)
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("User-Agent", r.userAgent)
+
+	resp, err := r.httpClient.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("failed to request reddit token: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return "", fmt.Errorf("reddit token endpoint returned status %d: %s", resp.StatusCode, string(body))
+	}
+
+	var tokenResp struct {
+		AccessToken string `json:"access_token"`
+		TokenType   string `json:"token_type"`
+		ExpiresIn   int    `json:"expires_in"`
+		Scope       string `json:"scope"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&tokenResp); err != nil {
+		return "", fmt.Errorf("failed to decode reddit token response: %w", err)
+	}
+	if tokenResp.AccessToken == "" {
+		return "", errors.New("reddit token response missing access token")
+	}
+
+	expires := tokenResp.ExpiresIn
+	if expires <= 0 {
+		expires = 3600
+	}
+	if expires < 120 {
+		expires = 120
+	}
+	r.appToken = &redditAppToken{
+		value:  tokenResp.AccessToken,
+		expiry: time.Now().Add(time.Duration(expires-60) * time.Second),
+	}
+	return r.appToken.value, nil
 }
 
 func (r *RedditClient) getCachedListing(ctx context.Context, key string) (*RedditListing, bool, error) {

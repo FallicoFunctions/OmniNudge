@@ -63,7 +63,7 @@ func TestRedditClientCachesFrontPage(t *testing.T) {
 	defer ts.Close()
 
 	cache := &mapCache{store: make(map[string]string)}
-	client := NewRedditClient("test-agent", cache, time.Minute)
+	client := NewRedditClient("test-agent", cache, time.Minute, "", "")
 	client.httpClient.Transport = &hostRewriteTransport{target: ts}
 
 	ctx := context.Background()
