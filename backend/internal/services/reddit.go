@@ -192,6 +192,32 @@ type RedditModeratedSubreddit struct {
 	Subscribers int    `json:"subscribers"`
 }
 
+// RedditSubredditAbout contains subreddit metadata/sidebar details
+type RedditSubredditAbout struct {
+	DisplayName         string  `json:"display_name"`
+	DisplayNamePrefixed string  `json:"display_name_prefixed"`
+	Title               string  `json:"title"`
+	PublicDescription   string  `json:"public_description"`
+	Description         string  `json:"description"`
+	DescriptionHTML     string  `json:"description_html"`
+	CommunityIcon       string  `json:"community_icon"`
+	IconImg             string  `json:"icon_img"`
+	BannerBackground    string  `json:"banner_background_image"`
+	BannerImg           string  `json:"banner_img"`
+	PrimaryColor        string  `json:"primary_color"`
+	ActiveUserCount     int     `json:"active_user_count"`
+	Subscribers         int     `json:"subscribers"`
+	CreatedUTC          float64 `json:"created_utc"`
+}
+
+// RedditSubredditModerator represents a single moderator entry for a subreddit
+type RedditSubredditModerator struct {
+	ID              string   `json:"id"`
+	Name            string   `json:"name"`
+	AuthorFlairText string   `json:"author_flair_text"`
+	ModPermissions  []string `json:"mod_permissions"`
+}
+
 // SubredditSuggestion represents a subreddit returned from the autocomplete endpoint
 type SubredditSuggestion struct {
 	Name        string `json:"name"`
@@ -851,6 +877,117 @@ func (r *RedditClient) GetUserModeratedSubreddits(ctx context.Context, username 
 	}
 
 	return subs, nil
+}
+
+// GetSubredditAbout fetches sidebar/about metadata for a subreddit
+func (r *RedditClient) GetSubredditAbout(ctx context.Context, subreddit string) (*RedditSubredditAbout, error) {
+	subreddit = strings.TrimSpace(subreddit)
+	if subreddit == "" {
+		return nil, fmt.Errorf("subreddit is required")
+	}
+
+	cacheKey := fmt.Sprintf("sr:about:%s", strings.ToLower(subreddit))
+	if cached, ok, err := r.cache.Get(ctx, cacheKey); err == nil && ok {
+		var about RedditSubredditAbout
+		if err := json.Unmarshal([]byte(cached), &about); err == nil {
+			return &about, nil
+		}
+	}
+
+	url := fmt.Sprintf("https://www.reddit.com/r/%s/about.json", subreddit)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create subreddit about request: %w", err)
+	}
+	req.Header.Set("User-Agent", r.userAgent)
+
+	resp, err := r.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch subreddit about: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("reddit API returned status %d: %s", resp.StatusCode, string(body))
+	}
+
+	var raw struct {
+		Data RedditSubredditAbout `json:"data"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&raw); err != nil {
+		return nil, fmt.Errorf("failed to decode subreddit about: %w", err)
+	}
+
+	if data, err := json.Marshal(raw.Data); err == nil {
+		_ = r.cache.Set(ctx, cacheKey, string(data), r.cacheTTL)
+	}
+
+	return &raw.Data, nil
+}
+
+// GetSubredditModerators fetches the moderators for a subreddit
+func (r *RedditClient) GetSubredditModerators(ctx context.Context, subreddit string) ([]RedditSubredditModerator, error) {
+	subreddit = strings.TrimSpace(subreddit)
+	if subreddit == "" {
+		return nil, fmt.Errorf("subreddit is required")
+	}
+
+	cacheKey := fmt.Sprintf("sr:mods:%s", strings.ToLower(subreddit))
+	if cached, ok, err := r.cache.Get(ctx, cacheKey); err == nil && ok {
+		var mods []RedditSubredditModerator
+		if err := json.Unmarshal([]byte(cached), &mods); err == nil {
+			return mods, nil
+		}
+	}
+
+	url := fmt.Sprintf("https://www.reddit.com/r/%s/about/moderators.json", subreddit)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create subreddit moderators request: %w", err)
+	}
+	req.Header.Set("User-Agent", r.userAgent)
+
+	resp, err := r.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch subreddit moderators: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("reddit API returned status %d: %s", resp.StatusCode, string(body))
+	}
+
+	var raw struct {
+		Data struct {
+			Children []struct {
+				ID              string   `json:"id"`
+				Name            string   `json:"name"`
+				AuthorFlairText string   `json:"author_flair_text"`
+				ModPermissions  []string `json:"mod_permissions"`
+			} `json:"children"`
+		} `json:"data"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&raw); err != nil {
+		return nil, fmt.Errorf("failed to decode subreddit moderators: %w", err)
+	}
+
+	mods := make([]RedditSubredditModerator, 0, len(raw.Data.Children))
+	for _, mod := range raw.Data.Children {
+		mods = append(mods, RedditSubredditModerator{
+			ID:              mod.ID,
+			Name:            mod.Name,
+			AuthorFlairText: mod.AuthorFlairText,
+			ModPermissions:  mod.ModPermissions,
+		})
+	}
+
+	if data, err := json.Marshal(mods); err == nil {
+		_ = r.cache.Set(ctx, cacheKey, string(data), r.cacheTTL)
+	}
+
+	return mods, nil
 }
 
 func (r *RedditClient) getCachedListing(ctx context.Context, key string) (*RedditListing, bool, error) {

@@ -47,6 +47,46 @@ type TabKey = 'omni' | 'reddit';
 
 const PAGE_SIZE = 25;
 
+const normalizeRemovedLabel = (value?: string | null) => {
+  if (!value) {
+    return '';
+  }
+  const normalized = value
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+  return normalized;
+};
+
+const isRemovedText = (value?: string | null) => {
+  const normalized = normalizeRemovedLabel(value);
+  if (!normalized) {
+    return false;
+  }
+  const stripped = normalized.replace(/[\[\]()]/g, '');
+  return (
+    normalized === '[removed]' ||
+    normalized === '[deleted]' ||
+    normalized.includes('removed by moderator') ||
+    stripped === 'removed' ||
+    stripped === 'deleted' ||
+    stripped === 'removed by moderator'
+  );
+};
+
+const isRedditPostLikelyRemoved = (post: SavedRedditPost, overrides?: Partial<SavedRedditPost>) => {
+  if (isRemovedText(post.title) || isRemovedText(post.author)) {
+    return true;
+  }
+  if (overrides && (isRemovedText(overrides.title) || isRemovedText(overrides.author))) {
+    return true;
+  }
+  return false;
+};
+
+const getPostKey = (post: SavedRedditPost) => `${post.subreddit}-${post.reddit_post_id}`;
+
 type HiddenItemsViewProps = {
   withContainer?: boolean;
   showHeading?: boolean;
@@ -88,19 +128,30 @@ export function HiddenItemsView({
     [data?.hidden_reddit_posts]
   );
   const [postDetails, setPostDetails] = useState<Record<string, Partial<SavedRedditPost>>>({});
+  const visibleHiddenRedditPosts = useMemo(
+    () =>
+      hiddenRedditPosts.filter(
+        (post) => !isRedditPostLikelyRemoved(post, postDetails[getPostKey(post)])
+      ),
+    [hiddenRedditPosts, postDetails]
+  );
+  const removedHiddenRedditPosts = useMemo(
+    () =>
+      hiddenRedditPosts.filter((post) =>
+        isRedditPostLikelyRemoved(post, postDetails[getPostKey(post)])
+      ),
+    [hiddenRedditPosts, postDetails]
+  );
   const fetchingDetailsRef = useRef<Set<string>>(new Set());
   const [saveConfirmTarget, setSaveConfirmTarget] = useState<SavedRedditPost | null>(null);
 
   const postsNeedingDetails = useMemo(
     () =>
-      hiddenRedditPosts.filter((post) => {
-        const titleValue = (post.title ?? '').trim();
-        const missingTitle = titleValue.length === 0;
-        const missingCounts =
-          typeof post.score !== 'number' && typeof post.num_comments !== 'number';
-        return missingTitle || missingCounts;
+      visibleHiddenRedditPosts.filter((post) => {
+        const postKey = getPostKey(post);
+        return !postDetails[postKey];
       }),
-    [hiddenRedditPosts]
+    [visibleHiddenRedditPosts, postDetails]
   );
 
   useEffect(() => {
@@ -160,6 +211,30 @@ export function HiddenItemsView({
     queryClient.invalidateQueries({ queryKey: ['hidden-items', 'all'] });
     queryClient.invalidateQueries({ queryKey: ['hidden-items', 'reddit_posts'] });
   };
+
+  useEffect(() => {
+    if (removedHiddenRedditPosts.length === 0) {
+      return;
+    }
+    let isCancelled = false;
+    const cleanupRemovedPosts = async () => {
+      for (const post of removedHiddenRedditPosts) {
+        try {
+          await savedService.unhideRedditPost(post.subreddit, post.reddit_post_id);
+        } catch (cleanupError) {
+          console.error('Failed to auto-unhide removed Reddit post', cleanupError);
+        }
+      }
+      if (!isCancelled) {
+        invalidateHiddenQueries();
+      }
+    };
+
+    cleanupRemovedPosts();
+    return () => {
+      isCancelled = true;
+    };
+  }, [removedHiddenRedditPosts, invalidateHiddenQueries]);
 
   const unhidePostMutation = useMutation({
     mutationFn: async (postId: number) => {
@@ -266,7 +341,7 @@ export function HiddenItemsView({
     resetPage: resetOmniPage,
   } = usePagination(omniItems, PAGE_SIZE);
 
-  const redditItems = hiddenRedditPosts
+  const redditItems = visibleHiddenRedditPosts
     .map((post) => ({
       key: `hidden-reddit-post-${post.subreddit}-${post.reddit_post_id}`,
       timestamp: toTimestamp(post.saved_at),

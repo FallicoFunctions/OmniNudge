@@ -7,6 +7,8 @@ import type {
   RedditUserAbout,
   RedditUserTrophy,
   RedditModeratedSubreddit,
+  RedditSubredditAbout,
+  RedditSubredditModerator,
 } from '../types/reddit';
 
 export const redditService = {
@@ -33,6 +35,20 @@ export const redditService = {
 
   async getPostComments(subreddit: string, postId: string): Promise<RedditComment[]> {
     return api.get<RedditComment[]>(`/reddit/r/${subreddit}/comments/${postId}`);
+  },
+
+  async getSubredditAbout(subreddit: string): Promise<RedditSubredditAbout> {
+    const response = await api.get<{ subreddit: string; about: RedditSubredditAbout }>(
+      `/reddit/r/${subreddit}/about`
+    );
+    return response.about;
+  },
+
+  async getSubredditModerators(subreddit: string): Promise<RedditSubredditModerator[]> {
+    const response = await api.get<{ subreddit: string; moderators: RedditSubredditModerator[] }>(
+      `/reddit/r/${subreddit}/moderators`
+    );
+    return response.moderators ?? [];
   },
 
   async searchPosts(query: string, subreddit?: string, limit = 25): Promise<RedditPostsResponse> {

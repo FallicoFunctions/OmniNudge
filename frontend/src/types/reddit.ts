@@ -161,3 +161,27 @@ export interface RedditModeratedSubreddit {
   title?: string;
   subscribers?: number;
 }
+
+export interface RedditSubredditAbout {
+  display_name: string;
+  display_name_prefixed?: string;
+  title?: string;
+  public_description?: string;
+  description?: string;
+  description_html?: string;
+  community_icon?: string;
+  icon_img?: string;
+  banner_background_image?: string;
+  banner_img?: string;
+  primary_color?: string;
+  active_user_count?: number;
+  subscribers?: number;
+  created_utc?: number;
+}
+
+export interface RedditSubredditModerator {
+  id?: string;
+  name: string;
+  author_flair_text?: string | null;
+  mod_permissions?: string[];
+}

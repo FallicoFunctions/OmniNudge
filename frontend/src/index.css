@@ -120,6 +120,39 @@ body.theme-transitioning {
   }
 }
 
+.reddit-sidebar-content {
+  font-size: 0.9rem;
+  line-height: 1.6;
+  color: var(--color-text-primary);
+}
+
+.reddit-sidebar-content p,
+.reddit-sidebar-content ul,
+.reddit-sidebar-content ol,
+.reddit-sidebar-content blockquote {
+  margin-bottom: 0.75rem;
+}
+
+.reddit-sidebar-content ul {
+  list-style: disc;
+  padding-left: 1.25rem;
+}
+
+.reddit-sidebar-content ol {
+  list-style: decimal;
+  padding-left: 1.25rem;
+}
+
+.reddit-sidebar-content a {
+  color: var(--color-primary);
+  text-decoration: underline;
+}
+
+.reddit-sidebar-content img {
+  max-width: 100%;
+  height: auto;
+}
+
 /* Fade in animation */
 @keyframes fadeIn {
   from {

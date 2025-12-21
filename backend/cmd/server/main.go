@@ -226,6 +226,8 @@ func main() {
 			reddit.GET("/frontpage", redditHandler.GetFrontPage)
 			reddit.GET("/subreddits/autocomplete", redditHandler.AutocompleteSubreddits)
 			reddit.GET("/r/:subreddit", redditHandler.GetSubredditPosts)
+			reddit.GET("/r/:subreddit/about", redditHandler.GetSubredditAbout)
+			reddit.GET("/r/:subreddit/moderators", redditHandler.GetSubredditModerators)
 			reddit.GET("/r/:subreddit/media", redditHandler.GetSubredditMedia)
 			reddit.GET("/r/:subreddit/comments/:postId", redditHandler.GetPostComments)
 			reddit.GET("/search", redditHandler.SearchPosts)
