@@ -8,12 +8,6 @@ This guide will help you install and run OmniNudge on your Mac computer, even if
 - An internet connection
 - About 30-45 minutes
 
-## What You DON'T Need
-
-Good news! You do NOT need:
-- **Reddit API credentials** - OmniNudge uses Reddit's public API to browse content. No API keys required!
-- **Redis** - The app works fine without Redis. Redis is only used for optional caching to improve performance.
-
 ## Table of Contents
 
 1. [Install Prerequisites](#step-1-install-prerequisites)
@@ -251,9 +245,13 @@ EOF
 
 ### 7.3 Load Environment Variables
 
+Run this command to tell the backend about your database settings:
+
 ```bash
 export $(cat .env | xargs)
 ```
+
+You won't see any output from this command - that's normal.
 
 ### 7.4 Install Go Dependencies
 
@@ -306,11 +304,13 @@ This will take several minutes as it downloads all necessary packages. You'll se
 
 ### 8.4 Set Up Frontend Environment
 
+Run this command to create a configuration file:
+
 ```bash
 cp .env.example .env.development
 ```
 
-This creates a configuration file that tells the frontend where to find the backend server.
+This creates a file called `.env.development` that tells the frontend where to find the backend server.
 
 ### 8.5 Start the Frontend Development Server
 
@@ -322,9 +322,11 @@ You should see something like:
 ```
   VITE ready in XXX ms
 
-  ➜  Local:   http://localhost:5173/
+  ➜  Local:   http://localhost:5176/
   ➜  Network: use --host to expose
 ```
+
+**Important:** Look at the output in your Terminal. It will show you the exact URL to use (usually http://localhost:5176).
 
 **Keep this Terminal window open too!** Both the backend and frontend need to run simultaneously.
 
@@ -335,7 +337,7 @@ You should see something like:
 ### 9.1 Open Your Web Browser
 
 1. Open your favorite web browser (Safari, Chrome, Firefox, etc.)
-2. Go to: **http://localhost:5173**
+2. Go to: **http://localhost:5176**
 
 You should see the OmniNudge application!
 
@@ -402,16 +404,25 @@ source ~/.zshrc
 
 ### Problem: "port already in use" error
 
-**Solution:** Another program is using port 8080 or 5173. You can either:
-1. Find and stop the other program
-2. Or change the port in the `.env` file (backend) or by setting `PORT=3000` before running `npm run dev` (frontend)
+**Solution:** This means another program is already using port 8080 or 5176.
+
+**Simple fix:** Try restarting your computer, then start OmniNudge again.
+
+**Alternative:** If you know how to find and stop programs using specific ports, you can do that. Otherwise, ask someone technical for help with this error.
 
 ### Problem: Cannot connect to database
 
 **Solution:**
-1. Make sure PostgreSQL is running: `brew services list`
-2. Check your database credentials in the `.env` file
-3. Try recreating the database:
+1. Check if PostgreSQL is running by typing this command in Terminal:
+   ```bash
+   brew services list
+   ```
+   Look for postgresql@16 - it should say "started". If it says "stopped", start it with:
+   ```bash
+   brew services start postgresql@16
+   ```
+2. Check your database credentials in the `.env` file (in the backend folder). Make sure the password matches what you set earlier.
+3. Try recreating the database by running these commands in Terminal:
    ```bash
    dropdb omninudge_dev
    createdb -O omninudge_user omninudge_dev
@@ -420,29 +431,39 @@ source ~/.zshrc
 ### Problem: "Password authentication failed"
 
 **Solution:**
-1. Make sure the password in your `.env` file matches what you set when creating the user
-2. Try resetting the user password:
+1. Open the `.env` file in the backend folder (you can use TextEdit or any text editor). Make sure the password on the line that says `DB_PASSWORD=` matches the password you chose when creating the database user.
+2. If you forgot your password, you can reset it by running this command in Terminal (replace `password123` with your new password):
    ```bash
    psql postgres -c "ALTER USER omninudge_user WITH PASSWORD 'password123';"
    ```
+   Then update the `.env` file with the same password.
 
 ### Problem: Backend starts but shows migration errors
 
 **Solution:** The database migrations will run automatically when you start the backend. If you see errors, try:
-1. Stop the backend server (Ctrl+C)
-2. Delete and recreate the database:
+1. In the Terminal window where the backend is running, press `Ctrl+C` to stop the server
+2. Delete and recreate the database by running these commands in Terminal:
    ```bash
    dropdb omninudge_dev
    createdb -O omninudge_user omninudge_dev
    ```
-3. Start the backend again
+3. Start the backend again by running:
+   ```bash
+   cd ~/Documents/OmniNudge/backend
+   export $(cat .env | xargs)
+   go run ./cmd/server/
+   ```
 
 ### Problem: Frontend shows "Cannot connect to server"
 
 **Solution:**
-1. Make sure the backend is running in another Terminal window
-2. Check that the backend is running on `http://localhost:8080`
-3. Verify the `.env.development` file in the frontend folder has:
+1. Check your Terminal windows. You should have TWO Terminal windows/tabs open:
+   - One showing "Server listening on http://localhost:8080" (this is the backend)
+   - One showing "VITE ready" with a localhost URL (this is the frontend)
+
+   If you don't see the "Server listening" message, the backend isn't running. Go back to Step 7 to start it.
+
+2. If the backend is running but you still get this error, check the `.env.development` file in the frontend folder. Open it with TextEdit and make sure it contains these lines:
    ```
    VITE_API_URL=http://localhost:8080/api/v1
    VITE_WS_URL=ws://localhost:8080/ws
@@ -452,7 +473,7 @@ source ~/.zshrc
 
 **Solution:**
 1. Make sure you have a stable internet connection
-2. Try clearing the npm cache:
+2. Try clearing the npm cache by running these commands in Terminal:
    ```bash
    npm cache clean --force
    npm install
@@ -479,7 +500,7 @@ cd ~/Documents/OmniNudge/frontend
 npm run dev
 ```
 
-Then open http://localhost:5173 in your browser.
+Then open http://localhost:5176 in your browser (or check the Terminal output for the exact URL).
 
 ### Option 2: Quick Start Script
 
@@ -508,7 +529,7 @@ echo "OmniNudge is starting..."
 echo "Backend PID: $BACKEND_PID"
 echo "Frontend PID: $FRONTEND_PID"
 echo ""
-echo "Open http://localhost:5173 in your browser"
+echo "Open http://localhost:5176 in your browser"
 echo ""
 echo "Press Ctrl+C to stop both servers"
 
