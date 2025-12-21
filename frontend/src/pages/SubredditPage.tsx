@@ -22,7 +22,11 @@ import {
   sanitizeHttpUrl,
   type RedditCrosspostSource,
 } from '../utils/crosspostHelpers';
-import type { SubredditSuggestion } from '../types/reddit';
+import type {
+  SubredditSuggestion,
+  RedditSubredditAbout,
+  RedditSubredditModerator,
+} from '../types/reddit';
 import { SubscribeButton } from '../components/common/SubscribeButton';
 import { RedditPostCard } from '../components/reddit/RedditPostCard';
 import { TOP_TIME_OPTIONS } from '../constants/topTimeRange';
@@ -527,6 +531,38 @@ export default function RedditPage() {
   };
 
   const trimmedInputValue = inputValue.trim();
+  const shouldShowSubredditSidebar = Boolean(subreddit);
+
+  const {
+    data: subredditAbout,
+    isLoading: loadingSubredditAbout,
+    isError: aboutError,
+  } = useQuery<RedditSubredditAbout>({
+    queryKey: ['subreddit-about', subreddit],
+    queryFn: () => redditService.getSubredditAbout(subreddit),
+    enabled: shouldShowSubredditSidebar,
+    staleTime: 1000 * 60 * 10,
+  });
+
+  const {
+    data: subredditModerators,
+    isLoading: loadingSubredditModerators,
+    isError: moderatorsError,
+  } = useQuery<RedditSubredditModerator[]>({
+    queryKey: ['subreddit-moderators', subreddit],
+    queryFn: () => redditService.getSubredditModerators(subreddit),
+    enabled: shouldShowSubredditSidebar,
+    staleTime: 1000 * 60 * 10,
+  });
+
+  const sidebarHtml = useMemo(
+    () => sanitizeRedditSidebarHtml(subredditAbout?.description_html),
+    [subredditAbout?.description_html]
+  );
+  const subredditIcon = useMemo(
+    () => normalizeSubredditIcon(subredditAbout),
+    [subredditAbout]
+  );
 
   const {
     data: subredditSuggestions,
@@ -781,8 +817,9 @@ export default function RedditPage() {
       )}
 
       {combinedPosts.length > 0 ? (
-        <div className="space-y-3">
-          {combinedPosts.map((item) => {
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+          <div className="space-y-3">
+            {combinedPosts.map((item) => {
             if (item.type === 'platform') {
               const post = item.post;
               const previewImage = post.thumbnail_url || post.media_url;
@@ -936,7 +973,130 @@ export default function RedditPage() {
                 linkState={originState}
               />
             );
-          })}
+            })}
+          </div>
+
+          {shouldShowSubredditSidebar && (
+            <aside className="space-y-4">
+              <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
+                <h3 className="text-sm font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
+                  About this subreddit
+                </h3>
+                {loadingSubredditAbout ? (
+                  <p className="mt-3 text-sm text-[var(--color-text-secondary)]">Loading details…</p>
+                ) : aboutError ? (
+                  <p className="mt-3 text-sm text-[var(--color-text-secondary)]">
+                    Unable to load subreddit details.
+                  </p>
+                ) : subredditAbout ? (
+                  <>
+                    {subredditIcon && (
+                      <img
+                        src={subredditIcon}
+                        alt=""
+                        className="mt-3 h-12 w-12 rounded-full object-cover"
+                        loading="lazy"
+                      />
+                    )}
+                    {sidebarHtml ? (
+                      <div
+                        className="reddit-sidebar-content mt-3"
+                        dangerouslySetInnerHTML={{ __html: sidebarHtml }}
+                      />
+                    ) : subredditAbout.public_description ? (
+                      <p className="mt-3 text-sm text-[var(--color-text-primary)]">
+                        {subredditAbout.public_description}
+                      </p>
+                    ) : (
+                      <p className="mt-3 text-sm text-[var(--color-text-secondary)]">
+                        No description provided.
+                      </p>
+                    )}
+                    <div className="mt-4 space-y-2 text-xs text-[var(--color-text-secondary)]">
+                      <div className="flex items-center justify-between">
+                        <span className="font-semibold text-[var(--color-text-primary)]">
+                          Members
+                        </span>
+                        <span>
+                          {typeof subredditAbout.subscribers === 'number'
+                            ? subredditAbout.subscribers.toLocaleString()
+                            : '—'}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="font-semibold text-[var(--color-text-primary)]">
+                          Online
+                        </span>
+                        <span>
+                          {typeof subredditAbout.active_user_count === 'number'
+                            ? subredditAbout.active_user_count.toLocaleString()
+                            : '—'}
+                        </span>
+                      </div>
+                      {subredditAbout.created_utc && (
+                        <div className="flex items-center justify-between">
+                          <span className="font-semibold text-[var(--color-text-primary)]">
+                            Created
+                          </span>
+                          <span>
+                            {new Date(subredditAbout.created_utc * 1000).toLocaleDateString()}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  <p className="mt-3 text-sm text-[var(--color-text-secondary)]">
+                    No details available.
+                  </p>
+                )}
+              </div>
+
+              <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
+                    Moderators
+                  </h3>
+                  {subredditModerators && subredditModerators.length > 0 && (
+                    <span className="text-xs text-[var(--color-text-secondary)]">
+                      {subredditModerators.length}
+                    </span>
+                  )}
+                </div>
+                {loadingSubredditModerators ? (
+                  <p className="mt-3 text-sm text-[var(--color-text-secondary)]">
+                    Loading moderators…
+                  </p>
+                ) : moderatorsError ? (
+                  <p className="mt-3 text-sm text-[var(--color-text-secondary)]">
+                    Unable to load moderators.
+                  </p>
+                ) : subredditModerators && subredditModerators.length > 0 ? (
+                  <ul className="mt-3 space-y-2">
+                    {subredditModerators.map((moderator) => (
+                      <li key={moderator.id ?? moderator.name} className="text-sm">
+                        <Link
+                          to={`/reddit/user/${moderator.name}`}
+                          className="font-medium text-[var(--color-text-primary)] hover:text-[var(--color-primary)]"
+                        >
+                          u/{moderator.name}
+                        </Link>
+                        {moderator.author_flair_text && (
+                          <span className="ml-2 text-xs text-[var(--color-text-secondary)]">
+                            {moderator.author_flair_text}
+                          </span>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="mt-3 text-sm text-[var(--color-text-secondary)]">
+                    No moderators listed.
+                  </p>
+                )}
+              </div>
+            </aside>
+          )}
         </div>
       ) : null}
 
@@ -1071,4 +1231,126 @@ export default function RedditPage() {
       )}
     </div>
   );
+}
+
+function decodeSidebarHtml(value: string): string {
+  return value
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&amp;/g, '&');
+}
+
+function isSafeSidebarUrl(value?: string | null): boolean {
+  if (!value) return false;
+  try {
+    const parsed = new URL(value, window.location.origin);
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
+function sanitizeRedditSidebarHtml(content?: string | null): string | null {
+  if (!content) return null;
+  if (typeof document === 'undefined') {
+    return decodeSidebarHtml(content);
+  }
+
+  const decoded = decodeSidebarHtml(content);
+  const template = document.createElement('template');
+  template.innerHTML = decoded;
+
+  const allowedTags = new Set([
+    'a',
+    'p',
+    'strong',
+    'em',
+    'ul',
+    'ol',
+    'li',
+    'span',
+    'div',
+    'h1',
+    'h2',
+    'h3',
+    'h4',
+    'h5',
+    'h6',
+    'table',
+    'thead',
+    'tbody',
+    'tr',
+    'td',
+    'th',
+    'img',
+    'blockquote',
+    'code',
+    'pre',
+    'hr',
+    'br',
+  ]);
+  const allowedAttrs: Record<string, Set<string>> = {
+    a: new Set(['href', 'title']),
+    img: new Set(['src', 'alt', 'title', 'width', 'height']),
+    span: new Set(['class']),
+    div: new Set(['class']),
+    td: new Set(['colspan', 'rowspan']),
+    th: new Set(['colspan', 'rowspan']),
+  };
+
+  template.content.querySelectorAll('*').forEach((element) => {
+    const el = element as HTMLElement;
+    const tag = el.tagName.toLowerCase();
+    if (!allowedTags.has(tag)) {
+      const parent = el.parentNode;
+      if (parent) {
+        parent.replaceChild(document.createTextNode(el.textContent ?? ''), el);
+      } else {
+        el.remove();
+      }
+      return;
+    }
+
+    Array.from(el.attributes).forEach((attr) => {
+      const attrName = attr.name.toLowerCase();
+      const allowedForTag = allowedAttrs[tag];
+      if (!allowedForTag || !allowedForTag.has(attrName)) {
+        el.removeAttribute(attr.name);
+        return;
+      }
+
+      if ((attrName === 'href' || attrName === 'src') && !isSafeSidebarUrl(attr.value)) {
+        el.removeAttribute(attr.name);
+        return;
+      }
+    });
+
+    if (tag === 'a') {
+      el.setAttribute('target', '_blank');
+      el.setAttribute('rel', 'noopener noreferrer');
+    }
+  });
+
+  return template.innerHTML;
+}
+
+function normalizeSubredditIcon(about?: RedditSubredditAbout): string | null {
+  if (!about) return null;
+  const candidates = [
+    about.community_icon,
+    about.icon_img,
+    about.banner_img,
+    about.banner_background_image,
+  ];
+  for (const candidate of candidates) {
+    if (!candidate) continue;
+    const stripped = candidate.split('?')[0];
+    const sanitized = sanitizeHttpUrl(stripped);
+    if (sanitized) {
+      return sanitized;
+    }
+  }
+  return null;
 }

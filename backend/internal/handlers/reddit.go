@@ -81,6 +81,46 @@ func (h *RedditHandler) GetSubredditPosts(c *gin.Context) {
 	})
 }
 
+// GetSubredditAbout handles GET /api/v1/reddit/r/:subreddit/about
+func (h *RedditHandler) GetSubredditAbout(c *gin.Context) {
+	subreddit := c.Param("subreddit")
+	if subreddit == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Subreddit name is required"})
+		return
+	}
+
+	about, err := h.redditClient.GetSubredditAbout(c.Request.Context(), subreddit)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch subreddit details", "details": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"subreddit": strings.ToLower(subreddit),
+		"about":     about,
+	})
+}
+
+// GetSubredditModerators handles GET /api/v1/reddit/r/:subreddit/moderators
+func (h *RedditHandler) GetSubredditModerators(c *gin.Context) {
+	subreddit := c.Param("subreddit")
+	if subreddit == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Subreddit name is required"})
+		return
+	}
+
+	moderators, err := h.redditClient.GetSubredditModerators(c.Request.Context(), subreddit)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch subreddit moderators", "details": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"subreddit":  strings.ToLower(subreddit),
+		"moderators": moderators,
+	})
+}
+
 // GetFrontPage handles GET /api/v1/reddit/frontpage
 func (h *RedditHandler) GetFrontPage(c *gin.Context) {
 	// Parse query parameters
