@@ -120,7 +120,7 @@ func setupRedditHandlerTest(t *testing.T) (*RedditHandler, *httptest.Server, *in
 	}))
 
 	cache := &mockRedditCache{store: make(map[string]string)}
-	client := services.NewRedditClient("test-agent", cache, time.Minute)
+	client := services.NewRedditClient("test-agent", cache, time.Minute, "", "")
 	client.SetHTTPClient(&http.Client{Transport: &hostRewriteTransport{target: ts}})
 
 	handler := NewRedditHandlerForTest(client)
@@ -306,7 +306,7 @@ func TestAutocompleteSubreddits(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	client := services.NewRedditClient("test-agent", nil, time.Minute)
+	client := services.NewRedditClient("test-agent", nil, time.Minute, "", "")
 	client.SetHTTPClient(&http.Client{Transport: &hostRewriteTransport{target: ts}})
 	handler := NewRedditHandlerForTest(client)
 
@@ -329,7 +329,7 @@ func TestAutocompleteSubreddits(t *testing.T) {
 }
 
 func TestAutocompleteSubredditsRequiresQuery(t *testing.T) {
-	client := services.NewRedditClient("test-agent", nil, time.Minute)
+	client := services.NewRedditClient("test-agent", nil, time.Minute, "", "")
 	handler := NewRedditHandlerForTest(client)
 
 	router := gin.Default()

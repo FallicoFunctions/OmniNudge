@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"html"
 	"log"
@@ -111,7 +112,18 @@ func (h *RedditHandler) GetSubredditModerators(c *gin.Context) {
 
 	moderators, err := h.redditClient.GetSubredditModerators(c.Request.Context(), subreddit)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch subreddit moderators", "details": err.Error()})
+		if errors.Is(err, services.ErrRedditModeratorsUnavailable) {
+			c.JSON(http.StatusOK, gin.H{
+				"subreddit":  strings.ToLower(subreddit),
+				"moderators": []services.RedditSubredditModerator{},
+				"warning":    "Reddit blocked the moderators list for this subreddit without OAuth access.",
+			})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error":   "Failed to fetch subreddit moderators",
+			"details": err.Error(),
+		})
 		return
 	}
 

@@ -9,6 +9,7 @@ import type {
   RedditModeratedSubreddit,
   RedditSubredditAbout,
   RedditSubredditModerator,
+  SubredditModeratorsResponse,
 } from '../types/reddit';
 
 export const redditService = {
@@ -44,11 +45,17 @@ export const redditService = {
     return response.about;
   },
 
-  async getSubredditModerators(subreddit: string): Promise<RedditSubredditModerator[]> {
-    const response = await api.get<{ subreddit: string; moderators: RedditSubredditModerator[] }>(
-      `/reddit/r/${subreddit}/moderators`
-    );
-    return response.moderators ?? [];
+  async getSubredditModerators(subreddit: string): Promise<SubredditModeratorsResponse> {
+    const response = await api.get<{
+      subreddit: string;
+      moderators: RedditSubredditModerator[];
+      warning?: string;
+    }>(`/reddit/r/${subreddit}/moderators`);
+
+    return {
+      moderators: response.moderators ?? [],
+      warning: response.warning,
+    };
   },
 
   async searchPosts(query: string, subreddit?: string, limit = 25): Promise<RedditPostsResponse> {
