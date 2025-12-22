@@ -119,7 +119,7 @@ export default function RedditWikiPage({ mode = 'view' }: RedditWikiPageProps = 
     return Math.min(...tocItems.map((item) => item.level));
   }, [tocItems]);
 
-  const revisionsList = revisionsData?.revisions ?? [];
+  const revisionsList = useMemo(() => revisionsData?.revisions ?? [], [revisionsData?.revisions]);
   const compareDiffRows = useMemo<DiffRow[]>(() => {
     if (!isCompareMode || !compareFromData || !compareToData) {
       return [];
@@ -892,7 +892,7 @@ function sanitizeWikiHtml(content: string): string {
   const decoded = decodeHtmlEntities(content);
 
   // Remove HTML comments
-  let cleaned = decoded.replace(/<!--[\s\S]*?-->/g, '');
+  const cleaned = decoded.replace(/<!--[\s\S]*?-->/g, '');
 
   const template = document.createElement('template');
   template.innerHTML = cleaned;
@@ -1027,31 +1027,36 @@ function formatAbsoluteDate(epochSeconds?: number): string {
   return new Date(epochSeconds * 1000).toLocaleString();
 }
 
-function extractRevisionMeta(data?: any, explicitId?: string): RevisionMeta | null {
+function extractRevisionMeta(data?: unknown, explicitId?: string): RevisionMeta | null {
   if (!data) {
     return null;
   }
-  const rawAuthorName = data?.revision_by?.data?.name
+  // Type assertion for Reddit API data structure
+  const apiData = data as Record<string, unknown>;
+  const revisionBy = apiData.revision_by as Record<string, unknown> | undefined;
+  const revisionByData = revisionBy?.data as Record<string, unknown> | undefined;
+
+  const rawAuthorName = (revisionByData?.name as string | undefined)
     ?.replace(/^u\//i, '')
     ?.replace(/^\/+/, '')
     ?.trim();
   const author =
-    data?.revision_by?.data?.display_name_prefixed?.trim() ??
+    (revisionByData?.display_name_prefixed as string | undefined)?.trim() ??
     (rawAuthorName ? `u/${rawAuthorName}` : undefined);
 
   let timestamp: number | undefined;
-  if (typeof data?.revision_date === 'number') {
-    timestamp = data.revision_date;
-  } else if (typeof data?.revision_date === 'string') {
-    const parsed = Number(data.revision_date);
+  if (typeof apiData.revision_date === 'number') {
+    timestamp = apiData.revision_date;
+  } else if (typeof apiData.revision_date === 'string') {
+    const parsed = Number(apiData.revision_date);
     if (!Number.isNaN(parsed)) {
       timestamp = parsed;
     }
   }
 
-  const reason = data?.reason || 'No description provided';
+  const reason = (apiData.reason as string | undefined) || 'No description provided';
   const revisionId =
-    explicitId || (typeof data?.revision_id === 'string' ? data.revision_id : undefined) || undefined;
+    explicitId || (typeof apiData.revision_id === 'string' ? apiData.revision_id : undefined) || undefined;
   return { author, timestamp, reason, revisionId };
 }
 
