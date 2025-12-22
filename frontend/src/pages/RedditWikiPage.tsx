@@ -547,8 +547,7 @@ export default function RedditWikiPage({ mode = 'view' }: RedditWikiPageProps = 
             ) : (
               <>
                 <div className="hidden grid-cols-[50px_50px_160px_120px_180px_1fr_120px] gap-4 border-b border-[var(--color-border)] py-3 text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)] md:grid">
-                  <span className="text-center"></span>
-                  <span className="text-center"></span>
+                  <span className="col-span-2 text-center">Compare</span>
                   <span>When</span>
                   <span>Page</span>
                   <span>Author</span>
