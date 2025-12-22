@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useEffect, useMemo } from 'react';
 import { diffLines } from 'diff';
 import { redditService } from '../services/redditService';
+import { sanitizeHttpUrl } from '../utils/crosspostHelpers';
 import type {
   RedditSubredditAbout,
   RedditWikiRevisionsResponse,
@@ -111,6 +112,25 @@ export default function RedditWikiPage({ mode = 'view' }: RedditWikiPageProps = 
     if (!subredditAbout?.description_html) return null;
     return sanitizeWikiHtml(subredditAbout.description_html);
   }, [subredditAbout?.description_html]);
+
+  const subredditIcon = useMemo(() => {
+    if (!subredditAbout) return null;
+    const candidates = [
+      subredditAbout.community_icon,
+      subredditAbout.icon_img,
+      subredditAbout.banner_img,
+      subredditAbout.banner_background_image,
+    ];
+    for (const candidate of candidates) {
+      if (!candidate) continue;
+      const stripped = candidate.split('?')[0];
+      const sanitized = sanitizeHttpUrl(stripped);
+      if (sanitized) {
+        return sanitized;
+      }
+    }
+    return null;
+  }, [subredditAbout]);
 
   const minHeadingLevel = useMemo(() => {
     if (!tocItems.length) {
@@ -319,6 +339,66 @@ export default function RedditWikiPage({ mode = 'view' }: RedditWikiPageProps = 
 
   return (
     <div className="mx-auto max-w-7xl p-6">
+      {/* Subreddit Header with Navigation */}
+      {subreddit && (
+        <div className="mb-4">
+          {/* Top row: Subreddit name and icon */}
+          <div className="mb-4 flex items-center gap-3">
+            {subredditIcon && (
+              <img
+                src={subredditIcon}
+                alt=""
+                className="h-12 w-12 flex-shrink-0 rounded-full object-cover"
+                loading="lazy"
+              />
+            )}
+            <h1 className="text-3xl font-bold text-[var(--color-text-primary)]">
+              r/{subreddit} subreddit
+            </h1>
+          </div>
+
+          {/* Sort and Wiki buttons row */}
+          <div className="flex flex-wrap items-center gap-2">
+            <Link
+              to={`/r/${subreddit}`}
+              className="rounded-md bg-[var(--color-surface-elevated)] px-3 py-2 text-sm font-medium capitalize text-[var(--color-text-primary)] hover:bg-[var(--color-border)]"
+            >
+              Hot
+            </Link>
+            <Link
+              to={`/r/${subreddit}`}
+              className="rounded-md bg-[var(--color-surface-elevated)] px-3 py-2 text-sm font-medium capitalize text-[var(--color-text-primary)] hover:bg-[var(--color-border)]"
+            >
+              New
+            </Link>
+            <Link
+              to={`/r/${subreddit}`}
+              className="rounded-md bg-[var(--color-surface-elevated)] px-3 py-2 text-sm font-medium capitalize text-[var(--color-text-primary)] hover:bg-[var(--color-border)]"
+            >
+              Top
+            </Link>
+            <Link
+              to={`/r/${subreddit}`}
+              className="rounded-md bg-[var(--color-surface-elevated)] px-3 py-2 text-sm font-medium capitalize text-[var(--color-text-primary)] hover:bg-[var(--color-border)]"
+            >
+              Rising
+            </Link>
+            <Link
+              to={`/r/${subreddit}`}
+              className="rounded-md bg-[var(--color-surface-elevated)] px-3 py-2 text-sm font-medium capitalize text-[var(--color-text-primary)] hover:bg-[var(--color-border)]"
+            >
+              Controversial
+            </Link>
+            <Link
+              to={`/r/${subreddit}/wiki/index`}
+              className="rounded-md bg-[var(--color-primary)] px-3 py-2 text-sm font-medium capitalize text-white"
+            >
+              Wiki
+            </Link>
+          </div>
+        </div>
+      )}
+
       <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-6">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div className="text-lg font-semibold capitalize text-[var(--color-text-primary)]">

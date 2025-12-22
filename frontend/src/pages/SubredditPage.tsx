@@ -93,10 +93,13 @@ export default function RedditPage() {
   const { useRelativeTime } = useSettings();
   const { blockedUsers } = useRedditBlocklist();
   const [subreddit, setSubreddit] = useState(routeSubreddit ?? 'popular');
-  const [sort, setSort] = useState<'hot' | 'new' | 'top' | 'rising'>('hot');
+  const [sort, setSort] = useState<'hot' | 'new' | 'top' | 'rising' | 'controversial'>('hot');
   const [topTimeRange, setTopTimeRange] = useState<TopTimeRange>('day');
+  const [controversialTimeRange, setControversialTimeRange] = useState<TopTimeRange>('day');
   const [customTopStart, setCustomTopStart] = useState('');
   const [customTopEnd, setCustomTopEnd] = useState('');
+  const [customControversialStart, setCustomControversialStart] = useState('');
+  const [customControversialEnd, setCustomControversialEnd] = useState('');
   const [inputValue, setInputValue] = useState('');
   const [hideTarget, setHideTarget] = useState<HideTarget | null>(null);
   const [crosspostTarget, setCrosspostTarget] = useState<CrosspostSource | null>(null);
@@ -117,21 +120,36 @@ export default function RedditPage() {
     return parsed.toISOString();
   };
   const isTopSort = sort === 'top';
+  const isControversialSort = sort === 'controversial';
   const isCustomTopRange = isTopSort && topTimeRange === 'custom';
-  const customStartISO = isCustomTopRange ? convertInputToISO(customTopStart) : undefined;
-  const customEndISO = isCustomTopRange ? convertInputToISO(customTopEnd) : undefined;
-  const isCustomRangeValid = Boolean(customStartISO && customEndISO);
+  const isCustomControversialRange = isControversialSort && controversialTimeRange === 'custom';
+  const customTopStartISO = isCustomTopRange ? convertInputToISO(customTopStart) : undefined;
+  const customTopEndISO = isCustomTopRange ? convertInputToISO(customTopEnd) : undefined;
+  const customControversialStartISO = isCustomControversialRange ? convertInputToISO(customControversialStart) : undefined;
+  const customControversialEndISO = isCustomControversialRange ? convertInputToISO(customControversialEnd) : undefined;
+  const isCustomTopRangeValid = Boolean(customTopStartISO && customTopEndISO);
+  const isCustomControversialRangeValid = Boolean(customControversialStartISO && customControversialEndISO);
   const topRangeKey = isTopSort
     ? topTimeRange === 'custom'
-      ? isCustomRangeValid
+      ? isCustomTopRangeValid
         ? `custom-${customTopStart}-${customTopEnd}`
         : 'custom-pending'
       : topTimeRange
+    : isControversialSort
+    ? controversialTimeRange === 'custom'
+      ? isCustomControversialRangeValid
+        ? `custom-${customControversialStart}-${customControversialEnd}`
+        : 'custom-pending'
+      : controversialTimeRange
     : 'none';
   const redditTimeFilter =
     isTopSort && topTimeRange !== 'custom'
       ? topTimeRange
       : isTopSort && topTimeRange === 'custom'
+      ? 'all'
+      : isControversialSort && controversialTimeRange !== 'custom'
+      ? controversialTimeRange
+      : isControversialSort && controversialTimeRange === 'custom'
       ? 'all'
       : undefined;
   const originState = useMemo(
@@ -139,17 +157,17 @@ export default function RedditPage() {
     [location.pathname, location.search]
   );
 
-  const { data, isLoading, error } = useQuery<FeedRedditPostsResponse>({
+  const { data, isLoading, error} = useQuery<FeedRedditPostsResponse>({
     queryKey: ['reddit', subreddit, sort, topRangeKey],
     queryFn: () => {
-      const limit = isTopSort ? 100 : 25;
+      const limit = isTopSort || isControversialSort ? 100 : 25;
       if (subreddit === 'frontpage') {
         return redditService.getFrontPage(sort, limit, redditTimeFilter);
       }
       return redditService.getSubredditPosts(subreddit, sort, limit, redditTimeFilter);
     },
     staleTime: 1000 * 60 * 5, // 5 minutes
-    enabled: !isCustomTopRange || isCustomRangeValid,
+    enabled: (!isCustomTopRange || isCustomTopRangeValid) && (!isCustomControversialRange || isCustomControversialRangeValid),
   });
 
   // Fetch hidden Reddit posts
@@ -188,15 +206,25 @@ export default function RedditPage() {
     queryFn: () => {
       const options =
         isTopSort && topTimeRange === 'custom'
-          ? isCustomRangeValid
+          ? isCustomTopRangeValid
             ? {
                 timeRange: 'custom' as const,
-                startDate: customStartISO as string,
-                endDate: customEndISO as string,
+                startDate: customTopStartISO as string,
+                endDate: customTopEndISO as string,
               }
             : undefined
           : isTopSort
           ? { timeRange: topTimeRange }
+          : isControversialSort && controversialTimeRange === 'custom'
+          ? isCustomControversialRangeValid
+            ? {
+                timeRange: 'custom' as const,
+                startDate: customControversialStartISO as string,
+                endDate: customControversialEndISO as string,
+              }
+            : undefined
+          : isControversialSort
+          ? { timeRange: controversialTimeRange }
           : undefined;
       return hubsService.getSubredditPosts(subreddit, sort, 25, 0, options);
     },
@@ -204,7 +232,8 @@ export default function RedditPage() {
       !!user &&
       subreddit !== 'popular' &&
       subreddit !== 'frontpage' &&
-      (!isCustomTopRange || isCustomRangeValid),
+      (!isCustomTopRange || isCustomTopRangeValid) &&
+      (!isCustomControversialRange || isCustomControversialRangeValid),
     staleTime: 1000 * 60 * 5, // 5 minutes
   });
 
@@ -253,19 +282,27 @@ export default function RedditPage() {
     if (!data?.posts) {
       return [];
     }
-    if (!isTopSort) {
+    if (!isTopSort && !isControversialSort) {
       return data.posts;
     }
-    if (topTimeRange === 'custom' && isCustomRangeValid && customStartISO && customEndISO) {
-      const startMs = new Date(customStartISO).getTime();
-      const endMs = new Date(customEndISO).getTime();
+    if (isTopSort && topTimeRange === 'custom' && isCustomTopRangeValid && customTopStartISO && customTopEndISO) {
+      const startMs = new Date(customTopStartISO).getTime();
+      const endMs = new Date(customTopEndISO).getTime();
+      return data.posts.filter((post) => {
+        const createdMs = post.created_utc * 1000;
+        return createdMs >= startMs && createdMs <= endMs;
+      });
+    }
+    if (isControversialSort && controversialTimeRange === 'custom' && isCustomControversialRangeValid && customControversialStartISO && customControversialEndISO) {
+      const startMs = new Date(customControversialStartISO).getTime();
+      const endMs = new Date(customControversialEndISO).getTime();
       return data.posts.filter((post) => {
         const createdMs = post.created_utc * 1000;
         return createdMs >= startMs && createdMs <= endMs;
       });
     }
     return data.posts;
-  }, [data?.posts, isTopSort, topTimeRange, isCustomRangeValid, customStartISO, customEndISO]);
+  }, [data?.posts, isTopSort, isControversialSort, topTimeRange, controversialTimeRange, isCustomTopRangeValid, isCustomControversialRangeValid, customTopStartISO, customTopEndISO, customControversialStartISO, customControversialEndISO]);
 
   // Filter out hidden posts
   const visiblePosts = useMemo(() => {
@@ -608,10 +645,11 @@ export default function RedditPage() {
 
   return (
     <div className="mx-auto w-full max-w-7xl px-4 py-8">
-      {/* Header */}
-      <div className="mb-6">
-        <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-          <div className="flex items-center gap-3 text-left md:self-start">
+      {/* Header with inline controls */}
+      <div className="mb-4">
+        {/* Top row: Subreddit name, icon, filter buttons, and search */}
+        <div className="mb-4 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex flex-wrap items-center gap-3 text-left">
             {subredditIcon && (
               <img
                 src={subredditIcon}
@@ -623,6 +661,29 @@ export default function RedditPage() {
             <h1 className="text-3xl font-bold text-[var(--color-text-primary)]">
               r/{subreddit} subreddit
             </h1>
+
+            {/* Sort and Wiki buttons inline with title */}
+            <div className="flex flex-wrap items-center gap-2">
+              {(['hot', 'new', 'top', 'rising', 'controversial'] as const).map((sortOption) => (
+                <button
+                  key={sortOption}
+                  onClick={() => setSort(sortOption)}
+                  className={`rounded-md px-3 py-2 text-sm font-medium capitalize ${
+                    sort === sortOption
+                      ? 'bg-[var(--color-primary)] text-white'
+                      : 'bg-[var(--color-surface-elevated)] text-[var(--color-text-primary)] hover:bg-[var(--color-border)]'
+                  }`}
+                >
+                  {sortOption}
+                </button>
+              ))}
+              <Link
+                to={`/r/${subreddit}/wiki/index`}
+                className="rounded-md bg-[var(--color-surface-elevated)] px-3 py-2 text-sm font-medium capitalize text-[var(--color-text-primary)] hover:bg-[var(--color-border)]"
+              >
+                Wiki
+              </Link>
+            </div>
           </div>
 
           <div className="flex flex-col gap-3">
@@ -724,25 +785,11 @@ export default function RedditPage() {
           )}
           </div>
         </div>
-      </div>
 
-      {/* Controls */}
-      <div className="mb-6 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
-        <div className="flex flex-wrap items-center gap-2">
-          {(['hot', 'new', 'top', 'rising'] as const).map((sortOption) => (
-            <button
-              key={sortOption}
-              onClick={() => setSort(sortOption)}
-              className={`rounded-md px-3 py-2 text-sm font-medium capitalize ${
-                sort === sortOption
-                  ? 'bg-[var(--color-primary)] text-white'
-                  : 'bg-[var(--color-surface-elevated)] text-[var(--color-text-primary)] hover:bg-[var(--color-border)]'
-              }`}
-            >
-              {sortOption}
-            </button>
-          ))}
-          {isTopSort && (
+        {/* Time filters row (appears below when Top or Controversial is selected) */}
+        {(isTopSort || isControversialSort) && (
+          <div className="flex flex-wrap items-center gap-2">
+            {isTopSort && (
             <div className="flex flex-col gap-2">
               <div className="flex items-center gap-2">
                 <span className="text-xs font-semibold uppercase text-[var(--color-text-secondary)]">
@@ -775,7 +822,7 @@ export default function RedditPage() {
                     onChange={(event) => setCustomTopEnd(event.target.value)}
                     className="rounded border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-2 py-1 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
                   />
-                  {!isCustomRangeValid && (
+                  {!isCustomTopRangeValid && (
                     <span className="text-xs text-[var(--color-error)]">
                       Select both start and end dates to apply this filter.
                     </span>
@@ -784,23 +831,50 @@ export default function RedditPage() {
               )}
             </div>
           )}
-          <div className="ml-auto flex items-center gap-2">
-            <span className="text-xs font-semibold uppercase text-[var(--color-text-secondary)]">
-              Show only Omni posts:
-            </span>
-            <button
-              type="button"
-              onClick={() => setShowOmniOnly((prev) => !prev)}
-              className={`rounded-md px-3 py-2 text-sm font-medium ${
-                showOmniOnly
-                  ? 'bg-[var(--color-primary)] text-white'
-                  : 'bg-[var(--color-surface-elevated)] text-[var(--color-text-primary)] hover:bg-[var(--color-border)]'
-              }`}
-            >
-              Omni
-            </button>
+          {isControversialSort && (
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-semibold uppercase text-[var(--color-text-secondary)]">
+                  Time range
+                </span>
+                <select
+                  value={controversialTimeRange}
+                  onChange={(event) => setControversialTimeRange(event.target.value as TopTimeRange)}
+                  className="rounded border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-1 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
+                >
+                  {TOP_TIME_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              {controversialTimeRange === 'custom' && (
+                <div className="flex flex-wrap items-center gap-2">
+                  <input
+                    type="datetime-local"
+                    value={customControversialStart}
+                    onChange={(event) => setCustomControversialStart(event.target.value)}
+                    className="rounded border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-2 py-1 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
+                  />
+                  <span className="text-xs text-[var(--color-text-secondary)]">to</span>
+                  <input
+                    type="datetime-local"
+                    value={customControversialEnd}
+                    onChange={(event) => setCustomControversialEnd(event.target.value)}
+                    className="rounded border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-2 py-1 text-sm text-[var(--color-text-primary)] focus:outline-none"
+                  />
+                  {!isCustomControversialRangeValid && (
+                    <span className="text-xs text-[var(--color-error)]">
+                      Select both start and end dates to apply this filter.
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+            )}
           </div>
-        </div>
+        )}
       </div>
 
       {/* Posts List */}
@@ -814,10 +888,11 @@ export default function RedditPage() {
         </div>
       )}
 
-      {combinedPosts.length > 0 ? (
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
-          <div className="space-y-3">
-            {combinedPosts.map((item) => {
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="space-y-3">
+          {combinedPosts.length > 0 ? (
+            <>
+              {combinedPosts.map((item) => {
             if (item.type === 'platform') {
               const post = item.post;
               const previewImage = post.thumbnail_url || post.media_url;
@@ -972,10 +1047,38 @@ export default function RedditPage() {
               />
             );
             })}
-          </div>
+            </>
+          ) : (
+            !isLoading && (
+              <div className="text-center text-[var(--color-text-secondary)]">
+                {showOmniOnly ? `No Omni posts found in r/${subreddit}` : `No posts found in r/${subreddit}`}
+              </div>
+            )
+          )}
+        </div>
 
-          {shouldShowSubredditSidebar && (
+        {shouldShowSubredditSidebar && (
             <aside className="space-y-4">
+              {/* Show Only Omni Posts Filter */}
+              <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
+                    Show only Omni posts
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setShowOmniOnly((prev) => !prev)}
+                    className={`rounded-md px-3 py-2 text-sm font-medium ${
+                      showOmniOnly
+                        ? 'bg-[var(--color-primary)] text-white'
+                        : 'bg-[var(--color-surface-elevated)] text-[var(--color-text-primary)] hover:bg-[var(--color-border)]'
+                    }`}
+                  >
+                    {showOmniOnly ? 'On' : 'Off'}
+                  </button>
+                </div>
+              </div>
+
               <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
                 <h3 className="text-sm font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
                   About this subreddit
@@ -1060,14 +1163,7 @@ export default function RedditPage() {
               </div>
             </aside>
           )}
-        </div>
-      ) : null}
-
-      {combinedPosts.length === 0 && !isLoading && (
-        <div className="text-center text-[var(--color-text-secondary)]">
-          {showOmniOnly ? `No Omni posts found in r/${subreddit}` : `No posts found in r/${subreddit}`}
-        </div>
-      )}
+      </div>
 
       {hideTarget && (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 px-4">
