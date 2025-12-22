@@ -10,6 +10,8 @@ import type {
   RedditSubredditAbout,
   RedditSubredditModerator,
   SubredditModeratorsResponse,
+  RedditWikiRevisionsResponse,
+  RedditWikiDiscussionsResponse,
 } from '../types/reddit';
 
 export const redditService = {
@@ -107,5 +109,66 @@ export const redditService = {
       `/reddit/user/${encodeURIComponent(username)}/moderated`
     );
     return response.moderated ?? [];
+  },
+
+  async getSubredditWikiPage(subreddit: string, pagePath: string, revision?: string | null): Promise<any> {
+    const params = new URLSearchParams();
+    if (revision) {
+      params.append('revision', revision);
+    }
+    const query = params.toString();
+    const path = query
+      ? `/reddit/r/${subreddit}/wiki/${pagePath}?${query}`
+      : `/reddit/r/${subreddit}/wiki/${pagePath}`;
+    return api.get<any>(path);
+  },
+
+  async compareSubredditWikiRevisions(
+    subreddit: string,
+    pagePath: string,
+    fromRevision: string,
+    toRevision: string
+  ): Promise<{ from: any; to: any; from_id: string; to_id: string }> {
+    const params = new URLSearchParams();
+    params.append('from', fromRevision);
+    params.append('to', toRevision);
+    const path = `/reddit/r/${subreddit}/wiki/${pagePath}/compare?${params.toString()}`;
+    return api.get(path);
+  },
+
+  async getWikiPage(pagePath: string): Promise<any> {
+    return api.get<any>(`/reddit/wiki/${pagePath}`);
+  },
+
+  async getSubredditWikiRevisions(
+    subreddit: string,
+    pagePath: string,
+    after?: string | null
+  ): Promise<RedditWikiRevisionsResponse> {
+    const params = new URLSearchParams();
+    if (after) {
+      params.append('after', after);
+    }
+    const query = params.toString();
+    const path = query
+      ? `/reddit/r/${subreddit}/wiki/revisions/${pagePath}?${query}`
+      : `/reddit/r/${subreddit}/wiki/revisions/${pagePath}`;
+    return api.get<RedditWikiRevisionsResponse>(path);
+  },
+
+  async getSubredditWikiDiscussions(
+    subreddit: string,
+    pagePath: string,
+    after?: string
+  ): Promise<RedditWikiDiscussionsResponse> {
+    const params = new URLSearchParams();
+    if (after) {
+      params.append('after', after);
+    }
+    const query = params.toString();
+    const path = query
+      ? `/reddit/r/${subreddit}/wiki/discussions/${pagePath}?${query}`
+      : `/reddit/r/${subreddit}/wiki/discussions/${pagePath}`;
+    return api.get<RedditWikiDiscussionsResponse>(path);
   },
 };
