@@ -319,26 +319,6 @@ export default function RedditWikiPage({ mode = 'view' }: RedditWikiPageProps = 
 
   return (
     <div className="mx-auto max-w-7xl p-6">
-      <div className="mb-4 flex items-center gap-2 text-sm text-[var(--color-text-secondary)]">
-        {subreddit ? (
-          <>
-            <a href={`/r/${subreddit}`} className="hover:underline">
-              r/{subreddit}
-            </a>
-            <span>/</span>
-            <span>wiki</span>
-            <span>/</span>
-            <span>{pagePath || 'index'}</span>
-          </>
-        ) : (
-          <>
-            <span>wiki</span>
-            <span>/</span>
-            <span>{pagePath || 'index'}</span>
-          </>
-        )}
-      </div>
-
       <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-6">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div className="text-lg font-semibold capitalize text-[var(--color-text-primary)]">
