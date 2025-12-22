@@ -705,7 +705,7 @@ export default function RedditPage() {
             {/* Subreddit Input */}
             <form
               onSubmit={handleSubredditSubmit}
-              className="flex gap-2 md:w-80 lg:w-96"
+              className="flex gap-2 md:w-80 lg:w-[20rem]"
             >
             <div className="relative flex-1 md:flex-initial md:w-full">
               <input
