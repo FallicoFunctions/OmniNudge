@@ -611,7 +611,15 @@ export default function RedditPage() {
       {/* Header */}
       <div className="mb-6">
         <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-          <div className="text-left md:self-start">
+          <div className="flex items-center gap-3 text-left md:self-start">
+            {subredditIcon && (
+              <img
+                src={subredditIcon}
+                alt=""
+                className="h-12 w-12 flex-shrink-0 rounded-full object-cover"
+                loading="lazy"
+              />
+            )}
             <h1 className="text-3xl font-bold text-[var(--color-text-primary)]">
               r/{subreddit} subreddit
             </h1>
