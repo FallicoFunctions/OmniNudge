@@ -12,6 +12,7 @@ import ThemesPage from './pages/ThemesPage';
 import SubredditPage from './pages/SubredditPage';
 import RedditPostWrapper from './pages/RedditPostWrapper';
 import RedditUserPage from './pages/RedditUserPage';
+import RedditWikiPage from './pages/RedditWikiPage';
 import UserProfilePage from './pages/UserProfilePage';
 import HubPage from './pages/HubPage';
 import CreateHubPage from './pages/CreateHubPage';
@@ -39,6 +40,20 @@ function App() {
                   {/* PUBLIC routes - accessible without auth */}
                   <Route path="/" element={<HomePage />} />
                   <Route path="/r/:subreddit" element={<SubredditPage />} />
+                  <Route
+                    path="/r/:subreddit/wiki/revisions/:pagePath"
+                    element={<RedditWikiPage mode="history" />}
+                  />
+                  <Route path="/r/:subreddit/wiki/revisions" element={<RedditWikiPage mode="history" />} />
+                  <Route
+                    path="/r/:subreddit/wiki/discussions/:pagePath"
+                    element={<RedditWikiPage mode="talk" />}
+                  />
+                  <Route path="/r/:subreddit/wiki/discussions" element={<RedditWikiPage mode="talk" />} />
+                  <Route path="/r/:subreddit/wiki/:pagePath" element={<RedditWikiPage mode="view" />} />
+                  <Route path="/r/:subreddit/wiki" element={<RedditWikiPage mode="view" />} />
+                  <Route path="/wiki/:pagePath" element={<RedditWikiPage />} />
+                  <Route path="/wiki" element={<RedditWikiPage />} />
                   <Route path="/r/:subreddit/comments/:postId" element={<RedditPostWrapper />} />
                   <Route
                     path="/r/:subreddit/comments/:postId/:commentId"

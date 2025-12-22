@@ -1283,8 +1283,19 @@ function sanitizeRedditSidebarHtml(content?: string | null): string | null {
     });
 
     if (tag === 'a') {
-      el.setAttribute('target', '_blank');
-      el.setAttribute('rel', 'noopener noreferrer');
+      const href = el.getAttribute('href');
+      if (href) {
+        // Keep internal app links (subreddit, user, wiki) as relative for React Router
+        const isInternalLink = href.startsWith('/r/') || href.startsWith('/u/') ||
+                               href.startsWith('/user/') || href.startsWith('/wiki/');
+
+        if (!isInternalLink) {
+          // External links open in new tab
+          el.setAttribute('target', '_blank');
+          el.setAttribute('rel', 'noopener noreferrer');
+        }
+        // Internal links will be handled by React Router (no target attribute)
+      }
     }
   });
 

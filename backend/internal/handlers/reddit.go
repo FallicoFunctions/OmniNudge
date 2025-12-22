@@ -7,6 +7,7 @@ import (
 	"html"
 	"log"
 	"net/http"
+	"path"
 	"strconv"
 	"strings"
 	"time"
@@ -573,4 +574,216 @@ func sanitizeThumbnail(thumbnail string) string {
 		return clean
 	}
 	return ""
+}
+
+// GetSubredditWikiPage handles GET /api/v1/reddit/r/:subreddit/wiki/:pagePath
+func (h *RedditHandler) GetSubredditWikiPage(c *gin.Context) {
+	subreddit := c.Param("subreddit")
+	pagePath := resolveWikiPagePath(c, "pagePath", "rest")
+	revision := c.Query("revision")
+
+	if subreddit == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Subreddit name is required"})
+		return
+	}
+
+	// Check if this is actually a compare request that got caught by the wildcard route
+	if strings.HasSuffix(pagePath, "/compare") {
+		// Delegate to the compare handler
+		h.CompareSubredditWikiRevisions(c)
+		return
+	}
+
+	if pagePath == "" {
+		pagePath = "index"
+	}
+
+	ctx := context.Background()
+	wikiPage, err := h.redditClient.GetSubredditWikiPage(ctx, subreddit, pagePath, revision)
+	if err != nil {
+		if errors.Is(err, services.ErrRedditNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": fmt.Sprintf("Wiki page not found: %s", pagePath)})
+			return
+		}
+		log.Printf("Error fetching wiki page for r/%s/wiki/%s: %v", subreddit, pagePath, err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch wiki page"})
+		return
+	}
+
+	c.JSON(http.StatusOK, wikiPage)
+}
+
+// CompareSubredditWikiRevisions fetches two specific revisions to compare their content.
+func (h *RedditHandler) CompareSubredditWikiRevisions(c *gin.Context) {
+	subreddit := c.Param("subreddit")
+	pagePath := resolveWikiPagePath(c, "pagePath", "rest")
+	fromRevision := strings.TrimSpace(c.Query("from"))
+	toRevision := strings.TrimSpace(c.Query("to"))
+
+	if subreddit == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Subreddit name is required"})
+		return
+	}
+
+	// Strip /compare suffix if present (when caught by wildcard route)
+	pagePath = strings.TrimSuffix(pagePath, "/compare")
+
+	if pagePath == "" {
+		pagePath = "index"
+	}
+	if fromRevision == "" || toRevision == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Both from and to revision IDs are required"})
+		return
+	}
+	if fromRevision == toRevision {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Revision IDs must be different"})
+		return
+	}
+
+	ctx := context.Background()
+	fromData, err := h.redditClient.GetSubredditWikiPage(ctx, subreddit, pagePath, fromRevision)
+	if err != nil {
+		if errors.Is(err, services.ErrRedditNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Older revision not found"})
+			return
+		}
+		log.Printf("Error fetching from revision for r/%s/wiki/%s: %v", subreddit, pagePath, err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch older revision"})
+		return
+	}
+
+	toData, err := h.redditClient.GetSubredditWikiPage(ctx, subreddit, pagePath, toRevision)
+	if err != nil {
+		if errors.Is(err, services.ErrRedditNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Newer revision not found"})
+			return
+		}
+		log.Printf("Error fetching to revision for r/%s/wiki/%s: %v", subreddit, pagePath, err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch newer revision"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"subreddit": strings.ToLower(subreddit),
+		"page":      pagePath,
+		"from_id":   fromRevision,
+		"to_id":     toRevision,
+		"from":      fromData,
+		"to":        toData,
+	})
+}
+
+// GetWikiPage handles GET /api/v1/reddit/wiki/:pagePath
+func (h *RedditHandler) GetWikiPage(c *gin.Context) {
+	pagePath := c.Param("pagePath")
+
+	if pagePath == "" {
+		pagePath = "index"
+	}
+
+	ctx := context.Background()
+	wikiPage, err := h.redditClient.GetWikiPage(ctx, pagePath)
+	if err != nil {
+		if errors.Is(err, services.ErrRedditNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": fmt.Sprintf("Wiki page not found: %s", pagePath)})
+			return
+		}
+		log.Printf("Error fetching wiki page wiki/%s: %v", pagePath, err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch wiki page"})
+		return
+	}
+
+	c.JSON(http.StatusOK, wikiPage)
+}
+
+// GetSubredditWikiRevisions handles GET /api/v1/reddit/r/:subreddit/wiki/revisions/:pagePath
+func (h *RedditHandler) GetSubredditWikiRevisions(c *gin.Context) {
+	subreddit := c.Param("subreddit")
+	pagePath := resolveWikiPagePath(c, "pagePath", "rest")
+	if subreddit == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Subreddit name is required"})
+		return
+	}
+	if pagePath == "" {
+		pagePath = "index"
+	}
+
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "25"))
+	after := c.DefaultQuery("after", "")
+	listing, err := h.redditClient.GetSubredditWikiRevisions(c.Request.Context(), subreddit, pagePath, limit, after)
+	if err != nil {
+		if errors.Is(err, services.ErrRedditNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": fmt.Sprintf("Wiki page not found: %s", pagePath)})
+			return
+		}
+		log.Printf("Error fetching wiki revisions for r/%s/wiki/%s: %v", subreddit, pagePath, err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch wiki revisions"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"subreddit": strings.ToLower(subreddit),
+		"page":      pagePath,
+		"after":     listing.After,
+		"before":    listing.Before,
+		"revisions": listing.Revisions,
+	})
+}
+
+// GetSubredditWikiDiscussions handles GET /api/v1/reddit/r/:subreddit/wiki/discussions/:pagePath
+func (h *RedditHandler) GetSubredditWikiDiscussions(c *gin.Context) {
+	subreddit := c.Param("subreddit")
+	pagePath := resolveWikiPagePath(c, "pagePath", "rest")
+	if subreddit == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Subreddit name is required"})
+		return
+	}
+	if pagePath == "" {
+		pagePath = "index"
+	}
+
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "25"))
+	after := c.DefaultQuery("after", "")
+
+	listing, err := h.redditClient.GetSubredditWikiDiscussions(c.Request.Context(), subreddit, pagePath, limit, after)
+	if err != nil {
+		if errors.Is(err, services.ErrRedditNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": fmt.Sprintf("Wiki page not found: %s", pagePath)})
+			return
+		}
+		log.Printf("Error fetching wiki discussions for r/%s/wiki/%s: %v", subreddit, pagePath, err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch wiki discussions"})
+		return
+	}
+
+	posts := make([]services.RedditPost, 0, len(listing.Data.Children))
+	for _, child := range listing.Data.Children {
+		posts = append(posts, normalizeRedditPost(child.Data))
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"subreddit":   strings.ToLower(subreddit),
+		"page":        pagePath,
+		"after":       listing.Data.After,
+		"before":      listing.Data.Before,
+		"discussions": posts,
+	})
+}
+
+func resolveWikiPagePath(c *gin.Context, primaryParam, restParam string) string {
+	pagePath := strings.Trim(c.Param(primaryParam), "/")
+	if restParam != "" {
+		rest := strings.Trim(c.Param(restParam), "/")
+		if rest != "" {
+			if pagePath != "" {
+				pagePath = path.Join(pagePath, rest)
+			} else {
+				pagePath = rest
+			}
+		}
+	}
+	if pagePath == "" {
+		pagePath = "index"
+	}
+	return pagePath
 }
