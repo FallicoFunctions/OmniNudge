@@ -199,6 +199,19 @@ export default function RedditPage() {
     staleTime: 1000 * 60 * 5, // 5 minutes
   });
 
+  // Determine whether the subreddit exposes a wiki page so we can show the Wiki button.
+  const {
+    data: wikiPreviewData,
+    isError: wikiPreviewError,
+  } = useQuery({
+    queryKey: ['subreddit-wiki-preview', subreddit],
+    queryFn: () => redditService.getSubredditWikiPage(subreddit, 'index'),
+    enabled: !!subreddit && subreddit !== 'popular' && subreddit !== 'frontpage',
+    staleTime: 1000 * 60 * 5,
+    retry: false,
+  });
+  const hasWiki = !!wikiPreviewData && !wikiPreviewError;
+
   const localPostsQueryKey = ['subreddit-posts', subreddit, sort, topRangeKey] as const;
   // Fetch local platform posts for this subreddit
   const { data: localPostsData } = useQuery<SubredditPostsResponse>({
@@ -677,12 +690,14 @@ export default function RedditPage() {
                   {sortOption}
                 </button>
               ))}
-              <Link
-                to={`/r/${subreddit}/wiki/index`}
-                className="rounded-md bg-[var(--color-surface-elevated)] px-3 py-2 text-sm font-medium capitalize text-[var(--color-text-primary)] hover:bg-[var(--color-border)]"
-              >
-                Wiki
-              </Link>
+              {hasWiki && (
+                <Link
+                  to={`/r/${subreddit}/wiki/index`}
+                  className="rounded-md bg-[var(--color-surface-elevated)] px-3 py-2 text-sm font-medium capitalize text-[var(--color-text-primary)] hover:bg-[var(--color-border)]"
+                >
+                  Wiki
+                </Link>
+              )}
             </div>
           </div>
 
