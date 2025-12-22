@@ -190,3 +190,37 @@ export interface SubredditModeratorsResponse {
   moderators: RedditSubredditModerator[];
   warning?: string;
 }
+
+export interface RedditWikiRevisionAuthorData {
+  name?: string;
+  display_name_prefixed?: string;
+  icon_img?: string;
+}
+
+export interface RedditWikiRevision {
+  id: string;
+  page: string;
+  reason?: string | null;
+  timestamp: number;
+  revision_hidden?: boolean;
+  author?: {
+    kind?: string;
+    data?: RedditWikiRevisionAuthorData;
+  };
+}
+
+export interface RedditWikiRevisionsResponse {
+  subreddit: string;
+  page: string;
+  after?: string | null;
+  before?: string | null;
+  revisions: RedditWikiRevision[];
+}
+
+export interface RedditWikiDiscussionsResponse {
+  subreddit: string;
+  page: string;
+  after?: string | null;
+  before?: string | null;
+  discussions: RedditApiPost[];
+}

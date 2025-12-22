@@ -8,6 +8,8 @@ import (
 	"html"
 	"io"
 	"net/http"
+	"net/url"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -34,6 +36,9 @@ type redditAppToken struct {
 
 // ErrRedditModeratorsUnavailable indicates Reddit refused to return the moderators list.
 var ErrRedditModeratorsUnavailable = errors.New("reddit moderators list unavailable without authentication")
+
+// ErrRedditNotFound indicates the requested Reddit resource was not found.
+var ErrRedditNotFound = errors.New("reddit resource not found")
 
 type redditHTTPError struct {
 	statusCode int
@@ -246,6 +251,36 @@ type RedditSubredditModerator struct {
 	Name            string   `json:"name"`
 	AuthorFlairText string   `json:"author_flair_text"`
 	ModPermissions  []string `json:"mod_permissions"`
+}
+
+// RedditWikiAuthor captures author details on wiki revision entries.
+type RedditWikiAuthor struct {
+	Kind string               `json:"kind"`
+	Data RedditWikiAuthorData `json:"data"`
+}
+
+// RedditWikiAuthorData contains the subset of profile data we surface for wiki revisions.
+type RedditWikiAuthorData struct {
+	Name                string `json:"name"`
+	DisplayNamePrefixed string `json:"display_name_prefixed"`
+	IconImg             string `json:"icon_img"`
+}
+
+// RedditWikiRevision represents a single wiki revision entry in Reddit's API.
+type RedditWikiRevision struct {
+	ID             string           `json:"id"`
+	Page           string           `json:"page"`
+	Reason         string           `json:"reason"`
+	Timestamp      float64          `json:"timestamp"`
+	RevisionHidden bool             `json:"revision_hidden"`
+	Author         RedditWikiAuthor `json:"author"`
+}
+
+// RedditWikiRevisionsListing wraps the wiki revision list along with pagination cursors.
+type RedditWikiRevisionsListing struct {
+	After     string               `json:"after"`
+	Before    string               `json:"before"`
+	Revisions []RedditWikiRevision `json:"revisions"`
 }
 
 // SubredditSuggestion represents a subreddit returned from the autocomplete endpoint
@@ -1211,4 +1246,183 @@ func (r *RedditClient) setCachedListing(ctx context.Context, key string, listing
 		return err
 	}
 	return r.cache.Set(ctx, key, string(data), r.cacheTTL)
+}
+
+// GetSubredditWikiPage fetches a wiki page from a subreddit
+func (r *RedditClient) GetSubredditWikiPage(ctx context.Context, subreddit string, pagePath string, revision string) (map[string]interface{}, error) {
+	requestURL := fmt.Sprintf("https://www.reddit.com/r/%s/wiki/%s.json", subreddit, pagePath)
+	if revision != "" {
+		params := url.Values{}
+		params.Set("v", revision)
+		requestURL = fmt.Sprintf("%s?%s", requestURL, params.Encode())
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, requestURL, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("User-Agent", r.userAgent)
+
+	resp, err := r.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, ErrRedditNotFound
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, &redditHTTPError{statusCode: resp.StatusCode, body: string(body)}
+	}
+
+	var result struct {
+		Data map[string]interface{} `json:"data"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, err
+	}
+
+	return result.Data, nil
+}
+
+// GetWikiPage fetches a wiki page from Reddit's main wiki
+func (r *RedditClient) GetWikiPage(ctx context.Context, pagePath string) (map[string]interface{}, error) {
+	url := fmt.Sprintf("https://www.reddit.com/wiki/%s.json", pagePath)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("User-Agent", r.userAgent)
+
+	resp, err := r.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, ErrRedditNotFound
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, &redditHTTPError{statusCode: resp.StatusCode, body: string(body)}
+	}
+
+	var result struct {
+		Data map[string]interface{} `json:"data"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, err
+	}
+
+	return result.Data, nil
+}
+
+// GetSubredditWikiRevisions fetches the revision history for a subreddit wiki page.
+func (r *RedditClient) GetSubredditWikiRevisions(ctx context.Context, subreddit, pagePath string, limit int, after string) (*RedditWikiRevisionsListing, error) {
+	if pagePath == "" {
+		pagePath = "index"
+	}
+	if limit <= 0 || limit > 100 {
+		limit = 25
+	}
+
+	params := url.Values{}
+	params.Set("limit", strconv.Itoa(limit))
+	params.Set("raw_json", "1")
+	if after != "" {
+		params.Set("after", after)
+	}
+
+	requestURL := fmt.Sprintf("https://www.reddit.com/r/%s/wiki/revisions/%s.json", subreddit, pagePath)
+	if query := params.Encode(); query != "" {
+		requestURL = fmt.Sprintf("%s?%s", requestURL, query)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, requestURL, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("User-Agent", r.userAgent)
+
+	resp, err := r.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, ErrRedditNotFound
+	}
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, &redditHTTPError{statusCode: resp.StatusCode, body: string(body)}
+	}
+
+	var listing struct {
+		Data struct {
+			After    string               `json:"after"`
+			Before   string               `json:"before"`
+			Children []RedditWikiRevision `json:"children"`
+		} `json:"data"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&listing); err != nil {
+		return nil, err
+	}
+
+	return &RedditWikiRevisionsListing{
+		After:     listing.Data.After,
+		Before:    listing.Data.Before,
+		Revisions: listing.Data.Children,
+	}, nil
+}
+
+// GetSubredditWikiDiscussions fetches discussions linked to a subreddit wiki page.
+func (r *RedditClient) GetSubredditWikiDiscussions(ctx context.Context, subreddit, pagePath string, limit int, after string) (*RedditListing, error) {
+	if pagePath == "" {
+		pagePath = "index"
+	}
+	if limit <= 0 || limit > 100 {
+		limit = 25
+	}
+
+	params := url.Values{}
+	params.Set("limit", strconv.Itoa(limit))
+	if after != "" {
+		params.Set("after", after)
+	}
+
+	requestURL := fmt.Sprintf("https://www.reddit.com/r/%s/wiki/discussions/%s.json", subreddit, pagePath)
+	if query := params.Encode(); query != "" {
+		requestURL = fmt.Sprintf("%s?%s", requestURL, query)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, requestURL, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("User-Agent", r.userAgent)
+
+	resp, err := r.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, ErrRedditNotFound
+	}
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, &redditHTTPError{statusCode: resp.StatusCode, body: string(body)}
+	}
+
+	var listing RedditListing
+	if err := json.NewDecoder(resp.Body).Decode(&listing); err != nil {
+		return nil, err
+	}
+	return &listing, nil
 }

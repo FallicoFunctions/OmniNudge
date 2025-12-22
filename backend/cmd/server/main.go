@@ -235,8 +235,29 @@ func main() {
 			reddit.GET("/r/:subreddit/about", redditHandler.GetSubredditAbout)
 			reddit.GET("/r/:subreddit/moderators", redditHandler.GetSubredditModerators)
 			reddit.GET("/r/:subreddit/media", redditHandler.GetSubredditMedia)
+			revisions := reddit.Group("/r/:subreddit/wiki/revisions")
+			{
+				revisions.GET("", redditHandler.GetSubredditWikiRevisions)
+				revisions.GET("/:pagePath", redditHandler.GetSubredditWikiRevisions)
+				revisions.GET("/:pagePath/*rest", redditHandler.GetSubredditWikiRevisions)
+			}
+
+			discussions := reddit.Group("/r/:subreddit/wiki/discussions")
+			{
+				discussions.GET("", redditHandler.GetSubredditWikiDiscussions)
+				discussions.GET("/:pagePath", redditHandler.GetSubredditWikiDiscussions)
+				discussions.GET("/:pagePath/*rest", redditHandler.GetSubredditWikiDiscussions)
+			}
+
+			wiki := reddit.Group("/r/:subreddit/wiki")
+			{
+				wiki.GET("", redditHandler.GetSubredditWikiPage)
+				wiki.GET("/:pagePath", redditHandler.GetSubredditWikiPage)
+				wiki.GET("/:pagePath/*rest", redditHandler.GetSubredditWikiPage)
+			}
 			reddit.GET("/r/:subreddit/comments/:postId", redditHandler.GetPostComments)
 			reddit.GET("/search", redditHandler.SearchPosts)
+			reddit.GET("/wiki/:pagePath", redditHandler.GetWikiPage)
 			reddit.GET("/user/:username/about", redditHandler.GetRedditUserAbout)
 			reddit.GET("/user/:username/trophies", redditHandler.GetRedditUserTrophies)
 			reddit.GET("/user/:username/moderated", redditHandler.GetRedditUserModerated)
