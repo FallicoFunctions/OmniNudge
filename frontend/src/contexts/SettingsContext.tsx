@@ -12,6 +12,8 @@ interface SettingsContextType {
   setDefaultOmniPostsOnly: (value: boolean) => void;
   stayOnPostAfterHide: boolean;
   setStayOnPostAfterHide: (value: boolean) => void;
+  useInfiniteScroll: boolean;
+  setUseInfiniteScroll: (value: boolean) => void;
 }
 
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
@@ -22,6 +24,7 @@ interface StoredSettings {
   notifyRemovedSavedPosts?: boolean;
   defaultOmniPostsOnly?: boolean;
   stayOnPostAfterHide?: boolean;
+  useInfiniteScroll?: boolean;
 }
 
 const getStoredSettings = (): StoredSettings => {
@@ -60,6 +63,10 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     const settings = getStoredSettings();
     return settings.stayOnPostAfterHide ?? false;
   });
+  const [useInfiniteScroll, setUseInfiniteScrollState] = useState<boolean>(() => {
+    const settings = getStoredSettings();
+    return settings.useInfiniteScroll ?? true; // Default to infinite scroll
+  });
 
   // Persist to localStorage whenever settings change
   useEffect(() => {
@@ -70,12 +77,13 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         notifyRemovedSavedPosts,
         defaultOmniPostsOnly,
         stayOnPostAfterHide,
+        useInfiniteScroll,
       };
       localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings));
     } catch (error) {
       console.error('Failed to save settings to localStorage:', error);
     }
-  }, [useRelativeTime, autoCloseThemeSelector, notifyRemovedSavedPosts, defaultOmniPostsOnly, stayOnPostAfterHide]);
+  }, [useRelativeTime, autoCloseThemeSelector, notifyRemovedSavedPosts, defaultOmniPostsOnly, stayOnPostAfterHide, useInfiniteScroll]);
 
   const setUseRelativeTime = (value: boolean) => {
     setUseRelativeTimeState(value);
@@ -97,6 +105,10 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     setStayOnPostAfterHideState(value);
   };
 
+  const setUseInfiniteScroll = (value: boolean) => {
+    setUseInfiniteScrollState(value);
+  };
+
   return (
     <SettingsContext.Provider
       value={{
@@ -110,6 +122,8 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         setDefaultOmniPostsOnly,
         stayOnPostAfterHide,
         setStayOnPostAfterHide,
+        useInfiniteScroll,
+        setUseInfiniteScroll,
       }}
     >
       {children}
