@@ -14,6 +14,10 @@ interface SettingsContextType {
   setStayOnPostAfterHide: (value: boolean) => void;
   useInfiniteScroll: boolean;
   setUseInfiniteScroll: (value: boolean) => void;
+  searchIncludeNsfwByDefault: boolean;
+  setSearchIncludeNsfwByDefault: (value: boolean) => void;
+  blockAllNsfw: boolean;
+  setBlockAllNsfw: (value: boolean) => void;
 }
 
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
@@ -25,6 +29,8 @@ interface StoredSettings {
   defaultOmniPostsOnly?: boolean;
   stayOnPostAfterHide?: boolean;
   useInfiniteScroll?: boolean;
+  searchIncludeNsfwByDefault?: boolean;
+  blockAllNsfw?: boolean;
 }
 
 const getStoredSettings = (): StoredSettings => {
@@ -67,6 +73,14 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     const settings = getStoredSettings();
     return settings.useInfiniteScroll ?? true; // Default to infinite scroll
   });
+  const [searchIncludeNsfwByDefault, setSearchIncludeNsfwByDefaultState] = useState<boolean>(() => {
+    const settings = getStoredSettings();
+    return settings.searchIncludeNsfwByDefault ?? false;
+  });
+  const [blockAllNsfw, setBlockAllNsfwState] = useState<boolean>(() => {
+    const settings = getStoredSettings();
+    return settings.blockAllNsfw ?? false;
+  });
 
   // Persist to localStorage whenever settings change
   useEffect(() => {
@@ -75,15 +89,17 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         useRelativeTime,
         autoCloseThemeSelector,
         notifyRemovedSavedPosts,
-        defaultOmniPostsOnly,
-        stayOnPostAfterHide,
-        useInfiniteScroll,
-      };
-      localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings));
-    } catch (error) {
-      console.error('Failed to save settings to localStorage:', error);
-    }
-  }, [useRelativeTime, autoCloseThemeSelector, notifyRemovedSavedPosts, defaultOmniPostsOnly, stayOnPostAfterHide, useInfiniteScroll]);
+      defaultOmniPostsOnly,
+      stayOnPostAfterHide,
+      useInfiniteScroll,
+      searchIncludeNsfwByDefault,
+      blockAllNsfw,
+    };
+    localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings));
+  } catch (error) {
+    console.error('Failed to save settings to localStorage:', error);
+  }
+  }, [useRelativeTime, autoCloseThemeSelector, notifyRemovedSavedPosts, defaultOmniPostsOnly, stayOnPostAfterHide, useInfiniteScroll, searchIncludeNsfwByDefault, blockAllNsfw]);
 
   const setUseRelativeTime = (value: boolean) => {
     setUseRelativeTimeState(value);
@@ -108,6 +124,12 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   const setUseInfiniteScroll = (value: boolean) => {
     setUseInfiniteScrollState(value);
   };
+  const setSearchIncludeNsfwByDefault = (value: boolean) => {
+    setSearchIncludeNsfwByDefaultState(value);
+  };
+  const setBlockAllNsfw = (value: boolean) => {
+    setBlockAllNsfwState(value);
+  };
 
   return (
     <SettingsContext.Provider
@@ -124,6 +146,10 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         setStayOnPostAfterHide,
         useInfiniteScroll,
         setUseInfiniteScroll,
+        searchIncludeNsfwByDefault,
+        setSearchIncludeNsfwByDefault,
+        blockAllNsfw,
+        setBlockAllNsfw,
       }}
     >
       {children}

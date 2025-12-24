@@ -6,6 +6,7 @@ import { redditService } from '../services/redditService';
 import { savedService } from '../services/savedService';
 import { hubsService } from '../services/hubsService';
 import { subscriptionService } from '../services/subscriptionService';
+import { siteWideSearch, type SiteWideSearchResults } from '../services/searchService';
 import type {
   CrosspostRequest,
   LocalSubredditPost,
@@ -92,7 +93,7 @@ export default function RedditPage() {
   const { subreddit: routeSubreddit } = useParams<{ subreddit?: string }>();
   const queryClient = useQueryClient();
   const { user } = useAuth();
-  const { useRelativeTime, useInfiniteScroll } = useSettings();
+  const { useRelativeTime, useInfiniteScroll, searchIncludeNsfwByDefault, blockAllNsfw } = useSettings();
   const { blockedUsers } = useRedditBlocklist();
   const [subreddit, setSubreddit] = useState(routeSubreddit ?? 'popular');
   const [sort, setSort] = useState<'hot' | 'new' | 'top' | 'rising' | 'controversial'>('hot');
@@ -105,6 +106,11 @@ export default function RedditPage() {
   const [inputValue, setInputValue] = useState('');
   const [postSearchInput, setPostSearchInput] = useState('');
   const [postSearchQuery, setPostSearchQuery] = useState('');
+  const [isSearchDropdownOpen, setIsSearchDropdownOpen] = useState(false);
+  const [limitSearchToContext, setLimitSearchToContext] = useState(true);
+  const [includeNsfwSearch, setIncludeNsfwSearch] = useState(false);
+  const [siteWideResults, setSiteWideResults] = useState<SiteWideSearchResults | null>(null);
+  const [isSiteWideSearching, setIsSiteWideSearching] = useState(false);
   const [hideTarget, setHideTarget] = useState<HideTarget | null>(null);
   const [crosspostTarget, setCrosspostTarget] = useState<CrosspostSource | null>(null);
   const [crosspostTitle, setCrosspostTitle] = useState('');
@@ -587,6 +593,17 @@ export default function RedditPage() {
   }, [subreddit]);
 
   useEffect(() => {
+    setIncludeNsfwSearch(!blockAllNsfw && searchIncludeNsfwByDefault);
+    setLimitSearchToContext(true);
+  }, [blockAllNsfw, searchIncludeNsfwByDefault, subreddit]);
+
+  useEffect(() => {
+    if (limitSearchToContext) {
+      setSiteWideResults(null);
+    }
+  }, [limitSearchToContext]);
+
+  useEffect(() => {
     if (postSearchQuery && postSearchInput.trim() === '') {
       setPostSearchQuery('');
     }
@@ -614,9 +631,25 @@ export default function RedditPage() {
     }
   };
 
-  const handlePostSearchSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+  const handlePostSearchSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    setPostSearchQuery(postSearchInput.trim());
+    const query = postSearchInput.trim();
+    if (!query) return;
+    if (limitSearchToContext) {
+      setPostSearchQuery(query);
+      setSiteWideResults(null);
+      return;
+    }
+    setIsSiteWideSearching(true);
+    try {
+      const results = await siteWideSearch(query, includeNsfwSearch && !blockAllNsfw);
+      setSiteWideResults(results);
+    } catch (searchError) {
+      console.error('Site-wide search failed', searchError);
+      setSiteWideResults(null);
+    } finally {
+      setIsSiteWideSearching(false);
+    }
   };
 
   const handleShareRedditPost = (post: FeedRedditPost) => {
@@ -956,14 +989,52 @@ export default function RedditPage() {
           </div>
 
           <div className="w-full lg:flex lg:justify-end">
-            <form onSubmit={handlePostSearchSubmit} className="flex w-full gap-2 lg:w-[20rem]">
-              <input
-                type="text"
-                value={postSearchInput}
-                onChange={(event) => setPostSearchInput(event.target.value)}
-                placeholder="Search posts..."
-                className="w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-2 text-sm text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
-              />
+            <form onSubmit={handlePostSearchSubmit} className="relative flex w-full gap-2 lg:w-[20rem]">
+              <div className="flex-1">
+                <input
+                  type="text"
+                  value={postSearchInput}
+                  onFocus={() => setIsSearchDropdownOpen(true)}
+                  onBlur={() => setTimeout(() => setIsSearchDropdownOpen(false), 120)}
+                  onChange={(event) => {
+                    setPostSearchInput(event.target.value);
+                    if (!isSearchDropdownOpen) {
+                      setIsSearchDropdownOpen(true);
+                    }
+                  }}
+                  placeholder="Search posts..."
+                  className="w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-2 text-sm text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
+                />
+                {isSearchDropdownOpen && (
+                  <div className="absolute left-0 right-0 top-full z-40 mt-1 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] p-3 shadow-lg">
+                    <div className="space-y-2 text-sm text-[var(--color-text-primary)]">
+                      <label className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={limitSearchToContext}
+                          onChange={(e) => setLimitSearchToContext(e.target.checked)}
+                        />
+                        <span>Limit search to r/{subreddit}</span>
+                      </label>
+                      {!blockAllNsfw && (
+                        <label className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={includeNsfwSearch}
+                            onChange={(e) => setIncludeNsfwSearch(e.target.checked)}
+                          />
+                          <span>Include NSFW results</span>
+                        </label>
+                      )}
+                      {blockAllNsfw && (
+                        <div className="text-xs text-[var(--color-text-secondary)]">
+                          NSFW content is blocked in settings.
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
               <button
                 type="submit"
                 className="rounded-md bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)]"
@@ -1095,6 +1166,40 @@ export default function RedditPage() {
       {error && (
         <div className="rounded-md bg-red-50 p-4 text-sm text-red-800 dark:bg-red-900/20 dark:text-red-400">
           Failed to load posts: {error instanceof Error ? error.message : 'Unknown error'}
+        </div>
+      )}
+
+      {!limitSearchToContext && siteWideResults && (
+        <div className="mb-4 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4">
+          <div className="mb-2 flex items-center justify-between">
+            <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">Site-wide results</h3>
+            {isSiteWideSearching && (
+              <span className="text-sm text-[var(--color-text-secondary)]">Searching...</span>
+            )}
+          </div>
+          <div className="grid gap-3 md:grid-cols-2">
+            <div>
+              <h4 className="text-sm font-semibold text-[var(--color-text-primary)]">Posts</h4>
+              <ul className="mt-1 space-y-1 text-sm text-[var(--color-text-secondary)]">
+                <li>Reddit posts: {siteWideResults.posts.reddit.length}</li>
+                <li>Omni posts: {siteWideResults.posts.platform.length}</li>
+              </ul>
+            </div>
+            <div>
+              <h4 className="text-sm font-semibold text-[var(--color-text-primary)]">Communities</h4>
+              <ul className="mt-1 space-y-1 text-sm text-[var(--color-text-secondary)]">
+                <li>Subreddits: {siteWideResults.subreddits.length}</li>
+                <li>Hubs: {siteWideResults.hubs.length}</li>
+              </ul>
+            </div>
+            <div>
+              <h4 className="text-sm font-semibold text-[var(--color-text-primary)]">Users</h4>
+              <ul className="mt-1 space-y-1 text-sm text-[var(--color-text-secondary)]">
+                <li>Reddit users: {siteWideResults.users.reddit.length}</li>
+                <li>Omni users: {siteWideResults.users.omni.length}</li>
+              </ul>
+            </div>
+          </div>
         </div>
       )}
 
