@@ -89,6 +89,120 @@ function getRedgifsId(url?: string | null): string | null {
   return match?.[1] ?? null;
 }
 
+function getImgurMp4(url?: string | null): string | null {
+  if (!url) return null;
+  const match = url.match(/i\.imgur\.com\/([a-zA-Z0-9]+)\.(?:gifv|gif)/i);
+  if (match?.[1]) {
+    return `https://i.imgur.com/${match[1]}.mp4`;
+  }
+  return null;
+}
+
+function getGiphyEmbed(url?: string | null): { iframeSrc?: string; mp4Src?: string } | null {
+  if (!url) return null;
+  const lower = url.toLowerCase();
+  if (lower.includes('media.giphy.com/media/')) {
+    const idMatch = url.match(/media\.giphy\.com\/media\/([^/]+)\//i);
+    if (idMatch?.[1]) {
+      return {
+        mp4Src: `https://media.giphy.com/media/${idMatch[1]}/giphy.mp4`,
+      };
+    }
+  }
+  if (lower.includes('giphy.com/gifs/')) {
+    const idMatch = url.match(/giphy\.com\/gifs\/[^/]*-?([a-zA-Z0-9]+)$/i);
+    if (idMatch?.[1]) {
+      return {
+        iframeSrc: `https://giphy.com/embed/${idMatch[1]}`,
+        mp4Src: `https://media.giphy.com/media/${idMatch[1]}/giphy.mp4`,
+      };
+    }
+  }
+  return null;
+}
+
+function getTenorMedia(url?: string | null): { iframeSrc?: string; mp4Src?: string } | null {
+  if (!url) return null;
+  const lower = url.toLowerCase();
+  if (!lower.includes('tenor.com') && !lower.includes('media.tenor.com')) return null;
+
+  // Tenor short links: tenor.com/view/<slug>-<id>
+  const slugMatch = url.match(/tenor\.com\/view\/[^/-]+-([a-z0-9]+)$/i);
+  if (slugMatch?.[1]) {
+    const id = slugMatch[1];
+    return {
+      iframeSrc: `https://tenor.com/embed/${id}`,
+      // MP4 URLs from Tenor CDN sometimes end with .mp4 on media.tenor.com
+      mp4Src: `https://media.tenor.com/${id}/AAAJ/${id}.mp4`,
+    };
+  }
+
+  // Direct media.tenor.com links may already be MP4/GIF
+  if (lower.includes('media.tenor.com')) {
+    return { mp4Src: url };
+  }
+
+  return null;
+}
+
+function getStreamableEmbed(url?: string | null): string | null {
+  if (!url) return null;
+  const match = url.match(/streamable\.com\/(?:e\/)?([a-z0-9]+)/i);
+  return match?.[1] ? `https://streamable.com/e/${match[1]}` : null;
+}
+
+function getGfycatToRedgifs(url?: string | null): string | null {
+  if (!url) return null;
+  const match = url.match(/gfycat\.com\/([a-zA-Z0-9_-]+)/i);
+  return match?.[1] ? `https://www.redgifs.com/ifr/${match[1]}` : null;
+}
+
+type InlineMedia =
+  | { kind: 'redgifs'; src: string }
+  | { kind: 'iframe'; src: string }
+  | { kind: 'video'; src: string };
+
+function getInlineMedia(url?: string | null): InlineMedia | null {
+  const sanitizedUrl = sanitizeHttpUrl(url);
+  const redgifsId = getRedgifsId(sanitizedUrl);
+  if (redgifsId) {
+    return { kind: 'redgifs', src: `https://www.redgifs.com/ifr/${redgifsId}` };
+  }
+
+  const imgurMp4 = getImgurMp4(sanitizedUrl);
+  if (imgurMp4) {
+    return { kind: 'video', src: imgurMp4 };
+  }
+
+  const giphy = getGiphyEmbed(sanitizedUrl);
+  if (giphy?.mp4Src) {
+    return { kind: 'video', src: giphy.mp4Src };
+  }
+  if (giphy?.iframeSrc) {
+    return { kind: 'iframe', src: giphy.iframeSrc };
+  }
+
+  const tenor = getTenorMedia(sanitizedUrl);
+  if (tenor?.mp4Src) {
+    return { kind: 'video', src: tenor.mp4Src };
+  }
+  if (tenor?.iframeSrc) {
+    return { kind: 'iframe', src: tenor.iframeSrc };
+  }
+
+  const streamableEmbed = getStreamableEmbed(sanitizedUrl);
+  if (streamableEmbed) {
+    return { kind: 'iframe', src: streamableEmbed };
+  }
+
+  const gfyToRedgifs = getGfycatToRedgifs(sanitizedUrl);
+  if (gfyToRedgifs) {
+    return { kind: 'redgifs', src: gfyToRedgifs };
+  }
+
+  return null;
+}
+
 export function RedditPostCard({
   post,
   useRelativeTime,
@@ -120,8 +234,8 @@ export function RedditPostCard({
   );
   const commentLabel = `${post.num_comments.toLocaleString()} Comments`;
   const previewImageUrl = getExpandableImageUrl(post);
-  const redgifsId = getRedgifsId(sanitizedExternalUrl);
-  const hasInlineMedia = Boolean(previewImageUrl || redgifsId);
+  const inlineMedia = getInlineMedia(sanitizedExternalUrl);
+  const hasInlineMedia = Boolean(previewImageUrl || inlineMedia);
   const isInlinePreviewOpen = !!(hasInlineMedia && expandedImageMap[post.id]);
 
   return (
@@ -241,13 +355,13 @@ export function RedditPostCard({
                 <span>•</span>
                 <span>submitted {formatTimestamp(post.created_utc, useRelativeTime)}</span>
               </div>
-              {expandedImageMap[post.id] && (previewImageUrl || redgifsId) && (
+              {expandedImageMap[post.id] && (previewImageUrl || inlineMedia) && (
                 <div className="mt-3 overflow-hidden rounded border border-[var(--color-border)] bg-[var(--color-surface-elevated)]">
-                  {redgifsId ? (
+                  {inlineMedia?.kind === 'redgifs' ? (
                     <div className="relative w-full bg-black">
                       <iframe
                         title={`${post.title} - Redgifs video`}
-                        src={`https://www.redgifs.com/ifr/${redgifsId}`}
+                        src={inlineMedia.src}
                         className="h-[70vh] w-full"
                         frameBorder="0"
                         scrolling="no"
@@ -255,6 +369,26 @@ export function RedditPostCard({
                         allowFullScreen
                       />
                     </div>
+                  ) : inlineMedia?.kind === 'iframe' ? (
+                    <div className="relative w-full bg-black">
+                      <iframe
+                        title={`${post.title} - Embedded media`}
+                        src={inlineMedia.src}
+                        className="h-[70vh] w-full"
+                        frameBorder="0"
+                        scrolling="no"
+                        allow="fullscreen; picture-in-picture; autoplay"
+                        allowFullScreen
+                      />
+                    </div>
+                  ) : inlineMedia?.kind === 'video' ? (
+                    <video
+                      src={inlineMedia.src}
+                      className="max-h-[70vh] w-full bg-black"
+                      controls
+                      playsInline
+                      loop
+                    />
                   ) : (
                     <img
                       src={previewImageUrl}
