@@ -1097,7 +1097,7 @@ export default function RedditPage() {
                       setIsSearchDropdownOpen(true);
                     }
                   }}
-                  placeholder="Search posts..."
+                  placeholder="Search"
                   className="w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-2 text-sm text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
                 />
                 {isSearchDropdownOpen && (
