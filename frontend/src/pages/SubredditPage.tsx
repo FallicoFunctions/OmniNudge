@@ -967,18 +967,38 @@ export default function RedditPage() {
       {/* Header with subreddit identity, filters, and search */}
       <div className="mb-4 flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
         <div className="flex flex-1 flex-col gap-3 text-left">
-          <div className="flex items-center gap-3">
-            {subredditIcon && (
-              <img
-                src={subredditIcon}
-                alt=""
-                className="h-12 w-12 flex-shrink-0 rounded-full object-cover"
-                loading="lazy"
-              />
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              {subredditIcon && (
+                <img
+                  src={subredditIcon}
+                  alt=""
+                  className="h-12 w-12 flex-shrink-0 rounded-full object-cover"
+                  loading="lazy"
+                />
+              )}
+              <h1 className="text-3xl font-bold text-[var(--color-text-primary)]">r/{subreddit}</h1>
+            </div>
+            {user && subreddit !== 'popular' && subreddit !== 'frontpage' && (
+              <div className="flex items-center gap-2">
+                <SubscribeButton
+                  type="subreddit"
+                  name={subreddit}
+                  initialSubscribed={subscriptionStatus?.is_subscribed ?? false}
+                />
+                <button
+                  type="button"
+                  onClick={() =>
+                    navigate('/posts/create', {
+                      state: { defaultSubreddit: subreddit },
+                    })
+                  }
+                  className="rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+                >
+                  Create Post
+                </button>
+              </div>
             )}
-            <h1 className="text-3xl font-bold text-[var(--color-text-primary)]">
-              r/{subreddit} subreddit
-            </h1>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
@@ -1135,28 +1155,6 @@ export default function RedditPage() {
               </button>
             </form>
           </div>
-
-          {/* Subscribe and Create Post Buttons */}
-          {user && subreddit !== 'popular' && subreddit !== 'frontpage' && (
-            <div className="flex w-full items-center gap-2 md:w-auto md:justify-end">
-              <SubscribeButton
-                type="subreddit"
-                name={subreddit}
-                initialSubscribed={subscriptionStatus?.is_subscribed ?? false}
-              />
-              <button
-                type="button"
-                onClick={() =>
-                  navigate('/posts/create', {
-                    state: { defaultSubreddit: subreddit },
-                  })
-                }
-                className="rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
-              >
-                Create Post
-              </button>
-            </div>
-          )}
           </div>
         </div>
 
