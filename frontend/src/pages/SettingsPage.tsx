@@ -14,6 +14,10 @@ export default function SettingsPage() {
     setStayOnPostAfterHide,
     useInfiniteScroll,
     setUseInfiniteScroll,
+    searchIncludeNsfwByDefault,
+    setSearchIncludeNsfwByDefault,
+    blockAllNsfw,
+    setBlockAllNsfw,
   } = useSettings();
 
   return (
@@ -315,6 +319,84 @@ export default function SettingsPage() {
                     aria-hidden="true"
                     className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
                       useInfiniteScroll ? 'translate-x-5' : 'translate-x-0'
+                    }`}
+                  />
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* NSFW Search & Visibility */}
+        <section className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-6">
+          <h2 className="mb-4 text-xl font-semibold text-[var(--color-text-primary)]">NSFW Preferences</h2>
+          <div className="space-y-4">
+            <div className="flex items-start justify-between">
+              <div className="flex-1">
+                <label
+                  htmlFor="block-all-nsfw-toggle"
+                  className="block text-sm font-medium text-[var(--color-text-primary)]"
+                >
+                  Block All NSFW Content
+                </label>
+                <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+                  Hide NSFW posts, hubs, subreddits, and users from search and feeds. Manually navigating to an NSFW page will show a warning instead of content.
+                </p>
+              </div>
+              <div className="ml-4">
+                <button
+                  id="block-all-nsfw-toggle"
+                  type="button"
+                  role="switch"
+                  aria-checked={blockAllNsfw}
+                  onClick={() => setBlockAllNsfw(!blockAllNsfw)}
+                  className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${
+                    blockAllNsfw ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
+                  }`}
+                >
+                  <span className="sr-only">Block all NSFW content</span>
+                  <span
+                    aria-hidden="true"
+                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                      blockAllNsfw ? 'translate-x-5' : 'translate-x-0'
+                    }`}
+                  />
+                </button>
+              </div>
+            </div>
+
+            <div className="flex items-start justify-between">
+              <div className="flex-1">
+                <label
+                  htmlFor="search-include-nsfw-default-toggle"
+                  className="block text-sm font-medium text-[var(--color-text-primary)]"
+                >
+                  Default “Include NSFW” in Search
+                </label>
+                <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+                  When enabled, the search dropdown will pre-check “Include NSFW results” (unless NSFW is fully blocked above).
+                </p>
+              </div>
+              <div className="ml-4">
+                <button
+                  id="search-include-nsfw-default-toggle"
+                  type="button"
+                  role="switch"
+                  aria-checked={searchIncludeNsfwByDefault && !blockAllNsfw}
+                  onClick={() => {
+                    if (blockAllNsfw) return;
+                    setSearchIncludeNsfwByDefault(!searchIncludeNsfwByDefault);
+                  }}
+                  className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${
+                    searchIncludeNsfwByDefault && !blockAllNsfw ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
+                  } ${blockAllNsfw ? 'opacity-60' : ''}`}
+                  aria-disabled={blockAllNsfw}
+                >
+                  <span className="sr-only">Default include NSFW in search</span>
+                  <span
+                    aria-hidden="true"
+                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                      searchIncludeNsfwByDefault && !blockAllNsfw ? 'translate-x-5' : 'translate-x-0'
                     }`}
                   />
                 </button>

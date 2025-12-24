@@ -141,6 +141,7 @@ func (h *RedditHandler) GetFrontPage(c *gin.Context) {
 	timeFilter := c.DefaultQuery("t", "")
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "25"))
 	after := c.DefaultQuery("after", "")
+	includeNSFW, _ := strconv.ParseBool(c.DefaultQuery("include_nsfw", "false"))
 
 	// Validate limit
 	if limit < 1 || limit > 100 {
@@ -223,7 +224,7 @@ func (h *RedditHandler) SearchPosts(c *gin.Context) {
 	}
 
 	// Fetch from Reddit
-	listing, err := h.redditClient.SearchPosts(c.Request.Context(), query, subreddit, sort, timeFilter, limit, after)
+	listing, err := h.redditClient.SearchPosts(c.Request.Context(), query, subreddit, sort, timeFilter, limit, after, includeNSFW)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to search posts", "details": err.Error()})
 		return
@@ -244,6 +245,58 @@ func (h *RedditHandler) SearchPosts(c *gin.Context) {
 		"after":     listing.Data.After,
 		"before":    listing.Data.Before,
 		"posts":     posts,
+	})
+}
+
+// SearchRedditUsers handles GET /api/v1/reddit/users/search
+func (h *RedditHandler) SearchRedditUsers(c *gin.Context) {
+	query := strings.TrimSpace(c.Query("q"))
+	if query == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Search query is required"})
+		return
+	}
+
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "25"))
+	if limit < 1 || limit > 100 {
+		limit = 25
+	}
+	after := c.DefaultQuery("after", "")
+	includeNSFW, _ := strconv.ParseBool(c.DefaultQuery("include_nsfw", "false"))
+
+	listing, err := h.redditClient.SearchUsers(c.Request.Context(), query, limit, after, includeNSFW)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to search users", "details": err.Error()})
+		return
+	}
+
+	type RedditUserResult struct {
+		Name    string `json:"name"`
+		Over18  bool   `json:"over_18"`
+		IconImg string `json:"icon_img,omitempty"`
+		ID      string `json:"id,omitempty"`
+	}
+
+	results := make([]RedditUserResult, 0, len(listing.Data.Children))
+	for _, child := range listing.Data.Children {
+		data := child.Data
+		name, _ := data["name"].(string)
+		icon, _ := data["icon_img"].(string)
+		id, _ := data["id"].(string)
+		over18, _ := data["over_18"].(bool)
+		results = append(results, RedditUserResult{
+			Name:    name,
+			IconImg: icon,
+			ID:      id,
+			Over18:  over18,
+		})
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"query":  query,
+		"limit":  limit,
+		"after":  listing.Data.After,
+		"before": listing.Data.Before,
+		"users":  results,
 	})
 }
 

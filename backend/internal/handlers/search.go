@@ -30,6 +30,7 @@ func (h *SearchHandler) SearchPosts(c *gin.Context) {
 
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
 	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
+	includeNSFW, _ := strconv.ParseBool(c.DefaultQuery("include_nsfw", "false"))
 
 	if limit < 1 || limit > 100 {
 		limit = 20
@@ -42,11 +43,12 @@ func (h *SearchHandler) SearchPosts(c *gin.Context) {
 		FROM platform_posts
 		WHERE search_vector @@ plainto_tsquery('english', $1)
 		AND is_deleted = FALSE
+		AND (nsfw = FALSE OR $4 = TRUE)
 		ORDER BY rank DESC, created_at DESC
 		LIMIT $2 OFFSET $3
 	`
 
-	rows, err := h.pool.Query(c.Request.Context(), sql, query, limit, offset)
+	rows, err := h.pool.Query(c.Request.Context(), sql, query, limit, offset, includeNSFW)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error":   "Search failed",
@@ -149,6 +151,7 @@ func (h *SearchHandler) SearchUsers(c *gin.Context) {
 
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
 	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
+	includeNSFW, _ := strconv.ParseBool(c.DefaultQuery("include_nsfw", "false"))
 
 	if limit < 1 || limit > 100 {
 		limit = 20
@@ -159,11 +162,12 @@ func (h *SearchHandler) SearchUsers(c *gin.Context) {
 		       ts_rank(search_vector, plainto_tsquery('english', $1)) as rank
 		FROM users
 		WHERE search_vector @@ plainto_tsquery('english', $1)
+		AND (nsfw = FALSE OR $4 = TRUE)
 		ORDER BY rank DESC, created_at DESC
 		LIMIT $2 OFFSET $3
 	`
 
-	rows, err := h.pool.Query(c.Request.Context(), sql, query, limit, offset)
+	rows, err := h.pool.Query(c.Request.Context(), sql, query, limit, offset, includeNSFW)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Search failed", "details": err.Error()})
 		return
@@ -204,6 +208,7 @@ func (h *SearchHandler) SearchHubs(c *gin.Context) {
 
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
 	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
+	includeNSFW, _ := strconv.ParseBool(c.DefaultQuery("include_nsfw", "false"))
 
 	if limit < 1 || limit > 100 {
 		limit = 20
@@ -214,11 +219,12 @@ func (h *SearchHandler) SearchHubs(c *gin.Context) {
 		       ts_rank(search_vector, plainto_tsquery('english', $1)) as rank
 		FROM hubs
 		WHERE search_vector @@ plainto_tsquery('english', $1)
+		AND (nsfw = FALSE OR $4 = TRUE)
 		ORDER BY rank DESC, created_at DESC
 		LIMIT $2 OFFSET $3
 	`
 
-	rows, err := h.pool.Query(c.Request.Context(), sql, query, limit, offset)
+	rows, err := h.pool.Query(c.Request.Context(), sql, query, limit, offset, includeNSFW)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Search failed", "details": err.Error()})
 		return
