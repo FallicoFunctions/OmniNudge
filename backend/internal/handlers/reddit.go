@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"html"
+	"encoding/json"
 	"log"
 	"net/http"
 	"path"
@@ -141,7 +142,6 @@ func (h *RedditHandler) GetFrontPage(c *gin.Context) {
 	timeFilter := c.DefaultQuery("t", "")
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "25"))
 	after := c.DefaultQuery("after", "")
-	includeNSFW, _ := strconv.ParseBool(c.DefaultQuery("include_nsfw", "false"))
 
 	// Validate limit
 	if limit < 1 || limit > 100 {
@@ -217,6 +217,7 @@ func (h *RedditHandler) SearchPosts(c *gin.Context) {
 	timeFilter := c.DefaultQuery("t", "")       // hour, day, week, month, year, all (for top)
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "25"))
 	after := c.DefaultQuery("after", "")
+	includeNSFW, _ := strconv.ParseBool(c.DefaultQuery("include_nsfw", "false"))
 
 	// Validate limit
 	if limit < 1 || limit > 100 {
@@ -278,16 +279,20 @@ func (h *RedditHandler) SearchRedditUsers(c *gin.Context) {
 
 	results := make([]RedditUserResult, 0, len(listing.Data.Children))
 	for _, child := range listing.Data.Children {
-		data := child.Data
-		name, _ := data["name"].(string)
-		icon, _ := data["icon_img"].(string)
-		id, _ := data["id"].(string)
-		over18, _ := data["over_18"].(bool)
+		var data struct {
+			Name   string `json:"name"`
+			Icon   string `json:"icon_img"`
+			ID     string `json:"id"`
+			Over18 bool   `json:"over_18"`
+		}
+		if err := json.Unmarshal(child.Data, &data); err != nil {
+			continue
+		}
 		results = append(results, RedditUserResult{
-			Name:    name,
-			IconImg: icon,
-			ID:      id,
-			Over18:  over18,
+			Name:    data.Name,
+			IconImg: data.Icon,
+			ID:      data.ID,
+			Over18:  data.Over18,
 		})
 	}
 

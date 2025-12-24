@@ -32,6 +32,7 @@ import { SubscribeButton } from '../components/common/SubscribeButton';
 import { RedditPostCard } from '../components/reddit/RedditPostCard';
 import { TOP_TIME_OPTIONS } from '../constants/topTimeRange';
 import type { TopTimeRange } from '../constants/topTimeRange';
+import { searchPlatformPosts } from '../services/platformSearchService';
 
 interface FeedRedditPost extends RedditCrosspostSource {
   id: string;
@@ -111,6 +112,10 @@ export default function RedditPage() {
   const [includeNsfwSearch, setIncludeNsfwSearch] = useState(false);
   const [siteWideResults, setSiteWideResults] = useState<SiteWideSearchResults | null>(null);
   const [isSiteWideSearching, setIsSiteWideSearching] = useState(false);
+  const [scopedSearchResults, setScopedSearchResults] = useState<CrosspostSource[] | null>(null);
+  const [scopedSearchAfter, setScopedSearchAfter] = useState<string | null>(null);
+  const [scopedSearchQuery, setScopedSearchQuery] = useState<string>('');
+  const [scopedSearchPage, setScopedSearchPage] = useState(1);
   const [hideTarget, setHideTarget] = useState<HideTarget | null>(null);
   const [crosspostTarget, setCrosspostTarget] = useState<CrosspostSource | null>(null);
   const [crosspostTitle, setCrosspostTitle] = useState('');
@@ -595,11 +600,18 @@ export default function RedditPage() {
   useEffect(() => {
     setIncludeNsfwSearch(!blockAllNsfw && searchIncludeNsfwByDefault);
     setLimitSearchToContext(true);
+    setScopedSearchResults(null);
+    setSiteWideResults(null);
+    setScopedSearchAfter(null);
+    setScopedSearchPage(1);
+    setScopedSearchQuery('');
   }, [blockAllNsfw, searchIncludeNsfwByDefault, subreddit]);
 
   useEffect(() => {
     if (limitSearchToContext) {
       setSiteWideResults(null);
+      setScopedSearchAfter(null);
+      setScopedSearchPage(1);
     }
   }, [limitSearchToContext]);
 
@@ -631,13 +643,110 @@ export default function RedditPage() {
     }
   };
 
+  const fetchScopedSearchPage = async (nextPage: number, afterToken: string | null) => {
+    if (!scopedSearchQuery) return;
+    try {
+      const [redditResults, platformResults] = await Promise.all([
+        redditService.searchPosts(scopedSearchQuery, {
+          subreddit,
+          limit: 25,
+          includeNsfw: includeNsfwSearch && !blockAllNsfw,
+          after: afterToken ?? undefined,
+        }),
+        searchPlatformPosts(scopedSearchQuery, includeNsfwSearch && !blockAllNsfw, {
+          limit: 25,
+          offset: (nextPage - 1) * 25,
+        }),
+      ]);
+
+      const filteredPlatform = platformResults.filter(
+        (post) => post.target_subreddit?.toLowerCase() === subreddit.toLowerCase()
+      );
+
+      const redditItems: CrosspostSource[] =
+        redditResults.posts?.map((post) => ({ type: 'reddit' as const, post })) ?? [];
+      const platformItems: CrosspostSource[] =
+        filteredPlatform.map((post) => ({ type: 'platform' as const, post })) ?? [];
+
+      const sorted = [...redditItems, ...platformItems].sort((a, b) => {
+        const aTime =
+          a.type === 'reddit'
+            ? a.post.created_utc * 1000
+            : new Date(a.post.crossposted_at ?? a.post.created_at ?? '').getTime();
+        const bTime =
+          b.type === 'reddit'
+            ? b.post.created_utc * 1000
+            : new Date(b.post.crossposted_at ?? b.post.created_at ?? '').getTime();
+        return bTime - aTime;
+      });
+
+      setScopedSearchResults(sorted);
+      setScopedSearchAfter(redditResults.after ?? null);
+      setScopedSearchPage(nextPage);
+    } catch (searchError) {
+      console.error('Scoped search paging failed', searchError);
+    }
+  };
+
   const handlePostSearchSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const query = postSearchInput.trim();
-    if (!query) return;
-    if (limitSearchToContext) {
-      setPostSearchQuery(query);
+    if (!query) {
+      setScopedSearchResults(null);
       setSiteWideResults(null);
+      setPostSearchQuery('');
+      setScopedSearchAfter(null);
+      setScopedSearchQuery('');
+      setScopedSearchPage(1);
+      return;
+    }
+    if (limitSearchToContext) {
+      setPostSearchQuery('');
+      setSiteWideResults(null);
+      setScopedSearchQuery(query);
+      setScopedSearchPage(1);
+      try {
+        const [redditResults, platformResults] = await Promise.all([
+          redditService.searchPosts(query, {
+            subreddit,
+            limit: 25,
+            includeNsfw: includeNsfwSearch && !blockAllNsfw,
+            after: scopedSearchAfter ?? undefined,
+          }),
+          searchPlatformPosts(query, includeNsfwSearch && !blockAllNsfw, {
+            limit: 25,
+            offset: 0,
+          }),
+        ]);
+
+        const filteredPlatform = platformResults.filter(
+          (post) => post.target_subreddit?.toLowerCase() === subreddit.toLowerCase()
+        );
+
+        const redditItems: CrosspostSource[] =
+          redditResults.posts?.map((post) => ({ type: 'reddit' as const, post })) ?? [];
+        const platformItems: CrosspostSource[] =
+          filteredPlatform.map((post) => ({ type: 'platform' as const, post })) ?? [];
+
+        const sorted = [...redditItems, ...platformItems].sort((a, b) => {
+          const aTime =
+            a.type === 'reddit'
+              ? a.post.created_utc * 1000
+              : new Date(a.post.crossposted_at ?? a.post.created_at ?? '').getTime();
+          const bTime =
+            b.type === 'reddit'
+              ? b.post.created_utc * 1000
+              : new Date(b.post.crossposted_at ?? b.post.created_at ?? '').getTime();
+          return bTime - aTime;
+        });
+
+        setScopedSearchResults(sorted);
+        setScopedSearchAfter(redditResults.after ?? null);
+      } catch (searchError) {
+        console.error('Scoped search failed', searchError);
+        setScopedSearchResults([]);
+        setScopedSearchAfter(null);
+      }
       return;
     }
     setIsSiteWideSearching(true);
@@ -1205,7 +1314,175 @@ export default function RedditPage() {
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div>
-          {filteredCombinedPosts.length > 0 ? (
+      {scopedSearchResults ? (
+        scopedSearchResults.length > 0 ? (
+          <div className="space-y-3">
+            {scopedSearchResults.map((item, idx) => {
+              if (item.type === 'platform') {
+                const post = item.post;
+                const previewImage = post.thumbnail_url || post.media_url;
+                const displaySubreddit =
+                  post.target_subreddit || post.crosspost_origin_subreddit || subreddit;
+                const displayAuthor =
+                  post.author_username ||
+                  post.author?.username ||
+                  (post.author_id === user?.id ? user?.username : undefined) ||
+                  'unknown';
+                const createdTimestamp = post.crossposted_at ?? post.created_at;
+                const createdLabel = createdTimestamp
+                  ? formatTimestamp(createdTimestamp, useRelativeTime)
+                  : 'unknown time';
+                const commentLabel = `${post.num_comments.toLocaleString()} Comments`;
+                const pointsLabel = `${post.score.toLocaleString()} points`;
+                const postUrl = getLocalPostUrl(post);
+                const canDelete = user?.id === post.author_id;
+                const isDeleting =
+                  deleteLocalPostMutation.isPending &&
+                  deleteLocalPostMutation.variables === post.id;
+                const isSavedLocal = savedLocalPostIds.has(post.id);
+                const isSavePendingLocal =
+                  savedLocalToggleMutation.isPending &&
+                  savedLocalToggleMutation.variables?.postId === post.id;
+
+                return (
+                  <article
+                    key={`scoped-local-${post.id}-${idx}`}
+                    className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)]"
+                  >
+                    <div className="flex gap-3 p-3">
+                      <VoteButtons
+                        postId={post.id}
+                        initialScore={post.score}
+                        initialUserVote={post.user_vote ?? null}
+                        layout="vertical"
+                        size="small"
+                      />
+                      {previewImage && (
+                        <img
+                          src={previewImage}
+                          alt=""
+                          className="h-16 w-16 flex-shrink-0 rounded object-cover"
+                        />
+                      )}
+                      <div className="flex-1 text-left">
+                        <div className="mb-1 inline-flex items-center gap-2">
+                          <span className="inline-block rounded bg-blue-600 px-2 py-0.5 text-[10px] font-bold uppercase text-white">
+                            Omni
+                          </span>
+                          {displaySubreddit && (
+                            <span className="text-[11px] font-medium text-[var(--color-text-secondary)]">
+                              r/{displaySubreddit}
+                            </span>
+                          )}
+                        </div>
+                        <Link to={postUrl}>
+                          <h3 className="text-base font-semibold text-[var(--color-text-primary)] hover:text-[var(--color-primary)]">
+                            {post.title}
+                          </h3>
+                        </Link>
+                        <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-[var(--color-text-secondary)]">
+                          <span>u/{displayAuthor}</span>
+                          <span>•</span>
+                          <span>{pointsLabel}</span>
+                          <span>•</span>
+                          <span>submitted {createdLabel}</span>
+                        </div>
+                        <div className="mt-1 flex flex-wrap items-center gap-3 text-[11px] text-[var(--color-text-secondary)]">
+                          <Link
+                            to={postUrl}
+                            className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+                          >
+                            {commentLabel}
+                          </Link>
+                          <button
+                            type="button"
+                            onClick={() => handleShareLocalPost(post)}
+                            className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+                          >
+                            Share
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleToggleSaveLocalPost(post.id, isSavedLocal)}
+                            disabled={isSavePendingLocal}
+                            className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] disabled:opacity-50"
+                          >
+                            {isSavePendingLocal ? 'Saving...' : isSavedLocal ? 'Unsave' : 'Save'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleSetHideTarget({ type: 'platform', post })}
+                            className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+                          >
+                            Hide
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleCrosspostSelection({ type: 'platform', post })}
+                            className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+                          >
+                            Crosspost
+                          </button>
+                          {canDelete && (
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteLocalPost(post.id)}
+                              disabled={isDeleting}
+                              className="text-red-600 hover:text-red-500 disabled:opacity-60"
+                            >
+                              {isDeleting ? 'Deleting...' : 'Delete'}
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </article>
+                );
+              }
+
+              const post = item.post;
+              const isSaved = savedRedditPostIds.has(`${post.subreddit}-${post.id}`);
+              const isSaveActionPending =
+                toggleSaveRedditPostMutation.isPending &&
+                toggleSaveRedditPostMutation.variables?.post.id === post.id;
+              const pendingShouldSave = toggleSaveRedditPostMutation.variables?.shouldSave;
+
+              return (
+                <RedditPostCard
+                  key={`scoped-reddit-${post.id}-${idx}`}
+                  post={post}
+                  useRelativeTime={useRelativeTime}
+                  isSaved={isSaved}
+                  isSaveActionPending={isSaveActionPending}
+                  pendingShouldSave={pendingShouldSave}
+                  onShare={() => handleShareRedditPost(post)}
+                  onToggleSave={(shouldSave) =>
+                    toggleSaveRedditPostMutation.mutate({ post, shouldSave })
+                  }
+                  onHide={() => handleSetHideTarget({ type: 'reddit', post })}
+                  onCrosspost={() => handleCrosspostSelection({ type: 'reddit', post })}
+                  linkState={originState}
+                />
+              );
+            })}
+            <div className="mt-4 flex items-center justify-between">
+              <span className="text-sm text-[var(--color-text-secondary)]">
+                Page {scopedSearchPage}
+              </span>
+              <button
+                type="button"
+                onClick={() => fetchScopedSearchPage(scopedSearchPage + 1, scopedSearchAfter)}
+                disabled={!scopedSearchAfter}
+                className="rounded bg-[var(--color-primary)] px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Next →
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="text-center text-[var(--color-text-secondary)]">No search results</div>
+        )
+      ) : filteredCombinedPosts.length > 0 ? (
             useInfiniteScroll ? (
               <div ref={parentRef} className="relative w-full">
                 <div
@@ -1563,7 +1840,10 @@ export default function RedditPage() {
           )}
 
           {/* Pagination controls */}
-          {!useInfiniteScroll && filteredCombinedPosts.length > 0 && (
+          {!useInfiniteScroll &&
+            !scopedSearchResults &&
+            filteredCombinedPosts.length > 0 &&
+            (pageHistory.length > 1 || Boolean(paginatedRedditQuery.data?.after)) && (
             <div className="mt-6 flex items-center justify-between border-t border-[var(--color-border)] pt-4">
               <button
                 type="button"

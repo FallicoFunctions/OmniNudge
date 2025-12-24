@@ -67,9 +67,12 @@ export const redditService = {
     };
   },
 
-  async searchPosts(query: string, subreddit?: string, limit = 25): Promise<RedditPostsResponse> {
-    const params = new URLSearchParams({ q: query, limit: String(limit) });
-    if (subreddit) params.append('subreddit', subreddit);
+  async searchPosts(query: string, options?: { subreddit?: string; limit?: number; includeNsfw?: boolean; after?: string | null }): Promise<RedditPostsResponse> {
+    const params = new URLSearchParams({ q: query });
+    if (options?.limit) params.append('limit', String(options.limit));
+    if (options?.subreddit) params.append('subreddit', options.subreddit);
+    if (options?.includeNsfw) params.append('include_nsfw', 'true');
+    if (options?.after) params.append('after', options.after);
     return api.get<RedditPostsResponse>(`/reddit/search?${params}`);
   },
 
