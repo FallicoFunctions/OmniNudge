@@ -81,6 +81,14 @@ function getThumbnailUrl(post: RedditPostCardProps['post']): string | null {
   return null;
 }
 
+function getRedgifsId(url?: string | null): string | null {
+  if (!url) return null;
+  const normalized = url.toLowerCase();
+  if (!normalized.includes('redgifs.com')) return null;
+  const match = url.match(/redgifs\.com\/(?:watch|ifr)\/([a-zA-Z0-9_-]+)/i);
+  return match?.[1] ?? null;
+}
+
 export function RedditPostCard({
   post,
   useRelativeTime,
@@ -112,7 +120,9 @@ export function RedditPostCard({
   );
   const commentLabel = `${post.num_comments.toLocaleString()} Comments`;
   const previewImageUrl = getExpandableImageUrl(post);
-  const isInlinePreviewOpen = !!(previewImageUrl && expandedImageMap[post.id]);
+  const redgifsId = getRedgifsId(sanitizedExternalUrl);
+  const hasInlineMedia = Boolean(previewImageUrl || redgifsId);
+  const isInlinePreviewOpen = !!(hasInlineMedia && expandedImageMap[post.id]);
 
   return (
     <article className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)]">
@@ -174,11 +184,11 @@ export function RedditPostCard({
             )}
           </div>
           <div className="mt-1 flex items-start gap-3 text-[11px] text-[var(--color-text-secondary)]">
-            {previewImageUrl && (
+            {hasInlineMedia && (
               <button
                 type="button"
                 onClick={() => toggleInlinePreview(post.id)}
-                aria-pressed={isInlinePreviewOpen}
+                aria-pressed={!!expandedImageMap[post.id]}
                 aria-label={isInlinePreviewOpen ? 'Hide image preview' : 'Show image preview'}
                 className="flex h-7 w-7 items-center justify-center rounded border border-[var(--color-border)] bg-[var(--color-surface-elevated)] text-[var(--color-text-secondary)] hover:border-[var(--color-primary)] hover:text-[var(--color-primary)]"
               >
@@ -231,13 +241,27 @@ export function RedditPostCard({
                 <span>•</span>
                 <span>submitted {formatTimestamp(post.created_utc, useRelativeTime)}</span>
               </div>
-              {isInlinePreviewOpen && previewImageUrl && (
+              {expandedImageMap[post.id] && (previewImageUrl || redgifsId) && (
                 <div className="mt-3 overflow-hidden rounded border border-[var(--color-border)] bg-[var(--color-surface-elevated)]">
-                  <img
-                    src={previewImageUrl}
-                    alt={post.title}
-                    className="max-h-[70vh] w-full object-contain"
-                  />
+                  {redgifsId ? (
+                    <div className="relative w-full bg-black">
+                      <iframe
+                        title={`${post.title} - Redgifs video`}
+                        src={`https://www.redgifs.com/ifr/${redgifsId}`}
+                        className="h-[70vh] w-full"
+                        frameBorder="0"
+                        scrolling="no"
+                        allow="fullscreen; picture-in-picture; autoplay"
+                        allowFullScreen
+                      />
+                    </div>
+                  ) : (
+                    <img
+                      src={previewImageUrl}
+                      alt={post.title}
+                      className="max-h-[70vh] w-full object-contain"
+                    />
+                  )}
                 </div>
               )}
               <div className="mt-1 flex flex-wrap items-center gap-3">
