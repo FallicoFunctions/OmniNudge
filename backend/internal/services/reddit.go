@@ -515,8 +515,8 @@ func (r *RedditClient) GetPostComments(ctx context.Context, subreddit string, po
 }
 
 // SearchPosts searches for posts across Reddit
-func (r *RedditClient) SearchPosts(ctx context.Context, query string, subreddit string, sort string, timeFilter string, limit int, after string) (*RedditListing, error) {
-	cacheKey := fmt.Sprintf("search:%s:%s:%s:%s:%d:%s", query, subreddit, sort, timeFilter, limit, after)
+func (r *RedditClient) SearchPosts(ctx context.Context, query string, subreddit string, sort string, timeFilter string, limit int, after string, includeNSFW bool) (*RedditListing, error) {
+	cacheKey := fmt.Sprintf("search:%s:%s:%s:%s:%d:%s:%t", query, subreddit, sort, timeFilter, limit, after, includeNSFW)
 	if listing, ok, err := r.getCachedListing(ctx, cacheKey); err == nil && ok {
 		return listing, nil
 	}
@@ -552,6 +552,7 @@ func (r *RedditClient) SearchPosts(ctx context.Context, query string, subreddit 
 	if limit > 0 {
 		q.Add("limit", fmt.Sprintf("%d", limit))
 	}
+	q.Add("include_over_18", strconv.FormatBool(includeNSFW))
 	if after != "" {
 		q.Add("after", after)
 	}
@@ -570,6 +571,51 @@ func (r *RedditClient) SearchPosts(ctx context.Context, query string, subreddit 
 	}
 
 	// Parse response
+	var listing RedditListing
+	if err := json.NewDecoder(resp.Body).Decode(&listing); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	_ = r.setCachedListing(ctx, cacheKey, listing)
+	return &listing, nil
+}
+
+// SearchUsers searches Reddit users
+func (r *RedditClient) SearchUsers(ctx context.Context, query string, limit int, after string, includeNSFW bool) (*RedditListing, error) {
+	cacheKey := fmt.Sprintf("search_users:%s:%d:%s:%t", query, limit, after, includeNSFW)
+	if listing, ok, err := r.getCachedListing(ctx, cacheKey); err == nil && ok {
+		return listing, nil
+	}
+
+	url := "https://www.reddit.com/users/search.json"
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+	req.Header.Set("User-Agent", r.userAgent)
+
+	q := req.URL.Query()
+	q.Add("q", query)
+	if limit > 0 {
+		q.Add("limit", fmt.Sprintf("%d", limit))
+	}
+	if after != "" {
+		q.Add("after", after)
+	}
+	q.Add("include_over_18", strconv.FormatBool(includeNSFW))
+	req.URL.RawQuery = q.Encode()
+
+	resp, err := r.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to search users: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("reddit API returned status %d: %s", resp.StatusCode, string(body))
+	}
+
 	var listing RedditListing
 	if err := json.NewDecoder(resp.Body).Decode(&listing); err != nil {
 		return nil, fmt.Errorf("failed to decode response: %w", err)

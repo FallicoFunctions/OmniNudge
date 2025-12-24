@@ -1,0 +1,8 @@
+ALTER TABLE platform_posts
+    DROP COLUMN IF EXISTS nsfw;
+
+ALTER TABLE users
+    DROP COLUMN IF EXISTS nsfw;
+
+ALTER TABLE hubs
+    DROP COLUMN IF EXISTS nsfw;

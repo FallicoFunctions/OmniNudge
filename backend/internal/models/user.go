@@ -34,6 +34,7 @@ type User struct {
 	// Timestamps
 	CreatedAt time.Time `json:"created_at"`
 	LastSeen  time.Time `json:"last_seen"`
+	NSFW      bool      `json:"nsfw"`
 }
 
 // UserRepository handles database operations for users
@@ -49,9 +50,9 @@ func NewUserRepository(pool *pgxpool.Pool) *UserRepository {
 // Create creates a new user with username/password
 func (r *UserRepository) Create(ctx context.Context, user *User) error {
 	query := `
-		INSERT INTO users (username, email, password_hash, avatar_url, bio)
-		VALUES ($1, $2, $3, $4, $5)
-		RETURNING id, created_at, last_seen, role
+		INSERT INTO users (username, email, password_hash, avatar_url, bio, nsfw)
+		VALUES ($1, $2, $3, $4, $5, $6)
+		RETURNING id, created_at, last_seen, role, nsfw
 	`
 
 	return r.pool.QueryRow(ctx, query,
@@ -60,14 +61,15 @@ func (r *UserRepository) Create(ctx context.Context, user *User) error {
 		user.PasswordHash,
 		user.AvatarURL,
 		user.Bio,
-	).Scan(&user.ID, &user.CreatedAt, &user.LastSeen, &user.Role)
+		user.NSFW,
+	).Scan(&user.ID, &user.CreatedAt, &user.LastSeen, &user.Role, &user.NSFW)
 }
 
 // CreateOrUpdateFromReddit creates or updates a user from Reddit OAuth (for future use)
 func (r *UserRepository) CreateOrUpdateFromReddit(ctx context.Context, user *User) error {
 	query := `
-		INSERT INTO users (username, reddit_id, reddit_username, access_token, refresh_token, token_expires_at, karma, avatar_url, password_hash)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, '')
+		INSERT INTO users (username, reddit_id, reddit_username, access_token, refresh_token, token_expires_at, karma, avatar_url, password_hash, nsfw)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, '', $9)
 		ON CONFLICT (reddit_id)
 		DO UPDATE SET
 			reddit_username = EXCLUDED.reddit_username,
@@ -77,7 +79,7 @@ func (r *UserRepository) CreateOrUpdateFromReddit(ctx context.Context, user *Use
 			karma = EXCLUDED.karma,
 			avatar_url = EXCLUDED.avatar_url,
 			last_seen = CURRENT_TIMESTAMP
-		RETURNING id, created_at, last_seen, role
+		RETURNING id, created_at, last_seen, role, nsfw
 	`
 
 	return r.pool.QueryRow(ctx, query,
@@ -89,7 +91,8 @@ func (r *UserRepository) CreateOrUpdateFromReddit(ctx context.Context, user *Use
 		user.TokenExpiresAt,
 		user.Karma,
 		user.AvatarURL,
-	).Scan(&user.ID, &user.CreatedAt, &user.LastSeen, &user.Role)
+		user.NSFW,
+	).Scan(&user.ID, &user.CreatedAt, &user.LastSeen, &user.Role, &user.NSFW)
 }
 
 // GetByID retrieves a user by their internal ID
