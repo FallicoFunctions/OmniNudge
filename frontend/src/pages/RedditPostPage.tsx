@@ -278,7 +278,7 @@ function RedditCommentView({
   const handleCopyPermalink = () => {
     const subreddit = window.location.pathname.split('/')[3];
     const postId = window.location.pathname.split('/')[5];
-    const url = `https://reddit.com/r/${subreddit}/comments/${postId}/_/${comment.data.id}`;
+    const url = `/reddit/r/${subreddit}/comments/${postId}/_/${comment.data.id}`;
     navigator.clipboard.writeText(url);
     alert('Permalink copied to clipboard!');
   };
@@ -286,7 +286,7 @@ function RedditCommentView({
   const handleEmbed = () => {
     const subreddit = window.location.pathname.split('/')[3];
     const postId = window.location.pathname.split('/')[5];
-    const permalink = `https://www.reddit.com/r/${subreddit}/comments/${postId}/_/${comment.data.id}`;
+    const permalink = `/reddit/r/${subreddit}/comments/${postId}/_/${comment.data.id}`;
     onEmbed({
       author: comment.data.author,
       body: comment.data.body ?? '',
@@ -297,10 +297,7 @@ function RedditCommentView({
   };
 
   const handleSave = () => {
-    // For now, just open Reddit's save feature in new tab
-    const subreddit = window.location.pathname.split('/')[3];
-    const postId = window.location.pathname.split('/')[5];
-    window.open(`https://reddit.com/r/${subreddit}/comments/${postId}/_/${comment.data.id}`, '_blank');
+    alert('Saving Reddit comments is not supported on OmniNudge.');
   };
 
   return (
@@ -1633,14 +1630,9 @@ export default function RedditPostPage() {
                   {!videoData.hasAudio && (
                     <div className="mt-2 text-xs text-[var(--color-text-muted)] italic">
                       Note: This video may not have audio. Reddit serves audio separately.{' '}
-                      <a
-                        href={`https://reddit.com${post.permalink}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-[var(--color-primary)] hover:underline"
-                      >
-                        Watch on Reddit
-                      </a>
+                      <span className="text-[var(--color-text-muted)]">
+                        Watch on Reddit is not available from OmniNudge.
+                      </span>
                     </div>
                   )}
                 </div>

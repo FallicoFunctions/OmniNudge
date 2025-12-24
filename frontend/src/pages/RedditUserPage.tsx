@@ -194,7 +194,7 @@ export default function RedditUserPage() {
   };
 
   const handleShareComment = (comment: RedditUserComment) => {
-    const permalink = `https://reddit.com${comment.permalink}`;
+    const permalink = `${window.location.origin}${comment.permalink}`;
     navigator.clipboard
       .writeText(permalink)
       .then(() => alert('Comment link copied to clipboard!'))

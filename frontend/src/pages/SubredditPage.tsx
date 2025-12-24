@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useRef } from 'react';
 import { useMutation, useQuery, useQueryClient, useInfiniteQuery } from '@tanstack/react-query';
 import { Link, useNavigate, useParams, useLocation } from 'react-router-dom';
 import { redditService } from '../services/redditService';
@@ -782,6 +782,7 @@ export default function RedditPage() {
     () => sanitizeRedditSidebarHtml(subredditAbout?.description_html),
     [subredditAbout?.description_html]
   );
+  const sidebarRef = useRef<HTMLDivElement>(null);
   const subredditIcon = useMemo(
     () => normalizeSubredditIcon(subredditAbout),
     [subredditAbout]
@@ -880,6 +881,32 @@ export default function RedditPage() {
     paginatedRedditQuery.isLoading,
     infiniteRedditQuery.isLoading,
   ]);
+
+  useEffect(() => {
+    const el = sidebarRef.current;
+    if (!el) return;
+
+    const handleClick = (event: Event) => {
+      const target = event.target as HTMLElement | null;
+      const anchor = target?.closest?.('a') as HTMLAnchorElement | null;
+      if (!anchor || !anchor.href) return;
+      try {
+        const parsed = new URL(anchor.href, window.location.origin);
+        const host = parsed.hostname.replace(/^www\./i, '').replace(/^old\./i, '');
+        if (host === 'reddit.com' && parsed.pathname.startsWith('/message')) {
+          event.preventDefault();
+          alert('Native Reddit messaging features are not available on OmniNudge.');
+        }
+      } catch {
+        // ignore malformed URLs
+      }
+    };
+
+    el.addEventListener('click', handleClick);
+    return () => {
+      el.removeEventListener('click', handleClick);
+    };
+  }, [sidebarHtml]);
 
   const filteredCombinedPosts = useMemo(() => {
     const query = postSearchQuery.trim().toLowerCase();
@@ -1840,6 +1867,7 @@ export default function RedditPage() {
                     )}
                     {sidebarHtml ? (
                       <div
+                        ref={sidebarRef}
                         className="reddit-sidebar-content mt-3"
                         dangerouslySetInnerHTML={{ __html: sidebarHtml }}
                       />
