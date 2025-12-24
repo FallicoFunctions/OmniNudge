@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useEffect, useMemo, useState, useRef } from 'react';
+import { useMutation, useQuery, useQueryClient, useInfiniteQuery } from '@tanstack/react-query';
 import { Link, useNavigate, useParams, useLocation } from 'react-router-dom';
+import { useWindowVirtualizer } from '@tanstack/react-virtual';
 import { redditService } from '../services/redditService';
 import { savedService } from '../services/savedService';
 import { hubsService } from '../services/hubsService';
@@ -49,6 +50,7 @@ interface FeedRedditPost extends RedditCrosspostSource {
 
 interface FeedRedditPostsResponse {
   posts: FeedRedditPost[];
+  after?: string | null;
 }
 
 type CrosspostSource =
@@ -90,7 +92,7 @@ export default function RedditPage() {
   const { subreddit: routeSubreddit } = useParams<{ subreddit?: string }>();
   const queryClient = useQueryClient();
   const { user } = useAuth();
-  const { useRelativeTime } = useSettings();
+  const { useRelativeTime, useInfiniteScroll } = useSettings();
   const { blockedUsers } = useRedditBlocklist();
   const [subreddit, setSubreddit] = useState(routeSubreddit ?? 'popular');
   const [sort, setSort] = useState<'hot' | 'new' | 'top' | 'rising' | 'controversial'>('hot');
@@ -111,6 +113,8 @@ export default function RedditPage() {
   const [sendRepliesToInbox, setSendRepliesToInbox] = useState(true);
   const [showOmniOnly, setShowOmniOnly] = useState(false);
   const [isAutocompleteOpen, setIsAutocompleteOpen] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageHistory, setPageHistory] = useState<(string | undefined)[]>([undefined]);
   const convertInputToISO = (value: string) => {
     if (!value) {
       return undefined;
@@ -159,18 +163,44 @@ export default function RedditPage() {
     [location.pathname, location.search]
   );
 
-  const { data, isLoading, error} = useQuery<FeedRedditPostsResponse>({
-    queryKey: ['reddit', subreddit, sort, topRangeKey],
-    queryFn: () => {
-      const limit = isTopSort || isControversialSort ? 100 : 25;
+  // Infinite scroll query
+  const infiniteRedditQuery = useInfiniteQuery<FeedRedditPostsResponse>({
+    queryKey: ['reddit-infinite', subreddit, sort, topRangeKey],
+    queryFn: ({ pageParam }) => {
+      const limit = 25;
+      const after = pageParam as string | undefined;
       if (subreddit === 'frontpage') {
-        return redditService.getFrontPage(sort, limit, redditTimeFilter);
+        return redditService.getFrontPage(sort, limit, redditTimeFilter, after);
       }
-      return redditService.getSubredditPosts(subreddit, sort, limit, redditTimeFilter);
+      return redditService.getSubredditPosts(subreddit, sort, limit, redditTimeFilter, after);
     },
-    staleTime: 1000 * 60 * 5, // 5 minutes
-    enabled: (!isCustomTopRange || isCustomTopRangeValid) && (!isCustomControversialRange || isCustomControversialRangeValid),
+    getNextPageParam: (lastPage) => lastPage.after ?? undefined,
+    initialPageParam: undefined,
+    staleTime: 1000 * 60 * 5,
+    enabled: useInfiniteScroll && (!isCustomTopRange || isCustomTopRangeValid) && (!isCustomControversialRange || isCustomControversialRangeValid),
   });
+
+  // Paginated query
+  const paginatedRedditQuery = useQuery<FeedRedditPostsResponse>({
+    queryKey: ['reddit-paginated', subreddit, sort, topRangeKey, pageHistory[pageHistory.length - 1]],
+    queryFn: () => {
+      const limit = 25;
+      const after = pageHistory[pageHistory.length - 1];
+      if (subreddit === 'frontpage') {
+        return redditService.getFrontPage(sort, limit, redditTimeFilter, after);
+      }
+      return redditService.getSubredditPosts(subreddit, sort, limit, redditTimeFilter, after);
+    },
+    staleTime: 1000 * 60 * 5,
+    enabled: !useInfiniteScroll && (!isCustomTopRange || isCustomTopRangeValid) && (!isCustomControversialRange || isCustomControversialRangeValid),
+  });
+
+  // Use appropriate query based on settings
+  const data = useInfiniteScroll
+    ? { posts: infiniteRedditQuery.data?.pages.flatMap(page => page.posts) ?? [] }
+    : paginatedRedditQuery.data;
+  const isLoading = useInfiniteScroll ? infiniteRedditQuery.isLoading : paginatedRedditQuery.isLoading;
+  const error = useInfiniteScroll ? infiniteRedditQuery.error : paginatedRedditQuery.error;
 
   // Fetch hidden Reddit posts
   const { data: hiddenPostsData } = useQuery({
@@ -641,7 +671,16 @@ export default function RedditPage() {
     setIsAutocompleteOpen(false);
   };
 
+  const currentPageSize = useInfiniteScroll ? undefined : paginatedRedditQuery.data?.posts.length ?? 0;
+
   const combinedPosts = useMemo(() => {
+    if (
+      (!useInfiniteScroll && paginatedRedditQuery.isLoading) ||
+      (useInfiniteScroll && infiniteRedditQuery.isLoading)
+    ) {
+      return [];
+    }
+
     const allPosts: CrosspostSource[] = [
       ...visiblePosts.map((post) => ({ type: 'reddit' as const, post })),
       ...visibleLocalPosts.map((post) => ({ type: 'platform' as const, post })),
@@ -671,8 +710,23 @@ export default function RedditPage() {
       return (post.post.score ?? 0) * 1_000_000 + recency;
     };
 
-    return filteredPosts.sort((a, b) => getSortValue(b) - getSortValue(a));
-  }, [visiblePosts, visibleLocalPosts, showOmniOnly, sort]);
+    const sorted = filteredPosts.sort((a, b) => getSortValue(b) - getSortValue(a));
+
+    if (!useInfiniteScroll && currentPageSize) {
+      return sorted.slice(0, currentPageSize);
+    }
+
+    return sorted;
+  }, [
+    visiblePosts,
+    visibleLocalPosts,
+    showOmniOnly,
+    sort,
+    useInfiniteScroll,
+    currentPageSize,
+    paginatedRedditQuery.isLoading,
+    infiniteRedditQuery.isLoading,
+  ]);
 
   const filteredCombinedPosts = useMemo(() => {
     const query = postSearchQuery.trim().toLowerCase();
@@ -704,6 +758,84 @@ export default function RedditPage() {
       );
     });
   }, [combinedPosts, postSearchQuery]);
+
+  // Pagination handlers
+  const handleNextPage = () => {
+    const nextAfter = paginatedRedditQuery.data?.after;
+    if (nextAfter) {
+      setPageHistory(prev => [...prev, nextAfter]);
+      setCurrentPage(prev => prev + 1);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
+  const handlePrevPage = () => {
+    if (pageHistory.length > 1) {
+      setPageHistory(prev => prev.slice(0, -1));
+      setCurrentPage(prev => prev - 1);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
+  // Reset pagination when switching subreddits or sort
+  useEffect(() => {
+    setPageHistory([undefined]);
+    setCurrentPage(1);
+  }, [subreddit, sort, topRangeKey]);
+
+  // Virtualization for infinite scroll
+  const parentRef = useRef<HTMLDivElement>(null);
+
+  const rowVirtualizer = useWindowVirtualizer({
+    count: useInfiniteScroll ? filteredCombinedPosts.length : 0,
+    estimateSize: () => 200,
+    overscan: 5,
+    scrollMargin: 0,
+    measureElement:
+      typeof window !== 'undefined' && navigator.userAgent.indexOf('Firefox') === -1
+        ? (element) => element?.getBoundingClientRect().height
+        : undefined,
+  });
+  const virtualItems = rowVirtualizer.getVirtualItems();
+  const {
+    hasNextPage: hasMoreRedditPages,
+    isFetchingNextPage,
+    fetchNextPage,
+  } = infiniteRedditQuery;
+  const scrollLockRef = useRef<number | null>(null);
+
+  // TODO: Keep viewport position stable when new virtualized pages append; current scroll locking still allows upward jumps after fetchNextPage.
+  useEffect(() => {
+    if (!useInfiniteScroll) return;
+    if (isFetchingNextPage && scrollLockRef.current === null) {
+      scrollLockRef.current = window.scrollY;
+      return;
+    }
+
+    if (!isFetchingNextPage && scrollLockRef.current !== null) {
+      window.scrollTo({ top: scrollLockRef.current });
+      scrollLockRef.current = null;
+    }
+  }, [useInfiniteScroll, isFetchingNextPage]);
+
+  // Auto-fetch next page when scrolling near bottom
+  useEffect(() => {
+    if (!useInfiniteScroll) return;
+
+    const handleScroll = () => {
+      if (!hasMoreRedditPages || isFetchingNextPage) return;
+      const scrollPosition = window.scrollY + window.innerHeight;
+      const threshold = document.documentElement.scrollHeight - 600;
+      if (scrollPosition >= threshold) {
+        fetchNextPage();
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+    };
+  }, [useInfiniteScroll, hasMoreRedditPages, isFetchingNextPage, fetchNextPage]);
 
   return (
     <div className="mx-auto w-full max-w-7xl px-4 py-8">
@@ -967,10 +1099,188 @@ export default function RedditPage() {
       )}
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
-        <div className="space-y-3">
+        <div>
           {filteredCombinedPosts.length > 0 ? (
-            <>
-              {filteredCombinedPosts.map((item) => {
+            useInfiniteScroll ? (
+              <div ref={parentRef} className="relative w-full">
+                <div
+                  style={{
+                    height: `${rowVirtualizer.getTotalSize()}px`,
+                    width: '100%',
+                    position: 'relative',
+                  }}
+                >
+                  {virtualItems.map((virtualItem) => {
+                    const item = filteredCombinedPosts[virtualItem.index];
+
+                    return (
+                      <div
+                        key={virtualItem.key}
+                        data-index={virtualItem.index}
+                        ref={rowVirtualizer.measureElement}
+                        style={{
+                          position: 'absolute',
+                          top: 0,
+                          left: 0,
+                          width: '100%',
+                          transform: `translateY(${virtualItem.start}px)`,
+                        }}
+                        className="pb-3"
+                      >
+                        {item.type === 'platform' ? (() => {
+                        const post = item.post;
+                        const previewImage = post.thumbnail_url || post.media_url;
+                        const displaySubreddit =
+                          post.target_subreddit || post.crosspost_origin_subreddit || subreddit;
+                        const displayAuthor =
+                          post.author_username ||
+                          post.author?.username ||
+                          (post.author_id === user?.id ? user?.username : undefined) ||
+                          'unknown';
+                        const createdTimestamp = post.crossposted_at ?? post.created_at;
+                        const createdLabel = createdTimestamp
+                          ? formatTimestamp(createdTimestamp, useRelativeTime)
+                          : 'unknown time';
+                        const commentLabel = `${post.num_comments.toLocaleString()} Comments`;
+                        const pointsLabel = `${post.score.toLocaleString()} points`;
+                        const postUrl = getLocalPostUrl(post);
+                        const canDelete = user?.id === post.author_id;
+                        const isDeleting =
+                          deleteLocalPostMutation.isPending &&
+                          deleteLocalPostMutation.variables === post.id;
+                        const isSavedLocal = savedLocalPostIds.has(post.id);
+                        const isSavePendingLocal =
+                          savedLocalToggleMutation.isPending &&
+                          savedLocalToggleMutation.variables?.postId === post.id;
+
+                        return (
+                          <article
+                            key={`local-${post.id}`}
+                            className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)]"
+                          >
+                            <div className="flex gap-3 p-3">
+                              <VoteButtons
+                                postId={post.id}
+                                initialScore={post.score}
+                                initialUserVote={post.user_vote ?? null}
+                                layout="vertical"
+                                size="small"
+                              />
+                              {previewImage && (
+                                <img
+                                  src={previewImage}
+                                  alt=""
+                                  className="h-16 w-16 flex-shrink-0 rounded object-cover"
+                                />
+                              )}
+                              <div className="flex-1 text-left">
+                                <div className="mb-1 inline-flex items-center gap-2">
+                                  <span className="inline-block rounded bg-blue-600 px-2 py-0.5 text-[10px] font-bold uppercase text-white">
+                                    Omni
+                                  </span>
+                                  {displaySubreddit && (
+                                    <span className="text-[11px] font-medium text-[var(--color-text-secondary)]">
+                                      r/{displaySubreddit}
+                                    </span>
+                                  )}
+                                </div>
+                                <Link to={postUrl}>
+                                  <h3 className="text-base font-semibold text-[var(--color-text-primary)] hover:text-[var(--color-primary)]">
+                                    {post.title}
+                                  </h3>
+                                </Link>
+                                <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-[var(--color-text-secondary)]">
+                                  <span>u/{displayAuthor}</span>
+                                  <span>•</span>
+                                  <span>{pointsLabel}</span>
+                                  <span>•</span>
+                                  <span>submitted {createdLabel}</span>
+                                </div>
+                                <div className="mt-1 flex flex-wrap items-center gap-3 text-[11px] text-[var(--color-text-secondary)]">
+                                  <Link
+                                    to={postUrl}
+                                    className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+                                  >
+                                    {commentLabel}
+                                  </Link>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleShareLocalPost(post)}
+                                    className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+                                  >
+                                    Share
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleToggleSaveLocalPost(post.id, isSavedLocal)}
+                                    disabled={isSavePendingLocal}
+                                    className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] disabled:opacity-50"
+                                  >
+                                    {isSavePendingLocal ? 'Saving...' : isSavedLocal ? 'Unsave' : 'Save'}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleSetHideTarget({ type: 'platform', post })}
+                                    className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+                                  >
+                                    Hide
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleCrosspostSelection({ type: 'platform', post })}
+                                    className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+                                  >
+                                    Crosspost
+                                  </button>
+                                  {canDelete && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleDeleteLocalPost(post.id)}
+                                      disabled={isDeleting}
+                                      className="text-red-600 hover:text-red-500 disabled:opacity-60"
+                                    >
+                                      {isDeleting ? 'Deleting...' : 'Delete'}
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          </article>
+                        );
+                      })() : (() => {
+                        const post = item.post;
+                        const isSaved = savedRedditPostIds.has(`${post.subreddit}-${post.id}`);
+                        const isSaveActionPending =
+                          toggleSaveRedditPostMutation.isPending &&
+                          toggleSaveRedditPostMutation.variables?.post.id === post.id;
+                        const pendingShouldSave = toggleSaveRedditPostMutation.variables?.shouldSave;
+
+                        return (
+                          <RedditPostCard
+                            key={`reddit-${post.id}`}
+                            post={post}
+                            useRelativeTime={useRelativeTime}
+                            isSaved={isSaved}
+                            isSaveActionPending={isSaveActionPending}
+                            pendingShouldSave={pendingShouldSave}
+                            onShare={() => handleShareRedditPost(post)}
+                            onToggleSave={(shouldSave) =>
+                              toggleSaveRedditPostMutation.mutate({ post, shouldSave })
+                            }
+                            onHide={() => handleSetHideTarget({ type: 'reddit', post })}
+                            onCrosspost={() => handleCrosspostSelection({ type: 'reddit', post })}
+                            linkState={originState}
+                          />
+                        );
+                      })()}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+            ) : (
+              <div className="space-y-3">
+                {filteredCombinedPosts.map((item) => {
             if (item.type === 'platform') {
               const post = item.post;
               const previewImage = post.thumbnail_url || post.media_url;
@@ -1100,6 +1410,7 @@ export default function RedditPage() {
               );
             }
 
+            // Reddit post
             const post = item.post;
             const isSaved = savedRedditPostIds.has(`${post.subreddit}-${post.id}`);
             const isSaveActionPending =
@@ -1125,7 +1436,8 @@ export default function RedditPage() {
               />
             );
             })}
-            </>
+              </div>
+            )
           ) : (
             !isLoading && (
               <div className="text-center text-[var(--color-text-secondary)]">
@@ -1136,6 +1448,38 @@ export default function RedditPage() {
                   : `No posts found in r/${subreddit}`}
               </div>
             )
+          )}
+
+          {/* Loading indicator for infinite scroll */}
+          {useInfiniteScroll && infiniteRedditQuery.isFetchingNextPage && (
+            <div className="mt-6 text-center text-[var(--color-text-secondary)]">
+              Loading more posts...
+            </div>
+          )}
+
+          {/* Pagination controls */}
+          {!useInfiniteScroll && filteredCombinedPosts.length > 0 && (
+            <div className="mt-6 flex items-center justify-between border-t border-[var(--color-border)] pt-4">
+              <button
+                type="button"
+                onClick={handlePrevPage}
+                disabled={pageHistory.length <= 1 || paginatedRedditQuery.isFetching}
+                className="rounded bg-[var(--color-primary)] px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                ← Previous
+              </button>
+              <span className="text-sm text-[var(--color-text-secondary)]">
+                Page {currentPage}
+              </span>
+              <button
+                type="button"
+                onClick={handleNextPage}
+                disabled={!paginatedRedditQuery.data?.after || paginatedRedditQuery.isFetching}
+                className="rounded bg-[var(--color-primary)] px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Next →
+              </button>
+            </div>
           )}
         </div>
 

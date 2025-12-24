@@ -12,6 +12,8 @@ export default function SettingsPage() {
     setDefaultOmniPostsOnly,
     stayOnPostAfterHide,
     setStayOnPostAfterHide,
+    useInfiniteScroll,
+    setUseInfiniteScroll,
   } = useSettings();
 
   return (
@@ -257,6 +259,66 @@ export default function SettingsPage() {
                   }`}
                 />
               </button>
+            </div>
+          </div>
+        </section>
+
+        {/* Infinite Scroll Settings */}
+        <section className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-6">
+          <h2 className="mb-4 text-xl font-semibold text-[var(--color-text-primary)]">
+            Subreddit Page Navigation
+          </h2>
+
+          <div className="space-y-4">
+            <div className="flex items-start justify-between">
+              <div className="flex-1">
+                <label
+                  htmlFor="infinite-scroll-toggle"
+                  className="block text-sm font-medium text-[var(--color-text-primary)]"
+                >
+                  Use Infinite Scroll
+                </label>
+                <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+                  Automatically load more posts as you scroll down on subreddit pages. When disabled, use traditional page-by-page navigation with Previous/Next buttons.
+                </p>
+                <div className="mt-2 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-3">
+                  <div className="text-xs text-[var(--color-text-secondary)]">
+                    <strong>Current mode:</strong>
+                  </div>
+                  <div className="mt-1 text-sm text-[var(--color-text-primary)]">
+                    {useInfiniteScroll ? (
+                      <>
+                        <span className="font-medium">Infinite Scroll:</span> New posts load automatically as you scroll
+                      </>
+                    ) : (
+                      <>
+                        <span className="font-medium">Pagination:</span> Use Previous/Next buttons to navigate
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="ml-4">
+                <button
+                  id="infinite-scroll-toggle"
+                  type="button"
+                  role="switch"
+                  aria-checked={useInfiniteScroll}
+                  onClick={() => setUseInfiniteScroll(!useInfiniteScroll)}
+                  className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${
+                    useInfiniteScroll ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
+                  }`}
+                >
+                  <span className="sr-only">Use infinite scroll</span>
+                  <span
+                    aria-hidden="true"
+                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                      useInfiniteScroll ? 'translate-x-5' : 'translate-x-0'
+                    }`}
+                  />
+                </button>
+              </div>
             </div>
           </div>
         </section>
