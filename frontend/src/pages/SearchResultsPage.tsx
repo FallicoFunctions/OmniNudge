@@ -34,16 +34,20 @@ export default function SearchResultsPage() {
     reddit: any[];
     platform: any[];
     redditAfter: string | null;
+    redditAfterStack: (string | null)[];
     platformOffset: number;
     hasMoreReddit: boolean;
     hasMorePlatform: boolean;
+    page: number;
   }>({
     reddit: [],
     platform: [],
     redditAfter: null,
+    redditAfterStack: [null],
     platformOffset: 0,
     hasMoreReddit: false,
     hasMorePlatform: false,
+    page: 1,
   });
   const [communities, setCommunities] = useState<{
     subreddits: any[];
@@ -74,68 +78,49 @@ export default function SearchResultsPage() {
 
   const handleSearch = async (
     q: string,
-    opts?: { tab?: Tab; sort?: SortOrder; append?: boolean }
+    opts?: { tab?: Tab; sort?: SortOrder; page?: number }
   ) => {
     if (!q.trim()) return;
     setIsLoading(true);
     try {
+      const targetPage = opts?.page ?? posts.page;
+      const redditAfter =
+        targetPage > 1 ? posts.redditAfterStack[targetPage - 2] ?? null : null;
+      const platformOffset = (targetPage - 1) * 25;
+      const hubsOffset = communities.hubsOffset && targetPage > 1 ? (targetPage - 1) * 25 : 0;
+      const omniOffset = users.omniOffset && targetPage > 1 ? (targetPage - 1) * 25 : 0;
+
       const res = await siteWideSearch(q, includeNsfw, {
         sort: opts?.sort ?? sort,
-        redditAfter: opts?.append ? posts.redditAfter : null,
-        platformOffset: opts?.append ? posts.platformOffset : 0,
-        hubsOffset: opts?.append ? communities.hubsOffset : 0,
-        omniUsersOffset: opts?.append ? users.omniOffset : 0,
+        redditAfter,
+        platformOffset,
+        hubsOffset,
+        omniUsersOffset: omniOffset,
       });
 
-      const nextPosts = opts?.append
-        ? {
-            reddit: [...posts.reddit, ...(res.posts.reddit ?? [])],
-            platform: [...posts.platform, ...(res.posts.platform ?? [])],
-          }
-        : {
-            reddit: res.posts.reddit ?? [],
-            platform: res.posts.platform ?? [],
-          };
-
-      const nextCommunities = opts?.append
-        ? {
-            subreddits: [...communities.subreddits, ...(res.subreddits ?? [])],
-            hubs: [...communities.hubs, ...(res.hubs ?? [])],
-          }
-        : {
-            subreddits: res.subreddits ?? [],
-            hubs: res.hubs ?? [],
-          };
-
-      const nextUsers = opts?.append
-        ? {
-            reddit: [...users.reddit, ...(res.users.reddit ?? [])],
-            omni: [...users.omni, ...(res.users.omni ?? [])],
-          }
-        : {
-            reddit: res.users.reddit ?? [],
-            omni: res.users.omni ?? [],
-          };
-
+      const nextAfterStack = [...posts.redditAfterStack];
+      nextAfterStack[targetPage - 1] = res.posts.redditAfter ?? null;
       setPosts({
-        reddit: nextPosts.reddit,
-        platform: nextPosts.platform,
+        reddit: res.posts.reddit ?? [],
+        platform: res.posts.platform ?? [],
         redditAfter: res.posts.redditAfter ?? null,
-        platformOffset: res.posts.platformOffset ?? nextPosts.platform.length,
+        redditAfterStack: nextAfterStack,
+        platformOffset: res.posts.platformOffset ?? platformOffset,
         hasMoreReddit: Boolean(res.posts.redditAfter),
         hasMorePlatform: (res.posts.platform?.length ?? 0) >= 25,
+        page: targetPage,
       });
       setCommunities({
-        subreddits: nextCommunities.subreddits,
-        hubs: nextCommunities.hubs,
-        hubsOffset: res.hubsOffset ?? nextCommunities.hubs.length,
+        subreddits: res.subreddits ?? [],
+        hubs: res.hubs ?? [],
+        hubsOffset: res.hubsOffset ?? 0,
         hasMoreHubs: (res.hubs?.length ?? 0) >= 25,
       });
       setUsers({
-        reddit: nextUsers.reddit,
-        omni: nextUsers.omni,
+        reddit: res.users.reddit ?? [],
+        omni: res.users.omni ?? [],
         redditAfter: res.users.redditAfter ?? null,
-        omniOffset: res.users.omniOffset ?? nextUsers.omni.length,
+        omniOffset: res.users.omniOffset ?? 0,
         hasMoreReddit: Boolean(res.users.redditAfter),
         hasMoreOmni: (res.users.omni?.length ?? 0) >= 25,
       });
@@ -180,7 +165,7 @@ export default function SearchResultsPage() {
     const merged = postSource === 'omni' ? mappedOmni : [...mappedReddit, ...mappedOmni];
 
     return merged;
-  }, [results, postSource]);
+  }, [posts, postSource]);
 
   const filteredSubreddits = useMemo(() => communities.subreddits ?? [], [communities]);
   const filteredHubs = useMemo(() => communities.hubs ?? [], [communities]);
@@ -416,19 +401,25 @@ export default function SearchResultsPage() {
               </article>
             );
           })}
-          {(posts.hasMoreReddit || posts.hasMorePlatform) && (
-            <div className="pt-2">
-              <button
-                type="button"
-                onClick={() =>
-                  handleSearch(query, { append: true, tab: activeTab, sort })
-                }
-                className="rounded bg-[var(--color-primary)] px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
-              >
-                Load more posts
-              </button>
-            </div>
-          )}
+          <div className="flex items-center justify-between pt-2">
+            <button
+              type="button"
+              onClick={() => handleSearch(query, { page: Math.max(1, posts.page - 1), tab: activeTab, sort })}
+              disabled={posts.page <= 1}
+              className="rounded bg-[var(--color-primary)] px-3 py-2 text-sm font-medium text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              ← Previous
+            </button>
+            <span className="text-sm text-[var(--color-text-secondary)]">Page {posts.page}</span>
+            <button
+              type="button"
+              onClick={() => handleSearch(query, { page: posts.page + 1, tab: activeTab, sort })}
+              disabled={!posts.hasMoreReddit && !posts.hasMorePlatform}
+              className="rounded bg-[var(--color-primary)] px-3 py-2 text-sm font-medium text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Next →
+            </button>
+          </div>
         </div>
       )}
 
