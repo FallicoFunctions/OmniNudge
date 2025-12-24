@@ -658,11 +658,10 @@ export default function RedditPage() {
 
   return (
     <div className="mx-auto w-full max-w-7xl px-4 py-8">
-      {/* Header with inline controls */}
-      <div className="mb-4">
-        {/* Top row: Subreddit name, icon, filter buttons, and search */}
-        <div className="mb-4 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex flex-wrap items-center gap-3 text-left">
+      {/* Header with subreddit identity, filters, and search */}
+      <div className="mb-4 flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+        <div className="flex flex-1 flex-col gap-3 text-left">
+          <div className="flex items-center gap-3">
             {subredditIcon && (
               <img
                 src={subredditIcon}
@@ -674,40 +673,37 @@ export default function RedditPage() {
             <h1 className="text-3xl font-bold text-[var(--color-text-primary)]">
               r/{subreddit} subreddit
             </h1>
-
-            {/* Sort and Wiki buttons inline with title */}
-            <div className="flex flex-wrap items-center gap-2">
-              {(['hot', 'new', 'top', 'rising', 'controversial'] as const).map((sortOption) => (
-                <button
-                  key={sortOption}
-                  onClick={() => setSort(sortOption)}
-                  className={`rounded-md px-3 py-2 text-sm font-medium capitalize ${
-                    sort === sortOption
-                      ? 'bg-[var(--color-primary)] text-white'
-                      : 'bg-[var(--color-surface-elevated)] text-[var(--color-text-primary)] hover:bg-[var(--color-border)]'
-                  }`}
-                >
-                  {sortOption}
-                </button>
-              ))}
-              {hasWiki && (
-                <Link
-                  to={`/r/${subreddit}/wiki/index`}
-                  className="rounded-md bg-[var(--color-surface-elevated)] px-3 py-2 text-sm font-medium capitalize text-[var(--color-text-primary)] hover:bg-[var(--color-border)]"
-                >
-                  Wiki
-                </Link>
-              )}
-            </div>
           </div>
 
-          <div className="flex flex-col gap-3">
-            {/* Subreddit Input */}
-            <form
-              onSubmit={handleSubredditSubmit}
-              className="flex gap-2 md:w-80 lg:w-[20rem]"
-            >
-            <div className="relative flex-1 md:flex-initial md:w-full">
+          <div className="flex flex-wrap items-center gap-2">
+            {(['hot', 'new', 'top', 'rising', 'controversial'] as const).map((sortOption) => (
+              <button
+                key={sortOption}
+                onClick={() => setSort(sortOption)}
+                className={`rounded-md px-3 py-2 text-sm font-medium capitalize ${
+                  sort === sortOption
+                    ? 'bg-[var(--color-primary)] text-white'
+                    : 'bg-[var(--color-surface-elevated)] text-[var(--color-text-primary)] hover:bg-[var(--color-border)]'
+                }`}
+              >
+                {sortOption}
+              </button>
+            ))}
+            {hasWiki && (
+              <Link
+                to={`/r/${subreddit}/wiki/index`}
+                className="rounded-md bg-[var(--color-surface-elevated)] px-3 py-2 text-sm font-medium capitalize text-[var(--color-text-primary)] hover:bg-[var(--color-border)]"
+              >
+                Wiki
+              </Link>
+            )}
+          </div>
+        </div>
+
+        <div className="flex w-full flex-col gap-3 lg:w-auto lg:items-end lg:self-start">
+          <div className="w-full lg:flex lg:justify-end">
+            <form onSubmit={handleSubredditSubmit} className="flex w-full gap-2 lg:w-[20rem]">
+              <div className="relative flex-1 md:flex-initial md:w-full">
               <input
                 type="text"
                 value={inputValue}
@@ -769,17 +765,18 @@ export default function RedditPage() {
                 </div>
               )}
             </div>
-            <button
-              type="submit"
-              className="rounded-md bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)]"
-            >
-              Go
-            </button>
-          </form>
+              <button
+                type="submit"
+                className="rounded-md bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)]"
+              >
+                Go
+              </button>
+            </form>
+          </div>
 
           {/* Subscribe and Create Post Buttons */}
           {user && subreddit !== 'popular' && subreddit !== 'frontpage' && (
-            <div className="flex w-full items-center gap-2 md:w-auto md:justify-end md:self-end">
+            <div className="flex w-full items-center gap-2 md:w-auto md:justify-end">
               <SubscribeButton
                 type="subreddit"
                 name={subreddit}
@@ -802,9 +799,9 @@ export default function RedditPage() {
         </div>
 
         {/* Time filters row (appears below when Top or Controversial is selected) */}
-        {(isTopSort || isControversialSort) && (
-          <div className="flex flex-wrap items-center gap-2">
-            {isTopSort && (
+      {(isTopSort || isControversialSort) && (
+        <div className="flex flex-wrap items-center gap-2">
+          {isTopSort && (
             <div className="flex flex-col gap-2">
               <div className="flex items-center gap-2">
                 <span className="text-xs font-semibold uppercase text-[var(--color-text-secondary)]">
@@ -887,10 +884,9 @@ export default function RedditPage() {
                 </div>
               )}
             </div>
-            )}
-          </div>
-        )}
-      </div>
+          )}
+        </div>
+      )}
 
       {/* Posts List */}
       {isLoading && (
