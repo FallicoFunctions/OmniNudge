@@ -581,12 +581,7 @@ func (r *RedditClient) SearchPosts(ctx context.Context, query string, subreddit 
 }
 
 // SearchUsers searches Reddit users
-func (r *RedditClient) SearchUsers(ctx context.Context, query string, limit int, after string, includeNSFW bool) (*RedditListing, error) {
-	cacheKey := fmt.Sprintf("search_users:%s:%d:%s:%t", query, limit, after, includeNSFW)
-	if listing, ok, err := r.getCachedListing(ctx, cacheKey); err == nil && ok {
-		return listing, nil
-	}
-
+func (r *RedditClient) SearchUsers(ctx context.Context, query string, limit int, after string, includeNSFW bool) (*redditGenericListing, error) {
 	url := "https://www.reddit.com/users/search.json"
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
@@ -616,12 +611,11 @@ func (r *RedditClient) SearchUsers(ctx context.Context, query string, limit int,
 		return nil, fmt.Errorf("reddit API returned status %d: %s", resp.StatusCode, string(body))
 	}
 
-	var listing RedditListing
+	var listing redditGenericListing
 	if err := json.NewDecoder(resp.Body).Decode(&listing); err != nil {
 		return nil, fmt.Errorf("failed to decode response: %w", err)
 	}
 
-	_ = r.setCachedListing(ctx, cacheKey, listing)
 	return &listing, nil
 }
 
