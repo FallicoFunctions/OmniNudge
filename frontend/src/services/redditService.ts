@@ -15,10 +15,13 @@ import type {
 } from '../types/reddit';
 
 export const redditService = {
-  async getFrontPage(sort = 'hot', limit = 25, timeFilter?: string): Promise<RedditPostsResponse> {
+  async getFrontPage(sort = 'hot', limit = 25, timeFilter?: string, after?: string): Promise<RedditPostsResponse> {
     const params = new URLSearchParams({ sort, limit: String(limit) });
     if (timeFilter) {
       params.append('t', timeFilter);
+    }
+    if (after) {
+      params.append('after', after);
     }
     return api.get<RedditPostsResponse>(`/reddit/frontpage?${params.toString()}`);
   },
@@ -27,11 +30,15 @@ export const redditService = {
     subreddit: string,
     sort = 'hot',
     limit = 25,
-    timeFilter?: string
+    timeFilter?: string,
+    after?: string
   ): Promise<RedditPostsResponse> {
     const params = new URLSearchParams({ sort, limit: String(limit) });
     if (timeFilter) {
       params.append('t', timeFilter);
+    }
+    if (after) {
+      params.append('after', after);
     }
     return api.get<RedditPostsResponse>(`/reddit/r/${subreddit}?${params.toString()}`);
   },
