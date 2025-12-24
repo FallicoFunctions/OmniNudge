@@ -157,10 +157,103 @@ function getGfycatToRedgifs(url?: string | null): string | null {
   return match?.[1] ? `https://www.redgifs.com/ifr/${match[1]}` : null;
 }
 
+function getYouTubeEmbed(url?: string | null): string | null {
+  if (!url) return null;
+  const match =
+    url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([A-Za-z0-9_-]{11})/) ||
+    url.match(/youtube\.com\/shorts\/([A-Za-z0-9_-]{11})/);
+  const id = match?.[1];
+  if (!id) return null;
+
+  const startMatch = url.match(/[?&]t=([0-9]+)s?/);
+  const start = startMatch?.[1];
+  return `https://www.youtube-nocookie.com/embed/${id}${start ? `?start=${start}` : ''}`;
+}
+
+function getVimeoEmbed(url?: string | null): string | null {
+  if (!url) return null;
+  const match = url.match(/vimeo\.com\/(?:video\/)?([0-9]+)/i);
+  return match?.[1] ? `https://player.vimeo.com/video/${match[1]}` : null;
+}
+
+function getSpotifyEmbed(url?: string | null): string | null {
+  if (!url) return null;
+  const match = url.match(/open\.spotify\.com\/(track|album|playlist|episode|show)\/([a-zA-Z0-9]+)/i);
+  if (!match) return null;
+  const [, type, id] = match;
+  return `https://open.spotify.com/embed/${type}/${id}`;
+}
+
+function getSoundCloudOEmbedHtml(url?: string | null): string | null {
+  if (!url) return null;
+  if (!url.toLowerCase().includes('soundcloud.com')) return null;
+  // SoundCloud requires oEmbed; use iframe fallback with player endpoint
+  return `https://w.soundcloud.com/player/?url=${encodeURIComponent(url)}&color=%23ff5500&inverse=false&auto_play=false&show_user=true`;
+}
+
+function getAppleMusicEmbed(url?: string | null): string | null {
+  if (!url) return null;
+  if (!url.toLowerCase().includes('music.apple.com') && !url.toLowerCase().includes('podcasts.apple.com')) {
+    return null;
+  }
+  return `https://embed.music.apple.com${url.substring(url.indexOf('.com') + 4)}`;
+}
+
+function getMixcloudEmbed(url?: string | null): string | null {
+  if (!url) return null;
+  if (!url.toLowerCase().includes('mixcloud.com')) return null;
+  return `https://www.mixcloud.com/widget/iframe/?hide_cover=1&feed=${encodeURIComponent(url)}`;
+}
+
+function getBandcampEmbed(url?: string | null): string | null {
+  if (!url) return null;
+  if (!url.toLowerCase().includes('bandcamp.com')) return null;
+  // Bandcamp embeds differ by type; use the generic embed endpoint
+  return `https://bandcamp.com/EmbeddedPlayer/${encodeURIComponent(url)}&size=large/bgcol=ffffff/linkcol=0687f5`;
+}
+
+function getTwitchEmbed(url?: string | null): string | null {
+  if (!url) return null;
+  const clipMatch = url.match(/twitch\.tv\/(?:[^/]+)\/clip\/([a-zA-Z0-9]+)/i);
+  if (clipMatch?.[1]) {
+    return `https://player.twitch.tv/?clip=${clipMatch[1]}&parent=${window.location.hostname}`;
+  }
+  const vodMatch = url.match(/twitch\.tv\/videos\/([0-9]+)/i);
+  if (vodMatch?.[1]) {
+    return `https://player.twitch.tv/?video=${vodMatch[1]}&parent=${window.location.hostname}`;
+  }
+  return null;
+}
+
+function getDailymotionEmbed(url?: string | null): string | null {
+  if (!url) return null;
+  const match = url.match(/dailymotion\.com\/video\/([a-zA-Z0-9]+)/i);
+  return match?.[1] ? `https://www.dailymotion.com/embed/video/${match[1]}` : null;
+}
+
+function getLoomEmbed(url?: string | null): string | null {
+  if (!url) return null;
+  const match = url.match(/loom\.com\/share\/([a-f0-9-]+)/i);
+  return match?.[1] ? `https://www.loom.com/embed/${match[1]}` : null;
+}
+
+function getTiktokEmbed(url?: string | null): string | null {
+  if (!url) return null;
+  const match = url.match(/tiktok\.com\/(?:@[^/]+\/video\/|v\/)([0-9]+)/i);
+  return match?.[1] ? `https://www.tiktok.com/embed/v2/${match[1]}` : null;
+}
+
+function getWistiaEmbed(url?: string | null): string | null {
+  if (!url) return null;
+  const match = url.match(/wistia\.(?:com|net)\/medias\/([a-zA-Z0-9]+)/i);
+  return match?.[1] ? `https://fast.wistia.net/embed/iframe/${match[1]}` : null;
+}
+
 type InlineMedia =
   | { kind: 'redgifs'; src: string }
   | { kind: 'iframe'; src: string }
-  | { kind: 'video'; src: string };
+  | { kind: 'video'; src: string }
+  | { kind: 'audio'; src: string; title?: string };
 
 function getInlineMedia(url?: string | null): InlineMedia | null {
   const sanitizedUrl = sanitizeHttpUrl(url);
@@ -198,6 +291,66 @@ function getInlineMedia(url?: string | null): InlineMedia | null {
   const gfyToRedgifs = getGfycatToRedgifs(sanitizedUrl);
   if (gfyToRedgifs) {
     return { kind: 'redgifs', src: gfyToRedgifs };
+  }
+
+  const youtube = getYouTubeEmbed(sanitizedUrl);
+  if (youtube) {
+    return { kind: 'iframe', src: youtube };
+  }
+
+  const vimeo = getVimeoEmbed(sanitizedUrl);
+  if (vimeo) {
+    return { kind: 'iframe', src: vimeo };
+  }
+
+  const spotify = getSpotifyEmbed(sanitizedUrl);
+  if (spotify) {
+    return { kind: 'iframe', src: spotify };
+  }
+
+  const soundcloud = getSoundCloudOEmbedHtml(sanitizedUrl);
+  if (soundcloud) {
+    return { kind: 'iframe', src: soundcloud };
+  }
+
+  const apple = getAppleMusicEmbed(sanitizedUrl);
+  if (apple) {
+    return { kind: 'iframe', src: apple };
+  }
+
+  const mixcloud = getMixcloudEmbed(sanitizedUrl);
+  if (mixcloud) {
+    return { kind: 'iframe', src: mixcloud };
+  }
+
+  const bandcamp = getBandcampEmbed(sanitizedUrl);
+  if (bandcamp) {
+    return { kind: 'iframe', src: bandcamp };
+  }
+
+  const twitch = getTwitchEmbed(sanitizedUrl);
+  if (twitch) {
+    return { kind: 'iframe', src: twitch };
+  }
+
+  const dailymotion = getDailymotionEmbed(sanitizedUrl);
+  if (dailymotion) {
+    return { kind: 'iframe', src: dailymotion };
+  }
+
+  const loom = getLoomEmbed(sanitizedUrl);
+  if (loom) {
+    return { kind: 'iframe', src: loom };
+  }
+
+  const tiktok = getTiktokEmbed(sanitizedUrl);
+  if (tiktok) {
+    return { kind: 'iframe', src: tiktok };
+  }
+
+  const wistia = getWistiaEmbed(sanitizedUrl);
+  if (wistia) {
+    return { kind: 'iframe', src: wistia };
   }
 
   return null;
