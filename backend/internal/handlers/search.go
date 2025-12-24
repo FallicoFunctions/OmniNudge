@@ -3,6 +3,7 @@ package handlers
 import (
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/omninudge/backend/internal/models"
 	"github.com/gin-gonic/gin"
@@ -31,9 +32,23 @@ func (h *SearchHandler) SearchPosts(c *gin.Context) {
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
 	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
 	includeNSFW, _ := strconv.ParseBool(c.DefaultQuery("include_nsfw", "false"))
+	sort := strings.ToLower(c.DefaultQuery("sort", "relevance")) // relevance | new | old
 
 	if limit < 1 || limit > 100 {
 		limit = 20
+	}
+
+	orderClause := `
+		ORDER BY rank DESC, created_at DESC
+	`
+	if sort == "new" {
+		orderClause = `
+		ORDER BY created_at DESC, rank DESC
+		`
+	} else if sort == "old" {
+		orderClause = `
+		ORDER BY created_at ASC, rank DESC
+		`
 	}
 
 	sql := `
@@ -44,7 +59,7 @@ func (h *SearchHandler) SearchPosts(c *gin.Context) {
 		WHERE search_vector @@ plainto_tsquery('english', $1)
 		AND is_deleted = FALSE
 		AND (nsfw = FALSE OR $4 = TRUE)
-		ORDER BY rank DESC, created_at DESC
+	` + orderClause + `
 		LIMIT $2 OFFSET $3
 	`
 
@@ -152,9 +167,23 @@ func (h *SearchHandler) SearchUsers(c *gin.Context) {
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
 	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
 	includeNSFW, _ := strconv.ParseBool(c.DefaultQuery("include_nsfw", "false"))
+	sort := strings.ToLower(c.DefaultQuery("sort", "relevance")) // relevance | new | old
 
 	if limit < 1 || limit > 100 {
 		limit = 20
+	}
+
+	orderClause := `
+		ORDER BY rank DESC, created_at DESC
+	`
+	if sort == "new" {
+		orderClause = `
+		ORDER BY created_at DESC, rank DESC
+		`
+	} else if sort == "old" {
+		orderClause = `
+		ORDER BY created_at ASC, rank DESC
+		`
 	}
 
 	sql := `
@@ -163,7 +192,7 @@ func (h *SearchHandler) SearchUsers(c *gin.Context) {
 		FROM users
 		WHERE search_vector @@ plainto_tsquery('english', $1)
 		AND (nsfw = FALSE OR $4 = TRUE)
-		ORDER BY rank DESC, created_at DESC
+	` + orderClause + `
 		LIMIT $2 OFFSET $3
 	`
 
@@ -209,18 +238,32 @@ func (h *SearchHandler) SearchHubs(c *gin.Context) {
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
 	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
 	includeNSFW, _ := strconv.ParseBool(c.DefaultQuery("include_nsfw", "false"))
+	sort := strings.ToLower(c.DefaultQuery("sort", "relevance")) // relevance | new | old
 
 	if limit < 1 || limit > 100 {
 		limit = 20
 	}
 
+	orderClause := `
+		ORDER BY rank DESC, created_at DESC
+	`
+	if sort == "new" {
+		orderClause = `
+		ORDER BY created_at DESC, rank DESC
+		`
+	} else if sort == "old" {
+		orderClause = `
+		ORDER BY created_at ASC, rank DESC
+		`
+	}
+
 	sql := `
-		SELECT id, name, description, created_by, created_at,
+		SELECT id, name, description, title, type, content_options, is_quarantined, subscriber_count, created_by, created_at,
 		       ts_rank(search_vector, plainto_tsquery('english', $1)) as rank
 		FROM hubs
 		WHERE search_vector @@ plainto_tsquery('english', $1)
 		AND (nsfw = FALSE OR $4 = TRUE)
-		ORDER BY rank DESC, created_at DESC
+	` + orderClause + `
 		LIMIT $2 OFFSET $3
 	`
 

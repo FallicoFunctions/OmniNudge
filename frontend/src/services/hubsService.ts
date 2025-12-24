@@ -158,8 +158,9 @@ export const hubsService = {
     return api.get<HubPostsResponse>(`/hubs/h/all?${params.toString()}`);
   },
 
-  async searchHubs(query: string, limit: number = 10): Promise<Hub[]> {
-    const response = await api.get<{ hubs: Hub[] }>(`/hubs/search?q=${encodeURIComponent(query)}&limit=${limit}`);
+  async searchHubs(query: string, limit: number = 10, offset: number = 0): Promise<Hub[]> {
+    const params = new URLSearchParams({ q: query, limit: String(limit), offset: String(offset) });
+    const response = await api.get<{ hubs: Hub[] }>(`/hubs/search?${params.toString()}`);
     return response.hubs || [];
   },
 
