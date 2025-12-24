@@ -24,6 +24,7 @@ interface RedditComment {
   data: {
     id: string;
     author: string;
+    permalink?: string;
     body?: string;
     body_html?: string;
     created_utc: number;
@@ -276,17 +277,22 @@ function RedditCommentView({
   };
 
   const handleCopyPermalink = () => {
-    const subreddit = window.location.pathname.split('/')[3];
-    const postId = window.location.pathname.split('/')[5];
-    const url = `/reddit/r/${subreddit}/comments/${postId}/_/${comment.data.id}`;
-    navigator.clipboard.writeText(url);
+    const pathFromApi = comment.data.permalink as string | undefined;
+    const localPath =
+      pathFromApi && pathFromApi.startsWith('/')
+        ? pathFromApi
+        : `/r/${subreddit}/comments/${postId}/_/${comment.data.id}`;
+    const absoluteUrl = `${window.location.origin}${localPath}`;
+    navigator.clipboard.writeText(absoluteUrl);
     alert('Permalink copied to clipboard!');
   };
 
   const handleEmbed = () => {
-    const subreddit = window.location.pathname.split('/')[3];
-    const postId = window.location.pathname.split('/')[5];
-    const permalink = `/reddit/r/${subreddit}/comments/${postId}/_/${comment.data.id}`;
+    const pathFromApi = comment.data.permalink as string | undefined;
+    const permalink =
+      pathFromApi && pathFromApi.startsWith('/')
+        ? `${window.location.origin}${pathFromApi}`
+        : `${window.location.origin}/r/${subreddit}/comments/${postId}/_/${comment.data.id}`;
     onEmbed({
       author: comment.data.author,
       body: comment.data.body ?? '',
