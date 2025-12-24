@@ -1,4 +1,4 @@
-import { Link, useParams, useSearchParams } from 'react-router-dom';
+import { Link, useLocation, useParams, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useEffect, useMemo } from 'react';
 import { diffLines } from 'diff';
@@ -22,6 +22,7 @@ export default function RedditWikiPage({ mode = 'view' }: RedditWikiPageProps = 
   const { subreddit, pagePath = 'index' } = useParams<{ subreddit?: string; pagePath?: string }>();
   const activeTab: WikiTab = mode ?? 'view';
   const currentPage = pagePath || 'index';
+  const location = useLocation();
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -138,6 +139,16 @@ export default function RedditWikiPage({ mode = 'view' }: RedditWikiPageProps = 
     }
     return Math.min(...tocItems.map((item) => item.level));
   }, [tocItems]);
+
+  useEffect(() => {
+    if (!location.hash) return;
+    const targetId = decodeURIComponent(location.hash.replace(/^#/, ''));
+    if (!targetId) return;
+    const el = document.getElementById(targetId) || document.getElementsByName(targetId)[0];
+    if (el && typeof el.scrollIntoView === 'function') {
+      el.scrollIntoView({ block: 'start' });
+    }
+  }, [processedHtml, location.hash]);
 
   const revisionsList = useMemo(() => revisionsData?.revisions ?? [], [revisionsData?.revisions]);
   const compareDiffRows = useMemo<DiffRow[]>(() => {
@@ -915,20 +926,23 @@ function processWikiContent(content?: string | null): { processedHtml: string | 
     }
 
     const level = Number(heading.tagName.substring(1));
-    let slug = slugifyHeading(text);
+    const existingId = heading.getAttribute('id') || heading.getAttribute('name');
+    let slug = existingId || slugifyHeading(text);
     if (!slug) {
       slug = `section-${index + 1}`;
     }
 
-    if (slugCounts.has(slug)) {
-      const count = (slugCounts.get(slug) ?? 0) + 1;
-      slugCounts.set(slug, count);
-      slug = `${slug}-${count}`;
-    } else {
-      slugCounts.set(slug, 0);
+    if (!existingId) {
+      if (slugCounts.has(slug)) {
+        const count = (slugCounts.get(slug) ?? 0) + 1;
+        slugCounts.set(slug, count);
+        slug = `${slug}-${count}`;
+      } else {
+        slugCounts.set(slug, 0);
+      }
+      (heading as HTMLElement).setAttribute('id', slug);
     }
 
-    (heading as HTMLElement).setAttribute('id', slug);
     tocItems.push({ id: slug, text, level: Number.isNaN(level) ? 1 : level });
   });
 
@@ -987,12 +1001,26 @@ function sanitizeWikiHtml(content: string): string {
     'br',
   ]);
   const allowedAttrs: Record<string, Set<string>> = {
-    a: new Set(['href', 'title']),
+    a: new Set(['href', 'title', 'id', 'name']),
     img: new Set(['src', 'alt', 'title', 'width', 'height']),
-    span: new Set(['class']),
-    div: new Set(['class']),
-    td: new Set(['colspan', 'rowspan']),
-    th: new Set(['colspan', 'rowspan']),
+    span: new Set(['class', 'id', 'name']),
+    div: new Set(['class', 'id', 'name']),
+    p: new Set(['id', 'name']),
+    ul: new Set(['id', 'name']),
+    ol: new Set(['id', 'name']),
+    li: new Set(['id', 'name']),
+    table: new Set(['id', 'name']),
+    thead: new Set(['id', 'name']),
+    tbody: new Set(['id', 'name']),
+    tr: new Set(['id', 'name']),
+    td: new Set(['colspan', 'rowspan', 'id', 'name']),
+    th: new Set(['colspan', 'rowspan', 'id', 'name']),
+    h1: new Set(['id', 'name']),
+    h2: new Set(['id', 'name']),
+    h3: new Set(['id', 'name']),
+    h4: new Set(['id', 'name']),
+    h5: new Set(['id', 'name']),
+    h6: new Set(['id', 'name']),
   };
 
   template.content.querySelectorAll('*').forEach((element) => {
