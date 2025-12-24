@@ -67,7 +67,6 @@ export default function HomePage() {
   const {
     useRelativeTime,
     defaultOmniPostsOnly,
-    useInfiniteScroll,
     searchIncludeNsfwByDefault,
     blockAllNsfw,
   } = useSettings();

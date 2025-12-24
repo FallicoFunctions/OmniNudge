@@ -1,7 +1,6 @@
-import { useEffect, useMemo, useState, useRef } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient, useInfiniteQuery } from '@tanstack/react-query';
 import { Link, useNavigate, useParams, useLocation } from 'react-router-dom';
-import { useWindowVirtualizer } from '@tanstack/react-virtual';
 import { redditService } from '../services/redditService';
 import { savedService } from '../services/savedService';
 import { hubsService } from '../services/hubsService';
@@ -203,10 +202,18 @@ export default function RedditPage() {
     enabled: !useInfiniteScroll && (!isCustomTopRange || isCustomTopRangeValid) && (!isCustomControversialRange || isCustomControversialRangeValid),
   });
 
-  // Use appropriate query based on settings
-  const data = useInfiniteScroll
-    ? { posts: infiniteRedditQuery.data?.pages.flatMap(page => page.posts) ?? [] }
-    : paginatedRedditQuery.data;
+  // Memoize flattened posts to prevent re-creating the entire array on every render
+  const flattenedPosts = useMemo(() => {
+    return infiniteRedditQuery.data?.pages.flatMap(page => page.posts) ?? [];
+  }, [infiniteRedditQuery.data]);
+
+  // Use appropriate query based on settings - memoize to prevent object recreation
+  const data = useMemo(() => {
+    return useInfiniteScroll
+      ? { posts: flattenedPosts }
+      : paginatedRedditQuery.data;
+  }, [useInfiniteScroll, flattenedPosts, paginatedRedditQuery.data]);
+
   const isLoading = useInfiniteScroll ? infiniteRedditQuery.isLoading : paginatedRedditQuery.isLoading;
   const error = useInfiniteScroll ? infiniteRedditQuery.error : paginatedRedditQuery.error;
 
@@ -809,15 +816,7 @@ export default function RedditPage() {
       return [];
     }
 
-    const allPosts: CrosspostSource[] = [
-      ...visiblePosts.map((post) => ({ type: 'reddit' as const, post })),
-      ...visibleLocalPosts.map((post) => ({ type: 'platform' as const, post })),
-    ];
-
-    const filteredPosts = showOmniOnly
-      ? allPosts.filter((post) => post.type === 'platform')
-      : allPosts;
-
+    // Helper functions for sorting
     const getCreatedTimestamp = (post: CrosspostSource) => {
       if (post.type === 'reddit') {
         return post.post.created_utc * 1000;
@@ -833,14 +832,40 @@ export default function RedditPage() {
       if (sort === 'top') {
         return post.post.score ?? 0;
       }
-
       const recency = getCreatedTimestamp(post);
       return (post.post.score ?? 0) * 1_000_000 + recency;
     };
 
-    const sorted = filteredPosts.sort((a, b) => getSortValue(b) - getSortValue(a));
+    // In infinite scroll mode: DON'T mix Omni and Reddit posts
+    // Just show one or the other based on showOmniOnly toggle
+    if (useInfiniteScroll) {
+      if (showOmniOnly) {
+        // Show only Omni posts, sorted
+        const localPosts: CrosspostSource[] = visibleLocalPosts.map((post) => ({
+          type: 'platform' as const,
+          post
+        }));
+        return [...localPosts].sort((a, b) => getSortValue(b) - getSortValue(a));
+      }
 
-    if (!useInfiniteScroll && currentPageSize) {
+      // Show only Reddit posts (already sorted by API)
+      return visiblePosts.map((post) => ({ type: 'reddit' as const, post }));
+    }
+
+    // For pagination mode, mix and sort all posts together
+    const allPosts: CrosspostSource[] = [
+      ...visiblePosts.map((post) => ({ type: 'reddit' as const, post })),
+      ...visibleLocalPosts.map((post) => ({ type: 'platform' as const, post })),
+    ];
+
+    const filteredPosts = showOmniOnly
+      ? allPosts.filter((post) => post.type === 'platform')
+      : allPosts;
+
+    // Create a new array before sorting to avoid mutation
+    const sorted = [...filteredPosts].sort((a, b) => getSortValue(b) - getSortValue(a));
+
+    if (currentPageSize) {
       return sorted.slice(0, currentPageSize);
     }
 
@@ -911,40 +936,12 @@ export default function RedditPage() {
     setCurrentPage(1);
   }, [subreddit, sort, topRangeKey]);
 
-  // Virtualization for infinite scroll
-  const parentRef = useRef<HTMLDivElement>(null);
-
-  const rowVirtualizer = useWindowVirtualizer({
-    count: useInfiniteScroll ? filteredCombinedPosts.length : 0,
-    estimateSize: () => 200,
-    overscan: 5,
-    scrollMargin: 0,
-    measureElement:
-      typeof window !== 'undefined' && navigator.userAgent.indexOf('Firefox') === -1
-        ? (element) => element?.getBoundingClientRect().height
-        : undefined,
-  });
-  const virtualItems = rowVirtualizer.getVirtualItems();
+  // Infinite scroll without virtualization
   const {
     hasNextPage: hasMoreRedditPages,
     isFetchingNextPage,
     fetchNextPage,
   } = infiniteRedditQuery;
-  const scrollLockRef = useRef<number | null>(null);
-
-  // TODO: Keep viewport position stable when new virtualized pages append; current scroll locking still allows upward jumps after fetchNextPage.
-  useEffect(() => {
-    if (!useInfiniteScroll) return;
-    if (isFetchingNextPage && scrollLockRef.current === null) {
-      scrollLockRef.current = window.scrollY;
-      return;
-    }
-
-    if (!isFetchingNextPage && scrollLockRef.current !== null) {
-      window.scrollTo({ top: scrollLockRef.current });
-      scrollLockRef.current = null;
-    }
-  }, [useInfiniteScroll, isFetchingNextPage]);
 
   // Auto-fetch next page when scrolling near bottom
   useEffect(() => {
@@ -1436,29 +1433,11 @@ export default function RedditPage() {
         )
       ) : filteredCombinedPosts.length > 0 ? (
             useInfiniteScroll ? (
-              <div ref={parentRef} className="relative w-full">
-                <div
-                  style={{
-                    height: `${rowVirtualizer.getTotalSize()}px`,
-                    width: '100%',
-                    position: 'relative',
-                  }}
-                >
-                  {virtualItems.map((virtualItem) => {
-                    const item = filteredCombinedPosts[virtualItem.index];
-
+              <div className="space-y-3">
+                {filteredCombinedPosts.map((item) => {
                     return (
                       <div
-                        key={virtualItem.key}
-                        data-index={virtualItem.index}
-                        ref={rowVirtualizer.measureElement}
-                        style={{
-                          position: 'absolute',
-                          top: 0,
-                          left: 0,
-                          width: '100%',
-                          transform: `translateY(${virtualItem.start}px)`,
-                        }}
+                        key={item.type === 'platform' ? `local-${item.post.id}` : `reddit-${item.post.id}`}
                         className="pb-3"
                       >
                         {item.type === 'platform' ? (() => {
@@ -1611,7 +1590,6 @@ export default function RedditPage() {
                   );
                 })}
               </div>
-            </div>
             ) : (
               <div className="space-y-3">
                 {filteredCombinedPosts.map((item) => {
