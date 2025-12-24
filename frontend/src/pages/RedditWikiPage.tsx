@@ -815,16 +815,13 @@ export default function RedditWikiPage({ mode = 'view' }: RedditWikiPageProps = 
                   There doesn&apos;t seem to be anything here.
                 </p>
                 {subreddit && (
-                  <a
-                    href={`https://www.reddit.com/r/${subreddit}/submit?selftext=true&title=${encodeURIComponent(
-                      `${currentPage} wiki discussion`
-                    )}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                  <button
+                    type="button"
+                    onClick={() => alert('Submitting Reddit discussions is not supported on OmniNudge.')}
                     className="mt-4 inline-flex items-center justify-center rounded-full border border-[var(--color-link,#0079d3)] px-4 py-2 text-sm font-semibold text-[var(--color-link,#0079d3)] hover:bg-[var(--color-link,#0079d3)] hover:text-white"
                   >
                     Submit a discussion
-                  </a>
+                  </button>
                 )}
               </div>
             )}
