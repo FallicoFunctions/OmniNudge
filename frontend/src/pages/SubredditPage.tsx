@@ -101,6 +101,8 @@ export default function RedditPage() {
   const [customControversialStart, setCustomControversialStart] = useState('');
   const [customControversialEnd, setCustomControversialEnd] = useState('');
   const [inputValue, setInputValue] = useState('');
+  const [postSearchInput, setPostSearchInput] = useState('');
+  const [postSearchQuery, setPostSearchQuery] = useState('');
   const [hideTarget, setHideTarget] = useState<HideTarget | null>(null);
   const [crosspostTarget, setCrosspostTarget] = useState<CrosspostSource | null>(null);
   const [crosspostTitle, setCrosspostTitle] = useState('');
@@ -549,6 +551,17 @@ export default function RedditPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [routeSubreddit]);
 
+  useEffect(() => {
+    setPostSearchInput('');
+    setPostSearchQuery('');
+  }, [subreddit]);
+
+  useEffect(() => {
+    if (postSearchQuery && postSearchInput.trim() === '') {
+      setPostSearchQuery('');
+    }
+  }, [postSearchInput, postSearchQuery]);
+
   const navigateToSubreddit = (value: string) => {
     const normalized = value.trim() || 'popular';
     setSubreddit(normalized);
@@ -569,6 +582,11 @@ export default function RedditPage() {
     if (!isAutocompleteOpen) {
       setIsAutocompleteOpen(true);
     }
+  };
+
+  const handlePostSearchSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setPostSearchQuery(postSearchInput.trim());
   };
 
   const handleShareRedditPost = (post: FeedRedditPost) => {
@@ -655,6 +673,37 @@ export default function RedditPage() {
 
     return filteredPosts.sort((a, b) => getSortValue(b) - getSortValue(a));
   }, [visiblePosts, visibleLocalPosts, showOmniOnly, sort]);
+
+  const filteredCombinedPosts = useMemo(() => {
+    const query = postSearchQuery.trim().toLowerCase();
+    if (!query) {
+      return combinedPosts;
+    }
+    const matchesSearch = (value?: string | null) =>
+      (value ?? '').toLowerCase().includes(query);
+
+    return combinedPosts.filter((item) => {
+      if (item.type === 'reddit') {
+        const post = item.post;
+        return (
+          matchesSearch(post.title) ||
+          matchesSearch(post.selftext) ||
+          matchesSearch(post.author) ||
+          matchesSearch(post.subreddit)
+        );
+      }
+
+      const post = item.post;
+      return (
+        matchesSearch(post.title) ||
+        matchesSearch(post.body) ||
+        matchesSearch(post.author_username) ||
+        matchesSearch(post.author?.username) ||
+        matchesSearch(post.target_subreddit) ||
+        matchesSearch(post.crosspost_origin_subreddit)
+      );
+    });
+  }, [combinedPosts, postSearchQuery]);
 
   return (
     <div className="mx-auto w-full max-w-7xl px-4 py-8">
@@ -770,6 +819,24 @@ export default function RedditPage() {
                 className="rounded-md bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)]"
               >
                 Go
+              </button>
+            </form>
+          </div>
+
+          <div className="w-full lg:flex lg:justify-end">
+            <form onSubmit={handlePostSearchSubmit} className="flex w-full gap-2 lg:w-[20rem]">
+              <input
+                type="text"
+                value={postSearchInput}
+                onChange={(event) => setPostSearchInput(event.target.value)}
+                placeholder="Search posts..."
+                className="w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-2 text-sm text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
+              />
+              <button
+                type="submit"
+                className="rounded-md bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)]"
+              >
+                Search
               </button>
             </form>
           </div>
@@ -901,9 +968,9 @@ export default function RedditPage() {
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="space-y-3">
-          {combinedPosts.length > 0 ? (
+          {filteredCombinedPosts.length > 0 ? (
             <>
-              {combinedPosts.map((item) => {
+              {filteredCombinedPosts.map((item) => {
             if (item.type === 'platform') {
               const post = item.post;
               const previewImage = post.thumbnail_url || post.media_url;
@@ -1062,7 +1129,11 @@ export default function RedditPage() {
           ) : (
             !isLoading && (
               <div className="text-center text-[var(--color-text-secondary)]">
-                {showOmniOnly ? `No Omni posts found in r/${subreddit}` : `No posts found in r/${subreddit}`}
+                {postSearchQuery
+                  ? `No posts match "${postSearchQuery}"`
+                  : showOmniOnly
+                  ? `No Omni posts found in r/${subreddit}`
+                  : `No posts found in r/${subreddit}`}
               </div>
             )
           )}
