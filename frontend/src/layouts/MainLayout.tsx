@@ -161,6 +161,13 @@ export default function MainLayout() {
                 >
                   Create Hub
                 </button>
+                <button
+                  type="button"
+                  onClick={() => navigate('/hubs')}
+                  className="rounded-md px-3 py-2 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
+                >
+                  Browse Hubs
+                </button>
               </div>
             </div>
 
