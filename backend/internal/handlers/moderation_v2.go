@@ -897,6 +897,7 @@ func (h *ModerationHandlerV2) GetModLog(c *gin.Context) {
 // ===== HELPER METHODS =====
 
 // checkModeratorPermission checks if a user is a moderator of a hub and returns the hub ID
+// Admins have full moderation powers on all hubs without being listed as moderators
 func (h *ModerationHandlerV2) checkModeratorPermission(c *gin.Context, hubName string, userID int) (int, bool, error) {
 	// Get hub by name
 	hub, err := h.hubRepo.GetByName(c.Request.Context(), hubName)
@@ -905,6 +906,14 @@ func (h *ModerationHandlerV2) checkModeratorPermission(c *gin.Context, hubName s
 	}
 	if hub == nil {
 		return 0, false, nil
+	}
+
+	// Check if user is an admin (admins have mod powers on all hubs)
+	roleVal, exists := c.Get("role")
+	if exists {
+		if role, ok := roleVal.(string); ok && role == "admin" {
+			return hub.ID, true, nil
+		}
 	}
 
 	// Check if user is a moderator

@@ -107,3 +107,12 @@ func (r *HubModeratorRepository) GetHubsForModerator(ctx context.Context, userID
 	}
 	return hubs, rows.Err()
 }
+
+// RemoveModerator removes a user as moderator from a hub
+func (r *HubModeratorRepository) RemoveModerator(ctx context.Context, hubID, userID int) error {
+	_, err := r.pool.Exec(ctx, `
+		DELETE FROM hub_moderators
+		WHERE hub_id = $1 AND user_id = $2
+	`, hubID, userID)
+	return err
+}
