@@ -115,7 +115,9 @@ type RedditPost struct {
 	Domain                   string         `json:"domain"`        // Source domain
 	MediaEmbed               MediaEmbed     `json:"media_embed"`   // Embedded media
 	SecureMediaEmbed         MediaEmbed     `json:"secure_media_embed"`
-	Preview                  *RedditPreview `json:"preview"` // Preview images for link posts
+	Media                    *RedditMedia   `json:"media"`          // Media container
+	SecureMedia              *RedditMedia   `json:"secure_media"`   // Secure media container
+	Preview                  *RedditPreview `json:"preview"`        // Preview images for link posts
 }
 
 // MediaEmbed represents embedded media from Reddit
@@ -144,6 +146,29 @@ type RedditImageSource struct {
 	URL    string `json:"url"`
 	Width  int    `json:"width"`
 	Height int    `json:"height"`
+}
+
+// RedditMedia holds rich media info (e.g., reddit_video)
+type RedditMedia struct {
+	RedditVideo *RedditVideo `json:"reddit_video,omitempty"`
+	Oembed      *struct {
+		ThumbnailURL    string `json:"thumbnail_url"`
+		ThumbnailWidth  int    `json:"thumbnail_width"`
+		ThumbnailHeight int    `json:"thumbnail_height"`
+	} `json:"oembed,omitempty"`
+}
+
+// RedditVideo describes reddit-hosted video variants
+type RedditVideo struct {
+	FallbackURL       string `json:"fallback_url"`
+	DashURL           string `json:"dash_url"`
+	HLSURL            string `json:"hls_url"`
+	Height            int    `json:"height"`
+	Width             int    `json:"width"`
+	Duration          int    `json:"duration"`
+	IsGif             bool   `json:"is_gif"`
+	TranscodingStatus string `json:"transcoding_status"`
+	HasAudio          bool   `json:"has_audio"`
 }
 
 // RedditListing represents Reddit's listing response
