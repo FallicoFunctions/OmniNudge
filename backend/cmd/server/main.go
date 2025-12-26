@@ -156,7 +156,7 @@ func main() {
 		commentRepo,
 		hubRepo,
 	)
-	adminHandler := handlers.NewAdminHandler(userRepo)
+	adminHandler := handlers.NewAdminHandler(userRepo, hubModRepo, db.Pool)
 	wsHandler := handlers.NewWebSocketHandler(hub)
 	notificationsHandler := handlers.NewNotificationsHandler(notificationRepo)
 	searchHandler := handlers.NewSearchHandler(db.Pool)
@@ -526,8 +526,17 @@ func main() {
 			admin := protected.Group("/admin")
 			admin.Use(middleware.RequireRole("admin"))
 			{
+				// User management
+				admin.GET("/users", adminHandler.ListUsers)
 				admin.POST("/users/:id/role", adminHandler.PromoteUser)
+
+				// Hub moderator management
 				admin.POST("/hubs/:name/moderators", hubsHandler.AddModerator)
+				admin.GET("/hubs/:hub_id/moderators", adminHandler.GetHubModerators)
+				admin.DELETE("/hubs/:hub_id/moderators/:user_id", adminHandler.RemoveHubModerator)
+
+				// Site statistics
+				admin.GET("/stats", adminHandler.GetSiteStats)
 			}
 
 			// WebSocket endpoint for real-time messaging
