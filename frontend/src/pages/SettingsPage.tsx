@@ -1,4 +1,6 @@
+import { useEffect, useState } from 'react';
 import { useSettings } from '../contexts/SettingsContext';
+import { getOwnPublicKeyBase64 } from '../services/keyManagementService';
 
 export default function SettingsPage() {
   const {
@@ -19,6 +21,13 @@ export default function SettingsPage() {
     blockAllNsfw,
     setBlockAllNsfw,
   } = useSettings();
+  const [publicKey, setPublicKey] = useState<string | null>(null);
+  const [showPublicKey, setShowPublicKey] = useState(false);
+  const [copyStatus, setCopyStatus] = useState<'idle' | 'copied' | 'error'>('idle');
+
+  useEffect(() => {
+    setPublicKey(getOwnPublicKeyBase64());
+  }, []);
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-8">
@@ -402,6 +411,56 @@ export default function SettingsPage() {
                 </button>
               </div>
             </div>
+          </div>
+        </section>
+
+        {/* Security & Keys */}
+        <section className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-6">
+          <h2 className="mb-2 text-xl font-semibold text-[var(--color-text-primary)]">Security</h2>
+          <p className="text-sm text-[var(--color-text-secondary)]">
+            Your public key is used for end-to-end encrypted features. It isn&apos;t shown on your public profile.
+          </p>
+
+          <div className="mt-4 flex flex-col gap-3">
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setShowPublicKey((v) => !v)}
+                className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-4 py-2 text-sm font-semibold text-[var(--color-text-primary)] hover:border-[var(--color-primary)] hover:text-[var(--color-primary)]"
+              >
+                {showPublicKey ? 'Hide public key' : 'Show public key'}
+              </button>
+              {publicKey && showPublicKey && (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      await navigator.clipboard.writeText(publicKey);
+                      setCopyStatus('copied');
+                      setTimeout(() => setCopyStatus('idle'), 1500);
+                    } catch {
+                      setCopyStatus('error');
+                      setTimeout(() => setCopyStatus('idle'), 1500);
+                    }
+                  }}
+                  className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-2 text-sm font-semibold text-[var(--color-text-primary)] hover:border-[var(--color-primary)] hover:text-[var(--color-primary)]"
+                >
+                  {copyStatus === 'copied' ? 'Copied!' : copyStatus === 'error' ? 'Copy failed' : 'Copy'}
+                </button>
+              )}
+            </div>
+
+            {showPublicKey && (
+              <div className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-3 text-sm text-[var(--color-text-primary)] break-all">
+                {publicKey ? (
+                  publicKey
+                ) : (
+                  <span className="text-[var(--color-text-secondary)]">
+                    No public key found for this account.
+                  </span>
+                )}
+              </div>
+            )}
           </div>
         </section>
       </div>

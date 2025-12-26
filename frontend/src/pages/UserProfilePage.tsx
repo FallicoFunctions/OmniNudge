@@ -346,12 +346,6 @@ export default function UserProfilePage() {
               </span>{' '}
               karma
             </div>
-            {profile.public_key && (
-              <div className="break-all">
-                <span className="font-semibold text-[var(--color-text-primary)]">Public key:</span>{' '}
-                {profile.public_key}
-              </div>
-            )}
             {canMessageUser && (
               <Link
                 to={`/messages?to=${encodeURIComponent(profile.username)}`}
