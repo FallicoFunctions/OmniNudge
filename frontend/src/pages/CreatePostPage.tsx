@@ -500,7 +500,14 @@ export default function CreatePostPage() {
           </button>
           <button
             type="button"
-            onClick={() => navigate(-1)}
+            onClick={() => {
+              const state = location.state as { returnTo?: string } | null;
+              if (state?.returnTo) {
+                navigate(state.returnTo);
+              } else {
+                navigate(-1);
+              }
+            }}
             className="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
           >
             Cancel

@@ -9,10 +9,19 @@ import { messagesService } from '../services/messagesService';
 import { useMessagingWebSocket } from '../hooks/useMessagingWebSocket';
 import type { UserProfile } from '../types/users';
 import AuthModal from '../pages/AuthModal';
+import { subscriptionService } from '../services/subscriptionService';
 
 export default function MainLayout() {
   const { user, logout } = useAuth();
   const [authModal, setAuthModal] = useState<'login' | 'signup' | null>(null);
+  const [pendingRedirect, setPendingRedirect] = useState<{ to: string; state?: unknown } | null>(null);
+  const [pendingAction, setPendingAction] = useState<
+    | null
+    | {
+        type: 'subscribeSubreddit';
+        subreddit: string;
+      }
+  >(null);
   const { activeConversationId } = useMessagingContext();
   const navigate = useNavigate();
   const location = useLocation();
@@ -23,7 +32,7 @@ export default function MainLayout() {
 
   const handleLogout = () => {
     logout();
-    navigate('/');
+    // User stays on current page after logout
   };
 
   const { data: conversations } = useQuery({
@@ -64,6 +73,36 @@ export default function MainLayout() {
     ping();
   }, [user, location.pathname, queryClient]);
 
+  useEffect(() => {
+    const handler = (event: Event) => {
+      const custom = event as CustomEvent<
+        { mode: 'login' | 'signup'; redirectTo?: string; redirectState?: unknown } | 'login' | 'signup'
+      >;
+      const detail = custom.detail;
+      if (detail === 'login' || detail === 'signup') {
+        setAuthModal(detail);
+        setPendingRedirect(null);
+        setPendingAction(null);
+        return;
+      }
+      if (detail && typeof detail === 'object' && (detail.mode === 'login' || detail.mode === 'signup')) {
+        setAuthModal(detail.mode);
+        if (detail.redirectTo) {
+          setPendingRedirect({ to: detail.redirectTo, state: detail.redirectState });
+        } else {
+          setPendingRedirect(null);
+        }
+        if (detail.action && detail.action.type === 'subscribeSubreddit') {
+          setPendingAction({ type: 'subscribeSubreddit', subreddit: detail.action.subreddit });
+        } else {
+          setPendingAction(null);
+        }
+      }
+    };
+    window.addEventListener('open-auth-modal', handler as EventListener);
+    return () => window.removeEventListener('open-auth-modal', handler as EventListener);
+  }, []);
+
   return (
     <div className="min-h-screen bg-[var(--color-background)]">
       {/* Navigation Bar */}
@@ -74,33 +113,55 @@ export default function MainLayout() {
               <Link to="/" className="text-xl font-bold text-[var(--color-primary)]">
                 OmniNudge
               </Link>
-              {user && (
-                <div className="hidden space-x-4 md:flex">
-                  <Link
-                    to="/posts/create"
-                    className="rounded-md px-3 py-2 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
-                  >
-                    Create Post
-                  </Link>
-                  <Link
-                    to="/messages"
-                    className="relative rounded-md px-3 py-2 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
-                  >
-                    Messages
-                    {unreadTotal > 0 && (
-                      <span className="absolute -right-2 -top-1 rounded-full bg-[var(--color-primary)] px-2 py-0.5 text-xs text-white">
-                        {unreadTotal}
-                      </span>
-                    )}
-                  </Link>
-                  <Link
-                    to="/hubs/create"
-                    className="rounded-md px-3 py-2 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
-                  >
-                    Create Hub
-                  </Link>
-                </div>
-              )}
+              <div className="hidden space-x-4 md:flex">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (user) {
+                      navigate('/posts/create');
+                    } else {
+                      setPendingRedirect({ to: '/posts/create' });
+                      setAuthModal('login');
+                    }
+                  }}
+                  className="rounded-md px-3 py-2 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
+                >
+                  Create Post
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (user) {
+                      navigate('/messages');
+                    } else {
+                      setPendingRedirect({ to: '/messages' });
+                      setAuthModal('login');
+                    }
+                  }}
+                  className="relative rounded-md px-3 py-2 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
+                >
+                  Messages
+                  {unreadTotal > 0 && (
+                    <span className="absolute -right-2 -top-1 rounded-full bg-[var(--color-primary)] px-2 py-0.5 text-xs text-white">
+                      {unreadTotal}
+                    </span>
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (user) {
+                      navigate('/hubs/create');
+                    } else {
+                      setPendingRedirect({ to: '/hubs/create' });
+                      setAuthModal('login');
+                    }
+                  }}
+                  className="rounded-md px-3 py-2 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
+                >
+                  Create Hub
+                </button>
+              </div>
             </div>
 
             <div className="flex items-center gap-4">
@@ -159,6 +220,24 @@ export default function MainLayout() {
           mode={authModal}
           onClose={() => setAuthModal(null)}
           onSwitch={(mode) => setAuthModal(mode)}
+          onSuccess={async () => {
+            setAuthModal(null);
+            if (pendingAction?.type === 'subscribeSubreddit') {
+              try {
+                await subscriptionService.subscribeToSubreddit(pendingAction.subreddit);
+                queryClient.invalidateQueries({ queryKey: ['subreddit-subscription', pendingAction.subreddit] });
+                queryClient.invalidateQueries({ queryKey: ['user-subscriptions'] });
+                queryClient.invalidateQueries({ queryKey: ['user-subscriptions', 'subreddits'] });
+              } catch (err) {
+                console.error('Auto-subscribe failed', err);
+              }
+              setPendingAction(null);
+            }
+            if (pendingRedirect) {
+              navigate(pendingRedirect.to, { state: pendingRedirect.state, replace: true });
+              setPendingRedirect(null);
+            }
+          }}
         />
       )}
     </div>

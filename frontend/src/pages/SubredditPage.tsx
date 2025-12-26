@@ -991,20 +991,53 @@ export default function RedditPage() {
               )}
               <h1 className="text-3xl font-bold text-[var(--color-text-primary)]">r/{subreddit}</h1>
             </div>
-            {user && subreddit !== 'popular' && subreddit !== 'frontpage' && (
+            {subreddit !== 'popular' && subreddit !== 'frontpage' && (
               <div className="flex items-center gap-2">
-                <SubscribeButton
-                  type="subreddit"
-                  name={subreddit}
-                  initialSubscribed={subscriptionStatus?.is_subscribed ?? false}
-                />
+                {user ? (
+                  <SubscribeButton
+                    type="subreddit"
+                    name={subreddit}
+                    initialSubscribed={subscriptionStatus?.is_subscribed ?? false}
+                  />
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      window.dispatchEvent(
+                        new CustomEvent('open-auth-modal', {
+                          detail: {
+                            mode: 'login',
+                            redirectTo: `/r/${subreddit}`,
+                            redirectState: location.state,
+                            action: { type: 'subscribeSubreddit', subreddit },
+                          },
+                        })
+                      )
+                    }
+                    className="rounded-md bg-[var(--color-surface-elevated)] px-4 py-2 text-sm font-semibold text-[var(--color-text-primary)] hover:bg-[var(--color-border)]"
+                  >
+                    Subscribe
+                  </button>
+                )}
                 <button
                   type="button"
-                  onClick={() =>
+                  onClick={() => {
+                    if (!user) {
+                      window.dispatchEvent(
+                        new CustomEvent('open-auth-modal', {
+                          detail: {
+                            mode: 'login',
+                            redirectTo: '/posts/create',
+                            redirectState: { defaultSubreddit: subreddit, returnTo: `/r/${subreddit}` },
+                          },
+                        })
+                      );
+                      return;
+                    }
                     navigate('/posts/create', {
-                      state: { defaultSubreddit: subreddit },
-                    })
-                  }
+                      state: { defaultSubreddit: subreddit, returnTo: `/r/${subreddit}` },
+                    });
+                  }}
                   className="rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
                 >
                   Create Post

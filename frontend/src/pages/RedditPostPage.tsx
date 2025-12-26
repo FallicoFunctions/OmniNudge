@@ -1237,11 +1237,7 @@ export default function RedditPostPage() {
       navigate(originPathFromState, { replace: true });
       return;
     }
-    if (window.history.length > 1) {
-      navigate(-1);
-    } else {
-      navigate('/');
-    }
+    navigate(-1);
   };
 
   const savePostMutation = useMutation({

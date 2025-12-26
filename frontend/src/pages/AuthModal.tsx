@@ -5,9 +5,10 @@ interface AuthModalProps {
   mode: 'login' | 'signup';
   onClose: () => void;
   onSwitch: (mode: 'login' | 'signup') => void;
+  onSuccess?: () => void;
 }
 
-export default function AuthModal({ mode, onClose, onSwitch }: AuthModalProps) {
+export default function AuthModal({ mode, onClose, onSwitch, onSuccess }: AuthModalProps) {
   const isLogin = mode === 'login';
   const { login, register } = useAuth();
   const [username, setUsername] = useState('');
@@ -27,7 +28,11 @@ export default function AuthModal({ mode, onClose, onSwitch }: AuthModalProps) {
       } else {
         await register({ username: normalizedUsername, password, email: email || undefined });
       }
-      onClose();
+      if (onSuccess) {
+        onSuccess();
+      } else {
+        onClose();
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : isLogin ? 'Login failed' : 'Registration failed');
     } finally {

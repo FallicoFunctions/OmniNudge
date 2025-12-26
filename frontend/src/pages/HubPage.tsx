@@ -379,7 +379,7 @@ export default function HubsPage() {
           )}
           {user && (
             <button
-              onClick={() => navigate('/posts/create', { state: { defaultHub: hubname } })}
+              onClick={() => navigate('/posts/create', { state: { defaultHub: hubname, returnTo: `/h/${hubname}` } })}
               className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
             >
               Create Post
@@ -387,7 +387,7 @@ export default function HubsPage() {
           )}
           {user && (
             <button
-              onClick={() => navigate('/hubs/create')}
+              onClick={() => navigate('/hubs/create', { state: { returnTo: `/h/${hubname}` } })}
               className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
             >
               Create Hub
