@@ -6,14 +6,17 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/omninudge/backend/internal/utils"
 )
 
 // User represents a user in the system
 type User struct {
-	ID           int     `json:"id"`
-	Username     string  `json:"username"`
-	Email        *string `json:"email,omitempty"`
-	PasswordHash string  `json:"-"` // Never expose password hash in JSON
+	ID              int     `json:"id"`
+	Username        string  `json:"username"`
+	Email           *string `json:"email,omitempty"`           // Decrypted email (for API responses)
+	EmailEncrypted  bool    `json:"-"`                         // Whether email is encrypted in DB
+	EncryptedEmail  *string `json:"-"`                         // Encrypted email (stored in DB)
+	PasswordHash    string  `json:"-"`                         // Never expose password hash in JSON
 
 	// Reddit integration (optional)
 	RedditID       *string    `json:"reddit_id,omitempty"`
@@ -49,15 +52,28 @@ func NewUserRepository(pool *pgxpool.Pool) *UserRepository {
 
 // Create creates a new user with username/password
 func (r *UserRepository) Create(ctx context.Context, user *User) error {
+	// Encrypt email if provided
+	var encryptedEmail *string
+	var emailEncrypted bool
+	if user.Email != nil && *user.Email != "" {
+		encrypted, err := utils.EncryptEmail(*user.Email)
+		if err != nil {
+			return err
+		}
+		encryptedEmail = &encrypted
+		emailEncrypted = true
+	}
+
 	query := `
-		INSERT INTO users (username, email, password_hash, avatar_url, bio, nsfw)
-		VALUES ($1, $2, $3, $4, $5, $6)
+		INSERT INTO users (username, email, email_encrypted, password_hash, avatar_url, bio, nsfw)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
 		RETURNING id, created_at, last_seen, role, nsfw
 	`
 
 	return r.pool.QueryRow(ctx, query,
 		user.Username,
-		user.Email,
+		encryptedEmail,
+		emailEncrypted,
 		user.PasswordHash,
 		user.AvatarURL,
 		user.Bio,
@@ -100,14 +116,15 @@ func (r *UserRepository) GetByID(ctx context.Context, id int) (*User, error) {
 	user := &User{}
 
 	query := `
-		SELECT id, username, email, reddit_id, reddit_username, public_key, avatar_url, bio, karma, role, created_at, last_seen
+		SELECT id, username, email, email_encrypted, reddit_id, reddit_username, public_key, avatar_url, bio, karma, role, created_at, last_seen
 		FROM users WHERE id = $1
 	`
 
 	err := r.pool.QueryRow(ctx, query, id).Scan(
 		&user.ID,
 		&user.Username,
-		&user.Email,
+		&user.EncryptedEmail,
+		&user.EmailEncrypted,
 		&user.RedditID,
 		&user.RedditUsername,
 		&user.PublicKey,
@@ -126,6 +143,18 @@ func (r *UserRepository) GetByID(ctx context.Context, id int) (*User, error) {
 		return nil, err
 	}
 
+	// Decrypt email if it's encrypted
+	if user.EncryptedEmail != nil && user.EmailEncrypted {
+		decrypted, err := utils.DecryptEmail(*user.EncryptedEmail)
+		if err != nil {
+			return nil, err
+		}
+		user.Email = &decrypted
+	} else if user.EncryptedEmail != nil {
+		// Email is not encrypted (legacy data)
+		user.Email = user.EncryptedEmail
+	}
+
 	return user, nil
 }
 
@@ -137,7 +166,7 @@ func (r *UserRepository) GetByUsername(ctx context.Context, username string) (*U
 
 	// Prefer exact match to avoid collisions between usernames that only differ by case.
 	if user, err := r.queryUser(ctx, `
-		SELECT id, username, email, password_hash, reddit_id, reddit_username, public_key, avatar_url, bio, karma, role, created_at, last_seen
+		SELECT id, username, email, email_encrypted, password_hash, reddit_id, reddit_username, public_key, avatar_url, bio, karma, role, created_at, last_seen
 		FROM users WHERE username = $1
 	`, username); err != nil || user != nil {
 		return user, err
@@ -145,7 +174,7 @@ func (r *UserRepository) GetByUsername(ctx context.Context, username string) (*U
 
 	// Fallback to case-insensitive/trimmed lookup for legacy data that may contain inconsistent casing/spacing.
 	return r.queryUser(ctx, `
-		SELECT id, username, email, password_hash, reddit_id, reddit_username, public_key, avatar_url, bio, karma, role, created_at, last_seen
+		SELECT id, username, email, email_encrypted, password_hash, reddit_id, reddit_username, public_key, avatar_url, bio, karma, role, created_at, last_seen
 		FROM users WHERE LOWER(TRIM(username)) = LOWER(TRIM($1))
 	`, username)
 }
@@ -156,7 +185,8 @@ func (r *UserRepository) queryUser(ctx context.Context, query string, arg interf
 	err := r.pool.QueryRow(ctx, query, arg).Scan(
 		&user.ID,
 		&user.Username,
-		&user.Email,
+		&user.EncryptedEmail,
+		&user.EmailEncrypted,
 		&user.PasswordHash,
 		&user.RedditID,
 		&user.RedditUsername,
@@ -176,6 +206,18 @@ func (r *UserRepository) queryUser(ctx context.Context, query string, arg interf
 		return nil, err
 	}
 
+	// Decrypt email if it's encrypted
+	if user.EncryptedEmail != nil && user.EmailEncrypted {
+		decrypted, err := utils.DecryptEmail(*user.EncryptedEmail)
+		if err != nil {
+			return nil, err
+		}
+		user.Email = &decrypted
+	} else if user.EncryptedEmail != nil {
+		// Email is not encrypted (legacy data)
+		user.Email = user.EncryptedEmail
+	}
+
 	return user, nil
 }
 
@@ -184,14 +226,15 @@ func (r *UserRepository) GetByRedditID(ctx context.Context, redditID string) (*U
 	user := &User{}
 
 	query := `
-		SELECT id, username, email, reddit_id, reddit_username, public_key, avatar_url, bio, karma, role, created_at, last_seen
+		SELECT id, username, email, email_encrypted, reddit_id, reddit_username, public_key, avatar_url, bio, karma, role, created_at, last_seen
 		FROM users WHERE reddit_id = $1
 	`
 
 	err := r.pool.QueryRow(ctx, query, redditID).Scan(
 		&user.ID,
 		&user.Username,
-		&user.Email,
+		&user.EncryptedEmail,
+		&user.EmailEncrypted,
 		&user.RedditID,
 		&user.RedditUsername,
 		&user.PublicKey,
@@ -208,6 +251,18 @@ func (r *UserRepository) GetByRedditID(ctx context.Context, redditID string) (*U
 			return nil, nil
 		}
 		return nil, err
+	}
+
+	// Decrypt email if it's encrypted
+	if user.EncryptedEmail != nil && user.EmailEncrypted {
+		decrypted, err := utils.DecryptEmail(*user.EncryptedEmail)
+		if err != nil {
+			return nil, err
+		}
+		user.Email = &decrypted
+	} else if user.EncryptedEmail != nil {
+		// Email is not encrypted (legacy data)
+		user.Email = user.EncryptedEmail
 	}
 
 	return user, nil

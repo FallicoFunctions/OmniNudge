@@ -16,6 +16,7 @@ import (
 	"github.com/omninudge/backend/internal/handlers"
 	"github.com/omninudge/backend/internal/models"
 	"github.com/omninudge/backend/internal/services"
+	"github.com/omninudge/backend/internal/utils"
 	"github.com/omninudge/backend/internal/websocket"
 	"github.com/omninudge/backend/internal/workers"
 )
@@ -28,6 +29,12 @@ func main() {
 	}
 
 	log.Printf("Starting OmniNudge server...")
+
+	// Initialize email encryption
+	if err := utils.SetEncryptionKey(cfg.Encryption.Key); err != nil {
+		log.Fatalf("Failed to initialize email encryption: %v", err)
+	}
+	log.Println("Email encryption initialized")
 
 	// Connect to database
 	db, err := database.New(cfg.Database.DatabaseURL())

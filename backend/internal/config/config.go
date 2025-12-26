@@ -9,11 +9,12 @@ import (
 
 // Config holds all configuration for the application
 type Config struct {
-	Server   ServerConfig
-	Database DatabaseConfig
-	Reddit   RedditConfig
-	JWT      JWTConfig
-	Redis    RedisConfig
+	Server     ServerConfig
+	Database   DatabaseConfig
+	Reddit     RedditConfig
+	JWT        JWTConfig
+	Redis      RedisConfig
+	Encryption EncryptionConfig
 }
 
 // RedditConfig holds Reddit OAuth configuration
@@ -55,6 +56,12 @@ type RedisConfig struct {
 	TTLSeconds int
 }
 
+// EncryptionConfig holds encryption configuration for sensitive data
+type EncryptionConfig struct {
+	// Key is the AES-256 encryption key (32 bytes, base64-encoded or raw string)
+	Key string
+}
+
 // Load reads configuration from environment variables with sensible defaults
 func Load() (*Config, error) {
 	cfg := &Config{
@@ -84,6 +91,9 @@ func Load() (*Config, error) {
 			Addr:       getEnv("REDIS_ADDR", ""),
 			Password:   getEnv("REDIS_PASSWORD", ""),
 			TTLSeconds: getEnvAsInt("REDIS_TTL_SECONDS", 300),
+		},
+		Encryption: EncryptionConfig{
+			Key: getEnv("ENCRYPTION_KEY", "dev-encryption-key-change-me!!"),
 		},
 	}
 
