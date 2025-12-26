@@ -574,3 +574,25 @@ func (r *PostCommentRepository) GetReplyCount(ctx context.Context, commentID int
 	err := r.pool.QueryRow(ctx, query, commentID, DeletedCommentPlaceholder).Scan(&count)
 	return count, err
 }
+
+// MarkAsRemoved marks a comment as removed by a moderator
+func (r *PostCommentRepository) MarkAsRemoved(ctx context.Context, commentID int, moderatorID int) error {
+	query := `
+		UPDATE post_comments
+		SET is_removed = TRUE, removed_by = $2, removed_at = NOW()
+		WHERE id = $1
+	`
+	_, err := r.pool.Exec(ctx, query, commentID, moderatorID)
+	return err
+}
+
+// MarkAsApproved marks a comment as approved (unremoves it)
+func (r *PostCommentRepository) MarkAsApproved(ctx context.Context, commentID int) error {
+	query := `
+		UPDATE post_comments
+		SET is_removed = FALSE, removed_by = NULL, removed_at = NULL
+		WHERE id = $1
+	`
+	_, err := r.pool.Exec(ctx, query, commentID)
+	return err
+}

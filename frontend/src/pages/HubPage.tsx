@@ -143,6 +143,12 @@ export default function HubsPage() {
     staleTime: 1000 * 60 * 5,
   });
 
+  // Check if current user is a moderator of this hub
+  const isModerator = useMemo(() => {
+    if (!user || !hubDetails?.moderators) return false;
+    return hubDetails.moderators.some((mod) => mod.id === user.id);
+  }, [user, hubDetails?.moderators]);
+
   // Fetch posts based on current hub
   const postsQueryKey = ['hub-posts', hubname, sort, timeRangeKey] as const;
   const { data, isLoading, error } = useQuery<HubPostsResponse>({
@@ -376,6 +382,14 @@ export default function HubsPage() {
               name={hubname}
               initialSubscribed={subscriptionStatus?.is_subscribed}
             />
+          )}
+          {isModerator && (
+            <button
+              onClick={() => navigate(`/h/${hubname}/mod`)}
+              className="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700"
+            >
+              Mod Tools
+            </button>
           )}
           {user && (
             <button
