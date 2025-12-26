@@ -159,7 +159,7 @@ export function SavedItemsView({
       fetchingDetailsRef.current.add(postKey);
       api
         .get<[RedditListingData, unknown]>(
-          `/reddit/r/${post.subreddit}/comments/${post.reddit_post_id}`
+          `/r/${post.subreddit}/comments/${post.reddit_post_id}`
         )
         .then((response) => {
           const listing = response[0];
@@ -248,7 +248,7 @@ export function SavedItemsView({
   );
 
   const handleShareRedditPost = (post: SavedRedditPost) => {
-    const shareUrl = `${window.location.origin}/reddit/r/${post.subreddit}/comments/${post.reddit_post_id}`;
+    const shareUrl = `${window.location.origin}/r/${post.subreddit}/comments/${post.reddit_post_id}`;
     navigator.clipboard
       .writeText(shareUrl)
       .then(() => alert('Post link copied to clipboard!'))
@@ -393,7 +393,7 @@ export function SavedItemsView({
               reddit_post_id: post.reddit_post_id,
             })}
             onHide={() => setHideTargetPost(post)}
-            onCrosspost={() => navigate(`/reddit/r/${post.subreddit}/comments/${post.reddit_post_id}`)}
+            onCrosspost={() => navigate(`/r/${post.subreddit}/comments/${post.reddit_post_id}`)}
             linkState={originState}
           />
         );
@@ -403,7 +403,7 @@ export function SavedItemsView({
       key: `reddit-comment-${comment.id}`,
       timestamp: toTimestamp(comment.created_at),
       node: (() => {
-        const permalink = `/reddit/r/${comment.subreddit}/comments/${comment.reddit_post_id}/${comment.id}`;
+        const permalink = `/r/${comment.subreddit}/comments/${comment.reddit_post_id}/${comment.id}`;
         return (
           <article className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
             <div className="mb-2 text-[11px] font-semibold uppercase text-[var(--color-text-muted)]">

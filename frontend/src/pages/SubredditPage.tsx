@@ -626,7 +626,7 @@ export default function RedditPage() {
   const navigateToSubreddit = (value: string) => {
     const normalized = value.trim() || 'popular';
     setSubreddit(normalized);
-    navigate(`/reddit/r/${normalized}`);
+    navigate(`/r/${normalized}`);
     setIsAutocompleteOpen(false);
   };
 
@@ -755,7 +755,7 @@ export default function RedditPage() {
   };
 
   const handleShareRedditPost = (post: FeedRedditPost) => {
-    const shareUrl = `${window.location.origin}/reddit/r/${post.subreddit}/comments/${post.id}`;
+    const shareUrl = `${window.location.origin}/r/${post.subreddit}/comments/${post.id}`;
     navigator.clipboard
       .writeText(shareUrl)
       .then(() => alert('Post link copied to clipboard!'))

@@ -1194,7 +1194,7 @@ export default function RedditPostPage() {
     if (window.history.length > 1) {
       navigate(-1);
     } else {
-      navigate('/reddit');
+      navigate('/');
     }
   };
 
@@ -1533,7 +1533,7 @@ export default function RedditPostPage() {
                   <span>
                     Posted by{' '}
                     <Link
-                      to={`/reddit/user/${post.author}`}
+                      to={`/user/${post.author}`}
                       className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
                     >
                       u/{post.author}

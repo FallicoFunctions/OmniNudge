@@ -272,7 +272,7 @@ export function HiddenItemsView({
   });
 
   const handleShareRedditPost = (post: SavedRedditPost) => {
-    const shareUrl = `${window.location.origin}/reddit/r/${post.subreddit}/comments/${post.reddit_post_id}`;
+    const shareUrl = `${window.location.origin}/r/${post.subreddit}/comments/${post.reddit_post_id}`;
     navigator.clipboard
       .writeText(shareUrl)
       .then(() => alert('Post link copied to clipboard!'))
@@ -383,7 +383,7 @@ export function HiddenItemsView({
               subreddit: post.subreddit,
               reddit_post_id: post.reddit_post_id,
             })}
-            onCrosspost={() => navigate(`/reddit/r/${post.subreddit}/comments/${post.reddit_post_id}`, { state: { isHidden: true } })}
+            onCrosspost={() => navigate(`/r/${post.subreddit}/comments/${post.reddit_post_id}`, { state: { isHidden: true } })}
             hideLabel="Unhide"
           />
         );

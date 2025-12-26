@@ -60,7 +60,7 @@ function App() {
                     path="/r/:subreddit/comments/:postId/:commentId"
                     element={<RedditPostWrapper />}
                   />
-                  <Route path="/reddit/user/:username" element={<RedditUserPage />} />
+                  <Route path="/user/:username" element={<RedditUserPage />} />
                   <Route path="/h/:hubname" element={<HubPage />} />
                   <Route path="/posts/:postId" element={<PostDetailPage />} />
                   <Route path="/posts/:postId/comments/:commentId" element={<PostDetailPage />} />

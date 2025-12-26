@@ -683,7 +683,7 @@ export default function RedditWikiPage({ mode = 'view' }: RedditWikiPageProps = 
                         </div>
                         {normalizedAuthorName ? (
                           <Link
-                            to={`/reddit/user/${normalizedAuthorName}`}
+                            to={`/user/${normalizedAuthorName}`}
                             className="truncate font-semibold text-[var(--color-link,#0079d3)] hover:underline"
                           >
                             {authorName}
