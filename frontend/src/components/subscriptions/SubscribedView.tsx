@@ -108,7 +108,7 @@ export default function SubscribedView({
                     className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] p-4"
                   >
                     <Link
-                      to={`/reddit/r/${subscription.subreddit_name}`}
+                      to={`/r/${subscription.subreddit_name}`}
                       className="text-lg font-semibold text-[var(--color-primary)] hover:underline"
                     >
                       r/{subscription.subreddit_name}

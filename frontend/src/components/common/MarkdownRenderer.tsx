@@ -102,12 +102,13 @@ function formatInline(text: string): string {
   // Replace r/subreddit with links
   result = result.replace(subredditRegex, (match, subreddit) => {
     const prefix = match.startsWith(' ') ? ' ' : '';
-    return `${prefix}<a href="/reddit/${subreddit}" class="text-[var(--color-primary)] hover:underline">${subreddit}</a>`;
+    return `${prefix}<a href="/${subreddit}" class="text-[var(--color-primary)] hover:underline">${subreddit}</a>`;
   });
   // Replace u/username with links
   result = result.replace(userRegex, (match, username) => {
     const prefix = match.startsWith(' ') ? ' ' : '';
-    return `${prefix}<a href="/reddit/${username}" class="text-[var(--color-primary)] hover:underline">${username}</a>`;
+    const normalized = username.replace(/^u\//i, '');
+    return `${prefix}<a href="/user/${normalized}" class="text-[var(--color-primary)] hover:underline">${username}</a>`;
   });
   return result;
 }
