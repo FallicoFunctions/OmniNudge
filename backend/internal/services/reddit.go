@@ -115,9 +115,9 @@ type RedditPost struct {
 	Domain                   string         `json:"domain"`        // Source domain
 	MediaEmbed               MediaEmbed     `json:"media_embed"`   // Embedded media
 	SecureMediaEmbed         MediaEmbed     `json:"secure_media_embed"`
-	Media                    *RedditMedia   `json:"media"`          // Media container
-	SecureMedia              *RedditMedia   `json:"secure_media"`   // Secure media container
-	Preview                  *RedditPreview `json:"preview"`        // Preview images for link posts
+	Media                    *RedditMedia   `json:"media"`        // Media container
+	SecureMedia              *RedditMedia   `json:"secure_media"` // Secure media container
+	Preview                  *RedditPreview `json:"preview"`      // Preview images for link posts
 }
 
 // MediaEmbed represents embedded media from Reddit
@@ -312,6 +312,7 @@ type RedditWikiRevisionsListing struct {
 type SubredditSuggestion struct {
 	Name        string `json:"name"`
 	Title       string `json:"title"`
+	Description string `json:"description,omitempty"`
 	Subscribers int    `json:"subscribers"`
 	IconURL     string `json:"icon_url,omitempty"`
 	Over18      bool   `json:"over_18"`
@@ -323,6 +324,25 @@ type subredditAutocompleteListing struct {
 			Data struct {
 				DisplayName   string `json:"display_name"`
 				Title         string `json:"title"`
+				PublicDesc    string `json:"public_description"`
+				Subscribers   int    `json:"subscribers"`
+				IconImg       string `json:"icon_img"`
+				CommunityIcon string `json:"community_icon"`
+				Over18        bool   `json:"over18"`
+			} `json:"data"`
+		} `json:"children"`
+	} `json:"data"`
+}
+
+type subredditSearchListing struct {
+	Data struct {
+		After    *string `json:"after"`
+		Before   *string `json:"before"`
+		Children []struct {
+			Data struct {
+				DisplayName   string `json:"display_name"`
+				Title         string `json:"title"`
+				PublicDesc    string `json:"public_description"`
 				Subscribers   int    `json:"subscribers"`
 				IconImg       string `json:"icon_img"`
 				CommunityIcon string `json:"community_icon"`
@@ -723,6 +743,7 @@ func (r *RedditClient) AutocompleteSubreddits(ctx context.Context, query string,
 		suggestions = append(suggestions, SubredditSuggestion{
 			Name:        data.DisplayName,
 			Title:       data.Title,
+			Description: data.PublicDesc,
 			Subscribers: data.Subscribers,
 			IconURL:     strings.TrimSpace(icon),
 			Over18:      data.Over18,
@@ -730,6 +751,67 @@ func (r *RedditClient) AutocompleteSubreddits(ctx context.Context, query string,
 	}
 
 	return suggestions, nil
+}
+
+// SearchSubreddits performs a paginated subreddit search (supports after cursor)
+func (r *RedditClient) SearchSubreddits(ctx context.Context, query string, limit int, after string) ([]SubredditSuggestion, *string, error) {
+	query = strings.TrimSpace(query)
+	if query == "" {
+		return nil, nil, fmt.Errorf("query is required")
+	}
+	if limit < 1 || limit > 100 {
+		limit = 25
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "GET", "https://www.reddit.com/subreddits/search.json", nil)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to create request: %w", err)
+	}
+	req.Header.Set("User-Agent", r.userAgent)
+
+	q := req.URL.Query()
+	q.Set("q", query)
+	q.Set("limit", fmt.Sprintf("%d", limit))
+	if after != "" {
+		q.Set("after", after)
+	}
+	req.URL.RawQuery = q.Encode()
+
+	resp, err := r.httpClient.Do(req)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to search subreddits: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, nil, fmt.Errorf("reddit API returned status %d: %s", resp.StatusCode, string(body))
+	}
+
+	var listing subredditSearchListing
+	if err := json.NewDecoder(resp.Body).Decode(&listing); err != nil {
+		return nil, nil, fmt.Errorf("failed to decode subreddit search response: %w", err)
+	}
+
+	suggestions := make([]SubredditSuggestion, 0, len(listing.Data.Children))
+	for _, child := range listing.Data.Children {
+		data := child.Data
+		icon := data.CommunityIcon
+		if icon == "" {
+			icon = data.IconImg
+		}
+		icon = html.UnescapeString(icon)
+		suggestions = append(suggestions, SubredditSuggestion{
+			Name:        data.DisplayName,
+			Title:       data.Title,
+			Description: data.PublicDesc,
+			Subscribers: data.Subscribers,
+			IconURL:     strings.TrimSpace(icon),
+			Over18:      data.Over18,
+		})
+	}
+
+	return suggestions, listing.Data.After, nil
 }
 
 // GetUserListing fetches a Reddit user's overview/submitted/comments listing
