@@ -3,6 +3,7 @@ package handlers
 import (
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/omninudge/backend/internal/models"
@@ -41,10 +42,13 @@ func (h *AdminHandler) PromoteUser(c *gin.Context) {
 		return
 	}
 
+	// Global "moderator" role is no longer supported; use hub moderators instead.
 	switch req.Role {
-	case "user", "moderator", "admin":
+	case "user", "admin":
 	default:
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid role"})
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Invalid role. Use hub moderator assignment for per-hub moderators.",
+		})
 		return
 	}
 
@@ -69,7 +73,7 @@ func (h *AdminHandler) ListUsers(c *gin.Context) {
 
 	// Build query dynamically with proper parameterization
 	baseQuery := `
-		SELECT id, username, email, reddit_id, role, created_at, last_seen_at, bio, avatar_url
+		SELECT id, username, email, reddit_id, role, created_at, last_seen, bio, avatar_url
 		FROM users
 		WHERE 1=1
 	`
@@ -106,10 +110,21 @@ func (h *AdminHandler) ListUsers(c *gin.Context) {
 	}
 	defer rows.Close()
 
+	type userRow struct {
+		ID        int
+		Username  string
+		Email     *string
+		RedditID  *string
+		Role      string
+		CreatedAt time.Time
+		LastSeen  *time.Time
+		Bio       *string
+		AvatarURL *string
+	}
 	type UserResponse struct {
 		ID         int     `json:"id"`
 		Username   string  `json:"username"`
-		Email      string  `json:"email"`
+		Email      *string `json:"email"`
 		RedditID   *string `json:"reddit_id"`
 		Role       string  `json:"role"`
 		CreatedAt  string  `json:"created_at"`
@@ -120,12 +135,27 @@ func (h *AdminHandler) ListUsers(c *gin.Context) {
 
 	users := []UserResponse{}
 	for rows.Next() {
-		var u UserResponse
-		if err := rows.Scan(&u.ID, &u.Username, &u.Email, &u.RedditID, &u.Role, &u.CreatedAt, &u.LastSeenAt, &u.Bio, &u.AvatarURL); err != nil {
+		var row userRow
+		if err := rows.Scan(&row.ID, &row.Username, &row.Email, &row.RedditID, &row.Role, &row.CreatedAt, &row.LastSeen, &row.Bio, &row.AvatarURL); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to scan user", "details": err.Error()})
 			return
 		}
-		users = append(users, u)
+		var lastSeenStr *string
+		if row.LastSeen != nil {
+			formatted := row.LastSeen.Format(time.RFC3339)
+			lastSeenStr = &formatted
+		}
+		users = append(users, UserResponse{
+			ID:         row.ID,
+			Username:   row.Username,
+			Email:      row.Email,
+			RedditID:   row.RedditID,
+			Role:       row.Role,
+			CreatedAt:  row.CreatedAt.Format(time.RFC3339),
+			LastSeenAt: lastSeenStr,
+			Bio:        row.Bio,
+			AvatarURL:  row.AvatarURL,
+		})
 	}
 
 	c.JSON(http.StatusOK, gin.H{
