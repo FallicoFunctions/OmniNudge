@@ -254,6 +254,7 @@ func main() {
 		{
 			reddit.GET("/frontpage", redditHandler.GetFrontPage)
 			reddit.GET("/subreddits/autocomplete", redditHandler.AutocompleteSubreddits)
+			reddit.GET("/subreddits/search", redditHandler.SearchSubreddits)
 			reddit.GET("/r/:subreddit", redditHandler.GetSubredditPosts)
 			reddit.GET("/r/:subreddit/about", redditHandler.GetSubredditAbout)
 			reddit.GET("/r/:subreddit/moderators", redditHandler.GetSubredditModerators)

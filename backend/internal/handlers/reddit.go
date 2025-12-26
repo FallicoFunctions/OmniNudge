@@ -2,10 +2,10 @@ package handlers
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"html"
-	"encoding/json"
 	"log"
 	"net/http"
 	"path"
@@ -326,6 +326,46 @@ func (h *RedditHandler) AutocompleteSubreddits(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"suggestions": suggestions,
+	})
+}
+
+// SearchSubreddits handles GET /api/v1/reddit/subreddits/search
+func (h *RedditHandler) SearchSubreddits(c *gin.Context) {
+	query := strings.TrimSpace(c.Query("q"))
+	if query == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Query is required"})
+		return
+	}
+
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "25"))
+	if limit < 1 || limit > 100 {
+		limit = 25
+	}
+	after := c.Query("after")
+	includeNSFW, _ := strconv.ParseBool(c.DefaultQuery("include_nsfw", "false"))
+
+	results, nextAfter, err := h.redditClient.SearchSubreddits(c.Request.Context(), query, limit, after)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to search subreddits", "details": err.Error()})
+		return
+	}
+
+	// Filter NSFW if not included
+	filtered := results
+	if !includeNSFW {
+		filtered = make([]services.SubredditSuggestion, 0, len(results))
+		for _, s := range results {
+			if !s.Over18 {
+				filtered = append(filtered, s)
+			}
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"subreddits": filtered,
+		"after":      nextAfter,
+		"limit":      limit,
+		"query":      query,
 	})
 }
 
