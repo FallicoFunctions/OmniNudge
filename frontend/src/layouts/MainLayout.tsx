@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../contexts/AuthContext';
@@ -8,9 +8,11 @@ import { usersService } from '../services/usersService';
 import { messagesService } from '../services/messagesService';
 import { useMessagingWebSocket } from '../hooks/useMessagingWebSocket';
 import type { UserProfile } from '../types/users';
+import AuthModal from '../pages/AuthModal';
 
 export default function MainLayout() {
   const { user, logout } = useAuth();
+  const [authModal, setAuthModal] = useState<'login' | 'signup' | null>(null);
   const { activeConversationId } = useMessagingContext();
   const navigate = useNavigate();
   const location = useLocation();
@@ -21,7 +23,7 @@ export default function MainLayout() {
 
   const handleLogout = () => {
     logout();
-    navigate('/login');
+    navigate('/');
   };
 
   const { data: conversations } = useQuery({
@@ -126,18 +128,20 @@ export default function MainLayout() {
                 </>
               ) : (
                 <>
-                  <Link
-                    to="/login"
+                  <button
+                    type="button"
+                    onClick={() => setAuthModal('login')}
                     className="rounded-md px-3 py-2 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
                   >
                     Login
-                  </Link>
-                  <Link
-                    to="/register"
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAuthModal('signup')}
                     className="rounded-md bg-[var(--color-primary)] px-3 py-2 text-sm font-medium text-white hover:opacity-90"
                   >
                     Sign Up
-                  </Link>
+                  </button>
                 </>
               )}
             </div>
@@ -149,6 +153,14 @@ export default function MainLayout() {
       <main>
         <Outlet />
       </main>
+
+      {authModal && (
+        <AuthModal
+          mode={authModal}
+          onClose={() => setAuthModal(null)}
+          onSwitch={(mode) => setAuthModal(mode)}
+        />
+      )}
     </div>
   );
 }
