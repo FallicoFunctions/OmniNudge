@@ -14,6 +14,7 @@ import RedditWikiPage from './pages/RedditWikiPage';
 import UserProfilePage from './pages/UserProfilePage';
 import HubPage from './pages/HubPage';
 import SearchResultsPage from './pages/SearchResultsPage';
+import HubsAndSubsPage from './pages/HubsAndSubsPage';
 import CreateHubPage from './pages/CreateHubPage';
 import CreatePostPage from './pages/CreatePostPage';
 import PostDetailPage from './pages/PostDetailPage';
@@ -60,6 +61,7 @@ function App() {
                   <Route path="/posts/:postId/comments/:commentId" element={<PostDetailPage />} />
                   <Route path="/users/:username" element={<UserProfilePage />} />
                   <Route path="/search" element={<SearchResultsPage />} />
+                  <Route path="/hubs" element={<HubsAndSubsPage />} />
 
                   {/* PROTECTED routes - require auth */}
                   <Route
