@@ -79,6 +79,12 @@ func main() {
 	hubSubRepo := models.NewHubSubscriptionRepository(db.Pool)
 	subredditSubRepo := models.NewSubredditSubscriptionRepository(db.Pool)
 
+	// Moderation Phase 1 repositories
+	hubBanRepo := models.NewHubBanRepository(db.Pool)
+	removalReasonRepo := models.NewRemovalReasonRepository(db.Pool)
+	removedContentRepo := models.NewRemovedContentRepository(db.Pool)
+	modLogRepo := models.NewModLogRepository(db.Pool)
+
 	// Initialize WebSocket hub
 	hub := websocket.NewHub()
 	go hub.Run()
@@ -140,6 +146,16 @@ func main() {
 	hubsHandler := handlers.NewHubsHandler(hubRepo, postRepo, hubModRepo, hubSubRepo)
 	subscriptionsHandler := handlers.NewSubscriptionsHandler(hubSubRepo, subredditSubRepo, hubRepo)
 	moderationHandler := handlers.NewModerationHandler(reportRepo, hubModRepo)
+	moderationHandlerV2 := handlers.NewModerationHandlerV2(
+		hubBanRepo,
+		removalReasonRepo,
+		removedContentRepo,
+		modLogRepo,
+		hubModRepo,
+		postRepo,
+		commentRepo,
+		hubRepo,
+	)
 	adminHandler := handlers.NewAdminHandler(userRepo)
 	wsHandler := handlers.NewWebSocketHandler(hub)
 	notificationsHandler := handlers.NewNotificationsHandler(notificationRepo)
@@ -467,12 +483,43 @@ func main() {
 
 			// Moderation reports
 			protected.POST("/reports", moderationHandler.CreateReport)
-			// Admin/mod endpoints
-			mod := protected.Group("/mod")
-			mod.Use(middleware.RequireRole("moderator", "admin"))
+
+			// Global moderation endpoints (require site-wide moderator/admin role)
+			globalMod := protected.Group("/mod")
+			globalMod.Use(middleware.RequireRole("moderator", "admin"))
 			{
-				mod.GET("/reports", moderationHandler.ListReports)
-				mod.POST("/reports/:id/status", moderationHandler.UpdateReportStatus)
+				globalMod.GET("/reports", moderationHandler.ListReports)
+				globalMod.POST("/reports/:id/status", moderationHandler.UpdateReportStatus)
+			}
+
+			// Hub-specific moderation endpoints (per-hub moderator check done in handlers)
+			hubMod := protected.Group("/mod")
+			{
+				// User bans
+				hubMod.POST("/hubs/:hub_name/bans", moderationHandlerV2.BanUser)
+				hubMod.DELETE("/hubs/:hub_name/bans/:user_id", moderationHandlerV2.UnbanUser)
+				hubMod.GET("/hubs/:hub_name/bans", moderationHandlerV2.GetBannedUsers)
+
+				// Post moderation
+				hubMod.POST("/posts/:id/remove", moderationHandlerV2.RemovePost)
+				hubMod.POST("/posts/:id/approve", moderationHandlerV2.ApprovePost)
+				hubMod.POST("/posts/:id/lock", moderationHandlerV2.LockPost)
+				hubMod.POST("/posts/:id/unlock", moderationHandlerV2.UnlockPost)
+				hubMod.POST("/posts/:id/pin", moderationHandlerV2.PinPost)
+				hubMod.POST("/posts/:id/unpin", moderationHandlerV2.UnpinPost)
+
+				// Comment moderation
+				hubMod.POST("/comments/:id/remove", moderationHandlerV2.RemoveComment)
+				hubMod.POST("/comments/:id/approve", moderationHandlerV2.ApproveComment)
+
+				// Removal reasons
+				hubMod.POST("/hubs/:hub_name/removal-reasons", moderationHandlerV2.CreateRemovalReason)
+				hubMod.PUT("/removal-reasons/:id", moderationHandlerV2.UpdateRemovalReason)
+				hubMod.DELETE("/removal-reasons/:id", moderationHandlerV2.DeleteRemovalReason)
+				hubMod.GET("/hubs/:hub_name/removal-reasons", moderationHandlerV2.GetRemovalReasons)
+
+				// Mod log
+				hubMod.GET("/hubs/:hub_name/mod-log", moderationHandlerV2.GetModLog)
 			}
 
 			// Admin endpoints

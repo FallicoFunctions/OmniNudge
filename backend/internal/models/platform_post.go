@@ -800,3 +800,53 @@ func (r *PlatformPostRepository) GetAllFeed(
 
 	return posts, rows.Err()
 }
+
+// MarkAsRemoved marks a post as removed by a moderator
+func (r *PlatformPostRepository) MarkAsRemoved(ctx context.Context, postID int, moderatorID int) error {
+	query := `
+		UPDATE platform_posts
+		SET is_removed = TRUE, removed_by = $2, removed_at = NOW()
+		WHERE id = $1
+	`
+	_, err := r.pool.Exec(ctx, query, postID, moderatorID)
+	return err
+}
+
+// MarkAsApproved marks a post as approved (unremoves it)
+func (r *PlatformPostRepository) MarkAsApproved(ctx context.Context, postID int) error {
+	query := `
+		UPDATE platform_posts
+		SET is_removed = FALSE, removed_by = NULL, removed_at = NULL
+		WHERE id = $1
+	`
+	_, err := r.pool.Exec(ctx, query, postID)
+	return err
+}
+
+// LockPost locks a post to prevent new comments
+func (r *PlatformPostRepository) LockPost(ctx context.Context, postID int) error {
+	query := `UPDATE platform_posts SET is_locked = TRUE WHERE id = $1`
+	_, err := r.pool.Exec(ctx, query, postID)
+	return err
+}
+
+// UnlockPost unlocks a post to allow new comments
+func (r *PlatformPostRepository) UnlockPost(ctx context.Context, postID int) error {
+	query := `UPDATE platform_posts SET is_locked = FALSE WHERE id = $1`
+	_, err := r.pool.Exec(ctx, query, postID)
+	return err
+}
+
+// PinPost pins a post to the top of the hub
+func (r *PlatformPostRepository) PinPost(ctx context.Context, postID int) error {
+	query := `UPDATE platform_posts SET is_pinned = TRUE WHERE id = $1`
+	_, err := r.pool.Exec(ctx, query, postID)
+	return err
+}
+
+// UnpinPost unpins a post
+func (r *PlatformPostRepository) UnpinPost(ctx context.Context, postID int) error {
+	query := `UPDATE platform_posts SET is_pinned = FALSE WHERE id = $1`
+	_, err := r.pool.Exec(ctx, query, postID)
+	return err
+}

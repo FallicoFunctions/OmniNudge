@@ -20,6 +20,7 @@ import CreatePostPage from './pages/CreatePostPage';
 import PostDetailPage from './pages/PostDetailPage';
 import MessagesPage from './pages/MessagesPage';
 import SettingsPage from './pages/SettingsPage';
+import ModToolsPage from './pages/ModToolsPage';
 import NotFoundPage from './pages/NotFoundPage';
 import './App.css';
 
@@ -64,6 +65,14 @@ function App() {
                   <Route path="/hubs" element={<HubsAndSubsPage />} />
 
                   {/* PROTECTED routes - require auth */}
+                  <Route
+                    path="/h/:hubName/mod"
+                    element={
+                      <ProtectedRoute>
+                        <ModToolsPage />
+                      </ProtectedRoute>
+                    }
+                  />
                   <Route
                     path="/posts/create"
                     element={
