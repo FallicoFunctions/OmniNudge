@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useSettings } from '../contexts/SettingsContext';
 import { siteWideSearch } from '../services/searchService';
 import { useRedditBlocklist } from '../contexts/RedditBlockContext';
@@ -432,13 +432,18 @@ export default function SearchResultsPage() {
             ) : (
               <ul className="mt-2 space-y-2">
                 {filteredSubreddits.map((sr) => (
-                  <li key={sr.name} className="rounded border border-[var(--color-border)] p-3">
-                    <div className="text-sm font-semibold text-[var(--color-text-primary)]">
-                      r/{sr.name}
-                    </div>
-                    {sr.title && (
-                      <div className="text-xs text-[var(--color-text-secondary)]">{sr.title}</div>
-                    )}
+                  <li
+                    key={sr.name}
+                    className="rounded border border-[var(--color-border)] p-3 hover:border-[var(--color-primary)] hover:shadow-sm transition"
+                  >
+                    <Link to={`/r/${sr.name}`} className="block">
+                      <div className="text-sm font-semibold text-[var(--color-text-primary)] underline-offset-2 hover:underline">
+                        r/{sr.name}
+                      </div>
+                      {sr.title && (
+                        <div className="text-xs text-[var(--color-text-secondary)]">{sr.title}</div>
+                      )}
+                    </Link>
                   </li>
                 ))}
               </ul>
@@ -451,18 +456,23 @@ export default function SearchResultsPage() {
             ) : (
               <ul className="mt-2 space-y-2">
                 {filteredHubs.map((hub) => (
-                  <li key={hub.id} className="rounded border border-[var(--color-border)] p-3">
-                    <div className="text-sm font-semibold text-[var(--color-text-primary)]">
-                      {hub.name}
-                    </div>
-                    {hub.title && (
-                      <div className="text-xs text-[var(--color-text-secondary)]">{hub.title}</div>
-                    )}
-                    {hub.description && (
-                      <div className="mt-1 text-xs text-[var(--color-text-secondary)]">
-                        {hub.description}
+                  <li
+                    key={hub.id}
+                    className="rounded border border-[var(--color-border)] p-3 hover:border-[var(--color-primary)] hover:shadow-sm transition"
+                  >
+                    <Link to={`/h/${hub.name}`} className="block">
+                      <div className="text-sm font-semibold text-[var(--color-text-primary)] underline-offset-2 hover:underline">
+                        h/{hub.name}
                       </div>
-                    )}
+                      {hub.title && (
+                        <div className="text-xs text-[var(--color-text-secondary)]">{hub.title}</div>
+                      )}
+                      {hub.description && (
+                        <div className="mt-1 text-xs text-[var(--color-text-secondary)]">
+                          {hub.description}
+                        </div>
+                      )}
+                    </Link>
                   </li>
                 ))}
               </ul>
