@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useRef } from 'react';
 import { Link, useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api';
@@ -85,6 +85,7 @@ interface RedditPostData {
       fallback_url?: string;
       dash_url?: string;
       hls_url?: string;
+      has_audio?: boolean;
       height?: number;
       width?: number;
     };
@@ -99,6 +100,7 @@ interface RedditPostData {
       fallback_url?: string;
       dash_url?: string;
       hls_url?: string;
+      has_audio?: boolean;
       height?: number;
       width?: number;
     };
@@ -150,20 +152,23 @@ function getGalleryImages(post: RedditPostData): string[] {
   return images;
 }
 
-function getVideoUrl(post: RedditPostData): { url: string; hasAudio: boolean } | undefined {
+type VideoSource = { url: string; hasAudio: boolean; kind: 'mp4' | 'hls' | 'dash' };
+
+function getVideoUrl(post: RedditPostData): VideoSource | undefined {
   // Try secure_media first, then media
   const videoData = post.secure_media?.reddit_video || post.media?.reddit_video;
   if (!videoData) return undefined;
 
-  // HLS and DASH URLs might have audio, fallback_url typically doesn't
+  if (videoData.fallback_url) {
+    // Prefer MP4 fallback when available (better cross-browser support)
+    return { url: videoData.fallback_url, hasAudio: Boolean(videoData.has_audio ?? true), kind: 'mp4' };
+  }
+  // HLS and DASH URLs might have audio
   if (videoData.hls_url) {
-    return { url: videoData.hls_url, hasAudio: true };
+    return { url: videoData.hls_url, hasAudio: true, kind: 'hls' };
   }
   if (videoData.dash_url) {
-    return { url: videoData.dash_url, hasAudio: true };
-  }
-  if (videoData.fallback_url) {
-    return { url: videoData.fallback_url, hasAudio: false };
+    return { url: videoData.dash_url, hasAudio: true, kind: 'dash' };
   }
 
   return undefined;
@@ -1040,7 +1045,49 @@ export default function RedditPostPage() {
   const galleryImages = post ? getGalleryImages(post) : [];
   const hasGallery = galleryImages.length > 0;
   const videoData = post ? getVideoUrl(post) : undefined;
+  const videoRef = useRef<HTMLVideoElement | null>(null);
   const hasVideo = Boolean(videoData);
+  useEffect(() => {
+    let hlsInstance: { destroy: () => void } | null = null;
+    const videoEl = videoRef.current;
+    if (!videoEl || !videoData) return;
+    if (videoData.kind !== 'hls') return;
+
+    const canNativePlay = videoEl.canPlayType('application/vnd.apple.mpegurl');
+    if (canNativePlay) {
+      videoEl.src = videoData.url;
+      return;
+    }
+
+    let isMounted = true;
+    (async () => {
+      try {
+        const hlsModule = await import('hls.js');
+        const Hls = hlsModule.default;
+        if (Hls?.isSupported && Hls.isSupported()) {
+          const instance = new Hls();
+          instance.loadSource(videoData.url);
+          instance.attachMedia(videoEl);
+          if (isMounted) {
+            hlsInstance = instance;
+          } else {
+            instance.destroy();
+          }
+        } else {
+          console.warn('HLS not supported and no fallback available.');
+        }
+      } catch (err) {
+        console.error('Failed to load hls.js for HLS playback', err);
+      }
+    })();
+
+    return () => {
+      isMounted = false;
+      if (hlsInstance) {
+        hlsInstance.destroy();
+      }
+    };
+  }, [videoData]);
   const previewSource = post?.preview?.images?.[0]?.source?.url
     ? sanitizeHttpUrl(post.preview.images[0].source.url)
     : undefined;
@@ -1625,12 +1672,17 @@ export default function RedditPostPage() {
               {videoData ? (
                 <div className="mb-4">
                   <video
+                    ref={videoRef}
                     controls
                     className="w-full max-h-[600px] rounded border border-[var(--color-border)]"
                     preload="metadata"
                     poster={posterUrl}
                   >
-                    <source src={videoData.url} type="video/mp4" />
+                    {videoData.kind === 'mp4' ? (
+                      <source src={videoData.url} type="video/mp4" />
+                    ) : (
+                      <source src={videoData.url} type="application/vnd.apple.mpegurl" />
+                    )}
                     Your browser does not support the video tag.
                   </video>
                   {!videoData.hasAudio && (
