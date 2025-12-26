@@ -123,7 +123,7 @@ func newTestDeps(t *testing.T) *TestDeps {
 	hubSubRepo := models.NewHubSubscriptionRepository(db.Pool)
 	hubsHandler := handlers.NewHubsHandler(hubRepo, postRepo, modRepo, hubSubRepo)
 	moderationHandler := handlers.NewModerationHandler(reportRepo, modRepo)
-	adminHandler := handlers.NewAdminHandler(userRepo)
+	adminHandler := handlers.NewAdminHandler(userRepo, modRepo, db.Pool)
 	wsHandler := handlers.NewWebSocketHandler(hub)
 
 	router := gin.New()
