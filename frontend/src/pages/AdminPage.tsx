@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { adminService } from '../services/adminService';
+import { hubsService } from '../services/hubsService';
 import type { AdminUser, SiteStats } from '../types/admin';
 
 type TabType = 'stats' | 'users' | 'moderators';
@@ -120,6 +121,11 @@ function UsersTab() {
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState<string>('');
   const [offset, setOffset] = useState(0);
+  const [modModalOpen, setModModalOpen] = useState(false);
+  const [modTargetUser, setModTargetUser] = useState<AdminUser | null>(null);
+  const [hubSearch, setHubSearch] = useState('');
+  const [hubInputFocused, setHubInputFocused] = useState(false);
+  const [hubError, setHubError] = useState('');
   const limit = 50;
 
   const { data, isLoading } = useQuery({
@@ -127,8 +133,20 @@ function UsersTab() {
     queryFn: () => adminService.listUsers(search, roleFilter, limit, offset),
   });
 
+  const { data: hubSuggestions = [], isFetching: isFetchingHubs } = useQuery({
+    queryKey: ['hubSearch', hubSearch],
+    enabled: hubSearch.trim().length > 0,
+    queryFn: () => hubsService.searchHubs(hubSearch.trim(), 15, 0),
+  });
+
+  const { data: trendingHubs = [] } = useQuery({
+    queryKey: ['hubTrending', modModalOpen],
+    enabled: modModalOpen,
+    queryFn: () => hubsService.getTrendingHubs(25),
+  });
+
   const updateRoleMutation = useMutation({
-    mutationFn: ({ userId, role }: { userId: number; role: 'user' | 'moderator' | 'admin' }) =>
+    mutationFn: ({ userId, role }: { userId: number; role: 'user' | 'admin' }) =>
       adminService.updateUserRole(userId, { role }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['adminUsers'] });
@@ -136,10 +154,55 @@ function UsersTab() {
     },
   });
 
-  const handleRoleChange = (userId: number, newRole: 'user' | 'moderator' | 'admin') => {
-    if (window.confirm(`Are you sure you want to change this user's role to "${newRole}"?`)) {
-      updateRoleMutation.mutate({ userId, role: newRole });
+  const addHubModeratorMutation = useMutation({
+    mutationFn: ({ hubName, userId }: { hubName: string; userId: number }) =>
+      adminService.addHubModerator(hubName, userId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['hubModerators'] });
+      queryClient.invalidateQueries({ queryKey: ['adminStats'] });
+      setModModalOpen(false);
+      setModTargetUser(null);
+      setHubSearch('');
+      setHubError('');
+    },
+    onError: (err: any) => {
+      setHubError(err?.response?.data?.error || 'Failed to add moderator');
+    },
+  });
+
+  const handleRoleChange = (user: AdminUser, newRole: 'user' | 'moderator' | 'admin') => {
+    if (newRole === 'moderator') {
+      setModTargetUser(user);
+      setHubSearch('');
+      setHubError('');
+      setModModalOpen(true);
+      return;
     }
+
+    if (window.confirm(`Are you sure you want to change this user's role to "${newRole}"?`)) {
+      updateRoleMutation.mutate({ userId: user.id, role: newRole as 'user' | 'admin' });
+    }
+  };
+
+  const matchingHub = (() => {
+    if (!hubSearch.trim()) return null;
+    const normalized = hubSearch.trim().toLowerCase().replace(/^h\//, '');
+    const pool = hubSearch.trim().length > 0 ? hubSuggestions : trendingHubs;
+    return pool.find((hub: any) => hub.name.toLowerCase() === normalized) || null;
+  })();
+
+  const filteredHubs =
+    hubSearch.trim().length > 0
+      ? hubSuggestions
+      : trendingHubs;
+
+  const confirmHubModerator = () => {
+    if (!modTargetUser) return;
+    if (!matchingHub) {
+      setHubError('Select a valid hub from the list');
+      return;
+    }
+    addHubModeratorMutation.mutate({ hubName: matchingHub.name, userId: modTargetUser.id });
   };
 
   return (
@@ -214,7 +277,7 @@ function UsersTab() {
                     <select
                       value={user.role}
                       onChange={(e) =>
-                        handleRoleChange(user.id, e.target.value as 'user' | 'moderator' | 'admin')
+                        handleRoleChange(user, e.target.value as 'user' | 'moderator' | 'admin')
                       }
                       className="px-3 py-1 text-sm border border-[var(--color-border)] rounded bg-[var(--color-surface)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
                     >
@@ -249,6 +312,97 @@ function UsersTab() {
             </button>
           </div>
         </>
+      )}
+
+      {modModalOpen && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-[var(--color-surface-elevated)] rounded-lg shadow-xl max-w-lg w-full mx-4 p-6">
+            <div className="flex justify-between items-start mb-4">
+              <div>
+                <h3 className="text-xl font-semibold">Assign hub moderator</h3>
+                {modTargetUser && (
+                  <p className="text-[var(--color-text-secondary)] mt-1">
+                    Choose a hub for <span className="font-medium">{modTargetUser.username}</span> to moderate.
+                  </p>
+                )}
+              </div>
+              <button
+                onClick={() => setModModalOpen(false)}
+                className="text-[var(--color-text-secondary)] hover:text-[var(--color-text)]"
+                aria-label="Close"
+              >
+                X
+              </button>
+            </div>
+
+            <label className="block text-sm font-medium mb-2" htmlFor="hubSearch">
+              Hub name
+            </label>
+            <div className="relative">
+              <input
+                id="hubSearch"
+                value={hubSearch}
+                onChange={(e) => {
+                  setHubSearch(e.target.value);
+                  setHubError('');
+                }}
+                onFocus={() => setHubInputFocused(true)}
+                onBlur={() => {
+                  setTimeout(() => setHubInputFocused(false), 120);
+                }}
+                placeholder="Start typing a hub name..."
+                className="w-full px-4 py-2 border border-[var(--color-border)] rounded-lg bg-[var(--color-surface)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+              />
+              {hubInputFocused && (
+                <div className="absolute z-20 left-0 right-0 mt-1 border border-[var(--color-border)] rounded-lg max-h-56 overflow-y-auto bg-[var(--color-surface)] shadow">
+                  {isFetchingHubs && hubSearch.trim().length > 0 && (
+                    <div className="px-4 py-2 text-sm text-[var(--color-text-secondary)]">Searching...</div>
+                  )}
+                  {!isFetchingHubs && filteredHubs.length === 0 && (
+                    <div className="px-4 py-2 text-sm text-[var(--color-text-secondary)]">No hubs found</div>
+                  )}
+                  {filteredHubs.map((hub: any) => (
+                    <button
+                      key={hub.id}
+                      type="button"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => {
+                        setHubSearch(hub.name);
+                        setHubError('');
+                      }}
+                      className="w-full text-left px-4 py-2 hover:bg-[var(--color-surface-hover)]"
+                    >
+                      <div className="font-medium">{hub.name}</div>
+                      {hub.title && (
+                        <div className="text-xs text-[var(--color-text-secondary)] truncate">{hub.title}</div>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            {hubError && <div className="text-red-600 text-sm mt-2">{hubError}</div>}
+
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                onClick={() => {
+                  setModModalOpen(false);
+                  setHubError('');
+                }}
+                className="px-4 py-2 rounded border border-[var(--color-border)] bg-[var(--color-surface-elevated)] hover:bg-[var(--color-surface-hover)]"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmHubModerator}
+                disabled={addHubModeratorMutation.isPending}
+                className="px-4 py-2 rounded bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-strong)] disabled:opacity-50"
+              >
+                {addHubModeratorMutation.isPending ? 'Assigning...' : 'Assign moderator'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

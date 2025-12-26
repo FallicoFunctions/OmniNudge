@@ -34,5 +34,5 @@ export interface HubModerator {
 }
 
 export interface UpdateRoleRequest {
-  role: 'user' | 'moderator' | 'admin';
+  role: 'user' | 'admin';
 }
