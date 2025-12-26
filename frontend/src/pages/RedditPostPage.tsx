@@ -159,16 +159,15 @@ function getVideoUrl(post: RedditPostData): VideoSource | undefined {
   const videoData = post.secure_media?.reddit_video || post.media?.reddit_video;
   if (!videoData) return undefined;
 
-  if (videoData.fallback_url) {
-    // Prefer MP4 fallback when available (better cross-browser support)
-    return { url: videoData.fallback_url, hasAudio: Boolean(videoData.has_audio ?? true), kind: 'mp4' };
-  }
-  // HLS and DASH URLs might have audio
   if (videoData.hls_url) {
     return { url: videoData.hls_url, hasAudio: true, kind: 'hls' };
   }
   if (videoData.dash_url) {
     return { url: videoData.dash_url, hasAudio: true, kind: 'dash' };
+  }
+  if (videoData.fallback_url) {
+    // MP4 fallback for browsers that need it
+    return { url: videoData.fallback_url, hasAudio: Boolean(videoData.has_audio ?? true), kind: 'mp4' };
   }
 
   return undefined;
@@ -1678,10 +1677,8 @@ export default function RedditPostPage() {
                     preload="metadata"
                     poster={posterUrl}
                   >
-                    {videoData.kind === 'mp4' ? (
+                    {videoData.kind === 'mp4' && (
                       <source src={videoData.url} type="video/mp4" />
-                    ) : (
-                      <source src={videoData.url} type="application/vnd.apple.mpegurl" />
                     )}
                     Your browser does not support the video tag.
                   </video>
