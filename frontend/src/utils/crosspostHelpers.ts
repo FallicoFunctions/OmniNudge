@@ -25,6 +25,7 @@ export interface RedditCrosspostSource {
       hls_url?: string;
       height?: number;
       width?: number;
+      has_audio?: boolean;
     };
     oembed?: {
       thumbnail_url?: string;
@@ -39,6 +40,7 @@ export interface RedditCrosspostSource {
       hls_url?: string;
       height?: number;
       width?: number;
+      has_audio?: boolean;
     };
     oembed?: {
       thumbnail_url?: string;

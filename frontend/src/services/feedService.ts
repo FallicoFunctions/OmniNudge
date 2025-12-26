@@ -41,6 +41,36 @@ export interface RedditPost {
       }>;
     }>;
   };
+  media?: {
+    reddit_video?: {
+      fallback_url?: string;
+      dash_url?: string;
+      hls_url?: string;
+      height?: number;
+      width?: number;
+      has_audio?: boolean;
+    };
+    oembed?: {
+      thumbnail_url?: string;
+      thumbnail_width?: number;
+      thumbnail_height?: number;
+    };
+  };
+  secure_media?: {
+    reddit_video?: {
+      fallback_url?: string;
+      dash_url?: string;
+      hls_url?: string;
+      height?: number;
+      width?: number;
+      has_audio?: boolean;
+    };
+    oembed?: {
+      thumbnail_url?: string;
+      thumbnail_width?: number;
+      thumbnail_height?: number;
+    };
+  };
 }
 
 export interface CombinedFeedItem {

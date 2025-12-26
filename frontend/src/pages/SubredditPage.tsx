@@ -837,23 +837,7 @@ export default function RedditPage() {
       return (post.post.score ?? 0) * 1_000_000 + recency;
     };
 
-    // In infinite scroll mode: DON'T mix Omni and Reddit posts
-    // Just show one or the other based on showOmniOnly toggle
-    if (useInfiniteScroll) {
-      if (showOmniOnly) {
-        // Show only Omni posts, sorted
-        const localPosts: CrosspostSource[] = visibleLocalPosts.map((post) => ({
-          type: 'platform' as const,
-          post
-        }));
-        return [...localPosts].sort((a, b) => getSortValue(b) - getSortValue(a));
-      }
-
-      // Show only Reddit posts (already sorted by API)
-      return visiblePosts.map((post) => ({ type: 'reddit' as const, post }));
-    }
-
-    // For pagination mode, mix and sort all posts together
+    // Combine ALL posts (Reddit + Omni) and sort by actual criteria
     const allPosts: CrosspostSource[] = [
       ...visiblePosts.map((post) => ({ type: 'reddit' as const, post })),
       ...visibleLocalPosts.map((post) => ({ type: 'platform' as const, post })),
@@ -866,7 +850,8 @@ export default function RedditPage() {
     // Create a new array before sorting to avoid mutation
     const sorted = [...filteredPosts].sort((a, b) => getSortValue(b) - getSortValue(a));
 
-    if (currentPageSize) {
+    // In pagination mode, limit to current page size
+    if (!useInfiniteScroll && currentPageSize) {
       return sorted.slice(0, currentPageSize);
     }
 
