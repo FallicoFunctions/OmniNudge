@@ -498,7 +498,7 @@ export function RedditPostCard({
                 </Link>
                 <span>•</span>
                 <Link
-                  to={`/reddit/user/${post.author}`}
+                  to={`/user/${post.author}`}
                   className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
                 >
                   u/{post.author}
