@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { formatTimestamp } from '../../utils/timeFormat';
 import { FlairBadge } from './FlairBadge';
@@ -255,6 +255,8 @@ type InlineMedia =
   | { kind: 'video'; src: string }
   | { kind: 'audio'; src: string; title?: string };
 
+type RedditVideoSource = { url: string; kind: 'mp4' | 'hls'; hasAudio: boolean };
+
 function getInlineMedia(url?: string | null): InlineMedia | null {
   const sanitizedUrl = sanitizeHttpUrl(url);
   const redgifsId = getRedgifsId(sanitizedUrl);
@@ -356,6 +358,21 @@ function getInlineMedia(url?: string | null): InlineMedia | null {
   return null;
 }
 
+function getRedditVideoSource(post: RedditPostCardProps['post']): RedditVideoSource | null {
+  const video = post.secure_media?.reddit_video || post.media?.reddit_video;
+  if (!video) return null;
+
+  if (video.fallback_url) {
+    return { url: video.fallback_url, hasAudio: Boolean(video.has_audio ?? true), kind: 'mp4' };
+  }
+
+  if (video.hls_url) {
+    return { url: video.hls_url, hasAudio: true, kind: 'hls' };
+  }
+
+  return null;
+}
+
 export function RedditPostCard({
   post,
   useRelativeTime,
@@ -388,8 +405,52 @@ export function RedditPostCard({
   const commentLabel = `${post.num_comments.toLocaleString()} Comments`;
   const previewImageUrl = getExpandableImageUrl(post);
   const inlineMedia = getInlineMedia(sanitizedExternalUrl);
-  const hasInlineMedia = Boolean(previewImageUrl || inlineMedia);
+  const redditVideoSource = getRedditVideoSource(post);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const hasInlineMedia = Boolean(previewImageUrl || inlineMedia || redditVideoSource);
   const isInlinePreviewOpen = !!(hasInlineMedia && expandedImageMap[post.id]);
+
+  useEffect(() => {
+    if (!redditVideoSource || redditVideoSource.kind !== 'hls') return;
+    const videoEl = videoRef.current;
+    if (!videoEl) return;
+
+    const canNativePlay = videoEl.canPlayType('application/vnd.apple.mpegurl');
+    if (canNativePlay) {
+      videoEl.src = redditVideoSource.url;
+      return;
+    }
+
+    let hlsInstance: { destroy: () => void } | null = null;
+    let mounted = true;
+    (async () => {
+      try {
+        const hlsModule = await import('hls.js');
+        const Hls = hlsModule.default;
+        if (Hls?.isSupported && Hls.isSupported()) {
+          const instance = new Hls();
+          instance.loadSource(redditVideoSource.url);
+          instance.attachMedia(videoEl);
+          if (mounted) {
+            hlsInstance = instance;
+          } else {
+            instance.destroy();
+          }
+        } else {
+          console.warn('HLS not supported and no fallback available.');
+        }
+      } catch (err) {
+        console.error('Failed to load hls.js for HLS playback', err);
+      }
+    })();
+
+    return () => {
+      mounted = false;
+      if (hlsInstance) {
+        hlsInstance.destroy();
+      }
+    };
+  }, [redditVideoSource]);
 
   return (
     <article className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)]">
@@ -508,9 +569,32 @@ export function RedditPostCard({
                 <span>•</span>
                 <span>submitted {formatTimestamp(post.created_utc, useRelativeTime)}</span>
               </div>
-              {expandedImageMap[post.id] && (previewImageUrl || inlineMedia) && (
+              {expandedImageMap[post.id] && (previewImageUrl || inlineMedia || redditVideoSource) && (
                 <div className="mt-3 overflow-hidden rounded border border-[var(--color-border)] bg-[var(--color-surface-elevated)]">
-                  {inlineMedia?.kind === 'redgifs' ? (
+                  {redditVideoSource ? (
+                    <div className="relative w-full bg-black">
+                      <video
+                        ref={videoRef}
+                        controls
+                        className="max-h-[70vh] w-full bg-black"
+                        playsInline
+                        preload="metadata"
+                      >
+                        {redditVideoSource.kind === 'mp4' && (
+                          <source src={redditVideoSource.url} type="video/mp4" />
+                        )}
+                        {redditVideoSource.kind === 'hls' && (
+                          <source src={redditVideoSource.url} type="application/vnd.apple.mpegurl" />
+                        )}
+                        Your browser does not support the video tag.
+                      </video>
+                      {!redditVideoSource.hasAudio && (
+                        <div className="p-2 text-xs text-[var(--color-text-secondary)]">
+                          Note: This video may not have audio.
+                        </div>
+                      )}
+                    </div>
+                  ) : inlineMedia?.kind === 'redgifs' ? (
                     <div className="relative w-full bg-black">
                       <iframe
                         title={`${post.title} - Redgifs video`}
