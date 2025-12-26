@@ -54,11 +54,19 @@ export default function SearchResultsPage() {
     hubs: any[];
     hubsOffset: number;
     hasMoreHubs: boolean;
+    subredditsAfter: string | null;
+    hasMoreSubreddits: boolean;
+    subredditsAfterStack: (string | null)[];
+    page: number;
   }>({
     subreddits: [],
     hubs: [],
     hubsOffset: 0,
     hasMoreHubs: false,
+    subredditsAfter: null,
+    hasMoreSubreddits: false,
+    subredditsAfterStack: [null],
+    page: 1,
   });
   const [users, setUsers] = useState<{
     reddit: any[];
@@ -78,16 +86,29 @@ export default function SearchResultsPage() {
 
   const handleSearch = async (
     q: string,
-    opts?: { tab?: Tab; sort?: SortOrder; page?: number }
+    opts?: { tab?: Tab; sort?: SortOrder; page?: number; append?: boolean }
   ) => {
     if (!q.trim()) return;
     setIsLoading(true);
     try {
-      const targetPage = opts?.page ?? posts.page;
+      const tabTarget = opts?.tab ?? activeTab;
+      const targetPage =
+        opts?.page ??
+        (tabTarget === 'communities' ? 1 : posts.page);
+
       const redditAfter =
         targetPage > 1 ? posts.redditAfterStack[targetPage - 2] ?? null : null;
-      const platformOffset = (targetPage - 1) * 25;
-      const hubsOffset = communities.hubsOffset && targetPage > 1 ? (targetPage - 1) * 25 : 0;
+      const platformOffset = (tabTarget === 'posts' ? targetPage : posts.page) > 1 ? (targetPage - 1) * 25 : 0;
+      const hubsOffset =
+        tabTarget === 'communities'
+          ? (targetPage - 1) * 25
+          : communities.hubsOffset && targetPage > 1
+          ? (targetPage - 1) * 25
+          : 0;
+      const subredditsAfter =
+        tabTarget === 'communities' && targetPage > 1
+          ? communities.subredditsAfterStack[targetPage - 2] ?? null
+          : null;
       const omniOffset = users.omniOffset && targetPage > 1 ? (targetPage - 1) * 25 : 0;
 
       const res = await siteWideSearch(q, includeNsfw, {
@@ -95,6 +116,7 @@ export default function SearchResultsPage() {
         redditAfter,
         platformOffset,
         hubsOffset,
+        subredditsAfter,
         omniUsersOffset: omniOffset,
       });
 
@@ -110,11 +132,21 @@ export default function SearchResultsPage() {
         hasMorePlatform: (res.posts.platform?.length ?? 0) >= 25,
         page: targetPage,
       });
+      const nextSubredditAfterStack = [...communities.subredditsAfterStack];
+      nextSubredditAfterStack[targetPage - 1] = res.subredditsAfter ?? null;
       setCommunities({
-        subreddits: res.subreddits ?? [],
-        hubs: res.hubs ?? [],
+        subreddits: opts?.append || tabTarget === 'communities'
+          ? [...(opts?.append ? communities.subreddits : []), ...(res.subreddits ?? [])]
+          : res.subreddits ?? [],
+        hubs: opts?.append || tabTarget === 'communities'
+          ? [...(opts?.append ? communities.hubs : []), ...(res.hubs ?? [])]
+          : res.hubs ?? [],
         hubsOffset: res.hubsOffset ?? 0,
         hasMoreHubs: (res.hubs?.length ?? 0) >= 25,
+        subredditsAfter: res.subredditsAfter ?? null,
+        hasMoreSubreddits: Boolean(res.subredditsAfter),
+        subredditsAfterStack: nextSubredditAfterStack,
+        page: tabTarget === 'communities' ? targetPage : communities.page,
       });
       setUsers({
         reddit: res.users.reddit ?? [],
@@ -227,6 +259,11 @@ export default function SearchResultsPage() {
             }`}
             onClick={() => {
               setActiveTab('communities');
+              setCommunities((prev) => ({
+                ...prev,
+                page: 1,
+                subredditsAfterStack: [null],
+              }));
               handleSearch(query, { tab: 'communities' });
             }}
           >
@@ -425,6 +462,40 @@ export default function SearchResultsPage() {
 
       {!isLoading && activeTab === 'communities' && (
         <div className="grid gap-4 md:grid-cols-2">
+            <div className="md:col-span-2 flex items-center justify-between bg-[var(--color-surface-elevated)] rounded-md border border-[var(--color-border)] px-3 py-2">
+              <button
+                type="button"
+                disabled={communities.page <= 1 || isLoading}
+                onClick={() =>
+                handleSearch(query, {
+                  tab: 'communities',
+                  sort,
+                  page: Math.max(1, communities.page - 1),
+                })
+              }
+              className="rounded bg-[var(--color-surface-elevated)] px-3 py-2 text-sm font-medium text-[var(--color-text-primary)] border border-[var(--color-border)] disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[var(--color-surface-hover)]"
+              >
+                ← Previous
+              </button>
+              <div className="text-sm text-[var(--color-text-secondary)]">
+                Page {communities.page}
+              </div>
+              <button
+                type="button"
+                disabled={isLoading || !(communities.hasMoreHubs || communities.hasMoreSubreddits)}
+                onClick={() =>
+                  handleSearch(query, {
+                    tab: 'communities',
+                    sort,
+                    page: communities.page + 1,
+                  })
+                }
+                className="rounded bg-[var(--color-primary)] px-3 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Next →
+              </button>
+          </div>
+
           <div>
             <h3 className="text-sm font-semibold text-[var(--color-text-primary)]">Subreddits</h3>
             {filteredSubreddits.length === 0 ? (
@@ -476,19 +547,6 @@ export default function SearchResultsPage() {
                   </li>
                 ))}
               </ul>
-            )}
-            {communities.hasMoreHubs && (
-              <div className="pt-2">
-                <button
-                  type="button"
-                  onClick={() =>
-                    handleSearch(query, { append: true, tab: 'communities', sort })
-                  }
-                  className="rounded bg-[var(--color-primary)] px-3 py-2 text-sm font-medium text-white hover:opacity-90"
-                >
-                  Load more hubs
-                </button>
-              </div>
             )}
           </div>
         </div>

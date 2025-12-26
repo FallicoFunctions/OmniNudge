@@ -11,6 +11,7 @@ export interface LocalRedditComment extends LocalCommentBase {
 export interface SubredditSuggestion {
   name: string;
   title?: string;
+  description?: string;
   subscribers?: number;
   icon_url?: string;
   over_18?: boolean;
