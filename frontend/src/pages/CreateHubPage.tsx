@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { hubsService, type CreateHubRequest } from '../services/hubsService';
 
 export default function CreateHubPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [name, setName] = useState('');
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -211,7 +212,14 @@ export default function CreateHubPage() {
           </button>
           <button
             type="button"
-            onClick={() => navigate(-1)}
+            onClick={() => {
+              const state = location.state as { returnTo?: string } | null;
+              if (state?.returnTo) {
+                navigate(state.returnTo);
+              } else {
+                navigate(-1);
+              }
+            }}
             className="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
           >
             Cancel

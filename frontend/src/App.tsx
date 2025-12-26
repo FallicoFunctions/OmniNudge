@@ -5,8 +5,6 @@ import { RedditBlockProvider } from './contexts/RedditBlockContext';
 import { MessagingProvider } from './contexts/MessagingContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import MainLayout from './layouts/MainLayout';
-import LoginPage from './pages/LoginPage';
-import RegisterPage from './pages/RegisterPage';
 import HomePage from './pages/HomePage';
 import ThemesPage from './pages/ThemesPage';
 import SubredditPage from './pages/SubredditPage';
@@ -32,10 +30,6 @@ function App() {
           <RedditBlockProvider>
             <MessagingProvider>
               <Routes>
-                {/* Auth routes - no layout */}
-                <Route path="/login" element={<LoginPage />} />
-                <Route path="/register" element={<RegisterPage />} />
-
                 {/* Main layout for public + protected pages */}
                 <Route element={<MainLayout />}>
                   {/* PUBLIC routes - accessible without auth */}
