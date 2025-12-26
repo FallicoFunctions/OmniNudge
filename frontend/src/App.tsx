@@ -21,6 +21,7 @@ import PostDetailPage from './pages/PostDetailPage';
 import MessagesPage from './pages/MessagesPage';
 import SettingsPage from './pages/SettingsPage';
 import ModToolsPage from './pages/ModToolsPage';
+import AdminPage from './pages/AdminPage';
 import NotFoundPage from './pages/NotFoundPage';
 import './App.css';
 
@@ -110,6 +111,14 @@ function App() {
                     element={
                       <ProtectedRoute>
                         <ThemesPage />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/admin"
+                    element={
+                      <ProtectedRoute>
+                        <AdminPage />
                       </ProtectedRoute>
                     }
                   />

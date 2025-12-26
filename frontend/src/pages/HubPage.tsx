@@ -143,9 +143,13 @@ export default function HubsPage() {
     staleTime: 1000 * 60 * 5,
   });
 
-  // Check if current user is a moderator of this hub
+  // Check if current user is a moderator of this hub (or admin)
   const isModerator = useMemo(() => {
-    if (!user || !hubDetails?.moderators) return false;
+    if (!user) return false;
+    // Admins have mod powers on all hubs
+    if (user.role === 'admin') return true;
+    // Check if user is listed as a moderator
+    if (!hubDetails?.moderators) return false;
     return hubDetails.moderators.some((mod) => mod.id === user.id);
   }, [user, hubDetails?.moderators]);
 

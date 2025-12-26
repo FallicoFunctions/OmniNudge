@@ -187,6 +187,14 @@ export default function MainLayout() {
                   >
                     Settings
                   </Link>
+                  {user.role === 'admin' && (
+                    <Link
+                      to="/admin"
+                      className="rounded-md bg-red-600 px-3 py-2 text-sm font-medium text-white hover:bg-red-700"
+                    >
+                      Admin
+                    </Link>
+                  )}
                   <button
                     onClick={handleLogout}
                     className="rounded-md bg-[var(--color-surface-elevated)] px-3 py-2 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-border)]"
