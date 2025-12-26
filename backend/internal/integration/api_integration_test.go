@@ -67,17 +67,17 @@ func TestHubCreation(t *testing.T) {
 	require.Equal(t, http.StatusCreated, w.Code)
 }
 
-func TestHubCreationAsModeratorAllowed(t *testing.T) {
+func TestHubCreationAsAdminAllowed(t *testing.T) {
 	deps := newTestDeps(t)
 	defer deps.DB.Close()
 
-	mod := createUser(t, deps.UserRepo, "moduser", "moderator")
-	modToken, _ := deps.AuthService.GenerateJWT(mod.ID, "", mod.Username, mod.Role)
+	admin := createUser(t, deps.UserRepo, "adminuser", "admin")
+	adminToken, _ := deps.AuthService.GenerateJWT(admin.ID, "", admin.Username, admin.Role)
 
 	body := []byte(`{"name":"dogs","description":"all dogs"}`)
 	req, _ := http.NewRequest("POST", "/api/v1/hubs", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+modToken)
+	req.Header.Set("Authorization", "Bearer "+adminToken)
 	w := doRequest(t, deps.Router, req)
 	require.Equal(t, http.StatusCreated, w.Code)
 }
@@ -178,20 +178,12 @@ func TestAdminPromotionAndAddModerator(t *testing.T) {
 	user := createUser(t, deps.UserRepo, "target", "user")
 	adminToken, _ := deps.AuthService.GenerateJWT(admin.ID, "", admin.Username, admin.Role)
 
-	// Promote user to moderator
-	body := []byte(`{"role":"moderator"}`)
-	req, _ := http.NewRequest("POST", "/api/v1/admin/users/"+fmt.Sprint(user.ID)+"/role", bytes.NewReader(body))
+	// Add as hub moderator
+	modBody := []byte(`{"user_id":` + fmt.Sprint(user.ID) + `}`)
+	req, _ := http.NewRequest("POST", "/api/v1/admin/hubs/general/moderators", bytes.NewReader(modBody))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+adminToken)
 	w := doRequest(t, deps.Router, req)
-	require.Equal(t, http.StatusOK, w.Code)
-
-	// Add as hub moderator
-	modBody := []byte(`{"user_id":` + fmt.Sprint(user.ID) + `}`)
-	req, _ = http.NewRequest("POST", "/api/v1/admin/hubs/general/moderators", bytes.NewReader(modBody))
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+adminToken)
-	w = doRequest(t, deps.Router, req)
 	require.Equal(t, http.StatusCreated, w.Code)
 	ok, err := deps.ModRepo.IsModerator(context.Background(), 1, user.ID)
 	require.NoError(t, err)
