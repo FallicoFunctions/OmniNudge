@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"net/http"
 	"strconv"
 	"time"
@@ -65,6 +66,58 @@ type ParticipantInfo struct {
 	Username    string  `json:"username"`
 	AvatarURL   *string `json:"avatar_url,omitempty"`
 	IsModerator bool    `json:"is_moderator"`
+}
+
+// Helper methods
+
+// fetchParticipants retrieves all participants for a conversation
+func (h *ModMailHandler) fetchParticipants(ctx context.Context, conversationID int) ([]ParticipantInfo, error) {
+	participants := []ParticipantInfo{}
+
+	partRows, err := h.pool.Query(ctx, `
+		SELECT cp.user_id, u.username, u.avatar_url, cp.is_moderator
+		FROM conversation_participants cp
+		JOIN users u ON cp.user_id = u.id
+		WHERE cp.conversation_id = $1
+	`, conversationID)
+	if err != nil {
+		return nil, err
+	}
+	defer partRows.Close()
+
+	for partRows.Next() {
+		var p ParticipantInfo
+		if err := partRows.Scan(&p.UserID, &p.Username, &p.AvatarURL, &p.IsModerator); err != nil {
+			return nil, err
+		}
+		participants = append(participants, p)
+	}
+
+	return participants, nil
+}
+
+// enrichConversationDetails adds participants, latest message, and unread count to a conversation
+func (h *ModMailHandler) enrichConversationDetails(ctx context.Context, conv *ModMailConversationDetails, userID int) error {
+	// Fetch participants
+	participants, err := h.fetchParticipants(ctx, conv.ID)
+	if err != nil {
+		return err
+	}
+	conv.Participants = participants
+
+	// Get latest message
+	latestMsg, err := h.messageRepo.GetLatestMessage(ctx, conv.ID)
+	if err == nil && latestMsg != nil {
+		conv.LatestMessage = latestMsg
+	}
+
+	// Get unread count
+	unreadCount, err := h.messageRepo.GetUnreadCount(ctx, conv.ID, userID)
+	if err == nil {
+		conv.UnreadCount = unreadCount
+	}
+
+	return nil
 }
 
 // CreateModMail handles POST /api/v1/mod-mail
@@ -250,40 +303,11 @@ func (h *ModMailHandler) GetModMailForHub(c *gin.Context) {
 			return
 		}
 		conv.HubName = hubName
-		conv.Participants = []ParticipantInfo{} // Initialize empty slice
 
-		// Get participants
-		partRows, err := h.pool.Query(c.Request.Context(), `
-			SELECT cp.user_id, u.username, u.avatar_url, cp.is_moderator
-			FROM conversation_participants cp
-			JOIN users u ON cp.user_id = u.id
-			WHERE cp.conversation_id = $1
-		`, conv.ID)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to query participants", "details": err.Error()})
+		// Enrich conversation with participants, latest message, and unread count
+		if err := h.enrichConversationDetails(c.Request.Context(), &conv, userID.(int)); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to enrich conversation", "details": err.Error()})
 			return
-		}
-		for partRows.Next() {
-			var p ParticipantInfo
-			if err := partRows.Scan(&p.UserID, &p.Username, &p.AvatarURL, &p.IsModerator); err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to scan participant", "details": err.Error()})
-				partRows.Close()
-				return
-			}
-			conv.Participants = append(conv.Participants, p)
-		}
-		partRows.Close()
-
-		// Get latest message
-		latestMsg, err := h.messageRepo.GetLatestMessage(c.Request.Context(), conv.ID)
-		if err == nil && latestMsg != nil {
-			conv.LatestMessage = latestMsg
-		}
-
-		// Get unread count for this moderator
-		unreadCount, err := h.messageRepo.GetUnreadCount(c.Request.Context(), conv.ID, userID.(int))
-		if err == nil {
-			conv.UnreadCount = unreadCount
 		}
 
 		conversations = append(conversations, conv)
@@ -333,16 +357,10 @@ func (h *ModMailHandler) GetUserModMail(c *gin.Context) {
 			return
 		}
 
-		// Get latest message
-		latestMsg, err := h.messageRepo.GetLatestMessage(c.Request.Context(), conv.ID)
-		if err == nil && latestMsg != nil {
-			conv.LatestMessage = latestMsg
-		}
-
-		// Get unread count
-		unreadCount, err := h.messageRepo.GetUnreadCount(c.Request.Context(), conv.ID, userID.(int))
-		if err == nil {
-			conv.UnreadCount = unreadCount
+		// Enrich conversation with participants, latest message, and unread count
+		if err := h.enrichConversationDetails(c.Request.Context(), &conv, userID.(int)); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to enrich conversation", "details": err.Error()})
+			return
 		}
 
 		conversations = append(conversations, conv)
