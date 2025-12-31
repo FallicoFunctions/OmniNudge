@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { moderationService } from '../services/moderationService';
+import { modMailService } from '../services/modMailService';
 import type {
   HubBan,
   CreateBanRequest,
@@ -9,8 +10,9 @@ import type {
   CreateRemovalReasonRequest,
   ModLog,
 } from '../types/moderation';
+import type { ModMailConversation } from '../types/modmail';
 
-type TabType = 'bans' | 'removal_reasons' | 'mod_log';
+type TabType = 'bans' | 'removal_reasons' | 'mod_log' | 'mod_mail';
 
 export default function ModToolsPage() {
   const { hubName } = useParams<{ hubName: string }>();
@@ -64,6 +66,16 @@ export default function ModToolsPage() {
           >
             Mod Log
           </button>
+          <button
+            onClick={() => setActiveTab('mod_mail')}
+            className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+              activeTab === 'mod_mail'
+                ? 'border-[var(--color-primary)] text-[var(--color-primary)]'
+                : 'border-transparent text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:border-gray-300'
+            }`}
+          >
+            Mod Mail
+          </button>
         </nav>
       </div>
 
@@ -71,6 +83,7 @@ export default function ModToolsPage() {
       {activeTab === 'bans' && <BansTab hubName={hubName} />}
       {activeTab === 'removal_reasons' && <RemovalReasonsTab hubName={hubName} />}
       {activeTab === 'mod_log' && <ModLogTab hubName={hubName} />}
+      {activeTab === 'mod_mail' && <ModMailTab hubName={hubName} />}
     </div>
   );
 }
@@ -576,4 +589,133 @@ function getActionDescription(log: ModLog): string {
   }
 
   return description;
+}
+
+// ===== MOD MAIL TAB =====
+
+function ModMailTab({ hubName }: { hubName: string }) {
+  const queryClient = useQueryClient();
+  const navigate = useNavigate();
+  const [statusFilter, setStatusFilter] = useState<'open' | 'archived' | 'resolved' | 'all'>('open');
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['modMail', hubName, statusFilter],
+    queryFn: () => modMailService.getHubModMail(hubName, statusFilter),
+  });
+
+  const updateStatusMutation = useMutation({
+    mutationFn: ({ conversationId, status }: { conversationId: number; status: 'open' | 'archived' | 'resolved' }) =>
+      modMailService.updateStatus(conversationId, { status }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['modMail', hubName] });
+    },
+  });
+
+  if (isLoading) {
+    return <div className="text-center py-8">Loading mod mail...</div>;
+  }
+
+  const conversations = data?.conversations || [];
+
+  return (
+    <div>
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="text-xl font-semibold">Mod Mail</h2>
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value as 'open' | 'archived' | 'resolved' | 'all')}
+          className="px-3 py-2 border border-[var(--color-border)] rounded bg-[var(--color-surface)] text-sm"
+        >
+          <option value="open">Open</option>
+          <option value="archived">Archived</option>
+          <option value="resolved">Resolved</option>
+          <option value="all">All</option>
+        </select>
+      </div>
+
+      {conversations.length === 0 && (
+        <div className="text-center py-12 text-[var(--color-text-secondary)]">
+          No {statusFilter !== 'all' ? statusFilter : ''} mod mail conversations
+        </div>
+      )}
+
+      <div className="space-y-3">
+        {conversations.map((conv: ModMailConversation) => (
+          <div
+            key={conv.id}
+            className="p-4 border border-[var(--color-border)] rounded-lg bg-[var(--color-surface-elevated)]"
+          >
+            <div className="flex justify-between items-start">
+              <div className="flex-1">
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => navigate(`/messages?conversation=${conv.id}`)}
+                    className="text-lg font-medium hover:text-[var(--color-primary)]"
+                  >
+                    {conv.subject}
+                  </button>
+                  <span
+                    className={`px-2 py-0.5 text-xs rounded ${
+                      conv.status === 'open'
+                        ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                        : conv.status === 'resolved'
+                        ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
+                        : 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200'
+                    }`}
+                  >
+                    {conv.status}
+                  </span>
+                  {conv.unread_count > 0 && (
+                    <span className="px-2 py-0.5 text-xs bg-red-500 text-white rounded-full">
+                      {conv.unread_count} new
+                    </span>
+                  )}
+                </div>
+                <div className="text-sm text-[var(--color-text-secondary)] mt-1">
+                  <span>From: {conv.participants.find((p) => !p.is_moderator)?.username || 'Unknown'}</span>
+                  <span className="mx-2">•</span>
+                  <span>{new Date(conv.created_at).toLocaleDateString()}</span>
+                  {conv.latest_message && (
+                    <>
+                      <span className="mx-2">•</span>
+                      <span>Last reply: {new Date(conv.latest_message.sent_at).toLocaleString()}</span>
+                    </>
+                  )}
+                </div>
+              </div>
+              <div className="ml-4 flex gap-2">
+                {conv.status === 'open' && (
+                  <>
+                    <button
+                      onClick={() => updateStatusMutation.mutate({ conversationId: conv.id, status: 'resolved' })}
+                      className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
+                      disabled={updateStatusMutation.isPending}
+                    >
+                      Resolve
+                    </button>
+                    <button
+                      onClick={() => updateStatusMutation.mutate({ conversationId: conv.id, status: 'archived' })}
+                      className="px-3 py-1 text-sm bg-gray-600 text-white rounded hover:bg-gray-700"
+                      disabled={updateStatusMutation.isPending}
+                    >
+                      Archive
+                    </button>
+                  </>
+                )}
+                {conv.status !== 'open' && (
+                  <button
+                    onClick={() => updateStatusMutation.mutate({ conversationId: conv.id, status: 'open' })}
+                    className="px-3 py-1 text-sm bg-green-600 text-white rounded hover:bg-green-700"
+                    disabled={updateStatusMutation.isPending}
+                  >
+                    Reopen
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 }
