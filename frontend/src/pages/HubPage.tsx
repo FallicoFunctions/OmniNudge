@@ -19,6 +19,7 @@ import { HubPostCard } from '../components/hubs/HubPostCard';
 import type { PlatformPost } from '../types/posts';
 import { TOP_TIME_OPTIONS } from '../constants/topTimeRange';
 import type { TopTimeRange } from '../constants/topTimeRange';
+import { ModMailModal } from '../components/modmail/ModMailModal';
 
 const EMPTY_POSTS: LocalSubredditPost[] = [];
 
@@ -38,6 +39,7 @@ export default function HubsPage() {
   const [selectedHub, setSelectedHub] = useState('');
   const [selectedSubreddit, setSelectedSubreddit] = useState('');
   const [sendRepliesToInbox, setSendRepliesToInbox] = useState(true);
+  const [showModMailModal, setShowModMailModal] = useState(false);
   const convertInputToISO = (value: string) => {
     if (!value) {
       return undefined;
@@ -606,6 +608,15 @@ export default function HubsPage() {
                   No moderators listed yet.
                 </p>
               )}
+              {/* Message the Mods button */}
+              {user && hubname !== 'popular' && hubname !== 'all' && (
+                <button
+                  onClick={() => setShowModMailModal(true)}
+                  className="mt-4 w-full px-4 py-2 text-sm font-medium text-[var(--color-primary)] border border-[var(--color-primary)] rounded-lg hover:bg-[var(--color-primary)] hover:text-white transition-colors"
+                >
+                  Message the Mods
+                </button>
+              )}
             </div>
           </aside>
         )}
@@ -712,6 +723,11 @@ export default function HubsPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Mod Mail Modal */}
+      {showModMailModal && hubname && (
+        <ModMailModal hubName={hubname} onClose={() => setShowModMailModal(false)} />
       )}
     </div>
   );
