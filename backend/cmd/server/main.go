@@ -15,6 +15,7 @@ import (
 	"github.com/omninudge/backend/internal/database"
 	"github.com/omninudge/backend/internal/handlers"
 	"github.com/omninudge/backend/internal/models"
+	"github.com/omninudge/backend/internal/repository"
 	"github.com/omninudge/backend/internal/services"
 	"github.com/omninudge/backend/internal/utils"
 	"github.com/omninudge/backend/internal/websocket"
@@ -84,6 +85,10 @@ func main() {
 	removalReasonRepo := models.NewRemovalReasonRepository(db.Pool)
 	removedContentRepo := models.NewRemovedContentRepository(db.Pool)
 	modLogRepo := models.NewModLogRepository(db.Pool)
+
+	// Hub Settings and Themes repositories (from repository package)
+	hubSettingsRepo := repository.NewHubSettingsRepository(db.Pool)
+	hubThemesRepo := repository.NewHubThemesRepository(db.Pool)
 
 	// Initialize WebSocket hub
 	hub := websocket.NewHub()
@@ -169,6 +174,8 @@ func main() {
 	savedItemsHandler := handlers.NewSavedItemsHandler(savedItemsRepo, postRepo, commentRepo, redditCommentRepo, redditClient)
 	feedHandler := handlers.NewFeedHandler(postRepo, hubSubRepo, subredditSubRepo, redditClient)
 	modMailHandler := handlers.NewModMailHandler(db.Pool, conversationRepo, messageRepo, userRepo, hubModRepo, hubRepo)
+	hubSettingsHandler := handlers.NewHubSettingsHandler(hubSettingsRepo)
+	hubThemesHandler := handlers.NewHubThemesHandler(hubThemesRepo, hubSettingsRepo)
 
 	// Inject notification service into handlers
 	postsHandler.SetNotificationService(notificationService)
@@ -304,6 +311,15 @@ func main() {
 			hubs.GET("/trending", hubsHandler.GetTrendingHubs)
 			hubs.GET("/:name", hubsHandler.Get)
 			hubs.GET("/:name/posts", hubsHandler.GetPosts)
+
+			// Hub settings (public can view some, moderators see all)
+			hubs.GET("/:name/settings", hubSettingsHandler.GetHubSettings)
+
+			// Hub moderators list (public)
+			hubs.GET("/:name/moderators", hubSettingsHandler.GetHubModerators)
+
+			// Hub theme (public)
+			hubs.GET("/:name/theme", hubThemesHandler.GetActiveTheme)
 		}
 
 		// Hub subscription check (optional auth)
@@ -455,6 +471,20 @@ func main() {
 			protected.GET("/mod-mail/user", modMailHandler.GetUserModMail)
 			protected.GET("/mod-mail/hubs/:hub_name", modMailHandler.GetModMailForHub)
 			protected.PATCH("/mod-mail/:id/status", modMailHandler.UpdateModMailStatus)
+
+			// Hub Settings routes (requires moderator permissions)
+			protected.PUT("/hubs/:name/settings", hubSettingsHandler.UpdateHubSettings)
+			protected.POST("/hubs/:name/moderators", hubSettingsHandler.AddHubModerator)
+			protected.PATCH("/hubs/:name/moderators/:user_id", hubSettingsHandler.UpdateModeratorRole)
+			protected.DELETE("/hubs/:name/moderators/:user_id", hubSettingsHandler.RemoveHubModerator)
+
+			// Hub Theme routes (requires moderator permissions)
+			protected.GET("/hubs/:name/themes", hubThemesHandler.GetAllThemes)
+			protected.POST("/hubs/:name/themes", hubThemesHandler.CreateTheme)
+			protected.PUT("/hubs/:name/themes/:id", hubThemesHandler.UpdateTheme)
+			protected.POST("/hubs/:name/themes/:id/activate", hubThemesHandler.ActivateTheme)
+			protected.DELETE("/hubs/:name/themes/:id", hubThemesHandler.DeleteTheme)
+			protected.POST("/hubs/:name/themes/preview", hubThemesHandler.PreviewTheme)
 
 			// Slideshow routes
 			protected.POST("/conversations/:id/slideshow", slideshowHandler.StartSlideshow)

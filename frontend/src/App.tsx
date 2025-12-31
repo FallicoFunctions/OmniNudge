@@ -21,6 +21,7 @@ import PostDetailPage from './pages/PostDetailPage';
 import MessagesPage from './pages/MessagesPage';
 import SettingsPage from './pages/SettingsPage';
 import ModToolsPage from './pages/ModToolsPage';
+import HubSettingsPage from './pages/HubSettingsPage';
 import AdminPage from './pages/AdminPage';
 import NotFoundPage from './pages/NotFoundPage';
 import './App.css';
@@ -71,6 +72,14 @@ function App() {
                     element={
                       <ProtectedRoute>
                         <ModToolsPage />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/h/:hubName/settings"
+                    element={
+                      <ProtectedRoute>
+                        <HubSettingsPage />
                       </ProtectedRoute>
                     }
                   />
