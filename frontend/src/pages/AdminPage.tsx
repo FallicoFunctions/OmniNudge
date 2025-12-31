@@ -3,8 +3,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { adminService } from '../services/adminService';
-import { hubsService } from '../services/hubsService';
-import type { AdminUser, SiteStats } from '../types/admin';
+import { hubsService, type Hub } from '../services/hubsService';
+import type { AdminUser } from '../types/admin';
 
 type TabType = 'stats' | 'users' | 'moderators';
 
@@ -165,8 +165,9 @@ function UsersTab() {
       setHubSearch('');
       setHubError('');
     },
-    onError: (err: any) => {
-      setHubError(err?.response?.data?.error || 'Failed to add moderator');
+    onError: (err: unknown) => {
+      const error = err as { response?: { data?: { error?: string } } };
+      setHubError(error?.response?.data?.error || 'Failed to add moderator');
     },
   });
 
@@ -188,7 +189,7 @@ function UsersTab() {
     if (!hubSearch.trim()) return null;
     const normalized = hubSearch.trim().toLowerCase().replace(/^h\//, '');
     const pool = hubSearch.trim().length > 0 ? hubSuggestions : trendingHubs;
-    return pool.find((hub: any) => hub.name.toLowerCase() === normalized) || null;
+    return pool.find((hub: Hub) => hub.name.toLowerCase() === normalized) || null;
   })();
 
   const filteredHubs =
@@ -361,7 +362,7 @@ function UsersTab() {
                   {!isFetchingHubs && filteredHubs.length === 0 && (
                     <div className="px-4 py-2 text-sm text-[var(--color-text-secondary)]">No hubs found</div>
                   )}
-                  {filteredHubs.map((hub: any) => (
+                  {filteredHubs.map((hub: Hub) => (
                     <button
                       key={hub.id}
                       type="button"
@@ -456,7 +457,7 @@ function ModeratorsTab() {
           className="w-full px-4 py-2 border border-[var(--color-border)] rounded-lg bg-[var(--color-surface)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
         >
           <option value="">-- Select a hub --</option>
-          {hubsData?.map((hub: any) => (
+          {hubsData?.map((hub: Hub) => (
             <option key={hub.id} value={hub.id}>
               h/{hub.name}
             </option>
