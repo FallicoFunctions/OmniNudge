@@ -76,7 +76,9 @@ export default function MainLayout() {
   useEffect(() => {
     const handler = (event: Event) => {
       const custom = event as CustomEvent<
-        { mode: 'login' | 'signup'; redirectTo?: string; redirectState?: unknown } | 'login' | 'signup'
+        | { mode: 'login' | 'signup'; redirectTo?: string; redirectState?: unknown; action?: { type: 'subscribeSubreddit'; subreddit: string } }
+        | 'login'
+        | 'signup'
       >;
       const detail = custom.detail;
       if (detail === 'login' || detail === 'signup') {
