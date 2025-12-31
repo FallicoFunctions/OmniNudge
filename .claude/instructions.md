@@ -10,6 +10,19 @@
 - Prioritize doing things right the first time rather than shipping a somewhat working version and finishing it later.
 - Suggest better solutions if what I ask for is not the most scalable or efficient solution.
 - Disregard complexity to implement.
+- Avoid redundent code where possible--create and use centralized methods where logic can be reusable
+
+## Server Management
+
+- **Default: NEVER start background servers** - Let the user run their own server so they can see output in real-time
+- After making code changes:
+  1. Tell the user you've made the changes
+  2. Instruct them to restart their server
+  3. Wait for them to test and report results
+- **Exception 1**: You may start a server temporarily to test something yourself, but you MUST:
+  1. Kill it immediately after testing
+  2. Tell the user to restart their own server
+- **Exception 2**: Only if user explicitly requests you to run the server for them
 
 ## Project Context
 
