@@ -1,0 +1,150 @@
+import { useState } from 'react';
+import type {
+  HubSettings,
+  UpdateHubSettingsRequest,
+  SpamFilterStrength,
+} from '../../types/hubSettings';
+
+interface Props {
+  settings: HubSettings;
+  onSave: (data: UpdateHubSettingsRequest) => void;
+}
+
+export default function ModerationSettingsTab({ settings, onSave }: Props) {
+  const [bannedWords, setBannedWords] = useState(settings.banned_words.join(', '));
+  const [spamFilterStrength, setSpamFilterStrength] = useState<SpamFilterStrength>(
+    settings.spam_filter_strength
+  );
+  const [newAccountFilterDays, setNewAccountFilterDays] = useState(
+    settings.new_account_filter_days.toString()
+  );
+  const [minAccountKarma, setMinAccountKarma] = useState(settings.min_account_karma.toString());
+
+  const handleSave = () => {
+    const bannedWordsArray = bannedWords
+      .split(',')
+      .map((word) => word.trim())
+      .filter((word) => word.length > 0);
+
+    onSave({
+      ...settings,
+      banned_words: bannedWordsArray,
+      spam_filter_strength: spamFilterStrength,
+      new_account_filter_days: parseInt(newAccountFilterDays) || 0,
+      min_account_karma: parseInt(minAccountKarma) || 0,
+    });
+  };
+
+  const hasChanges =
+    bannedWords !== settings.banned_words.join(', ') ||
+    spamFilterStrength !== settings.spam_filter_strength ||
+    newAccountFilterDays !== settings.new_account_filter_days.toString() ||
+    minAccountKarma !== settings.min_account_karma.toString();
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-xl font-bold text-[var(--color-text-primary)] mb-4">
+          Moderation & Auto-Moderation
+        </h2>
+        <p className="text-[var(--color-text-secondary)] mb-6">
+          Configure automated moderation rules and content filters
+        </p>
+      </div>
+
+      {/* Spam Filter */}
+      <div>
+        <label className="block text-sm font-medium text-[var(--color-text-primary)] mb-2">
+          Spam Filter Strength
+        </label>
+        <select
+          value={spamFilterStrength}
+          onChange={(e) => setSpamFilterStrength(e.target.value as SpamFilterStrength)}
+          className="w-full px-3 py-2 border border-[var(--color-border)] rounded bg-[var(--color-background)] text-[var(--color-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+        >
+          <option value="low">Low - Minimal filtering</option>
+          <option value="medium">Medium - Balanced (Recommended)</option>
+          <option value="high">High - Aggressive filtering</option>
+        </select>
+        <p className="text-xs text-[var(--color-text-secondary)] mt-1">
+          Higher settings may catch more spam but could also flag legitimate content
+        </p>
+      </div>
+
+      {/* Banned Words */}
+      <div>
+        <label className="block text-sm font-medium text-[var(--color-text-primary)] mb-2">
+          Banned Words & Phrases
+        </label>
+        <textarea
+          value={bannedWords}
+          onChange={(e) => setBannedWords(e.target.value)}
+          placeholder="Enter words separated by commas..."
+          rows={4}
+          className="w-full px-3 py-2 border border-[var(--color-border)] rounded bg-[var(--color-background)] text-[var(--color-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] font-mono text-sm"
+        />
+        <p className="text-xs text-[var(--color-text-secondary)] mt-1">
+          Posts and comments containing these words will be automatically removed. Separate with
+          commas.
+        </p>
+      </div>
+
+      {/* Account Age Filter */}
+      <div>
+        <label className="block text-sm font-medium text-[var(--color-text-primary)] mb-2">
+          Minimum Account Age (days)
+        </label>
+        <input
+          type="number"
+          value={newAccountFilterDays}
+          onChange={(e) => setNewAccountFilterDays(e.target.value)}
+          min="0"
+          placeholder="0"
+          className="w-full px-3 py-2 border border-[var(--color-border)] rounded bg-[var(--color-background)] text-[var(--color-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+        />
+        <p className="text-xs text-[var(--color-text-secondary)] mt-1">
+          Require accounts to be at least this many days old to post (0 = no restriction)
+        </p>
+      </div>
+
+      {/* Minimum Karma */}
+      <div>
+        <label className="block text-sm font-medium text-[var(--color-text-primary)] mb-2">
+          Minimum Account Karma
+        </label>
+        <input
+          type="number"
+          value={minAccountKarma}
+          onChange={(e) => setMinAccountKarma(e.target.value)}
+          min="0"
+          placeholder="0"
+          className="w-full px-3 py-2 border border-[var(--color-border)] rounded bg-[var(--color-background)] text-[var(--color-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+        />
+        <p className="text-xs text-[var(--color-text-secondary)] mt-1">
+          Require accounts to have at least this much karma to post (0 = no restriction)
+        </p>
+      </div>
+
+      {/* Info Box */}
+      <div className="bg-blue-50 border border-blue-200 rounded p-4">
+        <h4 className="font-medium text-blue-900 mb-2">About Auto-Moderation</h4>
+        <p className="text-sm text-blue-800">
+          These filters help reduce spam and unwanted content. Content flagged by auto-moderation
+          will appear in the moderation queue for manual review. You can always approve flagged
+          content from the Mod Tools page.
+        </p>
+      </div>
+
+      {/* Save Button */}
+      <div className="flex justify-end pt-4 border-t border-[var(--color-border)]">
+        <button
+          onClick={handleSave}
+          disabled={!hasChanges}
+          className="px-6 py-2 rounded bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-strong)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        >
+          Save Changes
+        </button>
+      </div>
+    </div>
+  );
+}

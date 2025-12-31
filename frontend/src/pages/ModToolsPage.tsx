@@ -26,11 +26,19 @@ export default function ModToolsPage() {
 
   return (
     <div className="max-w-6xl mx-auto p-6">
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold">Mod Tools - h/{hubName}</h1>
-        <p className="text-[var(--color-text-secondary)] mt-2">
-          Manage users, content, and moderation settings
-        </p>
+      <div className="mb-6 flex justify-between items-start">
+        <div>
+          <h1 className="text-3xl font-bold">Mod Tools - h/{hubName}</h1>
+          <p className="text-[var(--color-text-secondary)] mt-2">
+            Manage users, content, and moderation settings
+          </p>
+        </div>
+        <button
+          onClick={() => navigate(`/h/${hubName}/settings`)}
+          className="px-4 py-2 rounded bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-strong)] transition-colors"
+        >
+          Hub Settings
+        </button>
       </div>
 
       {/* Tabs */}

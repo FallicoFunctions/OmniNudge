@@ -6,11 +6,25 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+// ModeratorRole represents the role of a moderator in a hub
+type ModeratorRole string
+
+const (
+	ModeratorRoleOwner         ModeratorRole = "owner"
+	ModeratorRoleFullModerator ModeratorRole = "full_moderator"
+	ModeratorRoleModerator     ModeratorRole = "moderator"
+)
+
 // HubModerator links users to moderated hubs
 type HubModerator struct {
-	ID     int `json:"id"`
-	HubID  int `json:"hub_id"`
-	UserID int `json:"user_id"`
+	ID     int           `json:"id"`
+	HubID  int           `json:"hub_id"`
+	UserID int           `json:"user_id"`
+	Role   ModeratorRole `json:"role"`
+
+	// Populated from joins
+	Username  string  `json:"username,omitempty"`
+	AvatarURL *string `json:"avatar_url,omitempty"`
 }
 
 // HubModeratorUser holds limited user info for moderators
