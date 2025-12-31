@@ -168,6 +168,7 @@ func main() {
 	redditCommentsHandler := handlers.NewRedditCommentsHandler(redditCommentRepo)
 	savedItemsHandler := handlers.NewSavedItemsHandler(savedItemsRepo, postRepo, commentRepo, redditCommentRepo, redditClient)
 	feedHandler := handlers.NewFeedHandler(postRepo, hubSubRepo, subredditSubRepo, redditClient)
+	modMailHandler := handlers.NewModMailHandler(db.Pool, conversationRepo, messageRepo, userRepo, hubModRepo, hubRepo)
 
 	// Inject notification service into handlers
 	postsHandler.SetNotificationService(notificationService)
@@ -448,6 +449,12 @@ func main() {
 			protected.POST("/conversations/:id/read", messagesHandler.MarkAsRead)
 			protected.POST("/messages/:id/read", messagesHandler.MarkSingleMessageAsRead)
 			protected.DELETE("/messages/:id", messagesHandler.DeleteMessage)
+
+			// Mod mail routes
+			protected.POST("/mod-mail", modMailHandler.CreateModMail)
+			protected.GET("/mod-mail/user", modMailHandler.GetUserModMail)
+			protected.GET("/mod-mail/hubs/:hub_name", modMailHandler.GetModMailForHub)
+			protected.PATCH("/mod-mail/:id/status", modMailHandler.UpdateModMailStatus)
 
 			// Slideshow routes
 			protected.POST("/conversations/:id/slideshow", slideshowHandler.StartSlideshow)
