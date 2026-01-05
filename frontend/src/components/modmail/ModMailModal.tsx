@@ -1,6 +1,11 @@
 import { useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { modMailService } from '../../services/modMailService';
+import { hubsService } from '../../services/hubsService';
+import { encryptionService } from '../../services/encryptionService';
+import { getOwnKeys, getUserPublicKey } from '../../services/keyManagementService';
+import { encryptForMultipleRecipients, type MultiRecipientEncryptionResult } from '../../utils/encryption';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface ModMailModalProps {
   hubName: string;
@@ -8,28 +13,117 @@ interface ModMailModalProps {
 }
 
 export function ModMailModal({ hubName, onClose }: ModMailModalProps) {
+  const { user } = useAuth();
   const [subject, setSubject] = useState('');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+  const [encryptionWarning, setEncryptionWarning] = useState<string | null>(null);
+
+  const prepareEncryptionPayload = async (): Promise<
+    | (MultiRecipientEncryptionResult & {
+        is_multi_recipient: true;
+        encryption_version: string;
+      })
+    | { is_multi_recipient: false; encryption_version: string; message: string }
+  > => {
+    // Fetch hub moderators to build the participant list (user + moderators)
+    const hub = await hubsService.getHub(hubName);
+    const moderatorIds = hub.moderators?.map((mod) => mod.id) ?? [];
+    const participantIds = Array.from(
+      new Set(
+        [user?.id, ...moderatorIds].filter((id): id is number => typeof id === 'number')
+      )
+    );
+
+    if (!participantIds.length) {
+      setEncryptionWarning('No participants found to encrypt the message for; sending plaintext.');
+      return { is_multi_recipient: false, encryption_version: 'plaintext', message };
+    }
+
+    // Fetch public keys for all participants
+    const publicKeys = await encryptionService.getPublicKeys(participantIds);
+    const cryptoKeys: { userId: number; publicKey: CryptoKey }[] = [];
+    const missing: number[] = [];
+
+    for (const pid of participantIds) {
+      const keyBase64 = publicKeys[pid];
+      if (!keyBase64) {
+        missing.push(pid);
+        continue;
+      }
+      const publicKey = await getUserPublicKey(pid, keyBase64);
+      if (publicKey) {
+        cryptoKeys.push({ userId: pid, publicKey });
+      } else {
+        missing.push(pid);
+      }
+    }
+
+    const ownKeys = await getOwnKeys();
+
+    if (!cryptoKeys.length || missing.length || !ownKeys?.publicKey) {
+      if (missing.length) {
+        setEncryptionWarning(
+          `Missing public keys for participants: ${missing.join(
+            ', '
+          )}. Sending message as plaintext.`
+        );
+      } else if (!ownKeys?.publicKey) {
+        setEncryptionWarning('No local encryption key found. Sending message as plaintext.');
+      }
+      return { is_multi_recipient: false, encryption_version: 'plaintext', message };
+    }
+
+    const encrypted = await encryptForMultipleRecipients(message, cryptoKeys, ownKeys.publicKey);
+    setEncryptionWarning(null);
+
+    return {
+      ...encrypted,
+      is_multi_recipient: true,
+      encryption_version: 'v2',
+    };
+  };
 
   const createMutation = useMutation({
-    mutationFn: () =>
-      modMailService.createModMail({
-        hub_name: hubName,
-        subject,
-        message,
-      }),
+    mutationFn: async () => {
+      const encryptionPayload = await prepareEncryptionPayload();
+      const request =
+        encryptionPayload.is_multi_recipient === true
+          ? {
+              hub_name: hubName,
+              subject,
+              encrypted_content: encryptionPayload.encryptedContent,
+              sender_encrypted_content:
+                encryptionPayload.senderEncryptedContent ?? encryptionPayload.encryptedContent,
+              encryption_version: encryptionPayload.encryption_version,
+              is_multi_recipient: encryptionPayload.is_multi_recipient,
+              shared_encryption_iv: encryptionPayload.sharedIv,
+              recipient_keys: encryptionPayload.recipientKeys,
+            }
+          : {
+              hub_name: hubName,
+              subject,
+              message: encryptionPayload.message,
+              encryption_version: encryptionPayload.encryption_version,
+              is_multi_recipient: false,
+            };
+
+      return modMailService.createModMail(request);
+    },
     onSuccess: () => {
       setSuccess(true);
+      setEncryptionWarning(null);
       // Close the modal after a brief delay to show success message
       setTimeout(() => {
         onClose();
       }, 1500);
     },
     onError: (err: unknown) => {
-      const error = err as { response?: { data?: { error?: string } } };
-      setError(error?.response?.data?.error || 'Failed to send mod mail');
+      const error = err as { response?: { data?: { error?: string } }; message?: string };
+      const friendlyMessage =
+        error?.response?.data?.error || error?.message || 'Failed to send mod mail';
+      setError(friendlyMessage);
     },
   });
 
@@ -102,6 +196,12 @@ export function ModMailModal({ hubName, onClose }: ModMailModalProps) {
           {error && (
             <div className="text-red-600 text-sm bg-red-50 border border-red-200 rounded p-3">
               {error}
+            </div>
+          )}
+
+          {encryptionWarning && (
+            <div className="text-amber-700 text-sm bg-amber-50 border border-amber-200 rounded p-3">
+              {encryptionWarning}
             </div>
           )}
 

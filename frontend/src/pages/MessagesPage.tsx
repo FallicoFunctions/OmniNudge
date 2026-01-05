@@ -6,6 +6,7 @@ import { mediaService } from '../services/mediaService';
 import { useAuth } from '../contexts/AuthContext';
 import { useMessagingContext } from '../contexts/MessagingContext';
 import type { Conversation, Message, SendMessageRequest } from '../types/messages';
+import type { ModMailConversation } from '../types/modmail';
 import { API_BASE_URL } from '../lib/api';
 import {
   decryptMessage,
@@ -13,6 +14,7 @@ import {
   decryptFile,
   encryptKeyWithPublicKey,
   arrayBufferToBase64,
+  decryptMultiRecipientContent,
 } from '../utils/encryption';
 import { getOwnKeys, getUserPublicKey } from '../services/keyManagementService';
 import { encryptionService } from '../services/encryptionService';
@@ -61,43 +63,75 @@ function inferMessageTypeFromMessage(message: Message): Message['message_type'] 
  * Hook to decrypt a message's encrypted content (if necessary)
  * Returns decrypted plaintext or the original content when encryption isn't applied
  */
-function useDecryptedContent(
-  encryptedContent: string | undefined,
-  shouldAttemptDecrypt: boolean
-): string {
+function useDecryptedContent(message: Message, isOwnMessage: boolean, currentUserId?: number): string {
   const [decryptedContent, setDecryptedContent] = useState<string>('');
 
   useEffect(() => {
-    if (!encryptedContent) {
-      setDecryptedContent('');
-      return;
-    }
+    const cipherText = isOwnMessage
+      ? message.sender_encrypted_content ?? message.encrypted_content
+      : message.encrypted_content;
 
-    if (!shouldAttemptDecrypt) {
-      setDecryptedContent(encryptedContent);
-      return;
-    }
+    if (!cipherText) return setDecryptedContent('');
 
     const attemptDecryption = async () => {
+      // Multi-recipient (mod mail) messages
+      if (message.is_multi_recipient && message.shared_encryption_iv && message.recipient_keys) {
+        try {
+          const keys = await getOwnKeys();
+          const encryptedKey = currentUserId ? message.recipient_keys?.[currentUserId] : null;
+          if (keys?.privateKey && encryptedKey) {
+            const decrypted = await decryptMultiRecipientContent(
+              cipherText,
+              encryptedKey,
+              message.shared_encryption_iv,
+              keys.privateKey
+            );
+            setDecryptedContent(decrypted);
+            return;
+          }
+        } catch (error) {
+          console.warn('Failed to decrypt multi-recipient message, falling back:', error);
+        }
+      }
+
+      const shouldAttemptDecrypt = Boolean(
+        (isOwnMessage && message.sender_encrypted_content) || (!isOwnMessage && message.encryption_version === 'v1')
+      );
+
+      if (!shouldAttemptDecrypt) {
+        setDecryptedContent(cipherText);
+        return;
+      }
+
       try {
         const keys = await getOwnKeys();
         if (!keys) {
-          // No keys available, return plaintext
-          setDecryptedContent(encryptedContent);
+          // No keys available, return ciphertext
+          setDecryptedContent(cipherText);
           return;
         }
 
-        const decrypted = await decryptMessage(encryptedContent, keys.privateKey);
+        const decrypted = await decryptMessage(cipherText, keys.privateKey);
         setDecryptedContent(decrypted);
       } catch (error) {
         // Decryption failed, content might be plaintext
         console.warn('Failed to decrypt message, displaying as plaintext:', error);
-        setDecryptedContent(encryptedContent);
+        setDecryptedContent(cipherText);
       }
     };
 
     attemptDecryption();
-  }, [encryptedContent, shouldAttemptDecrypt]);
+  }, [
+    currentUserId,
+    isOwnMessage,
+    message.encrypted_content,
+    message.encryption_version,
+    message.id,
+    message.is_multi_recipient,
+    message.recipient_keys,
+    message.sender_encrypted_content,
+    message.shared_encryption_iv,
+  ]);
 
   return decryptedContent;
 }
@@ -108,23 +142,15 @@ function useDecryptedContent(
 function DecryptedMessageContent({
   message,
   isOwnMessage,
+  currentUserId,
   className,
 }: {
   message: Message;
   isOwnMessage: boolean;
+  currentUserId?: number;
   className?: string;
 }) {
-  const cipherText = isOwnMessage
-    ? message.sender_encrypted_content ?? message.encrypted_content
-    : message.encrypted_content;
-
-  if (!cipherText) return null;
-
-  const shouldDecrypt = Boolean(
-    (isOwnMessage && message.sender_encrypted_content) || (!isOwnMessage && message.encryption_version === 'v1')
-  );
-
-  const decryptedContent = useDecryptedContent(cipherText, shouldDecrypt);
+  const decryptedContent = useDecryptedContent(message, isOwnMessage, currentUserId);
 
   if (!decryptedContent) return null;
 
@@ -341,6 +367,26 @@ export default function MessagesPage() {
     queryFn: () => messagesService.getMessages(selectedConversationId!),
     enabled: !!selectedConversationId,
     refetchOnWindowFocus: false,
+  });
+
+  const selectedConversation = conversations?.find((c) => c.id === selectedConversationId);
+
+  // Fetch mod-mail conversation details if this is a mod_mail conversation
+  const { data: modMailConversation } = useQuery<ModMailConversation>({
+    queryKey: ['modMailConversation', selectedConversationId],
+    queryFn: async () => {
+      const token = localStorage.getItem('auth_token');
+      const response = await fetch(`http://localhost:8080/api/v1/mod-mail/${selectedConversationId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      if (!response.ok) {
+        throw new Error('Failed to fetch mod-mail conversation');
+      }
+      return response.json();
+    },
+    enabled: !!selectedConversationId && selectedConversation?.conversation_type === 'mod_mail',
   });
 
   const uploadMediaMutation = useMutation({
@@ -619,8 +665,14 @@ export default function MessagesPage() {
     });
   };
 
-  const selectedConversation = conversations?.find((c) => c.id === selectedConversationId);
-  const orderedMessages = useMemo(() => (messages ? [...messages].reverse() : []), [messages]);
+  // For mod_mail conversations, backend returns messages in ASC order (oldest first)
+  // For DM conversations, backend returns messages in DESC order (newest first)
+  // We want to display oldest-to-newest (newest at bottom), so only reverse for DMs
+  const orderedMessages = useMemo(() => {
+    if (!messages) return [];
+    const isModMail = selectedConversation?.conversation_type === 'mod_mail';
+    return isModMail ? [...messages] : [...messages].reverse();
+  }, [messages, selectedConversation?.conversation_type]);
   const messagesContainerRef = useRef<HTMLDivElement | null>(null);
   const scrollToLatestMessage = useCallback(() => {
     const container = messagesContainerRef.current;
@@ -749,7 +801,9 @@ export default function MessagesPage() {
             >
               <div className="flex items-center justify-between">
                 <span className="font-medium text-[var(--color-text-primary)]">
-                  {conversation.other_user?.username || 'Unknown'}
+                  {conversation.conversation_type === 'mod_mail'
+                    ? `${conversation.hub_name ? `h/${conversation.hub_name}` : 'Hub'} - Mod Mail - ${conversation.subject || 'Untitled'}`
+                    : conversation.other_user?.username || 'Unknown'}
                 </span>
                 {conversation.unread_count > 0 && conversation.id !== selectedConversationId && (
                   <span className="rounded-full bg-[var(--color-primary)] px-2 py-0.5 text-xs text-white">
@@ -763,6 +817,7 @@ export default function MessagesPage() {
                   <DecryptedMessageContent
                     message={conversation.latest_message}
                     isOwnMessage={conversation.latest_message.sender_id === user?.id}
+                    currentUserId={user?.id}
                     className="mt-1 truncate text-sm text-[var(--color-text-secondary)]"
                   />
                 )}
@@ -786,6 +841,8 @@ export default function MessagesPage() {
               <h3 className="font-semibold text-[var(--color-text-primary)]">
                 {isCreatingChat
                   ? 'New Chat'
+                  : selectedConversation?.conversation_type === 'mod_mail'
+                  ? `${selectedConversation?.hub_name ? `h/${selectedConversation.hub_name}` : 'Hub'} - Mod Mail - ${selectedConversation?.subject || 'Untitled'}`
                   : selectedConversation?.other_user?.username || 'Unknown'}
               </h3>
             </div>
@@ -804,6 +861,15 @@ export default function MessagesPage() {
                 <div className="space-y-3">
                   {orderedMessages.map((message) => {
                     const isOwnMessage = message.sender_id === user?.id;
+
+                    // For mod_mail, get sender info from participants
+                    const isModMail = selectedConversation?.conversation_type === 'mod_mail';
+                    const participant = isModMail
+                      ? modMailConversation?.participants?.find((p) => p.user_id === message.sender_id)
+                      : null;
+                    const senderUsername = participant?.username || (isOwnMessage ? 'You' : 'User');
+                    const isModerator = participant?.is_moderator || false;
+
                     return (
                       <div
                         key={message.id}
@@ -825,16 +891,31 @@ export default function MessagesPage() {
                               <DecryptedMessageContent
                                 message={message}
                                 isOwnMessage={isOwnMessage}
-                                className="text-sm"
+                                currentUserId={user?.id}
+                                className="text-sm mb-1"
                               />
                             )}
-                            <span
-                              className={`mt-1 block text-xs ${
+                            <div
+                              className={`text-xs flex items-center gap-1 ${
                                 isOwnMessage ? 'text-white/70' : 'text-[var(--color-text-muted)]'
                               }`}
                             >
-                              {new Date(message.sent_at).toLocaleTimeString()}
-                            </span>
+                              {isModMail && (
+                                <>
+                                  <span>{senderUsername}</span>
+                                  {isModerator && (
+                                    <span className={`px-1.5 py-0.5 text-[10px] font-semibold rounded ${
+                                      isOwnMessage
+                                        ? 'bg-white/20 text-white'
+                                        : 'bg-green-600 text-white'
+                                    }`}>
+                                      MOD
+                                    </span>
+                                  )}
+                                </>
+                              )}
+                              <span>{new Date(message.sent_at).toLocaleString()}</span>
+                            </div>
                           </div>
                           <div className="relative">
                             <button

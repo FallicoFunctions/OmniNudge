@@ -22,6 +22,7 @@ import MessagesPage from './pages/MessagesPage';
 import SettingsPage from './pages/SettingsPage';
 import ModToolsPage from './pages/ModToolsPage';
 import HubSettingsPage from './pages/HubSettingsPage';
+import ModMailConversationPage from './pages/ModMailConversationPage';
 import AdminPage from './pages/AdminPage';
 import NotFoundPage from './pages/NotFoundPage';
 import './App.css';
@@ -80,6 +81,14 @@ function App() {
                     element={
                       <ProtectedRoute>
                         <HubSettingsPage />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/mod-mail/:conversationId"
+                    element={
+                      <ProtectedRoute>
+                        <ModMailConversationPage />
                       </ProtectedRoute>
                     }
                   />

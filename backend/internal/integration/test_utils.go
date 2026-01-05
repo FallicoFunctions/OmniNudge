@@ -115,7 +115,7 @@ func newTestDeps(t *testing.T) *TestDeps {
 		services.NewRedditClient(cfg.Reddit.UserAgent, services.NoopCache{}, 0, cfg.Reddit.ClientID, cfg.Reddit.ClientSecret),
 		redditPostRepo,
 	)
-	conversationsHandler := handlers.NewConversationsHandler(conversationRepo, messageRepo, userRepo)
+	conversationsHandler := handlers.NewConversationsHandler(db.Pool, conversationRepo, messageRepo, userRepo)
 	messagesHandler := handlers.NewMessagesHandler(db.Pool, messageRepo, conversationRepo, hub)
 	usersHandler := handlers.NewUsersHandler(userRepo, postRepo, commentRepo, nil, modRepo)
 	thumbnailService := services.NewThumbnailService()

@@ -285,3 +285,92 @@ export async function decryptFile(
   // Return as Blob with original mime type
   return new Blob([decryptedData], { type: encryptedFile.mimeType });
 }
+
+export interface MultiRecipientEncryptionResult {
+  encryptedContent: string;
+  senderEncryptedContent?: string;
+  sharedIv: string;
+  recipientKeys: Record<number, string>;
+}
+
+/**
+ * Encrypts plaintext for multiple recipients using a shared AES key.
+ * The AES key is encrypted for each participant with their RSA public key.
+ */
+export async function encryptForMultipleRecipients(
+  plaintext: string,
+  recipients: { userId: number; publicKey: CryptoKey }[],
+  senderPublicKey?: CryptoKey
+): Promise<MultiRecipientEncryptionResult> {
+  const encoder = new TextEncoder();
+  const aesKey = await window.crypto.subtle.generateKey(
+    { name: 'AES-GCM', length: 256 },
+    true,
+    ['encrypt', 'decrypt']
+  );
+  const iv = window.crypto.getRandomValues(new Uint8Array(12));
+
+  const encryptedBuffer = await window.crypto.subtle.encrypt(
+    { name: 'AES-GCM', iv },
+    aesKey,
+    encoder.encode(plaintext)
+  );
+
+  const rawKey = await window.crypto.subtle.exportKey('raw', aesKey);
+  const recipientKeys: Record<number, string> = {};
+
+  for (const { userId, publicKey } of recipients) {
+    recipientKeys[userId] = await encryptKeyWithPublicKey(rawKey, publicKey);
+  }
+
+  let senderEncryptedContent: string | undefined;
+  if (senderPublicKey) {
+    try {
+      senderEncryptedContent = await encryptMessage(plaintext, senderPublicKey);
+    } catch (error) {
+      console.warn('Failed to encrypt sender copy, falling back to shared ciphertext:', error);
+    }
+  }
+
+  return {
+    encryptedContent: arrayBufferToBase64(encryptedBuffer),
+    senderEncryptedContent,
+    sharedIv: arrayBufferToBase64(iv.buffer),
+    recipientKeys,
+  };
+}
+
+/**
+ * Decrypts a multi-recipient encrypted message using the recipient's private key.
+ */
+export async function decryptMultiRecipientContent(
+  encryptedContent: string,
+  encryptedKey: string,
+  ivBase64: string,
+  privateKey: CryptoKey
+): Promise<string> {
+  const aesKeyBuffer = await window.crypto.subtle.decrypt(
+    { name: 'RSA-OAEP' },
+    privateKey,
+    base64ToArrayBuffer(encryptedKey)
+  );
+
+  const aesKey = await window.crypto.subtle.importKey(
+    'raw',
+    aesKeyBuffer,
+    { name: 'AES-GCM', length: 256 },
+    false,
+    ['decrypt']
+  );
+
+  const plaintextBuffer = await window.crypto.subtle.decrypt(
+    {
+      name: 'AES-GCM',
+      iv: new Uint8Array(base64ToArrayBuffer(ivBase64)),
+    },
+    aesKey,
+    base64ToArrayBuffer(encryptedContent)
+  );
+
+  return new TextDecoder().decode(plaintextBuffer);
+}
