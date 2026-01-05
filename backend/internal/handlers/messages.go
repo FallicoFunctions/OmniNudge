@@ -42,18 +42,21 @@ func NewMessagesHandler(
 
 // SendMessageRequest represents the request body for sending a message
 type SendMessageRequest struct {
-	ConversationID           int     `json:"conversation_id" binding:"required"`
-	EncryptedContent         string  `json:"encrypted_content,omitempty"` // Base64 encoded encrypted blob
-	SenderEncryptedContent   *string `json:"sender_encrypted_content,omitempty"`
-	MessageType              string  `json:"message_type" binding:"required"` // "text", "image", "video", "audio", "file"
-	MediaFileID              *int    `json:"media_file_id,omitempty"`         // References media_files table
-	MediaURL                 *string `json:"media_url,omitempty"`
-	MediaType                *string `json:"media_type,omitempty"`
-	MediaSize                *int    `json:"media_size,omitempty"`
-	EncryptionVersion        string  `json:"encryption_version" binding:"required"` // Default: v1
-	MediaEncryptionKey       *string `json:"media_encryption_key,omitempty"`        // RSA-encrypted AES key (Base64)
-	MediaEncryptionIV        *string `json:"media_encryption_iv,omitempty"`         // AES-GCM IV (Base64)
-	SenderMediaEncryptionKey *string `json:"sender_media_encryption_key,omitempty"`
+	ConversationID           int            `json:"conversation_id" binding:"required"`
+	EncryptedContent         string         `json:"encrypted_content,omitempty"` // Base64 encoded encrypted blob
+	SenderEncryptedContent   *string        `json:"sender_encrypted_content,omitempty"`
+	MessageType              string         `json:"message_type" binding:"required"` // "text", "image", "video", "audio", "file"
+	MediaFileID              *int           `json:"media_file_id,omitempty"`         // References media_files table
+	MediaURL                 *string        `json:"media_url,omitempty"`
+	MediaType                *string        `json:"media_type,omitempty"`
+	MediaSize                *int           `json:"media_size,omitempty"`
+	EncryptionVersion        string         `json:"encryption_version" binding:"required"` // Default: v1
+	MediaEncryptionKey       *string        `json:"media_encryption_key,omitempty"`        // RSA-encrypted AES key (Base64)
+	MediaEncryptionIV        *string        `json:"media_encryption_iv,omitempty"`         // AES-GCM IV (Base64)
+	SenderMediaEncryptionKey *string        `json:"sender_media_encryption_key,omitempty"`
+	IsMultiRecipient         bool           `json:"is_multi_recipient,omitempty"`   // True for multi-recipient messages (mod mail)
+	SharedEncryptionIV       *string        `json:"shared_encryption_iv,omitempty"` // Shared IV for multi-recipient messages
+	RecipientKeys            map[int]string `json:"recipient_keys,omitempty"`       // Map of user_id -> encrypted_key for multi-recipient
 }
 
 // SendMessage handles POST /api/v1/messages
@@ -88,47 +91,92 @@ func (h *MessagesHandler) SendMessage(c *gin.Context) {
 		return
 	}
 
-	if req.EncryptionVersion == "" {
-		req.EncryptionVersion = "v1"
-	}
-
-	// Verify conversation exists and user is a participant
-	conversation, err := h.conversationRepo.GetByID(c.Request.Context(), req.ConversationID)
+	// Check conversation type
+	var conversationType string
+	var err error
+	err = h.pool.QueryRow(c.Request.Context(), `
+		SELECT conversation_type FROM conversations WHERE id = $1
+	`, req.ConversationID).Scan(&conversationType)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get conversation", "details": err.Error()})
-		return
-	}
-
-	if conversation == nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Conversation not found"})
 		return
 	}
 
-	if !conversation.IsParticipant(userID.(int)) {
-		c.JSON(http.StatusForbidden, gin.H{"error": "You are not a participant in this conversation"})
-		return
+	var recipientID int
+
+	// For mod_mail conversations, verify participation differently
+	if conversationType == "mod_mail" {
+		var isParticipant bool
+		err = h.pool.QueryRow(c.Request.Context(), `
+			SELECT EXISTS(
+				SELECT 1 FROM conversation_participants
+				WHERE conversation_id = $1 AND user_id = $2
+			)
+		`, req.ConversationID, userID.(int)).Scan(&isParticipant)
+		if err != nil || !isParticipant {
+			c.JSON(http.StatusForbidden, gin.H{"error": "You are not a participant in this conversation"})
+			return
+		}
+		// For mod mail, we don't target a single recipient; use sender as recipient to satisfy schema
+		recipientID = userID.(int)
+	} else {
+		// For regular conversations, use the existing method
+		conversation, err := h.conversationRepo.GetByID(c.Request.Context(), req.ConversationID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get conversation", "details": err.Error()})
+			return
+		}
+
+		if conversation == nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Conversation not found"})
+			return
+		}
+
+		if !conversation.IsParticipant(userID.(int)) {
+			c.JSON(http.StatusForbidden, gin.H{"error": "You are not a participant in this conversation"})
+			return
+		}
+
+		// Determine recipient (the other user in the conversation)
+		recipientID = conversation.GetOtherUserID(userID.(int))
+
+		// Check if sender is blocked by recipient
+		var isBlocked bool
+		blockCheckQuery := `
+			SELECT EXISTS(
+				SELECT 1 FROM blocked_users
+				WHERE blocker_id = $1 AND blocked_id = $2
+			)
+		`
+		err = h.pool.QueryRow(c.Request.Context(), blockCheckQuery, recipientID, userID.(int)).Scan(&isBlocked)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check blocking status"})
+			return
+		}
+
+		if isBlocked {
+			c.JSON(http.StatusForbidden, gin.H{"error": "You cannot send messages to this user"})
+			return
+		}
 	}
 
-	// Determine recipient (the other user in the conversation)
-	recipientID := conversation.GetOtherUserID(userID.(int))
-
-	// Check if sender is blocked by recipient
-	var isBlocked bool
-	blockCheckQuery := `
-		SELECT EXISTS(
-			SELECT 1 FROM blocked_users
-			WHERE blocker_id = $1 AND blocked_id = $2
-		)
-	`
-	err = h.pool.QueryRow(c.Request.Context(), blockCheckQuery, recipientID, userID.(int)).Scan(&isBlocked)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check blocking status"})
-		return
+	if req.EncryptionVersion == "" {
+		if req.IsMultiRecipient {
+			req.EncryptionVersion = "v2"
+		} else {
+			req.EncryptionVersion = "v1"
+		}
 	}
 
-	if isBlocked {
-		c.JSON(http.StatusForbidden, gin.H{"error": "You cannot send messages to this user"})
-		return
+	// Mod mail messages using multi-recipient encryption must include payloads
+	if conversationType == "mod_mail" && req.IsMultiRecipient {
+		if len(req.RecipientKeys) == 0 || req.SharedEncryptionIV == nil {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error":   "Missing encryption payloads for mod mail message",
+				"details": "Provide shared_encryption_iv and recipient_keys for all participants",
+			})
+			return
+		}
 	}
 
 	// Create message
@@ -147,6 +195,9 @@ func (h *MessagesHandler) SendMessage(c *gin.Context) {
 		MediaEncryptionKey:       req.MediaEncryptionKey,
 		MediaEncryptionIV:        req.MediaEncryptionIV,
 		SenderMediaEncryptionKey: req.SenderMediaEncryptionKey,
+		IsMultiRecipient:         req.IsMultiRecipient,
+		SharedEncryptionIV:       req.SharedEncryptionIV,
+		RecipientKeys:            req.RecipientKeys,
 	}
 
 	if err := h.messageRepo.Create(c.Request.Context(), message); err != nil {
@@ -208,21 +259,47 @@ func (h *MessagesHandler) GetMessages(c *gin.Context) {
 		return
 	}
 
-	// Verify conversation exists and user is a participant
-	conversation, err := h.conversationRepo.GetByID(c.Request.Context(), conversationID)
+	// Check conversation type and verify user is a participant
+	var conversationType string
+	var hubID *int
+	err = h.pool.QueryRow(c.Request.Context(), `
+		SELECT conversation_type, hub_id FROM conversations WHERE id = $1
+	`, conversationID).Scan(&conversationType, &hubID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get conversation", "details": err.Error()})
-		return
-	}
-
-	if conversation == nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Conversation not found"})
 		return
 	}
 
-	if !conversation.IsParticipant(userID.(int)) {
-		c.JSON(http.StatusForbidden, gin.H{"error": "You are not a participant in this conversation"})
-		return
+	// For mod_mail conversations, check conversation_participants table
+	if conversationType == "mod_mail" {
+		var isParticipant bool
+		err = h.pool.QueryRow(c.Request.Context(), `
+			SELECT EXISTS(
+				SELECT 1 FROM conversation_participants
+				WHERE conversation_id = $1 AND user_id = $2
+			)
+		`, conversationID, userID.(int)).Scan(&isParticipant)
+		if err != nil || !isParticipant {
+			c.JSON(http.StatusForbidden, gin.H{"error": "You are not a participant in this conversation"})
+			return
+		}
+	} else {
+		// For regular conversations, use the existing method
+		conversation, err := h.conversationRepo.GetByID(c.Request.Context(), conversationID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get conversation", "details": err.Error()})
+			return
+		}
+
+		if conversation == nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Conversation not found"})
+			return
+		}
+
+		if !conversation.IsParticipant(userID.(int)) {
+			c.JSON(http.StatusForbidden, gin.H{"error": "You are not a participant in this conversation"})
+			return
+		}
 	}
 
 	// Parse query parameters
@@ -234,7 +311,14 @@ func (h *MessagesHandler) GetMessages(c *gin.Context) {
 		limit = 50
 	}
 
-	messages, err := h.messageRepo.GetByConversationID(c.Request.Context(), conversationID, userID.(int), limit, offset)
+	var messages []*models.Message
+
+	// For mod mail, return all messages for the conversation (all participants can view)
+	if conversationType == "mod_mail" {
+		messages, err = h.messageRepo.GetByConversationIDForAll(c.Request.Context(), conversationID, limit, offset)
+	} else {
+		messages, err = h.messageRepo.GetByConversationID(c.Request.Context(), conversationID, userID.(int), limit, offset)
+	}
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get messages", "details": err.Error()})
 		return
@@ -279,21 +363,49 @@ func (h *MessagesHandler) MarkAsRead(c *gin.Context) {
 		return
 	}
 
-	// Verify conversation exists and user is a participant
-	conversation, err := h.conversationRepo.GetByID(c.Request.Context(), conversationID)
+	// Check conversation type first
+	var conversationType string
+	err = h.pool.QueryRow(c.Request.Context(), `
+		SELECT conversation_type FROM conversations WHERE id = $1
+	`, conversationID).Scan(&conversationType)
+
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get conversation", "details": err.Error()})
+		if err.Error() == "no rows in result set" {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Conversation not found"})
+		} else {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get conversation", "details": err.Error()})
+		}
 		return
 	}
 
-	if conversation == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Conversation not found"})
-		return
-	}
-
-	if !conversation.IsParticipant(userID.(int)) {
-		c.JSON(http.StatusForbidden, gin.H{"error": "You are not a participant in this conversation"})
-		return
+	// Verify user is a participant based on conversation type
+	if conversationType == "mod_mail" {
+		var isParticipant bool
+		err = h.pool.QueryRow(c.Request.Context(), `
+			SELECT EXISTS(
+				SELECT 1 FROM conversation_participants
+				WHERE conversation_id = $1 AND user_id = $2
+			)
+		`, conversationID, userID.(int)).Scan(&isParticipant)
+		if err != nil || !isParticipant {
+			c.JSON(http.StatusForbidden, gin.H{"error": "You are not a participant in this conversation"})
+			return
+		}
+	} else {
+		// For DM conversations, use the traditional method
+		conversation, err := h.conversationRepo.GetByID(c.Request.Context(), conversationID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get conversation", "details": err.Error()})
+			return
+		}
+		if conversation == nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Conversation not found"})
+			return
+		}
+		if !conversation.IsParticipant(userID.(int)) {
+			c.JSON(http.StatusForbidden, gin.H{"error": "You are not a participant in this conversation"})
+			return
+		}
 	}
 
 	// Get all unread messages before marking as read, so we can send individual events
@@ -348,16 +460,46 @@ func (h *MessagesHandler) MarkAsRead(c *gin.Context) {
 			})
 		}
 
-		// Also notify the other participant that the conversation was read
-		otherUserID := conversation.GetOtherUserID(userID.(int))
-		h.hub.Broadcast(&websocket.Message{
-			RecipientID: otherUserID,
-			Type:        "conversation_read",
-			Payload: gin.H{
-				"conversation_id": conversationID,
-				"reader_id":       userID.(int),
-			},
-		})
+		// Notify other participants based on conversation type
+		if conversationType == "mod_mail" {
+			// For mod mail, notify all participants except the reader
+			rows, err := h.pool.Query(c.Request.Context(), `
+				SELECT user_id FROM conversation_participants
+				WHERE conversation_id = $1 AND user_id != $2
+			`, conversationID, userID.(int))
+			if err == nil {
+				defer rows.Close()
+				for rows.Next() {
+					var participantID int
+					if rows.Scan(&participantID) == nil {
+						h.hub.Broadcast(&websocket.Message{
+							RecipientID: participantID,
+							Type:        "conversation_read",
+							Payload: gin.H{
+								"conversation_id": conversationID,
+								"reader_id":       userID.(int),
+							},
+						})
+					}
+				}
+			}
+		} else {
+			// For DM conversations, notify the other participant
+			conversation, err := h.conversationRepo.GetByID(c.Request.Context(), conversationID)
+			if err == nil && conversation != nil {
+				otherUserID := conversation.GetOtherUserID(userID.(int))
+				if otherUserID != 0 {
+					h.hub.Broadcast(&websocket.Message{
+						RecipientID: otherUserID,
+						Type:        "conversation_read",
+						Payload: gin.H{
+							"conversation_id": conversationID,
+							"reader_id":       userID.(int),
+						},
+					})
+				}
+			}
+		}
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Messages marked as read"})

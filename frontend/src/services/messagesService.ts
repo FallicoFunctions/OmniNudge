@@ -48,63 +48,69 @@ export const messagesService = {
     const messageType =
       data.message_type ?? (data.media_file_id ? ('image' as Message['message_type']) : 'text');
 
-    // Get the conversation to find recipient ID
-    const conversation = await this.getConversation(conversationId);
-    const recipientId = conversation.other_user?.id;
+    // For multi-recipient messages (mod mail), the caller provides encryption payloads.
+    // Only fetch the conversation for traditional 1:1 messages to find the recipient.
+    const conversation = data.is_multi_recipient ? undefined : await this.getConversation(conversationId);
+    const recipientId = conversation?.other_user?.id;
 
-    let encryptedContent = data.content ?? '';
-    let senderEncryptedContent = data.content ?? undefined;
-    let encryptionVersion: string = data.content ? 'plaintext' : 'none';
+    const skipClientEncryption = Boolean(data.encrypted_content);
+    let encryptedContent = data.encrypted_content ?? data.content ?? '';
+    let senderEncryptedContent =
+      data.sender_encrypted_content ?? (data.content ? data.content : undefined);
+    let encryptionVersion: string =
+      data.encryption_version ?? (data.content ? 'plaintext' : 'none');
 
     // Encrypt message content if provided
     const ownKeys = await getOwnKeys();
 
-    if (data.content && recipientId) {
-      try {
-        // Fetch recipient's public key
-        const publicKeys = await encryptionService.getPublicKeys([recipientId]);
-        const recipientPublicKeyBase64 = publicKeys[recipientId];
+    if (!skipClientEncryption) {
+      if (data.content && recipientId) {
+        try {
+          // Fetch recipient's public key
+          const publicKeys = await encryptionService.getPublicKeys([recipientId]);
+          const recipientPublicKeyBase64 = publicKeys[recipientId];
 
-        if (recipientPublicKeyBase64) {
-          // Import recipient's public key
-          const recipientPublicKey = await getUserPublicKey(recipientId, recipientPublicKeyBase64);
+          if (recipientPublicKeyBase64) {
+            // Import recipient's public key
+            const recipientPublicKey = await getUserPublicKey(recipientId, recipientPublicKeyBase64);
 
-          if (recipientPublicKey) {
-            // Encrypt the message
-            encryptedContent = await encryptMessage(data.content, recipientPublicKey);
-            encryptionVersion = 'v1';
+            if (recipientPublicKey) {
+              // Encrypt the message
+              encryptedContent = await encryptMessage(data.content, recipientPublicKey);
+              encryptionVersion = 'v1';
+            } else {
+              // Fallback to plaintext if key import fails
+              console.warn('Failed to import recipient public key, sending plaintext');
+              encryptedContent = data.content;
+              encryptionVersion = 'plaintext';
+            }
           } else {
-            // Fallback to plaintext if key import fails
-            console.warn('Failed to import recipient public key, sending plaintext');
+            // Recipient hasn't set up encryption yet, send plaintext
+            console.warn('Recipient has no public key, sending plaintext');
             encryptedContent = data.content;
             encryptionVersion = 'plaintext';
           }
-        } else {
-          // Recipient hasn't set up encryption yet, send plaintext
-          console.warn('Recipient has no public key, sending plaintext');
+        } catch (error) {
+          // Fallback to plaintext if encryption fails
+          console.error('Encryption failed, sending plaintext:', error);
           encryptedContent = data.content;
           encryptionVersion = 'plaintext';
         }
-      } catch (error) {
-        // Fallback to plaintext if encryption fails
-        console.error('Encryption failed, sending plaintext:', error);
+      } else if (data.content) {
         encryptedContent = data.content;
         encryptionVersion = 'plaintext';
       }
-    } else if (data.content) {
-      encryptedContent = data.content;
-      encryptionVersion = 'plaintext';
-    }
 
-    if (data.content && ownKeys?.publicKey) {
-      try {
-        senderEncryptedContent = await encryptMessage(data.content, ownKeys.publicKey);
-      } catch (error) {
-        console.error('Failed to encrypt sender copy, storing plaintext:', error);
-        senderEncryptedContent = data.content;
+      if (data.content && ownKeys?.publicKey) {
+        try {
+          senderEncryptedContent = await encryptMessage(data.content, ownKeys.publicKey);
+        } catch (error) {
+          console.error('Failed to encrypt sender copy, storing plaintext:', error);
+          senderEncryptedContent = data.content;
+        }
+      } else if (!data.content) {
+        senderEncryptedContent = undefined;
       }
-    } else if (!data.content) {
-      senderEncryptedContent = undefined;
     }
 
     return api.post<Message>('/messages', {
@@ -120,6 +126,10 @@ export const messagesService = {
       media_encryption_iv: data.media_encryption_iv,
       sender_encrypted_content: senderEncryptedContent,
       sender_media_encryption_key: data.sender_media_encryption_key,
+      is_multi_recipient: data.is_multi_recipient,
+      shared_encryption_iv: data.shared_encryption_iv,
+      recipient_keys: data.recipient_keys,
+      encryption_version: encryptionVersion,
     });
   },
 

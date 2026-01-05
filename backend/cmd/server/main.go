@@ -138,7 +138,7 @@ func main() {
 	postsHandler := handlers.NewPostsHandler(postRepo, hubRepo, userRepo, hubModRepo, feedRepo)
 	commentsHandler := handlers.NewCommentsHandler(commentRepo, postRepo, hubModRepo)
 	redditHandler := handlers.NewRedditHandler(redditClient, redditPostRepo)
-	conversationsHandler := handlers.NewConversationsHandler(conversationRepo, messageRepo, userRepo)
+	conversationsHandler := handlers.NewConversationsHandler(db.Pool, conversationRepo, messageRepo, userRepo)
 	// Initialize thumbnail service
 	thumbnailService := services.NewThumbnailService()
 
@@ -470,6 +470,7 @@ func main() {
 			protected.POST("/mod-mail", modMailHandler.CreateModMail)
 			protected.GET("/mod-mail/user", modMailHandler.GetUserModMail)
 			protected.GET("/mod-mail/hubs/:hub_name", modMailHandler.GetModMailForHub)
+			protected.GET("/mod-mail/:id", modMailHandler.GetModMailConversation)
 			protected.PATCH("/mod-mail/:id/status", modMailHandler.UpdateModMailStatus)
 
 			// Hub Settings routes (requires moderator permissions)

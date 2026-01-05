@@ -657,7 +657,7 @@ function ModMailTab({ hubName }: { hubName: string }) {
               <div className="flex-1">
                 <div className="flex items-center gap-2">
                   <button
-                    onClick={() => navigate(`/messages?conversation=${conv.id}`)}
+                    onClick={() => navigate(`/mod-mail/${conv.id}`)}
                     className="text-lg font-medium hover:text-[var(--color-primary)]"
                   >
                     {conv.subject}

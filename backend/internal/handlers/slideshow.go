@@ -54,7 +54,7 @@ func (h *SlideshowHandler) StartSlideshow(c *gin.Context) {
 		return
 	}
 
-	if conversation.User1ID != userID && conversation.User2ID != userID {
+	if !conversation.IsParticipant(userID) {
 		c.JSON(http.StatusForbidden, gin.H{"error": "You are not part of this conversation"})
 		return
 	}
@@ -152,12 +152,14 @@ func (h *SlideshowHandler) StartSlideshow(c *gin.Context) {
 	}
 
 	// Broadcast slideshow_started event to both users
-	otherUserID := conversation.User1ID
-	if otherUserID == userID {
-		otherUserID = conversation.User2ID
+	otherUserID := conversation.GetOtherUserID(userID)
+
+	userIDs := []int{userID}
+	if otherUserID != 0 {
+		userIDs = append(userIDs, otherUserID)
 	}
 
-	h.hub.BroadcastToUsers([]int{userID, otherUserID}, "slideshow_started", gin.H{
+	h.hub.BroadcastToUsers(userIDs, "slideshow_started", gin.H{
 		"conversation_id":        conversationID,
 		"slideshow_id":           session.ID,
 		"slideshow_type":         session.SlideshowType,
@@ -230,7 +232,14 @@ func (h *SlideshowHandler) NavigateSlideshow(c *gin.Context) {
 	}
 
 	// Broadcast navigate event
-	h.hub.BroadcastToUsers([]int{conversation.User1ID, conversation.User2ID}, "slideshow_navigate", gin.H{
+	var userIDs []int
+	if conversation.User1ID != nil {
+		userIDs = append(userIDs, *conversation.User1ID)
+	}
+	if conversation.User2ID != nil {
+		userIDs = append(userIDs, *conversation.User2ID)
+	}
+	h.hub.BroadcastToUsers(userIDs, "slideshow_navigate", gin.H{
 		"slideshow_id":   sessionID,
 		"current_index":  req.Index,
 		"controller_id":  userID,
@@ -275,9 +284,10 @@ func (h *SlideshowHandler) TransferControl(c *gin.Context) {
 	}
 
 	// Determine the other user
-	newControllerID := conversation.User1ID
-	if newControllerID == userID {
-		newControllerID = conversation.User2ID
+	newControllerID := conversation.GetOtherUserID(userID)
+	if newControllerID == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Cannot determine other user"})
+		return
 	}
 
 	// Update controller
@@ -288,7 +298,14 @@ func (h *SlideshowHandler) TransferControl(c *gin.Context) {
 	}
 
 	// Broadcast control_transferred event
-	h.hub.BroadcastToUsers([]int{conversation.User1ID, conversation.User2ID}, "slideshow_control_transferred", gin.H{
+	var userIDs []int
+	if conversation.User1ID != nil {
+		userIDs = append(userIDs, *conversation.User1ID)
+	}
+	if conversation.User2ID != nil {
+		userIDs = append(userIDs, *conversation.User2ID)
+	}
+	h.hub.BroadcastToUsers(userIDs, "slideshow_control_transferred", gin.H{
 		"slideshow_id":          sessionID,
 		"new_controller_id":     newControllerID,
 		"previous_controller_id": userID,
@@ -366,7 +383,14 @@ func (h *SlideshowHandler) UpdateAutoAdvance(c *gin.Context) {
 	}
 
 	// Broadcast auto_advance_updated event
-	h.hub.BroadcastToUsers([]int{conversation.User1ID, conversation.User2ID}, "slideshow_auto_advance_updated", gin.H{
+	var userIDs []int
+	if conversation.User1ID != nil {
+		userIDs = append(userIDs, *conversation.User1ID)
+	}
+	if conversation.User2ID != nil {
+		userIDs = append(userIDs, *conversation.User2ID)
+	}
+	h.hub.BroadcastToUsers(userIDs, "slideshow_auto_advance_updated", gin.H{
 		"slideshow_id":          sessionID,
 		"auto_advance":          req.AutoAdvance,
 		"auto_advance_interval": req.AutoAdvanceInterval,
@@ -406,7 +430,7 @@ func (h *SlideshowHandler) StopSlideshow(c *gin.Context) {
 	}
 
 	// Verify user is part of the conversation
-	if conversation.User1ID != userID && conversation.User2ID != userID {
+	if !conversation.IsParticipant(userID) {
 		c.JSON(http.StatusForbidden, gin.H{"error": "You are not part of this conversation"})
 		return
 	}
@@ -419,7 +443,14 @@ func (h *SlideshowHandler) StopSlideshow(c *gin.Context) {
 	}
 
 	// Broadcast slideshow_stopped event
-	h.hub.BroadcastToUsers([]int{conversation.User1ID, conversation.User2ID}, "slideshow_stopped", gin.H{
+	var userIDs []int
+	if conversation.User1ID != nil {
+		userIDs = append(userIDs, *conversation.User1ID)
+	}
+	if conversation.User2ID != nil {
+		userIDs = append(userIDs, *conversation.User2ID)
+	}
+	h.hub.BroadcastToUsers(userIDs, "slideshow_stopped", gin.H{
 		"slideshow_id": sessionID,
 		"stopped_by":   userID,
 	})
@@ -447,7 +478,7 @@ func (h *SlideshowHandler) GetSlideshow(c *gin.Context) {
 		return
 	}
 
-	if conversation.User1ID != userID && conversation.User2ID != userID {
+	if !conversation.IsParticipant(userID) {
 		c.JSON(http.StatusForbidden, gin.H{"error": "You are not part of this conversation"})
 		return
 	}

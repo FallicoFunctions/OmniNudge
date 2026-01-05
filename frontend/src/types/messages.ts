@@ -8,11 +8,16 @@ export interface ConversationUser {
 
 export interface Conversation {
   id: number;
-  user1_id: number;
-  user2_id: number;
+  user1_id?: number | null; // NULL for mod_mail
+  user2_id?: number | null; // NULL for mod_mail
   created_at: string;
   last_message_at: string;
-  other_user?: ConversationUser;
+  conversation_type: 'dm' | 'mod_mail';
+  hub_id?: number | null; // For mod_mail conversations
+  hub_name?: string | null; // For mod_mail conversations
+  subject?: string | null; // For mod_mail conversations
+  status?: string | null; // For mod_mail: 'open', 'archived', 'resolved'
+  other_user?: ConversationUser; // Only for DM conversations
   latest_message?: Message;
   unread_count: number;
 }
@@ -38,6 +43,9 @@ export interface Message {
   media_encryption_key?: string | null; // RSA-encrypted AES key (Base64)
   media_encryption_iv?: string | null; // AES-GCM IV (Base64)
   sender_media_encryption_key?: string | null;
+  is_multi_recipient?: boolean;
+  shared_encryption_iv?: string | null;
+  recipient_keys?: Record<number, string>;
 }
 
 export interface SendMessageRequest {
@@ -54,4 +62,8 @@ export interface SendMessageRequest {
   encryption_version?: string;
   sender_encrypted_content?: string;
   sender_media_encryption_key?: string;
+  encrypted_content?: string;
+  is_multi_recipient?: boolean;
+  shared_encryption_iv?: string;
+  recipient_keys?: Record<number, string>;
 }
