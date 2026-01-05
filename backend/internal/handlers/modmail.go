@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -42,23 +43,29 @@ func NewModMailHandler(
 
 // CreateModMailRequest represents a request to start a mod mail conversation
 type CreateModMailRequest struct {
-	HubName string `json:"hub_name" binding:"required"`
-	Subject string `json:"subject" binding:"required,max=300"`
-	Message string `json:"message" binding:"required"`
+	HubName                string         `json:"hub_name" binding:"required"`
+	Subject                string         `json:"subject" binding:"required,max=300"`
+	Message                string         `json:"message"` // Plaintext fallback
+	EncryptedContent       string         `json:"encrypted_content"`
+	SenderEncryptedContent *string        `json:"sender_encrypted_content,omitempty"`
+	EncryptionVersion      string         `json:"encryption_version"`
+	IsMultiRecipient       bool           `json:"is_multi_recipient"`
+	SharedEncryptionIV     *string        `json:"shared_encryption_iv,omitempty"`
+	RecipientKeys          map[int]string `json:"recipient_keys,omitempty"`
 }
 
 // ModMailConversationDetails includes conversation info with participants
 type ModMailConversationDetails struct {
-	ID             int                   `json:"id"`
-	HubID          int                   `json:"hub_id"`
-	HubName        string                `json:"hub_name"`
-	Subject        string                `json:"subject"`
-	Status         string                `json:"status"`
-	CreatedAt      time.Time             `json:"created_at"`
-	LastMessageAt  time.Time             `json:"last_message_at"`
-	Participants   []ParticipantInfo     `json:"participants"`
-	LatestMessage  *models.Message       `json:"latest_message,omitempty"`
-	UnreadCount    int                   `json:"unread_count"`
+	ID            int               `json:"id"`
+	HubID         int               `json:"hub_id"`
+	HubName       string            `json:"hub_name"`
+	Subject       string            `json:"subject"`
+	Status        string            `json:"status"`
+	CreatedAt     time.Time         `json:"created_at"`
+	LastMessageAt time.Time         `json:"last_message_at"`
+	Participants  []ParticipantInfo `json:"participants"`
+	LatestMessage *models.Message   `json:"latest_message,omitempty"`
+	UnreadCount   int               `json:"unread_count"`
 }
 
 type ParticipantInfo struct {
@@ -135,6 +142,20 @@ func (h *ModMailHandler) CreateModMail(c *gin.Context) {
 		return
 	}
 
+	if strings.TrimSpace(req.Message) == "" && strings.TrimSpace(req.EncryptedContent) == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Message content is required"})
+		return
+	}
+
+	// Default encryption version
+	if req.EncryptionVersion == "" {
+		if req.IsMultiRecipient {
+			req.EncryptionVersion = "v2"
+		} else {
+			req.EncryptionVersion = "plaintext"
+		}
+	}
+
 	// Get hub by name
 	hub, err := h.hubRepo.GetByName(c.Request.Context(), req.HubName)
 	if err != nil {
@@ -209,21 +230,61 @@ func (h *ModMailHandler) CreateModMail(c *gin.Context) {
 		}
 	}
 
-	// Create the first message
-	// For mod mail, we'll store messages without full E2E encryption since mods need to see them
-	// Instead, we'll use a simple encrypted format that all mods can read
+	participantIDs := append([]int{userID.(int)}, moderatorIDs...)
+
+	// Validate encryption payloads for multi-recipient encryption
+	if req.IsMultiRecipient {
+		if req.SharedEncryptionIV == nil || len(req.RecipientKeys) == 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Missing encryption payloads for multi-recipient mod mail"})
+			return
+		}
+
+		for _, pid := range participantIDs {
+			if _, ok := req.RecipientKeys[pid]; !ok {
+				c.JSON(http.StatusBadRequest, gin.H{
+					"error":   "Missing encrypted key for one or more participants",
+					"details": "Provide recipient_keys entries for all participants (user and moderators)",
+				})
+				return
+			}
+		}
+	}
+
+	// Create the first message (encrypted for all participants)
 	var messageID int
+	encryptedContent := req.EncryptedContent
+	if encryptedContent == "" {
+		encryptedContent = req.Message
+	}
+
+	isMulti := req.IsMultiRecipient && len(req.RecipientKeys) > 0 && req.SharedEncryptionIV != nil
+
 	err = tx.QueryRow(c.Request.Context(), `
 		INSERT INTO messages (
-			conversation_id, sender_id, recipient_id, encrypted_content,
-			message_type, sent_at
+			conversation_id, sender_id, recipient_id, encrypted_content, sender_encrypted_content,
+			message_type, media_file_id, media_url, media_type, media_size, encryption_version,
+			media_encryption_key, media_encryption_iv, sender_media_encryption_key,
+			is_multi_recipient, shared_encryption_iv
 		)
-		VALUES ($1, $2, $2, $3, 'text', NOW())
+		VALUES ($1, $2, $2, $3, $4, 'text', NULL, NULL, NULL, NULL, $5, NULL, NULL, NULL, $6, $7)
 		RETURNING id
-	`, conversationID, userID.(int), req.Message).Scan(&messageID)
+	`, conversationID, userID.(int), encryptedContent, req.SenderEncryptedContent, req.EncryptionVersion, isMulti, req.SharedEncryptionIV).Scan(&messageID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create message", "details": err.Error()})
 		return
+	}
+
+	if isMulti {
+		for pid, encryptedKey := range req.RecipientKeys {
+			_, err = tx.Exec(c.Request.Context(), `
+				INSERT INTO message_recipient_keys (message_id, user_id, encrypted_key)
+				VALUES ($1, $2, $3)
+			`, messageID, pid, encryptedKey)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to store recipient key", "details": err.Error()})
+				return
+			}
+		}
 	}
 
 	// Commit transaction
@@ -371,6 +432,64 @@ func (h *ModMailHandler) GetUserModMail(c *gin.Context) {
 	})
 }
 
+// GetModMailConversation handles GET /api/v1/mod-mail/:id
+// Returns details for a single mod mail conversation
+func (h *ModMailHandler) GetModMailConversation(c *gin.Context) {
+	userID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
+
+	conversationID, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid conversation ID"})
+		return
+	}
+
+	// Fetch conversation details
+	var conv ModMailConversationDetails
+	err = h.pool.QueryRow(c.Request.Context(), `
+		SELECT c.id, c.hub_id, h.name, c.subject, c.status, c.created_at, c.last_message_at
+		FROM conversations c
+		JOIN hubs h ON c.hub_id = h.id
+		WHERE c.id = $1 AND c.conversation_type = 'mod_mail'
+	`, conversationID).Scan(
+		&conv.ID,
+		&conv.HubID,
+		&conv.HubName,
+		&conv.Subject,
+		&conv.Status,
+		&conv.CreatedAt,
+		&conv.LastMessageAt,
+	)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Conversation not found"})
+		return
+	}
+
+	// Check if user is a participant
+	var isParticipant bool
+	err = h.pool.QueryRow(c.Request.Context(), `
+		SELECT EXISTS(
+			SELECT 1 FROM conversation_participants
+			WHERE conversation_id = $1 AND user_id = $2
+		)
+	`, conversationID, userID.(int)).Scan(&isParticipant)
+	if err != nil || !isParticipant {
+		c.JSON(http.StatusForbidden, gin.H{"error": "You are not a participant in this conversation"})
+		return
+	}
+
+	// Enrich with participants, latest message, and unread count
+	if err := h.enrichConversationDetails(c.Request.Context(), &conv, userID.(int)); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load conversation details"})
+		return
+	}
+
+	c.JSON(http.StatusOK, conv)
+}
+
 // UpdateModMailStatus handles PATCH /api/v1/mod-mail/:id/status
 // Allows moderators to archive or resolve mod mail
 func (h *ModMailHandler) UpdateModMailStatus(c *gin.Context) {
@@ -390,9 +509,12 @@ func (h *ModMailHandler) UpdateModMailStatus(c *gin.Context) {
 		Status string `json:"status" binding:"required,oneof=open archived resolved"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request", "details": err.Error()})
 		return
 	}
+
+	// Debug logging
+	println("UpdateModMailStatus: conversationID =", conversationID, "status =", req.Status, "userID =", userID.(int))
 
 	// Get conversation to check hub
 	var hubID int
@@ -400,28 +522,33 @@ func (h *ModMailHandler) UpdateModMailStatus(c *gin.Context) {
 		SELECT hub_id FROM conversations WHERE id = $1 AND conversation_type = 'mod_mail'
 	`, conversationID).Scan(&hubID)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Conversation not found"})
+		c.JSON(http.StatusNotFound, gin.H{"error": "Conversation not found", "details": err.Error()})
 		return
 	}
 
 	// Check if user is moderator
 	userRole, _ := c.Get("user_role")
 	isMod, err := h.hubModRepo.IsModerator(c.Request.Context(), hubID, userID.(int))
-	if err != nil || (!isMod && userRole != "admin") {
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check moderator status", "details": err.Error()})
+		return
+	}
+	if !isMod && userRole != "admin" {
 		c.JSON(http.StatusForbidden, gin.H{"error": "Only moderators can update mod mail status"})
 		return
 	}
 
 	// Update status
+	// Use explicit type casting to help PostgreSQL infer parameter types correctly
 	_, err = h.pool.Exec(c.Request.Context(), `
 		UPDATE conversations
-		SET status = $1,
-		    archived_at = CASE WHEN $1 IN ('archived', 'resolved') THEN NOW() ELSE NULL END,
-		    archived_by = CASE WHEN $1 IN ('archived', 'resolved') THEN $2 ELSE NULL END
+		SET status = $1::varchar,
+		    archived_at = CASE WHEN $1::varchar = 'archived' OR $1::varchar = 'resolved' THEN NOW() ELSE NULL END,
+		    archived_by = CASE WHEN $1::varchar = 'archived' OR $1::varchar = 'resolved' THEN $2::integer ELSE NULL END
 		WHERE id = $3
 	`, req.Status, userID.(int), conversationID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update status"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update status", "details": err.Error()})
 		return
 	}
 

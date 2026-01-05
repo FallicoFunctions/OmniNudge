@@ -3,13 +3,16 @@ package handlers
 import (
 	"net/http"
 	"strconv"
+	"time"
 
-	"github.com/omninudge/backend/internal/models"
 	"github.com/gin-gonic/gin"
+	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/omninudge/backend/internal/models"
 )
 
 // ConversationsHandler handles HTTP requests for conversations
 type ConversationsHandler struct {
+	pool             *pgxpool.Pool
 	conversationRepo *models.ConversationRepository
 	messageRepo      *models.MessageRepository
 	userRepo         *models.UserRepository
@@ -17,11 +20,13 @@ type ConversationsHandler struct {
 
 // NewConversationsHandler creates a new conversations handler
 func NewConversationsHandler(
+	pool *pgxpool.Pool,
 	conversationRepo *models.ConversationRepository,
 	messageRepo *models.MessageRepository,
 	userRepo *models.UserRepository,
 ) *ConversationsHandler {
 	return &ConversationsHandler{
+		pool:             pool,
 		conversationRepo: conversationRepo,
 		messageRepo:      messageRepo,
 		userRepo:         userRepo,
@@ -36,7 +41,8 @@ type CreateConversationRequest struct {
 // ConversationWithDetails includes conversation info plus latest message and unread count
 type ConversationWithDetails struct {
 	*models.Conversation
-	OtherUser     *models.User    `json:"other_user"`
+	OtherUser     *models.User    `json:"other_user,omitempty"`
+	HubName       *string         `json:"hub_name,omitempty"`
 	LatestMessage *models.Message `json:"latest_message,omitempty"`
 	UnreadCount   int             `json:"unread_count"`
 }
@@ -114,11 +120,22 @@ func (h *ConversationsHandler) GetConversations(c *gin.Context) {
 			Conversation: conv,
 		}
 
-		// Get other user info
-		otherUserID := conv.GetOtherUserID(userID.(int))
-		otherUser, err := h.userRepo.GetByID(c.Request.Context(), otherUserID)
-		if err == nil && otherUser != nil {
-			details.OtherUser = otherUser
+		// Get other user info (only for DM conversations)
+		if conv.ConversationType == "dm" {
+			otherUserID := conv.GetOtherUserID(userID.(int))
+			if otherUserID != 0 {
+				otherUser, err := h.userRepo.GetByID(c.Request.Context(), otherUserID)
+				if err == nil && otherUser != nil {
+					details.OtherUser = otherUser
+				}
+			}
+		} else if conv.ConversationType == "mod_mail" && conv.HubID != nil {
+			// For mod_mail, get hub name
+			var hubName string
+			err := h.pool.QueryRow(c.Request.Context(), `SELECT name FROM hubs WHERE id = $1`, *conv.HubID).Scan(&hubName)
+			if err == nil {
+				details.HubName = &hubName
+			}
 		}
 
 		// Get latest message
@@ -155,6 +172,66 @@ func (h *ConversationsHandler) GetConversation(c *gin.Context) {
 	conversationID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid conversation ID"})
+		return
+	}
+
+	// Determine conversation type first
+	var conversationType string
+	err = h.pool.QueryRow(c.Request.Context(), `
+		SELECT conversation_type FROM conversations WHERE id = $1
+	`, conversationID).Scan(&conversationType)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Conversation not found"})
+		return
+	}
+
+	// Special handling for mod_mail threads (no user1/user2)
+	if conversationType == "mod_mail" {
+		// Verify participation via conversation_participants
+		var isParticipant bool
+		err = h.pool.QueryRow(c.Request.Context(), `
+			SELECT EXISTS(
+				SELECT 1 FROM conversation_participants
+				WHERE conversation_id = $1 AND user_id = $2
+			)
+		`, conversationID, userID.(int)).Scan(&isParticipant)
+		if err != nil || !isParticipant {
+			c.JSON(http.StatusForbidden, gin.H{"error": "You are not a participant in this conversation"})
+			return
+		}
+
+		// Fetch basics to populate timestamps
+		var createdAt, lastMessageAt time.Time
+		err = h.pool.QueryRow(c.Request.Context(), `
+			SELECT created_at, last_message_at FROM conversations WHERE id = $1
+		`, conversationID).Scan(&createdAt, &lastMessageAt)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load conversation", "details": err.Error()})
+			return
+		}
+
+		uid := userID.(int)
+		conv := &models.Conversation{
+			ID:               conversationID,
+			User1ID:          &uid, // placeholder to pass IsParticipant checks elsewhere if needed
+			User2ID:          &uid,
+			CreatedAt:        createdAt,
+			LastMessageAt:    lastMessageAt,
+			ConversationType: "dm", // Assume DM if we're creating it this way
+		}
+		details := &ConversationWithDetails{Conversation: conv}
+
+		// Latest message
+		latestMsg, _ := h.messageRepo.GetLatestMessage(c.Request.Context(), conversationID)
+		if latestMsg != nil {
+			details.LatestMessage = latestMsg
+		}
+		// Unread count
+		if unreadCount, err := h.messageRepo.GetUnreadCount(c.Request.Context(), conversationID, userID.(int)); err == nil {
+			details.UnreadCount = unreadCount
+		}
+
+		c.JSON(http.StatusOK, details)
 		return
 	}
 

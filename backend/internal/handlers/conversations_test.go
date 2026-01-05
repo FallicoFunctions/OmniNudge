@@ -11,9 +11,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gin-gonic/gin"
 	"github.com/omninudge/backend/internal/database"
 	"github.com/omninudge/backend/internal/models"
-	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -52,7 +52,7 @@ func setupConversationsHandlerTest(t *testing.T) (*ConversationsHandler, *databa
 	// Create handler
 	convRepo := models.NewConversationRepository(db.Pool)
 	messageRepo := models.NewMessageRepository(db.Pool)
-	handler := NewConversationsHandler(convRepo, messageRepo, userRepo)
+	handler := NewConversationsHandler(db.Pool, convRepo, messageRepo, userRepo)
 
 	cleanup := func() {
 		db.Close()

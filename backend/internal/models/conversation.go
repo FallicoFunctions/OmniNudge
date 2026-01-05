@@ -8,15 +8,19 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// Conversation represents a 1-on-1 chat between two users
+// Conversation represents a 1-on-1 chat between two users or a mod mail thread
 type Conversation struct {
-	ID            int       `json:"id"`
-	User1ID       int       `json:"user1_id"`
-	User2ID       int       `json:"user2_id"`
-	User1         *User     `json:"user1,omitempty"` // Optional populated user info
-	User2         *User     `json:"user2,omitempty"` // Optional populated user info
-	CreatedAt     time.Time `json:"created_at"`
-	LastMessageAt time.Time `json:"last_message_at"`
+	ID               int       `json:"id"`
+	User1ID          *int      `json:"user1_id,omitempty"`          // NULL for mod_mail
+	User2ID          *int      `json:"user2_id,omitempty"`          // NULL for mod_mail
+	User1            *User     `json:"user1,omitempty"`             // Optional populated user info
+	User2            *User     `json:"user2,omitempty"`             // Optional populated user info
+	CreatedAt        time.Time `json:"created_at"`
+	LastMessageAt    time.Time `json:"last_message_at"`
+	ConversationType string    `json:"conversation_type"`           // 'dm' or 'mod_mail'
+	HubID            *int      `json:"hub_id,omitempty"`            // For mod_mail conversations
+	Subject          *string   `json:"subject,omitempty"`           // For mod_mail conversations
+	Status           *string   `json:"status,omitempty"`            // For mod_mail: 'open', 'archived', 'resolved'
 
 	// Phase 2 features (not implemented yet)
 	User1AutoDeleteAfter *string `json:"user1_auto_delete_after,omitempty"`
@@ -44,8 +48,9 @@ func (r *ConversationRepository) Create(ctx context.Context, user1ID, user2ID in
 	}
 
 	conversation := &Conversation{
-		User1ID: user1ID,
-		User2ID: user2ID,
+		User1ID:          &user1ID,
+		User2ID:          &user2ID,
+		ConversationType: "dm",
 	}
 
 	query := `
@@ -143,9 +148,20 @@ func (r *ConversationRepository) GetByUserID(ctx context.Context, userID int, li
 	query := `
 		SELECT id, user1_id, user2_id, created_at, last_message_at,
 		       user1_auto_delete_after, user2_auto_delete_after,
-		       user1_pseudonym, user2_pseudonym
+		       user1_pseudonym, user2_pseudonym,
+		       conversation_type, hub_id, subject, status
 		FROM conversations
-		WHERE user1_id = $1 OR user2_id = $1
+		WHERE (
+			-- DM conversations (including legacy conversations with NULL conversation_type)
+			((conversation_type = 'dm' OR conversation_type IS NULL) AND (user1_id = $1 OR user2_id = $1))
+			OR
+			-- Mod mail conversations where user is a participant but NOT a moderator
+			(conversation_type = 'mod_mail' AND id IN (
+				SELECT conversation_id
+				FROM conversation_participants
+				WHERE user_id = $1 AND is_moderator = FALSE
+			))
+		)
 		ORDER BY last_message_at DESC
 		LIMIT $2 OFFSET $3
 	`
@@ -169,6 +185,10 @@ func (r *ConversationRepository) GetByUserID(ctx context.Context, userID int, li
 			&conversation.User2AutoDeleteAfter,
 			&conversation.User1Pseudonym,
 			&conversation.User2Pseudonym,
+			&conversation.ConversationType,
+			&conversation.HubID,
+			&conversation.Subject,
+			&conversation.Status,
 		)
 		if err != nil {
 			return nil, err
@@ -194,14 +214,19 @@ func (r *ConversationRepository) Delete(ctx context.Context, conversationID int)
 }
 
 // GetOtherUserID returns the ID of the other user in the conversation
+// Returns 0 for mod_mail conversations (not applicable)
 func (c *Conversation) GetOtherUserID(currentUserID int) int {
-	if c.User1ID == currentUserID {
-		return c.User2ID
+	if c.User1ID != nil && *c.User1ID == currentUserID && c.User2ID != nil {
+		return *c.User2ID
 	}
-	return c.User1ID
+	if c.User1ID != nil {
+		return *c.User1ID
+	}
+	return 0
 }
 
 // IsParticipant checks if a user is a participant in the conversation
+// For DM conversations only (mod_mail uses conversation_participants table)
 func (c *Conversation) IsParticipant(userID int) bool {
-	return c.User1ID == userID || c.User2ID == userID
+	return (c.User1ID != nil && *c.User1ID == userID) || (c.User2ID != nil && *c.User2ID == userID)
 }

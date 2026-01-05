@@ -9,26 +9,29 @@ import (
 
 // Message represents an encrypted message in a conversation
 type Message struct {
-	ID                       int        `json:"id"`
-	ConversationID           int        `json:"conversation_id"`
-	SenderID                 int        `json:"sender_id"`
-	RecipientID              int        `json:"recipient_id"`
-	EncryptedContent         string     `json:"encrypted_content"` // Base64 encoded encrypted blob (recipient copy or plaintext)
-	SenderEncryptedContent   *string    `json:"sender_encrypted_content,omitempty"`
-	MessageType              string     `json:"message_type"` // "text", "image", "video", "audio"
-	SentAt                   time.Time  `json:"sent_at"`
-	DeliveredAt              *time.Time `json:"delivered_at,omitempty"`
-	ReadAt                   *time.Time `json:"read_at,omitempty"`
-	DeletedForSender         bool       `json:"deleted_for_sender"`
-	DeletedForRecipient      bool       `json:"deleted_for_recipient"`
-	MediaFileID              *int       `json:"media_file_id,omitempty"` // References media_files table
-	MediaURL                 *string    `json:"media_url,omitempty"`
-	MediaType                *string    `json:"media_type,omitempty"`
-	MediaSize                *int       `json:"media_size,omitempty"`
-	EncryptionVersion        string     `json:"encryption_version"`             // For future encryption updates, e.g., "v1"
-	MediaEncryptionKey       *string    `json:"media_encryption_key,omitempty"` // RSA-encrypted AES key (Base64) for recipient
-	MediaEncryptionIV        *string    `json:"media_encryption_iv,omitempty"`  // AES-GCM initialization vector (Base64)
-	SenderMediaEncryptionKey *string    `json:"sender_media_encryption_key,omitempty"`
+	ID                       int                         `json:"id"`
+	ConversationID           int                         `json:"conversation_id"`
+	SenderID                 int                         `json:"sender_id"`
+	RecipientID              int                         `json:"recipient_id"`
+	EncryptedContent         string                      `json:"encrypted_content"` // Base64 encoded encrypted blob (recipient copy or plaintext)
+	SenderEncryptedContent   *string                     `json:"sender_encrypted_content,omitempty"`
+	MessageType              string                      `json:"message_type"` // "text", "image", "video", "audio"
+	SentAt                   time.Time                   `json:"sent_at"`
+	DeliveredAt              *time.Time                  `json:"delivered_at,omitempty"`
+	ReadAt                   *time.Time                  `json:"read_at,omitempty"`
+	DeletedForSender         bool                        `json:"deleted_for_sender"`
+	DeletedForRecipient      bool                        `json:"deleted_for_recipient"`
+	MediaFileID              *int                        `json:"media_file_id,omitempty"` // References media_files table
+	MediaURL                 *string                     `json:"media_url,omitempty"`
+	MediaType                *string                     `json:"media_type,omitempty"`
+	MediaSize                *int                        `json:"media_size,omitempty"`
+	EncryptionVersion        string                      `json:"encryption_version"`             // For future encryption updates, e.g., "v1"
+	MediaEncryptionKey       *string                     `json:"media_encryption_key,omitempty"` // RSA-encrypted AES key (Base64) for recipient
+	MediaEncryptionIV        *string                     `json:"media_encryption_iv,omitempty"`  // AES-GCM initialization vector (Base64)
+	SenderMediaEncryptionKey *string                     `json:"sender_media_encryption_key,omitempty"`
+	IsMultiRecipient         bool                        `json:"is_multi_recipient"`                // True for multi-recipient messages (mod mail)
+	SharedEncryptionIV       *string                     `json:"shared_encryption_iv,omitempty"`    // Shared IV for multi-recipient messages
+	RecipientKeys            map[int]string              `json:"recipient_keys,omitempty"`          // Map of user_id -> encrypted_key for multi-recipient
 }
 
 // MessageRepository handles database operations for messages
@@ -49,17 +52,25 @@ type DeliveredMessage struct {
 
 // Create creates a new message
 func (r *MessageRepository) Create(ctx context.Context, message *Message) error {
+	// Start a transaction for multi-recipient messages
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
 	query := `
 		INSERT INTO messages (
 			conversation_id, sender_id, recipient_id, encrypted_content, sender_encrypted_content,
 			message_type, media_file_id, media_url, media_type, media_size, encryption_version,
-			media_encryption_key, media_encryption_iv, sender_media_encryption_key
+			media_encryption_key, media_encryption_iv, sender_media_encryption_key,
+			is_multi_recipient, shared_encryption_iv
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
 		RETURNING id, sent_at
 	`
 
-	err := r.pool.QueryRow(
+	err = tx.QueryRow(
 		ctx, query,
 		message.ConversationID,
 		message.SenderID,
@@ -75,9 +86,57 @@ func (r *MessageRepository) Create(ctx context.Context, message *Message) error 
 		message.MediaEncryptionKey,
 		message.MediaEncryptionIV,
 		message.SenderMediaEncryptionKey,
+		message.IsMultiRecipient,
+		message.SharedEncryptionIV,
 	).Scan(&message.ID, &message.SentAt)
 
-	return err
+	if err != nil {
+		return err
+	}
+
+	// If this is a multi-recipient message, insert recipient keys
+	if message.IsMultiRecipient && len(message.RecipientKeys) > 0 {
+		for userID, encryptedKey := range message.RecipientKeys {
+			_, err = tx.Exec(ctx, `
+				INSERT INTO message_recipient_keys (message_id, user_id, encrypted_key)
+				VALUES ($1, $2, $3)
+			`, message.ID, userID, encryptedKey)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	return tx.Commit(ctx)
+}
+
+// loadRecipientKeys loads the recipient keys for a multi-recipient message
+func (r *MessageRepository) loadRecipientKeys(ctx context.Context, message *Message) error {
+	if !message.IsMultiRecipient {
+		return nil
+	}
+
+	rows, err := r.pool.Query(ctx, `
+		SELECT user_id, encrypted_key
+		FROM message_recipient_keys
+		WHERE message_id = $1
+	`, message.ID)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	message.RecipientKeys = make(map[int]string)
+	for rows.Next() {
+		var userID int
+		var encryptedKey string
+		if err := rows.Scan(&userID, &encryptedKey); err != nil {
+			return err
+		}
+		message.RecipientKeys[userID] = encryptedKey
+	}
+
+	return rows.Err()
 }
 
 // GetByID retrieves a message by its ID
@@ -96,7 +155,9 @@ func (r *MessageRepository) GetByID(ctx context.Context, id int) (*Message, erro
 		       m.encryption_version,
 		       m.media_encryption_key,
 		       m.media_encryption_iv,
-		       m.sender_media_encryption_key
+		       m.sender_media_encryption_key,
+		       COALESCE(m.is_multi_recipient, FALSE) as is_multi_recipient,
+		       m.shared_encryption_iv
 		FROM messages m
 		LEFT JOIN media_files mf ON m.media_file_id = mf.id
 		WHERE m.id = $1
@@ -123,9 +184,16 @@ func (r *MessageRepository) GetByID(ctx context.Context, id int) (*Message, erro
 		&message.MediaEncryptionKey,
 		&message.MediaEncryptionIV,
 		&message.SenderMediaEncryptionKey,
+		&message.IsMultiRecipient,
+		&message.SharedEncryptionIV,
 	)
 
 	if err != nil {
+		return nil, err
+	}
+
+	// Load recipient keys if this is a multi-recipient message
+	if err := r.loadRecipientKeys(ctx, message); err != nil {
 		return nil, err
 	}
 
@@ -147,7 +215,9 @@ func (r *MessageRepository) GetByConversationID(ctx context.Context, conversatio
 		       m.encryption_version,
 		       m.media_encryption_key,
 		       m.media_encryption_iv,
-		       m.sender_media_encryption_key
+		       m.sender_media_encryption_key,
+		       COALESCE(m.is_multi_recipient, FALSE) as is_multi_recipient,
+		       m.shared_encryption_iv
 		FROM messages m
 		LEFT JOIN media_files mf ON m.media_file_id = mf.id
 		WHERE m.conversation_id = $1
@@ -189,10 +259,91 @@ func (r *MessageRepository) GetByConversationID(ctx context.Context, conversatio
 			&message.MediaEncryptionKey,
 			&message.MediaEncryptionIV,
 			&message.SenderMediaEncryptionKey,
+			&message.IsMultiRecipient,
+			&message.SharedEncryptionIV,
 		)
 		if err != nil {
 			return nil, err
 		}
+
+		// Load recipient keys if this is a multi-recipient message
+		if err := r.loadRecipientKeys(ctx, message); err != nil {
+			return nil, err
+		}
+
+		messages = append(messages, message)
+	}
+
+	return messages, rows.Err()
+}
+
+// GetByConversationIDForAll retrieves messages for mod mail conversations (visible to all participants)
+func (r *MessageRepository) GetByConversationIDForAll(ctx context.Context, conversationID int, limit int, offset int) ([]*Message, error) {
+	query := `
+		SELECT m.id, m.conversation_id, m.sender_id, m.recipient_id, m.encrypted_content,
+		       m.sender_encrypted_content,
+		       m.message_type, m.sent_at, m.delivered_at, m.read_at,
+		       m.deleted_for_sender, m.deleted_for_recipient,
+		       m.media_file_id,
+		       COALESCE(mf.storage_url, m.media_url) as media_url,
+		       COALESCE(m.media_type, mf.file_type) as media_type,
+		       COALESCE(m.media_size, mf.file_size) as media_size,
+		       m.encryption_version,
+		       m.media_encryption_key,
+		       m.media_encryption_iv,
+		       m.sender_media_encryption_key,
+		       COALESCE(m.is_multi_recipient, FALSE) as is_multi_recipient,
+		       m.shared_encryption_iv
+		FROM messages m
+		LEFT JOIN media_files mf ON m.media_file_id = mf.id
+		WHERE m.conversation_id = $1
+		  AND NOT (m.deleted_for_sender = TRUE AND m.deleted_for_recipient = TRUE)
+		ORDER BY m.sent_at ASC
+		LIMIT $2 OFFSET $3
+	`
+
+	rows, err := r.pool.Query(ctx, query, conversationID, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var messages []*Message
+	for rows.Next() {
+		message := &Message{}
+		err := rows.Scan(
+			&message.ID,
+			&message.ConversationID,
+			&message.SenderID,
+			&message.RecipientID,
+			&message.EncryptedContent,
+			&message.SenderEncryptedContent,
+			&message.MessageType,
+			&message.SentAt,
+			&message.DeliveredAt,
+			&message.ReadAt,
+			&message.DeletedForSender,
+			&message.DeletedForRecipient,
+			&message.MediaFileID,
+			&message.MediaURL,
+			&message.MediaType,
+			&message.MediaSize,
+			&message.EncryptionVersion,
+			&message.MediaEncryptionKey,
+			&message.MediaEncryptionIV,
+			&message.SenderMediaEncryptionKey,
+			&message.IsMultiRecipient,
+			&message.SharedEncryptionIV,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		// Load recipient keys if this is a multi-recipient message
+		if err := r.loadRecipientKeys(ctx, message); err != nil {
+			return nil, err
+		}
+
 		messages = append(messages, message)
 	}
 
@@ -339,7 +490,9 @@ func (r *MessageRepository) GetLatestMessage(ctx context.Context, conversationID
 		       m.encryption_version,
 		       m.media_encryption_key,
 		       m.media_encryption_iv,
-		       m.sender_media_encryption_key
+		       m.sender_media_encryption_key,
+		       COALESCE(m.is_multi_recipient, FALSE) as is_multi_recipient,
+		       m.shared_encryption_iv
 		FROM messages m
 		LEFT JOIN media_files mf ON m.media_file_id = mf.id
 		WHERE m.conversation_id = $1
@@ -368,9 +521,16 @@ func (r *MessageRepository) GetLatestMessage(ctx context.Context, conversationID
 		&message.MediaEncryptionKey,
 		&message.MediaEncryptionIV,
 		&message.SenderMediaEncryptionKey,
+		&message.IsMultiRecipient,
+		&message.SharedEncryptionIV,
 	)
 
 	if err != nil {
+		return nil, err
+	}
+
+	// Load recipient keys if this is a multi-recipient message
+	if err := r.loadRecipientKeys(ctx, message); err != nil {
 		return nil, err
 	}
 
