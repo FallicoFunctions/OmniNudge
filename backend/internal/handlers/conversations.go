@@ -178,7 +178,9 @@ func (h *ConversationsHandler) GetConversation(c *gin.Context) {
 	// Determine conversation type first
 	var conversationType string
 	err = h.pool.QueryRow(c.Request.Context(), `
-		SELECT conversation_type FROM conversations WHERE id = $1
+		SELECT COALESCE(conversation_type, 'dm') AS conversation_type
+		FROM conversations
+		WHERE id = $1
 	`, conversationID).Scan(&conversationType)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Conversation not found"})
