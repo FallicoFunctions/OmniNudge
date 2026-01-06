@@ -3,6 +3,7 @@ package models
 import (
 	"context"
 	"database/sql"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -11,12 +12,13 @@ import (
 
 // User represents a user in the system
 type User struct {
-	ID              int     `json:"id"`
-	Username        string  `json:"username"`
-	Email           *string `json:"email,omitempty"`           // Decrypted email (for API responses)
-	EmailEncrypted  bool    `json:"-"`                         // Whether email is encrypted in DB
-	EncryptedEmail  *string `json:"-"`                         // Encrypted email (stored in DB)
-	PasswordHash    string  `json:"-"`                         // Never expose password hash in JSON
+	ID                 int     `json:"id"`
+	Username           string  `json:"username"`
+	UsernameNormalized string  `json:"-"`                         // Lowercase username for case-insensitive lookups
+	Email              *string `json:"email,omitempty"`           // Decrypted email (for API responses)
+	EmailEncrypted     bool    `json:"-"`                         // Whether email is encrypted in DB
+	EncryptedEmail     *string `json:"-"`                         // Encrypted email (stored in DB)
+	PasswordHash       string  `json:"-"`                         // Never expose password hash in JSON
 
 	// Reddit integration (optional)
 	RedditID       *string    `json:"reddit_id,omitempty"`
@@ -52,6 +54,9 @@ func NewUserRepository(pool *pgxpool.Pool) *UserRepository {
 
 // Create creates a new user with username/password
 func (r *UserRepository) Create(ctx context.Context, user *User) error {
+	// Set normalized username for case-insensitive uniqueness
+	user.UsernameNormalized = strings.ToLower(user.Username)
+
 	// Encrypt email if provided
 	var encryptedEmail *string
 	var emailEncrypted bool
@@ -65,13 +70,14 @@ func (r *UserRepository) Create(ctx context.Context, user *User) error {
 	}
 
 	query := `
-		INSERT INTO users (username, email, email_encrypted, password_hash, avatar_url, bio, nsfw)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		INSERT INTO users (username, username_normalized, email, email_encrypted, password_hash, avatar_url, bio, nsfw)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 		RETURNING id, created_at, last_seen, role, nsfw
 	`
 
 	return r.pool.QueryRow(ctx, query,
 		user.Username,
+		user.UsernameNormalized,
 		encryptedEmail,
 		emailEncrypted,
 		user.PasswordHash,
@@ -158,25 +164,19 @@ func (r *UserRepository) GetByID(ctx context.Context, id int) (*User, error) {
 	return user, nil
 }
 
-// GetByUsername retrieves a user by their username
+// GetByUsername retrieves a user by their username (case-insensitive)
 func (r *UserRepository) GetByUsername(ctx context.Context, username string) (*User, error) {
 	if username == "" {
 		return nil, nil
 	}
 
-	// Prefer exact match to avoid collisions between usernames that only differ by case.
-	if user, err := r.queryUser(ctx, `
-		SELECT id, username, email, email_encrypted, password_hash, reddit_id, reddit_username, public_key, avatar_url, bio, karma, role, created_at, last_seen
-		FROM users WHERE username = $1
-	`, username); err != nil || user != nil {
-		return user, err
-	}
+	// Use username_normalized for case-insensitive lookup
+	normalizedUsername := strings.ToLower(strings.TrimSpace(username))
 
-	// Fallback to case-insensitive/trimmed lookup for legacy data that may contain inconsistent casing/spacing.
 	return r.queryUser(ctx, `
 		SELECT id, username, email, email_encrypted, password_hash, reddit_id, reddit_username, public_key, avatar_url, bio, karma, role, created_at, last_seen
-		FROM users WHERE LOWER(TRIM(username)) = LOWER(TRIM($1))
-	`, username)
+		FROM users WHERE username_normalized = $1
+	`, normalizedUsername)
 }
 
 func (r *UserRepository) queryUser(ctx context.Context, query string, arg interface{}) (*User, error) {

@@ -3,6 +3,7 @@ package models
 import (
 	"context"
 	"database/sql"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -12,6 +13,7 @@ import (
 type Hub struct {
 	ID              int        `json:"id"`
 	Name            string     `json:"name"`
+	NameNormalized  string     `json:"-"`                          // Lowercase name for case-insensitive lookups
 	Description     *string    `json:"description,omitempty"`
 	Title           *string    `json:"title,omitempty"`           // Display title for the hub
 	Type            string     `json:"type"`                       // public or private
@@ -35,6 +37,9 @@ func NewHubRepository(pool *pgxpool.Pool) *HubRepository {
 
 // Create creates a hub
 func (r *HubRepository) Create(ctx context.Context, h *Hub) error {
+	// Set normalized name for case-insensitive uniqueness
+	h.NameNormalized = strings.ToLower(h.Name)
+
 	// Set defaults if not provided
 	if h.Type == "" {
 		h.Type = "public"
@@ -44,23 +49,30 @@ func (r *HubRepository) Create(ctx context.Context, h *Hub) error {
 	}
 
 	query := `
-		INSERT INTO hubs (name, description, title, type, content_options, created_by, nsfw)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		INSERT INTO hubs (name, name_normalized, description, title, type, content_options, created_by, nsfw)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 		RETURNING id, created_at, is_quarantined, subscriber_count, nsfw
 	`
-	return r.pool.QueryRow(ctx, query, h.Name, h.Description, h.Title, h.Type, h.ContentOptions, h.CreatedBy, h.NSFW).
+	return r.pool.QueryRow(ctx, query, h.Name, h.NameNormalized, h.Description, h.Title, h.Type, h.ContentOptions, h.CreatedBy, h.NSFW).
 		Scan(&h.ID, &h.CreatedAt, &h.IsQuarantined, &h.SubscriberCount, &h.NSFW)
 }
 
-// GetByName fetches hub by name
+// GetByName fetches hub by name (case-insensitive)
 func (r *HubRepository) GetByName(ctx context.Context, name string) (*Hub, error) {
+	if name == "" {
+		return nil, nil
+	}
+
+	// Use name_normalized for case-insensitive lookup
+	normalizedName := strings.ToLower(strings.TrimSpace(name))
+
 	h := &Hub{}
 	query := `
 		SELECT id, name, description, title, type, content_options, is_quarantined, subscriber_count, created_by, created_at, nsfw
 		FROM hubs
-		WHERE name = $1
+		WHERE name_normalized = $1
 	`
-	err := r.pool.QueryRow(ctx, query, name).Scan(&h.ID, &h.Name, &h.Description, &h.Title, &h.Type, &h.ContentOptions, &h.IsQuarantined, &h.SubscriberCount, &h.CreatedBy, &h.CreatedAt, &h.NSFW)
+	err := r.pool.QueryRow(ctx, query, normalizedName).Scan(&h.ID, &h.Name, &h.Description, &h.Title, &h.Type, &h.ContentOptions, &h.IsQuarantined, &h.SubscriberCount, &h.CreatedBy, &h.CreatedAt, &h.NSFW)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, nil
