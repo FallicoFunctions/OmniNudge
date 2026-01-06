@@ -95,10 +95,16 @@ func (h *MessagesHandler) SendMessage(c *gin.Context) {
 	var conversationType string
 	var err error
 	err = h.pool.QueryRow(c.Request.Context(), `
-		SELECT conversation_type FROM conversations WHERE id = $1
+		SELECT COALESCE(conversation_type, 'dm') AS conversation_type
+		FROM conversations
+		WHERE id = $1
 	`, req.ConversationID).Scan(&conversationType)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Conversation not found"})
+		if err.Error() == "no rows in result set" {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Conversation not found"})
+		} else {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get conversation", "details": err.Error()})
+		}
 		return
 	}
 
@@ -266,7 +272,11 @@ func (h *MessagesHandler) GetMessages(c *gin.Context) {
 		SELECT conversation_type, hub_id FROM conversations WHERE id = $1
 	`, conversationID).Scan(&conversationType, &hubID)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Conversation not found"})
+		if err.Error() == "no rows in result set" {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Conversation not found"})
+		} else {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get conversation", "details": err.Error()})
+		}
 		return
 	}
 
@@ -366,7 +376,9 @@ func (h *MessagesHandler) MarkAsRead(c *gin.Context) {
 	// Check conversation type first
 	var conversationType string
 	err = h.pool.QueryRow(c.Request.Context(), `
-		SELECT conversation_type FROM conversations WHERE id = $1
+		SELECT COALESCE(conversation_type, 'dm') AS conversation_type
+		FROM conversations
+		WHERE id = $1
 	`, conversationID).Scan(&conversationType)
 
 	if err != nil {

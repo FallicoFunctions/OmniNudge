@@ -362,14 +362,43 @@ export default function MessagesPage() {
     queryFn: () => messagesService.getConversations(),
   });
 
+  // Prune stale message queries for conversations that no longer exist
+  useEffect(() => {
+    if (!conversations) return;
+    const validIds = new Set(conversations.map((c) => c.id));
+    queryClient.removeQueries({
+      queryKey: ['messages'],
+      predicate: (query) => {
+        const key = query.queryKey;
+        const convId = key && key.length > 1 ? (key[1] as number | undefined) : undefined;
+        return typeof convId === 'number' && !validIds.has(convId);
+      },
+    });
+  }, [conversations, queryClient]);
+
+  // Auto-select the first available conversation if none is selected or the current selection no longer exists.
+  useEffect(() => {
+    if (isCreatingChat) return;
+    if (!conversations || conversations.length === 0) return;
+    const currentExists = selectedConversationId
+      ? conversations.some((c) => c.id === selectedConversationId)
+      : false;
+
+    if (!selectedConversationId || !currentExists) {
+      setSelectedConversationId(conversations[0].id);
+    }
+  }, [conversations, isCreatingChat, selectedConversationId]);
+
+  const selectedConversation = conversations?.find((c) => c.id === selectedConversationId);
+  const selectedConversationExists = Boolean(selectedConversation);
+
   const { data: messages, isLoading: loadingMessages } = useQuery({
     queryKey: ['messages', selectedConversationId],
     queryFn: () => messagesService.getMessages(selectedConversationId!),
-    enabled: !!selectedConversationId,
+    enabled: !!selectedConversationId && selectedConversationExists,
     refetchOnWindowFocus: false,
+    retry: false, // Avoid retry loops on 404 when a conversation was deleted
   });
-
-  const selectedConversation = conversations?.find((c) => c.id === selectedConversationId);
 
   // Fetch mod-mail conversation details if this is a mod_mail conversation
   const { data: modMailConversation } = useQuery<ModMailConversation>({
