@@ -182,8 +182,9 @@ export default function ModMailConversationPage() {
       );
 
       if (!participantIds.length) {
-        setEncryptionWarning('No participants found to encrypt the message for; sending plaintext.');
-        return { is_multi_recipient: false, encryption_version: 'plaintext' };
+        const error = 'CRITICAL: No participants found. Cannot send unencrypted mod mail.';
+        setEncryptionWarning(error);
+        throw new Error(error);
       }
 
       const publicKeys = await encryptionService.getPublicKeys(participantIds);
@@ -206,16 +207,16 @@ export default function ModMailConversationPage() {
 
       const ownKeys = await getOwnKeys();
       if (!cryptoKeys.length || missing.length || !ownKeys?.publicKey) {
+        let errorMsg = 'CRITICAL: Cannot send unencrypted mod mail. ';
         if (missing.length) {
-          setEncryptionWarning(
-            `Missing public keys for participants: ${missing.join(
-              ', '
-            )}. Sending message as plaintext.`
-          );
-        } else if (!ownKeys?.publicKey) {
-          setEncryptionWarning('No local encryption key found. Sending message as plaintext.');
+          errorMsg += `Missing public keys for user IDs: ${missing.join(', ')}. `;
         }
-        return { is_multi_recipient: false, encryption_version: 'plaintext' };
+        if (!ownKeys?.publicKey) {
+          errorMsg += 'You have not set up encryption keys. ';
+        }
+        errorMsg += 'All participants must have encryption enabled.';
+        setEncryptionWarning(errorMsg);
+        throw new Error(errorMsg);
       }
 
       const encrypted = await encryptForMultipleRecipients(content, cryptoKeys, ownKeys.publicKey);

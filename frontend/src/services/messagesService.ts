@@ -129,7 +129,6 @@ export const messagesService = {
       is_multi_recipient: data.is_multi_recipient,
       shared_encryption_iv: data.shared_encryption_iv,
       recipient_keys: data.recipient_keys,
-      encryption_version: encryptionVersion,
     });
   },
 

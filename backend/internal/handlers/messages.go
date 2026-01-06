@@ -174,15 +174,42 @@ func (h *MessagesHandler) SendMessage(c *gin.Context) {
 		}
 	}
 
-	// Mod mail messages using multi-recipient encryption must include payloads
-	if conversationType == "mod_mail" && req.IsMultiRecipient {
-		if len(req.RecipientKeys) == 0 || req.SharedEncryptionIV == nil {
+	// CRITICAL: Mod mail messages MUST be encrypted - reject plaintext
+	if conversationType == "mod_mail" {
+		if req.EncryptionVersion == "plaintext" || req.EncryptionVersion == "none" || req.EncryptionVersion == "" {
 			c.JSON(http.StatusBadRequest, gin.H{
-				"error":   "Missing encryption payloads for mod mail message",
-				"details": "Provide shared_encryption_iv and recipient_keys for all participants",
+				"error":   "Mod mail messages must be encrypted",
+				"details": "Encryption failed. Ensure all participants have public keys set up.",
 			})
 			return
 		}
+
+		// Mod mail messages using multi-recipient encryption must include payloads
+		if req.IsMultiRecipient {
+			if len(req.RecipientKeys) == 0 || req.SharedEncryptionIV == nil {
+				c.JSON(http.StatusBadRequest, gin.H{
+					"error":   "Missing encryption payloads for mod mail message",
+					"details": "Provide shared_encryption_iv and recipient_keys for all participants",
+				})
+				return
+			}
+		} else {
+			// If not multi-recipient, it should still be encrypted (v1 encryption)
+			if req.EncryptionVersion != "v1" && req.EncryptionVersion != "v2" {
+				c.JSON(http.StatusBadRequest, gin.H{
+					"error":   "Mod mail messages must use v1 or v2 encryption",
+					"details": "Invalid encryption version for mod mail",
+				})
+				return
+			}
+		}
+	}
+
+	// IMPORTANT: All messages should be encrypted for security
+	// Log a warning if sending plaintext (but allow for backwards compatibility)
+	if conversationType == "dm" && (req.EncryptionVersion == "plaintext" || req.EncryptionVersion == "none") {
+		// Don't block, but this should be investigated
+		c.Writer.Header().Add("X-Warning", "Message sent without encryption. Ensure users have encryption keys set up.")
 	}
 
 	// Create message
