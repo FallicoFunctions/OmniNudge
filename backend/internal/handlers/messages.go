@@ -244,10 +244,22 @@ func (h *MessagesHandler) SendMessage(c *gin.Context) {
 		message = fullMessage
 	}
 
-	// Update conversation's last_message_at timestamp
+	// Update conversation's last_message_at timestamp and re-add users if deleted/archived
 	if err := h.conversationRepo.UpdateLastMessageAt(c.Request.Context(), req.ConversationID); err != nil {
 		// Log error but don't fail the request
 		c.Writer.Header().Add("X-Warning", "Failed to update conversation timestamp")
+	}
+
+	// Re-add users to conversation if they had deleted or archived it (for DM conversations only)
+	if conversationType == "dm" {
+		_, _ = h.pool.Exec(c.Request.Context(), `
+			UPDATE conversations
+			SET deleted_for_user1 = FALSE,
+			    deleted_for_user2 = FALSE,
+			    archived_for_user1 = FALSE,
+			    archived_for_user2 = FALSE
+			WHERE id = $1 AND conversation_type = 'dm'
+		`, req.ConversationID)
 	}
 
 	// Broadcast message to recipient via WebSocket if they're online
