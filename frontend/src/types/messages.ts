@@ -17,6 +17,8 @@ export interface Conversation {
   hub_name?: string | null; // For mod_mail conversations
   subject?: string | null; // For mod_mail conversations
   status?: string | null; // For mod_mail: 'open', 'archived', 'resolved'
+  archived_at?: string | null; // When conversation was archived
+  archived_by?: number | null; // User who archived it
   other_user?: ConversationUser; // Only for DM conversations
   latest_message?: Message;
   unread_count: number;

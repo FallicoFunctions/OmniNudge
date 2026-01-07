@@ -27,8 +27,9 @@ async function ensureConversationId(data: SendMessageRequest): Promise<number> {
 }
 
 export const messagesService = {
-  async getConversations(): Promise<Conversation[]> {
-    const response = await api.get<{ conversations: Conversation[] }>('/conversations');
+  async getConversations(includeArchived = false): Promise<Conversation[]> {
+    const query = includeArchived ? '?include_archived=true' : '';
+    const response = await api.get<{ conversations: Conversation[] }>(`/conversations${query}`);
     return response.conversations;
   },
 
@@ -143,5 +144,22 @@ export const messagesService = {
     const scope = options?.deleteFor && options.deleteFor !== 'self' ? options.deleteFor : undefined;
     const query = scope ? `?delete_for=${scope}` : '';
     await api.delete(`/messages/${messageId}${query}`);
+  },
+
+  async archiveConversation(conversationId: number): Promise<void> {
+    await api.put(`/conversations/${conversationId}/archive`, {});
+  },
+
+  async unarchiveConversation(conversationId: number): Promise<void> {
+    await api.put(`/conversations/${conversationId}/unarchive`, {});
+  },
+
+  async deleteConversation(
+    conversationId: number,
+    options?: { deleteFor?: 'me' | 'both' }
+  ): Promise<void> {
+    const deleteFor = options?.deleteFor || 'me';
+    const query = `?delete_for=${deleteFor}`;
+    await api.delete(`/conversations/${conversationId}${query}`);
   },
 };
