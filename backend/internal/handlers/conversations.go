@@ -3,6 +3,7 @@ package handlers
 import (
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -101,13 +102,14 @@ func (h *ConversationsHandler) GetConversations(c *gin.Context) {
 	// Parse query parameters
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
 	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
+	includeArchived := c.DefaultQuery("include_archived", "false") == "true"
 
 	// Validate limit
 	if limit < 1 || limit > 100 {
 		limit = 20
 	}
 
-	conversations, err := h.conversationRepo.GetByUserID(c.Request.Context(), userID.(int), limit, offset)
+	conversations, err := h.conversationRepo.GetByUserID(c.Request.Context(), userID.(int), limit, offset, includeArchived)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get conversations", "details": err.Error()})
 		return
@@ -295,6 +297,13 @@ func (h *ConversationsHandler) DeleteConversation(c *gin.Context) {
 		return
 	}
 
+	// Get delete scope from query parameter
+	deleteFor := strings.ToLower(strings.TrimSpace(c.DefaultQuery("delete_for", "me")))
+	if deleteFor != "me" && deleteFor != "both" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid delete_for value. Must be 'me' or 'both'"})
+		return
+	}
+
 	// Verify conversation exists and user is a participant
 	conversation, err := h.conversationRepo.GetByID(c.Request.Context(), conversationID)
 	if err != nil {
@@ -312,11 +321,108 @@ func (h *ConversationsHandler) DeleteConversation(c *gin.Context) {
 		return
 	}
 
-	// Delete the conversation and all messages
-	if err := h.conversationRepo.Delete(c.Request.Context(), conversationID); err != nil {
+	if deleteFor == "both" {
+		// Hard delete all user's messages
+		if err := h.conversationRepo.HardDeleteMessages(c.Request.Context(), conversationID, userID.(int)); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete messages", "details": err.Error()})
+			return
+		}
+	}
+
+	// Soft delete conversation for this user
+	if err := h.conversationRepo.SoftDeleteForUser(c.Request.Context(), conversationID, userID.(int)); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete conversation", "details": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Conversation deleted successfully"})
+	// Attempt to hard delete if both users have deleted
+	_ = h.conversationRepo.HardDeleteIfBothDeleted(c.Request.Context(), conversationID)
+
+	if deleteFor == "both" {
+		c.JSON(http.StatusOK, gin.H{"message": "Conversation and your messages deleted successfully"})
+	} else {
+		c.JSON(http.StatusOK, gin.H{"message": "Conversation deleted successfully"})
+	}
+}
+
+// ArchiveConversation handles PUT /api/v1/conversations/:id/archive
+func (h *ConversationsHandler) ArchiveConversation(c *gin.Context) {
+	// Get user ID from context
+	userID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
+
+	conversationID, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid conversation ID"})
+		return
+	}
+
+	// Verify conversation exists and user is a participant
+	conversation, err := h.conversationRepo.GetByID(c.Request.Context(), conversationID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get conversation", "details": err.Error()})
+		return
+	}
+
+	if conversation == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Conversation not found"})
+		return
+	}
+
+	if !conversation.IsParticipant(userID.(int)) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "You are not a participant in this conversation"})
+		return
+	}
+
+	// Archive the conversation
+	if err := h.conversationRepo.Archive(c.Request.Context(), conversationID, userID.(int)); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to archive conversation", "details": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Conversation archived successfully"})
+}
+
+// UnarchiveConversation handles PUT /api/v1/conversations/:id/unarchive
+func (h *ConversationsHandler) UnarchiveConversation(c *gin.Context) {
+	// Get user ID from context
+	userID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
+
+	conversationID, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid conversation ID"})
+		return
+	}
+
+	// Verify conversation exists and user is a participant
+	conversation, err := h.conversationRepo.GetByID(c.Request.Context(), conversationID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get conversation", "details": err.Error()})
+		return
+	}
+
+	if conversation == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Conversation not found"})
+		return
+	}
+
+	if !conversation.IsParticipant(userID.(int)) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "You are not a participant in this conversation"})
+		return
+	}
+
+	// Unarchive the conversation
+	if err := h.conversationRepo.Unarchive(c.Request.Context(), conversationID); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to unarchive conversation", "details": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Conversation unarchived successfully"})
 }
