@@ -3,7 +3,6 @@ import { Link, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../contexts/AuthContext';
 import { useMessagingContext } from '../contexts/MessagingContext';
-import ThemeSelector from '../components/themes/ThemeSelector';
 import { usersService } from '../services/usersService';
 import { messagesService } from '../services/messagesService';
 import { useMessagingWebSocket } from '../hooks/useMessagingWebSocket';
@@ -174,7 +173,6 @@ export default function MainLayout() {
             </div>
 
             <div className="flex items-center gap-4">
-              <ThemeSelector variant="toolbar" />
               {user ? (
                 <>
                   <Link
