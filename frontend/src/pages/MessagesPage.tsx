@@ -391,7 +391,13 @@ export default function MessagesPage() {
   // Auto-select the first available conversation if none is selected or the current selection no longer exists.
   useEffect(() => {
     if (isCreatingChat) return;
-    if (!conversations || conversations.length === 0) return;
+    if (!conversations || conversations.length === 0) {
+      // Clear selection if there are no conversations
+      if (selectedConversationId !== null) {
+        setSelectedConversationId(null);
+      }
+      return;
+    }
     const currentExists = selectedConversationId
       ? conversations.some((c) => c.id === selectedConversationId)
       : false;
@@ -1300,7 +1306,9 @@ export default function MessagesPage() {
                 }}
                 disabled={deleteConversationMutation.isPending}
               >
-                {deleteConversationMutation.isPending ? 'Deleting...' : 'Delete for me'}
+                {deleteConversationMutation.isPending
+                  ? 'Deleting...'
+                  : 'Delete for me (Other user will still see your messages)'}
               </button>
               <button
                 type="button"
@@ -1313,9 +1321,7 @@ export default function MessagesPage() {
                 }}
                 disabled={deleteConversationMutation.isPending}
               >
-                {deleteConversationMutation.isPending
-                  ? 'Deleting for both...'
-                  : 'Delete for both (deletes your messages)'}
+                {deleteConversationMutation.isPending ? 'Deleting for both...' : 'Delete for both'}
               </button>
               <button
                 type="button"
