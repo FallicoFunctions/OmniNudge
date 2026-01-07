@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import ThemeSelector from '../components/themes/ThemeSelector';
 import { useSettings } from '../contexts/SettingsContext';
 import { getOwnPublicKeyBase64 } from '../services/keyManagementService';
 
@@ -39,6 +40,15 @@ export default function SettingsPage() {
       </div>
 
       <div className="space-y-6">
+        {/* Theme Selection */}
+        <section className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-6">
+          <h2 className="mb-4 text-xl font-semibold text-[var(--color-text-primary)]">Theme</h2>
+          <p className="mb-4 text-sm text-[var(--color-text-secondary)]">
+            Choose an active theme or create your own.
+          </p>
+          <ThemeSelector />
+        </section>
+
         {/* Date & Time Settings */}
         <section className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-6">
           <h2 className="mb-4 text-xl font-semibold text-[var(--color-text-primary)]">
