@@ -492,8 +492,8 @@ export default function MessagesPage() {
 
   const archiveConversationMutation = useMutation({
     mutationFn: (conversationId: number) => messagesService.archiveConversation(conversationId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['conversations'] });
+    onSuccess: async () => {
+      await queryClient.refetchQueries({ queryKey: ['conversations'] });
       setConversationMenuOpen(null);
     },
     onError: (error) => {
@@ -503,8 +503,8 @@ export default function MessagesPage() {
 
   const unarchiveConversationMutation = useMutation({
     mutationFn: (conversationId: number) => messagesService.unarchiveConversation(conversationId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['conversations'] });
+    onSuccess: async () => {
+      await queryClient.refetchQueries({ queryKey: ['conversations'] });
       setConversationMenuOpen(null);
     },
     onError: (error) => {
