@@ -11,18 +11,18 @@ import (
 // Conversation represents a 1-on-1 chat between two users or a mod mail thread
 type Conversation struct {
 	ID               int        `json:"id"`
-	User1ID          *int       `json:"user1_id,omitempty"`          // NULL for mod_mail
-	User2ID          *int       `json:"user2_id,omitempty"`          // NULL for mod_mail
-	User1            *User      `json:"user1,omitempty"`             // Optional populated user info
-	User2            *User      `json:"user2,omitempty"`             // Optional populated user info
+	User1ID          *int       `json:"user1_id,omitempty"` // NULL for mod_mail
+	User2ID          *int       `json:"user2_id,omitempty"` // NULL for mod_mail
+	User1            *User      `json:"user1,omitempty"`    // Optional populated user info
+	User2            *User      `json:"user2,omitempty"`    // Optional populated user info
 	CreatedAt        time.Time  `json:"created_at"`
 	LastMessageAt    time.Time  `json:"last_message_at"`
-	ConversationType string     `json:"conversation_type"`           // 'dm' or 'mod_mail'
-	HubID            *int       `json:"hub_id,omitempty"`            // For mod_mail conversations
-	Subject          *string    `json:"subject,omitempty"`           // For mod_mail conversations
-	Status           *string    `json:"status,omitempty"`            // For mod_mail: 'open', 'archived', 'resolved'
-	ArchivedAt       *time.Time `json:"archived_at,omitempty"`       // When conversation was archived
-	ArchivedBy       *int       `json:"archived_by,omitempty"`       // User who archived it
+	ConversationType string     `json:"conversation_type"` // 'dm' or 'mod_mail'
+	HubID            *int       `json:"hub_id,omitempty"`  // For mod_mail conversations
+	Subject          *string    `json:"subject,omitempty"` // For mod_mail conversations
+	Status           *string    `json:"status,omitempty"`  // For mod_mail: 'open', 'archived', 'resolved'
+	ArchivedAt       *time.Time `json:"archived_at"`       // When conversation was archived (explicit null when active)
+	ArchivedBy       *int       `json:"archived_by"`       // User who archived it (explicit null when active)
 
 	// Phase 2 features (not implemented yet)
 	User1AutoDeleteAfter *string `json:"user1_auto_delete_after,omitempty"`
@@ -62,7 +62,9 @@ func (r *ConversationRepository) Create(ctx context.Context, user1ID, user2ID in
 		ON CONFLICT (user1_id, user2_id) DO UPDATE
 		SET last_message_at = CURRENT_TIMESTAMP,
 		    deleted_for_user1 = FALSE,
-		    deleted_for_user2 = FALSE
+		    deleted_for_user2 = FALSE,
+		    archived_at = NULL,
+		    archived_by = NULL
 		RETURNING id, created_at, last_message_at
 	`
 
@@ -248,26 +250,53 @@ func (c *Conversation) IsParticipant(userID int) bool {
 	return (c.User1ID != nil && *c.User1ID == userID) || (c.User2ID != nil && *c.User2ID == userID)
 }
 
-// Archive archives a conversation (DM only)
+// Archive archives a conversation
+// For DMs: sets archived_at and archived_by
+// For mod_mail: sets status to 'archived', archived_at, and archived_by
 func (r *ConversationRepository) Archive(ctx context.Context, conversationID int, userID int) error {
 	query := `
 		UPDATE conversations
-		SET archived_at = CURRENT_TIMESTAMP, archived_by = $2
-		WHERE id = $1 AND conversation_type = 'dm'
+		SET archived_at = CURRENT_TIMESTAMP,
+		    archived_by = $2,
+		    status = CASE
+		        WHEN conversation_type = 'mod_mail' THEN 'archived'::varchar
+		        ELSE status
+		    END
+		WHERE id = $1 AND (conversation_type = 'dm' OR conversation_type = 'mod_mail')
 	`
 	_, err := r.pool.Exec(ctx, query, conversationID, userID)
 	return err
 }
 
 // Unarchive unarchives a conversation
-func (r *ConversationRepository) Unarchive(ctx context.Context, conversationID int) error {
+// For DMs: clears archived_at and archived_by (participant check required)
+// For mod_mail: sets status to 'open', clears archived_at and archived_by (no participant check needed)
+func (r *ConversationRepository) Unarchive(ctx context.Context, conversationID int, userID int) error {
 	query := `
 		UPDATE conversations
-		SET archived_at = NULL, archived_by = NULL
+		SET archived_at = NULL,
+		    archived_by = NULL,
+		    status = CASE
+		        WHEN conversation_type = 'mod_mail' THEN 'open'::varchar
+		        ELSE status
+		    END
 		WHERE id = $1
+		  AND (
+		      (conversation_type = 'dm' AND (user1_id = $2 OR user2_id = $2))
+		      OR conversation_type = 'mod_mail'
+		  )
 	`
-	_, err := r.pool.Exec(ctx, query, conversationID)
-	return err
+	result, err := r.pool.Exec(ctx, query, conversationID, userID)
+	if err != nil {
+		return err
+	}
+
+	rowsAffected := result.RowsAffected()
+	if rowsAffected == 0 {
+		return pgx.ErrNoRows
+	}
+
+	return nil
 }
 
 // SoftDeleteForUser marks a conversation as deleted for a specific user

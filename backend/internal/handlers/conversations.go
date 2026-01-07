@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/omninudge/backend/internal/models"
 )
@@ -372,9 +373,23 @@ func (h *ConversationsHandler) ArchiveConversation(c *gin.Context) {
 		return
 	}
 
-	if !conversation.IsParticipant(userID.(int)) {
-		c.JSON(http.StatusForbidden, gin.H{"error": "You are not a participant in this conversation"})
-		return
+	// Check permissions based on conversation type
+	if conversation.ConversationType == "dm" {
+		if !conversation.IsParticipant(userID.(int)) {
+			c.JSON(http.StatusForbidden, gin.H{"error": "You are not a participant in this conversation"})
+			return
+		}
+	} else if conversation.ConversationType == "mod_mail" {
+		// For mod mail, check if user is a participant in conversation_participants table
+		var count int
+		err := h.pool.QueryRow(c.Request.Context(), `
+			SELECT COUNT(*) FROM conversation_participants
+			WHERE conversation_id = $1 AND user_id = $2
+		`, conversationID, userID.(int)).Scan(&count)
+		if err != nil || count == 0 {
+			c.JSON(http.StatusForbidden, gin.H{"error": "You are not a participant in this mod mail conversation"})
+			return
+		}
 	}
 
 	// Archive the conversation
@@ -401,25 +416,12 @@ func (h *ConversationsHandler) UnarchiveConversation(c *gin.Context) {
 		return
 	}
 
-	// Verify conversation exists and user is a participant
-	conversation, err := h.conversationRepo.GetByID(c.Request.Context(), conversationID)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get conversation", "details": err.Error()})
-		return
-	}
-
-	if conversation == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Conversation not found"})
-		return
-	}
-
-	if !conversation.IsParticipant(userID.(int)) {
-		c.JSON(http.StatusForbidden, gin.H{"error": "You are not a participant in this conversation"})
-		return
-	}
-
-	// Unarchive the conversation
-	if err := h.conversationRepo.Unarchive(c.Request.Context(), conversationID); err != nil {
+	// Unarchive the conversation (permission check is done in the repository method)
+	if err := h.conversationRepo.Unarchive(c.Request.Context(), conversationID, userID.(int)); err != nil {
+		if err == pgx.ErrNoRows {
+			c.JSON(http.StatusForbidden, gin.H{"error": "You are not a participant in this conversation or conversation is not archived"})
+			return
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to unarchive conversation", "details": err.Error()})
 		return
 	}
