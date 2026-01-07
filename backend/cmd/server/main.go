@@ -457,6 +457,8 @@ func main() {
 			protected.POST("/conversations", conversationsHandler.CreateConversation)
 			protected.GET("/conversations", conversationsHandler.GetConversations)
 			protected.GET("/conversations/:id", conversationsHandler.GetConversation)
+			protected.PUT("/conversations/:id/archive", conversationsHandler.ArchiveConversation)
+			protected.PUT("/conversations/:id/unarchive", conversationsHandler.UnarchiveConversation)
 			protected.DELETE("/conversations/:id", conversationsHandler.DeleteConversation)
 
 			// Protected messages routes

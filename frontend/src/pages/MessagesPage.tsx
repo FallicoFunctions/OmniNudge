@@ -352,20 +352,32 @@ export default function MessagesPage() {
   const [messageMenuOpen, setMessageMenuOpen] = useState<number | null>(null);
   const [deleteDialogMessage, setDeleteDialogMessage] = useState<Message | null>(null);
   const [deleteScopeInFlight, setDeleteScopeInFlight] = useState<'self' | 'both' | null>(null);
+  const [activeTab, setActiveTab] = useState<'active' | 'archived'>('active');
+  const [conversationMenuOpen, setConversationMenuOpen] = useState<number | null>(null);
+  const [deleteConversationDialog, setDeleteConversationDialog] = useState<Conversation | null>(null);
   const queryClient = useQueryClient();
   const [searchParams] = useSearchParams();
   const toUsernameParam = searchParams.get('to');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const { data: conversations, isLoading: loadingConversations } = useQuery({
+  const { data: allConversations, isLoading: loadingConversations } = useQuery({
     queryKey: ['conversations'],
-    queryFn: () => messagesService.getConversations(),
+    queryFn: () => messagesService.getConversations(true), // Fetch all including archived
   });
+
+  // Filter conversations based on active tab
+  const conversations = useMemo(() => {
+    if (!allConversations) return undefined;
+    if (activeTab === 'archived') {
+      return allConversations.filter((c) => c.archived_at !== null);
+    }
+    return allConversations.filter((c) => c.archived_at === null);
+  }, [allConversations, activeTab]);
 
   // Prune stale message queries for conversations that no longer exist
   useEffect(() => {
-    if (!conversations) return;
-    const validIds = new Set(conversations.map((c) => c.id));
+    if (!allConversations) return;
+    const validIds = new Set(allConversations.map((c) => c.id));
     queryClient.removeQueries({
       queryKey: ['messages'],
       predicate: (query) => {
@@ -374,7 +386,7 @@ export default function MessagesPage() {
         return typeof convId === 'number' && !validIds.has(convId);
       },
     });
-  }, [conversations, queryClient]);
+  }, [allConversations, queryClient]);
 
   // Auto-select the first available conversation if none is selected or the current selection no longer exists.
   useEffect(() => {
@@ -475,6 +487,50 @@ export default function MessagesPage() {
     },
     onSettled: () => {
       setDeleteScopeInFlight(null);
+    },
+  });
+
+  const archiveConversationMutation = useMutation({
+    mutationFn: (conversationId: number) => messagesService.archiveConversation(conversationId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['conversations'] });
+      setConversationMenuOpen(null);
+    },
+    onError: (error) => {
+      alert(error instanceof Error ? error.message : 'Failed to archive conversation');
+    },
+  });
+
+  const unarchiveConversationMutation = useMutation({
+    mutationFn: (conversationId: number) => messagesService.unarchiveConversation(conversationId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['conversations'] });
+      setConversationMenuOpen(null);
+    },
+    onError: (error) => {
+      alert(error instanceof Error ? error.message : 'Failed to unarchive conversation');
+    },
+  });
+
+  const deleteConversationMutation = useMutation({
+    mutationFn: ({
+      conversationId,
+      deleteFor,
+    }: {
+      conversationId: number;
+      deleteFor: 'me' | 'both';
+    }) => messagesService.deleteConversation(conversationId, { deleteFor }),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['conversations'] });
+      setDeleteConversationDialog(null);
+      setConversationMenuOpen(null);
+      // If deleted conversation was selected, clear selection
+      if (selectedConversationId === variables.conversationId) {
+        setSelectedConversationId(null);
+      }
+    },
+    onError: (error) => {
+      alert(error instanceof Error ? error.message : 'Failed to delete conversation');
     },
   });
 
@@ -783,13 +839,31 @@ export default function MessagesPage() {
     return () => document.removeEventListener('click', handleClick);
   }, [messageMenuOpen]);
 
+  useEffect(() => {
+    if (conversationMenuOpen === null) return;
+    const handleClick = (event: MouseEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (!target) {
+        setConversationMenuOpen(null);
+        return;
+      }
+      const container = target.closest('[data-conversation-menu-container]');
+      if (!container || container.getAttribute('data-conversation-menu-container') !== String(conversationMenuOpen)) {
+        setConversationMenuOpen(null);
+      }
+    };
+
+    document.addEventListener('click', handleClick);
+    return () => document.removeEventListener('click', handleClick);
+  }, [conversationMenuOpen]);
+
   return (
     <>
       <div className="mx-auto flex h-[calc(100vh-8rem)] max-w-6xl gap-4 px-4 py-8">
       {/* Conversations List */}
       <div className="w-80 flex-shrink-0 overflow-hidden rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)]">
         <div className="border-b border-[var(--color-border)] p-4">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between mb-3">
             <h2 className="text-lg font-semibold text-[var(--color-text-primary)]">Messages</h2>
             <button
               onClick={() => {
@@ -804,9 +878,32 @@ export default function MessagesPage() {
               New Chat
             </button>
           </div>
+          {/* Tabs */}
+          <div className="flex gap-1 border-b border-[var(--color-border)]">
+            <button
+              onClick={() => setActiveTab('active')}
+              className={`px-3 py-1.5 text-sm font-medium transition-colors ${
+                activeTab === 'active'
+                  ? 'text-[var(--color-primary)] border-b-2 border-[var(--color-primary)]'
+                  : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
+              }`}
+            >
+              Active
+            </button>
+            <button
+              onClick={() => setActiveTab('archived')}
+              className={`px-3 py-1.5 text-sm font-medium transition-colors ${
+                activeTab === 'archived'
+                  ? 'text-[var(--color-primary)] border-b-2 border-[var(--color-primary)]'
+                  : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
+              }`}
+            >
+              Archived
+            </button>
+          </div>
         </div>
 
-        <div className="overflow-y-auto" style={{ height: 'calc(100% - 65px)' }}>
+        <div className="overflow-y-auto" style={{ height: 'calc(100% - 116px)' }}>
           {loadingConversations && (
             <div className="p-4 text-center text-sm text-[var(--color-text-secondary)]">
               Loading...
@@ -814,43 +911,98 @@ export default function MessagesPage() {
           )}
 
           {conversations?.map((conversation) => (
-            <button
+            <div
               key={conversation.id}
-              onClick={() => {
-                setSelectedConversationId(conversation.id);
-                setIsCreatingChat(false);
-                setNewChatUsername('');
-                setSelectedFile(null);
-              }}
-              className={`w-full border-b border-[var(--color-border)] p-4 text-left transition-colors ${
+              className={`relative w-full border-b border-[var(--color-border)] transition-colors ${
                 selectedConversationId === conversation.id
                   ? 'bg-[var(--color-surface-elevated)]'
                   : 'hover:bg-[var(--color-surface-elevated)]'
               }`}
+              data-conversation-menu-container={conversation.id}
             >
-              <div className="flex items-center justify-between">
-                <span className="font-medium text-[var(--color-text-primary)]">
-                  {conversation.conversation_type === 'mod_mail'
-                    ? `${conversation.hub_name ? `h/${conversation.hub_name}` : 'Hub'} - Mod Mail - ${conversation.subject || 'Untitled'}`
-                    : conversation.other_user?.username || 'Unknown'}
-                </span>
-                {conversation.unread_count > 0 && conversation.id !== selectedConversationId && (
-                  <span className="rounded-full bg-[var(--color-primary)] px-2 py-0.5 text-xs text-white">
-                    {conversation.unread_count}
+              <button
+                onClick={() => {
+                  setSelectedConversationId(conversation.id);
+                  setIsCreatingChat(false);
+                  setNewChatUsername('');
+                  setSelectedFile(null);
+                }}
+                className="w-full p-4 text-left"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="font-medium text-[var(--color-text-primary)] flex-1 pr-2">
+                    {conversation.conversation_type === 'mod_mail'
+                      ? `${conversation.hub_name ? `h/${conversation.hub_name}` : 'Hub'} - Mod Mail - ${conversation.subject || 'Untitled'}`
+                      : conversation.other_user?.username || 'Unknown'}
                   </span>
-                )}
-              </div>
-              {conversation.latest_message &&
-                conversation.latest_message.encrypted_content &&
-                !isAutoGeneratedMediaCaption(conversation.latest_message) && (
-                  <DecryptedMessageContent
-                    message={conversation.latest_message}
-                    isOwnMessage={conversation.latest_message.sender_id === user?.id}
-                    currentUserId={user?.id}
-                    className="mt-1 truncate text-sm text-[var(--color-text-secondary)]"
-                  />
-                )}
-            </button>
+                  <div className="flex items-center gap-2">
+                    {conversation.unread_count > 0 && conversation.id !== selectedConversationId && (
+                      <span className="rounded-full bg-[var(--color-primary)] px-2 py-0.5 text-xs text-white">
+                        {conversation.unread_count}
+                      </span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setConversationMenuOpen(
+                          conversationMenuOpen === conversation.id ? null : conversation.id
+                        );
+                      }}
+                      className="rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-0.5 text-xs font-semibold text-[var(--color-text-secondary)] transition hover:bg-[var(--color-surface-elevated)] hover:text-[var(--color-text-primary)]"
+                    >
+                      ...
+                    </button>
+                  </div>
+                </div>
+                {conversation.latest_message &&
+                  conversation.latest_message.encrypted_content &&
+                  !isAutoGeneratedMediaCaption(conversation.latest_message) && (
+                    <DecryptedMessageContent
+                      message={conversation.latest_message}
+                      isOwnMessage={conversation.latest_message.sender_id === user?.id}
+                      currentUserId={user?.id}
+                      className="mt-1 truncate text-sm text-[var(--color-text-secondary)]"
+                    />
+                  )}
+              </button>
+              {/* Context Menu */}
+              {conversationMenuOpen === conversation.id && (
+                <div className="absolute right-2 top-12 z-20 w-44 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] p-2 shadow-lg">
+                  {activeTab === 'active' ? (
+                    <button
+                      type="button"
+                      className="w-full rounded-md px-3 py-2 text-left text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
+                      onClick={() => {
+                        archiveConversationMutation.mutate(conversation.id);
+                      }}
+                    >
+                      Archive
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      className="w-full rounded-md px-3 py-2 text-left text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
+                      onClick={() => {
+                        unarchiveConversationMutation.mutate(conversation.id);
+                      }}
+                    >
+                      Unarchive
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    className="w-full rounded-md px-3 py-2 text-left text-sm font-medium text-[var(--color-error)] hover:bg-[var(--color-surface-elevated)]"
+                    onClick={() => {
+                      setConversationMenuOpen(null);
+                      setDeleteConversationDialog(conversation);
+                    }}
+                  >
+                    Delete
+                  </button>
+                </div>
+              )}
+            </div>
           ))}
 
           {conversations?.length === 0 && (
@@ -1109,6 +1261,71 @@ export default function MessagesPage() {
                   }
                 }}
                 disabled={deleteMessageMutation.isPending}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Delete Conversation Modal */}
+      {deleteConversationDialog && (
+        <div
+          className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4"
+          role="dialog"
+          aria-modal="true"
+          onClick={() => {
+            if (!deleteConversationMutation.isPending) {
+              setDeleteConversationDialog(null);
+            }
+          }}
+        >
+          <div
+            className="w-full max-w-md rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6 shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">Delete conversation?</h3>
+            <p className="mt-2 text-sm text-[var(--color-text-secondary)]">
+              Choose how you want to delete this conversation.
+            </p>
+            <div className="mt-6 flex flex-col gap-3">
+              <button
+                type="button"
+                className="rounded-md border border-[var(--color-border)] px-4 py-2 text-sm font-semibold text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)] disabled:opacity-50"
+                onClick={() => {
+                  deleteConversationMutation.mutate({
+                    conversationId: deleteConversationDialog.id,
+                    deleteFor: 'me',
+                  });
+                }}
+                disabled={deleteConversationMutation.isPending}
+              >
+                {deleteConversationMutation.isPending ? 'Deleting...' : 'Delete for me'}
+              </button>
+              <button
+                type="button"
+                className="rounded-md bg-[var(--color-error)] px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-50"
+                onClick={() => {
+                  deleteConversationMutation.mutate({
+                    conversationId: deleteConversationDialog.id,
+                    deleteFor: 'both',
+                  });
+                }}
+                disabled={deleteConversationMutation.isPending}
+              >
+                {deleteConversationMutation.isPending
+                  ? 'Deleting for both...'
+                  : 'Delete for both (deletes your messages)'}
+              </button>
+              <button
+                type="button"
+                className="rounded-md px-4 py-2 text-sm font-semibold text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] disabled:opacity-50"
+                onClick={() => {
+                  if (!deleteConversationMutation.isPending) {
+                    setDeleteConversationDialog(null);
+                  }
+                }}
+                disabled={deleteConversationMutation.isPending}
               >
                 Cancel
               </button>
