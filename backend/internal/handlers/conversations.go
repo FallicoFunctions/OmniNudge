@@ -153,6 +153,31 @@ func (h *ConversationsHandler) GetConversations(c *gin.Context) {
 			details.UnreadCount = unreadCount
 		}
 
+		// For DMs: compute per-user archived_at based on archived_for_user1/user2
+		// This ensures the frontend can filter correctly based on archived_at
+		if conv.ConversationType == "dm" {
+			var archivedForUser1, archivedForUser2 bool
+			err := h.pool.QueryRow(c.Request.Context(), `
+				SELECT COALESCE(archived_for_user1, false), COALESCE(archived_for_user2, false)
+				FROM conversations WHERE id = $1
+			`, conv.ID).Scan(&archivedForUser1, &archivedForUser2)
+			if err == nil {
+				// If this conversation is archived for the current user, set archived_at
+				// Otherwise, clear it
+				if (conv.User1ID != nil && *conv.User1ID == userID.(int) && archivedForUser1) ||
+					(conv.User2ID != nil && *conv.User2ID == userID.(int) && archivedForUser2) {
+					// Keep the existing archived_at if set, otherwise use current time as a placeholder
+					if details.ArchivedAt == nil {
+						now := time.Now()
+						details.ArchivedAt = &now
+					}
+				} else {
+					// Not archived for this user
+					details.ArchivedAt = nil
+				}
+			}
+		}
+
 		enriched = append(enriched, details)
 	}
 

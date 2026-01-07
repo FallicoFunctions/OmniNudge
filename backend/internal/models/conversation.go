@@ -63,6 +63,8 @@ func (r *ConversationRepository) Create(ctx context.Context, user1ID, user2ID in
 		SET last_message_at = CURRENT_TIMESTAMP,
 		    deleted_for_user1 = FALSE,
 		    deleted_for_user2 = FALSE,
+		    archived_for_user1 = FALSE,
+		    archived_for_user2 = FALSE,
 		    archived_at = NULL,
 		    archived_by = NULL
 		RETURNING id, created_at, last_message_at
@@ -177,7 +179,12 @@ func (r *ConversationRepository) GetByUserID(ctx context.Context, userID int, li
 	`
 
 	if !includeArchived {
-		query += ` AND archived_at IS NULL`
+		// For DMs: check per-user archive flags
+		// For mod_mail: check conversation-level archived_at
+		query += ` AND (
+			(conversation_type = 'dm' AND NOT ((user1_id = $1 AND archived_for_user1 = TRUE) OR (user2_id = $1 AND archived_for_user2 = TRUE)))
+			OR (conversation_type = 'mod_mail' AND archived_at IS NULL)
+		)`
 	}
 
 	query += ` ORDER BY last_message_at DESC LIMIT $2 OFFSET $3`
@@ -251,52 +258,109 @@ func (c *Conversation) IsParticipant(userID int) bool {
 }
 
 // Archive archives a conversation
-// For DMs: sets archived_at and archived_by
-// For mod_mail: sets status to 'archived', archived_at, and archived_by
+// For DMs: sets archived_for_user1 or archived_for_user2 (per-user archiving)
+// For mod_mail: sets status to 'archived', archived_at, and archived_by (conversation-level archiving)
 func (r *ConversationRepository) Archive(ctx context.Context, conversationID int, userID int) error {
-	query := `
-		UPDATE conversations
-		SET archived_at = CURRENT_TIMESTAMP,
-		    archived_by = $2,
-		    status = CASE
-		        WHEN conversation_type = 'mod_mail' THEN 'archived'::varchar
-		        ELSE status
-		    END
-		WHERE id = $1 AND (conversation_type = 'dm' OR conversation_type = 'mod_mail')
-	`
-	_, err := r.pool.Exec(ctx, query, conversationID, userID)
-	return err
-}
-
-// Unarchive unarchives a conversation
-// For DMs: clears archived_at and archived_by (participant check required)
-// For mod_mail: sets status to 'open', clears archived_at and archived_by (no participant check needed)
-func (r *ConversationRepository) Unarchive(ctx context.Context, conversationID int, userID int) error {
-	query := `
-		UPDATE conversations
-		SET archived_at = NULL,
-		    archived_by = NULL,
-		    status = CASE
-		        WHEN conversation_type = 'mod_mail' THEN 'open'::varchar
-		        ELSE status
-		    END
+	// Get conversation to determine type and user position
+	var conversationType string
+	var user1ID, user2ID *int
+	err := r.pool.QueryRow(ctx, `
+		SELECT conversation_type, user1_id, user2_id
+		FROM conversations
 		WHERE id = $1
-		  AND (
-		      (conversation_type = 'dm' AND (user1_id = $2 OR user2_id = $2))
-		      OR conversation_type = 'mod_mail'
-		  )
-	`
-	result, err := r.pool.Exec(ctx, query, conversationID, userID)
+	`, conversationID).Scan(&conversationType, &user1ID, &user2ID)
 	if err != nil {
 		return err
 	}
 
-	rowsAffected := result.RowsAffected()
-	if rowsAffected == 0 {
-		return pgx.ErrNoRows
+	if conversationType == "dm" {
+		// For DMs: per-user archive
+		var query string
+		if user1ID != nil && *user1ID == userID {
+			query = `UPDATE conversations SET archived_for_user1 = TRUE WHERE id = $1`
+		} else if user2ID != nil && *user2ID == userID {
+			query = `UPDATE conversations SET archived_for_user2 = TRUE WHERE id = $1`
+		} else {
+			return pgx.ErrNoRows // User is not a participant
+		}
+		result, err := r.pool.Exec(ctx, query, conversationID)
+		if err != nil {
+			return err
+		}
+		if result.RowsAffected() == 0 {
+			return pgx.ErrNoRows
+		}
+		return nil
+	} else if conversationType == "mod_mail" {
+		// For mod_mail: conversation-level archive
+		query := `
+			UPDATE conversations
+			SET archived_at = CURRENT_TIMESTAMP,
+			    archived_by = $2,
+			    status = 'archived'::varchar
+			WHERE id = $1
+		`
+		_, err := r.pool.Exec(ctx, query, conversationID, userID)
+		return err
 	}
 
 	return nil
+}
+
+// Unarchive unarchives a conversation
+// For DMs: clears archived_for_user1 or archived_for_user2 (per-user archiving)
+// For mod_mail: sets status to 'open', clears archived_at and archived_by (conversation-level archiving)
+func (r *ConversationRepository) Unarchive(ctx context.Context, conversationID int, userID int) error {
+	// Get conversation to determine type and user position
+	var conversationType string
+	var user1ID, user2ID *int
+	err := r.pool.QueryRow(ctx, `
+		SELECT conversation_type, user1_id, user2_id
+		FROM conversations
+		WHERE id = $1
+	`, conversationID).Scan(&conversationType, &user1ID, &user2ID)
+	if err != nil {
+		return err
+	}
+
+	if conversationType == "dm" {
+		// For DMs: per-user unarchive
+		var query string
+		if user1ID != nil && *user1ID == userID {
+			query = `UPDATE conversations SET archived_for_user1 = FALSE WHERE id = $1`
+		} else if user2ID != nil && *user2ID == userID {
+			query = `UPDATE conversations SET archived_for_user2 = FALSE WHERE id = $1`
+		} else {
+			return pgx.ErrNoRows // User is not a participant
+		}
+		result, err := r.pool.Exec(ctx, query, conversationID)
+		if err != nil {
+			return err
+		}
+		if result.RowsAffected() == 0 {
+			return pgx.ErrNoRows
+		}
+		return nil
+	} else if conversationType == "mod_mail" {
+		// For mod_mail: conversation-level unarchive
+		query := `
+			UPDATE conversations
+			SET archived_at = NULL,
+			    archived_by = NULL,
+			    status = 'open'::varchar
+			WHERE id = $1
+		`
+		result, err := r.pool.Exec(ctx, query, conversationID)
+		if err != nil {
+			return err
+		}
+		if result.RowsAffected() == 0 {
+			return pgx.ErrNoRows
+		}
+		return nil
+	}
+
+	return pgx.ErrNoRows
 }
 
 // SoftDeleteForUser marks a conversation as deleted for a specific user
