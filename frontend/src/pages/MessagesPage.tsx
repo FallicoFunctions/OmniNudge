@@ -867,9 +867,9 @@ export default function MessagesPage() {
 
   return (
     <>
-      <div className="mx-auto flex h-[calc(100vh-8rem)] max-w-6xl gap-4 px-4 py-8">
+      <div className="flex h-[calc(100vh-4rem)]">
       {/* Conversations List */}
-      <div className="w-80 flex-shrink-0 overflow-hidden rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)]">
+      <div className="w-80 flex-shrink-0 overflow-hidden border-r border-[var(--color-border)] bg-[var(--color-surface)]">
         <div className="border-b border-[var(--color-border)] p-4">
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-lg font-semibold text-[var(--color-text-primary)]">Messages</h2>
@@ -1022,7 +1022,7 @@ export default function MessagesPage() {
       </div>
 
       {/* Chat Area */}
-      <div className="flex flex-1 flex-col overflow-hidden rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)]">
+      <div className="flex flex-1 flex-col overflow-hidden bg-[var(--color-surface)]">
         {selectedConversationId || isCreatingChat ? (
           <>
             {/* Chat Header */}
