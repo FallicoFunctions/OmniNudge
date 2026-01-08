@@ -4,9 +4,9 @@ import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { adminService } from '../services/adminService';
 import { hubsService, type Hub } from '../services/hubsService';
-import type { AdminUser } from '../types/admin';
+import type { AdminUser, BanHistoryItem } from '../types/admin';
 
-type TabType = 'stats' | 'users' | 'moderators';
+type TabType = 'stats' | 'users' | 'moderators' | 'ban-activity';
 
 export default function AdminPage() {
   const { user } = useAuth();
@@ -61,12 +61,23 @@ export default function AdminPage() {
           >
             Hub Moderators
           </button>
+          <button
+            onClick={() => setActiveTab('ban-activity')}
+            className={`pb-3 px-1 border-b-2 font-medium transition-colors ${
+              activeTab === 'ban-activity'
+                ? 'border-[var(--color-primary)] text-[var(--color-primary)]'
+                : 'border-transparent text-[var(--color-text-secondary)] hover:text-[var(--color-text)] hover:border-[var(--color-border)]'
+            }`}
+          >
+            Ban Activity
+          </button>
         </nav>
       </div>
 
       {activeTab === 'stats' && <StatsTab />}
       {activeTab === 'users' && <UsersTab />}
       {activeTab === 'moderators' && <ModeratorsTab />}
+      {activeTab === 'ban-activity' && <BanActivityTab />}
     </div>
   );
 }
@@ -116,36 +127,43 @@ function StatsTab() {
 
 // ===== USERS TAB =====
 
+type BanModalType = 'shadow-ban' | 'ban' | 'unban' | 'delete' | null;
+
+interface BanModalState {
+  type: BanModalType;
+  user: AdminUser | null;
+  reason: string;
+  showReason: boolean;
+}
+
 function UsersTab() {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState<string>('');
+  const [statusFilter, setStatusFilter] = useState<string>('');
   const [offset, setOffset] = useState(0);
-  const [modModalOpen, setModModalOpen] = useState(false);
-  const [modTargetUser, setModTargetUser] = useState<AdminUser | null>(null);
-  const [hubSearch, setHubSearch] = useState('');
-  const [hubInputFocused, setHubInputFocused] = useState(false);
-  const [hubError, setHubError] = useState('');
+  const [pageSize, setPageSize] = useState(50);
+  const [jumpToPage, setJumpToPage] = useState('');
+  const [viewMode, setViewMode] = useState<'card' | 'table'>('card');
+  const [selectedUsers, setSelectedUsers] = useState<Set<number>>(new Set());
+  const [expandedUser, setExpandedUser] = useState<number | null>(null);
+  const [bulkActionModal, setBulkActionModal] = useState<{ open: boolean; action: BanModalType }>({ open: false, action: null });
+  const [bulkReason, setBulkReason] = useState('');
+  const [bulkShowReason, setBulkShowReason] = useState(false);
+  const [banModal, setBanModal] = useState<BanModalState>({
+    type: null,
+    user: null,
+    reason: '',
+    showReason: false,
+  });
   const [historyModalUser, setHistoryModalUser] = useState<AdminUser | null>(null);
   const [banHistory, setBanHistory] = useState<BanHistoryItem[] | null>(null);
   const [loadingHistory, setLoadingHistory] = useState(false);
-  const limit = 50;
+  const [actionMenuOpen, setActionMenuOpen] = useState<number | null>(null);
 
   const { data, isLoading } = useQuery({
-    queryKey: ['adminUsers', search, roleFilter, offset],
-    queryFn: () => adminService.listUsers(search, roleFilter, limit, offset),
-  });
-
-  const { data: hubSuggestions = [], isFetching: isFetchingHubs } = useQuery({
-    queryKey: ['hubSearch', hubSearch],
-    enabled: hubSearch.trim().length > 0,
-    queryFn: () => hubsService.searchHubs(hubSearch.trim(), 15, 0),
-  });
-
-  const { data: trendingHubs = [] } = useQuery({
-    queryKey: ['hubTrending', modModalOpen],
-    enabled: modModalOpen,
-    queryFn: () => hubsService.getTrendingHubs(25),
+    queryKey: ['adminUsers', search, roleFilter, statusFilter, pageSize, offset],
+    queryFn: () => adminService.listUsers(search, roleFilter, statusFilter, pageSize, offset),
   });
 
   const updateRoleMutation = useMutation({
@@ -160,41 +178,36 @@ function UsersTab() {
   const banUserMutation = useMutation({
     mutationFn: ({ userId, reason, showReason }: { userId: number; reason: string; showReason: boolean }) =>
       adminService.banUser(userId, reason, showReason),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['adminUsers'] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['adminUsers'] });
+      setBanModal({ type: null, user: null, reason: '', showReason: false });
+    },
   });
 
   const shadowBanUserMutation = useMutation({
     mutationFn: ({ userId, reason, showReason }: { userId: number; reason: string; showReason: boolean }) =>
       adminService.shadowBanUser(userId, reason, showReason),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['adminUsers'] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['adminUsers'] });
+      setBanModal({ type: null, user: null, reason: '', showReason: false });
+    },
   });
 
   const unbanUserMutation = useMutation({
     mutationFn: ({ userId, reason }: { userId: number; reason: string }) =>
       adminService.unbanUser(userId, reason),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['adminUsers'] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['adminUsers'] });
+      setBanModal({ type: null, user: null, reason: '', showReason: false });
+    },
   });
 
   const softDeleteUserMutation = useMutation({
     mutationFn: ({ userId, reason }: { userId: number; reason: string }) =>
       adminService.softDeleteUser(userId, reason),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['adminUsers'] }),
-  });
-
-  const addHubModeratorMutation = useMutation({
-    mutationFn: ({ hubName, userId }: { hubName: string; userId: number }) =>
-      adminService.addHubModerator(hubName, userId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['hubModerators'] });
-      queryClient.invalidateQueries({ queryKey: ['adminStats'] });
-      setModModalOpen(false);
-      setModTargetUser(null);
-      setHubSearch('');
-      setHubError('');
-    },
-    onError: (err: unknown) => {
-      const error = err as { response?: { data?: { error?: string } } };
-      setHubError(error?.response?.data?.error || 'Failed to add moderator');
+      queryClient.invalidateQueries({ queryKey: ['adminUsers'] });
+      setBanModal({ type: null, user: null, reason: '', showReason: false });
     },
   });
 
@@ -208,6 +221,7 @@ function UsersTab() {
     setHistoryModalUser(user);
     setBanHistory(null);
     setLoadingHistory(true);
+    setActionMenuOpen(null);
     try {
       const res = await adminService.getBanHistory(user.id);
       setBanHistory(res.history);
@@ -218,31 +232,165 @@ function UsersTab() {
     }
   };
 
-  const matchingHub = (() => {
-    if (!hubSearch.trim()) return null;
-    const normalized = hubSearch.trim().toLowerCase().replace(/^h\//, '');
-    const pool = hubSearch.trim().length > 0 ? hubSuggestions : trendingHubs;
-    return pool.find((hub: Hub) => hub.name.toLowerCase() === normalized) || null;
-  })();
+  const handleBanAction = (type: BanModalType, user: AdminUser) => {
+    setBanModal({ type, user, reason: '', showReason: false });
+    setActionMenuOpen(null);
+  };
 
-  const filteredHubs =
-    hubSearch.trim().length > 0
-      ? hubSuggestions
-      : trendingHubs;
-
-  const confirmHubModerator = () => {
-    if (!modTargetUser) return;
-    if (!matchingHub) {
-      setHubError('Select a valid hub from the list');
+  const submitBanAction = () => {
+    if (!banModal.user || !banModal.type) return;
+    if (!banModal.reason.trim()) {
+      alert('Reason is required');
       return;
     }
-    addHubModeratorMutation.mutate({ hubName: matchingHub.name, userId: modTargetUser.id });
+
+    const { user, reason, showReason } = banModal;
+
+    switch (banModal.type) {
+      case 'shadow-ban':
+        shadowBanUserMutation.mutate({ userId: user.id, reason, showReason });
+        break;
+      case 'ban':
+        banUserMutation.mutate({ userId: user.id, reason, showReason });
+        break;
+      case 'unban':
+        unbanUserMutation.mutate({ userId: user.id, reason });
+        break;
+      case 'delete':
+        softDeleteUserMutation.mutate({ userId: user.id, reason });
+        break;
+    }
+  };
+
+  const totalPages = data ? Math.ceil(data.total / pageSize) : 0;
+  const currentPage = Math.floor(offset / pageSize) + 1;
+
+  const handleJumpToPage = () => {
+    const page = parseInt(jumpToPage, 10);
+    if (page >= 1 && page <= totalPages) {
+      setOffset((page - 1) * pageSize);
+      setJumpToPage('');
+    }
+  };
+
+  const handlePageSizeChange = (newSize: number) => {
+    setPageSize(newSize);
+    setOffset(0);
+  };
+
+  const getUserStatusBadge = (user: AdminUser) => {
+    if (user.deleted) {
+      return <span className="px-2 py-0.5 text-xs rounded bg-gray-500 text-white">Deleted</span>;
+    }
+    if (user.banned) {
+      return <span className="px-2 py-0.5 text-xs rounded bg-red-600 text-white">Banned</span>;
+    }
+    if (user.shadow_banned) {
+      return <span className="px-2 py-0.5 text-xs rounded bg-orange-600 text-white">Shadow Banned</span>;
+    }
+    return null;
+  };
+
+  const toggleUserSelection = (userId: number) => {
+    const newSelection = new Set(selectedUsers);
+    if (newSelection.has(userId)) {
+      newSelection.delete(userId);
+    } else {
+      newSelection.add(userId);
+    }
+    setSelectedUsers(newSelection);
+  };
+
+  const toggleSelectAll = () => {
+    if (!data?.users) return;
+    if (selectedUsers.size === data.users.length) {
+      setSelectedUsers(new Set());
+    } else {
+      setSelectedUsers(new Set(data.users.map(u => u.id)));
+    }
+  };
+
+  const handleBulkAction = (action: BanModalType) => {
+    if (selectedUsers.size === 0) {
+      alert('Please select at least one user');
+      return;
+    }
+    setBulkActionModal({ open: true, action });
+    setBulkReason('');
+    setBulkShowReason(false);
+  };
+
+  const submitBulkAction = async () => {
+    if (!bulkReason.trim()) {
+      alert('Reason is required');
+      return;
+    }
+
+    const userIds = Array.from(selectedUsers);
+    const promises = userIds.map(userId => {
+      switch (bulkActionModal.action) {
+        case 'shadow-ban':
+          return adminService.shadowBanUser(userId, bulkReason, bulkShowReason);
+        case 'ban':
+          return adminService.banUser(userId, bulkReason, bulkShowReason);
+        case 'unban':
+          return adminService.unbanUser(userId, bulkReason);
+        case 'delete':
+          return adminService.softDeleteUser(userId, bulkReason);
+        default:
+          return Promise.resolve();
+      }
+    });
+
+    try {
+      await Promise.all(promises);
+      queryClient.invalidateQueries({ queryKey: ['adminUsers'] });
+      setBulkActionModal({ open: false, action: null });
+      setSelectedUsers(new Set());
+      alert(`Successfully applied action to ${userIds.length} users`);
+    } catch (error) {
+      alert('Some actions failed. Please check and try again.');
+    }
+  };
+
+  const exportUsers = (format: 'csv' | 'json') => {
+    if (!data?.users) return;
+
+    if (format === 'json') {
+      const jsonStr = JSON.stringify(data.users, null, 2);
+      const blob = new Blob([jsonStr], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `users_export_${new Date().toISOString().split('T')[0]}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } else {
+      const headers = ['ID', 'Username', 'Email', 'Role', 'Status', 'Created At', 'Last Seen'];
+      const rows = data.users.map(u => [
+        u.id,
+        u.username,
+        u.email || '',
+        u.role,
+        u.deleted ? 'Deleted' : u.banned ? 'Banned' : u.shadow_banned ? 'Shadow Banned' : 'Active',
+        new Date(u.created_at).toLocaleDateString(),
+        u.last_seen_at ? new Date(u.last_seen_at).toLocaleDateString() : 'Never'
+      ]);
+      const csvContent = [headers, ...rows].map(row => row.join(',')).join('\n');
+      const blob = new Blob([csvContent], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `users_export_${new Date().toISOString().split('T')[0]}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
   };
 
   return (
     <div>
       {/* Search and filters */}
-      <div className="mb-6 flex gap-4">
+      <div className="mb-4 flex gap-4 flex-wrap">
         <input
           type="text"
           placeholder="Search by username or email..."
@@ -251,7 +399,7 @@ function UsersTab() {
             setSearch(e.target.value);
             setOffset(0);
           }}
-          className="flex-1 px-4 py-2 border border-[var(--color-border)] rounded-lg bg-[var(--color-surface)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+          className="flex-1 min-w-[250px] px-4 py-2 border border-[var(--color-border)] rounded-lg bg-[var(--color-surface)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
         />
         <select
           value={roleFilter}
@@ -265,7 +413,115 @@ function UsersTab() {
           <option value="user">User</option>
           <option value="admin">Admin</option>
         </select>
+        <select
+          value={statusFilter}
+          onChange={(e) => {
+            setStatusFilter(e.target.value);
+            setOffset(0);
+          }}
+          className="px-4 py-2 border border-[var(--color-border)] rounded-lg bg-[var(--color-surface)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+        >
+          <option value="">All Status</option>
+          <option value="active">Active</option>
+          <option value="shadow_banned">Shadow Banned</option>
+          <option value="banned">Banned</option>
+          <option value="deleted">Deleted</option>
+        </select>
       </div>
+
+      {/* Toolbar with view mode, bulk actions, and export */}
+      <div className="mb-4 flex justify-between items-center flex-wrap gap-3">
+        <div className="flex items-center gap-2">
+          {/* View mode toggle */}
+          <div className="flex border border-[var(--color-border)] rounded-lg overflow-hidden">
+            <button
+              onClick={() => setViewMode('card')}
+              className={`px-3 py-1 text-sm ${viewMode === 'card' ? 'bg-[var(--color-primary)] text-white' : 'bg-[var(--color-surface)] hover:bg-[var(--color-surface-hover)]'}`}
+            >
+              Card View
+            </button>
+            <button
+              onClick={() => setViewMode('table')}
+              className={`px-3 py-1 text-sm ${viewMode === 'table' ? 'bg-[var(--color-primary)] text-white' : 'bg-[var(--color-surface)] hover:bg-[var(--color-surface-hover)]'}`}
+            >
+              Table View
+            </button>
+          </div>
+
+          {/* Bulk actions */}
+          {selectedUsers.size > 0 && (
+            <div className="flex items-center gap-2 ml-4">
+              <span className="text-sm text-[var(--color-text-secondary)]">
+                {selectedUsers.size} selected
+              </span>
+              <button
+                onClick={() => handleBulkAction('shadow-ban')}
+                className="px-3 py-1 text-sm border border-[var(--color-border)] rounded hover:bg-[var(--color-surface-hover)]"
+              >
+                Shadow Ban
+              </button>
+              <button
+                onClick={() => handleBulkAction('ban')}
+                className="px-3 py-1 text-sm border border-[var(--color-border)] rounded hover:bg-[var(--color-surface-hover)]"
+              >
+                Ban
+              </button>
+              <button
+                onClick={() => handleBulkAction('unban')}
+                className="px-3 py-1 text-sm border border-[var(--color-border)] rounded hover:bg-[var(--color-surface-hover)]"
+              >
+                Unban
+              </button>
+              <button
+                onClick={() => setSelectedUsers(new Set())}
+                className="px-3 py-1 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded"
+              >
+                Clear
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Export buttons */}
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => exportUsers('csv')}
+            disabled={!data?.users || data.users.length === 0}
+            className="px-3 py-1 text-sm border border-[var(--color-border)] rounded hover:bg-[var(--color-surface-hover)] disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Export CSV
+          </button>
+          <button
+            onClick={() => exportUsers('json')}
+            disabled={!data?.users || data.users.length === 0}
+            className="px-3 py-1 text-sm border border-[var(--color-border)] rounded hover:bg-[var(--color-surface-hover)] disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Export JSON
+          </button>
+        </div>
+      </div>
+
+      {/* Total count and page size selector */}
+      {data && (
+        <div className="mb-4 flex justify-between items-center text-sm text-[var(--color-text-secondary)]">
+          <div>
+            Showing {offset + 1} - {Math.min(offset + pageSize, data.total)} of {data.total} users
+          </div>
+          <div className="flex items-center gap-2">
+            <label htmlFor="pageSize">Per page:</label>
+            <select
+              id="pageSize"
+              value={pageSize}
+              onChange={(e) => handlePageSizeChange(Number(e.target.value))}
+              className="px-3 py-1 border border-[var(--color-border)] rounded bg-[var(--color-surface)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+            >
+              <option value="25">25</option>
+              <option value="50">50</option>
+              <option value="100">100</option>
+            </select>
+          </div>
+        </div>
+      )}
 
       {isLoading && <div className="text-center py-12">Loading users...</div>}
 
@@ -275,124 +531,213 @@ function UsersTab() {
 
       {data && data.users.length > 0 && (
         <>
-          <div className="space-y-3">
-            {data.users.map((user: AdminUser) => (
-              <div
-                key={user.id}
-                className="p-4 border border-[var(--color-border)] rounded-lg bg-[var(--color-surface-elevated)]"
-              >
-                <div className="flex justify-between items-start">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium">{user.username}</span>
-                      <span
-                        className={`px-2 py-0.5 text-xs rounded ${
-                          user.role === 'admin'
-                            ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-                            : user.role === 'moderator'
-                            ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
-                            : 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200'
-                        }`}
-                      >
-                        {user.role}
-                      </span>
+          {/* Card View */}
+          {viewMode === 'card' && (
+            <div className="space-y-3">
+              {data.users.map((user: AdminUser) => (
+                <div
+                  key={user.id}
+                  className="border border-[var(--color-border)] rounded-lg bg-[var(--color-surface-elevated)]"
+                >
+                  <div className="p-4 flex justify-between items-start">
+                    <div className="flex items-start gap-3 flex-1">
+                      <input
+                        type="checkbox"
+                        checked={selectedUsers.has(user.id)}
+                        onChange={() => toggleUserSelection(user.id)}
+                        className="mt-1"
+                      />
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <button
+                            onClick={() => setExpandedUser(expandedUser === user.id ? null : user.id)}
+                            className="font-medium hover:text-[var(--color-primary)]"
+                          >
+                            {user.username} {expandedUser === user.id ? '▲' : '▼'}
+                          </button>
+                          <span
+                            className={`px-2 py-0.5 text-xs rounded ${
+                              user.role === 'admin'
+                                ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                                : 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200'
+                            }`}
+                          >
+                            {user.role}
+                          </span>
+                          {getUserStatusBadge(user)}
+                        </div>
+                        <div className="text-sm text-[var(--color-text-secondary)] mt-1">{user.email}</div>
+                        <div className="text-sm text-[var(--color-text-secondary)] mt-1">
+                          ID: {user.id} | Joined: {new Date(user.created_at).toLocaleDateString()}
+                          {user.last_seen_at && <> | Last seen: {new Date(user.last_seen_at).toLocaleDateString()}</>}
+                        </div>
+                      </div>
                     </div>
-                    <div className="text-sm text-[var(--color-text-secondary)] mt-1">{user.email}</div>
-                    <div className="text-sm text-[var(--color-text-secondary)] mt-1">
-                      ID: {user.id} | Joined:{' '}
-                      {new Date(user.created_at).toLocaleDateString()}
-                      {user.last_seen_at && (
-                        <> | Last seen: {new Date(user.last_seen_at).toLocaleDateString()}</>
-                      )}
-                    </div>
-                  </div>
-                  <div className="ml-4">
-                    <select
-                      value={user.role}
-                      onChange={(e) =>
-                        handleRoleChange(user, e.target.value as 'user' | 'admin')
-                      }
-                      className="px-3 py-1 text-sm border border-[var(--color-border)] rounded bg-[var(--color-surface)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
-                    >
-                      <option value="user">User</option>
-                      <option value="admin">Admin</option>
-                    </select>
-                    <div className="mt-3 space-y-2">
-                      <button
-                        type="button"
-                        className="w-full rounded border border-[var(--color-border)] px-3 py-1 text-xs hover:bg-[var(--color-surface-hover)]"
-                        onClick={() => {
-                          const reason = window.prompt('Reason for shadow ban?');
-                          if (!reason) return;
-                          const showReason = window.confirm('Show reason to user? OK = yes, Cancel = no');
-                          shadowBanUserMutation.mutate({ userId: user.id, reason, showReason });
-                        }}
+                    <div className="ml-4 flex flex-col gap-2">
+                      <select
+                        value={user.role}
+                        onChange={(e) => handleRoleChange(user, e.target.value as 'user' | 'admin')}
+                        className="px-3 py-1 text-sm border border-[var(--color-border)] rounded bg-[var(--color-surface)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
                       >
-                        Shadow Ban
-                      </button>
-                      <button
-                        type="button"
-                        className="w-full rounded border border-[var(--color-border)] px-3 py-1 text-xs hover:bg-[var(--color-surface-hover)]"
-                        onClick={() => {
-                          const reason = window.prompt('Reason for ban?');
-                          if (!reason) return;
-                          const showReason = window.confirm('Show reason to user? OK = yes, Cancel = no');
-                          banUserMutation.mutate({ userId: user.id, reason, showReason });
-                        }}
-                      >
-                        Ban
-                      </button>
-                      <button
-                        type="button"
-                        className="w-full rounded border border-[var(--color-border)] px-3 py-1 text-xs hover:bg-[var(--color-surface-hover)]"
-                        onClick={() => {
-                          const reason = window.prompt('Reason for unban?');
-                          if (!reason) return;
-                          unbanUserMutation.mutate({ userId: user.id, reason });
-                        }}
-                      >
-                        Unban
-                      </button>
-                      <button
-                        type="button"
-                        className="w-full rounded border border-[var(--color-border)] px-3 py-1 text-xs text-red-600 hover:bg-[var(--color-surface-hover)]"
-                        onClick={() => {
-                          const reason = window.prompt('Reason for soft delete?');
-                          if (!reason) return;
-                          softDeleteUserMutation.mutate({ userId: user.id, reason });
-                        }}
-                      >
-                        Soft Delete
-                      </button>
-                      <button
-                        type="button"
-                        className="w-full rounded border border-[var(--color-border)] px-3 py-1 text-xs hover:bg-[var(--color-surface-hover)]"
-                        onClick={() => openBanHistory(user)}
-                      >
-                        View Ban History
-                      </button>
+                        <option value="user">User</option>
+                        <option value="admin">Admin</option>
+                      </select>
+                      <div className="relative">
+                        <button
+                          onClick={() => setActionMenuOpen(actionMenuOpen === user.id ? null : user.id)}
+                          className="w-full px-3 py-1 text-sm border border-[var(--color-border)] rounded bg-[var(--color-surface)] hover:bg-[var(--color-surface-hover)]"
+                        >
+                          Actions ▼
+                        </button>
+                        {actionMenuOpen === user.id && (
+                          <div className="absolute right-0 mt-1 w-48 bg-[var(--color-surface)] border border-[var(--color-border)] rounded-lg shadow-lg z-10">
+                            <button onClick={() => handleBanAction('shadow-ban', user)} className="w-full text-left px-4 py-2 text-sm hover:bg-[var(--color-surface-hover)] rounded-t-lg">Shadow Ban</button>
+                            <button onClick={() => handleBanAction('ban', user)} className="w-full text-left px-4 py-2 text-sm hover:bg-[var(--color-surface-hover)]">Ban</button>
+                            <button onClick={() => handleBanAction('unban', user)} className="w-full text-left px-4 py-2 text-sm hover:bg-[var(--color-surface-hover)]">Unban</button>
+                            <button onClick={() => handleBanAction('delete', user)} className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-[var(--color-surface-hover)]">Soft Delete</button>
+                            <button onClick={() => openBanHistory(user)} className="w-full text-left px-4 py-2 text-sm hover:bg-[var(--color-surface-hover)] rounded-b-lg border-t border-[var(--color-border)]">View Ban History</button>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
-              </div>
-            ))}
-          </div>
 
-          {/* Pagination */}
-          <div className="mt-6 flex justify-between items-center">
+                  {/* Expanded details */}
+                  {expandedUser === user.id && (
+                    <div className="px-4 pb-4 pt-2 border-t border-[var(--color-border)] bg-[var(--color-surface)] text-sm">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div><span className="font-medium">Reddit ID:</span> {user.reddit_id || 'N/A'}</div>
+                        <div><span className="font-medium">Karma:</span> N/A</div>
+                        <div><span className="font-medium">Bio:</span> {user.bio || 'N/A'}</div>
+                        <div><span className="font-medium">Avatar:</span> {user.avatar_url ? 'Yes' : 'No'}</div>
+                        {user.banned_at && <div><span className="font-medium">Banned at:</span> {new Date(user.banned_at).toLocaleString()}</div>}
+                        {user.banned_by && <div><span className="font-medium">Banned by ID:</span> {user.banned_by}</div>}
+                        {user.ban_reason && (
+                          <div className="col-span-2">
+                            <span className="font-medium">Ban reason:</span> {user.ban_reason}
+                            {user.show_ban_reason && <span className="ml-2 text-xs text-[var(--color-primary)]">(shown to user)</span>}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Table View */}
+          {viewMode === 'table' && (
+            <div className="overflow-x-auto border border-[var(--color-border)] rounded-lg">
+              <table className="w-full text-sm">
+                <thead className="bg-[var(--color-surface-elevated)] border-b border-[var(--color-border)]">
+                  <tr>
+                    <th className="p-3 text-left">
+                      <input
+                        type="checkbox"
+                        checked={data.users.length > 0 && selectedUsers.size === data.users.length}
+                        onChange={toggleSelectAll}
+                      />
+                    </th>
+                    <th className="p-3 text-left">ID</th>
+                    <th className="p-3 text-left">Username</th>
+                    <th className="p-3 text-left">Email</th>
+                    <th className="p-3 text-left">Role</th>
+                    <th className="p-3 text-left">Status</th>
+                    <th className="p-3 text-left">Joined</th>
+                    <th className="p-3 text-left">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.users.map((user: AdminUser) => (
+                    <tr key={user.id} className="border-b border-[var(--color-border)] hover:bg-[var(--color-surface-hover)]">
+                      <td className="p-3">
+                        <input
+                          type="checkbox"
+                          checked={selectedUsers.has(user.id)}
+                          onChange={() => toggleUserSelection(user.id)}
+                        />
+                      </td>
+                      <td className="p-3">{user.id}</td>
+                      <td className="p-3 font-medium">{user.username}</td>
+                      <td className="p-3 text-[var(--color-text-secondary)]">{user.email}</td>
+                      <td className="p-3">
+                        <select
+                          value={user.role}
+                          onChange={(e) => handleRoleChange(user, e.target.value as 'user' | 'admin')}
+                          className="px-2 py-1 text-xs border border-[var(--color-border)] rounded bg-[var(--color-surface)]"
+                        >
+                          <option value="user">User</option>
+                          <option value="admin">Admin</option>
+                        </select>
+                      </td>
+                      <td className="p-3">{getUserStatusBadge(user) || <span className="text-[var(--color-text-secondary)]">Active</span>}</td>
+                      <td className="p-3 text-[var(--color-text-secondary)]">{new Date(user.created_at).toLocaleDateString()}</td>
+                      <td className="p-3">
+                        <div className="relative">
+                          <button
+                            onClick={() => setActionMenuOpen(actionMenuOpen === user.id ? null : user.id)}
+                            className="px-2 py-1 text-xs border border-[var(--color-border)] rounded hover:bg-[var(--color-surface-hover)]"
+                          >
+                            •••
+                          </button>
+                          {actionMenuOpen === user.id && (
+                            <div className="absolute right-0 mt-1 w-40 bg-[var(--color-surface)] border border-[var(--color-border)] rounded-lg shadow-lg z-10">
+                              <button onClick={() => handleBanAction('shadow-ban', user)} className="w-full text-left px-3 py-2 text-xs hover:bg-[var(--color-surface-hover)] rounded-t-lg">Shadow Ban</button>
+                              <button onClick={() => handleBanAction('ban', user)} className="w-full text-left px-3 py-2 text-xs hover:bg-[var(--color-surface-hover)]">Ban</button>
+                              <button onClick={() => handleBanAction('unban', user)} className="w-full text-left px-3 py-2 text-xs hover:bg-[var(--color-surface-hover)]">Unban</button>
+                              <button onClick={() => handleBanAction('delete', user)} className="w-full text-left px-3 py-2 text-xs text-red-600 hover:bg-[var(--color-surface-hover)]">Delete</button>
+                              <button onClick={() => openBanHistory(user)} className="w-full text-left px-3 py-2 text-xs hover:bg-[var(--color-surface-hover)] rounded-b-lg border-t border-[var(--color-border)]">History</button>
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* Enhanced Pagination */}
+          <div className="mt-6 flex justify-between items-center flex-wrap gap-4">
             <button
-              onClick={() => setOffset(Math.max(0, offset - limit))}
+              onClick={() => setOffset(Math.max(0, offset - pageSize))}
               disabled={offset === 0}
               className="px-4 py-2 bg-[var(--color-surface-elevated)] border border-[var(--color-border)] rounded-lg hover:bg-[var(--color-surface-hover)] disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Previous
             </button>
-            <span className="text-sm text-[var(--color-text-secondary)]">
-              Showing {offset + 1} - {Math.min(offset + limit, offset + data.users.length)}
-            </span>
+
+            <div className="flex items-center gap-3 text-sm">
+              <span className="text-[var(--color-text-secondary)]">
+                Page {currentPage} of {totalPages}
+              </span>
+              <div className="flex items-center gap-2">
+                <label htmlFor="jumpTo" className="text-[var(--color-text-secondary)]">Jump to:</label>
+                <input
+                  id="jumpTo"
+                  type="number"
+                  min="1"
+                  max={totalPages}
+                  value={jumpToPage}
+                  onChange={(e) => setJumpToPage(e.target.value)}
+                  placeholder={currentPage.toString()}
+                  className="w-20 px-2 py-1 border border-[var(--color-border)] rounded bg-[var(--color-surface)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+                />
+                <button
+                  onClick={handleJumpToPage}
+                  disabled={!jumpToPage}
+                  className="px-3 py-1 bg-[var(--color-primary)] text-white rounded hover:bg-[var(--color-primary-strong)] disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Go
+                </button>
+              </div>
+            </div>
+
             <button
-              onClick={() => setOffset(offset + limit)}
-              disabled={data.users.length < limit}
+              onClick={() => setOffset(offset + pageSize)}
+              disabled={offset + pageSize >= data.total}
               className="px-4 py-2 bg-[var(--color-surface-elevated)] border border-[var(--color-border)] rounded-lg hover:bg-[var(--color-surface-hover)] disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Next
@@ -401,6 +746,160 @@ function UsersTab() {
         </>
       )}
 
+      {/* Bulk Action Modal */}
+      {bulkActionModal.open && bulkActionModal.action && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-[var(--color-surface-elevated)] rounded-lg shadow-xl max-w-lg w-full mx-4 p-6">
+            <div className="flex justify-between items-start mb-4">
+              <div>
+                <h3 className="text-xl font-semibold">
+                  Bulk {bulkActionModal.action === 'shadow-ban' ? 'Shadow Ban' :
+                        bulkActionModal.action === 'ban' ? 'Ban' :
+                        bulkActionModal.action === 'unban' ? 'Unban' : 'Delete'} Users
+                </h3>
+                <p className="text-[var(--color-text-secondary)] mt-1">
+                  This will affect {selectedUsers.size} selected user{selectedUsers.size > 1 ? 's' : ''}
+                </p>
+              </div>
+              <button
+                onClick={() => setBulkActionModal({ open: false, action: null })}
+                className="text-[var(--color-text-secondary)] hover:text-[var(--color-text)]"
+                aria-label="Close"
+              >
+                X
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label htmlFor="bulkReason" className="block text-sm font-medium mb-2">
+                  Reason (required)
+                </label>
+                <textarea
+                  id="bulkReason"
+                  value={bulkReason}
+                  onChange={(e) => setBulkReason(e.target.value)}
+                  rows={3}
+                  className="w-full px-4 py-2 border border-[var(--color-border)] rounded-lg bg-[var(--color-surface)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+                  placeholder="Enter reason..."
+                />
+              </div>
+
+              {(bulkActionModal.action === 'shadow-ban' || bulkActionModal.action === 'ban') && (
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="bulkShowReason"
+                    checked={bulkShowReason}
+                    onChange={(e) => setBulkShowReason(e.target.checked)}
+                    className="w-4 h-4"
+                  />
+                  <label htmlFor="bulkShowReason" className="text-sm">
+                    Show reason to users
+                  </label>
+                </div>
+              )}
+            </div>
+
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                onClick={() => setBulkActionModal({ open: false, action: null })}
+                className="px-4 py-2 rounded border border-[var(--color-border)] bg-[var(--color-surface-elevated)] hover:bg-[var(--color-surface-hover)]"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={submitBulkAction}
+                disabled={!bulkReason.trim()}
+                className={`px-4 py-2 rounded text-white disabled:opacity-50 ${
+                  bulkActionModal.action === 'delete' ? 'bg-red-600 hover:bg-red-700' : 'bg-[var(--color-primary)] hover:bg-[var(--color-primary-strong)]'
+                }`}
+              >
+                Confirm ({selectedUsers.size} users)
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Ban Action Modal */}
+      {banModal.type && banModal.user && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-[var(--color-surface-elevated)] rounded-lg shadow-xl max-w-lg w-full mx-4 p-6">
+            <div className="flex justify-between items-start mb-4">
+              <div>
+                <h3 className="text-xl font-semibold">
+                  {banModal.type === 'shadow-ban' && 'Shadow Ban User'}
+                  {banModal.type === 'ban' && 'Ban User'}
+                  {banModal.type === 'unban' && 'Unban User'}
+                  {banModal.type === 'delete' && 'Soft Delete User'}
+                </h3>
+                <p className="text-[var(--color-text-secondary)] mt-1">
+                  User: <span className="font-medium">{banModal.user.username}</span>
+                </p>
+              </div>
+              <button
+                onClick={() => setBanModal({ type: null, user: null, reason: '', showReason: false })}
+                className="text-[var(--color-text-secondary)] hover:text-[var(--color-text)]"
+                aria-label="Close"
+              >
+                X
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label htmlFor="banReason" className="block text-sm font-medium mb-2">
+                  Reason (required)
+                </label>
+                <textarea
+                  id="banReason"
+                  value={banModal.reason}
+                  onChange={(e) => setBanModal({ ...banModal, reason: e.target.value })}
+                  rows={3}
+                  className="w-full px-4 py-2 border border-[var(--color-border)] rounded-lg bg-[var(--color-surface)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+                  placeholder="Enter reason..."
+                />
+              </div>
+
+              {(banModal.type === 'shadow-ban' || banModal.type === 'ban') && (
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="showReason"
+                    checked={banModal.showReason}
+                    onChange={(e) => setBanModal({ ...banModal, showReason: e.target.checked })}
+                    className="w-4 h-4"
+                  />
+                  <label htmlFor="showReason" className="text-sm">
+                    Show reason to user
+                  </label>
+                </div>
+              )}
+            </div>
+
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                onClick={() => setBanModal({ type: null, user: null, reason: '', showReason: false })}
+                className="px-4 py-2 rounded border border-[var(--color-border)] bg-[var(--color-surface-elevated)] hover:bg-[var(--color-surface-hover)]"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={submitBanAction}
+                disabled={!banModal.reason.trim() || shadowBanUserMutation.isPending || banUserMutation.isPending || unbanUserMutation.isPending || softDeleteUserMutation.isPending}
+                className={`px-4 py-2 rounded text-white disabled:opacity-50 ${
+                  banModal.type === 'delete' ? 'bg-red-600 hover:bg-red-700' : 'bg-[var(--color-primary)] hover:bg-[var(--color-primary-strong)]'
+                }`}
+              >
+                {(shadowBanUserMutation.isPending || banUserMutation.isPending || unbanUserMutation.isPending || softDeleteUserMutation.isPending) ? 'Processing...' : 'Confirm'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Ban History Modal */}
       {historyModalUser && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
           <div className="bg-white dark:bg-[var(--color-surface-elevated)] rounded-lg shadow-xl max-w-2xl w-full mx-4 p-6">
@@ -443,97 +942,6 @@ function UsersTab() {
                 ))}
               </div>
             )}
-          </div>
-        </div>
-      )}
-
-      {modModalOpen && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-[var(--color-surface-elevated)] rounded-lg shadow-xl max-w-lg w-full mx-4 p-6">
-            <div className="flex justify-between items-start mb-4">
-              <div>
-                <h3 className="text-xl font-semibold">Assign hub moderator</h3>
-                {modTargetUser && (
-                  <p className="text-[var(--color-text-secondary)] mt-1">
-                    Choose a hub for <span className="font-medium">{modTargetUser.username}</span> to moderate.
-                  </p>
-                )}
-              </div>
-              <button
-                onClick={() => setModModalOpen(false)}
-                className="text-[var(--color-text-secondary)] hover:text-[var(--color-text)]"
-                aria-label="Close"
-              >
-                X
-              </button>
-            </div>
-
-            <label className="block text-sm font-medium mb-2" htmlFor="hubSearch">
-              Hub name
-            </label>
-            <div className="relative">
-              <input
-                id="hubSearch"
-                value={hubSearch}
-                onChange={(e) => {
-                  setHubSearch(e.target.value);
-                  setHubError('');
-                }}
-                onFocus={() => setHubInputFocused(true)}
-                onBlur={() => {
-                  setTimeout(() => setHubInputFocused(false), 120);
-                }}
-                placeholder="Start typing a hub name..."
-                className="w-full px-4 py-2 border border-[var(--color-border)] rounded-lg bg-[var(--color-surface)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
-              />
-              {hubInputFocused && (
-                <div className="absolute z-20 left-0 right-0 mt-1 border border-[var(--color-border)] rounded-lg max-h-56 overflow-y-auto bg-[var(--color-surface)] shadow">
-                  {isFetchingHubs && hubSearch.trim().length > 0 && (
-                    <div className="px-4 py-2 text-sm text-[var(--color-text-secondary)]">Searching...</div>
-                  )}
-                  {!isFetchingHubs && filteredHubs.length === 0 && (
-                    <div className="px-4 py-2 text-sm text-[var(--color-text-secondary)]">No hubs found</div>
-                  )}
-                  {filteredHubs.map((hub: Hub) => (
-                    <button
-                      key={hub.id}
-                      type="button"
-                      onMouseDown={(e) => e.preventDefault()}
-                      onClick={() => {
-                        setHubSearch(hub.name);
-                        setHubError('');
-                      }}
-                      className="w-full text-left px-4 py-2 hover:bg-[var(--color-surface-hover)]"
-                    >
-                      <div className="font-medium">{hub.name}</div>
-                      {hub.title && (
-                        <div className="text-xs text-[var(--color-text-secondary)] truncate">{hub.title}</div>
-                      )}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-            {hubError && <div className="text-red-600 text-sm mt-2">{hubError}</div>}
-
-            <div className="mt-6 flex justify-end gap-3">
-              <button
-                onClick={() => {
-                  setModModalOpen(false);
-                  setHubError('');
-                }}
-                className="px-4 py-2 rounded border border-[var(--color-border)] bg-[var(--color-surface-elevated)] hover:bg-[var(--color-surface-hover)]"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={confirmHubModerator}
-                disabled={addHubModeratorMutation.isPending}
-                className="px-4 py-2 rounded bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-strong)] disabled:opacity-50"
-              >
-                {addHubModeratorMutation.isPending ? 'Assigning...' : 'Assign moderator'}
-              </button>
-            </div>
           </div>
         </div>
       )}
@@ -641,6 +1049,158 @@ function ModeratorsTab() {
               ))}
             </div>
           )}
+        </>
+      )}
+    </div>
+  );
+}
+
+// ===== BAN ACTIVITY TAB =====
+
+function BanActivityTab() {
+  const [offset, setOffset] = useState(0);
+  const [pageSize, setPageSize] = useState(50);
+  const [jumpToPage, setJumpToPage] = useState('');
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['banActivity', pageSize, offset],
+    queryFn: () => adminService.getAllBanHistory(pageSize, offset),
+  });
+
+  const totalPages = data ? Math.ceil(data.total / pageSize) : 0;
+  const currentPage = Math.floor(offset / pageSize) + 1;
+
+  const handleJumpToPage = () => {
+    const page = parseInt(jumpToPage, 10);
+    if (page >= 1 && page <= totalPages) {
+      setOffset((page - 1) * pageSize);
+      setJumpToPage('');
+    }
+  };
+
+  const handlePageSizeChange = (newSize: number) => {
+    setPageSize(newSize);
+    setOffset(0);
+  };
+
+  return (
+    <div>
+      <div className="mb-6">
+        <h2 className="text-xl font-semibold">Site-wide Ban Activity</h2>
+        <p className="text-sm text-[var(--color-text-secondary)] mt-1">
+          All ban, shadow-ban, unban, and delete actions across the site
+        </p>
+      </div>
+
+      {/* Total count and page size selector */}
+      {data && (
+        <div className="mb-4 flex justify-between items-center text-sm text-[var(--color-text-secondary)]">
+          <div>
+            Showing {offset + 1} - {Math.min(offset + pageSize, data.total)} of {data.total} actions
+          </div>
+          <div className="flex items-center gap-2">
+            <label htmlFor="banPageSize">Per page:</label>
+            <select
+              id="banPageSize"
+              value={pageSize}
+              onChange={(e) => handlePageSizeChange(Number(e.target.value))}
+              className="px-3 py-1 border border-[var(--color-border)] rounded bg-[var(--color-surface)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+            >
+              <option value="25">25</option>
+              <option value="50">50</option>
+              <option value="100">100</option>
+            </select>
+          </div>
+        </div>
+      )}
+
+      {isLoading && <div className="text-center py-12">Loading ban activity...</div>}
+
+      {data && data.history.length === 0 && (
+        <div className="text-center py-12 text-[var(--color-text-secondary)]">No ban activity found</div>
+      )}
+
+      {data && data.history.length > 0 && (
+        <>
+          <div className="space-y-3">
+            {data.history.map((entry: BanHistoryItem) => (
+              <div
+                key={entry.id}
+                className="p-4 border border-[var(--color-border)] rounded-lg bg-[var(--color-surface-elevated)]"
+              >
+                <div className="flex justify-between items-start">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold text-sm">{entry.action}</span>
+                      <span
+                        className={`px-2 py-0.5 text-xs rounded ${
+                          entry.action.includes('ban') && !entry.action.includes('unban')
+                            ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                            : entry.action === 'unban'
+                            ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                            : 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200'
+                        }`}
+                      >
+                        User ID: {entry.user_id}
+                      </span>
+                    </div>
+                    <div className="text-sm text-[var(--color-text-secondary)] mt-1">
+                      <span className="font-medium">Reason:</span> {entry.reason}
+                      {entry.show_reason && <span className="ml-2 text-xs text-[var(--color-primary)]">(shown to user)</span>}
+                    </div>
+                    <div className="text-sm text-[var(--color-text-secondary)] mt-1">
+                      {new Date(entry.created_at).toLocaleString()} by {entry.admin_name} (ID: {entry.admin_id})
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Enhanced Pagination */}
+          <div className="mt-6 flex justify-between items-center flex-wrap gap-4">
+            <button
+              onClick={() => setOffset(Math.max(0, offset - pageSize))}
+              disabled={offset === 0}
+              className="px-4 py-2 bg-[var(--color-surface-elevated)] border border-[var(--color-border)] rounded-lg hover:bg-[var(--color-surface-hover)] disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Previous
+            </button>
+
+            <div className="flex items-center gap-3 text-sm">
+              <span className="text-[var(--color-text-secondary)]">
+                Page {currentPage} of {totalPages}
+              </span>
+              <div className="flex items-center gap-2">
+                <label htmlFor="banJumpTo" className="text-[var(--color-text-secondary)]">Jump to:</label>
+                <input
+                  id="banJumpTo"
+                  type="number"
+                  min="1"
+                  max={totalPages}
+                  value={jumpToPage}
+                  onChange={(e) => setJumpToPage(e.target.value)}
+                  placeholder={currentPage.toString()}
+                  className="w-20 px-2 py-1 border border-[var(--color-border)] rounded bg-[var(--color-surface)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+                />
+                <button
+                  onClick={handleJumpToPage}
+                  disabled={!jumpToPage}
+                  className="px-3 py-1 bg-[var(--color-primary)] text-white rounded hover:bg-[var(--color-primary-strong)] disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Go
+                </button>
+              </div>
+            </div>
+
+            <button
+              onClick={() => setOffset(offset + pageSize)}
+              disabled={offset + pageSize >= data.total}
+              className="px-4 py-2 bg-[var(--color-surface-elevated)] border border-[var(--color-border)] rounded-lg hover:bg-[var(--color-surface-hover)] disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Next
+            </button>
+          </div>
         </>
       )}
     </div>

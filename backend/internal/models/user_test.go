@@ -1,17 +1,12 @@
 package models
 
 import (
-	"context"
 	"testing"
 	"time"
-
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// This is a lightweight test using an in-memory pgxpool substitute.
-// In the current repo, spinning up a real DB would be ideal; here we assert the BanStatus struct wiring works.
-
-type fakePool struct{}
+// This is a lightweight test using struct validation.
+// Actual DB tests are in user_ban_test.go
 
 func TestBanStatusStruct(t *testing.T) {
 	// Ensure struct fields are present and default zero-values don't panic
@@ -19,15 +14,6 @@ func TestBanStatusStruct(t *testing.T) {
 	if status.Banned || status.ShadowBanned || status.Deleted {
 		t.Fatalf("expected zero ban flags to be false")
 	}
-}
-
-// Placeholder to satisfy compiler when using fakePool; these aren't executed.
-func (f *fakePool) Exec(ctx context.Context, sql string, arguments ...interface{}) (pgxpool.CommandTag, error) {
-	return pgxpool.CommandTag{}, nil
-}
-
-func (f *fakePool) QueryRow(ctx context.Context, sql string, args ...interface{}) pgxpool.Row {
-	return nil
 }
 
 // Compile-time check to ensure BanHistory stays aligned

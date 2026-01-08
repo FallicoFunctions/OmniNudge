@@ -200,10 +200,42 @@ func (h *AdminHandler) GetBanHistory(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"history": history})
 }
 
+// GetAllBanHistory handles GET /api/v1/admin/ban-history
+func (h *AdminHandler) GetAllBanHistory(c *gin.Context) {
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "50"))
+	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
+
+	if limit > 200 {
+		limit = 200
+	}
+
+	history, err := h.userRepo.GetAllBanHistory(c.Request.Context(), limit, offset)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch ban history", "details": err.Error()})
+		return
+	}
+
+	// Get total count
+	var totalCount int
+	countQuery := "SELECT COUNT(*) FROM ban_history"
+	if err := h.pool.QueryRow(c.Request.Context(), countQuery).Scan(&totalCount); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to count ban history", "details": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"history": history,
+		"limit":   limit,
+		"offset":  offset,
+		"total":   totalCount,
+	})
+}
+
 // ListUsers handles GET /api/v1/admin/users
 func (h *AdminHandler) ListUsers(c *gin.Context) {
 	search := c.Query("search")
 	roleFilter := c.Query("role")
+	statusFilter := c.Query("status") // "shadow_banned", "banned", "deleted", "active"
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "50"))
 	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
 
@@ -213,7 +245,8 @@ func (h *AdminHandler) ListUsers(c *gin.Context) {
 
 	// Build query dynamically with proper parameterization
 	baseQuery := `
-		SELECT id, username, email, reddit_id, role, created_at, last_seen, bio, avatar_url
+		SELECT id, username, email, reddit_id, role, created_at, last_seen, bio, avatar_url,
+		       shadow_banned, banned, deleted, ban_reason, show_ban_reason, banned_at, banned_by
 		FROM users
 		WHERE 1=1
 	`
@@ -234,9 +267,34 @@ func (h *AdminHandler) ListUsers(c *gin.Context) {
 		paramCount++
 	}
 
+	// Add status filter
+	if statusFilter != "" {
+		switch statusFilter {
+		case "shadow_banned":
+			conditions = append(conditions, "shadow_banned = true")
+		case "banned":
+			conditions = append(conditions, "banned = true")
+		case "deleted":
+			conditions = append(conditions, "deleted = true")
+		case "active":
+			conditions = append(conditions, "shadow_banned = false AND banned = false AND deleted = false")
+		}
+	}
+
 	// Add conditions to query
 	for _, cond := range conditions {
 		baseQuery += " AND " + cond
+	}
+
+	// Get total count before pagination
+	countQuery := "SELECT COUNT(*) FROM users WHERE 1=1"
+	for _, cond := range conditions {
+		countQuery += " AND " + cond
+	}
+	var totalCount int
+	if err := h.pool.QueryRow(c.Request.Context(), countQuery, args...).Scan(&totalCount); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to count users", "details": err.Error()})
+		return
 	}
 
 	// Add ordering and pagination
@@ -251,32 +309,47 @@ func (h *AdminHandler) ListUsers(c *gin.Context) {
 	defer rows.Close()
 
 	type userRow struct {
-		ID        int
-		Username  string
-		Email     *string
-		RedditID  *string
-		Role      string
-		CreatedAt time.Time
-		LastSeen  *time.Time
-		Bio       *string
-		AvatarURL *string
+		ID            int
+		Username      string
+		Email         *string
+		RedditID      *string
+		Role          string
+		CreatedAt     time.Time
+		LastSeen      *time.Time
+		Bio           *string
+		AvatarURL     *string
+		ShadowBanned  bool
+		Banned        bool
+		Deleted       bool
+		BanReason     *string
+		ShowBanReason bool
+		BannedAt      *time.Time
+		BannedBy      *int
 	}
 	type UserResponse struct {
-		ID         int     `json:"id"`
-		Username   string  `json:"username"`
-		Email      *string `json:"email"`
-		RedditID   *string `json:"reddit_id"`
-		Role       string  `json:"role"`
-		CreatedAt  string  `json:"created_at"`
-		LastSeenAt *string `json:"last_seen_at"`
-		Bio        *string `json:"bio"`
-		AvatarURL  *string `json:"avatar_url"`
+		ID            int     `json:"id"`
+		Username      string  `json:"username"`
+		Email         *string `json:"email"`
+		RedditID      *string `json:"reddit_id"`
+		Role          string  `json:"role"`
+		CreatedAt     string  `json:"created_at"`
+		LastSeenAt    *string `json:"last_seen_at"`
+		Bio           *string `json:"bio"`
+		AvatarURL     *string `json:"avatar_url"`
+		ShadowBanned  bool    `json:"shadow_banned"`
+		Banned        bool    `json:"banned"`
+		Deleted       bool    `json:"deleted"`
+		BanReason     *string `json:"ban_reason"`
+		ShowBanReason bool    `json:"show_ban_reason"`
+		BannedAt      *string `json:"banned_at"`
+		BannedBy      *int    `json:"banned_by"`
 	}
 
 	users := []UserResponse{}
 	for rows.Next() {
 		var row userRow
-		if err := rows.Scan(&row.ID, &row.Username, &row.Email, &row.RedditID, &row.Role, &row.CreatedAt, &row.LastSeen, &row.Bio, &row.AvatarURL); err != nil {
+		if err := rows.Scan(&row.ID, &row.Username, &row.Email, &row.RedditID, &row.Role, &row.CreatedAt, &row.LastSeen, &row.Bio, &row.AvatarURL,
+			&row.ShadowBanned, &row.Banned, &row.Deleted, &row.BanReason, &row.ShowBanReason, &row.BannedAt, &row.BannedBy); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to scan user", "details": err.Error()})
 			return
 		}
@@ -285,16 +358,28 @@ func (h *AdminHandler) ListUsers(c *gin.Context) {
 			formatted := row.LastSeen.Format(time.RFC3339)
 			lastSeenStr = &formatted
 		}
+		var bannedAtStr *string
+		if row.BannedAt != nil {
+			formatted := row.BannedAt.Format(time.RFC3339)
+			bannedAtStr = &formatted
+		}
 		users = append(users, UserResponse{
-			ID:         row.ID,
-			Username:   row.Username,
-			Email:      row.Email,
-			RedditID:   row.RedditID,
-			Role:       row.Role,
-			CreatedAt:  row.CreatedAt.Format(time.RFC3339),
-			LastSeenAt: lastSeenStr,
-			Bio:        row.Bio,
-			AvatarURL:  row.AvatarURL,
+			ID:            row.ID,
+			Username:      row.Username,
+			Email:         row.Email,
+			RedditID:      row.RedditID,
+			Role:          row.Role,
+			CreatedAt:     row.CreatedAt.Format(time.RFC3339),
+			LastSeenAt:    lastSeenStr,
+			Bio:           row.Bio,
+			AvatarURL:     row.AvatarURL,
+			ShadowBanned:  row.ShadowBanned,
+			Banned:        row.Banned,
+			Deleted:       row.Deleted,
+			BanReason:     row.BanReason,
+			ShowBanReason: row.ShowBanReason,
+			BannedAt:      bannedAtStr,
+			BannedBy:      row.BannedBy,
 		})
 	}
 
@@ -302,6 +387,7 @@ func (h *AdminHandler) ListUsers(c *gin.Context) {
 		"users":  users,
 		"limit":  limit,
 		"offset": offset,
+		"total":  totalCount,
 	})
 }
 
