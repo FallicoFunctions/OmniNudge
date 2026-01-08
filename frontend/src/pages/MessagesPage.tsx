@@ -361,7 +361,7 @@ export default function MessagesPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: allConversations, isLoading: loadingConversations } = useQuery({
-    queryKey: ['conversations'],
+    queryKey: ['conversations', 'all'], // Different key to avoid cache conflicts with MainLayout
     queryFn: () => messagesService.getConversations(true), // Fetch all including archived
   });
 
@@ -499,7 +499,8 @@ export default function MessagesPage() {
   const archiveConversationMutation = useMutation({
     mutationFn: (conversationId: number) => messagesService.archiveConversation(conversationId),
     onSuccess: async () => {
-      await queryClient.refetchQueries({ queryKey: ['conversations'] });
+      await queryClient.refetchQueries({ queryKey: ['conversations', 'all'] });
+      await queryClient.refetchQueries({ queryKey: ['conversations'] }); // Also refetch MainLayout's query
       setConversationMenuOpen(null);
     },
     onError: (error) => {
@@ -510,7 +511,8 @@ export default function MessagesPage() {
   const unarchiveConversationMutation = useMutation({
     mutationFn: (conversationId: number) => messagesService.unarchiveConversation(conversationId),
     onSuccess: async () => {
-      await queryClient.refetchQueries({ queryKey: ['conversations'] });
+      await queryClient.refetchQueries({ queryKey: ['conversations', 'all'] });
+      await queryClient.refetchQueries({ queryKey: ['conversations'] }); // Also refetch MainLayout's query
       setConversationMenuOpen(null);
     },
     onError: (error) => {

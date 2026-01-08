@@ -162,10 +162,14 @@ func (h *ConversationsHandler) GetConversations(c *gin.Context) {
 				FROM conversations WHERE id = $1
 			`, conv.ID).Scan(&archivedForUser1, &archivedForUser2)
 			if err == nil {
+				// Legacy fallback: if conversation-level archived_at is set, treat as archived for both users
+				legacyArchived := conv.ArchivedAt != nil
+
 				// If this conversation is archived for the current user, set archived_at
 				// Otherwise, clear it
 				if (conv.User1ID != nil && *conv.User1ID == userID.(int) && archivedForUser1) ||
-					(conv.User2ID != nil && *conv.User2ID == userID.(int) && archivedForUser2) {
+					(conv.User2ID != nil && *conv.User2ID == userID.(int) && archivedForUser2) ||
+					legacyArchived {
 					// Keep the existing archived_at if set, otherwise use current time as a placeholder
 					if details.ArchivedAt == nil {
 						now := time.Now()
