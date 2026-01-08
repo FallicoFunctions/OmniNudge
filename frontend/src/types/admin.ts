@@ -10,6 +10,13 @@ export interface AdminUser {
   last_seen_at?: string;
   bio?: string;
   avatar_url?: string;
+  shadow_banned: boolean;
+  banned: boolean;
+  deleted: boolean;
+  ban_reason?: string;
+  show_ban_reason: boolean;
+  banned_at?: string;
+  banned_by?: number;
 }
 
 export interface BanHistoryItem {

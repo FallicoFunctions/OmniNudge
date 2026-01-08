@@ -576,6 +576,7 @@ func main() {
 				admin.POST("/users/:id/unban", adminHandler.UnbanUser)
 				admin.POST("/users/:id/delete", adminHandler.SoftDeleteUser)
 				admin.GET("/users/:id/ban-history", adminHandler.GetBanHistory)
+				admin.GET("/ban-history", adminHandler.GetAllBanHistory)
 
 				// Hub moderator management
 				admin.POST("/hubs/:name/moderators", hubsHandler.AddModerator)
