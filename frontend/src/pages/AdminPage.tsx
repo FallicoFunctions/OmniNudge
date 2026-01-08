@@ -533,11 +533,13 @@ function UsersTab() {
         <>
           {/* Card View */}
           {viewMode === 'card' && (
-            <div className="space-y-3">
-              {data.users.map((user: AdminUser) => (
+            <div className="space-y-0">
+              {data.users.map((user: AdminUser, idx: number) => (
                 <div
                   key={user.id}
-                  className="border border-[var(--color-border)] rounded-lg bg-[var(--color-surface-elevated)]"
+                  className={`border border-[var(--color-border)] bg-[var(--color-surface-elevated)] ${
+                    idx === 0 ? 'rounded-t-lg' : ''
+                  } ${idx === data.users.length - 1 ? 'rounded-b-lg' : 'border-t-0'}`}
                 >
                   <div className="p-4 flex justify-between items-start">
                     <div className="flex items-start gap-3 flex-1">
