@@ -358,6 +358,7 @@ func main() {
 		// Protected routes (auth required)
 		protected := api.Group("")
 		protected.Use(middleware.AuthRequired(authService))
+		protected.Use(middleware.BanEnforcement(userRepo))
 		{
 			protected.GET("/auth/me", authHandler.GetMe)
 			protected.POST("/auth/logout", authHandler.Logout)
@@ -570,6 +571,11 @@ func main() {
 				// User management
 				admin.GET("/users", adminHandler.ListUsers)
 				admin.POST("/users/:id/role", adminHandler.PromoteUser)
+				admin.POST("/users/:id/ban", adminHandler.BanUser)
+				admin.POST("/users/:id/shadow-ban", adminHandler.ShadowBanUser)
+				admin.POST("/users/:id/unban", adminHandler.UnbanUser)
+				admin.POST("/users/:id/delete", adminHandler.SoftDeleteUser)
+				admin.GET("/users/:id/ban-history", adminHandler.GetBanHistory)
 
 				// Hub moderator management
 				admin.POST("/hubs/:name/moderators", hubsHandler.AddModerator)

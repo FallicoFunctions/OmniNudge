@@ -296,6 +296,11 @@ func (h *MessagesHandler) GetMessages(c *gin.Context) {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
 		return
 	}
+	if c.GetBool("shadow_banned") {
+		// Silently accept but do not persist
+		c.JSON(http.StatusCreated, gin.H{"message": "Message sent", "shadow_banned": true})
+		return
+	}
 
 	conversationID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {

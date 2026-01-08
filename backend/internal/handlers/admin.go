@@ -3,11 +3,12 @@ package handlers
 import (
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
+	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/omninudge/backend/internal/models"
-	"github.com/gin-gonic/gin"
 )
 
 // AdminHandler handles admin-level actions
@@ -58,6 +59,145 @@ func (h *AdminHandler) PromoteUser(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Role updated", "user_id": targetID, "role": req.Role})
+}
+
+// BanUser handles POST /api/v1/admin/users/:id/ban (regular ban)
+func (h *AdminHandler) BanUser(c *gin.Context) {
+	targetID, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user ID"})
+		return
+	}
+
+	var req struct {
+		Reason     string `json:"reason" binding:"required"`
+		ShowReason bool   `json:"show_reason"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil || strings.TrimSpace(req.Reason) == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Reason is required"})
+		return
+	}
+
+	adminID, ok := c.Get("user_id")
+	if !ok {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Missing admin context"})
+		return
+	}
+
+	if err := h.userRepo.BanUser(c.Request.Context(), targetID, req.Reason, req.ShowReason, adminID.(int)); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to ban user", "details": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "User banned", "user_id": targetID})
+}
+
+// ShadowBanUser handles POST /api/v1/admin/users/:id/shadow-ban
+func (h *AdminHandler) ShadowBanUser(c *gin.Context) {
+	targetID, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user ID"})
+		return
+	}
+
+	var req struct {
+		Reason     string `json:"reason" binding:"required"`
+		ShowReason bool   `json:"show_reason"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil || strings.TrimSpace(req.Reason) == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Reason is required"})
+		return
+	}
+
+	adminID, ok := c.Get("user_id")
+	if !ok {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Missing admin context"})
+		return
+	}
+
+	if err := h.userRepo.ShadowBanUser(c.Request.Context(), targetID, req.Reason, req.ShowReason, adminID.(int)); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to shadow ban user", "details": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "User shadow banned", "user_id": targetID})
+}
+
+// UnbanUser handles POST /api/v1/admin/users/:id/unban
+func (h *AdminHandler) UnbanUser(c *gin.Context) {
+	targetID, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user ID"})
+		return
+	}
+
+	var req struct {
+		Reason string `json:"reason" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil || strings.TrimSpace(req.Reason) == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Reason is required"})
+		return
+	}
+
+	adminID, ok := c.Get("user_id")
+	if !ok {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Missing admin context"})
+		return
+	}
+
+	if err := h.userRepo.UnbanUser(c.Request.Context(), targetID, req.Reason, adminID.(int)); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to unban user", "details": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "User unbanned", "user_id": targetID})
+}
+
+// SoftDeleteUser handles POST /api/v1/admin/users/:id/delete
+func (h *AdminHandler) SoftDeleteUser(c *gin.Context) {
+	targetID, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user ID"})
+		return
+	}
+
+	var req struct {
+		Reason string `json:"reason" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil || strings.TrimSpace(req.Reason) == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Reason is required"})
+		return
+	}
+
+	adminID, ok := c.Get("user_id")
+	if !ok {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Missing admin context"})
+		return
+	}
+
+	if err := h.userRepo.SoftDeleteUser(c.Request.Context(), targetID, req.Reason, adminID.(int)); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete user", "details": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "User soft deleted", "user_id": targetID})
+}
+
+// GetBanHistory handles GET /api/v1/admin/users/:id/ban-history
+func (h *AdminHandler) GetBanHistory(c *gin.Context) {
+	targetID, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user ID"})
+		return
+	}
+
+	history, err := h.userRepo.GetBanHistory(c.Request.Context(), targetID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch ban history", "details": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"history": history})
 }
 
 // ListUsers handles GET /api/v1/admin/users
@@ -183,14 +323,14 @@ func (h *AdminHandler) GetSiteStats(c *gin.Context) {
 
 	// Get all stats in parallel queries
 	queries := map[string]*int{
-		`SELECT COUNT(*) FROM users`:                      &stats.TotalUsers,
-		`SELECT COUNT(*) FROM platform_posts`:             &stats.TotalPosts,
-		`SELECT COUNT(*) FROM post_comments`:              &stats.TotalComments,
-		`SELECT COUNT(*) FROM hubs`:                       &stats.TotalHubs,
-		`SELECT COUNT(*) FROM conversations`:              &stats.TotalConversations,
-		`SELECT COUNT(*) FROM messages`:                   &stats.TotalMessages,
-		`SELECT COUNT(*) FROM reports`:                    &stats.TotalReports,
-		`SELECT COUNT(*) FROM users WHERE role = 'admin'`: &stats.AdminCount,
+		`SELECT COUNT(*) FROM users`:                         &stats.TotalUsers,
+		`SELECT COUNT(*) FROM platform_posts`:                &stats.TotalPosts,
+		`SELECT COUNT(*) FROM post_comments`:                 &stats.TotalComments,
+		`SELECT COUNT(*) FROM hubs`:                          &stats.TotalHubs,
+		`SELECT COUNT(*) FROM conversations`:                 &stats.TotalConversations,
+		`SELECT COUNT(*) FROM messages`:                      &stats.TotalMessages,
+		`SELECT COUNT(*) FROM reports`:                       &stats.TotalReports,
+		`SELECT COUNT(*) FROM users WHERE role = 'admin'`:    &stats.AdminCount,
 		`SELECT COUNT(DISTINCT user_id) FROM hub_moderators`: &stats.ModeratorCount,
 	}
 

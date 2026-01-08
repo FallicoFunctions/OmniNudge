@@ -18,6 +18,26 @@ export const adminService = {
     return api.post<{ message: string; user_id: number; role: string }>(`/admin/users/${userId}/role`, data);
   },
 
+  async banUser(userId: number, reason: string, showReason: boolean): Promise<{ message: string }> {
+    return api.post<{ message: string }>(`/admin/users/${userId}/ban`, { reason, show_reason: showReason });
+  },
+
+  async shadowBanUser(userId: number, reason: string, showReason: boolean): Promise<{ message: string }> {
+    return api.post<{ message: string }>(`/admin/users/${userId}/shadow-ban`, { reason, show_reason: showReason });
+  },
+
+  async unbanUser(userId: number, reason: string): Promise<{ message: string }> {
+    return api.post<{ message: string }>(`/admin/users/${userId}/unban`, { reason });
+  },
+
+  async softDeleteUser(userId: number, reason: string): Promise<{ message: string }> {
+    return api.post<{ message: string }>(`/admin/users/${userId}/delete`, { reason });
+  },
+
+  async getBanHistory(userId: number) {
+    return api.get<{ history: BanHistoryItem[] }>(`/admin/users/${userId}/ban-history`);
+  },
+
   // ===== HUB MODERATOR MANAGEMENT =====
 
   async getHubModerators(hubId: number): Promise<HubModerator[]> {

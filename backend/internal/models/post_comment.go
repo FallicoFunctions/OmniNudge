@@ -199,9 +199,9 @@ func (r *PostCommentRepository) GetByPostID(ctx context.Context, postID int, sor
 			       pc.is_deleted, pc.is_edited, pc.edited_at, pc.depth, pc.created_at,
 			       pc.inbox_replies_disabled,
 			       0 AS user_vote
-			FROM post_comments pc
-			JOIN users u ON u.id = pc.user_id
-			WHERE pc.post_id = $1 AND (pc.is_deleted = FALSE OR pc.body = $4)
+		FROM post_comments pc
+		JOIN users u ON u.id = pc.user_id
+		WHERE pc.post_id = $1 AND (pc.is_deleted = FALSE OR pc.body = $4) AND u.shadow_banned = FALSE
 			` + orderClause + `
 			LIMIT $2 OFFSET $3
 		`
@@ -291,9 +291,9 @@ func (r *PostCommentRepository) GetReplies(ctx context.Context, parentCommentID 
 			       pc.is_deleted, pc.is_edited, pc.edited_at, pc.depth, pc.created_at,
 			       pc.inbox_replies_disabled,
 			       0 AS user_vote
-			FROM post_comments pc
-			JOIN users u ON u.id = pc.user_id
-			WHERE pc.parent_comment_id = $1 AND (pc.is_deleted = FALSE OR pc.body = $4)
+		FROM post_comments pc
+		JOIN users u ON u.id = pc.user_id
+		WHERE pc.parent_comment_id = $1 AND (pc.is_deleted = FALSE OR pc.body = $4) AND u.shadow_banned = FALSE
 			` + orderClause + `
 			LIMIT $2 OFFSET $3
 		`
