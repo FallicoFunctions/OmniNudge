@@ -62,11 +62,7 @@ func (r *ConversationRepository) Create(ctx context.Context, user1ID, user2ID in
 		ON CONFLICT (user1_id, user2_id) DO UPDATE
 		SET last_message_at = CURRENT_TIMESTAMP,
 		    deleted_for_user1 = FALSE,
-		    deleted_for_user2 = FALSE,
-		    archived_for_user1 = FALSE,
-		    archived_for_user2 = FALSE,
-		    archived_at = NULL,
-		    archived_by = NULL
+		    deleted_for_user2 = FALSE
 		RETURNING id, created_at, last_message_at
 	`
 
@@ -180,9 +176,14 @@ func (r *ConversationRepository) GetByUserID(ctx context.Context, userID int, li
 
 	if !includeArchived {
 		// For DMs: check per-user archive flags
+		// Also honor legacy conversation-level archived_at values as archived
 		// For mod_mail: check conversation-level archived_at
 		query += ` AND (
-			(conversation_type = 'dm' AND NOT ((user1_id = $1 AND archived_for_user1 = TRUE) OR (user2_id = $1 AND archived_for_user2 = TRUE)))
+			(conversation_type = 'dm' AND NOT (
+				(user1_id = $1 AND archived_for_user1 = TRUE) OR
+				(user2_id = $1 AND archived_for_user2 = TRUE) OR
+				archived_at IS NOT NULL
+			))
 			OR (conversation_type = 'mod_mail' AND archived_at IS NULL)
 		)`
 	}
@@ -327,9 +328,21 @@ func (r *ConversationRepository) Unarchive(ctx context.Context, conversationID i
 		// For DMs: per-user unarchive
 		var query string
 		if user1ID != nil && *user1ID == userID {
-			query = `UPDATE conversations SET archived_for_user1 = FALSE WHERE id = $1`
+			query = `
+				UPDATE conversations
+				SET archived_for_user1 = FALSE,
+				    archived_at = NULL,
+				    archived_by = NULL
+				WHERE id = $1
+			`
 		} else if user2ID != nil && *user2ID == userID {
-			query = `UPDATE conversations SET archived_for_user2 = FALSE WHERE id = $1`
+			query = `
+				UPDATE conversations
+				SET archived_for_user2 = FALSE,
+				    archived_at = NULL,
+				    archived_by = NULL
+				WHERE id = $1
+			`
 		} else {
 			return pgx.ErrNoRows // User is not a participant
 		}
