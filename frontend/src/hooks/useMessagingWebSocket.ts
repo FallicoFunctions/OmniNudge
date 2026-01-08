@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../contexts/AuthContext';
+import { useSettings } from '../contexts/SettingsContext';
 import { API_BASE_URL } from '../lib/api';
 import type { Message, Conversation } from '../types/messages';
 
@@ -20,6 +21,7 @@ interface UseMessagingWebSocketOptions {
 export function useMessagingWebSocket(options: UseMessagingWebSocketOptions = {}) {
   const { activeConversationId, onMessageReceived } = options;
   const { user } = useAuth();
+  const { notifyArchivedMessages } = useSettings();
   const queryClient = useQueryClient();
   const wsRef = useRef<WebSocket | null>(null);
 
@@ -66,49 +68,61 @@ export function useMessagingWebSocket(options: UseMessagingWebSocketOptions = {}
               }
             );
 
-            // Update conversations list - this is the key part for the notification count
-            queryClient.setQueryData<Conversation[] | undefined>(['conversations'], (prev) => {
-              if (!prev) {
-                // If no conversations cached, invalidate to fetch fresh data
-                queryClient.invalidateQueries({ queryKey: ['conversations'] });
-                return prev;
-              }
-
-              return prev.map((conv) => {
-                if (conv.id !== payload.conversation_id) {
-                  return conv;
+            const updateConversationList = (key: (string | number)[]) => {
+              let found = false;
+              queryClient.setQueryData<Conversation[] | undefined>(key, (prev) => {
+                if (!prev) {
+                  return prev;
                 }
 
-                // Increment unread count only if user is the recipient
-                const isRecipient = payload.recipient_id === user?.id;
-                const isArchived = Boolean(conv.archived_at);
-                // Don't increment if this is the active conversation (user is currently viewing it)
-                // Use ref to get current value and avoid stale closure
-                const currentActiveConvId = activeConversationIdRef.current;
-                const isActiveConversation = currentActiveConvId === payload.conversation_id;
+                const next = prev.map((conv) => {
+                  if (conv.id !== payload.conversation_id) {
+                    return conv;
+                  }
+                  found = true;
 
-                if (isArchived) {
-                  // Keep unread count unchanged for archived conversations
+                  // Increment unread count only if user is the recipient
+                  const isRecipient = payload.recipient_id === user?.id;
+                  const isArchived = Boolean(conv.archived_at);
+                  // Don't increment if this is the active conversation (user is currently viewing it)
+                  // Use ref to get current value and avoid stale closure
+                  const currentActiveConvId = activeConversationIdRef.current;
+                  const isActiveConversation = currentActiveConvId === payload.conversation_id;
+
+                  if (isArchived && !notifyArchivedMessages) {
+                    // Keep unread count unchanged for archived conversations
+                    return {
+                      ...conv,
+                      latest_message: payload,
+                      unread_count: conv.unread_count,
+                    };
+                  }
+
+                  // If viewing active conversation, always set unread to 0
+                  // Otherwise, increment only if user is recipient
+                  const nextUnread = isActiveConversation
+                    ? 0
+                    : (isRecipient ? conv.unread_count + 1 : conv.unread_count);
+
                   return {
                     ...conv,
                     latest_message: payload,
-                    unread_count: conv.unread_count,
+                    unread_count: nextUnread,
                   };
-                }
+                });
 
-                // If viewing active conversation, always set unread to 0
-                // Otherwise, increment only if user is recipient
-                const nextUnread = isActiveConversation
-                  ? 0
-                  : (isRecipient ? conv.unread_count + 1 : conv.unread_count);
-
-                return {
-                  ...conv,
-                  latest_message: payload,
-                  unread_count: nextUnread,
-                };
+                return next;
               });
-            });
+
+              // If not found in cache, refetch this query key
+              if (!found) {
+                queryClient.invalidateQueries({ queryKey: key });
+              }
+            };
+
+            // Update both active-only list (MainLayout) and full list (MessagesPage)
+            updateConversationList(['conversations']);
+            updateConversationList(['conversations', 'all']);
 
             // Call the callback if provided
             if (onMessageReceived) {

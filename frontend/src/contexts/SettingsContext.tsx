@@ -6,6 +6,8 @@ interface SettingsContextType {
   setUseRelativeTime: (value: boolean) => void;
   autoCloseThemeSelector: boolean;
   setAutoCloseThemeSelector: (value: boolean) => void;
+  notifyArchivedMessages: boolean;
+  setNotifyArchivedMessages: (value: boolean) => void;
   notifyRemovedSavedPosts: boolean;
   setNotifyRemovedSavedPosts: (value: boolean) => void;
   defaultOmniPostsOnly: boolean;
@@ -25,6 +27,7 @@ const SettingsContext = createContext<SettingsContextType | undefined>(undefined
 interface StoredSettings {
   useRelativeTime?: boolean;
   autoCloseThemeSelector?: boolean;
+  notifyArchivedMessages?: boolean;
   notifyRemovedSavedPosts?: boolean;
   defaultOmniPostsOnly?: boolean;
   stayOnPostAfterHide?: boolean;
@@ -61,6 +64,10 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     const settings = getStoredSettings();
     return settings.notifyRemovedSavedPosts ?? true;
   });
+  const [notifyArchivedMessages, setNotifyArchivedMessagesState] = useState<boolean>(() => {
+    const settings = getStoredSettings();
+    return settings.notifyArchivedMessages ?? false; // Default: no notifications for archived chats
+  });
   const [defaultOmniPostsOnly, setDefaultOmniPostsOnlyState] = useState<boolean>(() => {
     const settings = getStoredSettings();
     return settings.defaultOmniPostsOnly ?? false;
@@ -88,18 +95,29 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       const settings: StoredSettings = {
         useRelativeTime,
         autoCloseThemeSelector,
+        notifyArchivedMessages,
         notifyRemovedSavedPosts,
-      defaultOmniPostsOnly,
-      stayOnPostAfterHide,
-      useInfiniteScroll,
-      searchIncludeNsfwByDefault,
-      blockAllNsfw,
-    };
-    localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings));
-  } catch (error) {
-    console.error('Failed to save settings to localStorage:', error);
-  }
-  }, [useRelativeTime, autoCloseThemeSelector, notifyRemovedSavedPosts, defaultOmniPostsOnly, stayOnPostAfterHide, useInfiniteScroll, searchIncludeNsfwByDefault, blockAllNsfw]);
+        defaultOmniPostsOnly,
+        stayOnPostAfterHide,
+        useInfiniteScroll,
+        searchIncludeNsfwByDefault,
+        blockAllNsfw,
+      };
+      localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings));
+    } catch (error) {
+      console.error('Failed to save settings to localStorage:', error);
+    }
+  }, [
+    useRelativeTime,
+    autoCloseThemeSelector,
+    notifyArchivedMessages,
+    notifyRemovedSavedPosts,
+    defaultOmniPostsOnly,
+    stayOnPostAfterHide,
+    useInfiniteScroll,
+    searchIncludeNsfwByDefault,
+    blockAllNsfw,
+  ]);
 
   const setUseRelativeTime = (value: boolean) => {
     setUseRelativeTimeState(value);
@@ -111,6 +129,10 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
 
   const setNotifyRemovedSavedPosts = (value: boolean) => {
     setNotifyRemovedSavedPostsState(value);
+  };
+
+  const setNotifyArchivedMessages = (value: boolean) => {
+    setNotifyArchivedMessagesState(value);
   };
 
   const setDefaultOmniPostsOnly = (value: boolean) => {
@@ -138,6 +160,8 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         setUseRelativeTime,
         autoCloseThemeSelector,
         setAutoCloseThemeSelector,
+        notifyArchivedMessages,
+        setNotifyArchivedMessages,
         notifyRemovedSavedPosts,
         setNotifyRemovedSavedPosts,
         defaultOmniPostsOnly,
