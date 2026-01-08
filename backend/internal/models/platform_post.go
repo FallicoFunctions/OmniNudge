@@ -155,8 +155,9 @@ func (r *PlatformPostRepository) GetByID(ctx context.Context, id int) (*Platform
 
 	query := `
 		SELECT ` + platformPostSelectColumns + `
-		FROM platform_posts
-		WHERE id = $1 AND is_deleted = FALSE
+		FROM platform_posts p
+		LEFT JOIN users u ON p.author_id = u.id
+		WHERE p.id = $1 AND p.is_deleted = FALSE AND u.shadow_banned = FALSE
 	`
 
 	err := scanPlatformPost(r.pool.QueryRow(ctx, query, id), post)
@@ -183,8 +184,9 @@ func (r *PlatformPostRepository) GetByIDWithUser(ctx context.Context, id int, us
 			ELSE -1
 		END as user_vote
 		FROM platform_posts p
+		LEFT JOIN users u ON p.author_id = u.id
 		LEFT JOIN post_votes pv ON pv.post_id = p.id AND pv.user_id = $2
-		WHERE p.id = $1 AND p.is_deleted = FALSE
+		WHERE p.id = $1 AND p.is_deleted = FALSE AND u.shadow_banned = FALSE
 	`
 
 	var err error
@@ -218,8 +220,9 @@ func (r *PlatformPostRepository) GetFeed(ctx context.Context, sortBy string, lim
 
 	query := `
 		SELECT ` + platformPostSelectColumns + `
-		FROM platform_posts
-		WHERE is_deleted = FALSE
+		FROM platform_posts p
+		LEFT JOIN users u ON p.author_id = u.id
+		WHERE p.is_deleted = FALSE AND u.shadow_banned = FALSE
 		` + orderClause + `
 		LIMIT $1 OFFSET $2
 	`
@@ -246,9 +249,10 @@ func (r *PlatformPostRepository) GetFeed(ctx context.Context, sortBy string, lim
 func (r *PlatformPostRepository) GetByAuthor(ctx context.Context, authorID int, limit, offset int) ([]*PlatformPost, error) {
 	query := `
 		SELECT ` + platformPostSelectColumns + `
-		FROM platform_posts
-		WHERE author_id = $1 AND is_deleted = FALSE
-		ORDER BY created_at DESC
+		FROM platform_posts p
+		LEFT JOIN users u ON p.author_id = u.id
+		WHERE p.author_id = $1 AND p.is_deleted = FALSE AND u.shadow_banned = FALSE
+		ORDER BY p.created_at DESC
 		LIMIT $2 OFFSET $3
 	`
 
@@ -309,8 +313,9 @@ func (r *PlatformPostRepository) GetByHubWithUser(
 			ELSE -1
 		END as user_vote
 		FROM platform_posts p
+		LEFT JOIN users u ON p.author_id = u.id
 		LEFT JOIN post_votes pv ON pv.post_id = p.id AND pv.user_id = $4
-		WHERE p.hub_id = $1 AND p.is_deleted = FALSE AND (p.target_subreddit IS NULL OR p.target_subreddit = '')` + timeClause + `
+		WHERE p.hub_id = $1 AND p.is_deleted = FALSE AND u.shadow_banned = FALSE AND (p.target_subreddit IS NULL OR p.target_subreddit = '')` + timeClause + `
 		` + orderClause + `
 		LIMIT $2 OFFSET $3
 	`
@@ -379,8 +384,9 @@ func (r *PlatformPostRepository) GetBySubredditWithUser(
 			ELSE -1
 		END as user_vote
 		FROM platform_posts p
+		LEFT JOIN users u ON p.author_id = u.id
 		LEFT JOIN post_votes pv ON pv.post_id = p.id AND pv.user_id = $4
-		WHERE p.target_subreddit = $1 AND p.is_deleted = FALSE` + timeClause + `
+		WHERE p.target_subreddit = $1 AND p.is_deleted = FALSE AND u.shadow_banned = FALSE` + timeClause + `
 		` + orderClause + `
 		LIMIT $2 OFFSET $3
 	`
@@ -415,9 +421,10 @@ func (r *PlatformPostRepository) GetBySubredditWithUser(
 func (r *PlatformPostRepository) GetByTags(ctx context.Context, tags []string, limit, offset int) ([]*PlatformPost, error) {
 	query := `
 		SELECT ` + platformPostSelectColumns + `
-		FROM platform_posts
-		WHERE tags && $1 AND is_deleted = FALSE
-		ORDER BY created_at DESC
+		FROM platform_posts p
+		LEFT JOIN users u ON p.author_id = u.id
+		WHERE tags && $1 AND p.is_deleted = FALSE AND u.shadow_banned = FALSE
+		ORDER BY p.created_at DESC
 		LIMIT $2 OFFSET $3
 	`
 
@@ -774,8 +781,9 @@ func (r *PlatformPostRepository) GetAllFeed(
 
 	query := `
 		SELECT ` + platformPostSelectColumns + `
-		FROM platform_posts
-		WHERE is_deleted = FALSE AND target_subreddit IS NULL` + timeClause + `
+		FROM platform_posts p
+		LEFT JOIN users u ON p.author_id = u.id
+		WHERE p.is_deleted = FALSE AND p.target_subreddit IS NULL AND u.shadow_banned = FALSE` + timeClause + `
 		` + orderClause + `
 		LIMIT $1 OFFSET $2
 	`

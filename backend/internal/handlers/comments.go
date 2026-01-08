@@ -99,6 +99,12 @@ func (h *CommentsHandler) CreateComment(c *gin.Context) {
 		Body:            req.Body,
 	}
 
+	if c.GetBool("shadow_banned") {
+		// Silently accept but do not persist
+		c.JSON(http.StatusCreated, gin.H{"message": "Comment submitted", "shadow_banned": true})
+		return
+	}
+
 	if err := h.commentRepo.Create(c.Request.Context(), comment); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create comment", "details": err.Error()})
 		return

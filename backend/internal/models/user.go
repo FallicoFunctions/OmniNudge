@@ -36,6 +36,15 @@ type User struct {
 	Karma     int     `json:"karma"`
 	Role      string  `json:"role"` // user, moderator, admin
 
+	// Ban/moderation fields
+	ShadowBanned  bool       `json:"shadow_banned"`
+	Banned        bool       `json:"banned"`
+	Deleted       bool       `json:"deleted"`
+	BanReason     *string    `json:"ban_reason,omitempty"`
+	ShowBanReason bool       `json:"show_ban_reason"`
+	BannedAt      *time.Time `json:"banned_at,omitempty"`
+	BannedBy      *int       `json:"banned_by,omitempty"`
+
 	// Timestamps
 	CreatedAt time.Time `json:"created_at"`
 	LastSeen  time.Time `json:"last_seen"`
@@ -122,7 +131,8 @@ func (r *UserRepository) GetByID(ctx context.Context, id int) (*User, error) {
 	user := &User{}
 
 	query := `
-		SELECT id, username, email, email_encrypted, reddit_id, reddit_username, public_key, avatar_url, bio, karma, role, created_at, last_seen
+		SELECT id, username, email, email_encrypted, reddit_id, reddit_username, public_key, avatar_url, bio, karma, role,
+		       shadow_banned, banned, deleted, ban_reason, show_ban_reason, banned_at, banned_by, created_at, last_seen
 		FROM users WHERE id = $1
 	`
 
@@ -138,6 +148,13 @@ func (r *UserRepository) GetByID(ctx context.Context, id int) (*User, error) {
 		&user.Bio,
 		&user.Karma,
 		&user.Role,
+		&user.ShadowBanned,
+		&user.Banned,
+		&user.Deleted,
+		&user.BanReason,
+		&user.ShowBanReason,
+		&user.BannedAt,
+		&user.BannedBy,
 		&user.CreatedAt,
 		&user.LastSeen,
 	)
@@ -174,7 +191,8 @@ func (r *UserRepository) GetByUsername(ctx context.Context, username string) (*U
 	normalizedUsername := strings.ToLower(strings.TrimSpace(username))
 
 	return r.queryUser(ctx, `
-		SELECT id, username, email, email_encrypted, password_hash, reddit_id, reddit_username, public_key, avatar_url, bio, karma, role, created_at, last_seen
+		SELECT id, username, email, email_encrypted, password_hash, reddit_id, reddit_username, public_key, avatar_url, bio, karma, role,
+		       shadow_banned, banned, deleted, ban_reason, show_ban_reason, banned_at, banned_by, created_at, last_seen
 		FROM users WHERE username_normalized = $1
 	`, normalizedUsername)
 }
@@ -195,6 +213,13 @@ func (r *UserRepository) queryUser(ctx context.Context, query string, arg interf
 		&user.Bio,
 		&user.Karma,
 		&user.Role,
+		&user.ShadowBanned,
+		&user.Banned,
+		&user.Deleted,
+		&user.BanReason,
+		&user.ShowBanReason,
+		&user.BannedAt,
+		&user.BannedBy,
 		&user.CreatedAt,
 		&user.LastSeen,
 	)
@@ -226,7 +251,8 @@ func (r *UserRepository) GetByRedditID(ctx context.Context, redditID string) (*U
 	user := &User{}
 
 	query := `
-		SELECT id, username, email, email_encrypted, reddit_id, reddit_username, public_key, avatar_url, bio, karma, role, created_at, last_seen
+		SELECT id, username, email, email_encrypted, reddit_id, reddit_username, public_key, avatar_url, bio, karma, role,
+		       shadow_banned, banned, deleted, ban_reason, show_ban_reason, banned_at, banned_by, created_at, last_seen
 		FROM users WHERE reddit_id = $1
 	`
 
@@ -242,6 +268,13 @@ func (r *UserRepository) GetByRedditID(ctx context.Context, redditID string) (*U
 		&user.Bio,
 		&user.Karma,
 		&user.Role,
+		&user.ShadowBanned,
+		&user.Banned,
+		&user.Deleted,
+		&user.BanReason,
+		&user.ShowBanReason,
+		&user.BannedAt,
+		&user.BannedBy,
 		&user.CreatedAt,
 		&user.LastSeen,
 	)
@@ -300,4 +333,236 @@ func (r *UserRepository) UpdatePassword(ctx context.Context, userID int, passwor
 	query := `UPDATE users SET password_hash = $1 WHERE id = $2`
 	_, err := r.pool.Exec(ctx, query, passwordHash, userID)
 	return err
+}
+
+// BanStatus represents ban/shadow-ban/delete flags for a user
+type BanStatus struct {
+	ShadowBanned  bool
+	Banned        bool
+	Deleted       bool
+	BanReason     *string
+	ShowBanReason bool
+}
+
+// GetBanStatus fetches ban flags for a user
+func (r *UserRepository) GetBanStatus(ctx context.Context, userID int) (*BanStatus, error) {
+	status := &BanStatus{}
+	err := r.pool.QueryRow(ctx, `
+		SELECT shadow_banned, banned, deleted, ban_reason, show_ban_reason
+		FROM users
+		WHERE id = $1
+	`, userID).Scan(
+		&status.ShadowBanned,
+		&status.Banned,
+		&status.Deleted,
+		&status.BanReason,
+		&status.ShowBanReason,
+	)
+
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	return status, nil
+}
+
+// BanHistory represents a ban history record
+type BanHistory struct {
+	ID         int       `json:"id"`
+	UserID     int       `json:"user_id"`
+	Action     string    `json:"action"` // 'shadow_ban', 'ban', 'unban', 'delete', 'restore'
+	Reason     string    `json:"reason"`
+	ShowReason bool      `json:"show_reason"`
+	AdminID    int       `json:"admin_id"`
+	AdminName  string    `json:"admin_name"`
+	CreatedAt  time.Time `json:"created_at"`
+}
+
+// ShadowBanUser shadow bans a user
+func (r *UserRepository) ShadowBanUser(ctx context.Context, userID int, reason string, showReason bool, adminID int) error {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	// Update user
+	query := `
+		UPDATE users
+		SET shadow_banned = true, ban_reason = $2, show_ban_reason = $3, banned_at = NOW(), banned_by = $4
+		WHERE id = $1
+	`
+	_, err = tx.Exec(ctx, query, userID, reason, showReason, adminID)
+	if err != nil {
+		return err
+	}
+
+	// Add to ban history
+	historyQuery := `
+		INSERT INTO ban_history (user_id, action, reason, show_reason, admin_id)
+		VALUES ($1, 'shadow_ban', $2, $3, $4)
+	`
+	_, err = tx.Exec(ctx, historyQuery, userID, reason, showReason, adminID)
+	if err != nil {
+		return err
+	}
+
+	return tx.Commit(ctx)
+}
+
+// BanUser bans a user (regular ban with force logout)
+func (r *UserRepository) BanUser(ctx context.Context, userID int, reason string, showReason bool, adminID int) error {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	// Update user
+	query := `
+		UPDATE users
+		SET banned = true, ban_reason = $2, show_ban_reason = $3, banned_at = NOW(), banned_by = $4
+		WHERE id = $1
+	`
+	_, err = tx.Exec(ctx, query, userID, reason, showReason, adminID)
+	if err != nil {
+		return err
+	}
+
+	// Add to ban history
+	historyQuery := `
+		INSERT INTO ban_history (user_id, action, reason, show_reason, admin_id)
+		VALUES ($1, 'ban', $2, $3, $4)
+	`
+	_, err = tx.Exec(ctx, historyQuery, userID, reason, showReason, adminID)
+	if err != nil {
+		return err
+	}
+
+	return tx.Commit(ctx)
+}
+
+// UnbanUser unbans a user (clears both shadow ban and regular ban)
+func (r *UserRepository) UnbanUser(ctx context.Context, userID int, reason string, adminID int) error {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	// Update user
+	query := `
+		UPDATE users
+		SET shadow_banned = false, banned = false, ban_reason = NULL, show_ban_reason = false, banned_at = NULL, banned_by = NULL
+		WHERE id = $1
+	`
+	_, err = tx.Exec(ctx, query, userID)
+	if err != nil {
+		return err
+	}
+
+	// Add to ban history
+	historyQuery := `
+		INSERT INTO ban_history (user_id, action, reason, show_reason, admin_id)
+		VALUES ($1, 'unban', $2, false, $3)
+	`
+	_, err = tx.Exec(ctx, historyQuery, userID, reason, adminID)
+	if err != nil {
+		return err
+	}
+
+	return tx.Commit(ctx)
+}
+
+// SoftDeleteUser soft deletes a user
+func (r *UserRepository) SoftDeleteUser(ctx context.Context, userID int, reason string, adminID int) error {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	// Update user
+	query := `
+		UPDATE users
+		SET deleted = true, ban_reason = $2, banned_at = NOW(), banned_by = $3
+		WHERE id = $1
+	`
+	_, err = tx.Exec(ctx, query, userID, reason, adminID)
+	if err != nil {
+		return err
+	}
+
+	// Add to ban history
+	historyQuery := `
+		INSERT INTO ban_history (user_id, action, reason, show_reason, admin_id)
+		VALUES ($1, 'delete', $2, false, $3)
+	`
+	_, err = tx.Exec(ctx, historyQuery, userID, reason, adminID)
+	if err != nil {
+		return err
+	}
+
+	return tx.Commit(ctx)
+}
+
+// GetBanHistory retrieves ban history for a user
+func (r *UserRepository) GetBanHistory(ctx context.Context, userID int) ([]BanHistory, error) {
+	query := `
+		SELECT bh.id, bh.user_id, bh.action, bh.reason, bh.show_reason, bh.admin_id, u.username as admin_name, bh.created_at
+		FROM ban_history bh
+		JOIN users u ON u.id = bh.admin_id
+		WHERE bh.user_id = $1
+		ORDER BY bh.created_at DESC
+	`
+
+	rows, err := r.pool.Query(ctx, query, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var history []BanHistory
+	for rows.Next() {
+		var h BanHistory
+		err := rows.Scan(&h.ID, &h.UserID, &h.Action, &h.Reason, &h.ShowReason, &h.AdminID, &h.AdminName, &h.CreatedAt)
+		if err != nil {
+			return nil, err
+		}
+		history = append(history, h)
+	}
+
+	return history, rows.Err()
+}
+
+// GetAllBanHistory retrieves all ban history (for admin panel)
+func (r *UserRepository) GetAllBanHistory(ctx context.Context, limit, offset int) ([]BanHistory, error) {
+	query := `
+		SELECT bh.id, bh.user_id, bh.action, bh.reason, bh.show_reason, bh.admin_id, u.username as admin_name, bh.created_at
+		FROM ban_history bh
+		JOIN users u ON u.id = bh.admin_id
+		ORDER BY bh.created_at DESC
+		LIMIT $1 OFFSET $2
+	`
+
+	rows, err := r.pool.Query(ctx, query, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var history []BanHistory
+	for rows.Next() {
+		var h BanHistory
+		err := rows.Scan(&h.ID, &h.UserID, &h.Action, &h.Reason, &h.ShowReason, &h.AdminID, &h.AdminName, &h.CreatedAt)
+		if err != nil {
+			return nil, err
+		}
+		history = append(history, h)
+	}
+
+	return history, rows.Err()
 }
