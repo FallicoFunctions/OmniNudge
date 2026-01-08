@@ -189,15 +189,17 @@ func (h *FeedHandler) fetchSubscribedFeeds(
 	if len(subredditSubs) == 0 {
 		return hubPosts, []services.RedditPost{}, nil
 	} else {
-		// Fetch from subscribed subreddits
-		// For now, fetch from first subscribed subreddit (TODO: implement multi-subreddit fetch)
-		listing, err := h.redditClient.GetSubredditPosts(ctx, subredditSubs[0].SubredditName, sortBy, redditTimeFilter, limit, "")
-		if err != nil {
-			// Non-fatal: continue with hub posts only
-			return hubPosts, []services.RedditPost{}, nil
+		// Fetch from all subscribed subreddits
+		for _, sub := range subredditSubs {
+			listing, err := h.redditClient.GetSubredditPosts(ctx, sub.SubredditName, sortBy, redditTimeFilter, limit, "")
+			if err != nil {
+				// Non-fatal: continue with other subreddits
+				continue
+			}
+			posts := extractRedditPosts(listing)
+			posts = filterRedditPostsByTimeRange(posts, startTime, endTime)
+			redditPosts = append(redditPosts, posts...)
 		}
-		redditPosts = extractRedditPosts(listing)
-		redditPosts = filterRedditPostsByTimeRange(redditPosts, startTime, endTime)
 	}
 
 	return hubPosts, redditPosts, nil
