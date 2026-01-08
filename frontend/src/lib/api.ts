@@ -48,6 +48,13 @@ class ApiClient {
         (await parseJson().catch(() => ({ error: 'Unknown error' }))) || {
           error: 'Unknown error',
         };
+
+      // If banned/deleted, clear auth and surface reason
+      if (response.status === 401 && error.error && error.error.toLowerCase().includes('ban')) {
+        localStorage.removeItem('auth_token');
+        localStorage.removeItem('user');
+      }
+
       throw new Error(error.message || error.error);
     }
 

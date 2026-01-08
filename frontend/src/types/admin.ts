@@ -12,6 +12,17 @@ export interface AdminUser {
   avatar_url?: string;
 }
 
+export interface BanHistoryItem {
+  id: number;
+  user_id: number;
+  action: string;
+  reason: string;
+  show_reason: boolean;
+  admin_id: number;
+  admin_name: string;
+  created_at: string;
+}
+
 export interface SiteStats {
   total_users: number;
   total_posts: number;

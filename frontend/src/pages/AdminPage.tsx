@@ -126,6 +126,9 @@ function UsersTab() {
   const [hubSearch, setHubSearch] = useState('');
   const [hubInputFocused, setHubInputFocused] = useState(false);
   const [hubError, setHubError] = useState('');
+  const [historyModalUser, setHistoryModalUser] = useState<AdminUser | null>(null);
+  const [banHistory, setBanHistory] = useState<BanHistoryItem[] | null>(null);
+  const [loadingHistory, setLoadingHistory] = useState(false);
   const limit = 50;
 
   const { data, isLoading } = useQuery({
@@ -154,6 +157,30 @@ function UsersTab() {
     },
   });
 
+  const banUserMutation = useMutation({
+    mutationFn: ({ userId, reason, showReason }: { userId: number; reason: string; showReason: boolean }) =>
+      adminService.banUser(userId, reason, showReason),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['adminUsers'] }),
+  });
+
+  const shadowBanUserMutation = useMutation({
+    mutationFn: ({ userId, reason, showReason }: { userId: number; reason: string; showReason: boolean }) =>
+      adminService.shadowBanUser(userId, reason, showReason),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['adminUsers'] }),
+  });
+
+  const unbanUserMutation = useMutation({
+    mutationFn: ({ userId, reason }: { userId: number; reason: string }) =>
+      adminService.unbanUser(userId, reason),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['adminUsers'] }),
+  });
+
+  const softDeleteUserMutation = useMutation({
+    mutationFn: ({ userId, reason }: { userId: number; reason: string }) =>
+      adminService.softDeleteUser(userId, reason),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['adminUsers'] }),
+  });
+
   const addHubModeratorMutation = useMutation({
     mutationFn: ({ hubName, userId }: { hubName: string; userId: number }) =>
       adminService.addHubModerator(hubName, userId),
@@ -171,17 +198,23 @@ function UsersTab() {
     },
   });
 
-  const handleRoleChange = (user: AdminUser, newRole: 'user' | 'moderator' | 'admin') => {
-    if (newRole === 'moderator') {
-      setModTargetUser(user);
-      setHubSearch('');
-      setHubError('');
-      setModModalOpen(true);
-      return;
-    }
-
+  const handleRoleChange = (user: AdminUser, newRole: 'user' | 'admin') => {
     if (window.confirm(`Are you sure you want to change this user's role to "${newRole}"?`)) {
-      updateRoleMutation.mutate({ userId: user.id, role: newRole as 'user' | 'admin' });
+      updateRoleMutation.mutate({ userId: user.id, role: newRole });
+    }
+  };
+
+  const openBanHistory = async (user: AdminUser) => {
+    setHistoryModalUser(user);
+    setBanHistory(null);
+    setLoadingHistory(true);
+    try {
+      const res = await adminService.getBanHistory(user.id);
+      setBanHistory(res.history);
+    } catch (err) {
+      setBanHistory([]);
+    } finally {
+      setLoadingHistory(false);
     }
   };
 
@@ -230,7 +263,6 @@ function UsersTab() {
         >
           <option value="">All Roles</option>
           <option value="user">User</option>
-          <option value="moderator">Moderator</option>
           <option value="admin">Admin</option>
         </select>
       </div>
@@ -278,14 +310,68 @@ function UsersTab() {
                     <select
                       value={user.role}
                       onChange={(e) =>
-                        handleRoleChange(user, e.target.value as 'user' | 'moderator' | 'admin')
+                        handleRoleChange(user, e.target.value as 'user' | 'admin')
                       }
                       className="px-3 py-1 text-sm border border-[var(--color-border)] rounded bg-[var(--color-surface)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
                     >
                       <option value="user">User</option>
-                      <option value="moderator">Moderator</option>
                       <option value="admin">Admin</option>
                     </select>
+                    <div className="mt-3 space-y-2">
+                      <button
+                        type="button"
+                        className="w-full rounded border border-[var(--color-border)] px-3 py-1 text-xs hover:bg-[var(--color-surface-hover)]"
+                        onClick={() => {
+                          const reason = window.prompt('Reason for shadow ban?');
+                          if (!reason) return;
+                          const showReason = window.confirm('Show reason to user? OK = yes, Cancel = no');
+                          shadowBanUserMutation.mutate({ userId: user.id, reason, showReason });
+                        }}
+                      >
+                        Shadow Ban
+                      </button>
+                      <button
+                        type="button"
+                        className="w-full rounded border border-[var(--color-border)] px-3 py-1 text-xs hover:bg-[var(--color-surface-hover)]"
+                        onClick={() => {
+                          const reason = window.prompt('Reason for ban?');
+                          if (!reason) return;
+                          const showReason = window.confirm('Show reason to user? OK = yes, Cancel = no');
+                          banUserMutation.mutate({ userId: user.id, reason, showReason });
+                        }}
+                      >
+                        Ban
+                      </button>
+                      <button
+                        type="button"
+                        className="w-full rounded border border-[var(--color-border)] px-3 py-1 text-xs hover:bg-[var(--color-surface-hover)]"
+                        onClick={() => {
+                          const reason = window.prompt('Reason for unban?');
+                          if (!reason) return;
+                          unbanUserMutation.mutate({ userId: user.id, reason });
+                        }}
+                      >
+                        Unban
+                      </button>
+                      <button
+                        type="button"
+                        className="w-full rounded border border-[var(--color-border)] px-3 py-1 text-xs text-red-600 hover:bg-[var(--color-surface-hover)]"
+                        onClick={() => {
+                          const reason = window.prompt('Reason for soft delete?');
+                          if (!reason) return;
+                          softDeleteUserMutation.mutate({ userId: user.id, reason });
+                        }}
+                      >
+                        Soft Delete
+                      </button>
+                      <button
+                        type="button"
+                        className="w-full rounded border border-[var(--color-border)] px-3 py-1 text-xs hover:bg-[var(--color-surface-hover)]"
+                        onClick={() => openBanHistory(user)}
+                      >
+                        View Ban History
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -313,6 +399,52 @@ function UsersTab() {
             </button>
           </div>
         </>
+      )}
+
+      {historyModalUser && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-[var(--color-surface-elevated)] rounded-lg shadow-xl max-w-2xl w-full mx-4 p-6">
+            <div className="flex justify-between items-start mb-4">
+              <div>
+                <h3 className="text-xl font-semibold">Ban history for {historyModalUser.username}</h3>
+                <p className="text-[var(--color-text-secondary)] text-sm">Recent ban/shadow-ban/unban actions</p>
+              </div>
+              <button
+                onClick={() => {
+                  setHistoryModalUser(null);
+                  setBanHistory(null);
+                }}
+                className="text-[var(--color-text-secondary)] hover:text-[var(--color-text)]"
+                aria-label="Close"
+              >
+                X
+              </button>
+            </div>
+
+            {loadingHistory && <div className="py-6 text-center text-sm text-[var(--color-text-secondary)]">Loading...</div>}
+            {!loadingHistory && banHistory && banHistory.length === 0 && (
+              <div className="py-6 text-center text-sm text-[var(--color-text-secondary)]">No history found.</div>
+            )}
+            {!loadingHistory && banHistory && banHistory.length > 0 && (
+              <div className="space-y-3 max-h-96 overflow-y-auto pr-2">
+                {banHistory.map((entry) => (
+                  <div key={entry.id} className="border border-[var(--color-border)] rounded-md p-3 bg-[var(--color-surface)]">
+                    <div className="flex justify-between text-sm">
+                      <span className="font-semibold">{entry.action}</span>
+                      <span className="text-[var(--color-text-secondary)]">
+                        {new Date(entry.created_at).toLocaleString()} by {entry.admin_name}
+                      </span>
+                    </div>
+                    <div className="mt-1 text-sm">
+                      <span className="font-medium">Reason:</span> {entry.reason}
+                      {entry.show_reason && <span className="ml-2 text-xs text-[var(--color-primary)]">(shown to user)</span>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
       )}
 
       {modModalOpen && (

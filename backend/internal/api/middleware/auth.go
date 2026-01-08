@@ -36,10 +36,10 @@ func AuthRequired(authService *services.AuthService) gin.HandlerFunc {
 
 		claims, err := authService.ValidateJWT(tokenString)
 		if err != nil {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid or expired token"})
-			c.Abort()
-			return
-		}
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid or expired token"})
+		c.Abort()
+		return
+	}
 
 		// Set user info in context for handlers to use
 		c.Set("user_id", claims.UserID)

@@ -124,6 +124,11 @@ func (h *PostsHandler) CreatePost(c *gin.Context) {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
 		return
 	}
+	if c.GetBool("shadow_banned") {
+		// Silently accept but do not persist
+		c.JSON(http.StatusCreated, gin.H{"message": "Post submitted", "shadow_banned": true})
+		return
+	}
 
 	var req CreatePostRequest
 	if err := c.ShouldBindJSON(&req); err != nil {

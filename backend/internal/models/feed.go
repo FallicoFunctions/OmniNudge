@@ -82,7 +82,7 @@ func (r *FeedRepository) GetUnifiedFeed(ctx context.Context, sortBy string, limi
 				p.thumbnail_url
 			FROM platform_posts p
 			JOIN users u ON p.author_id = u.id
-			WHERE p.is_deleted = FALSE
+			WHERE p.is_deleted = FALSE AND u.shadow_banned = FALSE
 
 			UNION ALL
 
