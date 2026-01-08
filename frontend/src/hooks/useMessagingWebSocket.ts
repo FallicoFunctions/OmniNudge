@@ -81,10 +81,20 @@ export function useMessagingWebSocket(options: UseMessagingWebSocketOptions = {}
 
                 // Increment unread count only if user is the recipient
                 const isRecipient = payload.recipient_id === user?.id;
+                const isArchived = Boolean(conv.archived_at);
                 // Don't increment if this is the active conversation (user is currently viewing it)
                 // Use ref to get current value and avoid stale closure
                 const currentActiveConvId = activeConversationIdRef.current;
                 const isActiveConversation = currentActiveConvId === payload.conversation_id;
+
+                if (isArchived) {
+                  // Keep unread count unchanged for archived conversations
+                  return {
+                    ...conv,
+                    latest_message: payload,
+                    unread_count: conv.unread_count,
+                  };
+                }
 
                 // If viewing active conversation, always set unread to 0
                 // Otherwise, increment only if user is recipient
