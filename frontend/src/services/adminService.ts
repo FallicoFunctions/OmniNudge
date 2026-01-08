@@ -1,17 +1,18 @@
 import { api } from '../lib/api';
-import type { AdminUser, SiteStats, HubModerator, UpdateRoleRequest } from '../types/admin';
+import type { AdminUser, SiteStats, HubModerator, UpdateRoleRequest, BanHistoryItem } from '../types/admin';
 
 export const adminService = {
   // ===== USER MANAGEMENT =====
 
-  async listUsers(search?: string, role?: string, limit = 50, offset = 0): Promise<{ users: AdminUser[]; limit: number; offset: number }> {
+  async listUsers(search?: string, role?: string, status?: string, limit = 50, offset = 0): Promise<{ users: AdminUser[]; limit: number; offset: number; total: number }> {
     const params = new URLSearchParams();
     if (search) params.append('search', search);
     if (role) params.append('role', role);
+    if (status) params.append('status', status);
     params.append('limit', limit.toString());
     params.append('offset', offset.toString());
 
-    return api.get<{ users: AdminUser[]; limit: number; offset: number }>(`/admin/users?${params.toString()}`);
+    return api.get<{ users: AdminUser[]; limit: number; offset: number; total: number }>(`/admin/users?${params.toString()}`);
   },
 
   async updateUserRole(userId: number, data: UpdateRoleRequest): Promise<{ message: string; user_id: number; role: string }> {
@@ -36,6 +37,14 @@ export const adminService = {
 
   async getBanHistory(userId: number) {
     return api.get<{ history: BanHistoryItem[] }>(`/admin/users/${userId}/ban-history`);
+  },
+
+  async getAllBanHistory(limit = 50, offset = 0): Promise<{ history: BanHistoryItem[]; limit: number; offset: number; total: number }> {
+    const params = new URLSearchParams();
+    params.append('limit', limit.toString());
+    params.append('offset', offset.toString());
+
+    return api.get<{ history: BanHistoryItem[]; limit: number; offset: number; total: number }>(`/admin/ban-history?${params.toString()}`);
   },
 
   // ===== HUB MODERATOR MANAGEMENT =====
