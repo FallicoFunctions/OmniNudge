@@ -340,6 +340,44 @@ const MessageMediaPreview = ({ message, isOwnMessage }: MessageMediaPreviewProps
   );
 };
 
+interface DownloadButtonProps {
+  message: Message;
+  isOwnMessage: boolean;
+  onClose: () => void;
+}
+
+const DownloadButton = ({ message, isOwnMessage, onClose }: DownloadButtonProps) => {
+  const mediaSrc = useDecryptedMedia(message, isOwnMessage);
+  const filename = message.media_url?.split('/').pop() ?? 'download';
+
+  const handleDownload = () => {
+    onClose();
+    if (!mediaSrc) {
+      alert('Media is still decrypting. Please wait and try again.');
+      return;
+    }
+
+    // Download the decrypted media
+    const link = document.createElement('a');
+    link.href = mediaSrc;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  return (
+    <button
+      type="button"
+      className="w-full rounded-md px-3 py-2 text-left text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
+      onClick={handleDownload}
+      disabled={!mediaSrc}
+    >
+      Download
+    </button>
+  );
+};
+
 export default function MessagesPage() {
   const { user } = useAuth();
   const { setActiveConversationId } = useMessagingContext();
@@ -1122,6 +1160,9 @@ export default function MessagesPage() {
                               <div
                                 className={`absolute ${isOwnMessage ? 'left-0' : 'right-0'} z-20 mt-2 w-44 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] p-2 shadow-lg`}
                               >
+                                {message.media_url && (
+                                  <DownloadButton message={message} isOwnMessage={isOwnMessage} onClose={() => setMessageMenuOpen(null)} />
+                                )}
                                 <button
                                   type="button"
                                   className="w-full rounded-md px-3 py-2 text-left text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
