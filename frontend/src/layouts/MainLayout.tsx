@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../contexts/AuthContext';
+import { useSettings } from '../contexts/SettingsContext';
 import { useMessagingContext } from '../contexts/MessagingContext';
 import { usersService } from '../services/usersService';
 import { messagesService } from '../services/messagesService';
@@ -12,6 +13,7 @@ import { subscriptionService } from '../services/subscriptionService';
 
 export default function MainLayout() {
   const { user, logout } = useAuth();
+  const { notifyArchivedMessages } = useSettings();
   const [authModal, setAuthModal] = useState<'login' | 'signup' | null>(null);
   const [pendingRedirect, setPendingRedirect] = useState<{ to: string; state?: unknown } | null>(null);
   const [pendingAction, setPendingAction] = useState<
@@ -35,13 +37,18 @@ export default function MainLayout() {
   };
 
   const { data: conversations } = useQuery({
-    queryKey: ['conversations'],
-    queryFn: () => messagesService.getConversations(),
+    queryKey: ['conversations', notifyArchivedMessages ? 'with-archived' : 'active'],
+    queryFn: () => messagesService.getConversations(notifyArchivedMessages),
     enabled: !!user,
   });
 
   const unreadTotal =
-    conversations?.reduce((total, conv) => total + (conv.unread_count ?? 0), 0) ?? 0;
+    conversations?.reduce((total, conv) => {
+      if (!notifyArchivedMessages && conv.archived_at) {
+        return total;
+      }
+      return total + (conv.unread_count ?? 0);
+    }, 0) ?? 0;
 
   useEffect(() => {
     if (!user) {
