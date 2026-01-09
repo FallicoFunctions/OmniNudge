@@ -58,6 +58,9 @@
 - Edit your own posts
 - Delete your own posts
 - View count tracking
+- Crosspost Reddit content to hubs
+- Link and text post types
+- Send replies to inbox option
 
 ### Platform Comments
 - Comment on platform posts
@@ -65,6 +68,30 @@
 - Edit your own comments
 - Delete your own comments
 - Sort comments (new, top, controversial)
+- Media in comments support
+
+### Hubs (Platform Communities)
+- Create and manage hubs (platform communities)
+- Hub settings and configuration
+  - Display title and sidebar markdown
+  - Privacy types (public, restricted, private)
+  - Content type controls (text, link, image, video, poll posts)
+  - Media in comments toggle
+  - Post flair requirements
+- Hub moderation
+  - Hub moderators with roles (owner, full_moderator, moderator)
+  - Banned words list
+  - Spam filter (low, medium, high)
+  - New account filters
+  - Minimum karma requirements
+- Hub customization
+  - Hub-specific themes with CSS
+  - Scoped CSS application (header, sidebar, posts, etc.)
+  - Theme preview and versioning
+  - Custom styling per hub
+- Hub feed and pagination
+- Subscribe to hubs
+- Hub discovery
 
 ### Unified Feed
 - Mixed feed showing:
@@ -73,6 +100,8 @@
 - Filter to show only Reddit or only platform posts
 - Sort by date, popularity, etc.
 - User can distinguish post types at a glance
+- Pagination for feeds
+- Per-surface scroll position settings
 
 ### User Discovery
 - View other users' profiles
@@ -94,6 +123,13 @@
 - DM inbox interface
 - Conversation list view
 - Unread message counter
+
+### Mod Mail System
+- Hub moderators can send/receive mod mail
+- End-to-end encrypted mod mail messages
+- Subject lines for mod mail conversations
+- Status tracking (open, archived, resolved)
+- Integration with hub moderation tools
 
 **Message Status:**
 - Sending
@@ -168,6 +204,14 @@
 - Both users can type while viewing
 - Synchronized viewing (both see same slide)
 
+### Conversation Media Gallery
+- View all media shared in a conversation
+- Full-screen media viewer with navigation
+- Filter by sender (all, mine, theirs)
+- Chronological ordering
+- Persistent user preferences
+- Support for images, videos, GIFs, and audio
+
 ### Reddit Subreddit Slideshow
 
 **Setup:**
@@ -203,24 +247,58 @@
 
 ## User Features
 
-### Blocking
+### Blocking & Moderation
 - Block users from sending messages
 - Blocked user can't send new messages
 - No notification to blocked user (silent)
 - Unblock option
 - View block list in settings
 
+### Admin & Moderation System
+- Admin panel for site administrators
+- User management (view, edit, ban, delete)
+- Shadow ban and regular ban functionality
+- Ban reasons and visibility controls
+- Ban history tracking
+- Site statistics dashboard
+- Role management (user, moderator, admin)
+- Hub moderator assignment
+- Moderation tools integration
+
 ### Notifications
 - Browser notifications for new messages
 - Sound notifications (toggle in settings)
 - Inbox badge counter showing unread count
 - Browser tab title updates with unread count
+- Support for notifications from archived chats
+- Per-user notification settings
 
 ### User Actions
 - "Send DM" button on user profiles
 - "Block User" option
-- Report user (moderation - Phase 2)
+- Report user (moderation)
 - View user's post history
+- Save posts and comments (platform and Reddit)
+- Hide posts (platform and Reddit)
+- Voting on posts and comments
+
+### Archive Conversations
+- Archive conversations you're not actively using
+- Remove from main inbox
+- Still searchable
+- View archived conversations in separate section
+- Unarchive anytime
+
+### Message Deletion
+- Delete for me only (removes from your view)
+- Delete for everyone (removes from both users)
+- Shows "[Message deleted]" placeholder
+
+### File Sharing
+- Upload files to conversations
+- Download shared files
+- Display file name, type, and size
+- Support for common file types
 
 ### Settings
 - Notification sound toggle
@@ -229,7 +307,6 @@
 - Theme selection (dark/light)
 - Privacy settings
 - Account management
-- Data export (Phase 2)
 
 ---
 
@@ -333,10 +410,14 @@
 ### User Experience
 - [ ] Can register and login with username/password
 - [ ] Can browse Reddit posts on the platform
-- [ ] Can create platform posts and comments
+- [ ] Can create and manage hubs (communities)
+- [ ] Can create platform posts and comments in hubs
 - [ ] Can send encrypted DMs to other users
-- [ ] Can share images and create slideshows
-- [ ] Can browse Reddit media together via slideshow
+- [ ] Can share images, videos, and files in messages
+- [ ] Can archive/unarchive conversations
+- [ ] Can delete messages
+- [ ] Can use hub-specific custom themes
+- [ ] Can access admin/moderation tools (for admins/mods)
 - [ ] Intuitive UI that users understand immediately
 
 ### Performance
@@ -360,33 +441,37 @@
 These features are deferred to Phase 2 or later:
 
 **Deferred to Phase 2:**
-- Voice/video calling
+- Voice/video calling (WebRTC)
+- Screen sharing
 - Audio messages and voice notes
+- Voice message transcription
 - Group chats
-- Auto-delete messages
+- Auto-delete messages (timer-based)
 - Multiple chat windows simultaneously
 - Link previews in chat
-- Full emoji picker
+- Full emoji picker (currently limited set)
 - Friend/contact system
 - Push notifications (mobile apps)
 - Save position in Reddit slideshow
-- Advanced search
+- Advanced search across all content
 - Content recommendation algorithm
+- Message editing
+- Pin messages
+- Mute conversations
+- Star/favorite messages
+- GIF search integration
+- Sticker packs
 
 **Deferred to Phase 3:**
-- Monetization features (tips, subscriptions)
+- Monetization features (tips, subscriptions, coin purchases)
 - Creator tools
 - Analytics dashboard
-- Advanced moderation tools
 - API for third-party integrations
+- Theme marketplace and monetization
 
-**Deferred to Phase 4:**
-- Communities/groups
-- Forums
+**Deferred to Phase 4+:**
 - Live streaming
 - Events system
-
-**Deferred to Phase 5:**
 - Professional network features
 - Job board
 - B2B marketplace
@@ -435,12 +520,14 @@ These features are deferred to Phase 2 or later:
 
 What makes Phase 1 platform unique:
 
-1. **Synchronized Media Viewing** - Browse Reddit media together in real-time
-2. **Personal Slideshow Sharing** - Share your own photos/videos seamlessly
-3. **Reddit Browser + Social Layer** - Mix Reddit content with platform posts
-4. **E2E Encryption** - Privacy-first messaging
-5. **Unified Experience** - One place for discovery and chatting
-6. **No App Required** - Works in any browser, PWA-capable
+1. **Hubs (Communities)** - Create and customize your own communities with advanced moderation and custom theming
+2. **Reddit Browser + Social Layer** - Mix Reddit content with platform posts in unified feeds
+3. **Hub-Specific Customization** - CSS-based themes per hub with scoped styling
+4. **E2E Encryption** - Privacy-first messaging for DMs and mod mail
+5. **Advanced Moderation** - Shadow bans, user management, spam filtering, and content controls
+6. **File Sharing** - Upload and share files with encryption in messages
+7. **Comprehensive Admin Tools** - Full admin dashboard for site management
+8. **No App Required** - Works in any browser, PWA-capable
 
 ---
 

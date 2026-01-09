@@ -750,17 +750,6 @@ See complete specification: [/docs/COMPONENT_REFERENCE.md](../COMPONENT_REFERENC
 - Clarify message
 - Add forgotten info
 
-### Message Deletion
-
-**Delete Options:**
-- Delete for me only (removes from your view)
-- Delete for everyone (removes from both users)
-
-**Restrictions:**
-- "Delete for everyone" only within 1 hour
-- Shows "[Message deleted]" placeholder
-- Can't delete if other person hasn't seen it yet (prevents abuse)
-
 ### Pin Messages
 
 **Pin Important Messages:**
@@ -782,15 +771,6 @@ See complete specification: [/docs/COMPONENT_REFERENCE.md](../COMPONENT_REFERENC
 - Duration options (1 hour, 8 hours, 24 hours, until unmuted)
 - Messages still received, just no notifications
 - Muted conversations marked in inbox
-
-### Archive Conversations
-
-**Archive Old Chats:**
-- Archive conversations you're not actively using
-- Remove from main inbox
-- Still searchable
-- View archived conversations in separate section
-- Unarchive anytime
 
 ### Star/Favorite Messages
 
