@@ -289,7 +289,6 @@ export default function RedditPage() {
       return hubsService.getSubredditPosts(subreddit, sort, 25, 0, options);
     },
     enabled:
-      !!user &&
       subreddit !== 'popular' &&
       subreddit !== 'frontpage' &&
       (!isCustomTopRange || isCustomTopRangeValid) &&

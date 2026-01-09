@@ -8,8 +8,10 @@ import { savedService } from '../services/savedService';
 import { api } from '../lib/api';
 import { hubsService } from '../services/hubsService';
 import { hubSettingsService } from '../services/hubSettingsService';
+import { redditService } from '../services/redditService';
 import type { PlatformPost, PostComment } from '../types/posts';
 import type { SavedItemsResponse } from '../types/saved';
+import type { RedditSubredditAbout } from '../types/reddit';
 import { CommentItem } from '../components/comments/CommentItem';
 import type { CommentActionHandlers } from '../components/comments/CommentItem';
 import { MarkdownRenderer } from '../components/common/MarkdownRenderer';
@@ -254,6 +256,18 @@ export default function PostDetailPage() {
   });
   const hubModerators = hubModeratorsData?.moderators ?? [];
 
+  // Fetch subreddit data if this is a subreddit post
+  const {
+    data: subredditAbout,
+    isLoading: loadingSubredditAbout,
+    isError: subredditAboutError,
+  } = useQuery<RedditSubredditAbout>({
+    queryKey: ['subreddit-about', targetSubreddit],
+    queryFn: () => redditService.getSubredditAbout(targetSubreddit!),
+    enabled: Boolean(targetSubreddit),
+    staleTime: 1000 * 60 * 10,
+  });
+
   const bodyText = postData?.body ?? postData?.content ?? undefined;
   const mediaUrl = postData?.media_url ?? undefined;
   const thumbnailUrl = postData?.thumbnail_url ?? undefined;
@@ -480,6 +494,10 @@ export default function PostDetailPage() {
         <form
           onSubmit={(e) => {
             e.preventDefault();
+            if (!user) {
+              window.dispatchEvent(new CustomEvent('open-auth-modal', { detail: 'login' }));
+              return;
+            }
             if (!commentText.trim()) return;
             handleCreateComment.mutate(commentText.trim());
           }}
@@ -590,7 +608,13 @@ export default function PostDetailPage() {
                 comment={comment}
                 allComments={commentsList}
                 replyingTo={replyingTo}
-                onReplySelect={(commentId) => setReplyingTo(commentId)}
+                onReplySelect={(commentId) => {
+                  if (!user) {
+                    window.dispatchEvent(new CustomEvent('open-auth-modal', { detail: 'login' }));
+                    return;
+                  }
+                  setReplyingTo(commentId);
+                }}
                 onCancelReply={() => setReplyingTo(null)}
                 handlers={commentHandlers}
                 savedCommentIds={savedCommentIds}
@@ -602,8 +626,10 @@ export default function PostDetailPage() {
           </div>
         </div>
 
-        {hubName && (
+        {(hubName || targetSubreddit) && (
           <aside className="space-y-4">
+            {hubName && (
+            <>
             <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
               <h3 className="text-sm font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
                 About this hub
@@ -671,6 +697,76 @@ export default function PostDetailPage() {
                 </ul>
               )}
             </div>
+            </>
+            )}
+
+            {targetSubreddit && (
+              <>
+                <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
+                  <h3 className="text-sm font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
+                    About this subreddit
+                  </h3>
+                  {loadingSubredditAbout ? (
+                    <p className="mt-3 text-sm text-[var(--color-text-secondary)]">Loading details…</p>
+                  ) : subredditAboutError ? (
+                    <p className="mt-3 text-sm text-[var(--color-text-secondary)]">
+                      Unable to load subreddit details.
+                    </p>
+                  ) : subredditAbout ? (
+                    <>
+                      {subredditAbout.public_description ? (
+                        <p className="mt-3 text-sm text-[var(--color-text-primary)]">
+                          {subredditAbout.public_description}
+                        </p>
+                      ) : (
+                        <p className="mt-3 text-sm text-[var(--color-text-secondary)]">
+                          No description provided.
+                        </p>
+                      )}
+                      <div className="mt-4 space-y-2 text-xs text-[var(--color-text-secondary)]">
+                        <div className="flex items-center justify-between">
+                          <span className="font-semibold text-[var(--color-text-primary)]">Members</span>
+                          <span>
+                            {typeof subredditAbout.subscribers === 'number'
+                              ? subredditAbout.subscribers.toLocaleString()
+                              : '—'}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="font-semibold text-[var(--color-text-primary)]">Online</span>
+                          <span>
+                            {typeof subredditAbout.active_user_count === 'number'
+                              ? subredditAbout.active_user_count.toLocaleString()
+                              : '—'}
+                          </span>
+                        </div>
+                        {subredditAbout.created_utc && (
+                          <div className="flex items-center justify-between">
+                            <span className="font-semibold text-[var(--color-text-primary)]">Created</span>
+                            <span>
+                              {new Date(subredditAbout.created_utc * 1000).toLocaleDateString()}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </>
+                  ) : (
+                    <p className="mt-3 text-sm text-[var(--color-text-secondary)]">
+                      No details available.
+                    </p>
+                  )}
+                </div>
+
+                <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
+                  <h3 className="text-sm font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
+                    Moderators
+                  </h3>
+                  <p className="mt-3 text-sm text-[var(--color-text-secondary)]">
+                    Public Reddit API does not provide the moderator list.
+                  </p>
+                </div>
+              </>
+            )}
           </aside>
         )}
       </div>
