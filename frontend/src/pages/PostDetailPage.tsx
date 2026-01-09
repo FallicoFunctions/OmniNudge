@@ -337,8 +337,8 @@ export default function PostDetailPage() {
   }
 
   return (
-    <div className="w-full max-w-6xl px-4 py-8">
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]">
+    <div className="mx-auto w-full max-w-7xl px-4 py-8">
+      <div className="mt-4 grid gap-6 lg:grid-cols-[minmax(0,1fr)_300px]">
         <div className="space-y-6">
           {postData && (
             <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-6">
