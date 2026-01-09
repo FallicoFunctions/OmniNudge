@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
   hubsService,
@@ -155,13 +155,13 @@ export default function HubsPage() {
     // Check if user is listed as a moderator
     if (!hubDetails?.moderators) return false;
     return hubDetails.moderators.some((mod) => mod.id === user.id);
-  }, [user, hubDetails?.moderators]);
+  }, [user, hubDetails]);
 
   // Fetch posts based on current hub
   const postsQueryKey = ['hub-posts', hubname, sort, timeRangeKey, pageOffset] as const;
-  const { data, isLoading, error, isFetching } = useQuery<HubPostsResponse>({
+  const { data, isLoading, error, isFetching } = useQuery({
     queryKey: postsQueryKey,
-    queryFn: () => {
+    queryFn: async (): Promise<HubPostsResponse> => {
       const feedOptions =
         isTopSort && topTimeRange === 'custom'
           ? isCustomRangeValid
@@ -184,7 +184,7 @@ export default function HubsPage() {
     },
     enabled: !!hubname && hubname !== '' && (!isCustomTopRange || isCustomRangeValid),
     staleTime: 1000 * 60 * 5,
-    keepPreviousData: true,
+    placeholderData: keepPreviousData,
   });
   const postsList = data?.posts ?? EMPTY_POSTS;
   const visiblePosts = useMemo(
