@@ -35,21 +35,35 @@
 
 5. **Wait 2 minutes**, copy server IP address (e.g., `159.89.123.45`)
 
-### Step 2: Point Domain to Server (5 minutes)
+### Step 2: Point Domain to Server on Cloudflare (5 minutes)
 
-1. **Log in to your domain registrar** (where you bought omninudge.com)
-2. **Go to DNS settings**
-3. **Add these records:**
+1. **Log in to Cloudflare:** https://dash.cloudflare.com/
+2. **Click "omninudge.com"** → **"DNS"** (left sidebar)
+3. **Add these DNS records** (click "Add record"):
 
+**First record:**
 ```
-Type    Name    Value              TTL
-A       @       YOUR_SERVER_IP     3600
-A       www     YOUR_SERVER_IP     3600
+Type: A
+Name: @
+Content: YOUR_SERVER_IP
+Proxy status: DNS only (click to turn cloud GRAY)
+TTL: Auto
 ```
 
-Replace `YOUR_SERVER_IP` with your actual server IP.
+**Second record:**
+```
+Type: A
+Name: www
+Content: YOUR_SERVER_IP
+Proxy status: DNS only (click to turn cloud GRAY)
+TTL: Auto
+```
 
-**Wait 10-30 minutes** for DNS to propagate (grab coffee ☕).
+**⚠️ IMPORTANT:** Make sure the cloud icon is **GRAY**, not orange! This is required for SSL setup.
+
+Replace `YOUR_SERVER_IP` with your actual server IP (e.g., `159.89.123.45`).
+
+**Wait 2-10 minutes** for DNS to propagate (Cloudflare is fast! ⚡).
 
 **Test:** `ping omninudge.com` should show your server IP.
 

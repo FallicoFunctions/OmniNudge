@@ -145,34 +145,52 @@ curl ifconfig.me
 # This shows your public IP (like 159.89.123.45)
 ```
 
-### Configure DNS
+### Configure DNS on Cloudflare
 
-1. **Log in to your domain registrar** (where you bought omninudge.com)
-   - GoDaddy, Namecheap, Google Domains, etc.
+Since you bought your domain on Cloudflare, DNS setup is easier and faster!
 
-2. **Find DNS settings** (might be called "DNS Management" or "Nameservers")
+1. **Log in to Cloudflare:** https://dash.cloudflare.com/
+2. **Click on "omninudge.com"** in your domains list
+3. **Click "DNS" in the left sidebar**
 
-3. **Add these DNS records:**
+4. **Add these DNS records:**
 
-| Type | Name | Value | TTL |
-|------|------|-------|-----|
-| A | @ | YOUR_SERVER_IP | 3600 |
-| A | www | YOUR_SERVER_IP | 3600 |
-| CNAME | api | omninudge.com | 3600 |
+Click "Add record" for each:
 
-**Example values:**
+| Type | Name | Content (IPv4 address) | Proxy status | TTL |
+|------|------|------------------------|--------------|-----|
+| A | @ | YOUR_SERVER_IP | DNS only (gray cloud) | Auto |
+| A | www | YOUR_SERVER_IP | DNS only (gray cloud) | Auto |
+
+**IMPORTANT:** Click the orange cloud to turn it **gray** (DNS only). This is required for SSL to work properly.
+
+**Example:**
 ```
-A     @     159.89.123.45    3600
-A     www   159.89.123.45    3600
-CNAME api   omninudge.com    3600
+Type: A
+Name: @
+Content: 159.89.123.45
+Proxy status: DNS only (gray cloud icon)
+TTL: Auto
+```
+
+```
+Type: A
+Name: www
+Content: 159.89.123.45
+Proxy status: DNS only (gray cloud icon)
+TTL: Auto
 ```
 
 **What this does:**
-- `omninudge.com` → Your server
-- `www.omninudge.com` → Your server
-- `api.omninudge.com` → Your server (for backend API)
+- `omninudge.com` → Your server (direct connection)
+- `www.omninudge.com` → Your server (direct connection)
 
-**Wait 10-60 minutes** for DNS to propagate.
+**Why "DNS only" (gray cloud)?**
+- Cloudflare proxy (orange cloud) conflicts with Let's Encrypt SSL
+- Use gray cloud for initial setup
+- Can enable Cloudflare proxy later if needed
+
+**Wait 2-10 minutes** for DNS to propagate (Cloudflare is fast!).
 
 **Check if it's working:**
 ```bash
@@ -180,7 +198,17 @@ CNAME api   omninudge.com    3600
 ping omninudge.com
 
 # Should show your server's IP address
+
+# Also check:
+nslookup omninudge.com
+# Should show your server IP
 ```
+
+**Cloudflare Benefits:**
+- ✅ Fast DNS propagation (minutes, not hours)
+- ✅ Free DDoS protection
+- ✅ Free analytics
+- ✅ Can enable CDN later (turn cloud orange after SSL setup)
 
 ---
 
@@ -661,6 +689,58 @@ You should see:
 - 🔒 Green padlock in address bar
 - Your website loads
 - No SSL warnings
+
+### (Optional) Enable Cloudflare Proxy
+
+Now that SSL is working, you can optionally enable Cloudflare's proxy for extra protection:
+
+1. **Go to Cloudflare Dashboard:** https://dash.cloudflare.com/
+2. **Click "omninudge.com"** → **"DNS"**
+3. **For each A record**, click the **gray cloud** to turn it **orange**
+4. **In Cloudflare, go to "SSL/TLS"** → Set mode to **"Full (strict)"**
+5. **Wait 5 minutes**, test your site again
+
+**Benefits of orange cloud (proxied):**
+- ✅ DDoS protection
+- ✅ CDN (faster loading worldwide)
+- ✅ Hides your real server IP
+- ✅ Web Application Firewall (WAF)
+
+**Important Configuration for Orange Cloud:**
+
+If you enable the proxy, you need to configure WebSockets:
+
+```bash
+# On your server, edit Nginx config
+nano /etc/nginx/sites-available/omninudge
+
+# Add this at the top, inside the server block:
+# Set real IP from Cloudflare
+set_real_ip_from 173.245.48.0/20;
+set_real_ip_from 103.21.244.0/22;
+set_real_ip_from 103.22.200.0/22;
+set_real_ip_from 103.31.4.0/22;
+set_real_ip_from 141.101.64.0/18;
+set_real_ip_from 108.162.192.0/18;
+set_real_ip_from 190.93.240.0/20;
+set_real_ip_from 188.114.96.0/20;
+set_real_ip_from 197.234.240.0/22;
+set_real_ip_from 198.41.128.0/17;
+set_real_ip_from 2400:cb00::/32;
+set_real_ip_from 2606:4700::/32;
+set_real_ip_from 2803:f800::/32;
+set_real_ip_from 2405:b500::/32;
+set_real_ip_from 2405:8100::/32;
+set_real_ip_from 2c0f:f248::/32;
+set_real_ip_from 2a06:98c0::/29;
+real_ip_header CF-Connecting-IP;
+
+# Then reload Nginx:
+nginx -t
+systemctl reload nginx
+```
+
+**Recommendation:** Start with **gray cloud** (DNS only). Enable orange cloud later if you need extra protection or global CDN.
 
 ### Test Auto-Renewal
 
