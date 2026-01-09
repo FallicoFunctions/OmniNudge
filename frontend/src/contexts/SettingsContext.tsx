@@ -43,7 +43,10 @@ interface StoredSettings {
   useInfiniteScroll?: boolean;
   searchIncludeNsfwByDefault?: boolean;
   blockAllNsfw?: boolean;
+  settingsVersion?: number;
 }
+
+const CURRENT_SETTINGS_VERSION = 2;
 
 const getStoredSettings = (): StoredSettings => {
   if (typeof window === 'undefined' || !window.localStorage) {
@@ -52,7 +55,21 @@ const getStoredSettings = (): StoredSettings => {
   try {
     const stored = localStorage.getItem(SETTINGS_STORAGE_KEY);
     if (stored) {
-      return JSON.parse(stored);
+      const parsed = JSON.parse(stored) as StoredSettings;
+      const storedVersion = parsed.settingsVersion ?? 1;
+      if (storedVersion < CURRENT_SETTINGS_VERSION) {
+        const migrated: StoredSettings = {
+          ...parsed,
+          useInfiniteScrollHome: false,
+          useInfiniteScrollHubs: false,
+          useInfiniteScrollSubs: false,
+          useInfiniteScroll: false,
+          settingsVersion: CURRENT_SETTINGS_VERSION,
+        };
+        localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(migrated));
+        return migrated;
+      }
+      return parsed;
     }
   } catch (error) {
     console.error('Failed to load settings from localStorage:', error);
@@ -99,7 +116,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   });
   const [useInfiniteScroll, setUseInfiniteScrollState] = useState<boolean>(() => {
     const settings = getStoredSettings();
-    return settings.useInfiniteScroll ?? true; // Default to infinite scroll
+    return settings.useInfiniteScroll ?? false;
   });
   const [searchIncludeNsfwByDefault, setSearchIncludeNsfwByDefaultState] = useState<boolean>(() => {
     const settings = getStoredSettings();
@@ -126,6 +143,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         useInfiniteScroll,
         searchIncludeNsfwByDefault,
         blockAllNsfw,
+        settingsVersion: CURRENT_SETTINGS_VERSION,
       };
       localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings));
     } catch (error) {
