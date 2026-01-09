@@ -577,6 +577,10 @@ function LocalCommentView({
 
   const handleSubmitReply = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!user) {
+      window.dispatchEvent(new CustomEvent('open-auth-modal', { detail: 'login' }));
+      return;
+    }
     if (!replyText.trim()) return;
     createReplyMutation.mutate(replyText);
   };
@@ -1510,6 +1514,10 @@ export default function RedditPostPage() {
 
   const handleSubmitComment = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!user) {
+      window.dispatchEvent(new CustomEvent('open-auth-modal', { detail: 'login' }));
+      return;
+    }
     if (!commentText.trim()) return;
     createCommentMutation.mutate(commentText);
   };
@@ -1963,7 +1971,13 @@ export default function RedditPostPage() {
                       subreddit={subreddit}
                       postId={postId}
                       replyingTo={replyingTo}
-                      onReply={(commentId) => setReplyingTo(commentId)}
+                      onReply={(commentId) => {
+                        if (!user) {
+                          window.dispatchEvent(new CustomEvent('open-auth-modal', { detail: 'login' }));
+                          return;
+                        }
+                        setReplyingTo(commentId);
+                      }}
                       onCancelReply={() => setReplyingTo(null)}
                       allComments={localCommentsData || []}
                       currentUsername={user?.username}
@@ -1987,7 +2001,13 @@ export default function RedditPostPage() {
                     subreddit={subreddit || ''}
                     postId={postId || ''}
                     replyingTo={replyingTo}
-                    onReply={(commentId) => setReplyingTo(commentId)}
+                    onReply={(commentId) => {
+                      if (!user) {
+                        window.dispatchEvent(new CustomEvent('open-auth-modal', { detail: 'login' }));
+                        return;
+                      }
+                      setReplyingTo(commentId);
+                    }}
                     onCancelReply={() => setReplyingTo(null)}
                     currentUsername={user?.username}
                     onPermalink={handlePermalink}
