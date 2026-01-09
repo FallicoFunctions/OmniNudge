@@ -6,7 +6,8 @@ import { useAuth } from '../contexts/AuthContext';
 import { useSettings } from '../contexts/SettingsContext';
 import { savedService } from '../services/savedService';
 import { hubsService } from '../services/hubsService';
-import type { LocalRedditComment } from '../types/reddit';
+import { redditService } from '../services/redditService';
+import type { LocalRedditComment, RedditSubredditAbout, RedditSubredditModerator } from '../types/reddit';
 import { formatTimestamp, formatRelativeTime } from '../utils/timeFormat';
 import {
   createRedditCrosspostPayload,
@@ -998,6 +999,48 @@ export default function RedditPostPage() {
     enabled: !!user,
   });
 
+  const {
+    data: subredditAbout,
+    isLoading: loadingSubredditAbout,
+    isError: subredditAboutError,
+  } = useQuery<RedditSubredditAbout>({
+    queryKey: ['subreddit-about', subreddit],
+    queryFn: () => redditService.getSubredditAbout(subreddit!),
+    enabled: Boolean(subreddit),
+    staleTime: 1000 * 60 * 10,
+  });
+
+  const {
+    data: subredditModeratorsData,
+    isLoading: loadingSubredditModerators,
+  } = useQuery<{
+    moderators: RedditSubredditModerator[];
+    warning?: string;
+  }>({
+    queryKey: ['subreddit-moderators', subreddit],
+    queryFn: () => redditService.getSubredditModerators(subreddit!),
+    enabled: Boolean(subreddit),
+    staleTime: 1000 * 60 * 10,
+  });
+  const subredditModerators = subredditModeratorsData?.moderators ?? [];
+  const moderatorsWarning = subredditModeratorsData?.warning;
+  const subredditIcon = useMemo(() => {
+    if (!subredditAbout) return null;
+    const candidates = [
+      subredditAbout.community_icon,
+      subredditAbout.icon_img,
+      subredditAbout.banner_img,
+      subredditAbout.banner_background_image,
+    ];
+    for (const candidate of candidates) {
+      if (!candidate) continue;
+      const stripped = candidate.split('?')[0];
+      const sanitized = sanitizeHttpUrl(stripped);
+      if (sanitized) return sanitized;
+    }
+    return null;
+  }, [subredditAbout]);
+
   // Derive saved status from query data
   const isPostSavedFromBackend = useMemo(() => {
     if (!savedPostsData?.saved_reddit_posts || !subreddit || !postId) {
@@ -1488,10 +1531,12 @@ export default function RedditPostPage() {
   }
 
   return (
-    <div className="w-full max-w-5xl px-4 py-8">
-      {/* Post Content Section */}
-      {post && (
-        <div className="mb-6 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-6 text-left">
+    <div className="mx-auto w-full max-w-6xl px-4 py-8">
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)]">
+        <div className="space-y-6">
+          {/* Post Content Section */}
+          {post && (
+            <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-6 text-left">
           {isPostHiddenOverall && (
             <div className="mb-4 rounded border border-yellow-200 bg-yellow-50 p-3 text-sm text-yellow-900">
               This post is hidden from your main feeds. You can unhide it to make it reappear in Reddit
@@ -1907,58 +1952,155 @@ export default function RedditPostPage() {
           </div>
         )}
 
-        {/* Combined Comments List */}
-        <div className="space-y-4">
-          {combinedTopLevel.map((item, index) => {
-            if (item.type === 'local') {
-              return (
-                <LocalCommentView
-                  key={`local-${item.local.id}-${index}`}
-                  comment={item.local}
-                  subreddit={subreddit}
-                  postId={postId}
-                  replyingTo={replyingTo}
-                  onReply={(commentId) => setReplyingTo(commentId)}
-                  onCancelReply={() => setReplyingTo(null)}
-                  allComments={localCommentsData || []}
-                  currentUsername={user?.username}
-                  onPermalink={handlePermalink}
-                  onEmbed={handleEmbed}
-                  onToggleSave={handleToggleSave}
-                  savedCommentIds={savedCommentIds}
-                  onEdit={handleEditComment}
-                  onDelete={handleDeleteComment}
-                  onToggleInbox={handleToggleInbox}
-                  onReport={handleReportComment}
-                  useRelativeTime={useRelativeTime}
-                />
-              );
-            }
-            return (
-              <RedditCommentView
-                key={item.reddit.data?.id || `reddit-${index}`}
-                comment={item.reddit}
-                localComments={localCommentsData || []}
-                subreddit={subreddit || ''}
-                postId={postId || ''}
-                replyingTo={replyingTo}
-                onReply={(commentId) => setReplyingTo(commentId)}
-                onCancelReply={() => setReplyingTo(null)}
-                currentUsername={user?.username}
-                onPermalink={handlePermalink}
-                onEmbed={handleEmbed}
-                onToggleSave={handleToggleSave}
-                savedCommentIds={savedCommentIds}
-                onEdit={handleEditComment}
-                onDelete={handleDeleteComment}
-                onToggleInbox={handleToggleInbox}
-                onReport={handleReportComment}
-                isRedditUserBlocked={isRedditUserBlocked}
-                useRelativeTime={useRelativeTime}
-              />
-            );
-          })}
+            {/* Combined Comments List */}
+            <div className="space-y-4">
+              {combinedTopLevel.map((item, index) => {
+                if (item.type === 'local') {
+                  return (
+                    <LocalCommentView
+                      key={`local-${item.local.id}-${index}`}
+                      comment={item.local}
+                      subreddit={subreddit}
+                      postId={postId}
+                      replyingTo={replyingTo}
+                      onReply={(commentId) => setReplyingTo(commentId)}
+                      onCancelReply={() => setReplyingTo(null)}
+                      allComments={localCommentsData || []}
+                      currentUsername={user?.username}
+                      onPermalink={handlePermalink}
+                      onEmbed={handleEmbed}
+                      onToggleSave={handleToggleSave}
+                      savedCommentIds={savedCommentIds}
+                      onEdit={handleEditComment}
+                      onDelete={handleDeleteComment}
+                      onToggleInbox={handleToggleInbox}
+                      onReport={handleReportComment}
+                      useRelativeTime={useRelativeTime}
+                    />
+                  );
+                }
+                return (
+                  <RedditCommentView
+                    key={item.reddit.data?.id || `reddit-${index}`}
+                    comment={item.reddit}
+                    localComments={localCommentsData || []}
+                    subreddit={subreddit || ''}
+                    postId={postId || ''}
+                    replyingTo={replyingTo}
+                    onReply={(commentId) => setReplyingTo(commentId)}
+                    onCancelReply={() => setReplyingTo(null)}
+                    currentUsername={user?.username}
+                    onPermalink={handlePermalink}
+                    onEmbed={handleEmbed}
+                    onToggleSave={handleToggleSave}
+                    savedCommentIds={savedCommentIds}
+                    onEdit={handleEditComment}
+                    onDelete={handleDeleteComment}
+                    onToggleInbox={handleToggleInbox}
+                    onReport={handleReportComment}
+                    isRedditUserBlocked={isRedditUserBlocked}
+                    useRelativeTime={useRelativeTime}
+                  />
+                );
+              })}
+            </div>
+          </div>
         </div>
+
+        {subreddit && (
+          <aside className="space-y-4">
+            <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
+              <h3 className="text-sm font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
+                About this subreddit
+              </h3>
+              {loadingSubredditAbout ? (
+                <p className="mt-3 text-sm text-[var(--color-text-secondary)]">Loading details…</p>
+              ) : subredditAboutError ? (
+                <p className="mt-3 text-sm text-[var(--color-text-secondary)]">Unable to load subreddit details.</p>
+              ) : subredditAbout ? (
+                <>
+                  {subredditIcon && (
+                    <img
+                      src={subredditIcon}
+                      alt=""
+                      className="mt-3 h-12 w-12 rounded-full object-cover"
+                      loading="lazy"
+                    />
+                  )}
+                  {subredditAbout.public_description ? (
+                    <p className="mt-3 text-sm text-[var(--color-text-primary)]">
+                      {subredditAbout.public_description}
+                    </p>
+                  ) : (
+                    <p className="mt-3 text-sm text-[var(--color-text-secondary)]">No description provided.</p>
+                  )}
+                  <div className="mt-4 space-y-2 text-xs text-[var(--color-text-secondary)]">
+                    <div className="flex items-center justify-between">
+                      <span className="font-semibold text-[var(--color-text-primary)]">
+                        Members
+                      </span>
+                      <span>
+                        {typeof subredditAbout.subscribers === 'number'
+                          ? subredditAbout.subscribers.toLocaleString()
+                          : '—'}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="font-semibold text-[var(--color-text-primary)]">
+                        Online
+                      </span>
+                      <span>
+                        {typeof subredditAbout.active_user_count === 'number'
+                          ? subredditAbout.active_user_count.toLocaleString()
+                          : '—'}
+                      </span>
+                    </div>
+                    {subredditAbout.created_utc && (
+                      <div className="flex items-center justify_between">
+                        <span className="font-semibold text-[var(--color-text-primary)]">
+                          Created
+                        </span>
+                        <span>
+                          {new Date(subredditAbout.created_utc * 1000).toLocaleDateString()}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <p className="mt-3 text-sm text-[var(--color-text-secondary)]">No details available.</p>
+              )}
+            </div>
+
+            <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
+              <h3 className="text-sm font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
+                Moderators
+              </h3>
+              {loadingSubredditModerators ? (
+                <p className="mt-3 text-sm text-[var(--color-text-secondary)]">Loading moderators…</p>
+              ) : moderatorsWarning ? (
+                <p className="mt-3 text_sm text-[var(--color-text-secondary)]">{moderatorsWarning}</p>
+              ) : subredditModerators.length === 0 ? (
+                <p className="mt-3 text-sm text-[var(--color-text-secondary)]">
+                  No moderators listed.
+                </p>
+              ) : (
+                <ul className="mt-3 space-y-2 text-sm text-[var(--color-text-primary)]">
+                  {subredditModerators.map((mod) => (
+                    <li key={mod.id} className="flex items-center justify-between">
+                      <span>u/{mod.name ?? mod.id}</span>
+                      {mod.mod_permissions && mod.mod_permissions.length > 0 && (
+                        <span className="text-xs uppercase tracking-wide text-[var(--color-text-secondary)]">
+                          {mod.mod_permissions.join(', ')}
+                        </span>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </aside>
+        )}
       </div>
 
       {/* Embed Modal */}
