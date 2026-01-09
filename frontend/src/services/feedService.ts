@@ -83,17 +83,21 @@ export interface HomeFeedResponse {
   posts: CombinedFeedItem[];
   sort: string;
   limit: number;
+  offset: number;
+  total: number;
+  has_more: boolean;
 }
 
 export const feedService = {
   async getHomeFeed(
     sort = 'hot',
     limit = 50,
+    offset = 0,
     omniOnly = false,
     forcePopular = false,
     options?: FeedTimeRangeOptions
   ): Promise<HomeFeedResponse> {
-    const params = new URLSearchParams({ sort, limit: String(limit) });
+    const params = new URLSearchParams({ sort, limit: String(limit), offset: String(offset) });
     params.set('omni_only', omniOnly ? 'true' : 'false');
     if (forcePopular) {
       params.set('force_popular', 'true');
