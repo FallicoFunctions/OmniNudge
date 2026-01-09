@@ -6,6 +6,12 @@ interface SettingsContextType {
   setUseRelativeTime: (value: boolean) => void;
   autoCloseThemeSelector: boolean;
   setAutoCloseThemeSelector: (value: boolean) => void;
+  useInfiniteScrollHome: boolean;
+  setUseInfiniteScrollHome: (value: boolean) => void;
+  useInfiniteScrollHubs: boolean;
+  setUseInfiniteScrollHubs: (value: boolean) => void;
+  useInfiniteScrollSubs: boolean;
+  setUseInfiniteScrollSubs: (value: boolean) => void;
   notifyArchivedMessages: boolean;
   setNotifyArchivedMessages: (value: boolean) => void;
   notifyRemovedSavedPosts: boolean;
@@ -27,6 +33,9 @@ const SettingsContext = createContext<SettingsContextType | undefined>(undefined
 interface StoredSettings {
   useRelativeTime?: boolean;
   autoCloseThemeSelector?: boolean;
+  useInfiniteScrollHome?: boolean;
+  useInfiniteScrollHubs?: boolean;
+  useInfiniteScrollSubs?: boolean;
   notifyArchivedMessages?: boolean;
   notifyRemovedSavedPosts?: boolean;
   defaultOmniPostsOnly?: boolean;
@@ -64,6 +73,18 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     const settings = getStoredSettings();
     return settings.notifyRemovedSavedPosts ?? true;
   });
+  const [useInfiniteScrollHome, setUseInfiniteScrollHomeState] = useState<boolean>(() => {
+    const settings = getStoredSettings();
+    return settings.useInfiniteScrollHome ?? true;
+  });
+  const [useInfiniteScrollHubs, setUseInfiniteScrollHubsState] = useState<boolean>(() => {
+    const settings = getStoredSettings();
+    return settings.useInfiniteScrollHubs ?? true;
+  });
+  const [useInfiniteScrollSubs, setUseInfiniteScrollSubsState] = useState<boolean>(() => {
+    const settings = getStoredSettings();
+    return settings.useInfiniteScrollSubs ?? true;
+  });
   const [notifyArchivedMessages, setNotifyArchivedMessagesState] = useState<boolean>(() => {
     const settings = getStoredSettings();
     return settings.notifyArchivedMessages ?? false; // Default: no notifications for archived chats
@@ -95,6 +116,9 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       const settings: StoredSettings = {
         useRelativeTime,
         autoCloseThemeSelector,
+        useInfiniteScrollHome,
+        useInfiniteScrollHubs,
+        useInfiniteScrollSubs,
         notifyArchivedMessages,
         notifyRemovedSavedPosts,
         defaultOmniPostsOnly,
@@ -110,6 +134,9 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   }, [
     useRelativeTime,
     autoCloseThemeSelector,
+    useInfiniteScrollHome,
+    useInfiniteScrollHubs,
+    useInfiniteScrollSubs,
     notifyArchivedMessages,
     notifyRemovedSavedPosts,
     defaultOmniPostsOnly,
@@ -125,6 +152,16 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
 
   const setAutoCloseThemeSelector = (value: boolean) => {
     setAutoCloseThemeSelectorState(value);
+  };
+
+  const setUseInfiniteScrollHome = (value: boolean) => {
+    setUseInfiniteScrollHomeState(value);
+  };
+  const setUseInfiniteScrollHubs = (value: boolean) => {
+    setUseInfiniteScrollHubsState(value);
+  };
+  const setUseInfiniteScrollSubs = (value: boolean) => {
+    setUseInfiniteScrollSubsState(value);
   };
 
   const setNotifyRemovedSavedPosts = (value: boolean) => {
@@ -160,6 +197,12 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         setUseRelativeTime,
         autoCloseThemeSelector,
         setAutoCloseThemeSelector,
+        useInfiniteScrollHome,
+        setUseInfiniteScrollHome,
+        useInfiniteScrollHubs,
+        setUseInfiniteScrollHubs,
+        useInfiniteScrollSubs,
+        setUseInfiniteScrollSubs,
         notifyArchivedMessages,
         setNotifyArchivedMessages,
         notifyRemovedSavedPosts,

@@ -51,6 +51,10 @@ func (h *FeedHandler) GetHomeFeed(c *gin.Context) {
 	if limit < 1 || limit > 100 {
 		limit = 50
 	}
+	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
+	if offset < 0 {
+		offset = 0
+	}
 
 	omniOnly := false
 	if omniOnlyParam := c.Query("omni_only"); omniOnlyParam != "" {
@@ -82,6 +86,14 @@ func (h *FeedHandler) GetHomeFeed(c *gin.Context) {
 	var hubPosts []*models.PlatformPost
 	var redditPosts []services.RedditPost
 
+	// Fetch extra items to ensure we have enough after merging and sorting
+	// We need to fetch more than limit + offset because we're merging two sources
+	// Fetch at least 2x to account for interleaving, or minimum of 100 items
+	fetchLimit := (limit + offset) * 2
+	if fetchLimit < 100 {
+		fetchLimit = 100
+	}
+
 	includeReddit := !omniOnly
 	if authenticated {
 		// Authenticated: fetch from subscribed sources
@@ -90,7 +102,7 @@ func (h *FeedHandler) GetHomeFeed(c *gin.Context) {
 			hubPosts, redditPosts, err = h.fetchPopularFeeds(
 				c.Request.Context(),
 				sortBy,
-				limit,
+				fetchLimit,
 				includeReddit,
 				startTime,
 				endTime,
@@ -101,7 +113,7 @@ func (h *FeedHandler) GetHomeFeed(c *gin.Context) {
 				c.Request.Context(),
 				uidInt,
 				sortBy,
-				limit,
+				fetchLimit,
 				includeReddit,
 				startTime,
 				endTime,
@@ -113,7 +125,7 @@ func (h *FeedHandler) GetHomeFeed(c *gin.Context) {
 		hubPosts, redditPosts, err = h.fetchPopularFeeds(
 			c.Request.Context(),
 			sortBy,
-			limit,
+			fetchLimit,
 			includeReddit,
 			startTime,
 			endTime,
@@ -126,14 +138,20 @@ func (h *FeedHandler) GetHomeFeed(c *gin.Context) {
 		return
 	}
 
-	// Merge and sort by score
-	combined := h.mergeAndSortPosts(hubPosts, redditPosts, sortBy, limit)
+	// Merge and sort by score, get pagination info
+	combined, totalBeforePaging := h.mergeAndSortPosts(hubPosts, redditPosts, sortBy, limit, offset)
+
+	// Calculate if there are more items available
+	hasMore := offset+len(combined) < totalBeforePaging
 
 	response := gin.H{
 		"posts":     combined,
 		"sort":      sortBy,
 		"limit":     limit,
+		"offset":    offset,
 		"omni_only": omniOnly,
+		"total":     totalBeforePaging,
+		"has_more":  hasMore,
 	}
 	if timeRangeKey != "" {
 		response["time_range"] = timeRangeKey
@@ -236,8 +254,9 @@ func (h *FeedHandler) fetchPopularFeeds(
 	return hubPosts, redditPosts, nil
 }
 
-// mergeAndSortPosts combines hub and reddit posts and sorts by score
-func (h *FeedHandler) mergeAndSortPosts(hubPosts []*models.PlatformPost, redditPosts []services.RedditPost, sortBy string, limit int) []CombinedFeedItem {
+// mergeAndSortPosts combines hub and reddit posts and sorts by score, then applies offset/limit
+// Returns the paginated slice and the total count before pagination
+func (h *FeedHandler) mergeAndSortPosts(hubPosts []*models.PlatformPost, redditPosts []services.RedditPost, sortBy string, limit, offset int) ([]CombinedFeedItem, int) {
 	var combined []CombinedFeedItem
 
 	// Add hub posts
@@ -268,11 +287,19 @@ func (h *FeedHandler) mergeAndSortPosts(hubPosts []*models.PlatformPost, redditP
 		}
 	})
 
-	// Return top N
-	if len(combined) > limit {
-		return combined[:limit]
+	// Store total before pagination
+	totalBeforePaging := len(combined)
+
+	// Apply offset/limit
+	start := offset
+	if start > len(combined) {
+		start = len(combined)
 	}
-	return combined
+	end := start + limit
+	if end > len(combined) {
+		end = len(combined)
+	}
+	return combined[start:end], totalBeforePaging
 }
 
 // extractRedditPosts extracts RedditPost slice from RedditListing

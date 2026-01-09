@@ -74,6 +74,7 @@ export default function HomePage() {
     defaultOmniPostsOnly,
     searchIncludeNsfwByDefault,
     blockAllNsfw,
+    useInfiniteScrollHome,
   } = useSettings();
   const location = useLocation();
   const navigate = useNavigate();
@@ -244,8 +245,10 @@ export default function HomePage() {
     setIncludeNsfwSearch(!blockAllNsfw && searchIncludeNsfwByDefault);
   }, [blockAllNsfw, searchIncludeNsfwByDefault]);
 
-  const homeFeedQueryKey = ['home-feed', sort, omniOnly, showPopularFallback, timeRangeKey] as const;
-  const { data, isLoading } = useQuery({
+  const [pageOffset, setPageOffset] = useState(0);
+  const pageSize = 50;
+  const homeFeedQueryKey = ['home-feed', sort, omniOnly, showPopularFallback, timeRangeKey, pageOffset] as const;
+  const { data, isLoading, isFetching } = useQuery({
     queryKey: homeFeedQueryKey,
     queryFn: () => {
       const timeOptions =
@@ -260,11 +263,17 @@ export default function HomePage() {
           : isTopSort
           ? { timeRange: topTimeRange }
           : undefined;
-      return feedService.getHomeFeed(sort, 50, omniOnly, showPopularFallback, timeOptions);
+      return feedService.getHomeFeed(sort, pageSize, pageOffset, omniOnly, showPopularFallback, timeOptions);
     },
     enabled: !isCustomTopRange || isCustomRangeValid,
     staleTime: 1000 * 60 * 5,
+    keepPreviousData: true,
   });
+
+  // When sort/time toggles change, reset offset
+  useEffect(() => {
+    setPageOffset(0);
+  }, [sort, omniOnly, showPopularFallback, timeRangeKey]);
 
   const displayedPosts = useMemo(() => {
     const basePosts = data?.posts ?? [];
@@ -273,6 +282,9 @@ export default function HomePage() {
     }
     return basePosts.filter((item) => item.source === 'hub');
   }, [data?.posts, omniOnly]);
+
+  const hasMore = data?.has_more ?? false;
+  const hasPrev = pageOffset > 0;
 
   // Saved posts state
   const savedPostsKey = ['saved-items', 'posts'] as const;
@@ -946,6 +958,33 @@ export default function HomePage() {
               );
             }
           })}
+        </div>
+      )}
+
+      {/* Pagination Controls */}
+      {!useInfiniteScrollHome && displayedPosts.length > 0 && (hasPrev || hasMore) && (
+        <div className="mt-6 flex items-center justify-between border-t border-[var(--color-border)] pt-4">
+          <button
+            onClick={() => {
+              const newOffset = Math.max(0, pageOffset - pageSize);
+              setPageOffset(newOffset);
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            disabled={!hasPrev || isFetching}
+            className="rounded bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)] disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            ← Previous
+          </button>
+          <button
+            onClick={() => {
+              setPageOffset(pageOffset + pageSize);
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            disabled={!hasMore || isFetching}
+            className="rounded bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)] disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Next →
+          </button>
         </div>
       )}
 
