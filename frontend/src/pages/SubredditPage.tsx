@@ -763,7 +763,7 @@ export default function RedditPage() {
   };
 
   const trimmedInputValue = inputValue.trim();
-  const shouldShowSubredditSidebar = Boolean(subreddit);
+  const shouldShowSubredditSidebar = Boolean(subreddit && subreddit !== '');
 
   const {
     data: subredditAbout,
@@ -1306,8 +1306,8 @@ export default function RedditPage() {
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div>
-      {scopedSearchResults ? (
-        scopedSearchResults.length > 0 ? (
+          {scopedSearchResults ? (
+            scopedSearchResults.length > 0 ? (
           <div className="space-y-3">
             {scopedSearchResults.map((item, idx) => {
               if (item.type === 'platform') {
@@ -1471,10 +1471,10 @@ export default function RedditPage() {
               </button>
             </div>
           </div>
-        ) : (
-          <div className="text-center text-[var(--color-text-secondary)]">No search results</div>
-        )
-      ) : filteredCombinedPosts.length > 0 ? (
+            ) : (
+              <div className="text-center text-[var(--color-text-secondary)]">No search results</div>
+            )
+          ) : filteredCombinedPosts.length > 0 ? (
             useInfiniteScrollSubs ? (
               <div className="space-y-3">
                 {filteredCombinedPosts.map((item) => {

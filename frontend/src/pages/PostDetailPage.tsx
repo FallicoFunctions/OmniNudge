@@ -6,6 +6,8 @@ import { useSettings } from '../contexts/SettingsContext';
 import { postsService } from '../services/postsService';
 import { savedService } from '../services/savedService';
 import { api } from '../lib/api';
+import { hubsService } from '../services/hubsService';
+import { hubSettingsService } from '../services/hubSettingsService';
 import type { PlatformPost, PostComment } from '../types/posts';
 import type { SavedItemsResponse } from '../types/saved';
 import { CommentItem } from '../components/comments/CommentItem';
@@ -66,6 +68,11 @@ export default function PostDetailPage() {
     return unwrapped;
   }, [postDataRaw]);
   const decodedTitle = postData ? decodeHtmlEntities(postData.title) : '';
+  const hubName = useMemo(() => postData?.hub?.name ?? postData?.hub_name, [postData]);
+  const targetSubreddit = useMemo(
+    () => postData?.target_subreddit ?? postData?.crosspost_origin_subreddit ?? null,
+    [postData]
+  );
 
   const commentsQueryKey = ['posts', parsedPostId, 'comments'] as const;
   const { data: postComments, isLoading: loadingComments } = useQuery<PostComment[]>({
@@ -224,6 +231,29 @@ export default function PostDetailPage() {
     ? `<iframe src="${embedPermalink}" width="600" height="250" frameborder="0"></iframe>`
     : '';
 
+  const {
+    data: hubDetails,
+    isLoading: loadingHubDetails,
+    isError: hubDetailsError,
+  } = useQuery({
+    queryKey: ['hub-details', hubName],
+    queryFn: () => hubsService.getHub(hubName!),
+    enabled: Boolean(hubName),
+    staleTime: 1000 * 60 * 5,
+  });
+
+  const {
+    data: hubModeratorsData,
+    isLoading: loadingHubModerators,
+    isError: hubModeratorsError,
+  } = useQuery({
+    queryKey: ['hub-moderators', hubName],
+    queryFn: () => hubSettingsService.getHubModerators(hubName!),
+    enabled: Boolean(hubName),
+    staleTime: 1000 * 60 * 5,
+  });
+  const hubModerators = hubModeratorsData?.moderators ?? [];
+
   const bodyText = postData?.body ?? postData?.content ?? undefined;
   const mediaUrl = postData?.media_url ?? undefined;
   const thumbnailUrl = postData?.thumbnail_url ?? undefined;
@@ -306,143 +336,146 @@ export default function PostDetailPage() {
     );
   }
 
-  const hubName = postData?.hub?.name ?? postData?.hub_name;
-  const targetSubreddit = postData?.target_subreddit ?? postData?.crosspost_origin_subreddit ?? null;
-
   return (
-    <div className="w-full max-w-5xl px-4 py-8">
-      {postData && (
-        <div className="mb-6 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-6">
-          {/* Post Header */}
-          <div className="mb-4">
-            <h1 className="text-2xl font-bold text-[var(--color-text-primary)]">{decodedTitle}</h1>
-            <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-[var(--color-text-secondary)]">
-              {targetSubreddit && (
-                <>
-                  <Link
-                    to={`/r/${targetSubreddit}`}
-                    className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
-                  >
-                    r/{targetSubreddit}
-                  </Link>
+    <div className="w-full max-w-6xl px-4 py-8">
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]">
+        <div className="space-y-6">
+          {postData && (
+            <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-6">
+              {/* Post Header */}
+              <div className="mb-4">
+                <h1 className="text-2xl font-bold text-[var(--color-text-primary)]">{decodedTitle}</h1>
+                <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-[var(--color-text-secondary)]">
+                  {targetSubreddit && (
+                    <>
+                      <Link
+                        to={`/r/${targetSubreddit}`}
+                        className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+                      >
+                        r/{targetSubreddit}
+                      </Link>
+                      <span>•</span>
+                    </>
+                  )}
+                  {hubName && (
+                    <>
+                      <Link
+                        to={`/h/${hubName}`}
+                        className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+                      >
+                        h/{hubName}
+                      </Link>
+                      <span>•</span>
+                    </>
+                  )}
+                  <span>
+                    Posted by{' '}
+                    <Link
+                      to={`/users/${postData?.author?.username ?? postData?.author_username}`}
+                      className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+                    >
+                      {postData?.author?.username ?? postData?.author_username}
+                    </Link>
+                  </span>
                   <span>•</span>
-                </>
-              )}
-              {hubName && (
-                <>
-                  <Link
-                    to={`/h/${hubName}`}
-                    className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
-                  >
-                    h/{hubName}
-                  </Link>
-                  <span>•</span>
-                </>
-              )}
-              <span>
-                Posted by{' '}
-                <Link
-                  to={`/users/${postData?.author?.username ?? postData?.author_username}`}
-                  className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
-                >
-                  {postData?.author?.username ?? postData?.author_username}
-                </Link>
-              </span>
-              <span>•</span>
-              <span>submitted {formatTimestamp(postData.crossposted_at ?? postData.created_at, useRelativeTime)}</span>
-            </div>
-          </div>
-
-          {/* Post Media */}
-          {(mediaUrl || thumbnailUrl) && (
-            <div className="mb-4 flex flex-col items-start gap-2">
-              <div
-                className="w-full cursor-pointer overflow-hidden rounded border border-[var(--color-border)] transition-all duration-200"
-                onClick={() => setImageExpanded((prev) => !prev)}
-                title={imageExpanded ? 'Click to shrink' : 'Click to enlarge'}
-              >
-                {mediaUrl ? (
-                  isVideoMedia ? (
-                    <video
-                      controls
-                      className={`w-full object-contain ${imageExpanded ? 'max-h-[80vh]' : 'max-h-[320px]'}`}
-                      src={mediaUrl}
-                    />
-                  ) : (
-                    <img
-                      src={mediaUrl}
-                      alt={decodedTitle}
-                      className={`w-full object-contain transition-transform duration-200 ${
-                        imageExpanded ? 'max-h-[80vh]' : 'max-h-[320px] hover:scale-[1.03]'
-                      }`}
-                    />
-                  )
-                ) : (
-                  <img
-                    src={thumbnailUrl ?? ''}
-                    alt={decodedTitle}
-                    className={`w-full object-contain transition-transform duration-200 ${
-                      imageExpanded ? 'max-h-[80vh]' : 'max-h-[320px] hover:scale-[1.03]'
-                    }`}
-                  />
-                )}
+                  <span>
+                    submitted {formatTimestamp(postData.crossposted_at ?? postData.created_at, useRelativeTime)}
+                  </span>
+                </div>
               </div>
-              <button
-                type="button"
-                onClick={() => setImageExpanded((prev) => !prev)}
-                className="text-xs text-[var(--color-primary)] hover:underline"
-              >
-                {imageExpanded ? 'View smaller' : 'View full size'}
-              </button>
+
+              {/* Post Media */}
+              {(mediaUrl || thumbnailUrl) && (
+                <div className="mb-4 flex flex-col items-start gap-2">
+                  <div
+                    className="w-full cursor-pointer overflow-hidden rounded border border-[var(--color-border)] transition-all duration-200"
+                    onClick={() => setImageExpanded((prev) => !prev)}
+                    title={imageExpanded ? 'Click to shrink' : 'Click to enlarge'}
+                  >
+                    {mediaUrl ? (
+                      isVideoMedia ? (
+                        <video
+                          controls
+                          className={`w-full object-contain ${imageExpanded ? 'max-h-[80vh]' : 'max-h-[320px]'}`}
+                          src={mediaUrl}
+                        />
+                      ) : (
+                        <img
+                          src={mediaUrl}
+                          alt={decodedTitle}
+                          className={`w-full object-contain transition-transform duration-200 ${
+                            imageExpanded ? 'max-h-[80vh]' : 'max-h-[320px] hover:scale-[1.03]'
+                          }`}
+                        />
+                      )
+                    ) : (
+                      <img
+                        src={thumbnailUrl ?? ''}
+                        alt={decodedTitle}
+                        className={`w-full object-contain transition-transform duration-200 ${
+                          imageExpanded ? 'max-h-[80vh]' : 'max-h-[320px] hover:scale-[1.03]'
+                        }`}
+                      />
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setImageExpanded((prev) => !prev)}
+                    className="text-xs text-[var(--color-primary)] hover:underline"
+                  >
+                    {imageExpanded ? 'View smaller' : 'View full size'}
+                  </button>
+                </div>
+              )}
+
+              {/* Post Body */}
+              {bodyText && (
+                <div className="mb-4 whitespace-pre-wrap text-sm text-[var(--color-text-primary)]">
+                  {bodyText}
+                </div>
+              )}
+
+              {/* Vote Buttons and Post Stats */}
+              <div className="flex items-center gap-4">
+                <VoteButtons
+                  postId={postData.id}
+                  initialScore={postData.score}
+                  initialUserVote={postData.user_vote}
+                  layout="horizontal"
+                  size="medium"
+                />
+                <div className="flex gap-4 text-xs text-[var(--color-text-secondary)]">
+                  <span>{(postData.comment_count ?? postData.num_comments ?? 0).toLocaleString()} comments</span>
+                  <span>•</span>
+                  <button onClick={handleSharePost} className="hover:underline">
+                    share
+                  </button>
+                  <span>•</span>
+                  <button
+                    onClick={handleSavePost}
+                    disabled={savePostMutation.isPending}
+                    className="hover:underline disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {savePostMutation.isPending
+                      ? 'saving...'
+                      : isPostSaved
+                        ? 'unsave'
+                        : 'save'}
+                  </button>
+                  <span>•</span>
+                  <button onClick={handleHidePost} className="hover:underline">
+                    hide
+                  </button>
+                  <span>•</span>
+                  <button onClick={handleCrosspost} className="hover:underline">
+                    crosspost
+                  </button>
+                </div>
+              </div>
             </div>
           )}
 
-          {/* Post Body */}
-          {bodyText && (
-            <div className="mb-4 whitespace-pre-wrap text-sm text-[var(--color-text-primary)]">{bodyText}</div>
-          )}
-
-          {/* Vote Buttons and Post Stats */}
-          <div className="flex items-center gap-4">
-            <VoteButtons
-              postId={postData.id}
-              initialScore={postData.score}
-              initialUserVote={postData.user_vote}
-              layout="horizontal"
-              size="medium"
-            />
-            <div className="flex gap-4 text-xs text-[var(--color-text-secondary)]">
-              <span>{(postData.comment_count ?? postData.num_comments ?? 0).toLocaleString()} comments</span>
-              <span>•</span>
-              <button onClick={handleSharePost} className="hover:underline">
-                share
-              </button>
-              <span>•</span>
-              <button
-                onClick={handleSavePost}
-                disabled={savePostMutation.isPending}
-                className="hover:underline disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {savePostMutation.isPending
-                  ? 'saving...'
-                  : isPostSaved
-                    ? 'unsave'
-                    : 'save'}
-              </button>
-              <span>•</span>
-              <button onClick={handleHidePost} className="hover:underline">
-                hide
-              </button>
-              <span>•</span>
-              <button onClick={handleCrosspost} className="hover:underline">
-                crosspost
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-6">
+          <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-6">
         <h2 className="mb-4 text-xl font-semibold text-[var(--color-text-primary)]">Comments</h2>
         <form
           onSubmit={(e) => {
@@ -565,6 +598,80 @@ export default function PostDetailPage() {
               />
             ))}
           </div>
+        )}
+          </div>
+        </div>
+
+        {hubName && (
+          <aside className="space-y-4">
+            <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
+              <h3 className="text-sm font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
+                About this hub
+              </h3>
+              {loadingHubDetails ? (
+                <p className="mt-3 text-sm text-[var(--color-text-secondary)]">Loading details…</p>
+              ) : hubDetailsError ? (
+                <p className="mt-3 text-sm text-[var(--color-text-secondary)]">Unable to load hub details.</p>
+              ) : hubDetails ? (
+                <>
+                  {hubDetails.title && (
+                    <p className="mt-2 text-base font-semibold text-[var(--color-text-primary)]">
+                      {hubDetails.title}
+                    </p>
+                  )}
+                  {hubDetails.description ? (
+                    <p className="mt-2 text-sm text-[var(--color-text-primary)]">{hubDetails.description}</p>
+                  ) : (
+                    <p className="mt-2 text-sm text-[var(--color-text-secondary)]">No description provided.</p>
+                  )}
+                  <div className="mt-4 space-y-2 text-xs text-[var(--color-text-secondary)]">
+                    <div className="flex items-center justify-between">
+                      <span className="font-semibold text-[var(--color-text-primary)]">Members</span>
+                      <span>{hubDetails.subscriber_count?.toLocaleString() ?? '—'}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="font-semibold text-[var(--color-text-primary)]">Visibility</span>
+                      <span>{hubDetails.type ? hubDetails.type.charAt(0).toUpperCase() + hubDetails.type.slice(1) : '—'}</span>
+                    </div>
+                    {hubDetails.created_at && (
+                      <div className="flex items-center justify-between">
+                        <span className="font-semibold text-[var(--color-text-primary)]">Created</span>
+                        <span>{new Date(hubDetails.created_at).toLocaleDateString()}</span>
+                      </div>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <p className="mt-3 text-sm text-[var(--color-text-secondary)]">No details available.</p>
+              )}
+            </div>
+
+            <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
+              <h3 className="text-sm font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
+                Moderators
+              </h3>
+              {loadingHubModerators ? (
+                <p className="mt-3 text-sm text-[var(--color-text-secondary)]">Loading moderators…</p>
+              ) : hubModeratorsError ? (
+                <p className="mt-3 text-sm text-[var(--color-text-secondary)]">Unable to load moderators.</p>
+              ) : hubModerators.length === 0 ? (
+                <p className="mt-3 text-sm text-[var(--color-text-secondary)]">
+                  No moderators listed yet.
+                </p>
+              ) : (
+                <ul className="mt-3 space-y-2 text-sm text-[var(--color-text-primary)]">
+                  {hubModerators.map((mod) => (
+                    <li key={`${mod.user_id}-${mod.role}`} className="flex items-center justify-between">
+                      <span>{mod.username ?? `User ${mod.user_id}`}</span>
+                      <span className="text-xs uppercase tracking-wide text-[var(--color-text-secondary)]">
+                        {mod.role}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </aside>
         )}
       </div>
 
