@@ -174,7 +174,7 @@ export default function RedditPage() {
   const infiniteRedditQuery = useInfiniteQuery<FeedRedditPostsResponse>({
     queryKey: ['reddit-infinite', subreddit, sort, topRangeKey],
     queryFn: ({ pageParam }) => {
-      const limit = 25;
+      const limit = 50;
       const after = pageParam as string | undefined;
       if (subreddit === 'frontpage') {
         return redditService.getFrontPage(sort, limit, redditTimeFilter, after);
@@ -191,7 +191,7 @@ export default function RedditPage() {
   const paginatedRedditQuery = useQuery<FeedRedditPostsResponse>({
     queryKey: ['reddit-paginated', subreddit, sort, topRangeKey, pageHistory[pageHistory.length - 1]],
     queryFn: () => {
-      const limit = 25;
+      const limit = 50;
       const after = pageHistory[pageHistory.length - 1];
       if (subreddit === 'frontpage') {
         return redditService.getFrontPage(sort, limit, redditTimeFilter, after);

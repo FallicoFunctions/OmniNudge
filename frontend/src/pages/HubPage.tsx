@@ -32,7 +32,7 @@ export default function HubsPage() {
   const [hubname, setHubname] = useState(routeHubname ?? 'popular');
   const [sort, setSort] = useState<'hot' | 'new' | 'top' | 'rising'>('hot');
   const [pageOffset, setPageOffset] = useState(0);
-  const pageSize = 25;
+  const pageSize = 50;
   const [topTimeRange, setTopTimeRange] = useState<TopTimeRange>('day');
   const [customTopStart, setCustomTopStart] = useState('');
   const [customTopEnd, setCustomTopEnd] = useState('');
