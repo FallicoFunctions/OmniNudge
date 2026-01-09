@@ -114,7 +114,7 @@ export default function MainLayout() {
   return (
     <div className="min-h-screen bg-[var(--color-background)]">
       {/* Navigation Bar */}
-      <nav className="border-b border-[var(--color-border)] bg-[var(--color-surface)]">
+      <nav className="sticky top-0 z-50 border-b border-[var(--color-border)] bg-[var(--color-surface)]">
         <div className="mx-auto max-w-7xl px-4">
           <div className="flex h-16 items-center justify-between">
             <div className="flex items-center gap-8">
