@@ -1531,8 +1531,8 @@ export default function RedditPostPage() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-6xl px-4 py-8">
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)]">
+    <div className="mx-auto w-full max-w-7xl px-4 py-8">
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="space-y-6">
           {/* Post Content Section */}
           {post && (
