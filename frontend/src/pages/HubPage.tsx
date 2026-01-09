@@ -28,9 +28,11 @@ export default function HubsPage() {
   const queryClient = useQueryClient();
   const { hubname: routeHubname } = useParams<{ hubname?: string }>();
   const { user } = useAuth();
-  const { useRelativeTime } = useSettings();
+  const { useRelativeTime, useInfiniteScrollHubs } = useSettings();
   const [hubname, setHubname] = useState(routeHubname ?? 'popular');
   const [sort, setSort] = useState<'hot' | 'new' | 'top' | 'rising'>('hot');
+  const [pageOffset, setPageOffset] = useState(0);
+  const pageSize = 25;
   const [topTimeRange, setTopTimeRange] = useState<TopTimeRange>('day');
   const [customTopStart, setCustomTopStart] = useState('');
   const [customTopEnd, setCustomTopEnd] = useState('');
@@ -156,8 +158,8 @@ export default function HubsPage() {
   }, [user, hubDetails?.moderators]);
 
   // Fetch posts based on current hub
-  const postsQueryKey = ['hub-posts', hubname, sort, timeRangeKey] as const;
-  const { data, isLoading, error } = useQuery<HubPostsResponse>({
+  const postsQueryKey = ['hub-posts', hubname, sort, timeRangeKey, pageOffset] as const;
+  const { data, isLoading, error, isFetching } = useQuery<HubPostsResponse>({
     queryKey: postsQueryKey,
     queryFn: () => {
       const feedOptions =
@@ -173,21 +175,30 @@ export default function HubsPage() {
           ? { timeRange: topTimeRange }
           : undefined;
       if (hubname === 'popular') {
-        return hubsService.getPopularFeed(sort, 25, 0, feedOptions);
+        return hubsService.getPopularFeed(sort, pageSize, pageOffset, feedOptions);
       }
       if (hubname === 'all') {
-        return hubsService.getAllFeed(sort, 25, 0, feedOptions);
+        return hubsService.getAllFeed(sort, pageSize, pageOffset, feedOptions);
       }
-      return hubsService.getHubPosts(hubname, sort, 25, 0, feedOptions);
+      return hubsService.getHubPosts(hubname, sort, pageSize, pageOffset, feedOptions);
     },
     enabled: !!hubname && hubname !== '' && (!isCustomTopRange || isCustomRangeValid),
     staleTime: 1000 * 60 * 5,
+    keepPreviousData: true,
   });
   const postsList = data?.posts ?? EMPTY_POSTS;
   const visiblePosts = useMemo(
     () => postsList.filter((post) => !hiddenPostIds.has(post.id)),
     [postsList, hiddenPostIds]
   );
+
+  const hasMore = data?.has_more ?? false;
+  const hasPrev = pageOffset > 0;
+
+  // Reset offset when sort/hub changes
+  useEffect(() => {
+    setPageOffset(0);
+  }, [sort, hubname, timeRangeKey]);
 
   // Check subscription status for specific hub
   const { data: subscriptionStatus } = useQuery({
@@ -524,6 +535,33 @@ export default function HubsPage() {
               <div className="py-12 text-center text-gray-500">No posts found in this hub</div>
             )}
           </div>
+
+          {/* Pagination Controls */}
+          {!useInfiniteScrollHubs && visiblePosts.length > 0 && (hasPrev || hasMore) && (
+            <div className="mt-6 flex items-center justify-between border-t border-[var(--color-border)] pt-4">
+              <button
+                onClick={() => {
+                  const newOffset = Math.max(0, pageOffset - pageSize);
+                  setPageOffset(newOffset);
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+                disabled={!hasPrev || isFetching}
+                className="rounded bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)] disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                ← Previous
+              </button>
+              <button
+                onClick={() => {
+                  setPageOffset(pageOffset + pageSize);
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+                disabled={!hasMore || isFetching}
+                className="rounded bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)] disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Next →
+              </button>
+            </div>
+          )}
         </div>
 
         {showHubSidebar && (

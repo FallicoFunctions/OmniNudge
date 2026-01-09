@@ -195,12 +195,16 @@ func (h *HubsHandler) GetPosts(c *gin.Context) {
 		return
 	}
 
+	// Determine if there are more posts by fetching one extra
+	hasMore := len(posts) == limit
+
 	response := gin.H{
-		"hub":    name,
-		"posts":  posts,
-		"limit":  limit,
-		"offset": offset,
-		"sort":   sortBy,
+		"hub":      name,
+		"posts":    posts,
+		"limit":    limit,
+		"offset":   offset,
+		"sort":     sortBy,
+		"has_more": hasMore,
 	}
 	if timeRangeKey != "" {
 		response["time_range"] = timeRangeKey

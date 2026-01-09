@@ -92,7 +92,7 @@ export default function RedditPage() {
   const { subreddit: routeSubreddit } = useParams<{ subreddit?: string }>();
   const queryClient = useQueryClient();
   const { user } = useAuth();
-  const { useRelativeTime, useInfiniteScroll, searchIncludeNsfwByDefault, blockAllNsfw } = useSettings();
+  const { useRelativeTime, useInfiniteScrollSubs, searchIncludeNsfwByDefault, blockAllNsfw } = useSettings();
   const { blockedUsers } = useRedditBlocklist();
   const [subreddit, setSubreddit] = useState(routeSubreddit ?? 'popular');
   const [sort, setSort] = useState<'hot' | 'new' | 'top' | 'rising' | 'controversial'>('hot');
@@ -184,7 +184,7 @@ export default function RedditPage() {
     getNextPageParam: (lastPage) => lastPage.after ?? undefined,
     initialPageParam: undefined,
     staleTime: 1000 * 60 * 5,
-    enabled: useInfiniteScroll && (!isCustomTopRange || isCustomTopRangeValid) && (!isCustomControversialRange || isCustomControversialRangeValid),
+    enabled: useInfiniteScrollSubs && (!isCustomTopRange || isCustomTopRangeValid) && (!isCustomControversialRange || isCustomControversialRangeValid),
   });
 
   // Paginated query
@@ -199,7 +199,7 @@ export default function RedditPage() {
       return redditService.getSubredditPosts(subreddit, sort, limit, redditTimeFilter, after);
     },
     staleTime: 1000 * 60 * 5,
-    enabled: !useInfiniteScroll && (!isCustomTopRange || isCustomTopRangeValid) && (!isCustomControversialRange || isCustomControversialRangeValid),
+    enabled: !useInfiniteScrollSubs && (!isCustomTopRange || isCustomTopRangeValid) && (!isCustomControversialRange || isCustomControversialRangeValid),
   });
 
   // Memoize flattened posts to prevent re-creating the entire array on every render
@@ -209,13 +209,13 @@ export default function RedditPage() {
 
   // Use appropriate query based on settings - memoize to prevent object recreation
   const data = useMemo(() => {
-    return useInfiniteScroll
+    return useInfiniteScrollSubs
       ? { posts: flattenedPosts }
       : paginatedRedditQuery.data;
-  }, [useInfiniteScroll, flattenedPosts, paginatedRedditQuery.data]);
+  }, [useInfiniteScrollSubs, flattenedPosts, paginatedRedditQuery.data]);
 
-  const isLoading = useInfiniteScroll ? infiniteRedditQuery.isLoading : paginatedRedditQuery.isLoading;
-  const error = useInfiniteScroll ? infiniteRedditQuery.error : paginatedRedditQuery.error;
+  const isLoading = useInfiniteScrollSubs ? infiniteRedditQuery.isLoading : paginatedRedditQuery.isLoading;
+  const error = useInfiniteScrollSubs ? infiniteRedditQuery.error : paginatedRedditQuery.error;
 
   // Fetch hidden Reddit posts
   const { data: hiddenPostsData } = useQuery({
@@ -807,12 +807,12 @@ export default function RedditPage() {
     setIsAutocompleteOpen(false);
   };
 
-  const currentPageSize = useInfiniteScroll ? undefined : paginatedRedditQuery.data?.posts.length ?? 0;
+  const currentPageSize = useInfiniteScrollSubs ? undefined : paginatedRedditQuery.data?.posts.length ?? 0;
 
   const combinedPosts = useMemo(() => {
     if (
-      (!useInfiniteScroll && paginatedRedditQuery.isLoading) ||
-      (useInfiniteScroll && infiniteRedditQuery.isLoading)
+      (!useInfiniteScrollSubs && paginatedRedditQuery.isLoading) ||
+      (useInfiniteScrollSubs && infiniteRedditQuery.isLoading)
     ) {
       return [];
     }
@@ -851,7 +851,7 @@ export default function RedditPage() {
     const sorted = [...filteredPosts].sort((a, b) => getSortValue(b) - getSortValue(a));
 
     // In pagination mode, limit to current page size
-    if (!useInfiniteScroll && currentPageSize) {
+    if (!useInfiniteScrollSubs && currentPageSize) {
       return sorted.slice(0, currentPageSize);
     }
 
@@ -861,7 +861,7 @@ export default function RedditPage() {
     visibleLocalPosts,
     showOmniOnly,
     sort,
-    useInfiniteScroll,
+    useInfiniteScrollSubs,
     currentPageSize,
     paginatedRedditQuery.isLoading,
     infiniteRedditQuery.isLoading,
@@ -957,7 +957,7 @@ export default function RedditPage() {
 
   // Auto-fetch next page when scrolling near bottom
   useEffect(() => {
-    if (!useInfiniteScroll) return;
+    if (!useInfiniteScrollSubs) return;
 
     const handleScroll = () => {
       if (!hasMoreRedditPages || isFetchingNextPage) return;
@@ -972,7 +972,7 @@ export default function RedditPage() {
     return () => {
       window.removeEventListener('scroll', handleScroll);
     };
-  }, [useInfiniteScroll, hasMoreRedditPages, isFetchingNextPage, fetchNextPage]);
+  }, [useInfiniteScrollSubs, hasMoreRedditPages, isFetchingNextPage, fetchNextPage]);
 
   return (
     <div className="mx-auto w-full max-w-7xl px-4 py-8">
@@ -1475,7 +1475,7 @@ export default function RedditPage() {
           <div className="text-center text-[var(--color-text-secondary)]">No search results</div>
         )
       ) : filteredCombinedPosts.length > 0 ? (
-            useInfiniteScroll ? (
+            useInfiniteScrollSubs ? (
               <div className="space-y-3">
                 {filteredCombinedPosts.map((item) => {
                     return (
@@ -1806,14 +1806,14 @@ export default function RedditPage() {
           )}
 
           {/* Loading indicator for infinite scroll */}
-          {useInfiniteScroll && infiniteRedditQuery.isFetchingNextPage && (
+          {useInfiniteScrollSubs && infiniteRedditQuery.isFetchingNextPage && (
             <div className="mt-6 text-center text-[var(--color-text-secondary)]">
               Loading more posts...
             </div>
           )}
 
           {/* Pagination controls */}
-          {!useInfiniteScroll &&
+          {!useInfiniteScrollSubs &&
             !scopedSearchResults &&
             filteredCombinedPosts.length > 0 &&
             (pageHistory.length > 1 || Boolean(paginatedRedditQuery.data?.after)) && (

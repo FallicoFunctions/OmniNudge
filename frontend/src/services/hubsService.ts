@@ -44,6 +44,7 @@ export interface HubPostsResponse {
   sort: string;
   limit: number;
   offset: number;
+  has_more: boolean;
 }
 
 export interface UserHubsResponse {
