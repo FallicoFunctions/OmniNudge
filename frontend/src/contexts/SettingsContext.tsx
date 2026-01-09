@@ -75,15 +75,15 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   });
   const [useInfiniteScrollHome, setUseInfiniteScrollHomeState] = useState<boolean>(() => {
     const settings = getStoredSettings();
-    return settings.useInfiniteScrollHome ?? true;
+    return settings.useInfiniteScrollHome ?? false;
   });
   const [useInfiniteScrollHubs, setUseInfiniteScrollHubsState] = useState<boolean>(() => {
     const settings = getStoredSettings();
-    return settings.useInfiniteScrollHubs ?? true;
+    return settings.useInfiniteScrollHubs ?? false;
   });
   const [useInfiniteScrollSubs, setUseInfiniteScrollSubsState] = useState<boolean>(() => {
     const settings = getStoredSettings();
-    return settings.useInfiniteScrollSubs ?? true;
+    return settings.useInfiniteScrollSubs ?? false;
   });
   const [notifyArchivedMessages, setNotifyArchivedMessagesState] = useState<boolean>(() => {
     const settings = getStoredSettings();
