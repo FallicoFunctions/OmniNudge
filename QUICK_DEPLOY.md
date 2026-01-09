@@ -67,12 +67,36 @@ Replace `YOUR_SERVER_IP` with your actual server IP (e.g., `159.89.123.45`).
 
 **Test:** `ping omninudge.com` should show your server IP.
 
-### Step 3: Run Automated Deployment (90 minutes)
+### Step 3: Consolidate Database Migrations (5 minutes)
+
+Before deploying, consolidate your 48 development migrations into one production schema:
 
 **On your Mac:**
 
 ```bash
 # 1. Navigate to project
+cd /Users/Nick_1/Documents/Personal_Projects/OmniNudge
+
+# 2. Make consolidation script executable
+chmod +x scripts/consolidate-migrations.sh
+
+# 3. Run consolidation
+bash scripts/consolidate-migrations.sh
+
+# Follow prompts:
+# - Database name: omninudge (or press Enter)
+# - Database user: (press Enter for default)
+# - Confirm: y
+```
+
+This creates one clean migration file instead of running 48 migrations. See [docs/MIGRATION_CONSOLIDATION.md](docs/MIGRATION_CONSOLIDATION.md) for details.
+
+### Step 4: Run Automated Deployment (90 minutes)
+
+**On your Mac:**
+
+```bash
+# 1. Navigate to project (if not already there)
 cd /Users/Nick_1/Documents/Personal_Projects/OmniNudge
 
 # 2. Upload scripts to server (replace YOUR_SERVER_IP)
@@ -105,7 +129,7 @@ bash deploy-app.sh
 # Done! 🎉
 ```
 
-### Step 4: Test Your Site (5 minutes)
+### Step 5: Test Your Site (5 minutes)
 
 **Visit:** https://omninudge.com
 

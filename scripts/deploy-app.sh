@@ -108,7 +108,24 @@ chmod 755 /var/www/omninudge/uploads
 echo "✓ Upload directory created"
 
 echo ""
-echo "Step 6: Creating systemd service..."
+echo "Step 6: Running database migrations..."
+cd /var/www/omninudge/backend/internal/database
+
+# Check if consolidated migration exists
+if [ -f "migrations/001_production_schema.up.sql" ]; then
+    echo "Using consolidated production schema..."
+    PGPASSWORD="$DB_PASSWORD" psql -U omninudge_user -d omninudge -h localhost \
+        -f migrations/001_production_schema.up.sql
+    echo "✓ Database schema created"
+else
+    echo "⚠ Warning: Consolidated migration not found!"
+    echo "Please run: bash scripts/consolidate-migrations.sh"
+    echo "Then re-run deployment."
+    exit 1
+fi
+
+echo ""
+echo "Step 7: Creating systemd service..."
 cat > /etc/systemd/system/omninudge-backend.service <<EOF
 [Unit]
 Description=OmniNudge Backend Server
@@ -138,7 +155,7 @@ systemctl restart omninudge-backend
 echo "✓ Backend service started"
 
 echo ""
-echo "Step 7: Configuring Nginx..."
+echo "Step 8: Configuring Nginx..."
 cat > /etc/nginx/sites-available/omninudge <<'NGINXEOF'
 # Redirect www to non-www
 server {
@@ -221,14 +238,14 @@ systemctl reload nginx
 echo "✓ Nginx configured"
 
 echo ""
-echo "Step 8: Setting up SSL with Let's Encrypt..."
+echo "Step 9: Setting up SSL with Let's Encrypt..."
 echo "Running certbot..."
 certbot --nginx -d $DOMAIN -d www.$DOMAIN --non-interactive --agree-tos --redirect --email admin@$DOMAIN
 
 echo "✓ SSL certificate installed"
 
 echo ""
-echo "Step 9: Creating backup script..."
+echo "Step 10: Creating backup script..."
 cat > /root/backup-omninudge.sh <<'BACKUPEOF'
 #!/bin/bash
 
