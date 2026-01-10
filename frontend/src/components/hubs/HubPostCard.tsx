@@ -81,6 +81,8 @@ export function HubPostCard({
           <img
             src={post.thumbnail_url}
             alt=""
+            loading="lazy"
+            decoding="async"
             className="h-14 w-14 flex-shrink-0 rounded object-cover"
           />
         )}

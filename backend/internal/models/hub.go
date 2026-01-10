@@ -101,14 +101,42 @@ func (r *HubRepository) GetByID(ctx context.Context, id int) (*Hub, error) {
 }
 
 // List returns paginated hubs
-func (r *HubRepository) List(ctx context.Context, limit, offset int) ([]*Hub, error) {
+func (r *HubRepository) List(ctx context.Context, limit, offset int, includeNsfw bool) ([]*Hub, error) {
 	query := `
 		SELECT id, name, description, title, type, content_options, is_quarantined, subscriber_count, created_by, created_at, nsfw
 		FROM hubs
+		WHERE ($3 = TRUE OR nsfw = FALSE)
 		ORDER BY created_at DESC
 		LIMIT $1 OFFSET $2
 	`
-	rows, err := r.pool.Query(ctx, query, limit, offset)
+	rows, err := r.pool.Query(ctx, query, limit, offset, includeNsfw)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var hubs []*Hub
+	for rows.Next() {
+		h := &Hub{}
+		if err := rows.Scan(&h.ID, &h.Name, &h.Description, &h.Title, &h.Type, &h.ContentOptions, &h.IsQuarantined, &h.SubscriberCount, &h.CreatedBy, &h.CreatedAt, &h.NSFW); err != nil {
+			return nil, err
+		}
+		hubs = append(hubs, h)
+	}
+	return hubs, rows.Err()
+}
+
+// ListByPrefix returns paginated hubs filtered by name prefix.
+func (r *HubRepository) ListByPrefix(ctx context.Context, prefix string, limit, offset int, includeNsfw bool) ([]*Hub, error) {
+	query := `
+		SELECT id, name, description, title, type, content_options, is_quarantined, subscriber_count, created_by, created_at, nsfw
+		FROM hubs
+		WHERE name ILIKE $1
+		  AND ($4 = TRUE OR nsfw = FALSE)
+		ORDER BY name ASC, created_at DESC
+		LIMIT $2 OFFSET $3
+	`
+	rows, err := r.pool.Query(ctx, query, prefix+"%", limit, offset, includeNsfw)
 	if err != nil {
 		return nil, err
 	}

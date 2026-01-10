@@ -24,6 +24,7 @@ import { useSubredditAbout } from '../hooks/useSubredditAbout';
 import { useSavedItems } from '../hooks/useSavedItems';
 import { getSavedCommentIdSet, getSavedPostIdSet } from '../utils/savedItems';
 import { LoadingMessage } from '../components/common/StatusMessage';
+import { PostDetailMedia } from '../components/posts/PostDetailMedia';
 
 const FORMATTING_EXAMPLES = [
   { input: '*italics*', output: '*italics*' },
@@ -387,49 +388,14 @@ export default function PostDetailPage() {
                 </div>
               </div>
 
-              {/* Post Media */}
-              {(mediaUrl || thumbnailUrl) && (
-                <div className="mb-4 flex flex-col items-start gap-2">
-                  <div
-                    className="w-full cursor-pointer overflow-hidden rounded border border-[var(--color-border)] transition-all duration-200"
-                    onClick={() => setImageExpanded((prev) => !prev)}
-                    title={imageExpanded ? 'Click to shrink' : 'Click to enlarge'}
-                  >
-                    {mediaUrl ? (
-                      isVideoMedia ? (
-                        <video
-                          controls
-                          className={`w-full object-contain ${imageExpanded ? 'max-h-[80vh]' : 'max-h-[320px]'}`}
-                          src={mediaUrl}
-                        />
-                      ) : (
-                        <img
-                          src={mediaUrl}
-                          alt={decodedTitle}
-                          className={`w-full object-contain transition-transform duration-200 ${
-                            imageExpanded ? 'max-h-[80vh]' : 'max-h-[320px] hover:scale-[1.03]'
-                          }`}
-                        />
-                      )
-                    ) : (
-                      <img
-                        src={thumbnailUrl ?? ''}
-                        alt={decodedTitle}
-                        className={`w-full object-contain transition-transform duration-200 ${
-                          imageExpanded ? 'max-h-[80vh]' : 'max-h-[320px] hover:scale-[1.03]'
-                        }`}
-                      />
-                    )}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setImageExpanded((prev) => !prev)}
-                    className="text-xs text-[var(--color-primary)] hover:underline"
-                  >
-                    {imageExpanded ? 'View smaller' : 'View full size'}
-                  </button>
-                </div>
-              )}
+              <PostDetailMedia
+                mediaUrl={mediaUrl}
+                thumbnailUrl={thumbnailUrl}
+                decodedTitle={decodedTitle}
+                isVideoMedia={isVideoMedia}
+                imageExpanded={imageExpanded}
+                onToggleExpanded={() => setImageExpanded((prev) => !prev)}
+              />
 
               {/* Post Body */}
               {bodyText && (

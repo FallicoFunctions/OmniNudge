@@ -312,3 +312,43 @@ func (h *UsersHandler) Ping(c *gin.Context) {
 		"last_seen": lastSeen.Format(time.RFC3339),
 	})
 }
+
+// UpdateLastAgentPostAt updates the last_agent_post_at timestamp for the authenticated user
+func (h *UsersHandler) UpdateLastAgentPostAt(c *gin.Context) {
+	userID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Not authenticated"})
+		return
+	}
+
+	timestamp := time.Now()
+
+	if err := h.userRepo.UpdateLastAgentPostAt(c.Request.Context(), userID.(int), timestamp); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update last agent post timestamp"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"last_agent_post_at": timestamp.Format(time.RFC3339),
+	})
+}
+
+// UpdateLastAgentBrowseAt updates the last_agent_browse_at timestamp for the authenticated user
+func (h *UsersHandler) UpdateLastAgentBrowseAt(c *gin.Context) {
+	userID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Not authenticated"})
+		return
+	}
+
+	timestamp := time.Now()
+
+	if err := h.userRepo.UpdateLastAgentBrowseAt(c.Request.Context(), userID.(int), timestamp); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update last agent browse timestamp"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"last_agent_browse_at": timestamp.Format(time.RFC3339),
+	})
+}

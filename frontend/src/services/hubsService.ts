@@ -105,8 +105,21 @@ export interface SubredditPostsResponse {
 
 export const hubsService = {
   // Hub browsing
-  async getAllHubs(limit: number = 25, offset: number = 0): Promise<HubsResponse> {
-    return api.get<HubsResponse>(`/hubs?limit=${limit}&offset=${offset}`);
+  async getAllHubs(
+    limit: number = 25,
+    offset: number = 0,
+    startsWith?: string,
+    includeNsfw: boolean = true
+  ): Promise<HubsResponse> {
+    const params = new URLSearchParams({
+      limit: String(limit),
+      offset: String(offset),
+    });
+    if (startsWith) {
+      params.set('starts_with', startsWith);
+    }
+    params.set('nsfw', includeNsfw ? 'true' : 'false');
+    return api.get<HubsResponse>(`/hubs?${params.toString()}`);
   },
 
   async getHub(hubName: string): Promise<Hub> {

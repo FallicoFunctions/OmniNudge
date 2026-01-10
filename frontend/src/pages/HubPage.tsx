@@ -21,6 +21,7 @@ import { useHubModerators } from '../hooks/useHubModerators';
 import { isUserHubModerator } from '../utils/moderation';
 import { useHubDetails } from '../hooks/useHubDetails';
 import { OffsetPaginationControls } from '../components/common/OffsetPaginationControls';
+import { VirtualizedList } from '../components/common/VirtualizedList';
 import { useSavedItems } from '../hooks/useSavedItems';
 import { useHiddenItems } from '../hooks/useHiddenItems';
 import { CrosspostModal } from '../components/common/CrosspostModal';
@@ -500,9 +501,13 @@ export default function HubsPage() {
           )}
 
           {/* Posts List */}
-          <div className="space-y-3">
-            {visiblePosts.length > 0 ? (
-              visiblePosts.map((post: LocalSubredditPost) => {
+          {visiblePosts.length > 0 ? (
+            <VirtualizedList
+              items={visiblePosts}
+              estimateSize={220}
+              className=""
+              getKey={(post) => post.id}
+              renderItem={(post: LocalSubredditPost) => {
                 const isSaved = savedPostIds.has(post.id);
                 const isSavePending =
                   savedToggleMutation.isPending && savedToggleMutation.variables?.postId === post.id;
@@ -523,31 +528,32 @@ export default function HubsPage() {
                 };
 
                 return (
-                  <HubPostCard
-                    key={post.id}
-                    post={normalizedPost}
-                    useRelativeTime={useRelativeTime}
-                    currentUserId={user?.id}
-                    hubNameMap={hubNameMap}
-                    currentHubName={hubname}
-                    isSaved={isSaved}
-                    isSavePending={isSavePending}
-                    isHiding={isHiding}
-                    isDeleting={isDeleting}
-                    onShare={() => handleSharePost(post.id)}
-                    onToggleSave={(shouldSave) => handleToggleSavePost(post.id, !shouldSave)}
-                    onHide={() => handleHidePost(post.id)}
-                    onCrosspost={() => handleCrosspostSelection(post)}
-                    onDelete={() => handleDeletePost(post.id)}
-                  />
+                  <div className="pb-3">
+                    <HubPostCard
+                      post={normalizedPost}
+                      useRelativeTime={useRelativeTime}
+                      currentUserId={user?.id}
+                      hubNameMap={hubNameMap}
+                      currentHubName={hubname}
+                      isSaved={isSaved}
+                      isSavePending={isSavePending}
+                      isHiding={isHiding}
+                      isDeleting={isDeleting}
+                      onShare={() => handleSharePost(post.id)}
+                      onToggleSave={(shouldSave) => handleToggleSavePost(post.id, !shouldSave)}
+                      onHide={() => handleHidePost(post.id)}
+                      onCrosspost={() => handleCrosspostSelection(post)}
+                      onDelete={() => handleDeletePost(post.id)}
+                    />
+                  </div>
                 );
-              })
-            ) : (
-              <div className="py-12 text-center">
-                <EmptyMessage>No posts found in this hub.</EmptyMessage>
-              </div>
-            )}
-          </div>
+              }}
+            />
+          ) : (
+            <div className="py-12 text-center">
+              <EmptyMessage>No posts found in this hub.</EmptyMessage>
+            </div>
+          )}
 
           {/* Pagination Controls */}
           {!useInfiniteScrollHubs && visiblePosts.length > 0 && (
