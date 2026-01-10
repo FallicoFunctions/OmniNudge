@@ -379,11 +379,12 @@ export default function SearchResultsPage() {
               post.author_username ||
               post.author?.username ||
               (post.author_id === undefined ? undefined : String(post.author_id));
+            const hubName = post.hub_name || post.hub?.name;
             const createdTimestamp = post.crossposted_at ?? post.created_at;
             const createdLabel = createdTimestamp ? formatTimestamp(createdTimestamp, true) : 'unknown time';
             const commentLabel = `${post.num_comments.toLocaleString()} Comments`;
             const pointsLabel = `${post.score.toLocaleString()} points`;
-            const postUrl = `/posts/${post.id}`;
+            const postUrl = hubName ? `/h/${hubName}/comments/${post.id}` : `/posts/${post.id}`;
             const isBlockedAuthor = displayAuthor ? blockedUsers.has(displayAuthor.toLowerCase()) : false;
             if (isBlockedAuthor) return null;
 
@@ -412,6 +413,14 @@ export default function SearchResultsPage() {
                       <span className="inline-block rounded bg-blue-600 px-2 py-0.5 text-[10px] font-bold uppercase text-white">
                         Omni
                       </span>
+                      {hubName && (
+                        <Link
+                          to={`/h/${hubName}`}
+                          className="text-[11px] text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+                        >
+                          h/{hubName}
+                        </Link>
+                      )}
                     </div>
                     <a href={postUrl}>
                       <h3 className="text-base font-semibold text-[var(--color-text-primary)] hover:text-[var(--color-primary)]">

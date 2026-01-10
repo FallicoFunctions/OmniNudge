@@ -52,13 +52,17 @@ func (h *SearchHandler) SearchPosts(c *gin.Context) {
 	}
 
 	sql := `
-		SELECT id, author_id, hub_id, title, body, tags, score, upvotes, downvotes,
-		       num_comments, view_count, created_at,
-		       ts_rank(search_vector, plainto_tsquery('english', $1)) as rank
-		FROM platform_posts
-		WHERE search_vector @@ plainto_tsquery('english', $1)
-		AND is_deleted = FALSE
-		AND (nsfw = FALSE OR $4 = TRUE)
+		SELECT p.id, p.author_id, p.hub_id, p.title, p.body, p.tags, p.score, p.upvotes, p.downvotes,
+		       p.num_comments, p.view_count, p.created_at, p.target_subreddit, p.crosspost_origin_subreddit,
+		       h.name as hub_name, u.username as author_username,
+		       ts_rank(p.search_vector, plainto_tsquery('english', $1)) as rank
+		FROM platform_posts p
+		LEFT JOIN hubs h ON p.hub_id = h.id
+		LEFT JOIN users u ON p.author_id = u.id
+		WHERE p.search_vector @@ plainto_tsquery('english', $1)
+		AND p.is_deleted = FALSE
+		AND (p.nsfw = FALSE OR $4 = TRUE)
+		AND u.shadow_banned = FALSE
 	` + orderClause + `
 		LIMIT $2 OFFSET $3
 	`
@@ -77,14 +81,22 @@ func (h *SearchHandler) SearchPosts(c *gin.Context) {
 	for rows.Next() {
 		post := &models.PlatformPost{}
 		var rank float64
+		var hubName, authorUsername *string
 		err := rows.Scan(
 			&post.ID, &post.AuthorID, &post.HubID, &post.Title, &post.Body, &post.Tags,
 			&post.Score, &post.Upvotes, &post.Downvotes, &post.NumComments, &post.ViewCount,
-			&post.CreatedAt, &rank,
+			&post.CreatedAt, &post.TargetSubreddit, &post.CrosspostOriginSubreddit,
+			&hubName, &authorUsername, &rank,
 		)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to parse results"})
 			return
+		}
+		if hubName != nil {
+			post.HubName = *hubName
+		}
+		if authorUsername != nil {
+			post.AuthorUsername = *authorUsername
 		}
 		posts = append(posts, post)
 	}
