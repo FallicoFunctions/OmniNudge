@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState, lazy, Suspense } from 'react';
 import { Link, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../contexts/AuthContext';
@@ -9,9 +9,28 @@ import { messagesService } from '../services/messagesService';
 import { useMessagingWebSocket } from '../hooks/useMessagingWebSocket';
 import type { UserProfile } from '../types/users';
 import AuthModal from '../pages/AuthModal';
-import { AboutContent } from '../pages/AboutPage';
 import BugReportModal from '../components/bugReports/BugReportModal';
 import { subscriptionService } from '../services/subscriptionService';
+import { LoadingMessage } from '../components/common/StatusMessage';
+
+const AboutContent = lazy(() =>
+  import('../components/about/AboutContent').then((module) => ({
+    default: module.AboutContent,
+  }))
+);
+
+const prefetchRoutes = {
+  about: () => import('../pages/AboutPage'),
+  bugReporting: () => import('../pages/BugReportingPage'),
+  createHub: () => import('../pages/CreateHubPage'),
+  createPost: () => import('../pages/CreatePostPage'),
+  hubs: () => import('../pages/HubsAndSubsPage'),
+  messages: () => import('../pages/MessagesPage'),
+  settings: () => import('../pages/SettingsPage'),
+  themes: () => import('../pages/ThemesPage'),
+  admin: () => import('../pages/AdminPage'),
+  profile: () => import('../pages/UserProfilePage'),
+};
 
 export default function MainLayout() {
   const { user, logout } = useAuth();
@@ -50,13 +69,16 @@ export default function MainLayout() {
     enabled: !!user,
   });
 
-  const unreadTotal =
-    conversations?.reduce((total, conv) => {
-      if (!notifyArchivedMessages && conv.archived_at) {
-        return total;
-      }
-      return total + (conv.unread_count ?? 0);
-    }, 0) ?? 0;
+  const unreadTotal = useMemo(
+    () =>
+      conversations?.reduce((total, conv) => {
+        if (!notifyArchivedMessages && conv.archived_at) {
+          return total;
+        }
+        return total + (conv.unread_count ?? 0);
+      }, 0) ?? 0,
+    [conversations, notifyArchivedMessages]
+  );
 
   useEffect(() => {
     if (!user) {
@@ -148,6 +170,7 @@ export default function MainLayout() {
                       setAuthModal('login');
                     }
                   }}
+                  onMouseEnter={() => prefetchRoutes.createPost()}
                   className="rounded-md px-3 py-2 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
                 >
                   Create Post
@@ -162,6 +185,7 @@ export default function MainLayout() {
                       setAuthModal('login');
                     }
                   }}
+                  onMouseEnter={() => prefetchRoutes.messages()}
                   className="relative rounded-md px-3 py-2 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
                 >
                   Messages
@@ -181,6 +205,7 @@ export default function MainLayout() {
                       setAuthModal('login');
                     }
                   }}
+                  onMouseEnter={() => prefetchRoutes.createHub()}
                   className="rounded-md px-3 py-2 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
                 >
                   Create Hub
@@ -188,12 +213,14 @@ export default function MainLayout() {
                 <button
                   type="button"
                   onClick={() => navigate('/hubs')}
+                  onMouseEnter={() => prefetchRoutes.hubs()}
                   className="rounded-md px-3 py-2 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
                 >
                   Browse Hubs
                 </button>
                 <Link
                   to="/about"
+                  onMouseEnter={() => prefetchRoutes.about()}
                   className="rounded-md px-3 py-2 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
                 >
                   About
@@ -210,18 +237,21 @@ export default function MainLayout() {
                       setBugReportUrl(window.location.href);
                       setShowBugReportModal(true);
                     }}
+                    onMouseEnter={() => prefetchRoutes.bugReporting()}
                     className="rounded-md px-3 py-2 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
                   >
                     Bug Reporting
                   </button>
                   <Link
                     to={`/users/${user.username}`}
+                    onMouseEnter={() => prefetchRoutes.profile()}
                     className="text-sm font-medium text-[var(--color-text-primary)]"
                   >
                     {user.username}
                   </Link>
                   <Link
                     to="/settings"
+                    onMouseEnter={() => prefetchRoutes.settings()}
                     className="rounded-md bg-[var(--color-surface-elevated)] px-3 py-2 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-border)]"
                   >
                     Settings
@@ -229,6 +259,7 @@ export default function MainLayout() {
                   {user.role === 'admin' && (
                     <Link
                       to="/admin"
+                      onMouseEnter={() => prefetchRoutes.admin()}
                       className="rounded-md bg-red-600 px-3 py-2 text-sm font-medium text-white hover:bg-red-700"
                     >
                       Admin
@@ -250,6 +281,7 @@ export default function MainLayout() {
                       setOpenBugReportAfterAuth(true);
                       setAuthModal('login');
                     }}
+                    onMouseEnter={() => prefetchRoutes.bugReporting()}
                     className="rounded-md px-3 py-2 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
                   >
                     Bug Reporting
@@ -284,7 +316,15 @@ export default function MainLayout() {
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 px-4 py-6">
           <div className="w-full max-w-4xl rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-6 shadow-xl">
             <div className="max-h-[70vh] overflow-y-auto pr-2">
-              <AboutContent />
+              <Suspense
+                fallback={
+                  <div className="py-6">
+                    <LoadingMessage>Loading...</LoadingMessage>
+                  </div>
+                }
+              >
+                <AboutContent />
+              </Suspense>
             </div>
             <div className="mt-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <label className="flex items-center gap-2 text-sm text-[var(--color-text-secondary)]">

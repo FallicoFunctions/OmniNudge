@@ -12,6 +12,8 @@ import SavedItemsView from '../components/saved/SavedItemsView';
 import HiddenItemsView from '../components/saved/HiddenItemsView';
 import SubscribedView from '../components/subscriptions/SubscribedView';
 import { getPostUrl } from '../utils/postUrl';
+import { Panel } from '../components/common/Panel';
+import { ErrorMessage, LoadingMessage } from '../components/common/StatusMessage';
 
 const BASE_TABS = [
   { key: 'overview', label: 'Overview' },
@@ -299,23 +301,23 @@ export default function UserProfilePage() {
 
   if (profileQuery.isLoading) {
     return (
-      <div className="mx-auto w-full max-w-5xl px-4 py-8 text-[var(--color-text-secondary)]">
-        Loading profile...
+      <div className="mx-auto w-full max-w-5xl px-4 py-8">
+        <LoadingMessage>Loading profile...</LoadingMessage>
       </div>
     );
   }
 
   if (profileQuery.isError || !profile) {
     return (
-      <div className="mx-auto w-full max-w-5xl px-4 py-8 text-[var(--color-text-secondary)]">
-        Unable to load user profile.
+      <div className="mx-auto w-full max-w-5xl px-4 py-8">
+        <ErrorMessage>Unable to load user profile.</ErrorMessage>
       </div>
     );
   }
 
   return (
     <div className="mx-auto w-full max-w-5xl px-4 py-8">
-      <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-6">
+      <Panel>
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div className="flex items-center gap-4">
             {profile.avatar_url ? (
@@ -361,7 +363,7 @@ export default function UserProfilePage() {
             <MarkdownRenderer content={profile.bio} />
           </div>
         )}
-      </div>
+      </Panel>
 
       {profile.moderated_hubs && profile.moderated_hubs.length > 0 && (
         <div className="mt-6 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4">

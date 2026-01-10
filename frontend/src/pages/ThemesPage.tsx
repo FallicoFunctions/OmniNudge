@@ -4,6 +4,7 @@ import ThemePreview from '../components/themes/ThemePreview';
 import ThemeSettingsSection from '../components/settings/ThemeSettingsSection';
 import { useTheme } from '../hooks/useTheme';
 import type { UserTheme } from '../types/theme';
+import { LoadingMessage } from '../components/common/StatusMessage';
 
 const ThemeGallery = lazy(() => import('../components/themes/ThemeGallery'));
 const ThemeEditor = lazy(() => import('../components/themes/ThemeEditor'));
@@ -124,8 +125,8 @@ export default function ThemesPage() {
         <div ref={galleryRef}>
           <Suspense
             fallback={
-              <section className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6 text-sm text-[var(--color-text-secondary)]">
-                Loading gallery…
+              <section className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6">
+                <LoadingMessage className="mt-0 text-sm">Loading gallery…</LoadingMessage>
               </section>
             }
           >
@@ -138,9 +139,7 @@ export default function ThemesPage() {
             Debug Info
           </p>
           {isLoading ? (
-            <p className="mt-2 text-sm text-[var(--color-text-secondary)]">
-              Loading theme data…
-            </p>
+            <LoadingMessage className="mt-2 text-sm">Loading theme data…</LoadingMessage>
           ) : (
             <div className="mt-4 space-y-2 text-sm text-[var(--color-text-secondary)]">
               <p>
@@ -163,7 +162,7 @@ export default function ThemesPage() {
         <Suspense
           fallback={
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 text-white">
-              Loading editor…
+              <LoadingMessage className="mt-0 text-white">Loading editor…</LoadingMessage>
             </div>
           }
         >

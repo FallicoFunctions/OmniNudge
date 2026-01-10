@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { hubsService, type Hub } from '../services/hubsService';
 import { redditService } from '../services/redditService';
 import type { SubredditSuggestion } from '../types/reddit';
+import { EmptyMessage, ErrorMessage, LoadingMessage } from '../components/common/StatusMessage';
 
 type CombinedSuggestion =
   | { type: 'subreddit'; data: SubredditSuggestion }
@@ -153,10 +154,12 @@ export default function HubsAndSubsPage() {
                 {shouldShowSuggestions && (
                   <div className="absolute left-0 right-0 top-full z-30 mt-1 overflow-hidden rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] shadow-lg">
                     {isAutocompleteLoading ? (
-                      <div className="px-3 py-2 text-sm text-[var(--color-text-secondary)]">Searching...</div>
+                      <div className="px-3 py-2">
+                        <LoadingMessage className="mt-0 text-sm">Searching...</LoadingMessage>
+                      </div>
                     ) : suggestionItems.length === 0 ? (
-                      <div className="px-3 py-2 text-sm text-[var(--color-text-secondary)]">
-                        No hubs or subreddits found
+                      <div className="px-3 py-2">
+                        <EmptyMessage className="mt-0 text-sm">No hubs or subreddits found.</EmptyMessage>
                       </div>
                     ) : (
                       <ul>
@@ -222,9 +225,9 @@ export default function HubsAndSubsPage() {
                                       r/{subreddit.name}
                                     </span>
                                   </div>
-                                  {typeof subreddit.subscriber_count === 'number' && subreddit.subscriber_count > 0 && (
+                                  {typeof subreddit.subscribers === 'number' && subreddit.subscribers > 0 && (
                                     <span className="ml-auto text-[11px] text-[var(--color-text-secondary)]">
-                                      {subreddit.subscriber_count.toLocaleString()} subs
+                                      {subreddit.subscribers.toLocaleString()} subs
                                     </span>
                                   )}
                                 </button>
@@ -294,16 +297,14 @@ export default function HubsAndSubsPage() {
       {/* Loading State */}
       {isLoading && (
         <div className="flex justify-center py-12">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[var(--color-primary)]"></div>
+          <LoadingMessage>Loading hubs...</LoadingMessage>
         </div>
       )}
 
       {/* Error State */}
       {hasError && !isLoading && (
-        <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
-          <p className="text-red-600">
-            Error loading communities. Please try again later.
-          </p>
+        <div className="p-4">
+          <ErrorMessage>Error loading communities. Please try again later.</ErrorMessage>
         </div>
       )}
 
@@ -312,7 +313,7 @@ export default function HubsAndSubsPage() {
         <>
           {paginatedHubs.length === 0 ? (
             <div className="text-center py-12">
-              <p className="text-[var(--color-text-secondary)]">No hubs found</p>
+              <EmptyMessage>No hubs found.</EmptyMessage>
             </div>
           ) : (
             <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-x-4 gap-y-2 mb-6">

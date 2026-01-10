@@ -6,18 +6,24 @@ import { useSettings } from '../contexts/SettingsContext';
 import { postsService } from '../services/postsService';
 import { savedService } from '../services/savedService';
 import { api } from '../lib/api';
-import { hubsService } from '../services/hubsService';
-import { hubSettingsService } from '../services/hubSettingsService';
-import { redditService } from '../services/redditService';
 import type { PlatformPost, PostComment } from '../types/posts';
-import type { SavedItemsResponse } from '../types/saved';
-import type { RedditSubredditAbout } from '../types/reddit';
 import { CommentItem } from '../components/comments/CommentItem';
 import type { CommentActionHandlers } from '../components/comments/CommentItem';
 import { MarkdownRenderer } from '../components/common/MarkdownRenderer';
 import { formatTimestamp } from '../utils/timeFormat';
 import { decodeHtmlEntities } from '../utils/text';
 import { VoteButtons } from '../components/VoteButtons';
+import { ModMailModal } from '../components/modmail/ModMailModal';
+import HubModeratorsPanel from '../components/hubs/HubModeratorsPanel';
+import HubAboutPanel from '../components/hubs/HubAboutPanel';
+import { useHubModerators } from '../hooks/useHubModerators';
+import { useHubDetails } from '../hooks/useHubDetails';
+import { Panel } from '../components/common/Panel';
+import SubredditAboutPanel from '../components/reddit/SubredditAboutPanel';
+import { useSubredditAbout } from '../hooks/useSubredditAbout';
+import { useSavedItems } from '../hooks/useSavedItems';
+import { getSavedCommentIdSet, getSavedPostIdSet } from '../utils/savedItems';
+import { LoadingMessage } from '../components/common/StatusMessage';
 
 const FORMATTING_EXAMPLES = [
   { input: '*italics*', output: '*italics*' },
@@ -47,6 +53,7 @@ export default function PostDetailPage() {
   const [embedTarget, setEmbedTarget] = useState<PostComment | null>(null);
   const [embedCopied, setEmbedCopied] = useState(false);
   const [imageExpanded, setImageExpanded] = useState(false);
+  const [showModMailModal, setShowModMailModal] = useState(false);
 
   const parsedPostId = postId ? Number(postId) : NaN;
   const focusedCommentId = commentId ? Number(commentId) : null;
@@ -91,29 +98,19 @@ export default function PostDetailPage() {
   const savedPostsKey = ['saved-items', 'posts'] as const;
   const hiddenPostsKey = ['hidden-items', 'posts'] as const;
   const savedSiteCommentsKey = ['saved-items', 'post_comments'] as const;
-  const { data: savedPostsData } = useQuery<SavedItemsResponse>({
-    queryKey: savedPostsKey,
-    queryFn: () => savedService.getSavedItems('posts'),
-    enabled: !!user,
-    staleTime: 1000 * 60 * 5,
-  });
-  const { data: savedSiteCommentsData } = useQuery<SavedItemsResponse>({
-    queryKey: savedSiteCommentsKey,
-    queryFn: () => savedService.getSavedItems('post_comments'),
-    enabled: !!user,
-  });
+  const { data: savedPostsData } = useSavedItems('posts', !!user);
+  const { data: savedSiteCommentsData } = useSavedItems('post_comments', !!user, 1000 * 60 * 5);
 
-  const isPostSaved = useMemo(() => {
-    if (!savedPostsData?.saved_posts || !Number.isFinite(parsedPostId)) {
-      return false;
-    }
-    return savedPostsData.saved_posts.some((post) => post.id === parsedPostId);
-  }, [savedPostsData, parsedPostId]);
+  const savedPostIds = useMemo(() => getSavedPostIdSet(savedPostsData), [savedPostsData]);
+  const isPostSaved = useMemo(
+    () => Number.isFinite(parsedPostId) && savedPostIds.has(parsedPostId),
+    [parsedPostId, savedPostIds]
+  );
 
-  const savedCommentIds = useMemo(() => {
-    const entries = savedSiteCommentsData?.saved_post_comments ?? [];
-    return new Set(entries.map((entry) => entry.comment_id ?? entry.id));
-  }, [savedSiteCommentsData]);
+  const savedCommentIds = useMemo(
+    () => getSavedCommentIdSet(savedSiteCommentsData),
+    [savedSiteCommentsData]
+  );
 
   const handleCreateComment = useMutation({
     mutationFn: (content: string) =>
@@ -244,36 +241,20 @@ export default function PostDetailPage() {
     data: hubDetails,
     isLoading: loadingHubDetails,
     isError: hubDetailsError,
-  } = useQuery({
-    queryKey: ['hub-details', hubName],
-    queryFn: () => hubsService.getHub(hubName!),
-    enabled: Boolean(hubName),
-    staleTime: 1000 * 60 * 5,
-  });
+  } = useHubDetails(hubName, Boolean(hubName));
 
   const {
-    data: hubModeratorsData,
+    moderators: hubModerators,
     isLoading: loadingHubModerators,
     isError: hubModeratorsError,
-  } = useQuery({
-    queryKey: ['hub-moderators', hubName],
-    queryFn: () => hubSettingsService.getHubModerators(hubName!),
-    enabled: Boolean(hubName),
-    staleTime: 1000 * 60 * 5,
-  });
-  const hubModerators = hubModeratorsData?.moderators ?? [];
+  } = useHubModerators(hubName, Boolean(hubName));
 
-  // Fetch subreddit data if this is a subreddit post
   const {
     data: subredditAbout,
     isLoading: loadingSubredditAbout,
     isError: subredditAboutError,
-  } = useQuery<RedditSubredditAbout>({
-    queryKey: ['subreddit-about', targetSubreddit],
-    queryFn: () => redditService.getSubredditAbout(targetSubreddit!),
-    enabled: Boolean(targetSubreddit),
-    staleTime: 1000 * 60 * 10,
-  });
+    iconUrl: subredditIcon,
+  } = useSubredditAbout(targetSubreddit, Boolean(targetSubreddit));
 
   const bodyText = postData?.body ?? postData?.content ?? undefined;
   const mediaUrl = postData?.media_url ?? undefined;
@@ -351,9 +332,9 @@ export default function PostDetailPage() {
 
   if (loadingPost) {
     return (
-      <div className="mx-auto max-w-4xl px-4 py-8">
-        <div className="text-[var(--color-text-secondary)]">Loading post...</div>
-      </div>
+        <div className="mx-auto max-w-4xl px-4 py-8">
+        <LoadingMessage>Loading post...</LoadingMessage>
+        </div>
     );
   }
 
@@ -362,7 +343,7 @@ export default function PostDetailPage() {
       <div className="mt-4 grid gap-6 lg:grid-cols-[minmax(0,1fr)_300px]">
         <div className="space-y-6">
           {postData && (
-            <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-6">
+            <Panel>
               {/* Post Header */}
               <div className="mb-4">
                 <h1 className="text-2xl font-bold text-[var(--color-text-primary)]">{decodedTitle}</h1>
@@ -494,278 +475,176 @@ export default function PostDetailPage() {
                   </button>
                 </div>
               </div>
-            </div>
+            </Panel>
           )}
 
-          <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-6">
-        <h2 className="mb-4 text-xl font-semibold text-[var(--color-text-primary)]">Comments</h2>
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (!user) {
-              window.dispatchEvent(new CustomEvent('open-auth-modal', { detail: 'login' }));
-              return;
-            }
-            if (!commentText.trim()) return;
-            handleCreateComment.mutate(commentText.trim());
-          }}
-          className="mb-6"
-        >
-          <textarea
-            value={commentText}
-            onChange={(e) => setCommentText(e.target.value)}
-            placeholder="Share your thoughts..."
-            rows={4}
-            className="w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-2 text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
-          />
-          <div className="mt-2 flex justify-start text-xs text-[var(--color-text-secondary)]">
-            <button
-              type="button"
-              onClick={() => setShowFormattingHelp((prev) => !prev)}
-              className="hover:text-[var(--color-primary)]"
+          <Panel>
+            <h2 className="mb-4 text-xl font-semibold text-[var(--color-text-primary)]">Comments</h2>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (!user) {
+                  window.dispatchEvent(new CustomEvent('open-auth-modal', { detail: 'login' }));
+                  return;
+                }
+                if (!commentText.trim()) return;
+                handleCreateComment.mutate(commentText.trim());
+              }}
+              className="mb-6"
             >
-              {showFormattingHelp ? 'hide formatting' : 'formatting help'}
-            </button>
-          </div>
-          {showFormattingHelp && (
-            <div className="mt-2 w-[70%] rounded border border-[var(--color-border)] bg-[var(--color-surface)] p-2 text-[13px] text-[var(--color-text-primary)] shadow-sm">
-              <p className="text-sm text-[var(--color-text-primary)]">
-                OmniNudge uses a slightly-customized version of{' '}
-                <a
-                  href="https://www.markdownguide.org/basic-syntax/"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-[var(--color-primary)] underline"
-                >
-                  Markdown
-                </a>{' '}
-                for formatting. See below for formatting help.
-              </p>
-              <div className="mt-2">
-                <table className="w-full border-collapse text-[13px]">
-                  <thead>
-                    <tr className="bg-[#fff9c4] text-[var(--color-text-primary)]">
-                      <th className="border border-[var(--color-border)] px-1 py-1 text-left font-semibold italic">
-                        you type:
-                      </th>
-                      <th className="border border-[var(--color-border)] px-1 py-1 text-left font-semibold italic">
-                        you see:
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {FORMATTING_EXAMPLES.map((example, index) => (
-                      <tr key={index} className="align-top">
-                        <td className="border border-[var(--color-border)] bg-white px-1 py-1 font-mono text-[11px] text-[var(--color-text-primary)]">
-                          <pre className="m-0 whitespace-pre-wrap text-[11px] leading-tight">
-                            {example.input}
-                          </pre>
-                        </td>
-                        <td className="border border-[var(--color-border)] bg-white px-1 py-1">
-                          <MarkdownRenderer content={example.output} className="leading-tight" />
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-          <button
-            type="submit"
-            disabled={handleCreateComment.isPending || !commentText.trim()}
-            className="mt-2 rounded-md bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)] disabled:opacity-50"
-          >
-            {handleCreateComment.isPending ? 'Posting...' : 'Add Comment'}
-          </button>
-        </form>
-
-        {loadingComments && (
-          <div className="text-sm text-[var(--color-text-secondary)]">Loading comments...</div>
-        )}
-
-        {commentNotFound && (
-          <div className="mb-4 rounded border border-yellow-200 bg-yellow-50 p-3 text-sm text-yellow-900">
-            We couldn&apos;t find that comment. It may have been removed.
-          </div>
-        )}
-
-        {focusedCommentId && !commentNotFound && (
-          <div className="mb-4 rounded border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800">
-            <div>You are viewing a single comment&apos;s thread.</div>
-            <button
-              onClick={() =>
-                navigate(hubName ? `/h/${hubName}/comments/${postId}` : `/posts/${postId}`)
-              }
-              className="mt-1 font-semibold text-[var(--color-primary)] hover:underline"
-            >
-              View the rest of the comments →
-            </button>
-          </div>
-        )}
-
-        {commentsList.length === 0 && !loadingComments && (
-          <div className="text-sm text-[var(--color-text-secondary)]">
-            No comments yet. Be the first to comment on this post!
-          </div>
-        )}
-
-        {topLevelComments.length > 0 && (
-          <div className="space-y-4">
-            {topLevelComments.map((comment) => (
-              <CommentItem
-                key={comment.id}
-                comment={comment}
-                allComments={commentsList}
-                replyingTo={replyingTo}
-                onReplySelect={(commentId) => {
-                  if (!user) {
-                    window.dispatchEvent(new CustomEvent('open-auth-modal', { detail: 'login' }));
-                    return;
-                  }
-                  setReplyingTo(commentId);
-                }}
-                onCancelReply={() => setReplyingTo(null)}
-                handlers={commentHandlers}
-                savedCommentIds={savedCommentIds}
-                currentUsername={user?.username}
+              <textarea
+                value={commentText}
+                onChange={(e) => setCommentText(e.target.value)}
+                placeholder="Share your thoughts..."
+                rows={4}
+                className="w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-2 text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
               />
-            ))}
-          </div>
-        )}
-          </div>
+              <div className="mt-2 flex justify-start text-xs text-[var(--color-text-secondary)]">
+                <button
+                  type="button"
+                  onClick={() => setShowFormattingHelp((prev) => !prev)}
+                  className="hover:text-[var(--color-primary)]"
+                >
+                  {showFormattingHelp ? 'hide formatting' : 'formatting help'}
+                </button>
+              </div>
+              {showFormattingHelp && (
+                <div className="mt-2 w-[70%] rounded border border-[var(--color-border)] bg-[var(--color-surface)] p-2 text-[13px] text-[var(--color-text-primary)] shadow-sm">
+                  <p className="text-sm text-[var(--color-text-primary)]">
+                    OmniNudge uses a slightly-customized version of{' '}
+                    <a
+                      href="https://www.markdownguide.org/basic-syntax/"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[var(--color-primary)] underline"
+                    >
+                      Markdown
+                    </a>{' '}
+                    for formatting. See below for formatting help.
+                  </p>
+                  <div className="mt-2">
+                    <table className="w-full border-collapse text-[13px]">
+                      <thead>
+                        <tr className="bg-[#fff9c4] text-[var(--color-text-primary)]">
+                          <th className="border border-[var(--color-border)] px-1 py-1 text-left font-semibold italic">
+                            you type:
+                          </th>
+                          <th className="border border-[var(--color-border)] px-1 py-1 text-left font-semibold italic">
+                            you see:
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {FORMATTING_EXAMPLES.map((example, index) => (
+                          <tr key={index} className="align-top">
+                            <td className="border border-[var(--color-border)] bg-white px-1 py-1 font-mono text-[11px] text-[var(--color-text-primary)]">
+                              <pre className="m-0 whitespace-pre-wrap text-[11px] leading-tight">
+                                {example.input}
+                              </pre>
+                            </td>
+                            <td className="border border-[var(--color-border)] bg-white px-1 py-1">
+                              <MarkdownRenderer content={example.output} className="leading-tight" />
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+              <button
+                type="submit"
+                disabled={handleCreateComment.isPending || !commentText.trim()}
+                className="mt-2 rounded-md bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)] disabled:opacity-50"
+              >
+                {handleCreateComment.isPending ? 'Posting...' : 'Add Comment'}
+              </button>
+            </form>
+
+            {loadingComments && <LoadingMessage>Loading comments...</LoadingMessage>}
+
+            {commentNotFound && (
+              <div className="mb-4 rounded border border-yellow-200 bg-yellow-50 p-3 text-sm text-yellow-900">
+                We couldn&apos;t find that comment. It may have been removed.
+              </div>
+            )}
+
+            {focusedCommentId && !commentNotFound && (
+              <div className="mb-4 rounded border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800">
+                <div>You are viewing a single comment&apos;s thread.</div>
+                <button
+                  onClick={() =>
+                    navigate(hubName ? `/h/${hubName}/comments/${postId}` : `/posts/${postId}`)
+                  }
+                  className="mt-1 font-semibold text-[var(--color-primary)] hover:underline"
+                >
+                  View the rest of the comments →
+                </button>
+              </div>
+            )}
+
+            {commentsList.length === 0 && !loadingComments && (
+              <div className="text-sm text-[var(--color-text-secondary)]">
+                No comments yet. Be the first to comment on this post!
+              </div>
+            )}
+
+            {topLevelComments.length > 0 && (
+              <div className="space-y-4">
+                {topLevelComments.map((comment) => (
+                  <CommentItem
+                    key={comment.id}
+                    comment={comment}
+                    allComments={commentsList}
+                    replyingTo={replyingTo}
+                    onReplySelect={(commentId) => {
+                      if (!user) {
+                        window.dispatchEvent(new CustomEvent('open-auth-modal', { detail: 'login' }));
+                        return;
+                      }
+                      setReplyingTo(commentId);
+                    }}
+                    onCancelReply={() => setReplyingTo(null)}
+                    handlers={commentHandlers}
+                    savedCommentIds={savedCommentIds}
+                    currentUsername={user?.username}
+                  />
+                ))}
+              </div>
+            )}
+          </Panel>
         </div>
 
         {(hubName || targetSubreddit) && (
           <aside className="space-y-4">
             {hubName && (
             <>
-            <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
-              <h3 className="text-sm font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
-                About this hub
-              </h3>
-              {loadingHubDetails ? (
-                <p className="mt-3 text-sm text-[var(--color-text-secondary)]">Loading details…</p>
-              ) : hubDetailsError ? (
-                <p className="mt-3 text-sm text-[var(--color-text-secondary)]">Unable to load hub details.</p>
-              ) : hubDetails ? (
-                <>
-                  {hubDetails.title && (
-                    <p className="mt-2 text-base font-semibold text-[var(--color-text-primary)]">
-                      {hubDetails.title}
-                    </p>
-                  )}
-                  {hubDetails.description ? (
-                    <p className="mt-2 text-sm text-[var(--color-text-primary)]">{hubDetails.description}</p>
-                  ) : (
-                    <p className="mt-2 text-sm text-[var(--color-text-secondary)]">No description provided.</p>
-                  )}
-                  <div className="mt-4 space-y-2 text-xs text-[var(--color-text-secondary)]">
-                    <div className="flex items-center justify-between">
-                      <span className="font-semibold text-[var(--color-text-primary)]">Members</span>
-                      <span>{hubDetails.subscriber_count?.toLocaleString() ?? '—'}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="font-semibold text-[var(--color-text-primary)]">Visibility</span>
-                      <span>{hubDetails.type ? hubDetails.type.charAt(0).toUpperCase() + hubDetails.type.slice(1) : '—'}</span>
-                    </div>
-                    {hubDetails.created_at && (
-                      <div className="flex items-center justify-between">
-                        <span className="font-semibold text-[var(--color-text-primary)]">Created</span>
-                        <span>{new Date(hubDetails.created_at).toLocaleDateString()}</span>
-                      </div>
-                    )}
-                  </div>
-                </>
-              ) : (
-                <p className="mt-3 text-sm text-[var(--color-text-secondary)]">No details available.</p>
-              )}
-            </div>
+            <HubAboutPanel
+              hubDetails={hubDetails}
+              isLoading={loadingHubDetails}
+              isError={hubDetailsError}
+              showStats
+            />
 
-            <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
-              <h3 className="text-sm font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
-                Moderators
-              </h3>
-              {loadingHubModerators ? (
-                <p className="mt-3 text-sm text-[var(--color-text-secondary)]">Loading moderators…</p>
-              ) : hubModeratorsError ? (
-                <p className="mt-3 text-sm text-[var(--color-text-secondary)]">Unable to load moderators.</p>
-              ) : hubModerators.length === 0 ? (
-                <p className="mt-3 text-sm text-[var(--color-text-secondary)]">
-                  No moderators listed yet.
-                </p>
-              ) : (
-                <ul className="mt-3 space-y-2 text-sm text-[var(--color-text-primary)]">
-                  {hubModerators.map((mod) => (
-                    <li key={`${mod.user_id}-${mod.role}`} className="flex items-center justify-between">
-                      <span>{mod.username ?? `User ${mod.user_id}`}</span>
-                      <span className="text-xs uppercase tracking-wide text-[var(--color-text-secondary)]">
-                        {mod.role}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
+            <HubModeratorsPanel
+              moderators={hubModerators}
+              isLoading={loadingHubModerators}
+              isError={hubModeratorsError}
+              hubName={hubName}
+              showMessageButton={Boolean(user && hubName)}
+              onMessageMods={() => setShowModMailModal(true)}
+            />
             </>
             )}
 
             {targetSubreddit && (
               <>
-                <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
-                  <h3 className="text-sm font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
-                    About this subreddit
-                  </h3>
-                  {loadingSubredditAbout ? (
-                    <p className="mt-3 text-sm text-[var(--color-text-secondary)]">Loading details…</p>
-                  ) : subredditAboutError ? (
-                    <p className="mt-3 text-sm text-[var(--color-text-secondary)]">
-                      Unable to load subreddit details.
-                    </p>
-                  ) : subredditAbout ? (
-                    <>
-                      {subredditAbout.public_description ? (
-                        <p className="mt-3 text-sm text-[var(--color-text-primary)]">
-                          {subredditAbout.public_description}
-                        </p>
-                      ) : (
-                        <p className="mt-3 text-sm text-[var(--color-text-secondary)]">
-                          No description provided.
-                        </p>
-                      )}
-                      <div className="mt-4 space-y-2 text-xs text-[var(--color-text-secondary)]">
-                        <div className="flex items-center justify-between">
-                          <span className="font-semibold text-[var(--color-text-primary)]">Members</span>
-                          <span>
-                            {typeof subredditAbout.subscribers === 'number'
-                              ? subredditAbout.subscribers.toLocaleString()
-                              : '—'}
-                          </span>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <span className="font-semibold text-[var(--color-text-primary)]">Online</span>
-                          <span>
-                            {typeof subredditAbout.active_user_count === 'number'
-                              ? subredditAbout.active_user_count.toLocaleString()
-                              : '—'}
-                          </span>
-                        </div>
-                        {subredditAbout.created_utc && (
-                          <div className="flex items-center justify-between">
-                            <span className="font-semibold text-[var(--color-text-primary)]">Created</span>
-                            <span>
-                              {new Date(subredditAbout.created_utc * 1000).toLocaleDateString()}
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                    </>
-                  ) : (
-                    <p className="mt-3 text-sm text-[var(--color-text-secondary)]">
-                      No details available.
-                    </p>
-                  )}
-                </div>
+                <SubredditAboutPanel
+                  about={subredditAbout}
+                  iconUrl={subredditIcon}
+                  isLoading={loadingSubredditAbout}
+                  isError={subredditAboutError}
+                />
 
                 <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
                   <h3 className="text-sm font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
@@ -825,6 +704,9 @@ export default function PostDetailPage() {
             </div>
           </div>
         </div>
+      )}
+      {showModMailModal && hubName && (
+        <ModMailModal hubName={hubName} onClose={() => setShowModMailModal(false)} />
       )}
     </div>
   );

@@ -18,6 +18,7 @@ export interface Hub {
   type: string; // 'public' or 'private'
   content_options: string; // 'any', 'links_only', or 'text_only'
   is_quarantined: boolean;
+  nsfw?: boolean;
   subscriber_count: number;
   created_by?: number;
   created_at: string;

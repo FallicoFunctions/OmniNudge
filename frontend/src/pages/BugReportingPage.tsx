@@ -4,6 +4,8 @@ import { useQuery } from '@tanstack/react-query';
 import { bugReportService, type KnownBug } from '../services/bugReportService';
 import { useAuth } from '../contexts/AuthContext';
 import BugReportModal from '../components/bugReports/BugReportModal';
+import { Panel } from '../components/common/Panel';
+import { EmptyMessage, LoadingMessage } from '../components/common/StatusMessage';
 
 export default function BugReportingPage() {
   const { user } = useAuth();
@@ -101,13 +103,13 @@ export default function BugReportingPage() {
       </div>
 
       {/* Known Bugs Section */}
-      <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-6">
+      <Panel>
         <h2 className="text-2xl font-semibold text-[var(--color-text-primary)] mb-4">Known Bugs</h2>
 
         {isLoading ? (
-          <p className="text-[var(--color-text-secondary)]">Loading known bugs...</p>
+          <LoadingMessage>Loading known bugs...</LoadingMessage>
         ) : knownBugs.length === 0 ? (
-          <p className="text-[var(--color-text-secondary)]">No known bugs at this time.</p>
+          <EmptyMessage>No known bugs at this time.</EmptyMessage>
         ) : (
           <div className="space-y-4">
             {knownBugs.map((bug: KnownBug) => (
@@ -162,7 +164,7 @@ export default function BugReportingPage() {
             ))}
           </div>
         )}
-      </div>
+      </Panel>
 
       <BugReportModal
         isOpen={showModal}

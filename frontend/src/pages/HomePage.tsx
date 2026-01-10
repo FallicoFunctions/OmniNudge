@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { feedService, type CombinedFeedItem, type RedditPost } from '../services/feedService';
+import { keepPreviousData, useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { feedService, type CombinedFeedItem, type HomeFeedResponse, type RedditPost } from '../services/feedService';
 import { useAuth } from '../contexts/AuthContext';
 import { useSettings } from '../contexts/SettingsContext';
 import type { PlatformPost } from '../types/posts';
@@ -11,6 +11,10 @@ import { savedService } from '../services/savedService';
 import { postsService } from '../services/postsService';
 import { subscriptionService } from '../services/subscriptionService';
 import { hubsService } from '../services/hubsService';
+import { OffsetPaginationControls } from '../components/common/OffsetPaginationControls';
+import { useSavedItems } from '../hooks/useSavedItems';
+import { getSavedPostIdSet, getSavedRedditPostIdSet } from '../utils/savedItems';
+import { EmptyMessage, LoadingMessage } from '../components/common/StatusMessage';
 import { createRedditCrosspostPayload } from '../utils/crosspostHelpers';
 import { OMNI_FEED_STORAGE_KEY } from '../constants/storageKeys';
 import { TOP_TIME_OPTIONS } from '../constants/topTimeRange';
@@ -248,7 +252,7 @@ export default function HomePage() {
   const [pageOffset, setPageOffset] = useState(0);
   const pageSize = 50;
   const homeFeedQueryKey = ['home-feed', sort, omniOnly, showPopularFallback, timeRangeKey, pageOffset] as const;
-  const { data, isLoading, isFetching } = useQuery({
+  const { data, isLoading, isFetching } = useQuery<HomeFeedResponse>({
     queryKey: homeFeedQueryKey,
     queryFn: () => {
       const timeOptions =
@@ -267,7 +271,7 @@ export default function HomePage() {
     },
     enabled: !isCustomTopRange || isCustomRangeValid,
     staleTime: 1000 * 60 * 5,
-    keepPreviousData: true,
+    placeholderData: keepPreviousData,
   });
 
   // When sort/time toggles change, reset offset
@@ -288,42 +292,18 @@ export default function HomePage() {
 
   // Saved posts state
   const savedPostsKey = ['saved-items', 'posts'] as const;
-  const { data: savedPostsData } = useQuery({
-    queryKey: savedPostsKey,
-    queryFn: () => savedService.getSavedItems('posts'),
-    enabled: !!user,
-    staleTime: 1000 * 60 * 5,
-  });
+  const { data: savedPostsData } = useSavedItems('posts', !!user);
 
-  const savedPostIds = useMemo(() => {
-    const ids = new Set<number>();
-    if (savedPostsData?.saved_posts) {
-      for (const item of savedPostsData.saved_posts) {
-        ids.add(item.id);
-      }
-    }
-    return ids;
-  }, [savedPostsData]);
+  const savedPostIds = useMemo(() => getSavedPostIdSet(savedPostsData), [savedPostsData]);
 
   // Saved Reddit posts state
   const savedRedditPostsKey = ['saved-items', 'reddit_posts'] as const;
-  const { data: savedRedditPostsData } = useQuery({
-    queryKey: savedRedditPostsKey,
-    queryFn: () => savedService.getSavedItems('reddit_posts'),
-    enabled: !!user,
-    staleTime: 1000 * 60 * 5,
-  });
+  const { data: savedRedditPostsData } = useSavedItems('reddit_posts', !!user);
 
-  const savedRedditPostIds = useMemo(() => {
-    const ids = new Set<string>();
-    if (savedRedditPostsData?.saved_reddit_posts) {
-      for (const item of savedRedditPostsData.saved_reddit_posts) {
-        const key = `${item.subreddit}-${item.reddit_post_id}`;
-        ids.add(key);
-      }
-    }
-    return ids;
-  }, [savedRedditPostsData]);
+  const savedRedditPostIds = useMemo(
+    () => getSavedRedditPostIdSet(savedRedditPostsData),
+    [savedRedditPostsData]
+  );
 
   // Fetch user's subscribed hubs for crossposting
   const { data: subscribedHubs } = useQuery({
@@ -591,10 +571,12 @@ export default function HomePage() {
                 {shouldShowSuggestions && (
                   <div className="absolute left-0 right-0 top-full z-30 mt-1 overflow-hidden rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] shadow-lg">
                     {isAutocompleteLoading ? (
-                      <div className="px-3 py-2 text-sm text-[var(--color-text-secondary)]">Searching...</div>
+                      <div className="px-3 py-2">
+                        <LoadingMessage className="mt-0 text-sm">Searching...</LoadingMessage>
+                      </div>
                     ) : suggestionItems.length === 0 ? (
-                      <div className="px-3 py-2 text-sm text-[var(--color-text-secondary)]">
-                        No hubs or subreddits found
+                      <div className="px-3 py-2">
+                        <EmptyMessage className="mt-0 text-sm">No hubs or subreddits found.</EmptyMessage>
                       </div>
                     ) : (
                       <ul>
@@ -866,7 +848,9 @@ export default function HomePage() {
 
       {/* Posts */}
       {isLoading ? (
-        <div className="text-center text-[var(--color-text-secondary)]">Loading feed...</div>
+        <div className="text-center">
+          <LoadingMessage>Loading feed...</LoadingMessage>
+        </div>
       ) : displayedPosts.length === 0 ? (
         <div className="text-center text-[var(--color-text-secondary)]">
           {user ? (
@@ -962,30 +946,21 @@ export default function HomePage() {
       )}
 
       {/* Pagination Controls */}
-      {!useInfiniteScrollHome && displayedPosts.length > 0 && (hasPrev || hasMore) && (
-        <div className="mt-6 flex items-center justify-between border-t border-[var(--color-border)] pt-4">
-          <button
-            onClick={() => {
-              const newOffset = Math.max(0, pageOffset - pageSize);
-              setPageOffset(newOffset);
-              window.scrollTo({ top: 0, behavior: 'smooth' });
-            }}
-            disabled={!hasPrev || isFetching}
-            className="rounded bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)] disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            ← Previous
-          </button>
-          <button
-            onClick={() => {
-              setPageOffset(pageOffset + pageSize);
-              window.scrollTo({ top: 0, behavior: 'smooth' });
-            }}
-            disabled={!hasMore || isFetching}
-            className="rounded bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)] disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            Next →
-          </button>
-        </div>
+      {!useInfiniteScrollHome && displayedPosts.length > 0 && (
+        <OffsetPaginationControls
+          hasPrev={hasPrev}
+          hasMore={hasMore}
+          isFetching={isFetching}
+          onPrev={() => {
+            const newOffset = Math.max(0, pageOffset - pageSize);
+            setPageOffset(newOffset);
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+          onNext={() => {
+            setPageOffset(pageOffset + pageSize);
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+        />
       )}
 
       {/* Hide Confirmation Modal */}

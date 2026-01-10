@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { savedService } from '../../services/savedService';
@@ -9,6 +9,7 @@ import { PaginationControls } from '../common/PaginationControls';
 import { sanitizeHttpUrl } from '../../utils/crosspostHelpers';
 import { RedditPostCard } from '../reddit/RedditPostCard';
 import { useSettings } from '../../contexts/SettingsContext';
+import { ErrorMessage, LoadingMessage } from '../common/StatusMessage';
 
 type RedditListingData = {
   data?: {
@@ -64,7 +65,7 @@ const isRemovedText = (value?: string | null) => {
   if (!normalized) {
     return false;
   }
-  const stripped = normalized.replace(/[\[\]()]/g, '');
+  const stripped = normalized.replace(/[()\]]/g, '').replace(/\[/g, '');
   return (
     normalized === '[removed]' ||
     normalized === '[deleted]' ||
@@ -207,10 +208,10 @@ export function HiddenItemsView({
     });
   }, [postsNeedingDetails, postDetails]);
 
-  const invalidateHiddenQueries = () => {
+  const invalidateHiddenQueries = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: ['hidden-items', 'all'] });
     queryClient.invalidateQueries({ queryKey: ['hidden-items', 'reddit_posts'] });
-  };
+  }, [queryClient]);
 
   useEffect(() => {
     if (removedHiddenRedditPosts.length === 0) {
@@ -493,14 +494,16 @@ export function HiddenItemsView({
       </div>
 
       {isLoading && (
-        <div className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] p-4 text-sm text-[var(--color-text-secondary)]">
-          Loading hidden content...
+        <div className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
+          <LoadingMessage className="mt-0 text-sm">Loading hidden content...</LoadingMessage>
         </div>
       )}
 
       {loadError && (
-        <div className="rounded-md border border-yellow-200 bg-yellow-50 p-4 text-sm text-yellow-800">
-          Unable to load hidden items right now. Showing the latest cached data.
+        <div className="rounded-md border border-yellow-200 bg-yellow-50 p-4">
+          <ErrorMessage className="mt-0 text-sm text-yellow-800">
+            Unable to load hidden items right now. Showing the latest cached data.
+          </ErrorMessage>
         </div>
       )}
 

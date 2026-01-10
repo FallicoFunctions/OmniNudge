@@ -7,7 +7,7 @@ import { useSettings } from '../contexts/SettingsContext';
 import { savedService } from '../services/savedService';
 import { hubsService } from '../services/hubsService';
 import { redditService } from '../services/redditService';
-import type { LocalRedditComment, RedditSubredditAbout, RedditSubredditModerator } from '../types/reddit';
+import type { LocalRedditComment, RedditSubredditModerator } from '../types/reddit';
 import { formatTimestamp, formatRelativeTime } from '../utils/timeFormat';
 import {
   createRedditCrosspostPayload,
@@ -19,6 +19,15 @@ import { MarkdownRenderer } from '../components/common/MarkdownRenderer';
 import { FlairBadge } from '../components/reddit/FlairBadge';
 import { useRedditBlocklist } from '../contexts/RedditBlockContext';
 import { decodeHtmlEntities } from '../utils/text';
+import { Panel } from '../components/common/Panel';
+import SubredditAboutPanel from '../components/reddit/SubredditAboutPanel';
+import { useSubredditAbout } from '../hooks/useSubredditAbout';
+import { useSavedItems } from '../hooks/useSavedItems';
+import { useHiddenItems } from '../hooks/useHiddenItems';
+import { CrosspostModal } from '../components/common/CrosspostModal';
+import { getSavedRedditCommentIdSetById } from '../utils/savedItems';
+import { EmptyMessage, LoadingMessage, StatusMessage } from '../components/common/StatusMessage';
+import { loadHls } from '../utils/hlsLoader';
 
 interface RedditComment {
   kind: string;
@@ -577,7 +586,7 @@ function LocalCommentView({
 
   const handleSubmitReply = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user) {
+    if (!currentUsername) {
       window.dispatchEvent(new CustomEvent('open-auth-modal', { detail: 'login' }));
       return;
     }
@@ -989,30 +998,22 @@ export default function RedditPostPage() {
     queryFn: () => hubsService.getUserHubs(),
     enabled: !!user,
   });
+  const hubOptions = useMemo(
+    () => hubsData?.hubs?.map((hub) => ({ id: hub.id, name: hub.name })) ?? [],
+    [hubsData]
+  );
 
   // Fetch saved Reddit posts to check if current post is saved
-  const { data: savedPostsData } = useQuery({
-    queryKey: ['saved-items', 'reddit_posts'],
-    queryFn: () => savedService.getSavedItems('reddit_posts'),
-    enabled: !!user,
-  });
+  const { data: savedPostsData } = useSavedItems('reddit_posts', !!user, 1000 * 60 * 5);
 
-  const { data: hiddenPostsData } = useQuery({
-    queryKey: ['hidden-items', 'reddit_posts'],
-    queryFn: () => savedService.getHiddenItems('reddit_posts'),
-    enabled: !!user,
-  });
+  const { data: hiddenPostsData } = useHiddenItems('reddit_posts', !!user, 1000 * 60 * 5);
 
   const {
     data: subredditAbout,
     isLoading: loadingSubredditAbout,
     isError: subredditAboutError,
-  } = useQuery<RedditSubredditAbout>({
-    queryKey: ['subreddit-about', subreddit],
-    queryFn: () => redditService.getSubredditAbout(subreddit!),
-    enabled: Boolean(subreddit),
-    staleTime: 1000 * 60 * 10,
-  });
+    iconUrl: subredditIcon,
+  } = useSubredditAbout(subreddit, Boolean(subreddit));
 
   const {
     data: subredditModeratorsData,
@@ -1028,7 +1029,7 @@ export default function RedditPostPage() {
   });
   const subredditModerators = subredditModeratorsData?.moderators ?? [];
   const moderatorsWarning = subredditModeratorsData?.warning;
-  const subredditIcon = useMemo(() => {
+  const subredditIconFallback = useMemo(() => {
     if (!subredditAbout) return null;
     const candidates = [
       subredditAbout.community_icon,
@@ -1108,8 +1109,7 @@ export default function RedditPostPage() {
     let isMounted = true;
     (async () => {
       try {
-        const hlsModule = await import('hls.js');
-        const Hls = hlsModule.default;
+        const Hls = await loadHls();
         if (Hls?.isSupported && Hls.isSupported()) {
           const instance = new Hls();
           instance.loadSource(videoData.url);
@@ -1123,7 +1123,7 @@ export default function RedditPostPage() {
           console.warn('HLS not supported and no fallback available.');
         }
       } catch (err) {
-        console.error('Failed to load hls.js for HLS playback', err);
+        console.error('Failed to load HLS player for playback', err);
       }
     })();
 
@@ -1182,10 +1182,10 @@ export default function RedditPostPage() {
     enabled: !!subreddit && !!postId && !!user,
   });
 
-  const savedCommentIds = useMemo(() => {
-    const ids = savedCommentsData?.saved_reddit_comments?.map((c) => c.id) ?? [];
-    return new Set(ids);
-  }, [savedCommentsData]);
+  const savedCommentIds = useMemo(
+    () => getSavedRedditCommentIdSetById(savedCommentsData),
+    [savedCommentsData]
+  );
 
   const buildEmbedHtml = (data: EmbedPayload) => {
     const escapeHtml = (value: string) =>
@@ -1397,6 +1397,8 @@ export default function RedditPostPage() {
       alert(`Failed to create crosspost: ${error.message}`);
     },
   });
+  const isCrosspostSubmitDisabled =
+    (!selectedHub && !selectedCrosspostSubreddit) || !crosspostTitle.trim();
 
   const handlePermalink = (commentTarget: LocalRedditComment) => {
     if (!subreddit || !postId) return;
@@ -1533,7 +1535,7 @@ export default function RedditPostPage() {
   if (loadingReddit) {
     return (
       <div className="mx-auto max-w-4xl px-4 py-8">
-        <div className="text-[var(--color-text-secondary)]">Loading post...</div>
+        <LoadingMessage>Loading post...</LoadingMessage>
       </div>
     );
   }
@@ -1544,112 +1546,112 @@ export default function RedditPostPage() {
         <div className="space-y-6">
           {/* Post Content Section */}
           {post && (
-            <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-6 text-left">
-          {isPostHiddenOverall && (
-            <div className="mb-4 rounded border border-yellow-200 bg-yellow-50 p-3 text-sm text-yellow-900">
-              This post is hidden from your main feeds. You can unhide it to make it reappear in Reddit
-              listings.
-              <button
-                type="button"
-                onClick={() => unhidePostMutation.mutate()}
-                disabled={unhidePostMutation.isPending}
-                className="ml-3 font-semibold text-[var(--color-primary)] hover:underline disabled:opacity-60"
-              >
-                {unhidePostMutation.isPending ? 'Unhiding…' : 'Unhide'}
-              </button>
-            </div>
-          )}
-          {isPostAuthorBlocked ? (
-            <div className="text-sm text-[var(--color-text-secondary)]">
-              You blocked u/{post.author}. This post is hidden.
-              <button
-                type="button"
-                onClick={() => unblockRedditUser(post.author)}
-                className="ml-3 text-[var(--color-primary)] hover:underline"
-              >
-                Unblock user
-              </button>
-            </div>
-          ) : (
-            <>
-              {/* Post Header */}
-              <div className="mb-4 text-left">
-                <div className="flex flex-wrap items-start gap-2">
-                  <h1 className="flex-1 text-left text-2xl font-bold text-[var(--color-text-primary)]">
-                    {isExternalLink ? (
-                      <a
-                        href={sanitizedExternalLink}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="hover:text-[var(--color-primary)]"
-                      >
-                        {decodedTitle}
-                      </a>
-                    ) : (
-                      decodedTitle
-                    )}
-                  </h1>
-                  {isExternalLink && (
-                    <a
-                      href={sanitizedExternalLink}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 rounded border border-[var(--color-border)] px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary)] hover:border-[var(--color-primary)] hover:text-[var(--color-primary)]"
-                    >
-                      {externalDomain ?? 'external'}
-                      <svg className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                        <path
-                          fillRule="evenodd"
-                          d="M4.25 5.5a.75.75 0 00-.75.75v8.5c0 .414.336.75.75.75h8.5a.75.75 0 00.75-.75v-4a.75.75 0 011.5 0v4A2.25 2.25 0 0112.75 17h-8.5A2.25 2.25 0 012 14.75v-8.5A2.25 2.25 0 014.25 4h5a.75.75 0 010 1.5h-5z"
-                          clipRule="evenodd"
-                        />
-                        <path
-                          fillRule="evenodd"
-                          d="M6.194 12.753a.75.75 0 001.06.053L16.5 4.44v2.81a.75.75 0 001.5 0v-4.5a.75.75 0 00-.75-.75h-4.5a.75.75 0 000 1.5h2.553l-9.056 8.194a.75.75 0 00-.053 1.06z"
-                          clipRule="evenodd"
-                        />
-                      </svg>
-                    </a>
-                  )}
-                  <FlairBadge
-                    text={post.link_flair_text}
-                    backgroundColor={post.link_flair_background_color}
-                    textColor={post.link_flair_text_color}
-                  />
-                </div>
-                <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-[var(--color-text-secondary)]">
-                  <Link
-                    to={`/r/${post.subreddit}`}
-                    className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+            <Panel className="text-left">
+              {isPostHiddenOverall && (
+                <div className="mb-4 rounded border border-yellow-200 bg-yellow-50 p-3 text-sm text-yellow-900">
+                  This post is hidden from your main feeds. You can unhide it to make it reappear in Reddit
+                  listings.
+                  <button
+                    type="button"
+                    onClick={() => unhidePostMutation.mutate()}
+                    disabled={unhidePostMutation.isPending}
+                    className="ml-3 font-semibold text-[var(--color-primary)] hover:underline disabled:opacity-60"
                   >
-                    r/{post.subreddit}
-                  </Link>
-                  <span>•</span>
-                  <span>
-                    Posted by{' '}
-                    <Link
-                      to={`/user/${post.author}`}
-                      className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
-                    >
-                      u/{post.author}
-                    </Link>
-                  </span>
-                  <span>•</span>
-                  <span>submitted {formatTimestamp(post.created_utc, useRelativeTime)}</span>
-                  {!isPostAuthorBlocked && (
-                    <>
-                      <span>•</span>
-                      <button
-                        type="button"
-                        onClick={() => blockRedditUser(post.author)}
+                    {unhidePostMutation.isPending ? 'Unhiding…' : 'Unhide'}
+                  </button>
+                </div>
+              )}
+              {isPostAuthorBlocked ? (
+                <div className="text-sm text-[var(--color-text-secondary)]">
+                  You blocked u/{post.author}. This post is hidden.
+                  <button
+                    type="button"
+                    onClick={() => unblockRedditUser(post.author)}
+                    className="ml-3 text-[var(--color-primary)] hover:underline"
+                  >
+                    Unblock user
+                  </button>
+                </div>
+              ) : (
+                <>
+                  {/* Post Header */}
+                  <div className="mb-4 text-left">
+                    <div className="flex flex-wrap items-start gap-2">
+                      <h1 className="flex-1 text-left text-2xl font-bold text-[var(--color-text-primary)]">
+                        {isExternalLink ? (
+                          <a
+                            href={sanitizedExternalLink}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="hover:text-[var(--color-primary)]"
+                          >
+                            {decodedTitle}
+                          </a>
+                        ) : (
+                          decodedTitle
+                        )}
+                      </h1>
+                      {isExternalLink && (
+                        <a
+                          href={sanitizedExternalLink}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 rounded border border-[var(--color-border)] px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary)] hover:border-[var(--color-primary)] hover:text-[var(--color-primary)]"
+                        >
+                          {externalDomain ?? 'external'}
+                          <svg className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                            <path
+                              fillRule="evenodd"
+                              d="M4.25 5.5a.75.75 0 00-.75.75v8.5c0 .414.336.75.75.75h8.5a.75.75 0 00.75-.75v-4a.75.75 0 011.5 0v4A2.25 2.25 0 0112.75 17h-8.5A2.25 2.25 0 012 14.75v-8.5A2.25 2.25 0 014.25 4h5a.75.75 0 010 1.5h-5z"
+                              clipRule="evenodd"
+                            />
+                            <path
+                              fillRule="evenodd"
+                              d="M6.194 12.753a.75.75 0 001.06.053L16.5 4.44v2.81a.75.75 0 001.5 0v-4.5a.75.75 0 00-.75-.75h-4.5a.75.75 0 000 1.5h2.553l-9.056 8.194a.75.75 0 00-.053 1.06z"
+                              clipRule="evenodd"
+                            />
+                          </svg>
+                        </a>
+                      )}
+                      <FlairBadge
+                        text={post.link_flair_text}
+                        backgroundColor={post.link_flair_background_color}
+                        textColor={post.link_flair_text_color}
+                      />
+                    </div>
+                    <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-[var(--color-text-secondary)]">
+                      <Link
+                        to={`/r/${post.subreddit}`}
                         className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
                       >
-                        block user
-                      </button>
-                    </>
-                  )}
-                </div>
-              </div>
+                        r/{post.subreddit}
+                      </Link>
+                      <span>•</span>
+                      <span>
+                        Posted by{' '}
+                        <Link
+                          to={`/user/${post.author}`}
+                          className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+                        >
+                          u/{post.author}
+                        </Link>
+                      </span>
+                      <span>•</span>
+                      <span>submitted {formatTimestamp(post.created_utc, useRelativeTime)}</span>
+                      {!isPostAuthorBlocked && (
+                        <>
+                          <span>•</span>
+                          <button
+                            type="button"
+                            onClick={() => blockRedditUser(post.author)}
+                            className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+                          >
+                            block user
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
 
               {/* Post Media/Content */}
               {post && inlineImage ? (
@@ -1827,13 +1829,13 @@ export default function RedditPostPage() {
                   crosspost
                 </button>
               </div>
-            </>
+                </>
+              )}
+            </Panel>
           )}
-        </div>
-      )}
 
       {/* Unified Comments Section */}
-      <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-6 text-left">
+      <Panel className="text-left">
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <h2 className="text-xl font-semibold text-[var(--color-text-primary)]">
             Comments
@@ -1932,14 +1934,12 @@ export default function RedditPostPage() {
 
         {/* Loading states */}
         {(loadingLocal || loadingReddit) && (
-          <div className="text-sm text-[var(--color-text-secondary)]">Loading comments...</div>
+          <LoadingMessage>Loading comments...</LoadingMessage>
         )}
 
         {/* Empty state */}
         {!loadingLocal && !loadingReddit && localCommentsData && localCommentsData.length === 0 && redditComments && redditComments.length === 0 && !focusedCommentId && (
-          <div className="text-sm text-[var(--color-text-secondary)]">
-            No comments yet. Be the first to comment on this post!
-          </div>
+          <EmptyMessage>No comments yet. Be the first to comment on this post!</EmptyMessage>
         )}
 
         {commentNotFound && (
@@ -2024,86 +2024,28 @@ export default function RedditPostPage() {
                 );
               })}
             </div>
-          </div>
+          </Panel>
         </div>
 
         {subreddit && (
           <aside className="space-y-4">
-            <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
-              <h3 className="text-sm font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
-                About this subreddit
-              </h3>
-              {loadingSubredditAbout ? (
-                <p className="mt-3 text-sm text-[var(--color-text-secondary)]">Loading details…</p>
-              ) : subredditAboutError ? (
-                <p className="mt-3 text-sm text-[var(--color-text-secondary)]">Unable to load subreddit details.</p>
-              ) : subredditAbout ? (
-                <>
-                  {subredditIcon && (
-                    <img
-                      src={subredditIcon}
-                      alt=""
-                      className="mt-3 h-12 w-12 rounded-full object-cover"
-                      loading="lazy"
-                    />
-                  )}
-                  {subredditAbout.public_description ? (
-                    <p className="mt-3 text-sm text-[var(--color-text-primary)]">
-                      {subredditAbout.public_description}
-                    </p>
-                  ) : (
-                    <p className="mt-3 text-sm text-[var(--color-text-secondary)]">No description provided.</p>
-                  )}
-                  <div className="mt-4 space-y-2 text-xs text-[var(--color-text-secondary)]">
-                    <div className="flex items-center justify-between">
-                      <span className="font-semibold text-[var(--color-text-primary)]">
-                        Members
-                      </span>
-                      <span>
-                        {typeof subredditAbout.subscribers === 'number'
-                          ? subredditAbout.subscribers.toLocaleString()
-                          : '—'}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="font-semibold text-[var(--color-text-primary)]">
-                        Online
-                      </span>
-                      <span>
-                        {typeof subredditAbout.active_user_count === 'number'
-                          ? subredditAbout.active_user_count.toLocaleString()
-                          : '—'}
-                      </span>
-                    </div>
-                    {subredditAbout.created_utc && (
-                      <div className="flex items-center justify_between">
-                        <span className="font-semibold text-[var(--color-text-primary)]">
-                          Created
-                        </span>
-                        <span>
-                          {new Date(subredditAbout.created_utc * 1000).toLocaleDateString()}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                </>
-              ) : (
-                <p className="mt-3 text-sm text-[var(--color-text-secondary)]">No details available.</p>
-              )}
-            </div>
+            <SubredditAboutPanel
+              about={subredditAbout}
+              iconUrl={subredditIcon ?? subredditIconFallback}
+              isLoading={loadingSubredditAbout}
+              isError={subredditAboutError}
+            />
 
             <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
               <h3 className="text-sm font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
                 Moderators
               </h3>
               {loadingSubredditModerators ? (
-                <p className="mt-3 text-sm text-[var(--color-text-secondary)]">Loading moderators…</p>
+                <LoadingMessage className="mt-3 text-sm">Loading moderators…</LoadingMessage>
               ) : moderatorsWarning ? (
-                <p className="mt-3 text_sm text-[var(--color-text-secondary)]">{moderatorsWarning}</p>
+                <StatusMessage className="mt-3 text-sm">{moderatorsWarning}</StatusMessage>
               ) : subredditModerators.length === 0 ? (
-                <p className="mt-3 text-sm text-[var(--color-text-secondary)]">
-                  No moderators listed.
-                </p>
+                <EmptyMessage className="mt-3 text-sm">No moderators listed.</EmptyMessage>
               ) : (
                 <ul className="mt-3 space-y-2 text-sm text-[var(--color-text-primary)]">
                   {subredditModerators.map((mod) => (
@@ -2203,95 +2145,23 @@ export default function RedditPostPage() {
         </div>
       )}
 
-      {/* Crosspost Modal */}
-      {showCrosspostModal && post && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
-          <div className="w-full max-w-md rounded-lg bg-white p-4 shadow-lg">
-            <div className="flex items-start justify-between">
-              <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">Submit a Crosspost</h3>
-              <button
-                onClick={resetCrosspostState}
-                className="text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
-              >
-                ✕
-              </button>
-            </div>
-            <div className="mt-3 rounded border border-yellow-200 bg-yellow-50 p-3 text-sm text-yellow-800">
-              <p>You can crosspost to an OmniHub, a subreddit, or both. At least one destination is required.</p>
-            </div>
-            <div className="mt-4 space-y-3">
-              <div>
-                <label className="mb-1 block text-xs font-medium text-[var(--color-text-secondary)]">
-                  Crosspost to OmniHub (optional)
-                </label>
-                <select
-                  value={selectedHub}
-                  onChange={(e) => setSelectedHub(e.target.value)}
-                  className="w-full rounded border border-[var(--color-border)] bg-[var(--color-surface)] p-2 text-sm text-[var(--color-text-primary)]"
-                >
-                  <option value="">Select a hub...</option>
-                  {hubsData?.hubs?.map((hub) => (
-                    <option key={hub.id} value={hub.name}>
-                      h/{hub.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="mb-1 block text-xs font-medium text-[var(--color-text-secondary)]">
-                  Crosspost to subreddit (optional)
-                </label>
-                <input
-                  type="text"
-                  value={selectedCrosspostSubreddit}
-                  onChange={(e) => setSelectedCrosspostSubreddit(e.target.value)}
-                  placeholder="e.g., cats, technology, AskReddit"
-                  className="w-full rounded border border-[var(--color-border)] bg-[var(--color-surface)] p-2 text-sm text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)]"
-                />
-              </div>
-              <div>
-                <label className="mb-1 block text-xs font-medium text-[var(--color-text-secondary)]">
-                  Choose a title <span className="text-red-500">*required</span>
-                </label>
-                <input
-                  type="text"
-                  value={crosspostTitle}
-                  onChange={(e) => setCrosspostTitle(e.target.value)}
-                  className="w-full rounded border border-[var(--color-border)] bg-[var(--color-surface)] p-2 text-sm text-[var(--color-text-primary)]"
-                  placeholder="Enter title..."
-                />
-              </div>
-              <div className="flex items-start gap-2">
-                <input
-                  type="checkbox"
-                  id="post-send-replies"
-                  checked={sendRepliesToInbox}
-                  onChange={(e) => setSendRepliesToInbox(e.target.checked)}
-                  className="mt-0.5"
-                />
-                <label htmlFor="post-send-replies" className="text-sm text-[var(--color-text-primary)]">
-                  Send replies to this post to my inbox
-                </label>
-              </div>
-              <div className="flex justify-end gap-2 pt-2">
-                <button
-                  onClick={resetCrosspostState}
-                  className="rounded border border-[var(--color-border)] px-4 py-2 text-sm font-semibold text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-elevated)]"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={() => crosspostMutation.mutate()}
-                  disabled={(!selectedHub && !selectedCrosspostSubreddit) || !crosspostTitle.trim() || crosspostMutation.isPending}
-                  className="rounded bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)] disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {crosspostMutation.isPending ? 'Submitting...' : 'Submit'}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <CrosspostModal
+        isOpen={showCrosspostModal && Boolean(post)}
+        onClose={resetCrosspostState}
+        hubOptions={hubOptions}
+        allowSubredditInput
+        hubValue={selectedHub}
+        subredditValue={selectedCrosspostSubreddit}
+        titleValue={crosspostTitle}
+        sendRepliesToInbox={sendRepliesToInbox}
+        onHubChange={setSelectedHub}
+        onSubredditChange={setSelectedCrosspostSubreddit}
+        onTitleChange={setCrosspostTitle}
+        onToggleSendReplies={setSendRepliesToInbox}
+        onSubmit={() => crosspostMutation.mutate()}
+        isSubmitting={crosspostMutation.isPending}
+        isSubmitDisabled={isCrosspostSubmitDisabled}
+      />
     </div>
   );
 }

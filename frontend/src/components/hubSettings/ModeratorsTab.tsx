@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { hubSettingsService } from '../../services/hubSettingsService';
 import type { ModeratorRole } from '../../types/hubSettings';
+import { LoadingMessage } from '../common/StatusMessage';
 
 interface Props {
   hubName: string;
@@ -57,7 +58,11 @@ export default function ModeratorsTab({ hubName, isOwner }: Props) {
   };
 
   if (isLoading) {
-    return <div className="text-center py-8 text-[var(--color-text-secondary)]">Loading...</div>;
+    return (
+      <div className="text-center py-8">
+        <LoadingMessage>Loading...</LoadingMessage>
+      </div>
+    );
   }
 
   const moderators = moderatorsData?.moderators || [];

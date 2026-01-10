@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { subscriptionService } from '../../services/subscriptionService';
 import { formatTimestamp } from '../../utils/timeFormat';
 import { useSettings } from '../../contexts/SettingsContext';
+import { EmptyMessage, ErrorMessage, LoadingMessage } from '../common/StatusMessage';
 
 interface SubscribedViewProps {
   withContainer?: boolean;
@@ -41,13 +42,13 @@ export default function SubscribedView({
       )}
 
       {isLoading ? (
-        <p className="text-sm text-[var(--color-text-secondary)]">Loading subscriptions...</p>
+        <LoadingMessage className="text-sm">Loading subscriptions...</LoadingMessage>
       ) : hasError ? (
-        <p className="text-sm text-[var(--color-error)]">Failed to load subscriptions.</p>
+        <ErrorMessage className="text-sm text-[var(--color-error)]">Failed to load subscriptions.</ErrorMessage>
       ) : hubs.length === 0 && subreddits.length === 0 ? (
-        <p className="text-sm text-[var(--color-text-secondary)]">
+        <EmptyMessage className="text-sm">
           No subscriptions yet. Subscribe to hubs or subreddits to see them here.
-        </p>
+        </EmptyMessage>
       ) : (
         <div className="grid gap-6 lg:grid-cols-2">
           {/* Hubs Column */}
@@ -56,9 +57,7 @@ export default function SubscribedView({
               Hubs ({hubs.length})
             </h3>
             {hubs.length === 0 ? (
-              <p className="text-sm text-[var(--color-text-secondary)]">
-                No hub subscriptions yet.
-              </p>
+              <EmptyMessage className="text-sm">No hub subscriptions yet.</EmptyMessage>
             ) : (
               <div className="space-y-2">
                 {hubs.map((subscription) => {
@@ -97,9 +96,7 @@ export default function SubscribedView({
               Subreddits ({subreddits.length})
             </h3>
             {subreddits.length === 0 ? (
-              <p className="text-sm text-[var(--color-text-secondary)]">
-                No subreddit subscriptions yet.
-              </p>
+              <EmptyMessage className="text-sm">No subreddit subscriptions yet.</EmptyMessage>
             ) : (
               <div className="space-y-2">
                 {subreddits.map((subscription) => (

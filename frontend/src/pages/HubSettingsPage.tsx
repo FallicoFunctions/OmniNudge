@@ -8,6 +8,7 @@ import ContentSettingsTab from '../components/hubSettings/ContentSettingsTab';
 import ModerationSettingsTab from '../components/hubSettings/ModerationSettingsTab';
 import ModeratorsTab from '../components/hubSettings/ModeratorsTab';
 import ThemeTab from '../components/hubSettings/ThemeTab';
+import { LoadingMessage, EmptyMessage } from '../components/common/StatusMessage';
 
 type TabType = 'general' | 'content' | 'moderation' | 'moderators' | 'theme';
 
@@ -58,10 +59,7 @@ export default function HubSettingsPage() {
   if (settingsLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[var(--color-primary)] mx-auto"></div>
-          <p className="mt-4 text-[var(--color-text-secondary)]">Loading settings...</p>
-        </div>
+        <LoadingMessage>Loading settings...</LoadingMessage>
       </div>
     );
   }
@@ -69,9 +67,7 @@ export default function HubSettingsPage() {
   if (!settings) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-[var(--color-text-primary)]">Settings not found</p>
-        </div>
+        <EmptyMessage>Settings not found.</EmptyMessage>
       </div>
     );
   }

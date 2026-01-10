@@ -6,6 +6,7 @@ import { encryptionService } from '../../services/encryptionService';
 import { getOwnKeys, getUserPublicKey } from '../../services/keyManagementService';
 import { encryptForMultipleRecipients, type MultiRecipientEncryptionResult } from '../../utils/encryption';
 import { useAuth } from '../../contexts/AuthContext';
+import { Modal } from '../common/Modal';
 
 interface ModMailModalProps {
   hubName: string;
@@ -145,8 +146,12 @@ export function ModMailModal({ hubName, onClose }: ModMailModalProps) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4">
-      <div className="bg-[var(--color-surface-elevated)] rounded-lg shadow-xl max-w-2xl w-full p-6">
+    <Modal
+      isOpen
+      onClose={onClose}
+      overlayClassName="bg-black/40"
+      className="bg-[var(--color-surface-elevated)] rounded-lg shadow-xl max-w-2xl w-full p-6"
+    >
         <div className="flex justify-between items-start mb-4">
           <div>
             <h3 className="text-xl font-semibold">Message the Moderators</h3>
@@ -229,7 +234,6 @@ export function ModMailModal({ hubName, onClose }: ModMailModalProps) {
             </button>
           </div>
         </form>
-      </div>
-    </div>
+    </Modal>
   );
 }

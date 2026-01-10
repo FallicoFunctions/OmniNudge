@@ -28,9 +28,15 @@ import type {
 } from '../types/reddit';
 import { SubscribeButton } from '../components/common/SubscribeButton';
 import { RedditPostCard } from '../components/reddit/RedditPostCard';
+import SubredditAboutPanel from '../components/reddit/SubredditAboutPanel';
 import { TOP_TIME_OPTIONS } from '../constants/topTimeRange';
 import type { TopTimeRange } from '../constants/topTimeRange';
 import { searchPlatformPosts } from '../services/platformSearchService';
+import { useSubredditAbout } from '../hooks/useSubredditAbout';
+import { useSavedItems } from '../hooks/useSavedItems';
+import { useHiddenItems } from '../hooks/useHiddenItems';
+import { getHiddenPostIdSet, getSavedPostIdSet, getSavedRedditPostIdSet } from '../utils/savedItems';
+import { EmptyMessage, LoadingMessage } from '../components/common/StatusMessage';
 
 interface FeedRedditPost extends RedditCrosspostSource {
   id: string;
@@ -218,11 +224,7 @@ export default function RedditPage() {
   const error = useInfiniteScrollSubs ? infiniteRedditQuery.error : paginatedRedditQuery.error;
 
   // Fetch hidden Reddit posts
-  const { data: hiddenPostsData } = useQuery({
-    queryKey: ['hidden-items', 'reddit_posts'],
-    queryFn: () => savedService.getHiddenItems('reddit_posts'),
-    enabled: !!user,
-  });
+  const { data: hiddenPostsData } = useHiddenItems('reddit_posts', !!user, 1000 * 60 * 5);
 
   // Fetch user's subscribed hubs for crossposting
   const { data: subscribedHubs } = useQuery({
@@ -297,24 +299,16 @@ export default function RedditPage() {
   });
 
   const savedLocalPostsKey = ['saved-items', 'posts'] as const;
-  const { data: savedLocalPostsData } = useQuery({
-    queryKey: savedLocalPostsKey,
-    queryFn: () => savedService.getSavedItems('posts'),
-    enabled: !!user,
-  });
+  const { data: savedLocalPostsData } = useSavedItems('posts', !!user, 1000 * 60 * 5);
   const savedLocalPostIds = useMemo(
-    () => new Set(savedLocalPostsData?.saved_posts?.map((post) => post.id) ?? []),
+    () => getSavedPostIdSet(savedLocalPostsData),
     [savedLocalPostsData]
   );
 
   const hiddenLocalPostsKey = ['hidden-items', 'posts'] as const;
-  const { data: hiddenLocalPostsData } = useQuery({
-    queryKey: hiddenLocalPostsKey,
-    queryFn: () => savedService.getHiddenItems('posts'),
-    enabled: !!user,
-  });
+  const { data: hiddenLocalPostsData } = useHiddenItems('posts', !!user, 1000 * 60 * 5);
   const hiddenLocalPostIds = useMemo(
-    () => new Set(hiddenLocalPostsData?.hidden_posts?.map((post) => post.id) ?? []),
+    () => getHiddenPostIdSet(hiddenLocalPostsData),
     [hiddenLocalPostsData]
   );
 
@@ -324,18 +318,12 @@ export default function RedditPage() {
   }, [localPostsData?.posts, hiddenLocalPostIds]);
 
   const savedRedditPostsKey = ['saved-items', 'reddit_posts'] as const;
-  const { data: savedRedditPostsData } = useQuery({
-    queryKey: savedRedditPostsKey,
-    queryFn: () => savedService.getSavedItems('reddit_posts'),
-    enabled: !!user,
-  });
+  const { data: savedRedditPostsData } = useSavedItems('reddit_posts', !!user, 1000 * 60 * 5);
 
-  const savedRedditPostIds = useMemo(() => {
-    const ids = savedRedditPostsData?.saved_reddit_posts?.map(
-      (post) => `${post.subreddit}-${post.reddit_post_id}`
-    );
-    return new Set(ids ?? []);
-  }, [savedRedditPostsData]);
+  const savedRedditPostIds = useMemo(
+    () => getSavedRedditPostIdSet(savedRedditPostsData),
+    [savedRedditPostsData]
+  );
 
   const filteredRedditPosts = useMemo(() => {
     if (!data?.posts) {
@@ -768,12 +756,8 @@ export default function RedditPage() {
     data: subredditAbout,
     isLoading: loadingSubredditAbout,
     isError: aboutError,
-  } = useQuery<RedditSubredditAbout>({
-    queryKey: ['subreddit-about', subreddit],
-    queryFn: () => redditService.getSubredditAbout(subreddit),
-    enabled: shouldShowSubredditSidebar,
-    staleTime: 1000 * 60 * 10,
-  });
+    iconUrl: subredditIcon,
+  } = useSubredditAbout(subreddit, shouldShowSubredditSidebar);
 
   // Reddit's public API does not provide moderator lists without OAuth
 
@@ -782,10 +766,7 @@ export default function RedditPage() {
     [subredditAbout?.description_html]
   );
   const sidebarRef = useRef<HTMLDivElement>(null);
-  const subredditIcon = useMemo(
-    () => normalizeSubredditIcon(subredditAbout),
-    [subredditAbout]
-  );
+  const fallbackSubredditIcon = useMemo(() => normalizeSubredditIcon(subredditAbout), [subredditAbout]);
 
   const {
     data: subredditSuggestions,
@@ -1085,13 +1066,15 @@ export default function RedditPage() {
               />
               {shouldShowSuggestions && (
                 <div className="absolute left-0 right-0 top-full z-30 mt-1 overflow-hidden rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] shadow-lg">
-                  {isAutocompleteLoading ? (
-                    <div className="px-3 py-2 text-sm text-[var(--color-text-secondary)]">Searching...</div>
-                  ) : suggestionItems.length === 0 ? (
-                    <div className="px-3 py-2 text-sm text-[var(--color-text-secondary)]">
-                      No subreddits found
-                    </div>
-                  ) : (
+                    {isAutocompleteLoading ? (
+                      <div className="px-3 py-2">
+                        <LoadingMessage className="mt-0 text-sm">Searching...</LoadingMessage>
+                      </div>
+                    ) : suggestionItems.length === 0 ? (
+                      <div className="px-3 py-2">
+                        <EmptyMessage className="mt-0 text-sm">No subreddits found.</EmptyMessage>
+                      </div>
+                    ) : (
                     <ul>
                       {suggestionItems.map((suggestion) => (
                         <li key={suggestion.name}>
@@ -1294,7 +1277,9 @@ export default function RedditPage() {
 
       {/* Posts List */}
       {isLoading && (
-        <div className="text-center text-[var(--color-text-secondary)]">Loading posts...</div>
+        <div className="text-center">
+          <LoadingMessage>Loading posts...</LoadingMessage>
+        </div>
       )}
 
       {error && (
@@ -1794,20 +1779,22 @@ export default function RedditPage() {
             )
           ) : (
             !isLoading && (
-              <div className="text-center text-[var(--color-text-secondary)]">
-                {postSearchQuery
-                  ? `No posts match "${postSearchQuery}"`
-                  : showOmniOnly
-                  ? `No Omni posts found in r/${subreddit}`
-                  : `No posts found in r/${subreddit}`}
+              <div className="text-center">
+                <EmptyMessage>
+                  {postSearchQuery
+                    ? `No posts match "${postSearchQuery}"`
+                    : showOmniOnly
+                    ? `No Omni posts found in r/${subreddit}`
+                    : `No posts found in r/${subreddit}`}
+                </EmptyMessage>
               </div>
             )
           )}
 
           {/* Loading indicator for infinite scroll */}
           {useInfiniteScrollSubs && infiniteRedditQuery.isFetchingNextPage && (
-            <div className="mt-6 text-center text-[var(--color-text-secondary)]">
-              Loading more posts...
+            <div className="mt-6 text-center">
+              <LoadingMessage>Loading more posts...</LoadingMessage>
             </div>
           )}
 
@@ -1862,80 +1849,14 @@ export default function RedditPage() {
                 </div>
               </div>
 
-              <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
-                <h3 className="text-sm font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
-                  About this subreddit
-                </h3>
-                {loadingSubredditAbout ? (
-                  <p className="mt-3 text-sm text-[var(--color-text-secondary)]">Loading details…</p>
-                ) : aboutError ? (
-                  <p className="mt-3 text-sm text-[var(--color-text-secondary)]">
-                    Unable to load subreddit details.
-                  </p>
-                ) : subredditAbout ? (
-                  <>
-                    {subredditIcon && (
-                      <img
-                        src={subredditIcon}
-                        alt=""
-                        className="mt-3 h-12 w-12 rounded-full object-cover"
-                        loading="lazy"
-                      />
-                    )}
-                    {sidebarHtml ? (
-                      <div
-                        ref={sidebarRef}
-                        className="reddit-sidebar-content mt-3"
-                        dangerouslySetInnerHTML={{ __html: sidebarHtml }}
-                      />
-                    ) : subredditAbout.public_description ? (
-                      <p className="mt-3 text-sm text-[var(--color-text-primary)]">
-                        {subredditAbout.public_description}
-                      </p>
-                    ) : (
-                      <p className="mt-3 text-sm text-[var(--color-text-secondary)]">
-                        No description provided.
-                      </p>
-                    )}
-                    <div className="mt-4 space-y-2 text-xs text-[var(--color-text-secondary)]">
-                      <div className="flex items-center justify-between">
-                        <span className="font-semibold text-[var(--color-text-primary)]">
-                          Members
-                        </span>
-                        <span>
-                          {typeof subredditAbout.subscribers === 'number'
-                            ? subredditAbout.subscribers.toLocaleString()
-                            : '—'}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="font-semibold text-[var(--color-text-primary)]">
-                          Online
-                        </span>
-                        <span>
-                          {typeof subredditAbout.active_user_count === 'number'
-                            ? subredditAbout.active_user_count.toLocaleString()
-                            : '—'}
-                        </span>
-                      </div>
-                      {subredditAbout.created_utc && (
-                        <div className="flex items-center justify-between">
-                          <span className="font-semibold text-[var(--color-text-primary)]">
-                            Created
-                          </span>
-                          <span>
-                            {new Date(subredditAbout.created_utc * 1000).toLocaleDateString()}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  </>
-                ) : (
-                  <p className="mt-3 text-sm text-[var(--color-text-secondary)]">
-                    No details available.
-                  </p>
-                )}
-              </div>
+              <SubredditAboutPanel
+                about={subredditAbout}
+                iconUrl={subredditIcon ?? fallbackSubredditIcon}
+                isLoading={loadingSubredditAbout}
+                isError={aboutError}
+                sidebarHtml={sidebarHtml}
+                sidebarRef={sidebarRef}
+              />
 
               <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
                 <h3 className="text-sm font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
