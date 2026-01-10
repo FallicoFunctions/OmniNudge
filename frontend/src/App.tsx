@@ -63,6 +63,8 @@ function App() {
                   />
                   <Route path="/user/:username" element={<RedditUserPage />} />
                   <Route path="/h/:hubname" element={<HubPage />} />
+                  <Route path="/h/:hubname/comments/:postId" element={<PostDetailPage />} />
+                  <Route path="/h/:hubname/comments/:postId/:commentId" element={<PostDetailPage />} />
                   <Route path="/posts/:postId" element={<PostDetailPage />} />
                   <Route path="/posts/:postId/comments/:commentId" element={<PostDetailPage />} />
                   <Route path="/users/:username" element={<UserProfilePage />} />

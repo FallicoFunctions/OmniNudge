@@ -198,7 +198,10 @@ export default function PostDetailPage() {
       alert('Thanks! The moderation team has been notified.');
     },
     permalink: (comment) => {
-      navigate(`/posts/${postId}/comments/${comment.id}`);
+      const url = hubName
+        ? `/h/${hubName}/comments/${postId}/${comment.id}`
+        : `/posts/${postId}/comments/${comment.id}`;
+      navigate(url);
     },
     embed: (comment) => {
       setEmbedCopied(false);
@@ -228,7 +231,11 @@ export default function PostDetailPage() {
 
   const embedOrigin = typeof window !== 'undefined' ? window.location.origin : '';
   const embedPermalink =
-    embedTarget && postId ? `${embedOrigin}/posts/${postId}/comments/${embedTarget.id}` : '';
+    embedTarget && postId
+      ? hubName
+        ? `${embedOrigin}/h/${hubName}/comments/${postId}/${embedTarget.id}`
+        : `${embedOrigin}/posts/${postId}/comments/${embedTarget.id}`
+      : '';
   const embedCode = embedTarget
     ? `<iframe src="${embedPermalink}" width="600" height="250" frameborder="0"></iframe>`
     : '';
@@ -360,17 +367,6 @@ export default function PostDetailPage() {
               <div className="mb-4">
                 <h1 className="text-2xl font-bold text-[var(--color-text-primary)]">{decodedTitle}</h1>
                 <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-[var(--color-text-secondary)]">
-                  {targetSubreddit && (
-                    <>
-                      <Link
-                        to={`/r/${targetSubreddit}`}
-                        className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
-                      >
-                        r/{targetSubreddit}
-                      </Link>
-                      <span>•</span>
-                    </>
-                  )}
                   {hubName && (
                     <>
                       <Link
@@ -378,6 +374,18 @@ export default function PostDetailPage() {
                         className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
                       >
                         h/{hubName}
+                      </Link>
+                      <span>•</span>
+                    </>
+                  )}
+                  {targetSubreddit && postData?.crosspost_origin_subreddit && (
+                    <>
+                      <span>Crosspost from </span>
+                      <Link
+                        to={`/r/${targetSubreddit}`}
+                        className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+                      >
+                        r/{targetSubreddit}
                       </Link>
                       <span>•</span>
                     </>
@@ -586,7 +594,9 @@ export default function PostDetailPage() {
           <div className="mb-4 rounded border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800">
             <div>You are viewing a single comment&apos;s thread.</div>
             <button
-              onClick={() => navigate(`/posts/${postId}`)}
+              onClick={() =>
+                navigate(hubName ? `/h/${hubName}/comments/${postId}` : `/posts/${postId}`)
+              }
               className="mt-1 font-semibold text-[var(--color-primary)] hover:underline"
             >
               View the rest of the comments →
