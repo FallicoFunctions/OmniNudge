@@ -9,6 +9,8 @@ import { messagesService } from '../services/messagesService';
 import { useMessagingWebSocket } from '../hooks/useMessagingWebSocket';
 import type { UserProfile } from '../types/users';
 import AuthModal from '../pages/AuthModal';
+import { AboutContent } from '../pages/AboutPage';
+import BugReportModal from '../components/bugReports/BugReportModal';
 import { subscriptionService } from '../services/subscriptionService';
 
 export default function MainLayout() {
@@ -27,6 +29,12 @@ export default function MainLayout() {
   const navigate = useNavigate();
   const location = useLocation();
   const queryClient = useQueryClient();
+  const [showAboutModal, setShowAboutModal] = useState(false);
+  const [dontShowAgain, setDontShowAgain] = useState(false);
+  const aboutModalStorageKey = 'omninudge_about_modal_dismissed';
+  const [showBugReportModal, setShowBugReportModal] = useState(false);
+  const [bugReportUrl, setBugReportUrl] = useState('');
+  const [openBugReportAfterAuth, setOpenBugReportAfterAuth] = useState(false);
 
   // Initialize WebSocket connection for real-time messaging
   useMessagingWebSocket({ activeConversationId });
@@ -111,6 +119,14 @@ export default function MainLayout() {
     return () => window.removeEventListener('open-auth-modal', handler as EventListener);
   }, []);
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const dismissed = localStorage.getItem(aboutModalStorageKey) === 'true';
+    if (!dismissed) {
+      setShowAboutModal(true);
+    }
+  }, [aboutModalStorageKey]);
+
   return (
     <div className="min-h-screen bg-[var(--color-background)]">
       {/* Navigation Bar */}
@@ -176,12 +192,28 @@ export default function MainLayout() {
                 >
                   Browse Hubs
                 </button>
+                <Link
+                  to="/about"
+                  className="rounded-md px-3 py-2 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
+                >
+                  About
+                </Link>
               </div>
             </div>
 
             <div className="flex items-center gap-4">
               {user ? (
                 <>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setBugReportUrl(window.location.href);
+                      setShowBugReportModal(true);
+                    }}
+                    className="rounded-md px-3 py-2 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
+                  >
+                    Bug Reporting
+                  </button>
                   <Link
                     to={`/users/${user.username}`}
                     className="text-sm font-medium text-[var(--color-text-primary)]"
@@ -213,6 +245,17 @@ export default function MainLayout() {
                 <>
                   <button
                     type="button"
+                    onClick={() => {
+                      setBugReportUrl(window.location.href);
+                      setOpenBugReportAfterAuth(true);
+                      setAuthModal('login');
+                    }}
+                    className="rounded-md px-3 py-2 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
+                  >
+                    Bug Reporting
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => setAuthModal('login')}
                     className="rounded-md px-3 py-2 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
                   >
@@ -237,6 +280,49 @@ export default function MainLayout() {
         <Outlet />
       </main>
 
+      {showAboutModal && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 px-4 py-6">
+          <div className="w-full max-w-4xl rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-6 shadow-xl">
+            <div className="max-h-[70vh] overflow-y-auto pr-2">
+              <AboutContent />
+            </div>
+            <div className="mt-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <label className="flex items-center gap-2 text-sm text-[var(--color-text-secondary)]">
+                <input
+                  type="checkbox"
+                  checked={dontShowAgain}
+                  onChange={(event) => setDontShowAgain(event.target.checked)}
+                  className="h-4 w-4"
+                />
+                Don&apos;t Show This Again
+              </label>
+              <button
+                type="button"
+                onClick={() => {
+                  if (dontShowAgain) {
+                    localStorage.setItem(aboutModalStorageKey, 'true');
+                  }
+                  setShowAboutModal(false);
+                }}
+                className="rounded-md bg-[var(--color-primary)] px-5 py-2 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)]"
+              >
+                Continue
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <BugReportModal
+        isOpen={showBugReportModal}
+        onClose={() => setShowBugReportModal(false)}
+        initialUrl={bugReportUrl}
+        onNavigateToPage={() => {
+          setShowBugReportModal(false);
+          navigate('/bug-reporting');
+        }}
+      />
+
       {authModal && (
         <AuthModal
           mode={authModal}
@@ -258,6 +344,10 @@ export default function MainLayout() {
             if (pendingRedirect) {
               navigate(pendingRedirect.to, { state: pendingRedirect.state, replace: true });
               setPendingRedirect(null);
+            }
+            if (openBugReportAfterAuth) {
+              setOpenBugReportAfterAuth(false);
+              setShowBugReportModal(true);
             }
           }}
         />
