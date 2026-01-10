@@ -380,6 +380,7 @@ export default function RedditWikiPage({ mode = 'view' }: RedditWikiPageProps = 
                 alt=""
                 className="h-12 w-12 flex-shrink-0 rounded-full object-cover"
                 loading="lazy"
+                decoding="async"
               />
             )}
             <h1 className="text-3xl font-bold text-[var(--color-text-primary)]">

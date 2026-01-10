@@ -8,6 +8,7 @@ import { RedditPostCard } from '../components/reddit/RedditPostCard';
 import { VoteButtons } from '../components/VoteButtons';
 import { EmptyMessage, LoadingMessage } from '../components/common/StatusMessage';
 import { OffsetPaginationControls } from '../components/common/OffsetPaginationControls';
+import { VirtualizedList } from '../components/common/VirtualizedList';
 import type { PlatformPost } from '../types/posts';
 import type { RedditApiPost, SubredditSuggestion } from '../types/reddit';
 import type { Hub } from '../services/hubsService';
@@ -209,6 +210,22 @@ export default function SearchResultsPage() {
   const filteredHubs = useMemo(() => communities.hubs ?? [], [communities]);
   const filteredRedditUsers = useMemo(() => users.reddit ?? [], [users]);
   const filteredOmniUsers = useMemo(() => users.omni ?? [], [users]);
+  const visiblePosts = useMemo(
+    () =>
+      filteredPosts.filter((item) => {
+        if (item.type === 'reddit') {
+          const author = item.post.author?.toLowerCase();
+          return author ? !blockedUsers.has(author) : true;
+        }
+
+        const displayAuthor =
+          item.post.author_username ||
+          item.post.author?.username ||
+          (item.post.author_id === undefined ? undefined : String(item.post.author_id));
+        return displayAuthor ? !blockedUsers.has(displayAuthor.toLowerCase()) : true;
+      }),
+    [filteredPosts, blockedUsers]
+  );
 
   return (
     <div className="mx-auto w-full max-w-7xl px-4 py-8">
@@ -359,100 +376,107 @@ export default function SearchResultsPage() {
 
       {!isLoading && activeTab === 'posts' && (
         <div className="space-y-3">
-          {filteredPosts.length === 0 && (
+          {visiblePosts.length === 0 && (
             <EmptyMessage className="text-sm">No posts found.</EmptyMessage>
           )}
-          {filteredPosts.map((item, idx) => {
-            if (item.type === 'reddit') {
-              return (
-                <RedditPostCard
-                  key={`sr-reddit-${item.post.id}-${idx}`}
-                  post={item.post}
-                  useRelativeTime
-                  isSaved={false}
-                  isSaveActionPending={false}
-                  pendingShouldSave={undefined}
-                  onShare={() => {}}
-                  onToggleSave={() => {}}
-                  onHide={() => {}}
-                  onCrosspost={() => {}}
-                />
-              );
+          <VirtualizedList
+            items={visiblePosts}
+            estimateSize={200}
+            getKey={(item, idx) =>
+              item.type === 'reddit' ? `sr-reddit-${item.post.id}-${idx}` : `sr-local-${item.post.id}-${idx}`
             }
-            const post = item.post;
-            const previewImage = post.thumbnail_url || post.media_url;
-            const displayAuthor =
-              post.author_username ||
-              post.author?.username ||
-              (post.author_id === undefined ? undefined : String(post.author_id));
-            const hubName = post.hub_name || post.hub?.name;
-            const createdTimestamp = post.crossposted_at ?? post.created_at;
-            const createdLabel = createdTimestamp ? formatTimestamp(createdTimestamp, true) : 'unknown time';
-            const commentLabel = `${(post.num_comments ?? 0).toLocaleString()} Comments`;
-            const pointsLabel = `${post.score.toLocaleString()} points`;
-            const postUrl = hubName ? `/h/${hubName}/comments/${post.id}` : `/posts/${post.id}`;
-            const isBlockedAuthor = displayAuthor ? blockedUsers.has(displayAuthor.toLowerCase()) : false;
-            if (isBlockedAuthor) return null;
-
-            return (
-              <article
-                key={`sr-local-${post.id}-${idx}`}
-                className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)]"
-              >
-                <div className="flex gap-3 p-3">
-                  <VoteButtons
-                    postId={post.id}
-                    initialScore={post.score}
-                    initialUserVote={post.user_vote ?? null}
-                    layout="vertical"
-                    size="small"
-                  />
-                  {previewImage && (
-                    <img
-                      src={previewImage}
-                      alt=""
-                      className="h-16 w-16 flex-shrink-0 rounded object-cover"
+            renderItem={(item) => {
+              if (item.type === 'reddit') {
+                return (
+                  <div className="pb-3">
+                    <RedditPostCard
+                      post={item.post}
+                      useRelativeTime
+                      isSaved={false}
+                      isSaveActionPending={false}
+                      pendingShouldSave={undefined}
+                      onShare={() => {}}
+                      onToggleSave={() => {}}
+                      onHide={() => {}}
+                      onCrosspost={() => {}}
                     />
-                  )}
-                  <div className="flex-1 text-left">
-                    <div className="mb-1 inline-flex items-center gap-2">
-                      <span className="inline-block rounded bg-blue-600 px-2 py-0.5 text-[10px] font-bold uppercase text-white">
-                        Omni
-                      </span>
-                      {hubName && (
-                        <Link
-                          to={`/h/${hubName}`}
-                          className="text-[11px] text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
-                        >
-                          h/{hubName}
-                        </Link>
-                      )}
-                    </div>
-                    <a href={postUrl}>
-                      <h3 className="text-base font-semibold text-[var(--color-text-primary)] hover:text-[var(--color-primary)]">
-                        {post.title}
-                      </h3>
-                    </a>
-                    <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-[var(--color-text-secondary)]">
-                      <span>u/{displayAuthor ?? 'unknown'}</span>
-                      <span>•</span>
-                      <span>{pointsLabel}</span>
-                      <span>•</span>
-                      <span>submitted {createdLabel}</span>
-                    </div>
-                    <div className="mt-1 flex flex-wrap items-center gap-3 text-[11px] text-[var(--color-text-secondary)]">
-                      <a
-                        href={postUrl}
-                        className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
-                      >
-                        {commentLabel}
-                      </a>
-                    </div>
                   </div>
+                );
+              }
+              const post = item.post;
+              const previewImage = post.thumbnail_url || post.media_url;
+              const displayAuthor =
+                post.author_username ||
+                post.author?.username ||
+                (post.author_id === undefined ? undefined : String(post.author_id));
+              const hubName = post.hub_name || post.hub?.name;
+              const createdTimestamp = post.crossposted_at ?? post.created_at;
+              const createdLabel = createdTimestamp ? formatTimestamp(createdTimestamp, true) : 'unknown time';
+              const commentLabel = `${(post.num_comments ?? 0).toLocaleString()} Comments`;
+              const pointsLabel = `${post.score.toLocaleString()} points`;
+              const postUrl = hubName ? `/h/${hubName}/comments/${post.id}` : `/posts/${post.id}`;
+
+              return (
+                <div className="pb-3">
+                  <article className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)]">
+                    <div className="flex gap-3 p-3">
+                      <VoteButtons
+                        postId={post.id}
+                        initialScore={post.score}
+                        initialUserVote={post.user_vote ?? null}
+                        layout="vertical"
+                        size="small"
+                      />
+                      {previewImage && (
+                        <img
+                          src={previewImage}
+                          alt=""
+                          loading="lazy"
+                          decoding="async"
+                          className="h-16 w-16 flex-shrink-0 rounded object-cover"
+                        />
+                      )}
+                      <div className="flex-1 text-left">
+                        <div className="mb-1 inline-flex items-center gap-2">
+                          <span className="inline-block rounded bg-blue-600 px-2 py-0.5 text-[10px] font-bold uppercase text-white">
+                            Omni
+                          </span>
+                          {hubName && (
+                            <Link
+                              to={`/h/${hubName}`}
+                              className="text-[11px] text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+                            >
+                              h/{hubName}
+                            </Link>
+                          )}
+                        </div>
+                        <a href={postUrl}>
+                          <h3 className="text-base font-semibold text-[var(--color-text-primary)] hover:text-[var(--color-primary)]">
+                            {post.title}
+                          </h3>
+                        </a>
+                        <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-[var(--color-text-secondary)]">
+                          <span>u/{displayAuthor ?? 'unknown'}</span>
+                          <span>•</span>
+                          <span>{pointsLabel}</span>
+                          <span>•</span>
+                          <span>submitted {createdLabel}</span>
+                        </div>
+                        <div className="mt-1 flex flex-wrap items-center gap-3 text-[11px] text-[var(--color-text-secondary)]">
+                          <a
+                            href={postUrl}
+                            className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+                          >
+                            {commentLabel}
+                          </a>
+                        </div>
+                      </div>
+                    </div>
+                  </article>
                 </div>
-              </article>
-            );
-          })}
+              );
+            }}
+          />
           <OffsetPaginationControls
             showDivider={false}
             className="mt-2"

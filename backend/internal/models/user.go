@@ -49,6 +49,10 @@ type User struct {
 	CreatedAt time.Time `json:"created_at"`
 	LastSeen  time.Time `json:"last_seen"`
 	NSFW      bool      `json:"nsfw"`
+
+	// Agent activity tracking
+	LastAgentPostAt   *time.Time `json:"last_agent_post_at,omitempty"`
+	LastAgentBrowseAt *time.Time `json:"last_agent_browse_at,omitempty"`
 }
 
 // UserRepository handles database operations for users
@@ -132,7 +136,8 @@ func (r *UserRepository) GetByID(ctx context.Context, id int) (*User, error) {
 
 	query := `
 		SELECT id, username, email, email_encrypted, reddit_id, reddit_username, public_key, avatar_url, bio, karma, role,
-		       shadow_banned, banned, deleted, ban_reason, show_ban_reason, banned_at, banned_by, created_at, last_seen
+		       shadow_banned, banned, deleted, ban_reason, show_ban_reason, banned_at, banned_by, created_at, last_seen,
+		       last_agent_post_at, last_agent_browse_at
 		FROM users WHERE id = $1
 	`
 
@@ -157,6 +162,8 @@ func (r *UserRepository) GetByID(ctx context.Context, id int) (*User, error) {
 		&user.BannedBy,
 		&user.CreatedAt,
 		&user.LastSeen,
+		&user.LastAgentPostAt,
+		&user.LastAgentBrowseAt,
 	)
 
 	if err != nil {
@@ -192,7 +199,8 @@ func (r *UserRepository) GetByUsername(ctx context.Context, username string) (*U
 
 	return r.queryUser(ctx, `
 		SELECT id, username, email, email_encrypted, password_hash, reddit_id, reddit_username, public_key, avatar_url, bio, karma, role,
-		       shadow_banned, banned, deleted, ban_reason, show_ban_reason, banned_at, banned_by, created_at, last_seen
+		       shadow_banned, banned, deleted, ban_reason, show_ban_reason, banned_at, banned_by, created_at, last_seen,
+		       last_agent_post_at, last_agent_browse_at
 		FROM users WHERE username_normalized = $1
 	`, normalizedUsername)
 }
@@ -222,6 +230,8 @@ func (r *UserRepository) queryUser(ctx context.Context, query string, arg interf
 		&user.BannedBy,
 		&user.CreatedAt,
 		&user.LastSeen,
+		&user.LastAgentPostAt,
+		&user.LastAgentBrowseAt,
 	)
 
 	if err != nil {
@@ -252,7 +262,8 @@ func (r *UserRepository) GetByRedditID(ctx context.Context, redditID string) (*U
 
 	query := `
 		SELECT id, username, email, email_encrypted, reddit_id, reddit_username, public_key, avatar_url, bio, karma, role,
-		       shadow_banned, banned, deleted, ban_reason, show_ban_reason, banned_at, banned_by, created_at, last_seen
+		       shadow_banned, banned, deleted, ban_reason, show_ban_reason, banned_at, banned_by, created_at, last_seen,
+		       last_agent_post_at, last_agent_browse_at
 		FROM users WHERE reddit_id = $1
 	`
 
@@ -277,6 +288,8 @@ func (r *UserRepository) GetByRedditID(ctx context.Context, redditID string) (*U
 		&user.BannedBy,
 		&user.CreatedAt,
 		&user.LastSeen,
+		&user.LastAgentPostAt,
+		&user.LastAgentBrowseAt,
 	)
 
 	if err != nil {
@@ -565,4 +578,18 @@ func (r *UserRepository) GetAllBanHistory(ctx context.Context, limit, offset int
 	}
 
 	return history, rows.Err()
+}
+
+// UpdateLastAgentPostAt updates the last_agent_post_at timestamp for a user
+func (r *UserRepository) UpdateLastAgentPostAt(ctx context.Context, userID int, timestamp time.Time) error {
+	query := `UPDATE users SET last_agent_post_at = $1 WHERE id = $2`
+	_, err := r.pool.Exec(ctx, query, timestamp, userID)
+	return err
+}
+
+// UpdateLastAgentBrowseAt updates the last_agent_browse_at timestamp for a user
+func (r *UserRepository) UpdateLastAgentBrowseAt(ctx context.Context, userID int, timestamp time.Time) error {
+	query := `UPDATE users SET last_agent_browse_at = $1 WHERE id = $2`
+	_, err := r.pool.Exec(ctx, query, timestamp, userID)
+	return err
 }

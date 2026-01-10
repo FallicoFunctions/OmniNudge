@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"regexp"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -139,11 +140,19 @@ func (h *HubsHandler) Get(c *gin.Context) {
 func (h *HubsHandler) List(c *gin.Context) {
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "50"))
 	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
+	startsWith := strings.TrimSpace(c.Query("starts_with"))
+	includeNsfw := c.DefaultQuery("nsfw", "true") == "true"
 	if limit < 1 || limit > 100 {
 		limit = 50
 	}
 
-	hubs, err := h.hubRepo.List(c.Request.Context(), limit, offset)
+	var hubs []*models.Hub
+	var err error
+	if startsWith != "" {
+		hubs, err = h.hubRepo.ListByPrefix(c.Request.Context(), startsWith, limit, offset, includeNsfw)
+	} else {
+		hubs, err = h.hubRepo.List(c.Request.Context(), limit, offset, includeNsfw)
+	}
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to list hubs", "details": err.Error()})
 		return
@@ -261,7 +270,7 @@ func (h *HubsHandler) GetUserHubs(c *gin.Context) {
 		limit = 100
 	}
 
-	hubs, err := h.hubRepo.List(c.Request.Context(), limit, 0)
+	hubs, err := h.hubRepo.List(c.Request.Context(), limit, 0, true)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch user hubs", "details": err.Error()})
 		return

@@ -456,7 +456,13 @@ export function RedditPostCard({
     <article className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)]">
       <div className="flex gap-3 p-3">
         {thumbnail && (
-          <img src={thumbnail} alt="" className="h-14 w-14 flex-shrink-0 rounded object-cover" />
+          <img
+            src={thumbnail}
+            alt=""
+            loading="lazy"
+            decoding="async"
+            className="h-14 w-14 flex-shrink-0 rounded object-cover"
+          />
         )}
         <div className="flex-1 text-left">
           <div className="flex flex-wrap items-center gap-2">
@@ -603,6 +609,7 @@ export function RedditPostCard({
                         frameBorder="0"
                         scrolling="no"
                         allow="fullscreen; picture-in-picture; autoplay"
+                        loading="lazy"
                         allowFullScreen
                       />
                     </div>
@@ -615,6 +622,7 @@ export function RedditPostCard({
                         frameBorder="0"
                         scrolling="no"
                         allow="fullscreen; picture-in-picture; autoplay"
+                        loading="lazy"
                         allowFullScreen
                       />
                     </div>
@@ -625,11 +633,14 @@ export function RedditPostCard({
                       controls
                       playsInline
                       loop
+                      preload="metadata"
                     />
                   ) : (
                     <img
                       src={previewImageUrl}
                       alt={post.title}
+                      loading="lazy"
+                      decoding="async"
                       className="max-h-[70vh] w-full object-contain"
                     />
                   )}
