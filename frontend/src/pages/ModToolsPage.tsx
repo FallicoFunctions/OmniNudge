@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { moderationService } from '../services/moderationService';
+import { EmptyMessage, LoadingMessage } from '../components/common/StatusMessage';
 import { modMailService } from '../services/modMailService';
 import type {
   HubBan,
@@ -115,7 +116,11 @@ function BansTab({ hubName }: { hubName: string }) {
   });
 
   if (isLoading) {
-    return <div className="text-center py-8">Loading...</div>;
+    return (
+      <div className="text-center py-8">
+        <LoadingMessage>Loading...</LoadingMessage>
+      </div>
+    );
   }
 
   return (
@@ -141,8 +146,8 @@ function BansTab({ hubName }: { hubName: string }) {
       )}
 
       {bans && bans.length === 0 && (
-        <div className="text-center py-12 text-[var(--color-text-secondary)]">
-          No banned users
+        <div className="text-center py-12">
+          <EmptyMessage>No banned users.</EmptyMessage>
         </div>
       )}
 
@@ -325,7 +330,11 @@ function RemovalReasonsTab({ hubName }: { hubName: string }) {
   });
 
   if (isLoading) {
-    return <div className="text-center py-8">Loading...</div>;
+    return (
+      <div className="text-center py-8">
+        <LoadingMessage>Loading...</LoadingMessage>
+      </div>
+    );
   }
 
   return (
@@ -360,8 +369,8 @@ function RemovalReasonsTab({ hubName }: { hubName: string }) {
       )}
 
       {reasons && reasons.length === 0 && (
-        <div className="text-center py-12 text-[var(--color-text-secondary)]">
-          No removal reason templates
+        <div className="text-center py-12">
+          <EmptyMessage>No removal reason templates.</EmptyMessage>
         </div>
       )}
 
@@ -511,7 +520,11 @@ function ModLogTab({ hubName }: { hubName: string }) {
   });
 
   if (isLoading) {
-    return <div className="text-center py-8">Loading...</div>;
+    return (
+      <div className="text-center py-8">
+        <LoadingMessage>Loading...</LoadingMessage>
+      </div>
+    );
   }
 
   const logs = data?.logs || [];
@@ -521,8 +534,8 @@ function ModLogTab({ hubName }: { hubName: string }) {
       <h2 className="text-xl font-semibold mb-4">Moderation Log</h2>
 
       {logs.length === 0 && (
-        <div className="text-center py-12 text-[var(--color-text-secondary)]">
-          No moderation actions yet
+        <div className="text-center py-12">
+          <EmptyMessage>No moderation actions yet.</EmptyMessage>
         </div>
       )}
 
@@ -620,7 +633,11 @@ function ModMailTab({ hubName }: { hubName: string }) {
   });
 
   if (isLoading) {
-    return <div className="text-center py-8">Loading mod mail...</div>;
+    return (
+      <div className="text-center py-8">
+        <LoadingMessage>Loading mod mail...</LoadingMessage>
+      </div>
+    );
   }
 
   const conversations = data?.conversations || [];
@@ -642,8 +659,10 @@ function ModMailTab({ hubName }: { hubName: string }) {
       </div>
 
       {conversations.length === 0 && (
-        <div className="text-center py-12 text-[var(--color-text-secondary)]">
-          No {statusFilter !== 'all' ? statusFilter : ''} mod mail conversations
+        <div className="text-center py-12">
+          <EmptyMessage>
+            No {statusFilter !== 'all' ? statusFilter : ''} mod mail conversations.
+          </EmptyMessage>
         </div>
       )}
 

@@ -24,6 +24,7 @@ export function useMessagingWebSocket(options: UseMessagingWebSocketOptions = {}
   const { notifyArchivedMessages } = useSettings();
   const queryClient = useQueryClient();
   const wsRef = useRef<WebSocket | null>(null);
+  const userId = user?.id ?? null;
 
   // Use ref to avoid stale closure in WebSocket handler
   const activeConversationIdRef = useRef<number | null>(activeConversationId ?? null);
@@ -35,7 +36,7 @@ export function useMessagingWebSocket(options: UseMessagingWebSocketOptions = {}
   }, [activeConversationId]);
 
   useEffect(() => {
-    if (!user) return;
+    if (!userId) return;
 
     const token = localStorage.getItem('auth_token');
     if (!token) return;
@@ -82,7 +83,7 @@ export function useMessagingWebSocket(options: UseMessagingWebSocketOptions = {}
                   found = true;
 
                   // Increment unread count only if user is the recipient
-                  const isRecipient = payload.recipient_id === user?.id;
+                  const isRecipient = payload.recipient_id === userId;
                   const isArchived = Boolean(conv.archived_at);
                   // Don't increment if this is the active conversation (user is currently viewing it)
                   // Use ref to get current value and avoid stale closure
@@ -173,7 +174,7 @@ export function useMessagingWebSocket(options: UseMessagingWebSocketOptions = {}
       }
       wsRef.current = null;
     };
-  }, [user?.id, queryClient, onMessageReceived]); // Don't include activeConversationId - we use ref to avoid recreation
+  }, [userId, notifyArchivedMessages, onMessageReceived, queryClient]); // Don't include activeConversationId - we use ref to avoid recreation
 
   return wsRef;
 }

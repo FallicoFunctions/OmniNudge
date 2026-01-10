@@ -9,6 +9,7 @@ import type { Message } from '../types/messages';
 import type { ModMailConversation } from '../types/modmail';
 import { decryptMessage, encryptForMultipleRecipients, decryptMultiRecipientContent } from '../utils/encryption';
 import { getOwnKeys, getUserPublicKey } from '../services/keyManagementService';
+import { LoadingMessage, ErrorMessage } from '../components/common/StatusMessage';
 
 function useDecryptedMessageContent(
   message: Message,
@@ -287,7 +288,9 @@ export default function ModMailConversationPage() {
   if (isLoadingMessages) {
     return (
       <div className="max-w-4xl mx-auto p-6">
-        <div className="text-center py-12">Loading conversation...</div>
+        <div className="text-center py-12">
+          <LoadingMessage>Loading conversation...</LoadingMessage>
+        </div>
       </div>
     );
   }
@@ -295,8 +298,8 @@ export default function ModMailConversationPage() {
   if (!messages) {
     return (
       <div className="max-w-4xl mx-auto p-6">
-        <div className="text-center py-12 text-[var(--color-text-secondary)]">
-          Unable to load messages
+        <div className="text-center py-12">
+          <ErrorMessage>Unable to load messages.</ErrorMessage>
         </div>
       </div>
     );

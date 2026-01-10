@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import ThemeSelector from '../themes/ThemeSelector';
 import { useTheme } from '../../hooks/useTheme';
+import { EmptyMessage, LoadingMessage } from '../common/StatusMessage';
 
 interface ThemeSettingsSectionProps {
   onCreateTheme: () => void;
@@ -72,7 +73,7 @@ const ThemeSettingsSection = ({ onCreateTheme, onManageThemes }: ThemeSettingsSe
             Active Theme
           </p>
           {isLoading ? (
-            <p className="mt-2 text-sm text-[var(--color-text-secondary)]">Loading theme…</p>
+            <LoadingMessage className="mt-2 text-sm">Loading theme…</LoadingMessage>
           ) : activeTheme ? (
             <>
               <p className="mt-1 text-xl font-semibold text-[var(--color-text-primary)]">
@@ -101,9 +102,9 @@ const ThemeSettingsSection = ({ onCreateTheme, onManageThemes }: ThemeSettingsSe
               </dl>
             </>
           ) : (
-            <p className="mt-2 text-sm text-[var(--color-text-secondary)]">
+            <EmptyMessage className="mt-2 text-sm">
               No active theme yet. Choose one from the selector.
-            </p>
+            </EmptyMessage>
           )}
         </div>
 

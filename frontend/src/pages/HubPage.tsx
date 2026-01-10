@@ -1,12 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Link, useNavigate, useParams } from 'react-router-dom';
-import {
-  hubsService,
-  type Hub,
-  type HubPostsResponse,
-  type LocalSubredditPost,
-} from '../services/hubsService';
+import { useNavigate, useParams } from 'react-router-dom';
+import { hubsService, type HubPostsResponse, type LocalSubredditPost } from '../services/hubsService';
 import { subscriptionService } from '../services/subscriptionService';
 import { useAuth } from '../contexts/AuthContext';
 import { SubscribeButton } from '../components/common/SubscribeButton';
@@ -16,10 +11,21 @@ import { savedService } from '../services/savedService';
 import { createLocalCrosspostPayload } from '../utils/crosspostHelpers';
 import type { CrosspostRequest } from '../services/hubsService';
 import { HubPostCard } from '../components/hubs/HubPostCard';
+import HubModeratorsPanel from '../components/hubs/HubModeratorsPanel';
+import HubAboutPanel from '../components/hubs/HubAboutPanel';
 import type { PlatformPost } from '../types/posts';
 import { TOP_TIME_OPTIONS } from '../constants/topTimeRange';
 import type { TopTimeRange } from '../constants/topTimeRange';
 import { ModMailModal } from '../components/modmail/ModMailModal';
+import { useHubModerators } from '../hooks/useHubModerators';
+import { isUserHubModerator } from '../utils/moderation';
+import { useHubDetails } from '../hooks/useHubDetails';
+import { OffsetPaginationControls } from '../components/common/OffsetPaginationControls';
+import { useSavedItems } from '../hooks/useSavedItems';
+import { useHiddenItems } from '../hooks/useHiddenItems';
+import { CrosspostModal } from '../components/common/CrosspostModal';
+import { getHiddenPostIdSet, getSavedPostIdSet } from '../utils/savedItems';
+import { EmptyMessage, ErrorMessage, LoadingMessage } from '../components/common/StatusMessage';
 
 const EMPTY_POSTS: LocalSubredditPost[] = [];
 
@@ -77,30 +83,32 @@ export default function HubsPage() {
     queryFn: () => subscriptionService.getUserSubredditSubscriptions(),
     enabled: !!user,
   });
+  const hubOptions = useMemo(
+    () =>
+      subscribedHubs
+        ?.map((sub) => {
+          const name = sub.hub_name || sub.hub?.name;
+          return name ? { id: sub.hub_id, name } : null;
+        })
+        .filter((option): option is { id: number; name: string } => Boolean(option)) ?? [],
+    [subscribedHubs]
+  );
+  const subredditOptions = useMemo(
+    () =>
+      subscribedSubreddits?.map((sub) => ({
+        id: sub.id,
+        name: sub.subreddit_name,
+      })) ?? [],
+    [subscribedSubreddits]
+  );
 
   const savedPostsKey = ['saved-items', 'posts'] as const;
-  const { data: savedPostsData } = useQuery({
-    queryKey: savedPostsKey,
-    queryFn: () => savedService.getSavedItems('posts'),
-    enabled: !!user,
-    staleTime: 1000 * 60 * 5,
-  });
-  const savedPostIds = useMemo(
-    () => new Set(savedPostsData?.saved_posts?.map((post) => post.id) ?? []),
-    [savedPostsData]
-  );
+  const { data: savedPostsData } = useSavedItems('posts', !!user);
+  const savedPostIds = useMemo(() => getSavedPostIdSet(savedPostsData), [savedPostsData]);
 
   const hiddenPostsKey = ['hidden-items', 'posts'] as const;
-  const { data: hiddenPostsData } = useQuery({
-    queryKey: hiddenPostsKey,
-    queryFn: () => savedService.getHiddenItems('posts'),
-    enabled: !!user,
-    staleTime: 1000 * 60 * 5,
-  });
-  const hiddenPostIds = useMemo(
-    () => new Set(hiddenPostsData?.hidden_posts?.map((post) => post.id) ?? []),
-    [hiddenPostsData]
-  );
+  const { data: hiddenPostsData } = useHiddenItems('posts', !!user);
+  const hiddenPostIds = useMemo(() => getHiddenPostIdSet(hiddenPostsData), [hiddenPostsData]);
 
   const { data: hubDirectory } = useQuery({
     queryKey: ['hub-directory', 'all'],
@@ -140,22 +148,18 @@ export default function HubsPage() {
     data: hubDetails,
     isLoading: loadingHubDetails,
     isError: hubDetailsError,
-  } = useQuery<Hub>({
-    queryKey: ['hub-details', hubname],
-    queryFn: () => hubsService.getHub(hubname),
-    enabled: showHubSidebar && !!hubname,
-    staleTime: 1000 * 60 * 5,
-  });
+  } = useHubDetails(hubname, showHubSidebar);
+
+  const {
+    moderators: hubModerators,
+    isLoading: loadingHubModerators,
+    isError: hubModeratorsError,
+  } = useHubModerators(hubname, showHubSidebar);
 
   // Check if current user is a moderator of this hub (or admin)
   const isModerator = useMemo(() => {
-    if (!user) return false;
-    // Admins have mod powers on all hubs
-    if (user.role === 'admin') return true;
-    // Check if user is listed as a moderator
-    if (!hubDetails?.moderators) return false;
-    return hubDetails.moderators.some((mod) => mod.id === user.id);
-  }, [user, hubDetails]);
+    return isUserHubModerator(user, hubModerators, hubDetails);
+  }, [user, hubModerators, hubDetails]);
 
   // Fetch posts based on current hub
   const postsQueryKey = ['hub-posts', hubname, sort, timeRangeKey, pageOffset] as const;
@@ -364,11 +368,18 @@ export default function HubsPage() {
       alert(`Failed to create crosspost: ${error.message}`);
     },
   });
+  const handleCrosspostSubmit = () => {
+    if ((!selectedHub && !selectedSubreddit) || !crosspostTitle.trim() || crosspostMutation.isPending) {
+      return;
+    }
+    crosspostMutation.mutate();
+  };
+  const isCrosspostSubmitDisabled = (!selectedHub && !selectedSubreddit) || !crosspostTitle.trim();
 
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="text-lg">Loading...</div>
+        <LoadingMessage className="text-lg">Loading...</LoadingMessage>
       </div>
     );
   }
@@ -376,7 +387,7 @@ export default function HubsPage() {
   if (error) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="text-lg text-red-600">Error loading posts</div>
+        <ErrorMessage className="text-lg text-red-600">Error loading posts.</ErrorMessage>
       </div>
     );
   }
@@ -532,236 +543,69 @@ export default function HubsPage() {
                 );
               })
             ) : (
-              <div className="py-12 text-center text-gray-500">No posts found in this hub</div>
+              <div className="py-12 text-center">
+                <EmptyMessage>No posts found in this hub.</EmptyMessage>
+              </div>
             )}
           </div>
 
           {/* Pagination Controls */}
-          {!useInfiniteScrollHubs && visiblePosts.length > 0 && (hasPrev || hasMore) && (
-            <div className="mt-6 flex items-center justify-between border-t border-[var(--color-border)] pt-4">
-              <button
-                onClick={() => {
-                  const newOffset = Math.max(0, pageOffset - pageSize);
-                  setPageOffset(newOffset);
-                  window.scrollTo({ top: 0, behavior: 'smooth' });
-                }}
-                disabled={!hasPrev || isFetching}
-                className="rounded bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)] disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                ← Previous
-              </button>
-              <button
-                onClick={() => {
-                  setPageOffset(pageOffset + pageSize);
-                  window.scrollTo({ top: 0, behavior: 'smooth' });
-                }}
-                disabled={!hasMore || isFetching}
-                className="rounded bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)] disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                Next →
-              </button>
-            </div>
+          {!useInfiniteScrollHubs && visiblePosts.length > 0 && (
+            <OffsetPaginationControls
+              hasPrev={hasPrev}
+              hasMore={hasMore}
+              isFetching={isFetching}
+              onPrev={() => {
+                const newOffset = Math.max(0, pageOffset - pageSize);
+                setPageOffset(newOffset);
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              onNext={() => {
+                setPageOffset(pageOffset + pageSize);
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+            />
           )}
         </div>
 
         {showHubSidebar && (
           <aside className="space-y-4">
-            <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
-              <h3 className="text-sm font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
-                About this hub
-              </h3>
-              {loadingHubDetails ? (
-                <p className="mt-3 text-sm text-[var(--color-text-secondary)]">Loading details…</p>
-              ) : hubDetailsError ? (
-                <p className="mt-3 text-sm text-[var(--color-text-secondary)]">
-                  Unable to load hub details.
-                </p>
-              ) : hubDetails ? (
-                <>
-                  {hubDetails.description ? (
-                    <p className="mt-3 text-sm text-[var(--color-text-primary)] whitespace-pre-line">
-                      {hubDetails.description}
-                    </p>
-                  ) : (
-                    <p className="mt-3 text-sm text-[var(--color-text-secondary)]">
-                      No description has been added yet.
-                    </p>
-                  )}
-                  {hubDetails.title && (
-                    <p className="mt-3 text-xs text-[var(--color-text-secondary)]">
-                      Display title: {hubDetails.title}
-                    </p>
-                  )}
-                </>
-              ) : (
-                <p className="mt-3 text-sm text-[var(--color-text-secondary)]">
-                  Hub details unavailable.
-                </p>
-              )}
-            </div>
+            <HubAboutPanel
+              hubDetails={hubDetails}
+              isLoading={loadingHubDetails}
+              isError={hubDetailsError}
+            />
 
-            <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
-                  Moderators
-                </h3>
-                {hubDetails?.moderators && hubDetails.moderators.length > 0 && (
-                  <span className="text-xs text-[var(--color-text-secondary)]">
-                    {hubDetails.moderators.length}
-                  </span>
-                )}
-              </div>
-              {loadingHubDetails ? (
-                <p className="mt-3 text-sm text-[var(--color-text-secondary)]">Loading moderators…</p>
-              ) : hubDetailsError ? (
-                <p className="mt-3 text-sm text-[var(--color-text-secondary)]">
-                  Unable to load moderators.
-                </p>
-              ) : hubDetails?.moderators && hubDetails.moderators.length > 0 ? (
-                <ul className="mt-3 space-y-2">
-                  {hubDetails.moderators.map((moderator) => (
-                    <li key={moderator.id} className="flex items-center gap-3">
-                      {moderator.avatar_url ? (
-                        <img
-                          src={moderator.avatar_url}
-                          alt={moderator.username}
-                          className="h-8 w-8 rounded-full object-cover"
-                        />
-                      ) : (
-                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--color-border)] text-sm font-semibold text-[var(--color-text-secondary)]">
-                          {moderator.username.charAt(0).toUpperCase()}
-                        </div>
-                      )}
-                      <Link
-                        to={`/users/${moderator.username}`}
-                        className="text-sm font-medium text-[var(--color-text-primary)] hover:text-[var(--color-primary)]"
-                      >
-                        {moderator.username}
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="mt-3 text-sm text-[var(--color-text-secondary)]">
-                  No moderators listed yet.
-                </p>
-              )}
-              {/* Message the Mods button */}
-              {user && hubname !== 'popular' && hubname !== 'all' && (
-                <button
-                  onClick={() => setShowModMailModal(true)}
-                  className="mt-4 w-full px-4 py-2 text-sm font-medium text-[var(--color-primary)] border border-[var(--color-primary)] rounded-lg hover:bg-[var(--color-primary)] hover:text-white transition-colors"
-                >
-                  Message the Mods
-                </button>
-              )}
-            </div>
+            <HubModeratorsPanel
+              moderators={hubModerators}
+              isLoading={loadingHubModerators}
+              isError={hubModeratorsError}
+              hubName={hubname}
+              showMessageButton={Boolean(user && hubname !== 'popular' && hubname !== 'all')}
+              onMessageMods={() => setShowModMailModal(true)}
+            />
           </aside>
         )}
       </div>
 
       {/* Crosspost Modal */}
-      {crosspostTarget && (
-        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 px-4">
-          <div className="w-full max-w-md rounded-lg bg-white p-4 shadow-lg">
-            <div className="flex items-start justify-between">
-              <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">Submit a Crosspost</h3>
-              <button
-                onClick={resetCrosspostState}
-                className="text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
-              >
-                ✕
-              </button>
-            </div>
-            <div className="mt-3 rounded border border-yellow-200 bg-yellow-50 p-3 text-sm text-yellow-800">
-              <p>You can crosspost to an OmniHub, a subreddit, or both. At least one destination is required.</p>
-            </div>
-            <div className="mt-4 space-y-3">
-              <div>
-                <label className="mb-1 block text-xs font-medium text-[var(--color-text-secondary)]">
-                  Crosspost to OmniHub (optional)
-                </label>
-                <select
-                  value={selectedHub}
-                  onChange={(e) => setSelectedHub(e.target.value)}
-                  className="w-full rounded border border-[var(--color-border)] bg-[var(--color-surface)] p-2 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
-                >
-                  <option value="">Select a hub...</option>
-                  {subscribedHubs?.map((sub) => {
-                    const hubOptionName = sub.hub_name || sub.hub?.name;
-                    if (!hubOptionName) return null;
-                    return (
-                      <option key={sub.hub_id} value={hubOptionName}>
-                        h/{hubOptionName}
-                      </option>
-                    );
-                  })}
-                </select>
-              </div>
-              <div>
-                <label className="mb-1 block text-xs font-medium text-[var(--color-text-secondary)]">
-                  Crosspost to subreddit (optional)
-                </label>
-                <select
-                  value={selectedSubreddit}
-                  onChange={(e) => setSelectedSubreddit(e.target.value)}
-                  className="w-full rounded border border-[var(--color-border)] bg-[var(--color-surface)] p-2 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
-                >
-                  <option value="">Select a subreddit...</option>
-                  {subscribedSubreddits?.map((sub) => (
-                    <option key={sub.id} value={sub.subreddit_name}>
-                      r/{sub.subreddit_name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="mb-1 block text-xs font-medium text-[var(--color-text-secondary)]">
-                  Choose a title <span className="text-red-500">*required</span>
-                </label>
-                <input
-                  type="text"
-                  value={crosspostTitle}
-                  onChange={(e) => setCrosspostTitle(e.target.value)}
-                  className="w-full rounded border border-[var(--color-border)] bg-[var(--color-surface)] p-2 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
-                  placeholder="Enter title..."
-                />
-              </div>
-              <div className="flex items-start gap-2">
-                <input
-                  type="checkbox"
-                  id="send-replies"
-                  checked={sendRepliesToInbox}
-                  onChange={(e) => setSendRepliesToInbox(e.target.checked)}
-                  className="mt-0.5"
-                />
-                <label htmlFor="send-replies" className="text-sm text-[var(--color-text-primary)]">
-                  Send replies to this post to my inbox
-                </label>
-              </div>
-              <div className="flex justify-end gap-2 pt-2">
-                <button
-                  onClick={resetCrosspostState}
-                  className="rounded border border-[var(--color-border)] px-4 py-2 text-sm font-semibold text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-elevated)]"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={() => crosspostMutation.mutate()}
-                  disabled={
-                    (!selectedHub && !selectedSubreddit) ||
-                    !crosspostTitle.trim() ||
-                    crosspostMutation.isPending
-                  }
-                  className="rounded bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)] disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {crosspostMutation.isPending ? 'Submitting...' : 'Submit'}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <CrosspostModal
+        isOpen={Boolean(crosspostTarget)}
+        onClose={resetCrosspostState}
+        hubOptions={hubOptions}
+        subredditOptions={subredditOptions}
+        hubValue={selectedHub}
+        subredditValue={selectedSubreddit}
+        titleValue={crosspostTitle}
+        sendRepliesToInbox={sendRepliesToInbox}
+        onHubChange={setSelectedHub}
+        onSubredditChange={setSelectedSubreddit}
+        onTitleChange={setCrosspostTitle}
+        onToggleSendReplies={setSendRepliesToInbox}
+        onSubmit={handleCrosspostSubmit}
+        isSubmitting={crosspostMutation.isPending}
+        isSubmitDisabled={isCrosspostSubmitDisabled}
+      />
 
       {/* Mod Mail Modal */}
       {showModMailModal && hubname && (

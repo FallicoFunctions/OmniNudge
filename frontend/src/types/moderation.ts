@@ -70,7 +70,7 @@ export interface ModLog {
   action: string;
   target_type?: string;
   target_id?: number;
-  details?: Record<string, any>;
+  details?: Record<string, unknown>;
   created_at: string;
   moderator_name?: string;
   hub_name?: string;

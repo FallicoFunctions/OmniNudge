@@ -1,24 +1,23 @@
 export default function PrivacyPage() {
   return (
-    <div className="mx-auto w-full max-w-4xl px-4 py-10">
-      <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-6 shadow-sm">
-        <h1 className="text-3xl font-bold text-[var(--color-text-primary)]">Privacy Policy</h1>
-        <p className="mt-2 text-sm text-[var(--color-text-secondary)]">
-          Effective date: January 10, 2026
-        </p>
+    <PageShell>
+      <h1 className="text-3xl font-bold text-[var(--color-text-primary)]">Privacy Policy</h1>
+      <p className="mt-2 text-sm text-[var(--color-text-secondary)]">
+        Effective date: January 10, 2026
+      </p>
 
-        <div className="mt-6 space-y-6 text-sm text-[var(--color-text-secondary)]">
-          <section>
-            <h2 className="text-lg font-semibold text-[var(--color-text-primary)]">
-              1. What We Collect
-            </h2>
-            <p className="mt-2">
-              We collect account information you provide (such as username and email), content you
-              post, and information related to your use of OmniNudge (such as pages you visit and
-              actions you take). We also collect technical data like IP address, device, and browser
-              details to keep the platform secure and functional.
-            </p>
-          </section>
+      <div className="mt-6 space-y-6 text-sm text-[var(--color-text-secondary)]">
+        <section>
+          <h2 className="text-lg font-semibold text-[var(--color-text-primary)]">
+            1. What We Collect
+          </h2>
+          <p className="mt-2">
+            We collect account information you provide (such as username and email), content you
+            post, and information related to your use of OmniNudge (such as pages you visit and
+            actions you take). We also collect technical data like IP address, device, and browser
+            details to keep the platform secure and functional.
+          </p>
+        </section>
 
           <section>
             <h2 className="text-lg font-semibold text-[var(--color-text-primary)]">
@@ -102,8 +101,8 @@ export default function PrivacyPage() {
               you accept the updated policy.
             </p>
           </section>
-        </div>
       </div>
-    </div>
+    </PageShell>
   );
 }
+import { PageShell } from '../components/common/PageShell';

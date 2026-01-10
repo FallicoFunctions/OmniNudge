@@ -1,20 +1,19 @@
 export default function TermsPage() {
   return (
-    <div className="mx-auto w-full max-w-4xl px-4 py-10">
-      <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-6 shadow-sm">
-        <h1 className="text-3xl font-bold text-[var(--color-text-primary)]">Terms of Service</h1>
-        <p className="mt-2 text-sm text-[var(--color-text-secondary)]">
-          Effective date: January 10, 2026
-        </p>
+    <PageShell>
+      <h1 className="text-3xl font-bold text-[var(--color-text-primary)]">Terms of Service</h1>
+      <p className="mt-2 text-sm text-[var(--color-text-secondary)]">
+        Effective date: January 10, 2026
+      </p>
 
-        <div className="mt-6 space-y-6 text-sm text-[var(--color-text-secondary)]">
-          <section>
-            <h2 className="text-lg font-semibold text-[var(--color-text-primary)]">1. Acceptance</h2>
-            <p className="mt-2">
-              By accessing or using OmniNudge, you agree to these Terms of Service. If you do not
-              agree, do not use the service.
-            </p>
-          </section>
+      <div className="mt-6 space-y-6 text-sm text-[var(--color-text-secondary)]">
+        <section>
+          <h2 className="text-lg font-semibold text-[var(--color-text-primary)]">1. Acceptance</h2>
+          <p className="mt-2">
+            By accessing or using OmniNudge, you agree to these Terms of Service. If you do not
+            agree, do not use the service.
+          </p>
+        </section>
 
           <section>
             <h2 className="text-lg font-semibold text-[var(--color-text-primary)]">
@@ -118,8 +117,8 @@ export default function TermsPage() {
               During the beta phase, OmniNudge uses A.I. Agents to enhance user experience until the userbase is large enough to support itself without the need of the agents.
             </p>
           </section>
-        </div>
       </div>
-    </div>
+    </PageShell>
   );
 }
+import { PageShell } from '../components/common/PageShell';

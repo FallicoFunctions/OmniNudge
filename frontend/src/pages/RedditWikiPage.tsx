@@ -1,9 +1,10 @@
 import { Link, useLocation, useParams, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { useEffect, useMemo } from 'react';
-import { diffLines } from 'diff';
+import { useEffect, useMemo, useState } from 'react';
 import { redditService } from '../services/redditService';
 import { sanitizeHttpUrl } from '../utils/crosspostHelpers';
+import { Panel } from '../components/common/Panel';
+import { EmptyMessage, ErrorMessage, LoadingMessage } from '../components/common/StatusMessage';
 import type {
   RedditSubredditAbout,
   RedditWikiRevisionsResponse,
@@ -104,6 +105,24 @@ export default function RedditWikiPage({ mode = 'view' }: RedditWikiPageProps = 
   });
   const compareFromData = comparePayload?.from;
   const compareToData = comparePayload?.to;
+  const [diffModule, setDiffModule] = useState<typeof import('diff') | null>(null);
+
+  useEffect(() => {
+    if (!isCompareMode) return;
+    let isActive = true;
+    import('diff')
+      .then((module) => {
+        if (isActive) {
+          setDiffModule(module);
+        }
+      })
+      .catch((error) => {
+        console.error('Failed to load diff module', error);
+      });
+    return () => {
+      isActive = false;
+    };
+  }, [isCompareMode]);
 
   const { processedHtml, tocItems } = useMemo(() => {
     return processWikiContent(wikiData?.content_html);
@@ -152,7 +171,7 @@ export default function RedditWikiPage({ mode = 'view' }: RedditWikiPageProps = 
 
   const revisionsList = useMemo(() => revisionsData?.revisions ?? [], [revisionsData?.revisions]);
   const compareDiffRows = useMemo<DiffRow[]>(() => {
-    if (!isCompareMode || !compareFromData || !compareToData) {
+    if (!isCompareMode || !compareFromData || !compareToData || !diffModule) {
       return [];
     }
     const fromText = (compareFromData?.content_md as string) ?? '';
@@ -160,7 +179,7 @@ export default function RedditWikiPage({ mode = 'view' }: RedditWikiPageProps = 
     if (!fromText && !toText) {
       return [];
     }
-    const diff = diffLines(fromText, toText);
+    const diff = diffModule.diffLines(fromText, toText);
 
     // Convert diff chunks into synchronized rows
     const rows: DiffRow[] = [];
@@ -207,7 +226,7 @@ export default function RedditWikiPage({ mode = 'view' }: RedditWikiPageProps = 
     });
 
     return rows;
-  }, [isCompareMode, compareFromData, compareToData]);
+  }, [isCompareMode, compareFromData, compareToData, diffModule]);
   const compareFromMeta = useMemo(
     () => extractRevisionMeta(compareFromData, comparePayload?.from_id),
     [compareFromData, comparePayload?.from_id]
@@ -316,7 +335,7 @@ export default function RedditWikiPage({ mode = 'view' }: RedditWikiPageProps = 
         : 'Loading discussions...';
     return (
       <div className="flex min-h-screen items-center justify-center">
-        <div className="text-[var(--color-text-secondary)]">{loadingMessage}</div>
+        <LoadingMessage>{loadingMessage}</LoadingMessage>
       </div>
     );
   }
@@ -332,9 +351,9 @@ export default function RedditWikiPage({ mode = 'view' }: RedditWikiPageProps = 
       <div className="mx-auto max-w-4xl p-6">
         <div className="rounded-lg border border-red-300 bg-red-50 p-4">
           <h2 className="text-lg font-semibold text-red-800">Something went wrong</h2>
-          <p className="mt-2 text-sm text-red-700">
+          <ErrorMessage className="mt-2 text-sm text-red-700">
             {currentError instanceof Error ? currentError.message : message}
-          </p>
+          </ErrorMessage>
           {subreddit && activeTab !== 'talk' && (
             <a
               href={`/r/${subreddit}`}
@@ -410,7 +429,7 @@ export default function RedditWikiPage({ mode = 'view' }: RedditWikiPageProps = 
         </div>
       )}
 
-      <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-6">
+      <Panel>
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div className="text-lg font-semibold capitalize text-[var(--color-text-primary)]">
             {currentPage}
@@ -525,7 +544,7 @@ export default function RedditWikiPage({ mode = 'view' }: RedditWikiPageProps = 
                 dangerouslySetInnerHTML={{ __html: processedHtml }}
               />
             ) : (
-              <p className="text-[var(--color-text-secondary)]">This wiki page is empty.</p>
+              <EmptyMessage>This wiki page is empty.</EmptyMessage>
             )}
             <div className="hidden lg:block clear-both" aria-hidden="true" />
           </div>
@@ -546,8 +565,8 @@ export default function RedditWikiPage({ mode = 'view' }: RedditWikiPageProps = 
                   </button>
                 </div>
                 {compareLoading ? (
-                  <div className="py-12 text-center text-sm text-[var(--color-text-secondary)]">
-                    Loading comparison…
+                  <div className="py-12 text-center">
+                    <LoadingMessage className="text-sm">Loading comparison…</LoadingMessage>
                   </div>
                 ) : compareIsError ? (
                   <div className="rounded border border-red-200 bg-red-50 p-4 text-sm text-red-800">
@@ -608,8 +627,8 @@ export default function RedditWikiPage({ mode = 'view' }: RedditWikiPageProps = 
                         </div>
                       </div>
                     ) : (
-                      <div className="rounded border border-[var(--color-border)] bg-[var(--color-surface-secondary,#f7f9fc)] p-6 text-center text-sm text-[var(--color-text-secondary)]">
-                        No differences detected between these revisions.
+                      <div className="rounded border border-[var(--color-border)] bg-[var(--color-surface-secondary,#f7f9fc)] p-6 text-center">
+                        <EmptyMessage className="text-sm">No differences detected between these revisions.</EmptyMessage>
                       </div>
                     )}
                   </div>
@@ -827,7 +846,7 @@ export default function RedditWikiPage({ mode = 'view' }: RedditWikiPageProps = 
             )}
           </div>
         )}
-      </div>
+      </Panel>
     </div>
   );
 }

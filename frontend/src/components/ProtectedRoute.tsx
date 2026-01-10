@@ -1,5 +1,6 @@
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { StatusMessage } from './common/StatusMessage';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -11,7 +12,7 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
   if (isLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[var(--color-background)]">
-        <div className="text-[var(--color-text-secondary)]">Loading...</div>
+        <StatusMessage>Loading...</StatusMessage>
       </div>
     );
   }

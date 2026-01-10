@@ -10,6 +10,8 @@ import type {
   RedditSubredditAbout,
   RedditSubredditModerator,
   SubredditModeratorsResponse,
+  RedditWikiPage,
+  RedditWikiCompareResponse,
   RedditWikiRevisionsResponse,
   RedditWikiDiscussionsResponse,
 } from '../types/reddit';
@@ -121,7 +123,7 @@ export const redditService = {
     return response.moderated ?? [];
   },
 
-  async getSubredditWikiPage(subreddit: string, pagePath: string, revision?: string | null): Promise<any> {
+  async getSubredditWikiPage(subreddit: string, pagePath: string, revision?: string | null): Promise<RedditWikiPage> {
     const params = new URLSearchParams();
     if (revision) {
       params.append('revision', revision);
@@ -130,7 +132,7 @@ export const redditService = {
     const path = query
       ? `/reddit/r/${subreddit}/wiki/${pagePath}?${query}`
       : `/reddit/r/${subreddit}/wiki/${pagePath}`;
-    return api.get<any>(path);
+    return api.get<RedditWikiPage>(path);
   },
 
   async compareSubredditWikiRevisions(
@@ -138,16 +140,16 @@ export const redditService = {
     pagePath: string,
     fromRevision: string,
     toRevision: string
-  ): Promise<{ from: any; to: any; from_id: string; to_id: string }> {
+  ): Promise<RedditWikiCompareResponse> {
     const params = new URLSearchParams();
     params.append('from', fromRevision);
     params.append('to', toRevision);
     const path = `/reddit/r/${subreddit}/wiki/${pagePath}/compare?${params.toString()}`;
-    return api.get(path);
+    return api.get<RedditWikiCompareResponse>(path);
   },
 
-  async getWikiPage(pagePath: string): Promise<any> {
-    return api.get<any>(`/reddit/wiki/${pagePath}`);
+  async getWikiPage(pagePath: string): Promise<RedditWikiPage> {
+    return api.get<RedditWikiPage>(`/reddit/wiki/${pagePath}`);
   },
 
   async getSubredditWikiRevisions(

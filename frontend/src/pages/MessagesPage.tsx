@@ -18,6 +18,7 @@ import {
 } from '../utils/encryption';
 import { getOwnKeys, getUserPublicKey } from '../services/keyManagementService';
 import { encryptionService } from '../services/encryptionService';
+import { EmptyMessage, LoadingMessage } from '../components/common/StatusMessage';
 
 const MAX_UPLOAD_SIZE = 25 * 1024 * 1024; // 25MB
 
@@ -951,8 +952,8 @@ export default function MessagesPage() {
 
         <div className="overflow-y-auto" style={{ height: 'calc(100% - 116px)' }}>
           {loadingConversations && (
-            <div className="p-4 text-center text-sm text-[var(--color-text-secondary)]">
-              Loading...
+            <div className="p-4 text-center">
+              <LoadingMessage className="text-sm">Loading...</LoadingMessage>
             </div>
           )}
 
@@ -1052,8 +1053,8 @@ export default function MessagesPage() {
           ))}
 
           {conversations?.length === 0 && (
-            <div className="p-4 text-center text-sm text-[var(--color-text-secondary)]">
-              No conversations yet. Start a new chat!
+            <div className="p-4 text-center">
+              <EmptyMessage className="text-sm">No conversations yet. Start a new chat!</EmptyMessage>
             </div>
           )}
         </div>
@@ -1081,8 +1082,8 @@ export default function MessagesPage() {
                   Enter a username and message to start a conversation
                 </div>
               ) : loadingMessages ? (
-                <div className="text-center text-sm text-[var(--color-text-secondary)]">
-                  Loading messages...
+                <div className="text-center">
+                  <LoadingMessage className="text-sm">Loading messages...</LoadingMessage>
                 </div>
               ) : (
                 <div className="space-y-3">

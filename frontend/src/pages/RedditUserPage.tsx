@@ -3,11 +3,19 @@ import { Link, useParams, useLocation } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { redditService } from '../services/redditService';
 import { savedService } from '../services/savedService';
+import { useSavedItems } from '../hooks/useSavedItems';
+import { useHiddenItems } from '../hooks/useHiddenItems';
+import {
+  getSavedRedditPostIdSet,
+  getSavedRedditCommentIdSet,
+  getHiddenRedditPostIdSet,
+} from '../utils/savedItems';
 import { useAuth } from '../contexts/AuthContext';
 import { useSettings } from '../contexts/SettingsContext';
 import { useRedditBlocklist } from '../contexts/RedditBlockContext';
 import { MarkdownRenderer } from '../components/common/MarkdownRenderer';
 import { RedditPostCard } from '../components/reddit/RedditPostCard';
+import { EmptyMessage, ErrorMessage, LoadingMessage } from '../components/common/StatusMessage';
 import type {
   RedditApiPost,
   RedditUserAbout,
@@ -89,52 +97,24 @@ export default function RedditUserPage() {
     staleTime: 1000 * 60 * 30,
   });
 
-  const { data: hiddenPostsData } = useQuery({
-    queryKey: ['hidden-items', 'reddit_posts'],
-    queryFn: () => savedService.getHiddenItems('reddit_posts'),
-    enabled: !!user,
-    staleTime: 1000 * 60 * 5,
-  });
+  const { data: hiddenPostsData } = useHiddenItems('reddit_posts', !!user, 1000 * 60 * 5);
 
   const hiddenPostIds = useMemo(
-    () =>
-      new Set(
-        hiddenPostsData?.hidden_reddit_posts?.map(
-          (post) => `${post.subreddit}-${post.reddit_post_id}`
-        ) ?? []
-      ),
+    () => getHiddenRedditPostIdSet(hiddenPostsData),
     [hiddenPostsData]
   );
 
-  const { data: savedRedditPostsData } = useQuery({
-    queryKey: ['saved-items', 'reddit_posts'],
-    queryFn: () => savedService.getSavedItems('reddit_posts'),
-    enabled: !!user,
-  });
+  const { data: savedRedditPostsData } = useSavedItems('reddit_posts', !!user, 1000 * 60 * 5);
 
   const savedRedditPostIds = useMemo(
-    () =>
-      new Set(
-        savedRedditPostsData?.saved_reddit_posts?.map(
-          (post) => `${post.subreddit}-${post.reddit_post_id}`
-        ) ?? []
-      ),
+    () => getSavedRedditPostIdSet(savedRedditPostsData),
     [savedRedditPostsData]
   );
 
-  const { data: savedRedditCommentsData } = useQuery({
-    queryKey: ['saved-items', 'reddit_comments'],
-    queryFn: () => savedService.getSavedItems('reddit_comments'),
-    enabled: !!user,
-  });
+  const { data: savedRedditCommentsData } = useSavedItems('reddit_comments', !!user, 1000 * 60 * 5);
 
   const savedRedditCommentIds = useMemo(
-    () =>
-      new Set(
-        savedRedditCommentsData?.saved_reddit_comments?.map(
-          (comment) => `${comment.subreddit}-${comment.reddit_post_id}-${comment.id}`
-        ) ?? []
-      ),
+    () => getSavedRedditCommentIdSet(savedRedditCommentsData),
     [savedRedditCommentsData]
   );
 
@@ -422,17 +402,15 @@ export default function RedditUserPage() {
             </div>
             <div className="space-y-3 px-4 py-4">
               {listingQuery.isLoading && (
-                <div className="text-sm text-[var(--color-text-secondary)]">Loading activity…</div>
+                <LoadingMessage className="text-sm">Loading activity…</LoadingMessage>
               )}
               {listingQuery.isError && (
-                <div className="rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-                  Failed to load user activity.
+                <div className="rounded border border-red-200 bg-red-50 p-3">
+                  <ErrorMessage className="text-sm text-red-700">Failed to load user activity.</ErrorMessage>
                 </div>
               )}
               {!listingQuery.isLoading && !listingQuery.isError && listingItems.length === 0 && (
-                <div className="text-sm text-[var(--color-text-secondary)]">
-                  No activity found for this tab.
-                </div>
+                <EmptyMessage className="text-sm">No activity found for this tab.</EmptyMessage>
               )}
               {!listingQuery.isLoading && !listingQuery.isError && listingItems.length > 0 && (
                 <>

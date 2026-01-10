@@ -9,6 +9,7 @@ import {
   type RedditCrosspostSource,
 } from '../../utils/crosspostHelpers';
 import { decodeHtmlEntities } from '../../utils/text';
+import { loadHls } from '../../utils/hlsLoader';
 
 interface RedditPostCardProps {
   post: RedditCrosspostSource & {
@@ -425,8 +426,7 @@ export function RedditPostCard({
     let mounted = true;
     (async () => {
       try {
-        const hlsModule = await import('hls.js');
-        const Hls = hlsModule.default;
+        const Hls = await loadHls();
         if (Hls?.isSupported && Hls.isSupported()) {
           const instance = new Hls();
           instance.loadSource(redditVideoSource.url);
@@ -440,7 +440,7 @@ export function RedditPostCard({
           console.warn('HLS not supported and no fallback available.');
         }
       } catch (err) {
-        console.error('Failed to load hls.js for HLS playback', err);
+        console.error('Failed to load HLS player for playback', err);
       }
     })();
 
