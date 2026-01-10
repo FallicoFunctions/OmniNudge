@@ -227,3 +227,21 @@ export interface RedditWikiDiscussionsResponse {
   before?: string | null;
   discussions: RedditApiPost[];
 }
+
+export interface RedditWikiPage {
+  content_html?: string | null;
+  content_md?: string | null;
+  revision_date?: number;
+  revision_by?: string | null;
+  revision_by_name?: string | null;
+  may_revise?: boolean;
+  page?: string;
+  subreddit?: string;
+}
+
+export interface RedditWikiCompareResponse {
+  from: RedditWikiPage;
+  to: RedditWikiPage;
+  from_id: string;
+  to_id: string;
+}

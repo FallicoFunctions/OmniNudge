@@ -1,9 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import '@testing-library/jest-dom/vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter } from 'react-router-dom';
 import AdminPage from '../AdminPage';
 import { adminService } from '../../services/adminService';
+import type { AdminUser } from '../../types/admin';
 
 // Mock the admin service
 vi.mock('../../services/adminService', () => ({
@@ -50,7 +52,7 @@ describe('AdminPage - Ban System', () => {
     vi.clearAllMocks();
 
     // Default mock implementations
-    (adminService.getSiteStats as any).mockResolvedValue({
+    vi.mocked(adminService.getSiteStats).mockResolvedValue({
       total_users: 100,
       total_posts: 500,
       total_comments: 1000,
@@ -62,7 +64,7 @@ describe('AdminPage - Ban System', () => {
       moderator_count: 5,
     });
 
-    (adminService.listUsers as any).mockResolvedValue({
+    vi.mocked(adminService.listUsers).mockResolvedValue({
       users: [
         {
           id: 2,
@@ -95,7 +97,7 @@ describe('AdminPage - Ban System', () => {
       total: 2,
     });
 
-    (adminService.getAllBanHistory as any).mockResolvedValue({
+    vi.mocked(adminService.getAllBanHistory).mockResolvedValue({
       history: [],
       limit: 50,
       offset: 0,
@@ -137,7 +139,7 @@ describe('AdminPage - Ban System', () => {
   });
 
   it('submits ban action with reason', async () => {
-    (adminService.banUser as any).mockResolvedValue({ message: 'User banned' });
+    vi.mocked(adminService.banUser).mockResolvedValue({ message: 'User banned' });
 
     render(<AdminPage />, { wrapper: createWrapper() });
 
@@ -173,7 +175,7 @@ describe('AdminPage - Ban System', () => {
   });
 
   it('handles shadow ban action', async () => {
-    (adminService.shadowBanUser as any).mockResolvedValue({ message: 'User shadow banned' });
+    vi.mocked(adminService.shadowBanUser).mockResolvedValue({ message: 'User shadow banned' });
 
     render(<AdminPage />, { wrapper: createWrapper() });
 
@@ -205,7 +207,7 @@ describe('AdminPage - Ban System', () => {
   });
 
   it('handles unban action', async () => {
-    (adminService.unbanUser as any).mockResolvedValue({ message: 'User unbanned' });
+    vi.mocked(adminService.unbanUser).mockResolvedValue({ message: 'User unbanned' });
 
     render(<AdminPage />, { wrapper: createWrapper() });
 
@@ -237,7 +239,7 @@ describe('AdminPage - Ban System', () => {
   });
 
   it('filters users by ban status', async () => {
-    const mockBannedUsers = {
+    const mockBannedUsers: { users: AdminUser[]; limit: number; offset: number; total: number } = {
       users: [
         {
           id: 3,
@@ -257,7 +259,7 @@ describe('AdminPage - Ban System', () => {
       total: 1,
     };
 
-    (adminService.listUsers as any).mockResolvedValue(mockBannedUsers);
+    vi.mocked(adminService.listUsers).mockResolvedValue(mockBannedUsers);
 
     render(<AdminPage />, { wrapper: createWrapper() });
 
@@ -306,7 +308,7 @@ describe('AdminPage - Ban System', () => {
       ],
     };
 
-    (adminService.getBanHistory as any).mockResolvedValue(mockHistory);
+    vi.mocked(adminService.getBanHistory).mockResolvedValue(mockHistory);
 
     render(<AdminPage />, { wrapper: createWrapper() });
 
@@ -330,7 +332,7 @@ describe('AdminPage - Ban System', () => {
   });
 
   it('supports bulk ban actions', async () => {
-    (adminService.banUser as any).mockResolvedValue({ message: 'User banned' });
+    vi.mocked(adminService.banUser).mockResolvedValue({ message: 'User banned' });
 
     render(<AdminPage />, { wrapper: createWrapper() });
 
@@ -394,13 +396,14 @@ describe('AdminPage - Ban System', () => {
     // Mock document.createElement to track link clicks
     const mockClick = vi.fn();
     const originalCreateElement = document.createElement.bind(document);
-    document.createElement = vi.fn((tagName: string) => {
+    const createElementMock: typeof document.createElement = vi.fn((tagName: string) => {
       const element = originalCreateElement(tagName);
       if (tagName === 'a') {
         element.click = mockClick;
       }
       return element;
-    }) as any;
+    });
+    document.createElement = createElementMock;
 
     render(<AdminPage />, { wrapper: createWrapper() });
 
@@ -438,7 +441,7 @@ describe('AdminPage - Ban System', () => {
       total: 1,
     };
 
-    (adminService.getAllBanHistory as any).mockResolvedValue(mockHistory);
+    vi.mocked(adminService.getAllBanHistory).mockResolvedValue(mockHistory);
 
     render(<AdminPage />, { wrapper: createWrapper() });
 

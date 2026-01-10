@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import ThemeSelector from '../components/themes/ThemeSelector';
+import { Panel } from '../components/common/Panel';
 import { useSettings } from '../contexts/SettingsContext';
 import { getOwnPublicKeyBase64 } from '../services/keyManagementService';
 
@@ -47,16 +48,16 @@ export default function SettingsPage() {
 
       <div className="space-y-6">
         {/* Theme Selection */}
-        <section className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-6">
+        <Panel as="section">
           <h2 className="mb-4 text-xl font-semibold text-[var(--color-text-primary)]">Theme</h2>
           <p className="mb-4 text-sm text-[var(--color-text-secondary)]">
             Choose an active theme or create your own.
           </p>
           <ThemeSelector />
-        </section>
+        </Panel>
 
         {/* Messaging Notifications */}
-        <section className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-6">
+        <Panel as="section">
           <h2 className="mb-4 text-xl font-semibold text-[var(--color-text-primary)]">
             Archived Chat Notifications
           </h2>
@@ -91,10 +92,10 @@ export default function SettingsPage() {
               />
             </button>
           </div>
-        </section>
+        </Panel>
 
         {/* Date & Time Settings */}
-        <section className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-6">
+        <Panel as="section">
           <h2 className="mb-4 text-xl font-semibold text-[var(--color-text-primary)]">
             Date & Time Display
           </h2>
@@ -152,9 +153,9 @@ export default function SettingsPage() {
               </div>
             </div>
           </div>
-        </section>
+        </Panel>
 
-        <section className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-6">
+        <Panel as="section">
           <h2 className="mb-4 text-xl font-semibold text-[var(--color-text-primary)]">
             Theme Selector Behavior
           </h2>
@@ -220,9 +221,9 @@ export default function SettingsPage() {
               </div>
             </label>
           </div>
-        </section>
+        </Panel>
 
-        <section className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-6">
+        <Panel as="section">
           <h2 className="mb-4 text-xl font-semibold text-[var(--color-text-primary)]">Saved Items Alerts</h2>
           <p className="text-sm text-[var(--color-text-secondary)]">
             When Reddit moderators remove a post you’ve saved, OmniNudge automatically cleans it from your Saved tab.
@@ -256,9 +257,9 @@ export default function SettingsPage() {
               />
             </button>
           </div>
-        </section>
+        </Panel>
 
-        <section className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-6">
+        <Panel as="section">
           <h2 className="mb-4 text-xl font-semibold text-[var(--color-text-primary)]">Omni Feed Defaults</h2>
           <p className="text-sm text-[var(--color-text-secondary)]">
             Decide whether your Omni feed should automatically start in “Omni posts only” mode every time
@@ -328,10 +329,10 @@ export default function SettingsPage() {
               </button>
             </div>
           </div>
-        </section>
+        </Panel>
 
         {/* Infinite Scroll Settings */}
-        <section className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-6">
+        <Panel as="section">
           <h2 className="mb-4 text-xl font-semibold text-[var(--color-text-primary)]">
             Page Navigation
           </h2>
@@ -460,10 +461,10 @@ export default function SettingsPage() {
               </div>
             </div>
           </div>
-        </section>
+        </Panel>
 
         {/* NSFW Search & Visibility */}
-        <section className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-6">
+        <Panel as="section">
           <h2 className="mb-4 text-xl font-semibold text-[var(--color-text-primary)]">NSFW Preferences</h2>
           <div className="space-y-4">
             <div className="flex items-start justify-between">
@@ -538,10 +539,10 @@ export default function SettingsPage() {
               </div>
             </div>
           </div>
-        </section>
+        </Panel>
 
         {/* Security & Keys */}
-        <section className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-6">
+        <Panel as="section">
           <h2 className="mb-2 text-xl font-semibold text-[var(--color-text-primary)]">Security</h2>
           <p className="text-sm text-[var(--color-text-secondary)]">
             Your public key is used for end-to-end encrypted features. It isn&apos;t shown on your public profile.
@@ -588,7 +589,7 @@ export default function SettingsPage() {
               </div>
             )}
           </div>
-        </section>
+        </Panel>
       </div>
     </div>
   );

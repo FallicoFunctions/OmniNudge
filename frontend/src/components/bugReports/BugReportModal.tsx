@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { bugReportService } from '../../services/bugReportService';
 import { api } from '../../lib/api';
+import { Modal } from '../common/Modal';
 
 type BugReportModalProps = {
   isOpen: boolean;
@@ -86,8 +87,11 @@ export default function BugReportModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
-      <div className="w-full max-w-2xl rounded-lg bg-[var(--color-surface)] p-6 shadow-xl">
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      className="w-full max-w-2xl rounded-lg bg-[var(--color-surface)] p-6 shadow-xl"
+    >
         <div className="flex items-center justify-between border-b border-[var(--color-border)] pb-4">
           <h2 className="text-2xl font-semibold text-[var(--color-text-primary)]">Report a Bug</h2>
           <button
@@ -215,7 +219,6 @@ export default function BugReportModal({
           </div>
           </form>
         )}
-      </div>
-    </div>
+    </Modal>
   );
 }

@@ -12,6 +12,7 @@ import { usePagination } from '../../hooks/usePagination';
 import { PaginationControls } from '../common/PaginationControls';
 import { sanitizeHttpUrl } from '../../utils/crosspostHelpers';
 import { getPostUrl, getPostCommentUrl } from '../../utils/postUrl';
+import { ErrorMessage, LoadingMessage } from '../common/StatusMessage';
 
 type RedditListingData = {
   data?: {
@@ -538,14 +539,14 @@ export function SavedItemsView({
       </div>
 
       {isLoading && (
-        <div className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] p-4 text-sm text-[var(--color-text-secondary)]">
-          Loading saved content...
+        <div className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
+          <LoadingMessage className="mt-0 text-sm">Loading saved content...</LoadingMessage>
         </div>
       )}
 
       {error && (
-        <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800">
-          Unable to load saved items.
+        <div className="rounded-md border border-red-200 bg-red-50 p-4">
+          <ErrorMessage className="mt-0 text-sm text-red-800">Unable to load saved items.</ErrorMessage>
         </div>
       )}
 

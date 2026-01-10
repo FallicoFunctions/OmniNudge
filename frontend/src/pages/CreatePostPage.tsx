@@ -7,6 +7,7 @@ import { redditService } from '../services/redditService';
 import type { CreatePostRequest } from '../types/posts';
 import type { SubredditSuggestion } from '../types/reddit';
 import { getPostUrl } from '../utils/postUrl';
+import { EmptyMessage, LoadingMessage } from '../components/common/StatusMessage';
 
 const HUB_AUTOCOMPLETE_MIN_LENGTH = 2;
 const SUBREDDIT_AUTOCOMPLETE_MIN_LENGTH = 2;
@@ -365,9 +366,13 @@ export default function CreatePostPage() {
                         trimmedHubInput.length >= HUB_AUTOCOMPLETE_MIN_LENGTH && (
                           <div className="absolute left-0 right-0 top-full z-20 mt-1 rounded-lg border bg-white shadow-lg">
                             {isHubAutocompleteLoading ? (
-                              <div className="px-3 py-2 text-sm text-gray-500">Searching...</div>
+                              <div className="px-3 py-2">
+                                <LoadingMessage className="mt-0 text-sm text-gray-500">Searching...</LoadingMessage>
+                              </div>
                             ) : hubSuggestions.length === 0 ? (
-                              <div className="px-3 py-2 text-sm text-gray-500">No hubs found</div>
+                              <div className="px-3 py-2">
+                                <EmptyMessage className="mt-0 text-sm text-gray-500">No hubs found.</EmptyMessage>
+                              </div>
                             ) : (
                               <ul>
                                 {hubSuggestions.map((hub) => (
@@ -421,9 +426,13 @@ export default function CreatePostPage() {
                         trimmedSubredditInput.length >= SUBREDDIT_AUTOCOMPLETE_MIN_LENGTH && (
                           <div className="absolute left-0 right-0 top-full z-20 mt-1 rounded-lg border bg-white shadow-lg">
                             {isSubredditAutocompleteLoading ? (
-                              <div className="px-3 py-2 text-sm text-gray-500">Searching...</div>
+                              <div className="px-3 py-2">
+                                <LoadingMessage className="mt-0 text-sm text-gray-500">Searching...</LoadingMessage>
+                              </div>
                             ) : subredditSuggestions.length === 0 ? (
-                              <div className="px-3 py-2 text-sm text-gray-500">No subreddits found</div>
+                              <div className="px-3 py-2">
+                                <EmptyMessage className="mt-0 text-sm text-gray-500">No subreddits found.</EmptyMessage>
+                              </div>
                             ) : (
                               <ul>
                                 {subredditSuggestions.map((suggestion) => (

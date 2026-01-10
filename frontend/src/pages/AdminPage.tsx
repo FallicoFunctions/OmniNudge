@@ -3,8 +3,9 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { adminService } from '../services/adminService';
-import { hubsService, type Hub } from '../services/hubsService';
+import type { Hub } from '../services/hubsService';
 import type { AdminUser, BanHistoryItem } from '../types/admin';
+import { EmptyMessage, LoadingMessage } from '../components/common/StatusMessage';
 
 type TabType = 'stats' | 'users' | 'moderators' | 'ban-activity';
 
@@ -91,11 +92,19 @@ function StatsTab() {
   });
 
   if (isLoading) {
-    return <div className="text-center py-12">Loading statistics...</div>;
+    return (
+      <div className="text-center py-12">
+        <LoadingMessage>Loading statistics...</LoadingMessage>
+      </div>
+    );
   }
 
   if (!stats) {
-    return <div className="text-center py-12 text-[var(--color-text-secondary)]">No statistics available</div>;
+    return (
+      <div className="text-center py-12">
+        <EmptyMessage>No statistics available.</EmptyMessage>
+      </div>
+    );
   }
 
   const statCards = [
@@ -226,6 +235,7 @@ function UsersTab() {
       const res = await adminService.getBanHistory(user.id);
       setBanHistory(res.history);
     } catch (err) {
+      console.error('Failed to load ban history', err);
       setBanHistory([]);
     } finally {
       setLoadingHistory(false);
@@ -349,6 +359,7 @@ function UsersTab() {
       setSelectedUsers(new Set());
       alert(`Successfully applied action to ${userIds.length} users`);
     } catch (error) {
+      console.error('Bulk admin action failed', error);
       alert('Some actions failed. Please check and try again.');
     }
   };
@@ -523,10 +534,16 @@ function UsersTab() {
         </div>
       )}
 
-      {isLoading && <div className="text-center py-12">Loading users...</div>}
+      {isLoading && (
+        <div className="text-center py-12">
+          <LoadingMessage>Loading users...</LoadingMessage>
+        </div>
+      )}
 
       {data && data.users.length === 0 && (
-        <div className="text-center py-12 text-[var(--color-text-secondary)]">No users found</div>
+        <div className="text-center py-12">
+          <EmptyMessage>No users found.</EmptyMessage>
+        </div>
       )}
 
       {data && data.users.length > 0 && (
@@ -922,9 +939,15 @@ function UsersTab() {
               </button>
             </div>
 
-            {loadingHistory && <div className="py-6 text-center text-sm text-[var(--color-text-secondary)]">Loading...</div>}
+            {loadingHistory && (
+              <div className="py-6 text-center">
+                <LoadingMessage className="text-sm">Loading...</LoadingMessage>
+              </div>
+            )}
             {!loadingHistory && banHistory && banHistory.length === 0 && (
-              <div className="py-6 text-center text-sm text-[var(--color-text-secondary)]">No history found.</div>
+              <div className="py-6 text-center">
+                <EmptyMessage className="text-sm">No history found.</EmptyMessage>
+              </div>
             )}
             {!loadingHistory && banHistory && banHistory.length > 0 && (
               <div className="space-y-3 max-h-96 overflow-y-auto pr-2">
@@ -1014,7 +1037,9 @@ function ModeratorsTab() {
       )}
 
       {selectedHubId && isLoading && (
-        <div className="text-center py-12">Loading moderators...</div>
+        <div className="text-center py-12">
+          <LoadingMessage>Loading moderators...</LoadingMessage>
+        </div>
       )}
 
       {selectedHubId && !isLoading && moderators && (
@@ -1116,10 +1141,16 @@ function BanActivityTab() {
         </div>
       )}
 
-      {isLoading && <div className="text-center py-12">Loading ban activity...</div>}
+      {isLoading && (
+        <div className="text-center py-12">
+          <LoadingMessage>Loading ban activity...</LoadingMessage>
+        </div>
+      )}
 
       {data && data.history.length === 0 && (
-        <div className="text-center py-12 text-[var(--color-text-secondary)]">No ban activity found</div>
+        <div className="text-center py-12">
+          <EmptyMessage>No ban activity found.</EmptyMessage>
+        </div>
       )}
 
       {data && data.history.length > 0 && (

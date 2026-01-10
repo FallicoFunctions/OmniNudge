@@ -1,11 +1,16 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useSettings } from '../contexts/SettingsContext';
-import { siteWideSearch } from '../services/searchService';
+import { siteWideSearch, type RedditUserSearchResult } from '../services/searchService';
 import { useRedditBlocklist } from '../contexts/RedditBlockContext';
 import { formatTimestamp } from '../utils/timeFormat';
 import { RedditPostCard } from '../components/reddit/RedditPostCard';
 import { VoteButtons } from '../components/VoteButtons';
+import { EmptyMessage, LoadingMessage } from '../components/common/StatusMessage';
+import type { PlatformPost } from '../types/posts';
+import type { RedditApiPost, SubredditSuggestion } from '../types/reddit';
+import type { Hub } from '../services/hubsService';
+import type { UserProfile } from '../types/users';
 
 type Tab = 'posts' | 'communities' | 'users';
 type PostSource = 'all' | 'omni';
@@ -31,8 +36,8 @@ export default function SearchResultsPage() {
   const [postSource, setPostSource] = useState<PostSource>('all');
   const [isLoading, setIsLoading] = useState(false);
   const [posts, setPosts] = useState<{
-    reddit: any[];
-    platform: any[];
+    reddit: RedditApiPost[];
+    platform: PlatformPost[];
     redditAfter: string | null;
     redditAfterStack: (string | null)[];
     platformOffset: number;
@@ -50,8 +55,8 @@ export default function SearchResultsPage() {
     page: 1,
   });
   const [communities, setCommunities] = useState<{
-    subreddits: any[];
-    hubs: any[];
+    subreddits: SubredditSuggestion[];
+    hubs: Hub[];
     hubsOffset: number;
     hasMoreHubs: boolean;
     subredditsAfter: string | null;
@@ -69,8 +74,8 @@ export default function SearchResultsPage() {
     page: 1,
   });
   const [users, setUsers] = useState<{
-    reddit: any[];
-    omni: any[];
+    reddit: RedditUserSearchResult[];
+    omni: UserProfile[];
     redditAfter: string | null;
     omniOffset: number;
     hasMoreReddit: boolean;
@@ -349,12 +354,12 @@ export default function SearchResultsPage() {
         )}
       </div>
 
-      {isLoading && <div className="text-sm text-[var(--color-text-secondary)]">Loading...</div>}
+      {isLoading && <LoadingMessage className="text-sm">Loading...</LoadingMessage>}
 
       {!isLoading && activeTab === 'posts' && (
         <div className="space-y-3">
           {filteredPosts.length === 0 && (
-            <div className="text-sm text-[var(--color-text-secondary)]">No posts found</div>
+            <EmptyMessage className="text-sm">No posts found.</EmptyMessage>
           )}
           {filteredPosts.map((item, idx) => {
             if (item.type === 'reddit') {
@@ -382,7 +387,7 @@ export default function SearchResultsPage() {
             const hubName = post.hub_name || post.hub?.name;
             const createdTimestamp = post.crossposted_at ?? post.created_at;
             const createdLabel = createdTimestamp ? formatTimestamp(createdTimestamp, true) : 'unknown time';
-            const commentLabel = `${post.num_comments.toLocaleString()} Comments`;
+            const commentLabel = `${(post.num_comments ?? 0).toLocaleString()} Comments`;
             const pointsLabel = `${post.score.toLocaleString()} points`;
             const postUrl = hubName ? `/h/${hubName}/comments/${post.id}` : `/posts/${post.id}`;
             const isBlockedAuthor = displayAuthor ? blockedUsers.has(displayAuthor.toLowerCase()) : false;
@@ -508,7 +513,7 @@ export default function SearchResultsPage() {
           <div>
             <h3 className="text-sm font-semibold text-[var(--color-text-primary)]">Subreddits</h3>
             {filteredSubreddits.length === 0 ? (
-              <div className="text-sm text-[var(--color-text-secondary)]">No subreddits found</div>
+              <EmptyMessage className="text-sm">No subreddits found.</EmptyMessage>
             ) : (
               <ul className="mt-2 space-y-2">
                 {filteredSubreddits.map((sr) => (
@@ -532,7 +537,7 @@ export default function SearchResultsPage() {
           <div>
             <h3 className="text-sm font-semibold text-[var(--color-text-primary)]">Hubs</h3>
             {filteredHubs.length === 0 ? (
-              <div className="text-sm text-[var(--color-text-secondary)]">No hubs found</div>
+              <EmptyMessage className="text-sm">No hubs found.</EmptyMessage>
             ) : (
               <ul className="mt-2 space-y-2">
                 {filteredHubs.map((hub) => (
@@ -566,7 +571,7 @@ export default function SearchResultsPage() {
           <div>
             <h3 className="text-sm font-semibold text-[var(--color-text-primary)]">Reddit users</h3>
             {filteredRedditUsers.length === 0 ? (
-              <div className="text-sm text-[var(--color-text-secondary)]">No Reddit users found</div>
+              <EmptyMessage className="text-sm">No Reddit users found.</EmptyMessage>
             ) : (
               <ul className="mt-2 space-y-2">
                 {filteredRedditUsers.map((user, idx) => (
@@ -595,7 +600,7 @@ export default function SearchResultsPage() {
           <div>
             <h3 className="text-sm font-semibold text-[var(--color-text-primary)]">Omni users</h3>
             {filteredOmniUsers.length === 0 ? (
-              <div className="text-sm text-[var(--color-text-secondary)]">No Omni users found</div>
+              <EmptyMessage className="text-sm">No Omni users found.</EmptyMessage>
             ) : (
               <ul className="mt-2 space-y-2">
                 {filteredOmniUsers.map((user) => (

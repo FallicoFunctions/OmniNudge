@@ -25,7 +25,7 @@ describe('adminService - Ban System', () => {
         total: 0,
       };
 
-      (api.get as any).mockResolvedValue(mockResponse);
+      vi.mocked(api.get).mockResolvedValue(mockResponse);
 
       const result = await adminService.listUsers();
 
@@ -47,7 +47,7 @@ describe('adminService - Ban System', () => {
         total: 1,
       };
 
-      (api.get as any).mockResolvedValue(mockResponse);
+      vi.mocked(api.get).mockResolvedValue(mockResponse);
 
       await adminService.listUsers('', '', 'banned', 50, 0);
 
@@ -64,7 +64,7 @@ describe('adminService - Ban System', () => {
   describe('banUser', () => {
     it('bans user with reason', async () => {
       const mockResponse = { message: 'User banned' };
-      (api.post as any).mockResolvedValue(mockResponse);
+      vi.mocked(api.post).mockResolvedValue(mockResponse);
 
       const result = await adminService.banUser(123, 'Spam posting', true);
 
@@ -77,7 +77,7 @@ describe('adminService - Ban System', () => {
 
     it('bans user with hidden reason', async () => {
       const mockResponse = { message: 'User banned' };
-      (api.post as any).mockResolvedValue(mockResponse);
+      vi.mocked(api.post).mockResolvedValue(mockResponse);
 
       await adminService.banUser(456, 'Internal reason', false);
 
@@ -91,7 +91,7 @@ describe('adminService - Ban System', () => {
   describe('shadowBanUser', () => {
     it('shadow bans user with reason', async () => {
       const mockResponse = { message: 'User shadow banned' };
-      (api.post as any).mockResolvedValue(mockResponse);
+      vi.mocked(api.post).mockResolvedValue(mockResponse);
 
       const result = await adminService.shadowBanUser(789, 'Suspicious activity', false);
 
@@ -106,7 +106,7 @@ describe('adminService - Ban System', () => {
   describe('unbanUser', () => {
     it('unbans user with reason', async () => {
       const mockResponse = { message: 'User unbanned' };
-      (api.post as any).mockResolvedValue(mockResponse);
+      vi.mocked(api.post).mockResolvedValue(mockResponse);
 
       const result = await adminService.unbanUser(123, 'Appeal approved');
 
@@ -120,7 +120,7 @@ describe('adminService - Ban System', () => {
   describe('softDeleteUser', () => {
     it('soft deletes user with reason', async () => {
       const mockResponse = { message: 'User deleted' };
-      (api.post as any).mockResolvedValue(mockResponse);
+      vi.mocked(api.post).mockResolvedValue(mockResponse);
 
       const result = await adminService.softDeleteUser(123, 'ToS violation');
 
@@ -148,7 +148,7 @@ describe('adminService - Ban System', () => {
         ],
       };
 
-      (api.get as any).mockResolvedValue(mockResponse);
+      vi.mocked(api.get).mockResolvedValue(mockResponse);
 
       const result = await adminService.getBanHistory(123);
 
@@ -166,7 +166,7 @@ describe('adminService - Ban System', () => {
         total: 0,
       };
 
-      (api.get as any).mockResolvedValue(mockResponse);
+      vi.mocked(api.get).mockResolvedValue(mockResponse);
 
       const result = await adminService.getAllBanHistory();
 
@@ -182,7 +182,7 @@ describe('adminService - Ban System', () => {
         total: 100,
       };
 
-      (api.get as any).mockResolvedValue(mockResponse);
+      vi.mocked(api.get).mockResolvedValue(mockResponse);
 
       const result = await adminService.getAllBanHistory(25, 10);
 
@@ -194,14 +194,14 @@ describe('adminService - Ban System', () => {
   describe('error handling', () => {
     it('propagates errors from ban operations', async () => {
       const mockError = new Error('Network error');
-      (api.post as any).mockRejectedValue(mockError);
+      vi.mocked(api.post).mockRejectedValue(mockError);
 
       await expect(adminService.banUser(123, 'Test', true)).rejects.toThrow('Network error');
     });
 
     it('propagates errors from history fetch', async () => {
       const mockError = new Error('Unauthorized');
-      (api.get as any).mockRejectedValue(mockError);
+      vi.mocked(api.get).mockRejectedValue(mockError);
 
       await expect(adminService.getBanHistory(123)).rejects.toThrow('Unauthorized');
     });
