@@ -19,6 +19,8 @@ import CreateHubPage from './pages/CreateHubPage';
 import CreatePostPage from './pages/CreatePostPage';
 import PostDetailPage from './pages/PostDetailPage';
 import AboutPage from './pages/AboutPage';
+import TermsPage from './pages/TermsPage';
+import PrivacyPage from './pages/PrivacyPage';
 import MessagesPage from './pages/MessagesPage';
 import SettingsPage from './pages/SettingsPage';
 import ModToolsPage from './pages/ModToolsPage';
@@ -71,6 +73,8 @@ function App() {
                   <Route path="/search" element={<SearchResultsPage />} />
                   <Route path="/hubs" element={<HubsAndSubsPage />} />
                   <Route path="/about" element={<AboutPage />} />
+                  <Route path="/terms" element={<TermsPage />} />
+                  <Route path="/privacy" element={<PrivacyPage />} />
                   <Route path="/bug-reporting" element={<BugReportingPage />} />
 
                   {/* PROTECTED routes - require auth */}
