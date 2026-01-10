@@ -1,3 +1,5 @@
+import type { ReactNode } from 'react';
+
 type OffsetPaginationControlsProps = {
   hasPrev: boolean;
   hasMore: boolean;
@@ -5,6 +7,8 @@ type OffsetPaginationControlsProps = {
   onPrev: () => void;
   onNext: () => void;
   className?: string;
+  showDivider?: boolean;
+  centerContent?: ReactNode;
 };
 
 export function OffsetPaginationControls({
@@ -14,14 +18,20 @@ export function OffsetPaginationControls({
   onPrev,
   onNext,
   className = '',
+  showDivider = true,
+  centerContent,
 }: OffsetPaginationControlsProps) {
   if (!hasPrev && !hasMore) {
     return null;
   }
 
+  const dividerClasses = showDivider
+    ? 'mt-6 border-t border-[var(--color-border)] pt-4'
+    : '';
+
   return (
     <div
-      className={`mt-6 flex items-center justify-between border-t border-[var(--color-border)] pt-4 ${className}`}
+      className={`flex items-center justify-between ${dividerClasses} ${className}`}
     >
       <button
         type="button"
@@ -31,6 +41,7 @@ export function OffsetPaginationControls({
       >
         ← Previous
       </button>
+      {centerContent}
       <button
         type="button"
         onClick={onNext}

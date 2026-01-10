@@ -6,6 +6,7 @@ import { adminService } from '../services/adminService';
 import type { Hub } from '../services/hubsService';
 import type { AdminUser, BanHistoryItem } from '../types/admin';
 import { EmptyMessage, LoadingMessage } from '../components/common/StatusMessage';
+import { PaginationControls } from '../components/common/PaginationControls';
 
 type TabType = 'stats' | 'users' | 'moderators' | 'ban-activity';
 
@@ -719,49 +720,43 @@ function UsersTab() {
           )}
 
           {/* Enhanced Pagination */}
-          <div className="mt-6 flex justify-between items-center flex-wrap gap-4">
-            <button
-              onClick={() => setOffset(Math.max(0, offset - pageSize))}
-              disabled={offset === 0}
-              className="px-4 py-2 bg-[var(--color-surface-elevated)] border border-[var(--color-border)] rounded-lg hover:bg-[var(--color-surface-hover)] disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Previous
-            </button>
-
-            <div className="flex items-center gap-3 text-sm">
-              <span className="text-[var(--color-text-secondary)]">
-                Page {currentPage} of {totalPages}
-              </span>
-              <div className="flex items-center gap-2">
-                <label htmlFor="jumpTo" className="text-[var(--color-text-secondary)]">Jump to:</label>
-                <input
-                  id="jumpTo"
-                  type="number"
-                  min="1"
-                  max={totalPages}
-                  value={jumpToPage}
-                  onChange={(e) => setJumpToPage(e.target.value)}
-                  placeholder={currentPage.toString()}
-                  className="w-20 px-2 py-1 border border-[var(--color-border)] rounded bg-[var(--color-surface)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
-                />
-                <button
-                  onClick={handleJumpToPage}
-                  disabled={!jumpToPage}
-                  className="px-3 py-1 bg-[var(--color-primary)] text-white rounded hover:bg-[var(--color-primary-strong)] disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Go
-                </button>
+          <PaginationControls
+            showDivider={false}
+            className="mt-6 gap-4"
+            pageIndex={currentPage - 1}
+            totalPages={totalPages}
+            onPrev={() => setOffset(Math.max(0, offset - pageSize))}
+            onNext={() => setOffset(offset + pageSize)}
+            canGoPrev={offset > 0}
+            canGoNext={offset + pageSize < data.total}
+            centerContent={
+              <div className="flex items-center gap-3 text-sm">
+                <span className="text-[var(--color-text-secondary)]">
+                  Page {currentPage} of {totalPages}
+                </span>
+                <div className="flex items-center gap-2">
+                  <label htmlFor="jumpTo" className="text-[var(--color-text-secondary)]">Jump to:</label>
+                  <input
+                    id="jumpTo"
+                    type="number"
+                    min="1"
+                    max={totalPages}
+                    value={jumpToPage}
+                    onChange={(e) => setJumpToPage(e.target.value)}
+                    placeholder={currentPage.toString()}
+                    className="w-20 px-2 py-1 border border-[var(--color-border)] rounded bg-[var(--color-surface)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+                  />
+                  <button
+                    onClick={handleJumpToPage}
+                    disabled={!jumpToPage}
+                    className="px-3 py-1 bg-[var(--color-primary)] text-white rounded hover:bg-[var(--color-primary-strong)] disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Go
+                  </button>
+                </div>
               </div>
-            </div>
-
-            <button
-              onClick={() => setOffset(offset + pageSize)}
-              disabled={offset + pageSize >= data.total}
-              className="px-4 py-2 bg-[var(--color-surface-elevated)] border border-[var(--color-border)] rounded-lg hover:bg-[var(--color-surface-hover)] disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Next
-            </button>
-          </div>
+            }
+          />
         </>
       )}
 
@@ -1191,49 +1186,43 @@ function BanActivityTab() {
           </div>
 
           {/* Enhanced Pagination */}
-          <div className="mt-6 flex justify-between items-center flex-wrap gap-4">
-            <button
-              onClick={() => setOffset(Math.max(0, offset - pageSize))}
-              disabled={offset === 0}
-              className="px-4 py-2 bg-[var(--color-surface-elevated)] border border-[var(--color-border)] rounded-lg hover:bg-[var(--color-surface-hover)] disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Previous
-            </button>
-
-            <div className="flex items-center gap-3 text-sm">
-              <span className="text-[var(--color-text-secondary)]">
-                Page {currentPage} of {totalPages}
-              </span>
-              <div className="flex items-center gap-2">
-                <label htmlFor="banJumpTo" className="text-[var(--color-text-secondary)]">Jump to:</label>
-                <input
-                  id="banJumpTo"
-                  type="number"
-                  min="1"
-                  max={totalPages}
-                  value={jumpToPage}
-                  onChange={(e) => setJumpToPage(e.target.value)}
-                  placeholder={currentPage.toString()}
-                  className="w-20 px-2 py-1 border border-[var(--color-border)] rounded bg-[var(--color-surface)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
-                />
-                <button
-                  onClick={handleJumpToPage}
-                  disabled={!jumpToPage}
-                  className="px-3 py-1 bg-[var(--color-primary)] text-white rounded hover:bg-[var(--color-primary-strong)] disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Go
-                </button>
+          <PaginationControls
+            showDivider={false}
+            className="mt-6 gap-4"
+            pageIndex={currentPage - 1}
+            totalPages={totalPages}
+            onPrev={() => setOffset(Math.max(0, offset - pageSize))}
+            onNext={() => setOffset(offset + pageSize)}
+            canGoPrev={offset > 0}
+            canGoNext={offset + pageSize < data.total}
+            centerContent={
+              <div className="flex items-center gap-3 text-sm">
+                <span className="text-[var(--color-text-secondary)]">
+                  Page {currentPage} of {totalPages}
+                </span>
+                <div className="flex items-center gap-2">
+                  <label htmlFor="banJumpTo" className="text-[var(--color-text-secondary)]">Jump to:</label>
+                  <input
+                    id="banJumpTo"
+                    type="number"
+                    min="1"
+                    max={totalPages}
+                    value={jumpToPage}
+                    onChange={(e) => setJumpToPage(e.target.value)}
+                    placeholder={currentPage.toString()}
+                    className="w-20 px-2 py-1 border border-[var(--color-border)] rounded bg-[var(--color-surface)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+                  />
+                  <button
+                    onClick={handleJumpToPage}
+                    disabled={!jumpToPage}
+                    className="px-3 py-1 bg-[var(--color-primary)] text-white rounded hover:bg-[var(--color-primary-strong)] disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Go
+                  </button>
+                </div>
               </div>
-            </div>
-
-            <button
-              onClick={() => setOffset(offset + pageSize)}
-              disabled={offset + pageSize >= data.total}
-              className="px-4 py-2 bg-[var(--color-surface-elevated)] border border-[var(--color-border)] rounded-lg hover:bg-[var(--color-surface-hover)] disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Next
-            </button>
-          </div>
+            }
+          />
         </>
       )}
     </div>

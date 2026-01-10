@@ -7,6 +7,7 @@ import { formatTimestamp } from '../utils/timeFormat';
 import { RedditPostCard } from '../components/reddit/RedditPostCard';
 import { VoteButtons } from '../components/VoteButtons';
 import { EmptyMessage, LoadingMessage } from '../components/common/StatusMessage';
+import { OffsetPaginationControls } from '../components/common/OffsetPaginationControls';
 import type { PlatformPost } from '../types/posts';
 import type { RedditApiPost, SubredditSuggestion } from '../types/reddit';
 import type { Hub } from '../services/hubsService';
@@ -452,63 +453,51 @@ export default function SearchResultsPage() {
               </article>
             );
           })}
-          <div className="flex items-center justify-between pt-2">
-            <button
-              type="button"
-              onClick={() => handleSearch(query, { page: Math.max(1, posts.page - 1), tab: activeTab, sort })}
-              disabled={posts.page <= 1}
-              className="rounded bg-[var(--color-primary)] px-3 py-2 text-sm font-medium text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              ← Previous
-            </button>
-            <span className="text-sm text-[var(--color-text-secondary)]">Page {posts.page}</span>
-            <button
-              type="button"
-              onClick={() => handleSearch(query, { page: posts.page + 1, tab: activeTab, sort })}
-              disabled={!posts.hasMoreReddit && !posts.hasMorePlatform}
-              className="rounded bg-[var(--color-primary)] px-3 py-2 text-sm font-medium text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              Next →
-            </button>
-          </div>
+          <OffsetPaginationControls
+            showDivider={false}
+            className="mt-2"
+            hasPrev={posts.page > 1}
+            hasMore={posts.hasMoreReddit || posts.hasMorePlatform}
+            isFetching={isLoading}
+            onPrev={() =>
+              handleSearch(query, { page: Math.max(1, posts.page - 1), tab: activeTab, sort })
+            }
+            onNext={() => handleSearch(query, { page: posts.page + 1, tab: activeTab, sort })}
+            centerContent={
+              <span className="text-sm text-[var(--color-text-secondary)]">Page {posts.page}</span>
+            }
+          />
         </div>
       )}
 
       {!isLoading && activeTab === 'communities' && (
         <div className="grid gap-4 md:grid-cols-2">
-            <div className="md:col-span-2 flex items-center justify-between bg-[var(--color-surface-elevated)] rounded-md border border-[var(--color-border)] px-3 py-2">
-              <button
-                type="button"
-                disabled={communities.page <= 1 || isLoading}
-                onClick={() =>
+            <OffsetPaginationControls
+              showDivider={false}
+              className="md:col-span-2 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-2"
+              hasPrev={communities.page > 1}
+              hasMore={communities.hasMoreHubs || communities.hasMoreSubreddits}
+              isFetching={isLoading}
+              onPrev={() =>
                 handleSearch(query, {
                   tab: 'communities',
                   sort,
                   page: Math.max(1, communities.page - 1),
                 })
               }
-              className="rounded bg-[var(--color-surface-elevated)] px-3 py-2 text-sm font-medium text-[var(--color-text-primary)] border border-[var(--color-border)] disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[var(--color-surface-hover)]"
-              >
-                ← Previous
-              </button>
-              <div className="text-sm text-[var(--color-text-secondary)]">
-                Page {communities.page}
-              </div>
-              <button
-                type="button"
-                disabled={isLoading || !(communities.hasMoreHubs || communities.hasMoreSubreddits)}
-                onClick={() =>
-                  handleSearch(query, {
-                    tab: 'communities',
-                    sort,
-                    page: communities.page + 1,
-                  })
-                }
-                className="rounded bg-[var(--color-primary)] px-3 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Next →
-              </button>
-          </div>
+              onNext={() =>
+                handleSearch(query, {
+                  tab: 'communities',
+                  sort,
+                  page: communities.page + 1,
+                })
+              }
+              centerContent={
+                <div className="text-sm text-[var(--color-text-secondary)]">
+                  Page {communities.page}
+                </div>
+              }
+            />
 
           <div>
             <h3 className="text-sm font-semibold text-[var(--color-text-primary)]">Subreddits</h3>

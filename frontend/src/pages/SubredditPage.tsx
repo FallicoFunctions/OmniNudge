@@ -37,6 +37,7 @@ import { useSavedItems } from '../hooks/useSavedItems';
 import { useHiddenItems } from '../hooks/useHiddenItems';
 import { getHiddenPostIdSet, getSavedPostIdSet, getSavedRedditPostIdSet } from '../utils/savedItems';
 import { EmptyMessage, LoadingMessage } from '../components/common/StatusMessage';
+import { OffsetPaginationControls } from '../components/common/OffsetPaginationControls';
 
 interface FeedRedditPost extends RedditCrosspostSource {
   id: string;
@@ -1441,19 +1442,19 @@ export default function RedditPage() {
                 />
               );
             })}
-            <div className="mt-4 flex items-center justify-between">
-              <span className="text-sm text-[var(--color-text-secondary)]">
-                Page {scopedSearchPage}
-              </span>
-              <button
-                type="button"
-                onClick={() => fetchScopedSearchPage(scopedSearchPage + 1, scopedSearchAfter)}
-                disabled={!scopedSearchAfter}
-                className="rounded bg-[var(--color-primary)] px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                Next →
-              </button>
-            </div>
+            <OffsetPaginationControls
+              showDivider={false}
+              className="mt-4"
+              hasPrev={false}
+              hasMore={Boolean(scopedSearchAfter)}
+              onPrev={() => {}}
+              onNext={() => fetchScopedSearchPage(scopedSearchPage + 1, scopedSearchAfter)}
+              centerContent={
+                <span className="text-sm text-[var(--color-text-secondary)]">
+                  Page {scopedSearchPage}
+                </span>
+              }
+            />
           </div>
             ) : (
               <div className="text-center text-[var(--color-text-secondary)]">No search results</div>
@@ -1803,27 +1804,18 @@ export default function RedditPage() {
             !scopedSearchResults &&
             filteredCombinedPosts.length > 0 &&
             (pageHistory.length > 1 || Boolean(paginatedRedditQuery.data?.after)) && (
-            <div className="mt-6 flex items-center justify-between border-t border-[var(--color-border)] pt-4">
-              <button
-                type="button"
-                onClick={handlePrevPage}
-                disabled={pageHistory.length <= 1 || paginatedRedditQuery.isFetching}
-                className="rounded bg-[var(--color-primary)] px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                ← Previous
-              </button>
-              <span className="text-sm text-[var(--color-text-secondary)]">
-                Page {currentPage}
-              </span>
-              <button
-                type="button"
-                onClick={handleNextPage}
-                disabled={!paginatedRedditQuery.data?.after || paginatedRedditQuery.isFetching}
-                className="rounded bg-[var(--color-primary)] px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                Next →
-              </button>
-            </div>
+            <OffsetPaginationControls
+              hasPrev={pageHistory.length > 1}
+              hasMore={Boolean(paginatedRedditQuery.data?.after)}
+              isFetching={paginatedRedditQuery.isFetching}
+              onPrev={handlePrevPage}
+              onNext={handleNextPage}
+              centerContent={
+                <span className="text-sm text-[var(--color-text-secondary)]">
+                  Page {currentPage}
+                </span>
+              }
+            />
           )}
         </div>
 
