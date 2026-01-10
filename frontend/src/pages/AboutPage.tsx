@@ -93,6 +93,16 @@ export function AboutContent({ className = '' }: { className?: string }) {
               Bug Reporting
             </a>
           </p>
+          <p className="mt-2">
+            <a href="/terms" className="text-[var(--color-primary)] underline">
+              Terms of Service
+            </a>
+          </p>
+          <p className="mt-2">
+            <a href="/privacy" className="text-[var(--color-primary)] underline">
+              Privacy Policy
+            </a>
+          </p>
         </div>
       </div>
     </div>
