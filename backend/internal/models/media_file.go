@@ -61,3 +61,34 @@ func (r *MediaFileRepository) Create(ctx context.Context, media *MediaFile) erro
 		media.UsedInMessageID,
 	).Scan(&media.ID, &media.UploadedAt)
 }
+
+// GetByStorageURL retrieves a media file by its storage URL.
+func (r *MediaFileRepository) GetByStorageURL(ctx context.Context, storageURL string) (*MediaFile, error) {
+	query := `
+		SELECT id, user_id, filename, original_filename, file_type, file_size,
+		       storage_url, thumbnail_url, storage_path, width, height, duration, used_in_message_id, uploaded_at
+		FROM media_files
+		WHERE storage_url = $1
+	`
+	media := &MediaFile{}
+	err := r.pool.QueryRow(ctx, query, storageURL).Scan(
+		&media.ID,
+		&media.UserID,
+		&media.Filename,
+		&media.OriginalFilename,
+		&media.FileType,
+		&media.FileSize,
+		&media.StorageURL,
+		&media.ThumbnailURL,
+		&media.StoragePath,
+		&media.Width,
+		&media.Height,
+		&media.Duration,
+		&media.UsedInMessageID,
+		&media.UploadedAt,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return media, nil
+}

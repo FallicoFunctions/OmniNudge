@@ -90,6 +90,10 @@ func main() {
 	hubSettingsRepo := repository.NewHubSettingsRepository(db.Pool)
 	hubThemesRepo := repository.NewHubThemesRepository(db.Pool)
 
+	// Bug reporting repositories
+	bugReportRepo := models.NewBugReportRepository(db.Pool)
+	knownBugRepo := models.NewKnownBugRepository(db.Pool)
+
 	// Initialize WebSocket hub
 	hub := websocket.NewHub()
 	go hub.Run()
@@ -173,6 +177,7 @@ func main() {
 	redditCommentsHandler := handlers.NewRedditCommentsHandler(redditCommentRepo)
 	savedItemsHandler := handlers.NewSavedItemsHandler(savedItemsRepo, postRepo, commentRepo, redditCommentRepo, redditClient)
 	feedHandler := handlers.NewFeedHandler(postRepo, hubSubRepo, subredditSubRepo, redditClient)
+	bugReportsHandler := handlers.NewBugReportsHandler(bugReportRepo, knownBugRepo, mediaRepo)
 	modMailHandler := handlers.NewModMailHandler(db.Pool, conversationRepo, messageRepo, userRepo, hubModRepo, hubRepo)
 	hubSettingsHandler := handlers.NewHubSettingsHandler(hubSettingsRepo)
 	hubThemesHandler := handlers.NewHubThemesHandler(hubThemesRepo, hubSettingsRepo)
@@ -353,6 +358,14 @@ func main() {
 			search.GET("/comments", searchHandler.SearchComments)
 			search.GET("/users", searchHandler.SearchUsers)
 			search.GET("/hubs", searchHandler.SearchHubs)
+		}
+
+		// Bug reporting routes (public access for known bugs, optional auth for reports)
+		bugReports := api.Group("/bug-reports")
+		bugReports.Use(middleware.AuthOptional(authService))
+		{
+			bugReports.POST("", bugReportsHandler.CreateBugReport) // Anyone can report bugs
+			bugReports.GET("/known", bugReportsHandler.GetKnownBugs) // Public list of known bugs
 		}
 
 		// Protected routes (auth required)
@@ -585,6 +598,15 @@ func main() {
 
 				// Site statistics
 				admin.GET("/stats", adminHandler.GetSiteStats)
+
+				// Bug report management
+				admin.GET("/bug-reports", bugReportsHandler.GetBugReports)
+				admin.PUT("/bug-reports/:id", bugReportsHandler.UpdateBugReport)
+
+				// Known bugs management
+				admin.POST("/known-bugs", bugReportsHandler.CreateKnownBug)
+				admin.PUT("/known-bugs/:id", bugReportsHandler.UpdateKnownBug)
+				admin.DELETE("/known-bugs/:id", bugReportsHandler.DeleteKnownBug)
 			}
 
 			// WebSocket endpoint for real-time messaging
