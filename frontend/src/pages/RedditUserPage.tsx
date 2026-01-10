@@ -16,6 +16,7 @@ import { useRedditBlocklist } from '../contexts/RedditBlockContext';
 import { MarkdownRenderer } from '../components/common/MarkdownRenderer';
 import { RedditPostCard } from '../components/reddit/RedditPostCard';
 import { EmptyMessage, ErrorMessage, LoadingMessage } from '../components/common/StatusMessage';
+import { OffsetPaginationControls } from '../components/common/OffsetPaginationControls';
 import type {
   RedditApiPost,
   RedditUserAbout,
@@ -425,27 +426,18 @@ export default function RedditUserPage() {
                       return null;
                     })}
                   </div>
-                  <div className="mt-4 flex items-center justify-between border-t border-[var(--color-border)] pt-4">
-                    <button
-                      type="button"
-                      onClick={handlePrevPage}
-                      disabled={pageHistory.length <= 1 || listingQuery.isFetching}
-                      className="rounded bg-[var(--color-primary)] px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed"
-                    >
-                      ← Previous
-                    </button>
-                    <span className="text-sm text-[var(--color-text-secondary)]">
-                      Page {pageHistory.length}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={handleNextPage}
-                      disabled={!listingQuery.data?.after || listingQuery.isFetching}
-                      className="rounded bg-[var(--color-primary)] px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed"
-                    >
-                      Next →
-                    </button>
-                  </div>
+                  <OffsetPaginationControls
+                    hasPrev={pageHistory.length > 1}
+                    hasMore={Boolean(listingQuery.data?.after)}
+                    isFetching={listingQuery.isFetching}
+                    onPrev={handlePrevPage}
+                    onNext={handleNextPage}
+                    centerContent={
+                      <span className="text-sm text-[var(--color-text-secondary)]">
+                        Page {pageHistory.length}
+                      </span>
+                    }
+                  />
                 </>
               )}
             </div>

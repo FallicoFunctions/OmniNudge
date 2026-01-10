@@ -5,6 +5,7 @@ import { hubsService, type Hub } from '../services/hubsService';
 import { redditService } from '../services/redditService';
 import type { SubredditSuggestion } from '../types/reddit';
 import { EmptyMessage, ErrorMessage, LoadingMessage } from '../components/common/StatusMessage';
+import { PaginationControls } from '../components/common/PaginationControls';
 
 type CombinedSuggestion =
   | { type: 'subreddit'; data: SubredditSuggestion }
@@ -331,29 +332,21 @@ export default function HubsAndSubsPage() {
 
           {/* Pagination Controls */}
           {totalPages > 1 && (
-            <div className="flex items-center justify-center gap-4 mt-6">
-              <button
-                type="button"
-                onClick={() => setPageIndex((prev) => prev - 1)}
-                disabled={pageIndex === 0}
-                className="px-4 py-2 text-sm font-medium rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] text-[var(--color-text-primary)] hover:bg-[var(--color-border)] disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                &lt; Prev
-              </button>
-
-              <span className="text-sm text-[var(--color-text-secondary)]">
-                {pageIndex + 1} / {totalPages}
-              </span>
-
-              <button
-                type="button"
-                onClick={() => setPageIndex((prev) => prev + 1)}
-                disabled={pageIndex >= totalPages - 1}
-                className="px-4 py-2 text-sm font-medium rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] text-[var(--color-text-primary)] hover:bg-[var(--color-border)] disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Next &gt;
-              </button>
-            </div>
+            <PaginationControls
+              showDivider={false}
+              className="mt-6 justify-center gap-4"
+              pageIndex={pageIndex}
+              totalPages={totalPages}
+              onPrev={() => setPageIndex((prev) => prev - 1)}
+              onNext={() => setPageIndex((prev) => prev + 1)}
+              canGoPrev={pageIndex > 0}
+              canGoNext={pageIndex < totalPages - 1}
+              centerContent={
+                <span className="text-sm text-[var(--color-text-secondary)]">
+                  {pageIndex + 1} / {totalPages}
+                </span>
+              }
+            />
           )}
         </>
       )}

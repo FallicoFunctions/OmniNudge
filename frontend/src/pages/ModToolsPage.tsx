@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { moderationService } from '../services/moderationService';
 import { EmptyMessage, LoadingMessage } from '../components/common/StatusMessage';
+import { OffsetPaginationControls } from '../components/common/OffsetPaginationControls';
 import { modMailService } from '../services/modMailService';
 import type {
   HubBan,
@@ -564,23 +565,15 @@ function ModLogTab({ hubName }: { hubName: string }) {
       </div>
 
       {logs.length >= limit && (
-        <div className="flex justify-center space-x-2 mt-6">
-          <button
-            onClick={() => setPage(p => Math.max(1, p - 1))}
-            disabled={page === 1}
-            className="px-4 py-2 border border-[var(--color-border)] rounded-lg disabled:opacity-50"
-          >
-            Previous
-          </button>
-          <span className="px-4 py-2">Page {page}</span>
-          <button
-            onClick={() => setPage(p => p + 1)}
-            disabled={logs.length < limit}
-            className="px-4 py-2 border border-[var(--color-border)] rounded-lg disabled:opacity-50"
-          >
-            Next
-          </button>
-        </div>
+        <OffsetPaginationControls
+          showDivider={false}
+          className="mt-6 justify-center gap-4"
+          hasPrev={page > 1}
+          hasMore={logs.length >= limit}
+          onPrev={() => setPage((prev) => Math.max(1, prev - 1))}
+          onNext={() => setPage((prev) => prev + 1)}
+          centerContent={<span className="px-4 py-2">Page {page}</span>}
+        />
       )}
     </div>
   );
