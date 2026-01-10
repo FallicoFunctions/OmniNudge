@@ -710,9 +710,11 @@ func (r *PlatformPostRepository) GetPopularFeed(
 	args = append(args, limit, offset)
 
 	query := fmt.Sprintf(`
-			SELECT %s, h.name as hub_name, u.username as author_username
+			SELECT %s,
+			       h.id as hub_id_val, h.name as hub_name, h.title as hub_title,
+			       u.username as author_username
 			FROM platform_posts p
-			JOIN hubs h ON p.hub_id = h.id
+			LEFT JOIN hubs h ON p.hub_id = h.id
 			JOIN users u ON p.author_id = u.id
 			%s
 			%s
@@ -728,9 +730,11 @@ func (r *PlatformPostRepository) GetPopularFeed(
 	var posts []*PlatformPost
 	for rows.Next() {
 		post := &PlatformPost{}
+		var hubID sql.NullInt64
 		var hubName sql.NullString
+		var hubTitle sql.NullString
 		var authorUsername sql.NullString
-		if err := scanPlatformPost(rows, post, &hubName, &authorUsername); err != nil {
+		if err := scanPlatformPost(rows, post, &hubID, &hubName, &hubTitle, &authorUsername); err != nil {
 			return nil, err
 		}
 		if hubName.Valid {
@@ -738,7 +742,14 @@ func (r *PlatformPostRepository) GetPopularFeed(
 			if post.Hub == nil {
 				post.Hub = &Hub{}
 			}
+			if hubID.Valid {
+				post.Hub.ID = int(hubID.Int64)
+			}
 			post.Hub.Name = hubName.String
+			if hubTitle.Valid {
+				titleStr := hubTitle.String
+				post.Hub.Title = &titleStr
+			}
 		}
 		if authorUsername.Valid {
 			post.AuthorUsername = authorUsername.String

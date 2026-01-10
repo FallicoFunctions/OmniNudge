@@ -27,6 +27,7 @@ type UnifiedFeedItem struct {
 	MediaURL       *string   `json:"media_url,omitempty"`
 	MediaType      *string   `json:"media_type,omitempty"`
 	ThumbnailURL   *string   `json:"thumbnail_url,omitempty"`
+	HubName        *string   `json:"hub_name,omitempty"`
 }
 
 // FeedRepository loads unified feed entries.
@@ -62,7 +63,9 @@ func (r *FeedRepository) GetUnifiedFeed(ctx context.Context, sortBy string, limi
 			created_at,
 			media_url,
 			media_type,
-			thumbnail_url
+			thumbnail_url,
+			hub_id,
+			hub_name
 		FROM (
 			SELECT
 				'platform' AS source,
@@ -79,9 +82,12 @@ func (r *FeedRepository) GetUnifiedFeed(ctx context.Context, sortBy string, limi
 				p.created_at,
 				p.media_url,
 				p.media_type,
-				p.thumbnail_url
+				p.thumbnail_url,
+				h.id AS hub_id,
+				h.name AS hub_name
 			FROM platform_posts p
 			JOIN users u ON p.author_id = u.id
+			LEFT JOIN hubs h ON p.hub_id = h.id
 			WHERE p.is_deleted = FALSE AND u.shadow_banned = FALSE
 
 			UNION ALL
@@ -101,7 +107,9 @@ func (r *FeedRepository) GetUnifiedFeed(ctx context.Context, sortBy string, limi
 				rp.created_utc AS created_at,
 				rp.media_url,
 				rp.media_type,
-				rp.thumbnail_url
+				rp.thumbnail_url,
+				NULL::INTEGER AS hub_id,
+				NULL::TEXT AS hub_name
 			FROM reddit_posts rp
 			WHERE rp.expires_at > NOW()
 		) feed
@@ -134,6 +142,8 @@ func (r *FeedRepository) GetUnifiedFeed(ctx context.Context, sortBy string, limi
 			mediaURL       sql.NullString
 			mediaType      sql.NullString
 			thumbnailURL   sql.NullString
+			hubID          sql.NullInt64
+			hubName        sql.NullString
 		)
 
 		if err := rows.Scan(
@@ -152,6 +162,8 @@ func (r *FeedRepository) GetUnifiedFeed(ctx context.Context, sortBy string, limi
 			&mediaURL,
 			&mediaType,
 			&thumbnailURL,
+			&hubID,
+			&hubName,
 		); err != nil {
 			return nil, err
 		}
@@ -168,6 +180,7 @@ func (r *FeedRepository) GetUnifiedFeed(ctx context.Context, sortBy string, limi
 			MediaURL:       nullableString(mediaURL),
 			MediaType:      nullableString(mediaType),
 			ThumbnailURL:   nullableString(thumbnailURL),
+			HubName:        nullableString(hubName),
 		}
 		if platformID.Valid {
 			id := int(platformID.Int64)
