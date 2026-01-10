@@ -154,7 +154,7 @@ func (r *PlatformPostRepository) GetByID(ctx context.Context, id int) (*Platform
 	post := &PlatformPost{}
 
 	query := `
-		SELECT ` + platformPostSelectColumns + `
+		SELECT ` + platformPostSelectColumnsPrefixed + `
 		FROM platform_posts p
 		LEFT JOIN users u ON p.author_id = u.id
 		WHERE p.id = $1 AND p.is_deleted = FALSE AND u.shadow_banned = FALSE
