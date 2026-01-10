@@ -28,7 +28,7 @@ import type {
 } from '../types/reddit';
 import { SubscribeButton } from '../components/common/SubscribeButton';
 import { RedditPostCard } from '../components/reddit/RedditPostCard';
-import SubredditAboutPanel from '../components/reddit/SubredditAboutPanel';
+import { SubredditSidebar } from '../components/subreddit/SubredditSidebar';
 import { TOP_TIME_OPTIONS } from '../constants/topTimeRange';
 import type { TopTimeRange } from '../constants/topTimeRange';
 import { searchPlatformPosts } from '../services/platformSearchService';
@@ -38,6 +38,7 @@ import { useHiddenItems } from '../hooks/useHiddenItems';
 import { getHiddenPostIdSet, getSavedPostIdSet, getSavedRedditPostIdSet } from '../utils/savedItems';
 import { EmptyMessage, LoadingMessage } from '../components/common/StatusMessage';
 import { OffsetPaginationControls } from '../components/common/OffsetPaginationControls';
+import { VirtualizedList } from '../components/common/VirtualizedList';
 
 interface FeedRedditPost extends RedditCrosspostSource {
   id: string;
@@ -905,6 +906,153 @@ export default function RedditPage() {
     });
   }, [combinedPosts, postSearchQuery]);
 
+  const renderCombinedPost = (item: (typeof filteredCombinedPosts)[number]) => {
+    if (item.type === 'platform') {
+      const post = item.post;
+      const previewImage = post.thumbnail_url || post.media_url;
+      const displaySubreddit =
+        post.target_subreddit || post.crosspost_origin_subreddit || subreddit;
+      const displayAuthor =
+        post.author_username ||
+        post.author?.username ||
+        (post.author_id === user?.id ? user?.username : undefined) ||
+        'unknown';
+      const createdTimestamp = post.crossposted_at ?? post.created_at;
+      const createdLabel = createdTimestamp
+        ? formatTimestamp(createdTimestamp, useRelativeTime)
+        : 'unknown time';
+      const commentLabel = `${post.num_comments.toLocaleString()} Comments`;
+      const pointsLabel = `${post.score.toLocaleString()} points`;
+      const postUrl = getLocalPostUrl(post);
+      const canDelete = user?.id === post.author_id;
+      const isDeleting =
+        deleteLocalPostMutation.isPending &&
+        deleteLocalPostMutation.variables === post.id;
+      const isSavedLocal = savedLocalPostIds.has(post.id);
+      const isSavePendingLocal =
+        savedLocalToggleMutation.isPending &&
+        savedLocalToggleMutation.variables?.postId === post.id;
+
+      return (
+        <article className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)]">
+          <div className="flex gap-3 p-3">
+            <VoteButtons
+              postId={post.id}
+              initialScore={post.score}
+              initialUserVote={post.user_vote ?? null}
+              layout="vertical"
+              size="small"
+            />
+            {previewImage && (
+              <img
+                src={previewImage}
+                alt=""
+                loading="lazy"
+                decoding="async"
+                className="h-16 w-16 flex-shrink-0 rounded object-cover"
+              />
+            )}
+            <div className="flex-1 text-left">
+              <div className="mb-1 inline-flex items-center gap-2">
+                <span className="inline-block rounded bg-blue-600 px-2 py-0.5 text-[10px] font-bold uppercase text-white">
+                  Omni
+                </span>
+                {displaySubreddit && (
+                  <span className="text-[11px] font-medium text-[var(--color-text-secondary)]">
+                    r/{displaySubreddit}
+                  </span>
+                )}
+              </div>
+              <Link to={postUrl}>
+                <h3 className="text-base font-semibold text-[var(--color-text-primary)] hover:text-[var(--color-primary)]">
+                  {post.title}
+                </h3>
+              </Link>
+              <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-[var(--color-text-secondary)]">
+                <span>u/{displayAuthor}</span>
+                <span>•</span>
+                <span>{pointsLabel}</span>
+                <span>•</span>
+                <span>submitted {createdLabel}</span>
+              </div>
+              <div className="mt-1 flex flex-wrap items-center gap-3 text-[11px] text-[var(--color-text-secondary)]">
+                <Link
+                  to={postUrl}
+                  className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+                >
+                  {commentLabel}
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => handleShareLocalPost(post)}
+                  className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+                >
+                  Share
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleToggleSaveLocalPost(post.id, isSavedLocal)}
+                  disabled={isSavePendingLocal}
+                  className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] disabled:opacity-50"
+                >
+                  {isSavePendingLocal ? 'Saving...' : isSavedLocal ? 'Unsave' : 'Save'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSetHideTarget({ type: 'platform', post })}
+                  className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+                >
+                  Hide
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleCrosspostSelection({ type: 'platform', post })}
+                  className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+                >
+                  Crosspost
+                </button>
+                {canDelete && (
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteLocalPost(post.id)}
+                    disabled={isDeleting}
+                    className="text-red-600 hover:text-red-500 disabled:opacity-60"
+                  >
+                    {isDeleting ? 'Deleting...' : 'Delete'}
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </article>
+      );
+    }
+
+    const post = item.post;
+    const isSaved = savedRedditPostIds.has(`${post.subreddit}-${post.id}`);
+    const isSaveActionPending =
+      toggleSaveRedditPostMutation.isPending &&
+      toggleSaveRedditPostMutation.variables?.post.id === post.id;
+    const pendingShouldSave = toggleSaveRedditPostMutation.variables?.shouldSave;
+
+    return (
+      <RedditPostCard
+        post={post}
+        useRelativeTime={useRelativeTime}
+        isSaved={isSaved}
+        isSaveActionPending={isSaveActionPending}
+        pendingShouldSave={pendingShouldSave}
+        onShare={() => handleShareRedditPost(post)}
+        onToggleSave={(shouldSave) =>
+          toggleSaveRedditPostMutation.mutate({ post, shouldSave })
+        }
+        onHide={() => handleSetHideTarget({ type: 'reddit', post })}
+        onCrosspost={() => handleCrosspostSelection({ type: 'reddit', post })}
+        linkState={originState}
+      />
+    );
+  };
+
   // Pagination handlers
   const handleNextPage = () => {
     const nextAfter = paginatedRedditQuery.data?.after;
@@ -968,6 +1116,7 @@ export default function RedditPage() {
                   alt=""
                   className="h-12 w-12 flex-shrink-0 rounded-full object-cover"
                   loading="lazy"
+                  decoding="async"
                 />
               )}
               <h1 className="text-3xl font-bold text-[var(--color-text-primary)]">r/{subreddit}</h1>
@@ -1089,6 +1238,8 @@ export default function RedditPage() {
                               <img
                                 src={suggestion.icon_url}
                                 alt=""
+                                loading="lazy"
+                                decoding="async"
                                 className="h-6 w-6 flex-shrink-0 rounded-full object-cover"
                               />
                             ) : (
@@ -1293,491 +1444,41 @@ export default function RedditPage() {
         <div>
           {scopedSearchResults ? (
             scopedSearchResults.length > 0 ? (
-          <div className="space-y-3">
-            {scopedSearchResults.map((item, idx) => {
-              if (item.type === 'platform') {
-                const post = item.post;
-                const previewImage = post.thumbnail_url || post.media_url;
-                const displaySubreddit =
-                  post.target_subreddit || post.crosspost_origin_subreddit || subreddit;
-                const displayAuthor =
-                  post.author_username ||
-                  post.author?.username ||
-                  (post.author_id === user?.id ? user?.username : undefined) ||
-                  'unknown';
-                const createdTimestamp = post.crossposted_at ?? post.created_at;
-                const createdLabel = createdTimestamp
-                  ? formatTimestamp(createdTimestamp, useRelativeTime)
-                  : 'unknown time';
-                const commentLabel = `${post.num_comments.toLocaleString()} Comments`;
-                const pointsLabel = `${post.score.toLocaleString()} points`;
-                const postUrl = getLocalPostUrl(post);
-                const canDelete = user?.id === post.author_id;
-                const isDeleting =
-                  deleteLocalPostMutation.isPending &&
-                  deleteLocalPostMutation.variables === post.id;
-                const isSavedLocal = savedLocalPostIds.has(post.id);
-                const isSavePendingLocal =
-                  savedLocalToggleMutation.isPending &&
-                  savedLocalToggleMutation.variables?.postId === post.id;
-
-                return (
-                  <article
-                    key={`scoped-local-${post.id}-${idx}`}
-                    className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)]"
-                  >
-                    <div className="flex gap-3 p-3">
-                      <VoteButtons
-                        postId={post.id}
-                        initialScore={post.score}
-                        initialUserVote={post.user_vote ?? null}
-                        layout="vertical"
-                        size="small"
-                      />
-                      {previewImage && (
-                        <img
-                          src={previewImage}
-                          alt=""
-                          className="h-16 w-16 flex-shrink-0 rounded object-cover"
-                        />
-                      )}
-                      <div className="flex-1 text-left">
-                        <div className="mb-1 inline-flex items-center gap-2">
-                          <span className="inline-block rounded bg-blue-600 px-2 py-0.5 text-[10px] font-bold uppercase text-white">
-                            Omni
-                          </span>
-                          {displaySubreddit && (
-                            <span className="text-[11px] font-medium text-[var(--color-text-secondary)]">
-                              r/{displaySubreddit}
-                            </span>
-                          )}
-                        </div>
-                        <Link to={postUrl}>
-                          <h3 className="text-base font-semibold text-[var(--color-text-primary)] hover:text-[var(--color-primary)]">
-                            {post.title}
-                          </h3>
-                        </Link>
-                        <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-[var(--color-text-secondary)]">
-                          <span>u/{displayAuthor}</span>
-                          <span>•</span>
-                          <span>{pointsLabel}</span>
-                          <span>•</span>
-                          <span>submitted {createdLabel}</span>
-                        </div>
-                        <div className="mt-1 flex flex-wrap items-center gap-3 text-[11px] text-[var(--color-text-secondary)]">
-                          <Link
-                            to={postUrl}
-                            className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
-                          >
-                            {commentLabel}
-                          </Link>
-                          <button
-                            type="button"
-                            onClick={() => handleShareLocalPost(post)}
-                            className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
-                          >
-                            Share
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleToggleSaveLocalPost(post.id, isSavedLocal)}
-                            disabled={isSavePendingLocal}
-                            className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] disabled:opacity-50"
-                          >
-                            {isSavePendingLocal ? 'Saving...' : isSavedLocal ? 'Unsave' : 'Save'}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleSetHideTarget({ type: 'platform', post })}
-                            className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
-                          >
-                            Hide
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleCrosspostSelection({ type: 'platform', post })}
-                            className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
-                          >
-                            Crosspost
-                          </button>
-                          {canDelete && (
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteLocalPost(post.id)}
-                              disabled={isDeleting}
-                              className="text-red-600 hover:text-red-500 disabled:opacity-60"
-                            >
-                              {isDeleting ? 'Deleting...' : 'Delete'}
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </article>
-                );
-              }
-
-              const post = item.post;
-              const isSaved = savedRedditPostIds.has(`${post.subreddit}-${post.id}`);
-              const isSaveActionPending =
-                toggleSaveRedditPostMutation.isPending &&
-                toggleSaveRedditPostMutation.variables?.post.id === post.id;
-              const pendingShouldSave = toggleSaveRedditPostMutation.variables?.shouldSave;
-
-              return (
-                <RedditPostCard
-                  key={`scoped-reddit-${post.id}-${idx}`}
-                  post={post}
-                  useRelativeTime={useRelativeTime}
-                  isSaved={isSaved}
-                  isSaveActionPending={isSaveActionPending}
-                  pendingShouldSave={pendingShouldSave}
-                  onShare={() => handleShareRedditPost(post)}
-                  onToggleSave={(shouldSave) =>
-                    toggleSaveRedditPostMutation.mutate({ post, shouldSave })
+              <>
+                <VirtualizedList
+                  items={scopedSearchResults}
+                  estimateSize={230}
+                  getKey={(item) =>
+                    item.type === 'platform' ? `scoped-local-${item.post.id}` : `scoped-reddit-${item.post.id}`
                   }
-                  onHide={() => handleSetHideTarget({ type: 'reddit', post })}
-                  onCrosspost={() => handleCrosspostSelection({ type: 'reddit', post })}
-                  linkState={originState}
+                  renderItem={(item) => <div className="pb-3">{renderCombinedPost(item)}</div>}
                 />
-              );
-            })}
-            <OffsetPaginationControls
-              showDivider={false}
-              className="mt-4"
-              hasPrev={false}
-              hasMore={Boolean(scopedSearchAfter)}
-              onPrev={() => {}}
-              onNext={() => fetchScopedSearchPage(scopedSearchPage + 1, scopedSearchAfter)}
-              centerContent={
-                <span className="text-sm text-[var(--color-text-secondary)]">
-                  Page {scopedSearchPage}
-                </span>
-              }
-            />
-          </div>
+                <OffsetPaginationControls
+                  showDivider={false}
+                  className="mt-4"
+                  hasPrev={false}
+                  hasMore={Boolean(scopedSearchAfter)}
+                  onPrev={() => {}}
+                  onNext={() => fetchScopedSearchPage(scopedSearchPage + 1, scopedSearchAfter)}
+                  centerContent={
+                    <span className="text-sm text-[var(--color-text-secondary)]">
+                      Page {scopedSearchPage}
+                    </span>
+                  }
+                />
+              </>
             ) : (
               <div className="text-center text-[var(--color-text-secondary)]">No search results</div>
             )
           ) : filteredCombinedPosts.length > 0 ? (
-            useInfiniteScrollSubs ? (
-              <div className="space-y-3">
-                {filteredCombinedPosts.map((item) => {
-                    return (
-                      <div
-                        key={item.type === 'platform' ? `local-${item.post.id}` : `reddit-${item.post.id}`}
-                        className="pb-3"
-                      >
-                        {item.type === 'platform' ? (() => {
-                        const post = item.post;
-                        const previewImage = post.thumbnail_url || post.media_url;
-                        const displaySubreddit =
-                          post.target_subreddit || post.crosspost_origin_subreddit || subreddit;
-                        const displayAuthor =
-                          post.author_username ||
-                          post.author?.username ||
-                          (post.author_id === user?.id ? user?.username : undefined) ||
-                          'unknown';
-                        const createdTimestamp = post.crossposted_at ?? post.created_at;
-                        const createdLabel = createdTimestamp
-                          ? formatTimestamp(createdTimestamp, useRelativeTime)
-                          : 'unknown time';
-                        const commentLabel = `${post.num_comments.toLocaleString()} Comments`;
-                        const pointsLabel = `${post.score.toLocaleString()} points`;
-                        const postUrl = getLocalPostUrl(post);
-                        const canDelete = user?.id === post.author_id;
-                        const isDeleting =
-                          deleteLocalPostMutation.isPending &&
-                          deleteLocalPostMutation.variables === post.id;
-                        const isSavedLocal = savedLocalPostIds.has(post.id);
-                        const isSavePendingLocal =
-                          savedLocalToggleMutation.isPending &&
-                          savedLocalToggleMutation.variables?.postId === post.id;
-
-                        return (
-                          <article
-                            key={`local-${post.id}`}
-                            className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)]"
-                          >
-                            <div className="flex gap-3 p-3">
-                              <VoteButtons
-                                postId={post.id}
-                                initialScore={post.score}
-                                initialUserVote={post.user_vote ?? null}
-                                layout="vertical"
-                                size="small"
-                              />
-                              {previewImage && (
-                                <img
-                                  src={previewImage}
-                                  alt=""
-                                  className="h-16 w-16 flex-shrink-0 rounded object-cover"
-                                />
-                              )}
-                              <div className="flex-1 text-left">
-                                <div className="mb-1 inline-flex items-center gap-2">
-                                  <span className="inline-block rounded bg-blue-600 px-2 py-0.5 text-[10px] font-bold uppercase text-white">
-                                    Omni
-                                  </span>
-                                  {displaySubreddit && (
-                                    <span className="text-[11px] font-medium text-[var(--color-text-secondary)]">
-                                      r/{displaySubreddit}
-                                    </span>
-                                  )}
-                                </div>
-                                <Link to={postUrl}>
-                                  <h3 className="text-base font-semibold text-[var(--color-text-primary)] hover:text-[var(--color-primary)]">
-                                    {post.title}
-                                  </h3>
-                                </Link>
-                                <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-[var(--color-text-secondary)]">
-                                  <span>u/{displayAuthor}</span>
-                                  <span>•</span>
-                                  <span>{pointsLabel}</span>
-                                  <span>•</span>
-                                  <span>submitted {createdLabel}</span>
-                                </div>
-                                <div className="mt-1 flex flex-wrap items-center gap-3 text-[11px] text-[var(--color-text-secondary)]">
-                                  <Link
-                                    to={postUrl}
-                                    className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
-                                  >
-                                    {commentLabel}
-                                  </Link>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleShareLocalPost(post)}
-                                    className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
-                                  >
-                                    Share
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleToggleSaveLocalPost(post.id, isSavedLocal)}
-                                    disabled={isSavePendingLocal}
-                                    className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] disabled:opacity-50"
-                                  >
-                                    {isSavePendingLocal ? 'Saving...' : isSavedLocal ? 'Unsave' : 'Save'}
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleSetHideTarget({ type: 'platform', post })}
-                                    className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
-                                  >
-                                    Hide
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleCrosspostSelection({ type: 'platform', post })}
-                                    className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
-                                  >
-                                    Crosspost
-                                  </button>
-                                  {canDelete && (
-                                    <button
-                                      type="button"
-                                      onClick={() => handleDeleteLocalPost(post.id)}
-                                      disabled={isDeleting}
-                                      className="text-red-600 hover:text-red-500 disabled:opacity-60"
-                                    >
-                                      {isDeleting ? 'Deleting...' : 'Delete'}
-                                    </button>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                          </article>
-                        );
-                      })() : (() => {
-                        const post = item.post;
-                        const isSaved = savedRedditPostIds.has(`${post.subreddit}-${post.id}`);
-                        const isSaveActionPending =
-                          toggleSaveRedditPostMutation.isPending &&
-                          toggleSaveRedditPostMutation.variables?.post.id === post.id;
-                        const pendingShouldSave = toggleSaveRedditPostMutation.variables?.shouldSave;
-
-                        return (
-                          <RedditPostCard
-                            key={`reddit-${post.id}`}
-                            post={post}
-                            useRelativeTime={useRelativeTime}
-                            isSaved={isSaved}
-                            isSaveActionPending={isSaveActionPending}
-                            pendingShouldSave={pendingShouldSave}
-                            onShare={() => handleShareRedditPost(post)}
-                            onToggleSave={(shouldSave) =>
-                              toggleSaveRedditPostMutation.mutate({ post, shouldSave })
-                            }
-                            onHide={() => handleSetHideTarget({ type: 'reddit', post })}
-                            onCrosspost={() => handleCrosspostSelection({ type: 'reddit', post })}
-                            linkState={originState}
-                          />
-                        );
-                      })()}
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {filteredCombinedPosts.map((item) => {
-            if (item.type === 'platform') {
-              const post = item.post;
-              const previewImage = post.thumbnail_url || post.media_url;
-              const displaySubreddit =
-                post.target_subreddit || post.crosspost_origin_subreddit || subreddit;
-              const displayAuthor =
-                post.author_username ||
-                post.author?.username ||
-                (post.author_id === user?.id ? user?.username : undefined) ||
-                'unknown';
-              const createdTimestamp = post.crossposted_at ?? post.created_at;
-              console.log('[RedditPage] Local post timestamp:', {
-                postId: post.id,
-                createdTimestamp,
-                useRelativeTime,
-                type: typeof createdTimestamp
-              });
-              const createdLabel = createdTimestamp
-                ? formatTimestamp(createdTimestamp, useRelativeTime)
-                : 'unknown time';
-              const commentLabel = `${post.num_comments.toLocaleString()} Comments`;
-              const pointsLabel = `${post.score.toLocaleString()} points`;
-              const postUrl = getLocalPostUrl(post);
-              const canDelete = user?.id === post.author_id;
-              const isDeleting =
-                deleteLocalPostMutation.isPending &&
-                deleteLocalPostMutation.variables === post.id;
-              const isSavedLocal = savedLocalPostIds.has(post.id);
-              const isSavePendingLocal =
-                savedLocalToggleMutation.isPending &&
-                savedLocalToggleMutation.variables?.postId === post.id;
-
-              return (
-                <article
-                  key={`local-${post.id}`}
-                  className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)]"
-                >
-                  <div className="flex gap-3 p-3">
-                    {/* Vote buttons */}
-                    <VoteButtons
-                      postId={post.id}
-                      initialScore={post.score}
-                      initialUserVote={post.user_vote ?? null}
-                      layout="vertical"
-                      size="small"
-                    />
-                    {previewImage && (
-                      <img
-                        src={previewImage}
-                        alt=""
-                        className="h-16 w-16 flex-shrink-0 rounded object-cover"
-                      />
-                    )}
-                    <div className="flex-1 text-left">
-                      <div className="mb-1 inline-flex items-center gap-2">
-                        <span className="inline-block rounded bg-blue-600 px-2 py-0.5 text-[10px] font-bold uppercase text-white">
-                          Omni
-                        </span>
-                        {displaySubreddit && (
-                          <span className="text-[11px] font-medium text-[var(--color-text-secondary)]">
-                            r/{displaySubreddit}
-                          </span>
-                        )}
-                      </div>
-                      <Link to={postUrl}>
-                        <h3 className="text-base font-semibold text-[var(--color-text-primary)] hover:text-[var(--color-primary)]">
-                          {post.title}
-                        </h3>
-                      </Link>
-                      <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-[var(--color-text-secondary)]">
-                        <span>u/{displayAuthor}</span>
-                        <span>•</span>
-                        <span>{pointsLabel}</span>
-                        <span>•</span>
-                        <span>submitted {createdLabel}</span>
-                      </div>
-                      <div className="mt-1 flex flex-wrap items-center gap-3 text-[11px] text-[var(--color-text-secondary)]">
-                        <Link
-                          to={postUrl}
-                          className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
-                        >
-                          {commentLabel}
-                        </Link>
-                        <button
-                          type="button"
-                          onClick={() => handleShareLocalPost(post)}
-                          className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
-                        >
-                          Share
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleToggleSaveLocalPost(post.id, isSavedLocal)}
-                          disabled={isSavePendingLocal}
-                          className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] disabled:opacity-50"
-                        >
-                          {isSavePendingLocal ? 'Saving...' : isSavedLocal ? 'Unsave' : 'Save'}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleSetHideTarget({ type: 'platform', post })}
-                          className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
-                        >
-                          Hide
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleCrosspostSelection({ type: 'platform', post })}
-                          className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
-                        >
-                          Crosspost
-                        </button>
-                        {canDelete && (
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteLocalPost(post.id)}
-                            disabled={isDeleting}
-                            className="text-red-600 hover:text-red-500 disabled:opacity-60"
-                          >
-                            {isDeleting ? 'Deleting...' : 'Delete'}
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </article>
-              );
-            }
-
-            // Reddit post
-            const post = item.post;
-            const isSaved = savedRedditPostIds.has(`${post.subreddit}-${post.id}`);
-            const isSaveActionPending =
-              toggleSaveRedditPostMutation.isPending &&
-              toggleSaveRedditPostMutation.variables?.post.id === post.id;
-            const pendingShouldSave = toggleSaveRedditPostMutation.variables?.shouldSave;
-
-            return (
-              <RedditPostCard
-                key={`reddit-${post.id}`}
-                post={post}
-                useRelativeTime={useRelativeTime}
-                isSaved={isSaved}
-                isSaveActionPending={isSaveActionPending}
-                pendingShouldSave={pendingShouldSave}
-                onShare={() => handleShareRedditPost(post)}
-                onToggleSave={(shouldSave) =>
-                  toggleSaveRedditPostMutation.mutate({ post, shouldSave })
-                }
-                onHide={() => handleSetHideTarget({ type: 'reddit', post })}
-                onCrosspost={() => handleCrosspostSelection({ type: 'reddit', post })}
-                linkState={originState}
-              />
-            );
-            })}
-              </div>
-            )
+            <VirtualizedList
+              items={filteredCombinedPosts}
+              estimateSize={230}
+              getKey={(item) =>
+                item.type === 'platform' ? `local-${item.post.id}` : `reddit-${item.post.id}`
+              }
+              renderItem={(item) => <div className="pb-3">{renderCombinedPost(item)}</div>}
+            />
           ) : (
             !isLoading && (
               <div className="text-center">
@@ -1820,46 +1521,17 @@ export default function RedditPage() {
         </div>
 
         {shouldShowSubredditSidebar && (
-            <aside className="space-y-4">
-              {/* Show Only Omni Posts Filter */}
-              <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
-                    Show only Omni posts
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setShowOmniOnly((prev) => !prev)}
-                    className={`rounded-md px-3 py-2 text-sm font-medium ${
-                      showOmniOnly
-                        ? 'bg-[var(--color-primary)] text-white'
-                        : 'bg-[var(--color-surface-elevated)] text-[var(--color-text-primary)] hover:bg-[var(--color-border)]'
-                    }`}
-                  >
-                    {showOmniOnly ? 'On' : 'Off'}
-                  </button>
-                </div>
-              </div>
-
-              <SubredditAboutPanel
-                about={subredditAbout}
-                iconUrl={subredditIcon ?? fallbackSubredditIcon}
-                isLoading={loadingSubredditAbout}
-                isError={aboutError}
-                sidebarHtml={sidebarHtml}
-                sidebarRef={sidebarRef}
-              />
-
-              <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
-                <h3 className="text-sm font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
-                  Moderators
-                </h3>
-                <p className="mt-3 text-sm text-[var(--color-text-secondary)]">
-                  Public Reddit API does not provide the moderator list.
-                </p>
-              </div>
-            </aside>
-          )}
+          <SubredditSidebar
+            showOmniOnly={showOmniOnly}
+            onToggleShowOmniOnly={() => setShowOmniOnly((prev) => !prev)}
+            about={subredditAbout}
+            iconUrl={subredditIcon ?? fallbackSubredditIcon}
+            isLoading={loadingSubredditAbout}
+            isError={aboutError}
+            sidebarHtml={sidebarHtml}
+            sidebarRef={sidebarRef}
+          />
+        )}
       </div>
 
       {hideTarget && (

@@ -231,6 +231,94 @@ func TestGetHub(t *testing.T) {
 	}
 }
 
+func TestListHubsWithNsfwFilter(t *testing.T) {
+	handler, hubRepo, _, cleanup := setupHubsTest(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	userID := 1
+
+	hubSafe := &models.Hub{
+		Name:      "bravo_safe",
+		CreatedBy: &userID,
+		NSFW:      false,
+	}
+	require.NoError(t, hubRepo.Create(ctx, hubSafe))
+
+	hubNsfw := &models.Hub{
+		Name:      "bravo_nsfw",
+		CreatedBy: &userID,
+		NSFW:      true,
+	}
+	require.NoError(t, hubRepo.Create(ctx, hubNsfw))
+
+	hubOther := &models.Hub{
+		Name:      "alpha_safe",
+		CreatedBy: &userID,
+		NSFW:      false,
+	}
+	require.NoError(t, hubRepo.Create(ctx, hubOther))
+
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	router.GET("/hubs", handler.List)
+
+	t.Run("filters_nsfw_false", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/hubs?limit=10&offset=0&starts_with=b&nsfw=false", nil)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+
+		var response map[string]interface{}
+		err := json.Unmarshal(w.Body.Bytes(), &response)
+		require.NoError(t, err)
+
+		hubs, ok := response["hubs"].([]interface{})
+		require.True(t, ok)
+		assert.Len(t, hubs, 1)
+
+		hub := hubs[0].(map[string]interface{})
+		assert.Equal(t, "bravo_safe", hub["name"])
+	})
+
+	t.Run("includes_nsfw_true", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/hubs?limit=10&offset=0&starts_with=b&nsfw=true", nil)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+
+		var response map[string]interface{}
+		err := json.Unmarshal(w.Body.Bytes(), &response)
+		require.NoError(t, err)
+
+		hubs, ok := response["hubs"].([]interface{})
+		require.True(t, ok)
+		assert.Len(t, hubs, 2)
+	})
+
+	t.Run("filters_nsfw_without_prefix", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/hubs?limit=10&offset=0&nsfw=false", nil)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+
+		var response map[string]interface{}
+		err := json.Unmarshal(w.Body.Bytes(), &response)
+		require.NoError(t, err)
+
+		hubs, ok := response["hubs"].([]interface{})
+		require.True(t, ok)
+		assert.Len(t, hubs, 2)
+		for _, h := range hubs {
+			hub := h.(map[string]interface{})
+			assert.Equal(t, false, hub["nsfw"])
+		}
+	})
+}
+
 func TestGetUserHubs(t *testing.T) {
 	handler, hubRepo, _, cleanup := setupHubsTest(t)
 	defer cleanup()

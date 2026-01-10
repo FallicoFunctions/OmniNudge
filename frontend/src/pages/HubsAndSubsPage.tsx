@@ -5,7 +5,7 @@ import { hubsService, type Hub } from '../services/hubsService';
 import { redditService } from '../services/redditService';
 import type { SubredditSuggestion } from '../types/reddit';
 import { EmptyMessage, ErrorMessage, LoadingMessage } from '../components/common/StatusMessage';
-import { PaginationControls } from '../components/common/PaginationControls';
+import { OffsetPaginationControls } from '../components/common/OffsetPaginationControls';
 
 type CombinedSuggestion =
   | { type: 'subreddit'; data: SubredditSuggestion }
@@ -23,14 +23,12 @@ export default function HubsAndSubsPage() {
   const [inputValue, setInputValue] = useState('');
   const [isAutocompleteOpen, setIsAutocompleteOpen] = useState(false);
 
-  // Fetch all hubs (cached globally)
   const { data: hubsResponse, isLoading: isHubsLoading, error: hubsError } = useQuery({
-    queryKey: ['all-hubs'],
-    queryFn: () => hubsService.getAllHubs(1000, 0), // Get up to 1000 hubs
-    staleTime: 1000 * 60 * 10, // 10 min cache
+    queryKey: ['all-hubs', selectedLetter, pageIndex, showNsfw],
+    queryFn: () =>
+      hubsService.getAllHubs(ITEMS_PER_PAGE, pageIndex * ITEMS_PER_PAGE, selectedLetter, showNsfw),
+    staleTime: 1000 * 60 * 10,
   });
-
-  const allHubs = hubsResponse?.hubs;
 
   // Autocomplete search
   const trimmedInputValue = inputValue.trim();
@@ -68,26 +66,16 @@ export default function HubsAndSubsPage() {
 
   // Filter hubs
   const filteredHubs = useMemo(() => {
-    if (!allHubs || !Array.isArray(allHubs)) {
+    if (!hubsResponse?.hubs || !Array.isArray(hubsResponse.hubs)) {
       return [];
     }
 
-    return allHubs
-      .filter((hub) => {
-        const matchesLetter = hub.name.toLowerCase().startsWith(selectedLetter.toLowerCase());
-        const matchesNsfw = showNsfw || !hub.nsfw;
-        return matchesLetter && matchesNsfw;
-      })
+    return hubsResponse.hubs
+      .filter((hub) => showNsfw || !hub.nsfw)
       .sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
-  }, [allHubs, selectedLetter, showNsfw]);
+  }, [hubsResponse, showNsfw]);
 
-  // Paginate results
-  const totalPages = Math.ceil(filteredHubs.length / ITEMS_PER_PAGE);
-  const paginatedHubs = useMemo(() => {
-    const start = pageIndex * ITEMS_PER_PAGE;
-    const end = start + ITEMS_PER_PAGE;
-    return filteredHubs.slice(start, end);
-  }, [filteredHubs, pageIndex]);
+  const hasMoreHubs = (hubsResponse?.hubs?.length ?? 0) >= ITEMS_PER_PAGE;
 
   // Handle letter selection
   const handleLetterClick = (letter: string) => {
@@ -214,6 +202,8 @@ export default function HubsAndSubsPage() {
                                     <img
                                       src={subreddit.icon_url}
                                       alt=""
+                                      loading="lazy"
+                                      decoding="async"
                                       className="h-6 w-6 flex-shrink-0 rounded-full object-cover"
                                     />
                                   ) : (
@@ -312,13 +302,13 @@ export default function HubsAndSubsPage() {
       {/* Items Grid */}
       {!isLoading && !hasError && (
         <>
-          {paginatedHubs.length === 0 ? (
+          {filteredHubs.length === 0 ? (
             <div className="text-center py-12">
               <EmptyMessage>No hubs found.</EmptyMessage>
             </div>
           ) : (
             <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-x-4 gap-y-2 mb-6">
-              {paginatedHubs.map((hub) => (
+              {filteredHubs.map((hub) => (
                 <Link
                   key={hub.name}
                   to={`/h/${hub.name}`}
@@ -331,23 +321,20 @@ export default function HubsAndSubsPage() {
           )}
 
           {/* Pagination Controls */}
-          {totalPages > 1 && (
-            <PaginationControls
-              showDivider={false}
-              className="mt-6 justify-center gap-4"
-              pageIndex={pageIndex}
-              totalPages={totalPages}
-              onPrev={() => setPageIndex((prev) => prev - 1)}
-              onNext={() => setPageIndex((prev) => prev + 1)}
-              canGoPrev={pageIndex > 0}
-              canGoNext={pageIndex < totalPages - 1}
-              centerContent={
-                <span className="text-sm text-[var(--color-text-secondary)]">
-                  {pageIndex + 1} / {totalPages}
-                </span>
-              }
-            />
-          )}
+          <OffsetPaginationControls
+            showDivider={false}
+            className="mt-6 justify-center gap-4"
+            hasPrev={pageIndex > 0}
+            hasMore={hasMoreHubs}
+            isFetching={isHubsLoading}
+            onPrev={() => setPageIndex((prev) => Math.max(0, prev - 1))}
+            onNext={() => setPageIndex((prev) => prev + 1)}
+            centerContent={
+              <span className="text-sm text-[var(--color-text-secondary)]">
+                Page {pageIndex + 1}
+              </span>
+            }
+          />
         </>
       )}
     </div>

@@ -12,6 +12,7 @@ import { postsService } from '../services/postsService';
 import { subscriptionService } from '../services/subscriptionService';
 import { hubsService } from '../services/hubsService';
 import { OffsetPaginationControls } from '../components/common/OffsetPaginationControls';
+import { VirtualizedList } from '../components/common/VirtualizedList';
 import { useSavedItems } from '../hooks/useSavedItems';
 import { getSavedPostIdSet, getSavedRedditPostIdSet } from '../utils/savedItems';
 import { EmptyMessage, LoadingMessage } from '../components/common/StatusMessage';
@@ -630,6 +631,8 @@ export default function HomePage() {
                                     <img
                                       src={subreddit.icon_url}
                                       alt=""
+                                      loading="lazy"
+                                      decoding="async"
                                       className="h-6 w-6 flex-shrink-0 rounded-full object-cover"
                                     />
                                   ) : (
@@ -888,8 +891,15 @@ export default function HomePage() {
           )}
         </div>
       ) : (
-        <div className="space-y-4">
-          {displayedPosts.map((item: CombinedFeedItem) => {
+        <VirtualizedList
+          items={displayedPosts}
+          estimateSize={240}
+          getKey={(item) =>
+            item.source === 'hub'
+              ? `hub-${(item.post as PlatformPost).id}`
+              : `reddit-${(item.post as RedditPost).id}`
+          }
+          renderItem={(item: CombinedFeedItem) => {
             if (item.source === 'hub') {
               const post = item.post as PlatformPost;
               const isSaved = savedPostIds.has(post.id);
@@ -900,32 +910,34 @@ export default function HomePage() {
                 deletePostMutation.isPending && deletePostMutation.variables === post.id;
 
               return (
-                <HubPostCard
-                  key={`hub-${post.id}`}
-                  post={post}
-                  useRelativeTime={useRelativeTime}
-                  currentUserId={user?.id}
-                  isSaved={isSaved}
-                  isSavePending={isSavePending}
-                  isHiding={isHiding}
-                  isDeleting={isDeleting}
-                  onShare={() => handleSharePost(post.id)}
-                  onToggleSave={(shouldSave) => handleToggleSavePost(post.id, !shouldSave)}
-                  onHide={() => handleHidePost(post.id)}
-                  onDelete={() => handleDeletePost(post.id)}
-                />
+                <div className="pb-4">
+                  <HubPostCard
+                    post={post}
+                    useRelativeTime={useRelativeTime}
+                    currentUserId={user?.id}
+                    isSaved={isSaved}
+                    isSavePending={isSavePending}
+                    isHiding={isHiding}
+                    isDeleting={isDeleting}
+                    onShare={() => handleSharePost(post.id)}
+                    onToggleSave={(shouldSave) => handleToggleSavePost(post.id, !shouldSave)}
+                    onHide={() => handleHidePost(post.id)}
+                    onDelete={() => handleDeletePost(post.id)}
+                  />
+                </div>
               );
-            } else {
-              const post = item.post as RedditPost;
-              const isSaved = savedRedditPostIds.has(`${post.subreddit}-${post.id}`);
-              const isSaveActionPending =
-                toggleSaveRedditPostMutation.isPending &&
-                toggleSaveRedditPostMutation.variables?.post.id === post.id;
-              const pendingShouldSave = toggleSaveRedditPostMutation.variables?.shouldSave;
+            }
 
-              return (
+            const post = item.post as RedditPost;
+            const isSaved = savedRedditPostIds.has(`${post.subreddit}-${post.id}`);
+            const isSaveActionPending =
+              toggleSaveRedditPostMutation.isPending &&
+              toggleSaveRedditPostMutation.variables?.post.id === post.id;
+            const pendingShouldSave = toggleSaveRedditPostMutation.variables?.shouldSave;
+
+            return (
+              <div className="pb-4">
                 <RedditPostCard
-                  key={`reddit-${post.id}`}
                   post={post}
                   useRelativeTime={useRelativeTime}
                   isSaved={isSaved}
@@ -939,10 +951,10 @@ export default function HomePage() {
                   onCrosspost={() => handleCrosspostRedditPost(post)}
                   linkState={originState}
                 />
-              );
-            }
-          })}
-        </div>
+              </div>
+            );
+          }}
+        />
       )}
 
       {/* Pagination Controls */}

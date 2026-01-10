@@ -524,6 +524,10 @@ func main() {
 			protected.POST("/users/change-password", usersHandler.ChangePassword)
 			protected.POST("/users/me/ping", usersHandler.Ping)
 
+			// Agent activity tracking
+			protected.POST("/users/me/agent/post", usersHandler.UpdateLastAgentPostAt)
+			protected.POST("/users/me/agent/browse", usersHandler.UpdateLastAgentBrowseAt)
+
 			// User blocking
 			protected.POST("/users/block", blockingHandler.BlockUser)
 			protected.DELETE("/users/block/:username", blockingHandler.UnblockUser)

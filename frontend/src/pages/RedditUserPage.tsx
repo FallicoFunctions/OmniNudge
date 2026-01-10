@@ -497,7 +497,13 @@ export default function RedditUserPage() {
                 {trophiesData.map((trophy) => (
                   <div key={trophy.name} className="flex items-center gap-2">
                     {trophy.icon_url ? (
-                      <img src={trophy.icon_url} alt={trophy.name} className="h-10 w-10 rounded" />
+                      <img
+                        src={trophy.icon_url}
+                        alt={trophy.name}
+                        loading="lazy"
+                        decoding="async"
+                        className="h-10 w-10 rounded"
+                      />
                     ) : (
                       <div className="h-10 w-10 rounded bg-[var(--color-border)]" />
                     )}

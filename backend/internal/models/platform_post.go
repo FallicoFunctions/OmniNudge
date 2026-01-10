@@ -41,7 +41,8 @@ type PlatformPost struct {
 	HotScore    float64 `json:"hot_score"` // Reddit-style hot ranking score
 
 	// User interaction (only populated when user is authenticated)
-	UserVote *int `json:"user_vote,omitempty"` // -1 (downvote), 0 (no vote), 1 (upvote), or null if not authenticated
+	UserVote     *int  `json:"user_vote,omitempty"`      // -1 (downvote), 0 (no vote), 1 (upvote), or null if not authenticated
+	HasCommented *bool `json:"has_commented,omitempty"` // true if authenticated user has top-level comment on this post
 
 	// Status
 	IsDeleted bool       `json:"is_deleted"`
@@ -182,18 +183,23 @@ func (r *PlatformPostRepository) GetByIDWithUser(ctx context.Context, id int, us
 			WHEN pv.is_upvote IS NULL THEN NULL
 			WHEN pv.is_upvote = TRUE THEN 1
 			ELSE -1
-		END as user_vote
+		END as user_vote,
+		CASE
+			WHEN pc.id IS NOT NULL THEN TRUE
+			ELSE FALSE
+		END as has_commented
 		FROM platform_posts p
 		LEFT JOIN users u ON p.author_id = u.id
 		LEFT JOIN post_votes pv ON pv.post_id = p.id AND pv.user_id = $2
+		LEFT JOIN post_comments pc ON pc.post_id = p.id AND pc.user_id = $2 AND pc.parent_comment_id IS NULL AND pc.is_deleted = FALSE
 		WHERE p.id = $1 AND p.is_deleted = FALSE AND u.shadow_banned = FALSE
 	`
 
 	var err error
 	if userID != nil {
-		err = scanPlatformPostWithVote(r.pool.QueryRow(ctx, query, id, *userID), post)
+		err = scanPlatformPostWithUserInfo(r.pool.QueryRow(ctx, query, id, *userID), post)
 	} else {
-		err = scanPlatformPostWithVote(r.pool.QueryRow(ctx, query, id, nil), post)
+		err = scanPlatformPostWithUserInfo(r.pool.QueryRow(ctx, query, id, nil), post)
 	}
 
 	if err != nil {
@@ -311,10 +317,15 @@ func (r *PlatformPostRepository) GetByHubWithUser(
 			WHEN pv.is_upvote IS NULL THEN NULL
 			WHEN pv.is_upvote = TRUE THEN 1
 			ELSE -1
-		END as user_vote
+		END as user_vote,
+		CASE
+			WHEN pc.id IS NOT NULL THEN TRUE
+			ELSE FALSE
+		END as has_commented
 		FROM platform_posts p
 		LEFT JOIN users u ON p.author_id = u.id
 		LEFT JOIN post_votes pv ON pv.post_id = p.id AND pv.user_id = $4
+		LEFT JOIN post_comments pc ON pc.post_id = p.id AND pc.user_id = $4 AND pc.parent_comment_id IS NULL AND pc.is_deleted = FALSE
 		WHERE p.hub_id = $1 AND p.is_deleted = FALSE AND u.shadow_banned = FALSE AND (p.target_subreddit IS NULL OR p.target_subreddit = '')` + timeClause + `
 		` + orderClause + `
 		LIMIT $2 OFFSET $3
@@ -337,7 +348,7 @@ func (r *PlatformPostRepository) GetByHubWithUser(
 	var posts []*PlatformPost
 	for rows.Next() {
 		post := &PlatformPost{}
-		if err := scanPlatformPostWithVote(rows, post); err != nil {
+		if err := scanPlatformPostWithUserInfo(rows, post); err != nil {
 			return nil, err
 		}
 		posts = append(posts, post)
@@ -382,10 +393,15 @@ func (r *PlatformPostRepository) GetBySubredditWithUser(
 			WHEN pv.is_upvote IS NULL THEN NULL
 			WHEN pv.is_upvote = TRUE THEN 1
 			ELSE -1
-		END as user_vote
+		END as user_vote,
+		CASE
+			WHEN pc.id IS NOT NULL THEN TRUE
+			ELSE FALSE
+		END as has_commented
 		FROM platform_posts p
 		LEFT JOIN users u ON p.author_id = u.id
 		LEFT JOIN post_votes pv ON pv.post_id = p.id AND pv.user_id = $4
+		LEFT JOIN post_comments pc ON pc.post_id = p.id AND pc.user_id = $4 AND pc.parent_comment_id IS NULL AND pc.is_deleted = FALSE
 		WHERE p.target_subreddit = $1 AND p.is_deleted = FALSE AND u.shadow_banned = FALSE` + timeClause + `
 		` + orderClause + `
 		LIMIT $2 OFFSET $3
@@ -408,7 +424,7 @@ func (r *PlatformPostRepository) GetBySubredditWithUser(
 	var posts []*PlatformPost
 	for rows.Next() {
 		post := &PlatformPost{}
-		if err := scanPlatformPostWithVote(rows, post); err != nil {
+		if err := scanPlatformPostWithUserInfo(rows, post); err != nil {
 			return nil, err
 		}
 		posts = append(posts, post)
@@ -547,6 +563,40 @@ func scanPlatformPostWithVote(row pgx.Row, post *PlatformPost, extraDest ...inte
 		&post.CreatedAt,
 		&post.HotScore,
 		&post.UserVote,
+	}
+	dests = append(dests, extraDest...)
+	return row.Scan(dests...)
+}
+
+func scanPlatformPostWithUserInfo(row pgx.Row, post *PlatformPost, extraDest ...interface{}) error {
+	dests := []interface{}{
+		&post.ID,
+		&post.AuthorID,
+		&post.HubID,
+		&post.Title,
+		&post.Body,
+		&post.Tags,
+		&post.MediaURL,
+		&post.MediaType,
+		&post.ThumbnailURL,
+		&post.Score,
+		&post.Upvotes,
+		&post.Downvotes,
+		&post.NumComments,
+		&post.ViewCount,
+		&post.IsDeleted,
+		&post.IsEdited,
+		&post.EditedAt,
+		&post.CrosspostOriginType,
+		&post.CrosspostOriginSubreddit,
+		&post.CrosspostOriginPostID,
+		&post.CrosspostOriginalTitle,
+		&post.TargetSubreddit,
+		&post.CrosspostedAt,
+		&post.CreatedAt,
+		&post.HotScore,
+		&post.UserVote,
+		&post.HasCommented,
 	}
 	dests = append(dests, extraDest...)
 	return row.Scan(dests...)
