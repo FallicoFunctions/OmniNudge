@@ -391,6 +391,7 @@ export default function PostDetailPage() {
               <PostDetailMedia
                 mediaUrl={mediaUrl}
                 thumbnailUrl={thumbnailUrl}
+                galleryImages={postData?.gallery_images}
                 decodedTitle={decodedTitle}
                 isVideoMedia={isVideoMedia}
                 imageExpanded={imageExpanded}

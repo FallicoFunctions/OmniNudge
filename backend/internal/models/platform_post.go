@@ -3,12 +3,20 @@ package models
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
+
+// GalleryImage represents a single image in a gallery post
+type GalleryImage struct {
+	URL    string `json:"url"`
+	Width  int    `json:"width,omitempty"`
+	Height int    `json:"height,omitempty"`
+}
 
 // PlatformPost represents a native post created by users
 type PlatformPost struct {
@@ -28,9 +36,10 @@ type PlatformPost struct {
 	Tags []string `json:"tags,omitempty"`
 
 	// Media (optional)
-	MediaURL     *string `json:"media_url,omitempty"`
-	MediaType    *string `json:"media_type,omitempty"`
-	ThumbnailURL *string `json:"thumbnail_url,omitempty"`
+	MediaURL      *string        `json:"media_url,omitempty"`
+	MediaType     *string        `json:"media_type,omitempty"`
+	ThumbnailURL  *string        `json:"thumbnail_url,omitempty"`
+	GalleryImages []GalleryImage `json:"gallery_images,omitempty"` // Array of gallery images
 
 	// Engagement metrics
 	Score       int     `json:"score"`
@@ -141,7 +150,7 @@ const platformPostSelectColumns = `
 	score, upvotes, downvotes, num_comments, view_count,
 	is_deleted, is_edited, edited_at,
 	crosspost_origin_type, crosspost_origin_subreddit, crosspost_origin_post_id, crosspost_original_title,
-	target_subreddit, crossposted_at, created_at, hot_score
+	target_subreddit, crossposted_at, created_at, hot_score, gallery_images
 `
 
 const platformPostSelectColumnsPrefixed = `
@@ -149,7 +158,7 @@ const platformPostSelectColumnsPrefixed = `
 	p.score, p.upvotes, p.downvotes, p.num_comments, p.view_count,
 	p.is_deleted, p.is_edited, p.edited_at,
 	p.crosspost_origin_type, p.crosspost_origin_subreddit, p.crosspost_origin_post_id, p.crosspost_original_title,
-	p.target_subreddit, p.crossposted_at, p.created_at, p.hot_score
+	p.target_subreddit, p.crossposted_at, p.created_at, p.hot_score, p.gallery_images
 `
 
 // PlatformPostRepository handles database operations for platform posts
@@ -164,13 +173,23 @@ func NewPlatformPostRepository(pool *pgxpool.Pool) *PlatformPostRepository {
 
 // Create creates a new platform post
 func (r *PlatformPostRepository) Create(ctx context.Context, post *PlatformPost) error {
+	// Marshal gallery_images to JSONB
+	var galleryImagesJSON []byte
+	var err error
+	if len(post.GalleryImages) > 0 {
+		galleryImagesJSON, err = json.Marshal(post.GalleryImages)
+		if err != nil {
+			return err
+		}
+	}
+
 	query := `
 		INSERT INTO platform_posts (
 			author_id, hub_id, title, body, tags, media_url, media_type, thumbnail_url,
 			crosspost_origin_type, crosspost_origin_subreddit, crosspost_origin_post_id, crosspost_original_title,
-			target_subreddit, crossposted_at
+			target_subreddit, crossposted_at, gallery_images
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
 		RETURNING id, score, upvotes, downvotes, num_comments, view_count, is_deleted, is_edited, edited_at, crossposted_at, created_at
 	`
 
@@ -189,6 +208,7 @@ func (r *PlatformPostRepository) Create(ctx context.Context, post *PlatformPost)
 		post.CrosspostOriginalTitle,
 		post.TargetSubreddit,
 		post.CrosspostedAt,
+		galleryImagesJSON,
 	).Scan(
 		&post.ID,
 		&post.Score,
@@ -655,6 +675,7 @@ func (r *PlatformPostRepository) UpdateCreatedAt(ctx context.Context, postID int
 }
 
 func scanPlatformPost(row pgx.Row, post *PlatformPost, extraDest ...interface{}) error {
+	var galleryImagesBytes []byte
 	dests := []interface{}{
 		&post.ID,
 		&post.AuthorID,
@@ -681,12 +702,25 @@ func scanPlatformPost(row pgx.Row, post *PlatformPost, extraDest ...interface{})
 		&post.CrosspostedAt,
 		&post.CreatedAt,
 		&post.HotScore,
+		&galleryImagesBytes,
 	}
 	dests = append(dests, extraDest...)
-	return row.Scan(dests...)
+	if err := row.Scan(dests...); err != nil {
+		return err
+	}
+
+	// Unmarshal gallery_images JSONB (skip if null/empty)
+	if galleryImagesBytes != nil && len(galleryImagesBytes) > 0 && string(galleryImagesBytes) != "null" {
+		if err := json.Unmarshal(galleryImagesBytes, &post.GalleryImages); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func scanPlatformPostWithVote(row pgx.Row, post *PlatformPost, extraDest ...interface{}) error {
+	var galleryImagesBytes []byte
 	dests := []interface{}{
 		&post.ID,
 		&post.AuthorID,
@@ -713,13 +747,26 @@ func scanPlatformPostWithVote(row pgx.Row, post *PlatformPost, extraDest ...inte
 		&post.CrosspostedAt,
 		&post.CreatedAt,
 		&post.HotScore,
+		&galleryImagesBytes,
 		&post.UserVote,
 	}
 	dests = append(dests, extraDest...)
-	return row.Scan(dests...)
+	if err := row.Scan(dests...); err != nil {
+		return err
+	}
+
+	// Unmarshal gallery_images JSONB (skip if null/empty)
+	if galleryImagesBytes != nil && len(galleryImagesBytes) > 0 && string(galleryImagesBytes) != "null" {
+		if err := json.Unmarshal(galleryImagesBytes, &post.GalleryImages); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func scanPlatformPostWithUserInfo(row pgx.Row, post *PlatformPost, extraDest ...interface{}) error {
+	var galleryImagesBytes []byte
 	dests := []interface{}{
 		&post.ID,
 		&post.AuthorID,
@@ -746,11 +793,23 @@ func scanPlatformPostWithUserInfo(row pgx.Row, post *PlatformPost, extraDest ...
 		&post.CrosspostedAt,
 		&post.CreatedAt,
 		&post.HotScore,
+		&galleryImagesBytes,
 		&post.UserVote,
 		&post.HasCommented,
 	}
 	dests = append(dests, extraDest...)
-	return row.Scan(dests...)
+	if err := row.Scan(dests...); err != nil {
+		return err
+	}
+
+	// Unmarshal gallery_images JSONB (skip if null/empty)
+	if galleryImagesBytes != nil && len(galleryImagesBytes) > 0 && string(galleryImagesBytes) != "null" {
+		if err := json.Unmarshal(galleryImagesBytes, &post.GalleryImages); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // Vote records a user's vote and updates aggregate counts, preventing duplicates.
