@@ -70,22 +70,62 @@ func (h *ModerationHandler) ListReports(c *gin.Context) {
 	status := c.DefaultQuery("status", "open")
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "50"))
 	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
+	cursorParam := c.Query("cursor")
 	if limit < 1 || limit > 200 {
 		limit = 50
 	}
 
-	reports, err := h.reportRepo.ListByStatus(c.Request.Context(), status, limit, offset)
+	var cursor *timeCursor
+	if cursorParam != "" {
+		decoded, err := decodeTimeCursor(cursorParam)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid cursor"})
+			return
+		}
+		cursor = decoded
+	}
+	useCursorPagination := cursorParam != "" || offset == 0
+	limitArg := limit
+	if useCursorPagination {
+		limitArg = limit + 1
+		offset = 0
+	}
+
+	var reports []*models.Report
+	var err error
+	if useCursorPagination {
+		var payload *models.TimeCursor
+		if cursor != nil {
+			payload = &models.TimeCursor{ID: cursor.ID, Timestamp: cursor.Timestamp}
+		}
+		reports, err = h.reportRepo.ListByStatusWithCursor(c.Request.Context(), status, limitArg, payload)
+	} else {
+		reports, err = h.reportRepo.ListByStatus(c.Request.Context(), status, limitArg, offset)
+	}
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to list reports", "details": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
+	nextCursor := ""
+	if useCursorPagination && len(reports) > limit {
+		reports = reports[:limit]
+		if len(reports) > 0 {
+			last := reports[len(reports)-1]
+			nextCursor = encodeTimeCursor(timeCursor{ID: last.ID, Timestamp: last.CreatedAt})
+		}
+	}
+
+	response := gin.H{
 		"reports": reports,
 		"limit":   limit,
 		"offset":  offset,
 		"status":  status,
-	})
+	}
+	if nextCursor != "" {
+		response["next_cursor"] = nextCursor
+	}
+	c.JSON(http.StatusOK, response)
 }
 
 // UpdateReportStatus handles POST /api/v1/mod/reports/:id/status

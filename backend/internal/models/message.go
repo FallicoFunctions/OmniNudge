@@ -2,6 +2,7 @@ package models
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -277,6 +278,94 @@ func (r *MessageRepository) GetByConversationID(ctx context.Context, conversatio
 	return messages, rows.Err()
 }
 
+// GetByConversationIDWithCursor retrieves messages for a conversation using cursor pagination (desc).
+func (r *MessageRepository) GetByConversationIDWithCursor(
+	ctx context.Context,
+	conversationID int,
+	userID int,
+	limit int,
+	cursor *TimeCursor,
+) ([]*Message, error) {
+	query := `
+		SELECT m.id, m.conversation_id, m.sender_id, m.recipient_id, m.encrypted_content,
+		       m.sender_encrypted_content,
+		       m.message_type, m.sent_at, m.delivered_at, m.read_at,
+		       m.deleted_for_sender, m.deleted_for_recipient,
+		       m.media_file_id,
+		       COALESCE(mf.storage_url, m.media_url) as media_url,
+		       COALESCE(m.media_type, mf.file_type) as media_type,
+		       COALESCE(m.media_size, mf.file_size) as media_size,
+		       m.encryption_version,
+		       m.media_encryption_key,
+		       m.media_encryption_iv,
+		       m.sender_media_encryption_key,
+		       COALESCE(m.is_multi_recipient, FALSE) as is_multi_recipient,
+		       m.shared_encryption_iv
+		FROM messages m
+		LEFT JOIN media_files mf ON m.media_file_id = mf.id
+		WHERE m.conversation_id = $1
+		  AND (
+		    (m.sender_id = $2 AND m.deleted_for_sender = false) OR
+		    (m.recipient_id = $2 AND m.deleted_for_recipient = false)
+		  )
+	`
+	args := []interface{}{conversationID, userID}
+	paramIdx := 3
+	if cursor != nil {
+		query += fmt.Sprintf(" AND (m.sent_at, m.id) < ($%d, $%d)", paramIdx, paramIdx+1)
+		args = append(args, cursor.Timestamp, cursor.ID)
+		paramIdx += 2
+	}
+	query += fmt.Sprintf(" ORDER BY m.sent_at DESC, m.id DESC LIMIT $%d", paramIdx)
+	args = append(args, limit)
+
+	rows, err := r.pool.Query(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var messages []*Message
+	for rows.Next() {
+		message := &Message{}
+		err := rows.Scan(
+			&message.ID,
+			&message.ConversationID,
+			&message.SenderID,
+			&message.RecipientID,
+			&message.EncryptedContent,
+			&message.SenderEncryptedContent,
+			&message.MessageType,
+			&message.SentAt,
+			&message.DeliveredAt,
+			&message.ReadAt,
+			&message.DeletedForSender,
+			&message.DeletedForRecipient,
+			&message.MediaFileID,
+			&message.MediaURL,
+			&message.MediaType,
+			&message.MediaSize,
+			&message.EncryptionVersion,
+			&message.MediaEncryptionKey,
+			&message.MediaEncryptionIV,
+			&message.SenderMediaEncryptionKey,
+			&message.IsMultiRecipient,
+			&message.SharedEncryptionIV,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		if err := r.loadRecipientKeys(ctx, message); err != nil {
+			return nil, err
+		}
+
+		messages = append(messages, message)
+	}
+
+	return messages, rows.Err()
+}
+
 // GetByConversationIDForAll retrieves messages for mod mail conversations (visible to all participants)
 func (r *MessageRepository) GetByConversationIDForAll(ctx context.Context, conversationID int, limit int, offset int) ([]*Message, error) {
 	query := `
@@ -340,6 +429,90 @@ func (r *MessageRepository) GetByConversationIDForAll(ctx context.Context, conve
 		}
 
 		// Load recipient keys if this is a multi-recipient message
+		if err := r.loadRecipientKeys(ctx, message); err != nil {
+			return nil, err
+		}
+
+		messages = append(messages, message)
+	}
+
+	return messages, rows.Err()
+}
+
+// GetByConversationIDForAllWithCursor retrieves mod mail messages using cursor pagination (asc).
+func (r *MessageRepository) GetByConversationIDForAllWithCursor(
+	ctx context.Context,
+	conversationID int,
+	limit int,
+	cursor *TimeCursor,
+) ([]*Message, error) {
+	query := `
+		SELECT m.id, m.conversation_id, m.sender_id, m.recipient_id, m.encrypted_content,
+		       m.sender_encrypted_content,
+		       m.message_type, m.sent_at, m.delivered_at, m.read_at,
+		       m.deleted_for_sender, m.deleted_for_recipient,
+		       m.media_file_id,
+		       COALESCE(mf.storage_url, m.media_url) as media_url,
+		       COALESCE(m.media_type, mf.file_type) as media_type,
+		       COALESCE(m.media_size, mf.file_size) as media_size,
+		       m.encryption_version,
+		       m.media_encryption_key,
+		       m.media_encryption_iv,
+		       m.sender_media_encryption_key,
+		       COALESCE(m.is_multi_recipient, FALSE) as is_multi_recipient,
+		       m.shared_encryption_iv
+		FROM messages m
+		LEFT JOIN media_files mf ON m.media_file_id = mf.id
+		WHERE m.conversation_id = $1
+		  AND NOT (m.deleted_for_sender = TRUE AND m.deleted_for_recipient = TRUE)
+	`
+	args := []interface{}{conversationID}
+	paramIdx := 2
+	if cursor != nil {
+		query += fmt.Sprintf(" AND (m.sent_at, m.id) > ($%d, $%d)", paramIdx, paramIdx+1)
+		args = append(args, cursor.Timestamp, cursor.ID)
+		paramIdx += 2
+	}
+	query += fmt.Sprintf(" ORDER BY m.sent_at ASC, m.id ASC LIMIT $%d", paramIdx)
+	args = append(args, limit)
+
+	rows, err := r.pool.Query(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var messages []*Message
+	for rows.Next() {
+		message := &Message{}
+		err := rows.Scan(
+			&message.ID,
+			&message.ConversationID,
+			&message.SenderID,
+			&message.RecipientID,
+			&message.EncryptedContent,
+			&message.SenderEncryptedContent,
+			&message.MessageType,
+			&message.SentAt,
+			&message.DeliveredAt,
+			&message.ReadAt,
+			&message.DeletedForSender,
+			&message.DeletedForRecipient,
+			&message.MediaFileID,
+			&message.MediaURL,
+			&message.MediaType,
+			&message.MediaSize,
+			&message.EncryptionVersion,
+			&message.MediaEncryptionKey,
+			&message.MediaEncryptionIV,
+			&message.SenderMediaEncryptionKey,
+			&message.IsMultiRecipient,
+			&message.SharedEncryptionIV,
+		)
+		if err != nil {
+			return nil, err
+		}
+
 		if err := r.loadRecipientKeys(ctx, message); err != nil {
 			return nil, err
 		}

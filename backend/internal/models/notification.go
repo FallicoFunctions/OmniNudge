@@ -136,6 +136,80 @@ func (r *NotificationRepository) GetByUserID(
 	return notifications, rows.Err()
 }
 
+// GetByUserIDWithCursor retrieves notifications with cursor pagination.
+func (r *NotificationRepository) GetByUserIDWithCursor(
+	ctx context.Context,
+	userID int,
+	limit int,
+	unreadOnly bool,
+	cursor *TimeCursor,
+) ([]*Notification, error) {
+	query := `
+		SELECT
+			n.id, n.user_id, n.notification_type, n.content_type, n.content_id,
+			n.actor_id, n.milestone_count, n.votes_per_hour, n.message, n.read, n.created_at,
+			u.id, u.username, u.avatar_url
+		FROM notifications n
+		LEFT JOIN users u ON n.actor_id = u.id
+		WHERE n.user_id = $1
+	`
+	args := []interface{}{userID}
+	paramIdx := 2
+
+	if unreadOnly {
+		query += " AND n.read = false"
+	}
+	if cursor != nil {
+		query += fmt.Sprintf(" AND (n.created_at, n.id) < ($%d, $%d)", paramIdx, paramIdx+1)
+		args = append(args, cursor.Timestamp, cursor.ID)
+		paramIdx += 2
+	}
+
+	query += fmt.Sprintf(" ORDER BY n.created_at DESC, n.id DESC LIMIT $%d", paramIdx)
+	args = append(args, limit)
+
+	rows, err := r.pool.Query(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var notifications []*Notification
+	for rows.Next() {
+		n := &Notification{Actor: &User{}}
+		var actorID *int
+		var actorUsername *string
+		var actorAvatar *string
+
+		err := rows.Scan(
+			&n.ID, &n.UserID, &n.NotificationType, &n.ContentType, &n.ContentID,
+			&n.ActorID, &n.MilestoneCount, &n.VotesPerHour, &n.Message, &n.Read, &n.CreatedAt,
+			&actorID, &actorUsername, &actorAvatar,
+		)
+		if err != nil {
+			return nil, err
+		}
+		n.Actor = nil
+		if actorID != nil {
+			n.Actor = &User{
+				ID:        *actorID,
+				Username:  derefString(actorUsername),
+				AvatarURL: actorAvatar,
+			}
+		}
+		notifications = append(notifications, n)
+	}
+
+	return notifications, rows.Err()
+}
+
+func derefString(value *string) string {
+	if value == nil {
+		return ""
+	}
+	return *value
+}
+
 // GetUnreadCount returns the count of unread notifications for a user
 func (r *NotificationRepository) GetUnreadCount(ctx context.Context, userID int) (int, error) {
 	var count int

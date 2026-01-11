@@ -2,6 +2,7 @@ package models
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -191,6 +192,94 @@ func (r *ConversationRepository) GetByUserID(ctx context.Context, userID int, li
 	query += ` ORDER BY last_message_at DESC LIMIT $2 OFFSET $3`
 
 	rows, err := r.pool.Query(ctx, query, userID, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var conversations []*Conversation
+	for rows.Next() {
+		conversation := &Conversation{}
+
+		err := rows.Scan(
+			&conversation.ID,
+			&conversation.User1ID,
+			&conversation.User2ID,
+			&conversation.CreatedAt,
+			&conversation.LastMessageAt,
+			&conversation.User1AutoDeleteAfter,
+			&conversation.User2AutoDeleteAfter,
+			&conversation.User1Pseudonym,
+			&conversation.User2Pseudonym,
+			&conversation.ConversationType,
+			&conversation.HubID,
+			&conversation.Subject,
+			&conversation.Status,
+			&conversation.ArchivedAt,
+			&conversation.ArchivedBy,
+		)
+		if err != nil {
+			return nil, err
+		}
+		conversations = append(conversations, conversation)
+	}
+
+	return conversations, rows.Err()
+}
+
+// GetByUserIDWithCursor retrieves conversations using cursor pagination (by last_message_at desc).
+func (r *ConversationRepository) GetByUserIDWithCursor(
+	ctx context.Context,
+	userID int,
+	limit int,
+	includeArchived bool,
+	cursor *TimeCursor,
+) ([]*Conversation, error) {
+	query := `
+		SELECT id, user1_id, user2_id, created_at, last_message_at,
+		       user1_auto_delete_after, user2_auto_delete_after,
+		       user1_pseudonym, user2_pseudonym,
+		       conversation_type, hub_id, subject, status, archived_at, archived_by
+		FROM conversations
+		WHERE (
+			(
+				(conversation_type = 'dm' OR conversation_type IS NULL) AND
+				(user1_id = $1 OR user2_id = $1) AND
+				NOT ((user1_id = $1 AND deleted_for_user1 = TRUE) OR (user2_id = $1 AND deleted_for_user2 = TRUE))
+			)
+			OR
+			(conversation_type = 'mod_mail' AND id IN (
+				SELECT conversation_id
+				FROM conversation_participants
+				WHERE user_id = $1 AND is_moderator = FALSE
+			))
+		)
+	`
+
+	args := []interface{}{userID}
+	paramIdx := 2
+
+	if !includeArchived {
+		query += ` AND (
+			(conversation_type = 'dm' AND NOT (
+				(user1_id = $1 AND archived_for_user1 = TRUE) OR
+				(user2_id = $1 AND archived_for_user2 = TRUE) OR
+				archived_at IS NOT NULL
+			))
+			OR (conversation_type = 'mod_mail' AND archived_at IS NULL)
+		)`
+	}
+
+	if cursor != nil {
+		query += fmt.Sprintf(" AND (last_message_at, id) < ($%d, $%d)", paramIdx, paramIdx+1)
+		args = append(args, cursor.Timestamp, cursor.ID)
+		paramIdx += 2
+	}
+
+	query += fmt.Sprintf(" ORDER BY last_message_at DESC, id DESC LIMIT $%d", paramIdx)
+	args = append(args, limit)
+
+	rows, err := r.pool.Query(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}

@@ -48,6 +48,7 @@ func (h *PostsHandler) GetSubredditPosts(c *gin.Context) {
 	sortBy := c.DefaultQuery("sort", "new") // "new", "hot", "score"
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "25"))
 	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
+	cursorParam := c.Query("cursor")
 
 	// Validate limit
 	if limit < 1 || limit > 100 {
@@ -68,7 +69,24 @@ func (h *PostsHandler) GetSubredditPosts(c *gin.Context) {
 	}
 
 	// Get posts by subreddit
-	posts, err := h.postRepo.GetBySubredditWithUser(c.Request.Context(), subredditName, sortBy, limit, offset, userID, startTime, endTime)
+	var cursor *models.PlatformPostCursor
+	if cursorParam != "" {
+		decoded, err := decodePlatformPostCursor(cursorParam)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid cursor"})
+			return
+		}
+		cursor = decoded
+	}
+
+	useCursorPagination := cursorParam != "" || offset == 0
+	var posts []*models.PlatformPost
+	if useCursorPagination {
+		limitPlusOne := limit + 1
+		posts, err = h.postRepo.GetBySubredditWithCursor(c.Request.Context(), subredditName, sortBy, limitPlusOne, cursor, userID, startTime, endTime)
+	} else {
+		posts, err = h.postRepo.GetBySubredditWithUser(c.Request.Context(), subredditName, sortBy, limit, offset, userID, startTime, endTime)
+	}
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch posts", "details": err.Error()})
 		return
@@ -79,12 +97,27 @@ func (h *PostsHandler) GetSubredditPosts(c *gin.Context) {
 		posts = []*models.PlatformPost{}
 	}
 
+	nextCursor := ""
+	if useCursorPagination {
+		hasMore := len(posts) > limit
+		if hasMore {
+			posts = posts[:limit]
+		}
+		if hasMore && len(posts) > 0 {
+			last := posts[len(posts)-1]
+			nextCursor = encodePlatformPostCursor(buildPlatformPostCursor(last, sortBy))
+		}
+	}
+
 	response := gin.H{
 		"posts":     posts,
 		"subreddit": subredditName,
 		"sort":      sortBy,
 		"limit":     limit,
 		"offset":    offset,
+	}
+	if nextCursor != "" {
+		response["next_cursor"] = nextCursor
 	}
 	if timeRangeKey != "" {
 		response["time_range"] = timeRangeKey

@@ -204,12 +204,39 @@ func (h *AdminHandler) GetBanHistory(c *gin.Context) {
 func (h *AdminHandler) GetAllBanHistory(c *gin.Context) {
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "50"))
 	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
+	cursorParam := c.Query("cursor")
 
 	if limit > 200 {
 		limit = 200
 	}
 
-	history, err := h.userRepo.GetAllBanHistory(c.Request.Context(), limit, offset)
+	var cursor *timeCursor
+	if cursorParam != "" {
+		decoded, err := decodeTimeCursor(cursorParam)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid cursor"})
+			return
+		}
+		cursor = decoded
+	}
+	useCursorPagination := cursorParam != "" || offset == 0
+	limitArg := limit
+	if useCursorPagination {
+		limitArg = limit + 1
+		offset = 0
+	}
+
+	var history []models.BanHistory
+	var err error
+	if useCursorPagination {
+		var payload *models.TimeCursor
+		if cursor != nil {
+			payload = &models.TimeCursor{ID: cursor.ID, Timestamp: cursor.Timestamp}
+		}
+		history, err = h.userRepo.GetAllBanHistoryWithCursor(c.Request.Context(), limitArg, payload)
+	} else {
+		history, err = h.userRepo.GetAllBanHistory(c.Request.Context(), limitArg, offset)
+	}
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch ban history", "details": err.Error()})
 		return
@@ -223,12 +250,25 @@ func (h *AdminHandler) GetAllBanHistory(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
+	nextCursor := ""
+	if useCursorPagination && len(history) > limit {
+		history = history[:limit]
+		if len(history) > 0 {
+			last := history[len(history)-1]
+			nextCursor = encodeTimeCursor(timeCursor{ID: last.ID, Timestamp: last.CreatedAt})
+		}
+	}
+
+	response := gin.H{
 		"history": history,
 		"limit":   limit,
 		"offset":  offset,
 		"total":   totalCount,
-	})
+	}
+	if nextCursor != "" {
+		response["next_cursor"] = nextCursor
+	}
+	c.JSON(http.StatusOK, response)
 }
 
 // ListUsers handles GET /api/v1/admin/users
@@ -238,9 +278,27 @@ func (h *AdminHandler) ListUsers(c *gin.Context) {
 	statusFilter := c.Query("status") // "shadow_banned", "banned", "deleted", "active"
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "50"))
 	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
+	cursorParam := c.Query("cursor")
 
 	if limit > 100 {
 		limit = 100
+	}
+
+	var cursor *timeCursor
+	if cursorParam != "" {
+		decoded, err := decodeTimeCursor(cursorParam)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid cursor"})
+			return
+		}
+		cursor = decoded
+	}
+	useCursorPagination := cursorParam != "" || offset == 0
+	limitArg := limit
+	offsetArg := offset
+	if useCursorPagination {
+		limitArg = limit + 1
+		offsetArg = 0
 	}
 
 	// Build query dynamically with proper parameterization
@@ -297,9 +355,14 @@ func (h *AdminHandler) ListUsers(c *gin.Context) {
 		return
 	}
 
+	cursorClause, cursorArgs := buildTimeCursorClause("created_at", cursor, paramCount, "desc")
+	baseQuery += cursorClause
+	args = append(args, cursorArgs...)
+	paramCount += len(cursorArgs)
+
 	// Add ordering and pagination
-	baseQuery += " ORDER BY created_at DESC LIMIT $" + strconv.Itoa(paramCount) + " OFFSET $" + strconv.Itoa(paramCount+1)
-	args = append(args, limit, offset)
+	baseQuery += " ORDER BY created_at DESC, id DESC LIMIT $" + strconv.Itoa(paramCount) + " OFFSET $" + strconv.Itoa(paramCount+1)
+	args = append(args, limitArg, offsetArg)
 
 	rows, err := h.pool.Query(c.Request.Context(), baseQuery, args...)
 	if err != nil {
@@ -383,12 +446,26 @@ func (h *AdminHandler) ListUsers(c *gin.Context) {
 		})
 	}
 
-	c.JSON(http.StatusOK, gin.H{
+	nextCursor := ""
+	if useCursorPagination && len(users) > limit {
+		users = users[:limit]
+		if len(users) > 0 {
+			last := users[len(users)-1]
+			createdAt, _ := time.Parse(time.RFC3339, last.CreatedAt)
+			nextCursor = encodeTimeCursor(timeCursor{ID: last.ID, Timestamp: createdAt})
+		}
+	}
+
+	response := gin.H{
 		"users":  users,
 		"limit":  limit,
 		"offset": offset,
 		"total":  totalCount,
-	})
+	}
+	if nextCursor != "" {
+		response["next_cursor"] = nextCursor
+	}
+	c.JSON(http.StatusOK, response)
 }
 
 // GetSiteStats handles GET /api/v1/admin/stats

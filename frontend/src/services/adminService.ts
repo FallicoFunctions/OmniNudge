@@ -4,15 +4,16 @@ import type { AdminUser, SiteStats, HubModerator, UpdateRoleRequest, BanHistoryI
 export const adminService = {
   // ===== USER MANAGEMENT =====
 
-  async listUsers(search?: string, role?: string, status?: string, limit = 50, offset = 0): Promise<{ users: AdminUser[]; limit: number; offset: number; total: number }> {
+  async listUsers(search?: string, role?: string, status?: string, limit = 50, offset = 0, cursor?: string): Promise<{ users: AdminUser[]; limit: number; offset: number; total: number; next_cursor?: string }> {
     const params = new URLSearchParams();
     if (search) params.append('search', search);
     if (role) params.append('role', role);
     if (status) params.append('status', status);
     params.append('limit', limit.toString());
     params.append('offset', offset.toString());
+    if (cursor) params.append('cursor', cursor);
 
-    return api.get<{ users: AdminUser[]; limit: number; offset: number; total: number }>(`/admin/users?${params.toString()}`);
+    return api.get<{ users: AdminUser[]; limit: number; offset: number; total: number; next_cursor?: string }>(`/admin/users?${params.toString()}`);
   },
 
   async updateUserRole(userId: number, data: UpdateRoleRequest): Promise<{ message: string; user_id: number; role: string }> {
@@ -39,12 +40,13 @@ export const adminService = {
     return api.get<{ history: BanHistoryItem[] }>(`/admin/users/${userId}/ban-history`);
   },
 
-  async getAllBanHistory(limit = 50, offset = 0): Promise<{ history: BanHistoryItem[]; limit: number; offset: number; total: number }> {
+  async getAllBanHistory(limit = 50, offset = 0, cursor?: string): Promise<{ history: BanHistoryItem[]; limit: number; offset: number; total: number; next_cursor?: string }> {
     const params = new URLSearchParams();
     params.append('limit', limit.toString());
     params.append('offset', offset.toString());
+    if (cursor) params.append('cursor', cursor);
 
-    return api.get<{ history: BanHistoryItem[]; limit: number; offset: number; total: number }>(`/admin/ban-history?${params.toString()}`);
+    return api.get<{ history: BanHistoryItem[]; limit: number; offset: number; total: number; next_cursor?: string }>(`/admin/ban-history?${params.toString()}`);
   },
 
   // ===== HUB MODERATOR MANAGEMENT =====

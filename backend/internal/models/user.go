@@ -3,6 +3,7 @@ package models
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"strings"
 	"time"
 
@@ -562,6 +563,43 @@ func (r *UserRepository) GetAllBanHistory(ctx context.Context, limit, offset int
 	`
 
 	rows, err := r.pool.Query(ctx, query, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var history []BanHistory
+	for rows.Next() {
+		var h BanHistory
+		err := rows.Scan(&h.ID, &h.UserID, &h.Action, &h.Reason, &h.ShowReason, &h.AdminID, &h.AdminName, &h.CreatedAt)
+		if err != nil {
+			return nil, err
+		}
+		history = append(history, h)
+	}
+
+	return history, rows.Err()
+}
+
+// GetAllBanHistoryWithCursor retrieves ban history with cursor-based pagination.
+func (r *UserRepository) GetAllBanHistoryWithCursor(ctx context.Context, limit int, cursor *TimeCursor) ([]BanHistory, error) {
+	query := `
+		SELECT bh.id, bh.user_id, bh.action, bh.reason, bh.show_reason, bh.admin_id, u.username as admin_name, bh.created_at
+		FROM ban_history bh
+		JOIN users u ON u.id = bh.admin_id
+		WHERE 1=1
+	`
+	args := []interface{}{}
+	paramIdx := 1
+	if cursor != nil {
+		query += fmt.Sprintf(" AND (bh.created_at, bh.id) < ($%d, $%d)", paramIdx, paramIdx+1)
+		args = append(args, cursor.Timestamp, cursor.ID)
+		paramIdx += 2
+	}
+	query += fmt.Sprintf(" ORDER BY bh.created_at DESC, bh.id DESC LIMIT $%d", paramIdx)
+	args = append(args, limit)
+
+	rows, err := r.pool.Query(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}

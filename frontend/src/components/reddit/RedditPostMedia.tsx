@@ -17,7 +17,7 @@ type RedditPostMediaProps = {
   onPrevGallery: () => void;
   onNextGallery: () => void;
   videoData?: VideoData;
-  videoRef: RefObject<HTMLVideoElement>;
+  videoRef: RefObject<HTMLVideoElement | null>;
   posterUrl?: string | null;
 };
 

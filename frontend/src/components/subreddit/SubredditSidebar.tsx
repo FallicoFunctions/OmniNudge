@@ -10,7 +10,7 @@ type SubredditSidebarProps = {
   isLoading: boolean;
   isError: boolean;
   sidebarHtml?: string | null;
-  sidebarRef: RefObject<HTMLDivElement>;
+  sidebarRef: RefObject<HTMLDivElement | null>;
 };
 
 export function SubredditSidebar({

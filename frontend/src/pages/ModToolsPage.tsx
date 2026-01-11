@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { moderationService } from '../services/moderationService';
@@ -512,12 +512,17 @@ function RemovalReasonForm({
 // ===== MOD LOG TAB =====
 
 function ModLogTab({ hubName }: { hubName: string }) {
-  const [page, setPage] = useState(1);
+  const [cursorStack, setCursorStack] = useState(['']);
   const limit = 50;
+  const currentCursor = cursorStack[cursorStack.length - 1] ?? '';
+
+  useEffect(() => {
+    setCursorStack(['']);
+  }, [hubName]);
 
   const { data, isLoading } = useQuery({
-    queryKey: ['modLog', hubName, page],
-    queryFn: () => moderationService.getModLog(hubName, limit, (page - 1) * limit),
+    queryKey: ['modLog', hubName, currentCursor],
+    queryFn: () => moderationService.getModLog(hubName, limit, 0, currentCursor),
   });
 
   if (isLoading) {
@@ -529,6 +534,8 @@ function ModLogTab({ hubName }: { hubName: string }) {
   }
 
   const logs = data?.logs || [];
+  const hasMore = Boolean(data?.next_cursor) || logs.length >= limit;
+  const hasPrev = cursorStack.length > 1;
 
   return (
     <div>
@@ -564,15 +571,20 @@ function ModLogTab({ hubName }: { hubName: string }) {
         ))}
       </div>
 
-      {logs.length >= limit && (
+      {logs.length > 0 && (
         <OffsetPaginationControls
           showDivider={false}
           className="mt-6 justify-center gap-4"
-          hasPrev={page > 1}
-          hasMore={logs.length >= limit}
-          onPrev={() => setPage((prev) => Math.max(1, prev - 1))}
-          onNext={() => setPage((prev) => prev + 1)}
-          centerContent={<span className="px-4 py-2">Page {page}</span>}
+          hasPrev={hasPrev}
+          hasMore={hasMore}
+          onPrev={() => setCursorStack((prev) => (prev.length > 1 ? prev.slice(0, -1) : prev))}
+          onNext={() => {
+            const nextCursor = data?.next_cursor;
+            if (nextCursor) {
+              setCursorStack((prev) => [...prev, nextCursor]);
+            }
+          }}
+          centerContent={<span className="px-4 py-2">Page {cursorStack.length}</span>}
         />
       )}
     </div>

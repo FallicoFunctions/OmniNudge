@@ -176,7 +176,14 @@ func main() {
 	themesHandler := handlers.NewThemesHandler(themeRepo, themeOverrideRepo, installedThemeRepo, userSettingsRepo, cssSanitizer)
 	redditCommentsHandler := handlers.NewRedditCommentsHandler(redditCommentRepo)
 	savedItemsHandler := handlers.NewSavedItemsHandler(savedItemsRepo, postRepo, commentRepo, redditCommentRepo, redditClient)
-	feedHandler := handlers.NewFeedHandler(postRepo, hubSubRepo, subredditSubRepo, redditClient)
+	feedHandler := handlers.NewFeedHandler(
+		postRepo,
+		hubSubRepo,
+		subredditSubRepo,
+		redditClient,
+		cache,
+		time.Duration(cfg.Redis.TTLSeconds)*time.Second,
+	)
 	bugReportsHandler := handlers.NewBugReportsHandler(bugReportRepo, knownBugRepo, mediaRepo)
 	modMailHandler := handlers.NewModMailHandler(db.Pool, conversationRepo, messageRepo, userRepo, hubModRepo, hubRepo)
 	hubSettingsHandler := handlers.NewHubSettingsHandler(hubSettingsRepo)

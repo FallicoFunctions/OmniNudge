@@ -113,6 +113,57 @@ func (r *ModLogRepository) GetByHub(ctx context.Context, hubID int, limit, offse
 	return logs, nil
 }
 
+// GetByHubWithCursor retrieves mod logs for a specific hub with cursor pagination.
+func (r *ModLogRepository) GetByHubWithCursor(
+	ctx context.Context,
+	hubID int,
+	limit int,
+	cursor *TimeCursor,
+) ([]*ModLog, error) {
+	query := `
+		SELECT ml.id, ml.hub_id, ml.moderator_id, ml.action, ml.target_type, ml.target_id,
+			   ml.details, ml.created_at, u.username as moderator_name, h.name as hub_name
+		FROM mod_logs ml
+		JOIN users u ON ml.moderator_id = u.id
+		JOIN hubs h ON ml.hub_id = h.id
+		WHERE ml.hub_id = $1
+	`
+	args := []interface{}{hubID}
+	paramIdx := 2
+	if cursor != nil {
+		query += fmt.Sprintf(" AND (ml.created_at, ml.id) < ($%d, $%d)", paramIdx, paramIdx+1)
+		args = append(args, cursor.Timestamp, cursor.ID)
+		paramIdx += 2
+	}
+	query += fmt.Sprintf(" ORDER BY ml.created_at DESC, ml.id DESC LIMIT $%d", paramIdx)
+	args = append(args, limit)
+
+	rows, err := r.db.Query(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get mod logs: %w", err)
+	}
+	defer rows.Close()
+
+	var logs []*ModLog
+	for rows.Next() {
+		var log ModLog
+		err := rows.Scan(
+			&log.ID, &log.HubID, &log.ModeratorID, &log.Action, &log.TargetType, &log.TargetID,
+			&log.Details, &log.CreatedAt, &log.ModeratorName, &log.HubName,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan mod log: %w", err)
+		}
+		logs = append(logs, &log)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating mod logs: %w", err)
+	}
+
+	return logs, nil
+}
+
 // GetByModerator retrieves mod logs for a specific moderator
 func (r *ModLogRepository) GetByModerator(ctx context.Context, moderatorID int, limit, offset int) ([]*ModLog, error) {
 	query := `
