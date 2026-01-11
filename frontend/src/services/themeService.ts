@@ -15,8 +15,8 @@ export const themeService = {
   },
 
   // Get user's custom themes
-  getMyThemes: async (limit = 20, offset = 0): Promise<{ themes: UserTheme[]; total: number }> => {
-    const { data } = await api.get('/themes/my', { params: { limit, offset } });
+  getMyThemes: async (limit = 20, offset = 0, cursor?: string): Promise<{ themes: UserTheme[]; total?: number; next_cursor?: string }> => {
+    const { data } = await api.get('/themes/my', { params: { limit, offset, cursor } });
     return data;
   },
 
@@ -47,10 +47,11 @@ export const themeService = {
   browseThemes: async (
     limit = 20,
     offset = 0,
-    category?: string
-  ): Promise<{ themes: UserTheme[]; total: number }> => {
+    category?: string,
+    cursor?: string
+  ): Promise<{ themes: UserTheme[]; total?: number; next_cursor?: string }> => {
     const { data } = await api.get('/themes/browse', {
-      params: { limit, offset, category }
+      params: { limit, offset, category, cursor }
     });
     return data;
   },

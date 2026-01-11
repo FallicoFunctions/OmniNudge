@@ -2,6 +2,9 @@ package handlers
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/json"
+	"fmt"
 	"net/http"
 	"sort"
 	"strconv"
@@ -18,6 +21,8 @@ type FeedHandler struct {
 	hubSubRepo       *models.HubSubscriptionRepository
 	subredditSubRepo *models.SubredditSubscriptionRepository
 	redditClient     *services.RedditClient
+	cache            services.Cache
+	cacheTTL         time.Duration
 }
 
 // NewFeedHandler creates a new feed handler
@@ -26,12 +31,16 @@ func NewFeedHandler(
 	hubSubRepo *models.HubSubscriptionRepository,
 	subredditSubRepo *models.SubredditSubscriptionRepository,
 	redditClient *services.RedditClient,
+	cache services.Cache,
+	cacheTTL time.Duration,
 ) *FeedHandler {
 	return &FeedHandler{
 		postRepo:         postRepo,
 		hubSubRepo:       hubSubRepo,
 		subredditSubRepo: subredditSubRepo,
 		redditClient:     redditClient,
+		cache:            cache,
+		cacheTTL:         cacheTTL,
 	}
 }
 
@@ -40,6 +49,26 @@ type CombinedFeedItem struct {
 	Source string      `json:"source"` // "hub" or "reddit"
 	Post   interface{} `json:"post"`
 	Score  int         `json:"score"`
+}
+
+type feedCursor struct {
+	Score     int   `json:"score"`
+	CreatedAt int64 `json:"created_at"`
+	ID        string `json:"id"`
+}
+
+type homeFeedResponse struct {
+	Posts        []CombinedFeedItem `json:"posts"`
+	Sort         string             `json:"sort"`
+	Limit        int                `json:"limit"`
+	Offset       int                `json:"offset"`
+	OmniOnly     bool               `json:"omni_only"`
+	Total        int                `json:"total"`
+	HasMore      bool               `json:"has_more"`
+	NextCursor   string             `json:"next_cursor,omitempty"`
+	TimeRange   string             `json:"time_range,omitempty"`
+	TimeRangeStart *time.Time       `json:"time_range_start,omitempty"`
+	TimeRangeEnd   *time.Time       `json:"time_range_end,omitempty"`
 }
 
 // GetHomeFeed returns combined hub + Reddit posts
@@ -55,6 +84,7 @@ func (h *FeedHandler) GetHomeFeed(c *gin.Context) {
 	if offset < 0 {
 		offset = 0
 	}
+	cursorParam := c.Query("cursor")
 
 	omniOnly := false
 	if omniOnlyParam := c.Query("omni_only"); omniOnlyParam != "" {
@@ -86,12 +116,35 @@ func (h *FeedHandler) GetHomeFeed(c *gin.Context) {
 	var hubPosts []*models.PlatformPost
 	var redditPosts []services.RedditPost
 
+	cacheKey := h.buildHomeFeedCacheKey(
+		sortBy,
+		limit,
+		offset,
+		cursorParam,
+		omniOnly,
+		forcePopular,
+		timeRangeKey,
+		startTime,
+		endTime,
+		authenticated,
+		userID,
+	)
+	if cacheKey != "" {
+		if cached, ok, err := h.cache.Get(c.Request.Context(), cacheKey); err == nil && ok {
+			c.Data(http.StatusOK, "application/json", []byte(cached))
+			return
+		}
+	}
+
 	// Fetch extra items to ensure we have enough after merging and sorting
 	// We need to fetch more than limit + offset because we're merging two sources
-	// Fetch at least 2x to account for interleaving, or minimum of 100 items
-	fetchLimit := (limit + offset) * 2
-	if fetchLimit < 100 {
-		fetchLimit = 100
+	// Use a more conservative multiplier (1.5x instead of 2x) to reduce over-fetching
+	// Minimum is 2x the display limit (not 100) to ensure enough variety
+	baseLimit := limit + offset
+	fetchLimit := baseLimit + (baseLimit / 2) // 1.5x multiplier
+	minFetchLimit := limit * 2
+	if fetchLimit < minFetchLimit {
+		fetchLimit = minFetchLimit
 	}
 
 	includeReddit := !omniOnly
@@ -139,31 +192,51 @@ func (h *FeedHandler) GetHomeFeed(c *gin.Context) {
 	}
 
 	// Merge and sort by score, get pagination info
-	combined, totalBeforePaging := h.mergeAndSortPosts(hubPosts, redditPosts, sortBy, limit, offset)
+	combined := h.mergeAndSortPosts(hubPosts, redditPosts, sortBy)
+	totalBeforePaging := len(combined)
 
-	// Calculate if there are more items available
-	hasMore := offset+len(combined) < totalBeforePaging
+	var page []CombinedFeedItem
+	var nextCursor string
+	var hasMore bool
 
-	response := gin.H{
-		"posts":     combined,
-		"sort":      sortBy,
-		"limit":     limit,
-		"offset":    offset,
-		"omni_only": omniOnly,
-		"total":     totalBeforePaging,
-		"has_more":  hasMore,
-	}
-	if timeRangeKey != "" {
-		response["time_range"] = timeRangeKey
-		if startTime != nil {
-			response["time_range_start"] = startTime
+	if cursorParam != "" {
+		cursor, err := decodeFeedCursor(cursorParam)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid cursor"})
+			return
 		}
-		if endTime != nil {
-			response["time_range_end"] = endTime
+		filtered := filterAfterCursor(combined, cursor, sortBy)
+		page, hasMore = sliceWithHasMore(filtered, limit)
+		if hasMore {
+			nextCursor = encodeFeedCursor(makeFeedCursor(page[len(page)-1]))
+		}
+	} else {
+		page, hasMore = sliceWithHasMoreOffset(combined, limit, offset)
+		if hasMore && len(page) > 0 {
+			nextCursor = encodeFeedCursor(makeFeedCursor(page[len(page)-1]))
 		}
 	}
 
-	c.JSON(http.StatusOK, response)
+	response := homeFeedResponse{
+		Posts:    page,
+		Sort:     sortBy,
+		Limit:    limit,
+		Offset:   offset,
+		OmniOnly: omniOnly,
+		Total:    totalBeforePaging,
+		HasMore:  hasMore,
+		NextCursor: nextCursor,
+		TimeRange: timeRangeKey,
+		TimeRangeStart: startTime,
+		TimeRangeEnd: endTime,
+	}
+
+	payload, err := json.Marshal(response)
+	if err == nil && cacheKey != "" {
+		_ = h.cache.Set(c.Request.Context(), cacheKey, string(payload), h.cacheTTL)
+	}
+
+	c.Data(http.StatusOK, "application/json", payload)
 }
 
 // fetchSubscribedFeeds fetches posts from subscribed hubs and subreddits
@@ -256,7 +329,7 @@ func (h *FeedHandler) fetchPopularFeeds(
 
 // mergeAndSortPosts combines hub and reddit posts and sorts by score, then applies offset/limit
 // Returns the paginated slice and the total count before pagination
-func (h *FeedHandler) mergeAndSortPosts(hubPosts []*models.PlatformPost, redditPosts []services.RedditPost, sortBy string, limit, offset int) ([]CombinedFeedItem, int) {
+func (h *FeedHandler) mergeAndSortPosts(hubPosts []*models.PlatformPost, redditPosts []services.RedditPost, sortBy string) []CombinedFeedItem {
 	var combined []CombinedFeedItem
 
 	// Add hub posts
@@ -288,18 +361,7 @@ func (h *FeedHandler) mergeAndSortPosts(hubPosts []*models.PlatformPost, redditP
 	})
 
 	// Store total before pagination
-	totalBeforePaging := len(combined)
-
-	// Apply offset/limit
-	start := offset
-	if start > len(combined) {
-		start = len(combined)
-	}
-	end := start + limit
-	if end > len(combined) {
-		end = len(combined)
-	}
-	return combined[start:end], totalBeforePaging
+	return combined
 }
 
 // extractRedditPosts extracts RedditPost slice from RedditListing
@@ -360,4 +422,148 @@ func getItemCreatedAt(item CombinedFeedItem) int64 {
 	default:
 		return 0
 	}
+}
+
+func getItemCursorID(item CombinedFeedItem) string {
+	switch post := item.Post.(type) {
+	case *models.PlatformPost:
+		return "hub:" + strconv.Itoa(post.ID)
+	case services.RedditPost:
+		return "reddit:" + post.ID
+	default:
+		return ""
+	}
+}
+
+func makeFeedCursor(item CombinedFeedItem) feedCursor {
+	return feedCursor{
+		Score:     item.Score,
+		CreatedAt: getItemCreatedAt(item),
+		ID:        getItemCursorID(item),
+	}
+}
+
+func encodeFeedCursor(cursor feedCursor) string {
+	raw, err := json.Marshal(cursor)
+	if err != nil {
+		return ""
+	}
+	return base64.RawURLEncoding.EncodeToString(raw)
+}
+
+func decodeFeedCursor(encoded string) (*feedCursor, error) {
+	if encoded == "" {
+		return nil, nil
+	}
+	raw, err := base64.RawURLEncoding.DecodeString(encoded)
+	if err != nil {
+		return nil, err
+	}
+	var cursor feedCursor
+	if err := json.Unmarshal(raw, &cursor); err != nil {
+		return nil, err
+	}
+	if cursor.ID == "" {
+		return nil, fmt.Errorf("invalid cursor")
+	}
+	return &cursor, nil
+}
+
+func filterAfterCursor(items []CombinedFeedItem, cursor *feedCursor, sortBy string) []CombinedFeedItem {
+	if cursor == nil {
+		return items
+	}
+	filtered := make([]CombinedFeedItem, 0, len(items))
+	for _, item := range items {
+		if isAfterCursor(item, *cursor, sortBy) {
+			filtered = append(filtered, item)
+		}
+	}
+	return filtered
+}
+
+func isAfterCursor(item CombinedFeedItem, cursor feedCursor, sortBy string) bool {
+	itemCreated := getItemCreatedAt(item)
+	itemID := getItemCursorID(item)
+
+	switch sortBy {
+	case "new":
+		if itemCreated < cursor.CreatedAt {
+			return true
+		}
+		if itemCreated == cursor.CreatedAt && itemID < cursor.ID {
+			return true
+		}
+		return false
+	default:
+		if item.Score < cursor.Score {
+			return true
+		}
+		if item.Score == cursor.Score {
+			if itemCreated < cursor.CreatedAt {
+				return true
+			}
+			if itemCreated == cursor.CreatedAt && itemID < cursor.ID {
+				return true
+			}
+		}
+		return false
+	}
+}
+
+func sliceWithHasMore(items []CombinedFeedItem, limit int) ([]CombinedFeedItem, bool) {
+	if len(items) <= limit {
+		return items, false
+	}
+	return items[:limit], true
+}
+
+func sliceWithHasMoreOffset(items []CombinedFeedItem, limit, offset int) ([]CombinedFeedItem, bool) {
+	if offset > len(items) {
+		return []CombinedFeedItem{}, false
+	}
+	end := offset + limit
+	if end > len(items) {
+		end = len(items)
+	}
+	hasMore := end < len(items)
+	return items[offset:end], hasMore
+}
+
+func (h *FeedHandler) buildHomeFeedCacheKey(
+	sortBy string,
+	limit int,
+	offset int,
+	cursor string,
+	omniOnly bool,
+	forcePopular bool,
+	timeRangeKey string,
+	startTime, endTime *time.Time,
+	authenticated bool,
+	userID interface{},
+) string {
+	if h.cache == nil || h.cacheTTL <= 0 {
+		return ""
+	}
+	userKey := "guest"
+	if authenticated {
+		if uid, ok := userID.(int); ok {
+			userKey = "user:" + strconv.Itoa(uid)
+		}
+	}
+	key := "feed:home:v2:" + userKey +
+		":sort=" + sortBy +
+		":limit=" + strconv.Itoa(limit) +
+		":offset=" + strconv.Itoa(offset) +
+		":cursor=" + cursor +
+		":omni=" + strconv.FormatBool(omniOnly) +
+		":popular=" + strconv.FormatBool(forcePopular) +
+		":range=" + timeRangeKey
+	if startTime != nil {
+		key += ":start=" + startTime.UTC().Format(time.RFC3339)
+	}
+	if endTime != nil {
+		key += ":end=" + endTime.UTC().Format(time.RFC3339)
+	}
+	return key
 }

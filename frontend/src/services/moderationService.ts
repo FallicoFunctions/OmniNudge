@@ -82,7 +82,14 @@ export const moderationService = {
 
   // ===== MOD LOG =====
 
-  async getModLog(hubName: string, limit = 50, offset = 0): Promise<ModLogResponse> {
-    return api.get<ModLogResponse>(`/mod/hubs/${hubName}/mod-log?limit=${limit}&offset=${offset}`);
+  async getModLog(hubName: string, limit = 50, offset = 0, cursor?: string): Promise<ModLogResponse> {
+    const params = new URLSearchParams({
+      limit: String(limit),
+      offset: String(offset),
+    });
+    if (cursor) {
+      params.set('cursor', cursor);
+    }
+    return api.get<ModLogResponse>(`/mod/hubs/${hubName}/mod-log?${params.toString()}`);
   },
 };

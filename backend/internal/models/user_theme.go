@@ -3,6 +3,7 @@ package models
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -213,6 +214,81 @@ func (r *UserThemeRepository) GetByUserID(ctx context.Context, userID int, limit
 	return themes, rows.Err()
 }
 
+// GetByUserIDWithCursor fetches themes for a user using cursor pagination.
+func (r *UserThemeRepository) GetByUserIDWithCursor(
+	ctx context.Context,
+	userID int,
+	limit int,
+	cursor *TimeCursor,
+) ([]*UserTheme, error) {
+	query := `
+		SELECT id, user_id, theme_name, theme_description, theme_type, scope_type, target_page,
+		       css_variables, custom_css, is_public, is_marketplace, price_coins,
+		       category, tags, thumbnail_url, install_count, rating_count, average_rating,
+		       version, created_at, updated_at
+		FROM user_themes
+		WHERE user_id = $1
+	`
+	args := []interface{}{userID}
+	paramIdx := 2
+	if cursor != nil {
+		query += fmt.Sprintf(" AND (created_at, id) < ($%d, $%d)", paramIdx, paramIdx+1)
+		args = append(args, cursor.Timestamp, cursor.ID)
+		paramIdx += 2
+	}
+	query += fmt.Sprintf(" ORDER BY created_at DESC, id DESC LIMIT $%d", paramIdx)
+	args = append(args, limit)
+
+	rows, err := r.pool.Query(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var themes []*UserTheme
+	for rows.Next() {
+		theme := &UserTheme{}
+		var cssVarsJSON []byte
+
+		err := rows.Scan(
+			&theme.ID,
+			&theme.UserID,
+			&theme.ThemeName,
+			&theme.ThemeDescription,
+			&theme.ThemeType,
+			&theme.ScopeType,
+			&theme.TargetPage,
+			&cssVarsJSON,
+			&theme.CustomCSS,
+			&theme.IsPublic,
+			&theme.IsMarketplace,
+			&theme.PriceCoins,
+			&theme.Category,
+			&theme.Tags,
+			&theme.ThumbnailURL,
+			&theme.InstallCount,
+			&theme.RatingCount,
+			&theme.AverageRating,
+			&theme.Version,
+			&theme.CreatedAt,
+			&theme.UpdatedAt,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		if cssVarsJSON != nil {
+			if err := json.Unmarshal(cssVarsJSON, &theme.CSSVariables); err != nil {
+				return nil, err
+			}
+		}
+
+		themes = append(themes, theme)
+	}
+
+	return themes, rows.Err()
+}
+
 // GetPublicThemes fetches all public themes (for browsing).
 func (r *UserThemeRepository) GetPublicThemes(ctx context.Context, limit, offset int, category *string) ([]*UserTheme, error) {
 	query := `
@@ -282,6 +358,92 @@ func (r *UserThemeRepository) GetPublicThemes(ctx context.Context, limit, offset
 		}
 
 		// Unmarshal CSS variables JSON
+		if cssVarsJSON != nil {
+			if err := json.Unmarshal(cssVarsJSON, &theme.CSSVariables); err != nil {
+				return nil, err
+			}
+		}
+
+		themes = append(themes, theme)
+	}
+
+	return themes, rows.Err()
+}
+
+// GetPublicThemesWithCursor fetches public themes using cursor pagination.
+func (r *UserThemeRepository) GetPublicThemesWithCursor(
+	ctx context.Context,
+	limit int,
+	category *string,
+	cursor *ThemePublicCursor,
+) ([]*UserTheme, error) {
+	query := `
+		SELECT id, user_id, theme_name, theme_description, theme_type, scope_type, target_page,
+		       css_variables, custom_css, is_public, is_marketplace, price_coins,
+		       category, tags, thumbnail_url, install_count, rating_count, average_rating,
+		       version, created_at, updated_at
+		FROM user_themes
+		WHERE is_public = true
+	`
+
+	args := []interface{}{}
+	paramIdx := 1
+
+	if category != nil && *category != "" {
+		query += fmt.Sprintf(" AND category = $%d", paramIdx)
+		args = append(args, *category)
+		paramIdx++
+	}
+	if cursor != nil {
+		query += fmt.Sprintf(
+			" AND ((install_count, average_rating, created_at, id) < ($%d, $%d, $%d, $%d))",
+			paramIdx, paramIdx+1, paramIdx+2, paramIdx+3,
+		)
+		args = append(args, cursor.InstallCount, cursor.AverageRating, cursor.CreatedAt, cursor.ID)
+		paramIdx += 4
+	}
+
+	query += fmt.Sprintf(" ORDER BY install_count DESC, average_rating DESC, created_at DESC, id DESC LIMIT $%d", paramIdx)
+	args = append(args, limit)
+
+	rows, err := r.pool.Query(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var themes []*UserTheme
+	for rows.Next() {
+		theme := &UserTheme{}
+		var cssVarsJSON []byte
+
+		err := rows.Scan(
+			&theme.ID,
+			&theme.UserID,
+			&theme.ThemeName,
+			&theme.ThemeDescription,
+			&theme.ThemeType,
+			&theme.ScopeType,
+			&theme.TargetPage,
+			&cssVarsJSON,
+			&theme.CustomCSS,
+			&theme.IsPublic,
+			&theme.IsMarketplace,
+			&theme.PriceCoins,
+			&theme.Category,
+			&theme.Tags,
+			&theme.ThumbnailURL,
+			&theme.InstallCount,
+			&theme.RatingCount,
+			&theme.AverageRating,
+			&theme.Version,
+			&theme.CreatedAt,
+			&theme.UpdatedAt,
+		)
+		if err != nil {
+			return nil, err
+		}
+
 		if cssVarsJSON != nil {
 			if err := json.Unmarshal(cssVarsJSON, &theme.CSSVariables); err != nil {
 				return nil, err

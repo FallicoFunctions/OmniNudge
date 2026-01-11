@@ -33,41 +33,63 @@ func (h *SearchHandler) SearchPosts(c *gin.Context) {
 	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
 	includeNSFW, _ := strconv.ParseBool(c.DefaultQuery("include_nsfw", "false"))
 	sort := strings.ToLower(c.DefaultQuery("sort", "relevance")) // relevance | new | old
+	cursorParam := c.Query("cursor")
 
 	if limit < 1 || limit > 100 {
 		limit = 20
 	}
 
+	var cursor *searchCursor
+	if cursorParam != "" {
+		decoded, err := decodeSearchCursor(cursorParam)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid cursor"})
+			return
+		}
+		cursor = decoded
+	}
+	useCursorPagination := cursorParam != "" || offset == 0
+	limitArg := limit
+	offsetArg := offset
+	if useCursorPagination {
+		limitArg = limit + 1
+		offsetArg = 0
+	}
+
 	orderClause := `
-		ORDER BY rank DESC, created_at DESC
+		ORDER BY rank DESC, created_at DESC, id DESC
 	`
 	if sort == "new" {
 		orderClause = `
-		ORDER BY created_at DESC, rank DESC
+		ORDER BY created_at DESC, rank DESC, id DESC
 		`
 	} else if sort == "old" {
 		orderClause = `
-		ORDER BY created_at ASC, rank DESC
+		ORDER BY created_at ASC, rank DESC, id DESC
 		`
 	}
 
+	rankExpr := "ts_rank(p.search_vector, plainto_tsquery('english', $1))"
+	cursorClause, cursorArgs := buildSearchCursorClause(sort, cursor, rankExpr, 5)
 	sql := `
 		SELECT p.id, p.author_id, p.hub_id, p.title, p.body, p.tags, p.score, p.upvotes, p.downvotes,
 		       p.num_comments, p.view_count, p.created_at, p.target_subreddit, p.crosspost_origin_subreddit,
 		       h.name as hub_name, u.username as author_username,
-		       ts_rank(p.search_vector, plainto_tsquery('english', $1)) as rank
+		       ` + rankExpr + ` as rank
 		FROM platform_posts p
 		LEFT JOIN hubs h ON p.hub_id = h.id
 		LEFT JOIN users u ON p.author_id = u.id
 		WHERE p.search_vector @@ plainto_tsquery('english', $1)
 		AND p.is_deleted = FALSE
 		AND (p.nsfw = FALSE OR $4 = TRUE)
-		AND u.shadow_banned = FALSE
+		AND u.shadow_banned = FALSE` + cursorClause + `
 	` + orderClause + `
 		LIMIT $2 OFFSET $3
 	`
 
-	rows, err := h.pool.Query(c.Request.Context(), sql, query, limit, offset, includeNSFW)
+	args := []interface{}{query, limitArg, offsetArg, includeNSFW}
+	args = append(args, cursorArgs...)
+	rows, err := h.pool.Query(c.Request.Context(), sql, args...)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error":   "Search failed",
@@ -77,7 +99,11 @@ func (h *SearchHandler) SearchPosts(c *gin.Context) {
 	}
 	defer rows.Close()
 
-	var posts []*models.PlatformPost
+	type searchPostResult struct {
+		post *models.PlatformPost
+		rank float64
+	}
+	var results []searchPostResult
 	for rows.Next() {
 		post := &models.PlatformPost{}
 		var rank float64
@@ -98,15 +124,36 @@ func (h *SearchHandler) SearchPosts(c *gin.Context) {
 		if authorUsername != nil {
 			post.AuthorUsername = *authorUsername
 		}
-		posts = append(posts, post)
+		results = append(results, searchPostResult{post: post, rank: rank})
 	}
 
-	c.JSON(http.StatusOK, gin.H{
+	nextCursor := ""
+	posts := make([]*models.PlatformPost, 0, len(results))
+	if useCursorPagination && len(results) > limit {
+		results = results[:limit]
+		if len(results) > 0 {
+			last := results[len(results)-1]
+			nextCursor = encodeSearchCursor(searchCursor{
+				ID:        last.post.ID,
+				CreatedAt: last.post.CreatedAt,
+				Rank:      last.rank,
+			})
+		}
+	}
+	for _, result := range results {
+		posts = append(posts, result.post)
+	}
+
+	response := gin.H{
 		"posts":  posts,
 		"limit":  limit,
 		"offset": offset,
 		"query":  query,
-	})
+	}
+	if nextCursor != "" {
+		response["next_cursor"] = nextCursor
+	}
+	c.JSON(http.StatusOK, response)
 }
 
 // SearchComments searches comments using full-text search
@@ -120,30 +167,56 @@ func (h *SearchHandler) SearchComments(c *gin.Context) {
 
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
 	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
+	cursorParam := c.Query("cursor")
 
 	if limit < 1 || limit > 100 {
 		limit = 20
 	}
 
+	var cursor *searchCursor
+	if cursorParam != "" {
+		decoded, err := decodeSearchCursor(cursorParam)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid cursor"})
+			return
+		}
+		cursor = decoded
+	}
+	useCursorPagination := cursorParam != "" || offset == 0
+	limitArg := limit
+	offsetArg := offset
+	if useCursorPagination {
+		limitArg = limit + 1
+		offsetArg = 0
+	}
+
+	rankExpr := "ts_rank(search_vector, plainto_tsquery('english', $1))"
+	cursorClause, cursorArgs := buildSearchCursorClause("relevance", cursor, rankExpr, 4)
 	sql := `
 		SELECT id, post_id, user_id, parent_comment_id, body, depth, score,
 		       upvotes, downvotes, created_at,
-		       ts_rank(search_vector, plainto_tsquery('english', $1)) as rank
+		       ` + rankExpr + ` as rank
 		FROM post_comments
 		WHERE search_vector @@ plainto_tsquery('english', $1)
-		AND is_deleted = FALSE
-		ORDER BY rank DESC, created_at DESC
+		AND is_deleted = FALSE` + cursorClause + `
+		ORDER BY rank DESC, created_at DESC, id DESC
 		LIMIT $2 OFFSET $3
 	`
 
-	rows, err := h.pool.Query(c.Request.Context(), sql, query, limit, offset)
+	args := []interface{}{query, limitArg, offsetArg}
+	args = append(args, cursorArgs...)
+	rows, err := h.pool.Query(c.Request.Context(), sql, args...)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Search failed", "details": err.Error()})
 		return
 	}
 	defer rows.Close()
 
-	var comments []*models.PostComment
+	type searchCommentResult struct {
+		comment *models.PostComment
+		rank    float64
+	}
+	var results []searchCommentResult
 	for rows.Next() {
 		comment := &models.PostComment{}
 		var rank float64
@@ -156,15 +229,36 @@ func (h *SearchHandler) SearchComments(c *gin.Context) {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to parse results"})
 			return
 		}
-		comments = append(comments, comment)
+		results = append(results, searchCommentResult{comment: comment, rank: rank})
 	}
 
-	c.JSON(http.StatusOK, gin.H{
+	nextCursor := ""
+	comments := make([]*models.PostComment, 0, len(results))
+	if useCursorPagination && len(results) > limit {
+		results = results[:limit]
+		if len(results) > 0 {
+			last := results[len(results)-1]
+			nextCursor = encodeSearchCursor(searchCursor{
+				ID:        last.comment.ID,
+				CreatedAt: last.comment.CreatedAt,
+				Rank:      last.rank,
+			})
+		}
+	}
+	for _, result := range results {
+		comments = append(comments, result.comment)
+	}
+
+	response := gin.H{
 		"comments": comments,
 		"limit":    limit,
 		"offset":   offset,
 		"query":    query,
-	})
+	}
+	if nextCursor != "" {
+		response["next_cursor"] = nextCursor
+	}
+	c.JSON(http.StatusOK, response)
 }
 
 // SearchUsers searches users using full-text search
@@ -180,42 +274,68 @@ func (h *SearchHandler) SearchUsers(c *gin.Context) {
 	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
 	includeNSFW, _ := strconv.ParseBool(c.DefaultQuery("include_nsfw", "false"))
 	sort := strings.ToLower(c.DefaultQuery("sort", "relevance")) // relevance | new | old
+	cursorParam := c.Query("cursor")
 
 	if limit < 1 || limit > 100 {
 		limit = 20
 	}
 
+	var cursor *searchCursor
+	if cursorParam != "" {
+		decoded, err := decodeSearchCursor(cursorParam)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid cursor"})
+			return
+		}
+		cursor = decoded
+	}
+	useCursorPagination := cursorParam != "" || offset == 0
+	limitArg := limit
+	offsetArg := offset
+	if useCursorPagination {
+		limitArg = limit + 1
+		offsetArg = 0
+	}
+
 	orderClause := `
-		ORDER BY rank DESC, created_at DESC
+		ORDER BY rank DESC, created_at DESC, id DESC
 	`
 	if sort == "new" {
 		orderClause = `
-		ORDER BY created_at DESC, rank DESC
+		ORDER BY created_at DESC, rank DESC, id DESC
 		`
 	} else if sort == "old" {
 		orderClause = `
-		ORDER BY created_at ASC, rank DESC
+		ORDER BY created_at ASC, rank DESC, id DESC
 		`
 	}
 
+	rankExpr := "ts_rank(search_vector, plainto_tsquery('english', $1))"
+	cursorClause, cursorArgs := buildSearchCursorClause(sort, cursor, rankExpr, 5)
 	sql := `
 		SELECT id, username, bio, avatar_url, karma, created_at,
-		       ts_rank(search_vector, plainto_tsquery('english', $1)) as rank
+		       ` + rankExpr + ` as rank
 		FROM users
 		WHERE search_vector @@ plainto_tsquery('english', $1)
-		AND (nsfw = FALSE OR $4 = TRUE)
+		AND (nsfw = FALSE OR $4 = TRUE)` + cursorClause + `
 	` + orderClause + `
 		LIMIT $2 OFFSET $3
 	`
 
-	rows, err := h.pool.Query(c.Request.Context(), sql, query, limit, offset, includeNSFW)
+	args := []interface{}{query, limitArg, offsetArg, includeNSFW}
+	args = append(args, cursorArgs...)
+	rows, err := h.pool.Query(c.Request.Context(), sql, args...)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Search failed", "details": err.Error()})
 		return
 	}
 	defer rows.Close()
 
-	var users []*models.User
+	type searchUserResult struct {
+		user *models.User
+		rank float64
+	}
+	var results []searchUserResult
 	for rows.Next() {
 		user := &models.User{}
 		var rank float64
@@ -227,15 +347,36 @@ func (h *SearchHandler) SearchUsers(c *gin.Context) {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to parse results"})
 			return
 		}
-		users = append(users, user)
+		results = append(results, searchUserResult{user: user, rank: rank})
 	}
 
-	c.JSON(http.StatusOK, gin.H{
+	nextCursor := ""
+	users := make([]*models.User, 0, len(results))
+	if useCursorPagination && len(results) > limit {
+		results = results[:limit]
+		if len(results) > 0 {
+			last := results[len(results)-1]
+			nextCursor = encodeSearchCursor(searchCursor{
+				ID:        last.user.ID,
+				CreatedAt: last.user.CreatedAt,
+				Rank:      last.rank,
+			})
+		}
+	}
+	for _, result := range results {
+		users = append(users, result.user)
+	}
+
+	response := gin.H{
 		"users":  users,
 		"limit":  limit,
 		"offset": offset,
 		"query":  query,
-	})
+	}
+	if nextCursor != "" {
+		response["next_cursor"] = nextCursor
+	}
+	c.JSON(http.StatusOK, response)
 }
 
 // SearchHubs searches hubs using full-text search
@@ -251,42 +392,68 @@ func (h *SearchHandler) SearchHubs(c *gin.Context) {
 	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
 	includeNSFW, _ := strconv.ParseBool(c.DefaultQuery("include_nsfw", "false"))
 	sort := strings.ToLower(c.DefaultQuery("sort", "relevance")) // relevance | new | old
+	cursorParam := c.Query("cursor")
 
 	if limit < 1 || limit > 100 {
 		limit = 20
 	}
 
+	var cursor *searchCursor
+	if cursorParam != "" {
+		decoded, err := decodeSearchCursor(cursorParam)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid cursor"})
+			return
+		}
+		cursor = decoded
+	}
+	useCursorPagination := cursorParam != "" || offset == 0
+	limitArg := limit
+	offsetArg := offset
+	if useCursorPagination {
+		limitArg = limit + 1
+		offsetArg = 0
+	}
+
 	orderClause := `
-		ORDER BY rank DESC, created_at DESC
+		ORDER BY rank DESC, created_at DESC, id DESC
 	`
 	if sort == "new" {
 		orderClause = `
-		ORDER BY created_at DESC, rank DESC
+		ORDER BY created_at DESC, rank DESC, id DESC
 		`
 	} else if sort == "old" {
 		orderClause = `
-		ORDER BY created_at ASC, rank DESC
+		ORDER BY created_at ASC, rank DESC, id DESC
 		`
 	}
 
+	rankExpr := "ts_rank(search_vector, plainto_tsquery('english', $1))"
+	cursorClause, cursorArgs := buildSearchCursorClause(sort, cursor, rankExpr, 5)
 	sql := `
 		SELECT id, name, description, title, type, content_options, is_quarantined, subscriber_count, created_by, created_at,
-		       ts_rank(search_vector, plainto_tsquery('english', $1)) as rank
+		       ` + rankExpr + ` as rank
 		FROM hubs
 		WHERE search_vector @@ plainto_tsquery('english', $1)
-		AND (nsfw = FALSE OR $4 = TRUE)
+		AND (nsfw = FALSE OR $4 = TRUE)` + cursorClause + `
 	` + orderClause + `
 		LIMIT $2 OFFSET $3
 	`
 
-	rows, err := h.pool.Query(c.Request.Context(), sql, query, limit, offset, includeNSFW)
+	args := []interface{}{query, limitArg, offsetArg, includeNSFW}
+	args = append(args, cursorArgs...)
+	rows, err := h.pool.Query(c.Request.Context(), sql, args...)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Search failed", "details": err.Error()})
 		return
 	}
 	defer rows.Close()
 
-	var hubs []*models.Hub
+	type searchHubResult struct {
+		hub  *models.Hub
+		rank float64
+	}
+	var results []searchHubResult
 	for rows.Next() {
 		hub := &models.Hub{}
 		var rank float64
@@ -298,13 +465,34 @@ func (h *SearchHandler) SearchHubs(c *gin.Context) {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to parse results"})
 			return
 		}
-		hubs = append(hubs, hub)
+		results = append(results, searchHubResult{hub: hub, rank: rank})
 	}
 
-	c.JSON(http.StatusOK, gin.H{
+	nextCursor := ""
+	hubs := make([]*models.Hub, 0, len(results))
+	if useCursorPagination && len(results) > limit {
+		results = results[:limit]
+		if len(results) > 0 {
+			last := results[len(results)-1]
+			nextCursor = encodeSearchCursor(searchCursor{
+				ID:        last.hub.ID,
+				CreatedAt: last.hub.CreatedAt,
+				Rank:      last.rank,
+			})
+		}
+	}
+	for _, result := range results {
+		hubs = append(hubs, result.hub)
+	}
+
+	response := gin.H{
 		"hubs":   hubs,
 		"limit":  limit,
 		"offset": offset,
 		"query":  query,
-	})
+	}
+	if nextCursor != "" {
+		response["next_cursor"] = nextCursor
+	}
+	c.JSON(http.StatusOK, response)
 }

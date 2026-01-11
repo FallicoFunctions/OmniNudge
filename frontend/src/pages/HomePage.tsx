@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { keepPreviousData, useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { feedService, type CombinedFeedItem, type HomeFeedResponse, type RedditPost } from '../services/feedService';
@@ -138,7 +138,7 @@ export default function HomePage() {
     [location.pathname, location.search]
   );
 
-  const handleSortChange = (nextSort: SortOption) => {
+  const handleSortChange = useCallback((nextSort: SortOption) => {
     if (nextSort === sort) {
       return;
     }
@@ -150,12 +150,12 @@ export default function HomePage() {
     }
     const search = params.toString();
     navigate(`${location.pathname}${search ? `?${search}` : ''}`);
-  };
+  }, [sort, location.search, location.pathname, navigate]);
 
   // Subreddit search handlers
   const trimmedInputValue = inputValue.trim();
 
-  const navigateToSubredditOrHub = async (value: string) => {
+  const navigateToSubredditOrHub = useCallback(async (value: string) => {
     const normalized = value.trim();
     if (!normalized) {
       navigate('/r/popular');
@@ -173,24 +173,24 @@ export default function HomePage() {
       navigate(`/r/${normalized}`);
     }
     setIsAutocompleteOpen(false);
-  };
+  }, [navigate]);
 
-  const handleSubredditSubmit = (e: React.FormEvent) => {
+  const handleSubredditSubmit = useCallback((e: React.FormEvent) => {
     e.preventDefault();
     if (trimmedInputValue) {
       navigateToSubredditOrHub(trimmedInputValue);
       setInputValue('');
     }
-  };
+  }, [trimmedInputValue, navigateToSubredditOrHub]);
 
-  const handleInputChange = (value: string) => {
+  const handleInputChange = useCallback((value: string) => {
     setInputValue(value);
     if (!isAutocompleteOpen) {
       setIsAutocompleteOpen(true);
     }
-  };
+  }, [isAutocompleteOpen]);
 
-  const handlePostSearchSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+  const handlePostSearchSubmit = useCallback((event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const query = postSearchInput.trim();
     if (!query) {
@@ -199,13 +199,13 @@ export default function HomePage() {
     const includeNsfwParam = includeNsfwSearch && !blockAllNsfw;
     const nsfwQuery = includeNsfwParam ? '&include_nsfw=true' : '';
     navigate(`/search?q=${encodeURIComponent(query)}&sort=relevance${nsfwQuery}`);
-  };
+  }, [postSearchInput, includeNsfwSearch, blockAllNsfw, navigate]);
 
-  const handleSelectSubredditSuggestion = (name: string) => {
+  const handleSelectSubredditSuggestion = useCallback((name: string) => {
     navigate(`/r/${name}`);
     setInputValue('');
     setIsAutocompleteOpen(false);
-  };
+  }, [navigate]);
 
   const {
     data: subredditSuggestions,
@@ -250,9 +250,10 @@ export default function HomePage() {
     setIncludeNsfwSearch(!blockAllNsfw && searchIncludeNsfwByDefault);
   }, [blockAllNsfw, searchIncludeNsfwByDefault]);
 
-  const [pageOffset, setPageOffset] = useState(0);
+  const [cursorStack, setCursorStack] = useState(['']);
   const pageSize = 50;
-  const homeFeedQueryKey = ['home-feed', sort, omniOnly, showPopularFallback, timeRangeKey, pageOffset] as const;
+  const currentCursor = cursorStack[cursorStack.length - 1] ?? '';
+  const homeFeedQueryKey = ['home-feed', sort, omniOnly, showPopularFallback, timeRangeKey, currentCursor] as const;
   const { data, isLoading, isFetching } = useQuery<HomeFeedResponse>({
     queryKey: homeFeedQueryKey,
     queryFn: () => {
@@ -268,16 +269,16 @@ export default function HomePage() {
           : isTopSort
           ? { timeRange: topTimeRange }
           : undefined;
-      return feedService.getHomeFeed(sort, pageSize, pageOffset, omniOnly, showPopularFallback, timeOptions);
+      return feedService.getHomeFeed(sort, pageSize, currentCursor, omniOnly, showPopularFallback, timeOptions);
     },
     enabled: !isCustomTopRange || isCustomRangeValid,
     staleTime: 1000 * 60 * 5,
     placeholderData: keepPreviousData,
   });
 
-  // When sort/time toggles change, reset offset
+  // When sort/time toggles change, reset cursor
   useEffect(() => {
-    setPageOffset(0);
+    setCursorStack(['']);
   }, [sort, omniOnly, showPopularFallback, timeRangeKey]);
 
   const displayedPosts = useMemo(() => {
@@ -288,8 +289,8 @@ export default function HomePage() {
     return basePosts.filter((item) => item.source === 'hub');
   }, [data?.posts, omniOnly]);
 
-  const hasMore = data?.has_more ?? false;
-  const hasPrev = pageOffset > 0;
+  const hasMore = Boolean(data?.next_cursor ?? data?.has_more);
+  const hasPrev = cursorStack.length > 1;
 
   // Saved posts state
   const savedPostsKey = ['saved-items', 'posts'] as const;
@@ -964,12 +965,14 @@ export default function HomePage() {
           hasMore={hasMore}
           isFetching={isFetching}
           onPrev={() => {
-            const newOffset = Math.max(0, pageOffset - pageSize);
-            setPageOffset(newOffset);
+            setCursorStack((prev) => (prev.length > 1 ? prev.slice(0, -1) : prev));
             window.scrollTo({ top: 0, behavior: 'smooth' });
           }}
           onNext={() => {
-            setPageOffset(pageOffset + pageSize);
+            if (!data?.next_cursor) {
+              return;
+            }
+            setCursorStack((prev) => [...prev, data.next_cursor ?? '']);
             window.scrollTo({ top: 0, behavior: 'smooth' });
           }}
         />

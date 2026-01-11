@@ -104,13 +104,40 @@ func (h *ConversationsHandler) GetConversations(c *gin.Context) {
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
 	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
 	includeArchived := c.DefaultQuery("include_archived", "false") == "true"
+	cursorParam := c.Query("cursor")
 
 	// Validate limit
 	if limit < 1 || limit > 100 {
 		limit = 20
 	}
 
-	conversations, err := h.conversationRepo.GetByUserID(c.Request.Context(), userID.(int), limit, offset, includeArchived)
+	var cursor *timeCursor
+	if cursorParam != "" {
+		decoded, err := decodeTimeCursor(cursorParam)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid cursor"})
+			return
+		}
+		cursor = decoded
+	}
+	useCursorPagination := cursorParam != "" || offset == 0
+	limitArg := limit
+	if useCursorPagination {
+		limitArg = limit + 1
+		offset = 0
+	}
+
+	var conversations []*models.Conversation
+	var err error
+	if useCursorPagination {
+		var payload *models.TimeCursor
+		if cursor != nil {
+			payload = &models.TimeCursor{ID: cursor.ID, Timestamp: cursor.Timestamp}
+		}
+		conversations, err = h.conversationRepo.GetByUserIDWithCursor(c.Request.Context(), userID.(int), limitArg, includeArchived, payload)
+	} else {
+		conversations, err = h.conversationRepo.GetByUserID(c.Request.Context(), userID.(int), limitArg, offset, includeArchived)
+	}
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get conversations", "details": err.Error()})
 		return
@@ -185,11 +212,24 @@ func (h *ConversationsHandler) GetConversations(c *gin.Context) {
 		enriched = append(enriched, details)
 	}
 
-	c.JSON(http.StatusOK, gin.H{
+	nextCursor := ""
+	if useCursorPagination && len(enriched) > limit {
+		enriched = enriched[:limit]
+		if len(enriched) > 0 {
+			last := enriched[len(enriched)-1]
+			nextCursor = encodeTimeCursor(timeCursor{ID: last.ID, Timestamp: last.LastMessageAt})
+		}
+	}
+
+	response := gin.H{
 		"conversations": enriched,
 		"limit":         limit,
 		"offset":        offset,
-	})
+	}
+	if nextCursor != "" {
+		response["next_cursor"] = nextCursor
+	}
+	c.JSON(http.StatusOK, response)
 }
 
 // GetConversation handles GET /api/v1/conversations/:id

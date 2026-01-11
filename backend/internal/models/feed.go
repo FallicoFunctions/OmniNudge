@@ -42,6 +42,15 @@ func NewFeedRepository(pool *pgxpool.Pool) *FeedRepository {
 
 // GetUnifiedFeed returns a combined feed of platform and cached Reddit posts.
 func (r *FeedRepository) GetUnifiedFeed(ctx context.Context, sortBy string, limit, offset int, sourceFilter string) ([]*UnifiedFeedItem, error) {
+	// Optimize: if filtering by source, skip the other source query entirely
+	if sourceFilter == "platform" {
+		return r.getPlatformOnlyFeed(ctx, sortBy, limit, offset)
+	}
+	if sourceFilter == "reddit" {
+		return r.getRedditOnlyFeed(ctx, sortBy, limit, offset)
+	}
+
+	// Mixed feed: proceed with UNION ALL
 	orderBy := "created_at DESC"
 	if sortBy == "hot" || sortBy == "score" {
 		orderBy = "score DESC, created_at DESC"
@@ -216,4 +225,180 @@ func nullableString(ns sql.NullString) *string {
 		return &val
 	}
 	return nil
+}
+
+// getPlatformOnlyFeed returns only platform posts (optimized for source filtering)
+func (r *FeedRepository) getPlatformOnlyFeed(ctx context.Context, sortBy string, limit, offset int) ([]*UnifiedFeedItem, error) {
+	orderBy := "p.created_at DESC"
+	if sortBy == "hot" || sortBy == "score" {
+		orderBy = "p.score DESC, p.created_at DESC"
+	}
+
+	query := fmt.Sprintf(`
+		SELECT
+			'platform' AS source,
+			p.id AS platform_id,
+			NULL::INTEGER AS reddit_cache_id,
+			NULL::TEXT AS reddit_post_id,
+			p.title,
+			p.body,
+			p.author_id,
+			u.username AS author_username,
+			NULL::TEXT AS subreddit,
+			p.score,
+			p.num_comments,
+			p.created_at,
+			p.media_url,
+			p.media_type,
+			p.thumbnail_url,
+			h.id AS hub_id,
+			h.name AS hub_name
+		FROM platform_posts p
+		JOIN users u ON p.author_id = u.id
+		LEFT JOIN hubs h ON p.hub_id = h.id
+		WHERE p.is_deleted = FALSE AND u.shadow_banned = FALSE
+		ORDER BY %s
+		LIMIT $1 OFFSET $2
+	`, orderBy)
+
+	rows, err := r.pool.Query(ctx, query, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	return r.scanUnifiedFeedItems(rows)
+}
+
+// getRedditOnlyFeed returns only Reddit posts (optimized for source filtering)
+func (r *FeedRepository) getRedditOnlyFeed(ctx context.Context, sortBy string, limit, offset int) ([]*UnifiedFeedItem, error) {
+	orderBy := "rp.created_utc DESC"
+	if sortBy == "hot" || sortBy == "score" {
+		orderBy = "rp.score DESC, rp.created_utc DESC"
+	}
+
+	query := fmt.Sprintf(`
+		SELECT
+			'reddit' AS source,
+			NULL::INTEGER AS platform_id,
+			rp.id AS reddit_cache_id,
+			rp.reddit_post_id,
+			rp.title,
+			rp.body,
+			NULL::INTEGER AS author_id,
+			rp.author AS author_username,
+			rp.subreddit,
+			rp.score,
+			rp.num_comments,
+			rp.created_utc AS created_at,
+			rp.media_url,
+			rp.media_type,
+			rp.thumbnail_url,
+			NULL::INTEGER AS hub_id,
+			NULL::TEXT AS hub_name
+		FROM reddit_posts rp
+		WHERE rp.expires_at > NOW()
+		ORDER BY %s
+		LIMIT $1 OFFSET $2
+	`, orderBy)
+
+	rows, err := r.pool.Query(ctx, query, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	return r.scanUnifiedFeedItems(rows)
+}
+
+// scanUnifiedFeedItems is a helper to scan rows into UnifiedFeedItem structs
+func (r *FeedRepository) scanUnifiedFeedItems(rows interface {
+	Next() bool
+	Scan(dest ...interface{}) error
+	Err() error
+}) ([]*UnifiedFeedItem, error) {
+	var items []*UnifiedFeedItem
+	for rows.Next() {
+		var (
+			source         string
+			platformID     sql.NullInt64
+			redditCacheID  sql.NullInt64
+			redditPostID   sql.NullString
+			title          string
+			body           sql.NullString
+			authorID       sql.NullInt64
+			authorUsername sql.NullString
+			subreddit      sql.NullString
+			score          int
+			numComments    int
+			createdAt      time.Time
+			mediaURL       sql.NullString
+			mediaType      sql.NullString
+			thumbnailURL   sql.NullString
+			hubID          sql.NullInt64
+			hubName        sql.NullString
+		)
+
+		if err := rows.Scan(
+			&source,
+			&platformID,
+			&redditCacheID,
+			&redditPostID,
+			&title,
+			&body,
+			&authorID,
+			&authorUsername,
+			&subreddit,
+			&score,
+			&numComments,
+			&createdAt,
+			&mediaURL,
+			&mediaType,
+			&thumbnailURL,
+			&hubID,
+			&hubName,
+		); err != nil {
+			return nil, err
+		}
+
+		item := &UnifiedFeedItem{
+			Source:         source,
+			Title:          title,
+			Score:          score,
+			NumComments:    numComments,
+			CreatedAt:      createdAt,
+			Body:           nullableString(body),
+			AuthorUsername: nullableString(authorUsername),
+			Subreddit:      nullableString(subreddit),
+			MediaURL:       nullableString(mediaURL),
+			MediaType:      nullableString(mediaType),
+			ThumbnailURL:   nullableString(thumbnailURL),
+			HubName:        nullableString(hubName),
+		}
+		if platformID.Valid {
+			id := int(platformID.Int64)
+			item.PlatformID = &id
+			item.ID = fmt.Sprintf("platform:%d", id)
+			if authorID.Valid {
+				aid := int(authorID.Int64)
+				item.AuthorID = &aid
+			}
+		}
+		if redditCacheID.Valid {
+			id := int(redditCacheID.Int64)
+			item.RedditCacheID = &id
+			item.ID = fmt.Sprintf("reddit:%d", id)
+		}
+		if redditPostID.Valid {
+			val := redditPostID.String
+			item.RedditPostID = &val
+			if item.ID == "" {
+				item.ID = fmt.Sprintf("reddit:%s", val)
+			}
+		}
+
+		items = append(items, item)
+	}
+
+	return items, rows.Err()
 }

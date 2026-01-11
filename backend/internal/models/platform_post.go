@@ -82,6 +82,60 @@ func buildTimeRangeClause(start, end *time.Time, startingIndex int) (string, []i
 	return clause, args
 }
 
+func buildPlatformPostOrder(sortBy string, includeID bool) string {
+	switch sortBy {
+	case "hot":
+		if includeID {
+			return "ORDER BY p.hot_score DESC, p.created_at DESC, p.id DESC"
+		}
+		return "ORDER BY p.hot_score DESC, p.created_at DESC"
+	case "new":
+		if includeID {
+			return "ORDER BY p.created_at DESC, p.id DESC"
+		}
+		return "ORDER BY p.created_at DESC"
+	case "top":
+		if includeID {
+			return "ORDER BY p.score DESC, p.created_at DESC, p.id DESC"
+		}
+		return "ORDER BY p.score DESC, p.created_at DESC"
+	case "rising":
+		if includeID {
+			return fmt.Sprintf("ORDER BY %s DESC, p.created_at DESC, p.id DESC", platformPostRisingScoreExpr)
+		}
+		return fmt.Sprintf("ORDER BY %s DESC, p.created_at DESC", platformPostRisingScoreExpr)
+	default:
+		if includeID {
+			return "ORDER BY p.hot_score DESC, p.created_at DESC, p.id DESC"
+		}
+		return "ORDER BY p.hot_score DESC, p.created_at DESC"
+	}
+}
+
+func buildPlatformPostCursorClause(sortBy string, cursor *PlatformPostCursor, startingIndex int) (string, []interface{}) {
+	if cursor == nil {
+		return "", nil
+	}
+	switch sortBy {
+	case "new":
+		return fmt.Sprintf(" AND (p.created_at, p.id) < ($%d, $%d)", startingIndex, startingIndex+1),
+			[]interface{}{cursor.CreatedAt, cursor.ID}
+	case "top":
+		return fmt.Sprintf(" AND (p.score, p.created_at, p.id) < ($%d, $%d, $%d)", startingIndex, startingIndex+1, startingIndex+2),
+			[]interface{}{cursor.Score, cursor.CreatedAt, cursor.ID}
+	case "hot":
+		return fmt.Sprintf(" AND (p.hot_score, p.created_at, p.id) < ($%d, $%d, $%d)", startingIndex, startingIndex+1, startingIndex+2),
+			[]interface{}{cursor.HotScore, cursor.CreatedAt, cursor.ID}
+	case "rising":
+		return fmt.Sprintf(" AND (%s, p.created_at, p.id) < ($%d, $%d, $%d)", platformPostRisingScoreExpr, startingIndex, startingIndex+1, startingIndex+2),
+			[]interface{}{cursor.RisingScore, cursor.CreatedAt, cursor.ID}
+	default:
+		return "", nil
+	}
+}
+
+const platformPostRisingScoreExpr = "(p.score::float / GREATEST(EXTRACT(EPOCH FROM (NOW() - p.created_at)) / 3600, 1))"
+
 const platformPostSelectColumns = `
 	id, author_id, hub_id, title, body, tags, media_url, media_type, thumbnail_url,
 	score, upvotes, downvotes, num_comments, view_count,
@@ -294,20 +348,7 @@ func (r *PlatformPostRepository) GetByHubWithUser(
 	userID *int,
 	startTime, endTime *time.Time,
 ) ([]*PlatformPost, error) {
-	var orderClause string
-	switch sortBy {
-	case "hot":
-		orderClause = "ORDER BY p.hot_score DESC, p.created_at DESC"
-	case "new":
-		orderClause = "ORDER BY p.created_at DESC"
-	case "top":
-		orderClause = "ORDER BY p.score DESC, p.created_at DESC"
-	case "rising":
-		// Rising sort: score divided by age in hours
-		orderClause = `ORDER BY (p.score::float / GREATEST(EXTRACT(EPOCH FROM (NOW() - p.created_at)) / 3600, 1)) DESC`
-	default:
-		orderClause = "ORDER BY p.hot_score DESC, p.created_at DESC"
-	}
+	orderClause := buildPlatformPostOrder(sortBy, false)
 
 	timeClause, timeArgs := buildTimeRangeClause(startTime, endTime, 5)
 
@@ -357,6 +398,67 @@ func (r *PlatformPostRepository) GetByHubWithUser(
 	return posts, rows.Err()
 }
 
+// GetByHubWithCursor retrieves posts by hub using cursor-based pagination.
+func (r *PlatformPostRepository) GetByHubWithCursor(
+	ctx context.Context,
+	hubID int,
+	sortBy string,
+	limit int,
+	cursor *PlatformPostCursor,
+	userID *int,
+	startTime, endTime *time.Time,
+) ([]*PlatformPost, error) {
+	orderClause := buildPlatformPostOrder(sortBy, true)
+	timeClause, timeArgs := buildTimeRangeClause(startTime, endTime, 4)
+	cursorClause, cursorArgs := buildPlatformPostCursorClause(sortBy, cursor, 4+len(timeArgs))
+
+	query := `
+		SELECT ` + platformPostSelectColumnsPrefixed + `,
+		CASE
+			WHEN pv.is_upvote IS NULL THEN NULL
+			WHEN pv.is_upvote = TRUE THEN 1
+			ELSE -1
+		END as user_vote,
+		CASE
+			WHEN pc.id IS NOT NULL THEN TRUE
+			ELSE FALSE
+		END as has_commented
+		FROM platform_posts p
+		LEFT JOIN users u ON p.author_id = u.id
+		LEFT JOIN post_votes pv ON pv.post_id = p.id AND pv.user_id = $3
+		LEFT JOIN post_comments pc ON pc.post_id = p.id AND pc.user_id = $3 AND pc.parent_comment_id IS NULL AND pc.is_deleted = FALSE
+		WHERE p.hub_id = $1 AND p.is_deleted = FALSE AND u.shadow_banned = FALSE AND (p.target_subreddit IS NULL OR p.target_subreddit = '')` + timeClause + cursorClause + `
+		` + orderClause + `
+		LIMIT $2
+	`
+
+	args := []interface{}{hubID, limit}
+	if userID != nil {
+		args = append(args, *userID)
+	} else {
+		args = append(args, nil)
+	}
+	args = append(args, timeArgs...)
+	args = append(args, cursorArgs...)
+
+	rows, err := r.pool.Query(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var posts []*PlatformPost
+	for rows.Next() {
+		post := &PlatformPost{}
+		if err := scanPlatformPostWithUserInfo(rows, post); err != nil {
+			return nil, err
+		}
+		posts = append(posts, post)
+	}
+
+	return posts, rows.Err()
+}
+
 // GetBySubreddit retrieves posts by target subreddit
 func (r *PlatformPostRepository) GetBySubreddit(ctx context.Context, subreddit string, sortBy string, limit, offset int) ([]*PlatformPost, error) {
 	return r.GetBySubredditWithUser(ctx, subreddit, sortBy, limit, offset, nil, nil, nil)
@@ -371,19 +473,7 @@ func (r *PlatformPostRepository) GetBySubredditWithUser(
 	userID *int,
 	startTime, endTime *time.Time,
 ) ([]*PlatformPost, error) {
-	var orderClause string
-	switch sortBy {
-	case "hot":
-		orderClause = "ORDER BY p.hot_score DESC, p.created_at DESC"
-	case "new":
-		orderClause = "ORDER BY p.created_at DESC"
-	case "top":
-		orderClause = "ORDER BY p.score DESC, p.created_at DESC"
-	case "rising":
-		orderClause = `ORDER BY (p.score::float / GREATEST(EXTRACT(EPOCH FROM (NOW() - p.created_at)) / 3600, 1)) DESC`
-	default:
-		orderClause = "ORDER BY p.hot_score DESC, p.created_at DESC"
-	}
+	orderClause := buildPlatformPostOrder(sortBy, false)
 
 	timeClause, timeArgs := buildTimeRangeClause(startTime, endTime, 5)
 
@@ -414,6 +504,67 @@ func (r *PlatformPostRepository) GetBySubredditWithUser(
 		args = append(args, nil)
 	}
 	args = append(args, timeArgs...)
+
+	rows, err := r.pool.Query(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var posts []*PlatformPost
+	for rows.Next() {
+		post := &PlatformPost{}
+		if err := scanPlatformPostWithUserInfo(rows, post); err != nil {
+			return nil, err
+		}
+		posts = append(posts, post)
+	}
+
+	return posts, rows.Err()
+}
+
+// GetBySubredditWithCursor retrieves posts by target subreddit with cursor-based pagination.
+func (r *PlatformPostRepository) GetBySubredditWithCursor(
+	ctx context.Context,
+	subreddit string,
+	sortBy string,
+	limit int,
+	cursor *PlatformPostCursor,
+	userID *int,
+	startTime, endTime *time.Time,
+) ([]*PlatformPost, error) {
+	orderClause := buildPlatformPostOrder(sortBy, true)
+	timeClause, timeArgs := buildTimeRangeClause(startTime, endTime, 4)
+	cursorClause, cursorArgs := buildPlatformPostCursorClause(sortBy, cursor, 4+len(timeArgs))
+
+	query := `
+		SELECT ` + platformPostSelectColumnsPrefixed + `,
+		CASE
+			WHEN pv.is_upvote IS NULL THEN NULL
+			WHEN pv.is_upvote = TRUE THEN 1
+			ELSE -1
+		END as user_vote,
+		CASE
+			WHEN pc.id IS NOT NULL THEN TRUE
+			ELSE FALSE
+		END as has_commented
+		FROM platform_posts p
+		LEFT JOIN users u ON p.author_id = u.id
+		LEFT JOIN post_votes pv ON pv.post_id = p.id AND pv.user_id = $3
+		LEFT JOIN post_comments pc ON pc.post_id = p.id AND pc.user_id = $3 AND pc.parent_comment_id IS NULL AND pc.is_deleted = FALSE
+		WHERE p.target_subreddit = $1 AND p.is_deleted = FALSE AND u.shadow_banned = FALSE` + timeClause + cursorClause + `
+		` + orderClause + `
+		LIMIT $2
+	`
+
+	args := []interface{}{subreddit, limit}
+	if userID != nil {
+		args = append(args, *userID)
+	} else {
+		args = append(args, nil)
+	}
+	args = append(args, timeArgs...)
+	args = append(args, cursorArgs...)
 
 	rows, err := r.pool.Query(ctx, query, args...)
 	if err != nil {
@@ -724,19 +875,7 @@ func (r *PlatformPostRepository) GetPopularFeed(
 	limit, offset int,
 	startTime, endTime *time.Time,
 ) ([]*PlatformPost, error) {
-	var orderClause string
-	switch sort {
-	case "hot":
-		orderClause = "ORDER BY p.hot_score DESC, p.created_at DESC"
-	case "new":
-		orderClause = "ORDER BY p.created_at DESC"
-	case "top":
-		orderClause = "ORDER BY p.score DESC, p.created_at DESC"
-	case "rising":
-		orderClause = `ORDER BY (p.score::float / GREATEST(EXTRACT(EPOCH FROM (NOW() - p.created_at)) / 3600, 1)) DESC`
-	default:
-		orderClause = "ORDER BY p.hot_score DESC, p.created_at DESC"
-	}
+	orderClause := buildPlatformPostOrder(sort, false)
 
 	// Base WHERE clause excludes deleted posts, quarantined hubs, and crossposted posts
 	whereClause := `WHERE p.is_deleted = FALSE AND h.is_quarantined = FALSE AND p.target_subreddit IS NULL`
@@ -814,6 +953,95 @@ func (r *PlatformPostRepository) GetPopularFeed(
 	return posts, rows.Err()
 }
 
+// GetPopularFeedWithCursor returns filtered feed with cursor-based pagination.
+func (r *PlatformPostRepository) GetPopularFeedWithCursor(
+	ctx context.Context,
+	subscribedHubIDs []int,
+	sort string,
+	limit int,
+	cursor *PlatformPostCursor,
+	startTime, endTime *time.Time,
+) ([]*PlatformPost, error) {
+	orderClause := buildPlatformPostOrder(sort, true)
+
+	// Base WHERE clause excludes deleted posts, quarantined hubs, and crossposted posts
+	whereClause := `WHERE p.is_deleted = FALSE AND h.is_quarantined = FALSE AND p.target_subreddit IS NULL`
+
+	args := []interface{}{}
+	paramIndex := 1
+
+	if len(subscribedHubIDs) > 0 {
+		whereClause += fmt.Sprintf(" AND p.hub_id = ANY($%d)", paramIndex)
+		args = append(args, subscribedHubIDs)
+		paramIndex++
+	}
+
+	timeClause, timeArgs := buildTimeRangeClause(startTime, endTime, paramIndex)
+	whereClause += timeClause
+	args = append(args, timeArgs...)
+	paramIndex += len(timeArgs)
+
+	cursorClause, cursorArgs := buildPlatformPostCursorClause(sort, cursor, paramIndex)
+	whereClause += cursorClause
+	args = append(args, cursorArgs...)
+	paramIndex += len(cursorArgs)
+
+	limitIdx := paramIndex
+	args = append(args, limit)
+
+	query := fmt.Sprintf(`
+			SELECT %s,
+			       h.id as hub_id_val, h.name as hub_name, h.title as hub_title,
+			       u.username as author_username
+			FROM platform_posts p
+			LEFT JOIN hubs h ON p.hub_id = h.id
+			JOIN users u ON p.author_id = u.id
+			%s
+			%s
+			LIMIT $%d`, platformPostSelectColumnsPrefixed, whereClause, orderClause, limitIdx)
+
+	rows, err := r.pool.Query(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var posts []*PlatformPost
+	for rows.Next() {
+		post := &PlatformPost{}
+		var hubID sql.NullInt64
+		var hubName sql.NullString
+		var hubTitle sql.NullString
+		var authorUsername sql.NullString
+		if err := scanPlatformPost(rows, post, &hubID, &hubName, &hubTitle, &authorUsername); err != nil {
+			return nil, err
+		}
+		if hubID.Valid {
+			id := int(hubID.Int64)
+			post.HubID = &id
+			post.Hub = &Hub{ID: id}
+			if hubName.Valid {
+				post.Hub.Name = hubName.String
+				post.HubName = hubName.String
+			}
+			if hubTitle.Valid {
+				titleStr := hubTitle.String
+				post.Hub.Title = &titleStr
+			}
+		}
+		if authorUsername.Valid {
+			post.AuthorUsername = authorUsername.String
+			if post.Author == nil {
+				post.Author = &User{}
+			}
+			post.Author.Username = authorUsername.String
+		}
+		posts = append(posts, post)
+	}
+
+	return posts, rows.Err()
+}
+
 // GetAllFeed returns global firehose (h/all)
 // Includes quarantined hubs (unless user opts out)
 // No subscription filtering
@@ -824,19 +1052,7 @@ func (r *PlatformPostRepository) GetAllFeed(
 	limit, offset int,
 	startTime, endTime *time.Time,
 ) ([]*PlatformPost, error) {
-	var orderClause string
-	switch sort {
-	case "hot":
-		orderClause = "ORDER BY hot_score DESC, created_at DESC"
-	case "new":
-		orderClause = "ORDER BY created_at DESC"
-	case "top":
-		orderClause = "ORDER BY score DESC, created_at DESC"
-	case "rising":
-		orderClause = `ORDER BY (score::float / GREATEST(EXTRACT(EPOCH FROM (NOW() - created_at)) / 3600, 1)) DESC`
-	default:
-		orderClause = "ORDER BY hot_score DESC, created_at DESC"
-	}
+	orderClause := buildPlatformPostOrder(sort, false)
 
 	timeClause, timeArgs := buildTimeRangeClause(startTime, endTime, 3)
 
@@ -851,6 +1067,50 @@ func (r *PlatformPostRepository) GetAllFeed(
 
 	args := []interface{}{limit, offset}
 	args = append(args, timeArgs...)
+
+	rows, err := r.pool.Query(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var posts []*PlatformPost
+	for rows.Next() {
+		post := &PlatformPost{}
+		if err := scanPlatformPost(rows, post); err != nil {
+			return nil, err
+		}
+		posts = append(posts, post)
+	}
+
+	return posts, rows.Err()
+}
+
+// GetAllFeedWithCursor returns global feed with cursor-based pagination.
+func (r *PlatformPostRepository) GetAllFeedWithCursor(
+	ctx context.Context,
+	sort string,
+	limit int,
+	cursor *PlatformPostCursor,
+	startTime, endTime *time.Time,
+) ([]*PlatformPost, error) {
+	orderClause := buildPlatformPostOrder(sort, true)
+
+	timeClause, timeArgs := buildTimeRangeClause(startTime, endTime, 2)
+	cursorClause, cursorArgs := buildPlatformPostCursorClause(sort, cursor, 2+len(timeArgs))
+
+	query := `
+		SELECT ` + platformPostSelectColumns + `
+		FROM platform_posts p
+		LEFT JOIN users u ON p.author_id = u.id
+		WHERE p.is_deleted = FALSE AND p.target_subreddit IS NULL AND u.shadow_banned = FALSE` + timeClause + cursorClause + `
+		` + orderClause + `
+		LIMIT $1
+	`
+
+	args := []interface{}{limit}
+	args = append(args, timeArgs...)
+	args = append(args, cursorArgs...)
 
 	rows, err := r.pool.Query(ctx, query, args...)
 	if err != nil {

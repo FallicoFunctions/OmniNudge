@@ -80,4 +80,5 @@ export interface ModLogResponse {
   logs: ModLog[];
   limit: number;
   offset: number;
+  next_cursor?: string;
 }

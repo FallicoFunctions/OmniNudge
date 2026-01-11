@@ -2,6 +2,7 @@ package models
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -91,6 +92,67 @@ func (r *BugReportRepository) GetAll(ctx context.Context, status *string, limit,
 		`
 		args = []interface{}{limit, offset}
 	}
+
+	rows, err := r.pool.Query(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var reports []*BugReport
+	for rows.Next() {
+		report := &BugReport{}
+		err := rows.Scan(
+			&report.ID,
+			&report.UserID,
+			&report.PageURL,
+			&report.Description,
+			&report.ScreenshotURL,
+			&report.Status,
+			&report.AdminNotes,
+			&report.CreatedAt,
+			&report.UpdatedAt,
+			&report.Username,
+		)
+		if err != nil {
+			return nil, err
+		}
+		reports = append(reports, report)
+	}
+
+	return reports, rows.Err()
+}
+
+// GetAllWithCursor retrieves bug reports with cursor-based pagination.
+func (r *BugReportRepository) GetAllWithCursor(
+	ctx context.Context,
+	status *string,
+	limit int,
+	cursor *TimeCursor,
+) ([]*BugReport, error) {
+	var query string
+	var args []interface{}
+	paramIdx := 1
+
+	query = `
+		SELECT br.id, br.user_id, br.page_url, br.description, br.screenshot_url,
+		       br.status, br.admin_notes, br.created_at, br.updated_at, u.username
+		FROM bug_reports br
+		LEFT JOIN users u ON br.user_id = u.id
+		WHERE 1=1
+	`
+	if status != nil && *status != "" {
+		query += fmt.Sprintf(" AND br.status = $%d", paramIdx)
+		args = append(args, *status)
+		paramIdx++
+	}
+	if cursor != nil {
+		query += fmt.Sprintf(" AND (br.created_at, br.id) < ($%d, $%d)", paramIdx, paramIdx+1)
+		args = append(args, cursor.Timestamp, cursor.ID)
+		paramIdx += 2
+	}
+	query += fmt.Sprintf(" ORDER BY br.created_at DESC, br.id DESC LIMIT $%d", paramIdx)
+	args = append(args, limit)
 
 	rows, err := r.pool.Query(ctx, query, args...)
 	if err != nil {

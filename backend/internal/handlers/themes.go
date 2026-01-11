@@ -246,21 +246,61 @@ func (h *ThemesHandler) GetMyThemes(c *gin.Context) {
 
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
 	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
+	cursorParam := c.Query("cursor")
 	if limit < 1 || limit > 100 {
 		limit = 20
 	}
 
-	themes, err := h.themeRepo.GetByUserID(c.Request.Context(), userID, limit, offset)
+	var cursor *timeCursor
+	if cursorParam != "" {
+		decoded, err := decodeTimeCursor(cursorParam)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid cursor"})
+			return
+		}
+		cursor = decoded
+	}
+	useCursorPagination := cursorParam != "" || offset == 0
+	limitArg := limit
+	if useCursorPagination {
+		limitArg = limit + 1
+		offset = 0
+	}
+
+	var themes []*models.UserTheme
+	var err error
+	if useCursorPagination {
+		var payload *models.TimeCursor
+		if cursor != nil {
+			payload = &models.TimeCursor{ID: cursor.ID, Timestamp: cursor.Timestamp}
+		}
+		themes, err = h.themeRepo.GetByUserIDWithCursor(c.Request.Context(), userID, limitArg, payload)
+	} else {
+		themes, err = h.themeRepo.GetByUserID(c.Request.Context(), userID, limitArg, offset)
+	}
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch themes", "details": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
+	nextCursor := ""
+	if useCursorPagination && len(themes) > limit {
+		themes = themes[:limit]
+		if len(themes) > 0 {
+			last := themes[len(themes)-1]
+			nextCursor = encodeTimeCursor(timeCursor{ID: last.ID, Timestamp: last.CreatedAt})
+		}
+	}
+
+	response := gin.H{
 		"themes": themes,
 		"limit":  limit,
 		"offset": offset,
-	})
+	}
+	if nextCursor != "" {
+		response["next_cursor"] = nextCursor
+	}
+	c.JSON(http.StatusOK, response)
 }
 
 type updateThemeRequest struct {
@@ -419,6 +459,7 @@ func (h *ThemesHandler) GetPredefinedThemes(c *gin.Context) {
 func (h *ThemesHandler) BrowseThemes(c *gin.Context) {
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
 	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
+	cursorParam := c.Query("cursor")
 	if limit < 1 || limit > 100 {
 		limit = 20
 	}
@@ -429,17 +470,57 @@ func (h *ThemesHandler) BrowseThemes(c *gin.Context) {
 		categoryPtr = &category
 	}
 
-	themes, err := h.themeRepo.GetPublicThemes(c.Request.Context(), limit, offset, categoryPtr)
+	var cursor *models.ThemePublicCursor
+	if cursorParam != "" {
+		decoded, err := decodeThemePublicCursor(cursorParam)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid cursor"})
+			return
+		}
+		cursor = decoded
+	}
+	useCursorPagination := cursorParam != "" || offset == 0
+	limitArg := limit
+	if useCursorPagination {
+		limitArg = limit + 1
+		offset = 0
+	}
+
+	var themes []*models.UserTheme
+	var err error
+	if useCursorPagination {
+		themes, err = h.themeRepo.GetPublicThemesWithCursor(c.Request.Context(), limitArg, categoryPtr, cursor)
+	} else {
+		themes, err = h.themeRepo.GetPublicThemes(c.Request.Context(), limitArg, offset, categoryPtr)
+	}
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch public themes", "details": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
+	nextCursor := ""
+	if useCursorPagination && len(themes) > limit {
+		themes = themes[:limit]
+		if len(themes) > 0 {
+			last := themes[len(themes)-1]
+			nextCursor = encodeThemePublicCursor(models.ThemePublicCursor{
+				ID:            last.ID,
+				InstallCount:  last.InstallCount,
+				AverageRating: last.AverageRating,
+				CreatedAt:     last.CreatedAt,
+			})
+		}
+	}
+
+	response := gin.H{
 		"themes": themes,
 		"limit":  limit,
 		"offset": offset,
-	})
+	}
+	if nextCursor != "" {
+		response["next_cursor"] = nextCursor
+	}
+	c.JSON(http.StatusOK, response)
 }
 
 // ============================================================================

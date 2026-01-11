@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../contexts/AuthContext';
 import { messagesService } from '../services/messagesService';
 import { modMailService } from '../services/modMailService';
@@ -145,16 +145,27 @@ export default function ModMailConversationPage() {
   });
 
   // Fetch messages
-  const { data: messagesData, isLoading: isLoadingMessages } = useQuery({
+  const {
+    data: messagesData,
+    isLoading: isLoadingMessages,
+    hasNextPage: hasMoreMessages,
+    fetchNextPage: fetchMoreMessages,
+    isFetchingNextPage: isFetchingMoreMessages,
+  } = useInfiniteQuery({
     queryKey: ['messages', convId],
-    queryFn: () => messagesService.getMessages(convId),
+    queryFn: ({ pageParam }) =>
+      messagesService.getMessagesPage(convId, 50, pageParam ? String(pageParam) : undefined),
+    initialPageParam: '',
+    getNextPageParam: (lastPage) => lastPage.next_cursor ?? undefined,
     enabled: !!convId,
     refetchInterval: 5000, // Poll every 5 seconds
   });
 
   // Sort messages by sent_at to ensure chronological order (oldest to newest)
   const messages = messagesData
-    ? [...messagesData].sort((a, b) => new Date(a.sent_at).getTime() - new Date(b.sent_at).getTime())
+    ? [...messagesData.pages.flatMap((page) => page.messages)].sort(
+        (a, b) => new Date(a.sent_at).getTime() - new Date(b.sent_at).getTime()
+      )
     : undefined;
 
   type EncryptionPayload =
@@ -380,6 +391,18 @@ export default function ModMailConversationPage() {
 
       {/* Messages */}
       <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-lg p-4 mb-4 max-h-[600px] overflow-y-auto">
+        {hasMoreMessages && (
+          <div className="mb-4 flex justify-center">
+            <button
+              type="button"
+              onClick={() => fetchMoreMessages()}
+              disabled={isFetchingMoreMessages}
+              className="rounded-md border border-[var(--color-border)] px-3 py-1 text-xs font-semibold text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-elevated)] disabled:opacity-60"
+            >
+              {isFetchingMoreMessages ? 'Loading…' : 'Load more messages'}
+            </button>
+          </div>
+        )}
         {messages && messages.length === 0 && (
           <div className="text-center py-12 text-[var(--color-text-secondary)]">
             No messages yet

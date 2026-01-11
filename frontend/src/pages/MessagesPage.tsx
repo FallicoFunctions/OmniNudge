@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { messagesService } from '../services/messagesService';
 import { mediaService } from '../services/mediaService';
 import { useAuth } from '../contexts/AuthContext';
@@ -399,14 +399,27 @@ export default function MessagesPage() {
   const toUsernameParam = searchParams.get('to');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const { data: allConversations, isLoading: loadingConversations } = useQuery({
-    queryKey: ['conversations', 'all'], // Different key to avoid cache conflicts with MainLayout
-    queryFn: () => messagesService.getConversations(true), // Fetch all including archived
+  const {
+    data: conversationsData,
+    isLoading: loadingConversations,
+    hasNextPage: hasMoreConversations,
+    fetchNextPage: fetchMoreConversations,
+    isFetchingNextPage: isFetchingMoreConversations,
+  } = useInfiniteQuery({
+    queryKey: ['conversations', 'all'],
+    queryFn: ({ pageParam }) =>
+      messagesService.getConversationsPage(true, 20, pageParam ? String(pageParam) : undefined),
+    initialPageParam: '',
+    getNextPageParam: (lastPage) => lastPage.next_cursor ?? undefined,
   });
+  const allConversations = useMemo(
+    () => conversationsData?.pages.flatMap((page) => page.conversations) ?? [],
+    [conversationsData]
+  );
 
   // Filter conversations based on active tab
   const conversations = useMemo(() => {
-    if (!allConversations) return undefined;
+    if (!allConversations.length) return undefined;
     if (activeTab === 'archived') {
       return allConversations.filter((c) => c.archived_at !== null);
     }
@@ -415,7 +428,7 @@ export default function MessagesPage() {
 
   // Prune stale message queries for conversations that no longer exist
   useEffect(() => {
-    if (!allConversations) return;
+    if (!allConversations.length) return;
     const validIds = new Set(allConversations.map((c) => c.id));
     queryClient.removeQueries({
       queryKey: ['messages'],
@@ -449,13 +462,30 @@ export default function MessagesPage() {
   const selectedConversation = conversations?.find((c) => c.id === selectedConversationId);
   const selectedConversationExists = Boolean(selectedConversation);
 
-  const { data: messages, isLoading: loadingMessages } = useQuery({
+  const {
+    data: messagesData,
+    isLoading: loadingMessages,
+    hasNextPage: hasMoreMessages,
+    fetchNextPage: fetchMoreMessages,
+    isFetchingNextPage: isFetchingMoreMessages,
+  } = useInfiniteQuery({
     queryKey: ['messages', selectedConversationId],
-    queryFn: () => messagesService.getMessages(selectedConversationId!),
+    queryFn: ({ pageParam }) =>
+      messagesService.getMessagesPage(
+        selectedConversationId!,
+        50,
+        pageParam ? String(pageParam) : undefined
+      ),
+    initialPageParam: '',
+    getNextPageParam: (lastPage) => lastPage.next_cursor ?? undefined,
     enabled: !!selectedConversationId && selectedConversationExists,
     refetchOnWindowFocus: false,
     retry: false, // Avoid retry loops on 404 when a conversation was deleted
   });
+  const messages = useMemo(
+    () => messagesData?.pages.flatMap((page) => page.messages) ?? [],
+    [messagesData]
+  );
 
   // Fetch mod-mail conversation details if this is a mod_mail conversation
   const { data: modMailConversation } = useQuery<ModMailConversation>({
@@ -495,6 +525,7 @@ export default function MessagesPage() {
             : conv
         );
       });
+      queryClient.invalidateQueries({ queryKey: ['conversations', 'all'] });
       setMessageText('');
       setSelectedFile(null);
       if (!variables.conversation_id && variables.recipient_username) {
@@ -524,6 +555,7 @@ export default function MessagesPage() {
         (prev) => (prev ? prev.filter((msg) => msg.id !== variables.messageId) : prev)
       );
       queryClient.invalidateQueries({ queryKey: ['conversations'] });
+      queryClient.invalidateQueries({ queryKey: ['conversations', 'all'] });
       setDeleteDialogMessage(null);
       setMessageMenuOpen(null);
     },
@@ -569,6 +601,7 @@ export default function MessagesPage() {
     }) => messagesService.deleteConversation(conversationId, { deleteFor }),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['conversations'] });
+      queryClient.invalidateQueries({ queryKey: ['conversations', 'all'] });
       setDeleteConversationDialog(null);
       setConversationMenuOpen(null);
       // If deleted conversation was selected, clear selection
@@ -825,6 +858,7 @@ export default function MessagesPage() {
           );
         });
         queryClient.invalidateQueries({ queryKey: ['conversations'] });
+        queryClient.invalidateQueries({ queryKey: ['conversations', 'all'] });
       } catch (error) {
         console.error('Failed to mark conversation as read', error);
       }
@@ -1057,6 +1091,19 @@ export default function MessagesPage() {
               <EmptyMessage className="text-sm">No conversations yet. Start a new chat!</EmptyMessage>
             </div>
           )}
+
+          {hasMoreConversations && (
+            <div className="p-4">
+              <button
+                type="button"
+                onClick={() => fetchMoreConversations()}
+                disabled={isFetchingMoreConversations}
+                className="w-full rounded-md border border-[var(--color-border)] px-3 py-2 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)] disabled:opacity-60"
+              >
+                {isFetchingMoreConversations ? 'Loading…' : 'Load more conversations'}
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -1087,6 +1134,18 @@ export default function MessagesPage() {
                 </div>
               ) : (
                 <div className="space-y-3">
+                  {hasMoreMessages && (
+                    <div className="flex justify-center">
+                      <button
+                        type="button"
+                        onClick={() => fetchMoreMessages()}
+                        disabled={isFetchingMoreMessages}
+                        className="rounded-md border border-[var(--color-border)] px-3 py-1 text-xs font-semibold text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-elevated)] disabled:opacity-60"
+                      >
+                        {isFetchingMoreMessages ? 'Loading…' : 'Load more messages'}
+                      </button>
+                    </div>
+                  )}
                   {orderedMessages.map((message) => {
                     const isOwnMessage = message.sender_id === user?.id;
 

@@ -2,6 +2,7 @@ package models
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -55,6 +56,45 @@ func (r *ReportRepository) ListByStatus(ctx context.Context, status string, limi
 		LIMIT $2 OFFSET $3
 	`
 	rows, err := r.pool.Query(ctx, query, status, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var reports []*Report
+	for rows.Next() {
+		rep := &Report{}
+		if err := rows.Scan(&rep.ID, &rep.ReporterID, &rep.TargetType, &rep.TargetID, &rep.Reason, &rep.Status, &rep.CreatedAt); err != nil {
+			return nil, err
+		}
+		reports = append(reports, rep)
+	}
+	return reports, rows.Err()
+}
+
+// ListByStatusWithCursor lists reports by status using cursor-based pagination.
+func (r *ReportRepository) ListByStatusWithCursor(
+	ctx context.Context,
+	status string,
+	limit int,
+	cursor *TimeCursor,
+) ([]*Report, error) {
+	query := `
+		SELECT id, reporter_id, target_type, target_id, reason, status, created_at
+		FROM reports
+		WHERE status = $1
+	`
+	args := []interface{}{status}
+	paramIdx := 2
+	if cursor != nil {
+		query += fmt.Sprintf(" AND (created_at, id) < ($%d, $%d)", paramIdx, paramIdx+1)
+		args = append(args, cursor.Timestamp, cursor.ID)
+		paramIdx += 2
+	}
+	query += fmt.Sprintf(" ORDER BY created_at DESC, id DESC LIMIT $%d", paramIdx)
+	args = append(args, limit)
+
+	rows, err := r.pool.Query(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}
