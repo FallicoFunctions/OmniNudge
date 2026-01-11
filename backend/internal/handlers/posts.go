@@ -127,16 +127,17 @@ func (h *PostsHandler) GetSubredditPosts(c *gin.Context) {
 
 // CreatePostRequest represents the request body for creating a post
 type CreatePostRequest struct {
-	Title              string   `json:"title" binding:"required,min=1,max=300"`
-	Body               *string  `json:"body"`
-	Tags               []string `json:"tags"`
-	MediaURL           *string  `json:"media_url"`
-	MediaType          *string  `json:"media_type"`
-	ThumbnailURL       *string  `json:"thumbnail_url"`
-	HubID              *int     `json:"hub_id"`                // Optional: post to specific hub
-	TargetSubreddit    *string  `json:"target_subreddit"`      // Optional: associate with subreddit
-	SendRepliesToInbox bool     `json:"send_replies_to_inbox"` // Notification preference
-	PostType           string   `json:"post_type"`             // "link" or "text"
+	Title              string                  `json:"title" binding:"required,min=1,max=300"`
+	Body               *string                 `json:"body"`
+	Tags               []string                `json:"tags"`
+	MediaURL           *string                 `json:"media_url"`
+	MediaType          *string                 `json:"media_type"`
+	ThumbnailURL       *string                 `json:"thumbnail_url"`
+	GalleryImages      []models.GalleryImage   `json:"gallery_images"` // Optional: gallery images
+	HubID              *int                    `json:"hub_id"`                // Optional: post to specific hub
+	TargetSubreddit    *string                 `json:"target_subreddit"`      // Optional: associate with subreddit
+	SendRepliesToInbox bool                    `json:"send_replies_to_inbox"` // Notification preference
+	PostType           string                  `json:"post_type"`             // "link" or "text"
 }
 
 // UpdatePostRequest represents the request body for updating a post
@@ -214,6 +215,7 @@ func (h *PostsHandler) CreatePost(c *gin.Context) {
 		MediaURL:        req.MediaURL,
 		MediaType:       req.MediaType,
 		ThumbnailURL:    req.ThumbnailURL,
+		GalleryImages:   req.GalleryImages,
 		TargetSubreddit: req.TargetSubreddit,
 	}
 
@@ -227,6 +229,11 @@ func (h *PostsHandler) CreatePost(c *gin.Context) {
 	_ = h.postRepo.Vote(c.Request.Context(), post.ID, userID.(int), &upvote)
 	post.Score++
 	post.Upvotes++
+
+	// Populate hub name if hub was specified (for agent logging)
+	if hub != nil {
+		post.HubName = hub.Name
+	}
 
 	c.JSON(http.StatusCreated, post)
 }
@@ -440,7 +447,7 @@ func (h *PostsHandler) DeletePost(c *gin.Context) {
 		return
 	}
 
-	// Verify user owns this post or is global mod/admin or hub mod
+	// Verify user owns this post or is admin or hub mod
 	isHubMod := false
 	if h.modRepo != nil && existingPost.HubID != nil {
 		if ok, err := h.modRepo.IsModerator(c.Request.Context(), *existingPost.HubID, userID.(int)); err == nil {
@@ -448,7 +455,7 @@ func (h *PostsHandler) DeletePost(c *gin.Context) {
 		}
 	}
 
-	if existingPost.AuthorID != userID.(int) && roleStr != "moderator" && roleStr != "admin" && !isHubMod {
+	if existingPost.AuthorID != userID.(int) && roleStr != "admin" && !isHubMod {
 		c.JSON(http.StatusForbidden, gin.H{"error": "You can only delete your own posts"})
 		return
 	}

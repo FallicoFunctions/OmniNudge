@@ -46,8 +46,3 @@ ON reddit_posts(score DESC, created_utc DESC, expires_at DESC);
 -- Comment votes optimization (for comment browsing)
 CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_comment_votes_composite
 ON comment_votes(user_id, comment_id, is_upvote);
-
--- User lookup optimization (username searches)
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_users_username_normalized
-ON users(username_normalized)
-WHERE deleted = FALSE AND shadow_banned = FALSE;

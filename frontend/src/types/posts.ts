@@ -1,3 +1,9 @@
+export interface GalleryImage {
+  url: string;
+  width?: number;
+  height?: number;
+}
+
 export interface PlatformPost {
   id: number;
   title: string;
@@ -17,6 +23,7 @@ export interface PlatformPost {
   media_url?: string | null;
   media_type?: string | null;
   thumbnail_url?: string | null;
+  gallery_images?: GalleryImage[];
   target_subreddit?: string | null;
   crosspost_origin_subreddit?: string | null;
   hub?: {
