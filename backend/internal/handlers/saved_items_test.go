@@ -41,6 +41,9 @@ func setupSavedItemsTest(t *testing.T) (*SavedItemsHandler, *models.SavedItemsRe
 	err = db.Migrate(ctx)
 	require.NoError(t, err)
 
+	err = database.ResetTestData(ctx, db)
+	require.NoError(t, err)
+
 	// Create a test user
 	userRepo := models.NewUserRepository(db.Pool)
 	user := &models.User{
@@ -87,7 +90,7 @@ func mockAuthMiddleware(userID int) gin.HandlerFunc {
 }
 
 func TestGetSavedItems(t *testing.T) {
-	handler, savedRepo, postRepo, _, userID, hubID, cleanup := setupSavedItemsTest(t)
+	handler, savedRepo, postRepo, redditClient, userID, hubID, cleanup := setupSavedItemsTest(t)
 	defer cleanup()
 
 	gin.SetMode(gin.TestMode)
@@ -122,6 +125,12 @@ func TestGetSavedItems(t *testing.T) {
 	}
 	err = savedRepo.SaveRedditPost(ctx, userID, redditPost)
 	require.NoError(t, err)
+	redditClient.posts[redditPost.RedditPostID] = &services.RedditPost{
+		ID:        redditPost.RedditPostID,
+		Subreddit: redditPost.Subreddit,
+		Title:     redditPost.Title,
+		Author:    redditPost.Author,
+	}
 
 	tests := []struct {
 		name           string
@@ -364,7 +373,7 @@ func TestSavePost(t *testing.T) {
 	// Create a test post
 	postBody := "Test body"
 	post := &models.PlatformPost{
-		AuthorID: 2, // Different user
+		AuthorID: userID,
 		HubID:    &hubID,
 		Title:    "Test Post",
 		Body:     &postBody,
@@ -449,7 +458,7 @@ func TestUnsavePost(t *testing.T) {
 	// Create and save a test post
 	postBody := "Test body"
 	post := &models.PlatformPost{
-		AuthorID: 2,
+		AuthorID: userID,
 		HubID:    &hubID,
 		Title:    "Test Post",
 		Body:     &postBody,
@@ -563,7 +572,7 @@ func TestHidePost(t *testing.T) {
 	// Create a test post
 	postBody := "Test body"
 	post := &models.PlatformPost{
-		AuthorID: 2,
+		AuthorID: userID,
 		HubID:    &hubID,
 		Title:    "Test Post",
 		Body:     &postBody,
@@ -612,7 +621,7 @@ func TestUnhidePost(t *testing.T) {
 	// Create and hide a test post
 	postBody := "Test body"
 	post := &models.PlatformPost{
-		AuthorID: 2,
+		AuthorID: userID,
 		HubID:    &hubID,
 		Title:    "Test Post",
 		Body:     &postBody,

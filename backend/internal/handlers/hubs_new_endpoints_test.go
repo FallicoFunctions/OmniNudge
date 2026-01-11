@@ -15,7 +15,7 @@ import (
 )
 
 func TestCreateHub_NameValidation(t *testing.T) {
-	handler, _, _, cleanup := setupHubsTest(t)
+	handler, _, _, _, cleanup := setupHubsTest(t)
 	defer cleanup()
 
 	gin.SetMode(gin.TestMode)
@@ -90,7 +90,7 @@ func TestCreateHub_NameValidation(t *testing.T) {
 }
 
 func TestCreateHub_DescriptionValidation(t *testing.T) {
-	handler, _, _, cleanup := setupHubsTest(t)
+	handler, _, _, _, cleanup := setupHubsTest(t)
 	defer cleanup()
 
 	gin.SetMode(gin.TestMode)
@@ -127,7 +127,7 @@ func TestCreateHub_DescriptionValidation(t *testing.T) {
 }
 
 func TestGetPopularFeed_ExcludesQuarantined(t *testing.T) {
-	handler, hubRepo, _, cleanup := setupHubsTest(t)
+	handler, hubRepo, _, _, cleanup := setupHubsTest(t)
 	defer cleanup()
 
 	ctx := context.Background()
@@ -173,7 +173,7 @@ func TestGetPopularFeed_ExcludesQuarantined(t *testing.T) {
 }
 
 func TestGetAllFeed_ReturnsGlobalPosts(t *testing.T) {
-	handler, hubRepo, _, cleanup := setupHubsTest(t)
+	handler, hubRepo, _, _, cleanup := setupHubsTest(t)
 	defer cleanup()
 
 	ctx := context.Background()
@@ -196,6 +196,9 @@ func TestGetAllFeed_ReturnsGlobalPosts(t *testing.T) {
 
 	router.ServeHTTP(w, req)
 
+	if w.Code != http.StatusOK {
+		t.Logf("unexpected response: %s", w.Body.String())
+	}
 	assert.Equal(t, http.StatusOK, w.Code)
 
 	var response map[string]interface{}
@@ -207,7 +210,7 @@ func TestGetAllFeed_ReturnsGlobalPosts(t *testing.T) {
 }
 
 func TestSearchHubs_ReturnsMatchingHubs(t *testing.T) {
-	handler, hubRepo, _, cleanup := setupHubsTest(t)
+	handler, hubRepo, _, _, cleanup := setupHubsTest(t)
 	defer cleanup()
 
 	ctx := context.Background()
@@ -264,7 +267,7 @@ func TestSearchHubs_ReturnsMatchingHubs(t *testing.T) {
 }
 
 func TestGetTrendingHubs_SortedBySubscribers(t *testing.T) {
-	handler, hubRepo, _, cleanup := setupHubsTest(t)
+	handler, hubRepo, _, _, cleanup := setupHubsTest(t)
 	defer cleanup()
 
 	ctx := context.Background()
@@ -322,4 +325,3 @@ func TestGetTrendingHubs_SortedBySubscribers(t *testing.T) {
 		assert.GreaterOrEqual(t, firstCount, secondCount)
 	}
 }
-

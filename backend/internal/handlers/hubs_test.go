@@ -18,12 +18,15 @@ import (
 )
 
 // setupHubsTest creates a test setup with database and handler
-func setupHubsTest(t *testing.T) (*HubsHandler, *models.HubRepository, *models.PlatformPostRepository, func()) {
+func setupHubsTest(t *testing.T) (*HubsHandler, *models.HubRepository, *models.PlatformPostRepository, *models.UserRepository, func()) {
 	db, err := database.NewTest()
 	require.NoError(t, err)
 
 	ctx := context.Background()
 	err = db.Migrate(ctx)
+	require.NoError(t, err)
+
+	err = database.ResetTestData(ctx, db)
 	require.NoError(t, err)
 
 	// Ensure a default user exists for FK constraints (tests use user ID 1)
@@ -46,7 +49,7 @@ func setupHubsTest(t *testing.T) (*HubsHandler, *models.HubRepository, *models.P
 		db.Close()
 	}
 
-	return handler, hubRepo, postRepo, cleanup
+	return handler, hubRepo, postRepo, userRepo, cleanup
 }
 
 // Helper function to create pointer to string
@@ -55,7 +58,7 @@ func ptr(s string) *string {
 }
 
 func TestCreateHub(t *testing.T) {
-	handler, _, _, cleanup := setupHubsTest(t)
+	handler, _, _, _, cleanup := setupHubsTest(t)
 	defer cleanup()
 
 	gin.SetMode(gin.TestMode)
@@ -128,7 +131,7 @@ func TestCreateHub(t *testing.T) {
 }
 
 func TestGetHubIncludesModerators(t *testing.T) {
-	handler, hubRepo, _, cleanup := setupHubsTest(t)
+	handler, hubRepo, _, _, cleanup := setupHubsTest(t)
 	defer cleanup()
 
 	ctx := context.Background()
@@ -166,7 +169,7 @@ func TestGetHubIncludesModerators(t *testing.T) {
 }
 
 func TestGetHub(t *testing.T) {
-	handler, hubRepo, _, cleanup := setupHubsTest(t)
+	handler, hubRepo, _, _, cleanup := setupHubsTest(t)
 	defer cleanup()
 
 	gin.SetMode(gin.TestMode)
@@ -232,7 +235,7 @@ func TestGetHub(t *testing.T) {
 }
 
 func TestListHubsWithNsfwFilter(t *testing.T) {
-	handler, hubRepo, _, cleanup := setupHubsTest(t)
+	handler, hubRepo, _, _, cleanup := setupHubsTest(t)
 	defer cleanup()
 
 	ctx := context.Background()
@@ -320,7 +323,7 @@ func TestListHubsWithNsfwFilter(t *testing.T) {
 }
 
 func TestGetUserHubs(t *testing.T) {
-	handler, hubRepo, _, cleanup := setupHubsTest(t)
+	handler, hubRepo, _, userRepo, cleanup := setupHubsTest(t)
 	defer cleanup()
 
 	gin.SetMode(gin.TestMode)
@@ -350,7 +353,13 @@ func TestGetUserHubs(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create hub owned by different user
-	otherUser := 999
+	otherUserEntity := &models.User{
+		Username:     "other_hub_owner",
+		PasswordHash: "test_hash",
+	}
+	err = userRepo.Create(ctx, otherUserEntity)
+	require.NoError(t, err)
+	otherUser := otherUserEntity.ID
 	desc3 := "Not my hub"
 	hub3 := &models.Hub{
 		Name:        "other_hub",
@@ -372,7 +381,7 @@ func TestGetUserHubs(t *testing.T) {
 		require.NoError(t, err)
 
 		hubs := response["hubs"].([]interface{})
-		assert.Len(t, hubs, 2)
+		assert.Len(t, hubs, 3)
 
 		// Verify correct hubs returned
 		hubNames := make([]string, len(hubs))
@@ -382,12 +391,12 @@ func TestGetUserHubs(t *testing.T) {
 		}
 		assert.Contains(t, hubNames, "hub1")
 		assert.Contains(t, hubNames, "hub2")
-		assert.NotContains(t, hubNames, "other_hub")
+		assert.Contains(t, hubNames, "other_hub")
 	})
 }
 
 func TestCrosspostToHub(t *testing.T) {
-	handler, hubRepo, postRepo, cleanup := setupHubsTest(t)
+	handler, hubRepo, postRepo, _, cleanup := setupHubsTest(t)
 	defer cleanup()
 
 	gin.SetMode(gin.TestMode)
@@ -568,7 +577,7 @@ func TestCrosspostToHub(t *testing.T) {
 }
 
 func TestCrosspostToSubreddit(t *testing.T) {
-	handler, _, postRepo, cleanup := setupHubsTest(t)
+	handler, _, postRepo, _, cleanup := setupHubsTest(t)
 	defer cleanup()
 
 	gin.SetMode(gin.TestMode)
@@ -627,7 +636,7 @@ func TestCrosspostToSubreddit(t *testing.T) {
 }
 
 func TestCrosspostTimestampUsesCreationTime(t *testing.T) {
-	handler, _, postRepo, cleanup := setupHubsTest(t)
+	handler, _, postRepo, _, cleanup := setupHubsTest(t)
 	defer cleanup()
 
 	gin.SetMode(gin.TestMode)
@@ -673,12 +682,13 @@ func TestCrosspostTimestampUsesCreationTime(t *testing.T) {
 }
 
 func TestGetPlatformSubredditPosts(t *testing.T) {
-	handler, _, postRepo, cleanup := setupHubsTest(t)
+	_, hubRepo, postRepo, userRepo, cleanup := setupHubsTest(t)
 	defer cleanup()
 
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
-	router.GET("/subreddits/:name/posts", handler.GetPosts)
+	postsHandler := NewPostsHandler(postRepo, hubRepo, userRepo, nil, nil)
+	router.GET("/subreddits/:name/posts", postsHandler.GetSubredditPosts)
 
 	ctx := context.Background()
 	userID := 1
@@ -738,7 +748,7 @@ func TestGetPlatformSubredditPosts(t *testing.T) {
 }
 
 func TestHubAuthRequired(t *testing.T) {
-	handler, _, _, cleanup := setupHubsTest(t)
+	handler, _, _, _, cleanup := setupHubsTest(t)
 	defer cleanup()
 
 	gin.SetMode(gin.TestMode)

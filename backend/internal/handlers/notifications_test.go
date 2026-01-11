@@ -36,6 +36,9 @@ func setupNotificationsHandlerTest(t *testing.T) (*NotificationsHandler, *databa
 	err = db.Migrate(ctx)
 	require.NoError(t, err)
 
+	err = database.ResetTestData(ctx, db)
+	require.NoError(t, err)
+
 	// Create test user
 	userRepo := models.NewUserRepository(db.Pool)
 	user := &models.User{

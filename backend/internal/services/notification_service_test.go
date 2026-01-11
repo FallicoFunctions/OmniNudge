@@ -32,6 +32,9 @@ func setupNotificationTest(t *testing.T) (*NotificationService, *database.Databa
 	err = db.Migrate(ctx)
 	require.NoError(t, err)
 
+	err = database.ResetTestData(ctx, db)
+	require.NoError(t, err)
+
 	notifRepo := models.NewNotificationRepository(db.Pool)
 	baselineRepo := models.NewUserBaselineRepository(db.Pool)
 	batchRepo := models.NewNotificationBatchRepository(db.Pool)

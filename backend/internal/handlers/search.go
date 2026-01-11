@@ -458,8 +458,17 @@ func (h *SearchHandler) SearchHubs(c *gin.Context) {
 		hub := &models.Hub{}
 		var rank float64
 		err := rows.Scan(
-			&hub.ID, &hub.Name, &hub.Description, &hub.CreatedBy,
-			&hub.CreatedAt, &rank,
+			&hub.ID,
+			&hub.Name,
+			&hub.Description,
+			&hub.Title,
+			&hub.Type,
+			&hub.ContentOptions,
+			&hub.IsQuarantined,
+			&hub.SubscriberCount,
+			&hub.CreatedBy,
+			&hub.CreatedAt,
+			&rank,
 		)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to parse results"})

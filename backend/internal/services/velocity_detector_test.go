@@ -31,6 +31,9 @@ func setupVelocityTest(t *testing.T) (*RuleBasedVelocityDetector, *database.Data
 	err = db.Migrate(ctx)
 	require.NoError(t, err)
 
+	err = database.ResetTestData(ctx, db)
+	require.NoError(t, err)
+
 	baselineRepo := models.NewUserBaselineRepository(db.Pool)
 	detector := NewRuleBasedVelocityDetector(db.Pool, baselineRepo)
 
