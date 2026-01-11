@@ -42,7 +42,8 @@ export default function SearchResultsPage() {
     platform: PlatformPost[];
     redditAfter: string | null;
     redditAfterStack: (string | null)[];
-    platformOffset: number;
+    platformCursorStack: string[];
+    platformNextCursor: string | null;
     hasMoreReddit: boolean;
     hasMorePlatform: boolean;
     page: number;
@@ -51,7 +52,8 @@ export default function SearchResultsPage() {
     platform: [],
     redditAfter: null,
     redditAfterStack: [null],
-    platformOffset: 0,
+    platformCursorStack: [''],
+    platformNextCursor: null,
     hasMoreReddit: false,
     hasMorePlatform: false,
     page: 1,
@@ -59,7 +61,8 @@ export default function SearchResultsPage() {
   const [communities, setCommunities] = useState<{
     subreddits: SubredditSuggestion[];
     hubs: Hub[];
-    hubsOffset: number;
+    hubsCursorStack: string[];
+    hubsNextCursor: string | null;
     hasMoreHubs: boolean;
     subredditsAfter: string | null;
     hasMoreSubreddits: boolean;
@@ -68,7 +71,8 @@ export default function SearchResultsPage() {
   }>({
     subreddits: [],
     hubs: [],
-    hubsOffset: 0,
+    hubsCursorStack: [''],
+    hubsNextCursor: null,
     hasMoreHubs: false,
     subredditsAfter: null,
     hasMoreSubreddits: false,
@@ -79,14 +83,14 @@ export default function SearchResultsPage() {
     reddit: RedditUserSearchResult[];
     omni: UserProfile[];
     redditAfter: string | null;
-    omniOffset: number;
+    omniCursor: string | null;
     hasMoreReddit: boolean;
     hasMoreOmni: boolean;
   }>({
     reddit: [],
     omni: [],
     redditAfter: null,
-    omniOffset: 0,
+    omniCursor: null,
     hasMoreReddit: false,
     hasMoreOmni: false,
   });
@@ -101,46 +105,54 @@ export default function SearchResultsPage() {
       const tabTarget = opts?.tab ?? activeTab;
       const targetPage =
         opts?.page ??
-        (tabTarget === 'communities' ? 1 : posts.page);
+        (tabTarget === 'communities' ? communities.page : posts.page);
+      const isUsersAppend = Boolean(opts?.append && tabTarget === 'users');
 
+      const postsPage = tabTarget === 'posts' ? targetPage : posts.page;
+      const communitiesPage = tabTarget === 'communities' ? targetPage : communities.page;
       const redditAfter =
-        targetPage > 1 ? posts.redditAfterStack[targetPage - 2] ?? null : null;
-      const platformOffset = (tabTarget === 'posts' ? targetPage : posts.page) > 1 ? (targetPage - 1) * 25 : 0;
-      const hubsOffset =
-        tabTarget === 'communities'
-          ? (targetPage - 1) * 25
-          : communities.hubsOffset && targetPage > 1
-          ? (targetPage - 1) * 25
-          : 0;
+        postsPage > 1 ? posts.redditAfterStack[postsPage - 2] ?? null : null;
+      const platformCursor =
+        postsPage > 1 ? posts.platformCursorStack[postsPage - 1] ?? '' : '';
+      const hubsCursor =
+        communitiesPage > 1 ? communities.hubsCursorStack[communitiesPage - 1] ?? '' : '';
       const subredditsAfter =
-        tabTarget === 'communities' && targetPage > 1
-          ? communities.subredditsAfterStack[targetPage - 2] ?? null
+        communitiesPage > 1
+          ? communities.subredditsAfterStack[communitiesPage - 2] ?? null
           : null;
-      const omniOffset = users.omniOffset && targetPage > 1 ? (targetPage - 1) * 25 : 0;
+      const omniCursor = isUsersAppend ? users.omniCursor : null;
 
       const res = await siteWideSearch(q, includeNsfw, {
         sort: opts?.sort ?? sort,
         redditAfter,
-        platformOffset,
-        hubsOffset,
+        platformCursor,
+        hubsCursor,
         subredditsAfter,
-        omniUsersOffset: omniOffset,
+        omniUsersCursor: omniCursor,
       });
 
-      const nextAfterStack = [...posts.redditAfterStack];
-      nextAfterStack[targetPage - 1] = res.posts.redditAfter ?? null;
+      const nextAfterStack = postsPage === 1 ? [null] : [...posts.redditAfterStack];
+      nextAfterStack[postsPage - 1] = res.posts.redditAfter ?? null;
+      const nextPlatformCursorStack =
+        postsPage === 1 ? [''] : [...posts.platformCursorStack];
+      nextPlatformCursorStack[postsPage] = res.posts.platformNextCursor ?? '';
       setPosts({
         reddit: res.posts.reddit ?? [],
         platform: res.posts.platform ?? [],
         redditAfter: res.posts.redditAfter ?? null,
         redditAfterStack: nextAfterStack,
-        platformOffset: res.posts.platformOffset ?? platformOffset,
+        platformCursorStack: nextPlatformCursorStack,
+        platformNextCursor: res.posts.platformNextCursor ?? null,
         hasMoreReddit: Boolean(res.posts.redditAfter),
-        hasMorePlatform: (res.posts.platform?.length ?? 0) >= 25,
-        page: targetPage,
+        hasMorePlatform: Boolean(res.posts.platformNextCursor),
+        page: postsPage,
       });
-      const nextSubredditAfterStack = [...communities.subredditsAfterStack];
-      nextSubredditAfterStack[targetPage - 1] = res.subredditsAfter ?? null;
+      const nextSubredditAfterStack =
+        communitiesPage === 1 ? [null] : [...communities.subredditsAfterStack];
+      nextSubredditAfterStack[communitiesPage - 1] = res.subredditsAfter ?? null;
+      const nextHubsCursorStack =
+        communitiesPage === 1 ? [''] : [...communities.hubsCursorStack];
+      nextHubsCursorStack[communitiesPage] = res.hubsNextCursor ?? '';
       setCommunities({
         subreddits: opts?.append || tabTarget === 'communities'
           ? [...(opts?.append ? communities.subreddits : []), ...(res.subreddits ?? [])]
@@ -148,20 +160,24 @@ export default function SearchResultsPage() {
         hubs: opts?.append || tabTarget === 'communities'
           ? [...(opts?.append ? communities.hubs : []), ...(res.hubs ?? [])]
           : res.hubs ?? [],
-        hubsOffset: res.hubsOffset ?? 0,
-        hasMoreHubs: (res.hubs?.length ?? 0) >= 25,
+        hubsCursorStack: nextHubsCursorStack,
+        hubsNextCursor: res.hubsNextCursor ?? null,
+        hasMoreHubs: Boolean(res.hubsNextCursor),
         subredditsAfter: res.subredditsAfter ?? null,
         hasMoreSubreddits: Boolean(res.subredditsAfter),
         subredditsAfterStack: nextSubredditAfterStack,
-        page: tabTarget === 'communities' ? targetPage : communities.page,
+        page: communitiesPage,
       });
+      const nextOmniUsers = isUsersAppend
+        ? [...(users.omni ?? []), ...(res.users.omni ?? [])]
+        : res.users.omni ?? [];
       setUsers({
         reddit: res.users.reddit ?? [],
-        omni: res.users.omni ?? [],
+        omni: nextOmniUsers,
         redditAfter: res.users.redditAfter ?? null,
-        omniOffset: res.users.omniOffset ?? 0,
+        omniCursor: res.users.omniNextCursor ?? null,
         hasMoreReddit: Boolean(res.users.redditAfter),
-        hasMoreOmni: (res.users.omni?.length ?? 0) >= 25,
+        hasMoreOmni: Boolean(res.users.omniNextCursor),
       });
       const nextParams = new URLSearchParams(location.search);
       nextParams.set('q', q);

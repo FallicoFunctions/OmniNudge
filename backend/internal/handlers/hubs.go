@@ -181,6 +181,7 @@ func (h *HubsHandler) GetPosts(c *gin.Context) {
 	sortBy := c.DefaultQuery("sort", "new")
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "25"))
 	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
+	cursorParam := c.Query("cursor")
 	if limit < 1 || limit > 100 {
 		limit = 25
 	}
@@ -198,14 +199,43 @@ func (h *HubsHandler) GetPosts(c *gin.Context) {
 		return
 	}
 
-	posts, err := h.postRepo.GetByHubWithUser(c.Request.Context(), hub.ID, sortBy, limit, offset, userID, startTime, endTime)
+	var cursor *models.PlatformPostCursor
+	if cursorParam != "" {
+		decoded, err := decodePlatformPostCursor(cursorParam)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid cursor"})
+			return
+		}
+		cursor = decoded
+	}
+
+	limitPlusOne := limit + 1
+	useCursorPagination := cursorParam != "" || offset == 0
+	var posts []*models.PlatformPost
+	if useCursorPagination {
+		posts, err = h.postRepo.GetByHubWithCursor(c.Request.Context(), hub.ID, sortBy, limitPlusOne, cursor, userID, startTime, endTime)
+	} else {
+		posts, err = h.postRepo.GetByHubWithUser(c.Request.Context(), hub.ID, sortBy, limit, offset, userID, startTime, endTime)
+	}
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch posts", "details": err.Error()})
 		return
 	}
 
-	// Determine if there are more posts by fetching one extra
-	hasMore := len(posts) == limit
+	hasMore := false
+	var nextCursor string
+	if useCursorPagination {
+		if len(posts) > limit {
+			hasMore = true
+			posts = posts[:limit]
+		}
+		if len(posts) > 0 && hasMore {
+			last := posts[len(posts)-1]
+			nextCursor = encodePlatformPostCursor(buildPlatformPostCursor(last, sortBy))
+		}
+	} else {
+		hasMore = len(posts) == limit
+	}
 
 	response := gin.H{
 		"hub":      name,
@@ -214,6 +244,9 @@ func (h *HubsHandler) GetPosts(c *gin.Context) {
 		"offset":   offset,
 		"sort":     sortBy,
 		"has_more": hasMore,
+	}
+	if nextCursor != "" {
+		response["next_cursor"] = nextCursor
 	}
 	if timeRangeKey != "" {
 		response["time_range"] = timeRangeKey
@@ -517,6 +550,7 @@ func (h *HubsHandler) GetPopularFeed(c *gin.Context) {
 	sortBy := c.DefaultQuery("sort", "hot")
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "25"))
 	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
+	cursorParam := c.Query("cursor")
 	if limit < 1 || limit > 100 {
 		limit = 25
 	}
@@ -542,18 +576,55 @@ func (h *HubsHandler) GetPopularFeed(c *gin.Context) {
 		return
 	}
 
-	posts, err := h.postRepo.GetPopularFeed(
-		c.Request.Context(),
-		subscribedHubIDs,
-		sortBy,
-		limit,
-		offset,
-		startTime,
-		endTime,
-	)
+	var cursor *models.PlatformPostCursor
+	if cursorParam != "" {
+		decoded, err := decodePlatformPostCursor(cursorParam)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid cursor"})
+			return
+		}
+		cursor = decoded
+	}
+
+	useCursorPagination := cursorParam != "" || offset == 0
+	var posts []*models.PlatformPost
+	if useCursorPagination {
+		limitPlusOne := limit + 1
+		posts, err = h.postRepo.GetPopularFeedWithCursor(
+			c.Request.Context(),
+			subscribedHubIDs,
+			sortBy,
+			limitPlusOne,
+			cursor,
+			startTime,
+			endTime,
+		)
+	} else {
+		posts, err = h.postRepo.GetPopularFeed(
+			c.Request.Context(),
+			subscribedHubIDs,
+			sortBy,
+			limit,
+			offset,
+			startTime,
+			endTime,
+		)
+	}
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch feed", "details": err.Error()})
 		return
+	}
+
+	nextCursor := ""
+	if useCursorPagination {
+		hasMore := len(posts) > limit
+		if hasMore {
+			posts = posts[:limit]
+		}
+		if hasMore && len(posts) > 0 {
+			last := posts[len(posts)-1]
+			nextCursor = encodePlatformPostCursor(buildPlatformPostCursor(last, sortBy))
+		}
 	}
 
 	response := gin.H{
@@ -561,6 +632,9 @@ func (h *HubsHandler) GetPopularFeed(c *gin.Context) {
 		"limit":  limit,
 		"offset": offset,
 		"sort":   sortBy,
+	}
+	if nextCursor != "" {
+		response["next_cursor"] = nextCursor
 	}
 	if timeRangeKey != "" {
 		response["time_range"] = timeRangeKey
@@ -575,6 +649,7 @@ func (h *HubsHandler) GetAllFeed(c *gin.Context) {
 	sortBy := c.DefaultQuery("sort", "hot")
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "25"))
 	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
+	cursorParam := c.Query("cursor")
 	if limit < 1 || limit > 100 {
 		limit = 25
 	}
@@ -585,10 +660,39 @@ func (h *HubsHandler) GetAllFeed(c *gin.Context) {
 		return
 	}
 
-	posts, err := h.postRepo.GetAllFeed(c.Request.Context(), sortBy, limit, offset, startTime, endTime)
+	var cursor *models.PlatformPostCursor
+	if cursorParam != "" {
+		decoded, err := decodePlatformPostCursor(cursorParam)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid cursor"})
+			return
+		}
+		cursor = decoded
+	}
+
+	useCursorPagination := cursorParam != "" || offset == 0
+	var posts []*models.PlatformPost
+	if useCursorPagination {
+		limitPlusOne := limit + 1
+		posts, err = h.postRepo.GetAllFeedWithCursor(c.Request.Context(), sortBy, limitPlusOne, cursor, startTime, endTime)
+	} else {
+		posts, err = h.postRepo.GetAllFeed(c.Request.Context(), sortBy, limit, offset, startTime, endTime)
+	}
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch feed", "details": err.Error()})
 		return
+	}
+
+	nextCursor := ""
+	if useCursorPagination {
+		hasMore := len(posts) > limit
+		if hasMore {
+			posts = posts[:limit]
+		}
+		if hasMore && len(posts) > 0 {
+			last := posts[len(posts)-1]
+			nextCursor = encodePlatformPostCursor(buildPlatformPostCursor(last, sortBy))
+		}
 	}
 
 	response := gin.H{
@@ -596,6 +700,9 @@ func (h *HubsHandler) GetAllFeed(c *gin.Context) {
 		"limit":  limit,
 		"offset": offset,
 		"sort":   sortBy,
+	}
+	if nextCursor != "" {
+		response["next_cursor"] = nextCursor
 	}
 	if timeRangeKey != "" {
 		response["time_range"] = timeRangeKey

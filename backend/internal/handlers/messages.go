@@ -358,19 +358,52 @@ func (h *MessagesHandler) GetMessages(c *gin.Context) {
 	// Parse query parameters
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "50"))
 	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
+	cursorParam := c.Query("cursor")
 
 	// Validate limit
 	if limit < 1 || limit > 100 {
 		limit = 50
 	}
 
+	var cursor *timeCursor
+	if cursorParam != "" {
+		decoded, err := decodeTimeCursor(cursorParam)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid cursor"})
+			return
+		}
+		cursor = decoded
+	}
+	useCursorPagination := cursorParam != "" || offset == 0
+	limitArg := limit
+	if useCursorPagination {
+		limitArg = limit + 1
+		offset = 0
+	}
+
 	var messages []*models.Message
 
 	// For mod mail, return all messages for the conversation (all participants can view)
 	if conversationType == "mod_mail" {
-		messages, err = h.messageRepo.GetByConversationIDForAll(c.Request.Context(), conversationID, limit, offset)
+		if useCursorPagination {
+			var payload *models.TimeCursor
+			if cursor != nil {
+				payload = &models.TimeCursor{ID: cursor.ID, Timestamp: cursor.Timestamp}
+			}
+			messages, err = h.messageRepo.GetByConversationIDForAllWithCursor(c.Request.Context(), conversationID, limitArg, payload)
+		} else {
+			messages, err = h.messageRepo.GetByConversationIDForAll(c.Request.Context(), conversationID, limitArg, offset)
+		}
 	} else {
-		messages, err = h.messageRepo.GetByConversationID(c.Request.Context(), conversationID, userID.(int), limit, offset)
+		if useCursorPagination {
+			var payload *models.TimeCursor
+			if cursor != nil {
+				payload = &models.TimeCursor{ID: cursor.ID, Timestamp: cursor.Timestamp}
+			}
+			messages, err = h.messageRepo.GetByConversationIDWithCursor(c.Request.Context(), conversationID, userID.(int), limitArg, payload)
+		} else {
+			messages, err = h.messageRepo.GetByConversationID(c.Request.Context(), conversationID, userID.(int), limitArg, offset)
+		}
 	}
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get messages", "details": err.Error()})
@@ -394,11 +427,24 @@ func (h *MessagesHandler) GetMessages(c *gin.Context) {
 		}
 	}
 
-	c.JSON(http.StatusOK, gin.H{
+	nextCursor := ""
+	if useCursorPagination && len(messages) > limit {
+		messages = messages[:limit]
+		if len(messages) > 0 {
+			last := messages[len(messages)-1]
+			nextCursor = encodeTimeCursor(timeCursor{ID: last.ID, Timestamp: last.SentAt})
+		}
+	}
+
+	response := gin.H{
 		"messages": messages,
 		"limit":    limit,
 		"offset":   offset,
-	})
+	}
+	if nextCursor != "" {
+		response["next_cursor"] = nextCursor
+	}
+	c.JSON(http.StatusOK, response)
 }
 
 // MarkAsRead handles POST /api/v1/conversations/:id/read

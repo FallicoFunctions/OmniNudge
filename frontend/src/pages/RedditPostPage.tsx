@@ -1899,7 +1899,7 @@ export default function RedditPostPage() {
                   ? `local-${item.local.id}-${index}`
                   : item.reddit.data?.id || `reddit-${index}`
               }
-              renderItem={(item, index) => {
+              renderItem={(item) => {
                 if (item.type === 'local') {
                   return (
                     <div className="pb-4">

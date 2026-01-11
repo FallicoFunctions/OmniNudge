@@ -15,17 +15,17 @@ export interface SiteWideSearchResults {
     platform: PlatformPost[];
     reddit: RedditPostsResponse['posts'];
     redditAfter?: string | null;
-    platformOffset?: number;
+    platformNextCursor?: string | null;
   };
   subreddits: SubredditSuggestion[];
   subredditsAfter?: string | null;
   hubs: Hub[];
-  hubsOffset?: number;
+  hubsNextCursor?: string | null;
   users: {
     reddit: RedditUserSearchResult[];
     omni: UserProfile[];
     redditAfter?: string | null;
-    omniOffset?: number;
+    omniNextCursor?: string | null;
   };
 }
 
@@ -35,10 +35,10 @@ export async function siteWideSearch(
   opts?: {
     sort?: 'relevance' | 'new' | 'old';
     redditAfter?: string | null;
-    platformOffset?: number;
-    hubsOffset?: number;
+    platformCursor?: string | null;
+    hubsCursor?: string | null;
     subredditsAfter?: string | null;
-    omniUsersOffset?: number;
+    omniUsersCursor?: string | null;
   }
 ): Promise<SiteWideSearchResults> {
   const qsInclude = includeNsfw ? 'true' : 'false';
@@ -48,10 +48,20 @@ export async function siteWideSearch(
 
   let subredditsSearch: SubredditSearchResponse | null = null;
 
+  const platformCursor = opts?.platformCursor ? `&cursor=${encodeURIComponent(opts.platformCursor)}` : '';
+  const hubsCursor = opts?.hubsCursor ? `&cursor=${encodeURIComponent(opts.hubsCursor)}` : '';
+  const omniUsersCursor = opts?.omniUsersCursor ? `&cursor=${encodeURIComponent(opts.omniUsersCursor)}` : '';
+
   const [platformPosts, hubs, omniUsers, redditPosts, redditUsers] = await Promise.all([
-    api.get<{ posts: PlatformPost[] }>(`/search/posts?q=${encodeURIComponent(query)}&include_nsfw=${qsInclude}&limit=25&offset=${encodeURIComponent(String(opts?.platformOffset ?? 0))}&sort=${encodeURIComponent(sortParam)}`),
-    api.get<{ hubs: Hub[] }>(`/search/hubs?q=${encodeURIComponent(query)}&limit=25&offset=${encodeURIComponent(String(opts?.hubsOffset ?? 0))}&sort=${encodeURIComponent(sortParam)}`),
-    api.get<{ users: UserProfile[] }>(`/search/users?q=${encodeURIComponent(query)}&include_nsfw=${qsInclude}&limit=25&offset=${encodeURIComponent(String(opts?.omniUsersOffset ?? 0))}&sort=${encodeURIComponent(sortParam)}`),
+    api.get<{ posts: PlatformPost[]; next_cursor?: string | null }>(
+      `/search/posts?q=${encodeURIComponent(query)}&include_nsfw=${qsInclude}&limit=25&offset=0&sort=${encodeURIComponent(sortParam)}${platformCursor}`
+    ),
+    api.get<{ hubs: Hub[]; next_cursor?: string | null }>(
+      `/search/hubs?q=${encodeURIComponent(query)}&limit=25&offset=0&sort=${encodeURIComponent(sortParam)}${hubsCursor}`
+    ),
+    api.get<{ users: UserProfile[]; next_cursor?: string | null }>(
+      `/search/users?q=${encodeURIComponent(query)}&include_nsfw=${qsInclude}&limit=25&offset=0&sort=${encodeURIComponent(sortParam)}${omniUsersCursor}`
+    ),
     api.get<RedditPostsResponse>(`/reddit/search?q=${encodeURIComponent(query)}&limit=25&include_nsfw=${qsInclude}&sort=${encodeURIComponent(sortParam)}${opts?.redditAfter ? `&after=${encodeURIComponent(opts.redditAfter)}` : ''}`),
     api.get<{ users: RedditUserSearchResult[]; after?: string | null }>(
       `/reddit/users/search?q=${encodeURIComponent(query)}&limit=25&include_nsfw=${qsInclude}`
@@ -121,17 +131,17 @@ export async function siteWideSearch(
       platform: platformPosts.posts ?? [],
       reddit: redditPosts.posts ?? [],
       redditAfter: redditPosts.after ?? null,
-      platformOffset: (opts?.platformOffset ?? 0) + (platformPosts.posts?.length ?? 0),
+      platformNextCursor: platformPosts.next_cursor ?? null,
     },
     subreddits: subredditsPage,
     subredditsAfter: nextAfter,
     hubs: hubs.hubs ?? [],
-    hubsOffset: (opts?.hubsOffset ?? 0) + (hubs.hubs?.length ?? 0),
+    hubsNextCursor: hubs.next_cursor ?? null,
     users: {
       reddit: filteredRedditUsers,
       omni: omniUsers.users ?? [],
       redditAfter: redditUsers.after ?? null,
-      omniOffset: (opts?.omniUsersOffset ?? 0) + (omniUsers.users?.length ?? 0),
+      omniNextCursor: omniUsers.next_cursor ?? null,
     },
   };
 }

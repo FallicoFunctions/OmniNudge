@@ -37,6 +37,7 @@ export interface BugReportsResponse {
   reports: BugReport[];
   limit: number;
   offset: number;
+  next_cursor?: string;
 }
 
 export interface KnownBugsResponse {
@@ -58,12 +59,13 @@ export const bugReportService = {
   },
 
   // Admin only: Get all bug reports
-  async getBugReports(status?: string, limit = 50, offset = 0): Promise<BugReportsResponse> {
+  async getBugReports(status?: string, limit = 50, offset = 0, cursor?: string): Promise<BugReportsResponse> {
     const params = new URLSearchParams({
       limit: String(limit),
       offset: String(offset),
     });
     if (status) params.append('status', status);
+    if (cursor) params.append('cursor', cursor);
     return api.get<BugReportsResponse>(`/admin/bug-reports?${params.toString()}`);
   },
 

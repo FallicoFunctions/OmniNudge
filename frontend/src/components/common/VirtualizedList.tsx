@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { useWindowVirtualizer } from '@tanstack/react-virtual';
+import { SkeletonList } from './SkeletonCard';
 
 type VirtualizedListProps<T> = {
   items: T[];
@@ -8,6 +9,8 @@ type VirtualizedListProps<T> = {
   className?: string;
   getKey?: (item: T, index: number) => string | number;
   renderItem: (item: T, index: number) => ReactNode;
+  isLoading?: boolean;
+  emptyState?: ReactNode;
 };
 
 export function VirtualizedList<T>({
@@ -17,6 +20,8 @@ export function VirtualizedList<T>({
   className = '',
   getKey,
   renderItem,
+  isLoading = false,
+  emptyState,
 }: VirtualizedListProps<T>) {
   const virtualizer = useWindowVirtualizer({
     count: items.length,
@@ -24,8 +29,12 @@ export function VirtualizedList<T>({
     overscan,
   });
 
+  if (isLoading) {
+    return <SkeletonList count={Math.ceil((window.innerHeight / estimateSize) * 1.5)} />;
+  }
+
   if (items.length === 0) {
-    return null;
+    return emptyState ? <>{emptyState}</> : null;
   }
 
   return (

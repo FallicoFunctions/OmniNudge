@@ -28,9 +28,27 @@ async function ensureConversationId(data: SendMessageRequest): Promise<number> {
 
 export const messagesService = {
   async getConversations(includeArchived = false): Promise<Conversation[]> {
-    const query = includeArchived ? '?include_archived=true' : '';
-    const response = await api.get<{ conversations: Conversation[] }>(`/conversations${query}`);
+    const response = await this.getConversationsPage(includeArchived);
     return response.conversations;
+  },
+
+  async getConversationsPage(
+    includeArchived = false,
+    limit = 20,
+    cursor?: string
+  ): Promise<{ conversations: Conversation[]; next_cursor?: string }> {
+    const params = new URLSearchParams();
+    if (includeArchived) {
+      params.set('include_archived', 'true');
+    }
+    params.set('limit', String(limit));
+    params.set('offset', '0');
+    if (cursor) {
+      params.set('cursor', cursor);
+    }
+    return api.get<{ conversations: Conversation[]; next_cursor?: string }>(
+      `/conversations?${params.toString()}`
+    );
   },
 
   async getConversation(id: number): Promise<Conversation> {
@@ -38,10 +56,25 @@ export const messagesService = {
   },
 
   async getMessages(conversationId: number): Promise<Message[]> {
-    const response = await api.get<{ messages: Message[] }>(
-      `/conversations/${conversationId}/messages`
-    );
+    const response = await this.getMessagesPage(conversationId);
     return response.messages;
+  },
+
+  async getMessagesPage(
+    conversationId: number,
+    limit = 50,
+    cursor?: string
+  ): Promise<{ messages: Message[]; next_cursor?: string }> {
+    const params = new URLSearchParams({
+      limit: String(limit),
+      offset: '0',
+    });
+    if (cursor) {
+      params.set('cursor', cursor);
+    }
+    return api.get<{ messages: Message[]; next_cursor?: string }>(
+      `/conversations/${conversationId}/messages?${params.toString()}`
+    );
   },
 
   async sendMessage(data: SendMessageRequest): Promise<Message> {

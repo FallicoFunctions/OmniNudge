@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -6,7 +6,7 @@ import { adminService } from '../services/adminService';
 import type { Hub } from '../services/hubsService';
 import type { AdminUser, BanHistoryItem } from '../types/admin';
 import { EmptyMessage, LoadingMessage } from '../components/common/StatusMessage';
-import { PaginationControls } from '../components/common/PaginationControls';
+import { OffsetPaginationControls } from '../components/common/OffsetPaginationControls';
 
 type TabType = 'stats' | 'users' | 'moderators' | 'ban-activity';
 
@@ -151,9 +151,8 @@ function UsersTab() {
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<string>('');
-  const [offset, setOffset] = useState(0);
+  const [cursorStack, setCursorStack] = useState(['']);
   const [pageSize, setPageSize] = useState(50);
-  const [jumpToPage, setJumpToPage] = useState('');
   const [viewMode, setViewMode] = useState<'card' | 'table'>('card');
   const [selectedUsers, setSelectedUsers] = useState<Set<number>>(new Set());
   const [expandedUser, setExpandedUser] = useState<number | null>(null);
@@ -171,9 +170,10 @@ function UsersTab() {
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [actionMenuOpen, setActionMenuOpen] = useState<number | null>(null);
 
+  const currentCursor = cursorStack[cursorStack.length - 1] ?? '';
   const { data, isLoading } = useQuery({
-    queryKey: ['adminUsers', search, roleFilter, statusFilter, pageSize, offset],
-    queryFn: () => adminService.listUsers(search, roleFilter, statusFilter, pageSize, offset),
+    queryKey: ['adminUsers', search, roleFilter, statusFilter, pageSize, currentCursor],
+    queryFn: () => adminService.listUsers(search, roleFilter, statusFilter, pageSize, 0, currentCursor),
   });
 
   const updateRoleMutation = useMutation({
@@ -273,20 +273,13 @@ function UsersTab() {
     }
   };
 
-  const totalPages = data ? Math.ceil(data.total / pageSize) : 0;
-  const currentPage = Math.floor(offset / pageSize) + 1;
-
-  const handleJumpToPage = () => {
-    const page = parseInt(jumpToPage, 10);
-    if (page >= 1 && page <= totalPages) {
-      setOffset((page - 1) * pageSize);
-      setJumpToPage('');
-    }
-  };
+  useEffect(() => {
+    setCursorStack(['']);
+  }, [search, roleFilter, statusFilter, pageSize]);
 
   const handlePageSizeChange = (newSize: number) => {
     setPageSize(newSize);
-    setOffset(0);
+    setCursorStack(['']);
   };
 
   const getUserStatusBadge = (user: AdminUser) => {
@@ -409,7 +402,7 @@ function UsersTab() {
           value={search}
           onChange={(e) => {
             setSearch(e.target.value);
-            setOffset(0);
+            setCursorStack(['']);
           }}
           className="flex-1 min-w-[250px] px-4 py-2 border border-[var(--color-border)] rounded-lg bg-[var(--color-surface)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
         />
@@ -417,7 +410,7 @@ function UsersTab() {
           value={roleFilter}
           onChange={(e) => {
             setRoleFilter(e.target.value);
-            setOffset(0);
+            setCursorStack(['']);
           }}
           className="px-4 py-2 border border-[var(--color-border)] rounded-lg bg-[var(--color-surface)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
         >
@@ -429,7 +422,7 @@ function UsersTab() {
           value={statusFilter}
           onChange={(e) => {
             setStatusFilter(e.target.value);
-            setOffset(0);
+            setCursorStack(['']);
           }}
           className="px-4 py-2 border border-[var(--color-border)] rounded-lg bg-[var(--color-surface)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
         >
@@ -517,7 +510,7 @@ function UsersTab() {
       {data && (
         <div className="mb-4 flex justify-between items-center text-sm text-[var(--color-text-secondary)]">
           <div>
-            Showing {offset + 1} - {Math.min(offset + pageSize, data.total)} of {data.total} users
+            Showing {data.users.length} users{typeof data.total === 'number' ? ` (Total ${data.total})` : ''}
           </div>
           <div className="flex items-center gap-2">
             <label htmlFor="pageSize">Per page:</label>
@@ -720,41 +713,21 @@ function UsersTab() {
           )}
 
           {/* Enhanced Pagination */}
-          <PaginationControls
+          <OffsetPaginationControls
             showDivider={false}
             className="mt-6 gap-4"
-            pageIndex={currentPage - 1}
-            totalPages={totalPages}
-            onPrev={() => setOffset(Math.max(0, offset - pageSize))}
-            onNext={() => setOffset(offset + pageSize)}
-            canGoPrev={offset > 0}
-            canGoNext={offset + pageSize < data.total}
+            hasPrev={cursorStack.length > 1}
+            hasMore={Boolean(data.next_cursor)}
+            onPrev={() => setCursorStack((prev) => (prev.length > 1 ? prev.slice(0, -1) : prev))}
+            onNext={() => {
+              if (data.next_cursor) {
+                setCursorStack((prev) => [...prev, data.next_cursor as string]);
+              }
+            }}
             centerContent={
-              <div className="flex items-center gap-3 text-sm">
-                <span className="text-[var(--color-text-secondary)]">
-                  Page {currentPage} of {totalPages}
-                </span>
-                <div className="flex items-center gap-2">
-                  <label htmlFor="jumpTo" className="text-[var(--color-text-secondary)]">Jump to:</label>
-                  <input
-                    id="jumpTo"
-                    type="number"
-                    min="1"
-                    max={totalPages}
-                    value={jumpToPage}
-                    onChange={(e) => setJumpToPage(e.target.value)}
-                    placeholder={currentPage.toString()}
-                    className="w-20 px-2 py-1 border border-[var(--color-border)] rounded bg-[var(--color-surface)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
-                  />
-                  <button
-                    onClick={handleJumpToPage}
-                    disabled={!jumpToPage}
-                    className="px-3 py-1 bg-[var(--color-primary)] text-white rounded hover:bg-[var(--color-primary-strong)] disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    Go
-                  </button>
-                </div>
-              </div>
+              <span className="text-sm text-[var(--color-text-secondary)]">
+                Page {cursorStack.length}
+              </span>
             }
           />
         </>
@@ -1080,29 +1053,18 @@ function ModeratorsTab() {
 // ===== BAN ACTIVITY TAB =====
 
 function BanActivityTab() {
-  const [offset, setOffset] = useState(0);
+  const [cursorStack, setCursorStack] = useState(['']);
   const [pageSize, setPageSize] = useState(50);
-  const [jumpToPage, setJumpToPage] = useState('');
+  const currentCursor = cursorStack[cursorStack.length - 1] ?? '';
 
   const { data, isLoading } = useQuery({
-    queryKey: ['banActivity', pageSize, offset],
-    queryFn: () => adminService.getAllBanHistory(pageSize, offset),
+    queryKey: ['banActivity', pageSize, currentCursor],
+    queryFn: () => adminService.getAllBanHistory(pageSize, 0, currentCursor),
   });
-
-  const totalPages = data ? Math.ceil(data.total / pageSize) : 0;
-  const currentPage = Math.floor(offset / pageSize) + 1;
-
-  const handleJumpToPage = () => {
-    const page = parseInt(jumpToPage, 10);
-    if (page >= 1 && page <= totalPages) {
-      setOffset((page - 1) * pageSize);
-      setJumpToPage('');
-    }
-  };
 
   const handlePageSizeChange = (newSize: number) => {
     setPageSize(newSize);
-    setOffset(0);
+    setCursorStack(['']);
   };
 
   return (
@@ -1118,7 +1080,7 @@ function BanActivityTab() {
       {data && (
         <div className="mb-4 flex justify-between items-center text-sm text-[var(--color-text-secondary)]">
           <div>
-            Showing {offset + 1} - {Math.min(offset + pageSize, data.total)} of {data.total} actions
+            Showing {data.history.length} actions{typeof data.total === 'number' ? ` (Total ${data.total})` : ''}
           </div>
           <div className="flex items-center gap-2">
             <label htmlFor="banPageSize">Per page:</label>
@@ -1186,41 +1148,21 @@ function BanActivityTab() {
           </div>
 
           {/* Enhanced Pagination */}
-          <PaginationControls
+          <OffsetPaginationControls
             showDivider={false}
             className="mt-6 gap-4"
-            pageIndex={currentPage - 1}
-            totalPages={totalPages}
-            onPrev={() => setOffset(Math.max(0, offset - pageSize))}
-            onNext={() => setOffset(offset + pageSize)}
-            canGoPrev={offset > 0}
-            canGoNext={offset + pageSize < data.total}
+            hasPrev={cursorStack.length > 1}
+            hasMore={Boolean(data.next_cursor)}
+            onPrev={() => setCursorStack((prev) => (prev.length > 1 ? prev.slice(0, -1) : prev))}
+            onNext={() => {
+              if (data.next_cursor) {
+                setCursorStack((prev) => [...prev, data.next_cursor as string]);
+              }
+            }}
             centerContent={
-              <div className="flex items-center gap-3 text-sm">
-                <span className="text-[var(--color-text-secondary)]">
-                  Page {currentPage} of {totalPages}
-                </span>
-                <div className="flex items-center gap-2">
-                  <label htmlFor="banJumpTo" className="text-[var(--color-text-secondary)]">Jump to:</label>
-                  <input
-                    id="banJumpTo"
-                    type="number"
-                    min="1"
-                    max={totalPages}
-                    value={jumpToPage}
-                    onChange={(e) => setJumpToPage(e.target.value)}
-                    placeholder={currentPage.toString()}
-                    className="w-20 px-2 py-1 border border-[var(--color-border)] rounded bg-[var(--color-surface)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
-                  />
-                  <button
-                    onClick={handleJumpToPage}
-                    disabled={!jumpToPage}
-                    className="px-3 py-1 bg-[var(--color-primary)] text-white rounded hover:bg-[var(--color-primary-strong)] disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    Go
-                  </button>
-                </div>
-              </div>
+              <span className="text-sm text-[var(--color-text-secondary)]">
+                Page {cursorStack.length}
+              </span>
             }
           />
         </>

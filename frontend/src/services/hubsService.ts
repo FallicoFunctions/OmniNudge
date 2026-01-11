@@ -46,6 +46,7 @@ export interface HubPostsResponse {
   limit: number;
   offset: number;
   has_more: boolean;
+  next_cursor?: string;
 }
 
 export interface UserHubsResponse {
@@ -101,6 +102,7 @@ export interface SubredditPostsResponse {
   sort: string;
   limit: number;
   offset: number;
+  next_cursor?: string;
 }
 
 export const hubsService = {
@@ -132,13 +134,17 @@ export const hubsService = {
     sort: string = 'hot',
     limit: number = 25,
     offset: number = 0,
-    options?: FeedTimeRangeOptions
+    options?: FeedTimeRangeOptions,
+    cursor?: string
   ): Promise<HubPostsResponse> {
     const params = new URLSearchParams({
       sort,
       limit: String(limit),
       offset: String(offset),
     });
+    if (cursor) {
+      params.set('cursor', cursor);
+    }
     appendTimeRangeParams(params, options);
     return api.get<HubPostsResponse>(`/hubs/${hubName}/posts?${params.toString()}`);
   },
@@ -147,13 +153,17 @@ export const hubsService = {
     sort: string = 'hot',
     limit: number = 25,
     offset: number = 0,
-    options?: FeedTimeRangeOptions
+    options?: FeedTimeRangeOptions,
+    cursor?: string
   ): Promise<HubPostsResponse> {
     const params = new URLSearchParams({
       sort,
       limit: String(limit),
       offset: String(offset),
     });
+    if (cursor) {
+      params.set('cursor', cursor);
+    }
     appendTimeRangeParams(params, options);
     return api.get<HubPostsResponse>(`/hubs/h/popular?${params.toString()}`);
   },
@@ -162,13 +172,17 @@ export const hubsService = {
     sort: string = 'hot',
     limit: number = 25,
     offset: number = 0,
-    options?: FeedTimeRangeOptions
+    options?: FeedTimeRangeOptions,
+    cursor?: string
   ): Promise<HubPostsResponse> {
     const params = new URLSearchParams({
       sort,
       limit: String(limit),
       offset: String(offset),
     });
+    if (cursor) {
+      params.set('cursor', cursor);
+    }
     appendTimeRangeParams(params, options);
     return api.get<HubPostsResponse>(`/hubs/h/all?${params.toString()}`);
   },
@@ -199,13 +213,17 @@ export const hubsService = {
     sort: string = 'new',
     limit: number = 25,
     offset: number = 0,
-    options?: FeedTimeRangeOptions
+    options?: FeedTimeRangeOptions,
+    cursor?: string
   ): Promise<SubredditPostsResponse> {
     const params = new URLSearchParams({
       sort,
       limit: String(limit),
       offset: String(offset),
     });
+    if (cursor) {
+      params.set('cursor', cursor);
+    }
     appendTimeRangeParams(params, options);
     return api.get<SubredditPostsResponse>(`/subreddits/${subredditName}/posts?${params.toString()}`);
   },

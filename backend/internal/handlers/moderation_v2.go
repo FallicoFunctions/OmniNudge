@@ -880,18 +880,57 @@ func (h *ModerationHandlerV2) GetModLog(c *gin.Context) {
 
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "50"))
 	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
+	cursorParam := c.Query("cursor")
 
 	if limit > 100 {
 		limit = 100
 	}
 
-	logs, err := h.modLogRepo.GetByHub(c.Request.Context(), hubID, limit, offset)
+	var cursor *timeCursor
+	if cursorParam != "" {
+		decoded, err := decodeTimeCursor(cursorParam)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid cursor"})
+			return
+		}
+		cursor = decoded
+	}
+	useCursorPagination := cursorParam != "" || offset == 0
+	limitArg := limit
+	if useCursorPagination {
+		limitArg = limit + 1
+		offset = 0
+	}
+
+	var logs []*models.ModLog
+	if useCursorPagination {
+		var payload *models.TimeCursor
+		if cursor != nil {
+			payload = &models.TimeCursor{ID: cursor.ID, Timestamp: cursor.Timestamp}
+		}
+		logs, err = h.modLogRepo.GetByHubWithCursor(c.Request.Context(), hubID, limitArg, payload)
+	} else {
+		logs, err = h.modLogRepo.GetByHub(c.Request.Context(), hubID, limitArg, offset)
+	}
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"logs": logs, "limit": limit, "offset": offset})
+	nextCursor := ""
+	if useCursorPagination && len(logs) > limit {
+		logs = logs[:limit]
+		if len(logs) > 0 {
+			last := logs[len(logs)-1]
+			nextCursor = encodeTimeCursor(timeCursor{ID: last.ID, Timestamp: last.CreatedAt})
+		}
+	}
+
+	response := gin.H{"logs": logs, "limit": limit, "offset": offset}
+	if nextCursor != "" {
+		response["next_cursor"] = nextCursor
+	}
+	c.JSON(http.StatusOK, response)
 }
 
 // ===== HELPER METHODS =====

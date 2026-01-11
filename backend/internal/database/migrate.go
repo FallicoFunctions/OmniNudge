@@ -7,6 +7,8 @@ import (
 	"io/fs"
 	"sort"
 	"strings"
+
+	"github.com/jackc/pgx/v5/pgconn"
 )
 
 //go:embed migrations/*.sql
@@ -72,6 +74,19 @@ func (db *DB) Migrate(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("failed to read migration %s: %w", filename, err)
 		}
+		contentStr := string(content)
+		requiresNoTransaction := strings.Contains(strings.ToUpper(contentStr), "CONCURRENTLY")
+
+		if requiresNoTransaction {
+			if err := executeStatements(ctx, db.Pool, contentStr); err != nil {
+				return fmt.Errorf("failed to execute migration %s: %w", filename, err)
+			}
+			if _, err := db.Pool.Exec(ctx, "INSERT INTO schema_migrations (version) VALUES ($1)", version); err != nil {
+				return fmt.Errorf("failed to record migration %s: %w", filename, err)
+			}
+			fmt.Printf("Applied migration: %s\n", version)
+			continue
+		}
 
 		// Execute migration in a transaction
 		tx, err := db.Pool.Begin(ctx)
@@ -79,7 +94,7 @@ func (db *DB) Migrate(ctx context.Context) error {
 			return fmt.Errorf("failed to begin transaction for %s: %w", filename, err)
 		}
 
-		if _, err := tx.Exec(ctx, string(content)); err != nil {
+		if _, err := tx.Exec(ctx, contentStr); err != nil {
 			tx.Rollback(ctx)
 			return fmt.Errorf("failed to execute migration %s: %w", filename, err)
 		}
@@ -118,6 +133,19 @@ func (db *DB) MigrateDown(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to read down migration %s: %w", downFile, err)
 	}
+	contentStr := string(content)
+	requiresNoTransaction := strings.Contains(strings.ToUpper(contentStr), "CONCURRENTLY")
+
+	if requiresNoTransaction {
+		if err := executeStatements(ctx, db.Pool, contentStr); err != nil {
+			return fmt.Errorf("failed to execute rollback %s: %w", downFile, err)
+		}
+		if _, err := db.Pool.Exec(ctx, "DELETE FROM schema_migrations WHERE version = $1", version); err != nil {
+			return fmt.Errorf("failed to remove migration record %s: %w", version, err)
+		}
+		fmt.Printf("Rolled back migration: %s\n", version)
+		return nil
+	}
 
 	// Execute rollback in a transaction
 	tx, err := db.Pool.Begin(ctx)
@@ -141,4 +169,22 @@ func (db *DB) MigrateDown(ctx context.Context) error {
 
 	fmt.Printf("Rolled back migration: %s\n", version)
 	return nil
+}
+
+func executeStatements(ctx context.Context, pool execer, content string) error {
+	statements := strings.Split(content, ";")
+	for _, statement := range statements {
+		trimmed := strings.TrimSpace(statement)
+		if trimmed == "" {
+			continue
+		}
+		if _, err := pool.Exec(ctx, trimmed); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+type execer interface {
+	Exec(ctx context.Context, sql string, arguments ...any) (pgconn.CommandTag, error)
 }

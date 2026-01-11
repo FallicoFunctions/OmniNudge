@@ -38,8 +38,9 @@ export default function HubsPage() {
   const { useRelativeTime, useInfiniteScrollHubs } = useSettings();
   const [hubname, setHubname] = useState(routeHubname ?? 'popular');
   const [sort, setSort] = useState<'hot' | 'new' | 'top' | 'rising'>('hot');
-  const [pageOffset, setPageOffset] = useState(0);
+  const [cursorStack, setCursorStack] = useState(['']);
   const pageSize = 50;
+  const currentCursor = cursorStack[cursorStack.length - 1] ?? '';
   const [topTimeRange, setTopTimeRange] = useState<TopTimeRange>('day');
   const [customTopStart, setCustomTopStart] = useState('');
   const [customTopEnd, setCustomTopEnd] = useState('');
@@ -163,7 +164,7 @@ export default function HubsPage() {
   }, [user, hubModerators, hubDetails]);
 
   // Fetch posts based on current hub
-  const postsQueryKey = ['hub-posts', hubname, sort, timeRangeKey, pageOffset] as const;
+  const postsQueryKey = ['hub-posts', hubname, sort, timeRangeKey, currentCursor] as const;
   const { data, isLoading, error, isFetching } = useQuery({
     queryKey: postsQueryKey,
     queryFn: async (): Promise<HubPostsResponse> => {
@@ -180,12 +181,12 @@ export default function HubsPage() {
           ? { timeRange: topTimeRange }
           : undefined;
       if (hubname === 'popular') {
-        return hubsService.getPopularFeed(sort, pageSize, pageOffset, feedOptions);
+        return hubsService.getPopularFeed(sort, pageSize, 0, feedOptions, currentCursor);
       }
       if (hubname === 'all') {
-        return hubsService.getAllFeed(sort, pageSize, pageOffset, feedOptions);
+        return hubsService.getAllFeed(sort, pageSize, 0, feedOptions, currentCursor);
       }
-      return hubsService.getHubPosts(hubname, sort, pageSize, pageOffset, feedOptions);
+      return hubsService.getHubPosts(hubname, sort, pageSize, 0, feedOptions, currentCursor);
     },
     enabled: !!hubname && hubname !== '' && (!isCustomTopRange || isCustomRangeValid),
     staleTime: 1000 * 60 * 5,
@@ -197,12 +198,12 @@ export default function HubsPage() {
     [postsList, hiddenPostIds]
   );
 
-  const hasMore = data?.has_more ?? false;
-  const hasPrev = pageOffset > 0;
+  const hasMore = Boolean(data?.next_cursor ?? data?.has_more);
+  const hasPrev = cursorStack.length > 1;
 
   // Reset offset when sort/hub changes
   useEffect(() => {
-    setPageOffset(0);
+    setCursorStack(['']);
   }, [sort, hubname, timeRangeKey]);
 
   // Check subscription status for specific hub
@@ -562,12 +563,14 @@ export default function HubsPage() {
               hasMore={hasMore}
               isFetching={isFetching}
               onPrev={() => {
-                const newOffset = Math.max(0, pageOffset - pageSize);
-                setPageOffset(newOffset);
+                setCursorStack((prev) => (prev.length > 1 ? prev.slice(0, -1) : prev));
                 window.scrollTo({ top: 0, behavior: 'smooth' });
               }}
               onNext={() => {
-                setPageOffset(pageOffset + pageSize);
+                const nextCursor = data?.next_cursor;
+                if (nextCursor) {
+                  setCursorStack((prev) => [...prev, nextCursor]);
+                }
                 window.scrollTo({ top: 0, behavior: 'smooth' });
               }}
             />
