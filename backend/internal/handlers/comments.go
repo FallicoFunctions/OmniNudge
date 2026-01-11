@@ -344,8 +344,8 @@ func (h *CommentsHandler) DeleteComment(c *gin.Context) {
 		}
 	}
 
-	// Verify user owns this comment or is mod/admin (global or hub)
-	if existingComment.UserID != userID.(int) && roleStr != "moderator" && roleStr != "admin" && !isHubMod {
+	// Verify user owns this comment or is admin or hub mod
+	if existingComment.UserID != userID.(int) && roleStr != "admin" && !isHubMod {
 		c.JSON(http.StatusForbidden, gin.H{"error": "You can only delete your own comments"})
 		return
 	}

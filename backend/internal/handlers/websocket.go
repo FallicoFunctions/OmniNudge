@@ -67,6 +67,19 @@ func (h *WebSocketHandler) HandleWebSocket(c *gin.Context) {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
 		return
 	}
+	uid, ok := userID.(int)
+	if !ok {
+		switch v := userID.(type) {
+		case int64:
+			uid = int(v)
+		case float64:
+			uid = int(v)
+		default:
+			log.Printf("Invalid user_id type for websocket: %T", userID)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid user context"})
+			return
+		}
+	}
 
 	// Upgrade HTTP connection to WebSocket
 	conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
@@ -77,7 +90,7 @@ func (h *WebSocketHandler) HandleWebSocket(c *gin.Context) {
 
 	// Create new client
 	client := &websocket.Client{
-		UserID: userID.(int),
+		UserID: uid,
 		Conn:   conn,
 		Send:   make(chan *websocket.Message, 256),
 		Hub:    h.hub,
