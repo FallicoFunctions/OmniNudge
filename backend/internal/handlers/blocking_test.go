@@ -36,6 +36,9 @@ func setupBlockingHandlerTest(t *testing.T) (*BlockingHandler, *database.Databas
 	err = db.Migrate(ctx)
 	require.NoError(t, err)
 
+	err = database.ResetTestData(ctx, db)
+	require.NoError(t, err)
+
 	// Create test users
 	userRepo := models.NewUserRepository(db.Pool)
 	blocker := &models.User{

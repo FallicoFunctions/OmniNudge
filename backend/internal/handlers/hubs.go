@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"errors"
 	"net/http"
 	"regexp"
 	"strconv"
@@ -8,6 +9,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/omninudge/backend/internal/models"
 )
 
@@ -98,6 +100,11 @@ func (h *HubsHandler) Create(c *gin.Context) {
 	}
 
 	if err := h.hubRepo.Create(c.Request.Context(), hub); err != nil {
+		var pgErr *pgconn.PgError
+		if ok := errors.As(err, &pgErr); ok && pgErr.Code == "23505" {
+			c.JSON(http.StatusConflict, gin.H{"error": "Hub already exists"})
+			return
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create hub", "details": err.Error()})
 		return
 	}
@@ -427,6 +434,7 @@ func hubResponse(h *models.Hub) gin.H {
 		"is_quarantined":   h.IsQuarantined,
 		"subscriber_count": h.SubscriberCount,
 		"created_at":       h.CreatedAt,
+		"nsfw":             h.NSFW,
 	}
 
 	if h.Description != nil {

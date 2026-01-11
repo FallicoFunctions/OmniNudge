@@ -34,6 +34,9 @@ func setupSlideshowHandlerTest(t *testing.T) (*SlideshowHandler, *database.Datab
 	err = db.Migrate(ctx)
 	require.NoError(t, err)
 
+	err = database.ResetTestData(ctx, db)
+	require.NoError(t, err)
+
 	// Create test users
 	userRepo := models.NewUserRepository(db.Pool)
 	user1 := &models.User{

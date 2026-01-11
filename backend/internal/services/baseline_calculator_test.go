@@ -57,6 +57,9 @@ func setupBaselineTest(t *testing.T) (*BaselineCalculatorService, *database.Data
 	err = db.Migrate(ctx)
 	require.NoError(t, err)
 
+	err = database.ResetTestData(ctx, db)
+	require.NoError(t, err)
+
 	baselineRepo := models.NewUserBaselineRepository(db.Pool)
 	service := NewBaselineCalculatorService(db.Pool, baselineRepo)
 

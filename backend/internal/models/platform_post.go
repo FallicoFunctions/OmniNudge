@@ -218,7 +218,7 @@ func (r *PlatformPostRepository) GetByID(ctx context.Context, id int) (*Platform
 	err := scanPlatformPost(r.pool.QueryRow(ctx, query, id), post)
 
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if err == pgx.ErrNoRows {
 			return nil, nil
 		}
 		return nil, err
@@ -257,7 +257,7 @@ func (r *PlatformPostRepository) GetByIDWithUser(ctx context.Context, id int, us
 	}
 
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if err == pgx.ErrNoRows {
 			return nil, nil
 		}
 		return nil, err
@@ -279,7 +279,7 @@ func (r *PlatformPostRepository) GetFeed(ctx context.Context, sortBy string, lim
 	}
 
 	query := `
-		SELECT ` + platformPostSelectColumns + `
+		SELECT ` + platformPostSelectColumnsPrefixed + `
 		FROM platform_posts p
 		LEFT JOIN users u ON p.author_id = u.id
 		WHERE p.is_deleted = FALSE AND u.shadow_banned = FALSE
@@ -308,7 +308,7 @@ func (r *PlatformPostRepository) GetFeed(ctx context.Context, sortBy string, lim
 // GetByAuthor retrieves posts by a specific author
 func (r *PlatformPostRepository) GetByAuthor(ctx context.Context, authorID int, limit, offset int) ([]*PlatformPost, error) {
 	query := `
-		SELECT ` + platformPostSelectColumns + `
+		SELECT ` + platformPostSelectColumnsPrefixed + `
 		FROM platform_posts p
 		LEFT JOIN users u ON p.author_id = u.id
 		WHERE p.author_id = $1 AND p.is_deleted = FALSE AND u.shadow_banned = FALSE
@@ -587,7 +587,7 @@ func (r *PlatformPostRepository) GetBySubredditWithCursor(
 // GetByTags retrieves posts that contain any of the specified tags
 func (r *PlatformPostRepository) GetByTags(ctx context.Context, tags []string, limit, offset int) ([]*PlatformPost, error) {
 	query := `
-		SELECT ` + platformPostSelectColumns + `
+		SELECT ` + platformPostSelectColumnsPrefixed + `
 		FROM platform_posts p
 		LEFT JOIN users u ON p.author_id = u.id
 		WHERE tags && $1 AND p.is_deleted = FALSE AND u.shadow_banned = FALSE
@@ -1057,7 +1057,7 @@ func (r *PlatformPostRepository) GetAllFeed(
 	timeClause, timeArgs := buildTimeRangeClause(startTime, endTime, 3)
 
 	query := `
-		SELECT ` + platformPostSelectColumns + `
+		SELECT ` + platformPostSelectColumnsPrefixed + `
 		FROM platform_posts p
 		LEFT JOIN users u ON p.author_id = u.id
 		WHERE p.is_deleted = FALSE AND p.target_subreddit IS NULL AND u.shadow_banned = FALSE` + timeClause + `
@@ -1100,7 +1100,7 @@ func (r *PlatformPostRepository) GetAllFeedWithCursor(
 	cursorClause, cursorArgs := buildPlatformPostCursorClause(sort, cursor, 2+len(timeArgs))
 
 	query := `
-		SELECT ` + platformPostSelectColumns + `
+		SELECT ` + platformPostSelectColumnsPrefixed + `
 		FROM platform_posts p
 		LEFT JOIN users u ON p.author_id = u.id
 		WHERE p.is_deleted = FALSE AND p.target_subreddit IS NULL AND u.shadow_banned = FALSE` + timeClause + cursorClause + `

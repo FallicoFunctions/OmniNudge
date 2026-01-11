@@ -4,9 +4,11 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/omninudge/backend/internal/database"
@@ -23,11 +25,21 @@ func setupPostsCreateTest(t *testing.T) (*PostsHandler, *models.HubRepository, *
 	err = db.Migrate(ctx)
 	require.NoError(t, err)
 
+	err = database.ResetTestData(ctx, db)
+	require.NoError(t, err)
+
 	hubRepo := models.NewHubRepository(db.Pool)
 	postRepo := models.NewPlatformPostRepository(db.Pool)
 	userRepo := models.NewUserRepository(db.Pool)
 	modRepo := models.NewHubModeratorRepository(db.Pool)
 	feedRepo := models.NewFeedRepository(db.Pool)
+
+	testUser := &models.User{
+		Username:     fmt.Sprintf("post_creator_%d", time.Now().UnixNano()),
+		PasswordHash: "test_hash",
+	}
+	err = userRepo.Create(ctx, testUser)
+	require.NoError(t, err)
 
 	handler := NewPostsHandler(postRepo, hubRepo, userRepo, modRepo, feedRepo)
 

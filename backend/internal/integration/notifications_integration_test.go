@@ -32,6 +32,9 @@ func setupNotificationIntegrationTest(t *testing.T) (*gin.Engine, *database.Data
 	err = db.Migrate(ctx)
 	require.NoError(t, err)
 
+	err = database.ResetTestData(ctx, db)
+	require.NoError(t, err)
+
 	// Initialize repositories
 	hubRepo := models.NewHubRepository(db.Pool)
 	userRepo := models.NewUserRepository(db.Pool)
@@ -103,11 +106,14 @@ func setupNotificationIntegrationTest(t *testing.T) (*gin.Engine, *database.Data
 	return router, db, notifService, cleanup
 }
 
-var uniqueCounter int64
+var (
+	uniqueCounter int64
+	uniqueSuffix  = time.Now().UnixNano()
+)
 
 func uniqueName(base string) string {
 	id := atomic.AddInt64(&uniqueCounter, 1)
-	return fmt.Sprintf("%s_%d", base, id)
+	return fmt.Sprintf("%s_%d_%d", base, uniqueSuffix, id)
 }
 
 func createIntegrationTestData(t *testing.T, db *database.Database) (authorID, voterID, hubID, postID int) {
@@ -185,7 +191,7 @@ func TestEndToEndPostVoteNotification(t *testing.T) {
 	// Vote on the post multiple times to reach milestone
 	for i := 0; i < 10; i++ {
 		voter := &models.User{
-			Username:     fmt.Sprintf("milestone_voter_%d", i),
+			Username:     uniqueName(fmt.Sprintf("milestone_voter_%d", i)),
 			PasswordHash: "test_hash",
 		}
 		err := userRepo.Create(ctx, voter)
@@ -335,7 +341,7 @@ func TestVelocityNotificationWithBatching(t *testing.T) {
 	isUpvote := true
 	for i := 0; i < 15; i++ {
 		voter := &models.User{
-			Username:     fmt.Sprintf("velocity_voter_%d", i),
+			Username:     uniqueName(fmt.Sprintf("velocity_voter_%d", i)),
 			PasswordHash: "test_hash",
 		}
 		err := userRepo.Create(ctx, voter)
