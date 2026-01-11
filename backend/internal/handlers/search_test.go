@@ -35,6 +35,9 @@ func setupSearchHandlerTest(t *testing.T) (*SearchHandler, *database.Database, f
 	err = db.Migrate(ctx)
 	require.NoError(t, err)
 
+	err = database.ResetTestData(ctx, db)
+	require.NoError(t, err)
+
 	handler := NewSearchHandler(db.Pool)
 
 	cleanup := func() {

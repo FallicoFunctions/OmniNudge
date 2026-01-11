@@ -33,6 +33,9 @@ func setupConversationsHandlerTest(t *testing.T) (*ConversationsHandler, *databa
 	err = db.Migrate(ctx)
 	require.NoError(t, err)
 
+	err = database.ResetTestData(ctx, db)
+	require.NoError(t, err)
+
 	// Create test users
 	userRepo := models.NewUserRepository(db.Pool)
 	user1 := &models.User{
@@ -445,16 +448,31 @@ func TestDeleteConversation(t *testing.T) {
 		handler.DeleteConversation(c)
 	})
 
-	req := httptest.NewRequest("DELETE", fmt.Sprintf("/conversations/%d", conv.ID), nil)
+	req := httptest.NewRequest("DELETE", fmt.Sprintf("/conversations/%d?delete_for=both", conv.ID), nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
 	assert.Equal(t, http.StatusOK, w.Code)
 
-	// Verify conversation is deleted
-	deleted, err := convRepo.GetByID(ctx, conv.ID)
+	// Conversation should still exist (soft-deleted for user1)
+	existing, err := convRepo.GetByID(ctx, conv.ID)
 	require.NoError(t, err)
-	assert.Nil(t, deleted)
+	assert.NotNil(t, existing)
+
+	// Deleted user should not see the conversation
+	user1Convs, err := convRepo.GetByUserID(ctx, user1ID, 10, 0, false)
+	require.NoError(t, err)
+	assert.Len(t, user1Convs, 0)
+
+	// Other user should still see the conversation
+	user2Convs, err := convRepo.GetByUserID(ctx, user2ID, 10, 0, false)
+	require.NoError(t, err)
+	assert.GreaterOrEqual(t, len(user2Convs), 1)
+
+	// User1 messages should be hard-deleted
+	user2Messages, err := messageRepo.GetByConversationID(ctx, conv.ID, user2ID, 10, 0)
+	require.NoError(t, err)
+	assert.Len(t, user2Messages, 0)
 }
 
 func TestDeleteConversation_NotParticipant(t *testing.T) {

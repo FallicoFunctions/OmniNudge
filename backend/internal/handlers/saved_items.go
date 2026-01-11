@@ -77,6 +77,9 @@ func (h *SavedItemsHandler) GetSavedItems(c *gin.Context) {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch saved posts", "details": err.Error()})
 			return
 		}
+		if posts == nil {
+			posts = []*models.SavedPostOverview{}
+		}
 		response["saved_posts"] = posts
 	}
 
@@ -87,6 +90,9 @@ func (h *SavedItemsHandler) GetSavedItems(c *gin.Context) {
 			return
 		}
 		filteredPosts, removed := h.pruneRemovedRedditPosts(c, intUserID, redditPosts)
+		if filteredPosts == nil {
+			filteredPosts = []*models.SavedRedditPost{}
+		}
 		response["saved_reddit_posts"] = filteredPosts
 		if len(removed) > 0 {
 			response["auto_removed_reddit_posts"] = removed
@@ -99,6 +105,9 @@ func (h *SavedItemsHandler) GetSavedItems(c *gin.Context) {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch saved site comments", "details": err.Error()})
 			return
 		}
+		if comments == nil {
+			comments = []*models.SavedPostComment{}
+		}
 		response["saved_post_comments"] = comments
 	}
 
@@ -107,6 +116,9 @@ func (h *SavedItemsHandler) GetSavedItems(c *gin.Context) {
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch saved comments", "details": err.Error()})
 			return
+		}
+		if comments == nil {
+			comments = []*models.RedditPostComment{}
 		}
 		response["saved_reddit_comments"] = comments
 	}

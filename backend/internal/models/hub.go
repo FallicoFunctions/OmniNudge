@@ -2,10 +2,10 @@ package models
 
 import (
 	"context"
-	"database/sql"
 	"strings"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -74,7 +74,7 @@ func (r *HubRepository) GetByName(ctx context.Context, name string) (*Hub, error
 	`
 	err := r.pool.QueryRow(ctx, query, normalizedName).Scan(&h.ID, &h.Name, &h.Description, &h.Title, &h.Type, &h.ContentOptions, &h.IsQuarantined, &h.SubscriberCount, &h.CreatedBy, &h.CreatedAt, &h.NSFW)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if err == pgx.ErrNoRows {
 			return nil, nil
 		}
 		return nil, err
@@ -92,7 +92,7 @@ func (r *HubRepository) GetByID(ctx context.Context, id int) (*Hub, error) {
 	`
 	err := r.pool.QueryRow(ctx, query, id).Scan(&h.ID, &h.Name, &h.Description, &h.Title, &h.Type, &h.ContentOptions, &h.IsQuarantined, &h.SubscriberCount, &h.CreatedBy, &h.CreatedAt, &h.NSFW)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if err == pgx.ErrNoRows {
 			return nil, nil
 		}
 		return nil, err

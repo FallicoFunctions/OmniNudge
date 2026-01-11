@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/omninudge/backend/internal/database"
 	"github.com/omninudge/backend/internal/utils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -19,17 +20,20 @@ func setupBanTestDB(t *testing.T) (*pgxpool.Pool, *UserRepository, func()) {
 	err := utils.SetEncryptionKey(testKey)
 	require.NoError(t, err)
 
-	// Use test database
-	pool, err := pgxpool.New(ctx, "postgres://Nick@localhost:5432/omninudge_test?sslmode=disable")
+	db, err := database.NewTest()
 	require.NoError(t, err)
 
+	err = db.Migrate(ctx)
+	require.NoError(t, err)
+
+	err = database.ResetTestData(ctx, db)
+	require.NoError(t, err)
+
+	pool := db.Pool
 	userRepo := NewUserRepository(pool)
 
 	cleanup := func() {
-		// Clean up test data
-		_, _ = pool.Exec(ctx, "DELETE FROM ban_history")
-		_, _ = pool.Exec(ctx, "DELETE FROM users WHERE username LIKE 'bantest_%'")
-		pool.Close()
+		db.Close()
 	}
 
 	return pool, userRepo, cleanup
