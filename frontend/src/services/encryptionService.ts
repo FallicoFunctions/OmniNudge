@@ -25,4 +25,21 @@ export const encryptionService = {
     );
     return response.public_keys;
   },
+
+  /**
+   * Upload encrypted private key to server for cross-browser sync
+   */
+  async uploadEncryptedPrivateKey(encryptedPrivateKey: string): Promise<void> {
+    await api.put('/auth/encrypted-private-key', { encrypted_private_key: encryptedPrivateKey });
+  },
+
+  /**
+   * Fetch encrypted private key from server
+   */
+  async getEncryptedPrivateKey(): Promise<string | null> {
+    const response = await api.get<{ encrypted_private_key: string | null }>(
+      '/auth/encrypted-private-key'
+    );
+    return response.encrypted_private_key;
+  },
 };
