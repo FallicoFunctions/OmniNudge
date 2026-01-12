@@ -17,23 +17,42 @@
 
 ### Step 1: Create VPS Server (10 minutes)
 
-1. **Sign up at Hetzner:** https://console.hetzner.cloud/
-2. **Create project:** "OmniNudge"
-3. **Add SSH key:**
-   ```bash
-   # On your Mac:
-   ssh-keygen -t ed25519 -C "your-email@example.com"
-   cat ~/.ssh/id_ed25519.pub
-   # Copy output, paste in Hetzner SSH Keys section
-   ```
-4. **Create server:**
-   - Location: US East or EU (closest to your users)
-   - Image: Ubuntu 22.04
-   - Type: CPX21 (4GB RAM, €5.83/month)
-   - Add your SSH key
-   - Name: `omninudge-prod`
+**1.1. Sign up at Hetzner**
+- Go to: https://console.hetzner.cloud/
+- Create account
 
-5. **Wait 2 minutes**, copy server IP address (e.g., `159.89.123.45`)
+**1.2. Create project**
+- Click "New Project"
+- Name: `OmniNudge`
+- Click "Create Project"
+
+**1.3. Add SSH key**
+On your Mac terminal:
+```bash
+# Generate SSH key (if you don't have one)
+ssh-keygen -t ed25519 -C "your-email@example.com"
+# Press Enter 3 times to accept defaults
+
+# Copy your public key
+cat ~/.ssh/id_ed25519.pub
+```
+- In Hetzner, click "Security" → "SSH Keys" → "Add SSH Key"
+- Paste the output from above
+- Name: `mac-ssh-key`
+
+**1.4. Create server (CPX21)**
+- Click "Add Server"
+- **Location:** Ashburn, VA (US East) or Falkenstein, Germany (EU)
+- **Image:** Ubuntu 22.04
+- **Type:** Shared vCPU → **CPX21** (4GB RAM, 3 vCPU, €5.83/month)
+- **SSH keys:** Check your key from step 1.3
+- **Name:** `omninudge-prod`
+- Click "Create & Buy Now"
+
+**1.5. Get server IP**
+- Wait ~60 seconds for server to provision
+- Copy the **IPv4 address** (e.g., `159.89.123.45`)
+- **Save this IP** - you'll need it multiple times!
 
 ### Step 2: Point Domain to Server on Cloudflare (5 minutes)
 
