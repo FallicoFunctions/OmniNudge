@@ -20,8 +20,12 @@ export const postsService = {
     return api.post<PlatformPost>('/posts', data);
   },
 
-  async deletePost(id: number): Promise<void> {
-    await api.delete(`/posts/${id}`);
+  async deletePost(id: number, reason?: string): Promise<void> {
+    if (reason) {
+      await api.delete(`/posts/${id}`, { reason });
+    } else {
+      await api.delete(`/posts/${id}`);
+    }
   },
 
   async votePost(id: number, value: 1 | -1 | 0): Promise<void> {
@@ -53,8 +57,12 @@ export const postsService = {
     return api.put<PostComment>(`/comments/${commentId}`, { body });
   },
 
-  async deleteComment(commentId: number): Promise<void> {
-    await api.delete(`/comments/${commentId}`);
+  async deleteComment(commentId: number, reason?: string): Promise<void> {
+    if (reason) {
+      await api.delete(`/comments/${commentId}`, { reason });
+    } else {
+      await api.delete(`/comments/${commentId}`);
+    }
   },
 
   async voteComment(id: number, value: 1 | -1 | 0): Promise<void> {

@@ -55,6 +55,8 @@ export default function PostDetailPage() {
   const [embedCopied, setEmbedCopied] = useState(false);
   const [imageExpanded, setImageExpanded] = useState(false);
   const [showModMailModal, setShowModMailModal] = useState(false);
+  const [deleteCommentTarget, setDeleteCommentTarget] = useState<{ commentId: number; authorId: number } | null>(null);
+  const [deleteCommentReason, setDeleteCommentReason] = useState('');
 
   const parsedPostId = postId ? Number(postId) : NaN;
   const focusedCommentId = commentId ? Number(commentId) : null;
@@ -171,8 +173,20 @@ export default function PostDetailPage() {
       await queryClient.invalidateQueries({ queryKey: commentsQueryKey });
     },
     remove: async (comment) => {
-      await postsService.deleteComment(comment.id);
-      await queryClient.invalidateQueries({ queryKey: commentsQueryKey });
+      // Check if this is a moderator action (deleting someone else's comment)
+      const isModeratorAction = user && comment.user_id !== user.id;
+
+      if (isModeratorAction) {
+        // Show reason modal for moderator actions
+        setDeleteCommentTarget({ commentId: comment.id, authorId: comment.user_id });
+      } else {
+        // For own comments, just confirm and delete
+        if (!window.confirm('Are you sure you want to delete this comment?')) {
+          return;
+        }
+        await postsService.deleteComment(comment.id);
+        await queryClient.invalidateQueries({ queryKey: commentsQueryKey });
+      }
     },
     toggleInbox: async (comment, nextValue) => {
       await postsService.toggleCommentInbox(parsedPostId, comment.id, nextValue);
@@ -205,6 +219,22 @@ export default function PostDetailPage() {
       setEmbedCopied(false);
       setEmbedTarget(comment);
     },
+  };
+
+  const handleConfirmDeleteComment = async () => {
+    if (!deleteCommentTarget) return;
+    if (!deleteCommentReason.trim()) {
+      alert('Please provide a reason for deletion');
+      return;
+    }
+    try {
+      await postsService.deleteComment(deleteCommentTarget.commentId, deleteCommentReason);
+      await queryClient.invalidateQueries({ queryKey: commentsQueryKey });
+      setDeleteCommentTarget(null);
+      setDeleteCommentReason('');
+    } catch (err) {
+      alert(`Failed to delete comment: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    }
   };
 
   const topLevelComments = useMemo(() => {
@@ -249,6 +279,12 @@ export default function PostDetailPage() {
     isLoading: loadingHubModerators,
     isError: hubModeratorsError,
   } = useHubModerators(hubName, Boolean(hubName));
+
+  // Check if current user is a moderator of this hub
+  const isModerator = useMemo(() => {
+    if (!user || !hubModerators?.length) return false;
+    return hubModerators.some((mod) => mod.user_id === user.id);
+  }, [user, hubModerators]);
 
   const {
     data: subredditAbout,
@@ -575,6 +611,8 @@ export default function PostDetailPage() {
                     handlers={commentHandlers}
                     savedCommentIds={savedCommentIds}
                     currentUsername={user?.username}
+                    currentUserRole={user?.role}
+                    isModerator={isModerator}
                   />
                 ))}
               </div>
@@ -674,6 +712,50 @@ export default function PostDetailPage() {
       )}
       {showModMailModal && hubName && (
         <ModMailModal hubName={hubName} onClose={() => setShowModMailModal(false)} />
+      )}
+
+      {/* Delete Comment Reason Modal */}
+      {deleteCommentTarget && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 px-4">
+          <div className="w-full max-w-md rounded-lg bg-white p-4 shadow-lg">
+            <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">
+              Delete Comment - Reason Required
+            </h3>
+            <p className="mt-2 text-sm text-[var(--color-text-secondary)]">
+              As a moderator, you must provide a reason for deleting this comment. The author will receive a modmail with your reason.
+            </p>
+            <div className="mt-4">
+              <label className="mb-1 block text-xs font-medium text-[var(--color-text-secondary)]">
+                Reason for deletion <span className="text-red-500">*</span>
+              </label>
+              <textarea
+                value={deleteCommentReason}
+                onChange={(e) => setDeleteCommentReason(e.target.value)}
+                placeholder="E.g., Violates rule 2: Be respectful..."
+                className="w-full rounded border border-[var(--color-border)] bg-[var(--color-surface)] p-2 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
+                rows={4}
+              />
+            </div>
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                onClick={() => {
+                  setDeleteCommentTarget(null);
+                  setDeleteCommentReason('');
+                }}
+                className="rounded border border-[var(--color-border)] px-3 py-1 text-sm hover:bg-[var(--color-surface-elevated)]"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmDeleteComment}
+                disabled={!deleteCommentReason.trim()}
+                className="rounded bg-red-600 px-3 py-1 text-sm font-semibold text-white hover:bg-red-500 disabled:opacity-50"
+              >
+                Delete Comment
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

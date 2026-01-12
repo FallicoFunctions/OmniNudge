@@ -45,6 +45,8 @@ export default function HubsPage() {
   const [customTopStart, setCustomTopStart] = useState('');
   const [customTopEnd, setCustomTopEnd] = useState('');
   const [crosspostTarget, setCrosspostTarget] = useState<LocalSubredditPost | null>(null);
+  const [deletePostTarget, setDeletePostTarget] = useState<{ postId: number; authorId: number } | null>(null);
+  const [deleteReason, setDeleteReason] = useState('');
   const [crosspostTitle, setCrosspostTitle] = useState('');
   const [selectedHub, setSelectedHub] = useState('');
   const [selectedSubreddit, setSelectedSubreddit] = useState('');
@@ -217,21 +219,41 @@ export default function HubsPage() {
     setSort(newSort);
   };
 
-  const deletePostMutation = useMutation<void, Error, number>({
-    mutationFn: async (postId: number) => postsService.deletePost(postId),
+  const deletePostMutation = useMutation<void, Error, { postId: number; reason?: string }>({
+    mutationFn: async ({ postId, reason }) => postsService.deletePost(postId, reason),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: postsQueryKey });
+      setDeletePostTarget(null);
+      setDeleteReason('');
     },
     onError: (err) => {
       alert(`Failed to delete post: ${err.message}`);
     },
   });
 
-  const handleDeletePost = (postId: number) => {
-    if (!window.confirm('Are you sure you want to delete this post?')) {
+  const handleDeletePost = (post: LocalSubredditPost) => {
+    // Check if this is a moderator action (deleting someone else's post)
+    const isModeratorAction = user && post.author_id !== user.id;
+
+    if (isModeratorAction) {
+      // Show reason modal for moderator actions
+      setDeletePostTarget({ postId: post.id, authorId: post.author_id });
+    } else {
+      // For own posts, just confirm
+      if (!window.confirm('Are you sure you want to delete this post?')) {
+        return;
+      }
+      deletePostMutation.mutate({ postId: post.id });
+    }
+  };
+
+  const handleConfirmDeletePost = () => {
+    if (!deletePostTarget) return;
+    if (!deleteReason.trim()) {
+      alert('Please provide a reason for deletion');
       return;
     }
-    deletePostMutation.mutate(postId);
+    deletePostMutation.mutate({ postId: deletePostTarget.postId, reason: deleteReason });
   };
 
   const handleSharePost = (postId: number) => {
@@ -514,7 +536,7 @@ export default function HubsPage() {
                   savedToggleMutation.isPending && savedToggleMutation.variables?.postId === post.id;
                 const isHiding = hidePostMutation.isPending && hidePostMutation.variables === post.id;
                 const isDeleting =
-                  deletePostMutation.isPending && deletePostMutation.variables === post.id;
+                  deletePostMutation.isPending && deletePostMutation.variables?.postId === post.id;
                 const normalizedPost: PlatformPost = {
                   ...post,
                   author_username:
@@ -534,6 +556,8 @@ export default function HubsPage() {
                       post={normalizedPost}
                       useRelativeTime={useRelativeTime}
                       currentUserId={user?.id}
+                      currentUserRole={user?.role}
+                      isModerator={isModerator}
                       hubNameMap={hubNameMap}
                       currentHubName={hubname}
                       isSaved={isSaved}
@@ -544,7 +568,7 @@ export default function HubsPage() {
                       onToggleSave={(shouldSave) => handleToggleSavePost(post.id, !shouldSave)}
                       onHide={() => handleHidePost(post.id)}
                       onCrosspost={() => handleCrosspostSelection(post)}
-                      onDelete={() => handleDeletePost(post.id)}
+                      onDelete={() => handleDeletePost(post)}
                     />
                   </div>
                 );
@@ -596,6 +620,50 @@ export default function HubsPage() {
           </aside>
         )}
       </div>
+
+      {/* Delete Post Reason Modal */}
+      {deletePostTarget && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 px-4">
+          <div className="w-full max-w-md rounded-lg bg-white p-4 shadow-lg">
+            <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">
+              Delete Post - Reason Required
+            </h3>
+            <p className="mt-2 text-sm text-[var(--color-text-secondary)]">
+              As a moderator, you must provide a reason for deleting this post. The author will receive a modmail with your reason.
+            </p>
+            <div className="mt-4">
+              <label className="mb-1 block text-xs font-medium text-[var(--color-text-secondary)]">
+                Reason for deletion <span className="text-red-500">*</span>
+              </label>
+              <textarea
+                value={deleteReason}
+                onChange={(e) => setDeleteReason(e.target.value)}
+                placeholder="E.g., Violates rule 3: No spam..."
+                className="w-full rounded border border-[var(--color-border)] bg-[var(--color-surface)] p-2 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
+                rows={4}
+              />
+            </div>
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                onClick={() => {
+                  setDeletePostTarget(null);
+                  setDeleteReason('');
+                }}
+                className="rounded border border-[var(--color-border)] px-3 py-1 text-sm hover:bg-[var(--color-surface-elevated)]"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmDeletePost}
+                disabled={deletePostMutation.isPending || !deleteReason.trim()}
+                className="rounded bg-red-600 px-3 py-1 text-sm font-semibold text-white hover:bg-red-500 disabled:opacity-50"
+              >
+                {deletePostMutation.isPending ? 'Deleting...' : 'Delete Post'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Crosspost Modal */}
       <CrosspostModal
