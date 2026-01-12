@@ -249,3 +249,50 @@ func (h *AuthHandler) GetPublicKeys(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"public_keys": publicKeys})
 }
+
+// UpdateEncryptedPrivateKey handles updating user's encrypted private key for cross-browser sync
+func (h *AuthHandler) UpdateEncryptedPrivateKey(c *gin.Context) {
+	userID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
+
+	var req struct {
+		EncryptedPrivateKey string `json:"encrypted_private_key" binding:"required"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
+		return
+	}
+
+	if err := h.userRepo.UpdateEncryptedPrivateKey(c.Request.Context(), userID.(int), req.EncryptedPrivateKey); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update encrypted private key"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Encrypted private key updated successfully"})
+}
+
+// GetEncryptedPrivateKey handles fetching user's encrypted private key for cross-browser sync
+func (h *AuthHandler) GetEncryptedPrivateKey(c *gin.Context) {
+	userID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
+
+	user, err := h.userRepo.GetByID(c.Request.Context(), userID.(int))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch user data"})
+		return
+	}
+
+	if user.EncryptedPrivateKey == nil {
+		c.JSON(http.StatusOK, gin.H{"encrypted_private_key": nil})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"encrypted_private_key": *user.EncryptedPrivateKey})
+}

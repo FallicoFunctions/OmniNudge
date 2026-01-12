@@ -384,6 +384,8 @@ func main() {
 			protected.POST("/auth/logout", authHandler.Logout)
 			protected.PUT("/auth/public-key", authHandler.UpdatePublicKey)
 			protected.GET("/auth/public-keys", authHandler.GetPublicKeys)
+			protected.PUT("/auth/encrypted-private-key", authHandler.UpdateEncryptedPrivateKey)
+			protected.GET("/auth/encrypted-private-key", authHandler.GetEncryptedPrivateKey)
 
 			protected.GET("/settings", settingsHandler.GetSettings)
 			protected.PUT("/settings", settingsHandler.UpdateSettings)

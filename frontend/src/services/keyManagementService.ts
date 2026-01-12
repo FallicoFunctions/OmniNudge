@@ -27,11 +27,7 @@ export async function initializeKeys(): Promise<KeyPair> {
 
   // Generate new key pair
   const keyPair = await generateKeyPair();
-  const exported = await exportKeyPair(keyPair);
-
-  // Store in localStorage
-  localStorage.setItem(PRIVATE_KEY_STORAGE_KEY, exported.privateKey);
-  localStorage.setItem(PUBLIC_KEY_STORAGE_KEY, exported.publicKey);
+  await saveKeys(keyPair);
 
   return keyPair;
 }
@@ -63,6 +59,15 @@ export async function getOwnKeys(): Promise<KeyPair | null> {
  */
 export function getOwnPublicKeyBase64(): string | null {
   return localStorage.getItem(PUBLIC_KEY_STORAGE_KEY);
+}
+
+/**
+ * Persist a key pair to localStorage (legacy export for older clients)
+ */
+export async function saveKeys(keyPair: KeyPair): Promise<void> {
+  const exported = await exportKeyPair(keyPair);
+  localStorage.setItem(PRIVATE_KEY_STORAGE_KEY, exported.privateKey);
+  localStorage.setItem(PUBLIC_KEY_STORAGE_KEY, exported.publicKey);
 }
 
 /**
@@ -124,3 +129,6 @@ export function clearKeys(): void {
     }
   });
 }
+
+// Temporary export to break Firefox cache - will be removed
+export const _cacheBreaker = Date.now();

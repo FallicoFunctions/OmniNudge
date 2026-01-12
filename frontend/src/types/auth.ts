@@ -7,6 +7,7 @@ export interface User {
   avatar_url?: string;
   role: 'user' | 'moderator' | 'admin';
   created_at: string;
+  public_key?: string;
 }
 
 export interface LoginRequest {
