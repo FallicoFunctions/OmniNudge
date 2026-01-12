@@ -36,3 +36,24 @@ if (import.meta.env.PROD && 'serviceWorker' in navigator) {
     });
   });
 }
+
+if (!import.meta.env.PROD && 'serviceWorker' in navigator) {
+  // In dev, ensure old SWs/caches do not serve stale bundles (Safari is sticky).
+  navigator.serviceWorker.getRegistrations().then((registrations) => {
+    registrations.forEach((registration) => {
+      registration.unregister().catch(() => {
+        // Ignore cleanup errors in dev.
+      });
+    });
+  });
+
+  if ('caches' in window) {
+    caches.keys().then((keys) => {
+      keys.forEach((key) => {
+        caches.delete(key).catch(() => {
+          // Ignore cleanup errors in dev.
+        });
+      });
+    });
+  }
+}
