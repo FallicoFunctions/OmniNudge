@@ -61,9 +61,12 @@ func NewWebSocketHandler(hub *websocket.Hub) *WebSocketHandler {
 
 // HandleWebSocket handles WebSocket upgrade requests
 func (h *WebSocketHandler) HandleWebSocket(c *gin.Context) {
+	log.Printf("WebSocket connection attempt from %s", c.ClientIP())
+
 	// Get user ID from context (set by AuthRequired middleware)
 	userID, exists := c.Get("user_id")
 	if !exists {
+		log.Printf("WebSocket rejected: User not authenticated")
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
 		return
 	}
@@ -81,12 +84,18 @@ func (h *WebSocketHandler) HandleWebSocket(c *gin.Context) {
 		}
 	}
 
+	log.Printf("Upgrading WebSocket for user_id=%d", uid)
 	// Upgrade HTTP connection to WebSocket
 	conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
 	if err != nil {
-		log.Printf("Failed to upgrade WebSocket: %v", err)
+		log.Printf("Failed to upgrade WebSocket for user_id=%d: %v", uid, err)
+		// Check if error is due to already written response
+		if strings.Contains(err.Error(), "response") || strings.Contains(err.Error(), "hijack") {
+			log.Printf("Response already written or connection hijacked - this is expected in some scenarios")
+		}
 		return
 	}
+	log.Printf("WebSocket upgraded successfully for user_id=%d", uid)
 
 	// Create new client
 	client := &websocket.Client{

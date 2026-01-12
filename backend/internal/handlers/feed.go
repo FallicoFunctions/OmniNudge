@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"sort"
 	"strconv"
@@ -279,19 +280,44 @@ func (h *FeedHandler) fetchSubscribedFeeds(
 	var redditPosts []services.RedditPost
 	if len(subredditSubs) == 0 {
 		return hubPosts, []services.RedditPost{}, nil
-	} else {
-		// Fetch from all subscribed subreddits
-		for _, sub := range subredditSubs {
-			listing, err := h.redditClient.GetSubredditPosts(ctx, sub.SubredditName, sortBy, redditTimeFilter, limit, "")
+	}
+
+	// Fetch from all subscribed subreddits concurrently for better performance
+	log.Printf("[Feed] Fetching from %d subscribed subreddits concurrently (limit=%d per subreddit)", len(subredditSubs), limit)
+
+	type subredditResult struct {
+		subreddit string
+		posts     []services.RedditPost
+		err       error
+	}
+
+	resultsChan := make(chan subredditResult, len(subredditSubs))
+
+	// Launch concurrent fetchers
+	for _, sub := range subredditSubs {
+		go func(subName string) {
+			listing, err := h.redditClient.GetSubredditPosts(ctx, subName, sortBy, redditTimeFilter, limit, "")
 			if err != nil {
-				// Non-fatal: continue with other subreddits
-				continue
+				resultsChan <- subredditResult{subreddit: subName, err: err}
+				return
 			}
 			posts := extractRedditPosts(listing)
 			posts = filterRedditPostsByTimeRange(posts, startTime, endTime)
-			redditPosts = append(redditPosts, posts...)
-		}
+			resultsChan <- subredditResult{subreddit: subName, posts: posts}
+		}(sub.SubredditName)
 	}
+
+	// Collect results
+	for i := 0; i < len(subredditSubs); i++ {
+		result := <-resultsChan
+		if result.err != nil {
+			log.Printf("[Feed] Error fetching r/%s: %v", result.subreddit, result.err)
+			continue
+		}
+		redditPosts = append(redditPosts, result.posts...)
+		log.Printf("[Feed] Fetched %d posts from r/%s (total so far: %d)", len(result.posts), result.subreddit, len(redditPosts))
+	}
+	log.Printf("[Feed] Total Reddit posts fetched: %d from %d subreddits", len(redditPosts), len(subredditSubs))
 
 	return hubPosts, redditPosts, nil
 }

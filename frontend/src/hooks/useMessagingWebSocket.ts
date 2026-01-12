@@ -41,10 +41,13 @@ export function useMessagingWebSocket(options: UseMessagingWebSocketOptions = {}
     const token = localStorage.getItem('auth_token');
     if (!token) return;
 
+    console.log('[WebSocket] Effect triggered, userId:', userId, 'timestamp:', new Date().toISOString());
+
     let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
     isCleanupRef.current = false;
 
     const connect = () => {
+      console.log('[WebSocket] Attempting to connect...', new Date().toISOString());
       const url = new URL(API_BASE_URL);
       url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
       url.pathname = `${url.pathname.replace(/\/$/, '')}/ws`;
@@ -52,6 +55,7 @@ export function useMessagingWebSocket(options: UseMessagingWebSocketOptions = {}
 
       const socket = new WebSocket(url.toString());
       wsRef.current = socket;
+      let hasOpened = false;
 
       socket.onmessage = (event) => {
         try {
@@ -144,8 +148,13 @@ export function useMessagingWebSocket(options: UseMessagingWebSocketOptions = {}
 
       socket.onclose = () => {
         if (isCleanupRef.current) return;
-        console.log('WebSocket closed, reconnecting in 5s...');
-        reconnectTimer = setTimeout(connect, 5000);
+        // Only reconnect if the socket had successfully opened before
+        if (hasOpened) {
+          console.log('WebSocket closed, reconnecting in 5s...');
+          reconnectTimer = setTimeout(connect, 5000);
+        } else {
+          console.log('WebSocket closed before opening, not reconnecting');
+        }
       };
 
       socket.onerror = (error) => {
@@ -158,7 +167,8 @@ export function useMessagingWebSocket(options: UseMessagingWebSocketOptions = {}
       };
 
       socket.onopen = () => {
-        console.log('WebSocket connected');
+        hasOpened = true;
+        console.log('[WebSocket] Connected successfully at', new Date().toISOString());
       };
     };
 

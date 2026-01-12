@@ -80,19 +80,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Check if user is already authenticated on mount
   useEffect(() => {
+    console.log('[AuthContext] Mounting, checking for token...', new Date().toISOString());
     const token = localStorage.getItem('auth_token');
     if (token) {
+      console.log('[AuthContext] Token found, fetching user data...');
       api
         .get<User>('/auth/me')
-        .then(async (userData) => {
+        .then((userData) => {
+          console.log('[AuthContext] User data received, setting user...', new Date().toISOString());
           setUser(userData);
-          await initializeEncryptionKeys();
+          console.log('[AuthContext] User set, starting background key init...', new Date().toISOString());
+          // Initialize encryption keys in background without blocking
+          initializeEncryptionKeys().catch((err) => {
+            console.error('Background encryption key init failed:', err);
+          });
         })
         .catch(() => {
           // Invalid token
           localStorage.removeItem('auth_token');
         })
-        .finally(() => setIsLoading(false));
+        .finally(() => {
+          console.log('[AuthContext] Setting isLoading to false...', new Date().toISOString());
+          setIsLoading(false);
+        });
     } else {
       setIsLoading(false);
     }
@@ -104,8 +114,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(response.user);
     persistOmniFeedStateForUser(response.user.id, resolveDefaultOmniFeedState());
 
-    // Initialize encryption keys with password for cross-browser sync
-    await initializeEncryptionKeys(credentials.password, response.user.public_key || undefined);
+    // Initialize encryption keys with password for cross-browser sync (non-blocking)
+    initializeEncryptionKeys(credentials.password, response.user.public_key || undefined).catch((err) => {
+      console.error('Background encryption key init failed:', err);
+    });
   };
 
   const register = async (data: RegisterRequest) => {
@@ -114,8 +126,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(response.user);
     persistOmniFeedStateForUser(response.user.id, resolveDefaultOmniFeedState());
 
-    // Initialize encryption keys with password for cross-browser sync
-    await initializeEncryptionKeys(data.password, response.user.public_key || undefined);
+    // Initialize encryption keys with password for cross-browser sync (non-blocking)
+    initializeEncryptionKeys(data.password, response.user.public_key || undefined).catch((err) => {
+      console.error('Background encryption key init failed:', err);
+    });
   };
 
   const logout = () => {
