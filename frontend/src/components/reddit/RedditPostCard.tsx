@@ -453,7 +453,15 @@ export function RedditPostCard({
   }, [redditVideoSource]);
 
   return (
-    <article className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)]">
+    <article
+      className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)]"
+      style={{
+        transform: 'translate3d(0,0,0)',
+        WebkitTransform: 'translate3d(0,0,0)',
+        backfaceVisibility: 'hidden',
+        WebkitBackfaceVisibility: 'hidden',
+      } as React.CSSProperties}
+    >
       <div className="flex gap-3 p-3">
         {thumbnail && (
           <img
