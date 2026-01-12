@@ -22,6 +22,13 @@ class ErrorBoundary extends Component<Props, State> {
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     console.error('Uncaught error:', error, errorInfo);
+
+    // If this is a Context error, it might be a lazy loading issue
+    // Log additional info for debugging
+    if (error.message?.includes('Context') || error.message?.includes('Provider')) {
+      console.error('Context/Provider error detected. This might be a lazy loading or Safari-specific issue.');
+      console.error('Component stack:', errorInfo.componentStack);
+    }
   }
 
   public render() {

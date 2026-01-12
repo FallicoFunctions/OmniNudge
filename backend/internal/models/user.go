@@ -29,7 +29,8 @@ type User struct {
 	TokenExpiresAt *time.Time `json:"-"`
 
 	// E2E encryption
-	PublicKey *string `json:"public_key,omitempty"`
+	PublicKey           *string `json:"public_key,omitempty"`
+	EncryptedPrivateKey *string `json:"encrypted_private_key,omitempty"` // For cross-browser sync
 
 	// Profile
 	AvatarURL *string `json:"avatar_url,omitempty"`
@@ -136,7 +137,7 @@ func (r *UserRepository) GetByID(ctx context.Context, id int) (*User, error) {
 	user := &User{}
 
 	query := `
-		SELECT id, username, email, email_encrypted, reddit_id, reddit_username, public_key, avatar_url, bio, karma, role,
+		SELECT id, username, email, email_encrypted, reddit_id, reddit_username, public_key, encrypted_private_key, avatar_url, bio, karma, role,
 		       shadow_banned, banned, deleted, ban_reason, show_ban_reason, banned_at, banned_by, created_at, last_seen,
 		       last_agent_post_at, last_agent_browse_at
 		FROM users WHERE id = $1
@@ -150,6 +151,7 @@ func (r *UserRepository) GetByID(ctx context.Context, id int) (*User, error) {
 		&user.RedditID,
 		&user.RedditUsername,
 		&user.PublicKey,
+		&user.EncryptedPrivateKey,
 		&user.AvatarURL,
 		&user.Bio,
 		&user.Karma,
@@ -199,7 +201,7 @@ func (r *UserRepository) GetByUsername(ctx context.Context, username string) (*U
 	normalizedUsername := strings.ToLower(strings.TrimSpace(username))
 
 	return r.queryUser(ctx, `
-		SELECT id, username, email, email_encrypted, password_hash, reddit_id, reddit_username, public_key, avatar_url, bio, karma, role,
+		SELECT id, username, email, email_encrypted, password_hash, reddit_id, reddit_username, public_key, encrypted_private_key, avatar_url, bio, karma, role,
 		       shadow_banned, banned, deleted, ban_reason, show_ban_reason, banned_at, banned_by, created_at, last_seen,
 		       last_agent_post_at, last_agent_browse_at
 		FROM users WHERE username_normalized = $1
@@ -218,6 +220,7 @@ func (r *UserRepository) queryUser(ctx context.Context, query string, arg interf
 		&user.RedditID,
 		&user.RedditUsername,
 		&user.PublicKey,
+		&user.EncryptedPrivateKey,
 		&user.AvatarURL,
 		&user.Bio,
 		&user.Karma,
@@ -262,7 +265,7 @@ func (r *UserRepository) GetByRedditID(ctx context.Context, redditID string) (*U
 	user := &User{}
 
 	query := `
-		SELECT id, username, email, email_encrypted, reddit_id, reddit_username, public_key, avatar_url, bio, karma, role,
+		SELECT id, username, email, email_encrypted, reddit_id, reddit_username, public_key, encrypted_private_key, avatar_url, bio, karma, role,
 		       shadow_banned, banned, deleted, ban_reason, show_ban_reason, banned_at, banned_by, created_at, last_seen,
 		       last_agent_post_at, last_agent_browse_at
 		FROM users WHERE reddit_id = $1
@@ -276,6 +279,7 @@ func (r *UserRepository) GetByRedditID(ctx context.Context, redditID string) (*U
 		&user.RedditID,
 		&user.RedditUsername,
 		&user.PublicKey,
+		&user.EncryptedPrivateKey,
 		&user.AvatarURL,
 		&user.Bio,
 		&user.Karma,
@@ -629,5 +633,12 @@ func (r *UserRepository) UpdateLastAgentPostAt(ctx context.Context, userID int, 
 func (r *UserRepository) UpdateLastAgentBrowseAt(ctx context.Context, userID int, timestamp time.Time) error {
 	query := `UPDATE users SET last_agent_browse_at = $1 WHERE id = $2`
 	_, err := r.pool.Exec(ctx, query, timestamp, userID)
+	return err
+}
+
+// UpdateEncryptedPrivateKey updates the user's encrypted private key for cross-browser sync
+func (r *UserRepository) UpdateEncryptedPrivateKey(ctx context.Context, userID int, encryptedPrivateKey string) error {
+	query := `UPDATE users SET encrypted_private_key = $1 WHERE id = $2`
+	_, err := r.pool.Exec(ctx, query, encryptedPrivateKey, userID)
 	return err
 }

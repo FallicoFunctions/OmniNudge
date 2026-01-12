@@ -3,8 +3,10 @@ import type { ReactNode } from 'react';
 import { api } from '../lib/api';
 import type { User, LoginRequest, RegisterRequest, AuthResponse } from '../types/auth';
 import { OMNI_FEED_STORAGE_KEY, SETTINGS_STORAGE_KEY } from '../constants/storageKeys';
-import { initializeKeys, getOwnPublicKeyBase64, clearKeys } from '../services/keyManagementService';
+import { initializeKeys, getOwnPublicKeyBase64, getOwnKeys } from '../services/keyManagementService';
 import { encryptionService } from '../services/encryptionService';
+import { encryptPrivateKeyWithPassword, decryptPrivateKeyWithPassword } from '../services/keySyncService';
+import { exportKeyPair } from '../utils/encryption';
 
 interface AuthContextType {
   user: User | null;
@@ -21,15 +23,54 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  const initializeEncryptionKeys = async () => {
+  const initializeEncryptionKeys = async (password?: string, publicKey?: string) => {
     try {
-      // Generate or retrieve encryption keys
-      await initializeKeys();
+      console.log('[AuthContext] Initializing encryption keys...');
+
+      // If password is provided, try to sync keys from server first
+      if (password) {
+        const encryptedPrivateKey = await encryptionService.getEncryptedPrivateKey();
+        if (encryptedPrivateKey) {
+          console.log('[AuthContext] Found encrypted keys on server, syncing...');
+          try {
+            const privateKeyBase64 = await decryptPrivateKeyWithPassword(encryptedPrivateKey, password);
+            // Use provided public key or get from local storage
+            const publicKeyBase64 = publicKey || getOwnPublicKeyBase64();
+
+            if (publicKeyBase64) {
+              localStorage.setItem('omninudge_private_key', privateKeyBase64);
+              localStorage.setItem('omninudge_public_key', publicKeyBase64);
+              console.log('[AuthContext] Keys synced from server');
+              return;
+            }
+          } catch (error) {
+            console.error('[AuthContext] Failed to decrypt keys from server:', error);
+            // Fall through to generate new keys
+          }
+        }
+      }
+
+      // Generate or retrieve encryption keys locally
+      const keys = await initializeKeys();
+      console.log('[AuthContext] Keys initialized:', { hasPrivateKey: !!keys.privateKey, hasPublicKey: !!keys.publicKey });
 
       // Get public key and upload to server
       const publicKeyBase64 = getOwnPublicKeyBase64();
+      console.log('[AuthContext] Public key base64:', publicKeyBase64 ? 'present' : 'missing');
       if (publicKeyBase64) {
         await encryptionService.uploadPublicKey(publicKeyBase64);
+        console.log('[AuthContext] Public key uploaded to server');
+
+        // If password is provided, encrypt and upload private key to server
+        if (password) {
+          const keyPair = await getOwnKeys();
+          if (keyPair) {
+            const exported = await exportKeyPair(keyPair);
+            const encryptedPrivateKey = await encryptPrivateKeyWithPassword(exported.privateKey, password);
+            await encryptionService.uploadEncryptedPrivateKey(encryptedPrivateKey);
+            console.log('[AuthContext] Encrypted private key uploaded to server');
+          }
+        }
       }
     } catch (error) {
       console.error('Failed to initialize encryption keys:', error);
@@ -63,8 +104,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(response.user);
     persistOmniFeedStateForUser(response.user.id, resolveDefaultOmniFeedState());
 
-    // Initialize encryption keys
-    await initializeEncryptionKeys();
+    // Initialize encryption keys with password for cross-browser sync
+    await initializeEncryptionKeys(credentials.password, response.user.public_key || undefined);
   };
 
   const register = async (data: RegisterRequest) => {
@@ -73,8 +114,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(response.user);
     persistOmniFeedStateForUser(response.user.id, resolveDefaultOmniFeedState());
 
-    // Initialize encryption keys
-    await initializeEncryptionKeys();
+    // Initialize encryption keys with password for cross-browser sync
+    await initializeEncryptionKeys(data.password, response.user.public_key || undefined);
   };
 
   const logout = () => {
@@ -82,8 +123,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem(OMNI_FEED_STORAGE_KEY);
     setUser(null);
 
-    // Clear encryption keys
-    clearKeys();
+    // NOTE: We do NOT clear encryption keys on logout
+    // This allows users to access their encrypted messages across sessions
+    // Keys should only be cleared if the user explicitly requests to "forget this device"
 
     // Optionally call backend logout endpoint
     api.post('/auth/logout').catch(() => {

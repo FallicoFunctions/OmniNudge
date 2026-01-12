@@ -29,7 +29,7 @@ createRoot(document.getElementById('root')!).render(
   </StrictMode>
 );
 
-if ('serviceWorker' in navigator) {
+if (import.meta.env.PROD && 'serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/service-worker.js').catch(() => {
       // Ignore registration errors to avoid blocking app load.
