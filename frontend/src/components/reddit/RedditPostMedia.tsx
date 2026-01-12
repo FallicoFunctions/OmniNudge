@@ -104,13 +104,33 @@ export function RedditPostMedia({
       ) : null}
 
       {videoData ? (
-        <div className="mb-4">
+        <div
+          className="mb-4"
+          style={{
+            isolation: 'isolate',
+            transform: 'translateZ(0)',
+            WebkitTransform: 'translate3d(0,0,0)',
+            backfaceVisibility: 'hidden',
+            WebkitBackfaceVisibility: 'hidden',
+            perspective: 1000,
+            WebkitPerspective: 1000,
+          } as React.CSSProperties}
+        >
           <video
             ref={videoRef}
             controls
             className="w-full max-h-[600px] rounded border border-[var(--color-border)]"
             preload="metadata"
             poster={posterUrl ?? undefined}
+            style={{
+              transform: 'translate3d(0,0,0)',
+              WebkitTransform: 'translate3d(0,0,0)',
+              backfaceVisibility: 'hidden',
+              WebkitBackfaceVisibility: 'hidden',
+              willChange: 'transform',
+            } as React.CSSProperties}
+            playsInline
+            webkit-playsinline="true"
           >
             {videoData.kind === 'mp4' && <source src={videoData.url} type="video/mp4" />}
             Your browser does not support the video tag.
