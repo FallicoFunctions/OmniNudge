@@ -1,27 +1,38 @@
 package handlers
 
 import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"io"
 	"net/http"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/omninudge/backend/internal/models"
 	"github.com/omninudge/backend/internal/services"
 )
 
 // CommentsHandler handles HTTP requests for post comments
 type CommentsHandler struct {
+	pool         *pgxpool.Pool
 	commentRepo  *models.PostCommentRepository
 	postRepo     *models.PlatformPostRepository
+	hubRepo      *models.HubRepository
+	userRepo     *models.UserRepository
 	modRepo      *models.HubModeratorRepository
 	notifService *services.NotificationService
 }
 
 // NewCommentsHandler creates a new comments handler
-func NewCommentsHandler(commentRepo *models.PostCommentRepository, postRepo *models.PlatformPostRepository, modRepo *models.HubModeratorRepository) *CommentsHandler {
+func NewCommentsHandler(pool *pgxpool.Pool, commentRepo *models.PostCommentRepository, postRepo *models.PlatformPostRepository, hubRepo *models.HubRepository, userRepo *models.UserRepository, modRepo *models.HubModeratorRepository) *CommentsHandler {
 	return &CommentsHandler{
+		pool:        pool,
 		commentRepo: commentRepo,
 		postRepo:    postRepo,
+		hubRepo:     hubRepo,
+		userRepo:    userRepo,
 		modRepo:     modRepo,
 	}
 }
@@ -306,6 +317,10 @@ func (h *CommentsHandler) UpdateComment(c *gin.Context) {
 }
 
 // DeleteComment handles DELETE /api/v1/comments/:id
+type DeleteCommentRequest struct {
+	Reason string `json:"reason"`
+}
+
 func (h *CommentsHandler) DeleteComment(c *gin.Context) {
 	// Get user ID from context
 	userID, exists := c.Get("user_id")
@@ -322,6 +337,16 @@ func (h *CommentsHandler) DeleteComment(c *gin.Context) {
 		return
 	}
 
+	// Parse deletion reason from request body (optional)
+	// Note: Gin's ShouldBindJSON has issues with DELETE requests, so we read manually
+	var req DeleteCommentRequest
+	if c.Request.Body != nil {
+		bodyBytes, err := io.ReadAll(c.Request.Body)
+		if err == nil && len(bodyBytes) > 0 {
+			_ = json.Unmarshal(bodyBytes, &req)
+		}
+	}
+
 	// Get existing comment to verify ownership
 	existingComment, err := h.commentRepo.GetByID(c.Request.Context(), commentID)
 	if err != nil {
@@ -334,13 +359,18 @@ func (h *CommentsHandler) DeleteComment(c *gin.Context) {
 		return
 	}
 
+	// Get the post to check hub moderator status and for modmail
+	post, err := h.postRepo.GetByID(c.Request.Context(), existingComment.PostID)
+	if err != nil || post == nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get post"})
+		return
+	}
+
 	// Hub mod check
 	isHubMod := false
-	if h.modRepo != nil {
-		if post, _ := h.postRepo.GetByID(c.Request.Context(), existingComment.PostID); post != nil && post.HubID != nil {
-			if ok, err := h.modRepo.IsModerator(c.Request.Context(), *post.HubID, userID.(int)); err == nil {
-				isHubMod = ok
-			}
+	if h.modRepo != nil && post.HubID != nil {
+		if ok, err := h.modRepo.IsModerator(c.Request.Context(), *post.HubID, userID.(int)); err == nil {
+			isHubMod = ok
 		}
 	}
 
@@ -350,12 +380,139 @@ func (h *CommentsHandler) DeleteComment(c *gin.Context) {
 		return
 	}
 
+	// Check if this is an admin/moderator deletion (not author)
+	isModeratorAction := existingComment.UserID != userID.(int) && (roleStr == "admin" || isHubMod)
+
+	// If it's a moderator action and no reason provided, require one
+	if isModeratorAction && req.Reason == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Deletion reason is required for moderator actions"})
+		return
+	}
+
 	if err := h.commentRepo.SoftDelete(c.Request.Context(), commentID); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete comment", "details": err.Error()})
 		return
 	}
 
+	// Send modmail notification if this is a moderator action
+	if isModeratorAction && req.Reason != "" && post.HubID != nil {
+		go h.sendCommentDeletionModMail(existingComment, post, userID.(int), req.Reason, roleStr)
+	}
+
 	c.JSON(http.StatusOK, gin.H{"message": "Comment deleted successfully"})
+}
+
+func (h *CommentsHandler) sendCommentDeletionModMail(comment *models.PostComment, post *models.PlatformPost, moderatorID int, reason string, moderatorRole string) {
+	// This runs in a goroutine, so we need a background context
+	ctx := context.Background()
+
+	// Get the hub
+	if post.HubID == nil {
+		return
+	}
+
+	hub, err := h.hubRepo.GetByID(ctx, *post.HubID)
+	if err != nil || hub == nil {
+		return
+	}
+
+	// Get moderator username
+	moderator, err := h.userRepo.GetByID(ctx, moderatorID)
+	if err != nil || moderator == nil {
+		return
+	}
+
+	// Create subject and message
+	subject := "Your comment was removed"
+	moderatorTitle := "moderator"
+	if moderatorRole == "admin" {
+		moderatorTitle = "admin"
+	}
+
+	// Truncate comment body for display (first 100 chars)
+	commentPreview := comment.Body
+	if len(commentPreview) > 100 {
+		commentPreview = commentPreview[:100] + "..."
+	}
+
+	message := fmt.Sprintf(
+		"Your comment on post '%s' was removed from h/%s by a %s.\n\nYour comment: \"%s\"\n\nReason: %s.",
+		post.Title,
+		hub.Name,
+		moderatorTitle,
+		commentPreview,
+		reason,
+	)
+
+	// Begin transaction to create mod mail
+	tx, err := h.pool.Begin(ctx)
+	if err != nil {
+		return
+	}
+	defer tx.Rollback(ctx)
+
+	// Create mod mail conversation
+	var conversationID int
+	err = tx.QueryRow(ctx, `
+		INSERT INTO conversations (conversation_type, hub_id, subject, status, created_at, last_message_at)
+		VALUES ('mod_mail', $1, $2, 'open', NOW(), NOW())
+		RETURNING id
+	`, post.HubID, subject).Scan(&conversationID)
+	if err != nil {
+		return
+	}
+
+	// Add the comment author as a participant (non-moderator)
+	_, err = tx.Exec(ctx, `
+		INSERT INTO conversation_participants (conversation_id, user_id, is_moderator, joined_at)
+		VALUES ($1, $2, FALSE, NOW())
+	`, conversationID, comment.UserID)
+	if err != nil {
+		return
+	}
+
+	// Get all moderators of the hub and add them
+	rows, err := tx.Query(ctx, `
+		SELECT user_id FROM hub_moderators WHERE hub_id = $1
+	`, post.HubID)
+	if err != nil {
+		return
+	}
+	defer rows.Close()
+
+	moderatorIDs := []int{}
+	for rows.Next() {
+		var modID int
+		if err := rows.Scan(&modID); err != nil {
+			return
+		}
+		moderatorIDs = append(moderatorIDs, modID)
+	}
+
+	for _, modID := range moderatorIDs {
+		_, err = tx.Exec(ctx, `
+			INSERT INTO conversation_participants (conversation_id, user_id, is_moderator, joined_at)
+			VALUES ($1, $2, TRUE, NOW())
+			ON CONFLICT (conversation_id, user_id) DO NOTHING
+		`, conversationID, modID)
+		if err != nil {
+			return
+		}
+	}
+
+	// Create the message
+	_, err = tx.Exec(ctx, `
+		INSERT INTO messages (
+			conversation_id, sender_id, recipient_id, encrypted_content,
+			message_type, encryption_version, is_multi_recipient
+		)
+		VALUES ($1, $2, $3, $4, 'text', 'plaintext', FALSE)
+	`, conversationID, moderatorID, comment.UserID, message)
+	if err != nil {
+		return
+	}
+
+	tx.Commit(ctx)
 }
 
 // UpdateCommentPreferencesRequest toggles inbox reply notifications for post comments

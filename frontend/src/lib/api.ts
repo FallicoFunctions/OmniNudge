@@ -90,8 +90,11 @@ class ApiClient {
     });
   }
 
-  async delete<T>(endpoint: string): Promise<T> {
-    return this.request<T>(endpoint, { method: 'DELETE' });
+  async delete<T>(endpoint: string, data?: unknown): Promise<T> {
+    return this.request<T>(endpoint, {
+      method: 'DELETE',
+      body: data ? JSON.stringify(data) : undefined,
+    });
   }
 
   async uploadFile<T>(endpoint: string, file: File, additionalData?: Record<string, string>): Promise<T> {
