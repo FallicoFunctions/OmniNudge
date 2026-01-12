@@ -1,16 +1,22 @@
 package handlers
 
 import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"io"
 	"net/http"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/omninudge/backend/internal/models"
 	"github.com/omninudge/backend/internal/services"
 )
 
 // PostsHandler handles HTTP requests for platform posts
 type PostsHandler struct {
+	pool         *pgxpool.Pool
 	postRepo     *models.PlatformPostRepository
 	hubRepo      *models.HubRepository
 	userRepo     *models.UserRepository
@@ -20,8 +26,9 @@ type PostsHandler struct {
 }
 
 // NewPostsHandler creates a new posts handler
-func NewPostsHandler(postRepo *models.PlatformPostRepository, hubRepo *models.HubRepository, userRepo *models.UserRepository, modRepo *models.HubModeratorRepository, feedRepo *models.FeedRepository) *PostsHandler {
+func NewPostsHandler(pool *pgxpool.Pool, postRepo *models.PlatformPostRepository, hubRepo *models.HubRepository, userRepo *models.UserRepository, modRepo *models.HubModeratorRepository, feedRepo *models.FeedRepository) *PostsHandler {
 	return &PostsHandler{
+		pool:     pool,
 		postRepo: postRepo,
 		hubRepo:  hubRepo,
 		userRepo: userRepo,
@@ -419,6 +426,10 @@ func (h *PostsHandler) UpdatePost(c *gin.Context) {
 }
 
 // DeletePost handles DELETE /api/v1/posts/:id
+type DeletePostRequest struct {
+	Reason string `json:"reason"`
+}
+
 func (h *PostsHandler) DeletePost(c *gin.Context) {
 	// Get user ID from context
 	userID, exists := c.Get("user_id")
@@ -433,6 +444,16 @@ func (h *PostsHandler) DeletePost(c *gin.Context) {
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid post ID"})
 		return
+	}
+
+	// Parse deletion reason from request body (optional)
+	// Note: Gin's ShouldBindJSON has issues with DELETE requests, so we read manually
+	var req DeletePostRequest
+	if c.Request.Body != nil {
+		bodyBytes, err := io.ReadAll(c.Request.Body)
+		if err == nil && len(bodyBytes) > 0 {
+			_ = json.Unmarshal(bodyBytes, &req)
+		}
 	}
 
 	// Get existing post to verify ownership
@@ -460,12 +481,132 @@ func (h *PostsHandler) DeletePost(c *gin.Context) {
 		return
 	}
 
+	// Check if this is an admin/moderator deletion (not author)
+	isModeratorAction := existingPost.AuthorID != userID.(int) && (roleStr == "admin" || isHubMod)
+
+	// If it's a moderator action and no reason provided, require one
+	if isModeratorAction && req.Reason == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Deletion reason is required for moderator actions"})
+		return
+	}
+
 	if err := h.postRepo.SoftDelete(c.Request.Context(), postID); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete post", "details": err.Error()})
 		return
 	}
 
+	// Send modmail notification if this is a moderator action
+	if isModeratorAction && req.Reason != "" && existingPost.HubID != nil {
+		go h.sendPostDeletionModMail(existingPost, userID.(int), req.Reason, roleStr)
+	}
+
 	c.JSON(http.StatusOK, gin.H{"message": "Post deleted successfully"})
+}
+
+func (h *PostsHandler) sendPostDeletionModMail(post *models.PlatformPost, moderatorID int, reason string, moderatorRole string) {
+	// This runs in a goroutine, so we need a background context
+	ctx := context.Background()
+
+	// Get the hub
+	if post.HubID == nil {
+		return
+	}
+
+	hub, err := h.hubRepo.GetByID(ctx, *post.HubID)
+	if err != nil || hub == nil {
+		return
+	}
+
+	// Get moderator username
+	moderator, err := h.userRepo.GetByID(ctx, moderatorID)
+	if err != nil || moderator == nil {
+		return
+	}
+
+	// Create subject and message
+	subject := "Your post was removed"
+	moderatorTitle := "moderator"
+	if moderatorRole == "admin" {
+		moderatorTitle = "admin"
+	}
+
+	message := fmt.Sprintf(
+		"Your post '%s' was removed from h/%s by a %s.\n\nReason: %s.",
+		post.Title,
+		hub.Name,
+		moderatorTitle,
+		reason,
+	)
+
+	// Begin transaction to create mod mail
+	tx, err := h.pool.Begin(ctx)
+	if err != nil {
+		return
+	}
+	defer tx.Rollback(ctx)
+
+	// Create mod mail conversation
+	var conversationID int
+	err = tx.QueryRow(ctx, `
+		INSERT INTO conversations (conversation_type, hub_id, subject, status, created_at, last_message_at)
+		VALUES ('mod_mail', $1, $2, 'open', NOW(), NOW())
+		RETURNING id
+	`, post.HubID, subject).Scan(&conversationID)
+	if err != nil {
+		return
+	}
+
+	// Add the post author as a participant (non-moderator)
+	_, err = tx.Exec(ctx, `
+		INSERT INTO conversation_participants (conversation_id, user_id, is_moderator, joined_at)
+		VALUES ($1, $2, FALSE, NOW())
+	`, conversationID, post.AuthorID)
+	if err != nil {
+		return
+	}
+
+	// Get all moderators of the hub and add them
+	rows, err := tx.Query(ctx, `
+		SELECT user_id FROM hub_moderators WHERE hub_id = $1
+	`, post.HubID)
+	if err != nil {
+		return
+	}
+	defer rows.Close()
+
+	moderatorIDs := []int{}
+	for rows.Next() {
+		var modID int
+		if err := rows.Scan(&modID); err != nil {
+			return
+		}
+		moderatorIDs = append(moderatorIDs, modID)
+	}
+
+	for _, modID := range moderatorIDs {
+		_, err = tx.Exec(ctx, `
+			INSERT INTO conversation_participants (conversation_id, user_id, is_moderator, joined_at)
+			VALUES ($1, $2, TRUE, NOW())
+			ON CONFLICT (conversation_id, user_id) DO NOTHING
+		`, conversationID, modID)
+		if err != nil {
+			return
+		}
+	}
+
+	// Create the message
+	_, err = tx.Exec(ctx, `
+		INSERT INTO messages (
+			conversation_id, sender_id, recipient_id, encrypted_content,
+			message_type, encryption_version, is_multi_recipient
+		)
+		VALUES ($1, $2, $3, $4, 'text', 'plaintext', FALSE)
+	`, conversationID, moderatorID, post.AuthorID, message)
+	if err != nil {
+		return
+	}
+
+	tx.Commit(ctx)
 }
 
 // VotePost handles POST /api/v1/posts/:id/vote

@@ -8,6 +8,8 @@ interface HubPostCardProps {
   post: PlatformPost;
   useRelativeTime: boolean;
   currentUserId?: number;
+  currentUserRole?: string;
+  isModerator?: boolean;
   hubNameMap?: Map<number, string>;
   currentHubName?: string;
   isSaved?: boolean;
@@ -25,6 +27,8 @@ export function HubPostCard({
   post,
   useRelativeTime,
   currentUserId,
+  currentUserRole,
+  isModerator = false,
   hubNameMap,
   currentHubName,
   isSaved = false,
@@ -63,8 +67,14 @@ export function HubPostCard({
     (post.comment_count ?? post.num_comments ?? 0) === 1 ? '' : 's'
   }`;
 
-  const canDelete = currentUserId === post.author_id;
+  // User can delete if they are: the author, an admin, or a moderator of this hub
+  const canDelete = currentUserId === post.author_id || currentUserRole === 'admin' || isModerator;
   const postUrl = `/posts/${post.id}`;
+
+  // Debug logging
+  if (currentUserRole === 'admin') {
+    console.log('[HubPostCard] Admin user - canDelete:', canDelete, 'currentUserId:', currentUserId, 'post.author_id:', post.author_id, 'currentUserRole:', currentUserRole, 'onDelete exists:', !!onDelete);
+  }
 
   return (
     <article className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)]">

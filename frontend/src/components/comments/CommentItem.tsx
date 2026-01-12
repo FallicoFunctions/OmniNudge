@@ -24,6 +24,8 @@ interface CommentItemProps<T extends LocalCommentBase> {
   handlers: CommentActionHandlers<T>;
   savedCommentIds: Set<number>;
   currentUsername?: string | null;
+  currentUserRole?: string;
+  isModerator?: boolean;
 }
 
 export function CommentItem<T extends LocalCommentBase>({
@@ -35,6 +37,8 @@ export function CommentItem<T extends LocalCommentBase>({
   handlers,
   savedCommentIds,
   currentUsername,
+  currentUserRole,
+  isModerator = false,
 }: CommentItemProps<T>) {
   const [replyText, setReplyText] = useState('');
   const [editText, setEditText] = useState(comment.content);
@@ -55,6 +59,8 @@ export function CommentItem<T extends LocalCommentBase>({
   );
   const isReplying = replyingTo === comment.id;
   const isOwner = currentUsername && comment.username === currentUsername;
+  // User can delete/edit if they are: the author, an admin, or a moderator
+  const canModerate = isOwner || currentUserRole === 'admin' || isModerator;
   const inboxDisabled = comment.inbox_replies_disabled ?? false;
   const isSaved = savedCommentIds.has(comment.id);
   const { useRelativeTime } = useSettings();
@@ -291,7 +297,7 @@ export function CommentItem<T extends LocalCommentBase>({
             >
               {isSaved ? 'unsave' : 'save'}
             </button>
-            {isOwner ? (
+            {isOwner && (
               <>
                 <button onClick={() => setIsEditing(true)} className="hover:text-[var(--color-primary)]">
                   edit
@@ -303,15 +309,18 @@ export function CommentItem<T extends LocalCommentBase>({
                 >
                   {inboxDisabled ? 'enable inbox replies' : 'disable inbox replies'}
                 </button>
-                <button
-                  onClick={handleDelete}
-                  disabled={deletePending}
-                  className="text-red-500 hover:text-red-600 disabled:opacity-50"
-                >
-                  delete
-                </button>
               </>
-            ) : (
+            )}
+            {canModerate && (
+              <button
+                onClick={handleDelete}
+                disabled={deletePending}
+                className="text-red-500 hover:text-red-600 disabled:opacity-50"
+              >
+                delete
+              </button>
+            )}
+            {!isOwner && (
               <button
                 onClick={handleReport}
                 disabled={reportPending}
@@ -372,6 +381,8 @@ export function CommentItem<T extends LocalCommentBase>({
               handlers={handlers}
               savedCommentIds={savedCommentIds}
               currentUsername={currentUsername}
+              currentUserRole={currentUserRole}
+              isModerator={isModerator}
             />
           ))}
         </div>
