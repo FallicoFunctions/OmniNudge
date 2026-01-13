@@ -173,6 +173,8 @@ func main() {
 	slideshowHandler := handlers.NewSlideshowHandler(db.Pool, slideshowRepo, conversationRepo, hub)
 	mediaGalleryHandler := handlers.NewMediaGalleryHandler(db.Pool)
 	userStatusHandler := handlers.NewUserStatusHandler(hub)
+	subredditPresence := services.NewSubredditPresence(10 * time.Minute)
+	subredditPresenceHandler := handlers.NewSubredditPresenceHandler(subredditPresence)
 	themesHandler := handlers.NewThemesHandler(themeRepo, themeOverrideRepo, installedThemeRepo, userSettingsRepo, cssSanitizer)
 	redditCommentsHandler := handlers.NewRedditCommentsHandler(redditCommentRepo)
 	savedItemsHandler := handlers.NewSavedItemsHandler(savedItemsRepo, postRepo, commentRepo, redditCommentRepo, redditClient)
@@ -347,6 +349,8 @@ func main() {
 		{
 			subreddits.GET("/:name/posts", postsHandler.GetSubredditPosts)
 			subreddits.GET("/:name/subscription", subscriptionsHandler.CheckSubredditSubscription)
+			subreddits.GET("/:name/active-users", subredditPresenceHandler.GetSubredditActiveUsers)
+			subreddits.POST("/:name/active-users/ping", subredditPresenceHandler.PingSubredditPresence)
 		}
 
 		// Public user profile routes

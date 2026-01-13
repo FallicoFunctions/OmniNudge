@@ -1,5 +1,6 @@
 import type { RefObject } from 'react';
 import SubredditAboutPanel from '../reddit/SubredditAboutPanel';
+import { SubredditModeratorsPanel } from './SubredditModeratorsPanel';
 import type { RedditSubredditAbout } from '../../types/reddit';
 
 type SubredditSidebarProps = {
@@ -11,6 +12,7 @@ type SubredditSidebarProps = {
   isError: boolean;
   sidebarHtml?: string | null;
   sidebarRef: RefObject<HTMLDivElement | null>;
+  activeOmniUsers?: number | null;
 };
 
 export function SubredditSidebar({
@@ -22,6 +24,7 @@ export function SubredditSidebar({
   isError,
   sidebarHtml,
   sidebarRef,
+  activeOmniUsers,
 }: SubredditSidebarProps) {
   return (
     <aside className="space-y-4">
@@ -51,16 +54,10 @@ export function SubredditSidebar({
         isError={isError}
         sidebarHtml={sidebarHtml}
         sidebarRef={sidebarRef}
+        activeOmniUsers={activeOmniUsers}
       />
 
-      <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
-        <h3 className="text-sm font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
-          Moderators
-        </h3>
-        <p className="mt-3 text-sm text-[var(--color-text-secondary)]">
-          Public Reddit API does not provide the moderator list.
-        </p>
-      </div>
+      <SubredditModeratorsPanel />
     </aside>
   );
 }
