@@ -138,16 +138,9 @@ func (h *SlideshowHandler) StartSlideshow(c *gin.Context) {
 
 	// For personal slideshows, add media items
 	if req.SlideshowType == "personal" {
-		for i, mediaFileID := range req.MediaFileIDs {
-			item := &models.SlideshowMediaItem{
-				SlideshowSessionID: session.ID,
-				MediaFileID:        mediaFileID,
-				Position:           i,
-			}
-			if err := h.slideshowRepo.AddMediaItem(c.Request.Context(), item); err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to add media items"})
-				return
-			}
+		if err := h.slideshowRepo.AddMediaItems(c.Request.Context(), session.ID, req.MediaFileIDs); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to add media items"})
+			return
 		}
 	}
 

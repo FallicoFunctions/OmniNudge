@@ -266,8 +266,10 @@ export function HiddenItemsView({
 
   const resaveRedditPostMutation = useMutation({
     mutationFn: async ({ subreddit, reddit_post_id }: { subreddit: string; reddit_post_id: string }) => {
-      await savedService.unhideRedditPost(subreddit, reddit_post_id);
-      await savedService.saveRedditPost(subreddit, reddit_post_id);
+      await Promise.all([
+        savedService.unhideRedditPost(subreddit, reddit_post_id),
+        savedService.saveRedditPost(subreddit, reddit_post_id),
+      ]);
     },
     onSuccess: () => {
       invalidateHiddenQueries();

@@ -238,13 +238,11 @@ func (h *AuthHandler) GetPublicKeys(c *gin.Context) {
 		return
 	}
 
-	// Fetch public keys for all users
-	publicKeys := make(map[int]string)
-	for _, userID := range userIDs {
-		user, err := h.userRepo.GetByID(c.Request.Context(), userID)
-		if err == nil && user != nil && user.PublicKey != nil {
-			publicKeys[userID] = *user.PublicKey
-		}
+	// Fetch public keys for all users in one query
+	publicKeys, err := h.userRepo.GetPublicKeysByIDs(c.Request.Context(), userIDs)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch public keys", "details": err.Error()})
+		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{"public_keys": publicKeys})
