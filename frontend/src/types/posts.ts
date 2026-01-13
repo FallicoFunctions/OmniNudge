@@ -1,5 +1,7 @@
 export interface GalleryImage {
   url: string;
+  media_type?: string;
+  thumbnail_url?: string;
   width?: number;
   height?: number;
 }
@@ -48,6 +50,7 @@ export interface CreatePostRequest {
   media_url?: string;
   media_type?: string;
   thumbnail_url?: string;
+  gallery_images?: GalleryImage[];
   hub_id?: number;
   target_subreddit?: string;
   send_replies_to_inbox?: boolean;

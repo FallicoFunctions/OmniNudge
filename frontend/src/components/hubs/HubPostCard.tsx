@@ -1,6 +1,7 @@
 import { Link, useLocation } from 'react-router-dom';
 import { useMemo } from 'react';
 import { formatTimestamp } from '../../utils/timeFormat';
+import { resolveMediaUrl } from '../../utils/mediaUrl';
 import { VoteButtons } from '../VoteButtons';
 import type { PlatformPost } from '../../types/posts';
 
@@ -89,7 +90,7 @@ export function HubPostCard({
         />
         {post.thumbnail_url && (
           <img
-            src={post.thumbnail_url}
+            src={resolveMediaUrl(post.thumbnail_url)}
             alt=""
             loading="lazy"
             decoding="async"

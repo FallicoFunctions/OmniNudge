@@ -524,9 +524,11 @@ func main() {
 			protected.GET("/conversations/:id/media", mediaGalleryHandler.GetConversationMedia)
 			protected.GET("/conversations/:id/media/:messageId/index", mediaGalleryHandler.FindMediaIndex)
 
-			// Media upload (with rate limiting: 10 uploads per minute)
+			// Media upload (with rate limiting: 30 uploads per minute)
 			uploadRateLimiter := middleware.UploadRateLimiter()
 			protected.POST("/media/upload", uploadRateLimiter.Middleware(), mediaHandler.UploadMedia)
+			// Batch media upload (no individual rate limiting, processes multiple files concurrently)
+			protected.POST("/media/batch-upload", mediaHandler.BatchUploadMedia)
 
 			// User profile management
 			protected.PUT("/users/profile", usersHandler.UpdateProfile)

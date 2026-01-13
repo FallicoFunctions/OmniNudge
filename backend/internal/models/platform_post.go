@@ -13,9 +13,11 @@ import (
 
 // GalleryImage represents a single image in a gallery post
 type GalleryImage struct {
-	URL    string `json:"url"`
-	Width  int    `json:"width,omitempty"`
-	Height int    `json:"height,omitempty"`
+	URL          string `json:"url"`
+	MediaType    string `json:"media_type,omitempty"`
+	ThumbnailURL string `json:"thumbnail_url,omitempty"`
+	Width        int    `json:"width,omitempty"`
+	Height       int    `json:"height,omitempty"`
 }
 
 // PlatformPost represents a native post created by users

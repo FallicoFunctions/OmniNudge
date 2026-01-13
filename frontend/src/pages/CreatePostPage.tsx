@@ -1,10 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { postsService } from '../services/postsService';
 import { hubsService, type Hub } from '../services/hubsService';
 import { redditService } from '../services/redditService';
-import type { CreatePostRequest } from '../types/posts';
+import { mediaService } from '../services/mediaService';
+import type { CreatePostRequest, GalleryImage } from '../types/posts';
 import type { SubredditSuggestion } from '../types/reddit';
 import { getPostUrl } from '../utils/postUrl';
 import { EmptyMessage, LoadingMessage } from '../components/common/StatusMessage';
@@ -23,13 +24,20 @@ export default function CreatePostPage() {
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [mediaUrl, setMediaUrl] = useState('');
-  const [destination, setDestination] = useState<'profile' | 'hub' | 'subreddit'>('hub');
+  const [mediaType, setMediaType] = useState<string | undefined>(undefined);
+  const [mediaItems, setMediaItems] = useState<GalleryImage[]>([]);
+  const [mediaPreviews, setMediaPreviews] = useState<string[]>([]);
+  const mediaPreviewsRef = useRef<string[]>([]);
+  const [mediaUploadError, setMediaUploadError] = useState<string | null>(null);
+  const [isUploadingMedia, setIsUploadingMedia] = useState(false);
+  const [destination, setDestination] = useState<'hub' | 'subreddit'>('hub');
   const [selectedHub, setSelectedHub] = useState<{ id?: number; name?: string } | null>(null);
   const [hubInputValue, setHubInputValue] = useState<string>('');
   const [isHubAutocompleteOpen, setIsHubAutocompleteOpen] = useState(false);
   const [subredditInputValue, setSubredditInputValue] = useState<string>('');
   const [isSubredditAutocompleteOpen, setIsSubredditAutocompleteOpen] = useState(false);
   const [sendRepliesToInbox, setSendRepliesToInbox] = useState(true);
+  const mediaInputRef = useRef<HTMLInputElement | null>(null);
 
   // Pre-fill destination from location state
   useEffect(() => {
@@ -115,6 +123,148 @@ export default function CreatePostPage() {
     setIsSubredditAutocompleteOpen(false);
   };
 
+  useEffect(() => {
+    mediaPreviewsRef.current = mediaPreviews;
+  }, [mediaPreviews]);
+
+  useEffect(() => {
+    return () => {
+      mediaPreviewsRef.current.forEach((url) => URL.revokeObjectURL(url));
+    };
+  }, []);
+
+  const normalizeUploadedMediaUrl = (storageUrl?: string, storagePath?: string) => {
+    if (storageUrl) {
+      if (storageUrl.startsWith('http')) {
+        const urlObj = new URL(storageUrl);
+        return urlObj.pathname;
+      }
+      return storageUrl.startsWith('/') ? storageUrl : `/${storageUrl}`;
+    }
+    if (storagePath) {
+      const normalizedPath = storagePath.replace(/^\/?uploads\/?/, '');
+      return `/uploads/${normalizedPath}`;
+    }
+    return '';
+  };
+
+  const handleMediaFiles = async (fileList: FileList) => {
+    const files = Array.from(fileList);
+    if (files.length === 0) return;
+
+    const validFiles = files.filter(
+      (file) => file.type.startsWith('image/') || file.type.startsWith('video/')
+    );
+    if (validFiles.length === 0) {
+      setMediaUploadError('Please choose image or video files.');
+      return;
+    }
+
+    setMediaUploadError(null);
+    setIsUploadingMedia(true);
+    const pendingItems = validFiles.map((file) => {
+      const previewUrl = URL.createObjectURL(file);
+      return { previewUrl, file };
+    });
+
+    try {
+      // Use batch upload for multiple files
+      const result = await mediaService.batchUploadMedia(validFiles);
+
+      const uploads: GalleryImage[] = [];
+      const previews: string[] = [];
+
+      // Process successful uploads
+      result.uploads.forEach((uploaded, index) => {
+        if (uploaded) {
+          const normalizedUrl = normalizeUploadedMediaUrl(
+            uploaded.storage_url,
+            uploaded.storage_path
+          );
+          uploads.push({
+            url: normalizedUrl,
+            media_type: uploaded.file_type || validFiles[index].type,
+            thumbnail_url: uploaded.thumbnail_url,
+          });
+          previews.push(pendingItems[index].previewUrl);
+        } else {
+          // Revoke preview URL for failed uploads
+          URL.revokeObjectURL(pendingItems[index].previewUrl);
+        }
+      });
+
+      if (uploads.length > 0) {
+        setMediaItems((prev) => [...prev, ...uploads]);
+        setMediaPreviews((prev) => [...prev, ...previews]);
+      }
+
+      if (uploads.length > 1 || mediaItems.length > 0) {
+        setMediaUrl('');
+        setMediaType(undefined);
+      } else if (uploads.length === 1) {
+        setMediaUrl(uploads[0].url);
+        setMediaType(uploads[0].media_type);
+      }
+
+      // Show error if some uploads failed
+      if (result.errors && result.errors.length > 0) {
+        setMediaUploadError(`${result.errors.length} file(s) failed to upload`);
+      }
+    } catch (error) {
+      console.error('[CreatePostPage] Failed to upload media:', error);
+      setMediaUploadError('Failed to upload media. Please try again.');
+    } finally {
+      setIsUploadingMedia(false);
+    }
+  };
+
+  const handleMediaInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (files && files.length > 0) {
+      void handleMediaFiles(files);
+    }
+  };
+
+  const handleMediaDrop = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    if (isUploadingMedia) return;
+    event.dataTransfer.dropEffect = 'copy';
+    const files = event.dataTransfer.files;
+    if (files && files.length > 0) {
+      void handleMediaFiles(files);
+    }
+  };
+
+  const clearMediaSelection = () => {
+    setMediaUrl('');
+    setMediaType(undefined);
+    setMediaItems([]);
+    setMediaUploadError(null);
+    mediaPreviews.forEach((url) => URL.revokeObjectURL(url));
+    setMediaPreviews([]);
+    if (mediaInputRef.current) {
+      mediaInputRef.current.value = '';
+    }
+  };
+
+  const removeMediaItem = (index: number) => {
+    setMediaItems((prev) => {
+      const next = prev.filter((_, idx) => idx !== index);
+      if (next.length === 0) {
+        setMediaUrl('');
+        setMediaType(undefined);
+      }
+      return next;
+    });
+    setMediaPreviews((prev) => {
+      const toRemove = prev[index];
+      if (toRemove) {
+        URL.revokeObjectURL(toRemove);
+      }
+      return prev.filter((_, idx) => idx !== index);
+    });
+  };
+
   const createPostMutation = useMutation({
     mutationFn: (data: CreatePostRequest) => postsService.createPost(data),
     onSuccess: (post) => {
@@ -130,8 +280,8 @@ export default function CreatePostPage() {
       return;
     }
 
-    if (destination === 'profile') {
-      alert('Profile posting is not yet implemented');
+    if (isUploadingMedia) {
+      alert('Please wait for the media upload to finish.');
       return;
     }
 
@@ -182,10 +332,29 @@ export default function CreatePostPage() {
       targetSubreddit = trimmedSubredditInput.replace(/^r\//i, '');
     }
 
+    const galleryImages = mediaItems.length > 1 ? mediaItems : undefined;
+    const singleMediaUrl =
+      mediaItems.length === 1 ? mediaItems[0].url : mediaUrl || undefined;
+    const primaryItem = mediaItems[0];
+    const primaryIsVideo = primaryItem?.media_type?.startsWith('video');
+    const thumbnailUrl = primaryItem
+      ? primaryIsVideo
+        ? primaryItem.thumbnail_url
+        : primaryItem.thumbnail_url || primaryItem.url
+      : undefined;
+
     const data: CreatePostRequest = {
       title,
       body: body || undefined,
-      media_url: activeTab === 'link' ? mediaUrl || undefined : undefined,
+      media_url: activeTab === 'link' ? singleMediaUrl : undefined,
+      media_type:
+        activeTab === 'link'
+          ? mediaItems.length === 1
+            ? mediaItems[0].media_type
+            : mediaType
+          : undefined,
+      thumbnail_url: activeTab === 'link' ? thumbnailUrl : undefined,
+      gallery_images: activeTab === 'link' ? galleryImages : undefined,
       hub_id: destination === 'hub' ? hubId : undefined,
       target_subreddit: destination === 'subreddit' ? targetSubreddit : undefined,
       send_replies_to_inbox: sendRepliesToInbox,
@@ -250,15 +419,110 @@ export default function CreatePostPage() {
           <div>
             <label className="block text-sm font-medium mb-2">URL or Media</label>
             <input
-              type="url"
+              type={mediaItems.length > 0 ? 'text' : 'url'}
               value={mediaUrl}
-              onChange={(e) => setMediaUrl(e.target.value)}
+              onChange={(e) => {
+                setMediaUrl(e.target.value);
+                if (e.target.value) {
+                  setMediaType(undefined);
+                  setMediaItems([]);
+                  setMediaUploadError(null);
+                }
+              }}
               className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
               placeholder="https://example.com"
+              disabled={mediaItems.length > 0}
             />
             <p className="mt-1 text-sm text-gray-500">
               Enter a URL or upload an image/video
             </p>
+            <div className="mt-4">
+              <label className="block text-sm font-medium mb-2">Image/Video</label>
+              <div
+                onDragOver={(event) => event.preventDefault()}
+                onDrop={handleMediaDrop}
+                className="flex flex-col items-center justify-center gap-3 rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 px-4 py-6 text-center"
+              >
+                {mediaItems.length > 0 ? (
+                  <>
+                    <div className="grid w-full grid-cols-1 gap-3 sm:grid-cols-2">
+                      {mediaItems.map((item, index) => {
+                        const previewUrl = mediaPreviews[index] ?? item.url;
+                        const isVideo = (item.media_type ?? '').startsWith('video');
+                        return (
+                          <div
+                            key={`${item.url}-${index}`}
+                            className="flex flex-col items-center gap-2 rounded-md border border-gray-200 bg-white p-3"
+                          >
+                            {isVideo ? (
+                              <video src={previewUrl} controls className="max-h-36 w-full rounded" />
+                            ) : (
+                              <img
+                                src={previewUrl}
+                                alt="Uploaded preview"
+                                className="max-h-36 w-full rounded object-contain"
+                              />
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => removeMediaItem(index)}
+                              className="text-xs text-blue-600 hover:text-blue-800"
+                              disabled={isUploadingMedia}
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => mediaInputRef.current?.click()}
+                        className="px-3 py-1.5 rounded-md border border-gray-300 text-sm text-gray-700 hover:bg-gray-100"
+                        disabled={isUploadingMedia}
+                      >
+                        Add more
+                      </button>
+                      <button
+                        type="button"
+                        onClick={clearMediaSelection}
+                        className="px-3 py-1.5 rounded-md text-sm text-red-600 hover:text-red-700"
+                        disabled={isUploadingMedia}
+                      >
+                        Clear all
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="text-sm text-gray-500">
+                      Drag and drop a file here, or
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => mediaInputRef.current?.click()}
+                      className="px-4 py-2 rounded-md bg-blue-600 text-white hover:bg-blue-700"
+                      disabled={isUploadingMedia}
+                    >
+                      {isUploadingMedia ? 'Uploading...' : 'Choose File'}
+                    </button>
+                  </>
+                )}
+                <input
+                  ref={mediaInputRef}
+                  type="file"
+                  accept="image/*,video/*"
+                  multiple
+                  className="hidden"
+                  onChange={handleMediaInputChange}
+                  disabled={isUploadingMedia}
+                />
+              </div>
+              {mediaUploadError && (
+                <p className="mt-2 text-sm text-red-600">{mediaUploadError}</p>
+              )}
+            </div>
           </div>
         )}
 
@@ -285,203 +549,180 @@ export default function CreatePostPage() {
           </label>
 
           <div className="space-y-3">
-            {/* Profile option (disabled for now) */}
-            <label className="flex items-center opacity-50 cursor-not-allowed">
-              <input
-                type="radio"
-                name="destination"
-                value="profile"
-                checked={destination === 'profile'}
-                onChange={() => setDestination('profile')}
-                className="mr-2"
-                disabled
-              />
-              <span>Your profile (coming soon)</span>
-            </label>
-
-            {/* Hub/Subreddit option */}
-            <label className="flex items-center">
-              <input
-                type="radio"
-                name="destination"
-                value="hub"
-                checked={destination === 'hub' || destination === 'subreddit'}
-                onChange={() => setDestination('hub')}
-                className="mr-2"
-              />
-              <span>A hub or subreddit</span>
-            </label>
-
-            {(destination === 'hub' || destination === 'subreddit') && (
-              <div className="ml-6 space-y-2">
-                {/* Hub/Subreddit tabs */}
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setDestination('hub')}
-                    className={`px-3 py-1 text-sm rounded ${
-                      destination === 'hub'
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-gray-200 text-gray-700'
-                    }`}
-                  >
-                    Hubs
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setDestination('subreddit')}
-                    className={`px-3 py-1 text-sm rounded ${
-                      destination === 'subreddit'
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-gray-200 text-gray-700'
-                    }`}
-                  >
-                    Subreddits
-                  </button>
-                </div>
-
-                {/* Hub selector */}
-                {destination === 'hub' && (
-                  <div>
-                    <label className="block text-sm text-gray-600 mb-1">Enter a hub</label>
-                    <div className="relative">
-                      <input
-                        type="text"
-                        value={hubInputValue || ''}
-                        onChange={(e) => {
-                          const newValue = e.target.value;
-                          setHubInputValue(newValue || '');
-                          // Only clear selectedHub if the user actually changed the value
-                          if (newValue !== selectedHub?.name) {
-                            setSelectedHub(null);
-                          }
-                        }}
-                        onFocus={() => setIsHubAutocompleteOpen(true)}
-                        onBlur={() => setIsHubAutocompleteOpen(false)}
-                        placeholder="Search for a hub..."
-                        className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-                      />
-                      {destination === 'hub' &&
-                        isHubAutocompleteOpen &&
-                        trimmedHubInput.length >= HUB_AUTOCOMPLETE_MIN_LENGTH && (
-                          <div className="absolute left-0 right-0 top-full z-20 mt-1 rounded-lg border bg-white shadow-lg">
-                            {isHubAutocompleteLoading ? (
-                              <div className="px-3 py-2">
-                                <LoadingMessage className="mt-0 text-sm text-gray-500">Searching...</LoadingMessage>
-                              </div>
-                            ) : hubSuggestions.length === 0 ? (
-                              <div className="px-3 py-2">
-                                <EmptyMessage className="mt-0 text-sm text-gray-500">No hubs found.</EmptyMessage>
-                              </div>
-                            ) : (
-                              <ul>
-                                {hubSuggestions.map((hub) => (
-                                  <li key={hub.id}>
-                                    <button
-                                      type="button"
-                                      onMouseDown={(event) => event.preventDefault()}
-                                      onClick={() => handleSelectHubSuggestion(hub)}
-                                      className="flex w-full items-center justify-between px-3 py-2 text-left hover:bg-gray-50"
-                                    >
-                                      <div className="min-w-0 pr-2">
-                                        <p className="text-sm font-medium text-gray-900 truncate">
-                                          h/{hub.name}
-                                        </p>
-                                        {hub.title && (
-                                          <p className="text-xs text-gray-500 truncate">{hub.title}</p>
-                                        )}
-                                      </div>
-                                      {typeof hub.subscriber_count === 'number' && (
-                                        <span className="text-xs text-gray-500">
-                                          {hub.subscriber_count.toLocaleString()} subs
-                                        </span>
-                                      )}
-                                    </button>
-                                  </li>
-                                ))}
-                              </ul>
-                            )}
-                          </div>
-                        )}
-                    </div>
-                  </div>
-                )}
-
-                {/* Subreddit selector */}
-                {destination === 'subreddit' && (
-                  <div>
-                    <label className="block text-sm text-gray-600 mb-1">Enter a subreddit</label>
-                    <div className="relative">
-                      <input
-                        type="text"
-                        value={subredditInputValue}
-                        onChange={(e) => setSubredditInputValue(e.target.value)}
-                        onFocus={() => setIsSubredditAutocompleteOpen(true)}
-                        onBlur={() => setIsSubredditAutocompleteOpen(false)}
-                        placeholder="Search for a subreddit..."
-                        className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-                      />
-                      {destination === 'subreddit' &&
-                        isSubredditAutocompleteOpen &&
-                        trimmedSubredditInput.length >= SUBREDDIT_AUTOCOMPLETE_MIN_LENGTH && (
-                          <div className="absolute left-0 right-0 top-full z-20 mt-1 rounded-lg border bg-white shadow-lg">
-                            {isSubredditAutocompleteLoading ? (
-                              <div className="px-3 py-2">
-                                <LoadingMessage className="mt-0 text-sm text-gray-500">Searching...</LoadingMessage>
-                              </div>
-                            ) : subredditSuggestions.length === 0 ? (
-                              <div className="px-3 py-2">
-                                <EmptyMessage className="mt-0 text-sm text-gray-500">No subreddits found.</EmptyMessage>
-                              </div>
-                            ) : (
-                              <ul>
-                                {subredditSuggestions.map((suggestion) => (
-                                  <li key={suggestion.name}>
-                                    <button
-                                      type="button"
-                                      onMouseDown={(event) => event.preventDefault()}
-                                      onClick={() => handleSelectSubredditSuggestion(suggestion.name)}
-                                      className="flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-gray-50"
-                                    >
-                                      {suggestion.icon_url ? (
-                                        <img
-                                          src={suggestion.icon_url}
-                                          alt=""
-                                          className="h-6 w-6 rounded-full object-cover"
-                                        />
-                                      ) : (
-                                        <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gray-200 text-xs text-gray-600">
-                                          r/
-                                        </div>
-                                      )}
-                                      <div className="flex min-w-0 flex-col">
-                                        <span className="truncate text-sm font-medium text-gray-900">
-                                          r/{suggestion.name}
-                                        </span>
-                                        {suggestion.title && (
-                                          <span className="truncate text-xs text-gray-500">
-                                            {suggestion.title}
-                                          </span>
-                                        )}
-                                      </div>
-                                      {typeof suggestion.subscribers === 'number' &&
-                                        suggestion.subscribers > 0 && (
-                                          <span className="ml-auto text-xs text-gray-500">
-                                            {suggestion.subscribers.toLocaleString()} subs
-                                          </span>
-                                        )}
-                                    </button>
-                                  </li>
-                                ))}
-                              </ul>
-                            )}
-                          </div>
-                        )}
-                    </div>
-                  </div>
-                )}
+            <div className="space-y-2">
+              {/* Hub/Subreddit tabs */}
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setDestination('hub')}
+                  className={`px-3 py-1 text-sm rounded ${
+                    destination === 'hub'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-200 text-gray-700'
+                  }`}
+                >
+                  Hubs
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDestination('subreddit')}
+                  className={`px-3 py-1 text-sm rounded ${
+                    destination === 'subreddit'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-200 text-gray-700'
+                  }`}
+                >
+                  Subreddits
+                </button>
               </div>
-            )}
+
+              {/* Hub selector */}
+              {destination === 'hub' && (
+                <div>
+                  <label className="block text-sm text-gray-600 mb-1">Enter a hub</label>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={hubInputValue || ''}
+                      onChange={(e) => {
+                        const newValue = e.target.value;
+                        setHubInputValue(newValue || '');
+                        // Only clear selectedHub if the user actually changed the value
+                        if (newValue !== selectedHub?.name) {
+                          setSelectedHub(null);
+                        }
+                      }}
+                      onFocus={() => setIsHubAutocompleteOpen(true)}
+                      onBlur={() => setIsHubAutocompleteOpen(false)}
+                      placeholder="Search for a hub..."
+                      className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                    />
+                    {isHubAutocompleteOpen &&
+                      trimmedHubInput.length >= HUB_AUTOCOMPLETE_MIN_LENGTH && (
+                        <div className="absolute left-0 right-0 top-full z-20 mt-1 rounded-lg border bg-white shadow-lg">
+                          {isHubAutocompleteLoading ? (
+                            <div className="px-3 py-2">
+                              <LoadingMessage className="mt-0 text-sm text-gray-500">
+                                Searching...
+                              </LoadingMessage>
+                            </div>
+                          ) : hubSuggestions.length === 0 ? (
+                            <div className="px-3 py-2">
+                              <EmptyMessage className="mt-0 text-sm text-gray-500">
+                                No hubs found.
+                              </EmptyMessage>
+                            </div>
+                          ) : (
+                            <ul>
+                              {hubSuggestions.map((hub) => (
+                                <li key={hub.id}>
+                                  <button
+                                    type="button"
+                                    onMouseDown={(event) => event.preventDefault()}
+                                    onClick={() => handleSelectHubSuggestion(hub)}
+                                    className="flex w-full items-center justify-between px-3 py-2 text-left hover:bg-gray-50"
+                                  >
+                                    <div className="min-w-0 pr-2">
+                                      <p className="text-sm font-medium text-gray-900 truncate">
+                                        h/{hub.name}
+                                      </p>
+                                      {hub.title && (
+                                        <p className="text-xs text-gray-500 truncate">{hub.title}</p>
+                                      )}
+                                    </div>
+                                    {typeof hub.subscriber_count === 'number' && (
+                                      <span className="text-xs text-gray-500">
+                                        {hub.subscriber_count.toLocaleString()} subs
+                                      </span>
+                                    )}
+                                  </button>
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                        </div>
+                      )}
+                  </div>
+                </div>
+              )}
+
+              {/* Subreddit selector */}
+              {destination === 'subreddit' && (
+                <div>
+                  <label className="block text-sm text-gray-600 mb-1">Enter a subreddit</label>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={subredditInputValue}
+                      onChange={(e) => setSubredditInputValue(e.target.value)}
+                      onFocus={() => setIsSubredditAutocompleteOpen(true)}
+                      onBlur={() => setIsSubredditAutocompleteOpen(false)}
+                      placeholder="Search for a subreddit..."
+                      className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                    />
+                    {isSubredditAutocompleteOpen &&
+                      trimmedSubredditInput.length >= SUBREDDIT_AUTOCOMPLETE_MIN_LENGTH && (
+                        <div className="absolute left-0 right-0 top-full z-20 mt-1 rounded-lg border bg-white shadow-lg">
+                          {isSubredditAutocompleteLoading ? (
+                            <div className="px-3 py-2">
+                              <LoadingMessage className="mt-0 text-sm text-gray-500">
+                                Searching...
+                              </LoadingMessage>
+                            </div>
+                          ) : subredditSuggestions.length === 0 ? (
+                            <div className="px-3 py-2">
+                              <EmptyMessage className="mt-0 text-sm text-gray-500">
+                                No subreddits found.
+                              </EmptyMessage>
+                            </div>
+                          ) : (
+                            <ul>
+                              {subredditSuggestions.map((suggestion) => (
+                                <li key={suggestion.name}>
+                                  <button
+                                    type="button"
+                                    onMouseDown={(event) => event.preventDefault()}
+                                    onClick={() => handleSelectSubredditSuggestion(suggestion.name)}
+                                    className="flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-gray-50"
+                                  >
+                                    {suggestion.icon_url ? (
+                                      <img
+                                        src={suggestion.icon_url}
+                                        alt=""
+                                        className="h-6 w-6 rounded-full object-cover"
+                                      />
+                                    ) : (
+                                      <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gray-200 text-xs text-gray-600">
+                                        r/
+                                      </div>
+                                    )}
+                                    <div className="flex min-w-0 flex-col">
+                                      <span className="truncate text-sm font-medium text-gray-900">
+                                        r/{suggestion.name}
+                                      </span>
+                                      {suggestion.title && (
+                                        <span className="truncate text-xs text-gray-500">
+                                          {suggestion.title}
+                                        </span>
+                                      )}
+                                    </div>
+                                    {typeof suggestion.subscribers === 'number' &&
+                                      suggestion.subscribers > 0 && (
+                                        <span className="ml-auto text-xs text-gray-500">
+                                          {suggestion.subscribers.toLocaleString()} subs
+                                        </span>
+                                      )}
+                                  </button>
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                        </div>
+                      )}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
@@ -502,7 +743,7 @@ export default function CreatePostPage() {
         <div className="flex gap-4">
           <button
             type="submit"
-            disabled={createPostMutation.isPending}
+            disabled={createPostMutation.isPending || isUploadingMedia}
             className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
           >
             {createPostMutation.isPending ? 'Creating...' : 'Create Post'}
