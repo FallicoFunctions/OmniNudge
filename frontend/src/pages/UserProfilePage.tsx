@@ -5,6 +5,7 @@ import { usersService } from '../services/usersService';
 import { useSettings } from '../contexts/SettingsContext';
 import { useAuth } from '../contexts/AuthContext';
 import { formatTimestamp } from '../utils/timeFormat';
+import { resolveMediaUrl } from '../utils/mediaUrl';
 import type { PlatformPost, PostComment } from '../types/posts';
 import type { UserProfile } from '../types/users';
 import { MarkdownRenderer } from '../components/common/MarkdownRenderer';
@@ -56,7 +57,7 @@ function PostsSection({
           <div className="flex gap-3 p-4">
             {post.thumbnail_url && (
               <img
-                src={post.thumbnail_url}
+                src={resolveMediaUrl(post.thumbnail_url)}
                 alt=""
                 className="h-16 w-16 flex-shrink-0 rounded object-cover"
               />

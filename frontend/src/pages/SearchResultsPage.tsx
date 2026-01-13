@@ -4,6 +4,7 @@ import { useSettings } from '../contexts/SettingsContext';
 import { siteWideSearch, type RedditUserSearchResult } from '../services/searchService';
 import { useRedditBlocklist } from '../contexts/RedditBlockContext';
 import { formatTimestamp } from '../utils/timeFormat';
+import { resolveMediaUrl } from '../utils/mediaUrl';
 import { RedditPostCard } from '../components/reddit/RedditPostCard';
 import { VoteButtons } from '../components/VoteButtons';
 import { EmptyMessage, LoadingMessage } from '../components/common/StatusMessage';
@@ -420,7 +421,7 @@ export default function SearchResultsPage() {
                 );
               }
               const post = item.post;
-              const previewImage = post.thumbnail_url || post.media_url;
+              const previewImage = resolveMediaUrl(post.thumbnail_url || post.media_url);
               const displayAuthor =
                 post.author_username ||
                 post.author?.username ||
