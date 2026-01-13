@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../contexts/AuthContext';
 import { useSettings } from '../contexts/SettingsContext';
 import { postsService } from '../services/postsService';
+import { hubsService } from '../services/hubsService';
 import { savedService } from '../services/savedService';
 import { api } from '../lib/api';
 import { subscriptionService } from '../services/subscriptionService';
@@ -36,6 +37,8 @@ import { useSubredditAutocomplete } from '../hooks/useSubredditAutocomplete';
 import { SubredditModeratorsPanel } from '../components/subreddit/SubredditModeratorsPanel';
 import { useSubredditActiveUsers } from '../hooks/useSubredditActiveUsers';
 import { useHubActiveUsers } from '../hooks/useHubActiveUsers';
+import { useHubSubredditAutocomplete } from '../hooks/useHubSubredditAutocomplete';
+import { CombinedSuggestionItem } from '../components/common/CombinedSuggestionItem';
 
 const FORMATTING_EXAMPLES = [
   { input: '*italics*', output: '*italics*' },
@@ -76,6 +79,12 @@ export default function PostDetailPage() {
   const [isSearchDropdownOpen, setIsSearchDropdownOpen] = useState(false);
   const [limitSearchToContext, setLimitSearchToContext] = useState(true);
   const [includeNsfwSearch, setIncludeNsfwSearch] = useState(false);
+  const [hubInputValue, setHubInputValue] = useState('');
+  const [hubIsAutocompleteOpen, setHubIsAutocompleteOpen] = useState(false);
+  const [hubPostSearchInput, setHubPostSearchInput] = useState('');
+  const [hubIsSearchDropdownOpen, setHubIsSearchDropdownOpen] = useState(false);
+  const [hubLimitSearchToContext, setHubLimitSearchToContext] = useState(true);
+  const [hubIncludeNsfwSearch, setHubIncludeNsfwSearch] = useState(false);
 
   const parsedPostId = postId ? Number(postId) : NaN;
   const focusedCommentId = commentId ? Number(commentId) : null;
@@ -156,6 +165,70 @@ export default function PostDetailPage() {
     }
     navigate(
       `/search?q=${encodeURIComponent(query)}&sort=relevance${includeNsfwSearch && !blockAllNsfw ? '&include_nsfw=true' : ''}`
+    );
+  };
+
+  useEffect(() => {
+    if (!hubName) return;
+    setHubIncludeNsfwSearch(!blockAllNsfw && searchIncludeNsfwByDefault);
+    setHubLimitSearchToContext(true);
+  }, [blockAllNsfw, hubName, searchIncludeNsfwByDefault]);
+
+  const {
+    trimmedInput: trimmedHubInput,
+    suggestions: hubSuggestions,
+    isLoading: isHubAutocompleteLoading,
+    shouldShowSuggestions: shouldShowHubSuggestions,
+  } = useHubSubredditAutocomplete(hubInputValue, hubIsAutocompleteOpen);
+
+  const navigateToHubOrSubreddit = async (value: string) => {
+    const normalized = value.trim();
+    if (!normalized) return;
+    try {
+      await hubsService.getHub(normalized);
+      navigate(`/h/${normalized}`);
+    } catch {
+      navigate(`/r/${normalized}`);
+    }
+    setHubIsAutocompleteOpen(false);
+  };
+
+  const handleHubSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!trimmedHubInput) return;
+    await navigateToHubOrSubreddit(trimmedHubInput);
+    setHubInputValue('');
+  };
+
+  const handleHubInputChange = (value: string) => {
+    setHubInputValue(value);
+    if (!hubIsAutocompleteOpen) {
+      setHubIsAutocompleteOpen(true);
+    }
+  };
+
+  const handleSelectHubSuggestion = (name: string) => {
+    navigate(`/h/${name}`);
+    setHubInputValue('');
+    setHubIsAutocompleteOpen(false);
+  };
+
+  const handleSelectHubSubredditSuggestion = (name: string) => {
+    navigate(`/r/${name}`);
+    setHubInputValue('');
+    setHubIsAutocompleteOpen(false);
+  };
+
+  const handleHubPostSearchSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const query = hubPostSearchInput.trim();
+    if (!query || !hubName) return;
+    if (hubLimitSearchToContext) {
+      navigate(`/h/${hubName}`, { state: { scopedSearchQuery: query } });
+      return;
+    }
+    navigate(
+      `/search?q=${encodeURIComponent(query)}&sort=relevance${hubIncludeNsfwSearch && !blockAllNsfw ? '&include_nsfw=true' : ''}`
     );
   };
 
@@ -572,7 +645,73 @@ export default function PostDetailPage() {
           }
         />
       )}
-      {hubName && <HubHeader hubName={hubName} isModerator={isModerator} />}
+      {hubName && (
+        <HubHeader
+          hubName={hubName}
+          isModerator={isModerator}
+          searchBars={
+            <FeedSearchBars
+              topValue={hubInputValue}
+              topPlaceholder="Enter hub or subreddit..."
+              onTopChange={handleHubInputChange}
+              onTopFocus={() => setHubIsAutocompleteOpen(true)}
+              onTopBlur={() => setHubIsAutocompleteOpen(false)}
+              onTopSubmit={handleHubSubmit}
+              topSuggestions={hubSuggestions}
+              topShouldShowSuggestions={shouldShowHubSuggestions}
+              topIsLoading={isHubAutocompleteLoading}
+              topEmptyMessage="No hubs or subreddits found."
+              renderTopSuggestion={(suggestion) => (
+                <CombinedSuggestionItem
+                  key={`${suggestion.type}-${suggestion.data.name}`}
+                  suggestion={suggestion}
+                  onSelectHub={handleSelectHubSuggestion}
+                  onSelectSubreddit={handleSelectHubSubredditSuggestion}
+                />
+              )}
+              postValue={hubPostSearchInput}
+              postPlaceholder="Search posts..."
+              onPostChange={(value) => {
+                setHubPostSearchInput(value);
+                if (!hubIsSearchDropdownOpen) {
+                  setHubIsSearchDropdownOpen(true);
+                }
+              }}
+              onPostFocus={() => setHubIsSearchDropdownOpen(true)}
+              onPostBlur={() => setTimeout(() => setHubIsSearchDropdownOpen(false), 120)}
+              onPostSubmit={handleHubPostSearchSubmit}
+              postDropdownOpen={hubIsSearchDropdownOpen}
+              postDropdownContent={
+                <div className="space-y-2 text-sm text-[var(--color-text-primary)]">
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={hubLimitSearchToContext}
+                      onChange={(e) => setHubLimitSearchToContext(e.target.checked)}
+                    />
+                    <span>Limit search to h/{hubName}</span>
+                  </label>
+                  {!blockAllNsfw && (
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={hubIncludeNsfwSearch}
+                        onChange={(e) => setHubIncludeNsfwSearch(e.target.checked)}
+                      />
+                      <span>Include NSFW results</span>
+                    </label>
+                  )}
+                  {blockAllNsfw && (
+                    <div className="text-xs text-[var(--color-text-secondary)]">
+                      NSFW content is blocked in settings.
+                    </div>
+                  )}
+                </div>
+              }
+            />
+          }
+        />
+      )}
       <div className="mt-4 grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="space-y-6">
           {postData && (

@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { hubsService, type HubPostsResponse, type LocalSubredditPost } from '../services/hubsService';
 import { useAuth } from '../contexts/AuthContext';
 import { HubHeader } from '../components/hubs/HubHeader';
@@ -19,6 +19,7 @@ import { ModMailModal } from '../components/modmail/ModMailModal';
 import { useHubModerators } from '../hooks/useHubModerators';
 import { isUserHubModerator } from '../utils/moderation';
 import { useHubDetails } from '../hooks/useHubDetails';
+import { useHubSubredditAutocomplete } from '../hooks/useHubSubredditAutocomplete';
 import { useHubActiveUsers } from '../hooks/useHubActiveUsers';
 import { OffsetPaginationControls } from '../components/common/OffsetPaginationControls';
 import { VirtualizedList } from '../components/common/VirtualizedList';
@@ -27,16 +28,28 @@ import { useHiddenItems } from '../hooks/useHiddenItems';
 import { CrosspostModal } from '../components/common/CrosspostModal';
 import { getHiddenPostIdSet, getSavedPostIdSet } from '../utils/savedItems';
 import { EmptyMessage, ErrorMessage, LoadingMessage } from '../components/common/StatusMessage';
+import { FeedSearchBars } from '../components/common/FeedSearchBars';
+import { CombinedSuggestionItem } from '../components/common/CombinedSuggestionItem';
+import { searchPlatformPosts } from '../services/platformSearchService';
 
 const EMPTY_POSTS: LocalSubredditPost[] = [];
 
 export default function HubsPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const queryClient = useQueryClient();
   const { hubname: routeHubname } = useParams<{ hubname?: string }>();
   const { user } = useAuth();
-  const { useRelativeTime, useInfiniteScrollHubs } = useSettings();
+  const { useRelativeTime, useInfiniteScrollHubs, searchIncludeNsfwByDefault, blockAllNsfw } = useSettings();
   const [hubname, setHubname] = useState(routeHubname ?? 'popular');
+  const [inputValue, setInputValue] = useState('');
+  const [postSearchInput, setPostSearchInput] = useState('');
+  const [isSearchDropdownOpen, setIsSearchDropdownOpen] = useState(false);
+  const [limitSearchToContext, setLimitSearchToContext] = useState(true);
+  const [includeNsfwSearch, setIncludeNsfwSearch] = useState(false);
+  const [isAutocompleteOpen, setIsAutocompleteOpen] = useState(false);
+  const [hubSearchResults, setHubSearchResults] = useState<LocalSubredditPost[] | null>(null);
+  const [hubSearchQuery, setHubSearchQuery] = useState('');
   const [sort, setSort] = useState<'hot' | 'new' | 'top' | 'rising'>('hot');
   const [cursorStack, setCursorStack] = useState(['']);
   const pageSize = 50;
@@ -156,10 +169,125 @@ export default function HubsPage() {
   const { data: activeUsersData } = useHubActiveUsers(showHubSidebar ? hubname : null, user);
 
   const {
+    trimmedInput,
+    suggestions,
+    shouldShowSuggestions,
+    isLoading: isAutocompleteLoading,
+  } = useHubSubredditAutocomplete(inputValue, isAutocompleteOpen);
+
+  const {
     moderators: hubModerators,
     isLoading: loadingHubModerators,
     isError: hubModeratorsError,
   } = useHubModerators(hubname, showHubSidebar);
+
+  useEffect(() => {
+    setIncludeNsfwSearch(!blockAllNsfw && searchIncludeNsfwByDefault);
+    setLimitSearchToContext(true);
+    setHubSearchResults(null);
+    setHubSearchQuery('');
+  }, [blockAllNsfw, searchIncludeNsfwByDefault, hubname]);
+
+  const navigateToHubOrSubreddit = useCallback(async (value: string) => {
+    const normalized = value.trim();
+    if (!normalized) {
+      navigate('/h/popular');
+      setIsAutocompleteOpen(false);
+      return;
+    }
+
+    try {
+      await hubsService.getHub(normalized);
+      navigate(`/h/${normalized}`);
+    } catch {
+      navigate(`/r/${normalized}`);
+    }
+    setIsAutocompleteOpen(false);
+  }, [navigate]);
+
+  const handleTopSubmit = useCallback((event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (trimmedInput) {
+      navigateToHubOrSubreddit(trimmedInput);
+      setInputValue('');
+    }
+  }, [navigateToHubOrSubreddit, trimmedInput]);
+
+  const handleTopChange = useCallback((value: string) => {
+    setInputValue(value);
+    if (!isAutocompleteOpen) {
+      setIsAutocompleteOpen(true);
+    }
+  }, [isAutocompleteOpen]);
+
+  const handleSelectHubSuggestion = useCallback((name: string) => {
+    navigate(`/h/${name}`);
+    setInputValue('');
+    setIsAutocompleteOpen(false);
+  }, [navigate]);
+
+  const handleSelectSubredditSuggestion = useCallback((name: string) => {
+    navigate(`/r/${name}`);
+    setInputValue('');
+    setIsAutocompleteOpen(false);
+  }, [navigate]);
+
+  const runHubPostSearch = useCallback(async (query: string, forceScoped: boolean = false) => {
+    if (!query) {
+      setHubSearchResults(null);
+      setHubSearchQuery('');
+      return;
+    }
+
+    const shouldScope = forceScoped || limitSearchToContext;
+    if (shouldScope && hubname) {
+      setHubSearchQuery(query);
+      try {
+        const results = await searchPlatformPosts(query, includeNsfwSearch && !blockAllNsfw, {
+          limit: 50,
+          offset: 0,
+        });
+        const filtered = results.filter((post) => {
+          const name = post.hub?.name ?? post.hub_name;
+          return name?.toLowerCase() === hubname.toLowerCase();
+        });
+        const sorted = [...filtered].sort((a, b) => {
+          const aTime = new Date(a.crossposted_at ?? a.created_at ?? '').getTime();
+          const bTime = new Date(b.crossposted_at ?? b.created_at ?? '').getTime();
+          return bTime - aTime;
+        });
+        setHubSearchResults(sorted);
+      } catch (error) {
+        console.error('Hub search failed', error);
+        setHubSearchResults([]);
+      }
+      return;
+    }
+
+    const includeNsfwParam = includeNsfwSearch && !blockAllNsfw;
+    const nsfwQuery = includeNsfwParam ? '&include_nsfw=true' : '';
+    navigate(`/search?q=${encodeURIComponent(query)}&sort=relevance${nsfwQuery}`);
+  }, [blockAllNsfw, hubname, includeNsfwSearch, limitSearchToContext, navigate]);
+
+  const handlePostSearchSubmit = useCallback((event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    runHubPostSearch(postSearchInput.trim());
+  }, [postSearchInput, runHubPostSearch]);
+
+  const lastAppliedScopedSearch = useRef<string | null>(null);
+  const scopedSearchFromState = (location.state as { scopedSearchQuery?: string } | null)
+    ?.scopedSearchQuery;
+
+  useEffect(() => {
+    const normalized = scopedSearchFromState?.trim();
+    if (!normalized || lastAppliedScopedSearch.current === normalized) {
+      return;
+    }
+    lastAppliedScopedSearch.current = normalized;
+    setLimitSearchToContext(true);
+    setPostSearchInput(normalized);
+    runHubPostSearch(normalized, true);
+  }, [runHubPostSearch, scopedSearchFromState]);
 
   // Check if current user is a moderator of this hub (or admin)
   const isModerator = useMemo(() => {
@@ -200,6 +328,8 @@ export default function HubsPage() {
     () => postsList.filter((post) => !hiddenPostIds.has(post.id)),
     [postsList, hiddenPostIds]
   );
+  const effectivePosts = hubSearchResults ?? visiblePosts;
+  const isSearchActive = hubSearchResults !== null;
 
   const hasMore = Boolean(data?.next_cursor ?? data?.has_more);
   const hasPrev = cursorStack.length > 1;
@@ -412,7 +542,71 @@ export default function HubsPage() {
 
   return (
     <div className="mx-auto w-full max-w-7xl px-4 py-8">
-      <HubHeader hubName={hubname} isModerator={isModerator} />
+      <HubHeader
+        hubName={hubname}
+        isModerator={isModerator}
+        searchBars={
+          <FeedSearchBars
+            topValue={inputValue}
+            topPlaceholder="Enter hub or subreddit..."
+            onTopChange={handleTopChange}
+            onTopFocus={() => setIsAutocompleteOpen(true)}
+            onTopBlur={() => setIsAutocompleteOpen(false)}
+            onTopSubmit={handleTopSubmit}
+            topSuggestions={suggestions}
+            topShouldShowSuggestions={shouldShowSuggestions}
+            topIsLoading={isAutocompleteLoading}
+            topEmptyMessage="No hubs or subreddits found."
+            renderTopSuggestion={(suggestion) => (
+              <CombinedSuggestionItem
+                key={`${suggestion.type}-${suggestion.data.name}`}
+                suggestion={suggestion}
+                onSelectHub={handleSelectHubSuggestion}
+                onSelectSubreddit={handleSelectSubredditSuggestion}
+              />
+            )}
+            postValue={postSearchInput}
+            postPlaceholder="Search posts..."
+            onPostChange={(value) => {
+              setPostSearchInput(value);
+              if (!isSearchDropdownOpen) {
+                setIsSearchDropdownOpen(true);
+              }
+            }}
+            onPostFocus={() => setIsSearchDropdownOpen(true)}
+            onPostBlur={() => setTimeout(() => setIsSearchDropdownOpen(false), 120)}
+            onPostSubmit={handlePostSearchSubmit}
+            postDropdownOpen={isSearchDropdownOpen}
+            postDropdownContent={
+              <div className="space-y-2 text-sm text-[var(--color-text-primary)]">
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={limitSearchToContext}
+                    onChange={(e) => setLimitSearchToContext(e.target.checked)}
+                  />
+                  <span>Limit search to h/{hubname}</span>
+                </label>
+                {!blockAllNsfw && (
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={includeNsfwSearch}
+                      onChange={(e) => setIncludeNsfwSearch(e.target.checked)}
+                    />
+                    <span>Include NSFW results</span>
+                  </label>
+                )}
+                {blockAllNsfw && (
+                  <div className="text-xs text-[var(--color-text-secondary)]">
+                    NSFW content is blocked in settings.
+                  </div>
+                )}
+              </div>
+            }
+          />
+        }
+      />
 
       <div className="mt-4 grid gap-6 lg:grid-cols-[minmax(0,1fr)_300px]">
         <div>
@@ -476,9 +670,9 @@ export default function HubsPage() {
           )}
 
           {/* Posts List */}
-          {visiblePosts.length > 0 ? (
+          {effectivePosts.length > 0 ? (
             <VirtualizedList
-              items={visiblePosts}
+              items={effectivePosts}
               estimateSize={220}
               className=""
               getKey={(post) => post.id}
@@ -528,12 +722,16 @@ export default function HubsPage() {
             />
           ) : (
             <div className="py-12 text-center">
-              <EmptyMessage>No posts found in this hub.</EmptyMessage>
+              <EmptyMessage>
+                {isSearchActive && hubSearchQuery
+                  ? `No results for "${hubSearchQuery}" in h/${hubname}.`
+                  : 'No posts found in this hub.'}
+              </EmptyMessage>
             </div>
           )}
 
           {/* Pagination Controls */}
-          {!useInfiniteScrollHubs && visiblePosts.length > 0 && (
+          {!useInfiniteScrollHubs && !isSearchActive && effectivePosts.length > 0 && (
             <OffsetPaginationControls
               hasPrev={hasPrev}
               hasMore={hasMore}
