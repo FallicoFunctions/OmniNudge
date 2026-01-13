@@ -5,7 +5,7 @@ export function AboutContent({ className = '' }: { className?: string }) {
     <div className={`space-y-6 text-sm text-[var(--color-text-secondary)] ${className}`}>
       <h2 className="text-lg font-semibold text-[var(--color-text-primary)]">OmniNudge(beta)</h2>
       <p>
-        Welcome to OmniNudge(beta). Originally, I wanted to call it Omni, but Omni.com was already
+        Welcome to OmniNudge(beta). Originally, I wanted to call this Omni. Omni means "all" and this platform is going to be able to do all that you can do online. Unfortunately, Omni.com was already
         taken. So I added “Nudge,” because of its definition relating to social media.
       </p>
 
