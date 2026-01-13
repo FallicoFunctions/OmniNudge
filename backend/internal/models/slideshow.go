@@ -232,6 +232,32 @@ func (r *SlideshowRepository) AddMediaItem(ctx context.Context, item *SlideshowM
 	return nil
 }
 
+// AddMediaItems adds multiple media items to a personal slideshow in a single query.
+func (r *SlideshowRepository) AddMediaItems(ctx context.Context, sessionID int, mediaFileIDs []int) error {
+	if len(mediaFileIDs) == 0 {
+		return nil
+	}
+
+	positions := make([]int, len(mediaFileIDs))
+	for i := range mediaFileIDs {
+		positions[i] = i
+	}
+
+	query := `
+		INSERT INTO slideshow_media_items (
+			slideshow_session_id, media_file_id, position
+		)
+		SELECT $1, UNNEST($2::int[]), UNNEST($3::int[])
+	`
+
+	_, err := r.pool.Exec(ctx, query, sessionID, mediaFileIDs, positions)
+	if err != nil {
+		return fmt.Errorf("failed to add media items: %w", err)
+	}
+
+	return nil
+}
+
 // GetMediaItems retrieves all media items for a slideshow session
 func (r *SlideshowRepository) GetMediaItems(ctx context.Context, sessionID int) ([]SlideshowMediaItem, error) {
 	query := `

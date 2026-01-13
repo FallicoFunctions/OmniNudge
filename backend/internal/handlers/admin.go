@@ -497,9 +497,28 @@ func (h *AdminHandler) GetSiteStats(c *gin.Context) {
 		`SELECT COUNT(DISTINCT user_id) FROM hub_moderators`: &stats.ModeratorCount,
 	}
 
+	// Execute all stat queries concurrently for better performance
+	type queryResult struct {
+		query  string
+		target *int
+		err    error
+	}
+
+	resultsChan := make(chan queryResult, len(queries))
+	ctx := c.Request.Context()
+
 	for query, target := range queries {
-		if err := h.pool.QueryRow(c.Request.Context(), query).Scan(target); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch stats", "details": err.Error()})
+		go func(q string, t *int) {
+			err := h.pool.QueryRow(ctx, q).Scan(t)
+			resultsChan <- queryResult{query: q, target: t, err: err}
+		}(query, target)
+	}
+
+	// Collect results
+	for i := 0; i < len(queries); i++ {
+		result := <-resultsChan
+		if result.err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch stats", "details": result.err.Error()})
 			return
 		}
 	}

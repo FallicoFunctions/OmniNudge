@@ -570,8 +570,10 @@ export default function MessagesPage() {
   const archiveConversationMutation = useMutation({
     mutationFn: (conversationId: number) => messagesService.archiveConversation(conversationId),
     onSuccess: async () => {
-      await queryClient.refetchQueries({ queryKey: ['conversations', 'all'] });
-      await queryClient.refetchQueries({ queryKey: ['conversations'] }); // Also refetch MainLayout's query
+      await Promise.all([
+        queryClient.refetchQueries({ queryKey: ['conversations', 'all'] }),
+        queryClient.refetchQueries({ queryKey: ['conversations'] }), // Also refetch MainLayout's query
+      ]);
       setConversationMenuOpen(null);
     },
     onError: (error) => {
@@ -582,8 +584,10 @@ export default function MessagesPage() {
   const unarchiveConversationMutation = useMutation({
     mutationFn: (conversationId: number) => messagesService.unarchiveConversation(conversationId),
     onSuccess: async () => {
-      await queryClient.refetchQueries({ queryKey: ['conversations', 'all'] });
-      await queryClient.refetchQueries({ queryKey: ['conversations'] }); // Also refetch MainLayout's query
+      await Promise.all([
+        queryClient.refetchQueries({ queryKey: ['conversations', 'all'] }),
+        queryClient.refetchQueries({ queryKey: ['conversations'] }), // Also refetch MainLayout's query
+      ]);
       setConversationMenuOpen(null);
     },
     onError: (error) => {

@@ -191,6 +191,40 @@ func (r *UserRepository) GetByID(ctx context.Context, id int) (*User, error) {
 	return user, nil
 }
 
+// GetPublicKeysByIDs retrieves public keys for a set of user IDs.
+func (r *UserRepository) GetPublicKeysByIDs(ctx context.Context, userIDs []int) (map[int]string, error) {
+	publicKeys := make(map[int]string)
+	if len(userIDs) == 0 {
+		return publicKeys, nil
+	}
+
+	query := `
+		SELECT id, public_key
+		FROM users
+		WHERE id = ANY($1) AND public_key IS NOT NULL
+	`
+	rows, err := r.pool.Query(ctx, query, userIDs)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var id int
+		var publicKey string
+		if err := rows.Scan(&id, &publicKey); err != nil {
+			return nil, err
+		}
+		publicKeys[id] = publicKey
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return publicKeys, nil
+}
+
 // GetByUsername retrieves a user by their username (case-insensitive)
 func (r *UserRepository) GetByUsername(ctx context.Context, username string) (*User, error) {
 	if username == "" {
