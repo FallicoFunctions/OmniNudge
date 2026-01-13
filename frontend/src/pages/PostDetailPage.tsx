@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../contexts/AuthContext';
@@ -6,6 +6,7 @@ import { useSettings } from '../contexts/SettingsContext';
 import { postsService } from '../services/postsService';
 import { savedService } from '../services/savedService';
 import { api } from '../lib/api';
+import { subscriptionService } from '../services/subscriptionService';
 import type { PlatformPost, PostComment } from '../types/posts';
 import { CommentItem } from '../components/comments/CommentItem';
 import type { CommentActionHandlers } from '../components/comments/CommentItem';
@@ -25,8 +26,15 @@ import { useSavedItems } from '../hooks/useSavedItems';
 import { getSavedCommentIdSet, getSavedPostIdSet } from '../utils/savedItems';
 import { LoadingMessage } from '../components/common/StatusMessage';
 import { PostDetailMedia } from '../components/posts/PostDetailMedia';
+import { PostHeader } from '../components/posts/PostHeader';
 import { canModerateContent } from '../utils/permissions';
 import { HubHeader } from '../components/hubs/HubHeader';
+import { FeedSearchBars } from '../components/common/FeedSearchBars';
+import { SubredditHeader } from '../components/subreddit/SubredditHeader';
+import { SubredditSuggestionItem } from '../components/subreddit/SubredditSuggestionItem';
+import { useSubredditAutocomplete } from '../hooks/useSubredditAutocomplete';
+import { SubredditModeratorsPanel } from '../components/subreddit/SubredditModeratorsPanel';
+import { useSubredditActiveUsers } from '../hooks/useSubredditActiveUsers';
 
 const FORMATTING_EXAMPLES = [
   { input: '*italics*', output: '*italics*' },
@@ -48,7 +56,7 @@ export default function PostDetailPage() {
   const location = useLocation();
   const queryClient = useQueryClient();
   const { user } = useAuth();
-  const { useRelativeTime, stayOnPostAfterHide } = useSettings();
+  const { useRelativeTime, stayOnPostAfterHide, searchIncludeNsfwByDefault, blockAllNsfw } = useSettings();
 
   const [commentText, setCommentText] = useState('');
   const [showFormattingHelp, setShowFormattingHelp] = useState(false);
@@ -61,6 +69,12 @@ export default function PostDetailPage() {
   const [deleteCommentReason, setDeleteCommentReason] = useState('');
   const [deletePostTarget, setDeletePostTarget] = useState<{ postId: number; authorId: number } | null>(null);
   const [deletePostReason, setDeletePostReason] = useState('');
+  const [subredditInputValue, setSubredditInputValue] = useState('');
+  const [isAutocompleteOpen, setIsAutocompleteOpen] = useState(false);
+  const [postSearchInput, setPostSearchInput] = useState('');
+  const [isSearchDropdownOpen, setIsSearchDropdownOpen] = useState(false);
+  const [limitSearchToContext, setLimitSearchToContext] = useState(true);
+  const [includeNsfwSearch, setIncludeNsfwSearch] = useState(false);
 
   const parsedPostId = postId ? Number(postId) : NaN;
   const focusedCommentId = commentId ? Number(commentId) : null;
@@ -89,6 +103,60 @@ export default function PostDetailPage() {
     () => postData?.target_subreddit ?? postData?.crosspost_origin_subreddit ?? null,
     [postData]
   );
+  const normalizedSubreddit = targetSubreddit?.trim() ?? '';
+
+  useEffect(() => {
+    if (!normalizedSubreddit) return;
+    setIncludeNsfwSearch(!blockAllNsfw && searchIncludeNsfwByDefault);
+    setLimitSearchToContext(true);
+  }, [blockAllNsfw, normalizedSubreddit, searchIncludeNsfwByDefault]);
+
+  const {
+    trimmedInput: trimmedSubredditInput,
+    suggestions: subredditSuggestions,
+    isLoading: isAutocompleteLoading,
+    shouldShowSuggestions,
+  } = useSubredditAutocomplete(subredditInputValue, isAutocompleteOpen);
+
+  const navigateToSubreddit = (value: string) => {
+    const normalized = value.trim();
+    if (!normalized) return;
+    navigate(`/r/${normalized}`);
+    setIsAutocompleteOpen(false);
+  };
+
+  const handleSubredditSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!trimmedSubredditInput) return;
+    navigateToSubreddit(trimmedSubredditInput);
+    setSubredditInputValue('');
+  };
+
+  const handleSubredditInputChange = (value: string) => {
+    setSubredditInputValue(value);
+    if (!isAutocompleteOpen) {
+      setIsAutocompleteOpen(true);
+    }
+  };
+
+  const handleSelectSubredditSuggestion = (name: string) => {
+    navigateToSubreddit(name);
+    setSubredditInputValue('');
+    setIsAutocompleteOpen(false);
+  };
+
+  const handlePostSearchSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const query = postSearchInput.trim();
+    if (!query || !normalizedSubreddit) return;
+    if (limitSearchToContext) {
+      navigate(`/r/${normalizedSubreddit}`, { state: { scopedSearchQuery: query } });
+      return;
+    }
+    navigate(
+      `/search?q=${encodeURIComponent(query)}&sort=relevance${includeNsfwSearch && !blockAllNsfw ? '&include_nsfw=true' : ''}`
+    );
+  };
 
   const commentsQueryKey = ['posts', parsedPostId, 'comments'] as const;
   const { data: postComments, isLoading: loadingComments } = useQuery<PostComment[]>({
@@ -101,6 +169,17 @@ export default function PostDetailPage() {
     enabled: Number.isFinite(parsedPostId),
   });
   const commentsList = useMemo(() => postComments ?? [], [postComments]);
+
+  const { data: subredditSubscriptionStatus } = useQuery({
+    queryKey: ['subreddit-subscription', normalizedSubreddit],
+    queryFn: () => subscriptionService.checkSubredditSubscription(normalizedSubreddit),
+    enabled:
+      !!user &&
+      !!normalizedSubreddit &&
+      normalizedSubreddit !== 'popular' &&
+      normalizedSubreddit !== 'frontpage',
+    staleTime: 1000 * 60 * 5,
+  });
 
   const savedPostsKey = ['saved-items', 'posts'] as const;
   const hiddenPostsKey = ['hidden-items', 'posts'] as const;
@@ -301,6 +380,7 @@ export default function PostDetailPage() {
     isError: subredditAboutError,
     iconUrl: subredditIcon,
   } = useSubredditAbout(targetSubreddit, Boolean(targetSubreddit));
+  const { data: activeUsersData } = useSubredditActiveUsers(targetSubreddit, user);
 
   const bodyText = postData?.body ?? postData?.content ?? undefined;
   const mediaUrl = postData?.media_url ?? undefined;
@@ -422,39 +502,105 @@ export default function PostDetailPage() {
 
   return (
     <div className="mx-auto w-full max-w-7xl px-4 py-8">
+      {normalizedSubreddit && (
+        <SubredditHeader
+          subreddit={normalizedSubreddit}
+          iconUrl={subredditIcon}
+          user={user}
+          isSubscribed={subredditSubscriptionStatus?.is_subscribed ?? false}
+          searchBars={
+            <FeedSearchBars
+              topValue={subredditInputValue}
+              topPlaceholder="Enter hub or subreddit..."
+              onTopChange={handleSubredditInputChange}
+              onTopFocus={() => setIsAutocompleteOpen(true)}
+              onTopBlur={() => setIsAutocompleteOpen(false)}
+              onTopSubmit={handleSubredditSubmit}
+              topSuggestions={subredditSuggestions}
+              topShouldShowSuggestions={shouldShowSuggestions}
+              topIsLoading={isAutocompleteLoading}
+              topEmptyMessage="No hubs or subreddits found."
+              renderTopSuggestion={(suggestion) => (
+                <SubredditSuggestionItem
+                  key={suggestion.name}
+                  suggestion={suggestion}
+                  onSelect={handleSelectSubredditSuggestion}
+                />
+              )}
+              postValue={postSearchInput}
+              postPlaceholder="Search posts..."
+              onPostChange={(value) => {
+                setPostSearchInput(value);
+                if (!isSearchDropdownOpen) {
+                  setIsSearchDropdownOpen(true);
+                }
+              }}
+              onPostFocus={() => setIsSearchDropdownOpen(true)}
+              onPostBlur={() => setTimeout(() => setIsSearchDropdownOpen(false), 120)}
+              onPostSubmit={handlePostSearchSubmit}
+              postDropdownOpen={isSearchDropdownOpen}
+              postDropdownContent={
+                <div className="space-y-2 text-sm text-[var(--color-text-primary)]">
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={limitSearchToContext}
+                      onChange={(e) => setLimitSearchToContext(e.target.checked)}
+                    />
+                    <span>Limit search to r/{normalizedSubreddit}</span>
+                  </label>
+                  {!blockAllNsfw && (
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={includeNsfwSearch}
+                        onChange={(e) => setIncludeNsfwSearch(e.target.checked)}
+                      />
+                      <span>Include NSFW results</span>
+                    </label>
+                  )}
+                  {blockAllNsfw && (
+                    <div className="text-xs text-[var(--color-text-secondary)]">
+                      NSFW content is blocked in settings.
+                    </div>
+                  )}
+                </div>
+              }
+            />
+          }
+        />
+      )}
       {hubName && <HubHeader hubName={hubName} isModerator={isModerator} />}
-      <div className="mt-4 grid gap-6 lg:grid-cols-[minmax(0,1fr)_300px]">
+      <div className="mt-4 grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="space-y-6">
           {postData && (
             <Panel>
-              {/* Post Header */}
-              <div className="mb-4">
-                <h1 className="text-2xl font-bold text-[var(--color-text-primary)]">{decodedTitle}</h1>
-                <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-[var(--color-text-secondary)]">
-                  {hubName && (
-                    <>
-                      <Link
-                        to={`/h/${hubName}`}
-                        className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
-                      >
-                        h/{hubName}
-                      </Link>
-                      <span>•</span>
-                    </>
-                  )}
-                  {targetSubreddit && postData?.crosspost_origin_subreddit && (
-                    <>
-                      <span>Crosspost from </span>
-                      <Link
-                        to={`/r/${targetSubreddit}`}
-                        className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
-                      >
-                        r/{targetSubreddit}
-                      </Link>
-                      <span>•</span>
-                    </>
-                  )}
-                  <span>
+              <PostHeader
+                title={decodedTitle}
+                metadataItems={[
+                  ...(hubName
+                    ? [
+                        <Link
+                          key="hub"
+                          to={`/h/${hubName}`}
+                          className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+                        >
+                          h/{hubName}
+                        </Link>,
+                      ]
+                    : []),
+                  ...(targetSubreddit
+                    ? [
+                        <Link
+                          key="subreddit"
+                          to={`/r/${targetSubreddit}`}
+                          className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+                        >
+                          r/{targetSubreddit}
+                        </Link>,
+                      ]
+                    : []),
+                  <span key="author">
                     Posted by{' '}
                     <Link
                       to={`/users/${postData?.author?.username ?? postData?.author_username}`}
@@ -462,13 +608,12 @@ export default function PostDetailPage() {
                     >
                       {postData?.author?.username ?? postData?.author_username}
                     </Link>
-                  </span>
-                  <span>•</span>
-                  <span>
+                  </span>,
+                  <span key="submitted">
                     submitted {formatTimestamp(postData.crossposted_at ?? postData.created_at, useRelativeTime)}
-                  </span>
-                </div>
-              </div>
+                  </span>,
+                ]}
+              />
 
               <PostDetailMedia
                 mediaUrl={mediaUrl}
@@ -703,16 +848,10 @@ export default function PostDetailPage() {
                   iconUrl={subredditIcon}
                   isLoading={loadingSubredditAbout}
                   isError={subredditAboutError}
+                  activeOmniUsers={activeUsersData?.active_users ?? null}
                 />
 
-                <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
-                  <h3 className="text-sm font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
-                    Moderators
-                  </h3>
-                  <p className="mt-3 text-sm text-[var(--color-text-secondary)]">
-                    Public Reddit API does not provide the moderator list.
-                  </p>
-                </div>
+                <SubredditModeratorsPanel />
               </>
             )}
           </aside>

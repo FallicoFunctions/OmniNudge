@@ -9,6 +9,7 @@ type SubredditAboutPanelProps = {
   isError: boolean;
   sidebarHtml?: string | null;
   sidebarRef?: RefObject<HTMLDivElement | null>;
+  activeOmniUsers?: number | null;
 };
 
 export default function SubredditAboutPanel({
@@ -18,6 +19,7 @@ export default function SubredditAboutPanel({
   isError,
   sidebarHtml,
   sidebarRef,
+  activeOmniUsers,
 }: SubredditAboutPanelProps) {
   return (
     <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
@@ -59,11 +61,9 @@ export default function SubredditAboutPanel({
               </span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="font-semibold text-[var(--color-text-primary)]">Online</span>
+              <span className="font-semibold text-[var(--color-text-primary)]">Active Omni Users</span>
               <span>
-                {typeof about.active_user_count === 'number'
-                  ? about.active_user_count.toLocaleString()
-                  : '—'}
+                {typeof activeOmniUsers === 'number' ? activeOmniUsers.toLocaleString() : '—'}
               </span>
             </div>
             {about.created_utc && (

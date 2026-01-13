@@ -16,6 +16,7 @@ import { VirtualizedList } from '../components/common/VirtualizedList';
 import { useSavedItems } from '../hooks/useSavedItems';
 import { getSavedPostIdSet, getSavedRedditPostIdSet } from '../utils/savedItems';
 import { EmptyMessage, LoadingMessage } from '../components/common/StatusMessage';
+import { FeedSearchBars } from '../components/common/FeedSearchBars';
 import { createRedditCrosspostPayload } from '../utils/crosspostHelpers';
 import { OMNI_FEED_STORAGE_KEY } from '../constants/storageKeys';
 import { TOP_TIME_OPTIONS } from '../constants/topTimeRange';
@@ -580,170 +581,127 @@ export default function HomePage() {
                   : 'Popular posts from all hubs and subreddits'}
             </p>
           </div>
-          <div className="flex w-full flex-col items-end gap-2 md:w-96">
-            {/* Subreddit Search */}
-            <form onSubmit={handleSubredditSubmit} className="flex w-full gap-2">
-              <div className="relative flex-1">
-                <input
-                  type="text"
-                  value={inputValue}
-                  onFocus={() => setIsAutocompleteOpen(true)}
-                  onBlur={() => setIsAutocompleteOpen(false)}
-                  onChange={(e) => handleInputChange(e.target.value)}
-                  placeholder="Enter hub or subreddit..."
-                  className="w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-2 text-sm text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
-                />
-                {shouldShowSuggestions && (
-                  <div className="absolute left-0 right-0 top-full z-30 mt-1 overflow-hidden rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] shadow-lg">
-                    {isAutocompleteLoading ? (
-                      <div className="px-3 py-2">
-                        <LoadingMessage className="mt-0 text-sm">Searching...</LoadingMessage>
+          <FeedSearchBars
+            topValue={inputValue}
+            topPlaceholder="Enter hub or subreddit..."
+            onTopChange={handleInputChange}
+            onTopFocus={() => setIsAutocompleteOpen(true)}
+            onTopBlur={() => setIsAutocompleteOpen(false)}
+            onTopSubmit={handleSubredditSubmit}
+            topSuggestions={suggestionItems}
+            topShouldShowSuggestions={shouldShowSuggestions}
+            topIsLoading={isAutocompleteLoading}
+            topEmptyMessage="No hubs or subreddits found."
+            renderTopSuggestion={(suggestion) => {
+              if (suggestion.type === 'hub') {
+                const hub = suggestion.data;
+                return (
+                  <li key={`hub-${hub.id}`}>
+                    <button
+                      type="button"
+                      onMouseDown={(event) => event.preventDefault()}
+                      onClick={() => {
+                        navigate(`/h/${hub.name}`);
+                        setInputValue('');
+                        setIsAutocompleteOpen(false);
+                      }}
+                      className="flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-[var(--color-surface-elevated)]"
+                    >
+                      <div className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-[var(--color-primary)] text-[10px] font-semibold text-white">
+                        h/
                       </div>
-                    ) : suggestionItems.length === 0 ? (
-                      <div className="px-3 py-2">
-                        <EmptyMessage className="mt-0 text-sm">No hubs or subreddits found.</EmptyMessage>
+                      <div className="flex min-w-0 flex-col">
+                        <span className="truncate text-sm font-medium text-[var(--color-text-primary)]">
+                          h/{hub.name}
+                        </span>
+                        {hub.title && (
+                          <span className="truncate text-[11px] text-[var(--color-text-secondary)]">
+                            {hub.title}
+                          </span>
+                        )}
                       </div>
-                    ) : (
-                      <ul>
-                        {suggestionItems.map((suggestion) => {
-                          if (suggestion.type === 'hub') {
-                            const hub = suggestion.data;
-                            return (
-                              <li key={`hub-${hub.id}`}>
-                                <button
-                                  type="button"
-                                  onMouseDown={(event) => event.preventDefault()}
-                                  onClick={() => {
-                                    navigate(`/h/${hub.name}`);
-                                    setInputValue('');
-                                    setIsAutocompleteOpen(false);
-                                  }}
-                                  className="flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-[var(--color-surface-elevated)]"
-                                >
-                                  <div className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-[var(--color-primary)] text-[10px] font-semibold text-white">
-                                    h/
-                                  </div>
-                                  <div className="flex min-w-0 flex-col">
-                                    <span className="truncate text-sm font-medium text-[var(--color-text-primary)]">
-                                      h/{hub.name}
-                                    </span>
-                                    {hub.title && (
-                                      <span className="truncate text-[11px] text-[var(--color-text-secondary)]">
-                                        {hub.title}
-                                      </span>
-                                    )}
-                                  </div>
-                                  {typeof hub.subscriber_count === 'number' && hub.subscriber_count > 0 && (
-                                    <span className="ml-auto text-[11px] text-[var(--color-text-secondary)]">
-                                      {hub.subscriber_count.toLocaleString()} subs
-                                    </span>
-                                  )}
-                                </button>
-                              </li>
-                            );
-                          } else {
-                            const subreddit = suggestion.data;
-                            return (
-                              <li key={`subreddit-${subreddit.name}`}>
-                                <button
-                                  type="button"
-                                  onMouseDown={(event) => event.preventDefault()}
-                                  onClick={() => handleSelectSubredditSuggestion(subreddit.name)}
-                                  className="flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-[var(--color-surface-elevated)]"
-                                >
-                                  {subreddit.icon_url ? (
-                                    <img
-                                      src={subreddit.icon_url}
-                                      alt=""
-                                      loading="lazy"
-                                      decoding="async"
-                                      className="h-6 w-6 flex-shrink-0 rounded-full object-cover"
-                                    />
-                                  ) : (
-                                    <div className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-[var(--color-border)] text-[10px] font-semibold text-[var(--color-text-secondary)]">
-                                      r/
-                                    </div>
-                                  )}
-                                  <div className="flex min-w-0 flex-col">
-                                    <span className="truncate text-sm font-medium text-[var(--color-text-primary)]">
-                                      r/{subreddit.name}
-                                    </span>
-                                    {subreddit.title && (
-                                      <span className="truncate text-[11px] text-[var(--color-text-secondary)]">
-                                        {subreddit.title}
-                                      </span>
-                                    )}
-                                  </div>
-                                  {typeof subreddit.subscribers === 'number' && subreddit.subscribers > 0 && (
-                                    <span className="ml-auto text-[11px] text-[var(--color-text-secondary)]">
-                                      {subreddit.subscribers.toLocaleString()} subs
-                                    </span>
-                                  )}
-                                </button>
-                              </li>
-                            );
-                          }
-                        })}
-                      </ul>
-                    )}
-                  </div>
-                )}
-              </div>
-              <button
-                type="submit"
-                className="rounded-md bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)]"
-              >
-                Go
-              </button>
-            </form>
-
-            {/* Post search */}
-            <form onSubmit={handlePostSearchSubmit} className="flex w-full gap-2">
-              <div className="relative flex-1">
-                <input
-                  type="text"
-                  value={postSearchInput}
-                  onFocus={() => setIsSearchDropdownOpen(true)}
-                  onBlur={() => setTimeout(() => setIsSearchDropdownOpen(false), 120)}
-                  onChange={(event) => {
-                    setPostSearchInput(event.target.value);
-                    if (!isSearchDropdownOpen) {
-                      setIsSearchDropdownOpen(true);
-                    }
-                  }}
-                  placeholder="Search posts..."
-                  className="w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-2 text-sm text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
-                />
-                {isSearchDropdownOpen && (
-                  <div className="absolute left-0 right-0 top-full z-40 mt-1 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] p-3 shadow-lg">
-                    <div className="space-y-2 text-sm text-[var(--color-text-primary)]">
-                      {!blockAllNsfw && (
-                        <label className="flex items-center gap-2">
-                          <input
-                            type="checkbox"
-                            checked={includeNsfwSearch}
-                            onChange={(e) => setIncludeNsfwSearch(e.target.checked)}
-                          />
-                          <span>Include NSFW results</span>
-                        </label>
+                      {typeof hub.subscriber_count === 'number' && hub.subscriber_count > 0 && (
+                        <span className="ml-auto text-[11px] text-[var(--color-text-secondary)]">
+                          {hub.subscriber_count.toLocaleString()} subs
+                        </span>
                       )}
-                      {blockAllNsfw && (
-                        <div className="text-xs text-[var(--color-text-secondary)]">
-                          NSFW content is blocked in settings.
-                        </div>
+                    </button>
+                  </li>
+                );
+              }
+              const subreddit = suggestion.data;
+              return (
+                <li key={`subreddit-${subreddit.name}`}>
+                  <button
+                    type="button"
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={() => handleSelectSubredditSuggestion(subreddit.name)}
+                    className="flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-[var(--color-surface-elevated)]"
+                  >
+                    {subreddit.icon_url ? (
+                      <img
+                        src={subreddit.icon_url}
+                        alt=""
+                        loading="lazy"
+                        decoding="async"
+                        className="h-6 w-6 flex-shrink-0 rounded-full object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-[var(--color-border)] text-[10px] font-semibold text-[var(--color-text-secondary)]">
+                        r/
+                      </div>
+                    )}
+                    <div className="flex min-w-0 flex-col">
+                      <span className="truncate text-sm font-medium text-[var(--color-text-primary)]">
+                        r/{subreddit.name}
+                      </span>
+                      {subreddit.title && (
+                        <span className="truncate text-[11px] text-[var(--color-text-secondary)]">
+                          {subreddit.title}
+                        </span>
                       )}
                     </div>
+                    {typeof subreddit.subscribers === 'number' && subreddit.subscribers > 0 && (
+                      <span className="ml-auto text-[11px] text-[var(--color-text-secondary)]">
+                        {subreddit.subscribers.toLocaleString()} subs
+                      </span>
+                    )}
+                  </button>
+                </li>
+              );
+            }}
+            postValue={postSearchInput}
+            postPlaceholder="Search posts..."
+            onPostChange={(value) => {
+              setPostSearchInput(value);
+              if (!isSearchDropdownOpen) {
+                setIsSearchDropdownOpen(true);
+              }
+            }}
+            onPostFocus={() => setIsSearchDropdownOpen(true)}
+            onPostBlur={() => setTimeout(() => setIsSearchDropdownOpen(false), 120)}
+            onPostSubmit={handlePostSearchSubmit}
+            postDropdownOpen={isSearchDropdownOpen}
+            postDropdownContent={
+              <div className="space-y-2 text-sm text-[var(--color-text-primary)]">
+                {!blockAllNsfw && (
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={includeNsfwSearch}
+                      onChange={(e) => setIncludeNsfwSearch(e.target.checked)}
+                    />
+                    <span>Include NSFW results</span>
+                  </label>
+                )}
+                {blockAllNsfw && (
+                  <div className="text-xs text-[var(--color-text-secondary)]">
+                    NSFW content is blocked in settings.
                   </div>
                 )}
               </div>
-              <button
-                type="submit"
-                className="rounded-md bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)]"
-              >
-                Search
-              </button>
-            </form>
-          </div>
+            }
+          />
         </div>
       </div>
       {user && showPopularFallback && !hasAnySubscriptions && (
