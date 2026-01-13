@@ -6,24 +6,24 @@ import (
 	"time"
 )
 
-type SubredditPresence struct {
+type PresenceStore struct {
 	ttl       time.Duration
 	mu        sync.RWMutex
 	lastSeen  map[string]map[string]time.Time
 }
 
-func NewSubredditPresence(ttl time.Duration) *SubredditPresence {
-	return &SubredditPresence{
+func NewPresenceStore(ttl time.Duration) *PresenceStore {
+	return &PresenceStore{
 		ttl:      ttl,
 		lastSeen: make(map[string]map[string]time.Time),
 	}
 }
 
-func (p *SubredditPresence) TTL() time.Duration {
+func (p *PresenceStore) TTL() time.Duration {
 	return p.ttl
 }
 
-func (p *SubredditPresence) Touch(subreddit string, key string) int {
+func (p *PresenceStore) Touch(subreddit string, key string) int {
 	if subreddit == "" || key == "" {
 		return 0
 	}
@@ -44,7 +44,7 @@ func (p *SubredditPresence) Touch(subreddit string, key string) int {
 	return len(p.lastSeen[normalized])
 }
 
-func (p *SubredditPresence) CountActive(subreddit string) int {
+func (p *PresenceStore) CountActive(subreddit string) int {
 	if subreddit == "" {
 		return 0
 	}
@@ -59,7 +59,7 @@ func (p *SubredditPresence) CountActive(subreddit string) int {
 	return len(p.lastSeen[normalized])
 }
 
-func (p *SubredditPresence) pruneLocked(subreddit string, now time.Time) {
+func (p *PresenceStore) pruneLocked(subreddit string, now time.Time) {
 	users, ok := p.lastSeen[subreddit]
 	if !ok {
 		return

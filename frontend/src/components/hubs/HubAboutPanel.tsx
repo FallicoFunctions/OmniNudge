@@ -6,6 +6,7 @@ type HubAboutPanelProps = {
   isLoading: boolean;
   isError: boolean;
   showStats?: boolean;
+  activeOmniUsers?: number | null;
 };
 
 export default function HubAboutPanel({
@@ -13,6 +14,7 @@ export default function HubAboutPanel({
   isLoading,
   isError,
   showStats = false,
+  activeOmniUsers,
 }: HubAboutPanelProps) {
   return (
     <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
@@ -44,6 +46,10 @@ export default function HubAboutPanel({
               <div className="flex items-center justify-between">
                 <span className="font-semibold text-[var(--color-text-primary)]">Members</span>
                 <span>{hubDetails.subscriber_count?.toLocaleString() ?? '—'}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="font-semibold text-[var(--color-text-primary)]">Active Omni Users</span>
+                <span>{typeof activeOmniUsers === 'number' ? activeOmniUsers.toLocaleString() : '—'}</span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="font-semibold text-[var(--color-text-primary)]">Visibility</span>

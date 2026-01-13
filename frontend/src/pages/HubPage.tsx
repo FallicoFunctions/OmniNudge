@@ -19,6 +19,7 @@ import { ModMailModal } from '../components/modmail/ModMailModal';
 import { useHubModerators } from '../hooks/useHubModerators';
 import { isUserHubModerator } from '../utils/moderation';
 import { useHubDetails } from '../hooks/useHubDetails';
+import { useHubActiveUsers } from '../hooks/useHubActiveUsers';
 import { OffsetPaginationControls } from '../components/common/OffsetPaginationControls';
 import { VirtualizedList } from '../components/common/VirtualizedList';
 import { useSavedItems } from '../hooks/useSavedItems';
@@ -152,6 +153,7 @@ export default function HubsPage() {
     isLoading: loadingHubDetails,
     isError: hubDetailsError,
   } = useHubDetails(hubname, showHubSidebar);
+  const { data: activeUsersData } = useHubActiveUsers(showHubSidebar ? hubname : null, user);
 
   const {
     moderators: hubModerators,
@@ -557,6 +559,8 @@ export default function HubsPage() {
               hubDetails={hubDetails}
               isLoading={loadingHubDetails}
               isError={hubDetailsError}
+              showStats
+              activeOmniUsers={activeUsersData?.active_users ?? null}
             />
 
             <HubModeratorsPanel
