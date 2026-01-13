@@ -156,13 +156,14 @@ export function HiddenItemsView({
   );
 
   useEffect(() => {
-    postsNeedingDetails.forEach((post) => {
+    // Fetch all post details concurrently for better performance
+    const fetchPromises = postsNeedingDetails.map((post) => {
       const postKey = `${post.subreddit}-${post.reddit_post_id}`;
       if (postDetails[postKey] || fetchingDetailsRef.current.has(postKey)) {
-        return;
+        return Promise.resolve();
       }
       fetchingDetailsRef.current.add(postKey);
-      api
+      return api
         .get<[RedditListingData, unknown]>(`/reddit/r/${post.subreddit}/comments/${post.reddit_post_id}`)
         .then((response) => {
           const listing = response[0];
@@ -206,6 +207,9 @@ export function HiddenItemsView({
           fetchingDetailsRef.current.delete(postKey);
         });
     });
+
+    // Execute all fetches concurrently
+    Promise.all(fetchPromises);
   }, [postsNeedingDetails, postDetails]);
 
   const invalidateHiddenQueries = useCallback(() => {
@@ -219,13 +223,16 @@ export function HiddenItemsView({
     }
     let isCancelled = false;
     const cleanupRemovedPosts = async () => {
-      for (const post of removedHiddenRedditPosts) {
-        try {
-          await savedService.unhideRedditPost(post.subreddit, post.reddit_post_id);
-        } catch (cleanupError) {
-          console.error('Failed to auto-unhide removed Reddit post', cleanupError);
-        }
-      }
+      // Unhide all posts concurrently for better performance
+      const unhidePromises = removedHiddenRedditPosts.map((post) =>
+        savedService.unhideRedditPost(post.subreddit, post.reddit_post_id)
+          .catch((cleanupError) => {
+            console.error('Failed to auto-unhide removed Reddit post', cleanupError);
+          })
+      );
+
+      await Promise.allSettled(unhidePromises);
+
       if (!isCancelled) {
         invalidateHiddenQueries();
       }

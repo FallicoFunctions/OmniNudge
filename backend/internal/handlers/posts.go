@@ -583,12 +583,13 @@ func (h *PostsHandler) sendPostDeletionModMail(post *models.PlatformPost, modera
 		moderatorIDs = append(moderatorIDs, modID)
 	}
 
-	for _, modID := range moderatorIDs {
+	// Batch insert all moderators for better performance (non-blocking)
+	if len(moderatorIDs) > 0 {
 		_, err = tx.Exec(ctx, `
 			INSERT INTO conversation_participants (conversation_id, user_id, is_moderator, joined_at)
-			VALUES ($1, $2, TRUE, NOW())
+			SELECT $1, UNNEST($2::int[]), TRUE, NOW()
 			ON CONFLICT (conversation_id, user_id) DO NOTHING
-		`, conversationID, modID)
+		`, conversationID, moderatorIDs)
 		if err != nil {
 			return
 		}

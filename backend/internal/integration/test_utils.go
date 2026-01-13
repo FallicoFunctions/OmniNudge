@@ -109,8 +109,8 @@ func newTestDeps(t *testing.T) *TestDeps {
 
 	// Handlers
 	authHandler := handlers.NewAuthHandler(authService, userRepo)
-	postsHandler := handlers.NewPostsHandler(postRepo, hubRepo, userRepo, modRepo, feedRepo)
-	commentsHandler := handlers.NewCommentsHandler(commentRepo, postRepo, modRepo)
+	postsHandler := handlers.NewPostsHandler(db.Pool, postRepo, hubRepo, userRepo, modRepo, feedRepo)
+	commentsHandler := handlers.NewCommentsHandler(db.Pool, commentRepo, postRepo, hubRepo, userRepo, modRepo)
 	redditHandler := handlers.NewRedditHandler(
 		services.NewRedditClient(cfg.Reddit.UserAgent, services.NoopCache{}, 0, cfg.Reddit.ClientID, cfg.Reddit.ClientSecret),
 		redditPostRepo,
