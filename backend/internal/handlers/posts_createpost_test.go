@@ -41,7 +41,7 @@ func setupPostsCreateTest(t *testing.T) (*PostsHandler, *models.HubRepository, *
 	err = userRepo.Create(ctx, testUser)
 	require.NoError(t, err)
 
-	handler := NewPostsHandler(postRepo, hubRepo, userRepo, modRepo, feedRepo)
+	handler := NewPostsHandler(db.Pool, postRepo, hubRepo, userRepo, modRepo, feedRepo)
 
 	cleanup := func() {
 		db.Close()
