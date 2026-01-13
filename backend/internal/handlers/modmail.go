@@ -364,14 +364,31 @@ func (h *ModMailHandler) GetModMailForHub(c *gin.Context) {
 			return
 		}
 		conv.HubName = hubName
+		conversations = append(conversations, conv)
+	}
 
-		// Enrich conversation with participants, latest message, and unread count
-		if err := h.enrichConversationDetails(c.Request.Context(), &conv, userID.(int)); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to enrich conversation", "details": err.Error()})
+	// Enrich all conversations concurrently for better performance
+	type enrichResult struct {
+		index int
+		err   error
+	}
+
+	resultsChan := make(chan enrichResult, len(conversations))
+
+	for i := range conversations {
+		go func(idx int) {
+			err := h.enrichConversationDetails(c.Request.Context(), &conversations[idx], userID.(int))
+			resultsChan <- enrichResult{index: idx, err: err}
+		}(i)
+	}
+
+	// Collect results
+	for i := 0; i < len(conversations); i++ {
+		result := <-resultsChan
+		if result.err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to enrich conversation", "details": result.err.Error()})
 			return
 		}
-
-		conversations = append(conversations, conv)
 	}
 
 	c.JSON(http.StatusOK, gin.H{
@@ -417,14 +434,31 @@ func (h *ModMailHandler) GetUserModMail(c *gin.Context) {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to scan conversation"})
 			return
 		}
+		conversations = append(conversations, conv)
+	}
 
-		// Enrich conversation with participants, latest message, and unread count
-		if err := h.enrichConversationDetails(c.Request.Context(), &conv, userID.(int)); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to enrich conversation", "details": err.Error()})
+	// Enrich all conversations concurrently for better performance
+	type enrichResult struct {
+		index int
+		err   error
+	}
+
+	resultsChan := make(chan enrichResult, len(conversations))
+
+	for i := range conversations {
+		go func(idx int) {
+			err := h.enrichConversationDetails(c.Request.Context(), &conversations[idx], userID.(int))
+			resultsChan <- enrichResult{index: idx, err: err}
+		}(i)
+	}
+
+	// Collect results
+	for i := 0; i < len(conversations); i++ {
+		result := <-resultsChan
+		if result.err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to enrich conversation", "details": result.err.Error()})
 			return
 		}
-
-		conversations = append(conversations, conv)
 	}
 
 	c.JSON(http.StatusOK, gin.H{

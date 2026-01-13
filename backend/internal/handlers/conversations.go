@@ -143,73 +143,91 @@ func (h *ConversationsHandler) GetConversations(c *gin.Context) {
 		return
 	}
 
-	// Enrich conversations with other user info, latest message, and unread count
-	var enriched []*ConversationWithDetails
-	for _, conv := range conversations {
-		details := &ConversationWithDetails{
-			Conversation: conv,
-		}
+	// Enrich conversations with other user info, latest message, and unread count concurrently
+	enriched := make([]*ConversationWithDetails, len(conversations))
+	ctx := c.Request.Context()
 
-		// Get other user info (only for DM conversations)
-		if conv.ConversationType == "dm" {
-			otherUserID := conv.GetOtherUserID(userID.(int))
-			if otherUserID != 0 {
-				otherUser, err := h.userRepo.GetByID(c.Request.Context(), otherUserID)
-				if err == nil && otherUser != nil {
-					details.OtherUser = otherUser
-				}
+	type enrichResult struct {
+		index int
+		err   error
+	}
+
+	resultsChan := make(chan enrichResult, len(conversations))
+
+	// Enrich all conversations concurrently for better performance
+	for i, conv := range conversations {
+		go func(idx int, conversation *models.Conversation) {
+			details := &ConversationWithDetails{
+				Conversation: conversation,
 			}
-		} else if conv.ConversationType == "mod_mail" && conv.HubID != nil {
-			// For mod_mail, get hub name
-			var hubName string
-			err := h.pool.QueryRow(c.Request.Context(), `SELECT name FROM hubs WHERE id = $1`, *conv.HubID).Scan(&hubName)
-			if err == nil {
-				details.HubName = &hubName
-			}
-		}
 
-		// Get latest message
-		latestMsg, err := h.messageRepo.GetLatestMessage(c.Request.Context(), conv.ID)
-		if err == nil && latestMsg != nil {
-			details.LatestMessage = latestMsg
-		}
-
-		// Get unread count
-		unreadCount, err := h.messageRepo.GetUnreadCount(c.Request.Context(), conv.ID, userID.(int))
-		if err == nil {
-			details.UnreadCount = unreadCount
-		}
-
-		// For DMs: compute per-user archived_at based on archived_for_user1/user2
-		// This ensures the frontend can filter correctly based on archived_at
-		if conv.ConversationType == "dm" {
-			var archivedForUser1, archivedForUser2 bool
-			err := h.pool.QueryRow(c.Request.Context(), `
-				SELECT COALESCE(archived_for_user1, false), COALESCE(archived_for_user2, false)
-				FROM conversations WHERE id = $1
-			`, conv.ID).Scan(&archivedForUser1, &archivedForUser2)
-			if err == nil {
-				// Legacy fallback: if conversation-level archived_at is set, treat as archived for both users
-				legacyArchived := conv.ArchivedAt != nil
-
-				// If this conversation is archived for the current user, set archived_at
-				// Otherwise, clear it
-				if (conv.User1ID != nil && *conv.User1ID == userID.(int) && archivedForUser1) ||
-					(conv.User2ID != nil && *conv.User2ID == userID.(int) && archivedForUser2) ||
-					legacyArchived {
-					// Keep the existing archived_at if set, otherwise use current time as a placeholder
-					if details.ArchivedAt == nil {
-						now := time.Now()
-						details.ArchivedAt = &now
+			// Get other user info (only for DM conversations)
+			if conversation.ConversationType == "dm" {
+				otherUserID := conversation.GetOtherUserID(userID.(int))
+				if otherUserID != 0 {
+					otherUser, err := h.userRepo.GetByID(ctx, otherUserID)
+					if err == nil && otherUser != nil {
+						details.OtherUser = otherUser
 					}
-				} else {
-					// Not archived for this user
-					details.ArchivedAt = nil
+				}
+			} else if conversation.ConversationType == "mod_mail" && conversation.HubID != nil {
+				// For mod_mail, get hub name
+				var hubName string
+				err := h.pool.QueryRow(ctx, `SELECT name FROM hubs WHERE id = $1`, *conversation.HubID).Scan(&hubName)
+				if err == nil {
+					details.HubName = &hubName
 				}
 			}
-		}
 
-		enriched = append(enriched, details)
+			// Get latest message
+			latestMsg, err := h.messageRepo.GetLatestMessage(ctx, conversation.ID)
+			if err == nil && latestMsg != nil {
+				details.LatestMessage = latestMsg
+			}
+
+			// Get unread count
+			unreadCount, err := h.messageRepo.GetUnreadCount(ctx, conversation.ID, userID.(int))
+			if err == nil {
+				details.UnreadCount = unreadCount
+			}
+
+			// For DMs: compute per-user archived_at based on archived_for_user1/user2
+			// This ensures the frontend can filter correctly based on archived_at
+			if conversation.ConversationType == "dm" {
+				var archivedForUser1, archivedForUser2 bool
+				err := h.pool.QueryRow(ctx, `
+					SELECT COALESCE(archived_for_user1, false), COALESCE(archived_for_user2, false)
+					FROM conversations WHERE id = $1
+				`, conversation.ID).Scan(&archivedForUser1, &archivedForUser2)
+				if err == nil {
+					// Legacy fallback: if conversation-level archived_at is set, treat as archived for both users
+					legacyArchived := conversation.ArchivedAt != nil
+
+					// If this conversation is archived for the current user, set archived_at
+					// Otherwise, clear it
+					if (conversation.User1ID != nil && *conversation.User1ID == userID.(int) && archivedForUser1) ||
+						(conversation.User2ID != nil && *conversation.User2ID == userID.(int) && archivedForUser2) ||
+						legacyArchived {
+						// Keep the existing archived_at if set, otherwise use current time as a placeholder
+						if details.ArchivedAt == nil {
+							now := time.Now()
+							details.ArchivedAt = &now
+						}
+					} else {
+						// Not archived for this user
+						details.ArchivedAt = nil
+					}
+				}
+			}
+
+			enriched[idx] = details
+			resultsChan <- enrichResult{index: idx, err: nil}
+		}(i, conv)
+	}
+
+	// Wait for all enrichment to complete
+	for i := 0; i < len(conversations); i++ {
+		<-resultsChan
 	}
 
 	nextCursor := ""
