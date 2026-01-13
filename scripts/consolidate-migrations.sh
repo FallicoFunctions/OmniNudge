@@ -61,7 +61,7 @@ rm -rf migrations
 mkdir -p migrations
 
 # Create the UP migration (apply schema)
-cat > migrations/001_production_schema.up.sql <<'EOF'
+cat > migrations/001_production_schema.up.sql <<EOF
 -- OmniNudge Production Schema
 -- Consolidated from 48 development migrations
 -- Generated: $(date +%Y-%m-%d)
