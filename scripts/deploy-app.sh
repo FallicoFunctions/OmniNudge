@@ -60,7 +60,16 @@ SERVER_PORT=8080
 SERVER_HOST=0.0.0.0
 ALLOWED_ORIGINS=https://$DOMAIN,https://www.$DOMAIN
 
-# Database
+# Database - Individual variables
+DB_HOST=localhost
+DB_PORT=5432
+DB_USER=omninudge_user
+DB_PASSWORD=$DB_PASSWORD
+DB_NAME=omninudge
+DB_SSLMODE=disable
+DB_AUTO_MIGRATE=false
+
+# Database - Connection URL (for tools that use it)
 DATABASE_URL=$DATABASE_URL
 
 # Security
@@ -80,7 +89,7 @@ echo "✓ Backend .env created"
 echo ""
 echo "Step 2: Creating frontend .env.production..."
 cat > frontend/.env.production <<EOF
-VITE_API_URL=https://$DOMAIN/api
+VITE_API_URL=https://$DOMAIN/api/v1
 VITE_WS_URL=wss://$DOMAIN/ws
 EOF
 
@@ -111,17 +120,21 @@ echo ""
 echo "Step 6: Running database migrations..."
 cd /var/www/omninudge/backend/internal/database
 
-# Check if consolidated migration exists
+# Check if consolidated migration exists, otherwise run all migrations
 if [ -f "migrations/001_production_schema.up.sql" ]; then
     echo "Using consolidated production schema..."
     PGPASSWORD="$DB_PASSWORD" psql -U omninudge_user -d omninudge -h localhost \
         -f migrations/001_production_schema.up.sql
     echo "✓ Database schema created"
 else
-    echo "⚠ Warning: Consolidated migration not found!"
-    echo "Please run: bash scripts/consolidate-migrations.sh"
-    echo "Then re-run deployment."
-    exit 1
+    echo "Running individual migrations..."
+    for migration in migrations/*.up.sql; do
+        if [ -f "$migration" ]; then
+            echo "  Running: $(basename $migration)"
+            PGPASSWORD="$DB_PASSWORD" psql -U omninudge_user -d omninudge -h localhost -f "$migration"
+        fi
+    done
+    echo "✓ All migrations completed"
 fi
 
 echo ""
