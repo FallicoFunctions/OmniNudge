@@ -136,31 +136,58 @@ func (h *SavedItemsHandler) pruneRemovedRedditPosts(c *gin.Context, userID int, 
 	var filtered []*models.SavedRedditPost
 	var removed []removedRedditPost
 
-	for _, post := range posts {
-		isRemoved := isLocallyRemovedRedditPost(post)
+	// Fetch Reddit API info for all posts concurrently for better performance
+	type postCheckResult struct {
+		post      *models.SavedRedditPost
+		isRemoved bool
+		err       error
+	}
 
-		if !isRemoved && h.redditClient != nil {
-			apiPost, err := h.redditClient.GetPostInfo(ctx, post.Subreddit, post.RedditPostID)
-			if err != nil {
-				c.Error(fmt.Errorf("failed to fetch reddit post info for %s/%s: %w", post.Subreddit, post.RedditPostID, err))
-			} else if services.IsRedditPostRemoved(apiPost) || apiPost == nil {
-				isRemoved = true
+	resultsChan := make(chan postCheckResult, len(posts))
+
+	// Launch concurrent checkers
+	for _, post := range posts {
+		go func(p *models.SavedRedditPost) {
+			isRemoved := isLocallyRemovedRedditPost(p)
+
+			if !isRemoved && h.redditClient != nil {
+				apiPost, err := h.redditClient.GetPostInfo(ctx, p.Subreddit, p.RedditPostID)
+				if err != nil {
+					resultsChan <- postCheckResult{post: p, isRemoved: false, err: err}
+					return
+				} else if services.IsRedditPostRemoved(apiPost) || apiPost == nil {
+					isRemoved = true
+				}
 			}
+
+			resultsChan <- postCheckResult{post: p, isRemoved: isRemoved, err: nil}
+		}(post)
+	}
+
+	// Collect results
+	for i := 0; i < len(posts); i++ {
+		result := <-resultsChan
+
+		if result.err != nil {
+			c.Error(fmt.Errorf("failed to fetch reddit post info for %s/%s: %w", result.post.Subreddit, result.post.RedditPostID, result.err))
+			// Keep the post if we couldn't verify it was removed
+			filtered = append(filtered, result.post)
+			continue
 		}
 
-		if isRemoved {
-			if err := h.savedRepo.RemoveRedditPost(ctx, userID, post.Subreddit, post.RedditPostID); err != nil {
-				c.Error(fmt.Errorf("failed to remove stale reddit post %s/%s: %w", post.Subreddit, post.RedditPostID, err))
-				filtered = append(filtered, post)
+		if result.isRemoved {
+			if err := h.savedRepo.RemoveRedditPost(ctx, userID, result.post.Subreddit, result.post.RedditPostID); err != nil {
+				c.Error(fmt.Errorf("failed to remove stale reddit post %s/%s: %w", result.post.Subreddit, result.post.RedditPostID, err))
+				filtered = append(filtered, result.post)
 				continue
 			}
 			removed = append(removed, removedRedditPost{
-				Subreddit:    post.Subreddit,
-				RedditPostID: post.RedditPostID,
+				Subreddit:    result.post.Subreddit,
+				RedditPostID: result.post.RedditPostID,
 			})
 			continue
 		}
-		filtered = append(filtered, post)
+		filtered = append(filtered, result.post)
 	}
 
 	return filtered, removed

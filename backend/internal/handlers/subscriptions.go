@@ -157,7 +157,7 @@ func (h *SubscriptionsHandler) GetUserHubSubscriptions(c *gin.Context) {
 		return
 	}
 
-	// Fetch hub details for each subscription
+	// Fetch hub details for each subscription concurrently
 	type SubscriptionWithHub struct {
 		ID           int         `json:"id"`
 		UserID       int         `json:"user_id"`
@@ -166,16 +166,34 @@ func (h *SubscriptionsHandler) GetUserHubSubscriptions(c *gin.Context) {
 		SubscribedAt string      `json:"subscribed_at"`
 	}
 
-	var result []SubscriptionWithHub
-	for _, sub := range subscriptions {
-		hub, _ := h.hubRepo.GetByID(c.Request.Context(), sub.HubID)
-		result = append(result, SubscriptionWithHub{
-			ID:           sub.ID,
-			UserID:       sub.UserID,
-			HubID:        sub.HubID,
-			Hub:          hub,
-			SubscribedAt: sub.SubscribedAt.Format("2006-01-02T15:04:05Z07:00"),
-		})
+	result := make([]SubscriptionWithHub, len(subscriptions))
+	ctx := c.Request.Context()
+
+	type hubResult struct {
+		index int
+		hub   *models.Hub
+	}
+
+	resultsChan := make(chan hubResult, len(subscriptions))
+
+	// Fetch hub details concurrently for better performance
+	for i, sub := range subscriptions {
+		go func(idx int, subscription *models.HubSubscription) {
+			hub, _ := h.hubRepo.GetByID(ctx, subscription.HubID)
+			resultsChan <- hubResult{index: idx, hub: hub}
+		}(i, sub)
+	}
+
+	// Collect results
+	for i := 0; i < len(subscriptions); i++ {
+		res := <-resultsChan
+		result[res.index] = SubscriptionWithHub{
+			ID:           subscriptions[res.index].ID,
+			UserID:       subscriptions[res.index].UserID,
+			HubID:        subscriptions[res.index].HubID,
+			Hub:          res.hub,
+			SubscribedAt: subscriptions[res.index].SubscribedAt.Format("2006-01-02T15:04:05Z07:00"),
+		}
 	}
 
 	c.JSON(http.StatusOK, gin.H{
