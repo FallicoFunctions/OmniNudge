@@ -10,10 +10,10 @@ import (
 )
 
 type SubredditPresenceHandler struct {
-	presence *services.SubredditPresence
+	presence *services.PresenceStore
 }
 
-func NewSubredditPresenceHandler(presence *services.SubredditPresence) *SubredditPresenceHandler {
+func NewSubredditPresenceHandler(presence *services.PresenceStore) *SubredditPresenceHandler {
 	return &SubredditPresenceHandler{presence: presence}
 }
 

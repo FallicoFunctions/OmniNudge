@@ -35,6 +35,7 @@ import { SubredditSuggestionItem } from '../components/subreddit/SubredditSugges
 import { useSubredditAutocomplete } from '../hooks/useSubredditAutocomplete';
 import { SubredditModeratorsPanel } from '../components/subreddit/SubredditModeratorsPanel';
 import { useSubredditActiveUsers } from '../hooks/useSubredditActiveUsers';
+import { useHubActiveUsers } from '../hooks/useHubActiveUsers';
 
 const FORMATTING_EXAMPLES = [
   { input: '*italics*', output: '*italics*' },
@@ -356,6 +357,7 @@ export default function PostDetailPage() {
     isLoading: loadingHubDetails,
     isError: hubDetailsError,
   } = useHubDetails(hubName, Boolean(hubName));
+  const { data: hubActiveUsersData } = useHubActiveUsers(hubName, user);
 
   const {
     moderators: hubModerators,
@@ -828,6 +830,7 @@ export default function PostDetailPage() {
               isLoading={loadingHubDetails}
               isError={hubDetailsError}
               showStats
+              activeOmniUsers={hubActiveUsersData?.active_users ?? null}
             />
 
             <HubModeratorsPanel
