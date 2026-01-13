@@ -410,12 +410,12 @@ func (h *MessagesHandler) GetMessages(c *gin.Context) {
 		return
 	}
 
-	// Mark undelivered messages as delivered for this recipient and notify senders
+	// Mark undelivered messages as delivered for this recipient and notify senders (concurrent broadcasts)
 	if h.hub != nil {
 		delivered, err := h.messageRepo.MarkUndeliveredAsDelivered(c.Request.Context(), conversationID, userID.(int))
 		if err == nil {
 			for _, dm := range delivered {
-				h.hub.Broadcast(&websocket.Message{
+				go h.hub.Broadcast(&websocket.Message{
 					RecipientID: dm.SenderID,
 					Type:        "message_delivered",
 					Payload: gin.H{

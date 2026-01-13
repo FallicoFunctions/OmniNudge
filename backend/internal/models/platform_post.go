@@ -145,14 +145,6 @@ func buildPlatformPostCursorClause(sortBy string, cursor *PlatformPostCursor, st
 
 const platformPostRisingScoreExpr = "(p.score::float / GREATEST(EXTRACT(EPOCH FROM (NOW() - p.created_at)) / 3600, 1))"
 
-const platformPostSelectColumns = `
-	id, author_id, hub_id, title, body, tags, media_url, media_type, thumbnail_url,
-	score, upvotes, downvotes, num_comments, view_count,
-	is_deleted, is_edited, edited_at,
-	crosspost_origin_type, crosspost_origin_subreddit, crosspost_origin_post_id, crosspost_original_title,
-	target_subreddit, crossposted_at, created_at, hot_score, gallery_images
-`
-
 const platformPostSelectColumnsPrefixed = `
 	p.id, p.author_id, p.hub_id, p.title, p.body, p.tags, p.media_url, p.media_type, p.thumbnail_url,
 	p.score, p.upvotes, p.downvotes, p.num_comments, p.view_count,
@@ -710,53 +702,7 @@ func scanPlatformPost(row pgx.Row, post *PlatformPost, extraDest ...interface{})
 	}
 
 	// Unmarshal gallery_images JSONB (skip if null/empty)
-	if galleryImagesBytes != nil && len(galleryImagesBytes) > 0 && string(galleryImagesBytes) != "null" {
-		if err := json.Unmarshal(galleryImagesBytes, &post.GalleryImages); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-func scanPlatformPostWithVote(row pgx.Row, post *PlatformPost, extraDest ...interface{}) error {
-	var galleryImagesBytes []byte
-	dests := []interface{}{
-		&post.ID,
-		&post.AuthorID,
-		&post.HubID,
-		&post.Title,
-		&post.Body,
-		&post.Tags,
-		&post.MediaURL,
-		&post.MediaType,
-		&post.ThumbnailURL,
-		&post.Score,
-		&post.Upvotes,
-		&post.Downvotes,
-		&post.NumComments,
-		&post.ViewCount,
-		&post.IsDeleted,
-		&post.IsEdited,
-		&post.EditedAt,
-		&post.CrosspostOriginType,
-		&post.CrosspostOriginSubreddit,
-		&post.CrosspostOriginPostID,
-		&post.CrosspostOriginalTitle,
-		&post.TargetSubreddit,
-		&post.CrosspostedAt,
-		&post.CreatedAt,
-		&post.HotScore,
-		&galleryImagesBytes,
-		&post.UserVote,
-	}
-	dests = append(dests, extraDest...)
-	if err := row.Scan(dests...); err != nil {
-		return err
-	}
-
-	// Unmarshal gallery_images JSONB (skip if null/empty)
-	if galleryImagesBytes != nil && len(galleryImagesBytes) > 0 && string(galleryImagesBytes) != "null" {
+	if len(galleryImagesBytes) > 0 && string(galleryImagesBytes) != "null" {
 		if err := json.Unmarshal(galleryImagesBytes, &post.GalleryImages); err != nil {
 			return err
 		}
@@ -803,7 +749,7 @@ func scanPlatformPostWithUserInfo(row pgx.Row, post *PlatformPost, extraDest ...
 	}
 
 	// Unmarshal gallery_images JSONB (skip if null/empty)
-	if galleryImagesBytes != nil && len(galleryImagesBytes) > 0 && string(galleryImagesBytes) != "null" {
+	if len(galleryImagesBytes) > 0 && string(galleryImagesBytes) != "null" {
 		if err := json.Unmarshal(galleryImagesBytes, &post.GalleryImages); err != nil {
 			return err
 		}

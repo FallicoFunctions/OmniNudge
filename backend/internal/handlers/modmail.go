@@ -217,15 +217,15 @@ func (h *ModMailHandler) CreateModMail(c *gin.Context) {
 		moderatorIDs = append(moderatorIDs, modID)
 	}
 
-	// Add all moderators as participants
-	for _, modID := range moderatorIDs {
+	// Add all moderators as participants (batch insert for better performance)
+	if len(moderatorIDs) > 0 {
 		_, err = tx.Exec(c.Request.Context(), `
 			INSERT INTO conversation_participants (conversation_id, user_id, is_moderator, joined_at)
-			VALUES ($1, $2, TRUE, NOW())
+			SELECT $1, UNNEST($2::int[]), TRUE, NOW()
 			ON CONFLICT (conversation_id, user_id) DO NOTHING
-		`, conversationID, modID)
+		`, conversationID, moderatorIDs)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to add moderator"})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to add moderators"})
 			return
 		}
 	}
@@ -274,16 +274,22 @@ func (h *ModMailHandler) CreateModMail(c *gin.Context) {
 		return
 	}
 
-	if isMulti {
+	if isMulti && len(req.RecipientKeys) > 0 {
+		// Batch insert recipient keys for better performance
+		var userIDs []int
+		var encryptedKeys []string
 		for pid, encryptedKey := range req.RecipientKeys {
-			_, err = tx.Exec(c.Request.Context(), `
-				INSERT INTO message_recipient_keys (message_id, user_id, encrypted_key)
-				VALUES ($1, $2, $3)
-			`, messageID, pid, encryptedKey)
-			if err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to store recipient key", "details": err.Error()})
-				return
-			}
+			userIDs = append(userIDs, pid)
+			encryptedKeys = append(encryptedKeys, encryptedKey)
+		}
+
+		_, err = tx.Exec(c.Request.Context(), `
+			INSERT INTO message_recipient_keys (message_id, user_id, encrypted_key)
+			SELECT $1, UNNEST($2::int[]), UNNEST($3::text[])
+		`, messageID, userIDs, encryptedKeys)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to store recipient keys", "details": err.Error()})
+			return
 		}
 	}
 
