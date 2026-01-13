@@ -95,6 +95,67 @@
 - Always handle loading and error states
 - Use proper TypeScript types (avoid `any`)
 
+### Code Reusability - CRITICAL
+**NO redundant code. Reuse code wherever possible.**
+
+- **Frontend (React/TypeScript)**:
+  - NEVER duplicate component logic across multiple pages
+  - ALWAYS create reusable components for UI elements that appear in multiple places
+  - **Examples that MUST be reusable components**:
+    - Hub "About" section that appears on hub main page, hub post page, etc.
+    - User profile cards that appear in different contexts
+    - Post cards that appear in feeds, search results, saved items, etc.
+    - Comment components that appear in post pages, mod mail, etc.
+    - Modal dialogs with similar structure
+    - Form inputs with validation
+    - Loading states and error displays
+  - **Pattern to follow**:
+    ```typescript
+    // ❌ BAD: Duplicating the same component logic
+    // HubPage.tsx
+    <div className="hub-about">
+      <h3>{hub.name}</h3>
+      <p>{hub.description}</p>
+      <div>{hub.rules}</div>
+    </div>
+
+    // HubPostPage.tsx
+    <div className="hub-about">
+      <h3>{hub.name}</h3>
+      <p>{hub.description}</p>
+      <div>{hub.rules}</div>
+    </div>
+
+    // ✅ GOOD: Reusable component
+    // components/HubAbout.tsx
+    export const HubAbout = ({ hub }) => (
+      <div className="hub-about">
+        <h3>{hub.name}</h3>
+        <p>{hub.description}</p>
+        <div>{hub.rules}</div>
+      </div>
+    );
+
+    // Then use <HubAbout hub={hub} /> in both pages
+    ```
+  - **Utility functions**: Extract common logic into utility files
+  - **Custom hooks**: Create custom hooks for reusable stateful logic
+  - **Types**: Define types once, import everywhere (no duplicate type definitions)
+
+- **Backend (Go)**:
+  - NEVER duplicate business logic across handlers
+  - ALWAYS create shared functions for common operations
+  - Extract repeated database queries into repository methods
+  - Create utility functions for common transformations
+  - Use middleware for cross-cutting concerns (auth, logging, etc.)
+
+- **Benefits of code reuse**:
+  - Reduces bugs (fix once, fixed everywhere)
+  - Easier maintenance (update once, updated everywhere)
+  - Smaller bundle size (less code to ship)
+  - Consistent UI/UX (same component = same behavior)
+  - Faster development (import existing component instead of rewriting)
+
 ## Performance Requirements
 
 ### Non-blocking Operations - CRITICAL

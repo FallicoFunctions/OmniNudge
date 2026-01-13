@@ -152,13 +152,14 @@ export function SavedItemsView({
   );
 
   useEffect(() => {
-    postsNeedingDetails.forEach((post) => {
+    // Fetch all post details concurrently for better performance
+    const fetchPromises = postsNeedingDetails.map((post) => {
       const postKey = `${post.subreddit}-${post.reddit_post_id}`;
       if (postDetails[postKey] || fetchingDetailsRef.current.has(postKey)) {
-        return;
+        return Promise.resolve();
       }
       fetchingDetailsRef.current.add(postKey);
-      api
+      return api
         .get<[RedditListingData, unknown]>(
           `/r/${post.subreddit}/comments/${post.reddit_post_id}`
         )
@@ -204,6 +205,9 @@ export function SavedItemsView({
           fetchingDetailsRef.current.delete(postKey);
         });
     });
+
+    // Execute all fetches concurrently
+    Promise.all(fetchPromises);
   }, [postsNeedingDetails, postDetails]);
 
   const invalidateSavedQueries = () => {
@@ -225,9 +229,11 @@ export function SavedItemsView({
 
   const hideRedditPostMutation = useMutation({
     mutationFn: async ({ subreddit, reddit_post_id }: { subreddit: string; reddit_post_id: string }) => {
-      // First unsave the post, then hide it
-      await savedService.unsaveRedditPost(subreddit, reddit_post_id);
-      await savedService.hideRedditPost(subreddit, reddit_post_id);
+      // Unsave and hide concurrently for better performance
+      await Promise.all([
+        savedService.unsaveRedditPost(subreddit, reddit_post_id),
+        savedService.hideRedditPost(subreddit, reddit_post_id),
+      ]);
     },
     onSuccess: () => {
       invalidateSavedQueries();

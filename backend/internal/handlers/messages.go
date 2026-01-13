@@ -547,10 +547,10 @@ func (h *MessagesHandler) MarkAsRead(c *gin.Context) {
 		return
 	}
 
-	// Notify senders about individual message read events
+	// Notify senders about individual message read events (concurrent for better performance)
 	if h.hub != nil {
 		for _, msg := range unreadMessages {
-			h.hub.Broadcast(&websocket.Message{
+			go h.hub.Broadcast(&websocket.Message{
 				RecipientID: msg.SenderID,
 				Type:        "message_read",
 				Payload: gin.H{
@@ -563,7 +563,7 @@ func (h *MessagesHandler) MarkAsRead(c *gin.Context) {
 
 		// Notify other participants based on conversation type
 		if conversationType == "mod_mail" {
-			// For mod mail, notify all participants except the reader
+			// For mod mail, notify all participants except the reader (concurrent broadcasts)
 			rows, err := h.pool.Query(c.Request.Context(), `
 				SELECT user_id FROM conversation_participants
 				WHERE conversation_id = $1 AND user_id != $2
@@ -573,7 +573,7 @@ func (h *MessagesHandler) MarkAsRead(c *gin.Context) {
 				for rows.Next() {
 					var participantID int
 					if rows.Scan(&participantID) == nil {
-						h.hub.Broadcast(&websocket.Message{
+						go h.hub.Broadcast(&websocket.Message{
 							RecipientID: participantID,
 							Type:        "conversation_read",
 							Payload: gin.H{

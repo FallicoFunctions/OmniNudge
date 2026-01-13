@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/omninudge/backend/internal/database"
 	"github.com/omninudge/backend/internal/models"
 	"github.com/stretchr/testify/assert"
@@ -18,7 +19,7 @@ import (
 )
 
 // setupHubsTest creates a test setup with database and handler
-func setupHubsTest(t *testing.T) (*HubsHandler, *models.HubRepository, *models.PlatformPostRepository, *models.UserRepository, func()) {
+func setupHubsTest(t *testing.T) (*HubsHandler, *pgxpool.Pool, *models.HubRepository, *models.PlatformPostRepository, *models.UserRepository, func()) {
 	db, err := database.NewTest()
 	require.NoError(t, err)
 
@@ -49,7 +50,7 @@ func setupHubsTest(t *testing.T) (*HubsHandler, *models.HubRepository, *models.P
 		db.Close()
 	}
 
-	return handler, hubRepo, postRepo, userRepo, cleanup
+	return handler, db.Pool, hubRepo, postRepo, userRepo, cleanup
 }
 
 // Helper function to create pointer to string
@@ -58,7 +59,7 @@ func ptr(s string) *string {
 }
 
 func TestCreateHub(t *testing.T) {
-	handler, _, _, _, cleanup := setupHubsTest(t)
+	handler, _, _, _, _, cleanup := setupHubsTest(t)
 	defer cleanup()
 
 	gin.SetMode(gin.TestMode)
@@ -131,7 +132,7 @@ func TestCreateHub(t *testing.T) {
 }
 
 func TestGetHubIncludesModerators(t *testing.T) {
-	handler, hubRepo, _, _, cleanup := setupHubsTest(t)
+	handler, _, hubRepo, _, _, cleanup := setupHubsTest(t)
 	defer cleanup()
 
 	ctx := context.Background()
@@ -169,7 +170,7 @@ func TestGetHubIncludesModerators(t *testing.T) {
 }
 
 func TestGetHub(t *testing.T) {
-	handler, hubRepo, _, _, cleanup := setupHubsTest(t)
+	handler, _, hubRepo, _, _, cleanup := setupHubsTest(t)
 	defer cleanup()
 
 	gin.SetMode(gin.TestMode)
@@ -235,7 +236,7 @@ func TestGetHub(t *testing.T) {
 }
 
 func TestListHubsWithNsfwFilter(t *testing.T) {
-	handler, hubRepo, _, _, cleanup := setupHubsTest(t)
+	handler, _, hubRepo, _, _, cleanup := setupHubsTest(t)
 	defer cleanup()
 
 	ctx := context.Background()
@@ -323,7 +324,7 @@ func TestListHubsWithNsfwFilter(t *testing.T) {
 }
 
 func TestGetUserHubs(t *testing.T) {
-	handler, hubRepo, _, userRepo, cleanup := setupHubsTest(t)
+	handler, _, hubRepo, _, userRepo, cleanup := setupHubsTest(t)
 	defer cleanup()
 
 	gin.SetMode(gin.TestMode)
@@ -396,7 +397,7 @@ func TestGetUserHubs(t *testing.T) {
 }
 
 func TestCrosspostToHub(t *testing.T) {
-	handler, hubRepo, postRepo, _, cleanup := setupHubsTest(t)
+	handler, _, hubRepo, postRepo, _, cleanup := setupHubsTest(t)
 	defer cleanup()
 
 	gin.SetMode(gin.TestMode)
@@ -577,7 +578,7 @@ func TestCrosspostToHub(t *testing.T) {
 }
 
 func TestCrosspostToSubreddit(t *testing.T) {
-	handler, _, postRepo, _, cleanup := setupHubsTest(t)
+	handler, _, _, postRepo, _, cleanup := setupHubsTest(t)
 	defer cleanup()
 
 	gin.SetMode(gin.TestMode)
@@ -636,7 +637,7 @@ func TestCrosspostToSubreddit(t *testing.T) {
 }
 
 func TestCrosspostTimestampUsesCreationTime(t *testing.T) {
-	handler, _, postRepo, _, cleanup := setupHubsTest(t)
+	handler, _, _, postRepo, _, cleanup := setupHubsTest(t)
 	defer cleanup()
 
 	gin.SetMode(gin.TestMode)
@@ -682,12 +683,12 @@ func TestCrosspostTimestampUsesCreationTime(t *testing.T) {
 }
 
 func TestGetPlatformSubredditPosts(t *testing.T) {
-	_, hubRepo, postRepo, userRepo, cleanup := setupHubsTest(t)
+	_, pool, hubRepo, postRepo, userRepo, cleanup := setupHubsTest(t)
 	defer cleanup()
 
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
-	postsHandler := NewPostsHandler(postRepo, hubRepo, userRepo, nil, nil)
+	postsHandler := NewPostsHandler(pool, postRepo, hubRepo, userRepo, nil, nil)
 	router.GET("/subreddits/:name/posts", postsHandler.GetSubredditPosts)
 
 	ctx := context.Background()
@@ -748,7 +749,7 @@ func TestGetPlatformSubredditPosts(t *testing.T) {
 }
 
 func TestHubAuthRequired(t *testing.T) {
-	handler, _, _, _, cleanup := setupHubsTest(t)
+	handler, _, _, _, _, cleanup := setupHubsTest(t)
 	defer cleanup()
 
 	gin.SetMode(gin.TestMode)

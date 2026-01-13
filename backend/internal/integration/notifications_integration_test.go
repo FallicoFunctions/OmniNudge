@@ -64,8 +64,8 @@ func setupNotificationIntegrationTest(t *testing.T) (*gin.Engine, *database.Data
 	feedRepo := models.NewFeedRepository(db.Pool)
 
 	// Initialize handlers
-	postsHandler := handlers.NewPostsHandler(postRepo, hubRepo, userRepo, hubModRepo, feedRepo)
-	commentsHandler := handlers.NewCommentsHandler(commentRepo, postRepo, hubModRepo)
+	postsHandler := handlers.NewPostsHandler(db.Pool, postRepo, hubRepo, userRepo, hubModRepo, feedRepo)
+	commentsHandler := handlers.NewCommentsHandler(db.Pool, commentRepo, postRepo, hubRepo, userRepo, hubModRepo)
 	notificationsHandler := handlers.NewNotificationsHandler(notifRepo)
 
 	// Inject notification service
@@ -184,7 +184,7 @@ func TestEndToEndPostVoteNotification(t *testing.T) {
 	hubRepo := models.NewHubRepository(db.Pool)
 	userRepo := models.NewUserRepository(db.Pool)
 	anotherFeedRepo := models.NewFeedRepository(db.Pool)
-	postsHandler := handlers.NewPostsHandler(postRepo, hubRepo, userRepo, nil, anotherFeedRepo)
+	postsHandler := handlers.NewPostsHandler(db.Pool, postRepo, hubRepo, userRepo, nil, anotherFeedRepo)
 	postsHandler.SetNotificationService(notifService)
 
 	postIDStr := strconv.Itoa(postID)
@@ -294,7 +294,9 @@ func TestEndToEndCommentReplyNotification(t *testing.T) {
 	c.Params = gin.Params{{Key: "id", Value: strconv.Itoa(postID)}}
 
 	postRepo := models.NewPlatformPostRepository(db.Pool)
-	commentsHandler := handlers.NewCommentsHandler(commentRepo, postRepo, nil)
+	hubRepo := models.NewHubRepository(db.Pool)
+	userRepo := models.NewUserRepository(db.Pool)
+	commentsHandler := handlers.NewCommentsHandler(db.Pool, commentRepo, postRepo, hubRepo, userRepo, nil)
 	commentsHandler.SetNotificationService(notifService)
 	commentsHandler.CreateComment(c)
 	require.Equal(t, http.StatusCreated, w.Code)
