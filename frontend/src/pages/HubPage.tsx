@@ -2,9 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useParams } from 'react-router-dom';
 import { hubsService, type HubPostsResponse, type LocalSubredditPost } from '../services/hubsService';
-import { subscriptionService } from '../services/subscriptionService';
 import { useAuth } from '../contexts/AuthContext';
-import { SubscribeButton } from '../components/common/SubscribeButton';
+import { HubHeader } from '../components/hubs/HubHeader';
 import { postsService } from '../services/postsService';
 import { useSettings } from '../contexts/SettingsContext';
 import { savedService } from '../services/savedService';
@@ -207,13 +206,6 @@ export default function HubsPage() {
   useEffect(() => {
     setCursorStack(['']);
   }, [sort, hubname, timeRangeKey]);
-
-  // Check subscription status for specific hub
-  const { data: subscriptionStatus } = useQuery({
-    queryKey: ['hub-subscription', hubname],
-    queryFn: () => subscriptionService.checkHubSubscription(hubname),
-    enabled: !!user && hubname !== 'popular' && hubname !== 'all',
-  });
 
   const handleSortChange = (newSort: 'hot' | 'new' | 'top' | 'rising') => {
     setSort(newSort);
@@ -418,49 +410,7 @@ export default function HubsPage() {
 
   return (
     <div className="mx-auto w-full max-w-7xl px-4 py-8">
-      {/* Header */}
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">
-            {hubname === 'popular' && 'h/popular'}
-            {hubname === 'all' && 'h/all'}
-            {hubname !== 'popular' && hubname !== 'all' && `h/${hubname}`}
-          </h1>
-        </div>
-        <div className="flex items-center gap-2">
-          {user && hubname !== 'popular' && hubname !== 'all' && (
-            <SubscribeButton
-              type="hub"
-              name={hubname}
-              initialSubscribed={subscriptionStatus?.is_subscribed}
-            />
-          )}
-          {isModerator && (
-            <button
-              onClick={() => navigate(`/h/${hubname}/mod`)}
-              className="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700"
-            >
-              Mod Tools
-            </button>
-          )}
-          {user && (
-            <button
-              onClick={() => navigate('/posts/create', { state: { defaultHub: hubname, returnTo: `/h/${hubname}` } })}
-              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-            >
-              Create Post
-            </button>
-          )}
-          {user && (
-            <button
-              onClick={() => navigate('/hubs/create', { state: { returnTo: `/h/${hubname}` } })}
-              className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
-            >
-              Create Hub
-            </button>
-          )}
-        </div>
-      </div>
+      <HubHeader hubName={hubname} isModerator={isModerator} />
 
       <div className="mt-4 grid gap-6 lg:grid-cols-[minmax(0,1fr)_300px]">
         <div>

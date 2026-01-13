@@ -26,6 +26,7 @@ import { getSavedCommentIdSet, getSavedPostIdSet } from '../utils/savedItems';
 import { LoadingMessage } from '../components/common/StatusMessage';
 import { PostDetailMedia } from '../components/posts/PostDetailMedia';
 import { canModerateContent } from '../utils/permissions';
+import { HubHeader } from '../components/hubs/HubHeader';
 
 const FORMATTING_EXAMPLES = [
   { input: '*italics*', output: '*italics*' },
@@ -421,6 +422,7 @@ export default function PostDetailPage() {
 
   return (
     <div className="mx-auto w-full max-w-7xl px-4 py-8">
+      {hubName && <HubHeader hubName={hubName} isModerator={isModerator} />}
       <div className="mt-4 grid gap-6 lg:grid-cols-[minmax(0,1fr)_300px]">
         <div className="space-y-6">
           {postData && (
