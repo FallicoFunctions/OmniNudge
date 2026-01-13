@@ -48,12 +48,35 @@ export function HubHeader({
           <h1 className="text-3xl font-bold">{headerLabel}</h1>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {user && !isSpecialHub && (
-            <SubscribeButton
-              type="hub"
-              name={hubName}
-              initialSubscribed={subscriptionStatus?.is_subscribed}
-            />
+          {!isSpecialHub && (
+            <>
+              {user ? (
+                <SubscribeButton
+                  type="hub"
+                  name={hubName}
+                  initialSubscribed={subscriptionStatus?.is_subscribed}
+                />
+              ) : (
+                <button
+                  type="button"
+                  onClick={() =>
+                    window.dispatchEvent(
+                      new CustomEvent('open-auth-modal', {
+                        detail: {
+                          mode: 'login',
+                          redirectTo: `/h/${hubName}`,
+                          redirectState: location.state,
+                          action: { type: 'subscribeHub', hub: hubName },
+                        },
+                      })
+                    )
+                  }
+                  className="px-4 py-2 bg-[var(--color-surface-elevated)] text-[var(--color-text-primary)] rounded hover:bg-[var(--color-border)]"
+                >
+                  Subscribe
+                </button>
+              )}
+            </>
           )}
           {isModerator && !isSpecialHub && (
             <button
@@ -63,21 +86,45 @@ export function HubHeader({
               Mod Tools
             </button>
           )}
-          {user && (
-            <button
-              onClick={() =>
-                navigate('/posts/create', {
-                  state: { defaultHub: hubName, returnTo: defaultReturnTo, originPath: location.pathname },
-                })
+          <button
+            onClick={() => {
+              if (!user) {
+                window.dispatchEvent(
+                  new CustomEvent('open-auth-modal', {
+                    detail: {
+                      mode: 'login',
+                      redirectTo: '/posts/create',
+                      redirectState: { defaultHub: hubName, returnTo: defaultReturnTo },
+                    },
+                  })
+                );
+                return;
               }
-              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-            >
-              Create Post
-            </button>
-          )}
-          {user && showCreateHub && (
+              navigate('/posts/create', {
+                state: { defaultHub: hubName, returnTo: defaultReturnTo, originPath: location.pathname },
+              });
+            }}
+            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+          >
+            Create Post
+          </button>
+          {showCreateHub && (
             <button
-              onClick={() => navigate('/hubs/create', { state: { returnTo: defaultReturnTo } })}
+              onClick={() => {
+                if (!user) {
+                  window.dispatchEvent(
+                    new CustomEvent('open-auth-modal', {
+                      detail: {
+                        mode: 'login',
+                        redirectTo: '/hubs/create',
+                        redirectState: { returnTo: defaultReturnTo },
+                      },
+                    })
+                  );
+                  return;
+                }
+                navigate('/hubs/create', { state: { returnTo: defaultReturnTo } });
+              }}
               className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
             >
               Create Hub
