@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { GalleryImage } from '../../types/posts';
+import { resolveMediaUrl } from '../../utils/mediaUrl';
 
 type PostDetailMediaProps = {
   mediaUrl?: string | null;
@@ -23,9 +24,16 @@ export function PostDetailMedia({
   const [galleryIndex, setGalleryIndex] = useState(0);
 
   const hasGallery = galleryImages && galleryImages.length > 0;
-  const displayImage = hasGallery ? galleryImages[galleryIndex].url : mediaUrl;
+  const galleryItem = hasGallery ? galleryImages[galleryIndex] : undefined;
+  const displayImage = hasGallery
+    ? resolveMediaUrl(galleryItem?.url)
+    : resolveMediaUrl(mediaUrl);
+  const resolvedThumbnailUrl = resolveMediaUrl(thumbnailUrl);
+  const isGalleryVideo =
+    (galleryItem?.media_type ?? '').startsWith('video') ||
+    /\.(mp4|webm|mov|m4v|ogg)$/i.test(galleryItem?.url ?? '');
 
-  if (!displayImage && !thumbnailUrl) {
+  if (!displayImage && !resolvedThumbnailUrl) {
     return null;
   }
 
@@ -48,7 +56,7 @@ export function PostDetailMedia({
           title={imageExpanded ? 'Click to shrink' : 'Click to enlarge'}
         >
           {displayImage ? (
-            isVideoMedia ? (
+            isVideoMedia || (hasGallery && isGalleryVideo) ? (
               <video
                 controls
                 className={`w-full object-contain ${imageExpanded ? 'max-h-[80vh]' : 'max-h-[320px]'}`}
@@ -72,7 +80,7 @@ export function PostDetailMedia({
             )
           ) : (
             <img
-              src={thumbnailUrl ?? ''}
+              src={resolvedThumbnailUrl ?? ''}
               alt={decodedTitle}
               loading="lazy"
               decoding="async"

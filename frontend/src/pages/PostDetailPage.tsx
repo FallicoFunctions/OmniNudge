@@ -25,6 +25,7 @@ import { useSavedItems } from '../hooks/useSavedItems';
 import { getSavedCommentIdSet, getSavedPostIdSet } from '../utils/savedItems';
 import { LoadingMessage } from '../components/common/StatusMessage';
 import { PostDetailMedia } from '../components/posts/PostDetailMedia';
+import { canModerateContent } from '../utils/permissions';
 
 const FORMATTING_EXAMPLES = [
   { input: '*italics*', output: '*italics*' },
@@ -57,6 +58,8 @@ export default function PostDetailPage() {
   const [showModMailModal, setShowModMailModal] = useState(false);
   const [deleteCommentTarget, setDeleteCommentTarget] = useState<{ commentId: number; authorId: number } | null>(null);
   const [deleteCommentReason, setDeleteCommentReason] = useState('');
+  const [deletePostTarget, setDeletePostTarget] = useState<{ postId: number; authorId: number } | null>(null);
+  const [deletePostReason, setDeletePostReason] = useState('');
 
   const parsedPostId = postId ? Number(postId) : NaN;
   const focusedCommentId = commentId ? Number(commentId) : null;
@@ -286,6 +289,11 @@ export default function PostDetailPage() {
     return hubModerators.some((mod) => mod.user_id === user.id);
   }, [user, hubModerators]);
 
+  const canDeletePost = useMemo(() => {
+    if (!postData) return false;
+    return canModerateContent(user?.id, postData.author_id, user?.role, isModerator);
+  }, [postData, user, isModerator]);
+
   const {
     data: subredditAbout,
     isLoading: loadingSubredditAbout,
@@ -328,6 +336,42 @@ export default function PostDetailPage() {
   };
 
   const originPathFromState = (location.state as { originPath?: string } | undefined)?.originPath;
+
+  const deletePostMutation = useMutation<void, Error, { postId: number; reason?: string }>({
+    mutationFn: async ({ postId, reason }) => postsService.deletePost(postId, reason),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: savedPostsKey });
+      queryClient.invalidateQueries({ queryKey: hiddenPostsKey });
+      setDeletePostTarget(null);
+      setDeletePostReason('');
+      navigate(originPathFromState ?? (hubName ? `/h/${hubName}` : '/'));
+    },
+    onError: (err) => {
+      alert(`Failed to delete post: ${err.message}`);
+    },
+  });
+
+  const handleDeletePost = () => {
+    if (!postData) return;
+    const isModeratorAction = user && postData.author_id !== user.id;
+    if (isModeratorAction) {
+      setDeletePostTarget({ postId: postData.id, authorId: postData.author_id });
+      return;
+    }
+    if (!window.confirm('Are you sure you want to delete this post?')) {
+      return;
+    }
+    deletePostMutation.mutate({ postId: postData.id });
+  };
+
+  const handleConfirmDeletePost = () => {
+    if (!deletePostTarget) return;
+    if (!deletePostReason.trim()) {
+      alert('Please provide a reason for deletion');
+      return;
+    }
+    deletePostMutation.mutate({ postId: deletePostTarget.postId, reason: deletePostReason });
+  };
 
   const handleHidePost = async () => {
     if (!user) {
@@ -476,6 +520,14 @@ export default function PostDetailPage() {
                   <button onClick={handleCrosspost} className="hover:underline">
                     crosspost
                   </button>
+                  {canDeletePost && (
+                    <>
+                      <span>•</span>
+                      <button onClick={handleDeletePost} className="text-red-600 hover:underline">
+                        delete
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
             </Panel>
@@ -752,6 +804,48 @@ export default function PostDetailPage() {
                 className="rounded bg-red-600 px-3 py-1 text-sm font-semibold text-white hover:bg-red-500 disabled:opacity-50"
               >
                 Delete Comment
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {deletePostTarget && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 px-4">
+          <div className="w-full max-w-md rounded-lg bg-white p-4 shadow-lg">
+            <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">
+              Delete Post - Reason Required
+            </h3>
+            <p className="mt-2 text-sm text-[var(--color-text-secondary)]">
+              As a moderator, you must provide a reason for deleting this post. The author will receive a modmail with your reason.
+            </p>
+            <div className="mt-4">
+              <label className="mb-1 block text-xs font-medium text-[var(--color-text-secondary)]">
+                Reason for deletion <span className="text-red-500">*</span>
+              </label>
+              <textarea
+                value={deletePostReason}
+                onChange={(e) => setDeletePostReason(e.target.value)}
+                placeholder="E.g., Violates rule 2: Be respectful..."
+                className="w-full rounded border border-[var(--color-border)] bg-[var(--color-surface)] p-2 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
+                rows={4}
+              />
+            </div>
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                onClick={() => {
+                  setDeletePostTarget(null);
+                  setDeletePostReason('');
+                }}
+                className="rounded border border-[var(--color-border)] px-3 py-1 text-sm hover:bg-[var(--color-surface-elevated)]"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmDeletePost}
+                disabled={!deletePostReason.trim() || deletePostMutation.isPending}
+                className="rounded bg-red-600 px-3 py-1 text-sm font-semibold text-white hover:bg-red-500 disabled:opacity-50"
+              >
+                {deletePostMutation.isPending ? 'Deleting...' : 'Delete Post'}
               </button>
             </div>
           </div>
