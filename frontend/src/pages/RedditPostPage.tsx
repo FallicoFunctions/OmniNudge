@@ -7,6 +7,7 @@ import { useSettings } from '../contexts/SettingsContext';
 import { savedService } from '../services/savedService';
 import { hubsService } from '../services/hubsService';
 import { redditService } from '../services/redditService';
+import { subscriptionService } from '../services/subscriptionService';
 import type { LocalRedditComment, RedditSubredditModerator } from '../types/reddit';
 import { formatTimestamp, formatRelativeTime } from '../utils/timeFormat';
 import {
@@ -20,13 +21,20 @@ import { FlairBadge } from '../components/reddit/FlairBadge';
 import { useRedditBlocklist } from '../contexts/RedditBlockContext';
 import { decodeHtmlEntities } from '../utils/text';
 import { Panel } from '../components/common/Panel';
+import { FeedSearchBars } from '../components/common/FeedSearchBars';
 import SubredditAboutPanel from '../components/reddit/SubredditAboutPanel';
+import { SubredditHeader } from '../components/subreddit/SubredditHeader';
+import { SubredditModeratorsPanel } from '../components/subreddit/SubredditModeratorsPanel';
+import { SubredditSuggestionItem } from '../components/subreddit/SubredditSuggestionItem';
 import { useSubredditAbout } from '../hooks/useSubredditAbout';
 import { useSavedItems } from '../hooks/useSavedItems';
 import { useHiddenItems } from '../hooks/useHiddenItems';
+import { useSubredditAutocomplete } from '../hooks/useSubredditAutocomplete';
+import { useSubredditActiveUsers } from '../hooks/useSubredditActiveUsers';
 import { CrosspostModal } from '../components/common/CrosspostModal';
+import { PostHeader } from '../components/posts/PostHeader';
 import { getSavedRedditCommentIdSetById } from '../utils/savedItems';
-import { EmptyMessage, LoadingMessage, StatusMessage } from '../components/common/StatusMessage';
+import { EmptyMessage, LoadingMessage } from '../components/common/StatusMessage';
 import { loadHls } from '../utils/hlsLoader';
 import { RedditPostMedia } from '../components/reddit/RedditPostMedia';
 import { VirtualizedList } from '../components/common/VirtualizedList';
@@ -940,7 +948,7 @@ export default function RedditPostPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuth();
-  const { useRelativeTime, stayOnPostAfterHide } = useSettings();
+  const { useRelativeTime, stayOnPostAfterHide, searchIncludeNsfwByDefault, blockAllNsfw } = useSettings();
   const { isRedditUserBlocked, blockRedditUser, unblockRedditUser } = useRedditBlocklist();
   const queryClient = useQueryClient();
 
@@ -952,6 +960,12 @@ export default function RedditPostPage() {
   const [sort, setSort] = useState<string>('best');
   const [imageExpanded, setImageExpanded] = useState(false);
   const [galleryIndex, setGalleryIndex] = useState(0);
+  const [subredditInputValue, setSubredditInputValue] = useState('');
+  const [isAutocompleteOpen, setIsAutocompleteOpen] = useState(false);
+  const [postSearchInput, setPostSearchInput] = useState('');
+  const [isSearchDropdownOpen, setIsSearchDropdownOpen] = useState(false);
+  const [limitSearchToContext, setLimitSearchToContext] = useState(true);
+  const [includeNsfwSearch, setIncludeNsfwSearch] = useState(false);
 
   // Post action states
   const [showHideConfirm, setShowHideConfirm] = useState(false);
@@ -960,6 +974,11 @@ export default function RedditPostPage() {
     ((location.state as { isHidden?: boolean } | null)?.isHidden) ?? false
   );
   const [isPostHidden, setIsPostHidden] = useState(initialHiddenState);
+
+  useEffect(() => {
+    setIncludeNsfwSearch(!blockAllNsfw && searchIncludeNsfwByDefault);
+    setLimitSearchToContext(true);
+  }, [blockAllNsfw, searchIncludeNsfwByDefault, subreddit]);
 
   // Crosspost form state
   const [crosspostTitle, setCrosspostTitle] = useState('');
@@ -1005,6 +1024,60 @@ export default function RedditPostPage() {
     [hubsData]
   );
 
+  const {
+    trimmedInput: trimmedSubredditInput,
+    suggestions: subredditSuggestions,
+    isLoading: isAutocompleteLoading,
+    shouldShowSuggestions,
+  } = useSubredditAutocomplete(subredditInputValue, isAutocompleteOpen);
+
+  const navigateToSubreddit = (value: string) => {
+    const normalized = value.trim();
+    if (!normalized) return;
+    navigate(`/r/${normalized}`);
+    setIsAutocompleteOpen(false);
+  };
+
+  const handleSubredditSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!trimmedSubredditInput) return;
+    navigateToSubreddit(trimmedSubredditInput);
+    setSubredditInputValue('');
+  };
+
+  const handleSubredditInputChange = (value: string) => {
+    setSubredditInputValue(value);
+    if (!isAutocompleteOpen) {
+      setIsAutocompleteOpen(true);
+    }
+  };
+
+  const handleSelectSubredditSuggestion = (name: string) => {
+    navigateToSubreddit(name);
+    setSubredditInputValue('');
+    setIsAutocompleteOpen(false);
+  };
+
+  const handlePostSearchSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const query = postSearchInput.trim();
+    if (!query) return;
+    if (limitSearchToContext) {
+      navigate(`/r/${subreddit}`, { state: { scopedSearchQuery: query } });
+      return;
+    }
+    navigate(
+      `/search?q=${encodeURIComponent(query)}&sort=relevance${includeNsfwSearch && !blockAllNsfw ? '&include_nsfw=true' : ''}`
+    );
+  };
+
+  const { data: subscriptionStatus } = useQuery({
+    queryKey: ['subreddit-subscription', subreddit],
+    queryFn: () => subscriptionService.checkSubredditSubscription(subreddit),
+    enabled: !!user && !!subreddit && subreddit !== 'popular' && subreddit !== 'frontpage',
+    staleTime: 1000 * 60 * 5,
+  });
+
   // Fetch saved Reddit posts to check if current post is saved
   const { data: savedPostsData } = useSavedItems('reddit_posts', !!user, 1000 * 60 * 5);
 
@@ -1016,13 +1089,10 @@ export default function RedditPostPage() {
     isError: subredditAboutError,
     iconUrl: subredditIcon,
   } = useSubredditAbout(subreddit, Boolean(subreddit));
+  const { data: activeUsersData } = useSubredditActiveUsers(subreddit, user);
 
-  const {
-    data: subredditModeratorsData,
-    isLoading: loadingSubredditModerators,
-  } = useQuery<{
+  const { data: subredditModeratorsData, isLoading: loadingSubredditModerators } = useQuery<{
     moderators: RedditSubredditModerator[];
-    warning?: string;
   }>({
     queryKey: ['subreddit-moderators', subreddit],
     queryFn: () => redditService.getSubredditModerators(subreddit!),
@@ -1030,7 +1100,6 @@ export default function RedditPostPage() {
     staleTime: 1000 * 60 * 10,
   });
   const subredditModerators = subredditModeratorsData?.moderators ?? [];
-  const moderatorsWarning = subredditModeratorsData?.warning;
   const subredditIconFallback = useMemo(() => {
     if (!subredditAbout) return null;
     const candidates = [
@@ -1544,6 +1613,72 @@ export default function RedditPostPage() {
 
   return (
     <div className="mx-auto w-full max-w-7xl px-4 py-8">
+      <SubredditHeader
+        subreddit={subreddit}
+        iconUrl={subredditIcon ?? subredditIconFallback}
+        user={user}
+        isSubscribed={subscriptionStatus?.is_subscribed ?? false}
+        searchBars={
+          <FeedSearchBars
+            topValue={subredditInputValue}
+            topPlaceholder="Enter hub or subreddit..."
+            onTopChange={handleSubredditInputChange}
+            onTopFocus={() => setIsAutocompleteOpen(true)}
+            onTopBlur={() => setIsAutocompleteOpen(false)}
+            onTopSubmit={handleSubredditSubmit}
+            topSuggestions={subredditSuggestions}
+            topShouldShowSuggestions={shouldShowSuggestions}
+            topIsLoading={isAutocompleteLoading}
+            topEmptyMessage="No hubs or subreddits found."
+            renderTopSuggestion={(suggestion) => (
+              <SubredditSuggestionItem
+                key={suggestion.name}
+                suggestion={suggestion}
+                onSelect={handleSelectSubredditSuggestion}
+              />
+            )}
+            postValue={postSearchInput}
+            postPlaceholder="Search posts..."
+            onPostChange={(value) => {
+              setPostSearchInput(value);
+              if (!isSearchDropdownOpen) {
+                setIsSearchDropdownOpen(true);
+              }
+            }}
+            onPostFocus={() => setIsSearchDropdownOpen(true)}
+            onPostBlur={() => setTimeout(() => setIsSearchDropdownOpen(false), 120)}
+            onPostSubmit={handlePostSearchSubmit}
+            postDropdownOpen={isSearchDropdownOpen}
+            postDropdownContent={
+              <div className="space-y-2 text-sm text-[var(--color-text-primary)]">
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={limitSearchToContext}
+                    onChange={(e) => setLimitSearchToContext(e.target.checked)}
+                  />
+                  <span>Limit search to r/{subreddit}</span>
+                </label>
+                {!blockAllNsfw && (
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={includeNsfwSearch}
+                      onChange={(e) => setIncludeNsfwSearch(e.target.checked)}
+                    />
+                    <span>Include NSFW results</span>
+                  </label>
+                )}
+                {blockAllNsfw && (
+                  <div className="text-xs text-[var(--color-text-secondary)]">
+                    NSFW content is blocked in settings.
+                  </div>
+                )}
+              </div>
+            }
+          />
+        }
+      />
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="space-y-6">
           {/* Post Content Section */}
@@ -1576,60 +1711,61 @@ export default function RedditPostPage() {
                 </div>
               ) : (
                 <>
-                  {/* Post Header */}
-                  <div className="mb-4 text-left">
-                    <div className="flex flex-wrap items-start gap-2">
-                      <h1 className="flex-1 text-left text-2xl font-bold text-[var(--color-text-primary)]">
-                        {isExternalLink ? (
-                          <a
-                            href={sanitizedExternalLink}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="hover:text-[var(--color-primary)]"
-                          >
-                            {decodedTitle}
-                          </a>
-                        ) : (
-                          decodedTitle
-                        )}
-                      </h1>
-                      {isExternalLink && (
+                  <PostHeader
+                    title={
+                      isExternalLink ? (
                         <a
                           href={sanitizedExternalLink}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 rounded border border-[var(--color-border)] px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary)] hover:border-[var(--color-primary)] hover:text-[var(--color-primary)]"
+                          className="hover:text-[var(--color-primary)]"
                         >
-                          {externalDomain ?? 'external'}
-                          <svg className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                            <path
-                              fillRule="evenodd"
-                              d="M4.25 5.5a.75.75 0 00-.75.75v8.5c0 .414.336.75.75.75h8.5a.75.75 0 00.75-.75v-4a.75.75 0 011.5 0v4A2.25 2.25 0 0112.75 17h-8.5A2.25 2.25 0 012 14.75v-8.5A2.25 2.25 0 014.25 4h5a.75.75 0 010 1.5h-5z"
-                              clipRule="evenodd"
-                            />
-                            <path
-                              fillRule="evenodd"
-                              d="M6.194 12.753a.75.75 0 001.06.053L16.5 4.44v2.81a.75.75 0 001.5 0v-4.5a.75.75 0 00-.75-.75h-4.5a.75.75 0 000 1.5h2.553l-9.056 8.194a.75.75 0 00-.053 1.06z"
-                              clipRule="evenodd"
-                            />
-                          </svg>
+                          {decodedTitle}
                         </a>
-                      )}
-                      <FlairBadge
-                        text={post.link_flair_text}
-                        backgroundColor={post.link_flair_background_color}
-                        textColor={post.link_flair_text_color}
-                      />
-                    </div>
-                    <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-[var(--color-text-secondary)]">
+                      ) : (
+                        decodedTitle
+                      )
+                    }
+                    titleBadges={
+                      <>
+                        {isExternalLink && (
+                          <a
+                            href={sanitizedExternalLink}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 rounded border border-[var(--color-border)] px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary)] hover:border-[var(--color-primary)] hover:text-[var(--color-primary)]"
+                          >
+                            {externalDomain ?? 'external'}
+                            <svg className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                              <path
+                                fillRule="evenodd"
+                                d="M4.25 5.5a.75.75 0 00-.75.75v8.5c0 .414.336.75.75.75h8.5a.75.75 0 00.75-.75v-4a.75.75 0 011.5 0v4A2.25 2.25 0 0112.75 17h-8.5A2.25 2.25 0 012 14.75v-8.5A2.25 2.25 0 014.25 4h5a.75.75 0 010 1.5h-5z"
+                                clipRule="evenodd"
+                              />
+                              <path
+                                fillRule="evenodd"
+                                d="M6.194 12.753a.75.75 0 001.06.053L16.5 4.44v2.81a.75.75 0 001.5 0v-4.5a.75.75 0 00-.75-.75h-4.5a.75.75 0 000 1.5h2.553l-9.056 8.194a.75.75 0 00-.053 1.06z"
+                                clipRule="evenodd"
+                              />
+                            </svg>
+                          </a>
+                        )}
+                        <FlairBadge
+                          text={post.link_flair_text}
+                          backgroundColor={post.link_flair_background_color}
+                          textColor={post.link_flair_text_color}
+                        />
+                      </>
+                    }
+                    metadataItems={[
                       <Link
+                        key="subreddit"
                         to={`/r/${post.subreddit}`}
                         className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
                       >
                         r/{post.subreddit}
-                      </Link>
-                      <span>•</span>
-                      <span>
+                      </Link>,
+                      <span key="author">
                         Posted by{' '}
                         <Link
                           to={`/user/${post.author}`}
@@ -1637,23 +1773,22 @@ export default function RedditPostPage() {
                         >
                           u/{post.author}
                         </Link>
-                      </span>
-                      <span>•</span>
-                      <span>submitted {formatTimestamp(post.created_utc, useRelativeTime)}</span>
-                      {!isPostAuthorBlocked && (
-                        <>
-                          <span>•</span>
-                          <button
-                            type="button"
-                            onClick={() => blockRedditUser(post.author)}
-                            className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
-                          >
-                            block user
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  </div>
+                      </span>,
+                      <span key="submitted">submitted {formatTimestamp(post.created_utc, useRelativeTime)}</span>,
+                      ...(!isPostAuthorBlocked
+                        ? [
+                            <button
+                              key="block"
+                              type="button"
+                              onClick={() => blockRedditUser(post.author)}
+                              className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+                            >
+                              block user
+                            </button>,
+                          ]
+                        : []),
+                    ]}
+                  />
 
               <RedditPostMedia
                 inlineImage={inlineImage}
@@ -1973,33 +2108,13 @@ export default function RedditPostPage() {
               iconUrl={subredditIcon ?? subredditIconFallback}
               isLoading={loadingSubredditAbout}
               isError={subredditAboutError}
+              activeOmniUsers={activeUsersData?.active_users ?? null}
             />
 
-            <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
-              <h3 className="text-sm font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
-                Moderators
-              </h3>
-              {loadingSubredditModerators ? (
-                <LoadingMessage className="mt-3 text-sm">Loading moderators…</LoadingMessage>
-              ) : moderatorsWarning ? (
-                <StatusMessage className="mt-3 text-sm">{moderatorsWarning}</StatusMessage>
-              ) : subredditModerators.length === 0 ? (
-                <EmptyMessage className="mt-3 text-sm">No moderators listed.</EmptyMessage>
-              ) : (
-                <ul className="mt-3 space-y-2 text-sm text-[var(--color-text-primary)]">
-                  {subredditModerators.map((mod) => (
-                    <li key={mod.id} className="flex items-center justify-between">
-                      <span>u/{mod.name ?? mod.id}</span>
-                      {mod.mod_permissions && mod.mod_permissions.length > 0 && (
-                        <span className="text-xs uppercase tracking-wide text-[var(--color-text-secondary)]">
-                          {mod.mod_permissions.join(', ')}
-                        </span>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
+            <SubredditModeratorsPanel
+              moderators={subredditModerators}
+              isLoading={loadingSubredditModerators}
+            />
           </aside>
         )}
       </div>
