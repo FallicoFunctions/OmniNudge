@@ -344,7 +344,8 @@ func (h *FeedHandler) fetchPopularFeeds(
 	// Fetch r/popular
 	listing, err := h.redditClient.GetSubredditPosts(ctx, "popular", sortBy, redditTimeFilter, limit, "")
 	if err != nil {
-		// Non-fatal: continue with hub posts only
+		// Log the error but continue with hub posts only
+		log.Printf("Warning: Failed to fetch Reddit posts: %v", err)
 		return hubPosts, []services.RedditPost{}, nil
 	}
 

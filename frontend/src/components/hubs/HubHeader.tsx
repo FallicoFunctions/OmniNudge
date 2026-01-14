@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { subscriptionService } from '../../services/subscriptionService';
 import { useAuth } from '../../contexts/AuthContext';
 import { SubscribeButton } from '../common/SubscribeButton';
+import { CreateActionButtons } from '../common/CreateActionButtons';
 
 interface HubHeaderProps {
   hubName: string;
@@ -86,50 +87,24 @@ export function HubHeader({
               Mod Tools
             </button>
           )}
-          <button
-            onClick={() => {
-              if (!user) {
-                window.dispatchEvent(
-                  new CustomEvent('open-auth-modal', {
-                    detail: {
-                      mode: 'login',
-                      redirectTo: '/posts/create',
-                      redirectState: { defaultHub: hubName, returnTo: defaultReturnTo },
-                    },
-                  })
-                );
-                return;
-              }
+          <CreateActionButtons
+            user={user}
+            onCreatePost={() =>
               navigate('/posts/create', {
                 state: { defaultHub: hubName, returnTo: defaultReturnTo, originPath: location.pathname },
-              });
+              })
+            }
+            onCreateHub={() => navigate('/hubs/create', { state: { returnTo: defaultReturnTo } })}
+            postAuth={{
+              redirectTo: '/posts/create',
+              redirectState: { defaultHub: hubName, returnTo: defaultReturnTo },
             }}
-            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-          >
-            Create Post
-          </button>
-          {showCreateHub && (
-            <button
-              onClick={() => {
-                if (!user) {
-                  window.dispatchEvent(
-                    new CustomEvent('open-auth-modal', {
-                      detail: {
-                        mode: 'login',
-                        redirectTo: '/hubs/create',
-                        redirectState: { returnTo: defaultReturnTo },
-                      },
-                    })
-                  );
-                  return;
-                }
-                navigate('/hubs/create', { state: { returnTo: defaultReturnTo } });
-              }}
-              className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
-            >
-              Create Hub
-            </button>
-          )}
+            hubAuth={{
+              redirectTo: '/hubs/create',
+              redirectState: { returnTo: defaultReturnTo },
+            }}
+            showCreateHub={showCreateHub}
+          />
         </div>
       </div>
       {searchBars}
