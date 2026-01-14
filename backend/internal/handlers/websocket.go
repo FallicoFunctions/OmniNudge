@@ -22,6 +22,12 @@ var allowedDevPorts = map[string]struct{}{
 	"8080": {},
 }
 
+var allowedProdHosts = map[string]struct{}{
+	"omninudge.com":     {},
+	"www.omninudge.com": {},
+	"api.omninudge.com": {},
+}
+
 var upgrader = ws.Upgrader{
 	ReadBufferSize:  1024,
 	WriteBufferSize: 1024,
@@ -37,6 +43,9 @@ var upgrader = ws.Upgrader{
 		}
 
 		host := strings.ToLower(parsed.Hostname())
+		if _, ok := allowedProdHosts[host]; ok {
+			return true
+		}
 		if host == "localhost" || host == "127.0.0.1" || host == "::1" {
 			if _, ok := allowedDevPorts[parsed.Port()]; ok {
 				return true
