@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -359,8 +360,12 @@ func (r *RedditClient) GetSubredditPosts(ctx context.Context, subreddit string, 
 		return listing, nil
 	}
 
-	// Build URL
-	url := fmt.Sprintf("https://www.reddit.com/r/%s/%s.json", subreddit, sort)
+	// Build URL - use proxy if configured
+	baseURL := "https://www.reddit.com"
+	if proxyURL := os.Getenv("REDDIT_PROXY_URL"); proxyURL != "" {
+		baseURL = proxyURL
+	}
+	url := fmt.Sprintf("%s/r/%s/%s.json", baseURL, subreddit, sort)
 
 	// Create request
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
