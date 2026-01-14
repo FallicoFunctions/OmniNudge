@@ -11,11 +11,13 @@ import (
 )
 
 type HubSettingsHandler struct {
+	hubRepo      *models.HubRepository
 	settingsRepo *repository.HubSettingsRepository
 }
 
-func NewHubSettingsHandler(settingsRepo *repository.HubSettingsRepository) *HubSettingsHandler {
+func NewHubSettingsHandler(hubRepo *models.HubRepository, settingsRepo *repository.HubSettingsRepository) *HubSettingsHandler {
 	return &HubSettingsHandler{
+		hubRepo:      hubRepo,
 		settingsRepo: settingsRepo,
 	}
 }
@@ -35,11 +37,37 @@ func (h *HubSettingsHandler) GetHubSettings(c *gin.Context) {
 	settings, err := h.settingsRepo.GetByHubID(c.Request.Context(), hubID)
 	if err != nil {
 		if err == pgx.ErrNoRows {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Settings not found"})
+			if h.hubRepo == nil {
+				c.JSON(http.StatusNotFound, gin.H{"error": "Settings not found"})
+				return
+			}
+
+			hub, hubErr := h.hubRepo.GetByName(c.Request.Context(), hubName)
+			if hubErr != nil || hub == nil {
+				c.JSON(http.StatusNotFound, gin.H{"error": "Hub not found"})
+				return
+			}
+
+			allowText, allowLink, allowImage, allowVideo := mapContentOptions(hub.ContentOptions)
+			defaults := buildDefaultHubSettings(hub.ID, hub.Type, allowText, allowLink, allowImage, allowVideo)
+			var createdBy *int
+			if hub.CreatedBy != nil {
+				createdBy = hub.CreatedBy
+			}
+			if err := h.settingsRepo.EnsureDefaults(c.Request.Context(), defaults, createdBy); err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to initialize hub settings"})
+				return
+			}
+
+			settings, err = h.settingsRepo.GetByHubID(c.Request.Context(), hubID)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get settings"})
+				return
+			}
+		} else {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get settings"})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get settings"})
-		return
 	}
 
 	// Check if user is a moderator
@@ -147,8 +175,8 @@ func (h *HubSettingsHandler) AddHubModerator(c *gin.Context) {
 	}
 
 	var req struct {
-		UserID int                   `json:"user_id" binding:"required"`
-		Role   models.ModeratorRole  `json:"role" binding:"required"`
+		UserID int                  `json:"user_id" binding:"required"`
+		Role   models.ModeratorRole `json:"role" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})

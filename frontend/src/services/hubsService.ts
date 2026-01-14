@@ -16,7 +16,7 @@ export interface Hub {
   description?: string;
   title?: string;
   type: string; // 'public' or 'private'
-  content_options: string; // 'any', 'links_only', or 'text_only'
+  content_options: string; // 'any', 'links_only', 'text_only', 'images_only', 'videos_only', or 'custom'
   is_quarantined: boolean;
   nsfw?: boolean;
   subscriber_count: number;
@@ -30,7 +30,11 @@ export interface CreateHubRequest {
   title?: string;
   description?: string;
   type: 'public' | 'private';
-  content_options: 'any' | 'links_only' | 'text_only';
+  content_options: 'any' | 'links_only' | 'text_only' | 'images_only' | 'videos_only' | 'custom';
+  allow_text_posts?: boolean;
+  allow_link_posts?: boolean;
+  allow_image_posts?: boolean;
+  allow_video_posts?: boolean;
 }
 
 export interface HubsResponse {

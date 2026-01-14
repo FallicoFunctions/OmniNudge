@@ -4,9 +4,11 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { postsService } from '../services/postsService';
 import { hubsService, type Hub } from '../services/hubsService';
 import { redditService } from '../services/redditService';
+import { hubSettingsService } from '../services/hubSettingsService';
 import { mediaService } from '../services/mediaService';
 import type { CreatePostRequest, GalleryImage } from '../types/posts';
 import type { SubredditSuggestion } from '../types/reddit';
+import type { HubSettings } from '../types/hubSettings';
 import { getPostUrl } from '../utils/postUrl';
 import { EmptyMessage, LoadingMessage } from '../components/common/StatusMessage';
 
@@ -85,6 +87,7 @@ export default function CreatePostPage() {
 
   const trimmedHubInput = (hubInputValue ?? '').trim();
   const trimmedSubredditInput = (subredditInputValue ?? '').trim();
+  const selectedHubName = destination === 'hub' ? selectedHub?.name ?? '' : '';
 
   const {
     data: hubSuggestions = [],
@@ -112,6 +115,51 @@ export default function CreatePostPage() {
     staleTime: 1000 * 60 * 5,
   });
 
+  const { data: hubSettings } = useQuery<HubSettings>({
+    queryKey: ['hub-settings', selectedHubName],
+    queryFn: () => hubSettingsService.getHubSettings(selectedHubName),
+    enabled: destination === 'hub' && Boolean(selectedHubName),
+    staleTime: 1000 * 60 * 5,
+  });
+
+  const allowTextPosts =
+    destination !== 'hub' || !hubSettings ? true : hubSettings.allow_text_posts;
+  const allowLinkPosts =
+    destination !== 'hub' || !hubSettings ? true : hubSettings.allow_link_posts;
+  const allowImagePosts =
+    destination !== 'hub' || !hubSettings ? true : hubSettings.allow_image_posts;
+  const allowVideoPosts =
+    destination !== 'hub' || !hubSettings ? true : hubSettings.allow_video_posts;
+  const allowLinkTab = allowLinkPosts || allowImagePosts || allowVideoPosts;
+  const mediaLabel =
+    allowImagePosts && allowVideoPosts
+      ? 'Images/Videos'
+      : allowImagePosts
+        ? 'Images'
+        : allowVideoPosts
+          ? 'Videos'
+          : 'Media';
+  const mediaAccept =
+    allowImagePosts && allowVideoPosts
+      ? 'image/*,video/*'
+      : allowImagePosts
+        ? 'image/*'
+        : allowVideoPosts
+          ? 'video/*'
+          : undefined;
+
+  useEffect(() => {
+    if (destination !== 'hub' || !hubSettings) {
+      return;
+    }
+
+    if (activeTab === 'link' && !allowLinkTab && allowTextPosts) {
+      setActiveTab('text');
+    } else if (activeTab === 'text' && !allowTextPosts && allowLinkTab) {
+      setActiveTab('link');
+    }
+  }, [activeTab, allowLinkTab, allowTextPosts, destination, hubSettings]);
+
   const handleSelectHubSuggestion = (hub: Hub) => {
     setSelectedHub({ id: hub.id, name: hub.name });
     setHubInputValue(hub.name);
@@ -133,6 +181,16 @@ export default function CreatePostPage() {
     };
   }, []);
 
+  useEffect(() => {
+    if (destination !== 'hub' || !hubSettings) {
+      return;
+    }
+    if (!allowLinkPosts && mediaUrl) {
+      setMediaUrl('');
+      setMediaType(undefined);
+    }
+  }, [allowLinkPosts, destination, hubSettings, mediaUrl]);
+
   const normalizeUploadedMediaUrl = (storageUrl?: string, storagePath?: string) => {
     if (storageUrl) {
       if (storageUrl.startsWith('http')) {
@@ -152,11 +210,28 @@ export default function CreatePostPage() {
     const files = Array.from(fileList);
     if (files.length === 0) return;
 
+    const allowImageUploads = allowImagePosts;
+    const allowVideoUploads = allowVideoPosts;
+    if (!allowImageUploads && !allowVideoUploads) {
+      setMediaUploadError('Media uploads are disabled for this hub.');
+      return;
+    }
+    const allowedLabel =
+      allowImageUploads && allowVideoUploads
+        ? 'image or video files'
+        : allowImageUploads
+          ? 'image files'
+          : allowVideoUploads
+            ? 'video files'
+            : 'media files';
+
     const validFiles = files.filter(
-      (file) => file.type.startsWith('image/') || file.type.startsWith('video/')
+      (file) =>
+        (allowImageUploads && file.type.startsWith('image/')) ||
+        (allowVideoUploads && file.type.startsWith('video/'))
     );
     if (validFiles.length === 0) {
-      setMediaUploadError('Please choose image or video files.');
+      setMediaUploadError(`Please choose ${allowedLabel}.`);
       return;
     }
 
@@ -332,6 +407,35 @@ export default function CreatePostPage() {
       targetSubreddit = trimmedSubredditInput.replace(/^r\//i, '');
     }
 
+    if (destination === 'hub' && hubSettings) {
+      if (activeTab === 'text' && !allowTextPosts) {
+        alert('This hub does not allow text posts.');
+        return;
+      }
+
+      if (activeTab === 'link') {
+        if (!allowLinkTab) {
+          alert('This hub does not allow link or media posts.');
+          return;
+        }
+
+        const hasMediaItems = mediaItems.length > 0;
+        if (!allowLinkPosts && !hasMediaItems) {
+          alert('This hub does not allow link posts. Upload an image or video instead.');
+          return;
+        }
+
+        if (hasMediaItems) {
+          const hasImage = mediaItems.some((item) => (item.media_type ?? '').startsWith('image/'));
+          const hasVideo = mediaItems.some((item) => (item.media_type ?? '').startsWith('video/'));
+          if ((hasImage && !allowImagePosts) || (hasVideo && !allowVideoPosts)) {
+            alert('This hub does not allow the selected media type.');
+            return;
+          }
+        }
+      }
+    }
+
     const galleryImages = mediaItems.length > 1 ? mediaItems : undefined;
     const singleMediaUrl =
       mediaItems.length === 1 ? mediaItems[0].url : mediaUrl || undefined;
@@ -375,26 +479,30 @@ export default function CreatePostPage() {
 
       {/* Tabs */}
       <div className="flex gap-2 mb-6 border-b">
-        <button
-          onClick={() => setActiveTab('link')}
-          className={`px-4 py-2 font-medium ${
-            activeTab === 'link'
-              ? 'border-b-2 border-blue-600 text-blue-600'
-              : 'text-gray-600 hover:text-gray-800'
-          }`}
-        >
-          Link
-        </button>
-        <button
-          onClick={() => setActiveTab('text')}
-          className={`px-4 py-2 font-medium ${
-            activeTab === 'text'
-              ? 'border-b-2 border-blue-600 text-blue-600'
-              : 'text-gray-600 hover:text-gray-800'
-          }`}
-        >
-          Text
-        </button>
+        {allowLinkTab && (
+          <button
+            onClick={() => setActiveTab('link')}
+            className={`px-4 py-2 font-medium ${
+              activeTab === 'link'
+                ? 'border-b-2 border-blue-600 text-blue-600'
+                : 'text-gray-600 hover:text-gray-800'
+            }`}
+          >
+            {allowLinkPosts ? 'Link' : 'Media'}
+          </button>
+        )}
+        {allowTextPosts && (
+          <button
+            onClick={() => setActiveTab('text')}
+            className={`px-4 py-2 font-medium ${
+              activeTab === 'text'
+                ? 'border-b-2 border-blue-600 text-blue-600'
+                : 'text-gray-600 hover:text-gray-800'
+            }`}
+          >
+            Text
+          </button>
+        )}
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
@@ -417,112 +525,120 @@ export default function CreatePostPage() {
         {/* Link Tab Content */}
         {activeTab === 'link' && (
           <div>
-            <label className="block text-sm font-medium mb-2">URL or Media</label>
-            <input
-              type={mediaItems.length > 0 ? 'text' : 'url'}
-              value={mediaUrl}
-              onChange={(e) => {
-                setMediaUrl(e.target.value);
-                if (e.target.value) {
-                  setMediaType(undefined);
-                  setMediaItems([]);
-                  setMediaUploadError(null);
-                }
-              }}
-              className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-              placeholder="https://example.com"
-              disabled={mediaItems.length > 0}
-            />
-            <p className="mt-1 text-sm text-gray-500">
-              Enter a URL or upload an image/video
-            </p>
-            <div className="mt-4">
-              <label className="block text-sm font-medium mb-2">Image/Video</label>
-              <div
-                onDragOver={(event) => event.preventDefault()}
-                onDrop={handleMediaDrop}
-                className="flex flex-col items-center justify-center gap-3 rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 px-4 py-6 text-center"
-              >
-                {mediaItems.length > 0 ? (
-                  <>
-                    <div className="grid w-full grid-cols-1 gap-3 sm:grid-cols-2">
-                      {mediaItems.map((item, index) => {
-                        const previewUrl = mediaPreviews[index] ?? item.url;
-                        const isVideo = (item.media_type ?? '').startsWith('video');
-                        return (
-                          <div
-                            key={`${item.url}-${index}`}
-                            className="flex flex-col items-center gap-2 rounded-md border border-gray-200 bg-white p-3"
-                          >
-                            {isVideo ? (
-                              <video src={previewUrl} controls className="max-h-36 w-full rounded" />
-                            ) : (
-                              <img
-                                src={previewUrl}
-                                alt="Uploaded preview"
-                                className="max-h-36 w-full rounded object-contain"
-                              />
-                            )}
-                            <button
-                              type="button"
-                              onClick={() => removeMediaItem(index)}
-                              className="text-xs text-blue-600 hover:text-blue-800"
-                              disabled={isUploadingMedia}
+            <label className="block text-sm font-medium mb-2">
+              {allowLinkPosts ? 'URL or Media' : 'Media'}
+            </label>
+            {allowLinkPosts && (
+              <>
+                <input
+                  type={mediaItems.length > 0 ? 'text' : 'url'}
+                  value={mediaUrl}
+                  onChange={(e) => {
+                    setMediaUrl(e.target.value);
+                    if (e.target.value) {
+                      setMediaType(undefined);
+                      setMediaItems([]);
+                      setMediaUploadError(null);
+                    }
+                  }}
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                  placeholder="https://example.com"
+                  disabled={mediaItems.length > 0}
+                />
+                <p className="mt-1 text-sm text-gray-500">
+                  Enter a URL or upload an image/video
+                </p>
+              </>
+            )}
+            {(allowImagePosts || allowVideoPosts) && (
+              <div className="mt-4">
+                <label className="block text-sm font-medium mb-2">{mediaLabel}</label>
+                <div
+                  onDragOver={(event) => event.preventDefault()}
+                  onDrop={handleMediaDrop}
+                  className="flex flex-col items-center justify-center gap-3 rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 px-4 py-6 text-center"
+                >
+                  {mediaItems.length > 0 ? (
+                    <>
+                      <div className="grid w-full grid-cols-1 gap-3 sm:grid-cols-2">
+                        {mediaItems.map((item, index) => {
+                          const previewUrl = mediaPreviews[index] ?? item.url;
+                          const isVideo = (item.media_type ?? '').startsWith('video');
+                          return (
+                            <div
+                              key={`${item.url}-${index}`}
+                              className="flex flex-col items-center gap-2 rounded-md border border-gray-200 bg-white p-3"
                             >
-                              Remove
-                            </button>
-                          </div>
-                        );
-                      })}
-                    </div>
-                    <div className="flex gap-2">
+                              {isVideo ? (
+                                <video src={previewUrl} controls className="max-h-36 w-full rounded" />
+                              ) : (
+                                <img
+                                  src={previewUrl}
+                                  alt="Uploaded preview"
+                                  className="max-h-36 w-full rounded object-contain"
+                                />
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => removeMediaItem(index)}
+                                className="text-xs text-blue-600 hover:text-blue-800"
+                                disabled={isUploadingMedia}
+                              >
+                                Remove
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => mediaInputRef.current?.click()}
+                          className="px-3 py-1.5 rounded-md border border-gray-300 text-sm text-gray-700 hover:bg-gray-100"
+                          disabled={isUploadingMedia}
+                        >
+                          Add more
+                        </button>
+                        <button
+                          type="button"
+                          onClick={clearMediaSelection}
+                          className="px-3 py-1.5 rounded-md text-sm text-red-600 hover:text-red-700"
+                          disabled={isUploadingMedia}
+                        >
+                          Clear all
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="text-sm text-gray-500">
+                        Drag and drop a file here, or
+                      </div>
                       <button
                         type="button"
                         onClick={() => mediaInputRef.current?.click()}
-                        className="px-3 py-1.5 rounded-md border border-gray-300 text-sm text-gray-700 hover:bg-gray-100"
+                        className="px-4 py-2 rounded-md bg-blue-600 text-white hover:bg-blue-700"
                         disabled={isUploadingMedia}
                       >
-                        Add more
+                        {isUploadingMedia ? 'Uploading...' : 'Choose File'}
                       </button>
-                      <button
-                        type="button"
-                        onClick={clearMediaSelection}
-                        className="px-3 py-1.5 rounded-md text-sm text-red-600 hover:text-red-700"
-                        disabled={isUploadingMedia}
-                      >
-                        Clear all
-                      </button>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div className="text-sm text-gray-500">
-                      Drag and drop a file here, or
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => mediaInputRef.current?.click()}
-                      className="px-4 py-2 rounded-md bg-blue-600 text-white hover:bg-blue-700"
-                      disabled={isUploadingMedia}
-                    >
-                      {isUploadingMedia ? 'Uploading...' : 'Choose File'}
-                    </button>
-                  </>
+                    </>
+                  )}
+                  <input
+                    ref={mediaInputRef}
+                    type="file"
+                    accept={mediaAccept}
+                    multiple
+                    className="hidden"
+                    onChange={handleMediaInputChange}
+                    disabled={isUploadingMedia}
+                  />
+                </div>
+                {mediaUploadError && (
+                  <p className="mt-2 text-sm text-red-600">{mediaUploadError}</p>
                 )}
-                <input
-                  ref={mediaInputRef}
-                  type="file"
-                  accept="image/*,video/*"
-                  multiple
-                  className="hidden"
-                  onChange={handleMediaInputChange}
-                  disabled={isUploadingMedia}
-                />
               </div>
-              {mediaUploadError && (
-                <p className="mt-2 text-sm text-red-600">{mediaUploadError}</p>
-              )}
-            </div>
+            )}
           </div>
         )}
 

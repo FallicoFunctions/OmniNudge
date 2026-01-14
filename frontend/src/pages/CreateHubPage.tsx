@@ -10,8 +10,13 @@ export default function CreateHubPage() {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [type, setType] = useState<'public' | 'private'>('public');
-  const [contentOptions, setContentOptions] = useState<'any' | 'links_only' | 'text_only'>('any');
+  const [allowAllPosts, setAllowAllPosts] = useState(true);
+  const [allowTextPosts, setAllowTextPosts] = useState(false);
+  const [allowLinkPosts, setAllowLinkPosts] = useState(false);
+  const [allowImagePosts, setAllowImagePosts] = useState(false);
+  const [allowVideoPosts, setAllowVideoPosts] = useState(false);
   const [nameError, setNameError] = useState('');
+  const [contentError, setContentError] = useState('');
 
   const createHubMutation = useMutation({
     mutationFn: (data: CreateHubRequest) => hubsService.createHub(data),
@@ -51,12 +56,24 @@ export default function CreateHubPage() {
       return;
     }
 
+    if (!allowAllPosts && !allowTextPosts && !allowLinkPosts && !allowImagePosts && !allowVideoPosts) {
+      setContentError('Select at least one post type.');
+      return;
+    }
+
+    setContentError('');
+    const allowAll =
+      allowAllPosts || (allowTextPosts && allowLinkPosts && allowImagePosts && allowVideoPosts);
     const data: CreateHubRequest = {
       name,
       title: title || undefined,
       description: description || undefined,
       type,
-      content_options: contentOptions,
+      content_options: allowAll ? 'any' : 'custom',
+      allow_text_posts: allowAll ? true : allowTextPosts,
+      allow_link_posts: allowAll ? true : allowLinkPosts,
+      allow_image_posts: allowAll ? true : allowImagePosts,
+      allow_video_posts: allowAll ? true : allowVideoPosts,
     };
 
     createHubMutation.mutate(data);
@@ -158,47 +175,104 @@ export default function CreateHubPage() {
           <label className="block text-sm font-medium mb-2">
             Content Options <span className="text-red-500">*</span>
           </label>
-          <div className="space-y-2">
+          <div className="space-y-3">
             <label className="flex items-center">
               <input
-                type="radio"
-                value="any"
-                checked={contentOptions === 'any'}
-                onChange={(e) => setContentOptions(e.target.value as 'any')}
+                type="checkbox"
+                checked={allowAllPosts}
+                onChange={(e) => {
+                  const checked = e.target.checked;
+                  setAllowAllPosts(checked);
+                  if (checked) {
+                    setAllowTextPosts(false);
+                    setAllowLinkPosts(false);
+                    setAllowImagePosts(false);
+                    setAllowVideoPosts(false);
+                  }
+                  setContentError('');
+                }}
                 className="mr-2"
               />
-              <span className="font-medium">Any</span>
+              <span className="font-medium">All</span>
               <span className="ml-2 text-sm text-gray-600">
-                - Links and text posts allowed
+                - Text, links, images, and videos allowed
+              </span>
+            </label>
+            <div className="ml-7 text-sm text-gray-500">or</div>
+            <label className="flex items-center">
+              <input
+                type="checkbox"
+                checked={allowLinkPosts}
+                onChange={(e) => {
+                  setAllowLinkPosts(e.target.checked);
+                  if (e.target.checked) {
+                    setAllowAllPosts(false);
+                  }
+                  setContentError('');
+                }}
+                className="mr-2"
+              />
+              <span className="font-medium">Links</span>
+              <span className="ml-2 text-sm text-gray-600">
+                - External link posts allowed
               </span>
             </label>
             <label className="flex items-center">
               <input
-                type="radio"
-                value="links_only"
-                checked={contentOptions === 'links_only'}
-                onChange={(e) => setContentOptions(e.target.value as 'links_only')}
+                type="checkbox"
+                checked={allowTextPosts}
+                onChange={(e) => {
+                  setAllowTextPosts(e.target.checked);
+                  if (e.target.checked) {
+                    setAllowAllPosts(false);
+                  }
+                  setContentError('');
+                }}
                 className="mr-2"
               />
-              <span className="font-medium">Links Only</span>
+              <span className="font-medium">Text</span>
               <span className="ml-2 text-sm text-gray-600">
-                - Only link posts allowed
+                - Text posts allowed
               </span>
             </label>
             <label className="flex items-center">
               <input
-                type="radio"
-                value="text_only"
-                checked={contentOptions === 'text_only'}
-                onChange={(e) => setContentOptions(e.target.value as 'text_only')}
+                type="checkbox"
+                checked={allowImagePosts}
+                onChange={(e) => {
+                  setAllowImagePosts(e.target.checked);
+                  if (e.target.checked) {
+                    setAllowAllPosts(false);
+                  }
+                  setContentError('');
+                }}
                 className="mr-2"
               />
-              <span className="font-medium">Text Only</span>
+              <span className="font-medium">Images</span>
               <span className="ml-2 text-sm text-gray-600">
-                - Only text posts allowed
+                - Image and gallery posts allowed
+              </span>
+            </label>
+            <label className="flex items-center">
+              <input
+                type="checkbox"
+                checked={allowVideoPosts}
+                onChange={(e) => {
+                  setAllowVideoPosts(e.target.checked);
+                  if (e.target.checked) {
+                    setAllowAllPosts(false);
+                  }
+                  setContentError('');
+                }}
+                className="mr-2"
+              />
+              <span className="font-medium">Videos</span>
+              <span className="ml-2 text-sm text-gray-600">
+                - Video posts allowed
               </span>
             </label>
           </div>
+          {contentError && <p className="mt-2 text-sm text-red-600">{contentError}</p>}
         </div>
 
         {/* Submit */}

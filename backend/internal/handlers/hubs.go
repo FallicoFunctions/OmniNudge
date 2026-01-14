@@ -11,33 +11,40 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/omninudge/backend/internal/models"
+	"github.com/omninudge/backend/internal/repository"
 )
 
 // HubsHandler handles hub CRUD
 type HubsHandler struct {
-	hubRepo    *models.HubRepository
-	postRepo   *models.PlatformPostRepository
-	modRepo    *models.HubModeratorRepository
-	hubSubRepo *models.HubSubscriptionRepository
+	hubRepo      *models.HubRepository
+	postRepo     *models.PlatformPostRepository
+	modRepo      *models.HubModeratorRepository
+	hubSubRepo   *models.HubSubscriptionRepository
+	settingsRepo *repository.HubSettingsRepository
 }
 
 // NewHubsHandler creates a new handler
-func NewHubsHandler(hubRepo *models.HubRepository, postRepo *models.PlatformPostRepository, modRepo *models.HubModeratorRepository, hubSubRepo *models.HubSubscriptionRepository) *HubsHandler {
+func NewHubsHandler(hubRepo *models.HubRepository, postRepo *models.PlatformPostRepository, modRepo *models.HubModeratorRepository, hubSubRepo *models.HubSubscriptionRepository, settingsRepo *repository.HubSettingsRepository) *HubsHandler {
 	return &HubsHandler{
-		hubRepo:    hubRepo,
-		postRepo:   postRepo,
-		modRepo:    modRepo,
-		hubSubRepo: hubSubRepo,
+		hubRepo:      hubRepo,
+		postRepo:     postRepo,
+		modRepo:      modRepo,
+		hubSubRepo:   hubSubRepo,
+		settingsRepo: settingsRepo,
 	}
 }
 
 // CreateHubRequest payload
 type CreateHubRequest struct {
-	Name           string  `json:"name" binding:"required,max=100"`
-	Title          *string `json:"title"`
-	Description    *string `json:"description"`
-	Type           string  `json:"type"`            // public or private
-	ContentOptions string  `json:"content_options"` // any, links_only, text_only
+	Name            string  `json:"name" binding:"required,max=100"`
+	Title           *string `json:"title"`
+	Description     *string `json:"description"`
+	Type            string  `json:"type"`            // public or private
+	ContentOptions  string  `json:"content_options"` // any, links_only, text_only, images_only, videos_only, custom
+	AllowTextPosts  *bool   `json:"allow_text_posts"`
+	AllowLinkPosts  *bool   `json:"allow_link_posts"`
+	AllowImagePosts *bool   `json:"allow_image_posts"`
+	AllowVideoPosts *bool   `json:"allow_video_posts"`
 }
 
 // Create handles POST /api/v1/hubs
@@ -81,13 +88,33 @@ func (h *HubsHandler) Create(c *gin.Context) {
 		return
 	}
 
-	// Validate content_options
+	allowText := req.AllowTextPosts != nil && *req.AllowTextPosts
+	allowLink := req.AllowLinkPosts != nil && *req.AllowLinkPosts
+	allowImage := req.AllowImagePosts != nil && *req.AllowImagePosts
+	allowVideo := req.AllowVideoPosts != nil && *req.AllowVideoPosts
+	hasExplicitOptions := req.AllowTextPosts != nil || req.AllowLinkPosts != nil || req.AllowImagePosts != nil || req.AllowVideoPosts != nil
+
+	// Validate content options
 	if req.ContentOptions == "" {
 		req.ContentOptions = "any"
 	}
-	if req.ContentOptions != "any" && req.ContentOptions != "links_only" && req.ContentOptions != "text_only" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Content options must be 'any', 'links_only', or 'text_only'"})
+	if req.ContentOptions != "any" && req.ContentOptions != "links_only" && req.ContentOptions != "text_only" && req.ContentOptions != "images_only" && req.ContentOptions != "videos_only" && req.ContentOptions != "custom" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Content options must be 'any', 'links_only', 'text_only', 'images_only', 'videos_only', or 'custom'"})
 		return
+	}
+
+	if hasExplicitOptions {
+		if !allowText && !allowLink && !allowImage && !allowVideo {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "At least one post type must be allowed"})
+			return
+		}
+		if allowText && allowLink && allowImage && allowVideo {
+			req.ContentOptions = "any"
+		} else {
+			req.ContentOptions = "custom"
+		}
+	} else {
+		allowText, allowLink, allowImage, allowVideo = mapContentOptions(req.ContentOptions)
 	}
 
 	hub := &models.Hub{
@@ -107,6 +134,15 @@ func (h *HubsHandler) Create(c *gin.Context) {
 		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create hub", "details": err.Error()})
 		return
+	}
+
+	if h.settingsRepo != nil {
+		settings := buildDefaultHubSettings(hub.ID, req.Type, allowText, allowLink, allowImage, allowVideo)
+		creatorID := userID.(int)
+		if err := h.settingsRepo.EnsureDefaults(c.Request.Context(), settings, &creatorID); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to initialize hub settings", "details": err.Error()})
+			return
+		}
 	}
 
 	// Creator becomes moderator of the hub
