@@ -121,11 +121,7 @@ cd /Users/Nick_1/Documents/Personal_Projects/OmniNudge
 # 2. Upload scripts to server (replace YOUR_SERVER_IP)
 scp scripts/deploy-*.sh root@YOUR_SERVER_IP:/root/
 
-# 3. Upload code to server
-rsync -avz --exclude 'node_modules' --exclude '.git' \
-  . root@YOUR_SERVER_IP:/var/www/omninudge/
-
-# 4. SSH into server
+# 3. SSH into server
 ssh root@YOUR_SERVER_IP
 ```
 
@@ -135,12 +131,31 @@ ssh root@YOUR_SERVER_IP
 # Step A: Install all software (5 minutes)
 cd /root
 bash deploy-setup.sh
+# This creates /var/www/omninudge directory
 
 # Step B: Set up database (2 minutes)
 bash deploy-database.sh
 # ⚠️ SAVE the credentials that appear!
 
-# Step C: Deploy app (15 minutes)
+# Step C: Exit SSH to upload code
+exit
+```
+
+**Back on your Mac:**
+
+```bash
+# 4. Upload code to server (now that directory exists)
+rsync -avz --exclude 'node_modules' --exclude '.git' --exclude '.gocache' --exclude 'dist' --exclude 'build' . root@77.42.47.79:/var/www/omninudge/
+
+# 5. SSH back into server
+ssh root@77.42.47.79
+```
+
+**On your server:**
+
+```bash
+# Step D: Deploy app (15 minutes)
+cd /root
 bash deploy-app.sh
 # Enter your domain: omninudge.com
 # Enter your email for SSL
