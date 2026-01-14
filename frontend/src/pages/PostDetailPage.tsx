@@ -12,7 +12,6 @@ import type { PlatformPost, PostComment } from '../types/posts';
 import { CommentItem } from '../components/comments/CommentItem';
 import type { CommentActionHandlers } from '../components/comments/CommentItem';
 import { MarkdownInput } from '../components/common/MarkdownInput';
-import { MarkdownRenderer } from '../components/common/MarkdownRenderer';
 import { FormattingHelpTable } from '../components/common/FormattingHelpTable';
 import { formatTimestamp } from '../utils/timeFormat';
 import { decodeHtmlEntities } from '../utils/text';
