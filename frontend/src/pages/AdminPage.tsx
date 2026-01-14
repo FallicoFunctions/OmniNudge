@@ -1262,6 +1262,7 @@ function BanActivityTab() {
     queryKey: ['banActivity', pageSize, currentCursor],
     queryFn: () => adminService.getAllBanHistory(pageSize, 0, currentCursor),
   });
+  const history = data?.history ?? [];
 
   const handlePageSizeChange = (newSize: number) => {
     setPageSize(newSize);
@@ -1281,7 +1282,7 @@ function BanActivityTab() {
       {data && (
         <div className="mb-4 flex justify-between items-center text-sm text-[var(--color-text-secondary)]">
           <div>
-            Showing {data.history.length} actions{typeof data.total === 'number' ? ` (Total ${data.total})` : ''}
+            Showing {history.length} actions{typeof data.total === 'number' ? ` (Total ${data.total})` : ''}
           </div>
           <div className="flex items-center gap-2">
             <label htmlFor="banPageSize">Per page:</label>
@@ -1305,16 +1306,16 @@ function BanActivityTab() {
         </div>
       )}
 
-      {data && data.history.length === 0 && (
+      {data && history.length === 0 && (
         <div className="text-center py-12">
           <EmptyMessage>No ban activity found.</EmptyMessage>
         </div>
       )}
 
-      {data && data.history.length > 0 && (
+      {data && history.length > 0 && (
         <>
           <div className="space-y-3">
-            {data.history.map((entry: BanHistoryItem) => (
+            {history.map((entry: BanHistoryItem) => (
               <div
                 key={entry.id}
                 className="p-4 border border-[var(--color-border)] rounded-lg bg-[var(--color-surface-elevated)]"
