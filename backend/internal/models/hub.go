@@ -17,7 +17,7 @@ type Hub struct {
 	Description     *string    `json:"description,omitempty"`
 	Title           *string    `json:"title,omitempty"`           // Display title for the hub
 	Type            string     `json:"type"`                       // public or private
-	ContentOptions  string     `json:"content_options"`            // any, links_only, or text_only
+	ContentOptions  string     `json:"content_options"`            // any, links_only, text_only, images_only, videos_only, or custom
 	IsQuarantined   bool       `json:"is_quarantined"`             // Whether hub is quarantined
 	SubscriberCount int        `json:"subscriber_count"`           // Number of subscribers
 	CreatedBy       *int       `json:"created_by,omitempty"`

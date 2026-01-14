@@ -13,6 +13,7 @@ import (
 	"github.com/omninudge/backend/internal/database"
 	"github.com/omninudge/backend/internal/handlers"
 	"github.com/omninudge/backend/internal/models"
+	"github.com/omninudge/backend/internal/repository"
 	"github.com/omninudge/backend/internal/services"
 	"github.com/omninudge/backend/internal/utils"
 	"github.com/omninudge/backend/internal/websocket"
@@ -96,6 +97,7 @@ func newTestDeps(t *testing.T) *TestDeps {
 	modRepo := models.NewHubModeratorRepository(db.Pool)
 	redditPostRepo := models.NewRedditPostRepository(db.Pool)
 	feedRepo := models.NewFeedRepository(db.Pool)
+	hubSettingsRepo := repository.NewHubSettingsRepository(db.Pool)
 	hub := websocket.NewHub()
 	go hub.Run()
 
@@ -109,7 +111,7 @@ func newTestDeps(t *testing.T) *TestDeps {
 
 	// Handlers
 	authHandler := handlers.NewAuthHandler(authService, userRepo)
-	postsHandler := handlers.NewPostsHandler(db.Pool, postRepo, hubRepo, userRepo, modRepo, feedRepo)
+	postsHandler := handlers.NewPostsHandler(db.Pool, postRepo, hubRepo, userRepo, modRepo, feedRepo, hubSettingsRepo)
 	commentsHandler := handlers.NewCommentsHandler(db.Pool, commentRepo, postRepo, hubRepo, userRepo, modRepo)
 	redditHandler := handlers.NewRedditHandler(
 		services.NewRedditClient(cfg.Reddit.UserAgent, services.NoopCache{}, 0, cfg.Reddit.ClientID, cfg.Reddit.ClientSecret),
@@ -121,7 +123,7 @@ func newTestDeps(t *testing.T) *TestDeps {
 	thumbnailService := services.NewThumbnailService()
 	mediaHandler := handlers.NewMediaHandler(models.NewMediaFileRepository(db.Pool), thumbnailService)
 	hubSubRepo := models.NewHubSubscriptionRepository(db.Pool)
-	hubsHandler := handlers.NewHubsHandler(hubRepo, postRepo, modRepo, hubSubRepo)
+	hubsHandler := handlers.NewHubsHandler(hubRepo, postRepo, modRepo, hubSubRepo, hubSettingsRepo)
 	moderationHandler := handlers.NewModerationHandler(reportRepo, modRepo)
 	adminHandler := handlers.NewAdminHandler(userRepo, modRepo, db.Pool)
 	wsHandler := handlers.NewWebSocketHandler(hub)

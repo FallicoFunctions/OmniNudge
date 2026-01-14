@@ -7,10 +7,13 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/omninudge/backend/internal/models"
+	"github.com/omninudge/backend/internal/repository"
 	"github.com/omninudge/backend/internal/services"
 )
 
@@ -22,18 +25,20 @@ type PostsHandler struct {
 	userRepo     *models.UserRepository
 	modRepo      *models.HubModeratorRepository
 	feedRepo     *models.FeedRepository
+	settingsRepo *repository.HubSettingsRepository
 	notifService *services.NotificationService
 }
 
 // NewPostsHandler creates a new posts handler
-func NewPostsHandler(pool *pgxpool.Pool, postRepo *models.PlatformPostRepository, hubRepo *models.HubRepository, userRepo *models.UserRepository, modRepo *models.HubModeratorRepository, feedRepo *models.FeedRepository) *PostsHandler {
+func NewPostsHandler(pool *pgxpool.Pool, postRepo *models.PlatformPostRepository, hubRepo *models.HubRepository, userRepo *models.UserRepository, modRepo *models.HubModeratorRepository, feedRepo *models.FeedRepository, settingsRepo *repository.HubSettingsRepository) *PostsHandler {
 	return &PostsHandler{
-		pool:     pool,
-		postRepo: postRepo,
-		hubRepo:  hubRepo,
-		userRepo: userRepo,
-		modRepo:  modRepo,
-		feedRepo: feedRepo,
+		pool:         pool,
+		postRepo:     postRepo,
+		hubRepo:      hubRepo,
+		userRepo:     userRepo,
+		modRepo:      modRepo,
+		feedRepo:     feedRepo,
+		settingsRepo: settingsRepo,
 	}
 }
 
@@ -201,14 +206,54 @@ func (h *PostsHandler) CreatePost(c *gin.Context) {
 		}
 		hubID = req.HubID
 
-		// Validate content_options
-		if hub.ContentOptions == "links_only" && req.PostType == "text" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "This hub only accepts link posts"})
-			return
+		postContentType := resolvePostContentType(req)
+
+		useContentOptionsFallback := h.settingsRepo == nil
+		if h.settingsRepo != nil {
+			settings, err := h.settingsRepo.GetByHubID(c.Request.Context(), hub.ID)
+			if err == nil {
+				if postContentType == "text" && !settings.AllowTextPosts {
+					c.JSON(http.StatusBadRequest, gin.H{"error": "This hub does not allow text posts"})
+					return
+				}
+				if postContentType == "link" && !settings.AllowLinkPosts {
+					c.JSON(http.StatusBadRequest, gin.H{"error": "This hub does not allow link posts"})
+					return
+				}
+				if postContentType == "image" && !settings.AllowImagePosts {
+					c.JSON(http.StatusBadRequest, gin.H{"error": "This hub does not allow image posts"})
+					return
+				}
+				if postContentType == "video" && !settings.AllowVideoPosts {
+					c.JSON(http.StatusBadRequest, gin.H{"error": "This hub does not allow video posts"})
+					return
+				}
+			} else if err != pgx.ErrNoRows {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load hub settings"})
+				return
+			} else {
+				useContentOptionsFallback = true
+			}
 		}
-		if hub.ContentOptions == "text_only" && req.PostType == "link" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "This hub only accepts text posts"})
-			return
+
+		if useContentOptionsFallback {
+			// Fallback to hub content_options if settings aren't available
+			if hub.ContentOptions == "links_only" && postContentType != "link" {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "This hub only accepts link posts"})
+				return
+			}
+			if hub.ContentOptions == "text_only" && postContentType != "text" {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "This hub only accepts text posts"})
+				return
+			}
+			if hub.ContentOptions == "images_only" && postContentType != "image" {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "This hub only accepts image posts"})
+				return
+			}
+			if hub.ContentOptions == "videos_only" && postContentType != "video" {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "This hub only accepts video posts"})
+				return
+			}
 		}
 	}
 	// If posting to subreddit only, hubID remains nil
@@ -289,6 +334,28 @@ func (h *PostsHandler) GetPost(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, post)
+}
+
+func resolvePostContentType(req CreatePostRequest) string {
+	if req.PostType == "text" {
+		return "text"
+	}
+
+	if len(req.GalleryImages) > 0 {
+		return "image"
+	}
+
+	if req.MediaType != nil && *req.MediaType != "" {
+		lower := strings.ToLower(*req.MediaType)
+		if strings.HasPrefix(lower, "image/") {
+			return "image"
+		}
+		if strings.HasPrefix(lower, "video/") {
+			return "video"
+		}
+	}
+
+	return "link"
 }
 
 // GetFeed handles GET /api/v1/posts/feed

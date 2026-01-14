@@ -14,6 +14,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/omninudge/backend/internal/database"
 	"github.com/omninudge/backend/internal/models"
+	"github.com/omninudge/backend/internal/repository"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -43,8 +44,9 @@ func setupHubsTest(t *testing.T) (*HubsHandler, *pgxpool.Pool, *models.HubReposi
 	postRepo := models.NewPlatformPostRepository(db.Pool)
 	modRepo := models.NewHubModeratorRepository(db.Pool)
 	hubSubRepo := models.NewHubSubscriptionRepository(db.Pool)
+	hubSettingsRepo := repository.NewHubSettingsRepository(db.Pool)
 
-	handler := NewHubsHandler(hubRepo, postRepo, modRepo, hubSubRepo)
+	handler := NewHubsHandler(hubRepo, postRepo, modRepo, hubSubRepo, hubSettingsRepo)
 
 	cleanup := func() {
 		db.Close()
@@ -688,7 +690,7 @@ func TestGetPlatformSubredditPosts(t *testing.T) {
 
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
-	postsHandler := NewPostsHandler(pool, postRepo, hubRepo, userRepo, nil, nil)
+	postsHandler := NewPostsHandler(pool, postRepo, hubRepo, userRepo, nil, nil, nil)
 	router.GET("/subreddits/:name/posts", postsHandler.GetSubredditPosts)
 
 	ctx := context.Background()

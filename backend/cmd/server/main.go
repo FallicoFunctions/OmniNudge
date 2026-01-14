@@ -139,7 +139,7 @@ func main() {
 	// Initialize handlers
 	authHandler := handlers.NewAuthHandler(authService, userRepo)
 	settingsHandler := handlers.NewSettingsHandler(userSettingsRepo)
-	postsHandler := handlers.NewPostsHandler(db.Pool, postRepo, hubRepo, userRepo, hubModRepo, feedRepo)
+	postsHandler := handlers.NewPostsHandler(db.Pool, postRepo, hubRepo, userRepo, hubModRepo, feedRepo, hubSettingsRepo)
 	commentsHandler := handlers.NewCommentsHandler(db.Pool, commentRepo, postRepo, hubRepo, userRepo, hubModRepo)
 	redditHandler := handlers.NewRedditHandler(redditClient, redditPostRepo)
 	conversationsHandler := handlers.NewConversationsHandler(db.Pool, conversationRepo, messageRepo, userRepo)
@@ -152,7 +152,7 @@ func main() {
 	messagesHandler := handlers.NewMessagesHandler(db.Pool, messageRepo, conversationRepo, hub)
 	usersHandler := handlers.NewUsersHandler(userRepo, postRepo, commentRepo, authService, hubModRepo)
 	mediaHandler := handlers.NewMediaHandler(mediaRepo, thumbnailService)
-	hubsHandler := handlers.NewHubsHandler(hubRepo, postRepo, hubModRepo, hubSubRepo)
+	hubsHandler := handlers.NewHubsHandler(hubRepo, postRepo, hubModRepo, hubSubRepo, hubSettingsRepo)
 	subscriptionsHandler := handlers.NewSubscriptionsHandler(hubSubRepo, subredditSubRepo, hubRepo)
 	moderationHandler := handlers.NewModerationHandler(reportRepo, hubModRepo)
 	moderationHandlerV2 := handlers.NewModerationHandlerV2(
@@ -189,7 +189,7 @@ func main() {
 	)
 	bugReportsHandler := handlers.NewBugReportsHandler(bugReportRepo, knownBugRepo, mediaRepo)
 	modMailHandler := handlers.NewModMailHandler(db.Pool, conversationRepo, messageRepo, userRepo, hubModRepo, hubRepo)
-	hubSettingsHandler := handlers.NewHubSettingsHandler(hubSettingsRepo)
+	hubSettingsHandler := handlers.NewHubSettingsHandler(hubRepo, hubSettingsRepo)
 	hubThemesHandler := handlers.NewHubThemesHandler(hubThemesRepo, hubSettingsRepo)
 
 	// Inject notification service into handlers
