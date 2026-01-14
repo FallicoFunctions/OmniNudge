@@ -138,18 +138,20 @@ func (h *PostsHandler) GetSubredditPosts(c *gin.Context) {
 }
 
 // CreatePostRequest represents the request body for creating a post
+const maxPostBodyLength = 10000
+
 type CreatePostRequest struct {
-	Title              string                  `json:"title" binding:"required,min=1,max=300"`
-	Body               *string                 `json:"body"`
-	Tags               []string                `json:"tags"`
-	MediaURL           *string                 `json:"media_url"`
-	MediaType          *string                 `json:"media_type"`
-	ThumbnailURL       *string                 `json:"thumbnail_url"`
-	GalleryImages      []models.GalleryImage   `json:"gallery_images"` // Optional: gallery images
-	HubID              *int                    `json:"hub_id"`                // Optional: post to specific hub
-	TargetSubreddit    *string                 `json:"target_subreddit"`      // Optional: associate with subreddit
-	SendRepliesToInbox bool                    `json:"send_replies_to_inbox"` // Notification preference
-	PostType           string                  `json:"post_type"`             // "link" or "text"
+	Title              string                `json:"title" binding:"required,min=1,max=300"`
+	Body               *string               `json:"body"`
+	Tags               []string              `json:"tags"`
+	MediaURL           *string               `json:"media_url"`
+	MediaType          *string               `json:"media_type"`
+	ThumbnailURL       *string               `json:"thumbnail_url"`
+	GalleryImages      []models.GalleryImage `json:"gallery_images"`        // Optional: gallery images
+	HubID              *int                  `json:"hub_id"`                // Optional: post to specific hub
+	TargetSubreddit    *string               `json:"target_subreddit"`      // Optional: associate with subreddit
+	SendRepliesToInbox bool                  `json:"send_replies_to_inbox"` // Notification preference
+	PostType           string                `json:"post_type"`             // "link" or "text"
 }
 
 // UpdatePostRequest represents the request body for updating a post
@@ -179,6 +181,10 @@ func (h *PostsHandler) CreatePost(c *gin.Context) {
 	var req CreatePostRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body", "details": err.Error()})
+		return
+	}
+	if req.Body != nil && len(*req.Body) > maxPostBodyLength {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Post body must be less than 10,000 characters"})
 		return
 	}
 
@@ -473,6 +479,10 @@ func (h *PostsHandler) UpdatePost(c *gin.Context) {
 	var req UpdatePostRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body", "details": err.Error()})
+		return
+	}
+	if req.Body != nil && len(*req.Body) > maxPostBodyLength {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Post body must be less than 10,000 characters"})
 		return
 	}
 

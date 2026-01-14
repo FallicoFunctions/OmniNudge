@@ -73,9 +73,11 @@ func (h *HubsHandler) Create(c *gin.Context) {
 		return
 	}
 
-	// Validate description length (max 500 chars)
-	if req.Description != nil && len(*req.Description) > 500 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Description must be less than 500 characters"})
+	const maxHubDescriptionLength = 10000
+
+	// Validate description length (max 10000 chars)
+	if req.Description != nil && len(*req.Description) > maxHubDescriptionLength {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Description must be less than 10,000 characters"})
 		return
 	}
 

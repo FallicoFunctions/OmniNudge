@@ -79,6 +79,12 @@ function isLikelyImageUrl(value: string): boolean {
 
 function formatInline(text: string): string {
   let result = escapeHtml(text);
+  const codePlaceholders: string[] = [];
+  result = result.replace(/`([^`]+)`/g, (_, code) => {
+    const token = `__CODE_PLACEHOLDER_${codePlaceholders.length}__`;
+    codePlaceholders.push(`<code>${escapeHtml(code)}</code>`);
+    return token;
+  });
   result = result.replace(boldRegex, '<strong>$1</strong>');
   result = result.replace(italicsRegex, '<em>$1</em>');
   result = result.replace(strikeRegex, '<del>$1</del>');
@@ -110,6 +116,9 @@ function formatInline(text: string): string {
     const normalized = username.replace(/^u\//i, '');
     return `${prefix}<a href="/user/${normalized}" class="text-[var(--color-primary)] hover:underline">${username}</a>`;
   });
+  codePlaceholders.forEach((htmlSnippet, index) => {
+    result = result.replace(`__CODE_PLACEHOLDER_${index}__`, htmlSnippet);
+  });
   return result;
 }
 
@@ -123,6 +132,8 @@ function convertMarkdown(markdown?: string | null): string {
   let inList = false;
   let inBlockquote = false;
   let inCode = false;
+  let inFence = false;
+  let fenceLanguage = '';
 
   const closeList = () => {
     if (inList) {
@@ -145,14 +156,61 @@ function convertMarkdown(markdown?: string | null): string {
     }
   };
 
-  for (const line of lines) {
+  const closeFence = () => {
+    if (inFence) {
+      html.push('</code></pre>');
+      inFence = false;
+      fenceLanguage = '';
+    }
+  };
+
+  const isTableSeparator = (line: string): boolean => {
+    const trimmed = line.trim();
+    if (!trimmed.includes('|')) {
+      return false;
+    }
+    return /^(\|?\s*:?-{3,}:?\s*\|)+\s*$/.test(trimmed);
+  };
+
+  const parseTableRow = (line: string): string[] => {
+    let trimmed = line.trim();
+    if (trimmed.startsWith('|')) {
+      trimmed = trimmed.slice(1);
+    }
+    if (trimmed.endsWith('|')) {
+      trimmed = trimmed.slice(0, -1);
+    }
+    return trimmed.split('|').map((cell) => cell.trim());
+  };
+
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index];
     const trimmed = line.trim();
     if (!trimmed) {
       closeList();
       closeBlockquote();
-      if (inCode) {
+      if (inCode || inFence) {
         html.push('\n');
       }
+      continue;
+    }
+
+    if (trimmed.startsWith('```')) {
+      closeList();
+      closeBlockquote();
+      if (!inFence) {
+        fenceLanguage = trimmed.slice(3).trim();
+        const languageClass = fenceLanguage ? ` class="language-${escapeHtml(fenceLanguage)}"` : '';
+        html.push(`<pre><code${languageClass}>`);
+        inFence = true;
+      } else {
+        closeFence();
+      }
+      continue;
+    }
+
+    if (inFence) {
+      html.push(`${escapeHtml(line)}\n`);
       continue;
     }
 
@@ -168,6 +226,47 @@ function convertMarkdown(markdown?: string | null): string {
       continue;
     } else {
       closeCode();
+    }
+
+    if (/^(-{3,}|\*{3,}|_{3,})$/.test(trimmed)) {
+      closeCode();
+      closeList();
+      closeBlockquote();
+      html.push('<hr />');
+      continue;
+    }
+
+    const nextLine = lines[index + 1];
+    if (nextLine && trimmed.includes('|') && isTableSeparator(nextLine)) {
+      closeCode();
+      closeList();
+      closeBlockquote();
+      const headerCells = parseTableRow(trimmed);
+      const bodyRows: string[][] = [];
+      index += 1;
+      for (let rowIndex = index + 1; rowIndex < lines.length; rowIndex += 1) {
+        const rowLine = lines[rowIndex];
+        if (!rowLine || !rowLine.includes('|')) {
+          index = rowIndex - 1;
+          break;
+        }
+        bodyRows.push(parseTableRow(rowLine));
+        index = rowIndex;
+      }
+      html.push('<table><thead><tr>');
+      headerCells.forEach((cell) => {
+        html.push(`<th>${formatInline(cell)}</th>`);
+      });
+      html.push('</tr></thead><tbody>');
+      bodyRows.forEach((row) => {
+        html.push('<tr>');
+        row.forEach((cell) => {
+          html.push(`<td>${formatInline(cell)}</td>`);
+        });
+        html.push('</tr>');
+      });
+      html.push('</tbody></table>');
+      continue;
     }
 
     if (line.startsWith('>')) {
@@ -211,6 +310,7 @@ function convertMarkdown(markdown?: string | null): string {
   closeList();
   closeBlockquote();
   closeCode();
+  closeFence();
 
   return html.join('');
 }

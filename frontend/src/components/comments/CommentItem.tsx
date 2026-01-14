@@ -2,6 +2,8 @@ import { useMemo, useState } from 'react';
 import type { LocalCommentBase } from '../../types/comments';
 import { useSettings } from '../../contexts/SettingsContext';
 import { formatRelativeTime } from '../../utils/timeFormat';
+import { MarkdownInput } from '../common/MarkdownInput';
+import { MarkdownRenderer } from '../common/MarkdownRenderer';
 
 export interface CommentActionHandlers<T extends LocalCommentBase> {
   vote: (comment: T, value: 1 | -1) => Promise<void>;
@@ -245,11 +247,11 @@ export function CommentItem<T extends LocalCommentBase>({
 
           {!isCollapsed && (isEditing ? (
             <form onSubmit={handleEditSubmit} className="mt-1 space-y-2">
-              <textarea
+              <MarkdownInput
+                label="Edit comment"
                 value={editText}
-                onChange={(e) => setEditText(e.target.value)}
+                onChange={setEditText}
                 rows={4}
-                className="w-full rounded border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-[var(--color-text-primary)]"
               />
               <div className="flex gap-2">
                 <button
@@ -272,7 +274,7 @@ export function CommentItem<T extends LocalCommentBase>({
               </div>
             </form>
           ) : (
-            <div className="mt-1 text-left text-sm text-[var(--color-text-primary)]">{comment.content}</div>
+            <MarkdownRenderer content={comment.content} className="mt-1" />
           ))}
 
           {!isCollapsed && actionError && (
@@ -339,13 +341,12 @@ export function CommentItem<T extends LocalCommentBase>({
 
           {!isCollapsed && isReplying && (
             <form onSubmit={handleReplySubmit} className="mt-3">
-              <textarea
+              <MarkdownInput
+                label="Write a reply"
                 value={replyText}
-                onChange={(e) => setReplyText(e.target.value)}
+                onChange={setReplyText}
                 placeholder="Write your reply..."
                 rows={3}
-                autoFocus
-                className="w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
               />
               <div className="mt-2 flex gap-2">
                 <button
