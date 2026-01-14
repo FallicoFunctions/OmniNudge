@@ -14,6 +14,10 @@ export function AboutContent({ className = '' }: { className?: string }) {
         system. The messaging system also allows you to send any file type (which is also encrypted).
       </p>
 
+      <p>
+        Please note: Reddit has been cracking down on third-party apps that access their API. Access to Reddit posts may stop at any time and without warning.
+      </p>
+
       <div>
         <h2 className="text-lg font-semibold text-[var(--color-text-primary)]">
           What OmniNudge Is Right Now
