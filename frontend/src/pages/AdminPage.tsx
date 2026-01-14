@@ -3,12 +3,14 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { adminService } from '../services/adminService';
+import { bugReportService, type BugReport } from '../services/bugReportService';
 import type { Hub } from '../services/hubsService';
 import type { AdminUser, BanHistoryItem } from '../types/admin';
 import { EmptyMessage, LoadingMessage } from '../components/common/StatusMessage';
 import { OffsetPaginationControls } from '../components/common/OffsetPaginationControls';
+import { resolveMediaUrl } from '../utils/mediaUrl';
 
-type TabType = 'stats' | 'users' | 'moderators' | 'ban-activity';
+type TabType = 'stats' | 'users' | 'moderators' | 'ban-activity' | 'bug-reports';
 
 export default function AdminPage() {
   const { user } = useAuth();
@@ -73,6 +75,16 @@ export default function AdminPage() {
           >
             Ban Activity
           </button>
+          <button
+            onClick={() => setActiveTab('bug-reports')}
+            className={`pb-3 px-1 border-b-2 font-medium transition-colors ${
+              activeTab === 'bug-reports'
+                ? 'border-[var(--color-primary)] text-[var(--color-primary)]'
+                : 'border-transparent text-[var(--color-text-secondary)] hover:text-[var(--color-text)] hover:border-[var(--color-border)]'
+            }`}
+          >
+            Bug Reports
+          </button>
         </nav>
       </div>
 
@@ -80,6 +92,7 @@ export default function AdminPage() {
       {activeTab === 'users' && <UsersTab />}
       {activeTab === 'moderators' && <ModeratorsTab />}
       {activeTab === 'ban-activity' && <BanActivityTab />}
+      {activeTab === 'bug-reports' && <BugReportsTab />}
     </div>
   );
 }
@@ -938,6 +951,195 @@ function UsersTab() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// ===== BUG REPORTS TAB =====
+
+function BugReportsTab() {
+  const [cursorStack, setCursorStack] = useState(['']);
+  const [pageSize, setPageSize] = useState(50);
+  const [statusFilter, setStatusFilter] = useState('');
+  const [expandedReportId, setExpandedReportId] = useState<number | null>(null);
+
+  const currentCursor = cursorStack[cursorStack.length - 1] ?? '';
+  const { data, isLoading } = useQuery({
+    queryKey: ['adminBugReports', statusFilter, pageSize, currentCursor],
+    queryFn: () => bugReportService.getBugReports(statusFilter || undefined, pageSize, 0, currentCursor),
+  });
+
+  const reports = data?.reports ?? [];
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 className="text-xl font-semibold">Bug Reports</h2>
+          <p className="text-sm text-[var(--color-text-secondary)]">
+            Click a report to view the screenshot and full details.
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-3">
+          <select
+            value={statusFilter}
+            onChange={(e) => {
+              setStatusFilter(e.target.value);
+              setCursorStack(['']);
+            }}
+            className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-[var(--color-text-primary)]"
+          >
+            <option value="">All statuses</option>
+            <option value="new">New</option>
+            <option value="investigating">Investigating</option>
+            <option value="fixed">Fixed</option>
+            <option value="wont_fix">Won&apos;t fix</option>
+            <option value="duplicate">Duplicate</option>
+          </select>
+          <select
+            value={pageSize}
+            onChange={(e) => {
+              setPageSize(Number(e.target.value));
+              setCursorStack(['']);
+            }}
+            className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-[var(--color-text-primary)]"
+          >
+            {[25, 50, 100].map((size) => (
+              <option key={size} value={size}>
+                {size} per page
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      {isLoading ? (
+        <div className="text-center py-12">
+          <LoadingMessage>Loading bug reports...</LoadingMessage>
+        </div>
+      ) : reports.length === 0 ? (
+        <div className="text-center py-12">
+          <EmptyMessage>No bug reports found.</EmptyMessage>
+        </div>
+      ) : (
+        <div className="overflow-x-auto rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)]">
+          <table className="w-full text-sm">
+            <thead className="bg-[var(--color-surface-elevated)] border-b border-[var(--color-border)]">
+              <tr>
+                <th className="p-3 text-left text-[var(--color-text-secondary)] font-medium">ID</th>
+                <th className="p-3 text-left text-[var(--color-text-secondary)] font-medium">Status</th>
+                <th className="p-3 text-left text-[var(--color-text-secondary)] font-medium">User</th>
+                <th className="p-3 text-left text-[var(--color-text-secondary)] font-medium">Page</th>
+                <th className="p-3 text-left text-[var(--color-text-secondary)] font-medium">Description</th>
+                <th className="p-3 text-left text-[var(--color-text-secondary)] font-medium">Submitted</th>
+              </tr>
+            </thead>
+            <tbody>
+              {reports.map((report) => {
+                const isExpanded = expandedReportId === report.id;
+                return (
+                  <>
+                    <tr
+                      key={report.id}
+                      onClick={() => setExpandedReportId(isExpanded ? null : report.id)}
+                      className="border-b border-[var(--color-border)] hover:bg-[var(--color-surface-hover)] cursor-pointer"
+                    >
+                      <td className="p-3 font-medium text-[var(--color-text-primary)]">
+                        #{report.id} {isExpanded ? '▲' : '▼'}
+                      </td>
+                      <td className="p-3 capitalize text-[var(--color-text-secondary)]">
+                        {report.status.replace('_', ' ')}
+                      </td>
+                      <td className="p-3 text-[var(--color-text-secondary)]">
+                        {report.username || (report.user_id ? `User #${report.user_id}` : 'Anonymous')}
+                      </td>
+                      <td className="p-3 text-[var(--color-text-secondary)]">
+                        <span className="block max-w-xs truncate">{report.page_url}</span>
+                      </td>
+                      <td className="p-3 text-[var(--color-text-secondary)]">
+                        <span className="block max-w-md truncate">{report.description}</span>
+                      </td>
+                      <td className="p-3 text-[var(--color-text-secondary)]">
+                        {new Date(report.created_at).toLocaleString()}
+                      </td>
+                    </tr>
+                    {isExpanded && (
+                      <tr key={`${report.id}-details`} className="border-b border-[var(--color-border)]">
+                        <td colSpan={6} className="p-4 bg-[var(--color-surface-elevated)]">
+                          <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,360px)]">
+                            <div className="space-y-3 text-sm text-[var(--color-text-secondary)]">
+                              <div>
+                                <span className="font-medium text-[var(--color-text-primary)]">Status:</span>{' '}
+                                <span className="capitalize">{report.status.replace('_', ' ')}</span>
+                              </div>
+                              <div>
+                                <span className="font-medium text-[var(--color-text-primary)]">Reporter:</span>{' '}
+                                {report.username || (report.user_id ? `User #${report.user_id}` : 'Anonymous')}
+                              </div>
+                              <div>
+                                <span className="font-medium text-[var(--color-text-primary)]">Page:</span>{' '}
+                                <span className="break-words">{report.page_url}</span>
+                              </div>
+                              <div>
+                                <span className="font-medium text-[var(--color-text-primary)]">Description:</span>
+                                <div className="mt-1 whitespace-pre-wrap text-[var(--color-text-primary)]">
+                                  {report.description}
+                                </div>
+                              </div>
+                            </div>
+                            <div>
+                              <div className="text-sm font-semibold text-[var(--color-text-primary)] mb-2">
+                                Screenshot
+                              </div>
+                              {report.screenshot_url ? (
+                                <a
+                                  href={resolveMediaUrl(report.screenshot_url)}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="block"
+                                >
+                                  <img
+                                    src={resolveMediaUrl(report.screenshot_url)}
+                                    alt="Bug report screenshot"
+                                    className="max-h-[260px] w-full rounded-md border border-[var(--color-border)] object-contain bg-[var(--color-surface)]"
+                                  />
+                                </a>
+                              ) : (
+                                <div className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] p-3 text-sm text-[var(--color-text-secondary)]">
+                                  No screenshot available.
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {data && (
+        <OffsetPaginationControls
+          limit={data.limit}
+          offset={data.offset}
+          hasNextPage={Boolean(data.next_cursor)}
+          onPrev={() => {
+            if (cursorStack.length > 1) {
+              setCursorStack((prev) => prev.slice(0, -1));
+            }
+          }}
+          onNext={() => {
+            if (data.next_cursor) {
+              setCursorStack((prev) => [...prev, data.next_cursor as string]);
+            }
+          }}
+        />
+      )}
+
     </div>
   );
 }
