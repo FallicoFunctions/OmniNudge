@@ -64,7 +64,7 @@ cat ~/.ssh/id_ed25519.pub
 ```
 Type: A
 Name: @
-Content: YOUR_SERVER_IP
+Content: 77.42.47.79
 Proxy status: DNS only (click to turn cloud GRAY)
 TTL: Auto
 ```
@@ -73,14 +73,12 @@ TTL: Auto
 ```
 Type: A
 Name: www
-Content: YOUR_SERVER_IP
+Content: 77.42.47.79
 Proxy status: DNS only (click to turn cloud GRAY)
 TTL: Auto
 ```
 
 **⚠️ IMPORTANT:** Make sure the cloud icon is **GRAY**, not orange! This is required for SSL setup.
-
-Replace `YOUR_SERVER_IP` with your actual server IP (e.g., `159.89.123.45`).
 
 **Wait 2-10 minutes** for DNS to propagate (Cloudflare is fast! ⚡).
 
@@ -118,11 +116,11 @@ This creates one clean migration file instead of running 48 migrations. See [doc
 # 1. Navigate to project (if not already there)
 cd /Users/Nick_1/Documents/Personal_Projects/OmniNudge
 
-# 2. Upload scripts to server (replace YOUR_SERVER_IP)
-scp scripts/deploy-*.sh root@YOUR_SERVER_IP:/root/
+# 2. Upload scripts to server
+scp scripts/deploy-*.sh root@77.42.47.79:/root/
 
 # 3. SSH into server
-ssh root@YOUR_SERVER_IP
+ssh root@77.42.47.79
 ```
 
 **On your server:**
@@ -270,14 +268,14 @@ certbot --nginx -d omninudge.com -d www.omninudge.com --force-renewal
 ### View Backend Logs
 
 ```bash
-ssh root@YOUR_SERVER_IP
+ssh root@77.42.47.79
 journalctl -u omninudge-backend -f
 ```
 
 ### Restart Backend
 
 ```bash
-ssh root@YOUR_SERVER_IP
+ssh root@77.42.47.79
 systemctl restart omninudge-backend
 ```
 
@@ -289,10 +287,10 @@ cd /Users/Nick_1/Documents/Personal_Projects/OmniNudge
 
 # Upload new code
 rsync -avz --exclude 'node_modules' --exclude '.git' \
-  . root@YOUR_SERVER_IP:/var/www/omninudge/
+  . root@77.42.47.79:/var/www/omninudge/
 
 # On server:
-ssh root@YOUR_SERVER_IP
+ssh root@77.42.47.79
 cd /var/www/omninudge
 
 # Rebuild and restart
@@ -379,7 +377,7 @@ cat /etc/postgresql/*/main/postgresql.conf | grep listen_addresses
 
 ```bash
 # SSH into server
-ssh root@YOUR_SERVER_IP
+ssh root@77.42.47.79
 
 # Restart everything
 systemctl restart omninudge-backend
