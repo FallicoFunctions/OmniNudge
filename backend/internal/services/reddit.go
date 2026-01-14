@@ -83,6 +83,13 @@ func (r *RedditClient) SetHTTPClient(client *http.Client) {
 	r.httpClient = client
 }
 
+func (r *RedditClient) redditBaseURL() string {
+	if proxyURL := strings.TrimSpace(os.Getenv("REDDIT_PROXY_URL")); proxyURL != "" {
+		return strings.TrimRight(proxyURL, "/")
+	}
+	return "https://www.reddit.com"
+}
+
 // normalizeRemovedIndicator lowercases and trims markers used for removal/deletion.
 func normalizeRemovedIndicator(value string) string {
 	return strings.ToLower(strings.TrimSpace(value))
@@ -361,11 +368,7 @@ func (r *RedditClient) GetSubredditPosts(ctx context.Context, subreddit string, 
 	}
 
 	// Build URL - use proxy if configured
-	baseURL := "https://www.reddit.com"
-	if proxyURL := os.Getenv("REDDIT_PROXY_URL"); proxyURL != "" {
-		baseURL = proxyURL
-	}
-	url := fmt.Sprintf("%s/r/%s/%s.json", baseURL, subreddit, sort)
+	url := fmt.Sprintf("%s/r/%s/%s.json", r.redditBaseURL(), subreddit, sort)
 
 	// Create request
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
@@ -708,7 +711,7 @@ func (r *RedditClient) AutocompleteSubreddits(ctx context.Context, query string,
 		limit = 10
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "GET", "https://www.reddit.com/api/subreddit_autocomplete_v2.json", nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("%s/api/subreddit_autocomplete_v2.json", r.redditBaseURL()), nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
@@ -768,7 +771,7 @@ func (r *RedditClient) SearchSubreddits(ctx context.Context, query string, limit
 		limit = 25
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "GET", "https://www.reddit.com/subreddits/search.json", nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("%s/subreddits/search.json", r.redditBaseURL()), nil)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to create request: %w", err)
 	}
