@@ -721,7 +721,7 @@ CREATE TABLE public.hubs (
     subscriber_count integer DEFAULT 0,
     nsfw boolean DEFAULT false NOT NULL,
     name_normalized character varying(50) NOT NULL,
-    CONSTRAINT hubs_content_options_check CHECK (((content_options)::text = ANY ((ARRAY['any'::character varying, 'links_only'::character varying, 'text_only'::character varying])::text[]))),
+    CONSTRAINT hubs_content_options_check CHECK (((content_options)::text = ANY ((ARRAY['any'::character varying, 'links_only'::character varying, 'text_only'::character varying, 'images_only'::character varying, 'videos_only'::character varying, 'custom'::character varying])::text[]))),
     CONSTRAINT hubs_type_check CHECK (((type)::text = ANY ((ARRAY['public'::character varying, 'private'::character varying])::text[])))
 );
 
@@ -4677,4 +4677,3 @@ ALTER TABLE ONLY public.vote_activity
 --
 -- PostgreSQL database dump complete
 --
-

@@ -51,6 +51,61 @@ func (r *HubSettingsRepository) GetByHubID(ctx context.Context, hubID int) (*mod
 	return &settings, nil
 }
 
+// EnsureDefaults inserts a hub settings row with provided defaults if missing.
+func (r *HubSettingsRepository) EnsureDefaults(ctx context.Context, settings *models.HubSettings, userID *int) error {
+	query := `
+		INSERT INTO hub_settings (
+			hub_id,
+			display_title,
+			sidebar_markdown,
+			privacy_type,
+			allow_text_posts,
+			allow_link_posts,
+			allow_image_posts,
+			allow_video_posts,
+			allow_poll_posts,
+			allow_media_in_comments,
+			require_post_flair,
+			banned_words,
+			spam_filter_strength,
+			new_account_filter_days,
+			min_account_karma,
+			allow_spoilers,
+			show_thumbnails,
+			enable_wiki,
+			updated_by
+		) VALUES (
+			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
+			$11, $12, $13, $14, $15, $16, $17, $18, $19
+		)
+		ON CONFLICT (hub_id) DO NOTHING
+	`
+
+	_, err := r.pool.Exec(ctx, query,
+		settings.HubID,
+		settings.DisplayTitle,
+		settings.SidebarMarkdown,
+		settings.PrivacyType,
+		settings.AllowTextPosts,
+		settings.AllowLinkPosts,
+		settings.AllowImagePosts,
+		settings.AllowVideoPosts,
+		settings.AllowPollPosts,
+		settings.AllowMediaInComments,
+		settings.RequirePostFlair,
+		settings.BannedWords,
+		settings.SpamFilterStrength,
+		settings.NewAccountFilterDays,
+		settings.MinAccountKarma,
+		settings.AllowSpoilers,
+		settings.ShowThumbnails,
+		settings.EnableWiki,
+		userID,
+	)
+
+	return err
+}
+
 // Update updates hub settings
 func (r *HubSettingsRepository) Update(ctx context.Context, settings *models.HubSettings, userID int) error {
 	query := `
