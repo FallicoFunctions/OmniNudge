@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { hubsService, type CreateHubRequest } from '../services/hubsService';
+import { MarkdownInput } from '../components/common/MarkdownInput';
 
 export default function CreateHubPage() {
   const navigate = useNavigate();
@@ -51,8 +52,8 @@ export default function CreateHubPage() {
       return;
     }
 
-    if (description.length > 500) {
-      alert('Description must be less than 500 characters');
+    if (description.length > 10000) {
+      alert('Description must be less than 10,000 characters');
       return;
     }
 
@@ -120,20 +121,15 @@ export default function CreateHubPage() {
         </div>
 
         {/* Description */}
-        <div>
-          <label className="block text-sm font-medium mb-2">Description (optional)</label>
-          <textarea
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-            rows={4}
-            maxLength={500}
-            placeholder="Describe your hub..."
-          />
-          <p className="mt-1 text-sm text-gray-500">
-            {description.length}/500 characters. Appears in search results and social media links.
-          </p>
-        </div>
+        <MarkdownInput
+          label="About (optional, Markdown supported)"
+          value={description}
+          onChange={setDescription}
+          rows={6}
+          maxLength={10000}
+          placeholder="Describe your hub..."
+          helperText={`${description.length}/10,000 characters. Appears in search results and social media links.`}
+        />
 
         {/* Type */}
         <div>

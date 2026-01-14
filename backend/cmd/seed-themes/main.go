@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"os"
+	"strings"
 
 	"github.com/omninudge/backend/internal/config"
 	"github.com/omninudge/backend/internal/database"
@@ -31,10 +32,10 @@ func main() {
 
 	// Create system user (user_id = 0) if not exists
 	_, err = db.Pool.Exec(ctx, `
-		INSERT INTO users (id, username, password_hash, reddit_id, created_at, last_seen, karma)
-		VALUES (0, 'system', '', 'system', NOW(), NOW(), 0)
+		INSERT INTO users (id, username, username_normalized, password_hash, reddit_id, created_at, last_seen, karma)
+		VALUES (0, 'system', $1, '', 'system', NOW(), NOW(), 0)
 		ON CONFLICT (id) DO NOTHING
-	`)
+	`, strings.ToLower("system"))
 	if err != nil {
 		log.Fatalf("Failed to create system user: %v", err)
 	}

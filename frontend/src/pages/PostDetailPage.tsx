@@ -11,7 +11,9 @@ import { subscriptionService } from '../services/subscriptionService';
 import type { PlatformPost, PostComment } from '../types/posts';
 import { CommentItem } from '../components/comments/CommentItem';
 import type { CommentActionHandlers } from '../components/comments/CommentItem';
+import { MarkdownInput } from '../components/common/MarkdownInput';
 import { MarkdownRenderer } from '../components/common/MarkdownRenderer';
+import { FormattingHelpTable } from '../components/common/FormattingHelpTable';
 import { formatTimestamp } from '../utils/timeFormat';
 import { decodeHtmlEntities } from '../utils/text';
 import { VoteButtons } from '../components/VoteButtons';
@@ -39,20 +41,6 @@ import { useSubredditActiveUsers } from '../hooks/useSubredditActiveUsers';
 import { useHubActiveUsers } from '../hooks/useHubActiveUsers';
 import { useHubSubredditAutocomplete } from '../hooks/useHubSubredditAutocomplete';
 import { CombinedSuggestionItem } from '../components/common/CombinedSuggestionItem';
-
-const FORMATTING_EXAMPLES = [
-  { input: '*italics*', output: '*italics*' },
-  { input: '**bold**', output: '**bold**' },
-  { input: '[OmniNudge!](https://omninudge.com)', output: '[OmniNudge!](https://omninudge.com)' },
-  { input: '* item 1\n* item 2\n* item 3', output: '* item 1\n* item 2\n* item 3' },
-  { input: '> quoted text', output: '> quoted text' },
-  {
-    input: 'Lines starting with four spaces are treated like code:\n\n    if 1 * 2 < 3:\n    print "hello, world!"',
-    output: 'Lines starting with four spaces are treated like code:\n\n    if 1 * 2 < 3:\n    print "hello, world!"',
-  },
-  { input: '~~strikethrough~~', output: '~~strikethrough~~' },
-  { input: 'super^script', output: 'super^script' },
-] as const;
 
 export default function PostDetailPage() {
   const { postId, commentId } = useParams<{ postId: string; commentId?: string }>();
@@ -835,12 +823,12 @@ export default function PostDetailPage() {
               }}
               className="mb-6"
             >
-              <textarea
+              <MarkdownInput
+                label="Add a comment"
                 value={commentText}
-                onChange={(e) => setCommentText(e.target.value)}
+                onChange={setCommentText}
                 placeholder="Share your thoughts..."
                 rows={4}
-                className="w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-2 text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
               />
               <div className="mt-2 flex justify-start text-xs text-[var(--color-text-secondary)]">
                 <button
@@ -865,34 +853,9 @@ export default function PostDetailPage() {
                     </a>{' '}
                     for formatting. See below for formatting help.
                   </p>
-                  <div className="mt-2">
-                    <table className="w-full border-collapse text-[13px]">
-                      <thead>
-                        <tr className="bg-[#fff9c4] text-[var(--color-text-primary)]">
-                          <th className="border border-[var(--color-border)] px-1 py-1 text-left font-semibold italic">
-                            you type:
-                          </th>
-                          <th className="border border-[var(--color-border)] px-1 py-1 text-left font-semibold italic">
-                            you see:
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {FORMATTING_EXAMPLES.map((example, index) => (
-                          <tr key={index} className="align-top">
-                            <td className="border border-[var(--color-border)] bg-white px-1 py-1 font-mono text-[11px] text-[var(--color-text-primary)]">
-                              <pre className="m-0 whitespace-pre-wrap text-[11px] leading-tight">
-                                {example.input}
-                              </pre>
-                            </td>
-                            <td className="border border-[var(--color-border)] bg-white px-1 py-1">
-                              <MarkdownRenderer content={example.output} className="leading-tight" />
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+              <div className="mt-2">
+                <FormattingHelpTable />
+              </div>
                 </div>
               )}
               <button
