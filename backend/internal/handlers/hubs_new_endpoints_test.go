@@ -98,9 +98,9 @@ func TestCreateHub_DescriptionValidation(t *testing.T) {
 	userID := 1
 	router.POST("/hubs", mockAuthMiddleware(userID), handler.Create)
 
-	// Create description that's too long (501 chars)
+	// Create description that's too long (10001 chars)
 	longDescription := ""
-	for i := 0; i < 501; i++ {
+	for i := 0; i < 10001; i++ {
 		longDescription += "a"
 	}
 
@@ -123,7 +123,7 @@ func TestCreateHub_DescriptionValidation(t *testing.T) {
 	var response map[string]interface{}
 	err := json.Unmarshal(w.Body.Bytes(), &response)
 	require.NoError(t, err)
-	assert.Contains(t, response["error"], "less than 500 characters")
+	assert.Contains(t, response["error"], "less than 10,000 characters")
 }
 
 func TestGetPopularFeed_ExcludesQuarantined(t *testing.T) {

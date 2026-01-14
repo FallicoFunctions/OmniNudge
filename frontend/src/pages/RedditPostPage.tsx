@@ -16,7 +16,9 @@ import {
   isRedditDomain,
   sanitizeHttpUrl,
 } from '../utils/crosspostHelpers';
+import { MarkdownInput } from '../components/common/MarkdownInput';
 import { MarkdownRenderer } from '../components/common/MarkdownRenderer';
+import { FormattingHelpTable } from '../components/common/FormattingHelpTable';
 import { FlairBadge } from '../components/reddit/FlairBadge';
 import { useRedditBlocklist } from '../contexts/RedditBlockContext';
 import { decodeHtmlEntities } from '../utils/text';
@@ -141,20 +143,6 @@ interface RedditListing<T> {
 
 type RedditPostListing = RedditListing<{ kind: string; data: RedditPostData }>;
 type RedditCommentsListing = RedditListing<RedditComment>;
-
-const FORMATTING_EXAMPLES = [
-  { input: '*italics*', output: '*italics*' },
-  { input: '**bold**', output: '**bold**' },
-  { input: '[OmniNudge!](https://omninudge.com)', output: '[OmniNudge!](https://omninudge.com)' },
-  { input: '* item 1\n* item 2\n* item 3', output: '* item 1\n* item 2\n* item 3' },
-  { input: '> quoted text', output: '> quoted text' },
-  {
-    input: 'Lines starting with four spaces are treated like code:\n\n    if 1 * 2 < 3:\n    print "hello, world!"',
-    output: 'Lines starting with four spaces are treated like code:\n\n    if 1 * 2 < 3:\n    print "hello, world!"',
-  },
-  { input: '~~strikethrough~~', output: '~~strikethrough~~' },
-  { input: 'super^script', output: 'super^script' },
-] as const;
 
 function getGalleryImages(post: RedditPostData): string[] {
   if (!post.gallery_data?.items || !post.media_metadata) {
@@ -405,13 +393,12 @@ function RedditCommentView({
                     createReplyMutation.mutate(replyText.trim());
                   }
                 }}>
-                  <textarea
+                  <MarkdownInput
+                    label="Write a reply"
                     value={replyText}
-                    onChange={(e) => setReplyText(e.target.value)}
+                    onChange={setReplyText}
                     placeholder="Write your reply..."
-                    className="w-full rounded border border-[var(--color-border)] bg-[var(--color-surface)] p-2 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
                     rows={4}
-                    disabled={createReplyMutation.isPending}
                   />
                   <div className="mt-2 flex gap-2">
                     <button
@@ -726,11 +713,11 @@ function LocalCommentView({
 
           {!isCollapsed && (isEditing ? (
             <form onSubmit={handleEditSubmit} className="mt-2 space-y-2">
-              <textarea
+              <MarkdownInput
+                label="Edit comment"
                 value={editText}
-                onChange={(e) => setEditText(e.target.value)}
+                onChange={setEditText}
                 rows={4}
-                className="w-full rounded border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-[var(--color-text-primary)]"
               />
               <div className="flex gap-2">
                 <button
@@ -834,13 +821,12 @@ function LocalCommentView({
 
           {!isCollapsed && isReplying && (
             <form onSubmit={handleSubmitReply} className="mt-3">
-              <textarea
+              <MarkdownInput
+                label="Write a reply"
                 value={replyText}
-                onChange={(e) => setReplyText(e.target.value)}
+                onChange={setReplyText}
                 placeholder="Write your reply..."
                 rows={3}
-                autoFocus
-                className="w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
               />
               <div className="mt-2 flex gap-2">
                 <button
@@ -1928,12 +1914,12 @@ export default function RedditPostPage() {
 
         {/* Comment Form */}
         <form id="comment-form" onSubmit={handleSubmitComment} className="mb-6">
-          <textarea
+          <MarkdownInput
+            label="Add a comment"
             value={commentText}
-            onChange={(e) => setCommentText(e.target.value)}
+            onChange={setCommentText}
             placeholder="Share your thoughts about this Reddit post..."
             rows={4}
-            className="w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-2 text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
           />
           <div className="mt-2 flex justify-start text-xs text-[var(--color-text-secondary)]">
             <button
@@ -1959,32 +1945,7 @@ export default function RedditPostPage() {
                 for formatting. See below for formatting help.
               </p>
               <div className="mt-2">
-                <table className="w-full border-collapse text-[13px]">
-                  <thead>
-                    <tr className="bg-[#fff9c4] text-[var(--color-text-primary)]">
-                      <th className="border border-[var(--color-border)] px-1 py-1 text-left font-semibold italic">
-                        you type:
-                      </th>
-                      <th className="border border-[var(--color-border)] px-1 py-1 text-left font-semibold italic">
-                        you see:
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {FORMATTING_EXAMPLES.map((example, index) => (
-                      <tr key={index} className="align-top">
-                        <td className="border border-[var(--color-border)] bg-white px-1 py-1 font-mono text-[11px] text-[var(--color-text-primary)]">
-                          <pre className="m-0 whitespace-pre-wrap text-[11px] leading-tight">
-                            {example.input}
-                          </pre>
-                        </td>
-                        <td className="border border-[var(--color-border)] bg-white px-1 py-1">
-                          <MarkdownRenderer content={example.output} className="leading-tight" />
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                <FormattingHelpTable />
               </div>
             </div>
           )}
