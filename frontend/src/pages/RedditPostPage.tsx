@@ -1073,7 +1073,7 @@ export default function RedditPostPage() {
 
   const { data: subscriptionStatus } = useQuery({
     queryKey: ['subreddit-subscription', subreddit],
-    queryFn: () => subscriptionService.checkSubredditSubscription(subreddit),
+    queryFn: () => subscriptionService.checkSubredditSubscription(subreddit!),
     enabled: !!user && !!subreddit && subreddit !== 'popular' && subreddit !== 'frontpage',
     staleTime: 1000 * 60 * 5,
   });

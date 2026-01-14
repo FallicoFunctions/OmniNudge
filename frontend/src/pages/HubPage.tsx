@@ -23,6 +23,7 @@ import { useHubSubredditAutocomplete } from '../hooks/useHubSubredditAutocomplet
 import { useHubActiveUsers } from '../hooks/useHubActiveUsers';
 import { OffsetPaginationControls } from '../components/common/OffsetPaginationControls';
 import { VirtualizedList } from '../components/common/VirtualizedList';
+import { subscriptionService } from '../services/subscriptionService';
 import { useSavedItems } from '../hooks/useSavedItems';
 import { useHiddenItems } from '../hooks/useHiddenItems';
 import { CrosspostModal } from '../components/common/CrosspostModal';
