@@ -82,6 +82,8 @@ func CORS() gin.HandlerFunc {
 
 		// In production, restrict this to your frontend domain
 		allowedOrigins := []string{
+			"https://omninudge.com",
+			"https://www.omninudge.com",
 			"http://localhost:3000",
 			"http://localhost:5173",
 			"http://localhost:5174",

@@ -37,7 +37,8 @@ export const adminService = {
   },
 
   async getBanHistory(userId: number) {
-    return api.get<{ history: BanHistoryItem[] }>(`/admin/users/${userId}/ban-history`);
+    const response = await api.get<{ history: BanHistoryItem[] | null }>(`/admin/users/${userId}/ban-history`);
+    return { ...response, history: response.history ?? [] };
   },
 
   async getAllBanHistory(limit = 50, offset = 0, cursor?: string): Promise<{ history: BanHistoryItem[]; limit: number; offset: number; total: number; next_cursor?: string }> {
@@ -46,7 +47,10 @@ export const adminService = {
     params.append('offset', offset.toString());
     if (cursor) params.append('cursor', cursor);
 
-    return api.get<{ history: BanHistoryItem[]; limit: number; offset: number; total: number; next_cursor?: string }>(`/admin/ban-history?${params.toString()}`);
+    const response = await api.get<{ history: BanHistoryItem[] | null; limit: number; offset: number; total: number; next_cursor?: string }>(
+      `/admin/ban-history?${params.toString()}`
+    );
+    return { ...response, history: response.history ?? [] };
   },
 
   // ===== HUB MODERATOR MANAGEMENT =====
