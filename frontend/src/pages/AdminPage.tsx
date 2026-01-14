@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { adminService } from '../services/adminService';
-import { bugReportService, type BugReport } from '../services/bugReportService';
+import { bugReportService } from '../services/bugReportService';
 import type { Hub } from '../services/hubsService';
 import type { AdminUser, BanHistoryItem } from '../types/admin';
 import { EmptyMessage, LoadingMessage } from '../components/common/StatusMessage';
@@ -1124,9 +1124,8 @@ function BugReportsTab() {
 
       {data && (
         <OffsetPaginationControls
-          limit={data.limit}
-          offset={data.offset}
-          hasNextPage={Boolean(data.next_cursor)}
+          hasPrev={cursorStack.length > 1}
+          hasMore={Boolean(data.next_cursor)}
           onPrev={() => {
             if (cursorStack.length > 1) {
               setCursorStack((prev) => prev.slice(0, -1));
