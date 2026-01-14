@@ -7,8 +7,6 @@
 -- PostgreSQL database dump
 --
 
-\restrict XQuRX83BiqjN1Z6broHzB2neDdReJDXwQpmYUJnIh9lE37zvmYMfcJajpvxjjpE
-
 -- Dumped from database version 14.19 (Homebrew)
 -- Dumped by pg_dump version 14.19 (Homebrew)
 
@@ -1943,7 +1941,6 @@ CREATE TABLE public.users (
     last_agent_post_at timestamp without time zone,
     last_agent_browse_at timestamp without time zone,
     encrypted_private_key text,
-    CONSTRAINT email_format CHECK (((email IS NULL) OR ((email)::text ~* '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$'::text))),
     CONSTRAINT username_length CHECK (((char_length((username)::text) >= 3) AND (char_length((username)::text) <= 50)))
 );
 
@@ -4680,6 +4677,4 @@ ALTER TABLE ONLY public.vote_activity
 --
 -- PostgreSQL database dump complete
 --
-
-\unrestrict XQuRX83BiqjN1Z6broHzB2neDdReJDXwQpmYUJnIh9lE37zvmYMfcJajpvxjjpE
 

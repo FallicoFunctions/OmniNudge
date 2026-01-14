@@ -267,7 +267,7 @@ func (h *ThemesHandler) GetMyThemes(c *gin.Context) {
 		offset = 0
 	}
 
-	var themes []*models.UserTheme
+	themes := make([]*models.UserTheme, 0)
 	var err error
 	if useCursorPagination {
 		var payload *models.TimeCursor
@@ -281,6 +281,11 @@ func (h *ThemesHandler) GetMyThemes(c *gin.Context) {
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch themes", "details": err.Error()})
 		return
+	}
+
+	// Ensure themes is never nil (convert nil to empty slice for JSON)
+	if themes == nil {
+		themes = make([]*models.UserTheme, 0)
 	}
 
 	nextCursor := ""
@@ -443,6 +448,11 @@ func (h *ThemesHandler) GetPredefinedThemes(c *gin.Context) {
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch predefined themes", "details": err.Error()})
 		return
+	}
+
+	// Ensure themes is never nil (convert nil to empty slice for JSON)
+	if themes == nil {
+		themes = make([]*models.UserTheme, 0)
 	}
 
 	c.JSON(http.StatusOK, gin.H{

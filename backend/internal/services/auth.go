@@ -10,6 +10,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 
@@ -178,6 +179,14 @@ func (s *AuthService) Register(ctx context.Context, userRepo *models.UserReposit
 
 	if len(req.Password) < 8 {
 		return nil, "", errors.New("password must be at least 8 characters")
+	}
+
+	// Validate email format if provided
+	if req.Email != nil && *req.Email != "" {
+		emailRegex := regexp.MustCompile(`^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$`)
+		if !emailRegex.MatchString(*req.Email) {
+			return nil, "", errors.New("invalid email format")
+		}
 	}
 
 	// Check if username already exists
