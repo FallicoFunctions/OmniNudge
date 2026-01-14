@@ -15,27 +15,21 @@ import { OffsetPaginationControls } from '../components/common/OffsetPaginationC
 import { VirtualizedList } from '../components/common/VirtualizedList';
 import { useSavedItems } from '../hooks/useSavedItems';
 import { getSavedPostIdSet, getSavedRedditPostIdSet } from '../utils/savedItems';
-import { EmptyMessage, LoadingMessage } from '../components/common/StatusMessage';
+import { LoadingMessage } from '../components/common/StatusMessage';
 import { FeedSearchBars } from '../components/common/FeedSearchBars';
+import { CreateActionButtons } from '../components/common/CreateActionButtons';
+import { CombinedSuggestionItem } from '../components/common/CombinedSuggestionItem';
+import { useHubSubredditAutocomplete } from '../hooks/useHubSubredditAutocomplete';
 import { createRedditCrosspostPayload } from '../utils/crosspostHelpers';
 import { OMNI_FEED_STORAGE_KEY } from '../constants/storageKeys';
 import { TOP_TIME_OPTIONS } from '../constants/topTimeRange';
 import type { TopTimeRange } from '../constants/topTimeRange';
-import { redditService } from '../services/redditService';
-import type { SubredditSuggestion } from '../types/reddit';
-import type { Hub } from '../services/hubsService';
 
 type SortOption = 'hot' | 'new' | 'top' | 'rising';
-
-type CombinedSuggestion =
-  | { type: 'subreddit'; data: SubredditSuggestion }
-  | { type: 'hub'; data: Hub };
 
 type HideTarget = { post: RedditPost };
 type CrosspostTarget = { post: RedditPost };
 type DeletePostTarget = { postId: number; authorId: number };
-
-const SUBREDDIT_AUTOCOMPLETE_MIN_LENGTH = 2;
 
 const getStoredOmniOnlyState = (userId: number | null | undefined, fallback: boolean) => {
   if (typeof window === 'undefined' || !window.localStorage) {
@@ -157,7 +151,8 @@ export default function HomePage() {
   }, [sort, location.search, location.pathname, navigate]);
 
   // Subreddit search handlers
-  const trimmedInputValue = inputValue.trim();
+  const { trimmedInput, suggestions, shouldShowSuggestions, isLoading: isAutocompleteLoading } =
+    useHubSubredditAutocomplete(inputValue, isAutocompleteOpen);
 
   const navigateToSubredditOrHub = useCallback(async (value: string) => {
     const normalized = value.trim();
@@ -167,13 +162,10 @@ export default function HomePage() {
       return;
     }
 
-    // Check if it's a hub by trying to fetch it
     try {
       await hubsService.getHub(normalized);
-      // If successful, it's a hub
       navigate(`/h/${normalized}`);
     } catch {
-      // If it fails, assume it's a subreddit
       navigate(`/r/${normalized}`);
     }
     setIsAutocompleteOpen(false);
@@ -181,11 +173,11 @@ export default function HomePage() {
 
   const handleSubredditSubmit = useCallback((e: React.FormEvent) => {
     e.preventDefault();
-    if (trimmedInputValue) {
-      navigateToSubredditOrHub(trimmedInputValue);
+    if (trimmedInput) {
+      navigateToSubredditOrHub(trimmedInput);
       setInputValue('');
     }
-  }, [trimmedInputValue, navigateToSubredditOrHub]);
+  }, [trimmedInput, navigateToSubredditOrHub]);
 
   const handleInputChange = useCallback((value: string) => {
     setInputValue(value);
@@ -211,36 +203,11 @@ export default function HomePage() {
     setIsAutocompleteOpen(false);
   }, [navigate]);
 
-  const {
-    data: subredditSuggestions,
-    isFetching: isSubredditAutocompleteLoading,
-  } = useQuery<SubredditSuggestion[]>({
-    queryKey: ['subreddit-autocomplete', trimmedInputValue],
-    queryFn: () => redditService.autocompleteSubreddits(trimmedInputValue),
-    enabled: isAutocompleteOpen && trimmedInputValue.length >= SUBREDDIT_AUTOCOMPLETE_MIN_LENGTH,
-    staleTime: 1000 * 60 * 10,
-  });
-
-  const {
-    data: hubSuggestions,
-    isFetching: isHubAutocompleteLoading,
-  } = useQuery<Hub[]>({
-    queryKey: ['hub-autocomplete', trimmedInputValue],
-    queryFn: () => hubsService.searchHubs(trimmedInputValue),
-    enabled: isAutocompleteOpen && trimmedInputValue.length >= SUBREDDIT_AUTOCOMPLETE_MIN_LENGTH,
-    staleTime: 1000 * 60 * 10,
-  });
-
-  const isAutocompleteLoading = isSubredditAutocompleteLoading || isHubAutocompleteLoading;
-
-  const suggestionItems: CombinedSuggestion[] = useMemo(() => {
-    const hubs: CombinedSuggestion[] = (hubSuggestions ?? []).map(hub => ({ type: 'hub' as const, data: hub }));
-    const subreddits: CombinedSuggestion[] = (subredditSuggestions ?? []).map(subreddit => ({ type: 'subreddit' as const, data: subreddit }));
-    return [...hubs, ...subreddits];
-  }, [hubSuggestions, subredditSuggestions]);
-
-  const shouldShowSuggestions =
-    isAutocompleteOpen && trimmedInputValue.length >= SUBREDDIT_AUTOCOMPLETE_MIN_LENGTH;
+  const handleSelectHubSuggestion = useCallback((name: string) => {
+    navigate(`/h/${name}`);
+    setInputValue('');
+    setIsAutocompleteOpen(false);
+  }, [navigate]);
 
   useEffect(() => {
     setOmniOnly(getStoredOmniOnlyState(user?.id ?? null, defaultOmniPostsOnly));
@@ -581,127 +548,67 @@ export default function HomePage() {
                   : 'Popular posts from all hubs and subreddits'}
             </p>
           </div>
-          <FeedSearchBars
-            topValue={inputValue}
-            topPlaceholder="Enter hub or subreddit..."
-            onTopChange={handleInputChange}
-            onTopFocus={() => setIsAutocompleteOpen(true)}
-            onTopBlur={() => setIsAutocompleteOpen(false)}
-            onTopSubmit={handleSubredditSubmit}
-            topSuggestions={suggestionItems}
-            topShouldShowSuggestions={shouldShowSuggestions}
-            topIsLoading={isAutocompleteLoading}
-            topEmptyMessage="No hubs or subreddits found."
-            renderTopSuggestion={(suggestion) => {
-              if (suggestion.type === 'hub') {
-                const hub = suggestion.data;
-                return (
-                  <li key={`hub-${hub.id}`}>
-                    <button
-                      type="button"
-                      onMouseDown={(event) => event.preventDefault()}
-                      onClick={() => {
-                        navigate(`/h/${hub.name}`);
-                        setInputValue('');
-                        setIsAutocompleteOpen(false);
-                      }}
-                      className="flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-[var(--color-surface-elevated)]"
-                    >
-                      <div className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-[var(--color-primary)] text-[10px] font-semibold text-white">
-                        h/
-                      </div>
-                      <div className="flex min-w-0 flex-col">
-                        <span className="truncate text-sm font-medium text-[var(--color-text-primary)]">
-                          h/{hub.name}
-                        </span>
-                        {hub.title && (
-                          <span className="truncate text-[11px] text-[var(--color-text-secondary)]">
-                            {hub.title}
-                          </span>
-                        )}
-                      </div>
-                      {typeof hub.subscriber_count === 'number' && hub.subscriber_count > 0 && (
-                        <span className="ml-auto text-[11px] text-[var(--color-text-secondary)]">
-                          {hub.subscriber_count.toLocaleString()} subs
-                        </span>
-                      )}
-                    </button>
-                  </li>
-                );
-              }
-              const subreddit = suggestion.data;
-              return (
-                <li key={`subreddit-${subreddit.name}`}>
-                  <button
-                    type="button"
-                    onMouseDown={(event) => event.preventDefault()}
-                    onClick={() => handleSelectSubredditSuggestion(subreddit.name)}
-                    className="flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-[var(--color-surface-elevated)]"
-                  >
-                    {subreddit.icon_url ? (
-                      <img
-                        src={subreddit.icon_url}
-                        alt=""
-                        loading="lazy"
-                        decoding="async"
-                        className="h-6 w-6 flex-shrink-0 rounded-full object-cover"
+          <div className="flex w-full flex-col gap-3 md:w-auto md:flex-row md:items-start md:justify-end">
+            <CreateActionButtons
+              user={user}
+              onCreatePost={() => navigate('/posts/create')}
+              onCreateHub={() => navigate('/hubs/create')}
+              postAuth={{ redirectTo: '/posts/create' }}
+              hubAuth={{ redirectTo: '/hubs/create' }}
+              className="md:self-start"
+            />
+            <FeedSearchBars
+              topValue={inputValue}
+              topPlaceholder="Enter hub or subreddit..."
+              onTopChange={handleInputChange}
+              onTopFocus={() => setIsAutocompleteOpen(true)}
+              onTopBlur={() => setIsAutocompleteOpen(false)}
+              onTopSubmit={handleSubredditSubmit}
+              topSuggestions={suggestions}
+              topShouldShowSuggestions={shouldShowSuggestions}
+              topIsLoading={isAutocompleteLoading}
+              topEmptyMessage="No hubs or subreddits found."
+              renderTopSuggestion={(suggestion) => (
+                <CombinedSuggestionItem
+                  key={`${suggestion.type}-${suggestion.data.name}`}
+                  suggestion={suggestion}
+                  onSelectHub={handleSelectHubSuggestion}
+                  onSelectSubreddit={handleSelectSubredditSuggestion}
+                />
+              )}
+              postValue={postSearchInput}
+              postPlaceholder="Search posts..."
+              onPostChange={(value) => {
+                setPostSearchInput(value);
+                if (!isSearchDropdownOpen) {
+                  setIsSearchDropdownOpen(true);
+                }
+              }}
+              onPostFocus={() => setIsSearchDropdownOpen(true)}
+              onPostBlur={() => setTimeout(() => setIsSearchDropdownOpen(false), 120)}
+              onPostSubmit={handlePostSearchSubmit}
+              postDropdownOpen={isSearchDropdownOpen}
+              postDropdownContent={
+                <div className="space-y-2 text-sm text-[var(--color-text-primary)]">
+                  {!blockAllNsfw && (
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={includeNsfwSearch}
+                        onChange={(e) => setIncludeNsfwSearch(e.target.checked)}
                       />
-                    ) : (
-                      <div className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-[var(--color-border)] text-[10px] font-semibold text-[var(--color-text-secondary)]">
-                        r/
-                      </div>
-                    )}
-                    <div className="flex min-w-0 flex-col">
-                      <span className="truncate text-sm font-medium text-[var(--color-text-primary)]">
-                        r/{subreddit.name}
-                      </span>
-                      {subreddit.title && (
-                        <span className="truncate text-[11px] text-[var(--color-text-secondary)]">
-                          {subreddit.title}
-                        </span>
-                      )}
+                      <span>Include NSFW results</span>
+                    </label>
+                  )}
+                  {blockAllNsfw && (
+                    <div className="text-xs text-[var(--color-text-secondary)]">
+                      NSFW content is blocked in settings.
                     </div>
-                    {typeof subreddit.subscribers === 'number' && subreddit.subscribers > 0 && (
-                      <span className="ml-auto text-[11px] text-[var(--color-text-secondary)]">
-                        {subreddit.subscribers.toLocaleString()} subs
-                      </span>
-                    )}
-                  </button>
-                </li>
-              );
-            }}
-            postValue={postSearchInput}
-            postPlaceholder="Search posts..."
-            onPostChange={(value) => {
-              setPostSearchInput(value);
-              if (!isSearchDropdownOpen) {
-                setIsSearchDropdownOpen(true);
+                  )}
+                </div>
               }
-            }}
-            onPostFocus={() => setIsSearchDropdownOpen(true)}
-            onPostBlur={() => setTimeout(() => setIsSearchDropdownOpen(false), 120)}
-            onPostSubmit={handlePostSearchSubmit}
-            postDropdownOpen={isSearchDropdownOpen}
-            postDropdownContent={
-              <div className="space-y-2 text-sm text-[var(--color-text-primary)]">
-                {!blockAllNsfw && (
-                  <label className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      checked={includeNsfwSearch}
-                      onChange={(e) => setIncludeNsfwSearch(e.target.checked)}
-                    />
-                    <span>Include NSFW results</span>
-                  </label>
-                )}
-                {blockAllNsfw && (
-                  <div className="text-xs text-[var(--color-text-secondary)]">
-                    NSFW content is blocked in settings.
-                  </div>
-                )}
-              </div>
-            }
-          />
+            />
+          </div>
         </div>
       </div>
       {user && showPopularFallback && !hasAnySubscriptions && (
