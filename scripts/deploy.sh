@@ -1,6 +1,7 @@
 #!/bin/bash
 # OmniNudge Production Deployment Script
-# Usage: ./scripts/deploy.sh
+# Usage: /Users/Nick_1/Documents/Personal_Projects/OmniNudge/scripts/deploy.sh
+#   (Can be run from any directory)
 
 set -e
 
@@ -10,7 +11,7 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
-# Configuration
+# Configuration (absolute paths)
 SERVER="root@77.42.47.79"
 SERVER_PATH="/var/www/omninudge"
 PROJECT_ROOT="/Users/Nick_1/Documents/Personal_Projects/OmniNudge"
