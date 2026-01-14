@@ -166,6 +166,15 @@ func (h *SubscriptionsHandler) GetUserHubSubscriptions(c *gin.Context) {
 		SubscribedAt string      `json:"subscribed_at"`
 	}
 
+	// Ensure subscriptions is never nil
+	if subscriptions == nil {
+		c.JSON(http.StatusOK, gin.H{
+			"subscriptions": []SubscriptionWithHub{},
+			"count":         0,
+		})
+		return
+	}
+
 	result := make([]SubscriptionWithHub, len(subscriptions))
 	ctx := c.Request.Context()
 
@@ -299,6 +308,11 @@ func (h *SubscriptionsHandler) GetUserSubredditSubscriptions(c *gin.Context) {
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch subscriptions", "details": err.Error()})
 		return
+	}
+
+	// Ensure subscriptions is never nil (convert nil to empty slice for JSON)
+	if subscriptions == nil {
+		subscriptions = make([]*models.SubredditSubscription, 0)
 	}
 
 	c.JSON(http.StatusOK, gin.H{
