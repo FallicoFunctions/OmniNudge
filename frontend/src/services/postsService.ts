@@ -3,6 +3,7 @@ import type {
   PlatformPost,
   PostComment,
   CreatePostRequest,
+  UpdatePostRequest,
   CreateCommentRequest,
   PostsResponse,
 } from '../types/posts';
@@ -26,6 +27,10 @@ export const postsService = {
     } else {
       await api.delete(`/posts/${id}`);
     }
+  },
+
+  async updatePost(id: number, data: UpdatePostRequest): Promise<PlatformPost> {
+    return api.put<PlatformPost>(`/posts/${id}`, data);
   },
 
   async votePost(id: number, value: 1 | -1 | 0): Promise<void> {

@@ -148,7 +148,7 @@ func buildPlatformPostCursorClause(sortBy string, cursor *PlatformPostCursor, st
 const platformPostRisingScoreExpr = "(p.score::float / GREATEST(EXTRACT(EPOCH FROM (NOW() - p.created_at)) / 3600, 1))"
 
 const platformPostSelectColumnsPrefixed = `
-	p.id, p.author_id, p.hub_id, p.title, p.body, p.tags, p.media_url, p.media_type, p.thumbnail_url,
+	p.id, p.author_id, u.username, p.hub_id, p.title, p.body, p.tags, p.media_url, p.media_type, p.thumbnail_url,
 	p.score, p.upvotes, p.downvotes, p.num_comments, p.view_count,
 	p.is_deleted, p.is_edited, p.edited_at,
 	p.crosspost_origin_type, p.crosspost_origin_subreddit, p.crosspost_origin_post_id, p.crosspost_original_title,
@@ -670,9 +670,11 @@ func (r *PlatformPostRepository) UpdateCreatedAt(ctx context.Context, postID int
 
 func scanPlatformPost(row pgx.Row, post *PlatformPost, extraDest ...interface{}) error {
 	var galleryImagesBytes []byte
+	var authorUsername sql.NullString
 	dests := []interface{}{
 		&post.ID,
 		&post.AuthorID,
+		&authorUsername,
 		&post.HubID,
 		&post.Title,
 		&post.Body,
@@ -710,14 +712,24 @@ func scanPlatformPost(row pgx.Row, post *PlatformPost, extraDest ...interface{})
 		}
 	}
 
+	if authorUsername.Valid {
+		post.AuthorUsername = authorUsername.String
+		if post.Author == nil {
+			post.Author = &User{}
+		}
+		post.Author.Username = authorUsername.String
+	}
+
 	return nil
 }
 
 func scanPlatformPostWithUserInfo(row pgx.Row, post *PlatformPost, extraDest ...interface{}) error {
 	var galleryImagesBytes []byte
+	var authorUsername sql.NullString
 	dests := []interface{}{
 		&post.ID,
 		&post.AuthorID,
+		&authorUsername,
 		&post.HubID,
 		&post.Title,
 		&post.Body,
@@ -755,6 +767,14 @@ func scanPlatformPostWithUserInfo(row pgx.Row, post *PlatformPost, extraDest ...
 		if err := json.Unmarshal(galleryImagesBytes, &post.GalleryImages); err != nil {
 			return err
 		}
+	}
+
+	if authorUsername.Valid {
+		post.AuthorUsername = authorUsername.String
+		if post.Author == nil {
+			post.Author = &User{}
+		}
+		post.Author.Username = authorUsername.String
 	}
 
 	return nil
@@ -907,8 +927,7 @@ func (r *PlatformPostRepository) GetPopularFeed(
 
 	query := fmt.Sprintf(`
 			SELECT %s,
-			       h.id as hub_id_val, h.name as hub_name, h.title as hub_title,
-			       u.username as author_username
+			       h.id as hub_id_val, h.name as hub_name, h.title as hub_title
 			FROM platform_posts p
 			LEFT JOIN hubs h ON p.hub_id = h.id
 			JOIN users u ON p.author_id = u.id
@@ -929,8 +948,7 @@ func (r *PlatformPostRepository) GetPopularFeed(
 		var hubID sql.NullInt64
 		var hubName sql.NullString
 		var hubTitle sql.NullString
-		var authorUsername sql.NullString
-		if err := scanPlatformPost(rows, post, &hubID, &hubName, &hubTitle, &authorUsername); err != nil {
+		if err := scanPlatformPost(rows, post, &hubID, &hubName, &hubTitle); err != nil {
 			return nil, err
 		}
 		if hubName.Valid {
@@ -946,13 +964,6 @@ func (r *PlatformPostRepository) GetPopularFeed(
 				titleStr := hubTitle.String
 				post.Hub.Title = &titleStr
 			}
-		}
-		if authorUsername.Valid {
-			post.AuthorUsername = authorUsername.String
-			if post.Author == nil {
-				post.Author = &User{}
-			}
-			post.Author.Username = authorUsername.String
 		}
 		posts = append(posts, post)
 	}
@@ -998,8 +1009,7 @@ func (r *PlatformPostRepository) GetPopularFeedWithCursor(
 
 	query := fmt.Sprintf(`
 			SELECT %s,
-			       h.id as hub_id_val, h.name as hub_name, h.title as hub_title,
-			       u.username as author_username
+			       h.id as hub_id_val, h.name as hub_name, h.title as hub_title
 			FROM platform_posts p
 			LEFT JOIN hubs h ON p.hub_id = h.id
 			JOIN users u ON p.author_id = u.id
@@ -1019,8 +1029,7 @@ func (r *PlatformPostRepository) GetPopularFeedWithCursor(
 		var hubID sql.NullInt64
 		var hubName sql.NullString
 		var hubTitle sql.NullString
-		var authorUsername sql.NullString
-		if err := scanPlatformPost(rows, post, &hubID, &hubName, &hubTitle, &authorUsername); err != nil {
+		if err := scanPlatformPost(rows, post, &hubID, &hubName, &hubTitle); err != nil {
 			return nil, err
 		}
 		if hubID.Valid {
@@ -1035,13 +1044,6 @@ func (r *PlatformPostRepository) GetPopularFeedWithCursor(
 				titleStr := hubTitle.String
 				post.Hub.Title = &titleStr
 			}
-		}
-		if authorUsername.Valid {
-			post.AuthorUsername = authorUsername.String
-			if post.Author == nil {
-				post.Author = &User{}
-			}
-			post.Author.Username = authorUsername.String
 		}
 		posts = append(posts, post)
 	}

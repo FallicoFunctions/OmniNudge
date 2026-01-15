@@ -30,6 +30,7 @@ import { LoadingMessage } from '../components/common/StatusMessage';
 import { PostDetailMedia } from '../components/posts/PostDetailMedia';
 import { PostHeader } from '../components/posts/PostHeader';
 import { canModerateContent } from '../utils/permissions';
+import { PostEditModal } from '../components/posts/PostEditModal';
 import { HubHeader } from '../components/hubs/HubHeader';
 import { FeedSearchBars } from '../components/common/FeedSearchBars';
 import { SubredditHeader } from '../components/subreddit/SubredditHeader';
@@ -38,6 +39,7 @@ import { useSubredditAutocomplete } from '../hooks/useSubredditAutocomplete';
 import { SubredditModeratorsPanel } from '../components/subreddit/SubredditModeratorsPanel';
 import { useSubredditActiveUsers } from '../hooks/useSubredditActiveUsers';
 import { useHubActiveUsers } from '../hooks/useHubActiveUsers';
+import { buildPostUpdateRequest } from '../utils/postUpdate';
 import { useHubSubredditAutocomplete } from '../hooks/useHubSubredditAutocomplete';
 import { CombinedSuggestionItem } from '../components/common/CombinedSuggestionItem';
 
@@ -60,6 +62,7 @@ export default function PostDetailPage() {
   const [deleteCommentReason, setDeleteCommentReason] = useState('');
   const [deletePostTarget, setDeletePostTarget] = useState<{ postId: number; authorId: number } | null>(null);
   const [deletePostReason, setDeletePostReason] = useState('');
+  const [editPostTarget, setEditPostTarget] = useState<PlatformPost | null>(null);
   const [subredditInputValue, setSubredditInputValue] = useState('');
   const [isAutocompleteOpen, setIsAutocompleteOpen] = useState(false);
   const [postSearchInput, setPostSearchInput] = useState('');
@@ -303,6 +306,25 @@ export default function PostDetailPage() {
     },
   });
 
+  const updatePostMutation = useMutation<
+    PlatformPost,
+    Error,
+    { post: PlatformPost; title: string; body: string }
+  >({
+    mutationFn: async ({ post, title, body }) =>
+      postsService.updatePost(post.id, buildPostUpdateRequest(post, { title, body })),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['posts', variables.post.id] });
+      if (hubName) {
+        queryClient.invalidateQueries({ queryKey: ['hub-posts', hubName] });
+      }
+      setEditPostTarget(null);
+    },
+    onError: (err) => {
+      alert(`Failed to update post: ${err.message}`);
+    },
+  });
+
   const commentHandlers: CommentActionHandlers<PostComment> = {
     vote: async (comment, value) => {
       await postsService.voteComment(comment.id, value);
@@ -431,6 +453,10 @@ export default function PostDetailPage() {
     return hubModerators.some((mod) => mod.user_id === user.id);
   }, [user, hubModerators]);
 
+  const canEditPost = useMemo(() => {
+    if (!postData) return false;
+    return user?.id === postData.author_id;
+  }, [postData, user]);
   const canDeletePost = useMemo(() => {
     if (!postData) return false;
     return canModerateContent(user?.id, postData.author_id, user?.role, isModerator);
@@ -795,6 +821,17 @@ export default function PostDetailPage() {
                   <button onClick={handleCrosspost} className="hover:underline">
                     crosspost
                   </button>
+                  {canEditPost && (
+                    <>
+                      <span>•</span>
+                      <button
+                        onClick={() => postData && setEditPostTarget(postData)}
+                        className="hover:underline"
+                      >
+                        edit
+                      </button>
+                    </>
+                  )}
                   {canDeletePost && (
                     <>
                       <span>•</span>
@@ -1010,6 +1047,19 @@ export default function PostDetailPage() {
       {showModMailModal && hubName && (
         <ModMailModal hubName={hubName} onClose={() => setShowModMailModal(false)} />
       )}
+
+      <PostEditModal
+        isOpen={Boolean(editPostTarget)}
+        title={editPostTarget?.title ?? ''}
+        body={editPostTarget?.body ?? editPostTarget?.content ?? ''}
+        maxLength={10000}
+        isSaving={updatePostMutation.isPending}
+        onClose={() => setEditPostTarget(null)}
+        onSave={({ title, body }) => {
+          if (!editPostTarget) return;
+          updatePostMutation.mutate({ post: editPostTarget, title, body });
+        }}
+      />
 
       {/* Delete Comment Reason Modal */}
       {deleteCommentTarget && (

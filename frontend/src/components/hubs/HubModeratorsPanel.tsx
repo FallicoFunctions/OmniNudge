@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { LoadingMessage, ErrorMessage, EmptyMessage } from '../common/StatusMessage';
 import type { HubModerator } from '../../types/hubSettings';
+import { getHubModeratorRoleLabel } from '../../utils/moderation';
 
 type HubModeratorsPanelProps = {
   moderators: HubModerator[];
@@ -9,12 +10,6 @@ type HubModeratorsPanelProps = {
   hubName?: string | null;
   onMessageMods?: () => void;
   showMessageButton?: boolean;
-};
-
-const getRoleLabel = (role: HubModerator['role']) => {
-  if (role === 'owner') return 'Owner';
-  if (role === 'full_moderator') return 'Full Moderator';
-  return 'Moderator';
 };
 
 export default function HubModeratorsPanel({
@@ -66,7 +61,7 @@ export default function HubModeratorsPanel({
                     {displayName}
                   </Link>
                   <span className="text-[11px] uppercase tracking-wide text-[var(--color-text-secondary)]">
-                    {getRoleLabel(moderator.role)}
+                    {getHubModeratorRoleLabel(moderator.role)}
                   </span>
                 </div>
               </li>
