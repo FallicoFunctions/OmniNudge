@@ -2,7 +2,9 @@ package repository
 
 import (
 	"context"
+	"database/sql"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/omninudge/backend/internal/models"
 )
@@ -160,18 +162,30 @@ func (r *HubSettingsRepository) Update(ctx context.Context, settings *models.Hub
 // GetModeratorRole gets a user's moderator role for a hub
 func (r *HubSettingsRepository) GetModeratorRole(ctx context.Context, hubID int, userID int) (*models.ModeratorRole, error) {
 	query := `
-		SELECT role
-		FROM hub_moderators
-		WHERE hub_id = $1 AND user_id = $2
+		SELECT h.created_by, hm.role
+		FROM hubs h
+		LEFT JOIN hub_moderators hm
+			ON hm.hub_id = h.id AND hm.user_id = $2
+		WHERE h.id = $1
 	`
 
-	var role models.ModeratorRole
-	err := r.pool.QueryRow(ctx, query, hubID, userID).Scan(&role)
+	var createdBy sql.NullInt64
+	var role sql.NullString
+	err := r.pool.QueryRow(ctx, query, hubID, userID).Scan(&createdBy, &role)
 	if err != nil {
 		return nil, err
 	}
 
-	return &role, nil
+	if createdBy.Valid && int(createdBy.Int64) == userID {
+		ownerRole := models.ModeratorRoleOwner
+		return &ownerRole, nil
+	}
+	if !role.Valid {
+		return nil, pgx.ErrNoRows
+	}
+
+	roleValue := models.ModeratorRole(role.String)
+	return &roleValue, nil
 }
 
 // GetHubModerators retrieves all moderators for a hub with their roles
@@ -204,6 +218,54 @@ func (r *HubSettingsRepository) GetHubModerators(ctx context.Context, hubID int)
 			return nil, err
 		}
 		moderators = append(moderators, mod)
+	}
+
+	var ownerID sql.NullInt64
+	var ownerUsername sql.NullString
+	var ownerAvatar sql.NullString
+	ownerQuery := `
+		SELECT h.created_by, u.username, u.avatar_url
+		FROM hubs h
+		LEFT JOIN users u ON h.created_by = u.id
+		WHERE h.id = $1
+	`
+	if err := r.pool.QueryRow(ctx, ownerQuery, hubID).Scan(&ownerID, &ownerUsername, &ownerAvatar); err != nil {
+		return nil, err
+	}
+
+	if ownerID.Valid {
+		ownerUserID := int(ownerID.Int64)
+		ownerIndex := -1
+		for i := range moderators {
+			if moderators[i].UserID == ownerUserID {
+				moderators[i].Role = models.ModeratorRoleOwner
+				ownerIndex = i
+				break
+			}
+		}
+
+		if ownerIndex == -1 {
+			var avatarURL *string
+			if ownerAvatar.Valid {
+				avatarValue := ownerAvatar.String
+				avatarURL = &avatarValue
+			}
+			moderators = append(moderators, models.HubModerator{
+				ID:        0,
+				HubID:     hubID,
+				UserID:    ownerUserID,
+				Role:      models.ModeratorRoleOwner,
+				Username:  ownerUsername.String,
+				AvatarURL: avatarURL,
+			})
+			ownerIndex = len(moderators) - 1
+		}
+
+		if ownerIndex > 0 {
+			owner := moderators[ownerIndex]
+			copy(moderators[1:ownerIndex+1], moderators[0:ownerIndex])
+			moderators[0] = owner
+		}
 	}
 
 	return moderators, nil

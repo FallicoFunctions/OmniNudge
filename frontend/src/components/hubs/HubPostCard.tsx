@@ -4,6 +4,7 @@ import { formatTimestamp } from '../../utils/timeFormat';
 import { resolveMediaUrl } from '../../utils/mediaUrl';
 import { VoteButtons } from '../VoteButtons';
 import type { PlatformPost } from '../../types/posts';
+import { canModerateContent } from '../../utils/permissions';
 
 interface HubPostCardProps {
   post: PlatformPost;
@@ -21,6 +22,7 @@ interface HubPostCardProps {
   onToggleSave?: (shouldSave: boolean) => void;
   onHide?: () => void;
   onCrosspost?: () => void;
+  onEdit?: () => void;
   onDelete?: () => void;
 }
 
@@ -40,6 +42,7 @@ export function HubPostCard({
   onToggleSave,
   onHide,
   onCrosspost,
+  onEdit,
   onDelete,
 }: HubPostCardProps) {
   const location = useLocation();
@@ -68,14 +71,9 @@ export function HubPostCard({
     (post.comment_count ?? post.num_comments ?? 0) === 1 ? '' : 's'
   }`;
 
-  // User can delete if they are: the author, an admin, or a moderator of this hub
-  const canDelete = currentUserId === post.author_id || currentUserRole === 'admin' || isModerator;
+  const canEdit = currentUserId === post.author_id;
+  const canDelete = canModerateContent(currentUserId, post.author_id, currentUserRole, isModerator);
   const postUrl = `/posts/${post.id}`;
-
-  // Debug logging
-  if (currentUserRole === 'admin') {
-    console.log('[HubPostCard] Admin user - canDelete:', canDelete, 'currentUserId:', currentUserId, 'post.author_id:', post.author_id, 'currentUserRole:', currentUserRole, 'onDelete exists:', !!onDelete);
-  }
 
   return (
     <article className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)]">
@@ -167,6 +165,15 @@ export function HubPostCard({
                 className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
               >
                 Crosspost
+              </button>
+            )}
+            {canEdit && onEdit && (
+              <button
+                type="button"
+                onClick={onEdit}
+                className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+              >
+                Edit
               </button>
             )}
             {canDelete && onDelete && (

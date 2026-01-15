@@ -32,6 +32,8 @@ import { EmptyMessage, ErrorMessage, LoadingMessage } from '../components/common
 import { FeedSearchBars } from '../components/common/FeedSearchBars';
 import { CombinedSuggestionItem } from '../components/common/CombinedSuggestionItem';
 import { searchPlatformPosts } from '../services/platformSearchService';
+import { PostEditModal } from '../components/posts/PostEditModal';
+import { buildPostUpdateRequest } from '../utils/postUpdate';
 
 const EMPTY_POSTS: LocalSubredditPost[] = [];
 
@@ -61,6 +63,7 @@ export default function HubsPage() {
   const [crosspostTarget, setCrosspostTarget] = useState<LocalSubredditPost | null>(null);
   const [deletePostTarget, setDeletePostTarget] = useState<{ postId: number; authorId: number } | null>(null);
   const [deleteReason, setDeleteReason] = useState('');
+  const [editPostTarget, setEditPostTarget] = useState<LocalSubredditPost | null>(null);
   const [crosspostTitle, setCrosspostTitle] = useState('');
   const [selectedHub, setSelectedHub] = useState('');
   const [selectedSubreddit, setSelectedSubreddit] = useState('');
@@ -353,6 +356,19 @@ export default function HubsPage() {
     },
     onError: (err) => {
       alert(`Failed to delete post: ${err.message}`);
+    },
+  });
+
+  const updatePostMutation = useMutation<PlatformPost, Error, { post: LocalSubredditPost; title: string; body: string }>({
+    mutationFn: async ({ post, title, body }) =>
+      postsService.updatePost(post.id, buildPostUpdateRequest(post, { title, body })),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: postsQueryKey });
+      queryClient.invalidateQueries({ queryKey: ['posts', variables.post.id] });
+      setEditPostTarget(null);
+    },
+    onError: (err) => {
+      alert(`Failed to update post: ${err.message}`);
     },
   });
 
@@ -715,6 +731,7 @@ export default function HubsPage() {
                       onToggleSave={(shouldSave) => handleToggleSavePost(post.id, !shouldSave)}
                       onHide={() => handleHidePost(post.id)}
                       onCrosspost={() => handleCrosspostSelection(post)}
+                      onEdit={() => setEditPostTarget(normalizedPost)}
                       onDelete={() => handleDeletePost(post)}
                     />
                   </div>
@@ -817,6 +834,19 @@ export default function HubsPage() {
           </div>
         </div>
       )}
+
+      <PostEditModal
+        isOpen={Boolean(editPostTarget)}
+        title={editPostTarget?.title ?? ''}
+        body={editPostTarget?.body ?? ''}
+        maxLength={10000}
+        isSaving={updatePostMutation.isPending}
+        onClose={() => setEditPostTarget(null)}
+        onSave={({ title, body }) => {
+          if (!editPostTarget) return;
+          updatePostMutation.mutate({ post: editPostTarget, title, body });
+        }}
+      />
 
       {/* Crosspost Modal */}
       <CrosspostModal

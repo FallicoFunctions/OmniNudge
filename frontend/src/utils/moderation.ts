@@ -17,3 +17,8 @@ export const isUserHubModerator = (
   }
   return false;
 };
+
+export const getHubModeratorRoleLabel = (role: HubModerator['role']): string => {
+  if (role === 'owner') return 'Owner';
+  return 'Moderator';
+};
