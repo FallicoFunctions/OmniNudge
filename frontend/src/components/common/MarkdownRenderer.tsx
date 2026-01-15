@@ -17,12 +17,30 @@ const IMAGE_URL_REGEX = /\.(jpe?g|png|gif|webp)(?:\?.*)?$/i;
 const REDDIT_IMAGE_HOSTS = new Set(['preview.redd.it', 'i.redd.it', 'i.imgur.com']);
 
 function decodeHtmlEntities(value: string): string {
-  return value
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&amp;/g, '&');
+  const decodeOnce = (input: string): string =>
+    input
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
+      .replace(/&amp;/g, '&');
+  const decodeDom = (input: string): string => {
+    if (typeof window === 'undefined') {
+      return decodeOnce(input);
+    }
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(input, 'text/html');
+    return doc.documentElement.textContent ?? input;
+  };
+  let output = value;
+  for (let i = 0; i < 3; i += 1) {
+    const next = decodeDom(output);
+    if (next === output) {
+      break;
+    }
+    output = next;
+  }
+  return output;
 }
 
 function escapeHtml(value: string): string {
