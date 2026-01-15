@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { HubSettings, UpdateHubSettingsRequest, PrivacyType } from '../../types/hubSettings';
+import { MarkdownInput } from '../common/MarkdownInput';
 
 interface Props {
   settings: HubSettings;
@@ -57,19 +58,14 @@ export default function GeneralSettingsTab({ settings, onSave, isOwner }: Props)
 
       {/* Sidebar Description */}
       <div>
-        <label className="block text-sm font-medium text-[var(--color-text-primary)] mb-2">
-          Sidebar Description
-        </label>
-        <textarea
+        <MarkdownInput
+          label="Sidebar Description"
           value={sidebarMarkdown}
-          onChange={(e) => setSidebarMarkdown(e.target.value)}
+          onChange={setSidebarMarkdown}
           placeholder="Markdown supported..."
           rows={8}
-          className="w-full px-3 py-2 border border-[var(--color-border)] rounded bg-[var(--color-background)] text-[var(--color-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] font-mono text-sm"
+          helperText="Displayed in the hub sidebar. Supports Markdown formatting."
         />
-        <p className="text-xs text-[var(--color-text-secondary)] mt-1">
-          Displayed in the hub sidebar. Supports Markdown formatting.
-        </p>
       </div>
 
       {/* Privacy Type */}

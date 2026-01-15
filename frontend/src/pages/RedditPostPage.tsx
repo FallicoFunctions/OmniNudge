@@ -18,6 +18,7 @@ import {
 } from '../utils/crosspostHelpers';
 import { MarkdownInput } from '../components/common/MarkdownInput';
 import { MarkdownRenderer } from '../components/common/MarkdownRenderer';
+import { PostBodyMarkdown } from '../components/posts/PostBodyMarkdown';
 import { FormattingHelpTable } from '../components/common/FormattingHelpTable';
 import { FlairBadge } from '../components/reddit/FlairBadge';
 import { useRedditBlocklist } from '../contexts/RedditBlockContext';
@@ -1795,20 +1796,7 @@ export default function RedditPostPage() {
                 posterUrl={posterUrl}
               />
 
-              {post.is_self && post.selftext && (
-                <div className="mb-4 text-sm text-[var(--color-text-primary)] text-left leading-normal">
-                  {post.selftext.split('\n\n').map((paragraph, i, arr) => (
-                    <p key={i} className={i < arr.length - 1 ? 'mb-3' : ''}>
-                      {paragraph.split('\n').map((line, j, lineArr) => (
-                        <span key={j}>
-                          {line}
-                          {j < lineArr.length - 1 && <br />}
-                        </span>
-                      ))}
-                    </p>
-                  ))}
-                </div>
-              )}
+              {post.is_self && post.selftext && <PostBodyMarkdown content={post.selftext} className="mb-4" />}
 
               {(() => {
                 if (

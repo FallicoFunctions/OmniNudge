@@ -6,6 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5"
+	"github.com/omninudge/backend/internal/helpers"
 	"github.com/omninudge/backend/internal/models"
 	"github.com/omninudge/backend/internal/repository"
 )
@@ -104,16 +105,18 @@ func (h *HubSettingsHandler) UpdateHubSettings(c *gin.Context) {
 		return
 	}
 
-	// Check permissions: must be owner or full_moderator
-	role, err := h.settingsRepo.GetModeratorRole(c.Request.Context(), hubID, userID.(int))
-	if err != nil || role == nil {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Not a moderator"})
-		return
-	}
+	if !helpers.IsAdmin(c) {
+		// Check permissions: must be owner or full_moderator
+		role, err := h.settingsRepo.GetModeratorRole(c.Request.Context(), hubID, userID.(int))
+		if err != nil || role == nil {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Not a moderator"})
+			return
+		}
 
-	if *role != models.ModeratorRoleOwner && *role != models.ModeratorRoleFullModerator {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Requires owner or full_moderator role"})
-		return
+		if *role != models.ModeratorRoleOwner && *role != models.ModeratorRoleFullModerator {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Requires owner or full_moderator role"})
+			return
+		}
 	}
 
 	var settings models.HubSettings

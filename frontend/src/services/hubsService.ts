@@ -169,7 +169,7 @@ export const hubsService = {
       params.set('cursor', cursor);
     }
     appendTimeRangeParams(params, options);
-    return api.get<HubPostsResponse>(`/hubs/h/popular?${params.toString()}`);
+    return api.get<HubPostsResponse>(`/h/popular?${params.toString()}`);
   },
 
   async getAllFeed(
@@ -188,7 +188,7 @@ export const hubsService = {
       params.set('cursor', cursor);
     }
     appendTimeRangeParams(params, options);
-    return api.get<HubPostsResponse>(`/hubs/h/all?${params.toString()}`);
+    return api.get<HubPostsResponse>(`/h/all?${params.toString()}`);
   },
 
   async searchHubs(query: string, limit: number = 10, offset: number = 0): Promise<Hub[]> {

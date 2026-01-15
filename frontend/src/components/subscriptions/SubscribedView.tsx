@@ -70,7 +70,7 @@ export default function SubscribedView({
                       className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] p-4"
                     >
                       <Link
-                        to={`/hubs/h/${hubName}`}
+                        to={`/h/${hubName}`}
                         className="text-lg font-semibold text-[var(--color-primary)] hover:underline"
                       >
                         h/{hubName}
