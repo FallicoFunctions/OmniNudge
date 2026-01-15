@@ -38,7 +38,6 @@ export function PostEditModal({
       onClose={onClose}
       className="w-full max-w-2xl rounded-lg bg-white p-6 shadow-xl"
       overlayClassName="bg-black/40"
-      closeOnOverlayClick={!isSaving}
     >
       <div className="space-y-4">
         <div>

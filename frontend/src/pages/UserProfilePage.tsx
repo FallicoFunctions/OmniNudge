@@ -9,6 +9,7 @@ import { resolveMediaUrl } from '../utils/mediaUrl';
 import type { PlatformPost, PostComment } from '../types/posts';
 import type { UserProfile } from '../types/users';
 import { MarkdownRenderer } from '../components/common/MarkdownRenderer';
+import { PostBodyMarkdown } from '../components/posts/PostBodyMarkdown';
 import SavedItemsView from '../components/saved/SavedItemsView';
 import HiddenItemsView from '../components/saved/HiddenItemsView';
 import SubscribedView from '../components/subscriptions/SubscribedView';
@@ -82,7 +83,7 @@ function PostsSection({
                 </h3>
               </Link>
               {post.body && (
-                <p className="mt-2 text-sm text-[var(--color-text-secondary)]">{post.body}</p>
+                <PostBodyMarkdown content={post.body} className="mt-2 text-[var(--color-text-secondary)]" />
               )}
               <div className="mt-2 text-xs font-medium text-[var(--color-text-secondary)]">
                 {(post.comment_count ?? post.num_comments ?? 0).toLocaleString()} Comments

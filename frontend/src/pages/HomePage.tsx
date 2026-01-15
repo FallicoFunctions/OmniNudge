@@ -805,6 +805,7 @@ export default function HomePage() {
                     useRelativeTime={useRelativeTime}
                     currentUserId={user?.id}
                     currentUserRole={user?.role}
+                    hubDisplayTitle={post.hub_display_title ?? null}
                     isSaved={isSaved}
                     isSavePending={isSavePending}
                     isHiding={isHiding}

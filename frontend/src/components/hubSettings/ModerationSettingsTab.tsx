@@ -11,14 +11,17 @@ interface Props {
 }
 
 export default function ModerationSettingsTab({ settings, onSave }: Props) {
-  const [bannedWords, setBannedWords] = useState(settings.banned_words.join(', '));
+  const initialBannedWords = (settings.banned_words ?? []).join(', ');
+  const [bannedWords, setBannedWords] = useState(initialBannedWords);
   const [spamFilterStrength, setSpamFilterStrength] = useState<SpamFilterStrength>(
     settings.spam_filter_strength
   );
   const [newAccountFilterDays, setNewAccountFilterDays] = useState(
-    settings.new_account_filter_days.toString()
+    (settings.new_account_filter_days ?? 0).toString()
   );
-  const [minAccountKarma, setMinAccountKarma] = useState(settings.min_account_karma.toString());
+  const [minAccountKarma, setMinAccountKarma] = useState(
+    (settings.min_account_karma ?? 0).toString()
+  );
 
   const handleSave = () => {
     const bannedWordsArray = bannedWords
@@ -36,10 +39,10 @@ export default function ModerationSettingsTab({ settings, onSave }: Props) {
   };
 
   const hasChanges =
-    bannedWords !== settings.banned_words.join(', ') ||
+    bannedWords !== initialBannedWords ||
     spamFilterStrength !== settings.spam_filter_strength ||
-    newAccountFilterDays !== settings.new_account_filter_days.toString() ||
-    minAccountKarma !== settings.min_account_karma.toString();
+    newAccountFilterDays !== (settings.new_account_filter_days ?? 0).toString() ||
+    minAccountKarma !== (settings.min_account_karma ?? 0).toString();
 
   return (
     <div className="space-y-6">

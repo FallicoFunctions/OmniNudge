@@ -154,9 +154,9 @@ func TestGetPopularFeed_ExcludesQuarantined(t *testing.T) {
 
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
-	router.GET("/hubs/h/popular", mockAuthMiddleware(1), handler.GetPopularFeed)
+	router.GET("/h/popular", mockAuthMiddleware(1), handler.GetPopularFeed)
 
-	req := httptest.NewRequest(http.MethodGet, "/hubs/h/popular?sort=hot", nil)
+	req := httptest.NewRequest(http.MethodGet, "/h/popular?sort=hot", nil)
 	w := httptest.NewRecorder()
 
 	router.ServeHTTP(w, req)
@@ -189,9 +189,9 @@ func TestGetAllFeed_ReturnsGlobalPosts(t *testing.T) {
 
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
-	router.GET("/hubs/h/all", handler.GetAllFeed)
+	router.GET("/h/all", handler.GetAllFeed)
 
-	req := httptest.NewRequest(http.MethodGet, "/hubs/h/all?sort=hot", nil)
+	req := httptest.NewRequest(http.MethodGet, "/h/all?sort=hot", nil)
 	w := httptest.NewRecorder()
 
 	router.ServeHTTP(w, req)

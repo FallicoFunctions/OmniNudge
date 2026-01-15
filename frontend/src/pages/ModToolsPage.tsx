@@ -35,12 +35,20 @@ export default function ModToolsPage() {
             Manage users, content, and moderation settings
           </p>
         </div>
-        <button
-          onClick={() => navigate(`/h/${hubName}/settings`)}
-          className="px-4 py-2 rounded bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-strong)] transition-colors"
-        >
-          Hub Settings
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => navigate(`/h/${hubName}`)}
+            className="px-4 py-2 rounded bg-[var(--color-surface-elevated)] text-[var(--color-text-primary)] hover:bg-[var(--color-border)] transition-colors"
+          >
+            Exit
+          </button>
+          <button
+            onClick={() => navigate(`/h/${hubName}/settings`)}
+            className="px-4 py-2 rounded bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-strong)] transition-colors"
+          >
+            Hub Settings
+          </button>
+        </div>
       </div>
 
       {/* Tabs */}
