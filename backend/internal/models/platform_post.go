@@ -22,13 +22,14 @@ type GalleryImage struct {
 
 // PlatformPost represents a native post created by users
 type PlatformPost struct {
-	ID             int    `json:"id"`
-	AuthorID       int    `json:"author_id"`
-	Author         *User  `json:"author,omitempty"`          // Optional populated user info
-	AuthorUsername string `json:"author_username,omitempty"` // Author's username
-	HubID          *int   `json:"hub_id,omitempty"`          // Optional: only set for hub posts
-	Hub            *Hub   `json:"hub,omitempty"`
-	HubName        string `json:"hub_name,omitempty"`
+	ID              int     `json:"id"`
+	AuthorID        int     `json:"author_id"`
+	Author          *User   `json:"author,omitempty"`          // Optional populated user info
+	AuthorUsername  string  `json:"author_username,omitempty"` // Author's username
+	HubID           *int    `json:"hub_id,omitempty"`          // Optional: only set for hub posts
+	Hub             *Hub    `json:"hub,omitempty"`
+	HubName         string  `json:"hub_name,omitempty"`
+	HubDisplayTitle *string `json:"hub_display_title,omitempty"`
 
 	// Post content
 	Title string  `json:"title"`
@@ -52,7 +53,7 @@ type PlatformPost struct {
 	HotScore    float64 `json:"hot_score"` // Reddit-style hot ranking score
 
 	// User interaction (only populated when user is authenticated)
-	UserVote     *int  `json:"user_vote,omitempty"`      // -1 (downvote), 0 (no vote), 1 (upvote), or null if not authenticated
+	UserVote     *int  `json:"user_vote,omitempty"`     // -1 (downvote), 0 (no vote), 1 (upvote), or null if not authenticated
 	HasCommented *bool `json:"has_commented,omitempty"` // true if authenticated user has top-level comment on this post
 
 	// Status
@@ -927,9 +928,13 @@ func (r *PlatformPostRepository) GetPopularFeed(
 
 	query := fmt.Sprintf(`
 			SELECT %s,
-			       h.id as hub_id_val, h.name as hub_name, h.title as hub_title
+			       h.id as hub_id_val,
+			       h.name as hub_name,
+			       h.title as hub_title,
+			       COALESCE(hs.display_title, h.title) as hub_display_title
 			FROM platform_posts p
 			LEFT JOIN hubs h ON p.hub_id = h.id
+			LEFT JOIN hub_settings hs ON p.hub_id = hs.hub_id
 			JOIN users u ON p.author_id = u.id
 			%s
 			%s
@@ -948,7 +953,8 @@ func (r *PlatformPostRepository) GetPopularFeed(
 		var hubID sql.NullInt64
 		var hubName sql.NullString
 		var hubTitle sql.NullString
-		if err := scanPlatformPost(rows, post, &hubID, &hubName, &hubTitle); err != nil {
+		var hubDisplayTitle sql.NullString
+		if err := scanPlatformPost(rows, post, &hubID, &hubName, &hubTitle, &hubDisplayTitle); err != nil {
 			return nil, err
 		}
 		if hubName.Valid {
@@ -964,6 +970,10 @@ func (r *PlatformPostRepository) GetPopularFeed(
 				titleStr := hubTitle.String
 				post.Hub.Title = &titleStr
 			}
+		}
+		if hubDisplayTitle.Valid {
+			titleStr := hubDisplayTitle.String
+			post.HubDisplayTitle = &titleStr
 		}
 		posts = append(posts, post)
 	}
@@ -1009,9 +1019,13 @@ func (r *PlatformPostRepository) GetPopularFeedWithCursor(
 
 	query := fmt.Sprintf(`
 			SELECT %s,
-			       h.id as hub_id_val, h.name as hub_name, h.title as hub_title
+			       h.id as hub_id_val,
+			       h.name as hub_name,
+			       h.title as hub_title,
+			       COALESCE(hs.display_title, h.title) as hub_display_title
 			FROM platform_posts p
 			LEFT JOIN hubs h ON p.hub_id = h.id
+			LEFT JOIN hub_settings hs ON p.hub_id = hs.hub_id
 			JOIN users u ON p.author_id = u.id
 			%s
 			%s
@@ -1029,7 +1043,8 @@ func (r *PlatformPostRepository) GetPopularFeedWithCursor(
 		var hubID sql.NullInt64
 		var hubName sql.NullString
 		var hubTitle sql.NullString
-		if err := scanPlatformPost(rows, post, &hubID, &hubName, &hubTitle); err != nil {
+		var hubDisplayTitle sql.NullString
+		if err := scanPlatformPost(rows, post, &hubID, &hubName, &hubTitle, &hubDisplayTitle); err != nil {
 			return nil, err
 		}
 		if hubID.Valid {
@@ -1044,6 +1059,10 @@ func (r *PlatformPostRepository) GetPopularFeedWithCursor(
 				titleStr := hubTitle.String
 				post.Hub.Title = &titleStr
 			}
+		}
+		if hubDisplayTitle.Valid {
+			titleStr := hubDisplayTitle.String
+			post.HubDisplayTitle = &titleStr
 		}
 		posts = append(posts, post)
 	}

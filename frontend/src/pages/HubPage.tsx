@@ -19,6 +19,7 @@ import { ModMailModal } from '../components/modmail/ModMailModal';
 import { useHubModerators } from '../hooks/useHubModerators';
 import { isUserHubModerator } from '../utils/moderation';
 import { useHubDetails } from '../hooks/useHubDetails';
+import { useHubSettings } from '../hooks/useHubSettings';
 import { useHubSubredditAutocomplete } from '../hooks/useHubSubredditAutocomplete';
 import { useHubActiveUsers } from '../hooks/useHubActiveUsers';
 import { OffsetPaginationControls } from '../components/common/OffsetPaginationControls';
@@ -63,7 +64,7 @@ export default function HubsPage() {
   const [crosspostTarget, setCrosspostTarget] = useState<LocalSubredditPost | null>(null);
   const [deletePostTarget, setDeletePostTarget] = useState<{ postId: number; authorId: number } | null>(null);
   const [deleteReason, setDeleteReason] = useState('');
-  const [editPostTarget, setEditPostTarget] = useState<LocalSubredditPost | null>(null);
+  const [editPostTarget, setEditPostTarget] = useState<PlatformPost | null>(null);
   const [crosspostTitle, setCrosspostTitle] = useState('');
   const [selectedHub, setSelectedHub] = useState('');
   const [selectedSubreddit, setSelectedSubreddit] = useState('');
@@ -170,7 +171,9 @@ export default function HubsPage() {
     isLoading: loadingHubDetails,
     isError: hubDetailsError,
   } = useHubDetails(hubname, showHubSidebar);
+  const { data: hubSettings } = useHubSettings(hubname, showHubSidebar);
   const { data: activeUsersData } = useHubActiveUsers(showHubSidebar ? hubname : null, user);
+  const hubDisplayTitle = hubSettings?.display_title?.trim() || hubDetails?.title || null;
 
   const {
     trimmedInput,
@@ -359,7 +362,11 @@ export default function HubsPage() {
     },
   });
 
-  const updatePostMutation = useMutation<PlatformPost, Error, { post: LocalSubredditPost; title: string; body: string }>({
+  const updatePostMutation = useMutation<
+    PlatformPost,
+    Error,
+    { post: PlatformPost; title: string; body: string }
+  >({
     mutationFn: async ({ post, title, body }) =>
       postsService.updatePost(post.id, buildPostUpdateRequest(post, { title, body })),
     onSuccess: (_data, variables) => {
@@ -561,6 +568,7 @@ export default function HubsPage() {
     <div className="mx-auto w-full max-w-7xl px-4 py-8">
       <HubHeader
         hubName={hubname}
+        displayTitle={hubDisplayTitle}
         isModerator={isModerator}
         searchBars={
           <FeedSearchBars
@@ -722,6 +730,7 @@ export default function HubsPage() {
                       currentUserRole={user?.role}
                       isModerator={isModerator}
                       hubNameMap={hubNameMap}
+                      hubDisplayTitle={hubDisplayTitle}
                       currentHubName={hubname}
                       isSaved={isSaved}
                       isSavePending={isSavePending}
@@ -773,6 +782,7 @@ export default function HubsPage() {
           <aside className="space-y-4">
             <HubAboutPanel
               hubDetails={hubDetails}
+              sidebarMarkdown={hubSettings?.sidebar_markdown ?? null}
               isLoading={loadingHubDetails}
               isError={hubDetailsError}
               showStats

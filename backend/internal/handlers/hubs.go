@@ -590,7 +590,7 @@ func (h *HubsHandler) CrosspostToSubreddit(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{"post": post})
 }
 
-// GetPopularFeed handles GET /api/v1/hubs/h/popular (auth optional)
+// GetPopularFeed handles GET /api/v1/h/popular (auth optional)
 // Returns filtered, personalized feed (excludes quarantined, filters by subscriptions if authenticated)
 func (h *HubsHandler) GetPopularFeed(c *gin.Context) {
 	sortBy := c.DefaultQuery("sort", "hot")
@@ -689,7 +689,7 @@ func (h *HubsHandler) GetPopularFeed(c *gin.Context) {
 	c.JSON(http.StatusOK, response)
 }
 
-// GetAllFeed handles GET /api/v1/hubs/h/all (public)
+// GetAllFeed handles GET /api/v1/h/all (public)
 // Returns global firehose (includes everything, no filtering)
 func (h *HubsHandler) GetAllFeed(c *gin.Context) {
 	sortBy := c.DefaultQuery("sort", "hot")

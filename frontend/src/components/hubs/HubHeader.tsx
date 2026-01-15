@@ -9,6 +9,7 @@ import { CreateActionButtons } from '../common/CreateActionButtons';
 
 interface HubHeaderProps {
   hubName: string;
+  displayTitle?: string | null;
   isModerator?: boolean;
   returnTo?: string;
   showCreateHub?: boolean;
@@ -17,6 +18,7 @@ interface HubHeaderProps {
 
 export function HubHeader({
   hubName,
+  displayTitle,
   isModerator = false,
   returnTo,
   showCreateHub = true,
@@ -30,8 +32,9 @@ export function HubHeader({
   const headerLabel = useMemo(() => {
     if (hubName === 'popular') return 'h/popular';
     if (hubName === 'all') return 'h/all';
+    if (displayTitle) return displayTitle;
     return `h/${hubName}`;
-  }, [hubName]);
+  }, [hubName, displayTitle]);
 
   const defaultReturnTo = returnTo ?? `/h/${hubName}`;
   const { data: subscriptionStatus } = useQuery({

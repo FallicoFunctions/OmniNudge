@@ -12,6 +12,7 @@ import type { PlatformPost, PostComment } from '../types/posts';
 import { CommentItem } from '../components/comments/CommentItem';
 import type { CommentActionHandlers } from '../components/comments/CommentItem';
 import { MarkdownInput } from '../components/common/MarkdownInput';
+import { PostBodyMarkdown } from '../components/posts/PostBodyMarkdown';
 import { FormattingHelpTable } from '../components/common/FormattingHelpTable';
 import { formatTimestamp } from '../utils/timeFormat';
 import { decodeHtmlEntities } from '../utils/text';
@@ -21,6 +22,7 @@ import HubModeratorsPanel from '../components/hubs/HubModeratorsPanel';
 import HubAboutPanel from '../components/hubs/HubAboutPanel';
 import { useHubModerators } from '../hooks/useHubModerators';
 import { useHubDetails } from '../hooks/useHubDetails';
+import { useHubSettings } from '../hooks/useHubSettings';
 import { Panel } from '../components/common/Panel';
 import SubredditAboutPanel from '../components/reddit/SubredditAboutPanel';
 import { useSubredditAbout } from '../hooks/useSubredditAbout';
@@ -30,6 +32,7 @@ import { LoadingMessage } from '../components/common/StatusMessage';
 import { PostDetailMedia } from '../components/posts/PostDetailMedia';
 import { PostHeader } from '../components/posts/PostHeader';
 import { canModerateContent } from '../utils/permissions';
+import { isUserHubModerator } from '../utils/moderation';
 import { PostEditModal } from '../components/posts/PostEditModal';
 import { HubHeader } from '../components/hubs/HubHeader';
 import { FeedSearchBars } from '../components/common/FeedSearchBars';
@@ -439,6 +442,8 @@ export default function PostDetailPage() {
     isLoading: loadingHubDetails,
     isError: hubDetailsError,
   } = useHubDetails(hubName, Boolean(hubName));
+  const { data: hubSettings } = useHubSettings(hubName, Boolean(hubName));
+  const hubDisplayTitle = hubSettings?.display_title?.trim() || null;
   const { data: hubActiveUsersData } = useHubActiveUsers(hubName, user);
 
   const {
@@ -447,11 +452,11 @@ export default function PostDetailPage() {
     isError: hubModeratorsError,
   } = useHubModerators(hubName, Boolean(hubName));
 
-  // Check if current user is a moderator of this hub
-  const isModerator = useMemo(() => {
-    if (!user || !hubModerators?.length) return false;
-    return hubModerators.some((mod) => mod.user_id === user.id);
-  }, [user, hubModerators]);
+  // Check if current user is a moderator of this hub (or admin)
+  const isModerator = useMemo(
+    () => isUserHubModerator(user, hubModerators ?? [], hubDetails),
+    [user, hubModerators, hubDetails]
+  );
 
   const canEditPost = useMemo(() => {
     if (!postData) return false;
@@ -661,6 +666,7 @@ export default function PostDetailPage() {
       {hubName && (
         <HubHeader
           hubName={hubName}
+          displayTitle={hubDisplayTitle}
           isModerator={isModerator}
           searchBars={
             <FeedSearchBars
@@ -739,7 +745,7 @@ export default function PostDetailPage() {
                           to={`/h/${hubName}`}
                           className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
                         >
-                          h/{hubName}
+                          {hubDisplayTitle ?? `h/${hubName}`}
                         </Link>,
                       ]
                     : []),
@@ -780,11 +786,7 @@ export default function PostDetailPage() {
               />
 
               {/* Post Body */}
-              {bodyText && (
-                <div className="mb-4 whitespace-pre-wrap text-sm text-[var(--color-text-primary)]">
-                  {bodyText}
-                </div>
-              )}
+              {bodyText && <PostBodyMarkdown content={bodyText} className="mb-4" />}
 
               {/* Vote Buttons and Post Stats */}
               <div className="flex items-center gap-4">
@@ -965,6 +967,7 @@ export default function PostDetailPage() {
             <>
             <HubAboutPanel
               hubDetails={hubDetails}
+              sidebarMarkdown={hubSettings?.sidebar_markdown ?? null}
               isLoading={loadingHubDetails}
               isError={hubDetailsError}
               showStats

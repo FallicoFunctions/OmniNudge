@@ -13,6 +13,7 @@ interface HubPostCardProps {
   currentUserRole?: string;
   isModerator?: boolean;
   hubNameMap?: Map<number, string>;
+  hubDisplayTitle?: string | null;
   currentHubName?: string;
   isSaved?: boolean;
   isSavePending?: boolean;
@@ -33,6 +34,7 @@ export function HubPostCard({
   currentUserRole,
   isModerator = false,
   hubNameMap,
+  hubDisplayTitle,
   currentHubName,
   isSaved = false,
   isSavePending = false,
@@ -52,9 +54,10 @@ export function HubPostCard({
   );
   const resolvedHubName =
     currentHubName ||
-    post.hub_name ||
     post.hub?.name ||
+    post.hub_name ||
     (post.hub_id ? hubNameMap?.get(post.hub_id) : undefined);
+  const resolvedHubTitle = hubDisplayTitle?.trim() || undefined;
 
   const displayAuthor =
     post.author_username ||
@@ -105,10 +108,10 @@ export function HubPostCard({
           <div className="flex flex-wrap items-center gap-2 text-[11px] leading-tight text-[var(--color-text-secondary)]">
             {resolvedHubName ? (
               <Link
-                to={`/hubs/h/${resolvedHubName}`}
+                to={`/h/${resolvedHubName}`}
                 className="font-semibold text-[var(--color-text-primary)] hover:text-[var(--color-primary)]"
               >
-                h/{resolvedHubName}
+                {resolvedHubTitle ?? `h/${resolvedHubName}`}
               </Link>
             ) : (
               <span className="font-semibold text-[var(--color-text-primary)]">h/unknown</span>

@@ -1,8 +1,10 @@
 import type { Hub } from '../../services/hubsService';
 import { LoadingMessage, ErrorMessage, EmptyMessage } from '../common/StatusMessage';
+import { PostBodyMarkdown } from '../posts/PostBodyMarkdown';
 
 type HubAboutPanelProps = {
   hubDetails?: Hub | null;
+  sidebarMarkdown?: string | null;
   isLoading: boolean;
   isError: boolean;
   showStats?: boolean;
@@ -11,11 +13,15 @@ type HubAboutPanelProps = {
 
 export default function HubAboutPanel({
   hubDetails,
+  sidebarMarkdown,
   isLoading,
   isError,
   showStats = false,
   activeOmniUsers,
 }: HubAboutPanelProps) {
+  const trimmedSidebar = sidebarMarkdown?.trim();
+  const hasSidebarMarkdown = Boolean(trimmedSidebar);
+
   return (
     <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
       <h3 className="text-sm font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
@@ -32,7 +38,12 @@ export default function HubAboutPanel({
               {hubDetails.title}
             </p>
           )}
-          {hubDetails.description ? (
+          {hasSidebarMarkdown ? (
+            <PostBodyMarkdown
+              content={trimmedSidebar ?? ''}
+              className="mt-2 text-sm text-[var(--color-text-primary)] leading-relaxed"
+            />
+          ) : hubDetails.description ? (
             <p className="mt-2 text-sm text-[var(--color-text-primary)] whitespace-pre-line">
               {hubDetails.description}
             </p>
