@@ -782,6 +782,7 @@ export default function HubsPage() {
           <aside className="space-y-4">
             <HubAboutPanel
               hubDetails={hubDetails}
+              displayTitle={hubDisplayTitle}
               sidebarMarkdown={hubSettings?.sidebar_markdown ?? null}
               isLoading={loadingHubDetails}
               isError={hubDetailsError}

@@ -109,18 +109,19 @@ function formatInline(text: string): string {
   result = result.replace(superscriptRegex, '$1<sup>$2</sup>');
   result = result.replace(imageRegex, (_, altText, source) => {
     const sanitizedSource = sanitizeImageSource(source);
+    const normalizedAlt = altText ? decodeHtmlEntities(altText) : '';
     if (!sanitizedSource) {
-      return altText ? escapeHtml(altText) : '';
+      return normalizedAlt ? escapeHtml(normalizedAlt) : '';
     }
     return `<img src="${escapeAttribute(sanitizedSource)}" alt="${escapeHtml(
-      altText ?? ''
+      normalizedAlt
     )}" loading="lazy" />`;
   });
   result = result.replace(
     linkRegex,
     (_, label, url) =>
       `<a href="${escapeAttribute(url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(
-        label
+        decodeHtmlEntities(label)
       )}</a>`
   );
   // Replace r/subreddit with links
