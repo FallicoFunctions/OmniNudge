@@ -4,6 +4,7 @@ import { PostBodyMarkdown } from '../posts/PostBodyMarkdown';
 
 type HubAboutPanelProps = {
   hubDetails?: Hub | null;
+  displayTitle?: string | null;
   sidebarMarkdown?: string | null;
   isLoading: boolean;
   isError: boolean;
@@ -13,6 +14,7 @@ type HubAboutPanelProps = {
 
 export default function HubAboutPanel({
   hubDetails,
+  displayTitle,
   sidebarMarkdown,
   isLoading,
   isError,
@@ -21,6 +23,7 @@ export default function HubAboutPanel({
 }: HubAboutPanelProps) {
   const trimmedSidebar = sidebarMarkdown?.trim();
   const hasSidebarMarkdown = Boolean(trimmedSidebar);
+  const resolvedTitle = displayTitle?.trim() || hubDetails?.title;
 
   return (
     <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
@@ -33,9 +36,9 @@ export default function HubAboutPanel({
         <ErrorMessage>Unable to load hub details.</ErrorMessage>
       ) : hubDetails ? (
         <>
-          {hubDetails.title && (
+          {resolvedTitle && (
             <p className="mt-2 text-base font-semibold text-[var(--color-text-primary)]">
-              {hubDetails.title}
+              {resolvedTitle}
             </p>
           )}
           {hasSidebarMarkdown ? (
@@ -77,11 +80,6 @@ export default function HubAboutPanel({
                 </div>
               )}
             </div>
-          )}
-          {hubDetails.title && !showStats && (
-            <p className="mt-3 text-xs text-[var(--color-text-secondary)]">
-              Display title: {hubDetails.title}
-            </p>
           )}
         </>
       ) : (
