@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { hubSettingsService } from '../../services/hubSettingsService';
 import type { ModeratorRole } from '../../types/hubSettings';
 import { LoadingMessage } from '../common/StatusMessage';
+import { getHubModeratorRoleLabel } from '../../utils/moderation';
 
 interface Props {
   hubName: string;
@@ -99,13 +100,17 @@ export default function ModeratorsTab({ hubName, isOwner }: Props) {
             </span>
           </div>
           <div>
-            <span className="font-medium text-[var(--color-text-primary)]">Full Moderator:</span>
+            <span className="font-medium text-[var(--color-text-primary)]">
+              Moderator (settings access):
+            </span>
             <span className="text-[var(--color-text-secondary)] ml-2">
               Can change settings and moderate content
             </span>
           </div>
           <div>
-            <span className="font-medium text-[var(--color-text-primary)]">Moderator:</span>
+            <span className="font-medium text-[var(--color-text-primary)]">
+              Moderator (content only):
+            </span>
             <span className="text-[var(--color-text-secondary)] ml-2">
               Can moderate content only, cannot change settings
             </span>
@@ -162,14 +167,12 @@ export default function ModeratorsTab({ hubName, isOwner }: Props) {
                       }
                       className="px-2 py-1 border border-[var(--color-border)] rounded bg-[var(--color-surface)] text-[var(--color-text-primary)] text-sm"
                     >
-                      <option value="full_moderator">Full Moderator</option>
-                      <option value="moderator">Moderator</option>
+                      <option value="full_moderator">Moderator (settings)</option>
+                      <option value="moderator">Moderator (content only)</option>
                     </select>
                   ) : (
                     <span className="inline-flex items-center px-2 py-1 rounded text-sm bg-[var(--color-background)] text-[var(--color-text-primary)]">
-                      {mod.role === 'owner' && '👑 Owner'}
-                      {mod.role === 'full_moderator' && 'Full Moderator'}
-                      {mod.role === 'moderator' && 'Moderator'}
+                      {mod.role === 'owner' ? '👑 Owner' : getHubModeratorRoleLabel(mod.role)}
                     </span>
                   )}
                 </td>
@@ -226,8 +229,8 @@ export default function ModeratorsTab({ hubName, isOwner }: Props) {
                   onChange={(e) => setNewModRole(e.target.value as ModeratorRole)}
                   className="w-full px-3 py-2 border border-[var(--color-border)] rounded bg-[var(--color-background)] text-[var(--color-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
                 >
-                  <option value="full_moderator">Full Moderator</option>
-                  <option value="moderator">Moderator</option>
+                  <option value="full_moderator">Moderator (settings)</option>
+                  <option value="moderator">Moderator (content only)</option>
                 </select>
               </div>
             </div>

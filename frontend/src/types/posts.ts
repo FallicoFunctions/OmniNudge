@@ -26,6 +26,7 @@ export interface PlatformPost {
   media_type?: string | null;
   thumbnail_url?: string | null;
   gallery_images?: GalleryImage[];
+  tags?: string[] | null;
   target_subreddit?: string | null;
   crosspost_origin_subreddit?: string | null;
   hub?: {
@@ -55,6 +56,15 @@ export interface CreatePostRequest {
   target_subreddit?: string;
   send_replies_to_inbox?: boolean;
   post_type: 'link' | 'text';
+}
+
+export interface UpdatePostRequest {
+  title: string;
+  body?: string;
+  tags?: string[];
+  media_url?: string;
+  media_type?: string;
+  thumbnail_url?: string;
 }
 
 export interface CreateCommentRequest {
