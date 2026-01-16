@@ -257,19 +257,104 @@ func (h *HubsHandler) GetPosts(c *gin.Context) {
 	limitPlusOne := limit + 1
 	useCursorPagination := cursorParam != "" || offset == 0
 	var posts []*models.PlatformPost
-	if useCursorPagination {
-		posts, err = h.postRepo.GetByHubWithCursor(c.Request.Context(), hub.ID, sortBy, limitPlusOne, cursor, userID, startTime, endTime)
-	} else {
-		posts, err = h.postRepo.GetByHubWithUser(c.Request.Context(), hub.ID, sortBy, limit, offset, userID, startTime, endTime)
-	}
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch posts", "details": err.Error()})
-		return
-	}
-
 	hasMore := false
 	var nextCursor string
-	if useCursorPagination {
+	usePinnedPosts := sortBy == "hot" && cursorParam == "" && offset == 0
+	if usePinnedPosts {
+		type postsResult struct {
+			posts []*models.PlatformPost
+			err   error
+			kind  string
+		}
+		resultsChan := make(chan postsResult, 2)
+		go func() {
+			pinnedPosts, err := h.postRepo.GetPinnedByHubWithUser(
+				c.Request.Context(),
+				hub.ID,
+				limit,
+				userID,
+				startTime,
+				endTime,
+			)
+			resultsChan <- postsResult{posts: pinnedPosts, err: err, kind: "pinned"}
+		}()
+		go func() {
+			unpinnedPosts, err := h.postRepo.GetByHubWithCursorExcludingPinned(
+				c.Request.Context(),
+				hub.ID,
+				sortBy,
+				limitPlusOne,
+				cursor,
+				userID,
+				startTime,
+				endTime,
+			)
+			resultsChan <- postsResult{posts: unpinnedPosts, err: err, kind: "unpinned"}
+		}()
+
+		var pinnedPosts []*models.PlatformPost
+		var unpinnedPosts []*models.PlatformPost
+		for i := 0; i < 2; i++ {
+			result := <-resultsChan
+			if result.err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{
+					"error":   "Failed to fetch posts",
+					"details": result.err.Error(),
+				})
+				return
+			}
+			if result.kind == "pinned" {
+				pinnedPosts = result.posts
+			} else {
+				unpinnedPosts = result.posts
+			}
+		}
+
+		unpinnedHasMore := false
+		if len(unpinnedPosts) > limit {
+			unpinnedHasMore = true
+			unpinnedPosts = unpinnedPosts[:limit]
+		}
+
+		if len(unpinnedPosts) > 0 {
+			if limit == 1 {
+				pinnedPosts = nil
+			} else if len(pinnedPosts) >= limit {
+				pinnedPosts = pinnedPosts[:limit-1]
+			}
+		} else if len(pinnedPosts) > limit {
+			pinnedPosts = pinnedPosts[:limit]
+		}
+
+		remaining := limit - len(pinnedPosts)
+		usedUnpinned := 0
+		if remaining > 0 && len(unpinnedPosts) > 0 {
+			if len(unpinnedPosts) > remaining {
+				posts = append(pinnedPosts, unpinnedPosts[:remaining]...)
+				usedUnpinned = remaining
+			} else {
+				posts = append(pinnedPosts, unpinnedPosts...)
+				usedUnpinned = len(unpinnedPosts)
+			}
+		} else {
+			posts = append(posts, pinnedPosts...)
+		}
+
+		hasMore = unpinnedHasMore || len(unpinnedPosts) > usedUnpinned
+		if hasMore && usedUnpinned > 0 {
+			last := posts[len(posts)-1]
+			nextCursor = encodePlatformPostCursor(buildPlatformPostCursor(last, sortBy))
+		}
+	} else if useCursorPagination {
+		if sortBy == "hot" {
+			posts, err = h.postRepo.GetByHubWithCursorExcludingPinned(c.Request.Context(), hub.ID, sortBy, limitPlusOne, cursor, userID, startTime, endTime)
+		} else {
+			posts, err = h.postRepo.GetByHubWithCursor(c.Request.Context(), hub.ID, sortBy, limitPlusOne, cursor, userID, startTime, endTime)
+		}
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch posts", "details": err.Error()})
+			return
+		}
 		if len(posts) > limit {
 			hasMore = true
 			posts = posts[:limit]
@@ -279,6 +364,15 @@ func (h *HubsHandler) GetPosts(c *gin.Context) {
 			nextCursor = encodePlatformPostCursor(buildPlatformPostCursor(last, sortBy))
 		}
 	} else {
+		if sortBy == "hot" {
+			posts, err = h.postRepo.GetByHubWithUserExcludingPinned(c.Request.Context(), hub.ID, sortBy, limit, offset, userID, startTime, endTime)
+		} else {
+			posts, err = h.postRepo.GetByHubWithUser(c.Request.Context(), hub.ID, sortBy, limit, offset, userID, startTime, endTime)
+		}
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch posts", "details": err.Error()})
+			return
+		}
 		hasMore = len(posts) == limit
 	}
 

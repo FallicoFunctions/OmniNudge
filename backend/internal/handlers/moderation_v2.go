@@ -14,10 +14,8 @@ type ModerationHandlerV2 struct {
 	removalReasonRepo    *models.RemovalReasonRepository
 	removedContentRepo   *models.RemovedContentRepository
 	modLogRepo           *models.ModLogRepository
-	hubModRepo           *models.HubModeratorRepository
 	postRepo             *models.PlatformPostRepository
 	commentRepo          *models.PostCommentRepository
-	hubRepo              *models.HubRepository
 }
 
 func NewModerationHandlerV2(
@@ -25,20 +23,16 @@ func NewModerationHandlerV2(
 	removalReasonRepo *models.RemovalReasonRepository,
 	removedContentRepo *models.RemovedContentRepository,
 	modLogRepo *models.ModLogRepository,
-	hubModRepo *models.HubModeratorRepository,
 	postRepo *models.PlatformPostRepository,
 	commentRepo *models.PostCommentRepository,
-	hubRepo *models.HubRepository,
 ) *ModerationHandlerV2 {
 	return &ModerationHandlerV2{
 		hubBanRepo:         hubBanRepo,
 		removalReasonRepo:  removalReasonRepo,
 		removedContentRepo: removedContentRepo,
 		modLogRepo:         modLogRepo,
-		hubModRepo:         hubModRepo,
 		postRepo:           postRepo,
 		commentRepo:        commentRepo,
-		hubRepo:            hubRepo,
 	}
 }
 
@@ -52,24 +46,9 @@ func (h *ModerationHandlerV2) BanUser(c *gin.Context) {
 		return
 	}
 
-	hubName := c.Param("hub_name")
-
-	// Get hub ID and check if user is a moderator
-	hubID, isMod, err := h.checkModeratorPermission(c, hubName, userID.(int))
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-	if hubID == 0 {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Hub not found"})
-		return
-	}
-	if hubID == 0 {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Hub not found"})
-		return
-	}
-	if !isMod {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Only moderators can ban users"})
+	hubID, ok := getHubIDFromContext(c)
+	if !ok {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Missing hub context"})
 		return
 	}
 
@@ -124,24 +103,15 @@ func (h *ModerationHandlerV2) UnbanUser(c *gin.Context) {
 		return
 	}
 
-	hubName := c.Param("hub_name")
 	targetUserID, err := strconv.Atoi(c.Param("userid"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user ID"})
 		return
 	}
 
-	hubID, isMod, err := h.checkModeratorPermission(c, hubName, userID.(int))
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-	if hubID == 0 {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Hub not found"})
-		return
-	}
-	if !isMod {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Only moderators can unban users"})
+	hubID, ok := getHubIDFromContext(c)
+	if !ok {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Missing hub context"})
 		return
 	}
 
@@ -159,25 +129,9 @@ func (h *ModerationHandlerV2) UnbanUser(c *gin.Context) {
 
 // GetBannedUsers - GET /api/v1/mod/hubs/:hubname/bans
 func (h *ModerationHandlerV2) GetBannedUsers(c *gin.Context) {
-	userID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
-		return
-	}
-
-	hubName := c.Param("hub_name")
-
-	hubID, isMod, err := h.checkModeratorPermission(c, hubName, userID.(int))
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-	if hubID == 0 {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Hub not found"})
-		return
-	}
-	if !isMod {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Only moderators can view banned users"})
+	hubID, ok := getHubIDFromContext(c)
+	if !ok {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Missing hub context"})
 		return
 	}
 
@@ -232,17 +186,6 @@ func (h *ModerationHandlerV2) RemovePost(c *gin.Context) {
 		return
 	}
 
-	// Check moderator permission
-	isMod, err := h.hubModRepo.IsModerator(c.Request.Context(), *post.HubID, userID.(int))
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-	if !isMod {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Only moderators can remove posts"})
-		return
-	}
-
 	// Mark post as removed
 	err = h.postRepo.MarkAsRemoved(c.Request.Context(), postID, userID.(int))
 	if err != nil {
@@ -292,17 +235,6 @@ func (h *ModerationHandlerV2) ApprovePost(c *gin.Context) {
 	}
 	if post.HubID == nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Cannot approve posts without a hub"})
-		return
-	}
-
-	// Check moderator permission
-	isMod, err := h.hubModRepo.IsModerator(c.Request.Context(), *post.HubID, userID.(int))
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-	if !isMod {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Only moderators can approve posts"})
 		return
 	}
 
@@ -369,17 +301,6 @@ func (h *ModerationHandlerV2) RemoveComment(c *gin.Context) {
 		return
 	}
 
-	// Check moderator permission
-	isMod, err := h.hubModRepo.IsModerator(c.Request.Context(), *post.HubID, userID.(int))
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-	if !isMod {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Only moderators can remove comments"})
-		return
-	}
-
 	// Mark comment as removed
 	err = h.commentRepo.MarkAsRemoved(c.Request.Context(), commentID, userID.(int))
 	if err != nil {
@@ -439,17 +360,6 @@ func (h *ModerationHandlerV2) ApproveComment(c *gin.Context) {
 		return
 	}
 
-	// Check moderator permission
-	isMod, err := h.hubModRepo.IsModerator(c.Request.Context(), *post.HubID, userID.(int))
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-	if !isMod {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Only moderators can approve comments"})
-		return
-	}
-
 	// Unmark as removed
 	err = h.commentRepo.MarkAsApproved(c.Request.Context(), commentID)
 	if err != nil {
@@ -496,16 +406,6 @@ func (h *ModerationHandlerV2) LockPost(c *gin.Context) {
 		return
 	}
 
-	isMod, err := h.hubModRepo.IsModerator(c.Request.Context(), *post.HubID, userID.(int))
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-	if !isMod {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Only moderators can lock posts"})
-		return
-	}
-
 	err = h.postRepo.LockPost(c.Request.Context(), postID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -542,16 +442,6 @@ func (h *ModerationHandlerV2) UnlockPost(c *gin.Context) {
 	}
 	if post.HubID == nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Cannot unlock posts without a hub"})
-		return
-	}
-
-	isMod, err := h.hubModRepo.IsModerator(c.Request.Context(), *post.HubID, userID.(int))
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-	if !isMod {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Only moderators can unlock posts"})
 		return
 	}
 
@@ -594,16 +484,6 @@ func (h *ModerationHandlerV2) PinPost(c *gin.Context) {
 		return
 	}
 
-	isMod, err := h.hubModRepo.IsModerator(c.Request.Context(), *post.HubID, userID.(int))
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-	if !isMod {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Only moderators can pin posts"})
-		return
-	}
-
 	err = h.postRepo.PinPost(c.Request.Context(), postID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -643,16 +523,6 @@ func (h *ModerationHandlerV2) UnpinPost(c *gin.Context) {
 		return
 	}
 
-	isMod, err := h.hubModRepo.IsModerator(c.Request.Context(), *post.HubID, userID.(int))
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-	if !isMod {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Only moderators can unpin posts"})
-		return
-	}
-
 	err = h.postRepo.UnpinPost(c.Request.Context(), postID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -662,6 +532,80 @@ func (h *ModerationHandlerV2) UnpinPost(c *gin.Context) {
 	_, _ = h.modLogRepo.Log(c.Request.Context(), *post.HubID, userID.(int), "unpin_post", "post", postID, models.JSONB{})
 
 	c.JSON(http.StatusOK, gin.H{"message": "Post unpinned successfully"})
+}
+
+// UpdatePinnedOrder - POST /api/v1/mod/hubs/:hub_name/pinned-order
+func (h *ModerationHandlerV2) UpdatePinnedOrder(c *gin.Context) {
+	userID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+
+	hubID, ok := getHubIDFromContext(c)
+	if !ok {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Missing hub context"})
+		return
+	}
+
+	var req struct {
+		PostIDs []int `json:"post_ids"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if len(req.PostIDs) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Post IDs are required"})
+		return
+	}
+
+	seen := make(map[int]struct{}, len(req.PostIDs))
+	for _, id := range req.PostIDs {
+		if id <= 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid post ID"})
+			return
+		}
+		if _, exists := seen[id]; exists {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Duplicate post ID"})
+			return
+		}
+		seen[id] = struct{}{}
+	}
+
+	pinnedIDs, err := h.postRepo.GetPinnedIDsByHub(c.Request.Context(), hubID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch pinned posts"})
+		return
+	}
+	if len(pinnedIDs) != len(req.PostIDs) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Pinned post list is out of date"})
+		return
+	}
+	for _, id := range pinnedIDs {
+		if _, ok := seen[id]; !ok {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Pinned post list is out of date"})
+			return
+		}
+	}
+
+	if err := h.postRepo.UpdatePinnedOrder(c.Request.Context(), hubID, req.PostIDs); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update pinned order"})
+		return
+	}
+
+	_, _ = h.modLogRepo.Log(
+		c.Request.Context(),
+		hubID,
+		userID.(int),
+		"reorder_pinned_posts",
+		"hub",
+		hubID,
+		models.JSONB{"post_ids": req.PostIDs},
+	)
+
+	c.JSON(http.StatusOK, gin.H{"message": "Pinned order updated"})
 }
 
 // ===== REMOVAL REASONS =====
@@ -674,19 +618,9 @@ func (h *ModerationHandlerV2) CreateRemovalReason(c *gin.Context) {
 		return
 	}
 
-	hubName := c.Param("hub_name")
-
-	hubID, isMod, err := h.checkModeratorPermission(c, hubName, userID.(int))
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-	if hubID == 0 {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Hub not found"})
-		return
-	}
-	if !isMod {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Only moderators can create removal reasons"})
+	hubID, ok := getHubIDFromContext(c)
+	if !ok {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Missing hub context"})
 		return
 	}
 
@@ -738,17 +672,6 @@ func (h *ModerationHandlerV2) UpdateRemovalReason(c *gin.Context) {
 		return
 	}
 
-	// Check moderator permission
-	isMod, err := h.hubModRepo.IsModerator(c.Request.Context(), existingReason.HubID, userID.(int))
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-	if !isMod {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Only moderators can update removal reasons"})
-		return
-	}
-
 	var req struct {
 		Title   string `json:"title" binding:"required,max=100"`
 		Message string `json:"message" binding:"required"`
@@ -797,17 +720,6 @@ func (h *ModerationHandlerV2) DeleteRemovalReason(c *gin.Context) {
 		return
 	}
 
-	// Check moderator permission
-	isMod, err := h.hubModRepo.IsModerator(c.Request.Context(), existingReason.HubID, userID.(int))
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-	if !isMod {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Only moderators can delete removal reasons"})
-		return
-	}
-
 	err = h.removalReasonRepo.Delete(c.Request.Context(), reasonID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -821,25 +733,9 @@ func (h *ModerationHandlerV2) DeleteRemovalReason(c *gin.Context) {
 
 // GetRemovalReasons - GET /api/v1/mod/hubs/:hubname/removal-reasons
 func (h *ModerationHandlerV2) GetRemovalReasons(c *gin.Context) {
-	userID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
-		return
-	}
-
-	hubName := c.Param("hub_name")
-
-	hubID, isMod, err := h.checkModeratorPermission(c, hubName, userID.(int))
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-	if hubID == 0 {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Hub not found"})
-		return
-	}
-	if !isMod {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Only moderators can view removal reasons"})
+	hubID, ok := getHubIDFromContext(c)
+	if !ok {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Missing hub context"})
 		return
 	}
 
@@ -856,25 +752,9 @@ func (h *ModerationHandlerV2) GetRemovalReasons(c *gin.Context) {
 
 // GetModLog - GET /api/v1/mod/hubs/:hubname/logs
 func (h *ModerationHandlerV2) GetModLog(c *gin.Context) {
-	userID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
-		return
-	}
-
-	hubName := c.Param("hub_name")
-
-	hubID, isMod, err := h.checkModeratorPermission(c, hubName, userID.(int))
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-	if hubID == 0 {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Hub not found"})
-		return
-	}
-	if !isMod {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Only moderators can view mod logs"})
+	hubID, ok := getHubIDFromContext(c)
+	if !ok {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Missing hub context"})
 		return
 	}
 
@@ -902,7 +782,10 @@ func (h *ModerationHandlerV2) GetModLog(c *gin.Context) {
 		offset = 0
 	}
 
-	var logs []*models.ModLog
+	var (
+		logs []*models.ModLog
+		err  error
+	)
 	if useCursorPagination {
 		var payload *models.TimeCursor
 		if cursor != nil {
@@ -935,31 +818,16 @@ func (h *ModerationHandlerV2) GetModLog(c *gin.Context) {
 
 // ===== HELPER METHODS =====
 
-// checkModeratorPermission checks if a user is a moderator of a hub and returns the hub ID
-// Admins have full moderation powers on all hubs without being listed as moderators
-func (h *ModerationHandlerV2) checkModeratorPermission(c *gin.Context, hubName string, userID int) (int, bool, error) {
-	// Get hub by name
-	hub, err := h.hubRepo.GetByName(c.Request.Context(), hubName)
-	if err != nil {
-		return 0, false, err
-	}
-	if hub == nil {
-		return 0, false, nil
+func getHubIDFromContext(c *gin.Context) (int, bool) {
+	hubIDVal, ok := c.Get("hub_id")
+	if !ok {
+		return 0, false
 	}
 
-	// Check if user is an admin (admins have mod powers on all hubs)
-	roleVal, exists := c.Get("role")
-	if exists {
-		if role, ok := roleVal.(string); ok && role == "admin" {
-			return hub.ID, true, nil
-		}
+	hubID, ok := hubIDVal.(int)
+	if !ok || hubID == 0 {
+		return 0, false
 	}
 
-	// Check if user is a moderator
-	isMod, err := h.hubModRepo.IsModerator(c.Request.Context(), hub.ID, userID)
-	if err != nil {
-		return 0, false, err
-	}
-
-	return hub.ID, isMod, nil
+	return hubID, true
 }

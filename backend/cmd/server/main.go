@@ -160,10 +160,8 @@ func main() {
 		removalReasonRepo,
 		removedContentRepo,
 		modLogRepo,
-		hubModRepo,
 		postRepo,
 		commentRepo,
-		hubRepo,
 	)
 	adminHandler := handlers.NewAdminHandler(userRepo, hubModRepo, db.Pool)
 	wsHandler := handlers.NewWebSocketHandler(hub)
@@ -569,8 +567,15 @@ func main() {
 				globalMod.POST("/reports/:id/status", moderationHandler.UpdateReportStatus)
 			}
 
-			// Hub-specific moderation endpoints (per-hub moderator check done in handlers)
+			// Hub-specific moderation endpoints (per-hub moderator check done in middleware)
 			hubMod := protected.Group("/mod")
+			hubMod.Use(middleware.RequireHubModeratorOrAdmin(
+				hubRepo,
+				hubModRepo,
+				postRepo,
+				commentRepo,
+				removalReasonRepo,
+			))
 			{
 				// User bans
 				hubMod.POST("/hubs/:hub_name/bans", moderationHandlerV2.BanUser)
@@ -584,6 +589,7 @@ func main() {
 				hubMod.POST("/posts/:id/unlock", moderationHandlerV2.UnlockPost)
 				hubMod.POST("/posts/:id/pin", moderationHandlerV2.PinPost)
 				hubMod.POST("/posts/:id/unpin", moderationHandlerV2.UnpinPost)
+				hubMod.POST("/hubs/:hub_name/pinned-order", moderationHandlerV2.UpdatePinnedOrder)
 
 				// Comment moderation
 				hubMod.POST("/comments/:id/remove", moderationHandlerV2.RemoveComment)
