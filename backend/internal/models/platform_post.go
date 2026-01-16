@@ -57,9 +57,11 @@ type PlatformPost struct {
 	HasCommented *bool `json:"has_commented,omitempty"` // true if authenticated user has top-level comment on this post
 
 	// Status
-	IsDeleted bool       `json:"is_deleted"`
-	IsEdited  bool       `json:"is_edited"`
-	EditedAt  *time.Time `json:"edited_at,omitempty"`
+	IsPinned       bool       `json:"is_pinned"`
+	PinnedPosition *int       `json:"pinned_position,omitempty"`
+	IsDeleted      bool       `json:"is_deleted"`
+	IsEdited       bool       `json:"is_edited"`
+	EditedAt       *time.Time `json:"edited_at,omitempty"`
 
 	// Crosspost information (if this post is a crosspost)
 	CrosspostOriginType      *string `json:"crosspost_origin_type,omitempty"`      // "reddit" or "platform"
@@ -151,7 +153,7 @@ const platformPostRisingScoreExpr = "(p.score::float / GREATEST(EXTRACT(EPOCH FR
 const platformPostSelectColumnsPrefixed = `
 	p.id, p.author_id, u.username, p.hub_id, p.title, p.body, p.tags, p.media_url, p.media_type, p.thumbnail_url,
 	p.score, p.upvotes, p.downvotes, p.num_comments, p.view_count,
-	p.is_deleted, p.is_edited, p.edited_at,
+	p.is_pinned, p.pinned_position, p.is_deleted, p.is_edited, p.edited_at,
 	p.crosspost_origin_type, p.crosspost_origin_subreddit, p.crosspost_origin_post_id, p.crosspost_original_title,
 	p.target_subreddit, p.crossposted_at, p.created_at, p.hot_score, p.gallery_images
 `
@@ -211,6 +213,8 @@ func (r *PlatformPostRepository) Create(ctx context.Context, post *PlatformPost)
 		&post.Downvotes,
 		&post.NumComments,
 		&post.ViewCount,
+		&post.IsPinned,
+		&post.PinnedPosition,
 		&post.IsDeleted,
 		&post.IsEdited,
 		&post.EditedAt,
@@ -354,20 +358,19 @@ func (r *PlatformPostRepository) GetByHub(ctx context.Context, hubID int, sortBy
 	return r.GetByHubWithUser(ctx, hubID, sortBy, limit, offset, nil, nil, nil)
 }
 
-// GetByHubWithUser retrieves posts by hub with optional user vote information
-func (r *PlatformPostRepository) GetByHubWithUser(
-	ctx context.Context,
-	hubID int,
-	sortBy string,
-	limit, offset int,
-	userID *int,
-	startTime, endTime *time.Time,
-) ([]*PlatformPost, error) {
-	orderClause := buildPlatformPostOrder(sortBy, false)
+func buildHubPinnedClause(pinnedFilter *bool) string {
+	if pinnedFilter == nil {
+		return ""
+	}
+	if *pinnedFilter {
+		return " AND p.is_pinned = TRUE"
+	}
+	return " AND p.is_pinned = FALSE"
+}
 
-	timeClause, timeArgs := buildTimeRangeClause(startTime, endTime, 5)
-
-	query := `
+func buildHubPostsBaseQuery(pinnedFilter *bool, userIDParamIndex int) string {
+	userIDParam := fmt.Sprintf("$%d", userIDParamIndex)
+	return `
 		SELECT ` + platformPostSelectColumnsPrefixed + `,
 		CASE
 			WHEN pv.is_upvote IS NULL THEN NULL
@@ -380,9 +383,27 @@ func (r *PlatformPostRepository) GetByHubWithUser(
 		END as has_commented
 		FROM platform_posts p
 		LEFT JOIN users u ON p.author_id = u.id
-		LEFT JOIN post_votes pv ON pv.post_id = p.id AND pv.user_id = $4
-		LEFT JOIN post_comments pc ON pc.post_id = p.id AND pc.user_id = $4 AND pc.parent_comment_id IS NULL AND pc.is_deleted = FALSE
-		WHERE p.hub_id = $1 AND p.is_deleted = FALSE AND u.shadow_banned = FALSE AND (p.target_subreddit IS NULL OR p.target_subreddit = '')` + timeClause + `
+		LEFT JOIN post_votes pv ON pv.post_id = p.id AND pv.user_id = ` + userIDParam + `
+		LEFT JOIN post_comments pc ON pc.post_id = p.id AND pc.user_id = ` + userIDParam + ` AND pc.parent_comment_id IS NULL AND pc.is_deleted = FALSE
+		WHERE p.hub_id = $1 AND p.is_deleted = FALSE AND u.shadow_banned = FALSE AND (p.target_subreddit IS NULL OR p.target_subreddit = '')` + buildHubPinnedClause(pinnedFilter)
+}
+
+func (r *PlatformPostRepository) getByHubWithUser(
+	ctx context.Context,
+	hubID int,
+	sortBy string,
+	limit, offset int,
+	userID *int,
+	startTime, endTime *time.Time,
+	pinnedFilter *bool,
+) ([]*PlatformPost, error) {
+	orderClause := buildPlatformPostOrder(sortBy, false)
+	if pinnedFilter != nil && *pinnedFilter {
+		orderClause = "ORDER BY p.pinned_position ASC NULLS LAST, p.created_at DESC, p.id DESC"
+	}
+	timeClause, timeArgs := buildTimeRangeClause(startTime, endTime, 5)
+
+	query := buildHubPostsBaseQuery(pinnedFilter, 4) + timeClause + `
 		` + orderClause + `
 		LIMIT $2 OFFSET $3
 	`
@@ -413,8 +434,44 @@ func (r *PlatformPostRepository) GetByHubWithUser(
 	return posts, rows.Err()
 }
 
-// GetByHubWithCursor retrieves posts by hub using cursor-based pagination.
-func (r *PlatformPostRepository) GetByHubWithCursor(
+// GetByHubWithUser retrieves posts by hub with optional user vote information
+func (r *PlatformPostRepository) GetByHubWithUser(
+	ctx context.Context,
+	hubID int,
+	sortBy string,
+	limit, offset int,
+	userID *int,
+	startTime, endTime *time.Time,
+) ([]*PlatformPost, error) {
+	return r.getByHubWithUser(ctx, hubID, sortBy, limit, offset, userID, startTime, endTime, nil)
+}
+
+// GetByHubWithUserExcludingPinned retrieves posts by hub excluding pinned posts.
+func (r *PlatformPostRepository) GetByHubWithUserExcludingPinned(
+	ctx context.Context,
+	hubID int,
+	sortBy string,
+	limit, offset int,
+	userID *int,
+	startTime, endTime *time.Time,
+) ([]*PlatformPost, error) {
+	pinned := false
+	return r.getByHubWithUser(ctx, hubID, sortBy, limit, offset, userID, startTime, endTime, &pinned)
+}
+
+// GetPinnedByHubWithUser retrieves pinned posts by hub.
+func (r *PlatformPostRepository) GetPinnedByHubWithUser(
+	ctx context.Context,
+	hubID int,
+	limit int,
+	userID *int,
+	startTime, endTime *time.Time,
+) ([]*PlatformPost, error) {
+	pinned := true
+	return r.getByHubWithUser(ctx, hubID, "new", limit, 0, userID, startTime, endTime, &pinned)
+}
+
+func (r *PlatformPostRepository) getByHubWithCursor(
 	ctx context.Context,
 	hubID int,
 	sortBy string,
@@ -422,27 +479,13 @@ func (r *PlatformPostRepository) GetByHubWithCursor(
 	cursor *PlatformPostCursor,
 	userID *int,
 	startTime, endTime *time.Time,
+	pinnedFilter *bool,
 ) ([]*PlatformPost, error) {
 	orderClause := buildPlatformPostOrder(sortBy, true)
 	timeClause, timeArgs := buildTimeRangeClause(startTime, endTime, 4)
 	cursorClause, cursorArgs := buildPlatformPostCursorClause(sortBy, cursor, 4+len(timeArgs))
 
-	query := `
-		SELECT ` + platformPostSelectColumnsPrefixed + `,
-		CASE
-			WHEN pv.is_upvote IS NULL THEN NULL
-			WHEN pv.is_upvote = TRUE THEN 1
-			ELSE -1
-		END as user_vote,
-		CASE
-			WHEN pc.id IS NOT NULL THEN TRUE
-			ELSE FALSE
-		END as has_commented
-		FROM platform_posts p
-		LEFT JOIN users u ON p.author_id = u.id
-		LEFT JOIN post_votes pv ON pv.post_id = p.id AND pv.user_id = $3
-		LEFT JOIN post_comments pc ON pc.post_id = p.id AND pc.user_id = $3 AND pc.parent_comment_id IS NULL AND pc.is_deleted = FALSE
-		WHERE p.hub_id = $1 AND p.is_deleted = FALSE AND u.shadow_banned = FALSE AND (p.target_subreddit IS NULL OR p.target_subreddit = '')` + timeClause + cursorClause + `
+	query := buildHubPostsBaseQuery(pinnedFilter, 3) + timeClause + cursorClause + `
 		` + orderClause + `
 		LIMIT $2
 	`
@@ -472,6 +515,33 @@ func (r *PlatformPostRepository) GetByHubWithCursor(
 	}
 
 	return posts, rows.Err()
+}
+
+// GetByHubWithCursor retrieves posts by hub using cursor-based pagination.
+func (r *PlatformPostRepository) GetByHubWithCursor(
+	ctx context.Context,
+	hubID int,
+	sortBy string,
+	limit int,
+	cursor *PlatformPostCursor,
+	userID *int,
+	startTime, endTime *time.Time,
+) ([]*PlatformPost, error) {
+	return r.getByHubWithCursor(ctx, hubID, sortBy, limit, cursor, userID, startTime, endTime, nil)
+}
+
+// GetByHubWithCursorExcludingPinned retrieves posts by hub using cursor-based pagination excluding pinned posts.
+func (r *PlatformPostRepository) GetByHubWithCursorExcludingPinned(
+	ctx context.Context,
+	hubID int,
+	sortBy string,
+	limit int,
+	cursor *PlatformPostCursor,
+	userID *int,
+	startTime, endTime *time.Time,
+) ([]*PlatformPost, error) {
+	pinned := false
+	return r.getByHubWithCursor(ctx, hubID, sortBy, limit, cursor, userID, startTime, endTime, &pinned)
 }
 
 // GetBySubreddit retrieves posts by target subreddit
@@ -688,6 +758,8 @@ func scanPlatformPost(row pgx.Row, post *PlatformPost, extraDest ...interface{})
 		&post.Downvotes,
 		&post.NumComments,
 		&post.ViewCount,
+		&post.IsPinned,
+		&post.PinnedPosition,
 		&post.IsDeleted,
 		&post.IsEdited,
 		&post.EditedAt,
@@ -743,6 +815,8 @@ func scanPlatformPostWithUserInfo(row pgx.Row, post *PlatformPost, extraDest ...
 		&post.Downvotes,
 		&post.NumComments,
 		&post.ViewCount,
+		&post.IsPinned,
+		&post.PinnedPosition,
 		&post.IsDeleted,
 		&post.IsEdited,
 		&post.EditedAt,
@@ -1196,14 +1270,69 @@ func (r *PlatformPostRepository) UnlockPost(ctx context.Context, postID int) err
 
 // PinPost pins a post to the top of the hub
 func (r *PlatformPostRepository) PinPost(ctx context.Context, postID int) error {
-	query := `UPDATE platform_posts SET is_pinned = TRUE WHERE id = $1`
+	query := `
+		UPDATE platform_posts
+		SET is_pinned = TRUE,
+		    pinned_position = (
+		        SELECT COALESCE(MAX(pinned_position), 0) + 1
+		        FROM platform_posts
+		        WHERE hub_id = (SELECT hub_id FROM platform_posts WHERE id = $1)
+		          AND is_pinned = TRUE
+		          AND id <> $1
+		    )
+		WHERE id = $1
+	`
 	_, err := r.pool.Exec(ctx, query, postID)
 	return err
 }
 
 // UnpinPost unpins a post
 func (r *PlatformPostRepository) UnpinPost(ctx context.Context, postID int) error {
-	query := `UPDATE platform_posts SET is_pinned = FALSE WHERE id = $1`
+	query := `UPDATE platform_posts SET is_pinned = FALSE, pinned_position = NULL WHERE id = $1`
 	_, err := r.pool.Exec(ctx, query, postID)
+	return err
+}
+
+// GetPinnedIDsByHub retrieves pinned post IDs for a hub in their current order.
+func (r *PlatformPostRepository) GetPinnedIDsByHub(ctx context.Context, hubID int) ([]int, error) {
+	rows, err := r.pool.Query(ctx, `
+		SELECT id
+		FROM platform_posts
+		WHERE hub_id = $1 AND is_pinned = TRUE
+		ORDER BY pinned_position ASC NULLS LAST, created_at DESC, id DESC
+	`, hubID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var ids []int
+	for rows.Next() {
+		var id int
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
+}
+
+// UpdatePinnedOrder updates the pinned ordering for a hub.
+func (r *PlatformPostRepository) UpdatePinnedOrder(ctx context.Context, hubID int, postIDs []int) error {
+	if len(postIDs) == 0 {
+		return nil
+	}
+	_, err := r.pool.Exec(ctx, `
+		WITH ordered AS (
+			SELECT unnest($1::int[]) AS post_id,
+			       generate_series(1, array_length($1, 1)) AS position
+		)
+		UPDATE platform_posts p
+		SET pinned_position = ordered.position
+		FROM ordered
+		WHERE p.id = ordered.post_id
+		  AND p.hub_id = $2
+		  AND p.is_pinned = TRUE
+	`, postIDs, hubID)
 	return err
 }

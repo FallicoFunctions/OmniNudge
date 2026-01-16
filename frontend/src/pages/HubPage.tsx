@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
+import type { HTMLAttributes, PointerEvent as ReactPointerEvent } from 'react';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { hubsService, type HubPostsResponse, type LocalSubredditPost } from '../services/hubsService';
 import { useAuth } from '../contexts/AuthContext';
 import { HubHeader } from '../components/hubs/HubHeader';
 import { postsService } from '../services/postsService';
+import { moderationService } from '../services/moderationService';
 import { useSettings } from '../contexts/SettingsContext';
 import { savedService } from '../services/savedService';
 import { createLocalCrosspostPayload } from '../utils/crosspostHelpers';
@@ -35,6 +37,7 @@ import { CombinedSuggestionItem } from '../components/common/CombinedSuggestionI
 import { searchPlatformPosts } from '../services/platformSearchService';
 import { PostEditModal } from '../components/posts/PostEditModal';
 import { buildPostUpdateRequest } from '../utils/postUpdate';
+import { requiresModerator } from '../utils/permissions';
 
 const EMPTY_POSTS: LocalSubredditPost[] = [];
 
@@ -335,16 +338,86 @@ export default function HubsPage() {
     () => postsList.filter((post) => !hiddenPostIds.has(post.id)),
     [postsList, hiddenPostIds]
   );
-  const effectivePosts = hubSearchResults ?? visiblePosts;
   const isSearchActive = hubSearchResults !== null;
+  const shouldShowPinned = showHubSidebar && !isSearchActive && sort === 'hot' && currentCursor === '';
+  const pinnedPosts = useMemo(
+    () => (shouldShowPinned ? visiblePosts.filter((post) => post.is_pinned) : []),
+    [shouldShowPinned, visiblePosts]
+  );
+  const sortedPinnedPosts = useMemo(() => {
+    if (!shouldShowPinned) {
+      return [];
+    }
+    return [...pinnedPosts].sort((a, b) => {
+      const positionA = a.pinned_position ?? Number.MAX_SAFE_INTEGER;
+      const positionB = b.pinned_position ?? Number.MAX_SAFE_INTEGER;
+      if (positionA !== positionB) {
+        return positionA - positionB;
+      }
+      const timeA = new Date(a.created_at ?? 0).getTime();
+      const timeB = new Date(b.created_at ?? 0).getTime();
+      return timeB - timeA;
+    });
+  }, [shouldShowPinned, pinnedPosts]);
+  const [pinnedOrderIds, setPinnedOrderIds] = useState<number[]>([]);
+  const [draggingPinnedId, setDraggingPinnedId] = useState<number | null>(null);
+  const pinnedListRef = useRef<HTMLDivElement | null>(null);
+  const pinnedDropZoneRef = useRef<HTMLDivElement | null>(null);
+  const pinnedOrderIdsRef = useRef<number[]>([]);
+  const pinnedDragStartOrderRef = useRef<number[] | null>(null);
+  const lastPinnedOverIdRef = useRef<number | null>(null);
+  const unpinnedPosts = useMemo(
+    () => (shouldShowPinned ? visiblePosts.filter((post) => !post.is_pinned) : visiblePosts),
+    [shouldShowPinned, visiblePosts]
+  );
+  const effectivePosts = hubSearchResults ?? unpinnedPosts;
+  const orderedPinnedPosts = useMemo(() => {
+    if (!shouldShowPinned) {
+      return [];
+    }
+    const postMap = new Map(sortedPinnedPosts.map((post) => [post.id, post]));
+    const orderedFromIds = pinnedOrderIds
+      .map((postId) => postMap.get(postId))
+      .filter(Boolean) as LocalSubredditPost[];
+    const missingPosts = sortedPinnedPosts.filter((post) => !pinnedOrderIds.includes(post.id));
+    return [...orderedFromIds, ...missingPosts];
+  }, [shouldShowPinned, pinnedOrderIds, sortedPinnedPosts]);
+  const hasPinnedPosts = orderedPinnedPosts.length > 0;
 
   const hasMore = Boolean(data?.next_cursor ?? data?.has_more);
   const hasPrev = cursorStack.length > 1;
+  const canManagePins = requiresModerator(user?.role, isModerator);
+  const canReorderPinned = shouldShowPinned && canManagePins;
+  const setPinnedOrder = useCallback((nextOrder: number[]) => {
+    pinnedOrderIdsRef.current = nextOrder;
+    setPinnedOrderIds(nextOrder);
+  }, []);
 
   // Reset offset when sort/hub changes
   useEffect(() => {
     setCursorStack(['']);
   }, [sort, hubname, timeRangeKey]);
+
+  useEffect(() => {
+    if (!shouldShowPinned) {
+      setPinnedOrder([]);
+      pinnedDragStartOrderRef.current = null;
+      lastPinnedOverIdRef.current = null;
+      return;
+    }
+    const nextOrder = sortedPinnedPosts.map((post) => post.id);
+    setPinnedOrderIds((prev) => {
+      if (prev.length === nextOrder.length && prev.every((id, index) => id === nextOrder[index])) {
+        return prev;
+      }
+      pinnedOrderIdsRef.current = nextOrder;
+      return nextOrder;
+    });
+  }, [shouldShowPinned, sortedPinnedPosts, setPinnedOrder]);
+
+  useEffect(() => {
+    pinnedOrderIdsRef.current = pinnedOrderIds;
+  }, [pinnedOrderIds]);
 
   const handleSortChange = (newSort: 'hot' | 'new' | 'top' | 'rising') => {
     setSort(newSort);
@@ -359,6 +432,31 @@ export default function HubsPage() {
     },
     onError: (err) => {
       alert(`Failed to delete post: ${err.message}`);
+    },
+  });
+
+  const togglePinMutation = useMutation<void, Error, { postId: number; isPinned: boolean }>({
+    mutationFn: async ({ postId, isPinned }) => {
+      if (isPinned) {
+        await moderationService.unpinPost(postId);
+      } else {
+        await moderationService.pinPost(postId);
+      }
+    },
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: postsQueryKey });
+      queryClient.invalidateQueries({ queryKey: ['posts', variables.postId] });
+    },
+  });
+
+  const updatePinnedOrderMutation = useMutation<void, Error, number[]>({
+    mutationFn: async (postIds) => moderationService.updatePinnedOrder(hubname, postIds),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: postsQueryKey });
+    },
+    onError: (err) => {
+      alert(`Failed to update pinned order: ${err.message}`);
+      queryClient.invalidateQueries({ queryKey: postsQueryKey });
     },
   });
 
@@ -411,6 +509,94 @@ export default function HubsPage() {
       .then(() => alert('Post link copied to clipboard!'))
       .catch(() => alert('Unable to copy link. Please try again.'));
   };
+
+  const getPinnedBaseOrder = useCallback(
+    () => (pinnedOrderIds.length > 0 ? pinnedOrderIds : sortedPinnedPosts.map((post) => post.id)),
+    [pinnedOrderIds, sortedPinnedPosts]
+  );
+
+  const handlePinnedPointerDown = useCallback(
+    (postId: number, event: ReactPointerEvent<HTMLButtonElement>) => {
+      if (!canReorderPinned) {
+        return;
+      }
+      event.preventDefault();
+      event.stopPropagation();
+      event.currentTarget.setPointerCapture(event.pointerId);
+      setDraggingPinnedId(postId);
+      const baseOrder = getPinnedBaseOrder();
+      pinnedDragStartOrderRef.current = baseOrder;
+      pinnedOrderIdsRef.current = baseOrder;
+      lastPinnedOverIdRef.current = postId;
+      setPinnedOrder(baseOrder);
+    },
+    [canReorderPinned, getPinnedBaseOrder, setPinnedOrder]
+  );
+
+  useEffect(() => {
+    if (!canReorderPinned || draggingPinnedId === null) {
+      return;
+    }
+    const handlePointerMove = (event: PointerEvent) => {
+      const target = document.elementFromPoint(event.clientX, event.clientY);
+      if (!target) {
+        return;
+      }
+      const dropZone = pinnedDropZoneRef.current;
+      const overDropZone = dropZone ? dropZone.contains(target) : false;
+      if (overDropZone) {
+        const baseOrder = pinnedOrderIdsRef.current;
+        const fromIndex = baseOrder.indexOf(draggingPinnedId);
+        if (fromIndex === -1 || fromIndex === baseOrder.length - 1) {
+          return;
+        }
+        const nextOrder = [...baseOrder];
+        nextOrder.splice(fromIndex, 1);
+        nextOrder.push(draggingPinnedId);
+        setPinnedOrder(nextOrder);
+        return;
+      }
+      const targetElement = (target as HTMLElement).closest<HTMLElement>('[data-pinned-post-id]');
+      const targetId = targetElement ? Number(targetElement.dataset.pinnedPostId) : null;
+      if (!targetId || targetId === draggingPinnedId) {
+        return;
+      }
+      if (lastPinnedOverIdRef.current === targetId) {
+        return;
+      }
+      lastPinnedOverIdRef.current = targetId;
+      const baseOrder = pinnedOrderIdsRef.current;
+      const fromIndex = baseOrder.indexOf(draggingPinnedId);
+      const toIndex = baseOrder.indexOf(targetId);
+      if (fromIndex === -1 || toIndex === -1 || fromIndex === toIndex) {
+        return;
+      }
+      const nextOrder = [...baseOrder];
+      nextOrder.splice(fromIndex, 1);
+      nextOrder.splice(toIndex, 0, draggingPinnedId);
+      setPinnedOrder(nextOrder);
+    };
+
+    const handlePointerUp = () => {
+      const baseOrder = pinnedDragStartOrderRef.current;
+      const nextOrder = pinnedOrderIdsRef.current;
+      if (baseOrder && nextOrder && baseOrder.join(',') !== nextOrder.join(',')) {
+        updatePinnedOrderMutation.mutate(nextOrder);
+      }
+      setDraggingPinnedId(null);
+      pinnedDragStartOrderRef.current = null;
+      lastPinnedOverIdRef.current = null;
+    };
+
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', handlePointerUp);
+    window.addEventListener('pointercancel', handlePointerUp);
+    return () => {
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', handlePointerUp);
+      window.removeEventListener('pointercancel', handlePointerUp);
+    };
+  }, [canReorderPinned, draggingPinnedId, setPinnedOrder, updatePinnedOrderMutation]);
 
   const savedToggleMutation = useMutation<void, Error, { postId: number; shouldSave: boolean }>({
     mutationFn: async ({ postId, shouldSave }) => {
@@ -484,6 +670,103 @@ export default function HubsPage() {
     setSelectedSubreddit('');
     setSendRepliesToInbox(true);
   };
+
+  const renderPostCard = useCallback(
+    (
+      post: LocalSubredditPost,
+      options: {
+        wrapperProps?: HTMLAttributes<HTMLDivElement>;
+        showPinnedGrabber?: boolean;
+        onPinnedPointerDown?: (postId: number, event: ReactPointerEvent<HTMLButtonElement>) => void;
+        onPinnedPointerUp?: (postId: number, event: ReactPointerEvent<HTMLButtonElement>) => void;
+      } = {}
+    ) => {
+      const { wrapperProps, showPinnedGrabber, onPinnedPointerDown, onPinnedPointerUp } = options;
+      const { className, ...restWrapperProps } = wrapperProps ?? {};
+      const isSaved = savedPostIds.has(post.id);
+      const isSavePending =
+        savedToggleMutation.isPending && savedToggleMutation.variables?.postId === post.id;
+      const isHiding = hidePostMutation.isPending && hidePostMutation.variables === post.id;
+      const isDeleting =
+        deletePostMutation.isPending && deletePostMutation.variables?.postId === post.id;
+      const isPinning =
+        togglePinMutation.isPending && togglePinMutation.variables?.postId === post.id;
+      const normalizedPost: PlatformPost = {
+        ...post,
+        author_username:
+          post.author_username ??
+          post.author?.username ??
+          (post.author_id === user?.id ? user?.username ?? 'You' : 'Unknown'),
+        hub_name:
+          post.hub_name ??
+          post.hub?.name ??
+          hubNameMap.get(post.hub_id) ??
+          (hubname !== 'popular' && hubname !== 'all' ? hubname : 'unknown'),
+      };
+
+      return (
+        <div
+          {...restWrapperProps}
+          className={['pb-3', className].filter(Boolean).join(' ')}
+        >
+          <HubPostCard
+            post={normalizedPost}
+            useRelativeTime={useRelativeTime}
+            currentUserId={user?.id}
+            currentUserRole={user?.role}
+            isModerator={isModerator}
+            hubNameMap={hubNameMap}
+            hubDisplayTitle={hubDisplayTitle}
+            currentHubName={hubname}
+            isSaved={isSaved}
+            isSavePending={isSavePending}
+            isHiding={isHiding}
+            isDeleting={isDeleting}
+            showPinnedGrabber={showPinnedGrabber}
+            onPinnedPointerDown={onPinnedPointerDown}
+            onPinnedPointerUp={onPinnedPointerUp}
+            onShare={() => handleSharePost(post.id)}
+            onToggleSave={(shouldSave) => handleToggleSavePost(post.id, !shouldSave)}
+            onHide={() => handleHidePost(post.id)}
+            onCrosspost={() => handleCrosspostSelection(post)}
+            onEdit={() => setEditPostTarget(normalizedPost)}
+            isPinning={isPinning}
+            onTogglePin={() =>
+              togglePinMutation.mutate({
+                postId: post.id,
+                isPinned: Boolean(normalizedPost.is_pinned),
+              })
+            }
+            onDelete={() => handleDeletePost(post)}
+          />
+        </div>
+      );
+    },
+    [
+      savedPostIds,
+      savedToggleMutation.isPending,
+      savedToggleMutation.variables,
+      hidePostMutation.isPending,
+      hidePostMutation.variables,
+      deletePostMutation.isPending,
+      deletePostMutation.variables,
+      togglePinMutation.isPending,
+      togglePinMutation.variables,
+      user?.id,
+      user?.role,
+      hubNameMap,
+      hubname,
+      hubDisplayTitle,
+      isModerator,
+      useRelativeTime,
+      handleSharePost,
+      handleToggleSavePost,
+      handleHidePost,
+      handleCrosspostSelection,
+      togglePinMutation,
+      handleDeletePost,
+    ]
+  );
 
   const crosspostMutation = useMutation<void, Error>({
     mutationFn: async () => {
@@ -695,58 +978,46 @@ export default function HubsPage() {
           )}
 
           {/* Posts List */}
-          {effectivePosts.length > 0 ? (
-            <VirtualizedList
-              items={effectivePosts}
-              estimateSize={220}
-              className=""
-              getKey={(post) => post.id}
-              renderItem={(post: LocalSubredditPost) => {
-                const isSaved = savedPostIds.has(post.id);
-                const isSavePending =
-                  savedToggleMutation.isPending && savedToggleMutation.variables?.postId === post.id;
-                const isHiding = hidePostMutation.isPending && hidePostMutation.variables === post.id;
-                const isDeleting =
-                  deletePostMutation.isPending && deletePostMutation.variables?.postId === post.id;
-                const normalizedPost: PlatformPost = {
-                  ...post,
-                  author_username:
-                    post.author_username ??
-                    post.author?.username ??
-                    (post.author_id === user?.id ? user?.username ?? 'You' : 'Unknown'),
-                  hub_name:
-                    post.hub_name ??
-                    post.hub?.name ??
-                    hubNameMap.get(post.hub_id) ??
-                    (hubname !== 'popular' && hubname !== 'all' ? hubname : 'unknown'),
-                };
-
-                return (
-                  <div className="pb-3">
-                    <HubPostCard
-                      post={normalizedPost}
-                      useRelativeTime={useRelativeTime}
-                      currentUserId={user?.id}
-                      currentUserRole={user?.role}
-                      isModerator={isModerator}
-                      hubNameMap={hubNameMap}
-                      hubDisplayTitle={hubDisplayTitle}
-                      currentHubName={hubname}
-                      isSaved={isSaved}
-                      isSavePending={isSavePending}
-                      isHiding={isHiding}
-                      isDeleting={isDeleting}
-                      onShare={() => handleSharePost(post.id)}
-                      onToggleSave={(shouldSave) => handleToggleSavePost(post.id, !shouldSave)}
-                      onHide={() => handleHidePost(post.id)}
-                      onCrosspost={() => handleCrosspostSelection(post)}
-                      onEdit={() => setEditPostTarget(normalizedPost)}
-                      onDelete={() => handleDeletePost(post)}
-                    />
-                  </div>
-                );
-              }}
-            />
+          {effectivePosts.length > 0 || hasPinnedPosts ? (
+            <>
+              {shouldShowPinned && hasPinnedPosts && (
+                <div className="mb-4 space-y-3" ref={pinnedListRef}>
+                  {orderedPinnedPosts.map((post) =>
+                    renderPostCard(post, {
+                      wrapperProps: canReorderPinned
+                        ? {
+                            'data-pinned-post-id': post.id,
+                            className: [
+                              'transition-all duration-150 ease-out',
+                              draggingPinnedId === post.id ? 'opacity-60' : null,
+                            ]
+                              .filter(Boolean)
+                              .join(' '),
+                          }
+                        : undefined,
+                      showPinnedGrabber: canReorderPinned,
+                      onPinnedPointerDown: canReorderPinned ? handlePinnedPointerDown : undefined,
+                      onPinnedPointerUp: undefined,
+                    })
+                  )}
+                  {canReorderPinned && draggingPinnedId !== null && orderedPinnedPosts.length > 0 && (
+                    <div
+                      className="flex h-10 items-center justify-center rounded border border-dashed border-[var(--color-border)] text-xs text-[var(--color-text-secondary)]"
+                      ref={pinnedDropZoneRef}
+                    >
+                      Drop here to move to bottom
+                    </div>
+                  )}
+                </div>
+              )}
+              <VirtualizedList
+                items={effectivePosts}
+                estimateSize={220}
+                className=""
+                getKey={(post) => post.id}
+                renderItem={(post: LocalSubredditPost) => renderPostCard(post)}
+              />
+            </>
           ) : (
             <div className="py-12 text-center">
               <EmptyMessage>

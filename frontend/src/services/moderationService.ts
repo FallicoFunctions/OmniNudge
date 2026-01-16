@@ -51,6 +51,10 @@ export const moderationService = {
     await api.post(`/mod/posts/${postId}/unpin`, {});
   },
 
+  async updatePinnedOrder(hubName: string, postIds: number[]): Promise<void> {
+    await api.post(`/mod/hubs/${hubName}/pinned-order`, { post_ids: postIds });
+  },
+
   // ===== COMMENT MODERATION =====
 
   async removeComment(commentId: number, data?: RemoveContentRequest): Promise<void> {
