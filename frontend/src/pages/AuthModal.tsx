@@ -95,7 +95,7 @@ export default function AuthModal({ mode, onClose, onSwitch, onSuccess }: AuthMo
                   htmlFor="auth-email"
                   className="block text-sm font-medium text-[var(--color-text-primary)]"
                 >
-                  Email (optional)
+                  Email (optional but required for password reset)
                 </label>
                 <input
                   id="auth-email"
@@ -125,6 +125,9 @@ export default function AuthModal({ mode, onClose, onSwitch, onSuccess }: AuthMo
                 placeholder="Password"
                 autoComplete={isLogin ? 'current-password' : 'new-password'}
               />
+              <p className="mt-1 text-xs text-[var(--color-text-secondary)]">
+                Your email is encrypted at rest. Your password is stored as a one-way hash (we can’t read it).
+              </p>
             </div>
             <button
               type="submit"
