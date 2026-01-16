@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"math"
 	"time"
 
 	"github.com/omninudge/backend/internal/models"
@@ -45,6 +46,9 @@ func buildPlatformPostCursor(post *models.PlatformPost, sortBy string) models.Pl
 	if sortBy == "rising" {
 		cursor.RisingScore = calculateRisingScore(post.Score, post.CreatedAt)
 	}
+	if sortBy == "controversial" {
+		cursor.ControversialScore = calculateControversialScore(post.Upvotes, post.Downvotes)
+	}
 	return cursor
 }
 
@@ -54,4 +58,15 @@ func calculateRisingScore(score int, createdAt time.Time) float64 {
 		hours = 1
 	}
 	return float64(score) / hours
+}
+
+func calculateControversialScore(ups, downs int) float64 {
+	n := ups + downs
+	if n == 0 {
+		return 0
+	}
+	p := float64(ups) / float64(n)
+	balance := 1 - math.Abs(p-0.5)*2
+	volume := math.Log10(float64(n) + 1)
+	return balance * volume
 }

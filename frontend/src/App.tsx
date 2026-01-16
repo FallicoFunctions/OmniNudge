@@ -15,6 +15,7 @@ const SubredditPage = lazy(() => import('./pages/SubredditPage'));
 const RedditPostWrapper = lazy(() => import('./pages/RedditPostWrapper'));
 const RedditUserPage = lazy(() => import('./pages/RedditUserPage'));
 const RedditWikiPage = lazy(() => import('./pages/RedditWikiPage'));
+const HubWikiPage = lazy(() => import('./pages/HubWikiPage'));
 const UserProfilePage = lazy(() => import('./pages/UserProfilePage'));
 const HubPage = lazy(() => import('./pages/HubPage'));
 const SearchResultsPage = lazy(() => import('./pages/SearchResultsPage'));
@@ -75,6 +76,8 @@ function App() {
                     />
                     <Route path="/user/:username" element={<RedditUserPage />} />
                     <Route path="/h/:hubname" element={<HubPage />} />
+                    <Route path="/h/:hubname/wiki/:pagePath" element={<HubWikiPage />} />
+                    <Route path="/h/:hubname/wiki" element={<HubWikiPage />} />
                     <Route path="/h/:hubname/comments/:postId" element={<PostDetailPage />} />
                     <Route path="/h/:hubname/comments/:postId/:commentId" element={<PostDetailPage />} />
                     <Route path="/posts/:postId" element={<PostDetailPage />} />

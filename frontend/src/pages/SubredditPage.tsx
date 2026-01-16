@@ -1136,45 +1136,23 @@ export default function RedditPage() {
               <button
                 key={sortOption}
                 onClick={() => setSort(sortOption)}
-                className={`rounded-md px-3 py-2 text-sm font-medium capitalize ${
+                className={`px-4 py-2 text-sm font-semibold ${
                   sort === sortOption
-                    ? 'bg-[var(--color-primary)] text-white'
-                    : 'bg-[var(--color-surface-elevated)] text-[var(--color-text-primary)] hover:bg-[var(--color-border)]'
+                    ? 'text-[var(--color-primary)]'
+                    : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
                 }`}
               >
-                {sortOption}
+                {sortOption.charAt(0).toUpperCase() + sortOption.slice(1)}
               </button>
             ))}
             {hasWiki && (
               <Link
                 to={`/r/${subreddit}/wiki/index`}
-                className="rounded-md bg-[var(--color-surface-elevated)] px-3 py-2 text-sm font-medium capitalize text-[var(--color-text-primary)] hover:bg-[var(--color-border)]"
+                className="px-4 py-2 text-sm font-semibold text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
               >
                 Wiki
               </Link>
             )}
-            <div className="ml-1 flex items-center gap-3 rounded-full border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-1 text-sm">
-              <span className="text-xs font-semibold uppercase text-[var(--color-text-secondary)]">
-                Omni posts only
-              </span>
-              <button
-                type="button"
-                role="switch"
-                aria-checked={showOmniOnly}
-                onClick={() => setShowOmniOnly((prev) => !prev)}
-                className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-1 ${
-                  showOmniOnly ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
-                }`}
-              >
-                <span className="sr-only">Toggle Omni posts filter</span>
-                <span
-                  aria-hidden="true"
-                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                    showOmniOnly ? 'translate-x-5' : 'translate-x-0'
-                  }`}
-                />
-              </button>
-            </div>
           </>
         }
         topSearch={
@@ -1213,66 +1191,90 @@ export default function RedditPage() {
           />
         }
         postSearch={
-          <FeedSearchBars
-            containerClassName="w-full md:w-96"
-            showTopForm={false}
-            topValue={inputValue}
-            topPlaceholder="Enter hub or subreddit..."
-            onTopChange={handleInputChange}
-            onTopFocus={() => setIsAutocompleteOpen(true)}
-            onTopBlur={() => setIsAutocompleteOpen(false)}
-            onTopSubmit={handleSubredditSubmit}
-            topSuggestions={suggestionItems}
-            topShouldShowSuggestions={shouldShowSuggestions}
-            topIsLoading={isAutocompleteLoading}
-            topEmptyMessage="No hubs or subreddits found."
-            renderTopSuggestion={(suggestion) => (
-              <SubredditSuggestionItem
-                key={suggestion.name}
-                suggestion={suggestion}
-                onSelect={handleSelectSubredditSuggestion}
-              />
-            )}
-            postValue={postSearchInput}
-            postPlaceholder="Search posts..."
-            onPostChange={(value) => {
-              setPostSearchInput(value);
-              if (!isSearchDropdownOpen) {
-                setIsSearchDropdownOpen(true);
-              }
-            }}
-            onPostFocus={() => setIsSearchDropdownOpen(true)}
-            onPostBlur={() => setTimeout(() => setIsSearchDropdownOpen(false), 120)}
-            onPostSubmit={handlePostSearchSubmit}
-            postDropdownOpen={isSearchDropdownOpen}
-            postDropdownContent={
-              <div className="space-y-2 text-sm text-[var(--color-text-primary)]">
-                <label className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={limitSearchToContext}
-                    onChange={(e) => setLimitSearchToContext(e.target.checked)}
-                  />
-                  <span>Limit search to r/{subreddit}</span>
-                </label>
-                {!blockAllNsfw && (
+          <div className="flex flex-wrap items-center justify-end gap-3">
+            <div className="flex items-center gap-3 rounded-full border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-1 text-sm">
+              <span className="text-xs font-semibold uppercase text-[var(--color-text-secondary)]">
+                Omni posts only
+              </span>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={showOmniOnly}
+                onClick={() => setShowOmniOnly((prev) => !prev)}
+                className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-1 ${
+                  showOmniOnly ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
+                }`}
+              >
+                <span className="sr-only">Toggle Omni posts filter</span>
+                <span
+                  aria-hidden="true"
+                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                    showOmniOnly ? 'translate-x-5' : 'translate-x-0'
+                  }`}
+                />
+              </button>
+            </div>
+            <FeedSearchBars
+              containerClassName="w-full md:w-96"
+              showTopForm={false}
+              topValue={inputValue}
+              topPlaceholder="Enter hub or subreddit..."
+              onTopChange={handleInputChange}
+              onTopFocus={() => setIsAutocompleteOpen(true)}
+              onTopBlur={() => setIsAutocompleteOpen(false)}
+              onTopSubmit={handleSubredditSubmit}
+              topSuggestions={suggestionItems}
+              topShouldShowSuggestions={shouldShowSuggestions}
+              topIsLoading={isAutocompleteLoading}
+              topEmptyMessage="No hubs or subreddits found."
+              renderTopSuggestion={(suggestion) => (
+                <SubredditSuggestionItem
+                  key={suggestion.name}
+                  suggestion={suggestion}
+                  onSelect={handleSelectSubredditSuggestion}
+                />
+              )}
+              postValue={postSearchInput}
+              postPlaceholder="Search posts..."
+              onPostChange={(value) => {
+                setPostSearchInput(value);
+                if (!isSearchDropdownOpen) {
+                  setIsSearchDropdownOpen(true);
+                }
+              }}
+              onPostFocus={() => setIsSearchDropdownOpen(true)}
+              onPostBlur={() => setTimeout(() => setIsSearchDropdownOpen(false), 120)}
+              onPostSubmit={handlePostSearchSubmit}
+              postDropdownOpen={isSearchDropdownOpen}
+              postDropdownContent={
+                <div className="space-y-2 text-sm text-[var(--color-text-primary)]">
                   <label className="flex items-center gap-2">
                     <input
                       type="checkbox"
-                      checked={includeNsfwSearch}
-                      onChange={(e) => setIncludeNsfwSearch(e.target.checked)}
+                      checked={limitSearchToContext}
+                      onChange={(e) => setLimitSearchToContext(e.target.checked)}
                     />
-                    <span>Include NSFW results</span>
+                    <span>Limit search to r/{subreddit}</span>
                   </label>
-                )}
-                {blockAllNsfw && (
-                  <div className="text-xs text-[var(--color-text-secondary)]">
-                    NSFW content is blocked in settings.
-                  </div>
-                )}
-              </div>
-            }
-          />
+                  {!blockAllNsfw && (
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={includeNsfwSearch}
+                        onChange={(e) => setIncludeNsfwSearch(e.target.checked)}
+                      />
+                      <span>Include NSFW results</span>
+                    </label>
+                  )}
+                  {blockAllNsfw && (
+                    <div className="text-xs text-[var(--color-text-secondary)]">
+                      NSFW content is blocked in settings.
+                    </div>
+                  )}
+                </div>
+              }
+            />
+          </div>
         }
       />
 
