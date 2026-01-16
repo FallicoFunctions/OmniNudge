@@ -8,7 +8,8 @@ interface SubredditHeaderProps {
   iconUrl?: string | null;
   user: User | null;
   isSubscribed?: boolean;
-  searchBars: ReactNode;
+  topSearch?: ReactNode;
+  postSearch?: ReactNode;
   filterControls?: ReactNode;
   showActions?: boolean;
 }
@@ -18,7 +19,8 @@ export function SubredditHeader({
   iconUrl,
   user,
   isSubscribed,
-  searchBars,
+  topSearch,
+  postSearch,
   filterControls,
   showActions,
 }: SubredditHeaderProps) {
@@ -28,21 +30,21 @@ export function SubredditHeader({
   const shouldShowActions = showActions ?? !isSpecialSubreddit;
 
   return (
-    <div className="mb-4 flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
-      <div className="flex flex-1 flex-col gap-3 text-left">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            {iconUrl && (
-              <img
-                src={iconUrl}
-                alt=""
-                className="h-12 w-12 flex-shrink-0 rounded-full object-cover"
-                loading="lazy"
-                decoding="async"
-              />
-            )}
-            <h1 className="text-3xl font-bold text-[var(--color-text-primary)]">r/{subreddit}</h1>
-          </div>
+    <div className="mb-4 flex flex-col gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          {iconUrl && (
+            <img
+              src={iconUrl}
+              alt=""
+              className="h-12 w-12 flex-shrink-0 rounded-full object-cover"
+              loading="lazy"
+              decoding="async"
+            />
+          )}
+          <h1 className="text-3xl font-bold text-[var(--color-text-primary)]">r/{subreddit}</h1>
+        </div>
+        <div className="flex flex-wrap items-center gap-3">
           {shouldShowActions && (
             <div className="flex items-center gap-2">
               {user ? (
@@ -96,12 +98,16 @@ export function SubredditHeader({
               </button>
             </div>
           )}
+          {topSearch}
         </div>
-
-        {filterControls && <div className="flex flex-wrap items-center gap-2">{filterControls}</div>}
       </div>
 
-      {searchBars}
+      <div className="flex items-center justify-between gap-3">
+        {filterControls && (
+          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">{filterControls}</div>
+        )}
+        <div className="flex-shrink-0">{postSearch}</div>
+      </div>
     </div>
   );
 }
