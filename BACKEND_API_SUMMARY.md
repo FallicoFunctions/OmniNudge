@@ -20,7 +20,7 @@ This is a condensed reference of all available backend endpoints for frontend de
 {
   "username": "string",
   "password": "string",
-  "email": "string (optional)"
+  "email": "string (optional but required for password reset)"
 }
 ```
 
