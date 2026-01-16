@@ -620,8 +620,45 @@ export default function PostDetailPage() {
           iconUrl={subredditIcon}
           user={user}
           isSubscribed={subredditSubscriptionStatus?.is_subscribed ?? false}
-          searchBars={
+          topSearch={
             <FeedSearchBars
+              containerClassName="w-full md:w-96"
+              showPostForm={false}
+              topValue={subredditInputValue}
+              topPlaceholder="Enter hub or subreddit..."
+              onTopChange={handleSubredditInputChange}
+              onTopFocus={() => setIsAutocompleteOpen(true)}
+              onTopBlur={() => setIsAutocompleteOpen(false)}
+              onTopSubmit={handleSubredditSubmit}
+              topSuggestions={subredditSuggestions}
+              topShouldShowSuggestions={shouldShowSuggestions}
+              topIsLoading={isAutocompleteLoading}
+              topEmptyMessage="No hubs or subreddits found."
+              renderTopSuggestion={(suggestion) => (
+                <SubredditSuggestionItem
+                  key={suggestion.name}
+                  suggestion={suggestion}
+                  onSelect={handleSelectSubredditSuggestion}
+                />
+              )}
+              postValue={postSearchInput}
+              postPlaceholder="Search posts..."
+              onPostChange={(value) => {
+                setPostSearchInput(value);
+                if (!isSearchDropdownOpen) {
+                  setIsSearchDropdownOpen(true);
+                }
+              }}
+              onPostFocus={() => setIsSearchDropdownOpen(true)}
+              onPostBlur={() => setTimeout(() => setIsSearchDropdownOpen(false), 120)}
+              onPostSubmit={handlePostSearchSubmit}
+              postDropdownOpen={isSearchDropdownOpen}
+            />
+          }
+          postSearch={
+            <FeedSearchBars
+              containerClassName="w-full md:w-96"
+              showTopForm={false}
               topValue={subredditInputValue}
               topPlaceholder="Enter hub or subreddit..."
               onTopChange={handleSubredditInputChange}

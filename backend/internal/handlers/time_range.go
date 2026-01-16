@@ -9,7 +9,8 @@ import (
 )
 
 func parseTopTimeRange(c *gin.Context, sort string) (*time.Time, *time.Time, string, error) {
-	if strings.ToLower(sort) != "top" {
+	normalized := strings.ToLower(sort)
+	if normalized != "top" && normalized != "controversial" {
 		return nil, nil, "", nil
 	}
 

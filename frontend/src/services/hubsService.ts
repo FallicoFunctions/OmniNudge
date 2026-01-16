@@ -1,4 +1,5 @@
 import { api } from '../lib/api';
+import type { HubWikiPage } from '../types/hubWiki';
 import {
   appendTimeRangeParams,
   type FeedTimeRangeOptions,
@@ -202,6 +203,16 @@ export const hubsService = {
   async getTrendingHubs(limit: number = 10): Promise<Hub[]> {
     const response = await api.get<{ hubs: Hub[] }>(`/hubs/trending?limit=${limit}`);
     return response.hubs || [];
+  },
+
+  async getHubWikiPage(hubName: string, pagePath: string = 'index'): Promise<HubWikiPage> {
+    const response = await api.get<HubWikiPage>(`/hubs/${hubName}/wiki/${pagePath}`);
+    return response;
+  },
+
+  async updateHubWikiPage(hubName: string, pagePath: string, content: string): Promise<HubWikiPage> {
+    const response = await api.put<HubWikiPage>(`/hubs/${hubName}/wiki/${pagePath}`, { content });
+    return response;
   },
 
   // Hub creation

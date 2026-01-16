@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import type { HTMLAttributes, PointerEvent as ReactPointerEvent } from 'react';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useNavigate, useParams, useLocation } from 'react-router-dom';
+import { useNavigate, useParams, useLocation, Link } from 'react-router-dom';
 import { hubsService, type HubPostsResponse, type LocalSubredditPost } from '../services/hubsService';
 import { useAuth } from '../contexts/AuthContext';
 import { HubHeader } from '../components/hubs/HubHeader';
@@ -57,7 +57,7 @@ export default function HubsPage() {
   const [isAutocompleteOpen, setIsAutocompleteOpen] = useState(false);
   const [hubSearchResults, setHubSearchResults] = useState<LocalSubredditPost[] | null>(null);
   const [hubSearchQuery, setHubSearchQuery] = useState('');
-  const [sort, setSort] = useState<'hot' | 'new' | 'top' | 'rising'>('hot');
+  const [sort, setSort] = useState<'hot' | 'new' | 'top' | 'rising' | 'controversial'>('hot');
   const [cursorStack, setCursorStack] = useState(['']);
   const pageSize = 50;
   const currentCursor = cursorStack[cursorStack.length - 1] ?? '';
@@ -84,11 +84,13 @@ export default function HubsPage() {
     return parsed.toISOString();
   };
   const isTopSort = sort === 'top';
-  const isCustomTopRange = isTopSort && topTimeRange === 'custom';
+  const isControversialSort = sort === 'controversial';
+  const isTimedSort = isTopSort || isControversialSort;
+  const isCustomTopRange = isTimedSort && topTimeRange === 'custom';
   const customStartISO = isCustomTopRange ? convertInputToISO(customTopStart) : undefined;
   const customEndISO = isCustomTopRange ? convertInputToISO(customTopEnd) : undefined;
   const isCustomRangeValid = Boolean(customStartISO && customEndISO);
-  const timeRangeKey = isTopSort
+  const timeRangeKey = isTimedSort
     ? topTimeRange === 'custom'
       ? isCustomRangeValid
         ? `custom-${customTopStart}-${customTopEnd}`
@@ -177,6 +179,7 @@ export default function HubsPage() {
   const { data: hubSettings } = useHubSettings(hubname, showHubSidebar);
   const { data: activeUsersData } = useHubActiveUsers(showHubSidebar ? hubname : null, user);
   const hubDisplayTitle = hubSettings?.display_title?.trim() || hubDetails?.title || null;
+  const hasWiki = Boolean(hubSettings?.enable_wiki);
 
   const {
     trimmedInput,
@@ -310,7 +313,7 @@ export default function HubsPage() {
     queryKey: postsQueryKey,
     queryFn: async (): Promise<HubPostsResponse> => {
       const feedOptions =
-        isTopSort && topTimeRange === 'custom'
+        isTimedSort && topTimeRange === 'custom'
           ? isCustomRangeValid
             ? {
                 timeRange: 'custom' as const,
@@ -318,7 +321,7 @@ export default function HubsPage() {
                 endDate: customEndISO as string,
               }
             : undefined
-          : isTopSort
+          : isTimedSort
           ? { timeRange: topTimeRange }
           : undefined;
       if (hubname === 'popular') {
@@ -419,7 +422,7 @@ export default function HubsPage() {
     pinnedOrderIdsRef.current = pinnedOrderIds;
   }, [pinnedOrderIds]);
 
-  const handleSortChange = (newSort: 'hot' | 'new' | 'top' | 'rising') => {
+  const handleSortChange = (newSort: 'hot' | 'new' | 'top' | 'rising' | 'controversial') => {
     setSort(newSort);
   };
 
@@ -919,8 +922,8 @@ export default function HubsPage() {
       <div className="mt-4 grid gap-6 lg:grid-cols-[minmax(0,1fr)_300px]">
         <div>
           {/* Sort Controls */}
-          <div className="mb-2 flex gap-2">
-            {(['hot', 'new', 'top', 'rising'] as const).map((sortOption) => (
+          <div className="mb-2 flex flex-wrap gap-2">
+            {(['hot', 'new', 'top', 'rising', 'controversial'] as const).map((sortOption) => (
               <button
                 key={sortOption}
                 onClick={() => handleSortChange(sortOption)}
@@ -933,8 +936,16 @@ export default function HubsPage() {
                 {sortOption.charAt(0).toUpperCase() + sortOption.slice(1)}
               </button>
             ))}
+            {hasWiki && showHubSidebar && (
+              <Link
+                to={`/h/${hubname}/wiki/index`}
+                className="px-3 py-1 rounded bg-gray-200 text-gray-700 hover:bg-gray-300"
+              >
+                Wiki
+              </Link>
+            )}
           </div>
-          {isTopSort && (
+          {(isTopSort || isControversialSort) && (
             <div className="mb-4 space-y-2">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
