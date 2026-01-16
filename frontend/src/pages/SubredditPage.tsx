@@ -1153,10 +1153,69 @@ export default function RedditPage() {
                 Wiki
               </Link>
             )}
+            <div className="ml-1 flex items-center gap-3 rounded-full border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-1 text-sm">
+              <span className="text-xs font-semibold uppercase text-[var(--color-text-secondary)]">
+                Omni posts only
+              </span>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={showOmniOnly}
+                onClick={() => setShowOmniOnly((prev) => !prev)}
+                className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-1 ${
+                  showOmniOnly ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
+                }`}
+              >
+                <span className="sr-only">Toggle Omni posts filter</span>
+                <span
+                  aria-hidden="true"
+                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                    showOmniOnly ? 'translate-x-5' : 'translate-x-0'
+                  }`}
+                />
+              </button>
+            </div>
           </>
         }
-        searchBars={
+        topSearch={
           <FeedSearchBars
+            containerClassName="w-full md:w-96"
+            showPostForm={false}
+            topValue={inputValue}
+            topPlaceholder="Enter hub or subreddit..."
+            onTopChange={handleInputChange}
+            onTopFocus={() => setIsAutocompleteOpen(true)}
+            onTopBlur={() => setIsAutocompleteOpen(false)}
+            onTopSubmit={handleSubredditSubmit}
+            topSuggestions={suggestionItems}
+            topShouldShowSuggestions={shouldShowSuggestions}
+            topIsLoading={isAutocompleteLoading}
+            topEmptyMessage="No hubs or subreddits found."
+            renderTopSuggestion={(suggestion) => (
+              <SubredditSuggestionItem
+                key={suggestion.name}
+                suggestion={suggestion}
+                onSelect={handleSelectSubredditSuggestion}
+              />
+            )}
+            postValue={postSearchInput}
+            postPlaceholder="Search posts..."
+            onPostChange={(value) => {
+              setPostSearchInput(value);
+              if (!isSearchDropdownOpen) {
+                setIsSearchDropdownOpen(true);
+              }
+            }}
+            onPostFocus={() => setIsSearchDropdownOpen(true)}
+            onPostBlur={() => setTimeout(() => setIsSearchDropdownOpen(false), 120)}
+            onPostSubmit={handlePostSearchSubmit}
+            postDropdownOpen={isSearchDropdownOpen}
+          />
+        }
+        postSearch={
+          <FeedSearchBars
+            containerClassName="w-full md:w-96"
+            showTopForm={false}
             topValue={inputValue}
             topPlaceholder="Enter hub or subreddit..."
             onTopChange={handleInputChange}
@@ -1402,8 +1461,6 @@ export default function RedditPage() {
 
         {shouldShowSubredditSidebar && (
           <SubredditSidebar
-            showOmniOnly={showOmniOnly}
-            onToggleShowOmniOnly={() => setShowOmniOnly((prev) => !prev)}
             about={subredditAbout}
             iconUrl={subredditIcon ?? fallbackSubredditIcon}
             isLoading={loadingSubredditAbout}
