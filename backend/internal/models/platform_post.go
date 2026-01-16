@@ -118,6 +118,11 @@ func buildPlatformPostOrder(sortBy string, includeID bool) string {
 			return fmt.Sprintf("ORDER BY %s DESC, p.created_at DESC, p.id DESC", platformPostRisingScoreExpr)
 		}
 		return fmt.Sprintf("ORDER BY %s DESC, p.created_at DESC", platformPostRisingScoreExpr)
+	case "controversial":
+		if includeID {
+			return fmt.Sprintf("ORDER BY %s DESC, p.created_at DESC, p.id DESC", platformPostControversialScoreExpr)
+		}
+		return fmt.Sprintf("ORDER BY %s DESC, p.created_at DESC", platformPostControversialScoreExpr)
 	default:
 		if includeID {
 			return "ORDER BY p.hot_score DESC, p.created_at DESC, p.id DESC"
@@ -143,12 +148,24 @@ func buildPlatformPostCursorClause(sortBy string, cursor *PlatformPostCursor, st
 	case "rising":
 		return fmt.Sprintf(" AND (%s, p.created_at, p.id) < ($%d, $%d, $%d)", platformPostRisingScoreExpr, startingIndex, startingIndex+1, startingIndex+2),
 			[]interface{}{cursor.RisingScore, cursor.CreatedAt, cursor.ID}
+	case "controversial":
+		return fmt.Sprintf(" AND (%s, p.created_at, p.id) < ($%d, $%d, $%d)", platformPostControversialScoreExpr, startingIndex, startingIndex+1, startingIndex+2),
+			[]interface{}{cursor.ControversialScore, cursor.CreatedAt, cursor.ID}
 	default:
 		return "", nil
 	}
 }
 
 const platformPostRisingScoreExpr = "(p.score::float / GREATEST(EXTRACT(EPOCH FROM (NOW() - p.created_at)) / 3600, 1))"
+
+const platformPostControversialScoreExpr = `
+	(CASE
+		WHEN (p.upvotes + p.downvotes) = 0 THEN 0
+		ELSE
+			(1 - ABS((p.upvotes::float / (p.upvotes + p.downvotes)) - 0.5) * 2)
+			* LOG(10, (p.upvotes + p.downvotes)::float + 1)
+	END)
+`
 
 const platformPostSelectColumnsPrefixed = `
 	p.id, p.author_id, u.username, p.hub_id, p.title, p.body, p.tags, p.media_url, p.media_type, p.thumbnail_url,

@@ -89,6 +89,7 @@ func main() {
 	// Hub Settings and Themes repositories (from repository package)
 	hubSettingsRepo := repository.NewHubSettingsRepository(db.Pool)
 	hubThemesRepo := repository.NewHubThemesRepository(db.Pool)
+	hubWikiRepo := repository.NewHubWikiRepository(db.Pool)
 
 	// Bug reporting repositories
 	bugReportRepo := models.NewBugReportRepository(db.Pool)
@@ -189,6 +190,7 @@ func main() {
 	modMailHandler := handlers.NewModMailHandler(db.Pool, conversationRepo, messageRepo, userRepo, hubModRepo, hubRepo)
 	hubSettingsHandler := handlers.NewHubSettingsHandler(hubRepo, hubSettingsRepo)
 	hubThemesHandler := handlers.NewHubThemesHandler(hubThemesRepo, hubSettingsRepo)
+	hubWikiHandler := handlers.NewHubWikiHandler(hubRepo, hubSettingsRepo, hubWikiRepo)
 
 	// Inject notification service into handlers
 	postsHandler.SetNotificationService(notificationService)
@@ -324,6 +326,8 @@ func main() {
 			hubs.GET("/trending", hubsHandler.GetTrendingHubs)
 			hubs.GET("/:name", hubsHandler.Get)
 			hubs.GET("/:name/posts", hubsHandler.GetPosts)
+			hubs.GET("/:name/wiki", hubWikiHandler.GetHubWikiPage)
+			hubs.GET("/:name/wiki/:pagePath", hubWikiHandler.GetHubWikiPage)
 			hubs.GET("/:name/active-users", hubPresenceHandler.GetHubActiveUsers)
 			hubs.POST("/:name/active-users/ping", hubPresenceHandler.PingHubPresence)
 
@@ -508,6 +512,8 @@ func main() {
 			protected.POST("/hubs/:name/moderators", hubSettingsHandler.AddHubModerator)
 			protected.PATCH("/hubs/:name/moderators/:user_id", hubSettingsHandler.UpdateModeratorRole)
 			protected.DELETE("/hubs/:name/moderators/:user_id", hubSettingsHandler.RemoveHubModerator)
+			protected.PUT("/hubs/:name/wiki", hubWikiHandler.UpdateHubWikiPage)
+			protected.PUT("/hubs/:name/wiki/:pagePath", hubWikiHandler.UpdateHubWikiPage)
 
 			// Hub Theme routes (requires moderator permissions)
 			protected.GET("/hubs/:name/themes", hubThemesHandler.GetAllThemes)

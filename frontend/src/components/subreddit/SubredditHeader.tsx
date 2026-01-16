@@ -102,7 +102,7 @@ export function SubredditHeader({
         </div>
       </div>
 
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex items-center justify-between gap-3 border-b border-[var(--color-border)] pb-2">
         {filterControls && (
           <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">{filterControls}</div>
         )}
