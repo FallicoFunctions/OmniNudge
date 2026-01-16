@@ -6,6 +6,7 @@ import { useSettings } from '../contexts/SettingsContext';
 import { postsService } from '../services/postsService';
 import { hubsService } from '../services/hubsService';
 import { savedService } from '../services/savedService';
+import { moderationService } from '../services/moderationService';
 import { api } from '../lib/api';
 import { subscriptionService } from '../services/subscriptionService';
 import type { PlatformPost, PostComment } from '../types/posts';
@@ -102,6 +103,7 @@ export default function PostDetailPage() {
   }, [postDataRaw]);
   const decodedTitle = postData ? decodeHtmlEntities(postData.title) : '';
   const hubName = useMemo(() => postData?.hub?.name ?? postData?.hub_name, [postData]);
+  const isHubPost = Boolean(hubName);
   const targetSubreddit = useMemo(
     () => postData?.target_subreddit ?? postData?.crosspost_origin_subreddit ?? null,
     [postData]
@@ -466,6 +468,7 @@ export default function PostDetailPage() {
     if (!postData) return false;
     return canModerateContent(user?.id, postData.author_id, user?.role, isModerator);
   }, [postData, user, isModerator]);
+  const canPinPost = Boolean(isHubPost && isModerator);
 
   const {
     data: subredditAbout,
@@ -522,6 +525,22 @@ export default function PostDetailPage() {
     },
     onError: (err) => {
       alert(`Failed to delete post: ${err.message}`);
+    },
+  });
+
+  const togglePinMutation = useMutation<void, Error, { postId: number; isPinned: boolean }>({
+    mutationFn: async ({ postId, isPinned }) => {
+      if (isPinned) {
+        await moderationService.unpinPost(postId);
+      } else {
+        await moderationService.pinPost(postId);
+      }
+    },
+    onSuccess: (_data, variables) => {
+      if (hubName) {
+        queryClient.invalidateQueries({ queryKey: ['hub-posts', hubName] });
+      }
+      queryClient.invalidateQueries({ queryKey: ['posts', variables.postId] });
     },
   });
 
@@ -823,6 +842,27 @@ export default function PostDetailPage() {
                   <button onClick={handleCrosspost} className="hover:underline">
                     crosspost
                   </button>
+                  {canPinPost && postData && (
+                    <>
+                      <span>•</span>
+                      <button
+                        onClick={() =>
+                          togglePinMutation.mutate({
+                            postId: postData.id,
+                            isPinned: Boolean(postData.is_pinned),
+                          })
+                        }
+                        disabled={togglePinMutation.isPending}
+                        className="hover:underline disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {togglePinMutation.isPending
+                          ? 'updating...'
+                          : postData.is_pinned
+                            ? 'unpin'
+                            : 'pin'}
+                      </button>
+                    </>
+                  )}
                   {canEditPost && (
                     <>
                       <span>•</span>

@@ -1,10 +1,11 @@
 import { Link, useLocation } from 'react-router-dom';
 import { useMemo } from 'react';
+import type { PointerEvent } from 'react';
 import { formatTimestamp } from '../../utils/timeFormat';
 import { resolveMediaUrl } from '../../utils/mediaUrl';
 import { VoteButtons } from '../VoteButtons';
 import type { PlatformPost } from '../../types/posts';
-import { canModerateContent } from '../../utils/permissions';
+import { canModerateContent, requiresModerator } from '../../utils/permissions';
 
 interface HubPostCardProps {
   post: PlatformPost;
@@ -19,10 +20,15 @@ interface HubPostCardProps {
   isSavePending?: boolean;
   isHiding?: boolean;
   isDeleting?: boolean;
+  isPinning?: boolean;
+  showPinnedGrabber?: boolean;
   onShare?: () => void;
   onToggleSave?: (shouldSave: boolean) => void;
   onHide?: () => void;
   onCrosspost?: () => void;
+  onTogglePin?: () => void;
+  onPinnedPointerDown?: (postId: number, event: PointerEvent<HTMLButtonElement>) => void;
+  onPinnedPointerUp?: (postId: number, event: PointerEvent<HTMLButtonElement>) => void;
   onEdit?: () => void;
   onDelete?: () => void;
 }
@@ -40,10 +46,15 @@ export function HubPostCard({
   isSavePending = false,
   isHiding = false,
   isDeleting = false,
+  isPinning = false,
+  showPinnedGrabber = false,
   onShare,
   onToggleSave,
   onHide,
   onCrosspost,
+  onTogglePin,
+  onPinnedPointerDown,
+  onPinnedPointerUp,
   onEdit,
   onDelete,
 }: HubPostCardProps) {
@@ -76,6 +87,7 @@ export function HubPostCard({
 
   const canEdit = currentUserId === post.author_id;
   const canDelete = canModerateContent(currentUserId, post.author_id, currentUserRole, isModerator);
+  const canPin = requiresModerator(currentUserRole, isModerator);
   const postUrl = `/posts/${post.id}`;
 
   return (
@@ -170,6 +182,16 @@ export function HubPostCard({
                 Crosspost
               </button>
             )}
+            {onTogglePin && canPin && (
+              <button
+                type="button"
+                onClick={onTogglePin}
+                disabled={isPinning}
+                className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] disabled:opacity-60"
+              >
+                {isPinning ? 'Updating...' : post.is_pinned ? 'Unpin' : 'Pin'}
+              </button>
+            )}
             {canEdit && onEdit && (
               <button
                 type="button"
@@ -191,6 +213,27 @@ export function HubPostCard({
             )}
           </div>
         </div>
+        {showPinnedGrabber && (
+          <div className="flex flex-shrink-0 items-start pt-1">
+            <button
+              type="button"
+              onPointerDown={(event) => onPinnedPointerDown?.(post.id, event)}
+              onPointerUp={(event) => onPinnedPointerUp?.(post.id, event)}
+              className="cursor-grab rounded border border-transparent p-1 text-[var(--color-text-secondary)] hover:border-[var(--color-border)] hover:text-[var(--color-primary)] active:cursor-grabbing"
+              aria-label="Reorder pinned post"
+              title="Drag to reorder pinned posts"
+            >
+              <svg viewBox="0 0 20 20" className="h-4 w-4" aria-hidden="true">
+                <circle cx="6" cy="5" r="1.5" />
+                <circle cx="14" cy="5" r="1.5" />
+                <circle cx="6" cy="10" r="1.5" />
+                <circle cx="14" cy="10" r="1.5" />
+                <circle cx="6" cy="15" r="1.5" />
+                <circle cx="14" cy="15" r="1.5" />
+              </svg>
+            </button>
+          </div>
+        )}
       </div>
     </article>
   );

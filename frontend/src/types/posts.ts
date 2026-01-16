@@ -17,6 +17,8 @@ export interface PlatformPost {
   hub_id?: number | null;
   hub_display_title?: string | null;
   score: number;
+  is_pinned?: boolean;
+  pinned_position?: number | null;
   comment_count?: number;
   num_comments?: number;
   user_vote?: number | null;

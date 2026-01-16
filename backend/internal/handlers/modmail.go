@@ -10,6 +10,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/omninudge/backend/internal/models"
+	"github.com/omninudge/backend/internal/permissions"
 )
 
 // ModMailHandler handles mod mail conversations
@@ -327,13 +328,12 @@ func (h *ModMailHandler) GetModMailForHub(c *gin.Context) {
 	}
 
 	// Check if user is a moderator of this hub (or admin)
-	userRole, _ := c.Get("user_role")
-	isMod, err := h.hubModRepo.IsModerator(c.Request.Context(), hub.ID, userID.(int))
+	isMod, err := permissions.RequireHubModeratorOrAdmin(c, hub.ID, h.hubModRepo)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check permissions"})
 		return
 	}
-	if !isMod && userRole != "admin" {
+	if !isMod {
 		c.JSON(http.StatusForbidden, gin.H{"error": "Only moderators can access mod mail"})
 		return
 	}
@@ -566,14 +566,13 @@ func (h *ModMailHandler) UpdateModMailStatus(c *gin.Context) {
 		return
 	}
 
-	// Check if user is moderator
-	userRole, _ := c.Get("user_role")
-	isMod, err := h.hubModRepo.IsModerator(c.Request.Context(), hubID, userID.(int))
+	// Check if user is moderator (or admin)
+	isMod, err := permissions.RequireHubModeratorOrAdmin(c, hubID, h.hubModRepo)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check moderator status", "details": err.Error()})
 		return
 	}
-	if !isMod && userRole != "admin" {
+	if !isMod {
 		c.JSON(http.StatusForbidden, gin.H{"error": "Only moderators can update mod mail status"})
 		return
 	}

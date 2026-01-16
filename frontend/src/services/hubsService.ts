@@ -90,6 +90,8 @@ export interface LocalSubredditPost {
   downvotes: number;
   num_comments: number;
   view_count: number;
+  is_pinned?: boolean;
+  pinned_position?: number | null;
   user_vote?: number | null;
   crosspost_origin_type?: string | null;
   crosspost_origin_subreddit?: string | null;
