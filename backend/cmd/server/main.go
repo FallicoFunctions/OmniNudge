@@ -106,6 +106,7 @@ func main() {
 		cfg.Reddit.RedirectURI,
 		cfg.JWT.Secret,
 		cfg.Reddit.UserAgent,
+		cfg.Turnstile.Secret,
 	)
 	var cache services.Cache = services.NoopCache{}
 	if cfg.Redis.Addr != "" {
@@ -380,7 +381,7 @@ func main() {
 		bugReports := api.Group("/bug-reports")
 		bugReports.Use(middleware.AuthOptional(authService))
 		{
-			bugReports.POST("", bugReportsHandler.CreateBugReport) // Anyone can report bugs
+			bugReports.POST("", bugReportsHandler.CreateBugReport)   // Anyone can report bugs
 			bugReports.GET("/known", bugReportsHandler.GetKnownBugs) // Public list of known bugs
 		}
 

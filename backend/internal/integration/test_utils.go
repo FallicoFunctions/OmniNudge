@@ -107,6 +107,7 @@ func newTestDeps(t *testing.T) *TestDeps {
 		cfg.Reddit.RedirectURI,
 		cfg.JWT.Secret,
 		cfg.Reddit.UserAgent,
+		cfg.Turnstile.Secret,
 	)
 
 	// Handlers
