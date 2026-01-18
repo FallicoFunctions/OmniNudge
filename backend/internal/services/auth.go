@@ -213,10 +213,10 @@ func (s *AuthService) ValidateJWT(tokenString string) (*JWTClaims, error) {
 
 // RegisterRequest represents the registration request payload
 type RegisterRequest struct {
-	Username     string  `json:"username"`
-	Password     string  `json:"password"`
-	Email        *string `json:"email,omitempty"`
-	CaptchaToken string  `json:"captcha_token"`
+	Username      string  `json:"username"`
+	Password      string  `json:"password"`
+	Email         *string `json:"email,omitempty"`
+	TurnstileToken string  `json:"turnstile_token"`
 }
 
 // LoginRequest represents the login request payload
@@ -248,7 +248,7 @@ func (s *AuthService) Register(ctx context.Context, userRepo *models.UserReposit
 	}
 
 	// Verify Turnstile captcha token
-	if err := s.VerifyTurnstileToken(req.CaptchaToken, ""); err != nil {
+	if err := s.VerifyTurnstileToken(req.TurnstileToken, ""); err != nil {
 		return nil, "", fmt.Errorf("captcha verification failed: %w", err)
 	}
 
