@@ -15,6 +15,7 @@ type Config struct {
 	JWT        JWTConfig
 	Redis      RedisConfig
 	Encryption EncryptionConfig
+	Turnstile  TurnstileConfig
 }
 
 // RedditConfig holds Reddit OAuth configuration
@@ -38,12 +39,12 @@ type ServerConfig struct {
 
 // DatabaseConfig holds database connection configuration
 type DatabaseConfig struct {
-	Host     string
-	Port     int
-	User     string
-	Password string
-	DBName   string
-	SSLMode  string
+	Host        string
+	Port        int
+	User        string
+	Password    string
+	DBName      string
+	SSLMode     string
 	AutoMigrate bool
 }
 
@@ -60,6 +61,11 @@ type RedisConfig struct {
 type EncryptionConfig struct {
 	// Key is the AES-256 encryption key (32 bytes, base64-encoded or raw string)
 	Key string
+}
+
+// TurnstileConfig holds Cloudflare Turnstile configuration
+type TurnstileConfig struct {
+	Secret string
 }
 
 // Load reads configuration from environment variables with sensible defaults
@@ -94,6 +100,9 @@ func Load() (*Config, error) {
 		},
 		Encryption: EncryptionConfig{
 			Key: getEnv("ENCRYPTION_KEY", "dev-encryption-key-change-me!!"),
+		},
+		Turnstile: TurnstileConfig{
+			Secret: getEnv("TURNSTILE_SECRET_KEY", ""),
 		},
 	}
 
