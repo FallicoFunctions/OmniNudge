@@ -4,7 +4,7 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tansta
 import { useNavigate, useParams, useLocation, Link } from 'react-router-dom';
 import { hubsService, type HubPostsResponse, type LocalSubredditPost } from '../services/hubsService';
 import { useAuth } from '../contexts/AuthContext';
-import { HubHeader } from '../components/hubs/HubHeader';
+import { CommunityHeader } from '../components/common/CommunityHeader';
 import { postsService } from '../services/postsService';
 import { moderationService } from '../services/moderationService';
 import { useSettings } from '../contexts/SettingsContext';
@@ -38,6 +38,8 @@ import { searchPlatformPosts } from '../services/platformSearchService';
 import { PostEditModal } from '../components/posts/PostEditModal';
 import { buildPostUpdateRequest } from '../utils/postUpdate';
 import { requiresModerator } from '../utils/permissions';
+import { useTimeRangeFilter } from '../hooks/useTimeRangeFilter';
+import { usePostSearch } from '../hooks/usePostSearch';
 
 const EMPTY_POSTS: LocalSubredditPost[] = [];
 
@@ -50,10 +52,6 @@ export default function HubsPage() {
   const { useRelativeTime, useInfiniteScrollHubs, searchIncludeNsfwByDefault, blockAllNsfw } = useSettings();
   const [hubname, setHubname] = useState(routeHubname ?? 'popular');
   const [inputValue, setInputValue] = useState('');
-  const [postSearchInput, setPostSearchInput] = useState('');
-  const [isSearchDropdownOpen, setIsSearchDropdownOpen] = useState(false);
-  const [limitSearchToContext, setLimitSearchToContext] = useState(true);
-  const [includeNsfwSearch, setIncludeNsfwSearch] = useState(false);
   const [isAutocompleteOpen, setIsAutocompleteOpen] = useState(false);
   const [hubSearchResults, setHubSearchResults] = useState<LocalSubredditPost[] | null>(null);
   const [hubSearchQuery, setHubSearchQuery] = useState('');
@@ -61,9 +59,6 @@ export default function HubsPage() {
   const [cursorStack, setCursorStack] = useState(['']);
   const pageSize = 50;
   const currentCursor = cursorStack[cursorStack.length - 1] ?? '';
-  const [topTimeRange, setTopTimeRange] = useState<TopTimeRange>('day');
-  const [customTopStart, setCustomTopStart] = useState('');
-  const [customTopEnd, setCustomTopEnd] = useState('');
   const [crosspostTarget, setCrosspostTarget] = useState<LocalSubredditPost | null>(null);
   const [deletePostTarget, setDeletePostTarget] = useState<{ postId: number; authorId: number } | null>(null);
   const [deleteReason, setDeleteReason] = useState('');
@@ -73,30 +68,33 @@ export default function HubsPage() {
   const [selectedSubreddit, setSelectedSubreddit] = useState('');
   const [sendRepliesToInbox, setSendRepliesToInbox] = useState(true);
   const [showModMailModal, setShowModMailModal] = useState(false);
-  const convertInputToISO = (value: string) => {
-    if (!value) {
-      return undefined;
-    }
-    const parsed = new Date(value);
-    if (Number.isNaN(parsed.getTime())) {
-      return undefined;
-    }
-    return parsed.toISOString();
-  };
-  const isTopSort = sort === 'top';
-  const isControversialSort = sort === 'controversial';
-  const isTimedSort = isTopSort || isControversialSort;
-  const isCustomTopRange = isTimedSort && topTimeRange === 'custom';
-  const customStartISO = isCustomTopRange ? convertInputToISO(customTopStart) : undefined;
-  const customEndISO = isCustomTopRange ? convertInputToISO(customTopEnd) : undefined;
-  const isCustomRangeValid = Boolean(customStartISO && customEndISO);
-  const timeRangeKey = isTimedSort
-    ? topTimeRange === 'custom'
-      ? isCustomRangeValid
-        ? `custom-${customTopStart}-${customTopEnd}`
-        : 'custom-pending'
-      : topTimeRange
-    : 'none';
+
+  // Use custom hooks for common functionality
+  const {
+    postSearchInput,
+    isSearchDropdownOpen,
+    limitSearchToContext,
+    includeNsfwSearch,
+    setPostSearchInput,
+    setIsSearchDropdownOpen,
+    setLimitSearchToContext,
+    setIncludeNsfwSearch,
+  } = usePostSearch();
+
+  const {
+    topTimeRange,
+    customTopStart,
+    customTopEnd,
+    setTopTimeRange,
+    setCustomTopStart,
+    setCustomTopEnd,
+    isTopSort,
+    isControversialSort,
+    isCustomTopRange,
+    isCustomRangeValid,
+    timeRangeKey,
+    timeOptions,
+  } = useTimeRangeFilter(sort);
 
   // Check if user has hub subscriptions to determine default view
   const { data: subscribedHubs } = useQuery({
@@ -312,18 +310,7 @@ export default function HubsPage() {
   const { data, isLoading, error, isFetching } = useQuery({
     queryKey: postsQueryKey,
     queryFn: async (): Promise<HubPostsResponse> => {
-      const feedOptions =
-        isTimedSort && topTimeRange === 'custom'
-          ? isCustomRangeValid
-            ? {
-                timeRange: 'custom' as const,
-                startDate: customStartISO as string,
-                endDate: customEndISO as string,
-              }
-            : undefined
-          : isTimedSort
-          ? { timeRange: topTimeRange }
-          : undefined;
+      const feedOptions = timeOptions;
       if (hubname === 'popular') {
         return hubsService.getPopularFeed(sort, pageSize, 0, feedOptions, currentCursor);
       }
@@ -678,7 +665,7 @@ export default function HubsPage() {
     (
       post: LocalSubredditPost,
       options: {
-        wrapperProps?: HTMLAttributes<HTMLDivElement>;
+        wrapperProps?: HTMLAttributes<HTMLDivElement> & { 'data-pinned-post-id'?: number };
         showPinnedGrabber?: boolean;
         onPinnedPointerDown?: (postId: number, event: ReactPointerEvent<HTMLButtonElement>) => void;
         onPinnedPointerUp?: (postId: number, event: ReactPointerEvent<HTMLButtonElement>) => void;
@@ -757,6 +744,7 @@ export default function HubsPage() {
       togglePinMutation.variables,
       user?.id,
       user?.role,
+      user?.username,
       hubNameMap,
       hubname,
       hubDisplayTitle,
@@ -852,8 +840,9 @@ export default function HubsPage() {
 
   return (
     <div className="mx-auto w-full max-w-7xl px-4 py-8">
-      <HubHeader
-        hubName={hubname}
+      <CommunityHeader
+        communityType="hub"
+        communityName={hubname}
         displayTitle={hubDisplayTitle}
         isModerator={isModerator}
         searchBars={
@@ -876,123 +865,147 @@ export default function HubsPage() {
                 onSelectSubreddit={handleSelectSubredditSuggestion}
               />
             )}
-            postValue={postSearchInput}
-            postPlaceholder="Search posts..."
-            onPostChange={(value) => {
-              setPostSearchInput(value);
-              if (!isSearchDropdownOpen) {
-                setIsSearchDropdownOpen(true);
-              }
-            }}
-            onPostFocus={() => setIsSearchDropdownOpen(true)}
-            onPostBlur={() => setTimeout(() => setIsSearchDropdownOpen(false), 120)}
-            onPostSubmit={handlePostSearchSubmit}
-            postDropdownOpen={isSearchDropdownOpen}
-            postDropdownContent={
-              <div className="space-y-2 text-sm text-[var(--color-text-primary)]">
-                <label className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={limitSearchToContext}
-                    onChange={(e) => setLimitSearchToContext(e.target.checked)}
-                  />
-                  <span>Limit search to h/{hubname}</span>
-                </label>
-                {!blockAllNsfw && (
-                  <label className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      checked={includeNsfwSearch}
-                      onChange={(e) => setIncludeNsfwSearch(e.target.checked)}
-                    />
-                    <span>Include NSFW results</span>
-                  </label>
-                )}
-                {blockAllNsfw && (
-                  <div className="text-xs text-[var(--color-text-secondary)]">
-                    NSFW content is blocked in settings.
+            postValue=""
+            postPlaceholder=""
+            onPostChange={() => {}}
+            onPostSubmit={(e) => e.preventDefault()}
+            postDropdownOpen={false}
+            showPostForm={false}
+          />
+        }
+        sortControls={
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2 border-b border-[var(--color-border)] pb-2">
+            <div className="flex flex-wrap items-center gap-2">
+              {(['hot', 'new', 'top', 'rising', 'controversial'] as const).map((sortOption) => (
+                <button
+                  key={sortOption}
+                  onClick={() => handleSortChange(sortOption)}
+                  className={`px-4 py-2 text-sm font-semibold ${
+                    sort === sortOption
+                      ? 'text-[var(--color-primary)]'
+                      : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
+                  }`}
+                >
+                  {sortOption.charAt(0).toUpperCase() + sortOption.slice(1)}
+                </button>
+              ))}
+              {hasWiki && showHubSidebar && (
+                <Link
+                  to={`/h/${hubname}/wiki/index`}
+                  className={`px-4 py-2 text-sm font-semibold text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]`}
+                >
+                  Wiki
+                </Link>
+              )}
+            </div>
+            <form onSubmit={handlePostSearchSubmit} className="flex w-full gap-2 md:w-96">
+              <div className="relative flex-1">
+                <input
+                  type="text"
+                  value={postSearchInput}
+                  onFocus={() => setIsSearchDropdownOpen(true)}
+                  onBlur={() => setTimeout(() => setIsSearchDropdownOpen(false), 120)}
+                  onChange={(event) => {
+                    setPostSearchInput(event.target.value);
+                    if (!isSearchDropdownOpen) {
+                      setIsSearchDropdownOpen(true);
+                    }
+                  }}
+                  placeholder="Search posts..."
+                  className="w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-2 text-sm text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
+                />
+                {isSearchDropdownOpen && (
+                  <div className="absolute left-0 right-0 top-full z-40 mt-1 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] p-3 shadow-lg">
+                    <div className="space-y-2 text-sm text-[var(--color-text-primary)]">
+                      <label className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={limitSearchToContext}
+                          onChange={(e) => setLimitSearchToContext(e.target.checked)}
+                        />
+                        <span>Limit search to h/{hubname}</span>
+                      </label>
+                      {!blockAllNsfw && (
+                        <label className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={includeNsfwSearch}
+                            onChange={(e) => setIncludeNsfwSearch(e.target.checked)}
+                          />
+                          <span>Include NSFW results</span>
+                        </label>
+                      )}
+                      {blockAllNsfw && (
+                        <div className="text-xs text-[var(--color-text-secondary)]">
+                          NSFW content is blocked in settings.
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>
-            }
-          />
+              <button
+                type="submit"
+                className="rounded-md bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)]"
+              >
+                Search
+              </button>
+            </form>
+          </div>
         }
       />
 
-      <div className="mt-4 grid gap-6 lg:grid-cols-[minmax(0,1fr)_300px]">
-        <div>
-          {/* Sort Controls */}
-          <div className="mb-2 flex flex-wrap gap-2">
-            {(['hot', 'new', 'top', 'rising', 'controversial'] as const).map((sortOption) => (
-              <button
-                key={sortOption}
-                onClick={() => handleSortChange(sortOption)}
-                className={`px-3 py-1 rounded ${
-                  sort === sortOption
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                }`}
-              >
-                {sortOption.charAt(0).toUpperCase() + sortOption.slice(1)}
-              </button>
-            ))}
-            {hasWiki && showHubSidebar && (
-              <Link
-                to={`/h/${hubname}/wiki/index`}
-                className="px-3 py-1 rounded bg-gray-200 text-gray-700 hover:bg-gray-300"
-              >
-                Wiki
-              </Link>
-            )}
+      {(isTopSort || isControversialSort) && (
+        <div className="mb-4 mt-4 space-y-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
+              Time range
+            </span>
+            <select
+              value={topTimeRange}
+              onChange={(event) => setTopTimeRange(event.target.value as TopTimeRange)}
+              className="rounded border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-1 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
+            >
+              {TOP_TIME_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
           </div>
-          {(isTopSort || isControversialSort) && (
-            <div className="mb-4 space-y-2">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
-                  Time range
+          {topTimeRange === 'custom' && (
+            <div className="flex flex-wrap items-center gap-2 pl-1">
+              <input
+                type="datetime-local"
+                value={customTopStart}
+                onChange={(event) => setCustomTopStart(event.target.value)}
+                className="rounded border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-2 py-1 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
+              />
+              <span className="text-xs text-[var(--color-text-secondary)]">to</span>
+              <input
+                type="datetime-local"
+                value={customTopEnd}
+                onChange={(event) => setCustomTopEnd(event.target.value)}
+                className="rounded border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-2 py-1 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
+              />
+              {!isCustomRangeValid && (
+                <span className="text-xs text-[var(--color-error)]">
+                  Select both start and end dates to apply this filter.
                 </span>
-                <select
-                  value={topTimeRange}
-                  onChange={(event) => setTopTimeRange(event.target.value as TopTimeRange)}
-                  className="rounded border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-1 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
-                >
-                  {TOP_TIME_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              {topTimeRange === 'custom' && (
-                <div className="flex flex-wrap items-center gap-2 pl-1">
-                  <input
-                    type="datetime-local"
-                    value={customTopStart}
-                    onChange={(event) => setCustomTopStart(event.target.value)}
-                    className="rounded border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-2 py-1 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
-                  />
-                  <span className="text-xs text-[var(--color-text-secondary)]">to</span>
-                  <input
-                    type="datetime-local"
-                    value={customTopEnd}
-                    onChange={(event) => setCustomTopEnd(event.target.value)}
-                    className="rounded border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-2 py-1 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
-                  />
-                  {!isCustomRangeValid && (
-                    <span className="text-xs text-[var(--color-error)]">
-                      Select both start and end dates to apply this filter.
-                    </span>
-                  )}
-                </div>
               )}
             </div>
           )}
+        </div>
+      )}
 
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_300px]">
+        <div>
           {/* Posts List */}
           {effectivePosts.length > 0 || hasPinnedPosts ? (
             <>
               {shouldShowPinned && hasPinnedPosts && (
                 <div className="mb-4 space-y-3" ref={pinnedListRef}>
+                  {/* eslint-disable-next-line react-hooks/refs */}
                   {orderedPinnedPosts.map((post) =>
                     renderPostCard(post, {
                       wrapperProps: canReorderPinned

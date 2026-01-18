@@ -35,9 +35,8 @@ import { PostHeader } from '../components/posts/PostHeader';
 import { canModerateContent } from '../utils/permissions';
 import { isUserHubModerator } from '../utils/moderation';
 import { PostEditModal } from '../components/posts/PostEditModal';
-import { HubHeader } from '../components/hubs/HubHeader';
+import { CommunityHeader } from '../components/common/CommunityHeader';
 import { FeedSearchBars } from '../components/common/FeedSearchBars';
-import { SubredditHeader } from '../components/subreddit/SubredditHeader';
 import { SubredditSuggestionItem } from '../components/subreddit/SubredditSuggestionItem';
 import { useSubredditAutocomplete } from '../hooks/useSubredditAutocomplete';
 import { SubredditModeratorsPanel } from '../components/subreddit/SubredditModeratorsPanel';
@@ -615,10 +614,10 @@ export default function PostDetailPage() {
   return (
     <div className="mx-auto w-full max-w-7xl px-4 py-8">
       {normalizedSubreddit && (
-        <SubredditHeader
-          subreddit={normalizedSubreddit}
+        <CommunityHeader
+          communityType="subreddit"
+          communityName={normalizedSubreddit}
           iconUrl={subredditIcon}
-          user={user}
           isSubscribed={subredditSubscriptionStatus?.is_subscribed ?? false}
           topSearch={
             <FeedSearchBars
@@ -720,8 +719,9 @@ export default function PostDetailPage() {
         />
       )}
       {hubName && (
-        <HubHeader
-          hubName={hubName}
+        <CommunityHeader
+          communityType="hub"
+          communityName={hubName}
           displayTitle={hubDisplayTitle}
           isModerator={isModerator}
           searchBars={

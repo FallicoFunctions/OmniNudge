@@ -6,7 +6,7 @@ interface MarkdownRendererProps {
 }
 
 const imageRegex = /!\[([^\]]*)]\(([^)]+)\)/g;
-const linkRegex = /\[([^\]]+)]\((https?:\/\/[^\s)]+)\)/g;
+const linkRegex = /\[([^\]]+)]\(([^\s)]+)\)/g;
 const boldRegex = /\*\*(.+?)\*\*/g;
 const italicsRegex = /\*(.+?)\*/g;
 const strikeRegex = /~~(.+?)~~/g;
@@ -119,10 +119,13 @@ function formatInline(text: string): string {
   });
   result = result.replace(
     linkRegex,
-    (_, label, url) =>
-      `<a href="${escapeAttribute(url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(
+    (_, label, url) => {
+      // Add https:// if the URL doesn't have a protocol
+      const fullUrl = /^https?:\/\//i.test(url) ? url : `https://${url}`;
+      return `<a href="${escapeAttribute(fullUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(
         decodeHtmlEntities(label)
-      )}</a>`
+      )}</a>`;
+    }
   );
   // Replace r/subreddit with links
   result = result.replace(subredditRegex, (match, subreddit) => {
