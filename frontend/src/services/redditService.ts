@@ -56,19 +56,6 @@ export const redditService = {
     return response.about;
   },
 
-  async getSubredditModerators(subreddit: string): Promise<SubredditModeratorsResponse> {
-    const response = await api.get<{
-      subreddit: string;
-      moderators: RedditSubredditModerator[];
-      warning?: string;
-    }>(`/reddit/r/${subreddit}/moderators`);
-
-    return {
-      moderators: response.moderators ?? [],
-      warning: response.warning,
-    };
-  },
-
   async searchPosts(query: string, options?: { subreddit?: string; limit?: number; includeNsfw?: boolean; after?: string | null }): Promise<RedditPostsResponse> {
     const params = new URLSearchParams({ q: query });
     if (options?.limit) params.append('limit', String(options.limit));
