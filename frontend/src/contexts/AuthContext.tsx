@@ -19,6 +19,26 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
+// Helper functions for token storage
+const getAuthToken = (): string | null => {
+  return localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token');
+};
+
+const setAuthToken = (token: string, keepLoggedIn: boolean) => {
+  if (keepLoggedIn) {
+    localStorage.setItem('auth_token', token);
+    sessionStorage.removeItem('auth_token');
+  } else {
+    sessionStorage.setItem('auth_token', token);
+    localStorage.removeItem('auth_token');
+  }
+};
+
+const removeAuthToken = () => {
+  localStorage.removeItem('auth_token');
+  sessionStorage.removeItem('auth_token');
+};
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -81,7 +101,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Check if user is already authenticated on mount
   useEffect(() => {
     console.log('[AuthContext] Mounting, checking for token...', new Date().toISOString());
-    const token = localStorage.getItem('auth_token');
+    const token = getAuthToken();
     if (token) {
       console.log('[AuthContext] Token found, fetching user data...');
       api
@@ -97,7 +117,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         })
         .catch(() => {
           // Invalid token
-          localStorage.removeItem('auth_token');
+          removeAuthToken();
         })
         .finally(() => {
           console.log('[AuthContext] Setting isLoading to false...', new Date().toISOString());
@@ -110,7 +130,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = async (credentials: LoginRequest) => {
     const response = await api.post<AuthResponse>('/auth/login', credentials);
-    localStorage.setItem('auth_token', response.token);
+    setAuthToken(response.token, credentials.keep_logged_in ?? false);
     setUser(response.user);
     persistOmniFeedStateForUser(response.user.id, resolveDefaultOmniFeedState());
 
@@ -122,7 +142,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const register = async (data: RegisterRequest) => {
     const response = await api.post<AuthResponse>('/auth/register', data);
-    localStorage.setItem('auth_token', response.token);
+    // For registration, default to keeping logged in (can be customized)
+    setAuthToken(response.token, true);
     setUser(response.user);
     persistOmniFeedStateForUser(response.user.id, resolveDefaultOmniFeedState());
 
@@ -133,7 +154,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = () => {
-    localStorage.removeItem('auth_token');
+    removeAuthToken();
     localStorage.removeItem(OMNI_FEED_STORAGE_KEY);
     setUser(null);
 

@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
+import { Turnstile, type TurnstileInstance } from '@marsidev/react-turnstile';
 import { useAuth } from '../contexts/AuthContext';
 
 interface AuthModalProps {
@@ -16,17 +17,34 @@ export default function AuthModal({ mode, onClose, onSwitch, onSuccess }: AuthMo
   const [email, setEmail] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [keepLoggedIn, setKeepLoggedIn] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState('');
+  const turnstileRef = useRef<TurnstileInstance | null>(null);
+
+  const turnstileSiteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+
+    // Validate Turnstile token for signup
+    if (!isLogin && !turnstileToken) {
+      setError('Please complete the security verification');
+      return;
+    }
+
     setIsLoading(true);
     const normalizedUsername = username.trim();
     try {
       if (isLogin) {
-        await login({ username: normalizedUsername, password });
+        await login({ username: normalizedUsername, password, keep_logged_in: keepLoggedIn });
       } else {
-        await register({ username: normalizedUsername, password, email: email || undefined });
+        await register({
+          username: normalizedUsername,
+          password,
+          email: email || undefined,
+          turnstile_token: turnstileToken
+        });
       }
       if (onSuccess) {
         onSuccess();
@@ -35,6 +53,11 @@ export default function AuthModal({ mode, onClose, onSwitch, onSuccess }: AuthMo
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : isLogin ? 'Login failed' : 'Registration failed');
+      // Reset Turnstile on error
+      if (!isLogin && turnstileRef.current) {
+        turnstileRef.current.reset();
+        setTurnstileToken('');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -126,12 +149,46 @@ export default function AuthModal({ mode, onClose, onSwitch, onSuccess }: AuthMo
                 autoComplete={isLogin ? 'current-password' : 'new-password'}
               />
               <p className="mt-1 text-xs text-[var(--color-text-secondary)]">
-                Your email is encrypted at rest. Your password is stored as a one-way hash (we can’t read it).
+                Your email is encrypted at rest. Your password is stored as a one-way hash (we can't read it).
               </p>
             </div>
+
+            {isLogin && (
+              <div className="flex items-center">
+                <input
+                  id="keep-logged-in"
+                  type="checkbox"
+                  checked={keepLoggedIn}
+                  onChange={(e) => setKeepLoggedIn(e.target.checked)}
+                  className="h-4 w-4 rounded border-[var(--color-border)] text-[var(--color-primary)] focus:ring-[var(--color-primary)]"
+                />
+                <label
+                  htmlFor="keep-logged-in"
+                  className="ml-2 block text-sm text-[var(--color-text-primary)]"
+                >
+                  Keep me logged in
+                </label>
+              </div>
+            )}
+
+            {!isLogin && turnstileSiteKey && (
+              <div className="flex justify-center">
+                <Turnstile
+                  ref={turnstileRef}
+                  siteKey={turnstileSiteKey}
+                  onSuccess={(token) => setTurnstileToken(token)}
+                  onError={() => {
+                    setTurnstileToken('');
+                    setError('Security verification failed. Please try again.');
+                  }}
+                  onExpire={() => setTurnstileToken('')}
+                />
+              </div>
+            )}
+
             <button
               type="submit"
-              disabled={isLoading}
+              disabled={isLoading || (!isLogin && !turnstileToken)}
               className="w-full rounded-md bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 disabled:opacity-50"
             >
               {isLoading ? (isLogin ? 'Signing in...' : 'Creating account...') : isLogin ? 'Sign in' : 'Sign up'}

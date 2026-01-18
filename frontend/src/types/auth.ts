@@ -13,12 +13,14 @@ export interface User {
 export interface LoginRequest {
   username: string;
   password: string;
+  keep_logged_in?: boolean;
 }
 
 export interface RegisterRequest {
   username: string;
   password: string;
   email?: string;
+  turnstile_token: string;
 }
 
 export interface AuthResponse {

@@ -5,8 +5,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/omninudge/backend/internal/services"
 	"github.com/gin-gonic/gin"
+	"github.com/omninudge/backend/internal/services"
 	"github.com/stretchr/testify/require"
 )
 
@@ -61,7 +61,7 @@ func TestRequireRole_BlocksWhenRoleMismatch(t *testing.T) {
 
 func TestAuthRequired_SetsContextOnValidToken(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	authService := services.NewAuthService("", "", "", "test-secret", "ua")
+	authService := services.NewAuthService("", "", "", "test-secret", "ua", "")
 	token, err := authService.GenerateJWT(42, "rid", "alice", "user")
 	require.NoError(t, err)
 
@@ -85,7 +85,7 @@ func TestAuthRequired_SetsContextOnValidToken(t *testing.T) {
 
 func TestAuthRequired_RejectsMissingHeader(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	authService := services.NewAuthService("", "", "", "test-secret", "ua")
+	authService := services.NewAuthService("", "", "", "test-secret", "ua", "")
 
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)

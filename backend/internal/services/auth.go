@@ -20,15 +20,22 @@ import (
 	"golang.org/x/oauth2"
 )
 
+// TurnstileResponse represents Cloudflare Turnstile verification response
+type TurnstileResponse struct {
+	Success    bool     `json:"success"`
+	ErrorCodes []string `json:"error-codes,omitempty"`
+}
+
 // AuthService handles authentication operations
 type AuthService struct {
-	oauthConfig *oauth2.Config
-	jwtSecret   []byte
-	userAgent   string
+	oauthConfig     *oauth2.Config
+	jwtSecret       []byte
+	userAgent       string
+	turnstileSecret string
 }
 
 // NewAuthService creates a new auth service
-func NewAuthService(clientID, clientSecret, redirectURI, jwtSecret, userAgent string) *AuthService {
+func NewAuthService(clientID, clientSecret, redirectURI, jwtSecret, userAgent, turnstileSecret string) *AuthService {
 	return &AuthService{
 		oauthConfig: &oauth2.Config{
 			ClientID:     clientID,
@@ -40,9 +47,53 @@ func NewAuthService(clientID, clientSecret, redirectURI, jwtSecret, userAgent st
 				TokenURL: "https://www.reddit.com/api/v1/access_token",
 			},
 		},
-		jwtSecret: []byte(jwtSecret),
-		userAgent: userAgent,
+		jwtSecret:       []byte(jwtSecret),
+		userAgent:       userAgent,
+		turnstileSecret: turnstileSecret,
 	}
+}
+
+// VerifyTurnstileToken verifies a Cloudflare Turnstile token
+func (s *AuthService) VerifyTurnstileToken(token, remoteIP string) error {
+	if s.turnstileSecret == "" {
+		// Skip verification if no secret is configured (for development)
+		return nil
+	}
+
+	// Prepare request to Cloudflare API
+	data := fmt.Sprintf("secret=%s&response=%s", s.turnstileSecret, token)
+	if remoteIP != "" {
+		data += fmt.Sprintf("&remoteip=%s", remoteIP)
+	}
+
+	req, err := http.NewRequest("POST", "https://challenges.cloudflare.com/turnstile/v0/siteverify", strings.NewReader(data))
+	if err != nil {
+		return fmt.Errorf("failed to create turnstile verification request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	// Send request
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to verify turnstile token: %w", err)
+	}
+	defer resp.Body.Close()
+
+	// Parse response
+	var turnstileResp TurnstileResponse
+	if err := json.NewDecoder(resp.Body).Decode(&turnstileResp); err != nil {
+		return fmt.Errorf("failed to decode turnstile response: %w", err)
+	}
+
+	if !turnstileResp.Success {
+		if len(turnstileResp.ErrorCodes) > 0 {
+			return fmt.Errorf("turnstile verification failed: %s", strings.Join(turnstileResp.ErrorCodes, ", "))
+		}
+		return errors.New("turnstile verification failed")
+	}
+
+	return nil
 }
 
 // GenerateState generates a random state string for OAuth
@@ -119,13 +170,18 @@ type JWTClaims struct {
 
 // GenerateJWT creates a new JWT token for a user
 func (s *AuthService) GenerateJWT(userID int, redditID, username, role string) (string, error) {
+	return s.GenerateJWTWithExpiry(userID, redditID, username, role, 7*24*time.Hour) // Default 7 days
+}
+
+// GenerateJWTWithExpiry creates a new JWT token for a user with custom expiry
+func (s *AuthService) GenerateJWTWithExpiry(userID int, redditID, username, role string, expiry time.Duration) (string, error) {
 	claims := JWTClaims{
 		UserID:   userID,
 		RedditID: redditID,
 		Username: username,
 		Role:     role,
 		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(7 * 24 * time.Hour)), // 7 days
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(expiry)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 			Issuer:    "OmniNudge",
 		},
@@ -157,15 +213,17 @@ func (s *AuthService) ValidateJWT(tokenString string) (*JWTClaims, error) {
 
 // RegisterRequest represents the registration request payload
 type RegisterRequest struct {
-	Username string  `json:"username"`
-	Password string  `json:"password"`
-	Email    *string `json:"email,omitempty"`
+	Username     string  `json:"username"`
+	Password     string  `json:"password"`
+	Email        *string `json:"email,omitempty"`
+	CaptchaToken string  `json:"captcha_token"`
 }
 
 // LoginRequest represents the login request payload
 type LoginRequest struct {
-	Username string `json:"username"`
-	Password string `json:"password"`
+	Username     string `json:"username"`
+	Password     string `json:"password"`
+	KeepLoggedIn bool   `json:"keep_logged_in"`
 }
 
 // Register creates a new user with username/password
@@ -187,6 +245,11 @@ func (s *AuthService) Register(ctx context.Context, userRepo *models.UserReposit
 		if !emailRegex.MatchString(*req.Email) {
 			return nil, "", errors.New("invalid email format")
 		}
+	}
+
+	// Verify Turnstile captcha token
+	if err := s.VerifyTurnstileToken(req.CaptchaToken, ""); err != nil {
+		return nil, "", fmt.Errorf("captcha verification failed: %w", err)
 	}
 
 	// Check if username already exists
@@ -245,13 +308,20 @@ func (s *AuthService) Login(ctx context.Context, userRepo *models.UserRepository
 	// Update last seen
 	_ = userRepo.UpdateLastSeen(ctx, user.ID)
 
-	// Generate JWT
+	// Generate JWT with appropriate expiry
 	redditID := ""
 	if user.RedditID != nil {
 		redditID = *user.RedditID
 	}
 
-	token, err := s.GenerateJWT(user.ID, redditID, user.Username, user.Role)
+	var expiry time.Duration
+	if req.KeepLoggedIn {
+		expiry = 30 * 24 * time.Hour // 30 days
+	} else {
+		expiry = 24 * time.Hour // 1 day
+	}
+
+	token, err := s.GenerateJWTWithExpiry(user.ID, redditID, user.Username, user.Role, expiry)
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to generate token: %w", err)
 	}
