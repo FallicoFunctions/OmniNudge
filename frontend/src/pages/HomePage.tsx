@@ -25,7 +25,7 @@ import { OMNI_FEED_STORAGE_KEY } from '../constants/storageKeys';
 import { TOP_TIME_OPTIONS } from '../constants/topTimeRange';
 import type { TopTimeRange } from '../constants/topTimeRange';
 
-type SortOption = 'hot' | 'new' | 'top' | 'rising';
+type SortOption = 'hot' | 'new' | 'top' | 'rising' | 'controversial';
 
 type HideTarget = { post: RedditPost };
 type CrosspostTarget = { post: RedditPost };
@@ -113,24 +113,26 @@ export default function HomePage() {
   const sort = useMemo<SortOption>(() => {
     const params = new URLSearchParams(location.search);
     const sortParam = params.get('sort');
-    if (sortParam === 'hot' || sortParam === 'new' || sortParam === 'top' || sortParam === 'rising') {
+    if (sortParam === 'hot' || sortParam === 'new' || sortParam === 'top' || sortParam === 'rising' || sortParam === 'controversial') {
       return sortParam;
     }
     return 'hot';
   }, [location.search]);
   const isTopSort = sort === 'top';
-  const isCustomTopRange = isTopSort && topTimeRange === 'custom';
+  const isControversialSort = sort === 'controversial';
+  const isTimedSort = isTopSort || isControversialSort;
+  const isCustomTopRange = isTimedSort && topTimeRange === 'custom';
   const customStartISO = isCustomTopRange ? convertInputToISO(customTopStart) : undefined;
   const customEndISO = isCustomTopRange ? convertInputToISO(customTopEnd) : undefined;
   const isCustomRangeValid = Boolean(customStartISO && customEndISO);
-  const timeRangeKey = isTopSort
+  const timeRangeKey = isTimedSort
     ? topTimeRange === 'custom'
       ? isCustomRangeValid
         ? `custom-${customTopStart}-${customTopEnd}`
         : 'custom-pending'
       : topTimeRange
     : 'none';
-  const requiresValidCustomRange = isTopSort && topTimeRange === 'custom' && !isCustomRangeValid;
+  const requiresValidCustomRange = isTimedSort && topTimeRange === 'custom' && !isCustomRangeValid;
   const originState = useMemo(
     () => ({ originPath: `${location.pathname}${location.search}` }),
     [location.pathname, location.search]
@@ -229,7 +231,7 @@ export default function HomePage() {
     queryKey: homeFeedQueryKey,
     queryFn: () => {
       const timeOptions =
-        isTopSort && topTimeRange === 'custom'
+        isTimedSort && topTimeRange === 'custom'
           ? isCustomRangeValid
             ? {
                 timeRange: 'custom' as const,
@@ -237,7 +239,7 @@ export default function HomePage() {
                 endDate: customEndISO as string,
               }
             : undefined
-          : isTopSort
+          : isTimedSort
           ? { timeRange: topTimeRange }
           : undefined;
       return feedService.getHomeFeed(sort, pageSize, currentCursor, omniOnly, showPopularFallback, timeOptions);
@@ -532,7 +534,7 @@ export default function HomePage() {
   return (
     <div className="mx-auto max-w-7xl px-4 py-6">
       {/* Header */}
-      <div className="mb-6">
+      <div className="mb-0">
         <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
           <div className="text-left md:self-start">
             <h1 className="text-2xl font-bold text-[var(--color-text-primary)]">
@@ -576,37 +578,12 @@ export default function HomePage() {
                   onSelectSubreddit={handleSelectSubredditSuggestion}
                 />
               )}
-              postValue={postSearchInput}
-              postPlaceholder="Search posts..."
-              onPostChange={(value) => {
-                setPostSearchInput(value);
-                if (!isSearchDropdownOpen) {
-                  setIsSearchDropdownOpen(true);
-                }
-              }}
-              onPostFocus={() => setIsSearchDropdownOpen(true)}
-              onPostBlur={() => setTimeout(() => setIsSearchDropdownOpen(false), 120)}
-              onPostSubmit={handlePostSearchSubmit}
-              postDropdownOpen={isSearchDropdownOpen}
-              postDropdownContent={
-                <div className="space-y-2 text-sm text-[var(--color-text-primary)]">
-                  {!blockAllNsfw && (
-                    <label className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        checked={includeNsfwSearch}
-                        onChange={(e) => setIncludeNsfwSearch(e.target.checked)}
-                      />
-                      <span>Include NSFW results</span>
-                    </label>
-                  )}
-                  {blockAllNsfw && (
-                    <div className="text-xs text-[var(--color-text-secondary)]">
-                      NSFW content is blocked in settings.
-                    </div>
-                  )}
-                </div>
-              }
+              postValue=""
+              postPlaceholder=""
+              onPostChange={() => {}}
+              onPostSubmit={(e) => e.preventDefault()}
+              postDropdownOpen={false}
+              showPostForm={false}
             />
           </div>
         </div>
@@ -625,8 +602,8 @@ export default function HomePage() {
       )}
 
       {/* Sort controls */}
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-4 border-b border-[var(--color-border)] pb-2">
-        <div className="flex flex-wrap gap-2">
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2 border-b border-[var(--color-border)] pb-2">
+        <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
             onClick={() => handleSortChange('hot')}
@@ -671,35 +648,93 @@ export default function HomePage() {
           >
             Rising
           </button>
-        </div>
-        <div className="flex items-center gap-3 rounded-full border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-1 text-sm">
-          <span className="text-xs font-semibold uppercase text-[var(--color-text-secondary)]">
-            Omni posts only
-          </span>
           <button
             type="button"
-            role="switch"
-            aria-checked={omniOnly}
-            onClick={() => setOmniOnly((prev) => !prev)}
-            className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-1 ${
-              omniOnly ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
+            onClick={() => handleSortChange('controversial')}
+            className={`px-4 py-2 text-sm font-semibold ${
+              sort === 'controversial'
+                ? 'text-[var(--color-primary)]'
+                : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
             }`}
           >
-            <span className="sr-only">Toggle Omni posts filter</span>
-            <span
-              aria-hidden="true"
-              className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                omniOnly ? 'translate-x-5' : 'translate-x-0'
-              }`}
-            />
+            Controversial
           </button>
         </div>
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3 rounded-full border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-1 text-sm">
+            <span className="text-xs font-semibold uppercase text-[var(--color-text-secondary)]">
+              Omni posts only
+            </span>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={omniOnly}
+              onClick={() => setOmniOnly((prev) => !prev)}
+              className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-1 ${
+                omniOnly ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
+              }`}
+            >
+              <span className="sr-only">Toggle Omni posts filter</span>
+              <span
+                aria-hidden="true"
+                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                  omniOnly ? 'translate-x-5' : 'translate-x-0'
+                }`}
+              />
+            </button>
+          </div>
+          <form onSubmit={handlePostSearchSubmit} className="flex w-full gap-2 md:w-96">
+            <div className="relative flex-1">
+              <input
+                type="text"
+                value={postSearchInput}
+                onFocus={() => setIsSearchDropdownOpen(true)}
+                onBlur={() => setTimeout(() => setIsSearchDropdownOpen(false), 120)}
+                onChange={(event) => {
+                  setPostSearchInput(event.target.value);
+                  if (!isSearchDropdownOpen) {
+                    setIsSearchDropdownOpen(true);
+                  }
+                }}
+                placeholder="Search posts..."
+                className="w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-2 text-sm text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
+              />
+              {isSearchDropdownOpen && (
+                <div className="absolute left-0 right-0 top-full z-40 mt-1 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] p-3 shadow-lg">
+                  <div className="space-y-2 text-sm text-[var(--color-text-primary)]">
+                    {!blockAllNsfw && (
+                      <label className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={includeNsfwSearch}
+                          onChange={(e) => setIncludeNsfwSearch(e.target.checked)}
+                        />
+                        <span>Include NSFW results</span>
+                      </label>
+                    )}
+                    {blockAllNsfw && (
+                      <div className="text-xs text-[var(--color-text-secondary)]">
+                        NSFW content is blocked in settings.
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+            <button
+              type="submit"
+              className="rounded-md bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)]"
+            >
+              Search
+            </button>
+          </form>
+        </div>
       </div>
-      {isTopSort && (
+      {isTimedSort && (
         <div className="mb-4 space-y-2 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-3">
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
-              Top time range
+              Time range
             </span>
             <select
               value={topTimeRange}

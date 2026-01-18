@@ -26,7 +26,7 @@ import { decodeHtmlEntities } from '../utils/text';
 import { Panel } from '../components/common/Panel';
 import { FeedSearchBars } from '../components/common/FeedSearchBars';
 import SubredditAboutPanel from '../components/reddit/SubredditAboutPanel';
-import { SubredditHeader } from '../components/subreddit/SubredditHeader';
+import { CommunityHeader } from '../components/common/CommunityHeader';
 import { SubredditModeratorsPanel } from '../components/subreddit/SubredditModeratorsPanel';
 import { SubredditSuggestionItem } from '../components/subreddit/SubredditSuggestionItem';
 import { useSubredditAbout } from '../hooks/useSubredditAbout';
@@ -1600,10 +1600,10 @@ export default function RedditPostPage() {
 
   return (
     <div className="mx-auto w-full max-w-7xl px-4 py-8">
-      <SubredditHeader
-        subreddit={subreddit}
+      <CommunityHeader
+        communityType="subreddit"
+        communityName={subreddit}
         iconUrl={subredditIcon ?? subredditIconFallback}
-        user={user}
         isSubscribed={subscriptionStatus?.is_subscribed ?? false}
         topSearch={
           <FeedSearchBars

@@ -25,8 +25,10 @@ import {
 import type { RedditSubredditAbout } from '../types/reddit';
 import { RedditPostCard } from '../components/reddit/RedditPostCard';
 import { SubredditSidebar } from '../components/subreddit/SubredditSidebar';
-import { SubredditHeader } from '../components/subreddit/SubredditHeader';
+import { CommunityHeader } from '../components/common/CommunityHeader';
 import { SubredditSuggestionItem } from '../components/subreddit/SubredditSuggestionItem';
+import { useTimeRangeFilter } from '../hooks/useTimeRangeFilter';
+import { usePostSearch } from '../hooks/usePostSearch';
 import { TOP_TIME_OPTIONS } from '../constants/topTimeRange';
 import type { TopTimeRange } from '../constants/topTimeRange';
 import { searchPlatformPosts } from '../services/platformSearchService';
@@ -103,18 +105,35 @@ export default function RedditPage() {
   const { blockedUsers } = useRedditBlocklist();
   const [subreddit, setSubreddit] = useState(routeSubreddit ?? 'popular');
   const [sort, setSort] = useState<'hot' | 'new' | 'top' | 'rising' | 'controversial'>('hot');
-  const [topTimeRange, setTopTimeRange] = useState<TopTimeRange>('day');
-  const [controversialTimeRange, setControversialTimeRange] = useState<TopTimeRange>('day');
-  const [customTopStart, setCustomTopStart] = useState('');
-  const [customTopEnd, setCustomTopEnd] = useState('');
-  const [customControversialStart, setCustomControversialStart] = useState('');
-  const [customControversialEnd, setCustomControversialEnd] = useState('');
+
+  // Use custom hooks for shared state management
+  const {
+    postSearchInput,
+    isSearchDropdownOpen,
+    limitSearchToContext,
+    includeNsfwSearch,
+    setPostSearchInput,
+    setIsSearchDropdownOpen,
+    setLimitSearchToContext,
+    setIncludeNsfwSearch,
+  } = usePostSearch();
+
+  const {
+    topTimeRange,
+    customTopStart,
+    customTopEnd,
+    setTopTimeRange,
+    setCustomTopStart,
+    setCustomTopEnd,
+    isTimedSort,
+    isCustomTopRange,
+    isCustomRangeValid,
+    timeRangeKey,
+    timeOptions,
+  } = useTimeRangeFilter(sort);
+
   const [inputValue, setInputValue] = useState('');
-  const [postSearchInput, setPostSearchInput] = useState('');
   const [postSearchQuery, setPostSearchQuery] = useState('');
-  const [isSearchDropdownOpen, setIsSearchDropdownOpen] = useState(false);
-  const [limitSearchToContext, setLimitSearchToContext] = useState(true);
-  const [includeNsfwSearch, setIncludeNsfwSearch] = useState(false);
   const [scopedSearchResults, setScopedSearchResults] = useState<CrosspostSource[] | null>(null);
   const [scopedSearchAfter, setScopedSearchAfter] = useState<string | null>(null);
   const [scopedSearchQuery, setScopedSearchQuery] = useState<string>('');
@@ -129,47 +148,12 @@ export default function RedditPage() {
   const [isAutocompleteOpen, setIsAutocompleteOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageHistory, setPageHistory] = useState<(string | undefined)[]>([undefined]);
-  const convertInputToISO = (value: string) => {
-    if (!value) {
-      return undefined;
-    }
-    const parsed = new Date(value);
-    if (Number.isNaN(parsed.getTime())) {
-      return undefined;
-    }
-    return parsed.toISOString();
-  };
-  const isTopSort = sort === 'top';
-  const isControversialSort = sort === 'controversial';
-  const isCustomTopRange = isTopSort && topTimeRange === 'custom';
-  const isCustomControversialRange = isControversialSort && controversialTimeRange === 'custom';
-  const customTopStartISO = isCustomTopRange ? convertInputToISO(customTopStart) : undefined;
-  const customTopEndISO = isCustomTopRange ? convertInputToISO(customTopEnd) : undefined;
-  const customControversialStartISO = isCustomControversialRange ? convertInputToISO(customControversialStart) : undefined;
-  const customControversialEndISO = isCustomControversialRange ? convertInputToISO(customControversialEnd) : undefined;
-  const isCustomTopRangeValid = Boolean(customTopStartISO && customTopEndISO);
-  const isCustomControversialRangeValid = Boolean(customControversialStartISO && customControversialEndISO);
-  const topRangeKey = isTopSort
-    ? topTimeRange === 'custom'
-      ? isCustomTopRangeValid
-        ? `custom-${customTopStart}-${customTopEnd}`
-        : 'custom-pending'
-      : topTimeRange
-    : isControversialSort
-    ? controversialTimeRange === 'custom'
-      ? isCustomControversialRangeValid
-        ? `custom-${customControversialStart}-${customControversialEnd}`
-        : 'custom-pending'
-      : controversialTimeRange
-    : 'none';
+
+  // Calculate redditTimeFilter based on timeOptions from hook
   const redditTimeFilter =
-    isTopSort && topTimeRange !== 'custom'
-      ? topTimeRange
-      : isTopSort && topTimeRange === 'custom'
-      ? 'all'
-      : isControversialSort && controversialTimeRange !== 'custom'
-      ? controversialTimeRange
-      : isControversialSort && controversialTimeRange === 'custom'
+    isTimedSort && timeOptions?.timeRange !== 'custom'
+      ? timeOptions?.timeRange
+      : isTimedSort && timeOptions?.timeRange === 'custom'
       ? 'all'
       : undefined;
   const originState = useMemo(
@@ -179,7 +163,7 @@ export default function RedditPage() {
 
   // Infinite scroll query
   const infiniteRedditQuery = useInfiniteQuery<FeedRedditPostsResponse>({
-    queryKey: ['reddit-infinite', subreddit, sort, topRangeKey],
+    queryKey: ['reddit-infinite', subreddit, sort, timeRangeKey],
     queryFn: ({ pageParam }) => {
       const limit = 50;
       const after = pageParam as string | undefined;
@@ -191,12 +175,12 @@ export default function RedditPage() {
     getNextPageParam: (lastPage) => lastPage.after ?? undefined,
     initialPageParam: undefined,
     staleTime: 1000 * 60 * 5,
-    enabled: useInfiniteScrollSubs && (!isCustomTopRange || isCustomTopRangeValid) && (!isCustomControversialRange || isCustomControversialRangeValid),
+    enabled: useInfiniteScrollSubs && (!isCustomTopRange || isCustomRangeValid),
   });
 
   // Paginated query
   const paginatedRedditQuery = useQuery<FeedRedditPostsResponse>({
-    queryKey: ['reddit-paginated', subreddit, sort, topRangeKey, pageHistory[pageHistory.length - 1]],
+    queryKey: ['reddit-paginated', subreddit, sort, timeRangeKey, pageHistory[pageHistory.length - 1]],
     queryFn: () => {
       const limit = 50;
       const after = pageHistory[pageHistory.length - 1];
@@ -206,7 +190,7 @@ export default function RedditPage() {
       return redditService.getSubredditPosts(subreddit, sort, limit, redditTimeFilter, after);
     },
     staleTime: 1000 * 60 * 5,
-    enabled: !useInfiniteScrollSubs && (!isCustomTopRange || isCustomTopRangeValid) && (!isCustomControversialRange || isCustomControversialRangeValid),
+    enabled: !useInfiniteScrollSubs && (!isCustomTopRange || isCustomRangeValid),
   });
 
   // Memoize flattened posts to prevent re-creating the entire array on every render
@@ -262,40 +246,17 @@ export default function RedditPage() {
   });
   const hasWiki = !!wikiPreviewData && !wikiPreviewError;
 
-  const localPostsQueryKey = ['subreddit-posts', subreddit, sort, topRangeKey] as const;
+  const localPostsQueryKey = ['subreddit-posts', subreddit, sort, timeRangeKey] as const;
   // Fetch local platform posts for this subreddit
   const { data: localPostsData } = useQuery<SubredditPostsResponse>({
     queryKey: localPostsQueryKey,
     queryFn: () => {
-      const options =
-        isTopSort && topTimeRange === 'custom'
-          ? isCustomTopRangeValid
-            ? {
-                timeRange: 'custom' as const,
-                startDate: customTopStartISO as string,
-                endDate: customTopEndISO as string,
-              }
-            : undefined
-          : isTopSort
-          ? { timeRange: topTimeRange }
-          : isControversialSort && controversialTimeRange === 'custom'
-          ? isCustomControversialRangeValid
-            ? {
-                timeRange: 'custom' as const,
-                startDate: customControversialStartISO as string,
-                endDate: customControversialEndISO as string,
-              }
-            : undefined
-          : isControversialSort
-          ? { timeRange: controversialTimeRange }
-          : undefined;
-      return hubsService.getSubredditPosts(subreddit, sort, 25, 0, options);
+      return hubsService.getSubredditPosts(subreddit, sort, 25, 0, timeOptions);
     },
     enabled:
       subreddit !== 'popular' &&
       subreddit !== 'frontpage' &&
-      (!isCustomTopRange || isCustomTopRangeValid) &&
-      (!isCustomControversialRange || isCustomControversialRangeValid),
+      (!isCustomTopRange || isCustomRangeValid),
     staleTime: 1000 * 60 * 5, // 5 minutes
   });
 
@@ -330,27 +291,19 @@ export default function RedditPage() {
     if (!data?.posts) {
       return [];
     }
-    if (!isTopSort && !isControversialSort) {
+    if (!isTimedSort) {
       return data.posts;
     }
-    if (isTopSort && topTimeRange === 'custom' && isCustomTopRangeValid && customTopStartISO && customTopEndISO) {
-      const startMs = new Date(customTopStartISO).getTime();
-      const endMs = new Date(customTopEndISO).getTime();
-      return data.posts.filter((post) => {
-        const createdMs = post.created_utc * 1000;
-        return createdMs >= startMs && createdMs <= endMs;
-      });
-    }
-    if (isControversialSort && controversialTimeRange === 'custom' && isCustomControversialRangeValid && customControversialStartISO && customControversialEndISO) {
-      const startMs = new Date(customControversialStartISO).getTime();
-      const endMs = new Date(customControversialEndISO).getTime();
+    if (timeOptions?.timeRange === 'custom' && timeOptions.startDate && timeOptions.endDate) {
+      const startMs = new Date(timeOptions.startDate).getTime();
+      const endMs = new Date(timeOptions.endDate).getTime();
       return data.posts.filter((post) => {
         const createdMs = post.created_utc * 1000;
         return createdMs >= startMs && createdMs <= endMs;
       });
     }
     return data.posts;
-  }, [data?.posts, isTopSort, isControversialSort, topTimeRange, controversialTimeRange, isCustomTopRangeValid, isCustomControversialRangeValid, customTopStartISO, customTopEndISO, customControversialStartISO, customControversialEndISO]);
+  }, [data?.posts, isTimedSort, timeOptions]);
 
   // Filter out hidden posts
   const visiblePosts = useMemo(() => {
@@ -1094,7 +1047,7 @@ export default function RedditPage() {
   useEffect(() => {
     setPageHistory([undefined]);
     setCurrentPage(1);
-  }, [subreddit, sort, topRangeKey]);
+  }, [subreddit, sort, timeRangeKey]);
 
   // Infinite scroll without virtualization
   const {
@@ -1125,10 +1078,10 @@ export default function RedditPage() {
   return (
     <div className="mx-auto w-full max-w-7xl px-4 py-8">
       {/* Header with subreddit identity, filters, and search */}
-      <SubredditHeader
-        subreddit={subreddit}
+      <CommunityHeader
+        communityType="subreddit"
+        communityName={subreddit}
         iconUrl={subredditIcon}
-        user={user}
         isSubscribed={subscriptionStatus?.is_subscribed ?? false}
         filterControls={
           <>
@@ -1279,92 +1232,48 @@ export default function RedditPage() {
       />
 
       {/* Time filters row (appears below when Top or Controversial is selected) */}
-      {(isTopSort || isControversialSort) && (
-        <div className="flex flex-wrap items-center gap-2">
-          {isTopSort && (
-            <div className="flex flex-col gap-2">
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-semibold uppercase text-[var(--color-text-secondary)]">
-                  Time range
-                </span>
-                <select
-                  value={topTimeRange}
-                  onChange={(event) => setTopTimeRange(event.target.value as TopTimeRange)}
-                  className="rounded border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-1 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
-                >
-                  {TOP_TIME_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              {topTimeRange === 'custom' && (
-                <div className="flex flex-wrap items-center gap-2">
-                  <input
-                    type="datetime-local"
-                    value={customTopStart}
-                    onChange={(event) => setCustomTopStart(event.target.value)}
-                    className="rounded border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-2 py-1 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
-                  />
-                  <span className="text-xs text-[var(--color-text-secondary)]">to</span>
-                  <input
-                    type="datetime-local"
-                    value={customTopEnd}
-                    onChange={(event) => setCustomTopEnd(event.target.value)}
-                    className="rounded border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-2 py-1 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
-                  />
-                  {!isCustomTopRangeValid && (
-                    <span className="text-xs text-[var(--color-error)]">
-                      Select both start and end dates to apply this filter.
-                    </span>
-                  )}
-                </div>
-              )}
+      {isTimedSort && (
+        <div className="mb-4 mt-4 space-y-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-semibold uppercase text-[var(--color-text-secondary)]">
+                Time range
+              </span>
+              <select
+                value={topTimeRange}
+                onChange={(event) => setTopTimeRange(event.target.value as TopTimeRange)}
+                className="rounded border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-1 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
+              >
+                {TOP_TIME_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
             </div>
-          )}
-          {isControversialSort && (
-            <div className="flex flex-col gap-2">
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-semibold uppercase text-[var(--color-text-secondary)]">
-                  Time range
-                </span>
-                <select
-                  value={controversialTimeRange}
-                  onChange={(event) => setControversialTimeRange(event.target.value as TopTimeRange)}
-                  className="rounded border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-1 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
-                >
-                  {TOP_TIME_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
+            {topTimeRange === 'custom' && (
+              <div className="flex flex-wrap items-center gap-2">
+                <input
+                  type="datetime-local"
+                  value={customTopStart}
+                  onChange={(event) => setCustomTopStart(event.target.value)}
+                  className="rounded border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-2 py-1 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
+                />
+                <span className="text-xs text-[var(--color-text-secondary)]">to</span>
+                <input
+                  type="datetime-local"
+                  value={customTopEnd}
+                  onChange={(event) => setCustomTopEnd(event.target.value)}
+                  className="rounded border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-2 py-1 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
+                />
+                {!isCustomRangeValid && (
+                  <span className="text-xs text-[var(--color-error)]">
+                    Select both start and end dates to apply this filter.
+                  </span>
+                )}
               </div>
-              {controversialTimeRange === 'custom' && (
-                <div className="flex flex-wrap items-center gap-2">
-                  <input
-                    type="datetime-local"
-                    value={customControversialStart}
-                    onChange={(event) => setCustomControversialStart(event.target.value)}
-                    className="rounded border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-2 py-1 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
-                  />
-                  <span className="text-xs text-[var(--color-text-secondary)]">to</span>
-                  <input
-                    type="datetime-local"
-                    value={customControversialEnd}
-                    onChange={(event) => setCustomControversialEnd(event.target.value)}
-                    className="rounded border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-2 py-1 text-sm text-[var(--color-text-primary)] focus:outline-none"
-                  />
-                  {!isCustomControversialRangeValid && (
-                    <span className="text-xs text-[var(--color-error)]">
-                      Select both start and end dates to apply this filter.
-                    </span>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
+            )}
+          </div>
         </div>
       )}
 
