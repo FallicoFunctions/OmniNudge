@@ -1,6 +1,6 @@
 #!/bin/bash
 # OmniNudge Production Deployment Script
-# Usage: /Users/Nick_1/Documents/Personal_Projects/OmniNudge/scripts/deploy.sh
+# Usage: deploy-on
 #   (Can be run from any directory)
 
 set -e
@@ -34,9 +34,9 @@ rsync -avz --delete \
 echo -e "${GREEN}✓ Frontend uploaded${NC}"
 echo ""
 
-# Step 3: Upload backend code
+# Step 3: Upload backend code (excluding locally-built binary)
 echo -e "${YELLOW}Step 3: Uploading backend code...${NC}"
-rsync -avz --exclude 'node_modules' --exclude '.git' --exclude '.gocache' --exclude 'dist' --exclude 'build' \
+rsync -avz --exclude 'node_modules' --exclude '.git' --exclude '.gocache' --exclude 'dist' --exclude 'build' --exclude 'omninudge-server' --exclude '.env' \
   "$PROJECT_ROOT/backend/" \
   "$SERVER:$SERVER_PATH/backend/"
 echo -e "${GREEN}✓ Backend code uploaded${NC}"
