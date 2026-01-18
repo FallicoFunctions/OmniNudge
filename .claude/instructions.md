@@ -58,13 +58,42 @@
   2. Tell the user to restart their own server
 - **Exception 2**: Only if user explicitly requests you to run the server for them
 
+## Production Deployment - CRITICAL
+
+- **NEVER deploy to production** - The user will ALWAYS handle production deployments themselves
+- **NEVER run deployment scripts** (deploy-on, safe-deploy.sh, etc.) - Only the user runs these
+- **NEVER modify the production .env file** - The user manages production environment variables manually
+- After making code changes:
+  1. Build and test locally if needed
+  2. Tell the user the changes are ready
+  3. Let the user deploy when they're ready
+- **Production .env protection**:
+  - The deployment script excludes `.env` to prevent overwriting production credentials
+  - Production `.env` file location: `/var/www/omninudge/backend/.env`
+  - The user manually manages production environment variables
+  - Never suggest or attempt to sync local .env to production
+
 ## Project Context
 
 ### Architecture
 - **Backend**: Go with PostgreSQL
 - **Frontend**: React + TypeScript + TanStack Query
-- **Reddit Integration**: Reddit posts fetched from Reddit public API (paginated, 25 per page)
+- **Reddit Integration**: Reddit posts fetched via Cloudflare Worker proxy (paginated, 25 per page)
 - **Omni Posts**: Local platform posts stored in database (backend returns max 25 posts)
+
+### Reddit API Integration
+- **Reddit Proxy**: Uses Cloudflare Worker to bypass Reddit API rate limits
+  - Proxy URL: `https://reddit-proxy.nickf2632.workers.dev`
+  - Configured via `REDDIT_PROXY_URL` environment variable
+  - Must include `https://` prefix in the URL
+  - Fetches data from Reddit's public JSON API (e.g., `/r/subreddit/hot.json`)
+  - No Reddit OAuth required - uses public API endpoints only
+- **Important**: All Reddit API calls in the backend MUST use `r.redditBaseURL()` method, never hardcoded URLs
+- **No full Reddit integration**:
+  - No Reddit authentication/login
+  - No posting to Reddit
+  - No Reddit chat/messaging
+  - Read-only public post/comment viewing only
 
 ### Key Technical Decisions
 
