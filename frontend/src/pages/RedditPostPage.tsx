@@ -27,7 +27,6 @@ import { Panel } from '../components/common/Panel';
 import { FeedSearchBars } from '../components/common/FeedSearchBars';
 import SubredditAboutPanel from '../components/reddit/SubredditAboutPanel';
 import { CommunityHeader } from '../components/common/CommunityHeader';
-import { SubredditModeratorsPanel } from '../components/subreddit/SubredditModeratorsPanel';
 import { SubredditSuggestionItem } from '../components/subreddit/SubredditSuggestionItem';
 import { useSubredditAbout } from '../hooks/useSubredditAbout';
 import { useSavedItems } from '../hooks/useSavedItems';
@@ -1078,15 +1077,6 @@ export default function RedditPostPage() {
   } = useSubredditAbout(subreddit, Boolean(subreddit));
   const { data: activeUsersData } = useSubredditActiveUsers(subreddit, user);
 
-  const { data: subredditModeratorsData, isLoading: loadingSubredditModerators } = useQuery<{
-    moderators: RedditSubredditModerator[];
-  }>({
-    queryKey: ['subreddit-moderators', subreddit],
-    queryFn: () => redditService.getSubredditModerators(subreddit!),
-    enabled: Boolean(subreddit),
-    staleTime: 1000 * 60 * 10,
-  });
-  const subredditModerators = subredditModeratorsData?.moderators ?? [];
   const subredditIconFallback = useMemo(() => {
     if (!subredditAbout) return null;
     const candidates = [
@@ -2095,11 +2085,6 @@ export default function RedditPostPage() {
               isLoading={loadingSubredditAbout}
               isError={subredditAboutError}
               activeOmniUsers={activeUsersData?.active_users ?? null}
-            />
-
-            <SubredditModeratorsPanel
-              moderators={subredditModerators}
-              isLoading={loadingSubredditModerators}
             />
           </aside>
         )}

@@ -422,7 +422,7 @@ func (r *RedditClient) GetFrontPage(ctx context.Context, sort string, timeFilter
 	}
 
 	// Build URL
-	url := fmt.Sprintf("https://www.reddit.com/%s.json", sort)
+	url := fmt.Sprintf("%s/%s.json", r.redditBaseURL(), sort)
 
 	// Create request
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
@@ -475,7 +475,7 @@ func (r *RedditClient) GetPostInfo(ctx context.Context, subreddit string, reddit
 	}
 	_ = subreddit
 
-	url := fmt.Sprintf("https://www.reddit.com/api/info.json?id=t3_%s", redditPostID)
+	url := fmt.Sprintf("%s/api/info.json?id=t3_%s", r.redditBaseURL(), redditPostID)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create info request: %w", err)
@@ -522,7 +522,7 @@ func (r *RedditClient) GetPostComments(ctx context.Context, subreddit string, po
 	}
 
 	// Build URL - Reddit returns [post, comments] array
-	url := fmt.Sprintf("https://www.reddit.com/r/%s/comments/%s.json", subreddit, postID)
+	url := fmt.Sprintf("%s/r/%s/comments/%s.json", r.redditBaseURL(), subreddit, postID)
 
 	// Create request
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
@@ -576,9 +576,9 @@ func (r *RedditClient) SearchPosts(ctx context.Context, query string, subreddit 
 
 	var url string
 	if subreddit != "" {
-		url = fmt.Sprintf("https://www.reddit.com/r/%s/search.json", subreddit)
+		url = fmt.Sprintf("%s/r/%s/search.json", r.redditBaseURL(), subreddit)
 	} else {
-		url = "https://www.reddit.com/search.json"
+		url = fmt.Sprintf("%s/search.json", r.redditBaseURL())
 	}
 
 	// Create request
@@ -635,7 +635,7 @@ func (r *RedditClient) SearchPosts(ctx context.Context, query string, subreddit 
 
 // SearchUsers searches Reddit users
 func (r *RedditClient) SearchUsers(ctx context.Context, query string, limit int, after string, includeNSFW bool) (*redditGenericListing, error) {
-	url := "https://www.reddit.com/users/search.json"
+	url := fmt.Sprintf("%s/users/search.json", r.redditBaseURL())
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
@@ -846,7 +846,7 @@ func (r *RedditClient) GetUserListing(ctx context.Context, username, section, so
 		}
 	}
 
-	url := fmt.Sprintf("https://www.reddit.com/user/%s/%s.json", username, section)
+	url := fmt.Sprintf("%s/user/%s/%s.json", r.redditBaseURL(), username, section)
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
@@ -923,7 +923,7 @@ func (r *RedditClient) GetUserAbout(ctx context.Context, username string) (*Redd
 		}
 	}
 
-	url := fmt.Sprintf("https://www.reddit.com/user/%s/about.json", username)
+	url := fmt.Sprintf("%s/user/%s/about.json", r.redditBaseURL(), username)
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
@@ -985,7 +985,7 @@ func (r *RedditClient) GetUserTrophies(ctx context.Context, username string) ([]
 		}
 	}
 
-	url := fmt.Sprintf("https://www.reddit.com/user/%s/trophies.json", username)
+	url := fmt.Sprintf("%s/user/%s/trophies.json", r.redditBaseURL(), username)
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
@@ -1054,7 +1054,7 @@ func (r *RedditClient) GetUserModeratedSubreddits(ctx context.Context, username 
 		}
 	}
 
-	url := fmt.Sprintf("https://www.reddit.com/user/%s/moderated_subreddits.json", username)
+	url := fmt.Sprintf("%s/user/%s/moderated_subreddits.json", r.redditBaseURL(), username)
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
@@ -1114,7 +1114,7 @@ func (r *RedditClient) GetSubredditAbout(ctx context.Context, subreddit string) 
 		}
 	}
 
-	url := fmt.Sprintf("https://www.reddit.com/r/%s/about.json", subreddit)
+	url := fmt.Sprintf("%s/r/%s/about.json", r.redditBaseURL(), subreddit)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create subreddit about request: %w", err)
@@ -1199,7 +1199,7 @@ func (r *RedditClient) fetchSubredditModeratorsAPI(ctx context.Context, subreddi
 	if token != "" {
 		url = fmt.Sprintf("https://oauth.reddit.com/r/%s/about/moderators", subreddit)
 	} else {
-		url = fmt.Sprintf("https://www.reddit.com/r/%s/about/moderators.json", subreddit)
+		url = fmt.Sprintf("%s/r/%s/about/moderators.json", r.redditBaseURL(), subreddit)
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
@@ -1248,7 +1248,7 @@ func (r *RedditClient) fetchSubredditModeratorsAPI(ctx context.Context, subreddi
 }
 
 func (r *RedditClient) fetchSubredditModeratorsFromHTML(ctx context.Context, subreddit string) ([]RedditSubredditModerator, error) {
-	url := fmt.Sprintf("https://www.reddit.com/r/%s/about/moderators", subreddit)
+	url := fmt.Sprintf("%s/r/%s/about/moderators", r.redditBaseURL(), subreddit)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create moderators fallback request: %w", err)
@@ -1405,7 +1405,7 @@ func (r *RedditClient) setCachedListing(ctx context.Context, key string, listing
 
 // GetSubredditWikiPage fetches a wiki page from a subreddit
 func (r *RedditClient) GetSubredditWikiPage(ctx context.Context, subreddit string, pagePath string, revision string) (map[string]interface{}, error) {
-	requestURL := fmt.Sprintf("https://www.reddit.com/r/%s/wiki/%s.json", subreddit, pagePath)
+	requestURL := fmt.Sprintf("%s/r/%s/wiki/%s.json", r.redditBaseURL(), subreddit, pagePath)
 	if revision != "" {
 		params := url.Values{}
 		params.Set("v", revision)
@@ -1444,7 +1444,7 @@ func (r *RedditClient) GetSubredditWikiPage(ctx context.Context, subreddit strin
 
 // GetWikiPage fetches a wiki page from Reddit's main wiki
 func (r *RedditClient) GetWikiPage(ctx context.Context, pagePath string) (map[string]interface{}, error) {
-	url := fmt.Sprintf("https://www.reddit.com/wiki/%s.json", pagePath)
+	url := fmt.Sprintf("%s/wiki/%s.json", r.redditBaseURL(), pagePath)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
@@ -1492,7 +1492,7 @@ func (r *RedditClient) GetSubredditWikiRevisions(ctx context.Context, subreddit,
 		params.Set("after", after)
 	}
 
-	requestURL := fmt.Sprintf("https://www.reddit.com/r/%s/wiki/revisions/%s.json", subreddit, pagePath)
+	requestURL := fmt.Sprintf("%s/r/%s/wiki/revisions/%s.json", r.redditBaseURL(), subreddit, pagePath)
 	if query := params.Encode(); query != "" {
 		requestURL = fmt.Sprintf("%s?%s", requestURL, query)
 	}
@@ -1550,7 +1550,7 @@ func (r *RedditClient) GetSubredditWikiDiscussions(ctx context.Context, subreddi
 		params.Set("after", after)
 	}
 
-	requestURL := fmt.Sprintf("https://www.reddit.com/r/%s/wiki/discussions/%s.json", subreddit, pagePath)
+	requestURL := fmt.Sprintf("%s/r/%s/wiki/discussions/%s.json", r.redditBaseURL(), subreddit, pagePath)
 	if query := params.Encode(); query != "" {
 		requestURL = fmt.Sprintf("%s?%s", requestURL, query)
 	}
