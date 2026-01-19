@@ -293,6 +293,46 @@ func (h *UsersHandler) ChangePassword(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Password changed successfully"})
 }
 
+type updateEmailRequest struct {
+	Email        string `json:"email" binding:"required,email"`
+	EmailConfirm string `json:"email_confirm" binding:"required"`
+}
+
+// UpdateEmail handles PUT /api/v1/users/email
+func (h *UsersHandler) UpdateEmail(c *gin.Context) {
+	userID := c.GetInt("user_id")
+
+	var req updateEmailRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request. Please provide a valid email address"})
+		return
+	}
+
+	if req.Email != req.EmailConfirm {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Email addresses do not match"})
+		return
+	}
+
+	normalizedEmail := strings.ToLower(strings.TrimSpace(req.Email))
+	if normalizedEmail == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Email cannot be empty"})
+		return
+	}
+
+	atIndex := strings.Index(normalizedEmail, "@")
+	if atIndex < 1 || atIndex >= len(normalizedEmail)-1 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid email format"})
+		return
+	}
+
+	if err := h.userRepo.UpdateEmail(c.Request.Context(), userID, &normalizedEmail); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update email"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Email updated successfully"})
+}
+
 // Ping updates the user's last_seen timestamp without fetching the profile
 func (h *UsersHandler) Ping(c *gin.Context) {
 	userID, exists := c.Get("user_id")

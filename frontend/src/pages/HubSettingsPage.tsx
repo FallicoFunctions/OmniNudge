@@ -41,6 +41,10 @@ export default function HubSettingsPage() {
     isAdmin(user?.role) ||
     (userMod !== undefined && (userMod.role === 'owner' || userMod.role === 'full_moderator'));
 
+  // Check if user is hub owner or admin (for owner-only settings)
+  const isHubOwnerOrAdmin =
+    isAdmin(user?.role) || userMod?.role === 'owner';
+
   // Update settings mutation
   const updateMutation = useMutation({
     mutationFn: (data: Parameters<typeof hubSettingsService.updateHubSettings>[1]) =>
@@ -175,7 +179,8 @@ export default function HubSettingsPage() {
                 setSaveStatus('saving');
                 updateMutation.mutate(data);
               }}
-              isOwner={userMod?.role === 'owner'}
+              isHubOwnerOrAdmin={isHubOwnerOrAdmin}
+              hubName={hubName!}
             />
           )}
           {activeTab === 'content' && (

@@ -24,4 +24,8 @@ export const usersService = {
     const response = await api.post<{ last_seen?: string }>('/users/me/ping');
     return response?.last_seen;
   },
+
+  async updateEmail(email: string, emailConfirm: string): Promise<void> {
+    await api.put('/users/email', { email, email_confirm: emailConfirm });
+  },
 };

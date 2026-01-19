@@ -14,7 +14,7 @@ class ApiClient {
   }
 
   private getAuthHeader(): HeadersInit {
-    const token = localStorage.getItem('auth_token');
+    const token = localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token');
     if (!token) return {};
     return { Authorization: `Bearer ${token}` };
   }

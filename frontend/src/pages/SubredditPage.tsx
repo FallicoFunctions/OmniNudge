@@ -42,6 +42,7 @@ import { EmptyMessage, LoadingMessage } from '../components/common/StatusMessage
 import { FeedSearchBars } from '../components/common/FeedSearchBars';
 import { OffsetPaginationControls } from '../components/common/OffsetPaginationControls';
 import { VirtualizedList } from '../components/common/VirtualizedList';
+import { RedditPostSlideshow } from '../components/slideshow/RedditPostSlideshow';
 
 interface FeedRedditPost extends RedditCrosspostSource {
   id: string;
@@ -148,6 +149,8 @@ export default function RedditPage() {
   const [isAutocompleteOpen, setIsAutocompleteOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageHistory, setPageHistory] = useState<(string | undefined)[]>([undefined]);
+  const [slideshowOpen, setSlideshowOpen] = useState(false);
+  const [includeTextPostsInSlideshow, setIncludeTextPostsInSlideshow] = useState(true);
 
   // Calculate redditTimeFilter based on timeOptions from hook
   const redditTimeFilter =
@@ -801,8 +804,22 @@ export default function RedditPage() {
       ? allPosts.filter((post) => post.type === 'platform')
       : allPosts;
 
-    // Create a new array before sorting to avoid mutation
-    const sorted = [...filteredPosts].sort((a, b) => getSortValue(b) - getSortValue(a));
+    // Only pin stickied posts to top when sorting by "hot"
+    const shouldPinStickied = sort === 'hot';
+
+    // Separate stickied posts from regular posts (only if sorting by hot)
+    const stickiedPosts = shouldPinStickied
+      ? filteredPosts.filter((post) => post.type === 'reddit' && post.post.stickied)
+      : [];
+    const regularPosts = shouldPinStickied
+      ? filteredPosts.filter((post) => !(post.type === 'reddit' && post.post.stickied))
+      : filteredPosts;
+
+    // Sort regular posts
+    const sortedRegular = [...regularPosts].sort((a, b) => getSortValue(b) - getSortValue(a));
+
+    // Combine: stickied posts first (only for hot), then sorted regular posts
+    const sorted = [...stickiedPosts, ...sortedRegular];
 
     // In pagination mode, limit to current page size
     if (!useInfiniteScrollSubs && currentPageSize) {
@@ -1105,6 +1122,17 @@ export default function RedditPage() {
               >
                 Wiki
               </Link>
+            )}
+            {visiblePosts.length > 0 && (
+              <button
+                onClick={() => setSlideshowOpen(true)}
+                className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
+              >
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                Slideshow ({visiblePosts.length})
+              </button>
             )}
           </>
         }
@@ -1505,6 +1533,15 @@ export default function RedditPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Slideshow */}
+      {slideshowOpen && (scopedSearchResults || filteredCombinedPosts).length > 0 && (
+        <RedditPostSlideshow
+          posts={(scopedSearchResults || filteredCombinedPosts).map((item) => item.post)}
+          onClose={() => setSlideshowOpen(false)}
+          includeTextPosts={includeTextPostsInSlideshow}
+        />
       )}
     </div>
   );

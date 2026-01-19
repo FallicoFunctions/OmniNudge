@@ -15,11 +15,11 @@ import (
 type User struct {
 	ID                 int     `json:"id"`
 	Username           string  `json:"username"`
-	UsernameNormalized string  `json:"-"`                         // Lowercase username for case-insensitive lookups
-	Email              *string `json:"email,omitempty"`           // Decrypted email (for API responses)
-	EmailEncrypted     bool    `json:"-"`                         // Whether email is encrypted in DB
-	EncryptedEmail     *string `json:"-"`                         // Encrypted email (stored in DB)
-	PasswordHash       string  `json:"-"`                         // Never expose password hash in JSON
+	UsernameNormalized string  `json:"-"`               // Lowercase username for case-insensitive lookups
+	Email              *string `json:"email,omitempty"` // Decrypted email (for API responses)
+	EmailEncrypted     bool    `json:"-"`               // Whether email is encrypted in DB
+	EncryptedEmail     *string `json:"-"`               // Encrypted email (stored in DB)
+	PasswordHash       string  `json:"-"`               // Never expose password hash in JSON
 
 	// Reddit integration (optional)
 	RedditID       *string    `json:"reddit_id,omitempty"`
@@ -674,5 +674,24 @@ func (r *UserRepository) UpdateLastAgentBrowseAt(ctx context.Context, userID int
 func (r *UserRepository) UpdateEncryptedPrivateKey(ctx context.Context, userID int, encryptedPrivateKey string) error {
 	query := `UPDATE users SET encrypted_private_key = $1 WHERE id = $2`
 	_, err := r.pool.Exec(ctx, query, encryptedPrivateKey, userID)
+	return err
+}
+
+// UpdateEmail updates a user's email address (encrypted)
+func (r *UserRepository) UpdateEmail(ctx context.Context, userID int, email *string) error {
+	var encryptedEmail *string
+	var emailEncrypted bool
+
+	if email != nil && *email != "" {
+		encrypted, err := utils.EncryptEmail(*email)
+		if err != nil {
+			return err
+		}
+		encryptedEmail = &encrypted
+		emailEncrypted = true
+	}
+
+	query := `UPDATE users SET email = $1, email_encrypted = $2 WHERE id = $3`
+	_, err := r.pool.Exec(ctx, query, encryptedEmail, emailEncrypted, userID)
 	return err
 }

@@ -172,6 +172,117 @@ func (h *RedditHandler) GetPostComments(c *gin.Context) {
 	c.JSON(http.StatusOK, result)
 }
 
+// GetPostGalleryImages handles GET /api/v1/reddit/r/:subreddit/gallery/:postId
+func (h *RedditHandler) GetPostGalleryImages(c *gin.Context) {
+	subreddit := c.Param("subreddit")
+	postID := c.Param("postId")
+
+	if subreddit == "" || postID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Subreddit and post ID are required"})
+		return
+	}
+
+	// Fetch post data from Reddit
+	result, err := h.redditClient.GetPostComments(c.Request.Context(), subreddit, postID, "", 0)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch post data", "details": err.Error()})
+		return
+	}
+
+	// Parse the response to extract gallery images
+	// Reddit returns an array: [post_listing, comments_listing]
+	resultArray, ok := result.([]interface{})
+	if !ok || len(resultArray) == 0 {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid response format from Reddit"})
+		return
+	}
+
+	// Get the post listing (first element)
+	postListing, ok := resultArray[0].(map[string]interface{})
+	if !ok {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid post listing format"})
+		return
+	}
+
+	// Navigate to post data
+	data, ok := postListing["data"].(map[string]interface{})
+	if !ok {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid post data format"})
+		return
+	}
+
+	children, ok := data["children"].([]interface{})
+	if !ok || len(children) == 0 {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "No post found"})
+		return
+	}
+
+	child, ok := children[0].(map[string]interface{})
+	if !ok {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid child format"})
+		return
+	}
+
+	postData, ok := child["data"].(map[string]interface{})
+	if !ok {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid post data"})
+		return
+	}
+
+	// Check if it's a gallery post
+	isGallery, _ := postData["is_gallery"].(bool)
+	if !isGallery {
+		c.JSON(http.StatusOK, gin.H{"images": []string{}})
+		return
+	}
+
+	// Extract media_metadata which contains the actual image URLs
+	mediaMetadata, ok := postData["media_metadata"].(map[string]interface{})
+	if !ok || len(mediaMetadata) == 0 {
+		c.JSON(http.StatusOK, gin.H{"images": []string{}})
+		return
+	}
+
+	// Also get gallery_data for ordering
+	type GalleryItem struct {
+		MediaID string `json:"media_id"`
+		ID      int    `json:"id"`
+	}
+
+	var galleryItems []GalleryItem
+	if galleryData, ok := postData["gallery_data"].(map[string]interface{}); ok {
+		if items, ok := galleryData["items"].([]interface{}); ok {
+			for _, item := range items {
+				if itemMap, ok := item.(map[string]interface{}); ok {
+					mediaID, _ := itemMap["media_id"].(string)
+					id, _ := itemMap["id"].(float64)
+					galleryItems = append(galleryItems, GalleryItem{
+						MediaID: mediaID,
+						ID:      int(id),
+					})
+				}
+			}
+		}
+	}
+
+	// Extract image URLs in the correct order
+	var imageURLs []string
+	for _, galleryItem := range galleryItems {
+		if media, ok := mediaMetadata[galleryItem.MediaID].(map[string]interface{}); ok {
+			// Check for the highest resolution image
+			if s, ok := media["s"].(map[string]interface{}); ok {
+				if url, ok := s["u"].(string); ok {
+					// Decode HTML entities in URL
+					url = html.UnescapeString(url)
+					imageURLs = append(imageURLs, url)
+				}
+			}
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{"images": imageURLs})
+}
+
 // SearchPosts handles GET /api/v1/reddit/search
 func (h *RedditHandler) SearchPosts(c *gin.Context) {
 	query := c.Query("q")

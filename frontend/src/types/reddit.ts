@@ -180,6 +180,7 @@ export interface RedditSubredditAbout {
   active_user_count?: number;
   subscribers?: number;
   created_utc?: number;
+  over_18?: boolean;
 }
 
 export interface RedditSubredditModerator {

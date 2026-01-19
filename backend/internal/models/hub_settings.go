@@ -8,8 +8,8 @@ import (
 
 // HubSettings represents configuration for a hub
 type HubSettings struct {
-	ID     int `json:"id"`
-	HubID  int `json:"hub_id"`
+	ID    int `json:"id"`
+	HubID int `json:"hub_id"`
 
 	// Basic info
 	DisplayTitle    *string `json:"display_title,omitempty"`
@@ -36,9 +36,12 @@ type HubSettings struct {
 	MinAccountKarma      int            `json:"min_account_karma"`
 
 	// Other settings
-	AllowSpoilers   bool `json:"allow_spoilers"`
-	ShowThumbnails  bool `json:"show_thumbnails"`
-	EnableWiki      bool `json:"enable_wiki"`
+	AllowSpoilers  bool `json:"allow_spoilers"`
+	ShowThumbnails bool `json:"show_thumbnails"`
+	EnableWiki     bool `json:"enable_wiki"`
+
+	// Hub properties (fetched from hub table)
+	NSFW bool `json:"nsfw"`
 
 	// Timestamps
 	UpdatedAt *time.Time `json:"updated_at,omitempty"`

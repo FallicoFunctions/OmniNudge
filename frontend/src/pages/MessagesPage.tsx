@@ -15,10 +15,17 @@ import {
   encryptKeyWithPublicKey,
   arrayBufferToBase64,
   decryptMultiRecipientContent,
+  encryptMessage,
 } from '../utils/encryption';
 import { getOwnKeys, getUserPublicKey } from '../services/keyManagementService';
 import { encryptionService } from '../services/encryptionService';
 import { EmptyMessage, LoadingMessage } from '../components/common/StatusMessage';
+import { MediaSlideshow } from '../components/slideshow/MediaSlideshow';
+import { MediaUploadZone } from '../components/slideshow/MediaUploadZone';
+import { RedditPostSlideshow } from '../components/slideshow/RedditPostSlideshow';
+import { redditService } from '../services/redditService';
+import { hubsService } from '../services/hubsService';
+import { useHubSubredditAutocomplete } from '../hooks/useHubSubredditAutocomplete';
 
 const MAX_UPLOAD_SIZE = 25 * 1024 * 1024; // 25MB
 
@@ -35,9 +42,172 @@ function inferMessageTypeFromFile(file: File): Message['message_type'] {
   return 'file';
 }
 
+interface DecryptedMediaViewerWrapperProps {
+  messages: Message[];
+  initialIndex: number;
+  onClose: () => void;
+  currentUserId?: number;
+}
+
+/**
+ * Wrapper component that handles decryption for full-screen media viewing
+ * This builds a custom viewer with decryption support rather than using FullScreenMediaViewer
+ */
+function DecryptedMediaViewerWrapper({
+  messages,
+  initialIndex,
+  onClose,
+  currentUserId,
+}: DecryptedMediaViewerWrapperProps) {
+  const [currentIndex, setCurrentIndex] = useState(initialIndex);
+
+  // Decrypt the current message's media
+  const currentMessage = messages[currentIndex];
+  const isOwnMessage = currentMessage.sender_id === currentUserId;
+  const mediaSrc = useDecryptedMedia(currentMessage, isOwnMessage);
+  const mediaType = inferMessageTypeFromMessage(currentMessage);
+
+  const handlePrevious = useCallback(() => {
+    setCurrentIndex((prev) => (prev > 0 ? prev - 1 : messages.length - 1));
+  }, [messages.length]);
+
+  const handleNext = useCallback(() => {
+    setCurrentIndex((prev) => (prev < messages.length - 1 ? prev + 1 : 0));
+  }, [messages.length]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      } else if (e.key === 'ArrowLeft') {
+        handlePrevious();
+      } else if (e.key === 'ArrowRight') {
+        handleNext();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handlePrevious, handleNext, onClose]);
+
+  // Prevent body scroll when viewer is open
+  useEffect(() => {
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, []);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 bg-black bg-opacity-95 flex items-center justify-center"
+      onClick={onClose}
+    >
+      {/* Close button */}
+      <button
+        onClick={onClose}
+        className="absolute top-4 right-4 text-white hover:text-[var(--color-primary)] transition-colors z-10 p-2"
+        aria-label="Close viewer"
+      >
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          className="h-8 w-8"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M6 18L18 6M6 6l12 12"
+          />
+        </svg>
+      </button>
+
+      {/* Media counter */}
+      {messages.length > 1 && (
+        <div className="absolute top-4 left-4 text-white text-lg font-medium z-10 bg-black bg-opacity-50 px-3 py-1 rounded">
+          {currentIndex + 1} / {messages.length}
+        </div>
+      )}
+
+      {/* Previous button */}
+      {messages.length > 1 && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            handlePrevious();
+          }}
+          className="absolute left-4 top-1/2 -translate-y-1/2 text-white hover:text-[var(--color-primary)] transition-colors z-10 p-2"
+          aria-label="Previous media"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            className="h-12 w-12"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+          </svg>
+        </button>
+      )}
+
+      {/* Media display */}
+      <div
+        className="w-full h-full flex items-center justify-center p-4"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {!mediaSrc ? (
+          <div className="text-white text-lg">Decrypting media...</div>
+        ) : mediaType === 'image' ? (
+          <img
+            src={mediaSrc}
+            alt="Full screen media"
+            className="max-w-full max-h-full object-contain"
+            style={{ maxWidth: '90vw', maxHeight: '90vh' }}
+          />
+        ) : mediaType === 'video' ? (
+          <video
+            src={mediaSrc}
+            controls
+            autoPlay
+            className="max-w-full max-h-full"
+            style={{ maxWidth: '90vw', maxHeight: '90vh' }}
+          />
+        ) : null}
+      </div>
+
+      {/* Next button */}
+      {messages.length > 1 && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            handleNext();
+          }}
+          className="absolute right-4 top-1/2 -translate-y-1/2 text-white hover:text-[var(--color-primary)] transition-colors z-10 p-2"
+          aria-label="Next media"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            className="h-12 w-12"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </button>
+      )}
+    </div>
+  );
+}
+
 interface MessageMediaPreviewProps {
   message: Message;
   isOwnMessage: boolean;
+  onMediaClick?: () => void;
 }
 
 const API_ORIGIN = new URL(API_BASE_URL).origin;
@@ -280,7 +450,7 @@ function useDecryptedMedia(message: Message, isOwnMessage: boolean): string | nu
   return mediaSrc;
 }
 
-const MessageMediaPreview = ({ message, isOwnMessage }: MessageMediaPreviewProps) => {
+const MessageMediaPreview = ({ message, isOwnMessage, onMediaClick }: MessageMediaPreviewProps) => {
   const mediaSrc = useDecryptedMedia(message, isOwnMessage);
   const filename = message.media_url?.split('/').pop() ?? 'attachment';
 
@@ -300,8 +470,9 @@ const MessageMediaPreview = ({ message, isOwnMessage }: MessageMediaPreviewProps
         <img
           src={mediaSrc}
           alt="Shared media"
-          className="max-w-full rounded cursor-pointer"
-          onClick={() => mediaSrc && window.open(mediaSrc, '_blank')}
+          className="max-w-full rounded cursor-pointer object-contain"
+          style={{ maxHeight: '50vh' }}
+          onClick={() => onMediaClick ? onMediaClick() : window.open(mediaSrc, '_blank')}
         />
       </div>
     );
@@ -310,7 +481,13 @@ const MessageMediaPreview = ({ message, isOwnMessage }: MessageMediaPreviewProps
   if (resolvedType === 'video') {
     return (
       <div className="mb-2">
-        <video src={mediaSrc} controls className="max-w-full rounded" />
+        <video
+          src={mediaSrc}
+          controls
+          className="max-w-full rounded cursor-pointer"
+          style={{ maxHeight: '50vh' }}
+          onClick={() => onMediaClick?.()}
+        />
       </div>
     );
   }
@@ -393,7 +570,16 @@ export default function MessagesPage() {
   const [deleteScopeInFlight, setDeleteScopeInFlight] = useState<'self' | 'both' | null>(null);
   const [activeTab, setActiveTab] = useState<'active' | 'archived'>('active');
   const [conversationMenuOpen, setConversationMenuOpen] = useState<number | null>(null);
+  const [slideshowOpen, setSlideshowOpen] = useState(false);
+  const [showMultiUpload, setShowMultiUpload] = useState(false);
   const [deleteConversationDialog, setDeleteConversationDialog] = useState<Conversation | null>(null);
+  const [viewerState, setViewerState] = useState<{ messages: Message[]; initialIndex: number } | null>(null);
+  const [redditSlideshowModalOpen, setRedditSlideshowModalOpen] = useState(false);
+  const [redditSlideshowInput, setRedditSlideshowInput] = useState('');
+  const [redditSlideshowAutocompleteOpen, setRedditSlideshowAutocompleteOpen] = useState(false);
+  const [redditSlideshowPosts, setRedditSlideshowPosts] = useState<any[]>([]);
+  const [redditSlideshowOpen, setRedditSlideshowOpen] = useState(false);
+  const [isLoadingRedditPosts, setIsLoadingRedditPosts] = useState(false);
   const queryClient = useQueryClient();
   const [searchParams] = useSearchParams();
   const toUsernameParam = searchParams.get('to');
@@ -486,6 +672,27 @@ export default function MessagesPage() {
     () => messagesData?.pages.flatMap((page) => page.messages) ?? [],
     [messagesData]
   );
+
+  // Create media messages list for full-screen viewer (images and videos only)
+  const conversationMediaMessages = useMemo(() => {
+    return messages.filter((msg) => {
+      const type = inferMessageTypeFromMessage(msg);
+      return type === 'image' || type === 'video';
+    });
+  }, [messages]);
+
+  const handleOpenMediaViewer = useCallback((message: Message) => {
+    const mediaType = inferMessageTypeFromMessage(message);
+    if (mediaType !== 'image' && mediaType !== 'video') return;
+
+    const mediaIndex = conversationMediaMessages.findIndex(msg => msg.id === message.id);
+    if (mediaIndex === -1) return;
+
+    setViewerState({
+      messages: conversationMediaMessages,
+      initialIndex: mediaIndex,
+    });
+  }, [conversationMediaMessages]);
 
   // Fetch mod-mail conversation details if this is a mod_mail conversation
   const { data: modMailConversation } = useQuery<ModMailConversation>({
@@ -626,6 +833,141 @@ export default function MessagesPage() {
         return;
       }
       setSelectedFile(file);
+    }
+  };
+
+  // Reddit/Hub slideshow autocomplete
+  const {
+    trimmedInput: redditSlideshowTrimmedInput,
+    suggestions: redditSlideshowSuggestions,
+    shouldShowSuggestions: redditSlideshowShouldShowSuggestions,
+    isLoading: redditSlideshowAutocompleteLoading,
+  } = useHubSubredditAutocomplete(redditSlideshowInput, redditSlideshowAutocompleteOpen);
+
+  const handleLoadRedditSlideshow = async () => {
+    const trimmed = redditSlideshowInput.trim();
+    if (!trimmed) return;
+
+    setIsLoadingRedditPosts(true);
+    setRedditSlideshowModalOpen(false);
+
+    try {
+      // Check if it's a hub (starts with h/) or subreddit (starts with r/ or just the name)
+      const isHub = trimmed.startsWith('h/');
+      const name = trimmed.replace(/^[hr]\//, '');
+
+      let posts: any[];
+
+      if (isHub) {
+        // Fetch hub posts
+        const response = await hubsService.getHubPosts(name, 'hot', 50, '');
+        posts = response.posts || [];
+      } else {
+        // Fetch subreddit posts
+        const response = await redditService.getSubredditPosts(name, 'hot', 50);
+        posts = response.posts || [];
+      }
+
+      setRedditSlideshowPosts(posts);
+      setRedditSlideshowOpen(true);
+    } catch (error) {
+      console.error('Failed to load slideshow posts:', error);
+      alert('Failed to load posts. Please try again.');
+    } finally {
+      setIsLoadingRedditPosts(false);
+    }
+  };
+
+  const handleSelectRedditSlideshowSuggestion = (type: 'hub' | 'subreddit', name: string) => {
+    setRedditSlideshowInput(type === 'hub' ? `h/${name}` : `r/${name}`);
+    setRedditSlideshowAutocompleteOpen(false);
+  };
+
+  const handleMultiFileUpload = async (files: File[]) => {
+    if (!selectedConversationId) return;
+
+    setUploadingMedia(true);
+    setShowMultiUpload(false);
+
+    try {
+      // Get recipient's ID for encryption
+      const conversation = conversations?.find((c) => c.id === selectedConversationId);
+      if (!conversation) {
+        alert('Conversation not found');
+        return;
+      }
+
+      const recipientId = conversation.user1_id === user?.id ? conversation.user2_id : conversation.user1_id;
+      if (!recipientId) {
+        alert('Recipient not found');
+        return;
+      }
+
+      // Get recipient's public key
+      const recipientPublicKey = await getUserPublicKey(recipientId);
+      if (!recipientPublicKey) {
+        throw new Error('Recipient public key not found');
+      }
+
+      // Get own keys
+      const ownKeys = await getOwnKeys();
+      if (!ownKeys?.publicKey || !ownKeys?.privateKey) {
+        throw new Error('Your encryption keys are not set up');
+      }
+
+      // Upload files sequentially and send as individual messages
+      for (const file of files) {
+        try {
+          const messageType = inferMessageTypeFromFile(file);
+
+          // Encrypt the file
+          const encryptedFile = await encryptFile(file);
+
+          // Upload encrypted file
+          const uploadResponse = await mediaService.uploadMedia(
+            new File([encryptedFile.encryptedData], file.name, { type: file.type })
+          );
+
+          // Encrypt AES key for recipient
+          const recipientEncryptedKey = await encryptKeyWithPublicKey(encryptedFile.rawKey, recipientPublicKey);
+
+          // Encrypt AES key for sender
+          const senderEncryptedKey = await encryptKeyWithPublicKey(encryptedFile.rawKey, ownKeys.publicKey);
+
+          // Create auto-generated caption
+          const captionText = `[${messageType === 'image' ? 'Image' : 'Video'}]`;
+          const encryptedCaption = await encryptMessage(captionText, recipientPublicKey);
+          const senderEncryptedCaption = await encryptMessage(captionText, ownKeys.publicKey);
+
+          // Send message
+          await messagesService.sendMessage({
+            conversation_id: selectedConversationId,
+            encrypted_content: encryptedCaption,
+            sender_encrypted_content: senderEncryptedCaption,
+            media_file_id: uploadResponse.id,
+            media_url: uploadResponse.storage_url,
+            media_type: file.type,
+            media_size: file.size,
+            message_type: messageType,
+            media_encryption_key: recipientEncryptedKey,
+            media_encryption_iv: arrayBufferToBase64(encryptedFile.iv.slice().buffer),
+            sender_media_encryption_key: senderEncryptedKey,
+            encryption_version: 'v1',
+          });
+        } catch (error) {
+          console.error('Failed to upload file:', file.name, error);
+          alert(`Failed to upload ${file.name}`);
+        }
+      }
+
+      // Refresh messages
+      await queryClient.invalidateQueries({ queryKey: ['messages', selectedConversationId] });
+      await queryClient.invalidateQueries({ queryKey: ['conversations'] });
+    } catch (error) {
+      console.error('Multi-file upload error:', error);
+      alert(error instanceof Error ? error.message : 'Failed to upload files');
+    } finally {
+      setUploadingMedia(false);
     }
   };
 
@@ -1117,13 +1459,69 @@ export default function MessagesPage() {
           <>
             {/* Chat Header */}
             <div className="border-b border-[var(--color-border)] p-4">
-              <h3 className="font-semibold text-[var(--color-text-primary)]">
-                {isCreatingChat
-                  ? 'New Chat'
-                  : selectedConversation?.conversation_type === 'mod_mail'
-                  ? `${selectedConversation?.hub_name ? `h/${selectedConversation.hub_name}` : 'Hub'} - Mod Mail - ${selectedConversation?.subject || 'Untitled'}`
-                  : selectedConversation?.other_user?.username || 'Unknown'}
-              </h3>
+              <div className="flex items-center justify-between">
+                <h3 className="font-semibold text-[var(--color-text-primary)]">
+                  {isCreatingChat
+                    ? 'New Chat'
+                    : selectedConversation?.conversation_type === 'mod_mail'
+                    ? `${selectedConversation?.hub_name ? `h/${selectedConversation.hub_name}` : 'Hub'} - Mod Mail - ${selectedConversation?.subject || 'Untitled'}`
+                    : selectedConversation?.other_user?.username || 'Unknown'}
+                </h3>
+
+                {/* Slideshow buttons */}
+                <div className="flex items-center gap-2">
+                  {/* Reddit/Hub slideshow button */}
+                  {!isCreatingChat && (
+                    <button
+                      onClick={() => {
+                        setRedditSlideshowModalOpen(true);
+                        setRedditSlideshowInput('');
+                      }}
+                      className="px-3 py-1.5 bg-[var(--color-surface-elevated)] text-[var(--color-text-primary)] border border-[var(--color-border)] rounded-md text-sm font-medium hover:bg-[var(--color-surface-hover)] transition-colors flex items-center gap-2"
+                    >
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="h-5 w-5"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                        />
+                      </svg>
+                      Browse Reddit/Hub
+                    </button>
+                  )}
+
+                  {/* Chat media slideshow button - only show if conversation has 2+ media items */}
+                  {!isCreatingChat && conversationMediaMessages.length >= 2 && (
+                    <button
+                      onClick={() => setSlideshowOpen(true)}
+                      className="px-3 py-1.5 bg-[var(--color-primary)] text-white rounded-md text-sm font-medium hover:bg-[var(--color-primary-dark)] transition-colors flex items-center gap-2"
+                    >
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="h-5 w-5"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                        />
+                      </svg>
+                      View Slideshow ({conversationMediaMessages.length})
+                    </button>
+                  )}
+                </div>
+              </div>
             </div>
 
             {/* Messages */}
@@ -1176,7 +1574,11 @@ export default function MessagesPage() {
                             }`}
                           >
                             {message.media_url && (
-                              <MessageMediaPreview message={message} isOwnMessage={isOwnMessage} />
+                              <MessageMediaPreview
+                                message={message}
+                                isOwnMessage={isOwnMessage}
+                                onMediaClick={() => handleOpenMediaViewer(message)}
+                              />
                             )}
                             {message.encrypted_content && !isAutoGeneratedMediaCaption(message) && (
                               <DecryptedMessageContent
@@ -1266,6 +1668,22 @@ export default function MessagesPage() {
                 />
               )}
 
+              {/* Multi-upload zone */}
+              {showMultiUpload && !isCreatingChat && (
+                <div className="mb-4">
+                  <div className="mb-2 flex items-center justify-between">
+                    <h4 className="font-medium text-[var(--color-text-primary)]">Upload Multiple Files</h4>
+                    <button
+                      onClick={() => setShowMultiUpload(false)}
+                      className="text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                  <MediaUploadZone onFilesSelected={handleMultiFileUpload} />
+                </div>
+              )}
+
               {selectedFile && (
                 <div className="mb-2 flex items-center gap-2 rounded-md bg-[var(--color-surface-elevated)] p-2">
                   <span className="text-sm text-[var(--color-text-secondary)]">
@@ -1291,10 +1709,20 @@ export default function MessagesPage() {
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
                   className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-2 text-sm text-[var(--color-text-primary)] hover:bg-[var(--color-surface)]"
-                  title="Attach file"
+                  title="Attach single file"
                 >
                   📎
                 </button>
+                {!isCreatingChat && (
+                  <button
+                    type="button"
+                    onClick={() => setShowMultiUpload(!showMultiUpload)}
+                    className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-2 text-sm text-[var(--color-text-primary)] hover:bg-[var(--color-surface)]"
+                    title="Upload multiple files"
+                  >
+                    📷+
+                  </button>
+                )}
                 <input
                   type="text"
                   value={messageText}
@@ -1446,6 +1874,183 @@ export default function MessagesPage() {
           </div>
         </div>
       )}
+
+      {/* Full-screen media viewer */}
+      {viewerState && (
+        <DecryptedMediaViewerWrapper
+          messages={viewerState.messages}
+          initialIndex={viewerState.initialIndex}
+          onClose={() => setViewerState(null)}
+          currentUserId={user?.id}
+        />
+      )}
+
+      {/* Media slideshow */}
+      {slideshowOpen && conversationMediaMessages.length > 0 && (
+        <MediaSlideshow
+          items={conversationMediaMessages.map((message) => {
+            const isOwnMessage = message.sender_id === user?.id;
+            return {
+              id: message.id,
+              element: (
+                <DecryptedSlideshowItem
+                  message={message}
+                  isOwnMessage={isOwnMessage}
+                />
+              ),
+            };
+          })}
+          initialIndex={0}
+          onClose={() => setSlideshowOpen(false)}
+        />
+      )}
+
+      {/* Reddit/Hub slideshow modal */}
+      {redditSlideshowModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 px-4">
+          <div className="w-full max-w-md rounded-lg bg-[var(--color-surface)] p-6 shadow-lg">
+            <div className="flex items-start justify-between mb-4">
+              <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">Browse Reddit/Hub Slideshow</h3>
+              <button
+                onClick={() => setRedditSlideshowModalOpen(false)}
+                className="text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div className="relative">
+                <label className="mb-2 block text-sm font-medium text-[var(--color-text-secondary)]">
+                  Enter subreddit or hub name
+                </label>
+                <input
+                  type="text"
+                  value={redditSlideshowInput}
+                  onChange={(e) => {
+                    setRedditSlideshowInput(e.target.value);
+                    if (!redditSlideshowAutocompleteOpen) {
+                      setRedditSlideshowAutocompleteOpen(true);
+                    }
+                  }}
+                  onFocus={() => setRedditSlideshowAutocompleteOpen(true)}
+                  onBlur={() => setTimeout(() => setRedditSlideshowAutocompleteOpen(false), 200)}
+                  placeholder="e.g., r/pics or h/gaming"
+                  className="w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-2 text-sm text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      handleLoadRedditSlideshow();
+                    }
+                  }}
+                />
+
+                {/* Autocomplete dropdown */}
+                {redditSlideshowAutocompleteOpen && redditSlideshowShouldShowSuggestions && (
+                  <div className="absolute left-0 right-0 top-full z-50 mt-1 max-h-60 overflow-auto rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] shadow-lg">
+                    {redditSlideshowAutocompleteLoading ? (
+                      <div className="p-3 text-center text-sm text-[var(--color-text-secondary)]">
+                        Loading suggestions...
+                      </div>
+                    ) : redditSlideshowSuggestions.length > 0 ? (
+                      redditSlideshowSuggestions.map((suggestion) => (
+                        <button
+                          key={`${suggestion.type}-${suggestion.data.name}`}
+                          type="button"
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            handleSelectRedditSlideshowSuggestion(suggestion.type, suggestion.data.name);
+                          }}
+                          className="w-full px-3 py-2 text-left text-sm hover:bg-[var(--color-surface-hover)] flex items-center gap-2"
+                        >
+                          <span className={`font-medium ${suggestion.type === 'hub' ? 'text-blue-600' : 'text-orange-600'}`}>
+                            {suggestion.type === 'hub' ? 'h/' : 'r/'}
+                          </span>
+                          <span className="text-[var(--color-text-primary)]">{suggestion.data.name}</span>
+                        </button>
+                      ))
+                    ) : (
+                      <div className="p-3 text-center text-sm text-[var(--color-text-secondary)]">
+                        No suggestions found
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <div className="flex justify-end gap-2">
+                <button
+                  onClick={() => setRedditSlideshowModalOpen(false)}
+                  className="rounded-md border border-[var(--color-border)] px-4 py-2 text-sm font-semibold text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-elevated)]"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleLoadRedditSlideshow}
+                  disabled={!redditSlideshowTrimmedInput || isLoadingRedditPosts}
+                  className="rounded-md bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)] disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {isLoadingRedditPosts ? 'Loading...' : 'Load Slideshow'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reddit/Hub slideshow */}
+      {redditSlideshowOpen && redditSlideshowPosts.length > 0 && (
+        <RedditPostSlideshow
+          posts={redditSlideshowPosts}
+          onClose={() => {
+            setRedditSlideshowOpen(false);
+            setRedditSlideshowPosts([]);
+          }}
+          includeTextPosts={true}
+        />
+      )}
     </>
+  );
+}
+
+// Helper component to decrypt and display media in slideshow
+function DecryptedSlideshowItem({ message, isOwnMessage }: { message: Message; isOwnMessage: boolean }) {
+  const mediaSrc = useDecryptedMedia(message, isOwnMessage);
+  const mediaType = inferMessageTypeFromMessage(message);
+
+  if (!mediaSrc) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="text-white text-lg">Decrypting...</div>
+      </div>
+    );
+  }
+
+  if (mediaType === 'image') {
+    return (
+      <img
+        src={mediaSrc}
+        alt="Slideshow media"
+        className="max-w-full max-h-full object-contain"
+        style={{ maxWidth: '90vw', maxHeight: '90vh' }}
+      />
+    );
+  }
+
+  if (mediaType === 'video') {
+    return (
+      <video
+        src={mediaSrc}
+        controls
+        autoPlay
+        className="max-w-full max-h-full object-contain"
+        style={{ maxWidth: '90vw', maxHeight: '90vh' }}
+      />
+    );
+  }
+
+  return (
+    <div className="flex items-center justify-center h-full">
+      <div className="text-white text-lg">Unsupported media type</div>
+    </div>
   );
 }

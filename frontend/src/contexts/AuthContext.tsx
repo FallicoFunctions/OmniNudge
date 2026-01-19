@@ -15,6 +15,7 @@ interface AuthContextType {
   register: (data: RegisterRequest) => Promise<void>;
   logout: () => void;
   isAuthenticated: boolean;
+  refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -135,9 +136,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     persistOmniFeedStateForUser(response.user.id, resolveDefaultOmniFeedState());
 
     // Initialize encryption keys with password for cross-browser sync (non-blocking)
-    initializeEncryptionKeys(credentials.password, response.user.public_key || undefined).catch((err) => {
-      console.error('Background encryption key init failed:', err);
-    });
+    // Small delay to ensure token is fully persisted in storage
+    setTimeout(() => {
+      initializeEncryptionKeys(credentials.password, response.user.public_key || undefined).catch((err) => {
+        console.error('Background encryption key init failed:', err);
+      });
+    }, 100);
   };
 
   const register = async (data: RegisterRequest) => {
@@ -168,6 +172,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
   };
 
+  const refreshUser = async () => {
+    try {
+      const userData = await api.get<User>('/auth/me');
+      setUser(userData);
+    } catch (error) {
+      console.error('Failed to refresh user:', error);
+    }
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -177,6 +190,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         register,
         logout,
         isAuthenticated: !!user,
+        refreshUser,
       }}
     >
       {children}
