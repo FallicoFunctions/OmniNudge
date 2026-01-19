@@ -172,9 +172,20 @@ function DecryptedMediaViewerWrapper({
           <video
             src={mediaSrc}
             controls
-            autoPlay
+            playsInline
+            loop
+            muted={false}
             className="max-w-full max-h-full"
             style={{ maxWidth: '90vw', maxHeight: '90vh' }}
+            onCanPlay={(e) => {
+              const video = e.currentTarget;
+              video.muted = false;
+              video.volume = 1.0;
+              console.log('Video can play, attempting to play with sound...');
+              video.play().catch((error) => {
+                console.log('Autoplay with sound blocked:', error);
+              });
+            }}
           />
         ) : null}
       </div>
@@ -2041,9 +2052,20 @@ function DecryptedSlideshowItem({ message, isOwnMessage }: { message: Message; i
       <video
         src={mediaSrc}
         controls
-        autoPlay
+        playsInline
+        loop
+        muted={false}
         className="max-w-full max-h-full object-contain"
         style={{ maxWidth: '90vw', maxHeight: '90vh' }}
+        onCanPlay={(e) => {
+          const video = e.currentTarget;
+          video.muted = false;
+          video.volume = 1.0;
+          console.log('Video can play, attempting to play with sound...');
+          video.play().catch((error) => {
+            console.log('Autoplay with sound blocked:', error);
+          });
+        }}
       />
     );
   }

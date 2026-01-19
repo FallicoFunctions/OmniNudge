@@ -5,6 +5,7 @@ import { SlideshowControls } from './SlideshowControls';
 import { redditService } from '../../services/redditService';
 import { PostBodyMarkdown } from '../posts/PostBodyMarkdown';
 import { resolveMediaUrl } from '../../utils/mediaUrl';
+import { getRedditDashAudioUrl } from '../../utils/redditVideoAudio';
 
 interface RedditPost {
   id: string;
@@ -62,6 +63,7 @@ interface SlideshowPost {
   id: string;
   title: string;
   mediaUrl?: string;
+  audioUrl?: string;
   mediaType: 'image' | 'video' | 'text';
   selftext?: string;
   postUrl: string;
@@ -74,6 +76,65 @@ export function RedditPostSlideshow({
 }: RedditPostSlideshowProps) {
   const [galleryData, setGalleryData] = useState<Record<string, string[]>>({});
   const [loadingGalleries, setLoadingGalleries] = useState(true);
+  const getOrCreateAudioEl = (postId: string, audioSrc: string) => {
+    const audioId = `audio-${postId}`;
+    let audioEl = document.getElementById(audioId) as HTMLAudioElement | null;
+    if (!audioEl) {
+      audioEl = document.createElement('audio');
+      audioEl.id = audioId;
+      audioEl.src = audioSrc;
+      audioEl.preload = 'metadata';
+      audioEl.loop = true;
+      document.body.appendChild(audioEl);
+    } else if (audioEl.src !== audioSrc) {
+      audioEl.src = audioSrc;
+    }
+    return audioEl;
+  };
+
+  const syncAudioWithVideo = (videoEl: HTMLVideoElement, audioEl: HTMLAudioElement) => {
+    audioEl.currentTime = videoEl.currentTime;
+    audioEl.volume = videoEl.volume;
+    audioEl.muted = false; // Always keep audio unmuted - let video control overall sound
+    audioEl.playbackRate = videoEl.playbackRate;
+  };
+
+  const tryPlayAudio = (videoEl: HTMLVideoElement, audioEl: HTMLAudioElement) => {
+    syncAudioWithVideo(videoEl, audioEl);
+    const playPromise = audioEl.play();
+    if (playPromise) {
+      playPromise.catch((error) => {
+        if (error?.name === 'NotAllowedError') {
+          videoEl.dataset.audioBlocked = 'true';
+        }
+      });
+    }
+  };
+
+  // Handle slide change - unmute video and play audio when navigating
+  const handleSlideChange = () => {
+    requestAnimationFrame(() => {
+      const videoElement = document.querySelector('video[data-active="true"]') as HTMLVideoElement;
+      if (videoElement) {
+        const audioSrc = videoElement.getAttribute('data-audio-src');
+
+        // Video should already be playing (autoPlay attribute), just unmute it
+        videoElement.muted = false;
+        videoElement.volume = 1.0;
+
+        // If there's a separate audio track, play it synchronized with video
+        if (audioSrc) {
+          const audioEl = getOrCreateAudioEl(videoElement.dataset.postId || '', audioSrc);
+          // Small delay to let video start first
+          setTimeout(() => {
+            if (!videoElement.paused) {
+              tryPlayAudio(videoElement, audioEl);
+            }
+          }, 100);
+        }
+      }
+    });
+  };
 
   // Fetch gallery images for all gallery posts
   useEffect(() => {
@@ -195,10 +256,15 @@ export function RedditPostSlideshow({
 
         // Check if it's a video post
         if (redditPost.is_video && redditPost.media?.reddit_video?.fallback_url) {
+          // Reddit videos have separate audio and video streams
+          const videoUrl = redditPost.media.reddit_video.fallback_url;
+          const audioUrl = getRedditDashAudioUrl(videoUrl);
+
           processedPosts.push({
             id: redditPost.id,
             title: redditPost.title,
-            mediaUrl: redditPost.media.reddit_video.fallback_url,
+            mediaUrl: videoUrl,
+            audioUrl: audioUrl, // Add audio URL
             mediaType: 'video' as const,
             postUrl,
           });
@@ -256,13 +322,80 @@ export function RedditPostSlideshow({
             )}
 
             {post.mediaType === 'video' && post.mediaUrl && (
-              <video
-                src={post.mediaUrl}
-                controls
-                autoPlay
-                className="object-contain"
-                style={{ maxWidth: '90vw', maxHeight: '70vh' }}
-              />
+              <div className="relative">
+                <video
+                  key={`video-${post.id}`}
+                  src={post.mediaUrl}
+                  controls
+                  playsInline
+                  loop
+                  autoPlay
+                  muted
+                  data-active="true"
+                  data-post-id={post.id}
+                  data-audio-src={post.audioUrl}
+                  className="object-contain"
+                  style={{ maxWidth: '90vw', maxHeight: '70vh' }}
+                  onPlay={(e) => {
+                    // When video plays, also play the audio element
+                    const audioSrc = e.currentTarget.getAttribute('data-audio-src');
+                    if (audioSrc) {
+                      const audioEl = getOrCreateAudioEl(post.id, audioSrc);
+                      tryPlayAudio(e.currentTarget, audioEl);
+                    }
+                  }}
+                  onPointerDown={(e) => {
+                    const videoEl = e.currentTarget;
+                    if (videoEl.dataset.audioBlocked !== 'true') return;
+                    const audioSrc = videoEl.getAttribute('data-audio-src');
+                    if (!audioSrc) return;
+                    const audioEl = getOrCreateAudioEl(post.id, audioSrc);
+                    delete videoEl.dataset.audioBlocked;
+                    tryPlayAudio(videoEl, audioEl);
+                  }}
+                  onPause={() => {
+                    // When video pauses, also pause the audio
+                    const audioId = `audio-${post.id}`;
+                    const audioEl = document.getElementById(audioId) as HTMLAudioElement;
+                    if (audioEl) {
+                      audioEl.pause();
+                    }
+                  }}
+                  onSeeking={(e) => {
+                    // Sync audio when seeking
+                    const audioId = `audio-${post.id}`;
+                    const audioEl = document.getElementById(audioId) as HTMLAudioElement;
+                    if (audioEl) {
+                      audioEl.currentTime = e.currentTarget.currentTime;
+                    }
+                  }}
+                  onVolumeChange={(e) => {
+                    const audioId = `audio-${post.id}`;
+                    const audioEl = document.getElementById(audioId) as HTMLAudioElement;
+                    if (!audioEl) return;
+                    // Only sync if audio element exists and is different
+                    if (Math.abs(audioEl.volume - e.currentTarget.volume) > 0.01) {
+                      audioEl.volume = e.currentTarget.volume;
+                    }
+                    if (audioEl.muted !== e.currentTarget.muted) {
+                      audioEl.muted = e.currentTarget.muted;
+                    }
+                  }}
+                  onRateChange={(e) => {
+                    const audioId = `audio-${post.id}`;
+                    const audioEl = document.getElementById(audioId) as HTMLAudioElement;
+                    if (!audioEl) return;
+                    audioEl.playbackRate = e.currentTarget.playbackRate;
+                  }}
+                  onEnded={() => {
+                    const audioId = `audio-${post.id}`;
+                    const audioEl = document.getElementById(audioId) as HTMLAudioElement;
+                    if (!audioEl) return;
+                    audioEl.pause();
+                    audioEl.currentTime = 0;
+                  }}
+                />
+              </div>
             )}
 
             {post.mediaType === 'text' && post.selftext && (
@@ -316,6 +449,7 @@ export function RedditPostSlideshow({
       autoAdvance={false}
       autoAdvanceInterval={5000}
       showControls={true}
+      onSlideChange={handleSlideChange}
       renderControls={({
         autoAdvance,
         autoAdvanceInterval,

@@ -13,6 +13,7 @@ interface BaseSlideshowProps {
   autoAdvance?: boolean;
   autoAdvanceInterval?: number;
   showControls?: boolean;
+  onSlideChange?: (index: number) => void;
   renderControls?: (props: {
     currentIndex: number;
     totalItems: number;
@@ -30,11 +31,17 @@ export function BaseSlideshow({
   autoAdvance: initialAutoAdvance = false,
   autoAdvanceInterval: initialInterval = 5000,
   showControls = true,
+  onSlideChange,
   renderControls,
 }: BaseSlideshowProps) {
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const [autoAdvance, setAutoAdvance] = useState(initialAutoAdvance);
   const [autoAdvanceInterval, setAutoAdvanceInterval] = useState(initialInterval);
+
+  // Call onSlideChange when currentIndex changes
+  useEffect(() => {
+    onSlideChange?.(currentIndex);
+  }, [currentIndex, onSlideChange]);
 
   const handlePrevious = useCallback(() => {
     setCurrentIndex((prev) => (prev > 0 ? prev - 1 : items.length - 1));
