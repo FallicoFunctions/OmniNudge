@@ -58,6 +58,7 @@ interface FeedRedditPost extends RedditCrosspostSource {
   is_self: boolean;
   post_hint?: string;
   is_video?: boolean;
+  permalink: string;
 }
 
 interface FeedRedditPostsResponse {
@@ -150,7 +151,7 @@ export default function RedditPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageHistory, setPageHistory] = useState<(string | undefined)[]>([undefined]);
   const [slideshowOpen, setSlideshowOpen] = useState(false);
-  const [includeTextPostsInSlideshow, setIncludeTextPostsInSlideshow] = useState(true);
+  const [includeTextPostsInSlideshow] = useState(true);
 
   // Calculate redditTimeFilter based on timeOptions from hook
   const redditTimeFilter =

@@ -1,5 +1,4 @@
 import { useMemo, useState, useEffect } from 'react';
-import type { ReactNode } from 'react';
 import { BaseSlideshow } from './BaseSlideshow';
 import type { SlideshowItem } from './BaseSlideshow';
 import { SlideshowControls } from './SlideshowControls';
