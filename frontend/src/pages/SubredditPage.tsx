@@ -1158,18 +1158,11 @@ export default function RedditPage() {
                 onSelect={handleSelectSubredditSuggestion}
               />
             )}
-            postValue={postSearchInput}
-            postPlaceholder="Search posts..."
-            onPostChange={(value) => {
-              setPostSearchInput(value);
-              if (!isSearchDropdownOpen) {
-                setIsSearchDropdownOpen(true);
-              }
-            }}
-            onPostFocus={() => setIsSearchDropdownOpen(true)}
-            onPostBlur={() => setTimeout(() => setIsSearchDropdownOpen(false), 120)}
-            onPostSubmit={handlePostSearchSubmit}
-            postDropdownOpen={isSearchDropdownOpen}
+            postValue=""
+            postPlaceholder=""
+            onPostChange={() => {}}
+            onPostSubmit={(e) => e.preventDefault()}
+            postDropdownOpen={false}
           />
         }
         postSearch={

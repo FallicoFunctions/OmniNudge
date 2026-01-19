@@ -1821,7 +1821,7 @@ export default function RedditPostPage() {
                 posterUrl={posterUrl}
               />
 
-              {post.is_self && post.selftext && <PostBodyMarkdown content={post.selftext} className="mb-4" />}
+              {post.selftext && <PostBodyMarkdown content={post.selftext} className="mb-4" />}
 
               {(() => {
                 if (
