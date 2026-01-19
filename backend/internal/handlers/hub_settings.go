@@ -86,6 +86,12 @@ func (h *HubSettingsHandler) GetHubSettings(c *gin.Context) {
 		settings.MinAccountKarma = 0
 	}
 
+	// Fetch hub to get NSFW status
+	hub, err := h.hubRepo.GetByName(c.Request.Context(), hubName)
+	if err == nil && hub != nil {
+		settings.NSFW = hub.NSFW
+	}
+
 	c.JSON(http.StatusOK, settings)
 }
 

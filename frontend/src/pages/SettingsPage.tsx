@@ -2,7 +2,9 @@ import { useEffect, useState } from 'react';
 import ThemeSelector from '../components/themes/ThemeSelector';
 import { Panel } from '../components/common/Panel';
 import { useSettings } from '../contexts/SettingsContext';
+import { useAuth } from '../contexts/AuthContext';
 import { getOwnPublicKeyBase64 } from '../services/keyManagementService';
+import { usersService } from '../services/usersService';
 
 export default function SettingsPage() {
   const {
@@ -32,6 +34,13 @@ export default function SettingsPage() {
   const [publicKey, setPublicKey] = useState<string | null>(null);
   const [showPublicKey, setShowPublicKey] = useState(false);
   const [copyStatus, setCopyStatus] = useState<'idle' | 'copied' | 'error'>('idle');
+  const { user, refreshUser } = useAuth();
+  const [isEditingEmail, setIsEditingEmail] = useState(false);
+  const [emailInput, setEmailInput] = useState('');
+  const [emailConfirmInput, setEmailConfirmInput] = useState('');
+  const [emailError, setEmailError] = useState<string | null>(null);
+  const [emailSuccess, setEmailSuccess] = useState(false);
+  const [isUpdatingEmail, setIsUpdatingEmail] = useState(false);
 
   useEffect(() => {
     setPublicKey(getOwnPublicKeyBase64());
@@ -586,6 +595,147 @@ export default function SettingsPage() {
                     No public key found for this account.
                   </span>
                 )}
+              </div>
+            )}
+          </div>
+        </Panel>
+
+        {/* Email Settings */}
+        <Panel as="section">
+          <h2 className="mb-2 text-xl font-semibold text-[var(--color-text-primary)]">Email</h2>
+          <p className="text-sm text-[var(--color-text-secondary)]">
+            Manage your email address associated with this account.
+          </p>
+
+          <div className="mt-4">
+            {isEditingEmail ? (
+              <form
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  setEmailError(null);
+                  setEmailSuccess(false);
+
+                  if (emailInput !== emailConfirmInput) {
+                    setEmailError('Email addresses do not match');
+                    return;
+                  }
+
+                  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                  if (!emailRegex.test(emailInput)) {
+                    setEmailError('Please enter a valid email address');
+                    return;
+                  }
+
+                  setIsUpdatingEmail(true);
+                  try {
+                    await usersService.updateEmail(emailInput, emailConfirmInput);
+                    await refreshUser();
+                    setEmailSuccess(true);
+                    setIsEditingEmail(false);
+                    setEmailInput('');
+                    setEmailConfirmInput('');
+                    setTimeout(() => setEmailSuccess(false), 3000);
+                  } catch (error) {
+                    setEmailError(error instanceof Error ? error.message : 'Failed to update email');
+                  } finally {
+                    setIsUpdatingEmail(false);
+                  }
+                }}
+                className="space-y-4"
+              >
+                <div>
+                  <label
+                    htmlFor="email"
+                    className="block text-sm font-medium text-[var(--color-text-primary)]"
+                  >
+                    New Email Address
+                  </label>
+                  <input
+                    type="email"
+                    id="email"
+                    value={emailInput}
+                    onChange={(e) => setEmailInput(e.target.value)}
+                    className="mt-1 block w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-2 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
+                    placeholder="you@example.com"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="emailConfirm"
+                    className="block text-sm font-medium text-[var(--color-text-primary)]"
+                  >
+                    Confirm New Email Address
+                  </label>
+                  <input
+                    type="email"
+                    id="emailConfirm"
+                    value={emailConfirmInput}
+                    onChange={(e) => setEmailConfirmInput(e.target.value)}
+                    className="mt-1 block w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-2 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
+                    placeholder="you@example.com"
+                    required
+                  />
+                </div>
+
+                {emailError && (
+                  <div className="rounded-md bg-red-50 p-3 text-sm text-red-600">
+                    {emailError}
+                  </div>
+                )}
+
+                {emailSuccess && (
+                  <div className="rounded-md bg-green-50 p-3 text-sm text-green-600">
+                    Email updated successfully
+                  </div>
+                )}
+
+                <div className="flex gap-3">
+                  <button
+                    type="submit"
+                    disabled={isUpdatingEmail}
+                    className="rounded-md bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50"
+                  >
+                    {isUpdatingEmail ? 'Updating...' : 'Save Changes'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsEditingEmail(false);
+                      setEmailInput('');
+                      setEmailConfirmInput('');
+                      setEmailError(null);
+                    }}
+                    className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-4 py-2 text-sm font-semibold text-[var(--color-text-primary)] hover:border-[var(--color-primary)]"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <div>
+                <div className="flex items-center justify-between rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4">
+                  <div>
+                    <p className="text-sm font-medium text-[var(--color-text-primary)]">Current Email</p>
+                    <p className="mt-1 text-base text-[var(--color-text-secondary)]">
+                      {user?.email || 'No email set'}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsEditingEmail(true);
+                      setEmailInput(user?.email || '');
+                      setEmailConfirmInput('');
+                      setEmailError(null);
+                      setEmailSuccess(false);
+                    }}
+                    className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-4 py-2 text-sm font-semibold text-[var(--color-text-primary)] hover:border-[var(--color-primary)] hover:text-[var(--color-primary)]"
+                  >
+                    {user?.email ? 'Update Email' : 'Add Email'}
+                  </button>
+                </div>
               </div>
             )}
           </div>

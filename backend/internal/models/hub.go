@@ -11,18 +11,18 @@ import (
 
 // Hub represents a site-local community
 type Hub struct {
-	ID              int        `json:"id"`
-	Name            string     `json:"name"`
-	NameNormalized  string     `json:"-"`                          // Lowercase name for case-insensitive lookups
-	Description     *string    `json:"description,omitempty"`
-	Title           *string    `json:"title,omitempty"`           // Display title for the hub
-	Type            string     `json:"type"`                       // public or private
-	ContentOptions  string     `json:"content_options"`            // any, links_only, text_only, images_only, videos_only, or custom
-	IsQuarantined   bool       `json:"is_quarantined"`             // Whether hub is quarantined
-	SubscriberCount int        `json:"subscriber_count"`           // Number of subscribers
-	CreatedBy       *int       `json:"created_by,omitempty"`
-	CreatedAt       time.Time  `json:"created_at"`
-	NSFW            bool       `json:"nsfw"`
+	ID              int       `json:"id"`
+	Name            string    `json:"name"`
+	NameNormalized  string    `json:"-"` // Lowercase name for case-insensitive lookups
+	Description     *string   `json:"description,omitempty"`
+	Title           *string   `json:"title,omitempty"`  // Display title for the hub
+	Type            string    `json:"type"`             // public or private
+	ContentOptions  string    `json:"content_options"`  // any, links_only, text_only, images_only, videos_only, or custom
+	IsQuarantined   bool      `json:"is_quarantined"`   // Whether hub is quarantined
+	SubscriberCount int       `json:"subscriber_count"` // Number of subscribers
+	CreatedBy       *int      `json:"created_by,omitempty"`
+	CreatedAt       time.Time `json:"created_at"`
+	NSFW            bool      `json:"nsfw"`
 }
 
 // HubRepository manages hubs
@@ -211,4 +211,11 @@ func (r *HubRepository) SearchHubs(ctx context.Context, query string, limit int)
 // For now, just returns popular hubs
 func (r *HubRepository) GetTrendingHubs(ctx context.Context, limit int) ([]*Hub, error) {
 	return r.GetPopularHubs(ctx, limit, 0)
+}
+
+// UpdateNSFW updates the hub's NSFW status
+func (r *HubRepository) UpdateNSFW(ctx context.Context, hubID int, nsfw bool) error {
+	query := `UPDATE hubs SET nsfw = $1 WHERE id = $2`
+	_, err := r.pool.Exec(ctx, query, nsfw, hubID)
+	return err
 }

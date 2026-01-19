@@ -8,8 +8,6 @@ import type {
   RedditUserTrophy,
   RedditModeratedSubreddit,
   RedditSubredditAbout,
-  RedditSubredditModerator,
-  SubredditModeratorsResponse,
   RedditWikiPage,
   RedditWikiCompareResponse,
   RedditWikiRevisionsResponse,
@@ -169,5 +167,10 @@ export const redditService = {
       ? `/reddit/r/${subreddit}/wiki/discussions/${pagePath}?${query}`
       : `/reddit/r/${subreddit}/wiki/discussions/${pagePath}`;
     return api.get<RedditWikiDiscussionsResponse>(path);
+  },
+
+  async getPostGalleryImages(subreddit: string, postId: string): Promise<string[]> {
+    const response = await api.get<{ images: string[] }>(`/reddit/r/${subreddit}/gallery/${postId}`);
+    return response.images;
   },
 };

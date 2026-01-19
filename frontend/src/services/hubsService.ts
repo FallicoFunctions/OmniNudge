@@ -36,6 +36,7 @@ export interface CreateHubRequest {
   allow_link_posts?: boolean;
   allow_image_posts?: boolean;
   allow_video_posts?: boolean;
+  nsfw?: boolean;
 }
 
 export interface HubsResponse {

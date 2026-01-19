@@ -97,35 +97,49 @@ func normalizeRemovedIndicator(value string) string {
 
 // RedditPost represents a post from Reddit's API
 type RedditPost struct {
-	ID                       string         `json:"id"`
-	Subreddit                string         `json:"subreddit"`
-	Title                    string         `json:"title"`
-	Author                   string         `json:"author"`
-	RemovedByCategory        string         `json:"removed_by_category"`
-	RemovedBy                *string        `json:"removed_by"`
-	BannedBy                 *string        `json:"banned_by"`
-	Selftext                 string         `json:"selftext"`     // Post body text
-	URL                      string         `json:"url"`          // Link or media URL
-	Permalink                string         `json:"permalink"`    // Reddit URL
-	Thumbnail                string         `json:"thumbnail"`    // Thumbnail URL
-	Score                    int            `json:"score"`        // Upvotes - downvotes
-	NumComments              int            `json:"num_comments"` // Comment count
-	CreatedUTC               float64        `json:"created_utc"`  // Unix timestamp
-	Over18                   bool           `json:"over_18"`      // NSFW flag
-	PostHint                 string         `json:"post_hint"`    // Type hint: image, video, link, etc.
-	IsVideo                  bool           `json:"is_video"`     // Is it a video
-	IsSelf                   bool           `json:"is_self"`      // Is it a text post
-	LinkFlairText            string         `json:"link_flair_text"`
-	LinkFlairBackgroundColor string         `json:"link_flair_background_color"`
-	LinkFlairTextColor       string         `json:"link_flair_text_color"`
-	Distinguished            *string        `json:"distinguished"` // Mod/admin flag
-	Stickied                 bool           `json:"stickied"`      // Pinned post
-	Domain                   string         `json:"domain"`        // Source domain
-	MediaEmbed               MediaEmbed     `json:"media_embed"`   // Embedded media
-	SecureMediaEmbed         MediaEmbed     `json:"secure_media_embed"`
-	Media                    *RedditMedia   `json:"media"`        // Media container
-	SecureMedia              *RedditMedia   `json:"secure_media"` // Secure media container
-	Preview                  *RedditPreview `json:"preview"`      // Preview images for link posts
+	ID                       string                    `json:"id"`
+	Subreddit                string                    `json:"subreddit"`
+	Title                    string                    `json:"title"`
+	Author                   string                    `json:"author"`
+	RemovedByCategory        string                    `json:"removed_by_category"`
+	RemovedBy                *string                   `json:"removed_by"`
+	BannedBy                 *string                   `json:"banned_by"`
+	Selftext                 string                    `json:"selftext"`     // Post body text
+	URL                      string                    `json:"url"`          // Link or media URL
+	Permalink                string                    `json:"permalink"`    // Reddit URL
+	Thumbnail                string                    `json:"thumbnail"`    // Thumbnail URL
+	Score                    int                       `json:"score"`        // Upvotes - downvotes
+	NumComments              int                       `json:"num_comments"` // Comment count
+	CreatedUTC               float64                   `json:"created_utc"`  // Unix timestamp
+	Over18                   bool                      `json:"over_18"`      // NSFW flag
+	PostHint                 string                    `json:"post_hint"`    // Type hint: image, video, link, gallery, etc.
+	IsVideo                  bool                      `json:"is_video"`     // Is it a video
+	IsSelf                   bool                      `json:"is_self"`      // Is it a text post
+	IsGallery                bool                      `json:"is_gallery"`   // Is it a gallery/album post
+	GalleryData              *RedditGalleryData        `json:"gallery_data"` // Gallery metadata
+	MediaMetadata            map[string]interface{}    `json:"media_metadata"` // Media metadata for gallery items
+	LinkFlairText            string                    `json:"link_flair_text"`
+	LinkFlairBackgroundColor string                    `json:"link_flair_background_color"`
+	LinkFlairTextColor       string                    `json:"link_flair_text_color"`
+	Distinguished            *string                   `json:"distinguished"` // Mod/admin flag
+	Stickied                 bool                      `json:"stickied"`      // Pinned post
+	Domain                   string                    `json:"domain"`        // Source domain
+	MediaEmbed               MediaEmbed                `json:"media_embed"`   // Embedded media
+	SecureMediaEmbed         MediaEmbed                `json:"secure_media_embed"`
+	Media                    *RedditMedia              `json:"media"`        // Media container
+	SecureMedia              *RedditMedia              `json:"secure_media"` // Secure media container
+	Preview                  *RedditPreview            `json:"preview"`      // Preview images for link posts
+}
+
+// RedditGalleryData holds gallery/album metadata
+type RedditGalleryData struct {
+	Items []RedditGalleryItem `json:"items"`
+}
+
+// RedditGalleryItem represents a single item in a gallery
+type RedditGalleryItem struct {
+	MediaID string `json:"media_id"`
+	ID      int    `json:"id"`
 }
 
 // MediaEmbed represents embedded media from Reddit
@@ -276,6 +290,7 @@ type RedditSubredditAbout struct {
 	ActiveUserCount     int     `json:"active_user_count"`
 	Subscribers         int     `json:"subscribers"`
 	CreatedUTC          float64 `json:"created_utc"`
+	Over18              bool    `json:"over_18"`
 }
 
 // RedditSubredditModerator represents a single moderator entry for a subreddit
@@ -408,6 +423,22 @@ func (r *RedditClient) GetSubredditPosts(ctx context.Context, subreddit string, 
 	var listing RedditListing
 	if err := json.NewDecoder(resp.Body).Decode(&listing); err != nil {
 		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	// Debug: Check if preview data exists for gallery posts
+	for i, child := range listing.Data.Children {
+		if child.Data.URL != "" && (strings.Contains(child.Data.URL, "/gallery/") || child.Data.IsGallery) {
+			hasPreview := child.Data.Preview != nil && len(child.Data.Preview.Images) > 0
+			previewCount := 0
+			if child.Data.Preview != nil {
+				previewCount = len(child.Data.Preview.Images)
+			}
+			fmt.Printf("[DEBUG] Gallery post %d: ID=%s, HasPreview=%v, PreviewImages=%d\n",
+				i, child.Data.ID, hasPreview, previewCount)
+			if hasPreview {
+				fmt.Printf("[DEBUG]   First preview URL: %s\n", child.Data.Preview.Images[0].Source.URL)
+			}
+		}
 	}
 
 	_ = r.setCachedListing(ctx, cacheKey, listing)
@@ -1138,6 +1169,8 @@ func (r *RedditClient) GetSubredditAbout(ctx context.Context, subreddit string) 
 	if err := json.NewDecoder(resp.Body).Decode(&raw); err != nil {
 		return nil, fmt.Errorf("failed to decode subreddit about: %w", err)
 	}
+
+	fmt.Printf("DEBUG: GetSubredditAbout for %s: over_18=%v\n", subreddit, raw.Data.Over18)
 
 	if data, err := json.Marshal(raw.Data); err == nil {
 		_ = r.cache.Set(ctx, cacheKey, string(data), r.cacheTTL)
