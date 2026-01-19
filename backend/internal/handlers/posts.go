@@ -278,22 +278,46 @@ func (h *PostsHandler) CreatePost(c *gin.Context) {
 	}
 
 	if err := h.postRepo.Create(c.Request.Context(), post); err != nil {
+		fmt.Printf("[CreatePost] Create failed: %v\n", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create post", "details": err.Error()})
 		return
 	}
 
-	// Default upvote by author (best-effort)
+	fmt.Printf("[CreatePost] Post created successfully with ID: %d\n", post.ID)
+
+	// Default upvote by author
 	upvote := true
-	_ = h.postRepo.Vote(c.Request.Context(), post.ID, userID.(int), &upvote)
-	post.Score++
-	post.Upvotes++
+	fmt.Printf("[CreatePost] Attempting to vote on post %d for user %d\n", post.ID, userID.(int))
+	voteErr := h.postRepo.Vote(c.Request.Context(), post.ID, userID.(int), &upvote)
+	if voteErr != nil {
+		// Log the error but don't fail the post creation
+		// The post exists, just without the auto-upvote
+		fmt.Printf("[CreatePost] Vote failed for post %d: %v\n", post.ID, voteErr)
+		c.Header("X-Upvote-Failed", "true")
+	} else {
+		fmt.Printf("[CreatePost] Vote succeeded for post %d\n", post.ID)
+	}
+
+	// Re-fetch post to get updated vote counts from DB (with user's vote info)
+	uid := userID.(int)
+	updatedPost, err := h.postRepo.GetByIDWithUser(c.Request.Context(), post.ID, &uid)
+	if err != nil {
+		// If we can't fetch, return the original post object
+		// It will have 0 score/upvotes but that's better than wrong counts
+		fmt.Printf("[CreatePost] GetByIDWithUser failed for post %d: %v\n", post.ID, err)
+		if hub != nil {
+			post.HubName = hub.Name
+		}
+		c.JSON(http.StatusCreated, post)
+		return
+	}
 
 	// Populate hub name if hub was specified (for agent logging)
 	if hub != nil {
-		post.HubName = hub.Name
+		updatedPost.HubName = hub.Name
 	}
 
-	c.JSON(http.StatusCreated, post)
+	c.JSON(http.StatusCreated, updatedPost)
 }
 
 // GetPost handles GET /api/v1/posts/:id
