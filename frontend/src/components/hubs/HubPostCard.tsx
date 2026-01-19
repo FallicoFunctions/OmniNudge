@@ -1,11 +1,12 @@
 import { Link, useLocation } from 'react-router-dom';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import type { PointerEvent } from 'react';
 import { formatTimestamp } from '../../utils/timeFormat';
 import { resolveMediaUrl } from '../../utils/mediaUrl';
 import { VoteButtons } from '../VoteButtons';
 import type { PlatformPost } from '../../types/posts';
 import { canModerateContent, requiresModerator } from '../../utils/permissions';
+import { PostBodyMarkdown } from '../posts/PostBodyMarkdown';
 
 interface HubPostCardProps {
   post: PlatformPost;
@@ -58,6 +59,18 @@ export function HubPostCard({
   onEdit,
   onDelete,
 }: HubPostCardProps) {
+  const [expandedTextMap, setExpandedTextMap] = useState<Record<number, boolean>>({});
+
+  const toggleTextPreview = (postId: number) => {
+    setExpandedTextMap((prev) => {
+      const isCurrentlyExpanded = prev[postId];
+      return {
+        ...prev,
+        [postId]: !isCurrentlyExpanded,
+      };
+    });
+  };
+
   const location = useLocation();
   const originState = useMemo(
     () => ({ originPath: `${location.pathname}${location.search}` }),
@@ -89,6 +102,10 @@ export function HubPostCard({
   const canDelete = canModerateContent(currentUserId, post.author_id, currentUserRole, isModerator);
   const canPin = requiresModerator(currentUserRole, isModerator);
   const postUrl = `/posts/${post.id}`;
+
+  const hasBody = Boolean(post.body && post.body.trim());
+  const hasInlinePreview = Boolean(post.thumbnail_url || hasBody);
+  const isInlinePreviewOpen = !!(hasInlinePreview && expandedTextMap[post.id]);
 
   return (
     <article className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)]">
@@ -136,14 +153,53 @@ export function HubPostCard({
             <span>submitted {submittedLabel}</span>
           </div>
 
-          <div className="mt-1 flex flex-wrap items-center gap-3 text-[11px] leading-tight text-[var(--color-text-secondary)]">
-            <Link
-              to={postUrl}
-              state={originState}
-              className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
-            >
-              {commentsLabel}
-            </Link>
+          <div className="mt-1 flex items-start gap-3 text-[11px] text-[var(--color-text-secondary)]">
+            {hasInlinePreview && (
+              <button
+                type="button"
+                onClick={() => toggleTextPreview(post.id)}
+                aria-pressed={!!expandedTextMap[post.id]}
+                aria-label={isInlinePreviewOpen ? 'Hide preview' : 'Show preview'}
+                className="flex h-7 w-7 items-center justify-center rounded border border-[var(--color-border)] bg-[var(--color-surface-elevated)] text-[var(--color-text-secondary)] hover:border-[var(--color-primary)] hover:text-[var(--color-primary)]"
+              >
+                <span className="sr-only">
+                  {isInlinePreviewOpen ? 'Hide preview' : 'Show preview'}
+                </span>
+                {isInlinePreviewOpen ? (
+                  <svg
+                    className="h-4 w-4"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <line x1="6" y1="6" x2="18" y2="18" />
+                    <line x1="6" y1="18" x2="18" y2="6" />
+                  </svg>
+                ) : (
+                  <svg
+                    className="h-4 w-4"
+                    viewBox="0 0 24 24"
+                    fill="currentColor"
+                    aria-hidden="true"
+                  >
+                    <path d="M8 5.5v13l10.5-6.5L8 5.5Z" />
+                  </svg>
+                )}
+              </button>
+            )}
+            <div className="flex-1">
+              <div className="flex flex-wrap items-center gap-3">
+                <Link
+                  to={postUrl}
+                  state={originState}
+                  className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+                >
+                  {commentsLabel}
+                </Link>
             {onShare && (
               <button
                 type="button"
@@ -211,6 +267,35 @@ export function HubPostCard({
                 {isDeleting ? 'Deleting...' : 'Delete'}
               </button>
             )}
+              </div>
+              {expandedTextMap[post.id] && (
+                <div className="mt-3 overflow-hidden rounded border border-[var(--color-border)] bg-[var(--color-surface-elevated)]">
+                  {post.thumbnail_url && post.media_url ? (
+                    post.media_type?.startsWith('video') ? (
+                      <video
+                        src={resolveMediaUrl(post.media_url)}
+                        className="max-h-[70vh] w-full bg-black"
+                        controls
+                        playsInline
+                        preload="metadata"
+                      />
+                    ) : (
+                      <img
+                        src={resolveMediaUrl(post.media_url)}
+                        alt={post.title}
+                        loading="lazy"
+                        decoding="async"
+                        className="max-h-[70vh] w-full object-contain"
+                      />
+                    )
+                  ) : hasBody ? (
+                    <div className="p-4">
+                      <PostBodyMarkdown content={post.body!} />
+                    </div>
+                  ) : null}
+                </div>
+              )}
+            </div>
           </div>
         </div>
         {showPinnedGrabber && (
