@@ -1,0 +1,1 @@
+-- No-op: do not restore empty banned_words arrays

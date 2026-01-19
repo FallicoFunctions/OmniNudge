@@ -91,6 +91,9 @@ func main() {
 	hubThemesRepo := repository.NewHubThemesRepository(db.Pool)
 	hubWikiRepo := repository.NewHubWikiRepository(db.Pool)
 
+	// Access request repository
+	hubAccessRequestRepo := models.NewHubAccessRequestRepository(db.Pool)
+
 	// Bug reporting repositories
 	bugReportRepo := models.NewBugReportRepository(db.Pool)
 	knownBugRepo := models.NewKnownBugRepository(db.Pool)
@@ -154,7 +157,7 @@ func main() {
 	messagesHandler := handlers.NewMessagesHandler(db.Pool, messageRepo, conversationRepo, hub)
 	usersHandler := handlers.NewUsersHandler(userRepo, postRepo, commentRepo, authService, hubModRepo)
 	mediaHandler := handlers.NewMediaHandler(mediaRepo, thumbnailService)
-	hubsHandler := handlers.NewHubsHandler(hubRepo, postRepo, hubModRepo, hubSubRepo, hubSettingsRepo)
+	hubsHandler := handlers.NewHubsHandlerWithAccessRequest(hubRepo, postRepo, hubModRepo, hubSubRepo, hubSettingsRepo, hubAccessRequestRepo)
 	subscriptionsHandler := handlers.NewSubscriptionsHandler(hubSubRepo, subredditSubRepo, hubRepo)
 	moderationHandler := handlers.NewModerationHandler(reportRepo, hubModRepo)
 	moderationHandlerV2 := handlers.NewModerationHandlerV2(
@@ -192,6 +195,7 @@ func main() {
 	hubSettingsHandler := handlers.NewHubSettingsHandler(hubRepo, hubSettingsRepo)
 	hubThemesHandler := handlers.NewHubThemesHandler(hubThemesRepo, hubSettingsRepo)
 	hubWikiHandler := handlers.NewHubWikiHandler(hubRepo, hubSettingsRepo, hubWikiRepo)
+	accessRequestHandler := handlers.NewAccessRequestHandler(hubAccessRequestRepo, hubRepo, hubSettingsRepo, userRepo)
 
 	// Inject notification service into handlers
 	postsHandler.SetNotificationService(notificationService)
@@ -482,6 +486,11 @@ func main() {
 			protected.DELETE("/hubs/:name/unsubscribe", subscriptionsHandler.UnsubscribeFromHub)
 			protected.GET("/users/me/subscriptions/hubs", subscriptionsHandler.GetUserHubSubscriptions)
 
+			// Hub access request routes (auth required)
+			protected.POST("/hubs/:name/access-request", accessRequestHandler.CreateRequest)
+			protected.GET("/hubs/:name/access-request/status", accessRequestHandler.CheckRequestStatus)
+			protected.GET("/users/me/access-requests", accessRequestHandler.GetUserRequests)
+
 			// Subreddit subscription routes (auth required)
 			protected.POST("/subreddits/:name/subscribe", subscriptionsHandler.SubscribeToSubreddit)
 			protected.DELETE("/subreddits/:name/unsubscribe", subscriptionsHandler.UnsubscribeFromSubreddit)
@@ -584,6 +593,7 @@ func main() {
 				postRepo,
 				commentRepo,
 				removalReasonRepo,
+				hubAccessRequestRepo,
 			))
 			{
 				// User bans
@@ -612,6 +622,12 @@ func main() {
 
 				// Mod log
 				hubMod.GET("/hubs/:hub_name/mod-log", moderationHandlerV2.GetModLog)
+
+				// Access request moderation
+				hubMod.GET("/hubs/:hub_name/access-requests", accessRequestHandler.GetPendingRequests)
+				hubMod.POST("/hubs/:hub_name/access-requests/add-user", accessRequestHandler.AddUserAccessByUsername)
+				hubMod.POST("/access-requests/:request_id/approve", accessRequestHandler.ApproveRequest)
+				hubMod.POST("/access-requests/:request_id/deny", accessRequestHandler.DenyRequest)
 			}
 
 			// Admin endpoints

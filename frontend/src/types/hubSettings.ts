@@ -31,6 +31,7 @@ export interface HubSettings {
   spam_filter_strength: SpamFilterStrength;
   new_account_filter_days: number;
   min_account_karma: number;
+  access_request_cooldown_days: number;
 
   // Other settings
   allow_spoilers: boolean;
@@ -94,6 +95,7 @@ export interface UpdateHubSettingsRequest {
   spam_filter_strength: SpamFilterStrength;
   new_account_filter_days: number;
   min_account_karma: number;
+  access_request_cooldown_days: number;
   allow_spoilers: boolean;
   show_thumbnails: boolean;
   enable_wiki: boolean;

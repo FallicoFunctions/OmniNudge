@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"errors"
 	"net/http"
 	"strconv"
 
@@ -37,12 +38,7 @@ func (h *HubSettingsHandler) GetHubSettings(c *gin.Context) {
 
 	settings, err := h.settingsRepo.GetByHubID(c.Request.Context(), hubID)
 	if err != nil {
-		if err == pgx.ErrNoRows {
-			if h.hubRepo == nil {
-				c.JSON(http.StatusNotFound, gin.H{"error": "Settings not found"})
-				return
-			}
-
+		if errors.Is(err, pgx.ErrNoRows) || h.hubRepo != nil {
 			hub, hubErr := h.hubRepo.GetByName(c.Request.Context(), hubName)
 			if hubErr != nil || hub == nil {
 				c.JSON(http.StatusNotFound, gin.H{"error": "Hub not found"})
@@ -56,17 +52,17 @@ func (h *HubSettingsHandler) GetHubSettings(c *gin.Context) {
 				createdBy = hub.CreatedBy
 			}
 			if err := h.settingsRepo.EnsureDefaults(c.Request.Context(), defaults, createdBy); err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to initialize hub settings"})
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to initialize hub settings", "details": err.Error()})
 				return
 			}
 
 			settings, err = h.settingsRepo.GetByHubID(c.Request.Context(), hubID)
 			if err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get settings"})
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get settings", "details": err.Error()})
 				return
 			}
 		} else {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get settings"})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get settings", "details": err.Error()})
 			return
 		}
 	}
@@ -132,6 +128,9 @@ func (h *HubSettingsHandler) UpdateHubSettings(c *gin.Context) {
 	}
 
 	settings.HubID = hubID
+	if len(settings.BannedWords) == 0 {
+		settings.BannedWords = nil
+	}
 
 	if err := h.settingsRepo.Update(c.Request.Context(), &settings, userID.(int)); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update settings"})

@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import type { HTMLAttributes, PointerEvent as ReactPointerEvent } from 'react';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useNavigate, useParams, useLocation, Link } from 'react-router-dom';
+import { useNavigate, useParams, useLocation, Link, Navigate } from 'react-router-dom';
 import { hubsService, type HubPostsResponse, type LocalSubredditPost } from '../services/hubsService';
 import { useAuth } from '../contexts/AuthContext';
 import { CommunityHeader } from '../components/common/CommunityHeader';
+import { CommunityHeaderControlsRow } from '../components/common/CommunityHeaderControlsRow';
 import { postsService } from '../services/postsService';
 import { moderationService } from '../services/moderationService';
 import { useSettings } from '../contexts/SettingsContext';
@@ -325,6 +326,16 @@ export default function HubsPage() {
     enabled: !!hubname && hubname !== '' && (!isCustomTopRange || isCustomRangeValid),
     staleTime: 1000 * 60 * 5,
     placeholderData: keepPreviousData,
+    retry: (failureCount, error) => {
+      const response = (error as { response?: { status?: number; data?: { access_required?: boolean } } })?.response;
+      if (response?.status === 403 && response?.data?.access_required) {
+        return false;
+      }
+      if (error instanceof Error && error.message.includes('private') && error.message.includes('do not have access')) {
+        return false;
+      }
+      return failureCount < 3;
+    },
   });
   const postsList = data?.posts ?? EMPTY_POSTS;
   const visiblePosts = useMemo(
@@ -834,6 +845,43 @@ export default function HubsPage() {
   }
 
   if (error) {
+    const errorMessage = error instanceof Error ? error.message : '';
+    const tanstackError = error as {
+      response?: {
+        status?: number;
+        data?: {
+          error?: string;
+          access_required?: boolean;
+          privacy_type?: string;
+        };
+      };
+      status?: number;
+    };
+    const errorStatus = tanstackError.status || tanstackError.response?.status;
+    const isForbidden = errorStatus === 403 || errorMessage.includes('status code 403');
+    const is403Error = errorStatus === 403;
+    const accessRequired = tanstackError.response?.data?.access_required === true;
+    const hasPrivateMessage = errorMessage.includes('private') && errorMessage.includes('do not have access');
+    const isPrivateHubSetting = hubSettings?.privacy_type === 'private' || tanstackError.response?.data?.privacy_type === 'private';
+    const isPrivateHubError =
+      hasPrivateMessage ||
+      accessRequired ||
+      ((is403Error || isForbidden) && isPrivateHubSetting);
+    
+    console.log('HubPage error detected:', {
+      errorMessage,
+      errorStatus,
+      is403Error,
+      accessRequired,
+      hasPrivateMessage,
+      isPrivateHubError,
+      hubname,
+      showHubSidebar
+    });
+    
+    if (isPrivateHubError && hubname && hubname !== 'popular' && hubname !== 'all') {
+      return <Navigate to={`/h/${hubname}/private`} replace state={{ from: location.pathname }} />;
+    }
     return (
       <div className="flex items-center justify-center min-h-screen">
         <ErrorMessage className="text-lg text-red-600">Error loading posts.</ErrorMessage>
@@ -877,95 +925,107 @@ export default function HubsPage() {
           />
         }
         sortControls={
-          <div className="mb-2 flex flex-wrap items-center justify-between gap-2 border-b border-[var(--color-border)] pb-2">
-            <div className="flex flex-wrap items-center gap-2">
-              {(['hot', 'new', 'top', 'rising', 'controversial'] as const).map((sortOption) => (
-                <button
-                  key={sortOption}
-                  onClick={() => handleSortChange(sortOption)}
-                  className={`px-4 py-2 text-sm font-semibold ${
-                    sort === sortOption
-                      ? 'text-[var(--color-primary)]'
-                      : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
-                  }`}
-                >
-                  {sortOption.charAt(0).toUpperCase() + sortOption.slice(1)}
-                </button>
-              ))}
-              {hasWiki && showHubSidebar && (
-                <Link
-                  to={`/h/${hubname}/wiki/index`}
-                  className={`px-4 py-2 text-sm font-semibold text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]`}
-                >
-                  Wiki
-                </Link>
-              )}
-              {effectivePosts.length > 0 && (
-                <button
-                  onClick={() => setSlideshowOpen(true)}
-                  className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
-                >
-                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                  </svg>
-                  Slideshow ({effectivePosts.length})
-                </button>
-              )}
-            </div>
-            <form onSubmit={handlePostSearchSubmit} className="flex w-full gap-2 md:w-96">
-              <div className="relative flex-1">
-                <input
-                  type="text"
-                  value={postSearchInput}
-                  onFocus={() => setIsSearchDropdownOpen(true)}
-                  onBlur={() => setTimeout(() => setIsSearchDropdownOpen(false), 120)}
-                  onChange={(event) => {
-                    setPostSearchInput(event.target.value);
-                    if (!isSearchDropdownOpen) {
-                      setIsSearchDropdownOpen(true);
-                    }
-                  }}
-                  placeholder="Search posts..."
-                  className="w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-2 text-sm text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
-                />
-                {isSearchDropdownOpen && (
-                  <div className="absolute left-0 right-0 top-full z-40 mt-1 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] p-3 shadow-lg">
-                    <div className="space-y-2 text-sm text-[var(--color-text-primary)]">
+          <CommunityHeaderControlsRow
+            left={
+              <>
+                {(['hot', 'new', 'top', 'rising', 'controversial'] as const).map((sortOption) => (
+                  <button
+                    key={sortOption}
+                    onClick={() => handleSortChange(sortOption)}
+                    className={`px-4 py-2 text-sm font-semibold ${
+                      sort === sortOption
+                        ? 'text-[var(--color-primary)]'
+                        : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
+                    }`}
+                  >
+                    {sortOption.charAt(0).toUpperCase() + sortOption.slice(1)}
+                  </button>
+                ))}
+                {hasWiki && showHubSidebar && (
+                  <Link
+                    to={`/h/${hubname}/wiki/index`}
+                    className={`px-4 py-2 text-sm font-semibold text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]`}
+                  >
+                    Wiki
+                  </Link>
+                )}
+                {effectivePosts.length > 0 && (
+                  <button
+                    onClick={() => setSlideshowOpen(true)}
+                    className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
+                  >
+                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                    Slideshow ({effectivePosts.length})
+                  </button>
+                )}
+              </>
+            }
+            right={
+              <FeedSearchBars
+                containerClassName="w-full md:w-96"
+                showTopForm={false}
+                topValue={inputValue}
+                topPlaceholder="Enter hub or subreddit..."
+                onTopChange={handleTopChange}
+                onTopFocus={() => setIsAutocompleteOpen(true)}
+                onTopBlur={() => setIsAutocompleteOpen(false)}
+                onTopSubmit={handleTopSubmit}
+                topSuggestions={suggestions}
+                topShouldShowSuggestions={shouldShowSuggestions}
+                topIsLoading={isAutocompleteLoading}
+                topEmptyMessage="No hubs or subreddits found."
+                renderTopSuggestion={(suggestion) => (
+                  <CombinedSuggestionItem
+                    key={`${suggestion.type}-${suggestion.data.name}`}
+                    suggestion={suggestion}
+                    onSelectHub={handleSelectHubSuggestion}
+                    onSelectSubreddit={handleSelectSubredditSuggestion}
+                  />
+                )}
+                postValue={postSearchInput}
+                postPlaceholder="Search posts..."
+                onPostChange={(value) => {
+                  setPostSearchInput(value);
+                  if (!isSearchDropdownOpen) {
+                    setIsSearchDropdownOpen(true);
+                  }
+                }}
+                onPostFocus={() => setIsSearchDropdownOpen(true)}
+                onPostBlur={() => setTimeout(() => setIsSearchDropdownOpen(false), 120)}
+                onPostSubmit={handlePostSearchSubmit}
+                postDropdownOpen={isSearchDropdownOpen}
+                postDropdownContent={
+                  <div className="space-y-2 text-sm text-[var(--color-text-primary)]">
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={limitSearchToContext}
+                        onChange={(e) => setLimitSearchToContext(e.target.checked)}
+                      />
+                      <span>Limit search to h/{hubname}</span>
+                    </label>
+                    {!blockAllNsfw && (
                       <label className="flex items-center gap-2">
                         <input
                           type="checkbox"
-                          checked={limitSearchToContext}
-                          onChange={(e) => setLimitSearchToContext(e.target.checked)}
+                          checked={includeNsfwSearch}
+                          onChange={(e) => setIncludeNsfwSearch(e.target.checked)}
                         />
-                        <span>Limit search to h/{hubname}</span>
+                        <span>Include NSFW results</span>
                       </label>
-                      {!blockAllNsfw && (
-                        <label className="flex items-center gap-2">
-                          <input
-                            type="checkbox"
-                            checked={includeNsfwSearch}
-                            onChange={(e) => setIncludeNsfwSearch(e.target.checked)}
-                          />
-                          <span>Include NSFW results</span>
-                        </label>
-                      )}
-                      {blockAllNsfw && (
-                        <div className="text-xs text-[var(--color-text-secondary)]">
-                          NSFW content is blocked in settings.
-                        </div>
-                      )}
-                    </div>
+                    )}
+                    {blockAllNsfw && (
+                      <div className="text-xs text-[var(--color-text-secondary)]">
+                        NSFW content is blocked in settings.
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
-              <button
-                type="submit"
-                className="rounded-md bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)]"
-              >
-                Search
-              </button>
-            </form>
-          </div>
+                }
+              />
+            }
+          />
         }
       />
 

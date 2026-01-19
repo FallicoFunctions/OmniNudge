@@ -29,6 +29,7 @@ func buildDefaultHubSettings(hubID int, privacyType string, allowText, allowLink
 		AllowMediaInComments: true,
 		RequirePostFlair:     false,
 		SpamFilterStrength:   "medium",
+		AccessRequestCooldownDays: 0,
 		AllowSpoilers:        true,
 		ShowThumbnails:       true,
 		EnableWiki:           false,

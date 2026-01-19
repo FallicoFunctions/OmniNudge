@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"errors"
 	"io"
 	"net/http"
@@ -10,6 +11,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/omninudge/backend/internal/helpers"
 	"github.com/omninudge/backend/internal/models"
@@ -18,11 +20,12 @@ import (
 
 // HubsHandler handles hub CRUD
 type HubsHandler struct {
-	hubRepo      *models.HubRepository
-	postRepo     *models.PlatformPostRepository
-	modRepo      *models.HubModeratorRepository
-	hubSubRepo   *models.HubSubscriptionRepository
-	settingsRepo *repository.HubSettingsRepository
+	hubRepo           *models.HubRepository
+	postRepo          *models.PlatformPostRepository
+	modRepo           *models.HubModeratorRepository
+	hubSubRepo        *models.HubSubscriptionRepository
+	settingsRepo      *repository.HubSettingsRepository
+	accessRequestRepo *models.HubAccessRequestRepository
 }
 
 // NewHubsHandler creates a new handler
@@ -33,6 +36,18 @@ func NewHubsHandler(hubRepo *models.HubRepository, postRepo *models.PlatformPost
 		modRepo:      modRepo,
 		hubSubRepo:   hubSubRepo,
 		settingsRepo: settingsRepo,
+	}
+}
+
+// NewHubsHandlerWithAccessRequest creates a handler with access request support
+func NewHubsHandlerWithAccessRequest(hubRepo *models.HubRepository, postRepo *models.PlatformPostRepository, modRepo *models.HubModeratorRepository, hubSubRepo *models.HubSubscriptionRepository, settingsRepo *repository.HubSettingsRepository, accessReqRepo *models.HubAccessRequestRepository) *HubsHandler {
+	return &HubsHandler{
+		hubRepo:           hubRepo,
+		postRepo:          postRepo,
+		modRepo:           modRepo,
+		hubSubRepo:        hubSubRepo,
+		settingsRepo:      settingsRepo,
+		accessRequestRepo: accessReqRepo,
 	}
 }
 
@@ -240,6 +255,53 @@ func (h *HubsHandler) GetPosts(c *gin.Context) {
 	if uid, exists := c.Get("user_id"); exists {
 		uidInt := uid.(int)
 		userID = &uidInt
+	}
+
+	// Check if hub is private and user has access
+	settings, err := h.settingsRepo.GetByHubID(c.Request.Context(), hub.ID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			allowText, allowLink, allowImage, allowVideo := mapContentOptions(hub.ContentOptions)
+			defaults := buildDefaultHubSettings(hub.ID, hub.Type, allowText, allowLink, allowImage, allowVideo)
+			var createdBy *int
+			if hub.CreatedBy != nil {
+				createdBy = hub.CreatedBy
+			}
+			if err := h.settingsRepo.EnsureDefaults(c.Request.Context(), defaults, createdBy); err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch hub settings", "details": err.Error()})
+				return
+			}
+			settings, err = h.settingsRepo.GetByHubID(c.Request.Context(), hub.ID)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch hub settings", "details": err.Error()})
+				return
+			}
+		} else {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch hub settings", "details": err.Error()})
+			return
+		}
+	}
+
+	if settings.PrivacyType == "private" {
+		hasAccess := false
+		if userID != nil {
+			hasAccess, err = h.CanUserAccessHub(c.Request.Context(), hub.ID, *userID)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check access", "details": err.Error()})
+				return
+			}
+		}
+
+		if !hasAccess {
+			c.JSON(http.StatusForbidden, gin.H{
+				"error":           "This hub is private and you do not have access",
+				"hub_name":        hub.Name,
+				"hub_title":       hub.Title,
+				"privacy_type":    settings.PrivacyType,
+				"access_required": true,
+			})
+			return
+		}
 	}
 
 	startTime, endTime, timeRangeKey, err := parseTopTimeRange(c, sortBy)
@@ -948,4 +1010,46 @@ func (h *HubsHandler) UpdateHubNSFW(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "NSFW status updated successfully"})
+}
+
+// CanUserAccessHub checks if a user can access a hub (considering privacy settings)
+func (h *HubsHandler) CanUserAccessHub(ctx context.Context, hubID, userID int) (bool, error) {
+	settings, err := h.settingsRepo.GetByHubID(ctx, hubID)
+	if err != nil {
+		return false, err
+	}
+
+	if settings.PrivacyType != "private" {
+		return true, nil
+	}
+
+	isMod, err := h.modRepo.IsModerator(ctx, hubID, userID)
+	if err != nil {
+		return false, err
+	}
+	if isMod {
+		return true, nil
+	}
+
+	if h.hubSubRepo != nil {
+		isSubscribed, err := h.hubSubRepo.IsSubscribed(ctx, hubID, userID)
+		if err != nil {
+			return false, err
+		}
+		if isSubscribed {
+			return true, nil
+		}
+	}
+
+	if h.accessRequestRepo != nil {
+		accessReq, err := h.accessRequestRepo.GetByUserAndHub(ctx, hubID, userID)
+		if err != nil {
+			return false, err
+		}
+		if accessReq != nil && accessReq.Status == "approved" {
+			return true, nil
+		}
+	}
+
+	return false, nil
 }

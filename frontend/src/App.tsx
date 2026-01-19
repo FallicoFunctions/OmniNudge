@@ -34,6 +34,7 @@ const ModMailConversationPage = lazy(() => import('./pages/ModMailConversationPa
 const AdminPage = lazy(() => import('./pages/AdminPage'));
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
 const BugReportingPage = lazy(() => import('./pages/BugReportingPage'));
+const PrivateHubPage = lazy(() => import('./pages/PrivateHubPage'));
 
 function App() {
   return (
@@ -75,6 +76,7 @@ function App() {
                       element={<RedditPostWrapper />}
                     />
                     <Route path="/user/:username" element={<RedditUserPage />} />
+                    <Route path="/h/:hubname/private" element={<PrivateHubPage />} />
                     <Route path="/h/:hubname" element={<HubPage />} />
                     <Route path="/h/:hubname/wiki/:pagePath" element={<HubWikiPage />} />
                     <Route path="/h/:hubname/wiki" element={<HubWikiPage />} />

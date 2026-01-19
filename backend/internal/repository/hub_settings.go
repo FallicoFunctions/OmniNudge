@@ -3,14 +3,33 @@ package repository
 import (
 	"context"
 	"database/sql"
+	"errors"
+	"strings"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/omninudge/backend/internal/models"
 )
 
 type HubSettingsRepository struct {
 	pool *pgxpool.Pool
+}
+
+func isMissingColumnError(err error, column string) bool {
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) && pgErr.Code == "42703" {
+		return strings.Contains(pgErr.Message, column)
+	}
+	return strings.Contains(err.Error(), column)
+}
+
+func (r *HubSettingsRepository) ensureAccessRequestCooldownColumn(ctx context.Context) error {
+	_, err := r.pool.Exec(ctx, `
+		ALTER TABLE hub_settings
+		ADD COLUMN IF NOT EXISTS access_request_cooldown_days integer DEFAULT 0
+	`)
+	return err
 }
 
 func NewHubSettingsRepository(pool *pgxpool.Pool) *HubSettingsRepository {
@@ -30,7 +49,7 @@ func (r *HubSettingsRepository) GetByHubID(ctx context.Context, hubID int) (*mod
 		SELECT id, hub_id, display_title, sidebar_markdown, privacy_type,
 		       allow_text_posts, allow_link_posts, allow_image_posts, allow_video_posts, allow_poll_posts,
 		       allow_media_in_comments, require_post_flair,
-		       banned_words, spam_filter_strength, new_account_filter_days, min_account_karma,
+		       banned_words, spam_filter_strength, new_account_filter_days, min_account_karma, COALESCE(access_request_cooldown_days, 0),
 		       allow_spoilers, show_thumbnails, enable_wiki,
 		       updated_at, updated_by
 		FROM hub_settings
@@ -42,11 +61,49 @@ func (r *HubSettingsRepository) GetByHubID(ctx context.Context, hubID int) (*mod
 		&settings.ID, &settings.HubID, &settings.DisplayTitle, &settings.SidebarMarkdown, &settings.PrivacyType,
 		&settings.AllowTextPosts, &settings.AllowLinkPosts, &settings.AllowImagePosts, &settings.AllowVideoPosts, &settings.AllowPollPosts,
 		&settings.AllowMediaInComments, &settings.RequirePostFlair,
-		&settings.BannedWords, &settings.SpamFilterStrength, &settings.NewAccountFilterDays, &settings.MinAccountKarma,
+		&settings.BannedWords, &settings.SpamFilterStrength, &settings.NewAccountFilterDays, &settings.MinAccountKarma, &settings.AccessRequestCooldownDays,
 		&settings.AllowSpoilers, &settings.ShowThumbnails, &settings.EnableWiki,
 		&settings.UpdatedAt, &settings.UpdatedBy,
 	)
 	if err != nil {
+		if isMissingColumnError(err, "access_request_cooldown_days") {
+			if ensureErr := r.ensureAccessRequestCooldownColumn(ctx); ensureErr == nil {
+				retryErr := r.pool.QueryRow(ctx, query, hubID).Scan(
+					&settings.ID, &settings.HubID, &settings.DisplayTitle, &settings.SidebarMarkdown, &settings.PrivacyType,
+					&settings.AllowTextPosts, &settings.AllowLinkPosts, &settings.AllowImagePosts, &settings.AllowVideoPosts, &settings.AllowPollPosts,
+					&settings.AllowMediaInComments, &settings.RequirePostFlair,
+					&settings.BannedWords, &settings.SpamFilterStrength, &settings.NewAccountFilterDays, &settings.MinAccountKarma, &settings.AccessRequestCooldownDays,
+					&settings.AllowSpoilers, &settings.ShowThumbnails, &settings.EnableWiki,
+					&settings.UpdatedAt, &settings.UpdatedBy,
+				)
+				if retryErr == nil {
+					return &settings, nil
+				}
+			}
+			legacyQuery := `
+				SELECT id, hub_id, display_title, sidebar_markdown, privacy_type,
+				       allow_text_posts, allow_link_posts, allow_image_posts, allow_video_posts, allow_poll_posts,
+				       allow_media_in_comments, require_post_flair,
+				       banned_words, spam_filter_strength, new_account_filter_days, min_account_karma,
+				       allow_spoilers, show_thumbnails, enable_wiki,
+				       updated_at, updated_by
+				FROM hub_settings
+				WHERE hub_id = $1
+			`
+			err = r.pool.QueryRow(ctx, legacyQuery, hubID).Scan(
+				&settings.ID, &settings.HubID, &settings.DisplayTitle, &settings.SidebarMarkdown, &settings.PrivacyType,
+				&settings.AllowTextPosts, &settings.AllowLinkPosts, &settings.AllowImagePosts, &settings.AllowVideoPosts, &settings.AllowPollPosts,
+				&settings.AllowMediaInComments, &settings.RequirePostFlair,
+				&settings.BannedWords, &settings.SpamFilterStrength, &settings.NewAccountFilterDays, &settings.MinAccountKarma,
+				&settings.AllowSpoilers, &settings.ShowThumbnails, &settings.EnableWiki,
+				&settings.UpdatedAt, &settings.UpdatedBy,
+			)
+			if err != nil {
+				return nil, err
+			}
+			settings.AccessRequestCooldownDays = 0
+			return &settings, nil
+		}
 		return nil, err
 	}
 
@@ -72,13 +129,14 @@ func (r *HubSettingsRepository) EnsureDefaults(ctx context.Context, settings *mo
 			spam_filter_strength,
 			new_account_filter_days,
 			min_account_karma,
+			access_request_cooldown_days,
 			allow_spoilers,
 			show_thumbnails,
 			enable_wiki,
 			updated_by
 		) VALUES (
 			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
-			$11, $12, $13, $14, $15, $16, $17, $18, $19
+			$11, $12, $13, $14, $15, $16, $17, $18, $19, $20
 		)
 		ON CONFLICT (hub_id) DO NOTHING
 	`
@@ -99,17 +157,100 @@ func (r *HubSettingsRepository) EnsureDefaults(ctx context.Context, settings *mo
 		settings.SpamFilterStrength,
 		settings.NewAccountFilterDays,
 		settings.MinAccountKarma,
+		settings.AccessRequestCooldownDays,
 		settings.AllowSpoilers,
 		settings.ShowThumbnails,
 		settings.EnableWiki,
 		userID,
 	)
 
+	if err != nil && isMissingColumnError(err, "access_request_cooldown_days") {
+		if ensureErr := r.ensureAccessRequestCooldownColumn(ctx); ensureErr == nil {
+			_, retryErr := r.pool.Exec(ctx, query,
+				settings.HubID,
+				settings.DisplayTitle,
+				settings.SidebarMarkdown,
+				settings.PrivacyType,
+				settings.AllowTextPosts,
+				settings.AllowLinkPosts,
+				settings.AllowImagePosts,
+				settings.AllowVideoPosts,
+				settings.AllowPollPosts,
+				settings.AllowMediaInComments,
+				settings.RequirePostFlair,
+				settings.BannedWords,
+				settings.SpamFilterStrength,
+				settings.NewAccountFilterDays,
+				settings.MinAccountKarma,
+				settings.AccessRequestCooldownDays,
+				settings.AllowSpoilers,
+				settings.ShowThumbnails,
+				settings.EnableWiki,
+				userID,
+			)
+			if retryErr == nil {
+				return nil
+			}
+		}
+		legacyQuery := `
+			INSERT INTO hub_settings (
+				hub_id,
+				display_title,
+				sidebar_markdown,
+				privacy_type,
+				allow_text_posts,
+				allow_link_posts,
+				allow_image_posts,
+				allow_video_posts,
+				allow_poll_posts,
+				allow_media_in_comments,
+				require_post_flair,
+				banned_words,
+				spam_filter_strength,
+				new_account_filter_days,
+				min_account_karma,
+				allow_spoilers,
+				show_thumbnails,
+				enable_wiki,
+				updated_by
+			) VALUES (
+				$1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
+				$11, $12, $13, $14, $15, $16, $17, $18, $19
+			)
+			ON CONFLICT (hub_id) DO NOTHING
+		`
+		_, legacyErr := r.pool.Exec(ctx, legacyQuery,
+			settings.HubID,
+			settings.DisplayTitle,
+			settings.SidebarMarkdown,
+			settings.PrivacyType,
+			settings.AllowTextPosts,
+			settings.AllowLinkPosts,
+			settings.AllowImagePosts,
+			settings.AllowVideoPosts,
+			settings.AllowPollPosts,
+			settings.AllowMediaInComments,
+			settings.RequirePostFlair,
+			settings.BannedWords,
+			settings.SpamFilterStrength,
+			settings.NewAccountFilterDays,
+			settings.MinAccountKarma,
+			settings.AllowSpoilers,
+			settings.ShowThumbnails,
+			settings.EnableWiki,
+			userID,
+		)
+		return legacyErr
+	}
+
 	return err
 }
 
 // Update updates hub settings
 func (r *HubSettingsRepository) Update(ctx context.Context, settings *models.HubSettings, userID int) error {
+	if len(settings.BannedWords) == 0 {
+		settings.BannedWords = nil
+	}
 	query := `
 		UPDATE hub_settings
 		SET display_title = $2,
@@ -126,11 +267,12 @@ func (r *HubSettingsRepository) Update(ctx context.Context, settings *models.Hub
 		    spam_filter_strength = $13,
 		    new_account_filter_days = $14,
 		    min_account_karma = $15,
-		    allow_spoilers = $16,
-		    show_thumbnails = $17,
-		    enable_wiki = $18,
+		    access_request_cooldown_days = $16,
+		    allow_spoilers = $17,
+		    show_thumbnails = $18,
+		    enable_wiki = $19,
 		    updated_at = CURRENT_TIMESTAMP,
-		    updated_by = $19
+		    updated_by = $20
 		WHERE hub_id = $1
 	`
 
@@ -150,11 +292,87 @@ func (r *HubSettingsRepository) Update(ctx context.Context, settings *models.Hub
 		settings.SpamFilterStrength,
 		settings.NewAccountFilterDays,
 		settings.MinAccountKarma,
+		settings.AccessRequestCooldownDays,
 		settings.AllowSpoilers,
 		settings.ShowThumbnails,
 		settings.EnableWiki,
 		userID,
 	)
+
+	if err != nil && isMissingColumnError(err, "access_request_cooldown_days") {
+		if ensureErr := r.ensureAccessRequestCooldownColumn(ctx); ensureErr == nil {
+			_, retryErr := r.pool.Exec(ctx, query,
+				settings.HubID,
+				settings.DisplayTitle,
+				settings.SidebarMarkdown,
+				settings.PrivacyType,
+				settings.AllowTextPosts,
+				settings.AllowLinkPosts,
+				settings.AllowImagePosts,
+				settings.AllowVideoPosts,
+				settings.AllowPollPosts,
+				settings.AllowMediaInComments,
+				settings.RequirePostFlair,
+				settings.BannedWords,
+				settings.SpamFilterStrength,
+				settings.NewAccountFilterDays,
+				settings.MinAccountKarma,
+				settings.AccessRequestCooldownDays,
+				settings.AllowSpoilers,
+				settings.ShowThumbnails,
+				settings.EnableWiki,
+				userID,
+			)
+			if retryErr == nil {
+				return nil
+			}
+		}
+		legacyQuery := `
+			UPDATE hub_settings
+			SET display_title = $2,
+			    sidebar_markdown = $3,
+			    privacy_type = $4,
+			    allow_text_posts = $5,
+			    allow_link_posts = $6,
+			    allow_image_posts = $7,
+			    allow_video_posts = $8,
+			    allow_poll_posts = $9,
+			    allow_media_in_comments = $10,
+			    require_post_flair = $11,
+			    banned_words = $12,
+			    spam_filter_strength = $13,
+			    new_account_filter_days = $14,
+			    min_account_karma = $15,
+			    allow_spoilers = $16,
+			    show_thumbnails = $17,
+			    enable_wiki = $18,
+			    updated_at = CURRENT_TIMESTAMP,
+			    updated_by = $19
+			WHERE hub_id = $1
+		`
+		_, legacyErr := r.pool.Exec(ctx, legacyQuery,
+			settings.HubID,
+			settings.DisplayTitle,
+			settings.SidebarMarkdown,
+			settings.PrivacyType,
+			settings.AllowTextPosts,
+			settings.AllowLinkPosts,
+			settings.AllowImagePosts,
+			settings.AllowVideoPosts,
+			settings.AllowPollPosts,
+			settings.AllowMediaInComments,
+			settings.RequirePostFlair,
+			settings.BannedWords,
+			settings.SpamFilterStrength,
+			settings.NewAccountFilterDays,
+			settings.MinAccountKarma,
+			settings.AllowSpoilers,
+			settings.ShowThumbnails,
+			settings.EnableWiki,
+			userID,
+		)
+		return legacyErr
+	}
 
 	return err
 }
