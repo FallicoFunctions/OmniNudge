@@ -1517,7 +1517,7 @@ export default function MessagesPage() {
                           d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
                         />
                       </svg>
-                      View Slideshow ({conversationMediaMessages.length})
+                      OmniScroll ({conversationMediaMessages.length})
                     </button>
                   )}
                 </div>
@@ -1910,7 +1910,7 @@ export default function MessagesPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 px-4">
           <div className="w-full max-w-md rounded-lg bg-[var(--color-surface)] p-6 shadow-lg">
             <div className="flex items-start justify-between mb-4">
-              <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">Browse Reddit/Hub Slideshow</h3>
+              <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">Browse Reddit/Hub OmniScroll</h3>
               <button
                 onClick={() => setRedditSlideshowModalOpen(false)}
                 className="text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
@@ -1989,7 +1989,7 @@ export default function MessagesPage() {
                   disabled={!redditSlideshowTrimmedInput || isLoadingRedditPosts}
                   className="rounded-md bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)] disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  {isLoadingRedditPosts ? 'Loading...' : 'Load Slideshow'}
+                  {isLoadingRedditPosts ? 'Loading...' : 'Load OmniScroll'}
                 </button>
               </div>
             </div>
