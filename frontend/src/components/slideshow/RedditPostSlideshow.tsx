@@ -4,6 +4,7 @@ import type { SlideshowItem } from './BaseSlideshow';
 import { SlideshowControls } from './SlideshowControls';
 import { redditService } from '../../services/redditService';
 import { PostBodyMarkdown } from '../posts/PostBodyMarkdown';
+import { resolveMediaUrl } from '../../utils/mediaUrl';
 
 interface RedditPost {
   id: string;
@@ -28,6 +29,12 @@ interface RedditPost {
   permalink: string;
 }
 
+interface GalleryImage {
+  url: string;
+  width?: number;
+  height?: number;
+}
+
 interface LocalPlatformPost {
   id: number;
   title: string;
@@ -35,6 +42,7 @@ interface LocalPlatformPost {
   media_url?: string | null;
   media_type?: string | null;
   thumbnail_url?: string | null;
+  gallery_images?: GalleryImage[];
   hub_name?: string | null;
   hub?: {
     name?: string | null;
@@ -122,13 +130,28 @@ export function RedditPostSlideshow({
             ? `${window.location.origin}/h/${hubName}/comments/${localPost.id}`
             : `${window.location.origin}/posts/${localPost.id}`;
 
+          // Check if it's a gallery post (hub gallery)
+          if (localPost.gallery_images && localPost.gallery_images.length > 0) {
+            // Create a separate slide for each image in the gallery
+            localPost.gallery_images.forEach((image, index) => {
+              processedPosts.push({
+                id: `${localPost.id}-gallery-${index}`,
+                title: `${localPost.title} (${index + 1}/${localPost.gallery_images!.length})`,
+                mediaUrl: resolveMediaUrl(image.url),
+                mediaType: 'image' as const,
+                postUrl,
+              });
+            });
+            return;
+          }
+
           // Check if it has media
           if (localPost.media_url && localPost.media_type) {
             const mediaType = localPost.media_type.startsWith('video') ? 'video' : 'image';
             processedPosts.push({
               id: String(localPost.id),
               title: localPost.title,
-              mediaUrl: localPost.media_url,
+              mediaUrl: resolveMediaUrl(localPost.media_url),
               mediaType: mediaType as 'image' | 'video',
               postUrl,
             });
