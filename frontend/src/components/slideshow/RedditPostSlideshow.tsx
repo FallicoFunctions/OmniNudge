@@ -85,6 +85,7 @@ export function RedditPostSlideshow({
       audioEl.src = audioSrc;
       audioEl.preload = 'metadata';
       audioEl.loop = true;
+      audioEl.crossOrigin = 'anonymous';
       document.body.appendChild(audioEl);
     } else if (audioEl.src !== audioSrc) {
       audioEl.src = audioSrc;
