@@ -204,7 +204,7 @@ func (r *PlatformPostRepository) Create(ctx context.Context, post *PlatformPost)
 			target_subreddit, crossposted_at, gallery_images
 		)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
-		RETURNING id, score, upvotes, downvotes, num_comments, view_count, is_deleted, is_edited, edited_at, crossposted_at, created_at
+		RETURNING id, score, upvotes, downvotes, num_comments, view_count, is_pinned, pinned_position, is_deleted, is_edited, edited_at, crossposted_at, created_at
 	`
 
 	return r.pool.QueryRow(ctx, query,
