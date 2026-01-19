@@ -70,7 +70,7 @@ export default function HubsPage() {
   const [sendRepliesToInbox, setSendRepliesToInbox] = useState(true);
   const [showModMailModal, setShowModMailModal] = useState(false);
   const [slideshowOpen, setSlideshowOpen] = useState(false);
-  const [includeTextPostsInSlideshow, setIncludeTextPostsInSlideshow] = useState(true);
+  const [includeTextPostsInSlideshow] = useState(true);
 
   // Use custom hooks for common functionality
   const {
@@ -1020,24 +1020,26 @@ export default function HubsPage() {
               {shouldShowPinned && hasPinnedPosts && (
                 <div className="mb-4 space-y-3" ref={pinnedListRef}>
                   {/* eslint-disable-next-line react-hooks/refs */}
-                  {orderedPinnedPosts.map((post) =>
-                    renderPostCard(post, {
-                      wrapperProps: canReorderPinned
-                        ? {
-                            'data-pinned-post-id': post.id,
-                            className: [
-                              'transition-all duration-150 ease-out',
-                              draggingPinnedId === post.id ? 'opacity-60' : null,
-                            ]
-                              .filter(Boolean)
-                              .join(' '),
-                          }
-                        : undefined,
-                      showPinnedGrabber: canReorderPinned,
-                      onPinnedPointerDown: canReorderPinned ? handlePinnedPointerDown : undefined,
-                      onPinnedPointerUp: undefined,
-                    })
-                  )}
+                  {orderedPinnedPosts.map((post) => (
+                    <div key={post.id}>
+                      {renderPostCard(post, {
+                        wrapperProps: canReorderPinned
+                          ? {
+                              'data-pinned-post-id': post.id,
+                              className: [
+                                'transition-all duration-150 ease-out',
+                                draggingPinnedId === post.id ? 'opacity-60' : null,
+                              ]
+                                .filter(Boolean)
+                                .join(' '),
+                            }
+                          : undefined,
+                        showPinnedGrabber: canReorderPinned,
+                        onPinnedPointerDown: canReorderPinned ? handlePinnedPointerDown : undefined,
+                        onPinnedPointerUp: undefined,
+                      })}
+                    </div>
+                  ))}
                   {canReorderPinned && draggingPinnedId !== null && orderedPinnedPosts.length > 0 && (
                     <div
                       className="flex h-10 items-center justify-center rounded border border-dashed border-[var(--color-border)] text-xs text-[var(--color-text-secondary)]"

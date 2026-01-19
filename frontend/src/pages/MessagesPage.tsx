@@ -860,7 +860,7 @@ export default function MessagesPage() {
 
       if (isHub) {
         // Fetch hub posts
-        const response = await hubsService.getHubPosts(name, 'hot', 50, '');
+        const response = await hubsService.getHubPosts(name, 'hot', 50, 0);
         posts = response.posts || [];
       } else {
         // Fetch subreddit posts
