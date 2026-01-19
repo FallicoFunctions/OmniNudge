@@ -19,17 +19,24 @@ PROJECT_ROOT="/Users/Nick_1/Documents/Personal_Projects/OmniNudge"
 echo -e "${GREEN}Starting OmniNudge deployment...${NC}"
 echo ""
 
-# Step 1: Create backup on server
-echo -e "${YELLOW}Step 1: Creating backup on server...${NC}"
+# Step 1: Build frontend locally
+echo -e "${YELLOW}Step 1: Building frontend locally...${NC}"
+cd "$PROJECT_ROOT/frontend"
+npm run build
+echo -e "${GREEN}✓ Frontend built${NC}"
+echo ""
+
+# Step 2: Create backup on server
+echo -e "${YELLOW}Step 2: Creating backup on server...${NC}"
 BACKUP_NAME="backup-$(date +%Y%m%d-%H%M%S)"
-ssh "$SERVER" << EOF
+ssh "$SERVER" bash << EOF
   # Create backup directory if it doesn't exist
   mkdir -p /var/www/omninudge/backups
 
   # Create backup
-  echo "Creating backup: \$BACKUP_NAME"
+  echo "Creating backup: $BACKUP_NAME"
   cd /var/www/omninudge
-  tar -czf backups/\${BACKUP_NAME}.tar.gz \
+  tar -czf backups/${BACKUP_NAME}.tar.gz \
     --exclude='backups' \
     --exclude='*.log' \
     --exclude='node_modules' \
@@ -38,19 +45,12 @@ ssh "$SERVER" << EOF
 
   # List last 5 backups
   echo "Recent backups:"
-  ls -lht backups/*.tar.gz | head -5
+  ls -lht backups/*.tar.gz 2>/dev/null | head -5 || echo "This is the first backup"
 
   # Clean up old backups (keep last 10)
-  ls -t backups/*.tar.gz | tail -n +11 | xargs -r rm
+  ls -t backups/*.tar.gz 2>/dev/null | tail -n +11 | xargs -r rm
 EOF
 echo -e "${GREEN}✓ Backup created: ${BACKUP_NAME}.tar.gz${NC}"
-echo ""
-
-# Step 2: Build frontend locally
-echo -e "${YELLOW}Step 2: Building frontend locally...${NC}"
-cd "$PROJECT_ROOT/frontend"
-npm run build
-echo -e "${GREEN}✓ Frontend built${NC}"
 echo ""
 
 # Step 3: Upload frontend build

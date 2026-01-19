@@ -47,6 +47,7 @@ export default function GeneralSettingsTab({ settings, onSave, isHubOwnerOrAdmin
         allow_spoilers: settings.allow_spoilers,
         show_thumbnails: settings.show_thumbnails,
         enable_wiki: settings.enable_wiki,
+        access_request_cooldown_days: settings.access_request_cooldown_days,
       });
     } catch (error) {
       setSaveError(error instanceof Error ? error.message : 'Failed to save changes');
