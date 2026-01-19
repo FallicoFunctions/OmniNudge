@@ -24,6 +24,7 @@ import { createRedditCrosspostPayload } from '../utils/crosspostHelpers';
 import { OMNI_FEED_STORAGE_KEY } from '../constants/storageKeys';
 import { TOP_TIME_OPTIONS } from '../constants/topTimeRange';
 import type { TopTimeRange } from '../constants/topTimeRange';
+import { RedditPostSlideshow } from '../components/slideshow/RedditPostSlideshow';
 
 type SortOption = 'hot' | 'new' | 'top' | 'rising' | 'controversial';
 
@@ -96,6 +97,8 @@ export default function HomePage() {
   const [includeNsfwSearch, setIncludeNsfwSearch] = useState(false);
   const [isSearchDropdownOpen, setIsSearchDropdownOpen] = useState(false);
   const [isAutocompleteOpen, setIsAutocompleteOpen] = useState(false);
+  const [slideshowOpen, setSlideshowOpen] = useState(false);
+  const [includeTextPostsInSlideshow] = useState(true);
   const convertInputToISO = (value: string) => {
     if (!value) {
       return undefined;
@@ -659,6 +662,17 @@ export default function HomePage() {
           >
             Controversial
           </button>
+          {displayedPosts.length > 0 && (
+            <button
+              onClick={() => setSlideshowOpen(true)}
+              className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
+            >
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+              Slideshow ({displayedPosts.length})
+            </button>
+          )}
         </div>
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-3 rounded-full border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-1 text-sm">
@@ -1081,6 +1095,15 @@ export default function HomePage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Slideshow */}
+      {slideshowOpen && displayedPosts.length > 0 && (
+        <RedditPostSlideshow
+          posts={displayedPosts.map((item) => item.post)}
+          onClose={() => setSlideshowOpen(false)}
+          includeTextPosts={includeTextPostsInSlideshow}
+        />
       )}
     </div>
   );
