@@ -5,7 +5,7 @@ import { bugReportService, type KnownBug } from '../services/bugReportService';
 import { useAuth } from '../contexts/AuthContext';
 import BugReportModal from '../components/bugReports/BugReportModal';
 import { Panel } from '../components/common/Panel';
-import { EmptyMessage, LoadingMessage } from '../components/common/StatusMessage';
+import { LoadingMessage } from '../components/common/StatusMessage';
 
 export default function BugReportingPage() {
   const { user } = useAuth();
@@ -38,7 +38,8 @@ export default function BugReportingPage() {
     queryFn: () => bugReportService.getKnownBugs(),
   });
 
-  const knownBugs = knownBugsData?.bugs || [];
+  const knownBugs = Array.isArray(knownBugsData?.bugs) ? knownBugsData.bugs : [];
+  const hasKnownBugs = knownBugs.length > 0;
 
   const initialPageUrl = typeof window !== 'undefined' ? window.location.href : '';
 
@@ -105,12 +106,16 @@ export default function BugReportingPage() {
       {/* Known Bugs Section */}
       <Panel>
         <h2 className="text-2xl font-semibold text-[var(--color-text-primary)] mb-4">Known Bugs</h2>
+        <div className="mb-4 divide-y divide-[var(--color-border)] text-sm text-[var(--color-text-secondary)]">
+          <p className="pb-4">
+            Reddit API usage is subject to aggressive rate limiting, which can cause delays or
+            missing content in feeds, searches, and comment loading.
+          </p>
+          <p className="pt-4">Theme creation is not enabled yet.</p>
+        </div>
 
-        {isLoading ? (
-          <LoadingMessage>Loading known bugs...</LoadingMessage>
-        ) : knownBugs.length === 0 ? (
-          <EmptyMessage>No known bugs at this time.</EmptyMessage>
-        ) : (
+        {isLoading && <LoadingMessage>Loading known bugs...</LoadingMessage>}
+        {!isLoading && hasKnownBugs && (
           <div className="space-y-4">
             {knownBugs.map((bug: KnownBug) => (
               <div

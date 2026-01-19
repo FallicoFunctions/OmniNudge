@@ -416,6 +416,8 @@ func (r *RedditClient) GetSubredditPosts(ctx context.Context, subreddit string, 
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
+		// Log the full error for debugging
+		fmt.Printf("[Reddit API Error] Status: %d, URL: %s, Body: %s\n", resp.StatusCode, req.URL.String(), string(body))
 		return nil, fmt.Errorf("reddit API returned status %d: %s", resp.StatusCode, string(body))
 	}
 
