@@ -22,6 +22,9 @@ export default function ModerationSettingsTab({ settings, onSave }: Props) {
   const [minAccountKarma, setMinAccountKarma] = useState(
     (settings.min_account_karma ?? 0).toString()
   );
+  const [accessRequestCooldownDays, setAccessRequestCooldownDays] = useState(
+    (settings.access_request_cooldown_days ?? 0).toString()
+  );
 
   const handleSave = () => {
     const bannedWordsArray = bannedWords
@@ -35,6 +38,7 @@ export default function ModerationSettingsTab({ settings, onSave }: Props) {
       spam_filter_strength: spamFilterStrength,
       new_account_filter_days: parseInt(newAccountFilterDays) || 0,
       min_account_karma: parseInt(minAccountKarma) || 0,
+      access_request_cooldown_days: parseInt(accessRequestCooldownDays) || 0,
     });
   };
 
@@ -42,7 +46,8 @@ export default function ModerationSettingsTab({ settings, onSave }: Props) {
     bannedWords !== initialBannedWords ||
     spamFilterStrength !== settings.spam_filter_strength ||
     newAccountFilterDays !== (settings.new_account_filter_days ?? 0).toString() ||
-    minAccountKarma !== (settings.min_account_karma ?? 0).toString();
+    minAccountKarma !== (settings.min_account_karma ?? 0).toString() ||
+    accessRequestCooldownDays !== (settings.access_request_cooldown_days ?? 0).toString();
 
   return (
     <div className="space-y-6">
@@ -125,6 +130,24 @@ export default function ModerationSettingsTab({ settings, onSave }: Props) {
         />
         <p className="text-xs text-[var(--color-text-secondary)] mt-1">
           Require accounts to have at least this much karma to post (0 = no restriction)
+        </p>
+      </div>
+
+      {/* Access Request Cooldown */}
+      <div>
+        <label className="block text-sm font-medium text-[var(--color-text-primary)] mb-2">
+          Access Request Cooldown (days)
+        </label>
+        <input
+          type="number"
+          value={accessRequestCooldownDays}
+          onChange={(e) => setAccessRequestCooldownDays(e.target.value)}
+          min="0"
+          placeholder="0"
+          className="w-full px-3 py-2 border border-[var(--color-border)] rounded bg-[var(--color-background)] text-[var(--color-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+        />
+        <p className="text-xs text-[var(--color-text-secondary)] mt-1">
+          How long a denied user must wait before requesting access again (0 = no cooldown)
         </p>
       </div>
 

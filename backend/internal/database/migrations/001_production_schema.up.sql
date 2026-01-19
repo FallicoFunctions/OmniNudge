@@ -597,6 +597,7 @@ CREATE TABLE public.hub_settings (
     spam_filter_strength character varying(20) DEFAULT 'medium'::character varying NOT NULL,
     new_account_filter_days integer DEFAULT 0,
     min_account_karma integer DEFAULT 0,
+    access_request_cooldown_days integer DEFAULT 0,
     allow_spoilers boolean DEFAULT true NOT NULL,
     show_thumbnails boolean DEFAULT true NOT NULL,
     enable_wiki boolean DEFAULT false NOT NULL,

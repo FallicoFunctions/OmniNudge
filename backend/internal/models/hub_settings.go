@@ -34,6 +34,7 @@ type HubSettings struct {
 	SpamFilterStrength   string         `json:"spam_filter_strength"` // low, medium, high
 	NewAccountFilterDays int            `json:"new_account_filter_days"`
 	MinAccountKarma      int            `json:"min_account_karma"`
+	AccessRequestCooldownDays int       `json:"access_request_cooldown_days"`
 
 	// Other settings
 	AllowSpoilers  bool `json:"allow_spoilers"`
