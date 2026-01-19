@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type SyntheticEvent } from 'react';
+import { flushSync } from 'react-dom';
 import { Link } from 'react-router-dom';
 import { formatTimestamp } from '../../utils/timeFormat';
 import { FlairBadge } from './FlairBadge';
@@ -12,6 +13,8 @@ import { decodeHtmlEntities } from '../../utils/text';
 import { loadHls } from '../../utils/hlsLoader';
 import { redditService } from '../../services/redditService';
 import { PinnedBadge } from '../common/PinnedBadge';
+import { getRedditDashAudioUrl } from '../../utils/redditVideoAudio';
+import { API_BASE_URL } from '../../lib/api';
 
 interface RedditPostCardProps {
   post: RedditCrosspostSource & {
@@ -369,16 +372,26 @@ function getInlineMedia(url?: string | null): InlineMedia | null {
   return null;
 }
 
-function getRedditVideoSource(post: RedditPostCardProps['post']): RedditVideoSource | null {
+function getRedditVideoSource(
+  post: RedditPostCardProps['post'],
+  preferHls: boolean
+): RedditVideoSource | null {
   const video = post.secure_media?.reddit_video || post.media?.reddit_video;
   if (!video) return null;
 
-  if (video.fallback_url) {
-    return { url: video.fallback_url, hasAudio: Boolean(video.has_audio ?? true), kind: 'mp4' };
+  const fallbackUrl = decodeHtmlEntities(video.fallback_url);
+  const hlsUrl = decodeHtmlEntities(video.hls_url);
+
+  if (preferHls && hlsUrl) {
+    return { url: hlsUrl, hasAudio: true, kind: 'hls' };
   }
 
-  if (video.hls_url) {
-    return { url: video.hls_url, hasAudio: true, kind: 'hls' };
+  if (fallbackUrl) {
+    return { url: fallbackUrl, hasAudio: Boolean(video.has_audio ?? true), kind: 'mp4' };
+  }
+
+  if (hlsUrl) {
+    return { url: hlsUrl, hasAudio: true, kind: 'hls' };
   }
 
   return null;
@@ -422,6 +435,45 @@ export function RedditPostCard({
       }
     }
 
+    const isOpening = !expandedImageMap[postId];
+
+    if (isOpening && redditVideoSource) {
+      // Set autoplay refs BEFORE flushSync to ensure they're set when effects run
+      autoplayRequestedRef.current = true;
+      autoplayWithSoundRef.current = true;
+
+      flushSync(() => {
+        setExpandedImageMap((prev) => ({
+          ...prev,
+          [postId]: true,
+        }));
+      });
+
+      console.log('[RedditPostCard] Preview expand', {
+        postId,
+        isFirefox,
+        videoKind: redditVideoSource.kind,
+        hasAudioFlag: redditVideoSource.hasAudio,
+        redditAudioUrl: Boolean(redditAudioUrl),
+      });
+      // For Reddit audio, prepare the audio element but don't play it yet
+      // Let the video's onPlay handler manage audio playback to avoid conflicts
+      if (isFirefox && redditAudioUrl) {
+        const audioEl = audioRef.current;
+        console.log('[RedditPostCard] Audio element on expand - preparing (not playing)', {
+          exists: Boolean(audioEl),
+          src: audioEl?.src,
+        });
+        if (audioEl) {
+          audioEl.muted = false;
+          audioEl.volume = 1.0;
+          audioEl.currentTime = 0;
+          // Don't play audio here - let onPlay handler sync and play it
+        }
+      }
+      return;
+    }
+
     setExpandedImageMap((prev) => ({
       ...prev,
       [postId]: !prev[postId],
@@ -438,34 +490,244 @@ export function RedditPostCard({
   const commentLabel = `${post.num_comments.toLocaleString()} Comments`;
   const previewImageUrl = getExpandableImageUrl(post);
   const inlineMedia = getInlineMedia(sanitizedExternalUrl);
-  const redditVideoSource = getRedditVideoSource(post);
+  const canNativeHls =
+    typeof document !== 'undefined' &&
+    typeof navigator !== 'undefined' &&
+    navigator.vendor === 'Apple Computer, Inc.' &&
+    /Safari/.test(navigator.userAgent) &&
+    !/Chrome|Chromium|Edg|OPR|Firefox|Android/i.test(navigator.userAgent) &&
+    Boolean(document.createElement('video').canPlayType('application/vnd.apple.mpegurl'));
+  const isFirefox = typeof navigator !== 'undefined' && /Firefox\//.test(navigator.userAgent);
+  const preferHls = canNativeHls || isFirefox;
+  const redditVideoSource = useMemo(() => getRedditVideoSource(post, preferHls), [post, preferHls]);
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const autoplayRequestedRef = useRef(false);
+  const autoplayWithSoundRef = useRef(false);
+  const audioBlockedRef = useRef(false);
+  const audioUnavailableRef = useRef(false);
   const hasSelftext = Boolean(post.selftext && post.selftext.trim());
   const hasInlineMedia = Boolean(isGalleryPost || previewImageUrl || inlineMedia || redditVideoSource || hasSelftext);
   const isInlinePreviewOpen = !!(hasInlineMedia && expandedImageMap[post.id]);
+  const redditAudioUrlRaw =
+    redditVideoSource && redditVideoSource.kind === 'mp4'
+      ? getRedditDashAudioUrl(redditVideoSource.url)
+      : undefined;
+  const redditAudioUrl = redditAudioUrlRaw
+    ? (() => {
+        const proxyUrl = new URL(`${API_BASE_URL}/reddit/media/proxy`);
+        proxyUrl.searchParams.set('url', redditAudioUrlRaw);
+        return proxyUrl.toString();
+      })()
+    : undefined;
 
-  useEffect(() => {
-    if (!redditVideoSource || redditVideoSource.kind !== 'hls') return;
+  const videoHasAudio = (videoEl: HTMLVideoElement) => {
+    const mozHasAudio = (videoEl as HTMLVideoElement & { mozHasAudio?: boolean }).mozHasAudio;
+    if (typeof mozHasAudio === 'boolean') return mozHasAudio;
+    const webkitAudioDecodedByteCount = (
+      videoEl as HTMLVideoElement & { webkitAudioDecodedByteCount?: number }
+    ).webkitAudioDecodedByteCount;
+    if (typeof webkitAudioDecodedByteCount === 'number') return webkitAudioDecodedByteCount > 0;
+    const audioTracks = (videoEl as HTMLVideoElement & { audioTracks?: { length: number } }).audioTracks;
+    if (audioTracks && typeof audioTracks.length === 'number') return audioTracks.length > 0;
+    return redditVideoSource?.hasAudio ?? true;
+  };
+
+  const shouldUseSeparateAudio = (videoEl: HTMLVideoElement) => {
+    if (!redditAudioUrl || audioUnavailableRef.current) return false;
+    if (redditVideoSource && !redditVideoSource.hasAudio) return true;
+    return !videoHasAudio(videoEl);
+  };
+
+  const handleRedditVideoPlay = (event: SyntheticEvent<HTMLVideoElement>) => {
+    if (!redditAudioUrl) return;
+    const audioEl = audioRef.current;
+    if (!audioEl) return;
+    const videoEl = event.currentTarget;
+    console.log('[RedditPostCard] Video play', {
+      currentTime: videoEl.currentTime,
+      muted: videoEl.muted,
+      volume: videoEl.volume,
+      readyState: videoEl.readyState,
+      audioSrc: audioEl.src,
+    });
+    if (!shouldUseSeparateAudio(videoEl)) {
+      audioEl.pause();
+      return;
+    }
+    audioEl.currentTime = videoEl.currentTime;
+    audioEl.volume = videoEl.volume;
+    audioEl.muted = videoEl.muted;
+    audioEl.playbackRate = videoEl.playbackRate;
+    const playPromise = audioEl.play();
+    if (playPromise) {
+      playPromise
+        .then(() => {
+          audioBlockedRef.current = false;
+          console.log('[RedditPostCard] Audio play ok');
+        })
+        .catch((error) => {
+          console.log('[RedditPostCard] Audio play error', {
+            name: error?.name,
+            message: error?.message,
+          });
+          if (error?.name === 'NotSupportedError') {
+            audioUnavailableRef.current = true;
+          }
+          if (error?.name === 'NotAllowedError') {
+            audioBlockedRef.current = true;
+          }
+        });
+    }
+  };
+
+  const handleRedditVideoPause = () => {
+    if (!redditAudioUrl) return;
+    const audioEl = audioRef.current;
+    if (audioEl) audioEl.pause();
+  };
+
+  const handleRedditVideoSeeking = (event: SyntheticEvent<HTMLVideoElement>) => {
+    if (!redditAudioUrl) return;
+    const audioEl = audioRef.current;
+    if (audioEl) audioEl.currentTime = event.currentTarget.currentTime;
+  };
+
+  const handleRedditVideoVolumeChange = (event: SyntheticEvent<HTMLVideoElement>) => {
+    if (!redditAudioUrl) return;
+    const audioEl = audioRef.current;
+    if (!audioEl) return;
+    if (!shouldUseSeparateAudio(event.currentTarget)) return;
+    audioEl.volume = event.currentTarget.volume;
+    audioEl.muted = event.currentTarget.muted;
+  };
+
+  const handleRedditVideoRateChange = (event: SyntheticEvent<HTMLVideoElement>) => {
+    if (!redditAudioUrl) return;
+    const audioEl = audioRef.current;
+    if (!audioEl) return;
+    if (!shouldUseSeparateAudio(event.currentTarget)) return;
+    audioEl.playbackRate = event.currentTarget.playbackRate;
+  };
+
+  const handleRedditVideoPointerDown = (event: SyntheticEvent<HTMLVideoElement>) => {
+    if (!redditAudioUrl || !audioBlockedRef.current) return;
+    const audioEl = audioRef.current;
+    if (!audioEl) return;
+    const videoEl = event.currentTarget;
+    if (!shouldUseSeparateAudio(videoEl)) return;
+    audioEl.currentTime = videoEl.currentTime;
+    audioEl.volume = videoEl.volume;
+    audioEl.muted = videoEl.muted;
+    audioEl.playbackRate = videoEl.playbackRate;
+    const playPromise = audioEl.play();
+    if (playPromise) {
+      playPromise
+        .then(() => {
+          audioBlockedRef.current = false;
+        })
+        .catch(() => undefined);
+    }
+  };
+
+  const handleRedditVideoEnded = () => {
+    if (!redditAudioUrl) return;
+    const audioEl = audioRef.current;
+    if (!audioEl) return;
+    audioEl.pause();
+    audioEl.currentTime = 0;
+  };
+
+  const attemptAutoplay = () => {
+    if (!autoplayRequestedRef.current) return;
     const videoEl = videoRef.current;
     if (!videoEl) return;
 
-    const canNativePlay = videoEl.canPlayType('application/vnd.apple.mpegurl');
-    if (canNativePlay) {
-      videoEl.src = redditVideoSource.url;
+    const preferSound = autoplayWithSoundRef.current;
+    const startMuted = isFirefox && redditVideoSource?.kind === 'hls';
+
+    console.log('[attemptAutoplay] Called', {
+      videoType: redditVideoSource?.kind,
+      readyState: videoEl.readyState,
+      startMuted,
+      preferSound,
+      isFirefox
+    });
+
+    const play = (muted: boolean) => {
+      console.log('[attemptAutoplay] play() called with muted:', muted);
+      videoEl.muted = muted;
+      if (!muted) {
+        videoEl.volume = 1.0;
+      }
+      const playPromise = videoEl.play();
+      if (playPromise) {
+        playPromise
+          .then(() => {
+            console.log('[attemptAutoplay] Play succeeded, muted:', muted);
+            autoplayRequestedRef.current = false;
+            if (muted && preferSound) {
+              console.log('[attemptAutoplay] Unmuting video after successful play');
+              videoEl.muted = false;
+              videoEl.play().catch(() => undefined);
+            }
+          })
+          .catch((error) => {
+            console.log('[attemptAutoplay] Play failed:', error?.name, error?.message);
+            if (!muted && error?.name === 'NotAllowedError') {
+              console.log('[attemptAutoplay] Retrying with muted=true');
+              play(true);
+            }
+          });
+      }
+    };
+
+    if (videoEl.readyState >= 2) {
+      console.log('[attemptAutoplay] Video ready, playing immediately');
+      play(startMuted || !preferSound);
       return;
     }
+
+    console.log('[attemptAutoplay] Video not ready, waiting for canplay event');
+    const handleCanPlay = () => {
+      console.log('[attemptAutoplay] canplay event fired');
+      videoEl.removeEventListener('canplay', handleCanPlay);
+      play(startMuted || !preferSound);
+    };
+    videoEl.addEventListener('canplay', handleCanPlay);
+  };
+
+  useEffect(() => {
+    if (
+      !redditVideoSource ||
+      redditVideoSource.kind !== 'hls' ||
+      !isInlinePreviewOpen ||
+      canNativeHls
+    ) {
+      return;
+    }
+    const videoEl = videoRef.current;
+    if (!videoEl) return;
+
+    console.log('[HLS Effect] Starting HLS setup', { url: redditVideoSource.url });
 
     let hlsInstance: { destroy: () => void } | null = null;
     let mounted = true;
     (async () => {
       try {
+        console.log('[HLS Effect] Loading HLS library...');
         const Hls = await loadHls();
         if (Hls?.isSupported && Hls.isSupported()) {
+          console.log('[HLS Effect] HLS supported, creating instance');
           const instance = new Hls();
           instance.loadSource(redditVideoSource.url);
           instance.attachMedia(videoEl);
           if (mounted) {
             hlsInstance = instance;
+            instance.on(Hls.Events.MANIFEST_PARSED, () => {
+              console.log('[HLS Effect] MANIFEST_PARSED - calling attemptAutoplay');
+              attemptAutoplay();
+            });
           } else {
             instance.destroy();
           }
@@ -478,12 +740,39 @@ export function RedditPostCard({
     })();
 
     return () => {
+      console.log('[HLS Effect] Cleanup');
       mounted = false;
       if (hlsInstance) {
         hlsInstance.destroy();
       }
     };
-  }, [redditVideoSource]);
+  }, [redditVideoSource, isInlinePreviewOpen, canNativeHls]);
+
+  // For native HLS (Safari), attempt autoplay when preview opens
+  // The onCanPlay handler provides a backup, but Safari sometimes doesn't fire it reliably
+  useEffect(() => {
+    if (!isInlinePreviewOpen || !redditVideoSource) return;
+
+    // Only handle native HLS here; HLS.js is handled by the MANIFEST_PARSED event
+    if (redditVideoSource.kind === 'hls' && canNativeHls) {
+      console.log('[Native HLS Effect] Attempting autoplay');
+      // Small delay to ensure video element is mounted
+      const timer = setTimeout(() => {
+        attemptAutoplay();
+      }, 50);
+      return () => clearTimeout(timer);
+    }
+  }, [isInlinePreviewOpen, redditVideoSource, canNativeHls]);
+
+  useEffect(() => {
+    if (isInlinePreviewOpen) return;
+    autoplayRequestedRef.current = false;
+    autoplayWithSoundRef.current = false;
+    const audioEl = audioRef.current;
+    if (!audioEl) return;
+    audioEl.pause();
+    audioEl.currentTime = 0;
+  }, [isInlinePreviewOpen]);
 
   return (
     <article
@@ -650,15 +939,63 @@ export function RedditPostCard({
                         className="max-h-[70vh] w-full bg-black"
                         playsInline
                         preload="metadata"
+                        onLoadedMetadata={() => {
+                          console.log('[RedditPostCard] onLoadedMetadata event', {
+                            videoKind: redditVideoSource.kind,
+                            autoplayRequested: autoplayRequestedRef.current,
+                            canNativeHls,
+                          });
+                          // For MP4 and native HLS videos, autoplay when metadata is loaded
+                          // (HLS.js videos are handled by MANIFEST_PARSED event)
+                          if (autoplayRequestedRef.current && (redditVideoSource.kind !== 'hls' || canNativeHls)) {
+                            const videoEl = videoRef.current;
+                            if (videoEl) {
+                              console.log('[RedditPostCard] Calling play() directly from onLoadedMetadata');
+                              videoEl.muted = false;
+                              videoEl.volume = 1.0;
+                              const playPromise = videoEl.play();
+                              if (playPromise) {
+                                playPromise
+                                  .then(() => {
+                                    console.log('[RedditPostCard] Video play succeeded');
+                                    autoplayRequestedRef.current = false;
+                                  })
+                                  .catch((error) => {
+                                    console.log('[RedditPostCard] Video play failed:', error?.name, error?.message);
+                                    if (error?.name === 'NotAllowedError') {
+                                      // Try again muted
+                                      videoEl.muted = true;
+                                      videoEl.play().catch(() => undefined);
+                                    }
+                                  });
+                              }
+                            }
+                          }
+                        }}
+                        onPlay={redditAudioUrl ? handleRedditVideoPlay : undefined}
+                        onPause={redditAudioUrl ? handleRedditVideoPause : undefined}
+                        onSeeking={redditAudioUrl ? handleRedditVideoSeeking : undefined}
+                        onVolumeChange={redditAudioUrl ? handleRedditVideoVolumeChange : undefined}
+                        onRateChange={redditAudioUrl ? handleRedditVideoRateChange : undefined}
+                        onEnded={redditAudioUrl ? handleRedditVideoEnded : undefined}
+                        onPointerDown={redditAudioUrl ? handleRedditVideoPointerDown : undefined}
                       >
                         {redditVideoSource.kind === 'mp4' && (
                           <source src={redditVideoSource.url} type="video/mp4" />
                         )}
-                        {redditVideoSource.kind === 'hls' && (
+                        {redditVideoSource.kind === 'hls' && canNativeHls && (
                           <source src={redditVideoSource.url} type="application/vnd.apple.mpegurl" />
                         )}
                         Your browser does not support the video tag.
                       </video>
+                      {redditAudioUrl && (
+                        <audio
+                          ref={audioRef}
+                          src={redditAudioUrl}
+                          preload="metadata"
+                          className="hidden"
+                        />
+                      )}
                       {!redditVideoSource.hasAudio && (
                         <div className="p-2 text-xs text-[var(--color-text-secondary)]">
                           Note: This video may not have audio.

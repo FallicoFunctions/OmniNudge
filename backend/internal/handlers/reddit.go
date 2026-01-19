@@ -6,8 +6,10 @@ import (
 	"errors"
 	"fmt"
 	"html"
+	"io"
 	"log"
 	"net/http"
+	"net/url"
 	"path"
 	"strconv"
 	"strings"
@@ -24,6 +26,76 @@ const redditCacheTTL = 15 * time.Minute
 type RedditHandler struct {
 	redditClient *services.RedditClient
 	redditRepo   *models.RedditPostRepository
+}
+
+// ProxyRedditMedia handles GET /api/v1/reddit/media/proxy?url=...
+// Used for audio streams that Firefox blocks when requested directly from v.redd.it.
+func (h *RedditHandler) ProxyRedditMedia(c *gin.Context) {
+	rawURL := strings.TrimSpace(c.Query("url"))
+	if rawURL == "" {
+		rawQuery := c.Request.URL.RawQuery
+		if strings.HasPrefix(rawQuery, "url=") {
+			rawURL = strings.TrimPrefix(rawQuery, "url=")
+			if decoded, err := url.QueryUnescape(rawURL); err == nil {
+				rawURL = decoded
+			}
+		}
+	}
+	if rawURL == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "url query param is required"})
+		return
+	}
+
+	parsedURL, err := url.Parse(rawURL)
+	if err != nil || parsedURL.Scheme != "https" || parsedURL.Host == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid url"})
+		return
+	}
+
+	host := strings.ToLower(parsedURL.Host)
+	if host != "v.redd.it" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "unsupported host"})
+		return
+	}
+
+	req, err := http.NewRequestWithContext(c.Request.Context(), http.MethodGet, parsedURL.String(), nil)
+	if err != nil {
+		c.JSON(http.StatusBadGateway, gin.H{"error": "failed to create proxy request"})
+		return
+	}
+
+	if rangeHeader := c.GetHeader("Range"); rangeHeader != "" {
+		req.Header.Set("Range", rangeHeader)
+	}
+
+	req.Header.Set("User-Agent", "Mozilla/5.0 (compatible; OmniNudge/1.0; +https://omninudge.com)")
+	req.Header.Set("Accept", "audio/*;q=0.9,video/*;q=0.8,*/*;q=0.5")
+	req.Header.Set("Referer", "https://www.reddit.com/")
+	req.Header.Set("Origin", "https://www.reddit.com")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		c.JSON(http.StatusBadGateway, gin.H{"error": "failed to fetch media"})
+		return
+	}
+	defer resp.Body.Close()
+
+	for _, header := range []string{
+		"Content-Type",
+		"Content-Length",
+		"Content-Range",
+		"Accept-Ranges",
+		"Cache-Control",
+		"ETag",
+		"Last-Modified",
+	} {
+		if value := resp.Header.Get(header); value != "" {
+			c.Header(header, value)
+		}
+	}
+
+	c.Status(resp.StatusCode)
+	_, _ = io.Copy(c.Writer, resp.Body)
 }
 
 // NewRedditHandler creates a new Reddit handler
