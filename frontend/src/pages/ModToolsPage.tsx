@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { moderationService } from '../services/moderationService';
+import { accessRequestService, type AccessRequest } from '../services/accessRequestService';
 import { EmptyMessage, LoadingMessage } from '../components/common/StatusMessage';
 import { OffsetPaginationControls } from '../components/common/OffsetPaginationControls';
 import { modMailService } from '../services/modMailService';
@@ -14,7 +15,7 @@ import type {
 } from '../types/moderation';
 import type { ModMailConversation } from '../types/modmail';
 
-type TabType = 'bans' | 'removal_reasons' | 'mod_log' | 'mod_mail';
+type TabType = 'bans' | 'removal_reasons' | 'mod_log' | 'mod_mail' | 'requests';
 
 export default function ModToolsPage() {
   const { hubName } = useParams<{ hubName: string }>();
@@ -94,6 +95,16 @@ export default function ModToolsPage() {
           >
             Mod Mail
           </button>
+          <button
+            onClick={() => setActiveTab('requests')}
+            className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+              activeTab === 'requests'
+                ? 'border-[var(--color-primary)] text-[var(--color-primary)]'
+                : 'border-transparent text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:border-gray-300'
+            }`}
+          >
+            Requests
+          </button>
         </nav>
       </div>
 
@@ -102,6 +113,7 @@ export default function ModToolsPage() {
       {activeTab === 'removal_reasons' && <RemovalReasonsTab hubName={hubName} />}
       {activeTab === 'mod_log' && <ModLogTab hubName={hubName} />}
       {activeTab === 'mod_mail' && <ModMailTab hubName={hubName} />}
+      {activeTab === 'requests' && <AccessRequestsTab hubName={hubName} />}
     </div>
   );
 }
@@ -751,6 +763,165 @@ function ModMailTab({ hubName }: { hubName: string }) {
                     Reopen
                   </button>
                 )}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ===== ACCESS REQUESTS TAB =====
+
+function AccessRequestsTab({ hubName }: { hubName: string }) {
+  const queryClient = useQueryClient();
+  const [usernameInput, setUsernameInput] = useState('');
+  const [addUserStatus, setAddUserStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle');
+  const [addUserError, setAddUserError] = useState('');
+
+  const { data: requests, isLoading } = useQuery({
+    queryKey: ['accessRequests', hubName],
+    queryFn: () => accessRequestService.getPendingRequests(hubName),
+  });
+
+  const addUserMutation = useMutation({
+    mutationFn: (username: string) => accessRequestService.addUserAccess(hubName, username),
+    onSuccess: () => {
+      setAddUserStatus('success');
+      setUsernameInput('');
+      queryClient.invalidateQueries({ queryKey: ['accessRequests', hubName] });
+    },
+    onError: (error: Error) => {
+      setAddUserStatus('error');
+      setAddUserError(error.message || 'Failed to grant access');
+    },
+  });
+
+  const approveMutation = useMutation({
+    mutationFn: (requestId: number) => accessRequestService.approveRequest(requestId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['accessRequests', hubName] });
+    },
+  });
+
+  const denyMutation = useMutation({
+    mutationFn: (requestId: number) => accessRequestService.denyRequest(requestId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['accessRequests', hubName] });
+    },
+  });
+
+  if (isLoading) {
+    return (
+      <div className="text-center py-8">
+        <LoadingMessage>Loading...</LoadingMessage>
+      </div>
+    );
+  }
+
+  const pendingRequests = requests?.requests || [];
+
+  return (
+    <div>
+      <h2 className="text-xl font-semibold mb-4">Access Requests</h2>
+
+      <div className="mb-6 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4">
+        <h3 className="text-sm font-semibold text-[var(--color-text-primary)]">Grant access by username</h3>
+        <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+          Add a user directly to this private hub even if their request was denied.
+        </p>
+        <form
+          onSubmit={(event) => {
+            event.preventDefault();
+            const trimmed = usernameInput.trim();
+            if (!trimmed) return;
+            setAddUserStatus('saving');
+            setAddUserError('');
+            addUserMutation.mutate(trimmed);
+          }}
+          className="mt-3 flex flex-col gap-3 md:flex-row"
+        >
+          <input
+            type="text"
+            value={usernameInput}
+            onChange={(event) => {
+              setUsernameInput(event.target.value);
+              if (addUserStatus !== 'idle') {
+                setAddUserStatus('idle');
+              }
+            }}
+            placeholder="Enter username (e.g. TestUser)"
+            className="flex-1 rounded border border-[var(--color-border)] bg-[var(--color-background)] px-3 py-2 text-sm text-[var(--color-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+          />
+          <button
+            type="submit"
+            disabled={addUserMutation.isPending || usernameInput.trim().length === 0}
+            className="rounded bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--color-primary-strong)] disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {addUserMutation.isPending ? 'Granting...' : 'Grant Access'}
+          </button>
+        </form>
+        {addUserStatus === 'success' && (
+          <p className="mt-2 text-sm text-green-600">Access granted successfully.</p>
+        )}
+        {addUserStatus === 'error' && (
+          <p className="mt-2 text-sm text-red-600">{addUserError}</p>
+        )}
+      </div>
+
+      {pendingRequests.length === 0 && (
+        <div className="text-center py-12">
+          <EmptyMessage>No pending access requests.</EmptyMessage>
+        </div>
+      )}
+
+      <div className="space-y-3">
+        {pendingRequests.map((request: AccessRequest) => (
+          <div
+            key={request.id}
+            className="p-4 border border-[var(--color-border)] rounded-lg bg-[var(--color-surface-elevated)]"
+          >
+            <div className="flex justify-between items-start">
+              <div className="flex-1">
+                <div className="flex items-center gap-2">
+                  <span className="font-medium">{request.username || `User #${request.user_id}`}</span>
+                  <span className="px-2 py-0.5 text-xs bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200 rounded">
+                    Pending
+                  </span>
+                </div>
+                {request.message && (
+                  <div className="text-sm text-[var(--color-text-secondary)] mt-2 p-3 bg-[var(--color-surface)] rounded border border-[var(--color-border)]">
+                    "{request.message}"
+                  </div>
+                )}
+                <div className="text-xs text-[var(--color-text-secondary)] mt-2">
+                  Requested on {new Date(request.created_at).toLocaleDateString()}
+                </div>
+              </div>
+              <div className="ml-4 flex gap-2">
+                <button
+                  onClick={() => {
+                    if (confirm('Approve this access request?')) {
+                      approveMutation.mutate(request.id);
+                    }
+                  }}
+                  disabled={approveMutation.isPending || denyMutation.isPending}
+                  className="px-3 py-1 text-sm bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50"
+                >
+                  Approve
+                </button>
+                <button
+                  onClick={() => {
+                    if (confirm('Deny this access request?')) {
+                      denyMutation.mutate(request.id);
+                    }
+                  }}
+                  disabled={approveMutation.isPending || denyMutation.isPending}
+                  className="px-3 py-1 text-sm bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50"
+                >
+                  Deny
+                </button>
               </div>
             </div>
           </div>

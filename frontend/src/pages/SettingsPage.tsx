@@ -30,6 +30,8 @@ export default function SettingsPage() {
     setSearchIncludeNsfwByDefault,
     blockAllNsfw,
     setBlockAllNsfw,
+    accessRequestCooldownDisplay,
+    setAccessRequestCooldownDisplay,
   } = useSettings();
   const [publicKey, setPublicKey] = useState<string | null>(null);
   const [showPublicKey, setShowPublicKey] = useState(false);
@@ -160,6 +162,30 @@ export default function SettingsPage() {
                   />
                 </button>
               </div>
+            </div>
+
+            <div className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4">
+              <label
+                htmlFor="access-request-cooldown-display"
+                className="block text-sm font-medium text-[var(--color-text-primary)]"
+              >
+                Access Request Cooldown Format
+              </label>
+              <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+                Choose how cooldown time is shown on private hub access requests.
+              </p>
+              <select
+                id="access-request-cooldown-display"
+                value={accessRequestCooldownDisplay}
+                onChange={(event) =>
+                  setAccessRequestCooldownDisplay(event.target.value as 'days' | 'date' | 'both')
+                }
+                className="mt-3 w-full rounded border border-[var(--color-border)] bg-[var(--color-background)] px-3 py-2 text-sm text-[var(--color-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+              >
+                <option value="days">Show days remaining</option>
+                <option value="date">Show the date</option>
+                <option value="both">Show days + date</option>
+              </select>
             </div>
           </div>
         </Panel>

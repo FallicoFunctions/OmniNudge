@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/jackc/pgx/v5"
 	"github.com/omninudge/backend/internal/models"
 	"github.com/omninudge/backend/internal/permissions"
 )
@@ -17,9 +18,10 @@ func RequireHubModeratorOrAdmin(
 	postRepo *models.PlatformPostRepository,
 	commentRepo *models.PostCommentRepository,
 	removalReasonRepo *models.RemovalReasonRepository,
+	accessRequestRepo *models.HubAccessRequestRepository,
 ) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		hubID, err := resolveHubIDForModeration(c, hubRepo, postRepo, commentRepo, removalReasonRepo)
+		hubID, err := resolveHubIDForModeration(c, hubRepo, postRepo, commentRepo, removalReasonRepo, accessRequestRepo)
 		if err != nil {
 			status := http.StatusInternalServerError
 			if errors.Is(err, errUnknownHubScope) || errors.Is(err, errMissingHubAssociation) {
@@ -74,11 +76,15 @@ func resolveHubIDForModeration(
 	postRepo *models.PlatformPostRepository,
 	commentRepo *models.PostCommentRepository,
 	removalReasonRepo *models.RemovalReasonRepository,
+	accessRequestRepo *models.HubAccessRequestRepository,
 ) (int, error) {
 	fullPath := c.FullPath()
+	if fullPath == "" {
+		fullPath = c.Request.URL.Path
+	}
 
 	switch {
-	case strings.HasPrefix(fullPath, "/api/v1/mod/hubs/"):
+	case strings.HasPrefix(fullPath, "/api/v1/mod/hubs/") || strings.HasPrefix(fullPath, "/mod/hubs/"):
 		hubName := c.Param("hub_name")
 		if hubName == "" {
 			return 0, errUnknownHubScope
@@ -91,7 +97,7 @@ func resolveHubIDForModeration(
 			return 0, nil
 		}
 		return hub.ID, nil
-	case strings.HasPrefix(fullPath, "/api/v1/mod/posts/"):
+	case strings.HasPrefix(fullPath, "/api/v1/mod/posts/") || strings.HasPrefix(fullPath, "/mod/posts/"):
 		postID, err := strconv.Atoi(c.Param("id"))
 		if err != nil {
 			return 0, errors.New("invalid post id")
@@ -107,7 +113,7 @@ func resolveHubIDForModeration(
 			return 0, errMissingHubAssociation
 		}
 		return *post.HubID, nil
-	case strings.HasPrefix(fullPath, "/api/v1/mod/comments/"):
+	case strings.HasPrefix(fullPath, "/api/v1/mod/comments/") || strings.HasPrefix(fullPath, "/mod/comments/"):
 		commentID, err := strconv.Atoi(c.Param("id"))
 		if err != nil {
 			return 0, errors.New("invalid comment id")
@@ -130,7 +136,7 @@ func resolveHubIDForModeration(
 			return 0, errMissingHubAssociation
 		}
 		return *post.HubID, nil
-	case strings.HasPrefix(fullPath, "/api/v1/mod/removal-reasons/"):
+	case strings.HasPrefix(fullPath, "/api/v1/mod/removal-reasons/") || strings.HasPrefix(fullPath, "/mod/removal-reasons/"):
 		reasonID, err := strconv.Atoi(c.Param("id"))
 		if err != nil {
 			return 0, errors.New("invalid removal reason id")
@@ -143,6 +149,19 @@ func resolveHubIDForModeration(
 			return 0, nil
 		}
 		return reason.HubID, nil
+	case strings.HasPrefix(fullPath, "/api/v1/mod/access-requests/") || strings.HasPrefix(fullPath, "/mod/access-requests/"):
+		requestID, err := strconv.Atoi(c.Param("request_id"))
+		if err != nil {
+			return 0, errors.New("invalid access request id")
+		}
+		accessRequest, err := accessRequestRepo.GetByID(c.Request.Context(), requestID)
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				return 0, nil
+			}
+			return 0, err
+		}
+		return accessRequest.HubID, nil
 	default:
 		return 0, errUnknownHubScope
 	}

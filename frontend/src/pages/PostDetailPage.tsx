@@ -36,6 +36,7 @@ import { canModerateContent } from '../utils/permissions';
 import { isUserHubModerator } from '../utils/moderation';
 import { PostEditModal } from '../components/posts/PostEditModal';
 import { CommunityHeader } from '../components/common/CommunityHeader';
+import { CommunityHeaderControlsRow } from '../components/common/CommunityHeaderControlsRow';
 import { FeedSearchBars } from '../components/common/FeedSearchBars';
 import { SubredditSuggestionItem } from '../components/subreddit/SubredditSuggestionItem';
 import { useSubredditAutocomplete } from '../hooks/useSubredditAutocomplete';
@@ -619,9 +620,8 @@ export default function PostDetailPage() {
           communityName={normalizedSubreddit}
           iconUrl={subredditIcon}
           isSubscribed={subredditSubscriptionStatus?.is_subscribed ?? false}
-          topSearch={
+          searchBars={
             <FeedSearchBars
-              containerClassName="w-full md:w-96"
               showPostForm={false}
               topValue={subredditInputValue}
               topPlaceholder="Enter hub or subreddit..."
@@ -640,79 +640,76 @@ export default function PostDetailPage() {
                   onSelect={handleSelectSubredditSuggestion}
                 />
               )}
-              postValue={postSearchInput}
-              postPlaceholder="Search posts..."
-              onPostChange={(value) => {
-                setPostSearchInput(value);
-                if (!isSearchDropdownOpen) {
-                  setIsSearchDropdownOpen(true);
-                }
-              }}
-              onPostFocus={() => setIsSearchDropdownOpen(true)}
-              onPostBlur={() => setTimeout(() => setIsSearchDropdownOpen(false), 120)}
-              onPostSubmit={handlePostSearchSubmit}
-              postDropdownOpen={isSearchDropdownOpen}
+              postValue=""
+              postPlaceholder=""
+              onPostChange={() => {}}
+              onPostSubmit={(event) => event.preventDefault()}
+              postDropdownOpen={false}
             />
           }
-          postSearch={
-            <FeedSearchBars
-              containerClassName="w-full md:w-96"
-              showTopForm={false}
-              topValue={subredditInputValue}
-              topPlaceholder="Enter hub or subreddit..."
-              onTopChange={handleSubredditInputChange}
-              onTopFocus={() => setIsAutocompleteOpen(true)}
-              onTopBlur={() => setIsAutocompleteOpen(false)}
-              onTopSubmit={handleSubredditSubmit}
-              topSuggestions={subredditSuggestions}
-              topShouldShowSuggestions={shouldShowSuggestions}
-              topIsLoading={isAutocompleteLoading}
-              topEmptyMessage="No hubs or subreddits found."
-              renderTopSuggestion={(suggestion) => (
-                <SubredditSuggestionItem
-                  key={suggestion.name}
-                  suggestion={suggestion}
-                  onSelect={handleSelectSubredditSuggestion}
-                />
-              )}
-              postValue={postSearchInput}
-              postPlaceholder="Search posts..."
-              onPostChange={(value) => {
-                setPostSearchInput(value);
-                if (!isSearchDropdownOpen) {
-                  setIsSearchDropdownOpen(true);
-                }
-              }}
-              onPostFocus={() => setIsSearchDropdownOpen(true)}
-              onPostBlur={() => setTimeout(() => setIsSearchDropdownOpen(false), 120)}
-              onPostSubmit={handlePostSearchSubmit}
-              postDropdownOpen={isSearchDropdownOpen}
-              postDropdownContent={
-                <div className="space-y-2 text-sm text-[var(--color-text-primary)]">
-                  <label className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      checked={limitSearchToContext}
-                      onChange={(e) => setLimitSearchToContext(e.target.checked)}
+          sortControls={
+            <CommunityHeaderControlsRow
+              right={
+                <FeedSearchBars
+                  containerClassName="w-full md:w-96"
+                  showTopForm={false}
+                  topValue={subredditInputValue}
+                  topPlaceholder="Enter hub or subreddit..."
+                  onTopChange={handleSubredditInputChange}
+                  onTopFocus={() => setIsAutocompleteOpen(true)}
+                  onTopBlur={() => setIsAutocompleteOpen(false)}
+                  onTopSubmit={handleSubredditSubmit}
+                  topSuggestions={subredditSuggestions}
+                  topShouldShowSuggestions={shouldShowSuggestions}
+                  topIsLoading={isAutocompleteLoading}
+                  topEmptyMessage="No hubs or subreddits found."
+                  renderTopSuggestion={(suggestion) => (
+                    <SubredditSuggestionItem
+                      key={suggestion.name}
+                      suggestion={suggestion}
+                      onSelect={handleSelectSubredditSuggestion}
                     />
-                    <span>Limit search to r/{normalizedSubreddit}</span>
-                  </label>
-                  {!blockAllNsfw && (
-                    <label className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        checked={includeNsfwSearch}
-                        onChange={(e) => setIncludeNsfwSearch(e.target.checked)}
-                      />
-                      <span>Include NSFW results</span>
-                    </label>
                   )}
-                  {blockAllNsfw && (
-                    <div className="text-xs text-[var(--color-text-secondary)]">
-                      NSFW content is blocked in settings.
+                  postValue={postSearchInput}
+                  postPlaceholder="Search posts..."
+                  onPostChange={(value) => {
+                    setPostSearchInput(value);
+                    if (!isSearchDropdownOpen) {
+                      setIsSearchDropdownOpen(true);
+                    }
+                  }}
+                  onPostFocus={() => setIsSearchDropdownOpen(true)}
+                  onPostBlur={() => setTimeout(() => setIsSearchDropdownOpen(false), 120)}
+                  onPostSubmit={handlePostSearchSubmit}
+                  postDropdownOpen={isSearchDropdownOpen}
+                  postDropdownContent={
+                    <div className="space-y-2 text-sm text-[var(--color-text-primary)]">
+                      <label className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={limitSearchToContext}
+                          onChange={(e) => setLimitSearchToContext(e.target.checked)}
+                        />
+                        <span>Limit search to r/{normalizedSubreddit}</span>
+                      </label>
+                      {!blockAllNsfw && (
+                        <label className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={includeNsfwSearch}
+                            onChange={(e) => setIncludeNsfwSearch(e.target.checked)}
+                          />
+                          <span>Include NSFW results</span>
+                        </label>
+                      )}
+                      {blockAllNsfw && (
+                        <div className="text-xs text-[var(--color-text-secondary)]">
+                          NSFW content is blocked in settings.
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
+                  }
+                />
               }
             />
           }
@@ -726,6 +723,7 @@ export default function PostDetailPage() {
           isModerator={isModerator}
           searchBars={
             <FeedSearchBars
+              showPostForm={false}
               topValue={hubInputValue}
               topPlaceholder="Enter hub or subreddit..."
               onTopChange={handleHubInputChange}
@@ -744,44 +742,77 @@ export default function PostDetailPage() {
                   onSelectSubreddit={handleSelectHubSubredditSuggestion}
                 />
               )}
-              postValue={hubPostSearchInput}
-              postPlaceholder="Search posts..."
-              onPostChange={(value) => {
-                setHubPostSearchInput(value);
-                if (!hubIsSearchDropdownOpen) {
-                  setHubIsSearchDropdownOpen(true);
-                }
-              }}
-              onPostFocus={() => setHubIsSearchDropdownOpen(true)}
-              onPostBlur={() => setTimeout(() => setHubIsSearchDropdownOpen(false), 120)}
-              onPostSubmit={handleHubPostSearchSubmit}
-              postDropdownOpen={hubIsSearchDropdownOpen}
-              postDropdownContent={
-                <div className="space-y-2 text-sm text-[var(--color-text-primary)]">
-                  <label className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      checked={hubLimitSearchToContext}
-                      onChange={(e) => setHubLimitSearchToContext(e.target.checked)}
+              postValue=""
+              postPlaceholder=""
+              onPostChange={() => {}}
+              onPostSubmit={(event) => event.preventDefault()}
+              postDropdownOpen={false}
+            />
+          }
+          sortControls={
+            <CommunityHeaderControlsRow
+              right={
+                <FeedSearchBars
+                  containerClassName="w-full md:w-96"
+                  showTopForm={false}
+                  topValue={hubInputValue}
+                  topPlaceholder="Enter hub or subreddit..."
+                  onTopChange={handleHubInputChange}
+                  onTopFocus={() => setHubIsAutocompleteOpen(true)}
+                  onTopBlur={() => setHubIsAutocompleteOpen(false)}
+                  onTopSubmit={handleHubSubmit}
+                  topSuggestions={hubSuggestions}
+                  topShouldShowSuggestions={shouldShowHubSuggestions}
+                  topIsLoading={isHubAutocompleteLoading}
+                  topEmptyMessage="No hubs or subreddits found."
+                  renderTopSuggestion={(suggestion) => (
+                    <CombinedSuggestionItem
+                      key={`${suggestion.type}-${suggestion.data.name}`}
+                      suggestion={suggestion}
+                      onSelectHub={handleSelectHubSuggestion}
+                      onSelectSubreddit={handleSelectHubSubredditSuggestion}
                     />
-                    <span>Limit search to h/{hubName}</span>
-                  </label>
-                  {!blockAllNsfw && (
-                    <label className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        checked={hubIncludeNsfwSearch}
-                        onChange={(e) => setHubIncludeNsfwSearch(e.target.checked)}
-                      />
-                      <span>Include NSFW results</span>
-                    </label>
                   )}
-                  {blockAllNsfw && (
-                    <div className="text-xs text-[var(--color-text-secondary)]">
-                      NSFW content is blocked in settings.
+                  postValue={hubPostSearchInput}
+                  postPlaceholder="Search posts..."
+                  onPostChange={(value) => {
+                    setHubPostSearchInput(value);
+                    if (!hubIsSearchDropdownOpen) {
+                      setHubIsSearchDropdownOpen(true);
+                    }
+                  }}
+                  onPostFocus={() => setHubIsSearchDropdownOpen(true)}
+                  onPostBlur={() => setTimeout(() => setHubIsSearchDropdownOpen(false), 120)}
+                  onPostSubmit={handleHubPostSearchSubmit}
+                  postDropdownOpen={hubIsSearchDropdownOpen}
+                  postDropdownContent={
+                    <div className="space-y-2 text-sm text-[var(--color-text-primary)]">
+                      <label className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={hubLimitSearchToContext}
+                          onChange={(e) => setHubLimitSearchToContext(e.target.checked)}
+                        />
+                        <span>Limit search to h/{hubName}</span>
+                      </label>
+                      {!blockAllNsfw && (
+                        <label className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={hubIncludeNsfwSearch}
+                            onChange={(e) => setHubIncludeNsfwSearch(e.target.checked)}
+                          />
+                          <span>Include NSFW results</span>
+                        </label>
+                      )}
+                      {blockAllNsfw && (
+                        <div className="text-xs text-[var(--color-text-secondary)]">
+                          NSFW content is blocked in settings.
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
+                  }
+                />
               }
             />
           }
