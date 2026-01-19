@@ -14,7 +14,6 @@ import { loadHls } from '../../utils/hlsLoader';
 import { redditService } from '../../services/redditService';
 import { PinnedBadge } from '../common/PinnedBadge';
 import { getRedditDashAudioUrl } from '../../utils/redditVideoAudio';
-import { API_BASE_URL } from '../../lib/api';
 
 interface RedditPostCardProps {
   post: RedditCrosspostSource & {
@@ -498,7 +497,8 @@ export function RedditPostCard({
     !/Chrome|Chromium|Edg|OPR|Firefox|Android/i.test(navigator.userAgent) &&
     Boolean(document.createElement('video').canPlayType('application/vnd.apple.mpegurl'));
   const isFirefox = typeof navigator !== 'undefined' && /Firefox\//.test(navigator.userAgent);
-  const preferHls = canNativeHls || isFirefox;
+  // Use HLS for Safari (native), Firefox, and Chrome (via HLS.js) to get audio+video in one stream
+  const preferHls = true;
   const redditVideoSource = useMemo(() => getRedditVideoSource(post, preferHls), [post, preferHls]);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -509,17 +509,10 @@ export function RedditPostCard({
   const hasSelftext = Boolean(post.selftext && post.selftext.trim());
   const hasInlineMedia = Boolean(isGalleryPost || previewImageUrl || inlineMedia || redditVideoSource || hasSelftext);
   const isInlinePreviewOpen = !!(hasInlineMedia && expandedImageMap[post.id]);
-  const redditAudioUrlRaw =
+  const redditAudioUrl =
     redditVideoSource && redditVideoSource.kind === 'mp4'
       ? getRedditDashAudioUrl(redditVideoSource.url)
       : undefined;
-  const redditAudioUrl = redditAudioUrlRaw
-    ? (() => {
-        const proxyUrl = new URL(`${API_BASE_URL}/reddit/media/proxy`);
-        proxyUrl.searchParams.set('url', redditAudioUrlRaw);
-        return proxyUrl.toString();
-      })()
-    : undefined;
 
   const videoHasAudio = (videoEl: HTMLVideoElement) => {
     const mozHasAudio = (videoEl as HTMLVideoElement & { mozHasAudio?: boolean }).mozHasAudio;
@@ -993,6 +986,7 @@ export function RedditPostCard({
                           ref={audioRef}
                           src={redditAudioUrl}
                           preload="metadata"
+                          crossOrigin="anonymous"
                           className="hidden"
                         />
                       )}
