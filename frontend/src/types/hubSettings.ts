@@ -37,6 +37,9 @@ export interface HubSettings {
   show_thumbnails: boolean;
   enable_wiki: boolean;
 
+  // Hub properties fetched from hub table
+  nsfw?: boolean;
+
   // Timestamps
   updated_at?: string;
   updated_by?: number;

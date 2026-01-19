@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"errors"
+	"io"
 	"net/http"
 	"regexp"
 	"strconv"
@@ -10,6 +11,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/omninudge/backend/internal/helpers"
 	"github.com/omninudge/backend/internal/models"
 	"github.com/omninudge/backend/internal/repository"
 )
@@ -45,6 +47,7 @@ type CreateHubRequest struct {
 	AllowLinkPosts  *bool   `json:"allow_link_posts"`
 	AllowImagePosts *bool   `json:"allow_image_posts"`
 	AllowVideoPosts *bool   `json:"allow_video_posts"`
+	NSFW            bool    `json:"nsfw"`
 }
 
 // Create handles POST /api/v1/hubs
@@ -126,6 +129,7 @@ func (h *HubsHandler) Create(c *gin.Context) {
 		Type:           req.Type,
 		ContentOptions: req.ContentOptions,
 		CreatedBy:      intPtr(userID.(int)),
+		NSFW:           req.NSFW,
 	}
 
 	if err := h.hubRepo.Create(c.Request.Context(), hub); err != nil {
@@ -894,4 +898,54 @@ func (h *HubsHandler) GetTrendingHubs(c *gin.Context) {
 		"hubs":  hubs,
 		"count": len(hubs),
 	})
+}
+
+// UpdateHubNSFW handles PUT /api/v1/hubs/:name/nsfw
+func (h *HubsHandler) UpdateHubNSFW(c *gin.Context) {
+	userID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
+
+	hubName := c.Param("name")
+	hub, err := h.hubRepo.GetByName(c.Request.Context(), hubName)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch hub", "details": err.Error()})
+		return
+	}
+	if hub == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Hub not found"})
+		return
+	}
+
+	// Check permissions: must be owner or admin
+	if !helpers.IsAdmin(c) {
+		role, err := h.settingsRepo.GetModeratorRole(c.Request.Context(), hub.ID, userID.(int))
+		if err != nil || role == nil || (*role != models.ModeratorRoleOwner && *role != models.ModeratorRoleFullModerator) {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Requires owner or full_moderator role"})
+			return
+		}
+	}
+
+	var req struct {
+		NSFW bool `json:"nsfw"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		// Read raw body for debugging
+		body, _ := io.ReadAll(c.Request.Body)
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":   "Invalid request body",
+			"details": err.Error(),
+			"body":    string(body),
+		})
+		return
+	}
+
+	if err := h.hubRepo.UpdateNSFW(c.Request.Context(), hub.ID, req.NSFW); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update NSFW status", "details": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "NSFW status updated successfully"})
 }

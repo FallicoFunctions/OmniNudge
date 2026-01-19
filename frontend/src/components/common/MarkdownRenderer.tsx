@@ -1,4 +1,4 @@
-import { useMemo, useRef, useEffect } from 'react';
+import { useMemo } from 'react';
 
 interface MarkdownRendererProps {
   content?: string | null;
@@ -15,6 +15,7 @@ const subredditRegex = /(?:^|\s)(r\/[A-Za-z0-9_]+)/g;
 const userRegex = /(?:^|\s)(u\/[A-Za-z0-9_-]+)/g;
 const IMAGE_URL_REGEX = /\.(jpe?g|png|gif|webp)(?:\?.*)?$/i;
 const REDDIT_IMAGE_HOSTS = new Set(['preview.redd.it', 'i.redd.it', 'i.imgur.com']);
+const giphyIdMap = new Map<string, string>();
 
 function decodeHtmlEntities(value: string): string {
   const decodeOnce = (input: string): string =>
@@ -69,7 +70,9 @@ function sanitizeImageSource(value: string): string | null {
   const giphyMatch = trimmed.match(/^giphy\|([A-Za-z0-9_-]+)/i);
   if (giphyMatch) {
     const id = giphyMatch[1];
-    return `https://i.giphy.com/media/${id}/giphy.gif`;
+    const imageUrl = `https://i.giphy.com/media/${id}/giphy.gif`;
+    giphyIdMap.set(imageUrl, id);  // Store the ID for later lookup
+    return imageUrl;
   }
   const normalized = trimmed.replace(/&amp;/g, '&');
   try {
@@ -95,6 +98,30 @@ function isLikelyImageUrl(value: string): boolean {
   }
 }
 
+function isExternalImage(url: string): boolean {
+  try {
+    const hostname = new URL(url).hostname.toLowerCase();
+
+    // Reddit/OmniNudge hosted images (don't open in new tab)
+    const internalHosts = ['i.redd.it', 'preview.redd.it', 'www.reddit.com'];
+
+    return !internalHosts.some(host => hostname === host || hostname.endsWith(`.${host}`));
+  } catch {
+    return false;
+  }
+}
+
+function getSourcePageUrl(imageUrl: string): string {
+  // Check if this is a Giphy URL with stored ID
+  const giphyId = giphyIdMap.get(imageUrl);
+  if (giphyId) {
+    return `https://giphy.com/gifs/${giphyId}`;
+  }
+
+  // For other external images, return the image URL itself
+  return imageUrl;
+}
+
 function formatInline(text: string): string {
   let result = escapeHtml(text);
   const codePlaceholders: string[] = [];
@@ -113,9 +140,18 @@ function formatInline(text: string): string {
     if (!sanitizedSource) {
       return normalizedAlt ? escapeHtml(normalizedAlt) : '';
     }
-    return `<img src="${escapeAttribute(sanitizedSource)}" alt="${escapeHtml(
+
+    const imgTag = `<img src="${escapeAttribute(sanitizedSource)}" alt="${escapeHtml(
       normalizedAlt
-    )}" loading="lazy" />`;
+    )}" />`;
+
+    // Check if external and wrap in link
+    if (isExternalImage(sanitizedSource)) {
+      const sourceUrl = getSourcePageUrl(sanitizedSource);
+      return `<a href="${escapeAttribute(sourceUrl)}" target="_blank" rel="noopener noreferrer">${imgTag}</a>`;
+    }
+
+    return imgTag;
   });
   result = result.replace(
     linkRegex,
@@ -319,9 +355,18 @@ function convertMarkdown(markdown?: string | null): string {
 
     if (/^https?:\/\/\S+$/.test(trimmed) && isLikelyImageUrl(trimmed)) {
       closeCode();
-      html.push(
-        `<p><img src="${escapeAttribute(trimmed)}" alt="Image" loading="lazy" /></p>`
-      );
+
+      const imgTag = `<img src="${escapeAttribute(trimmed)}" alt="Image" />`;
+
+      // Check if external and wrap in link
+      if (isExternalImage(trimmed)) {
+        const sourceUrl = getSourcePageUrl(trimmed);
+        html.push(
+          `<p><a href="${escapeAttribute(sourceUrl)}" target="_blank" rel="noopener noreferrer">${imgTag}</a></p>`
+        );
+      } else {
+        html.push(`<p>${imgTag}</p>`);
+      }
       continue;
     }
 
@@ -339,22 +384,6 @@ function convertMarkdown(markdown?: string | null): string {
 
 export function MarkdownRenderer({ content, className = '' }: MarkdownRendererProps) {
   const renderedHtml = useMemo(() => convertMarkdown(content), [content]);
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
-
-    const handleImageClick = (e: MouseEvent) => {
-      const target = e.target as HTMLElement;
-      if (target.tagName === 'IMG') {
-        target.classList.toggle('expanded');
-      }
-    };
-
-    container.addEventListener('click', handleImageClick);
-    return () => container.removeEventListener('click', handleImageClick);
-  }, [renderedHtml]);
 
   if (!renderedHtml) {
     return null;
@@ -362,7 +391,6 @@ export function MarkdownRenderer({ content, className = '' }: MarkdownRendererPr
 
   return (
     <div
-      ref={containerRef}
       className={`markdown-content text-left text-sm text-[var(--color-text-primary)] ${className}`}
       dangerouslySetInnerHTML={{ __html: renderedHtml }}
     />

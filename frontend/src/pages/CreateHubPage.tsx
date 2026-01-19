@@ -16,6 +16,7 @@ export default function CreateHubPage() {
   const [allowLinkPosts, setAllowLinkPosts] = useState(false);
   const [allowImagePosts, setAllowImagePosts] = useState(false);
   const [allowVideoPosts, setAllowVideoPosts] = useState(false);
+  const [isNsfw, setIsNsfw] = useState(false);
   const [nameError, setNameError] = useState('');
   const [contentError, setContentError] = useState('');
 
@@ -75,6 +76,7 @@ export default function CreateHubPage() {
       allow_link_posts: allowAll ? true : allowLinkPosts,
       allow_image_posts: allowAll ? true : allowImagePosts,
       allow_video_posts: allowAll ? true : allowVideoPosts,
+      nsfw: isNsfw || undefined,
     };
 
     createHubMutation.mutate(data);
@@ -269,6 +271,25 @@ export default function CreateHubPage() {
             </label>
           </div>
           {contentError && <p className="mt-2 text-sm text-red-600">{contentError}</p>}
+        </div>
+
+        {/* NSFW */}
+        <div>
+          <label className="flex items-start gap-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={isNsfw}
+              onChange={(e) => setIsNsfw(e.target.checked)}
+              className="mt-1 h-4 w-4 rounded border-[var(--color-border)] text-[var(--color-primary)] focus:ring-[var(--color-primary)]"
+            />
+            <div>
+              <span className="font-medium text-[var(--color-text-primary)]">Mark as NSFW (18+)</span>
+              <p className="text-sm text-[var(--color-text-secondary)] mt-1">
+                This hub contains adult content and should only be viewed by users 18 years or older.
+                NSFW hubs are hidden from default feeds and search results unless users explicitly opt-in.
+              </p>
+            </div>
+          </label>
         </div>
 
         {/* Submit */}

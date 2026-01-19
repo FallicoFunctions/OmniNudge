@@ -303,6 +303,7 @@ func main() {
 				wiki.GET("/:pagePath/*rest", redditHandler.GetSubredditWikiPage)
 			}
 			reddit.GET("/r/:subreddit/comments/:postId", redditHandler.GetPostComments)
+			reddit.GET("/r/:subreddit/gallery/:postId", redditHandler.GetPostGalleryImages)
 			reddit.GET("/search", redditHandler.SearchPosts)
 			reddit.GET("/wiki/:pagePath", redditHandler.GetWikiPage)
 			reddit.GET("/user/:username/about", redditHandler.GetRedditUserAbout)
@@ -471,6 +472,7 @@ func main() {
 
 			// Protected hub creation and crossposting
 			protected.POST("/hubs", hubsHandler.Create)
+			protected.PUT("/hubs/:name/nsfw", hubsHandler.UpdateHubNSFW)
 			protected.GET("/users/me/hubs", hubsHandler.GetUserHubs)
 			protected.POST("/hubs/:name/crosspost", hubsHandler.CrosspostToHub)
 			protected.POST("/subreddits/:name/crosspost", hubsHandler.CrosspostToSubreddit)
@@ -543,6 +545,7 @@ func main() {
 
 			// User profile management
 			protected.PUT("/users/profile", usersHandler.UpdateProfile)
+			protected.PUT("/users/email", usersHandler.UpdateEmail)
 			protected.POST("/users/change-password", usersHandler.ChangePassword)
 			protected.POST("/users/me/ping", usersHandler.Ping)
 

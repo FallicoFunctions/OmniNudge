@@ -6,9 +6,8 @@ import { useAuth } from '../contexts/AuthContext';
 import { useSettings } from '../contexts/SettingsContext';
 import { savedService } from '../services/savedService';
 import { hubsService } from '../services/hubsService';
-import { redditService } from '../services/redditService';
 import { subscriptionService } from '../services/subscriptionService';
-import type { LocalRedditComment, RedditSubredditModerator } from '../types/reddit';
+import type { LocalRedditComment } from '../types/reddit';
 import { formatTimestamp, formatRelativeTime } from '../utils/timeFormat';
 import {
   createRedditCrosspostPayload,
@@ -39,7 +38,6 @@ import { getSavedRedditCommentIdSetById } from '../utils/savedItems';
 import { EmptyMessage, LoadingMessage } from '../components/common/StatusMessage';
 import { loadHls } from '../utils/hlsLoader';
 import { RedditPostMedia } from '../components/reddit/RedditPostMedia';
-import { VirtualizedList } from '../components/common/VirtualizedList';
 
 interface RedditComment {
   kind: string;
@@ -2002,53 +2000,18 @@ export default function RedditPostPage() {
         )}
 
             {/* Combined Comments List */}
-            <VirtualizedList
-              items={combinedTopLevel}
-              estimateSize={260}
-              getKey={(item, index) =>
-                item.type === 'local'
-                  ? `local-${item.local.id}-${index}`
-                  : item.reddit.data?.id || `reddit-${index}`
-              }
-              renderItem={(item) => {
-                if (item.type === 'local') {
-                  return (
-                    <div className="pb-4">
-                      <LocalCommentView
-                        comment={item.local}
-                        subreddit={subreddit}
-                        postId={postId}
-                        replyingTo={replyingTo}
-                        onReply={(commentId) => {
-                          if (!user) {
-                            window.dispatchEvent(new CustomEvent('open-auth-modal', { detail: 'login' }));
-                            return;
-                          }
-                          setReplyingTo(commentId);
-                        }}
-                        onCancelReply={() => setReplyingTo(null)}
-                        allComments={localCommentsData || []}
-                        currentUsername={user?.username}
-                        onPermalink={handlePermalink}
-                        onEmbed={handleEmbed}
-                        onToggleSave={handleToggleSave}
-                        savedCommentIds={savedCommentIds}
-                        onEdit={handleEditComment}
-                        onDelete={handleDeleteComment}
-                        onToggleInbox={handleToggleInbox}
-                        onReport={handleReportComment}
-                        useRelativeTime={useRelativeTime}
-                      />
-                    </div>
-                  );
-                }
+            {combinedTopLevel.map((item, index) => {
+              const key = item.type === 'local'
+                ? `local-${item.local.id}-${index}`
+                : item.reddit.data?.id || `reddit-${index}`;
+
+              if (item.type === 'local') {
                 return (
-                  <div className="pb-4">
-                    <RedditCommentView
-                      comment={item.reddit}
-                      localComments={localCommentsData || []}
-                      subreddit={subreddit || ''}
-                      postId={postId || ''}
+                  <div key={key} className="pb-4">
+                    <LocalCommentView
+                      comment={item.local}
+                      subreddit={subreddit}
+                      postId={postId}
                       replyingTo={replyingTo}
                       onReply={(commentId) => {
                         if (!user) {
@@ -2058,6 +2021,7 @@ export default function RedditPostPage() {
                         setReplyingTo(commentId);
                       }}
                       onCancelReply={() => setReplyingTo(null)}
+                      allComments={localCommentsData || []}
                       currentUsername={user?.username}
                       onPermalink={handlePermalink}
                       onEmbed={handleEmbed}
@@ -2067,13 +2031,42 @@ export default function RedditPostPage() {
                       onDelete={handleDeleteComment}
                       onToggleInbox={handleToggleInbox}
                       onReport={handleReportComment}
-                      isRedditUserBlocked={isRedditUserBlocked}
                       useRelativeTime={useRelativeTime}
                     />
                   </div>
                 );
-              }}
-            />
+              }
+              return (
+                <div key={key} className="pb-4">
+                  <RedditCommentView
+                    comment={item.reddit}
+                    localComments={localCommentsData || []}
+                    subreddit={subreddit || ''}
+                    postId={postId || ''}
+                    replyingTo={replyingTo}
+                    onReply={(commentId) => {
+                      if (!user) {
+                        window.dispatchEvent(new CustomEvent('open-auth-modal', { detail: 'login' }));
+                        return;
+                      }
+                      setReplyingTo(commentId);
+                    }}
+                    onCancelReply={() => setReplyingTo(null)}
+                    currentUsername={user?.username}
+                    onPermalink={handlePermalink}
+                    onEmbed={handleEmbed}
+                    onToggleSave={handleToggleSave}
+                    savedCommentIds={savedCommentIds}
+                    onEdit={handleEditComment}
+                    onDelete={handleDeleteComment}
+                    onToggleInbox={handleToggleInbox}
+                    onReport={handleReportComment}
+                    isRedditUserBlocked={isRedditUserBlocked}
+                    useRelativeTime={useRelativeTime}
+                  />
+                </div>
+              );
+            })}
           </Panel>
         </div>
 

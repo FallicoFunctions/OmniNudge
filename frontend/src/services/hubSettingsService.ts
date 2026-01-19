@@ -25,6 +25,10 @@ export const hubSettingsService = {
     await api.put(`/hubs/${hubName}/settings`, settings);
   },
 
+  async updateHubNSFW(hubName: string, nsfw: boolean): Promise<void> {
+    await api.put(`/hubs/${hubName}/nsfw`, { nsfw });
+  },
+
   // Moderators
   async getHubModerators(hubName: string): Promise<{ moderators: HubModerator[] }> {
     const response = await api.get(`/hubs/${hubName}/moderators`);

@@ -10,6 +10,7 @@ import {
 } from '../../utils/crosspostHelpers';
 import { decodeHtmlEntities } from '../../utils/text';
 import { loadHls } from '../../utils/hlsLoader';
+import { redditService } from '../../services/redditService';
 
 interface RedditPostCardProps {
   post: RedditCrosspostSource & {
@@ -42,12 +43,20 @@ interface RedditPostCardProps {
 const IMAGE_URL_REGEX = /\.(jpe?g|png|gif|webp)$/i;
 
 function getExpandableImageUrl(post: RedditPostCardProps['post']): string | undefined {
+  // Gallery posts are handled separately, don't return thumbnail as preview
+  const isGalleryPost = post.url?.includes('/gallery/');
+  if (isGalleryPost) {
+    return undefined;
+  }
+
+  // Check for regular image preview
   const previewUrl = post.preview?.images?.[0]?.source?.url;
   const sanitizedPreview = sanitizeHttpUrl(previewUrl);
   if (sanitizedPreview) {
     return sanitizedPreview;
   }
 
+  // Check direct image URL
   const sanitizedPostUrl = sanitizeHttpUrl(post.url);
   if (!sanitizedPostUrl) {
     return undefined;
@@ -388,8 +397,30 @@ export function RedditPostCard({
   linkState,
 }: RedditPostCardProps) {
   const [expandedImageMap, setExpandedImageMap] = useState<Record<string, boolean>>({});
+  const [galleryImages, setGalleryImages] = useState<string[]>([]);
+  const [isLoadingGallery, setIsLoadingGallery] = useState(false);
+  const isGalleryPost = post.url?.includes('/gallery/');
 
-  const toggleInlinePreview = (postId: string) => {
+  const toggleInlinePreview = async (postId: string) => {
+    // For gallery posts, fetch images from API
+    if (isGalleryPost) {
+      const isCurrentlyExpanded = expandedImageMap[postId];
+
+      if (!isCurrentlyExpanded) {
+        // Expanding - fetch gallery images
+        setIsLoadingGallery(true);
+        try {
+          const images = await redditService.getPostGalleryImages(post.subreddit, post.id);
+          setGalleryImages(images);
+        } catch (error) {
+          console.error('Failed to fetch gallery images:', error);
+          setGalleryImages([]);
+        } finally {
+          setIsLoadingGallery(false);
+        }
+      }
+    }
+
     setExpandedImageMap((prev) => ({
       ...prev,
       [postId]: !prev[postId],
@@ -408,7 +439,7 @@ export function RedditPostCard({
   const inlineMedia = getInlineMedia(sanitizedExternalUrl);
   const redditVideoSource = getRedditVideoSource(post);
   const videoRef = useRef<HTMLVideoElement | null>(null);
-  const hasInlineMedia = Boolean(previewImageUrl || inlineMedia || redditVideoSource);
+  const hasInlineMedia = Boolean(isGalleryPost || previewImageUrl || inlineMedia || redditVideoSource);
   const isInlinePreviewOpen = !!(hasInlineMedia && expandedImageMap[post.id]);
 
   useEffect(() => {
@@ -497,6 +528,22 @@ export function RedditPostCard({
               backgroundColor={post.link_flair_background_color}
               textColor={post.link_flair_text_color}
             />
+            {post.stickied && (
+              <div
+                className="inline-flex items-center gap-1 rounded bg-green-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-green-800 dark:bg-green-900/30 dark:text-green-400"
+                title="Pinned by moderators"
+              >
+                <svg
+                  className="h-3 w-3"
+                  fill="currentColor"
+                  viewBox="0 0 20 20"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path d="M10 2a1 1 0 011 1v1.323l3.954 1.582 1.599-.8a1 1 0 01.894 1.79l-1.233.616 1.738 5.42a1 1 0 01-.285 1.05A3.989 3.989 0 0115 15a3.989 3.989 0 01-2.667-1.019 1 1 0 01-.285-1.05l1.715-5.349L11 6.477V16h2a1 1 0 110 2H7a1 1 0 110-2h2V6.477L6.237 7.582l1.715 5.349a1 1 0 01-.285 1.05A3.989 3.989 0 015 15a3.989 3.989 0 01-2.667-1.019 1 1 0 01-.285-1.05l1.738-5.42-1.233-.617a1 1 0 01.894-1.788l1.599.799L9 4.323V3a1 1 0 011-1z" />
+                </svg>
+                Pinned
+              </div>
+            )}
             {isExternalLink && (
               <a
                 href={sanitizedExternalUrl}
@@ -583,9 +630,32 @@ export function RedditPostCard({
                 <span>•</span>
                 <span>submitted {formatTimestamp(post.created_utc, useRelativeTime)}</span>
               </div>
-              {expandedImageMap[post.id] && (previewImageUrl || inlineMedia || redditVideoSource) && (
+              {expandedImageMap[post.id] && (
                 <div className="mt-3 overflow-hidden rounded border border-[var(--color-border)] bg-[var(--color-surface-elevated)]">
-                  {redditVideoSource ? (
+                  {isGalleryPost ? (
+                    isLoadingGallery ? (
+                      <div className="flex items-center justify-center p-8 text-[var(--color-text-secondary)]">
+                        Loading gallery images...
+                      </div>
+                    ) : galleryImages.length > 0 ? (
+                      <div className="space-y-2 p-2">
+                        {galleryImages.map((imageUrl, index) => (
+                          <img
+                            key={index}
+                            src={imageUrl}
+                            alt={`${post.title} - Image ${index + 1}`}
+                            loading="lazy"
+                            decoding="async"
+                            className="max-h-[70vh] w-full object-contain"
+                          />
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-center p-8 text-[var(--color-text-secondary)]">
+                        No images found in this gallery
+                      </div>
+                    )
+                  ) : redditVideoSource ? (
                     <div className="relative w-full bg-black">
                       <video
                         ref={videoRef}
@@ -643,7 +713,7 @@ export function RedditPostCard({
                       loop
                       preload="metadata"
                     />
-                  ) : (
+                  ) : previewImageUrl ? (
                     <img
                       src={previewImageUrl}
                       alt={post.title}
@@ -651,7 +721,7 @@ export function RedditPostCard({
                       decoding="async"
                       className="max-h-[70vh] w-full object-contain"
                     />
-                  )}
+                  ) : null}
                 </div>
               )}
               <div className="mt-1 flex flex-wrap items-center gap-3">
