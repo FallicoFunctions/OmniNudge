@@ -439,7 +439,8 @@ export function RedditPostCard({
   const inlineMedia = getInlineMedia(sanitizedExternalUrl);
   const redditVideoSource = getRedditVideoSource(post);
   const videoRef = useRef<HTMLVideoElement | null>(null);
-  const hasInlineMedia = Boolean(isGalleryPost || previewImageUrl || inlineMedia || redditVideoSource);
+  const hasSelftext = Boolean(post.selftext && post.selftext.trim());
+  const hasInlineMedia = Boolean(isGalleryPost || previewImageUrl || inlineMedia || redditVideoSource || hasSelftext);
   const isInlinePreviewOpen = !!(hasInlineMedia && expandedImageMap[post.id]);
 
   useEffect(() => {
@@ -721,6 +722,12 @@ export function RedditPostCard({
                       decoding="async"
                       className="max-h-[70vh] w-full object-contain"
                     />
+                  ) : hasSelftext ? (
+                    <div className="p-4 text-[var(--color-text-primary)]">
+                      <div className="prose prose-sm max-w-none dark:prose-invert">
+                        <p className="whitespace-pre-wrap">{post.selftext}</p>
+                      </div>
+                    </div>
                   ) : null}
                 </div>
               )}
