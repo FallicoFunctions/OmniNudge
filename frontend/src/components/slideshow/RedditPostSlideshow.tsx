@@ -193,19 +193,6 @@ export function RedditPostSlideshow({
           return;
         }
 
-        // Check preview images
-        if (redditPost.preview?.images?.[0]?.source?.url) {
-          const imageUrl = redditPost.preview.images[0].source.url.replace(/&amp;/g, '&');
-          processedPosts.push({
-            id: redditPost.id,
-            title: redditPost.title,
-            mediaUrl: imageUrl,
-            mediaType: 'image' as const,
-            postUrl,
-          });
-          return;
-        }
-
         // Text post (if includeTextPosts is true)
         if (includeTextPosts && redditPost.selftext) {
           processedPosts.push({
