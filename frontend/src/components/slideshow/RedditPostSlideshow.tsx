@@ -3,6 +3,7 @@ import { BaseSlideshow } from './BaseSlideshow';
 import type { SlideshowItem } from './BaseSlideshow';
 import { SlideshowControls } from './SlideshowControls';
 import { redditService } from '../../services/redditService';
+import { PostBodyMarkdown } from '../posts/PostBodyMarkdown';
 
 interface RedditPost {
   id: string;
@@ -243,9 +244,7 @@ export function RedditPostSlideshow({
 
             {post.mediaType === 'text' && post.selftext && (
               <div className="bg-[var(--color-surface)] rounded-lg p-6 max-w-3xl max-h-[70vh] overflow-auto">
-                <p className="text-[var(--color-text)] whitespace-pre-wrap">
-                  {post.selftext}
-                </p>
+                <PostBodyMarkdown content={post.selftext} />
               </div>
             )}
           </div>
