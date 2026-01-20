@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../contexts/AuthContext';
 import { useSettings } from '../contexts/SettingsContext';
 import { useMessagingContext } from '../contexts/MessagingContext';
+import { useMultiColumnFeed } from '../contexts/MultiColumnFeedContext';
 import { usersService } from '../services/usersService';
 import { messagesService } from '../services/messagesService';
 import { useMessagingWebSocket } from '../hooks/useMessagingWebSocket';
@@ -12,6 +13,7 @@ import AuthModal from '../pages/AuthModal';
 import BugReportModal from '../components/bugReports/BugReportModal';
 import { subscriptionService } from '../services/subscriptionService';
 import { LoadingMessage } from '../components/common/StatusMessage';
+import { ViewModeToggle } from '../components/feed/ViewModeToggle';
 
 const AboutContent = lazy(() =>
   import('../components/about/AboutContent').then((module) => ({
@@ -35,6 +37,7 @@ const prefetchRoutes = {
 export default function MainLayout() {
   const { user, logout } = useAuth();
   const { notifyArchivedMessages } = useSettings();
+  const { state: multiColumnState } = useMultiColumnFeed();
   const [authModal, setAuthModal] = useState<'login' | 'signup' | null>(null);
   const [pendingRedirect, setPendingRedirect] = useState<{ to: string; state?: unknown } | null>(null);
   const [pendingAction, setPendingAction] = useState<
@@ -54,6 +57,10 @@ export default function MainLayout() {
   const [showBugReportModal, setShowBugReportModal] = useState(false);
   const [bugReportUrl, setBugReportUrl] = useState('');
   const [openBugReportAfterAuth, setOpenBugReportAfterAuth] = useState(false);
+
+  // Determine if slim mode
+  const isSlimMode = multiColumnState.viewMode === 'multi-column' || multiColumnState.viewMode === 'vertical-omniscroll';
+  const navHeight = isSlimMode ? 'h-9' : 'h-16';
 
   // Initialize WebSocket connection for real-time messaging
   useMessagingWebSocket({ activeConversationId });
@@ -152,14 +159,21 @@ export default function MainLayout() {
   return (
     <div className="min-h-screen bg-[var(--color-background)]">
       {/* Navigation Bar */}
-      <nav className="sticky top-0 z-50 border-b border-[var(--color-border)] bg-[var(--color-surface)]">
-        <div className="mx-auto max-w-7xl px-4">
-          <div className="flex h-16 items-center justify-between">
-            <div className="flex items-center gap-8">
-              <Link to="/" className="text-xl font-bold text-[var(--color-primary)]">
-                OmniNudge
+      <nav
+        className="sticky top-0 z-50 border-b border-[var(--color-border)] bg-[var(--color-surface)] transition-all duration-200"
+        style={{ height: isSlimMode ? '36px' : '64px' }}
+      >
+        <div className="mx-auto max-w-7xl px-4 h-full">
+          <div className={`flex ${navHeight} items-center justify-between h-full`}>
+            <div className="flex items-center gap-4">
+              <Link
+                to="/"
+                className={`font-bold text-[var(--color-primary)] transition-all duration-200 ${isSlimMode ? 'text-base' : 'text-xl'}`}
+              >
+                {isSlimMode ? 'ON' : 'OmniNudge'}
               </Link>
-              <div className="hidden space-x-4 md:flex">
+              {!isSlimMode && (
+                <div className="hidden space-x-4 md:flex">
                 <button
                   type="button"
                   onClick={() => {
@@ -218,6 +232,20 @@ export default function MainLayout() {
                 >
                   Browse Hubs
                 </button>
+                  <Link
+                    to="/about"
+                    onMouseEnter={() => prefetchRoutes.about()}
+                    className="rounded-md px-3 py-2 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
+                  >
+                    About
+                  </Link>
+                </div>
+              )}
+
+              {/* View Mode Toggle - always visible */}
+              <ViewModeToggle />
+
+              {!isSlimMode && (
                 <Link
                   to="/about"
                   onMouseEnter={() => prefetchRoutes.about()}
@@ -225,38 +253,42 @@ export default function MainLayout() {
                 >
                   About
                 </Link>
-              </div>
+              )}
             </div>
 
-            <div className="flex items-center gap-4">
+            <div className={`flex items-center ${isSlimMode ? 'gap-2' : 'gap-4'}`}>
               {user ? (
                 <>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setBugReportUrl(window.location.href);
-                      setShowBugReportModal(true);
-                    }}
-                    onMouseEnter={() => prefetchRoutes.bugReporting()}
-                    className="rounded-md px-3 py-2 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
-                  >
-                    Bug Reporting
-                  </button>
-                  <Link
-                    to={`/users/${user.username}`}
-                    onMouseEnter={() => prefetchRoutes.profile()}
-                    className="text-sm font-medium text-[var(--color-text-primary)]"
-                  >
-                    {user.username}
-                  </Link>
+                  {!isSlimMode && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setBugReportUrl(window.location.href);
+                          setShowBugReportModal(true);
+                        }}
+                        onMouseEnter={() => prefetchRoutes.bugReporting()}
+                        className="rounded-md px-3 py-2 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
+                      >
+                        Bug Reporting
+                      </button>
+                      <Link
+                        to={`/users/${user.username}`}
+                        onMouseEnter={() => prefetchRoutes.profile()}
+                        className="text-sm font-medium text-[var(--color-text-primary)]"
+                      >
+                        {user.username}
+                      </Link>
+                    </>
+                  )}
                   <Link
                     to="/settings"
                     onMouseEnter={() => prefetchRoutes.settings()}
-                    className="rounded-md bg-[var(--color-surface-elevated)] px-3 py-2 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-border)]"
+                    className={`rounded-md bg-[var(--color-surface-elevated)] ${isSlimMode ? 'px-2 py-1 text-xs' : 'px-3 py-2 text-sm'} font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-border)]`}
                   >
-                    Settings
+                    {isSlimMode ? '⚙' : 'Settings'}
                   </Link>
-                  {user.role === 'admin' && (
+                  {!isSlimMode && user.role === 'admin' && (
                     <Link
                       to="/admin"
                       onMouseEnter={() => prefetchRoutes.admin()}
@@ -265,41 +297,47 @@ export default function MainLayout() {
                       Admin
                     </Link>
                   )}
-                  <button
-                    onClick={handleLogout}
-                    className="rounded-md bg-[var(--color-surface-elevated)] px-3 py-2 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-border)]"
-                  >
-                    Logout
-                  </button>
+                  {!isSlimMode && (
+                    <button
+                      onClick={handleLogout}
+                      className="rounded-md bg-[var(--color-surface-elevated)] px-3 py-2 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-border)]"
+                    >
+                      Logout
+                    </button>
+                  )}
                 </>
               ) : (
                 <>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setBugReportUrl(window.location.href);
-                      setOpenBugReportAfterAuth(true);
-                      setAuthModal('login');
-                    }}
-                    onMouseEnter={() => prefetchRoutes.bugReporting()}
-                    className="rounded-md px-3 py-2 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
-                  >
-                    Bug Reporting
-                  </button>
+                  {!isSlimMode && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setBugReportUrl(window.location.href);
+                        setOpenBugReportAfterAuth(true);
+                        setAuthModal('login');
+                      }}
+                      onMouseEnter={() => prefetchRoutes.bugReporting()}
+                      className="rounded-md px-3 py-2 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
+                    >
+                      Bug Reporting
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={() => setAuthModal('login')}
-                    className="rounded-md px-3 py-2 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
+                    className={`rounded-md ${isSlimMode ? 'px-2 py-1 text-xs' : 'px-3 py-2 text-sm'} font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]`}
                   >
                     Login
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => setAuthModal('signup')}
-                    className="rounded-md bg-[var(--color-primary)] px-3 py-2 text-sm font-medium text-white hover:opacity-90"
-                  >
-                    Sign Up
-                  </button>
+                  {!isSlimMode && (
+                    <button
+                      type="button"
+                      onClick={() => setAuthModal('signup')}
+                      className="rounded-md bg-[var(--color-primary)] px-3 py-2 text-sm font-medium text-white hover:opacity-90"
+                    >
+                      Sign Up
+                    </button>
+                  )}
                 </>
               )}
             </div>
