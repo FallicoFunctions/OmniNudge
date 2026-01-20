@@ -24,6 +24,8 @@ type RedditListingData = {
         link_flair_text?: string | null;
         link_flair_background_color?: string | null;
         link_flair_text_color?: string | null;
+        over18?: boolean;
+        over_18?: boolean;
         preview?: {
           images?: Array<{
             source?: { url?: string };
