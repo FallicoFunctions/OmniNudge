@@ -118,6 +118,7 @@ type RedditPost struct {
 	IsGallery                bool                      `json:"is_gallery"`   // Is it a gallery/album post
 	GalleryData              *RedditGalleryData        `json:"gallery_data"` // Gallery metadata
 	MediaMetadata            map[string]interface{}    `json:"media_metadata"` // Media metadata for gallery items
+	GalleryImages            []string                  `json:"gallery_images,omitempty"` // Ordered list of full-resolution gallery image URLs
 	LinkFlairText            string                    `json:"link_flair_text"`
 	LinkFlairBackgroundColor string                    `json:"link_flair_background_color"`
 	LinkFlairTextColor       string                    `json:"link_flair_text_color"`
