@@ -26,6 +26,8 @@ interface SettingsContextType {
   setSearchIncludeNsfwByDefault: (value: boolean) => void;
   blockAllNsfw: boolean;
   setBlockAllNsfw: (value: boolean) => void;
+  blockNsfwThumbnails: boolean;
+  setBlockNsfwThumbnails: (value: boolean) => void;
   accessRequestCooldownDisplay: 'days' | 'date' | 'both';
   setAccessRequestCooldownDisplay: (value: 'days' | 'date' | 'both') => void;
 }
@@ -45,11 +47,12 @@ interface StoredSettings {
   useInfiniteScroll?: boolean;
   searchIncludeNsfwByDefault?: boolean;
   blockAllNsfw?: boolean;
+  blockNsfwThumbnails?: boolean;
   accessRequestCooldownDisplay?: 'days' | 'date' | 'both';
   settingsVersion?: number;
 }
 
-const CURRENT_SETTINGS_VERSION = 3;
+const CURRENT_SETTINGS_VERSION = 4;
 
 const getStoredSettings = (): StoredSettings => {
   if (typeof window === 'undefined' || !window.localStorage) {
@@ -68,6 +71,7 @@ const getStoredSettings = (): StoredSettings => {
           useInfiniteScrollSubs: false,
           useInfiniteScroll: false,
           accessRequestCooldownDisplay: parsed.accessRequestCooldownDisplay ?? 'days',
+          blockNsfwThumbnails: parsed.blockNsfwThumbnails ?? true,
           settingsVersion: CURRENT_SETTINGS_VERSION,
         };
         localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(migrated));
@@ -130,6 +134,10 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     const settings = getStoredSettings();
     return settings.blockAllNsfw ?? false;
   });
+  const [blockNsfwThumbnails, setBlockNsfwThumbnailsState] = useState<boolean>(() => {
+    const settings = getStoredSettings();
+    return settings.blockNsfwThumbnails ?? true;
+  });
   const [accessRequestCooldownDisplay, setAccessRequestCooldownDisplayState] = useState<
     'days' | 'date' | 'both'
   >(() => {
@@ -149,13 +157,14 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         notifyArchivedMessages,
         notifyRemovedSavedPosts,
         defaultOmniPostsOnly,
-      stayOnPostAfterHide,
-      useInfiniteScroll,
-      searchIncludeNsfwByDefault,
-      blockAllNsfw,
-      accessRequestCooldownDisplay,
-      settingsVersion: CURRENT_SETTINGS_VERSION,
-    };
+        stayOnPostAfterHide,
+        useInfiniteScroll,
+        searchIncludeNsfwByDefault,
+        blockAllNsfw,
+        blockNsfwThumbnails,
+        accessRequestCooldownDisplay,
+        settingsVersion: CURRENT_SETTINGS_VERSION,
+      };
       localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings));
     } catch (error) {
       console.error('Failed to save settings to localStorage:', error);
@@ -173,6 +182,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     useInfiniteScroll,
     searchIncludeNsfwByDefault,
     blockAllNsfw,
+    blockNsfwThumbnails,
     accessRequestCooldownDisplay,
   ]);
 
@@ -219,6 +229,9 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   const setBlockAllNsfw = (value: boolean) => {
     setBlockAllNsfwState(value);
   };
+  const setBlockNsfwThumbnails = (value: boolean) => {
+    setBlockNsfwThumbnailsState(value);
+  };
   const setAccessRequestCooldownDisplay = (value: 'days' | 'date' | 'both') => {
     setAccessRequestCooldownDisplayState(value);
   };
@@ -250,6 +263,8 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         setSearchIncludeNsfwByDefault,
         blockAllNsfw,
         setBlockAllNsfw,
+        blockNsfwThumbnails,
+        setBlockNsfwThumbnails,
         accessRequestCooldownDisplay,
         setAccessRequestCooldownDisplay,
       }}

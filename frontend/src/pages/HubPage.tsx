@@ -895,6 +895,7 @@ export default function HubsPage() {
         communityType="hub"
         communityName={hubname}
         displayTitle={hubDisplayTitle}
+        isNsfw={hubDetails?.nsfw ?? hubSettings?.nsfw ?? false}
         isModerator={isModerator}
         searchBars={
           <FeedSearchBars
