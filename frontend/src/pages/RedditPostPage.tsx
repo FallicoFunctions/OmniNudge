@@ -71,6 +71,7 @@ interface RedditPostData {
   link_flair_text?: string;
   link_flair_background_color?: string;
   link_flair_text_color?: string;
+  over18?: boolean;
   preview?: {
     images?: Array<{
       source?: { url?: string };
@@ -1594,6 +1595,7 @@ export default function RedditPostPage() {
         communityName={subreddit}
         iconUrl={subredditIcon ?? subredditIconFallback}
         isSubscribed={subscriptionStatus?.is_subscribed ?? false}
+        isNsfw={subredditAbout?.over18 ?? false}
         searchBars={
           <FeedSearchBars
             showPostForm={false}
@@ -1758,6 +1760,14 @@ export default function RedditPostPage() {
                               />
                             </svg>
                           </a>
+                        )}
+                        {post.over18 && (
+                          <FlairBadge
+                            text="NSFW"
+                            backgroundColor="#dc2626"
+                            textColor="#fff"
+                            className="uppercase"
+                          />
                         )}
                         <FlairBadge
                           text={post.link_flair_text}

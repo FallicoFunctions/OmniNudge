@@ -111,7 +111,7 @@ type RedditPost struct {
 	Score                    int                       `json:"score"`        // Upvotes - downvotes
 	NumComments              int                       `json:"num_comments"` // Comment count
 	CreatedUTC               float64                   `json:"created_utc"`  // Unix timestamp
-	Over18                   bool                      `json:"over_18"`      // NSFW flag
+	Over18                   bool                      `json:"over18"`      // NSFW flag
 	PostHint                 string                    `json:"post_hint"`    // Type hint: image, video, link, gallery, etc.
 	IsVideo                  bool                      `json:"is_video"`     // Is it a video
 	IsSelf                   bool                      `json:"is_self"`      // Is it a text post
@@ -129,6 +129,26 @@ type RedditPost struct {
 	Media                    *RedditMedia              `json:"media"`        // Media container
 	SecureMedia              *RedditMedia              `json:"secure_media"` // Secure media container
 	Preview                  *RedditPreview            `json:"preview"`      // Preview images for link posts
+}
+
+func (r *RedditPost) UnmarshalJSON(data []byte) error {
+	type Alias RedditPost
+	aux := &struct {
+		Over18Legacy *bool `json:"over_18"`
+		Over18       *bool `json:"over18"`
+		*Alias
+	}{
+		Alias: (*Alias)(r),
+	}
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+	if aux.Over18 != nil {
+		r.Over18 = *aux.Over18
+	} else if aux.Over18Legacy != nil {
+		r.Over18 = *aux.Over18Legacy
+	}
+	return nil
 }
 
 // RedditGalleryData holds gallery/album metadata
@@ -290,7 +310,25 @@ type RedditSubredditAbout struct {
 	ActiveUserCount     int     `json:"active_user_count"`
 	Subscribers         int     `json:"subscribers"`
 	CreatedUTC          float64 `json:"created_utc"`
-	Over18              bool    `json:"over_18"`
+	Over18              bool    `json:"over18"`
+}
+
+type redditSubredditAboutPayload struct {
+	DisplayName         string  `json:"display_name"`
+	DisplayNamePrefixed string  `json:"display_name_prefixed"`
+	Title               string  `json:"title"`
+	PublicDescription   string  `json:"public_description"`
+	Description         string  `json:"description"`
+	DescriptionHTML     string  `json:"description_html"`
+	CommunityIcon       string  `json:"community_icon"`
+	IconImg             string  `json:"icon_img"`
+	BannerBackground    string  `json:"banner_background_image"`
+	BannerImg           string  `json:"banner_img"`
+	PrimaryColor        string  `json:"primary_color"`
+	ActiveUserCount     int     `json:"active_user_count"`
+	Subscribers         int     `json:"subscribers"`
+	CreatedUTC          float64 `json:"created_utc"`
+	Over18              bool    `json:"over18"`
 }
 
 // RedditSubredditModerator represents a single moderator entry for a subreddit
@@ -338,7 +376,7 @@ type SubredditSuggestion struct {
 	Description string `json:"description,omitempty"`
 	Subscribers int    `json:"subscribers"`
 	IconURL     string `json:"icon_url,omitempty"`
-	Over18      bool   `json:"over_18"`
+	Over18      bool   `json:"over18"`
 }
 
 type subredditAutocompleteListing struct {
@@ -1166,19 +1204,37 @@ func (r *RedditClient) GetSubredditAbout(ctx context.Context, subreddit string) 
 	}
 
 	var raw struct {
-		Data RedditSubredditAbout `json:"data"`
+		Data redditSubredditAboutPayload `json:"data"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&raw); err != nil {
 		return nil, fmt.Errorf("failed to decode subreddit about: %w", err)
 	}
 
-	fmt.Printf("DEBUG: GetSubredditAbout for %s: over_18=%v\n", subreddit, raw.Data.Over18)
+	about := RedditSubredditAbout{
+		DisplayName:         raw.Data.DisplayName,
+		DisplayNamePrefixed: raw.Data.DisplayNamePrefixed,
+		Title:               raw.Data.Title,
+		PublicDescription:   raw.Data.PublicDescription,
+		Description:         raw.Data.Description,
+		DescriptionHTML:     raw.Data.DescriptionHTML,
+		CommunityIcon:       raw.Data.CommunityIcon,
+		IconImg:             raw.Data.IconImg,
+		BannerBackground:    raw.Data.BannerBackground,
+		BannerImg:           raw.Data.BannerImg,
+		PrimaryColor:        raw.Data.PrimaryColor,
+		ActiveUserCount:     raw.Data.ActiveUserCount,
+		Subscribers:         raw.Data.Subscribers,
+		CreatedUTC:          raw.Data.CreatedUTC,
+		Over18:              raw.Data.Over18,
+	}
 
-	if data, err := json.Marshal(raw.Data); err == nil {
+	fmt.Printf("DEBUG: GetSubredditAbout for %s: over18=%v\n", subreddit, about.Over18)
+
+	if data, err := json.Marshal(about); err == nil {
 		_ = r.cache.Set(ctx, cacheKey, string(data), r.cacheTTL)
 	}
 
-	return &raw.Data, nil
+	return &about, nil
 }
 
 // GetSubredditModerators fetches the moderators for a subreddit
