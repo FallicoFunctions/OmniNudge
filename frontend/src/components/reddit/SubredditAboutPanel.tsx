@@ -21,14 +21,14 @@ export default function SubredditAboutPanel({
   sidebarRef,
   activeOmniUsers,
 }: SubredditAboutPanelProps) {
-  console.log('SubredditAboutPanel - about:', about, 'over_18:', about?.over_18);
+  console.log('SubredditAboutPanel - about:', about, 'over18:', about?.over18);
   return (
     <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
           About this subreddit
         </h3>
-        {about?.over_18 && (
+        {about?.over18 && (
           <span className="rounded bg-red-600 px-2 py-0.5 text-xs font-semibold text-white">
             NSFW
           </span>

@@ -7,6 +7,7 @@ import (
 	"net"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -22,6 +23,73 @@ type NoopCache struct{}
 func (NoopCache) Get(ctx context.Context, key string) (string, bool, error) { return "", false, nil }
 func (NoopCache) Set(ctx context.Context, key string, value string, ttl time.Duration) error {
 	return nil
+}
+
+// MemoryCache is a simple in-memory cache with TTL support
+type MemoryCache struct {
+	data  map[string]*cacheEntry
+	mutex sync.RWMutex
+}
+
+type cacheEntry struct {
+	value      string
+	expiration time.Time
+}
+
+// NewMemoryCache creates an in-memory cache
+func NewMemoryCache() *MemoryCache {
+	cache := &MemoryCache{
+		data: make(map[string]*cacheEntry),
+	}
+	// Start background cleanup goroutine
+	go cache.cleanup()
+	return cache
+}
+
+func (m *MemoryCache) Get(ctx context.Context, key string) (string, bool, error) {
+	m.mutex.RLock()
+	defer m.mutex.RUnlock()
+
+	entry, exists := m.data[key]
+	if !exists {
+		return "", false, nil
+	}
+
+	// Check if expired
+	if time.Now().After(entry.expiration) {
+		return "", false, nil
+	}
+
+	return entry.value, true, nil
+}
+
+func (m *MemoryCache) Set(ctx context.Context, key string, value string, ttl time.Duration) error {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+
+	m.data[key] = &cacheEntry{
+		value:      value,
+		expiration: time.Now().Add(ttl),
+	}
+
+	return nil
+}
+
+// cleanup removes expired entries every minute
+func (m *MemoryCache) cleanup() {
+	ticker := time.NewTicker(1 * time.Minute)
+	defer ticker.Stop()
+
+	for range ticker.C {
+		m.mutex.Lock()
+		now := time.Now()
+		for key, entry := range m.data {
+			if now.After(entry.expiration) {
+				delete(m.data, key)
+			}
+		}
+		m.mutex.Unlock()
+	}
 }
 
 // RedisCache is a lightweight Redis client using RESP for simple GET/SETEX

@@ -30,6 +30,7 @@ interface RedditPostCardProps {
     is_self: boolean;
     post_hint?: string;
     is_video?: boolean;
+    over18?: boolean;
   };
   useRelativeTime: boolean;
   isSaved?: boolean;
@@ -807,8 +808,11 @@ export function RedditPostCard({
                 {decodeHtmlEntities(post.title)}
               </Link>
             )}
-        <FlairBadge
-          text={decodeHtmlEntities(post.link_flair_text)}
+            {post.over18 && (
+              <FlairBadge text="NSFW" backgroundColor="#dc2626" textColor="#fff" className="uppercase" />
+            )}
+            <FlairBadge
+              text={decodeHtmlEntities(post.link_flair_text)}
               backgroundColor={post.link_flair_background_color}
               textColor={post.link_flair_text_color}
             />

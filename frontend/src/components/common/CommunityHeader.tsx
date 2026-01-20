@@ -20,6 +20,7 @@ interface CommunityHeaderProps {
   // Optional props (subreddit-specific)
   iconUrl?: string | null;
   isSubscribed?: boolean;
+  isNsfw?: boolean;
 
   // Content slots
   searchBars?: ReactNode;
@@ -34,6 +35,7 @@ export function CommunityHeader({
   showCreateHub = true,
   iconUrl,
   isSubscribed,
+  isNsfw = false,
   searchBars,
   sortControls,
 }: CommunityHeaderProps) {
@@ -92,7 +94,14 @@ export function CommunityHeader({
                 decoding="async"
               />
             )}
-            <h1 className="text-3xl font-bold">{headerLabel}</h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-3xl font-bold">{headerLabel}</h1>
+              {isSubreddit && isNsfw && (
+                <span className="rounded bg-red-600 px-2 py-0.5 text-xs font-semibold text-white">
+                  NSFW
+                </span>
+              )}
+            </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {shouldShowSubscribe && (

@@ -197,6 +197,11 @@ export function HiddenItemsView({
                 null,
               link_flair_text_color:
                 remotePost.link_flair_text_color ?? prev[postKey]?.link_flair_text_color ?? null,
+              over18:
+                remotePost.over18 ??
+                remotePost.over_18 ??
+                prev[postKey]?.over18 ??
+                null,
             },
           }));
         })
@@ -378,6 +383,7 @@ export function HiddenItemsView({
           link_flair_text: mergedPost.link_flair_text ?? undefined,
           link_flair_background_color: mergedPost.link_flair_background_color ?? undefined,
           link_flair_text_color: mergedPost.link_flair_text_color ?? undefined,
+          over18: mergedPost.over18 ?? undefined,
         };
 
         return (

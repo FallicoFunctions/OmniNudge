@@ -37,6 +37,7 @@ type PlatformPost struct {
 
 	// Categorization
 	Tags []string `json:"tags,omitempty"`
+	NSFW bool     `json:"nsfw"`
 
 	// Media (optional)
 	MediaURL      *string        `json:"media_url,omitempty"`
@@ -172,7 +173,7 @@ const platformPostSelectColumnsPrefixed = `
 	p.score, p.upvotes, p.downvotes, p.num_comments, p.view_count,
 	p.is_pinned, p.pinned_position, p.is_deleted, p.is_edited, p.edited_at,
 	p.crosspost_origin_type, p.crosspost_origin_subreddit, p.crosspost_origin_post_id, p.crosspost_original_title,
-	p.target_subreddit, p.crossposted_at, p.created_at, p.hot_score, p.gallery_images
+	p.target_subreddit, p.nsfw, p.crossposted_at, p.created_at, p.hot_score, p.gallery_images
 `
 
 // PlatformPostRepository handles database operations for platform posts
@@ -201,9 +202,9 @@ func (r *PlatformPostRepository) Create(ctx context.Context, post *PlatformPost)
 		INSERT INTO platform_posts (
 			author_id, hub_id, title, body, tags, media_url, media_type, thumbnail_url,
 			crosspost_origin_type, crosspost_origin_subreddit, crosspost_origin_post_id, crosspost_original_title,
-			target_subreddit, crossposted_at, gallery_images
+			target_subreddit, nsfw, crossposted_at, gallery_images
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
 		RETURNING id, score, upvotes, downvotes, num_comments, view_count, is_pinned, pinned_position, is_deleted, is_edited, edited_at, crossposted_at, created_at
 	`
 
@@ -221,6 +222,7 @@ func (r *PlatformPostRepository) Create(ctx context.Context, post *PlatformPost)
 		post.CrosspostOriginPostID,
 		post.CrosspostOriginalTitle,
 		post.TargetSubreddit,
+		post.NSFW,
 		post.CrosspostedAt,
 		galleryImagesJSON,
 	).Scan(
@@ -785,6 +787,7 @@ func scanPlatformPost(row pgx.Row, post *PlatformPost, extraDest ...interface{})
 		&post.CrosspostOriginPostID,
 		&post.CrosspostOriginalTitle,
 		&post.TargetSubreddit,
+		&post.NSFW,
 		&post.CrosspostedAt,
 		&post.CreatedAt,
 		&post.HotScore,
@@ -842,6 +845,7 @@ func scanPlatformPostWithUserInfo(row pgx.Row, post *PlatformPost, extraDest ...
 		&post.CrosspostOriginPostID,
 		&post.CrosspostOriginalTitle,
 		&post.TargetSubreddit,
+		&post.NSFW,
 		&post.CrosspostedAt,
 		&post.CreatedAt,
 		&post.HotScore,

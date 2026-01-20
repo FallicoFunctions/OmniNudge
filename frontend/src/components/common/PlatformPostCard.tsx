@@ -148,6 +148,11 @@ export function PlatformPostCard({
                 Omni
               </span>
             )}
+            {post.nsfw && (
+              <span className="inline-flex items-center rounded bg-red-600 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">
+                NSFW
+              </span>
+            )}
             {post.is_pinned && <PinnedBadge />}
           </div>
 

@@ -29,6 +29,7 @@ export interface PlatformPost {
   media_type?: string | null;
   thumbnail_url?: string | null;
   gallery_images?: GalleryImage[];
+  nsfw?: boolean;
   tags?: string[] | null;
   target_subreddit?: string | null;
   crosspost_origin_subreddit?: string | null;
@@ -51,6 +52,7 @@ export interface CreatePostRequest {
   title: string;
   body?: string;
   tags?: string[];
+  nsfw?: boolean;
   media_url?: string;
   media_type?: string;
   thumbnail_url?: string;

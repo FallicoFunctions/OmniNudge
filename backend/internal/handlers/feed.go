@@ -52,10 +52,19 @@ type CombinedFeedItem struct {
 	Score  int         `json:"score"`
 }
 
+// feedCursor tracks pagination state across multiple sources
 type feedCursor struct {
-	Score     int   `json:"score"`
-	CreatedAt int64 `json:"created_at"`
-	ID        string `json:"id"`
+	// For hub posts
+	HubOffset int `json:"hub_offset"`
+
+	// For Reddit: map of subreddit name to Reddit "after" cursor
+	SubredditCursors map[string]string `json:"subreddit_cursors"`
+
+	// Track exhausted sources
+	ExhaustedSources map[string]bool `json:"exhausted_sources"`
+
+	// Metadata
+	Version int `json:"version"` // For future cursor format changes
 }
 
 type homeFeedResponse struct {
@@ -72,7 +81,7 @@ type homeFeedResponse struct {
 	TimeRangeEnd   *time.Time       `json:"time_range_end,omitempty"`
 }
 
-// GetHomeFeed returns combined hub + Reddit posts
+// GetHomeFeed returns combined hub + Reddit posts using interleaved lazy fetching
 // If authenticated: returns posts from subscribed hubs + subscribed subreddits
 // If unauthenticated: returns popular posts from all hubs + r/popular
 func (h *FeedHandler) GetHomeFeed(c *gin.Context) {
@@ -80,10 +89,6 @@ func (h *FeedHandler) GetHomeFeed(c *gin.Context) {
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "50"))
 	if limit < 1 || limit > 100 {
 		limit = 50
-	}
-	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
-	if offset < 0 {
-		offset = 0
 	}
 	cursorParam := c.Query("cursor")
 
@@ -114,130 +119,134 @@ func (h *FeedHandler) GetHomeFeed(c *gin.Context) {
 	// Check if user is authenticated
 	userID, authenticated := c.Get("user_id")
 
-	var hubPosts []*models.PlatformPost
-	var redditPosts []services.RedditPost
-
-	cacheKey := h.buildHomeFeedCacheKey(
-		sortBy,
-		limit,
-		offset,
-		cursorParam,
-		omniOnly,
-		forcePopular,
-		timeRangeKey,
-		startTime,
-		endTime,
-		authenticated,
-		userID,
-	)
-	if cacheKey != "" {
-		if cached, ok, err := h.cache.Get(c.Request.Context(), cacheKey); err == nil && ok {
-			c.Data(http.StatusOK, "application/json", []byte(cached))
+	// Decode cursor if provided
+	var cursor *feedCursor
+	if cursorParam != "" {
+		cursor, err = decodeFeedCursor(cursorParam)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid cursor"})
 			return
 		}
 	}
 
-	// Fetch extra items to ensure we have enough after merging and sorting
-	// We need to fetch more than limit + offset because we're merging two sources
-	// Use a more conservative multiplier (1.5x instead of 2x) to reduce over-fetching
-	// Minimum is 2x the display limit (not 100) to ensure enough variety
-	baseLimit := limit + offset
-	fetchLimit := baseLimit + (baseLimit / 2) // 1.5x multiplier
-	minFetchLimit := limit * 2
-	if fetchLimit < minFetchLimit {
-		fetchLimit = minFetchLimit
-	}
+	var page []CombinedFeedItem
+	var newCursor *feedCursor
 
-	includeReddit := !omniOnly
-	if authenticated {
-		// Authenticated: fetch from subscribed sources
+	if authenticated && !forcePopular {
+		// Authenticated user with subscriptions - use interleaved fetching
 		uidInt := userID.(int)
-		if forcePopular {
-			hubPosts, redditPosts, err = h.fetchPopularFeeds(
-				c.Request.Context(),
-				sortBy,
-				fetchLimit,
-				includeReddit,
-				startTime,
-				endTime,
-				redditTimeFilter,
-			)
-		} else {
-			hubPosts, redditPosts, err = h.fetchSubscribedFeeds(
-				c.Request.Context(),
-				uidInt,
-				sortBy,
-				fetchLimit,
-				includeReddit,
-				startTime,
-				endTime,
-				redditTimeFilter,
-			)
+
+		// Get user's subscriptions
+		subscriptions, err := h.subredditSubRepo.GetUserSubscriptions(c.Request.Context(), uidInt)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch subscriptions"})
+			return
+		}
+
+		subredditNames := make([]string, len(subscriptions))
+		for i, sub := range subscriptions {
+			subredditNames[i] = sub.SubredditName
+		}
+
+		// Use interleaved fetch
+		page, newCursor, err = h.fetchInterleavedFeed(
+			c.Request.Context(),
+			uidInt,
+			subredditNames,
+			cursor,
+			limit,
+			sortBy,
+			redditTimeFilter,
+			startTime,
+			endTime,
+			omniOnly,
+		)
+
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch feed", "details": err.Error()})
+			return
 		}
 	} else {
-		// Unauthenticated: fetch popular posts
+		// Unauthenticated or forcePopular: use simple popular feed (no subscriptions)
+		// For now, fall back to old approach for popular feed
+		// TODO: Could also implement interleaved for r/popular
+		var hubPosts []*models.PlatformPost
+		var redditPosts []services.RedditPost
+
+		includeReddit := !omniOnly
 		hubPosts, redditPosts, err = h.fetchPopularFeeds(
 			c.Request.Context(),
 			sortBy,
-			fetchLimit,
+			limit*2, // Fetch extra to ensure we have enough after merge
 			includeReddit,
 			startTime,
 			endTime,
 			redditTimeFilter,
 		)
-	}
 
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch feed", "details": err.Error()})
-		return
-	}
-
-	// Merge and sort by score, get pagination info
-	combined := h.mergeAndSortPosts(hubPosts, redditPosts, sortBy)
-	totalBeforePaging := len(combined)
-
-	var page []CombinedFeedItem
-	var nextCursor string
-	var hasMore bool
-
-	if cursorParam != "" {
-		cursor, err := decodeFeedCursor(cursorParam)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid cursor"})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch feed", "details": err.Error()})
 			return
 		}
-		filtered := filterAfterCursor(combined, cursor, sortBy)
-		page, hasMore = sliceWithHasMore(filtered, limit)
-		if hasMore {
-			nextCursor = encodeFeedCursor(makeFeedCursor(page[len(page)-1]))
+
+		// Merge and sort
+		combined := h.mergeAndSortPosts(hubPosts, redditPosts, sortBy)
+
+		// Simple pagination for popular feed (no cursor needed)
+		offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
+		if offset < 0 {
+			offset = 0
 		}
-	} else {
+
+		var hasMore bool
 		page, hasMore = sliceWithHasMoreOffset(combined, limit, offset)
-		if hasMore && len(page) > 0 {
-			nextCursor = encodeFeedCursor(makeFeedCursor(page[len(page)-1]))
+
+		// Create cursor for popular feed if needed (simple offset-based)
+		if hasMore {
+			newCursor = &feedCursor{
+				Version:   1,
+				HubOffset: offset + limit,
+			}
+		}
+	}
+
+	// Build nextCursor string
+	var nextCursor string
+	var hasMore bool
+	if newCursor != nil {
+		if authenticated && !forcePopular {
+			// For interleaved feed, check if sources are exhausted
+			subscriptions, _ := h.subredditSubRepo.GetUserSubscriptions(c.Request.Context(), userID.(int))
+			subredditNames := make([]string, len(subscriptions))
+			for i, sub := range subscriptions {
+				subredditNames[i] = sub.SubredditName
+			}
+			hasMore = !allSourcesExhausted(newCursor, subredditNames, omniOnly)
+		} else {
+			// For popular feed, simple check
+			hasMore = true
+		}
+
+		if hasMore {
+			nextCursor = encodeFeedCursor(newCursor)
 		}
 	}
 
 	response := homeFeedResponse{
-		Posts:    page,
-		Sort:     sortBy,
-		Limit:    limit,
-		Offset:   offset,
-		OmniOnly: omniOnly,
-		Total:    totalBeforePaging,
-		HasMore:  hasMore,
-		NextCursor: nextCursor,
-		TimeRange: timeRangeKey,
+		Posts:          page,
+		Sort:           sortBy,
+		Limit:          limit,
+		Offset:         0, // Not used with cursor-based pagination
+		OmniOnly:       omniOnly,
+		Total:          len(page), // With interleaved fetch, we don't know total upfront
+		HasMore:        hasMore,
+		NextCursor:     nextCursor,
+		TimeRange:      timeRangeKey,
 		TimeRangeStart: startTime,
-		TimeRangeEnd: endTime,
+		TimeRangeEnd:   endTime,
 	}
 
-	payload, err := json.Marshal(response)
-	if err == nil && cacheKey != "" {
-		_ = h.cache.Set(c.Request.Context(), cacheKey, string(payload), h.cacheTTL)
-	}
-
-	c.Data(http.StatusOK, "application/json", payload)
+	c.JSON(http.StatusOK, response)
 }
 
 // fetchSubscribedFeeds fetches posts from subscribed hubs and subreddits
@@ -462,15 +471,10 @@ func getItemCursorID(item CombinedFeedItem) string {
 	}
 }
 
-func makeFeedCursor(item CombinedFeedItem) feedCursor {
-	return feedCursor{
-		Score:     item.Score,
-		CreatedAt: getItemCreatedAt(item),
-		ID:        getItemCursorID(item),
+func encodeFeedCursor(cursor *feedCursor) string {
+	if cursor == nil {
+		return ""
 	}
-}
-
-func encodeFeedCursor(cursor feedCursor) string {
 	raw, err := json.Marshal(cursor)
 	if err != nil {
 		return ""
@@ -490,52 +494,7 @@ func decodeFeedCursor(encoded string) (*feedCursor, error) {
 	if err := json.Unmarshal(raw, &cursor); err != nil {
 		return nil, err
 	}
-	if cursor.ID == "" {
-		return nil, fmt.Errorf("invalid cursor")
-	}
 	return &cursor, nil
-}
-
-func filterAfterCursor(items []CombinedFeedItem, cursor *feedCursor, sortBy string) []CombinedFeedItem {
-	if cursor == nil {
-		return items
-	}
-	filtered := make([]CombinedFeedItem, 0, len(items))
-	for _, item := range items {
-		if isAfterCursor(item, *cursor, sortBy) {
-			filtered = append(filtered, item)
-		}
-	}
-	return filtered
-}
-
-func isAfterCursor(item CombinedFeedItem, cursor feedCursor, sortBy string) bool {
-	itemCreated := getItemCreatedAt(item)
-	itemID := getItemCursorID(item)
-
-	switch sortBy {
-	case "new":
-		if itemCreated < cursor.CreatedAt {
-			return true
-		}
-		if itemCreated == cursor.CreatedAt && itemID < cursor.ID {
-			return true
-		}
-		return false
-	default:
-		if item.Score < cursor.Score {
-			return true
-		}
-		if item.Score == cursor.Score {
-			if itemCreated < cursor.CreatedAt {
-				return true
-			}
-			if itemCreated == cursor.CreatedAt && itemID < cursor.ID {
-				return true
-			}
-		}
-		return false
-	}
 }
 
 func sliceWithHasMore(items []CombinedFeedItem, limit int) ([]CombinedFeedItem, bool) {
@@ -593,4 +552,260 @@ func (h *FeedHandler) buildHomeFeedCacheKey(
 		key += ":end=" + endTime.UTC().Format(time.RFC3339)
 	}
 	return key
+}
+
+// fetchSubredditWithCache fetches posts from a subreddit with caching
+func (h *FeedHandler) fetchSubredditWithCache(
+	ctx context.Context,
+	subreddit string,
+	sortBy string,
+	redditTimeFilter string,
+	afterCursor string,
+	limit int,
+) []services.RedditPost {
+	// Build cache key
+	cacheKey := fmt.Sprintf("subreddit:%s:sort:%s:time:%s:after:%s:limit:%d",
+		subreddit, sortBy, redditTimeFilter, afterCursor, limit)
+
+	// Check cache
+	if cached, ok, _ := h.cache.Get(ctx, cacheKey); ok {
+		var posts []services.RedditPost
+		if err := json.Unmarshal([]byte(cached), &posts); err == nil {
+			log.Printf("[Cache HIT] %s: %d posts", cacheKey, len(posts))
+			return posts
+		}
+	}
+
+	// Cache miss - fetch from Reddit
+	log.Printf("[Cache MISS] Fetching r/%s (after=%s, limit=%d)", subreddit, afterCursor, limit)
+
+	listing, err := h.redditClient.GetSubredditPosts(ctx, subreddit, sortBy, redditTimeFilter, limit, afterCursor)
+	if err != nil {
+		log.Printf("Error fetching r/%s: %v", subreddit, err)
+		return []services.RedditPost{}
+	}
+
+	posts := extractRedditPosts(listing)
+
+	// Cache the result (5 minute TTL)
+	if data, err := json.Marshal(posts); err == nil {
+		h.cache.Set(ctx, cacheKey, string(data), 5*time.Minute)
+	}
+
+	return posts
+}
+
+// fetchInterleavedFeed fetches posts in a round-robin fashion from subscribed sources
+func (h *FeedHandler) fetchInterleavedFeed(
+	ctx context.Context,
+	userID int,
+	subscriptions []string,
+	cursor *feedCursor,
+	pageSize int,
+	sortBy string,
+	redditTimeFilter string,
+	startTime, endTime *time.Time,
+	omniOnly bool,
+) ([]CombinedFeedItem, *feedCursor, error) {
+	// Initialize new cursor
+	newCursor := &feedCursor{
+		Version:          1,
+		SubredditCursors: make(map[string]string),
+		ExhaustedSources: make(map[string]bool),
+	}
+
+	// Copy state from existing cursor
+	if cursor != nil {
+		newCursor.HubOffset = cursor.HubOffset
+		if cursor.SubredditCursors != nil {
+			for k, v := range cursor.SubredditCursors {
+				newCursor.SubredditCursors[k] = v
+			}
+		}
+		if cursor.ExhaustedSources != nil {
+			for k, v := range cursor.ExhaustedSources {
+				newCursor.ExhaustedSources[k] = v
+			}
+		}
+	}
+
+	itemsPerSource := 5 // Fetch 5 items per source
+
+	// Determine which sources are active (not exhausted)
+	activeSources := []string{}
+	if !newCursor.ExhaustedSources["hub"] {
+		activeSources = append(activeSources, "hub")
+	}
+	if !omniOnly {
+		for _, sub := range subscriptions {
+			if !newCursor.ExhaustedSources[sub] {
+				activeSources = append(activeSources, sub)
+			}
+		}
+	}
+
+	if len(activeSources) == 0 {
+		return []CombinedFeedItem{}, newCursor, nil
+	}
+
+	// Fetch from all active sources concurrently
+	type fetchResult struct {
+		source string
+		items  []CombinedFeedItem
+		after  string
+		count  int
+		err    error
+	}
+
+	resultsChan := make(chan fetchResult, len(activeSources))
+	fetchCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	log.Printf("[FetchInterleavedFeed] Fetching from %d sources concurrently: %v", len(activeSources), activeSources)
+
+	for _, source := range activeSources {
+		source := source // Capture loop variable
+
+		go func() {
+			result := fetchResult{source: source}
+
+			if source == "hub" {
+				hubPosts, err := h.postRepo.GetPopularFeed(
+					fetchCtx, []int{}, sortBy, itemsPerSource, newCursor.HubOffset, startTime, endTime,
+				)
+				result.err = err
+				if err == nil && len(hubPosts) > 0 {
+					for _, p := range hubPosts {
+						result.items = append(result.items, CombinedFeedItem{
+							Source: "hub",
+							Post:   p,
+							Score:  p.Score,
+						})
+					}
+					result.count = len(hubPosts)
+				}
+			} else {
+				// Reddit subreddit
+				afterCursor := newCursor.SubredditCursors[source]
+				posts := h.fetchSubredditWithCache(fetchCtx, source, sortBy, redditTimeFilter, afterCursor, itemsPerSource)
+
+				if len(posts) > 0 {
+					posts = filterRedditPostsByTimeRange(posts, startTime, endTime)
+
+					for _, p := range posts {
+						result.items = append(result.items, CombinedFeedItem{
+							Source: "reddit",
+							Post:   p,
+							Score:  p.Score,
+						})
+					}
+					result.count = len(posts)
+					if len(posts) > 0 {
+						result.after = "t3_" + posts[len(posts)-1].ID
+					}
+				}
+			}
+
+			resultsChan <- result
+		}()
+	}
+
+	// Collect all results
+	results := make(map[string]fetchResult)
+	for i := 0; i < len(activeSources); i++ {
+		result := <-resultsChan
+		results[result.source] = result
+
+		// Update cursor state
+		if result.source == "hub" {
+			if result.err != nil || result.count < itemsPerSource {
+				newCursor.ExhaustedSources["hub"] = true
+			} else {
+				newCursor.HubOffset += result.count
+			}
+		} else {
+			if result.count < itemsPerSource {
+				newCursor.ExhaustedSources[result.source] = true
+			} else if result.after != "" {
+				newCursor.SubredditCursors[result.source] = result.after
+			}
+		}
+
+		log.Printf("[FetchInterleavedFeed] Source '%s': fetched %d items", result.source, len(result.items))
+	}
+
+	cancel() // Clean up context
+
+	// Merge results based on sort type
+	var combined []CombinedFeedItem
+
+	if sortBy == "hot" {
+		// For "hot", use round-robin merge to maintain diversity
+		// Each source already returned posts in hot order
+		log.Printf("[FetchInterleavedFeed] Using round-robin merge for 'hot' sort")
+
+		maxItems := 0
+		for _, result := range results {
+			if len(result.items) > maxItems {
+				maxItems = len(result.items)
+			}
+		}
+
+		// Round-robin: take 1st item from each source, then 2nd from each, etc.
+		for i := 0; i < maxItems && len(combined) < pageSize; i++ {
+			for _, source := range activeSources {
+				if result, ok := results[source]; ok && i < len(result.items) {
+					combined = append(combined, result.items[i])
+					if len(combined) >= pageSize {
+						break
+					}
+				}
+			}
+		}
+	} else {
+		// For "new" and "top", collect all and sort
+		for _, result := range results {
+			combined = append(combined, result.items...)
+		}
+
+		if sortBy == "new" {
+			log.Printf("[FetchInterleavedFeed] Sorting by created_at for 'new'")
+			sort.Slice(combined, func(i, j int) bool {
+				return getItemCreatedAt(combined[i]) > getItemCreatedAt(combined[j])
+			})
+		} else {
+			log.Printf("[FetchInterleavedFeed] Sorting by score for 'top'")
+			sort.Slice(combined, func(i, j int) bool {
+				return combined[i].Score > combined[j].Score
+			})
+		}
+
+		// Trim to page size
+		if len(combined) > pageSize {
+			combined = combined[:pageSize]
+		}
+	}
+
+	log.Printf("[FetchInterleavedFeed] Returning %d combined items", len(combined))
+
+	return combined, newCursor, nil
+}
+
+// allSourcesExhausted checks if all sources have been exhausted
+func allSourcesExhausted(cursor *feedCursor, subscriptions []string, omniOnly bool) bool {
+	// Check if hub is exhausted
+	if !cursor.ExhaustedSources["hub"] {
+		return false
+	}
+	// If omniOnly, we don't care about subreddit exhaustion
+	if omniOnly {
+		return true
+	}
+	// Check if any subscription is not exhausted
+	for _, sub := range subscriptions {
+		if !cursor.ExhaustedSources[sub] {
+			return false
+		}
+	}
+	return true
 }

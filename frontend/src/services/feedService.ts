@@ -17,7 +17,7 @@ export interface RedditPost {
   score: number;
   num_comments: number;
   created_utc: number;
-  over_18: boolean;
+  over18: boolean;
   post_hint?: string;
   is_video: boolean;
   is_self: boolean;
