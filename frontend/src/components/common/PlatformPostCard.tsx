@@ -145,7 +145,7 @@ export function PlatformPostCard({
             {shouldBlurThumbnail && (
               <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
                 <span
-                  className={`${thumbnailOverlayClass} inline-flex items-center font-extrabold leading-none text-red-600`}
+                  className={`${thumbnailOverlayClass} inline-flex items-center font-extrabold leading-none text-white`}
                   style={{ textShadow: '0 0 2px #000' }}
                 >
                   <span>18</span>
