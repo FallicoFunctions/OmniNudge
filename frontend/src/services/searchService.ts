@@ -6,7 +6,7 @@ import type { UserProfile } from '../types/users';
 
 export interface RedditUserSearchResult {
   name: string;
-  over_18?: boolean;
+  over18?: boolean;
   icon_img?: string;
 }
 
@@ -94,7 +94,7 @@ export async function siteWideSearch(
   const normalizedQuery = query.toLowerCase();
   const filterSubs = (subs: SubredditSuggestion[]) =>
     (subs ?? []).filter((s) => {
-      if (!includeNsfw && s.over_18) return false;
+      if (!includeNsfw && s.over18) return false;
       const nameMatch = s.name.toLowerCase().includes(normalizedQuery);
       const titleMatch = (s.title || '').toLowerCase().includes(normalizedQuery);
       return nameMatch || titleMatch;
@@ -124,7 +124,7 @@ export async function siteWideSearch(
 
   const filteredRedditUsers = includeNsfw
     ? redditUsers.users ?? []
-    : (redditUsers.users ?? []).filter((u) => !u.over_18);
+    : (redditUsers.users ?? []).filter((u) => !u.over18);
 
   return {
     posts: {

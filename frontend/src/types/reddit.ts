@@ -14,7 +14,7 @@ export interface SubredditSuggestion {
   description?: string;
   subscribers?: number;
   icon_url?: string;
-  over_18?: boolean;
+  over18?: boolean;
 }
 
 export interface RedditApiPost {
@@ -29,7 +29,7 @@ export interface RedditApiPost {
   score: number;
   num_comments: number;
   created_utc: number;
-  over_18?: boolean;
+  over18?: boolean;
   post_hint?: string;
   is_video?: boolean;
   is_self: boolean;
@@ -180,7 +180,7 @@ export interface RedditSubredditAbout {
   active_user_count?: number;
   subscribers?: number;
   created_utc?: number;
-  over_18?: boolean;
+  over18?: boolean;
 }
 
 export interface RedditSubredditModerator {

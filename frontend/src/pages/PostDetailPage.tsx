@@ -620,6 +620,7 @@ export default function PostDetailPage() {
           communityName={normalizedSubreddit}
           iconUrl={subredditIcon}
           isSubscribed={subredditSubscriptionStatus?.is_subscribed ?? false}
+          isNsfw={subredditAbout?.over18 ?? false}
           searchBars={
             <FeedSearchBars
               showPostForm={false}
@@ -824,6 +825,13 @@ export default function PostDetailPage() {
             <Panel>
               <PostHeader
                 title={decodedTitle}
+                titleBadges={
+                  postData?.nsfw ? (
+                    <span className="inline-flex items-center rounded bg-red-600 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">
+                      NSFW
+                    </span>
+                  ) : undefined
+                }
                 metadataItems={[
                   ...(hubName
                     ? [

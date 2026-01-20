@@ -424,7 +424,7 @@ func (h *RedditHandler) SearchRedditUsers(c *gin.Context) {
 
 	type RedditUserResult struct {
 		Name    string `json:"name"`
-		Over18  bool   `json:"over_18"`
+		Over18  bool   `json:"over18"`
 		IconImg string `json:"icon_img,omitempty"`
 		ID      string `json:"id,omitempty"`
 	}
@@ -675,7 +675,7 @@ func (h *RedditHandler) GetSubredditMedia(c *gin.Context) {
 				"permalink":   "https://reddit.com" + post.Permalink,
 				"score":       post.Score,
 				"created_utc": post.CreatedUTC,
-				"over_18":     post.Over18,
+				"over18":     post.Over18,
 			})
 
 			// Stop when we have enough media posts

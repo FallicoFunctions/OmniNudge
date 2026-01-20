@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { keepPreviousData, useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { feedService, type CombinedFeedItem, type HomeFeedResponse, type RedditPost } from '../services/feedService';
 import { useAuth } from '../contexts/AuthContext';
 import { useSettings } from '../contexts/SettingsContext';
@@ -249,7 +249,6 @@ export default function HomePage() {
     },
     enabled: !isCustomTopRange || isCustomRangeValid,
     staleTime: 1000 * 60 * 5,
-    placeholderData: keepPreviousData,
   });
 
   // When sort/time toggles change, reset cursor

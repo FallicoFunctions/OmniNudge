@@ -144,6 +144,7 @@ type CreatePostRequest struct {
 	Title              string                `json:"title" binding:"required,min=1,max=300"`
 	Body               *string               `json:"body"`
 	Tags               []string              `json:"tags"`
+	NSFW               bool                  `json:"nsfw"`
 	MediaURL           *string               `json:"media_url"`
 	MediaType          *string               `json:"media_type"`
 	ThumbnailURL       *string               `json:"thumbnail_url"`
@@ -183,6 +184,7 @@ func (h *PostsHandler) CreatePost(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body", "details": err.Error()})
 		return
 	}
+	fmt.Printf("[CreatePost] Parsed NSFW=%v hub_id=%v target_subreddit=%v\n", req.NSFW, req.HubID, req.TargetSubreddit)
 	if req.Body != nil && len(*req.Body) > maxPostBodyLength {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Post body must be less than 10,000 characters"})
 		return
@@ -270,6 +272,7 @@ func (h *PostsHandler) CreatePost(c *gin.Context) {
 		Title:           req.Title,
 		Body:            req.Body,
 		Tags:            req.Tags,
+		NSFW:            req.NSFW,
 		MediaURL:        req.MediaURL,
 		MediaType:       req.MediaType,
 		ThumbnailURL:    req.ThumbnailURL,
@@ -316,6 +319,7 @@ func (h *PostsHandler) CreatePost(c *gin.Context) {
 	if hub != nil {
 		updatedPost.HubName = hub.Name
 	}
+	fmt.Printf("[CreatePost] Stored NSFW=%v for post %d\n", updatedPost.NSFW, updatedPost.ID)
 
 	c.JSON(http.StatusCreated, updatedPost)
 }

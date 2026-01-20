@@ -948,6 +948,11 @@ export default function RedditPage() {
                 <span className="inline-block rounded bg-blue-600 px-2 py-0.5 text-[10px] font-bold uppercase text-white">
                   Omni
                 </span>
+                {post.nsfw && (
+                  <span className="inline-block rounded bg-red-600 px-2 py-0.5 text-[10px] font-bold uppercase text-white">
+                    NSFW
+                  </span>
+                )}
                 {displaySubreddit && (
                   <span className="text-[11px] font-medium text-[var(--color-text-secondary)]">
                     r/{displaySubreddit}
@@ -1102,6 +1107,7 @@ export default function RedditPage() {
         communityName={subreddit}
         iconUrl={subredditIcon}
         isSubscribed={subscriptionStatus?.is_subscribed ?? false}
+        isNsfw={subredditAbout?.over18 ?? false}
         searchBars={
           <FeedSearchBars
             showPostForm={false}

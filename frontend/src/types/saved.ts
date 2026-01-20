@@ -31,6 +31,7 @@ export interface SavedRedditPost {
   link_flair_text?: string | null;
   link_flair_background_color?: string | null;
   link_flair_text_color?: string | null;
+  over18?: boolean | null;
   saved_at: string;
 }
 
@@ -44,6 +45,7 @@ export interface SaveRedditPostPayload {
   link_flair_text?: string | null;
   link_flair_background_color?: string | null;
   link_flair_text_color?: string | null;
+  over18?: boolean | null;
 }
 
 export interface SavedItemsResponse {

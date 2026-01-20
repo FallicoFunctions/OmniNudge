@@ -41,6 +41,7 @@ export default function CreatePostPage() {
   const [subredditInputValue, setSubredditInputValue] = useState<string>('');
   const [isSubredditAutocompleteOpen, setIsSubredditAutocompleteOpen] = useState(false);
   const [sendRepliesToInbox, setSendRepliesToInbox] = useState(true);
+  const [isNsfw, setIsNsfw] = useState(false);
   const mediaInputRef = useRef<HTMLInputElement | null>(null);
 
   // Pre-fill destination from location state
@@ -469,6 +470,7 @@ export default function CreatePostPage() {
       target_subreddit: destination === 'subreddit' ? targetSubreddit : undefined,
       send_replies_to_inbox: sendRepliesToInbox,
       post_type: activeTab,
+      nsfw: isNsfw,
     };
 
     console.log('[CreatePostPage] Submitting post with data:', data);
@@ -841,6 +843,15 @@ export default function CreatePostPage() {
                   </div>
                 </div>
               )}
+              <label className="flex items-center text-sm text-gray-600">
+                <input
+                  type="checkbox"
+                  checked={isNsfw}
+                  onChange={(e) => setIsNsfw(e.target.checked)}
+                  className="mr-2"
+                />
+                Mark as NSFW (18+)
+              </label>
             </div>
           </div>
         </div>

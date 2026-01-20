@@ -111,9 +111,13 @@ func main() {
 		cfg.Reddit.UserAgent,
 		cfg.Turnstile.Secret,
 	)
-	var cache services.Cache = services.NoopCache{}
+	var cache services.Cache
 	if cfg.Redis.Addr != "" {
 		cache = services.NewRedisCache(cfg.Redis.Addr, cfg.Redis.Password, 2*time.Second)
+	} else {
+		// Use in-memory cache as fallback
+		cache = services.NewMemoryCache()
+		log.Println("Using in-memory cache (Redis not configured)")
 	}
 	redditClient := services.NewRedditClient(
 		cfg.Reddit.UserAgent,
