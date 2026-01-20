@@ -30,6 +30,8 @@ export default function SettingsPage() {
     setSearchIncludeNsfwByDefault,
     blockAllNsfw,
     setBlockAllNsfw,
+    blockNsfwThumbnails,
+    setBlockNsfwThumbnails,
     accessRequestCooldownDisplay,
     setAccessRequestCooldownDisplay,
   } = useSettings();
@@ -568,6 +570,40 @@ export default function SettingsPage() {
                     aria-hidden="true"
                     className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
                       searchIncludeNsfwByDefault && !blockAllNsfw ? 'translate-x-5' : 'translate-x-0'
+                    }`}
+                  />
+                </button>
+              </div>
+            </div>
+
+            <div className="flex items-start justify-between">
+              <div className="flex-1">
+                <label
+                  htmlFor="block-nsfw-thumbnails-toggle"
+                  className="block text-sm font-medium text-[var(--color-text-primary)]"
+                >
+                  Block NSFW post thumbnails
+                </label>
+                <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+                  Blur NSFW post thumbnails and overlay an 18+ warning.
+                </p>
+              </div>
+              <div className="ml-4">
+                <button
+                  id="block-nsfw-thumbnails-toggle"
+                  type="button"
+                  role="switch"
+                  aria-checked={blockNsfwThumbnails}
+                  onClick={() => setBlockNsfwThumbnails(!blockNsfwThumbnails)}
+                  className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${
+                    blockNsfwThumbnails ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
+                  }`}
+                >
+                  <span className="sr-only">Block NSFW post thumbnails</span>
+                  <span
+                    aria-hidden="true"
+                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                      blockNsfwThumbnails ? 'translate-x-5' : 'translate-x-0'
                     }`}
                   />
                 </button>

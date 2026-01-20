@@ -331,7 +331,7 @@ export function SavedItemsView({
             </div>
             <div className="mt-1">
               <span className="font-semibold">Post:</span>{' '}
-              <Link to={getPostUrl({ id: comment.post_id, target_subreddit: null })} className="text-[var(--color-primary)] hover:underline">
+              <Link to={getPostUrl({ id: comment.post_id, target_subreddit: null, hub_name: comment.hub_name })} className="text-[var(--color-primary)] hover:underline">
                 {comment.post_title}
               </Link>
             </div>
@@ -340,7 +340,7 @@ export function SavedItemsView({
           <div className="mt-3 flex items-center gap-4 text-xs text-[var(--color-text-secondary)]">
             <span>{comment.score} points</span>
             <Link
-              to={getPostCommentUrl({ id: comment.post_id, target_subreddit: null }, comment.comment_id)}
+              to={getPostCommentUrl({ id: comment.post_id, target_subreddit: null, hub_name: comment.hub_name }, comment.comment_id)}
               className="text-[var(--color-primary)] hover:underline"
             >
               View thread →

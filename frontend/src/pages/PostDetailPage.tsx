@@ -721,6 +721,7 @@ export default function PostDetailPage() {
           communityType="hub"
           communityName={hubName}
           displayTitle={hubDisplayTitle}
+          isNsfw={hubDetails?.nsfw ?? hubSettings?.nsfw ?? false}
           isModerator={isModerator}
           searchBars={
             <FeedSearchBars
