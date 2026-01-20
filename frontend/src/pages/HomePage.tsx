@@ -1,6 +1,6 @@
-import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from '@tanstack/react-query';
 import { feedService, type CombinedFeedItem, type HomeFeedResponse, type RedditPost } from '../services/feedService';
 import { useAuth } from '../contexts/AuthContext';
 import { useSettings } from '../contexts/SettingsContext';
@@ -25,6 +25,9 @@ import { OMNI_FEED_STORAGE_KEY } from '../constants/storageKeys';
 import { TOP_TIME_OPTIONS } from '../constants/topTimeRange';
 import type { TopTimeRange } from '../constants/topTimeRange';
 import { RedditPostSlideshow } from '../components/slideshow/RedditPostSlideshow';
+import { useMultiColumnFeed } from '../contexts/MultiColumnFeedContext';
+import { MultiColumnFeedView } from '../components/feed/MultiColumnFeedView';
+import { VerticalOmniScroll } from '../components/feed/VerticalOmniScroll';
 
 type SortOption = 'hot' | 'new' | 'top' | 'rising' | 'controversial';
 
@@ -80,6 +83,7 @@ export default function HomePage() {
   } = useSettings();
   const location = useLocation();
   const navigate = useNavigate();
+  const { state: multiColumnState, setViewMode } = useMultiColumnFeed();
   const [hideTarget, setHideTarget] = useState<HideTarget | null>(null);
   const [crosspostTarget, setCrosspostTarget] = useState<CrosspostTarget | null>(null);
   const [deletePostTarget, setDeletePostTarget] = useState<DeletePostTarget | null>(null);
@@ -112,6 +116,7 @@ export default function HomePage() {
   const [topTimeRange, setTopTimeRange] = useState<TopTimeRange>('day');
   const [customTopStart, setCustomTopStart] = useState('');
   const [customTopEnd, setCustomTopEnd] = useState('');
+  const loadMoreRef = useRef<HTMLDivElement | null>(null);
   const queryClient = useQueryClient();
   const sort = useMemo<SortOption>(() => {
     const params = new URLSearchParams(location.search);
@@ -136,6 +141,22 @@ export default function HomePage() {
       : topTimeRange
     : 'none';
   const requiresValidCustomRange = isTimedSort && topTimeRange === 'custom' && !isCustomRangeValid;
+  const timeOptions = useMemo(() => {
+    if (isTimedSort && topTimeRange === 'custom') {
+      if (!isCustomRangeValid) {
+        return undefined;
+      }
+      return {
+        timeRange: 'custom' as const,
+        startDate: customStartISO as string,
+        endDate: customEndISO as string,
+      };
+    }
+    if (isTimedSort) {
+      return { timeRange: topTimeRange };
+    }
+    return undefined;
+  }, [isTimedSort, topTimeRange, isCustomRangeValid, customStartISO, customEndISO]);
   const originState = useMemo(
     () => ({ originPath: `${location.pathname}${location.search}` }),
     [location.pathname, location.search]
@@ -230,42 +251,72 @@ export default function HomePage() {
   const pageSize = 50;
   const currentCursor = cursorStack[cursorStack.length - 1] ?? '';
   const homeFeedQueryKey = ['home-feed', sort, omniOnly, showPopularFallback, timeRangeKey, currentCursor] as const;
-  const { data, isLoading, isFetching } = useQuery<HomeFeedResponse>({
+  const { data: pagedData, isLoading: isPagedLoading, isFetching: isPagedFetching } = useQuery<HomeFeedResponse>({
     queryKey: homeFeedQueryKey,
     queryFn: () => {
-      const timeOptions =
-        isTimedSort && topTimeRange === 'custom'
-          ? isCustomRangeValid
-            ? {
-                timeRange: 'custom' as const,
-                startDate: customStartISO as string,
-                endDate: customEndISO as string,
-              }
-            : undefined
-          : isTimedSort
-          ? { timeRange: topTimeRange }
-          : undefined;
       return feedService.getHomeFeed(sort, pageSize, currentCursor, omniOnly, showPopularFallback, timeOptions);
     },
-    enabled: !isCustomTopRange || isCustomRangeValid,
+    enabled: !useInfiniteScrollHome && (!isCustomTopRange || isCustomRangeValid),
+    staleTime: 1000 * 60 * 5,
+  });
+
+  const {
+    data: infiniteData,
+    isLoading: isInfiniteLoading,
+    isFetching: isInfiniteFetching,
+    hasNextPage,
+    fetchNextPage,
+    isFetchingNextPage,
+  } = useInfiniteQuery<HomeFeedResponse>({
+    queryKey: ['home-feed-infinite', sort, omniOnly, showPopularFallback, timeRangeKey],
+    queryFn: ({ pageParam }) =>
+      feedService.getHomeFeed(
+        sort,
+        pageSize,
+        typeof pageParam === 'string' ? pageParam : '',
+        omniOnly,
+        showPopularFallback,
+        timeOptions
+      ),
+    initialPageParam: '',
+    getNextPageParam: (lastPage) => lastPage.next_cursor ?? undefined,
+    enabled: useInfiniteScrollHome && (!isCustomTopRange || isCustomRangeValid),
     staleTime: 1000 * 60 * 5,
   });
 
   // When sort/time toggles change, reset cursor
   useEffect(() => {
-    setCursorStack(['']);
-  }, [sort, omniOnly, showPopularFallback, timeRangeKey]);
+    if (!useInfiniteScrollHome) {
+      setCursorStack(['']);
+    }
+  }, [sort, omniOnly, showPopularFallback, timeRangeKey, useInfiniteScrollHome]);
+
+  const basePosts = useMemo(() => {
+    if (useInfiniteScrollHome) {
+      return infiniteData?.pages.flatMap((page) => page.posts) ?? [];
+    }
+    return pagedData?.posts ?? [];
+  }, [useInfiniteScrollHome, infiniteData?.pages, pagedData?.posts]);
 
   const displayedPosts = useMemo(() => {
-    const basePosts = data?.posts ?? [];
+    const baseItems = basePosts;
     if (!omniOnly) {
-      return basePosts;
+      return baseItems;
     }
-    return basePosts.filter((item) => item.source === 'hub');
-  }, [data?.posts, omniOnly]);
+    return baseItems.filter((item) => item.source === 'hub');
+  }, [basePosts, omniOnly]);
 
-  const hasMore = Boolean(data?.next_cursor ?? data?.has_more);
-  const hasPrev = cursorStack.length > 1;
+  const hasMore = useInfiniteScrollHome
+    ? Boolean(hasNextPage)
+    : Boolean(pagedData?.next_cursor ?? pagedData?.has_more);
+  const hasPrev = !useInfiniteScrollHome && cursorStack.length > 1;
+  const isLoading = useInfiniteScrollHome ? isInfiniteLoading : isPagedLoading;
+  const isFetching = useInfiniteScrollHome ? isInfiniteFetching : isPagedFetching;
+
+  const invalidateHomeFeed = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ['home-feed'] });
+    queryClient.invalidateQueries({ queryKey: ['home-feed-infinite'] });
+  }, [queryClient]);
 
   // Saved posts state
   const savedPostsKey = ['saved-items', 'posts'] as const;
@@ -308,7 +359,7 @@ export default function HomePage() {
   const deletePostMutation = useMutation<void, Error, { postId: number; reason?: string }>({
     mutationFn: async ({ postId, reason }) => postsService.deletePost(postId, reason),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['home-feed'] });
+      invalidateHomeFeed();
       setDeletePostTarget(null);
       setDeleteReason('');
     },
@@ -344,7 +395,7 @@ export default function HomePage() {
       await savedService.hidePost(postId);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['home-feed'] });
+      invalidateHomeFeed();
     },
     onError: (err) => {
       alert(`Failed to hide post: ${err.message}`);
@@ -383,7 +434,7 @@ export default function HomePage() {
       await savedService.hideRedditPost(post.subreddit, post.id);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['home-feed'] });
+      invalidateHomeFeed();
       setHideTarget(null);
     },
     onError: (err) => {
@@ -439,7 +490,7 @@ export default function HomePage() {
       setSelectedHub('');
       setSelectedSubreddit('');
       setSendRepliesToInbox(true);
-      queryClient.invalidateQueries({ queryKey: ['home-feed'] });
+      invalidateHomeFeed();
       alert('Crosspost created successfully!');
     },
     onError: (error) => {
@@ -533,6 +584,40 @@ export default function HomePage() {
 
   const isHidePending = hideRedditPostMutation.isPending;
 
+  useEffect(() => {
+    if (!useInfiniteScrollHome) {
+      return;
+    }
+    const loadMoreEl = loadMoreRef.current;
+    if (!loadMoreEl) {
+      return;
+    }
+    if (!hasNextPage || isFetchingNextPage) {
+      return;
+    }
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting && hasNextPage && !isFetchingNextPage) {
+          fetchNextPage();
+        }
+      },
+      { rootMargin: '200px 0px' }
+    );
+    observer.observe(loadMoreEl);
+    return () => observer.disconnect();
+  }, [useInfiniteScrollHome, hasNextPage, isFetchingNextPage, fetchNextPage]);
+
+  // Multi-column view mode
+  if (multiColumnState.viewMode === 'multi-column') {
+    return <MultiColumnFeedView />;
+  }
+
+  // Vertical OmniScroll view mode
+  if (multiColumnState.viewMode === 'vertical-omniscroll') {
+    return <VerticalOmniScroll onClose={() => setViewMode('standard')} />;
+  }
+
+  // Standard view mode
   return (
     <div className="mx-auto max-w-7xl px-4 py-6">
       {/* Header */}
@@ -897,6 +982,17 @@ export default function HomePage() {
       )}
 
       {/* Pagination Controls */}
+      {useInfiniteScrollHome && displayedPosts.length > 0 && (
+        <>
+          <div ref={loadMoreRef} className="h-10" />
+          {isFetchingNextPage && (
+            <div className="py-3 text-center text-sm text-[var(--color-text-secondary)]">
+              Loading more posts...
+            </div>
+          )}
+        </>
+      )}
+
       {!useInfiniteScrollHome && displayedPosts.length > 0 && (
         <OffsetPaginationControls
           hasPrev={hasPrev}
@@ -907,10 +1003,10 @@ export default function HomePage() {
             window.scrollTo({ top: 0, behavior: 'smooth' });
           }}
           onNext={() => {
-            if (!data?.next_cursor) {
+            if (!pagedData?.next_cursor) {
               return;
             }
-            setCursorStack((prev) => [...prev, data.next_cursor ?? '']);
+            setCursorStack((prev) => [...prev, pagedData.next_cursor ?? '']);
             window.scrollTo({ top: 0, behavior: 'smooth' });
           }}
         />

@@ -4,6 +4,7 @@ import { AuthProvider } from './contexts/AuthContext';
 import { SettingsProvider } from './contexts/SettingsContext';
 import { RedditBlockProvider } from './contexts/RedditBlockContext';
 import { MessagingProvider } from './contexts/MessagingContext';
+import { MultiColumnFeedProvider } from './contexts/MultiColumnFeedContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import MainLayout from './layouts/MainLayout';
 import { LoadingMessage } from './components/common/StatusMessage';
@@ -43,14 +44,15 @@ function App() {
         <SettingsProvider>
           <RedditBlockProvider>
             <MessagingProvider>
-              <Suspense
-                fallback={
-                  <div className="flex min-h-screen items-center justify-center">
-                    <LoadingMessage>Loading page...</LoadingMessage>
-                  </div>
-                }
-              >
-                <Routes>
+              <MultiColumnFeedProvider>
+                <Suspense
+                  fallback={
+                    <div className="flex min-h-screen items-center justify-center">
+                      <LoadingMessage>Loading page...</LoadingMessage>
+                    </div>
+                  }
+                >
+                  <Routes>
                   {/* Main layout for public + protected pages */}
                   <Route element={<MainLayout />}>
                     {/* PUBLIC routes - accessible without auth */}
@@ -170,8 +172,9 @@ function App() {
                   {/* 404 */}
                   <Route path="/404" element={<NotFoundPage />} />
                   <Route path="*" element={<Navigate to="/404" replace />} />
-                </Routes>
-              </Suspense>
+                  </Routes>
+                </Suspense>
+              </MultiColumnFeedProvider>
             </MessagingProvider>
           </RedditBlockProvider>
         </SettingsProvider>
