@@ -1000,8 +1000,8 @@ func (r *PlatformPostRepository) GetPopularFeed(
 ) ([]*PlatformPost, error) {
 	orderClause := buildPlatformPostOrder(sort, false)
 
-	// Base WHERE clause excludes deleted posts, quarantined hubs, and crossposted posts
-	whereClause := `WHERE p.is_deleted = FALSE AND h.is_quarantined = FALSE AND p.target_subreddit IS NULL`
+	// Base WHERE clause excludes deleted posts, quarantined hubs, crossposted posts, and pinned posts
+	whereClause := `WHERE p.is_deleted = FALSE AND h.is_quarantined = FALSE AND p.target_subreddit IS NULL AND p.is_pinned = FALSE`
 
 	args := []interface{}{}
 	paramIndex := 1
@@ -1087,8 +1087,8 @@ func (r *PlatformPostRepository) GetPopularFeedWithCursor(
 ) ([]*PlatformPost, error) {
 	orderClause := buildPlatformPostOrder(sort, true)
 
-	// Base WHERE clause excludes deleted posts, quarantined hubs, and crossposted posts
-	whereClause := `WHERE p.is_deleted = FALSE AND h.is_quarantined = FALSE AND p.target_subreddit IS NULL`
+	// Base WHERE clause excludes deleted posts, quarantined hubs, crossposted posts, and pinned posts
+	whereClause := `WHERE p.is_deleted = FALSE AND h.is_quarantined = FALSE AND p.target_subreddit IS NULL AND p.is_pinned = FALSE`
 
 	args := []interface{}{}
 	paramIndex := 1

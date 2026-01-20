@@ -14,6 +14,7 @@ import { loadHls } from '../../utils/hlsLoader';
 import { redditService } from '../../services/redditService';
 import { PinnedBadge } from '../common/PinnedBadge';
 import { getRedditDashAudioUrl } from '../../utils/redditVideoAudio';
+import { useSettings } from '../../contexts/SettingsContext';
 
 interface RedditPostCardProps {
   post: RedditCrosspostSource & {
@@ -482,6 +483,8 @@ export function RedditPostCard({
 
   const postUrl = `/r/${post.subreddit}/comments/${post.id}`;
   const thumbnail = getThumbnailUrl(post);
+  const { blockNsfwThumbnails } = useSettings();
+  const shouldBlurThumbnail = Boolean(post.over18 && blockNsfwThumbnails);
   const sanitizedExternalUrl = sanitizeHttpUrl(post.url);
   const externalDomain = getDisplayDomain(sanitizedExternalUrl);
   const isExternalLink = Boolean(
@@ -786,13 +789,28 @@ export function RedditPostCard({
     >
       <div className="flex gap-3 p-3">
         {thumbnail && (
-          <img
-            src={thumbnail}
-            alt=""
-            loading="lazy"
-            decoding="async"
-            className="h-14 w-14 flex-shrink-0 rounded object-cover"
-          />
+          <div className="relative h-14 w-14 flex-shrink-0">
+            <img
+              src={thumbnail}
+              alt=""
+              loading="lazy"
+              decoding="async"
+              className={`h-full w-full rounded object-cover ${shouldBlurThumbnail ? 'blur-sm' : ''}`}
+            />
+            {shouldBlurThumbnail && (
+              <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                <span
+                  className="inline-flex items-center text-[26px] font-extrabold leading-none text-red-600"
+                  style={{ textShadow: '0 0 2px #000' }}
+                >
+                  <span>18</span>
+                  <span className="relative" style={{ fontSize: '0.95em', top: '-0.02em' }}>
+                    +
+                  </span>
+                </span>
+              </div>
+            )}
+          </div>
         )}
         <div className="flex-1 text-left">
           <div className="flex flex-wrap items-center gap-2">

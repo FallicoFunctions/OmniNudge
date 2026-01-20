@@ -8,6 +8,8 @@ import type { PlatformPost } from '../../types/posts';
 import { canModerateContent, requiresModerator } from '../../utils/permissions';
 import { PostBodyMarkdown } from '../posts/PostBodyMarkdown';
 import { PinnedBadge } from './PinnedBadge';
+import { getPostUrl } from '../../utils/postUrl';
+import { useSettings } from '../../contexts/SettingsContext';
 
 interface PlatformPostCardProps {
   post: PlatformPost;
@@ -69,6 +71,7 @@ export function PlatformPostCard({
   onDelete,
 }: PlatformPostCardProps) {
   const [expandedTextMap, setExpandedTextMap] = useState<Record<number, boolean>>({});
+  const { blockNsfwThumbnails } = useSettings();
 
   const toggleTextPreview = (postId: number) => {
     setExpandedTextMap((prev) => ({
@@ -108,13 +111,16 @@ export function PlatformPostCard({
   const canEdit = currentUserId === post.author_id;
   const canDelete = canModerateContent(currentUserId, post.author_id, currentUserRole, isModerator);
   const canPin = requiresModerator(currentUserRole, isModerator);
-  const postUrl = `/posts/${post.id}`;
+  const postUrl = getPostUrl(post);
 
   const hasBody = Boolean(post.body && post.body.trim());
   const hasInlinePreview = Boolean(post.thumbnail_url || hasBody);
   const isInlinePreviewOpen = !!(hasInlinePreview && expandedTextMap[post.id]);
 
   const thumbnailClass = thumbnailSize === 'small' ? 'h-16 w-16' : 'h-14 w-14';
+  const shouldBlurThumbnail = Boolean(post.nsfw && blockNsfwThumbnails);
+  const thumbnailOverlayClass =
+    thumbnailSize === 'small' ? 'text-[30px]' : 'text-[26px]';
 
   return (
     <article className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)]">
@@ -128,13 +134,28 @@ export function PlatformPostCard({
           size={voteButtonSize}
         />
         {post.thumbnail_url && (
-          <img
-            src={resolveMediaUrl(post.thumbnail_url)}
-            alt=""
-            loading="lazy"
-            decoding="async"
-            className={`${thumbnailClass} flex-shrink-0 rounded object-cover`}
-          />
+          <div className={`relative ${thumbnailClass} flex-shrink-0`}>
+            <img
+              src={resolveMediaUrl(post.thumbnail_url)}
+              alt=""
+              loading="lazy"
+              decoding="async"
+              className={`h-full w-full rounded object-cover ${shouldBlurThumbnail ? 'blur-sm' : ''}`}
+            />
+            {shouldBlurThumbnail && (
+              <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                <span
+                  className={`${thumbnailOverlayClass} inline-flex items-center font-extrabold leading-none text-red-600`}
+                  style={{ textShadow: '0 0 2px #000' }}
+                >
+                  <span>18</span>
+                  <span className="relative" style={{ fontSize: '0.95em', top: '-0.02em' }}>
+                    +
+                  </span>
+                </span>
+              </div>
+            )}
+          </div>
         )}
         <div className="flex-1 space-y-1 text-left">
           <div className="flex flex-wrap items-center gap-2">

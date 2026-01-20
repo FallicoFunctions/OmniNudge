@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import type { ReactNode } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { subscriptionService } from '../../services/subscriptionService';
 import { useAuth } from '../../contexts/AuthContext';
@@ -95,8 +95,12 @@ export function CommunityHeader({
               />
             )}
             <div className="flex items-center gap-2">
-              <h1 className="text-3xl font-bold">{headerLabel}</h1>
-              {isSubreddit && isNsfw && (
+              <h1 className="text-3xl font-bold">
+                <Link to={defaultReturnTo} className="no-underline hover:text-blue-600">
+                  {headerLabel}
+                </Link>
+              </h1>
+              {isNsfw && (
                 <span className="rounded bg-red-600 px-2 py-0.5 text-xs font-semibold text-white">
                   NSFW
                 </span>

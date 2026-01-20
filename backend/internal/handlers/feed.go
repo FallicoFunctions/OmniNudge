@@ -408,6 +408,10 @@ func extractRedditPosts(listing *services.RedditListing) []services.RedditPost {
 
 	posts := make([]services.RedditPost, 0, len(listing.Data.Children))
 	for _, child := range listing.Data.Children {
+		// Skip stickied/pinned posts
+		if child.Data.Stickied {
+			continue
+		}
 		posts = append(posts, normalizeRedditPost(child.Data))
 	}
 	return posts

@@ -27,9 +27,16 @@ export default function HubAboutPanel({
 
   return (
     <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
-      <h3 className="text-sm font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
-        About this hub
-      </h3>
+      <div className="flex items-center justify-between">
+        <h3 className="text-sm font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
+          About this hub
+        </h3>
+        {hubDetails?.nsfw && (
+          <span className="rounded bg-red-600 px-2 py-0.5 text-xs font-semibold text-white">
+            NSFW
+          </span>
+        )}
+      </div>
       {isLoading ? (
         <LoadingMessage>Loading details…</LoadingMessage>
       ) : isError ? (
