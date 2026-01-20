@@ -1,8 +1,10 @@
 import { Link } from 'react-router-dom';
+import { useState, useEffect, useRef } from 'react';
 import { formatDistanceToNow } from 'date-fns';
 import { getPostUrl } from '../../utils/postUrl';
 import { resolveMediaUrl } from '../../utils/mediaUrl';
 import { HlsVideo } from '../common/HlsVideo';
+import { ImageCarousel } from './ImageCarousel';
 import type { PlatformPost } from '../../types/posts';
 import type { CombinedFeedItem } from '../../services/feedService';
 import type { Conversation } from '../../types/messages';
@@ -13,6 +15,10 @@ interface CompactPostCardProps {
 }
 
 export function CompactPostCard({ post, feedType }: CompactPostCardProps) {
+  const [galleryIndex, setGalleryIndex] = useState(0);
+  const [isGalleryHovered, setIsGalleryHovered] = useState(false);
+  const titleAreaRef = useRef<HTMLDivElement>(null);
+  const [isTitleAreaHovered, setIsTitleAreaHovered] = useState(false);
   // Handle messages differently
   if (feedType === 'messages') {
     const conversation = post as Conversation;
@@ -93,6 +99,42 @@ export function CompactPostCard({ post, feedType }: CompactPostCardProps) {
     thumbnail = null;
   }
 
+  // Check for gallery posts
+  const galleryImages = actualPost.gallery_images;
+  const isGallery = actualPost.is_gallery || (galleryImages && galleryImages.length > 0);
+
+  // Gallery navigation functions
+  const handleGalleryNavigate = (direction: 'prev' | 'next') => {
+    if (!galleryImages || galleryImages.length <= 1) return;
+
+    if (direction === 'prev') {
+      setGalleryIndex((prev) => (prev === 0 ? galleryImages.length - 1 : prev - 1));
+    } else {
+      setGalleryIndex((prev) => (prev === galleryImages.length - 1 ? 0 : prev + 1));
+    }
+  };
+
+  // Keyboard navigation for gallery when hovering over image or title area
+  useEffect(() => {
+    if (!isGallery || !galleryImages || galleryImages.length <= 1) return;
+    if (!isGalleryHovered && !isTitleAreaHovered) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        e.stopPropagation();
+        handleGalleryNavigate('prev');
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        e.stopPropagation();
+        handleGalleryNavigate('next');
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isGallery, isGalleryHovered, isTitleAreaHovered, galleryImages, galleryIndex]);
+
   // For Reddit videos, get HLS URL (has audio+video in one stream)
   const redditVideo = actualPost.secure_media?.reddit_video || actualPost.media?.reddit_video;
   const redditHlsUrl = redditVideo?.hls_url;
@@ -107,11 +149,10 @@ export function CompactPostCard({ post, feedType }: CompactPostCardProps) {
     mediaUrl?.includes('redgifs.com') ||
     mediaUrl?.includes('gfycat.com');
 
-  const isImage = !isVideo && (
+  const isImage = !isVideo && !isGallery && (
     mediaUrl?.match(/\.(jpg|jpeg|png|gif|webp)$/i) ||
     mediaUrl?.includes('i.redd.it') ||
     mediaUrl?.includes('preview.redd.it') ||
-    mediaUrl?.includes('/gallery/') ||
     thumbnail?.includes('i.redd.it') ||
     thumbnail?.includes('preview.redd.it')
   );
@@ -132,8 +173,8 @@ export function CompactPostCard({ post, feedType }: CompactPostCardProps) {
     } else if (thumbnail) {
       displayMedia = thumbnail;
     }
-  } else if (thumbnail) {
-    // Fall back to thumbnail for any post
+  } else if (!isGallery && thumbnail) {
+    // Fall back to thumbnail for any non-gallery post
     displayMedia = thumbnail;
   }
 
@@ -169,14 +210,23 @@ export function CompactPostCard({ post, feedType }: CompactPostCardProps) {
   return (
     <article className="compact-post-card">
       {/* Media (full width if available) */}
-      {displayMedia && (
+      {isGallery && galleryImages && galleryImages.length > 0 ? (
+        <ImageCarousel
+          images={galleryImages}
+          title={title}
+          className="w-full"
+          currentIndex={galleryIndex}
+          onNavigate={handleGalleryNavigate}
+          onHoverChange={setIsGalleryHovered}
+        />
+      ) : displayMedia ? (
         <div className="w-full">
           {isVideo ? (
             <HlsVideo
               src={displayMedia.startsWith('http') ? displayMedia : resolveMediaUrl(displayMedia)}
               poster={videoPoster}
               className="w-full h-auto"
-              style={{ display: 'block' }}
+              style={{ display: 'block', maxHeight: 'calc(100vh - 200px)', objectFit: 'contain' }}
               controls
               loop
               playsInline
@@ -187,17 +237,22 @@ export function CompactPostCard({ post, feedType }: CompactPostCardProps) {
               src={displayMedia.startsWith('http') ? displayMedia : resolveMediaUrl(displayMedia)}
               alt={title}
               className="w-full h-auto"
-              style={{ display: 'block' }}
+              style={{ display: 'block', maxHeight: 'calc(100vh - 200px)', objectFit: 'contain' }}
               loading="lazy"
             />
           )}
         </div>
-      )}
+      ) : null}
 
       {/* Content below media */}
       <div className="p-2 bg-[var(--color-surface)] flex gap-2">
         {/* Left side - Text content */}
-        <div className="flex-1 min-w-0">
+        <div
+          ref={titleAreaRef}
+          className="flex-1 min-w-0"
+          onMouseEnter={() => setIsTitleAreaHovered(true)}
+          onMouseLeave={() => setIsTitleAreaHovered(false)}
+        >
           {/* Title */}
           <Link to={postUrl} className="hover:underline">
             <h3 className="text-sm font-medium leading-tight line-clamp-2" style={{ color: 'var(--ac-text, #e8e8f0)' }}>
@@ -217,9 +272,9 @@ export function CompactPostCard({ post, feedType }: CompactPostCardProps) {
           <div className="flex items-center gap-1.5 mt-1 text-xs flex-wrap" style={{ color: 'var(--ac-text-muted, #8a8a9a)' }}>
             <span className="truncate" style={{ maxWidth: '80px' }}>{author}</span>
             <span>•</span>
-            <span>{score}</span>
+            <span>{score.toLocaleString()} pts</span>
             <span>•</span>
-            <span>{commentCount}</span>
+            <span>{commentCount.toLocaleString()} comment{commentCount !== 1 ? 's' : ''}</span>
             {timeAgo && (
               <>
                 <span>•</span>

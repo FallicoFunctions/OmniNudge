@@ -785,12 +785,53 @@ func normalizeRedditPost(post services.RedditPost) services.RedditPost {
 	post.Permalink = html.UnescapeString(post.Permalink)
 	post.Domain = html.UnescapeString(post.Domain)
 
-	if thumb := sanitizeThumbnail(post.Thumbnail); thumb != "" {
-		post.Thumbnail = thumb
-	} else if preview := extractPreviewThumbnail(post); preview != "" {
-		post.Thumbnail = preview
+	// Detect content types
+	isVideo := post.IsVideo || (post.SecureMedia != nil && post.SecureMedia.RedditVideo != nil) || (post.Media != nil && post.Media.RedditVideo != nil)
+	isGallery := post.IsGallery
+	isImagePost := post.PostHint == "image"
+
+	// For GALLERY posts: Extract ALL image URLs from MediaMetadata
+	if isGallery && post.GalleryData != nil && len(post.GalleryData.Items) > 0 && post.MediaMetadata != nil {
+		var galleryImages []string
+
+		for _, item := range post.GalleryData.Items {
+			if mediaItem, ok := post.MediaMetadata[item.MediaID].(map[string]interface{}); ok {
+				if s, ok := mediaItem["s"].(map[string]interface{}); ok {
+					if url, ok := s["u"].(string); ok {
+						galleryImages = append(galleryImages, html.UnescapeString(url))
+					}
+				}
+			}
+		}
+
+		// Store all gallery images
+		post.GalleryImages = galleryImages
+
+		// Set the first image as the main URL for backward compatibility
+		if len(galleryImages) > 0 {
+			post.URL = galleryImages[0]
+		}
+	}
+
+	// Thumbnail prioritization based on content type
+	if isVideo || isGallery || isImagePost {
+		// For media-rich content, prioritize high-quality preview
+		if preview := extractPreviewThumbnail(post); preview != "" {
+			post.Thumbnail = preview
+		} else if thumb := sanitizeThumbnail(post.Thumbnail); thumb != "" {
+			post.Thumbnail = thumb
+		} else {
+			post.Thumbnail = ""
+		}
 	} else {
-		post.Thumbnail = ""
+		// For links and text posts, keep small thumbnail first
+		if thumb := sanitizeThumbnail(post.Thumbnail); thumb != "" {
+			post.Thumbnail = thumb
+		} else if preview := extractPreviewThumbnail(post); preview != "" {
+			post.Thumbnail = preview
+		} else {
+			post.Thumbnail = ""
+		}
 	}
 
 	return post
