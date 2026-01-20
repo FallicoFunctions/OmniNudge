@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type SyntheticEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type SyntheticEvent } from 'react';
 import { flushSync } from 'react-dom';
 import { Link } from 'react-router-dom';
 import { formatTimestamp } from '../../utils/timeFormat';
@@ -635,7 +635,7 @@ export function RedditPostCard({
     audioEl.currentTime = 0;
   };
 
-  const attemptAutoplay = () => {
+  const attemptAutoplay = useCallback(() => {
     if (!autoplayRequestedRef.current) return;
     const videoEl = videoRef.current;
     if (!videoEl) return;
@@ -692,7 +692,7 @@ export function RedditPostCard({
       play(startMuted || !preferSound);
     };
     videoEl.addEventListener('canplay', handleCanPlay);
-  };
+  }, [isFirefox, redditVideoSource]);
 
   useEffect(() => {
     if (
@@ -749,7 +749,7 @@ export function RedditPostCard({
         hlsInstance.destroy();
       }
     };
-  }, [redditVideoSource, isInlinePreviewOpen, canNativeHls]);
+  }, [redditVideoSource, isInlinePreviewOpen, canNativeHls, attemptAutoplay]);
 
   // For native HLS (Safari), attempt autoplay when preview opens
   // The onCanPlay handler provides a backup, but Safari sometimes doesn't fire it reliably
@@ -765,7 +765,7 @@ export function RedditPostCard({
       }, 50);
       return () => clearTimeout(timer);
     }
-  }, [isInlinePreviewOpen, redditVideoSource, canNativeHls]);
+  }, [isInlinePreviewOpen, redditVideoSource, canNativeHls, attemptAutoplay]);
 
   useEffect(() => {
     if (isInlinePreviewOpen) return;

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"math"
 	"net/http"
 	"sort"
 	"strconv"
@@ -148,10 +149,17 @@ func (h *FeedHandler) GetHomeFeed(c *gin.Context) {
 			subredditNames[i] = sub.SubredditName
 		}
 
+		subscribedHubIDs, err := h.hubSubRepo.GetSubscribedHubIDs(c.Request.Context(), uidInt)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch hub subscriptions"})
+			return
+		}
+
 		// Use interleaved fetch
 		page, newCursor, err = h.fetchInterleavedFeed(
 			c.Request.Context(),
 			uidInt,
+			subscribedHubIDs,
 			subredditNames,
 			cursor,
 			limit,
@@ -603,6 +611,7 @@ func (h *FeedHandler) fetchSubredditWithCache(
 func (h *FeedHandler) fetchInterleavedFeed(
 	ctx context.Context,
 	userID int,
+	subscribedHubIDs []int,
 	subscriptions []string,
 	cursor *feedCursor,
 	pageSize int,
@@ -633,26 +642,12 @@ func (h *FeedHandler) fetchInterleavedFeed(
 		}
 	}
 
-	itemsPerSource := 5 // Fetch 5 items per source
-
-	// Determine which sources are active (not exhausted)
-	activeSources := []string{}
-	if !newCursor.ExhaustedSources["hub"] {
-		activeSources = append(activeSources, "hub")
-	}
-	if !omniOnly {
-		for _, sub := range subscriptions {
-			if !newCursor.ExhaustedSources[sub] {
-				activeSources = append(activeSources, sub)
-			}
-		}
+	if len(subscribedHubIDs) == 0 {
+		newCursor.ExhaustedSources["hub"] = true
 	}
 
-	if len(activeSources) == 0 {
-		return []CombinedFeedItem{}, newCursor, nil
-	}
+	var combined []CombinedFeedItem
 
-	// Fetch from all active sources concurrently
 	type fetchResult struct {
 		source string
 		items  []CombinedFeedItem
@@ -661,132 +656,162 @@ func (h *FeedHandler) fetchInterleavedFeed(
 		err    error
 	}
 
-	resultsChan := make(chan fetchResult, len(activeSources))
-	fetchCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
-	defer cancel()
+	for {
+		remaining := pageSize - len(combined)
+		if remaining <= 0 {
+			break
+		}
 
-	log.Printf("[FetchInterleavedFeed] Fetching from %d sources concurrently: %v", len(activeSources), activeSources)
-
-	for _, source := range activeSources {
-		source := source // Capture loop variable
-
-		go func() {
-			result := fetchResult{source: source}
-
-			if source == "hub" {
-				hubPosts, err := h.postRepo.GetPopularFeed(
-					fetchCtx, []int{}, sortBy, itemsPerSource, newCursor.HubOffset, startTime, endTime,
-				)
-				result.err = err
-				if err == nil && len(hubPosts) > 0 {
-					for _, p := range hubPosts {
-						result.items = append(result.items, CombinedFeedItem{
-							Source: "hub",
-							Post:   p,
-							Score:  p.Score,
-						})
-					}
-					result.count = len(hubPosts)
+		// Determine which sources are active (not exhausted)
+		activeSources := []string{}
+		if !newCursor.ExhaustedSources["hub"] {
+			activeSources = append(activeSources, "hub")
+		}
+		if !omniOnly {
+			for _, sub := range subscriptions {
+				if !newCursor.ExhaustedSources[sub] {
+					activeSources = append(activeSources, sub)
 				}
-			} else {
-				// Reddit subreddit
-				afterCursor := newCursor.SubredditCursors[source]
-				posts := h.fetchSubredditWithCache(fetchCtx, source, sortBy, redditTimeFilter, afterCursor, itemsPerSource)
+			}
+		}
 
-				if len(posts) > 0 {
-					posts = filterRedditPostsByTimeRange(posts, startTime, endTime)
+		if len(activeSources) == 0 {
+			break
+		}
 
-					for _, p := range posts {
-						result.items = append(result.items, CombinedFeedItem{
-							Source: "reddit",
-							Post:   p,
-							Score:  p.Score,
-						})
+		batch := int(math.Ceil(float64(remaining) / float64(len(activeSources))))
+		if batch < 1 {
+			batch = 1
+		}
+		if batch > pageSize {
+			batch = pageSize
+		}
+
+		// Fetch from all active sources concurrently
+		resultsChan := make(chan fetchResult, len(activeSources))
+		fetchCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+
+		log.Printf("[FetchInterleavedFeed] Fetching from %d sources (batch=%d): %v", len(activeSources), batch, activeSources)
+
+		for _, source := range activeSources {
+			source := source // Capture loop variable
+
+			go func() {
+				result := fetchResult{source: source}
+
+				if source == "hub" {
+					hubPosts, err := h.postRepo.GetPopularFeed(
+						fetchCtx, subscribedHubIDs, sortBy, batch, newCursor.HubOffset, startTime, endTime,
+					)
+					result.err = err
+					if err == nil && len(hubPosts) > 0 {
+						for _, p := range hubPosts {
+							result.items = append(result.items, CombinedFeedItem{
+								Source: "hub",
+								Post:   p,
+								Score:  p.Score,
+							})
+						}
+						result.count = len(hubPosts)
 					}
-					result.count = len(posts)
+				} else {
+					// Reddit subreddit
+					afterCursor := newCursor.SubredditCursors[source]
+					posts := h.fetchSubredditWithCache(fetchCtx, source, sortBy, redditTimeFilter, afterCursor, batch)
+
 					if len(posts) > 0 {
-						result.after = "t3_" + posts[len(posts)-1].ID
+						posts = filterRedditPostsByTimeRange(posts, startTime, endTime)
+
+						for _, p := range posts {
+							result.items = append(result.items, CombinedFeedItem{
+								Source: "reddit",
+								Post:   p,
+								Score:  p.Score,
+							})
+						}
+						result.count = len(posts)
+						if len(posts) > 0 {
+							result.after = "t3_" + posts[len(posts)-1].ID
+						}
 					}
 				}
-			}
 
-			resultsChan <- result
-		}()
-	}
+				resultsChan <- result
+			}()
+		}
 
-	// Collect all results
-	results := make(map[string]fetchResult)
-	for i := 0; i < len(activeSources); i++ {
-		result := <-resultsChan
-		results[result.source] = result
+		// Collect all results
+		results := make(map[string]fetchResult)
+		for i := 0; i < len(activeSources); i++ {
+			result := <-resultsChan
+			results[result.source] = result
 
-		// Update cursor state
-		if result.source == "hub" {
-			if result.err != nil || result.count < itemsPerSource {
-				newCursor.ExhaustedSources["hub"] = true
+			// Update cursor state
+			if result.source == "hub" {
+				if result.err != nil || result.count < batch {
+					newCursor.ExhaustedSources["hub"] = true
+				} else {
+					newCursor.HubOffset += result.count
+				}
 			} else {
-				newCursor.HubOffset += result.count
+				if result.count < batch {
+					newCursor.ExhaustedSources[result.source] = true
+				} else if result.after != "" {
+					newCursor.SubredditCursors[result.source] = result.after
+				}
 			}
-		} else {
-			if result.count < itemsPerSource {
-				newCursor.ExhaustedSources[result.source] = true
-			} else if result.after != "" {
-				newCursor.SubredditCursors[result.source] = result.after
-			}
+
+			log.Printf("[FetchInterleavedFeed] Source '%s': fetched %d items", result.source, len(result.items))
 		}
 
-		log.Printf("[FetchInterleavedFeed] Source '%s': fetched %d items", result.source, len(result.items))
-	}
+		cancel() // Clean up context
 
-	cancel() // Clean up context
+		// Merge results based on sort type
+		if sortBy == "hot" {
+			// For "hot", use round-robin merge to maintain diversity
+			// Each source already returned posts in hot order
+			log.Printf("[FetchInterleavedFeed] Using round-robin merge for 'hot' sort")
 
-	// Merge results based on sort type
-	var combined []CombinedFeedItem
-
-	if sortBy == "hot" {
-		// For "hot", use round-robin merge to maintain diversity
-		// Each source already returned posts in hot order
-		log.Printf("[FetchInterleavedFeed] Using round-robin merge for 'hot' sort")
-
-		maxItems := 0
-		for _, result := range results {
-			if len(result.items) > maxItems {
-				maxItems = len(result.items)
+			maxItems := 0
+			for _, result := range results {
+				if len(result.items) > maxItems {
+					maxItems = len(result.items)
+				}
 			}
-		}
 
-		// Round-robin: take 1st item from each source, then 2nd from each, etc.
-		for i := 0; i < maxItems && len(combined) < pageSize; i++ {
-			for _, source := range activeSources {
-				if result, ok := results[source]; ok && i < len(result.items) {
-					combined = append(combined, result.items[i])
-					if len(combined) >= pageSize {
-						break
+			// Round-robin: take 1st item from each source, then 2nd from each, etc.
+			for i := 0; i < maxItems && len(combined) < pageSize; i++ {
+				for _, source := range activeSources {
+					if result, ok := results[source]; ok && i < len(result.items) {
+						combined = append(combined, result.items[i])
+						if len(combined) >= pageSize {
+							break
+						}
 					}
 				}
 			}
-		}
-	} else {
-		// For "new" and "top", collect all and sort
-		for _, result := range results {
-			combined = append(combined, result.items...)
-		}
-
-		if sortBy == "new" {
-			log.Printf("[FetchInterleavedFeed] Sorting by created_at for 'new'")
-			sort.Slice(combined, func(i, j int) bool {
-				return getItemCreatedAt(combined[i]) > getItemCreatedAt(combined[j])
-			})
 		} else {
-			log.Printf("[FetchInterleavedFeed] Sorting by score for 'top'")
-			sort.Slice(combined, func(i, j int) bool {
-				return combined[i].Score > combined[j].Score
-			})
-		}
+			// For "new" and "top", collect all and sort
+			for _, result := range results {
+				combined = append(combined, result.items...)
+			}
 
-		// Trim to page size
-		if len(combined) > pageSize {
-			combined = combined[:pageSize]
+			if sortBy == "new" {
+				log.Printf("[FetchInterleavedFeed] Sorting by created_at for 'new'")
+				sort.Slice(combined, func(i, j int) bool {
+					return getItemCreatedAt(combined[i]) > getItemCreatedAt(combined[j])
+				})
+			} else {
+				log.Printf("[FetchInterleavedFeed] Sorting by score for '%s'", sortBy)
+				sort.Slice(combined, func(i, j int) bool {
+					return combined[i].Score > combined[j].Score
+				})
+			}
+
+			// Trim to page size
+			if len(combined) > pageSize {
+				combined = combined[:pageSize]
+			}
 		}
 	}
 

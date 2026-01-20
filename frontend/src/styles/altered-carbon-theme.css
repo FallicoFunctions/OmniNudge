@@ -1,0 +1,315 @@
+/* Altered Carbon Theme - Sleek, futuristic cyberpunk aesthetic */
+
+/* Custom scrollbar styles */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* Multi-column feed view specific styles */
+.multi-column-feed {
+  --column-gap: 0px;
+  --column-border: 1px solid rgba(0, 229, 255, 0.1);
+  --column-hover-bg: rgba(0, 229, 255, 0.05);
+  --column-active-ring: rgba(0, 229, 255, 0.5);
+}
+
+/* Compact post card styles */
+.compact-post-card {
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  transition: background-color 0.15s ease;
+}
+
+.compact-post-card:hover {
+  background-color: var(--column-hover-bg);
+}
+
+/* Slim toolbar mode */
+.slim-toolbar {
+  height: 36px;
+  font-size: 0.875rem;
+}
+
+.slim-toolbar .logo {
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+
+/* Altered Carbon color palette overrides */
+:root {
+  --ac-cyan: #00e5ff;
+  --ac-cyan-dark: #00a8cc;
+  --ac-cyan-light: #6effff;
+  --ac-purple: #9d00ff;
+  --ac-pink: #ff00ff;
+  --ac-dark-bg: #0a0a0f;
+  --ac-surface: #13131a;
+  --ac-border: rgba(0, 229, 255, 0.2);
+  --ac-text: #e8e8f0;
+  --ac-text-muted: #8a8a9a;
+}
+
+/* Apply Altered Carbon theme to multi-column and omniscroll modes */
+.view-mode-multi-column,
+.view-mode-vertical-omniscroll {
+  --color-primary: var(--ac-cyan);
+  --color-background: var(--ac-dark-bg);
+  --color-surface: var(--ac-surface);
+  --color-border: var(--ac-border);
+  --color-text: var(--ac-text);
+  --color-text-muted: var(--ac-text-muted);
+  --color-hover: rgba(0, 229, 255, 0.1);
+}
+
+/* Vertical OmniScroll specific styles */
+.omniscroll-container {
+  scroll-behavior: smooth;
+  scroll-snap-type: y mandatory;
+}
+
+.omniscroll-post {
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+}
+
+/* Glowing cyan accents */
+.glow-cyan {
+  box-shadow: 0 0 10px rgba(0, 229, 255, 0.5), 0 0 20px rgba(0, 229, 255, 0.3);
+}
+
+.glow-cyan-strong {
+  box-shadow: 0 0 15px rgba(0, 229, 255, 0.7), 0 0 30px rgba(0, 229, 255, 0.5),
+    0 0 45px rgba(0, 229, 255, 0.3);
+}
+
+/* Futuristic button styles */
+.btn-cyber {
+  position: relative;
+  background: linear-gradient(135deg, var(--ac-cyan) 0%, var(--ac-purple) 100%);
+  color: black;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  border: none;
+  padding: 0.5rem 1.5rem;
+  clip-path: polygon(0 0, 100% 0, 95% 100%, 5% 100%);
+  transition: all 0.3s ease;
+}
+
+.btn-cyber:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 5px 20px rgba(0, 229, 255, 0.5);
+}
+
+.btn-cyber:active {
+  transform: translateY(0);
+}
+
+/* Holographic text effect */
+.text-holographic {
+  background: linear-gradient(135deg, var(--ac-cyan) 0%, var(--ac-pink) 50%, var(--ac-purple) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: holographic-shift 3s ease-in-out infinite;
+}
+
+@keyframes holographic-shift {
+  0%,
+  100% {
+    filter: hue-rotate(0deg);
+  }
+  50% {
+    filter: hue-rotate(20deg);
+  }
+}
+
+/* Scanline effect overlay (subtle) */
+.scanlines::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    rgba(0, 0, 0, 0.15),
+    rgba(0, 0, 0, 0.15) 1px,
+    transparent 1px,
+    transparent 2px
+  );
+  pointer-events: none;
+  z-index: 1000;
+  opacity: 0.3;
+}
+
+/* Grid background pattern */
+.grid-bg {
+  background-image: linear-gradient(rgba(0, 229, 255, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 229, 255, 0.05) 1px, transparent 1px);
+  background-size: 50px 50px;
+}
+
+/* Neon border effect */
+.border-neon {
+  border: 1px solid var(--ac-cyan);
+  box-shadow: 0 0 5px var(--ac-cyan), inset 0 0 5px rgba(0, 229, 255, 0.2);
+}
+
+.border-neon-purple {
+  border: 1px solid var(--ac-purple);
+  box-shadow: 0 0 5px var(--ac-purple), inset 0 0 5px rgba(157, 0, 255, 0.2);
+}
+
+/* Column feed active indicator */
+.column-feed-active {
+  position: relative;
+}
+
+.column-feed-active::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border: 2px solid var(--ac-cyan);
+  pointer-events: none;
+  opacity: 0.5;
+  animation: pulse-border 2s ease-in-out infinite;
+}
+
+@keyframes pulse-border {
+  0%,
+  100% {
+    opacity: 0.3;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+/* Progress bar with glow */
+.progress-bar-glow {
+  background: linear-gradient(90deg, var(--ac-cyan) 0%, var(--ac-purple) 100%);
+  box-shadow: 0 0 10px var(--ac-cyan), 0 0 20px var(--ac-cyan);
+  animation: progress-glow 2s ease-in-out infinite;
+}
+
+@keyframes progress-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 10px var(--ac-cyan), 0 0 20px var(--ac-cyan);
+  }
+  50% {
+    box-shadow: 0 0 15px var(--ac-cyan), 0 0 30px var(--ac-cyan);
+  }
+}
+
+/* Backdrop blur for controls */
+.backdrop-blur-cyber {
+  backdrop-filter: blur(10px) saturate(150%);
+  background-color: rgba(10, 10, 15, 0.8);
+}
+
+/* Smooth transitions */
+.transition-cyber {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* View mode toggle active state */
+.view-toggle-active {
+  background: var(--ac-cyan);
+  color: black;
+  font-weight: 700;
+  box-shadow: 0 0 10px var(--ac-cyan);
+}
+
+/* Column config panel */
+.column-config-panel {
+  background: rgba(19, 19, 26, 0.95);
+  border: 1px solid var(--ac-border);
+  border-radius: 0.5rem;
+  backdrop-filter: blur(10px);
+}
+
+/* Hover effects for interactive elements */
+.hover-cyber:hover {
+  color: var(--ac-cyan);
+  transform: translateX(2px);
+}
+
+/* Loading spinner with cyan glow */
+@keyframes spin-glow {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+.spinner-cyan {
+  border: 3px solid rgba(0, 229, 255, 0.1);
+  border-top-color: var(--ac-cyan);
+  border-radius: 50%;
+  animation: spin-glow 1s linear infinite;
+  box-shadow: 0 0 10px var(--ac-cyan);
+}
+
+/* Fade in animation */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.fade-in {
+  animation: fadeIn 0.3s ease-out;
+}
+
+/* Slide in from right */
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.slide-in-right {
+  animation: slideInRight 0.3s ease-out;
+}
+
+/* Pulsing indicator for active column */
+@keyframes pulse-dot {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(1.2);
+  }
+}
+
+.pulse-indicator {
+  animation: pulse-dot 2s ease-in-out infinite;
+}
