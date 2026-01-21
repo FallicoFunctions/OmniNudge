@@ -15,7 +15,7 @@ type VirtualizedListProps<T> = {
 
 export function VirtualizedList<T>({
   items,
-  estimateSize = 220,
+  estimateSize = 120,
   overscan = 6,
   className = '',
   getKey,

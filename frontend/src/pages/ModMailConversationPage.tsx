@@ -4,6 +4,7 @@ import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tansta
 import { useAuth } from '../contexts/AuthContext';
 import { messagesService } from '../services/messagesService';
 import { modMailService } from '../services/modMailService';
+import { hubsService } from '../services/hubsService';
 import { encryptionService } from '../services/encryptionService';
 import type { Message } from '../types/messages';
 import type { ModMailConversation } from '../types/modmail';
@@ -343,6 +344,12 @@ export default function ModMailConversationPage() {
 
   // Extract hub name from conversation (assuming it's in metadata or participants)
   const hubName = conversation?.hub_name || '';
+  const { data: hubDetails } = useQuery({
+    queryKey: ['hub-details', hubName],
+    queryFn: () => hubsService.getHub(hubName),
+    enabled: !!hubName,
+  });
+  const hubDisplayTitle = hubDetails?.title?.trim() || hubName;
   const status = conversation?.status || 'open';
   const subject = conversation?.subject || 'Mod Mail Conversation';
 
@@ -362,7 +369,7 @@ export default function ModMailConversationPage() {
               {subject}
             </h1>
             {hubName && (
-              <p className="text-[var(--color-text-secondary)] mt-1">h/{hubName}</p>
+              <p className="text-[var(--color-text-secondary)] mt-1">{hubDisplayTitle}</p>
             )}
           </div>
           <div className="flex items-center gap-2">
@@ -490,7 +497,7 @@ export default function ModMailConversationPage() {
         )}
         <div className="flex justify-between items-center mt-3">
           <p className="text-xs text-[var(--color-text-secondary)]">
-            All moderators of h/{hubName} can see and reply to this conversation
+            All moderators of {hubDisplayTitle} can see and reply to this conversation
           </p>
           <button
             type="submit"

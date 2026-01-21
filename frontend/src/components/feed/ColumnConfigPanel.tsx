@@ -1,6 +1,10 @@
 import { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useMultiColumnFeed } from '../../contexts/MultiColumnFeedContext';
 import type { ColumnConfig } from '../../contexts/MultiColumnFeedContext';
+import { subscriptionService } from '../../services/subscriptionService';
+import { useAuth } from '../../contexts/AuthContext';
+import { InlineCreatePost } from './InlineCreatePost';
 
 interface ColumnConfigPanelProps {
   columnId: string;
@@ -9,7 +13,59 @@ interface ColumnConfigPanelProps {
 
 export function ColumnConfigPanel({ columnId, config }: ColumnConfigPanelProps) {
   const { updateColumnConfig } = useMultiColumnFeed();
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
   const [isExpanded, setIsExpanded] = useState(false);
+  const [showCreatePost, setShowCreatePost] = useState(false);
+
+  console.log('[ColumnConfigPanel] Render:', columnId, 'isExpanded:', isExpanded, 'showCreatePost:', showCreatePost);
+
+  // Check if user can subscribe (must be logged in and have a feedSource)
+  const canSubscribe = user && config.feedSource && (config.feedType === 'hub' || config.feedType === 'subreddit');
+
+  // Check if user can create posts (must be logged in, have a feedSource, and be hub/subreddit)
+  const canCreatePost = user && config.feedSource && (config.feedType === 'hub' || config.feedType === 'subreddit');
+
+  // Fetch subscription status
+  const { data: subscriptionStatus } = useQuery({
+    queryKey: ['subscription', config.feedType, config.feedSource],
+    queryFn: () => {
+      if (!canSubscribe) return null;
+      if (config.feedType === 'hub') {
+        return subscriptionService.checkHubSubscription(config.feedSource!);
+      } else {
+        return subscriptionService.checkSubredditSubscription(config.feedSource!);
+      }
+    },
+    enabled: !!canSubscribe,
+  });
+
+  const isSubscribed = subscriptionStatus?.is_subscribed || false;
+
+  // Subscribe/unsubscribe mutation
+  const subscribeMutation = useMutation({
+    mutationFn: async () => {
+      if (!config.feedSource) return;
+      if (config.feedType === 'hub') {
+        if (isSubscribed) {
+          return subscriptionService.unsubscribeFromHub(config.feedSource);
+        } else {
+          return subscriptionService.subscribeToHub(config.feedSource);
+        }
+      } else {
+        if (isSubscribed) {
+          return subscriptionService.unsubscribeFromSubreddit(config.feedSource);
+        } else {
+          return subscriptionService.subscribeToSubreddit(config.feedSource);
+        }
+      }
+    },
+    onSuccess: () => {
+      // Invalidate subscription queries
+      queryClient.invalidateQueries({ queryKey: ['subscription', config.feedType, config.feedSource] });
+      queryClient.invalidateQueries({ queryKey: ['subscriptions'] });
+    },
+  });
 
   const getFeedLabel = () => {
     switch (config.feedType) {
@@ -27,28 +83,103 @@ export function ColumnConfigPanel({ columnId, config }: ColumnConfigPanelProps) 
   };
 
   return (
-    <div className="column-config-panel flex-1 border-r border-[var(--color-border)] last:border-r-0">
+    <div
+      className="column-config-panel flex-1 border-r border-[var(--color-border)] last:border-r-0"
+      onClick={(e) => e.stopPropagation()}
+    >
       {/* Collapsed header */}
-      <button
-        onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full px-3 py-2 text-xs text-left flex items-center justify-between hover:bg-[var(--color-hover)] transition-cyber border-b border-[var(--color-border)]"
-      >
-        <div className="flex items-center gap-2 flex-1 min-w-0">
-          <span className="w-2 h-2 rounded-full bg-cyan-500 pulse-indicator"></span>
-          <span className="truncate font-semibold text-[var(--color-text)]">
-            {getFeedLabel()}
-          </span>
-        </div>
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          className={`h-3 w-3 text-cyan-400 transition-transform ${isExpanded ? 'rotate-90' : ''}`}
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
+      <div className="w-full border-b border-[var(--color-border)] flex items-center">
+        <button
+          type="button"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log('[ColumnConfigPanel] Arrow clicked for column:', columnId, 'current isExpanded:', isExpanded);
+            setIsExpanded(!isExpanded);
+          }}
+          className="flex-1 px-3 py-2 text-xs text-left flex items-center justify-between hover:bg-[var(--color-hover)] transition-cyber"
         >
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-        </svg>
-      </button>
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+            <span className="w-2 h-2 rounded-full bg-cyan-500 pulse-indicator"></span>
+            <span className="truncate font-semibold text-[var(--color-text)]">
+              {getFeedLabel()}
+            </span>
+          </div>
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            className={`h-3 w-3 text-cyan-400 transition-transform ${isExpanded ? 'rotate-90' : ''}`}
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </button>
+
+        {/* Create Post button */}
+        {canCreatePost && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              console.log('[ColumnConfigPanel] Create post clicked for column:', columnId);
+              setShowCreatePost(!showCreatePost);
+            }}
+            className={`px-3 py-2 text-xs transition-colors border-l border-[var(--color-border)] ${
+              showCreatePost
+                ? 'text-cyan-400 bg-cyan-400/10'
+                : 'text-[var(--color-text-muted)] hover:text-cyan-400 hover:bg-cyan-400/10'
+            }`}
+            title="Create Post"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-3 w-3"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"
+              />
+            </svg>
+          </button>
+        )}
+
+        {/* Subscribe/Unsubscribe button */}
+        {canSubscribe && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              subscribeMutation.mutate();
+            }}
+            disabled={subscribeMutation.isPending}
+            className={`px-3 py-2 text-xs font-medium transition-colors border-l border-[var(--color-border)] ${
+              isSubscribed
+                ? 'text-cyan-400 hover:text-red-400 hover:bg-red-400/10'
+                : 'text-[var(--color-text-muted)] hover:text-cyan-400 hover:bg-cyan-400/10'
+            } disabled:opacity-50`}
+            title={isSubscribed ? 'Unsubscribe' : 'Subscribe'}
+          >
+            {subscribeMutation.isPending ? '...' : isSubscribed ? '✓' : '+'}
+          </button>
+        )}
+      </div>
+
+      {/* Inline Create Post Form */}
+      {showCreatePost && canCreatePost && (
+        <InlineCreatePost
+          feedType={config.feedType as 'hub' | 'subreddit'}
+          feedSource={config.feedSource!}
+          onClose={() => setShowCreatePost(false)}
+        />
+      )}
 
       {/* Expanded controls */}
       {isExpanded && (

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient, useQueries } from '@tanstack/react-query';
 import { messagesService } from '../services/messagesService';
 import { mediaService } from '../services/mediaService';
 import { useAuth } from '../contexts/AuthContext';
@@ -613,6 +613,38 @@ export default function MessagesPage() {
     () => conversationsData?.pages.flatMap((page) => page.conversations) ?? [],
     [conversationsData]
   );
+  const modMailHubNames = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          allConversations
+            .filter((conversation) => conversation.conversation_type === 'mod_mail' && conversation.hub_name)
+            .map((conversation) => conversation.hub_name as string)
+        )
+      ),
+    [allConversations]
+  );
+  const hubQueries = useQueries({
+    queries: modMailHubNames.map((hubName) => ({
+      queryKey: ['hub-details', hubName],
+      queryFn: () => hubsService.getHub(hubName),
+      enabled: !!hubName,
+    })),
+  });
+  const hubTitleByName = useMemo(() => {
+    const map = new Map<string, string>();
+    hubQueries.forEach((query, index) => {
+      const hubName = modMailHubNames[index];
+      if (!hubName) return;
+      const title = query.data?.title?.trim();
+      map.set(hubName, title || hubName);
+    });
+    return map;
+  }, [hubQueries, modMailHubNames]);
+  const getHubDisplayTitle = (hubName?: string | null) => {
+    if (!hubName) return 'Hub';
+    return hubTitleByName.get(hubName) ?? hubName;
+  };
 
   // Filter conversations based on active tab
   const conversations = useMemo(() => {
@@ -1370,7 +1402,7 @@ export default function MessagesPage() {
                 <div className="flex items-center justify-between">
                   <span className="font-medium text-[var(--color-text-primary)] flex-1 pr-2">
                     {conversation.conversation_type === 'mod_mail'
-                      ? `${conversation.hub_name ? `h/${conversation.hub_name}` : 'Hub'} - Mod Mail - ${conversation.subject || 'Untitled'}`
+                      ? `${getHubDisplayTitle(conversation.hub_name)} - Mod Mail - ${conversation.subject || 'Untitled'}`
                       : conversation.other_user?.username || 'Unknown'}
                   </span>
                   <div className="flex items-center gap-2">
@@ -1475,7 +1507,7 @@ export default function MessagesPage() {
                   {isCreatingChat
                     ? 'New Chat'
                     : selectedConversation?.conversation_type === 'mod_mail'
-                    ? `${selectedConversation?.hub_name ? `h/${selectedConversation.hub_name}` : 'Hub'} - Mod Mail - ${selectedConversation?.subject || 'Untitled'}`
+                    ? `${getHubDisplayTitle(selectedConversation?.hub_name)} - Mod Mail - ${selectedConversation?.subject || 'Untitled'}`
                     : selectedConversation?.other_user?.username || 'Unknown'}
                 </h3>
 
@@ -1528,7 +1560,7 @@ export default function MessagesPage() {
                           d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
                         />
                       </svg>
-                      OmniScroll ({conversationMediaMessages.length})
+                      Scroll ({conversationMediaMessages.length})
                     </button>
                   )}
                 </div>

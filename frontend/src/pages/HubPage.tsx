@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import type { HTMLAttributes, PointerEvent as ReactPointerEvent } from 'react';
-import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useMutation, useQuery, useQueryClient, useInfiniteQuery } from '@tanstack/react-query';
 import { useNavigate, useParams, useLocation, Link, Navigate } from 'react-router-dom';
 import { hubsService, type HubPostsResponse, type LocalSubredditPost } from '../services/hubsService';
 import { useAuth } from '../contexts/AuthContext';
@@ -72,6 +72,7 @@ export default function HubsPage() {
   const [showModMailModal, setShowModMailModal] = useState(false);
   const [slideshowOpen, setSlideshowOpen] = useState(false);
   const [includeTextPostsInSlideshow] = useState(true);
+  const loadMoreRef = useRef<HTMLDivElement | null>(null);
 
   // Use custom hooks for common functionality
   const {
@@ -201,7 +202,13 @@ export default function HubsPage() {
     setLimitSearchToContext(true);
     setHubSearchResults(null);
     setHubSearchQuery('');
-  }, [blockAllNsfw, searchIncludeNsfwByDefault, hubname]);
+  }, [
+    blockAllNsfw,
+    searchIncludeNsfwByDefault,
+    hubname,
+    setIncludeNsfwSearch,
+    setLimitSearchToContext,
+  ]);
 
   const navigateToHubOrSubreddit = useCallback(async (value: string) => {
     const normalized = value.trim();
@@ -302,16 +309,18 @@ export default function HubsPage() {
     setLimitSearchToContext(true);
     setPostSearchInput(normalized);
     runHubPostSearch(normalized, true);
-  }, [runHubPostSearch, scopedSearchFromState]);
+  }, [runHubPostSearch, scopedSearchFromState, setLimitSearchToContext, setPostSearchInput]);
 
   // Check if current user is a moderator of this hub (or admin)
   const isModerator = useMemo(() => {
     return isUserHubModerator(user, hubModerators, hubDetails);
   }, [user, hubModerators, hubDetails]);
 
+  const isSearchActive = hubSearchResults !== null;
+
   // Fetch posts based on current hub
   const postsQueryKey = ['hub-posts', hubname, sort, timeRangeKey, currentCursor] as const;
-  const { data, isLoading, error, isFetching } = useQuery({
+  const { data: paginatedData, isLoading: paginatedLoading, error: paginatedError, isFetching: paginatedFetching } = useQuery({
     queryKey: postsQueryKey,
     queryFn: async (): Promise<HubPostsResponse> => {
       const feedOptions = timeOptions;
@@ -323,7 +332,7 @@ export default function HubsPage() {
       }
       return hubsService.getHubPosts(hubname, sort, pageSize, 0, feedOptions, currentCursor);
     },
-    enabled: !!hubname && hubname !== '' && (!isCustomTopRange || isCustomRangeValid),
+    enabled: !!hubname && hubname !== '' && (!isCustomTopRange || isCustomRangeValid) && !useInfiniteScrollHubs,
     staleTime: 1000 * 60 * 5,
     placeholderData: keepPreviousData,
     retry: (failureCount, error) => {
@@ -337,13 +346,52 @@ export default function HubsPage() {
       return failureCount < 3;
     },
   });
-  const postsList = data?.posts ?? EMPTY_POSTS;
+  const {
+    data: infiniteData,
+    isLoading: infiniteLoading,
+    error: infiniteError,
+    isFetchingNextPage,
+    hasNextPage,
+    fetchNextPage,
+  } = useInfiniteQuery({
+    queryKey: ['hub-posts-infinite', hubname, sort, timeRangeKey],
+    queryFn: async ({ pageParam }: { pageParam: string }) => {
+      const feedOptions = timeOptions;
+      if (hubname === 'popular') {
+        return hubsService.getPopularFeed(sort, pageSize, 0, feedOptions, pageParam as string);
+      }
+      if (hubname === 'all') {
+        return hubsService.getAllFeed(sort, pageSize, 0, feedOptions, pageParam as string);
+      }
+      return hubsService.getHubPosts(hubname, sort, pageSize, 0, feedOptions, pageParam as string);
+    },
+    getNextPageParam: (lastPage) => lastPage.next_cursor ?? undefined,
+    initialPageParam: '',
+    enabled:
+      !!hubname &&
+      hubname !== '' &&
+      useInfiniteScrollHubs &&
+      (!isCustomTopRange || isCustomRangeValid) &&
+      !isSearchActive,
+    staleTime: 1000 * 60 * 5,
+  });
+  const infinitePosts = useMemo(
+    () => infiniteData?.pages.flatMap((page) => page.posts) ?? EMPTY_POSTS,
+    [infiniteData]
+  );
+  const postsList = (useInfiniteScrollHubs ? infinitePosts : paginatedData?.posts) ?? EMPTY_POSTS;
+  const isLoading = useInfiniteScrollHubs ? infiniteLoading : paginatedLoading;
+  const error = useInfiniteScrollHubs ? infiniteError : paginatedError;
+  const isFetching = useInfiniteScrollHubs ? isFetchingNextPage : paginatedFetching;
   const visiblePosts = useMemo(
     () => postsList.filter((post) => !hiddenPostIds.has(post.id)),
     [postsList, hiddenPostIds]
   );
-  const isSearchActive = hubSearchResults !== null;
-  const shouldShowPinned = showHubSidebar && !isSearchActive && sort === 'hot' && currentCursor === '';
+  const shouldShowPinned =
+    showHubSidebar &&
+    !isSearchActive &&
+    sort === 'hot' &&
+    (useInfiniteScrollHubs || currentCursor === '');
   const pinnedPosts = useMemo(
     () => (shouldShowPinned ? visiblePosts.filter((post) => post.is_pinned) : []),
     [shouldShowPinned, visiblePosts]
@@ -388,8 +436,31 @@ export default function HubsPage() {
   }, [shouldShowPinned, pinnedOrderIds, sortedPinnedPosts]);
   const hasPinnedPosts = orderedPinnedPosts.length > 0;
 
-  const hasMore = Boolean(data?.next_cursor ?? data?.has_more);
+  const hasMore = Boolean(paginatedData?.next_cursor ?? paginatedData?.has_more);
   const hasPrev = cursorStack.length > 1;
+
+  useEffect(() => {
+    if (!useInfiniteScrollHubs || isSearchActive) {
+      return;
+    }
+    const loadMoreEl = loadMoreRef.current;
+    if (!loadMoreEl) {
+      return;
+    }
+    if (!hasNextPage || isFetchingNextPage) {
+      return;
+    }
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting && hasNextPage && !isFetchingNextPage) {
+          fetchNextPage();
+        }
+      },
+      { rootMargin: '200px 0px' }
+    );
+    observer.observe(loadMoreEl);
+    return () => observer.disconnect();
+  }, [useInfiniteScrollHubs, isSearchActive, hasNextPage, isFetchingNextPage, fetchNextPage]);
   const canManagePins = requiresModerator(user?.role, isModerator);
   const canReorderPinned = shouldShowPinned && canManagePins;
   const setPinnedOrder = useCallback((nextOrder: number[]) => {
@@ -481,7 +552,7 @@ export default function HubsPage() {
     },
   });
 
-  const handleDeletePost = (post: LocalSubredditPost) => {
+  const handleDeletePost = useCallback((post: LocalSubredditPost) => {
     // Check if this is a moderator action (deleting someone else's post)
     const isModeratorAction = user && post.author_id !== user.id;
 
@@ -495,7 +566,7 @@ export default function HubsPage() {
       }
       deletePostMutation.mutate({ postId: post.id });
     }
-  };
+  }, [deletePostMutation, user]);
 
   const handleConfirmDeletePost = () => {
     if (!deletePostTarget) return;
@@ -506,13 +577,13 @@ export default function HubsPage() {
     deletePostMutation.mutate({ postId: deletePostTarget.postId, reason: deleteReason });
   };
 
-  const handleSharePost = (postId: number) => {
+  const handleSharePost = useCallback((postId: number) => {
     const shareUrl = `${window.location.origin}/posts/${postId}`;
     navigator.clipboard
       .writeText(shareUrl)
       .then(() => alert('Post link copied to clipboard!'))
       .catch(() => alert('Unable to copy link. Please try again.'));
-  };
+  }, []);
 
   const getPinnedBaseOrder = useCallback(
     () => (pinnedOrderIds.length > 0 ? pinnedOrderIds : sortedPinnedPosts.map((post) => post.id)),
@@ -636,15 +707,15 @@ export default function HubsPage() {
     },
   });
 
-  const handleToggleSavePost = (postId: number, isCurrentlySaved: boolean) => {
+  const handleToggleSavePost = useCallback((postId: number, isCurrentlySaved: boolean) => {
     if (!user) {
       alert('Please sign in to save posts.');
       return;
     }
     savedToggleMutation.mutate({ postId, shouldSave: !isCurrentlySaved });
-  };
+  }, [savedToggleMutation, user]);
 
-  const handleHidePost = (postId: number) => {
+  const handleHidePost = useCallback((postId: number) => {
     if (!user) {
       alert('Please sign in to hide posts.');
       return;
@@ -653,7 +724,7 @@ export default function HubsPage() {
       return;
     }
     hidePostMutation.mutate(postId);
-  };
+  }, [hidePostMutation, user]);
 
   const resetCrosspostState = () => {
     setCrosspostTarget(null);
@@ -663,7 +734,7 @@ export default function HubsPage() {
     setSendRepliesToInbox(true);
   };
 
-  const handleCrosspostSelection = (post: LocalSubredditPost) => {
+  const handleCrosspostSelection = useCallback((post: LocalSubredditPost) => {
     if (!user) {
       alert('Please sign in to crosspost.');
       return;
@@ -673,7 +744,14 @@ export default function HubsPage() {
     setSelectedHub('');
     setSelectedSubreddit('');
     setSendRepliesToInbox(true);
-  };
+  }, [
+    user,
+    setCrosspostTarget,
+    setCrosspostTitle,
+    setSelectedHub,
+    setSelectedSubreddit,
+    setSendRepliesToInbox,
+  ]);
 
   const renderPostCard = useCallback(
     (
@@ -754,8 +832,6 @@ export default function HubsPage() {
       hidePostMutation.variables,
       deletePostMutation.isPending,
       deletePostMutation.variables,
-      togglePinMutation.isPending,
-      togglePinMutation.variables,
       user?.id,
       user?.role,
       user?.username,
@@ -1113,7 +1189,7 @@ export default function HubsPage() {
               )}
               <VirtualizedList
                 items={effectivePosts}
-                estimateSize={220}
+                estimateSize={120}
                 className=""
                 getKey={(post) => post.id}
                 renderItem={(post: LocalSubredditPost) => renderPostCard(post)}
@@ -1129,6 +1205,17 @@ export default function HubsPage() {
             </div>
           )}
 
+          {useInfiniteScrollHubs && !isSearchActive && effectivePosts.length > 0 && (
+            <>
+              <div ref={loadMoreRef} className="h-10" />
+              {isFetchingNextPage && (
+                <div className="mt-4 text-center">
+                  <LoadingMessage>Loading more posts...</LoadingMessage>
+                </div>
+              )}
+            </>
+          )}
+
           {/* Pagination Controls */}
           {!useInfiniteScrollHubs && !isSearchActive && effectivePosts.length > 0 && (
             <OffsetPaginationControls
@@ -1140,7 +1227,7 @@ export default function HubsPage() {
                 window.scrollTo({ top: 0, behavior: 'smooth' });
               }}
               onNext={() => {
-                const nextCursor = data?.next_cursor;
+                const nextCursor = paginatedData?.next_cursor;
                 if (nextCursor) {
                   setCursorStack((prev) => [...prev, nextCursor]);
                 }
