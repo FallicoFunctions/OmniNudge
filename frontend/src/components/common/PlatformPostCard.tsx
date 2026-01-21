@@ -33,6 +33,7 @@ interface PlatformPostCardProps {
   onShare?: () => void;
   onToggleSave?: (shouldSave: boolean) => void;
   onHide?: () => void;
+  hideLabel?: string;
   onCrosspost?: () => void;
   onTogglePin?: () => void;
   onPinnedPointerDown?: (postId: number, event: PointerEvent<HTMLButtonElement>) => void;
@@ -63,6 +64,7 @@ export function PlatformPostCard({
   onShare,
   onToggleSave,
   onHide,
+  hideLabel = 'Hide',
   onCrosspost,
   onTogglePin,
   onPinnedPointerDown,
@@ -269,7 +271,7 @@ export function PlatformPostCard({
                     disabled={isHiding}
                     className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] disabled:opacity-60"
                   >
-                    {isHiding ? 'Hiding...' : 'Hide'}
+                    {isHiding ? 'Hiding...' : hideLabel}
                   </button>
                 )}
                 {onCrosspost && (

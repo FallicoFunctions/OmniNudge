@@ -144,6 +144,12 @@ export default function ModMailConversationPage() {
     enabled: !!convId,
   });
 
+  const { data: recipientsData } = useQuery<{ hub_name: string; recipient_ids: number[] }>({
+    queryKey: ['modMailRecipients', conversation?.hub_name],
+    queryFn: () => modMailService.getRecipients(conversation?.hub_name || ''),
+    enabled: !!conversation?.hub_name,
+  });
+
   // Fetch messages
   const {
     data: messagesData,
@@ -184,11 +190,13 @@ export default function ModMailConversationPage() {
 
   const prepareEncryptionPayload = useCallback(
     async (content: string): Promise<EncryptionPayload> => {
+      const recipientIds = recipientsData?.recipient_ids ?? [];
       const participantIds = Array.from(
         new Set(
           [
             user?.id,
             ...(conversation?.participants?.map((p) => p.user_id) ?? []),
+            ...recipientIds,
           ].filter((id): id is number => typeof id === 'number')
         )
       );
@@ -218,21 +226,32 @@ export default function ModMailConversationPage() {
       }
 
       const ownKeys = await getOwnKeys();
-      if (!cryptoKeys.length || missing.length || !ownKeys?.publicKey) {
-        let errorMsg = 'CRITICAL: Cannot send unencrypted mod mail. ';
-        if (missing.length) {
-          errorMsg += `Missing public keys for user IDs: ${missing.join(', ')}. `;
-        }
-        if (!ownKeys?.publicKey) {
-          errorMsg += 'You have not set up encryption keys. ';
-        }
-        errorMsg += 'All participants must have encryption enabled.';
+
+      // Check if sender has keys (required)
+      if (!ownKeys?.publicKey) {
+        const errorMsg = 'CRITICAL: You have not set up encryption keys. Cannot send mod mail.';
+        setEncryptionWarning(errorMsg);
+        throw new Error(errorMsg);
+      }
+
+      // Warn if some recipients don't have keys, but allow sending
+      if (missing.length > 0) {
+        const warningMsg = `Warning: Some participants (user IDs: ${missing.join(', ')}) do not have encryption keys set up. They will not be able to read this message until they enable encryption.`;
+        setEncryptionWarning(warningMsg);
+        console.warn('[Mod Mail Encryption]', warningMsg);
+      } else {
+        setEncryptionWarning(null);
+      }
+
+      // If no recipients have keys, we can't encrypt (need at least sender's key)
+      if (cryptoKeys.length === 0) {
+        const errorMsg = 'CRITICAL: No recipients have encryption enabled. Cannot send encrypted mod mail.';
         setEncryptionWarning(errorMsg);
         throw new Error(errorMsg);
       }
 
       const encrypted = await encryptForMultipleRecipients(content, cryptoKeys, ownKeys.publicKey);
-      setEncryptionWarning(null);
+      // Don't clear the warning here - it was already set above if there are missing keys
 
       return {
         is_multi_recipient: true,

@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { resolveMediaUrl } from '../../utils/mediaUrl';
+import type { GalleryImage } from '../../types/posts';
 
 interface ImageCarouselProps {
-  images: string[];
+  images: (string | GalleryImage)[];
   title: string;
   className?: string;
   style?: React.CSSProperties;
@@ -58,6 +59,13 @@ export function ImageCarousel({ images, title, className = '', style = {}, onHov
     onHoverChange?.(true);
   };
 
+  // Get the URL from either string or GalleryImage object
+  const getCurrentImageUrl = () => {
+    const image = images[currentIndex];
+    const url = typeof image === 'string' ? image : image.url;
+    return url.startsWith('http') ? url : resolveMediaUrl(url);
+  };
+
   return (
     <div
       ref={containerRef}
@@ -69,7 +77,7 @@ export function ImageCarousel({ images, title, className = '', style = {}, onHov
     >
       {/* Main image */}
       <img
-        src={images[currentIndex].startsWith('http') ? images[currentIndex] : resolveMediaUrl(images[currentIndex])}
+        src={getCurrentImageUrl()}
         alt={`${title} - ${currentIndex + 1}/${images.length}`}
         className="w-full h-auto"
         style={{ display: 'block', maxHeight: 'calc(100vh - 200px)', objectFit: 'contain' }}

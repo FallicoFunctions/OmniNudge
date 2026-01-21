@@ -62,6 +62,35 @@ type RedditPostDetails struct {
 	CreatedUTC   *int64
 }
 
+// SavedRedditAPIComment represents a saved Reddit API comment
+type SavedRedditAPIComment struct {
+	Subreddit        string    `json:"subreddit"`
+	RedditPostID     string    `json:"reddit_post_id"`
+	RedditCommentID  string    `json:"reddit_comment_id"`
+	PostTitle        *string   `json:"post_title,omitempty"`
+	PostAuthor       *string   `json:"post_author,omitempty"`
+	CommentAuthor    string    `json:"comment_author"`
+	CommentBody      string    `json:"comment_body"`
+	Score            int       `json:"score"`
+	CreatedUTC       *int64    `json:"created_utc,omitempty"`
+	ParentID         *string   `json:"parent_id,omitempty"`
+	SavedAt          time.Time `json:"saved_at"`
+}
+
+// RedditAPICommentDetails contains the metadata we store for Reddit API comments
+type RedditAPICommentDetails struct {
+	Subreddit       string
+	RedditPostID    string
+	RedditCommentID string
+	PostTitle       *string
+	PostAuthor      *string
+	CommentAuthor   string
+	CommentBody     string
+	Score           int
+	CreatedUTC      *int64
+	ParentID        *string
+}
+
 // NewSavedItemsRepository creates a repository for saved content
 func NewSavedItemsRepository(pool *pgxpool.Pool) *SavedItemsRepository {
 	return &SavedItemsRepository{pool: pool}
@@ -330,6 +359,137 @@ func (r *SavedItemsRepository) IsRedditPostSaved(ctx context.Context, userID int
 		)
 	`, userID, subreddit, redditPostID).Scan(&exists)
 	return exists, err
+}
+
+// SaveRedditAPIComment saves a Reddit API comment with metadata
+func (r *SavedItemsRepository) SaveRedditAPIComment(ctx context.Context, userID int, comment *RedditAPICommentDetails) error {
+	if comment == nil {
+		return nil
+	}
+	var postTitle interface{}
+	if comment.PostTitle != nil && *comment.PostTitle != "" {
+		postTitle = *comment.PostTitle
+	}
+	var postAuthor interface{}
+	if comment.PostAuthor != nil && *comment.PostAuthor != "" {
+		postAuthor = *comment.PostAuthor
+	}
+	var createdUTC interface{}
+	if comment.CreatedUTC != nil && *comment.CreatedUTC > 0 {
+		createdUTC = *comment.CreatedUTC
+	}
+	var parentID interface{}
+	if comment.ParentID != nil && *comment.ParentID != "" {
+		parentID = *comment.ParentID
+	}
+	_, err := r.pool.Exec(ctx, `
+		INSERT INTO saved_reddit_api_comments (
+			user_id, subreddit, reddit_post_id, reddit_comment_id,
+			post_title, post_author, comment_author, comment_body,
+			score, created_utc, parent_id
+		)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+		ON CONFLICT (user_id, reddit_comment_id)
+		DO UPDATE SET
+			post_title = EXCLUDED.post_title,
+			post_author = EXCLUDED.post_author,
+			comment_author = EXCLUDED.comment_author,
+			comment_body = EXCLUDED.comment_body,
+			score = EXCLUDED.score,
+			created_utc = EXCLUDED.created_utc,
+			parent_id = EXCLUDED.parent_id
+	`, userID,
+		comment.Subreddit,
+		comment.RedditPostID,
+		comment.RedditCommentID,
+		postTitle,
+		postAuthor,
+		comment.CommentAuthor,
+		comment.CommentBody,
+		comment.Score,
+		createdUTC,
+		parentID,
+	)
+	return err
+}
+
+// RemoveRedditAPIComment removes a Reddit API comment from the user's saved list
+func (r *SavedItemsRepository) RemoveRedditAPIComment(ctx context.Context, userID int, redditCommentID string) error {
+	_, err := r.pool.Exec(ctx, `
+		DELETE FROM saved_reddit_api_comments
+		WHERE user_id = $1 AND reddit_comment_id = $2
+	`, userID, redditCommentID)
+	return err
+}
+
+// IsRedditAPICommentSaved checks if a Reddit API comment is saved by the user
+func (r *SavedItemsRepository) IsRedditAPICommentSaved(ctx context.Context, userID int, redditCommentID string) (bool, error) {
+	var exists bool
+	err := r.pool.QueryRow(ctx, `
+		SELECT EXISTS (
+			SELECT 1 FROM saved_reddit_api_comments
+			WHERE user_id = $1 AND reddit_comment_id = $2
+		)
+	`, userID, redditCommentID).Scan(&exists)
+	return exists, err
+}
+
+// GetSavedRedditAPIComments returns saved Reddit API comments for the user
+func (r *SavedItemsRepository) GetSavedRedditAPIComments(ctx context.Context, userID int) ([]*SavedRedditAPIComment, error) {
+	query := `
+		SELECT subreddit, reddit_post_id, reddit_comment_id,
+		       post_title, post_author, comment_author, comment_body,
+		       COALESCE(score, 0) AS score,
+		       created_utc, parent_id, saved_at
+		FROM saved_reddit_api_comments
+		WHERE user_id = $1
+		ORDER BY saved_at DESC
+	`
+	rows, err := r.pool.Query(ctx, query, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var comments []*SavedRedditAPIComment
+	for rows.Next() {
+		comment := &SavedRedditAPIComment{}
+		var postTitle, postAuthor, parentID sql.NullString
+		var createdUTC sql.NullInt64
+
+		if err := rows.Scan(
+			&comment.Subreddit,
+			&comment.RedditPostID,
+			&comment.RedditCommentID,
+			&postTitle,
+			&postAuthor,
+			&comment.CommentAuthor,
+			&comment.CommentBody,
+			&comment.Score,
+			&createdUTC,
+			&parentID,
+			&comment.SavedAt,
+		); err != nil {
+			return nil, err
+		}
+
+		if postTitle.Valid {
+			comment.PostTitle = &postTitle.String
+		}
+		if postAuthor.Valid {
+			comment.PostAuthor = &postAuthor.String
+		}
+		if createdUTC.Valid {
+			comment.CreatedUTC = &createdUTC.Int64
+		}
+		if parentID.Valid {
+			comment.ParentID = &parentID.String
+		}
+
+		comments = append(comments, comment)
+	}
+
+	return comments, rows.Err()
 }
 
 // GetSavedRedditPosts returns saved Reddit posts for the user

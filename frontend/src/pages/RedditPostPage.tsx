@@ -35,7 +35,7 @@ import { useSubredditAutocomplete } from '../hooks/useSubredditAutocomplete';
 import { useSubredditActiveUsers } from '../hooks/useSubredditActiveUsers';
 import { CrosspostModal } from '../components/common/CrosspostModal';
 import { PostHeader } from '../components/posts/PostHeader';
-import { getSavedRedditCommentIdSetById } from '../utils/savedItems';
+import { getSavedRedditCommentIdSetById, getSavedRedditAPICommentIdSet } from '../utils/savedItems';
 import { EmptyMessage, LoadingMessage } from '../components/common/StatusMessage';
 import { loadHls } from '../utils/hlsLoader';
 import { RedditPostMedia } from '../components/reddit/RedditPostMedia';
@@ -210,6 +210,9 @@ function RedditCommentView({
   onReport,
   useRelativeTime,
   isRedditUserBlocked,
+  postTitle,
+  postAuthor,
+  savedRedditAPICommentIds = new Set(),
 }: {
   comment: RedditComment;
   depth?: number;
@@ -230,6 +233,9 @@ function RedditCommentView({
   onReport: (commentId: number) => Promise<void>;
   useRelativeTime: boolean;
   isRedditUserBlocked: (username?: string | null) => boolean;
+  postTitle?: string;
+  postAuthor?: string;
+  savedRedditAPICommentIds?: Set<string>;
 }) {
   const queryClient = useQueryClient();
   const [collapsed, setCollapsed] = useState(false);
@@ -314,8 +320,31 @@ function RedditCommentView({
     });
   };
 
-  const handleSave = () => {
-    alert('Saving Reddit comments is not supported on OmniNudge.');
+  const isSaved = savedRedditAPICommentIds.has(comment.data.id);
+
+  const handleSave = async () => {
+    try {
+      if (isSaved) {
+        await savedService.unsaveRedditAPIComment(comment.data.id);
+      } else {
+        await savedService.saveRedditAPIComment({
+          subreddit,
+          reddit_post_id: postId,
+          reddit_comment_id: comment.data.id,
+          post_title: postTitle,
+          post_author: postAuthor,
+          comment_author: comment.data.author,
+          comment_body: comment.data.body ?? '',
+          score: comment.data.score,
+          created_utc: comment.data.created_utc,
+          parent_id: comment.data.parent_id,
+        });
+      }
+      // Invalidate the query to refetch saved comments
+      queryClient.invalidateQueries({ queryKey: ['saved-items', 'reddit_api_comments'] });
+    } catch (err) {
+      console.error('Failed to save comment:', err);
+    }
   };
 
   return (
@@ -374,7 +403,7 @@ function RedditCommentView({
                 onClick={handleSave}
                 className="hover:text-[var(--color-primary)]"
               >
-                save
+                {isSaved ? 'unsave' : 'save'}
               </button>
               <button
                 onClick={handleReplyClick}
@@ -447,6 +476,9 @@ function RedditCommentView({
                   onReport={onReport}
                   isRedditUserBlocked={isRedditUserBlocked}
                   useRelativeTime={useRelativeTime}
+                  postTitle={postTitle}
+                  postAuthor={postAuthor}
+                  savedRedditAPICommentIds={savedRedditAPICommentIds}
                 />
                 ))}
 
@@ -1233,6 +1265,18 @@ export default function RedditPostPage() {
   const savedCommentIds = useMemo(
     () => getSavedRedditCommentIdSetById(savedCommentsData),
     [savedCommentsData]
+  );
+
+  // Fetch saved Reddit API comments
+  const { data: savedRedditAPICommentsData } = useQuery({
+    queryKey: ['saved-items', 'reddit_api_comments'],
+    queryFn: () => savedService.getSavedItems('reddit_api_comments'),
+    enabled: !!subreddit && !!postId && !!user,
+  });
+
+  const savedRedditAPICommentIds = useMemo(
+    () => getSavedRedditAPICommentIdSet(savedRedditAPICommentsData),
+    [savedRedditAPICommentsData]
   );
 
   const buildEmbedHtml = (data: EmbedPayload) => {
@@ -2070,6 +2114,9 @@ export default function RedditPostPage() {
                     onReport={handleReportComment}
                     isRedditUserBlocked={isRedditUserBlocked}
                     useRelativeTime={useRelativeTime}
+                    postTitle={post?.title}
+                    postAuthor={post?.author}
+                    savedRedditAPICommentIds={savedRedditAPICommentIds}
                   />
                 </div>
               );

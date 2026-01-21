@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { modMailService } from '../../services/modMailService';
-import { hubsService } from '../../services/hubsService';
 import { encryptionService } from '../../services/encryptionService';
 import { getOwnKeys, getUserPublicKey } from '../../services/keyManagementService';
 import { encryptForMultipleRecipients, type MultiRecipientEncryptionResult } from '../../utils/encryption';
@@ -28,12 +27,12 @@ export function ModMailModal({ hubName, onClose }: ModMailModalProps) {
       })
     | { is_multi_recipient: false; encryption_version: string; message: string }
   > => {
-    // Fetch hub moderators to build the participant list (user + moderators)
-    const hub = await hubsService.getHub(hubName);
-    const moderatorIds = hub.moderators?.map((mod) => mod.id) ?? [];
+    // Fetch hub moderators and admins to build the participant list
+    const recipients = await modMailService.getRecipients(hubName);
+    const recipientIds = recipients.recipient_ids ?? [];
     const participantIds = Array.from(
       new Set(
-        [user?.id, ...moderatorIds].filter((id): id is number => typeof id === 'number')
+        [user?.id, ...recipientIds].filter((id): id is number => typeof id === 'number')
       )
     );
 
@@ -63,21 +62,29 @@ export function ModMailModal({ hubName, onClose }: ModMailModalProps) {
 
     const ownKeys = await getOwnKeys();
 
-    if (!cryptoKeys.length || missing.length || !ownKeys?.publicKey) {
-      if (missing.length) {
-        setEncryptionWarning(
-          `Missing public keys for participants: ${missing.join(
-            ', '
-          )}. Sending message as plaintext.`
-        );
-      } else if (!ownKeys?.publicKey) {
-        setEncryptionWarning('No local encryption key found. Sending message as plaintext.');
-      }
-      return { is_multi_recipient: false, encryption_version: 'plaintext', message };
+    // Check if sender has keys (required)
+    if (!ownKeys?.publicKey) {
+      const errorMsg = 'CRITICAL: You have not set up encryption keys. Cannot send mod mail.';
+      setEncryptionWarning(errorMsg);
+      throw new Error(errorMsg);
+    }
+
+    // Warn if some recipients don't have keys, but allow sending
+    // Note: Only log to console for non-mods, don't show UI warning since they can't do anything about it
+    if (missing.length > 0) {
+      console.warn('[Mod Mail Encryption] Some participants do not have encryption keys:', missing);
+    }
+    setEncryptionWarning(null);
+
+    // If no recipients have keys, we can't encrypt (need at least sender's key)
+    if (cryptoKeys.length === 0) {
+      const errorMsg = 'CRITICAL: No recipients have encryption enabled. Cannot send encrypted mod mail.';
+      setEncryptionWarning(errorMsg);
+      throw new Error(errorMsg);
     }
 
     const encrypted = await encryptForMultipleRecipients(message, cryptoKeys, ownKeys.publicKey);
-    setEncryptionWarning(null);
+    // Don't clear the warning here - it was already set above if there are missing keys
 
     return {
       ...encrypted,

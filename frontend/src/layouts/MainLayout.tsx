@@ -178,21 +178,6 @@ export default function MainLayout() {
                   type="button"
                   onClick={() => {
                     if (user) {
-                      navigate('/posts/create');
-                    } else {
-                      setPendingRedirect({ to: '/posts/create' });
-                      setAuthModal('login');
-                    }
-                  }}
-                  onMouseEnter={() => prefetchRoutes.createPost()}
-                  className="rounded-md px-3 py-2 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
-                >
-                  Create Post
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (user) {
                       navigate('/messages');
                     } else {
                       setPendingRedirect({ to: '/messages' });
@@ -211,34 +196,12 @@ export default function MainLayout() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => {
-                    if (user) {
-                      navigate('/hubs/create');
-                    } else {
-                      setPendingRedirect({ to: '/hubs/create' });
-                      setAuthModal('login');
-                    }
-                  }}
-                  onMouseEnter={() => prefetchRoutes.createHub()}
-                  className="rounded-md px-3 py-2 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
-                >
-                  Create Hub
-                </button>
-                <button
-                  type="button"
                   onClick={() => navigate('/hubs')}
                   onMouseEnter={() => prefetchRoutes.hubs()}
                   className="rounded-md px-3 py-2 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
                 >
                   Browse Hubs
                 </button>
-                  <Link
-                    to="/about"
-                    onMouseEnter={() => prefetchRoutes.about()}
-                    className="rounded-md px-3 py-2 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
-                  >
-                    About
-                  </Link>
                 </div>
               )}
 

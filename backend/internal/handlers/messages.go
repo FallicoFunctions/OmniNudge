@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"net/http"
 	"strconv"
 	"strings"
@@ -38,6 +39,14 @@ func NewMessagesHandler(
 		conversationRepo: conversationRepo,
 		hub:              hub,
 	}
+}
+
+func (h *MessagesHandler) isAdmin(ctx context.Context, userID int) (bool, error) {
+	var isAdmin bool
+	err := h.pool.QueryRow(ctx, `
+		SELECT role = 'admin' FROM users WHERE id = $1
+	`, userID).Scan(&isAdmin)
+	return isAdmin, err
 }
 
 // SendMessageRequest represents the request body for sending a message
@@ -119,9 +128,20 @@ func (h *MessagesHandler) SendMessage(c *gin.Context) {
 				WHERE conversation_id = $1 AND user_id = $2
 			)
 		`, req.ConversationID, userID.(int)).Scan(&isParticipant)
-		if err != nil || !isParticipant {
-			c.JSON(http.StatusForbidden, gin.H{"error": "You are not a participant in this conversation"})
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check participant status"})
 			return
+		}
+		if !isParticipant {
+			isAdmin, err := h.isAdmin(c.Request.Context(), userID.(int))
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check admin status"})
+				return
+			}
+			if !isAdmin {
+				c.JSON(http.StatusForbidden, gin.H{"error": "You are not a participant in this conversation"})
+				return
+			}
 		}
 		// For mod mail, we don't target a single recipient; use sender as recipient to satisfy schema
 		recipientID = userID.(int)
@@ -332,9 +352,20 @@ func (h *MessagesHandler) GetMessages(c *gin.Context) {
 				WHERE conversation_id = $1 AND user_id = $2
 			)
 		`, conversationID, userID.(int)).Scan(&isParticipant)
-		if err != nil || !isParticipant {
-			c.JSON(http.StatusForbidden, gin.H{"error": "You are not a participant in this conversation"})
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check participant status"})
 			return
+		}
+		if !isParticipant {
+			isAdmin, err := h.isAdmin(c.Request.Context(), userID.(int))
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check admin status"})
+				return
+			}
+			if !isAdmin {
+				c.JSON(http.StatusForbidden, gin.H{"error": "You are not a participant in this conversation"})
+				return
+			}
 		}
 	} else {
 		// For regular conversations, use the existing method
@@ -488,9 +519,20 @@ func (h *MessagesHandler) MarkAsRead(c *gin.Context) {
 				WHERE conversation_id = $1 AND user_id = $2
 			)
 		`, conversationID, userID.(int)).Scan(&isParticipant)
-		if err != nil || !isParticipant {
-			c.JSON(http.StatusForbidden, gin.H{"error": "You are not a participant in this conversation"})
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check participant status"})
 			return
+		}
+		if !isParticipant {
+			isAdmin, err := h.isAdmin(c.Request.Context(), userID.(int))
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check admin status"})
+				return
+			}
+			if !isAdmin {
+				c.JSON(http.StatusForbidden, gin.H{"error": "You are not a participant in this conversation"})
+				return
+			}
 		}
 	} else {
 		// For DM conversations, use the traditional method

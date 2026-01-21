@@ -32,3 +32,6 @@ export const getSavedRedditCommentIdSet = (data?: SavedItemsResponse) =>
 
 export const getSavedRedditCommentIdSetById = (data?: SavedItemsResponse) =>
   new Set<number>(data?.saved_reddit_comments?.map((comment) => comment.id) ?? []);
+
+export const getSavedRedditAPICommentIdSet = (data?: SavedItemsResponse) =>
+  new Set<string>(data?.saved_reddit_api_comments?.map((comment) => comment.reddit_comment_id) ?? []);

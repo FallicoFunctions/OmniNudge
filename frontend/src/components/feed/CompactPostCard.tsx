@@ -5,6 +5,8 @@ import { getPostUrl } from '../../utils/postUrl';
 import { resolveMediaUrl } from '../../utils/mediaUrl';
 import { HlsVideo } from '../common/HlsVideo';
 import { ImageCarousel } from './ImageCarousel';
+import { ExpandedPost } from './ExpandedPost';
+import { ExpandedMessage } from './ExpandedMessage';
 import type { PlatformPost } from '../../types/posts';
 import type { CombinedFeedItem } from '../../services/feedService';
 import type { Conversation } from '../../types/messages';
@@ -12,13 +14,16 @@ import type { Conversation } from '../../types/messages';
 interface CompactPostCardProps {
   post: PlatformPost | any; // Can be RedditPost, PlatformPost, or Conversation
   feedType: 'home' | 'subreddit' | 'hub' | 'messages';
+  isExpanded?: boolean;
+  onToggleExpand?: () => void;
 }
 
-export function CompactPostCard({ post, feedType }: CompactPostCardProps) {
+export function CompactPostCard({ post, feedType, isExpanded = false, onToggleExpand }: CompactPostCardProps) {
   const [galleryIndex, setGalleryIndex] = useState(0);
   const [isGalleryHovered, setIsGalleryHovered] = useState(false);
   const titleAreaRef = useRef<HTMLDivElement>(null);
   const [isTitleAreaHovered, setIsTitleAreaHovered] = useState(false);
+  const cardRef = useRef<HTMLDivElement>(null);
   // Handle messages differently
   if (feedType === 'messages') {
     const conversation = post as Conversation;
@@ -27,43 +32,47 @@ export function CompactPostCard({ post, feedType }: CompactPostCardProps) {
 
     return (
       <article className="compact-post-card">
-        <Link
-          to={`/messages/${conversation.id}`}
-          className="block hover:bg-[var(--color-hover)] transition-colors"
-        >
-          <div className="flex items-start gap-2 p-2">
-            {/* Avatar */}
-            <div className="flex-shrink-0 w-10 h-10 rounded-full bg-[var(--color-background)] overflow-hidden">
-              {otherUser?.avatar_url ? (
-                <img
-                  src={resolveMediaUrl(otherUser.avatar_url)}
-                  alt={otherUser.username || 'User'}
-                  className="w-full h-full object-cover"
-                  loading="lazy"
-                />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center text-[var(--color-text-muted)]">
-                  {(otherUser?.username?.[0] || '?').toUpperCase()}
-                </div>
-              )}
-            </div>
+        {isExpanded ? (
+          <ExpandedMessage conversation={conversation} onCollapse={onToggleExpand!} />
+        ) : (
+          <div
+            onClick={onToggleExpand}
+            className="block hover:bg-[var(--color-hover)] transition-colors cursor-pointer"
+          >
+            <div className="flex items-start gap-2 p-2">
+              {/* Avatar */}
+              <div className="flex-shrink-0 w-10 h-10 rounded-full bg-[var(--color-background)] overflow-hidden">
+                {otherUser?.avatar_url ? (
+                  <img
+                    src={resolveMediaUrl(otherUser.avatar_url)}
+                    alt={otherUser.username || 'User'}
+                    className="w-full h-full object-cover"
+                    loading="lazy"
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-[var(--color-text-muted)]">
+                    {(otherUser?.username?.[0] || '?').toUpperCase()}
+                  </div>
+                )}
+              </div>
 
-            {/* Content */}
-            <div className="flex-1 min-w-0">
-              <h3 className="text-sm font-medium leading-tight text-[var(--color-text)]">
-                {otherUser?.username || 'Unknown User'}
-              </h3>
-              {lastMessage && lastMessage.encrypted_content && (
-                <p className="text-xs text-[var(--color-text-muted)] mt-1 line-clamp-1">
-                  {lastMessage.encrypted_content}
-                </p>
-              )}
-              <div className="text-xs text-[var(--color-text-muted)] mt-1">
-                {conversation.last_message_at && formatDistanceToNow(new Date(conversation.last_message_at), { addSuffix: true })}
+              {/* Content */}
+              <div className="flex-1 min-w-0">
+                <h3 className="text-sm font-medium leading-tight text-[var(--color-text)]">
+                  {otherUser?.username || 'Unknown User'}
+                </h3>
+                {lastMessage && lastMessage.encrypted_content && (
+                  <p className="text-xs text-[var(--color-text-muted)] mt-1 line-clamp-1">
+                    {lastMessage.encrypted_content}
+                  </p>
+                )}
+                <div className="text-xs text-[var(--color-text-muted)] mt-1">
+                  {conversation.last_message_at && formatDistanceToNow(new Date(conversation.last_message_at), { addSuffix: true })}
+                </div>
               </div>
             </div>
           </div>
-        </Link>
+        )}
         <div className="border-b border-[var(--color-border)]" />
       </article>
     );
@@ -207,8 +216,37 @@ export function CompactPostCard({ post, feedType }: CompactPostCardProps) {
   // Get video poster/preview image
   const videoPoster = isVideo && thumbnail ? (thumbnail.startsWith('http') ? thumbnail : resolveMediaUrl(thumbnail)) : undefined;
 
+  const handleTitleClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (onToggleExpand) {
+      onToggleExpand();
+    }
+  };
+
+  const handleCollapse = () => {
+    if (onToggleExpand) {
+      onToggleExpand();
+      // Scroll card into view
+      setTimeout(() => {
+        cardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }, 100);
+    }
+  };
+
   return (
-    <article className="compact-post-card">
+    <article ref={cardRef} className="compact-post-card">
+      {/* Expanded view */}
+      {isExpanded && (
+        <ExpandedPost
+          post={actualPost}
+          feedType={feedType}
+          onCollapse={handleCollapse}
+        />
+      )}
+
+      {/* Compact view - hide when expanded */}
+      {!isExpanded && (
+        <>
       {/* Media (full width if available) */}
       {isGallery && galleryImages && galleryImages.length > 0 ? (
         <ImageCarousel
@@ -254,7 +292,7 @@ export function CompactPostCard({ post, feedType }: CompactPostCardProps) {
           onMouseLeave={() => setIsTitleAreaHovered(false)}
         >
           {/* Title */}
-          <Link to={postUrl} className="hover:underline">
+          <Link to={postUrl} onClick={handleTitleClick} className="hover:underline">
             <h3 className="text-sm font-medium leading-tight line-clamp-2" style={{ color: 'var(--ac-text, #e8e8f0)' }}>
               {nsfw && <span className="text-red-500 text-xs mr-1">NSFW</span>}
               {title}
@@ -334,6 +372,8 @@ export function CompactPostCard({ post, feedType }: CompactPostCardProps) {
 
       {/* Bottom border only (no rounded corners) */}
       <div className="border-b border-[var(--color-border)]" />
+      </>
+      )}
     </article>
   );
 }

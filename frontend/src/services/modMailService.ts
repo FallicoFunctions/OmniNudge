@@ -12,6 +12,11 @@ export const modMailService = {
     return api.get<{ conversations: ModMailConversation[]; hub_name: string; status: string }>(`/mod-mail/hubs/${hubName}?status=${status}`);
   },
 
+  // Get mod mail recipients (hub moderators + admins)
+  async getRecipients(hubName: string): Promise<{ hub_name: string; recipient_ids: number[] }> {
+    return api.get<{ hub_name: string; recipient_ids: number[] }>(`/mod-mail/hubs/${hubName}/recipients`);
+  },
+
   // Get mod mail conversations created by the current user
   async getUserModMail(): Promise<{ conversations: ModMailConversation[] }> {
     return api.get<{ conversations: ModMailConversation[] }>('/mod-mail/user');

@@ -1,4 +1,4 @@
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useState } from 'react';
 import { useColumnFeed } from '../../hooks/useColumnFeed';
 import { CompactPostCard } from './CompactPostCard';
 import type { ColumnConfig } from '../../contexts/MultiColumnFeedContext';
@@ -12,6 +12,7 @@ interface ColumnFeedProps {
 
 export function ColumnFeed({ columnId, config, isActive, showBorder }: ColumnFeedProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const [expandedPostIds, setExpandedPostIds] = useState<Set<string>>(new Set());
 
   const {
     data,
@@ -108,6 +109,18 @@ export function ColumnFeed({ columnId, config, isActive, showBorder }: ColumnFee
     );
   }
 
+  const handleToggleExpand = (postId: string) => {
+    setExpandedPostIds(prev => {
+      const next = new Set(prev);
+      if (next.has(postId)) {
+        next.delete(postId);
+      } else {
+        next.add(postId);
+      }
+      return next;
+    });
+  };
+
   return (
     <div
       ref={scrollRef}
@@ -120,9 +133,18 @@ export function ColumnFeed({ columnId, config, isActive, showBorder }: ColumnFee
         scrollbarColor: 'var(--color-border) transparent',
       }}
     >
-      {allPosts.map((post, index) => (
-        <CompactPostCard key={`${config.feedType}-${index}`} post={post} feedType={config.feedType} />
-      ))}
+      {allPosts.map((post, index) => {
+        const postId = post.id || `${config.feedType}-${index}`;
+        return (
+          <CompactPostCard
+            key={postId}
+            post={post}
+            feedType={config.feedType}
+            isExpanded={expandedPostIds.has(postId)}
+            onToggleExpand={() => handleToggleExpand(postId)}
+          />
+        );
+      })}
 
       {isFetchingNextPage && (
         <div className="p-2 text-center text-xs text-[var(--color-text-muted)]">

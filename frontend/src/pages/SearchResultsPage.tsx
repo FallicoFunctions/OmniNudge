@@ -1,23 +1,33 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSettings } from '../contexts/SettingsContext';
+import { useAuth } from '../contexts/AuthContext';
 import { siteWideSearch, type RedditUserSearchResult } from '../services/searchService';
 import { useRedditBlocklist } from '../contexts/RedditBlockContext';
-import { formatTimestamp } from '../utils/timeFormat';
-import { resolveMediaUrl } from '../utils/mediaUrl';
+import { savedService } from '../services/savedService';
+import { subscriptionService } from '../services/subscriptionService';
+import { hubsService } from '../services/hubsService';
 import { RedditPostCard } from '../components/reddit/RedditPostCard';
-import { VoteButtons } from '../components/VoteButtons';
+import { HubPostCard } from '../components/hubs/HubPostCard';
+import { CrosspostModal } from '../components/common/CrosspostModal';
 import { EmptyMessage, LoadingMessage } from '../components/common/StatusMessage';
 import { OffsetPaginationControls } from '../components/common/OffsetPaginationControls';
 import { VirtualizedList } from '../components/common/VirtualizedList';
+import { useHiddenItems } from '../hooks/useHiddenItems';
+import { useSavedItems } from '../hooks/useSavedItems';
 import type { PlatformPost } from '../types/posts';
 import type { RedditApiPost, SubredditSuggestion } from '../types/reddit';
 import type { Hub } from '../services/hubsService';
 import type { UserProfile } from '../types/users';
+import { createRedditCrosspostPayload } from '../utils/crosspostHelpers';
+import { getPostUrl } from '../utils/postUrl';
+import { getHiddenPostIdSet, getHiddenRedditPostIdSet, getSavedPostIdSet, getSavedRedditPostIdSet } from '../utils/savedItems';
 
 type Tab = 'posts' | 'communities' | 'users';
 type PostSource = 'all' | 'omni';
 type SortOrder = 'relevance' | 'new' | 'old';
+type CrosspostTarget = { post: RedditApiPost };
 
 export default function SearchResultsPage() {
   const location = useLocation();
@@ -27,7 +37,9 @@ export default function SearchResultsPage() {
   const initialSort = (params.get('sort') as SortOrder) ?? 'relevance';
   const initialTab = (params.get('tab') as Tab) ?? 'posts';
   const initialIncludeNsfwParam = params.get('include_nsfw') === 'true';
-  const { searchIncludeNsfwByDefault, blockAllNsfw } = useSettings();
+  const { searchIncludeNsfwByDefault, blockAllNsfw, useRelativeTime } = useSettings();
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
   const { blockedUsers } = useRedditBlocklist();
 
   const [query, setQuery] = useState(initialQuery);
@@ -95,6 +107,210 @@ export default function SearchResultsPage() {
     hasMoreReddit: false,
     hasMoreOmni: false,
   });
+  const [crosspostTarget, setCrosspostTarget] = useState<CrosspostTarget | null>(null);
+  const [crosspostTitle, setCrosspostTitle] = useState('');
+  const [selectedHub, setSelectedHub] = useState('');
+  const [selectedSubreddit, setSelectedSubreddit] = useState('');
+  const [sendRepliesToInbox, setSendRepliesToInbox] = useState(true);
+  const [hideTarget, setHideTarget] = useState<RedditApiPost | null>(null);
+
+  const savedPostsKey = ['saved-items', 'posts'] as const;
+  const hiddenPostsKey = ['hidden-items', 'posts'] as const;
+  const savedRedditPostsKey = ['saved-items', 'reddit_posts'] as const;
+  const hiddenRedditPostsKey = ['hidden-items', 'reddit_posts'] as const;
+  const { data: savedPostsData } = useSavedItems('posts', !!user);
+  const { data: hiddenPostsData } = useHiddenItems('posts', !!user);
+  const { data: savedRedditPostsData } = useSavedItems('reddit_posts', !!user);
+  const { data: hiddenRedditPostsData } = useHiddenItems('reddit_posts', !!user);
+  const savedPostIds = useMemo(() => getSavedPostIdSet(savedPostsData), [savedPostsData]);
+  const hiddenPostIds = useMemo(() => getHiddenPostIdSet(hiddenPostsData), [hiddenPostsData]);
+  const savedRedditPostIds = useMemo(
+    () => getSavedRedditPostIdSet(savedRedditPostsData),
+    [savedRedditPostsData]
+  );
+  const hiddenRedditPostIds = useMemo(
+    () => getHiddenRedditPostIdSet(hiddenRedditPostsData),
+    [hiddenRedditPostsData]
+  );
+
+  const toggleSaveMutation = useMutation<void, Error, { postId: number; shouldSave: boolean }>({
+    mutationFn: async ({ postId, shouldSave }) => {
+      if (shouldSave) {
+        await savedService.savePost(postId);
+      } else {
+        await savedService.unsavePost(postId);
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: savedPostsKey });
+    },
+    onError: (mutationError: Error) => {
+      alert(`Failed to update save: ${mutationError.message}`);
+    },
+  });
+
+  const hidePostMutation = useMutation<void, Error, number>({
+    mutationFn: async (postId) => {
+      await savedService.hidePost(postId);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: hiddenPostsKey });
+    },
+    onError: (mutationError: Error) => {
+      alert(`Failed to hide post: ${mutationError.message}`);
+    },
+  });
+
+  const toggleSaveRedditPostMutation = useMutation<
+    void,
+    Error,
+    { post: RedditApiPost; shouldSave: boolean }
+  >({
+    mutationFn: async ({ post, shouldSave }) => {
+      if (shouldSave) {
+        await savedService.saveRedditPost(post.subreddit, post.id, {
+          title: post.title,
+          author: post.author,
+          score: post.score,
+          num_comments: post.num_comments,
+          thumbnail: post.thumbnail ?? null,
+          created_utc: post.created_utc,
+          link_flair_text: post.link_flair_text ?? null,
+          link_flair_background_color: post.link_flair_background_color ?? null,
+          link_flair_text_color: post.link_flair_text_color ?? null,
+          over18: post.over18 ?? post.over_18 ?? null,
+        });
+      } else {
+        await savedService.unsaveRedditPost(post.subreddit, post.id);
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: savedRedditPostsKey });
+    },
+    onError: (mutationError: Error) => {
+      alert(`Failed to update save: ${mutationError.message}`);
+    },
+  });
+
+  const hideRedditPostMutation = useMutation<void, Error, RedditApiPost>({
+    mutationFn: async (post) => {
+      await savedService.hideRedditPost(post.subreddit, post.id);
+    },
+    onSuccess: (_data, post) => {
+      queryClient.invalidateQueries({ queryKey: hiddenRedditPostsKey });
+      setPosts((prev) => ({
+        ...prev,
+        reddit: prev.reddit.filter(
+          (entry) => !(entry.id === post.id && entry.subreddit === post.subreddit)
+        ),
+      }));
+      setHideTarget(null);
+    },
+    onError: (mutationError: Error) => {
+      alert(`Failed to hide post: ${mutationError.message}`);
+    },
+  });
+
+  const { data: subscribedHubs } = useQuery({
+    queryKey: ['user-subscriptions', 'hubs'],
+    queryFn: () => subscriptionService.getUserHubSubscriptions(),
+    enabled: !!user,
+  });
+  const { data: subscribedSubreddits } = useQuery({
+    queryKey: ['user-subscriptions', 'subreddits'],
+    queryFn: () => subscriptionService.getUserSubredditSubscriptions(),
+    enabled: !!user,
+  });
+  const hubOptions = useMemo(
+    () =>
+      subscribedHubs
+        ?.map((sub) => {
+          const name = sub.hub_name || sub.hub?.name;
+          return name ? { id: sub.hub_id, name } : null;
+        })
+        .filter((option): option is { id: number; name: string } => Boolean(option)) ?? [],
+    [subscribedHubs]
+  );
+  const subredditOptions = useMemo(
+    () =>
+      subscribedSubreddits?.map((sub) => ({
+        id: sub.id,
+        name: sub.subreddit_name,
+      })) ?? [],
+    [subscribedSubreddits]
+  );
+
+  const crosspostMutation = useMutation({
+    mutationFn: async () => {
+      if (!crosspostTarget) {
+        throw new Error('No post selected for crosspost');
+      }
+      if (!selectedHub && !selectedSubreddit) {
+        throw new Error('Please select at least one destination (hub or subreddit)');
+      }
+
+      const post = crosspostTarget.post;
+      const title = crosspostTitle || post.title;
+      const payload = createRedditCrosspostPayload(post, title, sendRepliesToInbox);
+      const promises = [];
+
+      if (selectedHub) {
+        promises.push(
+          hubsService.crosspostToHub(
+            selectedHub,
+            { ...payload },
+            'reddit',
+            post.id,
+            post.subreddit,
+            post.title
+          )
+        );
+      }
+
+      if (selectedSubreddit) {
+        promises.push(
+          hubsService.crosspostToSubreddit(
+            selectedSubreddit,
+            { ...payload },
+            'reddit',
+            post.id,
+            post.subreddit,
+            post.title
+          )
+        );
+      }
+
+      await Promise.all(promises);
+    },
+    onSuccess: () => {
+      setCrosspostTarget(null);
+      setCrosspostTitle('');
+      setSelectedHub('');
+      setSelectedSubreddit('');
+      setSendRepliesToInbox(true);
+      alert('Crosspost created successfully!');
+    },
+    onError: (error) => {
+      alert(`Failed to create crosspost: ${error.message}`);
+    },
+  });
+
+  const handleCrosspostRedditPost = (post: RedditApiPost) => {
+    if (!user) {
+      alert('Please sign in to crosspost.');
+      return;
+    }
+    setCrosspostTarget({ post });
+    setCrosspostTitle(post.title);
+  };
+
+  const resetCrosspostState = () => {
+    setCrosspostTarget(null);
+    setCrosspostTitle('');
+    setSelectedHub('');
+    setSelectedSubreddit('');
+    setSendRepliesToInbox(true);
+  };
 
   const handleSearch = async (
     q: string,
@@ -231,8 +447,16 @@ export default function SearchResultsPage() {
     () =>
       filteredPosts.filter((item) => {
         if (item.type === 'reddit') {
+          const postKey = `${item.post.subreddit}-${item.post.id}`;
+          if (hiddenRedditPostIds.has(postKey)) {
+            return false;
+          }
           const author = item.post.author?.toLowerCase();
           return author ? !blockedUsers.has(author) : true;
+        }
+
+        if (hiddenPostIds.has(item.post.id)) {
+          return false;
         }
 
         const displayAuthor =
@@ -241,7 +465,7 @@ export default function SearchResultsPage() {
           (item.post.author_id === undefined ? undefined : String(item.post.author_id));
         return displayAuthor ? !blockedUsers.has(displayAuthor.toLowerCase()) : true;
       }),
-    [filteredPosts, blockedUsers]
+    [filteredPosts, blockedUsers, hiddenPostIds, hiddenRedditPostIds]
   );
 
   return (
@@ -404,92 +628,92 @@ export default function SearchResultsPage() {
             }
             renderItem={(item) => {
               if (item.type === 'reddit') {
+                const post = item.post;
+                const postKey = `${post.subreddit}-${post.id}`;
+                const isSaved = savedRedditPostIds.has(postKey);
+                const isSaveActionPending =
+                  toggleSaveRedditPostMutation.isPending &&
+                  toggleSaveRedditPostMutation.variables?.post.id === post.id;
+                const pendingShouldSave = toggleSaveRedditPostMutation.variables?.shouldSave;
+
                 return (
                   <div className="pb-3">
                     <RedditPostCard
-                      post={item.post}
-                      useRelativeTime
-                      isSaved={false}
-                      isSaveActionPending={false}
-                      pendingShouldSave={undefined}
-                      onShare={() => {}}
-                      onToggleSave={() => {}}
-                      onHide={() => {}}
-                      onCrosspost={() => {}}
+                      post={post}
+                      useRelativeTime={useRelativeTime}
+                      isSaved={isSaved}
+                      isSaveActionPending={isSaveActionPending}
+                      pendingShouldSave={pendingShouldSave}
+                      onShare={() => {
+                        const shareUrl = `${window.location.origin}/r/${post.subreddit}/comments/${post.id}`;
+                        navigator.clipboard
+                          .writeText(shareUrl)
+                          .then(() => alert('Post link copied to clipboard!'))
+                          .catch(() => alert('Unable to copy link. Please try again.'));
+                      }}
+                      onToggleSave={(shouldSave) => {
+                        if (!user) {
+                          alert('Please sign in to save posts.');
+                          return;
+                        }
+                        toggleSaveRedditPostMutation.mutate({ post, shouldSave });
+                      }}
+                      onHide={() => {
+                        if (!user) {
+                          alert('Please sign in to hide posts.');
+                          return;
+                        }
+                        setHideTarget(post);
+                      }}
+                      onCrosspost={() => handleCrosspostRedditPost(post)}
                     />
                   </div>
                 );
               }
               const post = item.post;
-              const previewImage = resolveMediaUrl(post.thumbnail_url || post.media_url);
-              const displayAuthor =
-                post.author_username ||
-                post.author?.username ||
-                (post.author_id === undefined ? undefined : String(post.author_id));
-              const hubName = post.hub_name || post.hub?.name;
-              const createdTimestamp = post.crossposted_at ?? post.created_at;
-              const createdLabel = createdTimestamp ? formatTimestamp(createdTimestamp, true) : 'unknown time';
-              const commentLabel = `${(post.num_comments ?? 0).toLocaleString()} Comments`;
-              const pointsLabel = `${post.score.toLocaleString()} points`;
-              const postUrl = hubName ? `/h/${hubName}/comments/${post.id}` : `/posts/${post.id}`;
 
               return (
                 <div className="pb-3">
-                  <article className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)]">
-                    <div className="flex gap-3 p-3">
-                      <VoteButtons
-                        postId={post.id}
-                        initialScore={post.score}
-                        initialUserVote={post.user_vote ?? null}
-                        layout="vertical"
-                        size="small"
-                      />
-                      {previewImage && (
-                        <img
-                          src={previewImage}
-                          alt=""
-                          loading="lazy"
-                          decoding="async"
-                          className="h-16 w-16 flex-shrink-0 rounded object-cover"
-                        />
-                      )}
-                      <div className="flex-1 text-left">
-                        <div className="mb-1 inline-flex items-center gap-2">
-                          <span className="inline-block rounded bg-blue-600 px-2 py-0.5 text-[10px] font-bold uppercase text-white">
-                            Omni
-                          </span>
-                          {hubName && (
-                            <Link
-                              to={`/h/${hubName}`}
-                              className="text-[11px] text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
-                            >
-                              h/{hubName}
-                            </Link>
-                          )}
-                        </div>
-                        <a href={postUrl}>
-                          <h3 className="text-base font-semibold text-[var(--color-text-primary)] hover:text-[var(--color-primary)]">
-                            {post.title}
-                          </h3>
-                        </a>
-                        <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-[var(--color-text-secondary)]">
-                          <span>u/{displayAuthor ?? 'unknown'}</span>
-                          <span>•</span>
-                          <span>{pointsLabel}</span>
-                          <span>•</span>
-                          <span>submitted {createdLabel}</span>
-                        </div>
-                        <div className="mt-1 flex flex-wrap items-center gap-3 text-[11px] text-[var(--color-text-secondary)]">
-                          <a
-                            href={postUrl}
-                            className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
-                          >
-                            {commentLabel}
-                          </a>
-                        </div>
-                      </div>
-                    </div>
-                  </article>
+                  <HubPostCard
+                    post={post}
+                    useRelativeTime={useRelativeTime}
+                    currentUserId={user?.id}
+                    currentUserRole={user?.role}
+                    hubDisplayTitle={post.hub_display_title ?? null}
+                    isSaved={savedPostIds.has(post.id)}
+                    isSavePending={
+                      toggleSaveMutation.isPending &&
+                      toggleSaveMutation.variables?.postId === post.id
+                    }
+                    isHiding={
+                      hidePostMutation.isPending &&
+                      hidePostMutation.variables === post.id
+                    }
+                    onShare={() => {
+                      const shareUrl = `${window.location.origin}${getPostUrl(post)}`;
+                      navigator.clipboard
+                        .writeText(shareUrl)
+                        .then(() => alert('Post link copied to clipboard!'))
+                        .catch(() => alert('Unable to copy link. Please try again.'));
+                    }}
+                    onToggleSave={(shouldSave) => {
+                      if (!user) {
+                        alert('Please sign in to save posts.');
+                        return;
+                      }
+                      toggleSaveMutation.mutate({ postId: post.id, shouldSave });
+                    }}
+                    onHide={() => {
+                      if (!user) {
+                        alert('Please sign in to hide posts.');
+                        return;
+                      }
+                      if (!window.confirm('Hide this post?')) {
+                        return;
+                      }
+                      hidePostMutation.mutate(post.id);
+                    }}
+                  />
                 </div>
               );
             }}
@@ -592,6 +816,52 @@ export default function SearchResultsPage() {
                 ))}
               </ul>
             )}
+          </div>
+        </div>
+      )}
+
+      <CrosspostModal
+        isOpen={Boolean(crosspostTarget)}
+        onClose={resetCrosspostState}
+        hubOptions={hubOptions}
+        subredditOptions={subredditOptions}
+        hubValue={selectedHub}
+        subredditValue={selectedSubreddit}
+        titleValue={crosspostTitle}
+        sendRepliesToInbox={sendRepliesToInbox}
+        onHubChange={setSelectedHub}
+        onSubredditChange={setSelectedSubreddit}
+        onTitleChange={setCrosspostTitle}
+        onToggleSendReplies={setSendRepliesToInbox}
+        onSubmit={() => crosspostMutation.mutate()}
+        isSubmitting={crosspostMutation.isPending}
+        isSubmitDisabled={!crosspostTitle.trim() || (!selectedHub && !selectedSubreddit)}
+      />
+
+      {hideTarget && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 px-4">
+          <div className="w-full max-w-md rounded-lg bg-white p-4 shadow-lg">
+            <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">
+              Hide this post?
+            </h3>
+            <p className="mt-2 text-sm text-[var(--color-text-secondary)]">
+              Are you sure? Hidden posts can be found at your hidden posts page.
+            </p>
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                onClick={() => setHideTarget(null)}
+                className="rounded border border-[var(--color-border)] px-3 py-1 text-sm hover:bg-[var(--color-surface-elevated)]"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => hideRedditPostMutation.mutate(hideTarget)}
+                disabled={hideRedditPostMutation.isPending}
+                className="rounded bg-[var(--color-primary)] px-3 py-1 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)] disabled:opacity-50"
+              >
+                {hideRedditPostMutation.isPending ? 'Hiding...' : 'Hide Post'}
+              </button>
+            </div>
           </div>
         </div>
       )}
