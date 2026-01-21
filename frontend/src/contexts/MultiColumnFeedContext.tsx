@@ -16,11 +16,13 @@ export interface MultiColumnFeedState {
   columns: ColumnConfig[];
   activeColumnId: string | null; // Which column mouse is over
   columnCount: number; // 2 or 3
+  lastStandardPath: string | null;
 }
 
 export interface MultiColumnFeedContextValue {
   state: MultiColumnFeedState;
   setViewMode: (mode: MultiColumnFeedState['viewMode']) => void;
+  setLastStandardPath: (path: string | null) => void;
   setColumnCount: (count: number) => void;
   updateColumnConfig: (columnId: string, config: Partial<ColumnConfig>) => void;
   setActiveColumn: (columnId: string | null) => void;
@@ -79,6 +81,7 @@ export function MultiColumnFeedProvider({ children }: { children: ReactNode }) {
             columnCount: parsed.columnCount || parsed.columns.length,
             columns: parsed.columns,
             activeColumnId: null, // Don't persist active column
+            lastStandardPath: typeof parsed.lastStandardPath === 'string' ? parsed.lastStandardPath : null,
           };
         }
       } catch (e) {
@@ -92,6 +95,7 @@ export function MultiColumnFeedProvider({ children }: { children: ReactNode }) {
       columnCount: 3,
       columns: createDefaultColumns(),
       activeColumnId: null,
+      lastStandardPath: null,
     };
   });
 
@@ -102,12 +106,17 @@ export function MultiColumnFeedProvider({ children }: { children: ReactNode }) {
       columnCount: state.columnCount,
       columns: state.columns,
       // Don't persist activeColumnId
+      lastStandardPath: state.lastStandardPath,
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(stateToPersist));
   }, [state]);
 
   const setViewMode = useCallback((mode: MultiColumnFeedState['viewMode']) => {
     setState(prev => ({ ...prev, viewMode: mode }));
+  }, []);
+
+  const setLastStandardPath = useCallback((path: string | null) => {
+    setState(prev => ({ ...prev, lastStandardPath: path }));
   }, []);
 
   const setColumnCount = useCallback((count: number) => {
@@ -189,6 +198,7 @@ export function MultiColumnFeedProvider({ children }: { children: ReactNode }) {
   const value: MultiColumnFeedContextValue = {
     state,
     setViewMode,
+    setLastStandardPath,
     setColumnCount,
     updateColumnConfig,
     setActiveColumn,

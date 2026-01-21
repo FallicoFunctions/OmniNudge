@@ -15,6 +15,7 @@ import { redditService } from '../../services/redditService';
 import { PinnedBadge } from '../common/PinnedBadge';
 import { getRedditDashAudioUrl } from '../../utils/redditVideoAudio';
 import { useSettings } from '../../contexts/SettingsContext';
+import { PostBodyMarkdown } from '../posts/PostBodyMarkdown';
 
 interface RedditPostCardProps {
   post: RedditCrosspostSource & {
@@ -1069,9 +1070,7 @@ export function RedditPostCard({
                     />
                   ) : hasSelftext ? (
                     <div className="p-4 text-[var(--color-text-primary)]">
-                      <div className="prose prose-sm max-w-none dark:prose-invert">
-                        <p className="whitespace-pre-wrap">{post.selftext}</p>
-                      </div>
+                      <PostBodyMarkdown content={post.selftext} />
                     </div>
                   ) : null}
                 </div>
