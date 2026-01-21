@@ -104,14 +104,18 @@ export default function BugReportingPage() {
       </div>
 
       {/* Known Bugs Section */}
-      <Panel>
+      <Panel className="pb-4">
         <h2 className="text-2xl font-semibold text-[var(--color-text-primary)] mb-4">Known Bugs</h2>
         <div className="mb-4 divide-y divide-[var(--color-border)] text-sm text-[var(--color-text-secondary)]">
-          <p className="pb-4">
+          <p className="py-4 last:pb-0">
             Reddit API usage is subject to aggressive rate limiting, which can cause delays or
             missing content in feeds, searches, and comment loading.
           </p>
-          <p className="pt-4">Theme creation is not enabled yet.</p>
+          <p className="py-4 last:pb-0">Theme creation is not enabled yet.</p>
+          <p className="py-4 last:pb-0">
+            The hide button is moving the post to user's hidden list but is not removing the post
+            from the feed.
+          </p>
         </div>
 
         {isLoading && <LoadingMessage>Loading known bugs...</LoadingMessage>}
