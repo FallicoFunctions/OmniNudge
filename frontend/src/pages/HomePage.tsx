@@ -32,7 +32,9 @@ import { VerticalOmniScroll } from '../components/feed/VerticalOmniScroll';
 
 type SortOption = 'hot' | 'new' | 'top' | 'rising' | 'controversial';
 
-type HideTarget = { post: RedditPost };
+type HideTarget =
+  | { type: 'reddit'; post: RedditPost }
+  | { type: 'platform'; post: PlatformPost };
 type CrosspostTarget = { post: RedditPost };
 type DeletePostTarget = { postId: number; authorId: number };
 
@@ -449,6 +451,7 @@ export default function HomePage() {
     },
     onSuccess: () => {
       invalidateHomeFeed();
+      setHideTarget(null);
     },
     onError: (err) => {
       alert(`Failed to hide post: ${err.message}`);
@@ -569,15 +572,12 @@ export default function HomePage() {
     savedToggleMutation.mutate({ postId, shouldSave: !isCurrentlySaved });
   };
 
-  const handleHidePost = (postId: number) => {
+  const handleHidePost = (post: PlatformPost) => {
     if (!user) {
       alert('Please sign in to hide posts.');
       return;
     }
-    if (!window.confirm('Hide this post?')) {
-      return;
-    }
-    hidePostMutation.mutate(postId);
+    setHideTarget({ type: 'platform', post });
   };
 
   const handleDeletePost = (post: PlatformPost) => {
@@ -619,7 +619,7 @@ export default function HomePage() {
       alert('Please sign in to hide posts.');
       return;
     }
-    setHideTarget({ post });
+    setHideTarget({ type: 'reddit', post });
   };
 
   const handleCrosspostRedditPost = (post: RedditPost) => {
@@ -633,10 +633,18 @@ export default function HomePage() {
 
   const handleConfirmHide = () => {
     if (!hideTarget) return;
-    hideRedditPostMutation.mutate(hideTarget.post);
+    if (hideTarget.type === 'platform') {
+      hidePostMutation.mutate(hideTarget.post.id);
+    } else {
+      hideRedditPostMutation.mutate(hideTarget.post);
+    }
   };
 
-  const isHidePending = hideRedditPostMutation.isPending;
+  const isHidePending = hideTarget
+    ? hideTarget.type === 'platform'
+      ? hidePostMutation.isPending
+      : hideRedditPostMutation.isPending
+    : false;
 
   useEffect(() => {
     if (!useInfiniteScrollHome) {
@@ -999,7 +1007,7 @@ export default function HomePage() {
                     isDeleting={isDeleting}
                     onShare={() => handleSharePost(post.id)}
                     onToggleSave={(shouldSave) => handleToggleSavePost(post.id, !shouldSave)}
-                    onHide={() => handleHidePost(post.id)}
+                    onHide={() => handleHidePost(post)}
                     onDelete={() => handleDeletePost(post)}
                   />
                 </div>

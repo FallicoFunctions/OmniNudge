@@ -28,6 +28,9 @@ type Tab = 'posts' | 'communities' | 'users';
 type PostSource = 'all' | 'omni';
 type SortOrder = 'relevance' | 'new' | 'old';
 type CrosspostTarget = { post: RedditApiPost };
+type HideTarget =
+  | { type: 'reddit'; post: RedditApiPost }
+  | { type: 'platform'; post: PlatformPost };
 
 export default function SearchResultsPage() {
   const location = useLocation();
@@ -112,7 +115,7 @@ export default function SearchResultsPage() {
   const [selectedHub, setSelectedHub] = useState('');
   const [selectedSubreddit, setSelectedSubreddit] = useState('');
   const [sendRepliesToInbox, setSendRepliesToInbox] = useState(true);
-  const [hideTarget, setHideTarget] = useState<RedditApiPost | null>(null);
+  const [hideTarget, setHideTarget] = useState<HideTarget | null>(null);
 
   const savedPostsKey = ['saved-items', 'posts'] as const;
   const hiddenPostsKey = ['hidden-items', 'posts'] as const;
@@ -155,6 +158,7 @@ export default function SearchResultsPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: hiddenPostsKey });
+      setHideTarget(null);
     },
     onError: (mutationError: Error) => {
       alert(`Failed to hide post: ${mutationError.message}`);
@@ -663,7 +667,7 @@ export default function SearchResultsPage() {
                           alert('Please sign in to hide posts.');
                           return;
                         }
-                        setHideTarget(post);
+                        setHideTarget({ type: 'reddit', post });
                       }}
                       onCrosspost={() => handleCrosspostRedditPost(post)}
                     />
@@ -708,10 +712,7 @@ export default function SearchResultsPage() {
                         alert('Please sign in to hide posts.');
                         return;
                       }
-                      if (!window.confirm('Hide this post?')) {
-                        return;
-                      }
-                      hidePostMutation.mutate(post.id);
+                      setHideTarget({ type: 'platform', post });
                     }}
                   />
                 </div>
@@ -855,11 +856,27 @@ export default function SearchResultsPage() {
                 Cancel
               </button>
               <button
-                onClick={() => hideRedditPostMutation.mutate(hideTarget)}
-                disabled={hideRedditPostMutation.isPending}
+                onClick={() => {
+                  if (hideTarget.type === 'platform') {
+                    hidePostMutation.mutate(hideTarget.post.id);
+                  } else {
+                    hideRedditPostMutation.mutate(hideTarget.post);
+                  }
+                }}
+                disabled={
+                  hideTarget.type === 'platform'
+                    ? hidePostMutation.isPending
+                    : hideRedditPostMutation.isPending
+                }
                 className="rounded bg-[var(--color-primary)] px-3 py-1 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)] disabled:opacity-50"
               >
-                {hideRedditPostMutation.isPending ? 'Hiding...' : 'Hide Post'}
+                {hideTarget.type === 'platform'
+                  ? hidePostMutation.isPending
+                    ? 'Hiding...'
+                    : 'Hide Post'
+                  : hideRedditPostMutation.isPending
+                  ? 'Hiding...'
+                  : 'Hide Post'}
               </button>
             </div>
           </div>
