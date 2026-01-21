@@ -21,6 +21,7 @@ import {
   type RedditCrosspostSource,
 } from '../utils/crosspostHelpers';
 import type { RedditSubredditAbout } from '../types/reddit';
+import type { PlatformPost } from '../types/posts';
 import { RedditPostCard } from '../components/reddit/RedditPostCard';
 import { SubredditSidebar } from '../components/subreddit/SubredditSidebar';
 import { CommunityHeader } from '../components/common/CommunityHeader';
@@ -152,6 +153,7 @@ export default function RedditPage() {
   const [pageHistory, setPageHistory] = useState<(string | undefined)[]>([undefined]);
   const [slideshowOpen, setSlideshowOpen] = useState(false);
   const [includeTextPostsInSlideshow] = useState(true);
+  const loadMoreRef = useRef<HTMLDivElement | null>(null);
 
   // Calculate redditTimeFilter based on timeOptions from hook
   const redditTimeFilter =
@@ -544,7 +546,7 @@ export default function RedditPage() {
   useEffect(() => {
     setPostSearchInput('');
     setPostSearchQuery('');
-  }, [subreddit]);
+  }, [setPostSearchInput, subreddit]);
 
   useEffect(() => {
     setIncludeNsfwSearch(!blockAllNsfw && searchIncludeNsfwByDefault);
@@ -553,7 +555,13 @@ export default function RedditPage() {
     setScopedSearchAfter(null);
     setScopedSearchPage(1);
     setScopedSearchQuery('');
-  }, [blockAllNsfw, searchIncludeNsfwByDefault, subreddit]);
+  }, [
+    blockAllNsfw,
+    searchIncludeNsfwByDefault,
+    setIncludeNsfwSearch,
+    setLimitSearchToContext,
+    subreddit,
+  ]);
 
   useEffect(() => {
     if (limitSearchToContext) {
@@ -723,7 +731,7 @@ export default function RedditPage() {
     setPostSearchInput(normalized);
     setLimitSearchToContext(true);
     runPostSearch(normalized, true);
-  }, [runPostSearch, scopedSearchFromState]);
+  }, [runPostSearch, scopedSearchFromState, setLimitSearchToContext, setPostSearchInput]);
 
   const handleShareRedditPost = (post: FeedRedditPost) => {
     const shareUrl = `${window.location.origin}/r/${post.subreddit}/comments/${post.id}`;
@@ -775,7 +783,17 @@ export default function RedditPage() {
       return [];
     }
 
-    // Helper functions for sorting
+    const redditItems = visiblePosts.map((post) => ({ type: 'reddit' as const, post }));
+    const localItems = visibleLocalPosts.map((post) => ({ type: 'platform' as const, post }));
+
+    if (showOmniOnly) {
+      return localItems;
+    }
+
+    if (localItems.length === 0) {
+      return redditItems;
+    }
+
     const getCreatedTimestamp = (post: CrosspostSource) => {
       if (post.type === 'reddit') {
         return post.post.created_utc * 1000;
@@ -784,50 +802,67 @@ export default function RedditPage() {
       return timestamp ? new Date(timestamp).getTime() : 0;
     };
 
-    const getSortValue = (post: CrosspostSource) => {
-      if (sort === 'new') {
-        return getCreatedTimestamp(post);
+    const getScoreValue = (post: CrosspostSource) => post.post.score ?? 0;
+
+    const mergeRoundRobin = (primary: CrosspostSource[], secondary: CrosspostSource[]) => {
+      const merged: CrosspostSource[] = [];
+      const maxItems = Math.max(primary.length, secondary.length);
+      for (let i = 0; i < maxItems; i += 1) {
+        if (i < primary.length) merged.push(primary[i]);
+        if (i < secondary.length) merged.push(secondary[i]);
       }
-      if (sort === 'top') {
-        return post.post.score ?? 0;
-      }
-      const recency = getCreatedTimestamp(post);
-      return (post.post.score ?? 0) * 1_000_000 + recency;
+      return merged;
     };
 
-    // Combine ALL posts (Reddit + Omni) and sort by actual criteria
-    const allPosts: CrosspostSource[] = [
-      ...visiblePosts.map((post) => ({ type: 'reddit' as const, post })),
-      ...visibleLocalPosts.map((post) => ({ type: 'platform' as const, post })),
-    ];
+    const mergeByKey = (
+      primary: CrosspostSource[],
+      secondary: CrosspostSource[],
+      getKey: (post: CrosspostSource) => number
+    ) => {
+      const merged: CrosspostSource[] = [];
+      let i = 0;
+      let j = 0;
+      while (i < primary.length && j < secondary.length) {
+        const primaryKey = getKey(primary[i]);
+        const secondaryKey = getKey(secondary[j]);
+        if (primaryKey >= secondaryKey) {
+          merged.push(primary[i]);
+          i += 1;
+        } else {
+          merged.push(secondary[j]);
+          j += 1;
+        }
+      }
+      if (i < primary.length) {
+        merged.push(...primary.slice(i));
+      }
+      if (j < secondary.length) {
+        merged.push(...secondary.slice(j));
+      }
+      return merged;
+    };
 
-    const filteredPosts = showOmniOnly
-      ? allPosts.filter((post) => post.type === 'platform')
-      : allPosts;
+    let merged: CrosspostSource[] = [];
 
-    // Only pin stickied posts to top when sorting by "hot"
-    const shouldPinStickied = sort === 'hot';
-
-    // Separate stickied posts from regular posts (only if sorting by hot)
-    const stickiedPosts = shouldPinStickied
-      ? filteredPosts.filter((post) => post.type === 'reddit' && post.post.stickied)
-      : [];
-    const regularPosts = shouldPinStickied
-      ? filteredPosts.filter((post) => !(post.type === 'reddit' && post.post.stickied))
-      : filteredPosts;
-
-    // Sort regular posts
-    const sortedRegular = [...regularPosts].sort((a, b) => getSortValue(b) - getSortValue(a));
-
-    // Combine: stickied posts first (only for hot), then sorted regular posts
-    const sorted = [...stickiedPosts, ...sortedRegular];
-
-    // In pagination mode, limit to current page size
-    if (!useInfiniteScrollSubs && currentPageSize) {
-      return sorted.slice(0, currentPageSize);
+    if (sort === 'hot') {
+      const stickiedPosts = redditItems.filter((item) => item.post.stickied);
+      const regularReddit = redditItems.filter((item) => !item.post.stickied);
+      merged = [...stickiedPosts, ...mergeRoundRobin(regularReddit, localItems)];
+    } else if (sort === 'new') {
+      const localSorted = [...localItems].sort(
+        (a, b) => getCreatedTimestamp(b) - getCreatedTimestamp(a)
+      );
+      merged = mergeByKey(redditItems, localSorted, getCreatedTimestamp);
+    } else {
+      const localSorted = [...localItems].sort((a, b) => getScoreValue(b) - getScoreValue(a));
+      merged = mergeByKey(redditItems, localSorted, getScoreValue);
     }
 
-    return sorted;
+    if (!useInfiniteScrollSubs && currentPageSize) {
+      return merged.slice(0, currentPageSize);
+    }
+
+    return merged;
   }, [
     visiblePosts,
     visibleLocalPosts,
@@ -1000,20 +1035,19 @@ export default function RedditPage() {
   // Auto-fetch next page when scrolling near bottom
   useEffect(() => {
     if (!useInfiniteScrollSubs) return;
-
-    const handleScroll = () => {
-      if (!hasMoreRedditPages || isFetchingNextPage) return;
-      const scrollPosition = window.scrollY + window.innerHeight;
-      const threshold = document.documentElement.scrollHeight - 600;
-      if (scrollPosition >= threshold) {
-        fetchNextPage();
-      }
-    };
-
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => {
-      window.removeEventListener('scroll', handleScroll);
-    };
+    const loadMoreEl = loadMoreRef.current;
+    if (!loadMoreEl) return;
+    if (!hasMoreRedditPages || isFetchingNextPage) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting && hasMoreRedditPages && !isFetchingNextPage) {
+          fetchNextPage();
+        }
+      },
+      { rootMargin: '200px 0px' }
+    );
+    observer.observe(loadMoreEl);
+    return () => observer.disconnect();
   }, [useInfiniteScrollSubs, hasMoreRedditPages, isFetchingNextPage, fetchNextPage]);
 
   return (
@@ -1246,7 +1280,7 @@ export default function RedditPage() {
               <>
                 <VirtualizedList
                   items={scopedSearchResults}
-                  estimateSize={230}
+                  estimateSize={120}
                   getKey={(item) =>
                     item.type === 'platform' ? `scoped-local-${item.post.id}` : `scoped-reddit-${item.post.id}`
                   }
@@ -1272,7 +1306,7 @@ export default function RedditPage() {
           ) : filteredCombinedPosts.length > 0 ? (
             <VirtualizedList
               items={filteredCombinedPosts}
-              estimateSize={230}
+              estimateSize={120}
               getKey={(item) =>
                 item.type === 'platform' ? `local-${item.post.id}` : `reddit-${item.post.id}`
               }
@@ -1290,6 +1324,10 @@ export default function RedditPage() {
                 </EmptyMessage>
               </div>
             )
+          )}
+
+          {useInfiniteScrollSubs && !scopedSearchResults && filteredCombinedPosts.length > 0 && (
+            <div ref={loadMoreRef} className="h-10" />
           )}
 
           {/* Loading indicator for infinite scroll */}

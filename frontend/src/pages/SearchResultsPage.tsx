@@ -182,7 +182,7 @@ export default function SearchResultsPage() {
           link_flair_text: post.link_flair_text ?? null,
           link_flair_background_color: post.link_flair_background_color ?? null,
           link_flair_text_color: post.link_flair_text_color ?? null,
-          over18: post.over18 ?? post.over_18 ?? null,
+          over18: post.over18 ?? (post as { over_18?: boolean }).over_18 ?? null,
         });
       } else {
         await savedService.unsaveRedditPost(post.subreddit, post.id);
@@ -626,7 +626,7 @@ export default function SearchResultsPage() {
           )}
           <VirtualizedList
             items={visiblePosts}
-            estimateSize={200}
+            estimateSize={120}
             getKey={(item, idx) =>
               item.type === 'reddit' ? `sr-reddit-${item.post.id}-${idx}` : `sr-local-${item.post.id}-${idx}`
             }

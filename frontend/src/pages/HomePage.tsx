@@ -253,7 +253,10 @@ export default function HomePage() {
   const [cursorStack, setCursorStack] = useState(['']);
   const pageSize = 50;
   const currentCursor = cursorStack[cursorStack.length - 1] ?? '';
-  const homeFeedQueryKey = ['home-feed', sort, omniOnly, showPopularFallback, timeRangeKey, currentCursor] as const;
+  const homeFeedQueryKey = useMemo(
+    () => ['home-feed', sort, omniOnly, showPopularFallback, timeRangeKey, currentCursor] as const,
+    [sort, omniOnly, showPopularFallback, timeRangeKey, currentCursor]
+  );
   const { data: pagedData, isLoading: isPagedLoading, isFetching: isPagedFetching } = useQuery<HomeFeedResponse>({
     queryKey: homeFeedQueryKey,
     queryFn: () => {
@@ -302,7 +305,6 @@ export default function HomePage() {
   }, [useInfiniteScrollHome, infiniteData?.pages, pagedData?.posts]);
 
   // Hidden Reddit posts state
-  const hiddenRedditPostsKey = ['hidden-items', 'reddit_posts'] as const;
   const { data: hiddenRedditPostsData } = useHiddenItems('reddit_posts', !!user);
   const hiddenRedditPostIds = useMemo(
     () => getHiddenRedditPostIdSet(hiddenRedditPostsData),
@@ -343,12 +345,16 @@ export default function HomePage() {
         if (!data) return data;
         return {
           ...data,
-          posts: data.posts.filter(
-            (item) =>
-              item.source !== 'reddit' ||
-              normalizeRedditPostId(item.post.id) !== targetId ||
-              item.post.subreddit !== post.subreddit
-          ),
+          posts: data.posts.filter((item) => {
+            if (item.source !== 'reddit') {
+              return true;
+            }
+            const redditItem = item.post as RedditPost;
+            return (
+              normalizeRedditPostId(redditItem.id) !== targetId ||
+              redditItem.subreddit !== post.subreddit
+            );
+          }),
         };
       });
       queryClient.setQueryData<InfiniteData<HomeFeedResponse>>(
@@ -359,12 +365,16 @@ export default function HomePage() {
             ...data,
             pages: data.pages.map((page) => ({
               ...page,
-              posts: page.posts.filter(
-                (item) =>
-                  item.source !== 'reddit' ||
-                  normalizeRedditPostId(item.post.id) !== targetId ||
-                  item.post.subreddit !== post.subreddit
-              ),
+              posts: page.posts.filter((item) => {
+                if (item.source !== 'reddit') {
+                  return true;
+                }
+                const redditItem = item.post as RedditPost;
+                return (
+                  normalizeRedditPostId(redditItem.id) !== targetId ||
+                  redditItem.subreddit !== post.subreddit
+                );
+              }),
             })),
           };
         }
@@ -977,7 +987,7 @@ export default function HomePage() {
       ) : (
         <VirtualizedList
           items={displayedPosts}
-          estimateSize={240}
+          estimateSize={120}
           getKey={(item) =>
             item.source === 'hub'
               ? `hub-${(item.post as PlatformPost).id}`

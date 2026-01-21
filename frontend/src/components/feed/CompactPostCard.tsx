@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { useState, useEffect, useRef } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { formatDistanceToNow } from 'date-fns';
 import { getPostUrl } from '../../utils/postUrl';
 import { resolveMediaUrl } from '../../utils/mediaUrl';
@@ -7,9 +8,13 @@ import { HlsVideo } from '../common/HlsVideo';
 import { ImageCarousel } from './ImageCarousel';
 import { ExpandedPost } from './ExpandedPost';
 import { ExpandedMessage } from './ExpandedMessage';
+import { useAuth } from '../../contexts/AuthContext';
+import { decryptMessage, decryptMultiRecipientContent } from '../../utils/encryption';
+import { getOwnKeys } from '../../services/keyManagementService';
+import { hubsService } from '../../services/hubsService';
 import type { PlatformPost } from '../../types/posts';
 import type { CombinedFeedItem } from '../../services/feedService';
-import type { Conversation } from '../../types/messages';
+import type { Conversation, Message } from '../../types/messages';
 
 interface CompactPostCardProps {
   post: PlatformPost | any; // Can be RedditPost, PlatformPost, or Conversation
@@ -18,7 +23,99 @@ interface CompactPostCardProps {
   onToggleExpand?: () => void;
 }
 
+function DecryptedMessagePreview({
+  message,
+  isOwnMessage,
+  userId,
+}: {
+  message?: Message | null;
+  isOwnMessage: boolean;
+  userId?: number;
+}) {
+  const [preview, setPreview] = useState('');
+
+  useEffect(() => {
+    if (!message) {
+      setPreview('');
+      return;
+    }
+    const cipherText = isOwnMessage
+      ? message.sender_encrypted_content ?? message.encrypted_content
+      : message.encrypted_content;
+
+    if (!cipherText) {
+      setPreview('');
+      return;
+    }
+
+    setPreview(cipherText);
+
+    const attemptDecryption = async () => {
+      if (message.is_multi_recipient && message.shared_encryption_iv && message.recipient_keys) {
+        try {
+          const keys = await getOwnKeys();
+          const encryptedKey = userId ? message.recipient_keys?.[userId] : null;
+          if (keys?.privateKey && encryptedKey) {
+            const decrypted = await decryptMultiRecipientContent(
+              cipherText,
+              encryptedKey,
+              message.shared_encryption_iv,
+              keys.privateKey
+            );
+            setPreview(decrypted);
+            return;
+          }
+        } catch (error) {
+          console.warn('Failed to decrypt multi-recipient preview:', error);
+        }
+      }
+
+      const shouldAttemptDecrypt = Boolean(
+        (isOwnMessage && message.sender_encrypted_content) ||
+          (!isOwnMessage && message.encryption_version === 'v1')
+      );
+
+      if (!shouldAttemptDecrypt) {
+        setPreview(cipherText);
+        return;
+      }
+
+      try {
+        const keys = await getOwnKeys();
+        if (!keys) {
+          setPreview(cipherText);
+          return;
+        }
+        const decrypted = await decryptMessage(cipherText, keys.privateKey);
+        setPreview(decrypted);
+      } catch (error) {
+        console.warn('Failed to decrypt preview, showing ciphertext:', error);
+        setPreview(cipherText);
+      }
+    };
+
+    attemptDecryption();
+  }, [
+    message,
+    isOwnMessage,
+    message?.encrypted_content,
+    message?.sender_encrypted_content,
+    message?.encryption_version,
+    message?.is_multi_recipient,
+    message?.shared_encryption_iv,
+    message?.recipient_keys,
+    userId,
+  ]);
+
+  if (!preview) {
+    return null;
+  }
+
+  return <>{preview}</>;
+}
+
 export function CompactPostCard({ post, feedType, isExpanded = false, onToggleExpand }: CompactPostCardProps) {
+  const { user } = useAuth();
   const [galleryIndex, setGalleryIndex] = useState(0);
   const [isGalleryHovered, setIsGalleryHovered] = useState(false);
   const titleAreaRef = useRef<HTMLDivElement>(null);
@@ -29,6 +126,16 @@ export function CompactPostCard({ post, feedType, isExpanded = false, onToggleEx
     const conversation = post as Conversation;
     const otherUser = conversation.other_user;
     const lastMessage = conversation.latest_message;
+    const isOwnMessage = lastMessage?.sender_id === user?.id;
+    const isModMail = conversation.conversation_type === 'mod_mail';
+    const hubName = conversation.hub_name ?? '';
+    const { data: hubDetails } = useQuery({
+      queryKey: ['hub-details', hubName],
+      queryFn: () => hubsService.getHub(hubName),
+      enabled: isModMail && !!hubName,
+    });
+    const hubDisplayTitle = hubDetails?.title?.trim() || hubName;
+    const modMailTitle = `${hubDisplayTitle || 'Hub'} - Mod Mail - ${conversation.subject || 'Untitled'}`;
 
     return (
       <article className="compact-post-card">
@@ -59,11 +166,15 @@ export function CompactPostCard({ post, feedType, isExpanded = false, onToggleEx
               {/* Content */}
               <div className="flex-1 min-w-0">
                 <h3 className="text-sm font-medium leading-tight text-[var(--color-text)]">
-                  {otherUser?.username || 'Unknown User'}
+                  {isModMail ? modMailTitle : otherUser?.username || 'Unknown User'}
                 </h3>
                 {lastMessage && lastMessage.encrypted_content && (
                   <p className="text-xs text-[var(--color-text-muted)] mt-1 line-clamp-1">
-                    {lastMessage.encrypted_content}
+                    <DecryptedMessagePreview
+                      message={lastMessage}
+                      isOwnMessage={!!isOwnMessage}
+                      userId={user?.id}
+                    />
                   </p>
                 )}
                 <div className="text-xs text-[var(--color-text-muted)] mt-1">
