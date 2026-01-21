@@ -274,14 +274,20 @@ export function RedditPostSlideshow({
         }
 
         // Check if it's an image post
-        if (redditPost.post_hint === 'image' && redditPost.url) {
-          processedPosts.push({
-            id: redditPost.id,
-            title: redditPost.title,
-            mediaUrl: redditPost.url,
-            mediaType: 'image' as const,
-            postUrl,
-          });
+        if (redditPost.post_hint === 'image') {
+          // Prefer high-resolution preview image over the url
+          const previewUrl = redditPost.preview?.images?.[0]?.source?.url;
+          const imageUrl = previewUrl?.replace(/&amp;/g, '&') || redditPost.url;
+
+          if (imageUrl) {
+            processedPosts.push({
+              id: redditPost.id,
+              title: redditPost.title,
+              mediaUrl: imageUrl,
+              mediaType: 'image' as const,
+              postUrl,
+            });
+          }
           return;
         }
 

@@ -214,6 +214,17 @@ export function CompactPostCard({ post, feedType, isExpanded = false, onToggleEx
   let mediaUrl = actualPost.media_url || actualPost.url;
   let thumbnail = actualPost.thumbnail_url || actualPost.thumbnail;
 
+  // For Reddit posts, check for high-resolution preview image
+  if (isRedditPost || source === 'reddit') {
+    const previewUrl = actualPost.preview?.images?.[0]?.source?.url;
+    if (previewUrl) {
+      // Decode HTML entities in preview URL
+      const sanitizedPreview = previewUrl.replace(/&amp;/g, '&');
+      // Use preview as thumbnail - it's higher quality than the thumbnail field
+      thumbnail = sanitizedPreview;
+    }
+  }
+
   // Clean up invalid thumbnails
   if (thumbnail === 'self' || thumbnail === 'default' || thumbnail === 'nsfw' || thumbnail === 'spoiler') {
     thumbnail = null;

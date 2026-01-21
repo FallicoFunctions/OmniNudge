@@ -1070,7 +1070,7 @@ export function RedditPostCard({
                     />
                   ) : hasSelftext ? (
                     <div className="p-4 text-[var(--color-text-primary)]">
-                      <PostBodyMarkdown content={post.selftext} />
+                      <PostBodyMarkdown content={post.selftext ?? ''} />
                     </div>
                   ) : null}
                 </div>
