@@ -244,6 +244,22 @@ export default function MainLayout() {
                       </Link>
                     </>
                   )}
+                  {isSlimMode && location.pathname === '/settings' && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (window.history.length > 1) {
+                          navigate(-1);
+                        } else {
+                          navigate('/');
+                        }
+                      }}
+                      className="rounded-md bg-[var(--color-surface-elevated)] px-2 py-1 text-xs font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-border)]"
+                      aria-label="Exit settings"
+                    >
+                      ←
+                    </button>
+                  )}
                   <Link
                     to="/settings"
                     onMouseEnter={() => prefetchRoutes.settings()}
