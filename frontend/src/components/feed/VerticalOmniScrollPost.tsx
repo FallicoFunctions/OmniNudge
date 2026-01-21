@@ -2,8 +2,38 @@ import { Link } from 'react-router-dom';
 import { formatDistanceToNow } from 'date-fns';
 import { getPostUrl } from '../../utils/postUrl';
 import { resolveMediaUrl } from '../../utils/mediaUrl';
+import { sanitizeHttpUrl } from '../../utils/crosspostHelpers';
 import type { PlatformPost } from '../../types/posts';
 import type { CombinedFeedItem } from '../../services/feedService';
+
+const IMAGE_URL_REGEX = /\.(jpe?g|png|gif|webp)$/i;
+
+function getExpandableImageUrl(post: any): string | undefined {
+  // Gallery posts are handled separately, don't return thumbnail as preview
+  const isGalleryPost = post.url?.includes('/gallery/');
+  if (isGalleryPost) {
+    return undefined;
+  }
+
+  // Check for regular image preview
+  const previewUrl = post.preview?.images?.[0]?.source?.url;
+  const sanitizedPreview = sanitizeHttpUrl(previewUrl);
+  if (sanitizedPreview) {
+    return sanitizedPreview;
+  }
+
+  // Check direct image URL
+  const sanitizedPostUrl = sanitizeHttpUrl(post.url);
+  if (!sanitizedPostUrl) {
+    return undefined;
+  }
+
+  if (post.post_hint === 'image' || IMAGE_URL_REGEX.test(sanitizedPostUrl.toLowerCase())) {
+    return sanitizedPostUrl;
+  }
+
+  return undefined;
+}
 
 interface VerticalOmniScrollPostProps {
   post: any;
@@ -36,6 +66,27 @@ export function VerticalOmniScrollPost({ post, feedType, isActive }: VerticalOmn
   // Media handling
   let mediaUrl = actualPost.media_url || actualPost.url;
   let thumbnailUrl = actualPost.thumbnail_url || actualPost.thumbnail;
+
+  // For Reddit posts, use the same logic as RedditPostCard
+  if (isRedditPost || source === 'reddit') {
+    const expandableImageUrl = getExpandableImageUrl(actualPost);
+    console.log('[OmniScroll Debug]', {
+      postId: actualPost.id,
+      title: title.substring(0, 50),
+      hasPreviewField: 'preview' in actualPost,
+      previewImages: actualPost.preview?.images?.length,
+      previewSourceUrl: actualPost.preview?.images?.[0]?.source?.url,
+      postHint: actualPost.post_hint,
+      postUrl: actualPost.url,
+      expandableImageUrl,
+      mediaUrl,
+    });
+    if (expandableImageUrl) {
+      mediaUrl = expandableImageUrl;
+      // Clear thumbnail when we have high-res image
+      thumbnailUrl = null;
+    }
+  }
 
   if (thumbnailUrl === 'self' || thumbnailUrl === 'default' || thumbnailUrl === 'nsfw' || thumbnailUrl === 'spoiler') {
     thumbnailUrl = null;
