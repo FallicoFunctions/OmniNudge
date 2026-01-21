@@ -128,6 +128,74 @@ func (h *ModMailHandler) enrichConversationDetails(ctx context.Context, conv *Mo
 	return nil
 }
 
+// GetModMailRecipients handles GET /api/v1/mod-mail/hubs/:hub_name/recipients
+// Returns user IDs for hub moderators and admins for encryption recipients.
+func (h *ModMailHandler) GetModMailRecipients(c *gin.Context) {
+	if _, exists := c.Get("user_id"); !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
+
+	hubName := c.Param("hub_name")
+	hub, err := h.hubRepo.GetByName(c.Request.Context(), hubName)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get hub", "details": err.Error()})
+		return
+	}
+	if hub == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Hub not found"})
+		return
+	}
+
+	recipientIDs := map[int]struct{}{}
+
+	rows, err := h.pool.Query(c.Request.Context(), `
+		SELECT user_id FROM hub_moderators WHERE hub_id = $1
+	`, hub.ID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get moderators"})
+		return
+	}
+	for rows.Next() {
+		var modID int
+		if err := rows.Scan(&modID); err != nil {
+			rows.Close()
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to scan moderators"})
+			return
+		}
+		recipientIDs[modID] = struct{}{}
+	}
+	rows.Close()
+
+	adminRows, err := h.pool.Query(c.Request.Context(), `
+		SELECT id FROM users WHERE role = 'admin' AND deleted = false
+	`)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get admins"})
+		return
+	}
+	for adminRows.Next() {
+		var adminID int
+		if err := adminRows.Scan(&adminID); err != nil {
+			adminRows.Close()
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to scan admins"})
+			return
+		}
+		recipientIDs[adminID] = struct{}{}
+	}
+	adminRows.Close()
+
+	out := make([]int, 0, len(recipientIDs))
+	for id := range recipientIDs {
+		out = append(out, id)
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"hub_name":      hub.Name,
+		"recipient_ids": out,
+	})
+}
+
 // CreateModMail handles POST /api/v1/mod-mail
 // Allows any logged-in user to message the mods of a hub
 func (h *ModMailHandler) CreateModMail(c *gin.Context) {
@@ -231,8 +299,6 @@ func (h *ModMailHandler) CreateModMail(c *gin.Context) {
 		}
 	}
 
-	participantIDs := append([]int{userID.(int)}, moderatorIDs...)
-
 	// Validate encryption payloads for multi-recipient encryption
 	if req.IsMultiRecipient {
 		if req.SharedEncryptionIV == nil || len(req.RecipientKeys) == 0 {
@@ -240,15 +306,9 @@ func (h *ModMailHandler) CreateModMail(c *gin.Context) {
 			return
 		}
 
-		for _, pid := range participantIDs {
-			if _, ok := req.RecipientKeys[pid]; !ok {
-				c.JSON(http.StatusBadRequest, gin.H{
-					"error":   "Missing encrypted key for one or more participants",
-					"details": "Provide recipient_keys entries for all participants (user and moderators)",
-				})
-				return
-			}
-		}
+		// Note: We don't require ALL participants to have recipient_keys entries
+		// Some users may not have public keys set up yet, and they won't be able to decrypt
+		// until they enable encryption. The frontend warns about this.
 	}
 
 	// Create the first message (encrypted for all participants)
@@ -508,15 +568,30 @@ func (h *ModMailHandler) GetModMailConversation(c *gin.Context) {
 		return
 	}
 
-	// Check if user is a participant
+	// Check if user is a participant OR is an admin
 	var isParticipant bool
+	var isAdmin bool
 	err = h.pool.QueryRow(c.Request.Context(), `
 		SELECT EXISTS(
 			SELECT 1 FROM conversation_participants
 			WHERE conversation_id = $1 AND user_id = $2
 		)
 	`, conversationID, userID.(int)).Scan(&isParticipant)
-	if err != nil || !isParticipant {
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check participant status"})
+		return
+	}
+
+	// Check if user is an admin
+	err = h.pool.QueryRow(c.Request.Context(), `
+		SELECT role = 'admin' FROM users WHERE id = $1
+	`, userID.(int)).Scan(&isAdmin)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check admin status"})
+		return
+	}
+
+	if !isParticipant && !isAdmin {
 		c.JSON(http.StatusForbidden, gin.H{"error": "You are not a participant in this conversation"})
 		return
 	}

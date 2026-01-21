@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, useInfiniteQuery, type InfiniteData } from '@tanstack/react-query';
 import { feedService, type CombinedFeedItem, type HomeFeedResponse, type RedditPost } from '../services/feedService';
 import { useAuth } from '../contexts/AuthContext';
 import { useSettings } from '../contexts/SettingsContext';
@@ -14,7 +14,8 @@ import { hubsService } from '../services/hubsService';
 import { OffsetPaginationControls } from '../components/common/OffsetPaginationControls';
 import { VirtualizedList } from '../components/common/VirtualizedList';
 import { useSavedItems } from '../hooks/useSavedItems';
-import { getSavedPostIdSet, getSavedRedditPostIdSet } from '../utils/savedItems';
+import { useHiddenItems } from '../hooks/useHiddenItems';
+import { getHiddenRedditPostIdSet, getSavedPostIdSet, getSavedRedditPostIdSet } from '../utils/savedItems';
 import { LoadingMessage } from '../components/common/StatusMessage';
 import { FeedSearchBars } from '../components/common/FeedSearchBars';
 import { CreateActionButtons } from '../components/common/CreateActionButtons';
@@ -298,13 +299,28 @@ export default function HomePage() {
     return pagedData?.posts ?? [];
   }, [useInfiniteScrollHome, infiniteData?.pages, pagedData?.posts]);
 
+  // Hidden Reddit posts state
+  const hiddenRedditPostsKey = ['hidden-items', 'reddit_posts'] as const;
+  const { data: hiddenRedditPostsData } = useHiddenItems('reddit_posts', !!user);
+  const hiddenRedditPostIds = useMemo(
+    () => getHiddenRedditPostIdSet(hiddenRedditPostsData),
+    [hiddenRedditPostsData]
+  );
+
+  const normalizeRedditPostId = (postId: string) => postId.replace(/^t3_/, '');
+
   const displayedPosts = useMemo(() => {
-    const baseItems = basePosts;
+    const baseItems = basePosts.filter((item) => {
+      if (item.source !== 'reddit') return true;
+      const redditPost = item.post as RedditPost;
+      const postKey = `${redditPost.subreddit}-${normalizeRedditPostId(redditPost.id)}`;
+      return !hiddenRedditPostIds.has(postKey);
+    });
     if (!omniOnly) {
       return baseItems;
     }
     return baseItems.filter((item) => item.source === 'hub');
-  }, [basePosts, omniOnly]);
+  }, [basePosts, hiddenRedditPostIds, omniOnly]);
 
   const hasMore = useInfiniteScrollHome
     ? Boolean(hasNextPage)
@@ -317,6 +333,43 @@ export default function HomePage() {
     queryClient.invalidateQueries({ queryKey: ['home-feed'] });
     queryClient.invalidateQueries({ queryKey: ['home-feed-infinite'] });
   }, [queryClient]);
+
+  const removeRedditPostFromFeedCache = useCallback(
+    (post: RedditPost) => {
+      const targetId = normalizeRedditPostId(post.id);
+      queryClient.setQueryData<HomeFeedResponse>(homeFeedQueryKey, (data) => {
+        if (!data) return data;
+        return {
+          ...data,
+          posts: data.posts.filter(
+            (item) =>
+              item.source !== 'reddit' ||
+              normalizeRedditPostId(item.post.id) !== targetId ||
+              item.post.subreddit !== post.subreddit
+          ),
+        };
+      });
+      queryClient.setQueryData<InfiniteData<HomeFeedResponse>>(
+        ['home-feed-infinite', sort, omniOnly, showPopularFallback, timeRangeKey],
+        (data) => {
+          if (!data) return data;
+          return {
+            ...data,
+            pages: data.pages.map((page) => ({
+              ...page,
+              posts: page.posts.filter(
+                (item) =>
+                  item.source !== 'reddit' ||
+                  normalizeRedditPostId(item.post.id) !== targetId ||
+                  item.post.subreddit !== post.subreddit
+              ),
+            })),
+          };
+        }
+      );
+    },
+    [homeFeedQueryKey, omniOnly, queryClient, showPopularFallback, sort, timeRangeKey]
+  );
 
   // Saved posts state
   const savedPostsKey = ['saved-items', 'posts'] as const;
@@ -433,7 +486,8 @@ export default function HomePage() {
       }
       await savedService.hideRedditPost(post.subreddit, post.id);
     },
-    onSuccess: () => {
+    onSuccess: (_data, post) => {
+      removeRedditPostFromFeedCache(post);
       invalidateHomeFeed();
       setHideTarget(null);
     },

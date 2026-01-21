@@ -20,6 +20,7 @@ interface HubPostCardProps {
   onShare?: () => void;
   onToggleSave?: (shouldSave: boolean) => void;
   onHide?: () => void;
+  hideLabel?: string;
   onCrosspost?: () => void;
   onTogglePin?: () => void;
   onPinnedPointerDown?: (postId: number, event: PointerEvent<HTMLButtonElement>) => void;

@@ -48,12 +48,27 @@ export interface SaveRedditPostPayload {
   over18?: boolean | null;
 }
 
+export interface SavedRedditAPIComment {
+  subreddit: string;
+  reddit_post_id: string;
+  reddit_comment_id: string;
+  post_title?: string | null;
+  post_author?: string | null;
+  comment_author: string;
+  comment_body: string;
+  score: number;
+  created_utc?: number | null;
+  parent_id?: string | null;
+  saved_at: string;
+}
+
 export interface SavedItemsResponse {
-  type: 'all' | 'posts' | 'reddit_posts' | 'reddit_comments' | 'post_comments';
+  type: 'all' | 'posts' | 'reddit_posts' | 'reddit_comments' | 'post_comments' | 'reddit_api_comments';
   saved_posts?: SavedPost[];
   saved_reddit_posts?: SavedRedditPost[];
   saved_post_comments?: SavedPostComment[];
   saved_reddit_comments?: LocalRedditComment[];
+  saved_reddit_api_comments?: SavedRedditAPIComment[];
   auto_removed_reddit_posts?: Array<{
     subreddit: string;
     reddit_post_id: string;

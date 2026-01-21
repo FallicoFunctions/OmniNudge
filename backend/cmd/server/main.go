@@ -474,6 +474,8 @@ func main() {
 			protected.POST("/reddit/posts/:subreddit/:postId/comments/:commentId/vote", redditCommentsHandler.VoteRedditPostComment)
 			protected.POST("/reddit/posts/:subreddit/:postId/comments/:commentId/save", savedItemsHandler.SaveRedditComment)
 			protected.DELETE("/reddit/posts/:subreddit/:postId/comments/:commentId/save", savedItemsHandler.UnsaveRedditComment)
+			protected.POST("/reddit/api-comments/save", savedItemsHandler.SaveRedditAPIComment)
+			protected.DELETE("/reddit/api-comments/:commentId/save", savedItemsHandler.UnsaveRedditAPIComment)
 			protected.POST("/reddit/posts/:subreddit/:postId/save", savedItemsHandler.SaveRedditPost)
 			protected.DELETE("/reddit/posts/:subreddit/:postId/save", savedItemsHandler.UnsaveRedditPost)
 			protected.POST("/reddit/posts/:subreddit/:postId/hide", savedItemsHandler.HideRedditPost)
@@ -519,6 +521,7 @@ func main() {
 			// Mod mail routes
 			protected.POST("/mod-mail", modMailHandler.CreateModMail)
 			protected.GET("/mod-mail/user", modMailHandler.GetUserModMail)
+			protected.GET("/mod-mail/hubs/:hub_name/recipients", modMailHandler.GetModMailRecipients)
 			protected.GET("/mod-mail/hubs/:hub_name", modMailHandler.GetModMailForHub)
 			protected.GET("/mod-mail/:id", modMailHandler.GetModMailConversation)
 			protected.PATCH("/mod-mail/:id/status", modMailHandler.UpdateModMailStatus)

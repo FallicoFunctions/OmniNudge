@@ -1,8 +1,10 @@
 import { api } from '../lib/api';
 import type { HiddenItemsResponse, SavedItemsResponse, SaveRedditPostPayload } from '../types/saved';
 
+const normalizeRedditPostId = (postId: string) => postId.replace(/^t3_/, '');
+
 export const savedService = {
-  async getSavedItems(type: 'all' | 'posts' | 'reddit_posts' | 'post_comments' | 'reddit_comments' = 'all'): Promise<SavedItemsResponse> {
+  async getSavedItems(type: 'all' | 'posts' | 'reddit_posts' | 'post_comments' | 'reddit_comments' | 'reddit_api_comments' = 'all'): Promise<SavedItemsResponse> {
     const query = type ? `?type=${type}` : '';
     return api.get<SavedItemsResponse>(`/users/me/saved${query}`);
   },
@@ -21,11 +23,11 @@ export const savedService = {
   },
 
   async saveRedditPost(subreddit: string, postId: string, payload?: SaveRedditPostPayload): Promise<void> {
-    await api.post(`/reddit/posts/${subreddit}/${postId}/save`, payload ?? {});
+    await api.post(`/reddit/posts/${subreddit}/${normalizeRedditPostId(postId)}/save`, payload ?? {});
   },
 
   async unsaveRedditPost(subreddit: string, postId: string): Promise<void> {
-    await api.delete(`/reddit/posts/${subreddit}/${postId}/save`);
+    await api.delete(`/reddit/posts/${subreddit}/${normalizeRedditPostId(postId)}/save`);
   },
 
   async savePostComment(commentId: number): Promise<void> {
@@ -44,6 +46,25 @@ export const savedService = {
     await api.delete(`/reddit/posts/${subreddit}/${postId}/comments/${commentId}/save`);
   },
 
+  async saveRedditAPIComment(payload: {
+    subreddit: string;
+    reddit_post_id: string;
+    reddit_comment_id: string;
+    post_title?: string;
+    post_author?: string;
+    comment_author: string;
+    comment_body: string;
+    score: number;
+    created_utc?: number;
+    parent_id?: string;
+  }): Promise<void> {
+    await api.post('/reddit/api-comments/save', payload);
+  },
+
+  async unsaveRedditAPIComment(redditCommentId: string): Promise<void> {
+    await api.delete(`/reddit/api-comments/${redditCommentId}/save`);
+  },
+
   async hidePost(postId: number): Promise<void> {
     await api.post(`/posts/${postId}/hide`);
   },
@@ -53,10 +74,10 @@ export const savedService = {
   },
 
   async hideRedditPost(subreddit: string, postId: string): Promise<void> {
-    await api.post(`/reddit/posts/${subreddit}/${postId}/hide`);
+    await api.post(`/reddit/posts/${subreddit}/${normalizeRedditPostId(postId)}/hide`);
   },
 
   async unhideRedditPost(subreddit: string, postId: string): Promise<void> {
-    await api.delete(`/reddit/posts/${subreddit}/${postId}/hide`);
+    await api.delete(`/reddit/posts/${subreddit}/${normalizeRedditPostId(postId)}/hide`);
   },
 };

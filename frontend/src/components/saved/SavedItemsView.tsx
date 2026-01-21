@@ -2,17 +2,20 @@ import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { savedService } from '../../services/savedService';
-import type { SavedPost, SavedPostComment, SavedRedditPost } from '../../types/saved';
+import type { SavedPost, SavedPostComment, SavedRedditPost, SavedRedditAPIComment } from '../../types/saved';
 import type { LocalRedditComment } from '../../types/reddit';
 import { api } from '../../lib/api';
 import { useSettings } from '../../contexts/SettingsContext';
-import { formatTimestamp } from '../../utils/timeFormat';
 import { RedditPostCard } from '../reddit/RedditPostCard';
+import { HubPostCard } from '../hubs/HubPostCard';
 import { usePagination } from '../../hooks/usePagination';
 import { PaginationControls } from '../common/PaginationControls';
 import { sanitizeHttpUrl } from '../../utils/crosspostHelpers';
 import { getPostUrl, getPostCommentUrl } from '../../utils/postUrl';
 import { ErrorMessage, LoadingMessage } from '../common/StatusMessage';
+import type { PlatformPost } from '../../types/posts';
+import { postsService } from '../../services/postsService';
+import { useAuth } from '../../contexts/AuthContext';
 
 type RedditListingData = {
   data?: {
@@ -23,6 +26,11 @@ type RedditListingData = {
         score?: number;
         num_comments?: number;
         thumbnail?: string;
+        url?: string;
+        selftext?: string;
+        is_self?: boolean;
+        post_hint?: string;
+        is_video?: boolean;
         created_utc?: number;
         link_flair_text?: string;
         link_flair_background_color?: string;
@@ -49,7 +57,8 @@ type RedditListingData = {
   };
 };
 
-type TabKey = 'omni' | 'reddit';
+type ContentType = 'posts' | 'comments' | 'both';
+type SourceFilter = 'omni' | 'reddit' | 'both';
 
 const PAGE_SIZE = 25;
 
@@ -88,11 +97,13 @@ export function SavedItemsView({
   const location = useLocation();
   const queryClient = useQueryClient();
   const { useRelativeTime, notifyRemovedSavedPosts } = useSettings();
+  const { user } = useAuth();
   const originState = useMemo(
     () => ({ originPath: `${location.pathname}${location.search}` }),
     [location.pathname, location.search]
   );
-  const [activeTab, setActiveTab] = useState<TabKey>('omni');
+  const [contentType, setContentType] = useState<ContentType>('posts');
+  const [sourceFilter, setSourceFilter] = useState<SourceFilter>('both');
   const [removedNoticeDismissed, setRemovedNoticeDismissed] = useState(false);
   const { data, isLoading, error } = useQuery({
     queryKey: ['saved-items', 'all'],
@@ -123,6 +134,10 @@ export function SavedItemsView({
     () => (data?.saved_reddit_comments ?? []) as LocalRedditComment[],
     [data?.saved_reddit_comments]
   );
+  const savedRedditAPIComments = useMemo(
+    () => (data?.saved_reddit_api_comments ?? []) as SavedRedditAPIComment[],
+    [data?.saved_reddit_api_comments]
+  );
   const hiddenRedditPostIds = useMemo(
     () =>
       new Set(
@@ -140,6 +155,8 @@ export function SavedItemsView({
   const [postDetails, setPostDetails] = useState<Record<string, Partial<SavedRedditPost>>>({});
   const fetchingDetailsRef = useRef<Set<string>>(new Set());
   const [hideTargetPost, setHideTargetPost] = useState<SavedRedditPost | null>(null);
+  const [omniPostDetails, setOmniPostDetails] = useState<Record<number, PlatformPost>>({});
+  const fetchingOmniDetailsRef = useRef<Set<number>>(new Set());
 
   const postsNeedingDetails = useMemo(
     () =>
@@ -182,6 +199,11 @@ export function SavedItemsView({
             [postKey]: {
               title: remotePost.title,
               author: remotePost.author,
+              url: remotePost.url,
+              selftext: remotePost.selftext,
+              is_self: remotePost.is_self,
+              post_hint: remotePost.post_hint,
+              is_video: remotePost.is_video,
               score:
                 typeof remotePost.score === 'number' ? remotePost.score : prev[postKey]?.score,
               num_comments:
@@ -202,6 +224,9 @@ export function SavedItemsView({
                 remotePost.over_18 ??
                 prev[postKey]?.over18 ??
                 null,
+              preview: remotePost.preview ?? prev[postKey]?.preview ?? null,
+              media: remotePost.media ?? prev[postKey]?.media ?? null,
+              secure_media: remotePost.secure_media ?? prev[postKey]?.secure_media ?? null,
             },
           }));
         })
@@ -217,6 +242,42 @@ export function SavedItemsView({
     Promise.all(fetchPromises);
   }, [postsNeedingDetails, postDetails]);
 
+  useEffect(() => {
+    const missingOmniPosts = savedPosts.filter((post) => {
+      if (omniPostDetails[post.id] || fetchingOmniDetailsRef.current.has(post.id)) {
+        return false;
+      }
+      return true;
+    });
+
+    if (missingOmniPosts.length === 0) {
+      return;
+    }
+
+    missingOmniPosts.forEach((post) => {
+      fetchingOmniDetailsRef.current.add(post.id);
+    });
+
+    Promise.all(
+      missingOmniPosts.map((post) =>
+        postsService
+          .getPost(post.id)
+          .then((details) => {
+            setOmniPostDetails((prev) => ({
+              ...prev,
+              [post.id]: details,
+            }));
+          })
+          .catch((fetchError) => {
+            console.error('Failed to refresh saved Omni post details', fetchError);
+          })
+          .finally(() => {
+            fetchingOmniDetailsRef.current.delete(post.id);
+          })
+      )
+    );
+  }, [savedPosts, omniPostDetails]);
+
   const invalidateSavedQueries = () => {
     queryClient.invalidateQueries({ queryKey: ['saved-items', 'all'] });
     queryClient.invalidateQueries({ queryKey: ['saved-items', 'reddit_posts'] });
@@ -225,6 +286,18 @@ export function SavedItemsView({
   const unsaveRedditPostMutation = useMutation({
     mutationFn: async ({ subreddit, reddit_post_id }: { subreddit: string; reddit_post_id: string }) => {
       await savedService.unsaveRedditPost(subreddit, reddit_post_id);
+    },
+    onSuccess: () => {
+      invalidateSavedQueries();
+    },
+    onError: (mutationError: Error) => {
+      alert(`Failed to unsave post: ${mutationError.message}`);
+    },
+  });
+
+  const unsavePostMutation = useMutation({
+    mutationFn: async (postId: number) => {
+      await savedService.unsavePost(postId);
     },
     onSuccess: () => {
       invalidateSavedQueries();
@@ -284,36 +357,73 @@ export function SavedItemsView({
     ...savedPosts.map((post) => ({
       key: `omni-post-${post.id}`,
       timestamp: toTimestamp(post.crossposted_at ?? post.created_at),
-      node: (
-        <article className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
-          <div className="mb-2 text-[11px] font-semibold uppercase text-[var(--color-text-muted)]">
-            Omni Post
-          </div>
-          <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--color-text-secondary)]">
-            <span className="rounded-full bg-[var(--color-surface-elevated)] px-2 py-1">h/{post.hub_name}</span>
-            <span>•</span>
-            <span>u/{post.author_username}</span>
-            <span>•</span>
-            <span>
-              submitted {formatTimestamp(post.crossposted_at ?? post.created_at, useRelativeTime)}
-            </span>
-          </div>
-          <h3 className="mt-2 text-lg font-semibold text-[var(--color-text-primary)]">{post.title}</h3>
-          <div className="mt-2 flex gap-4 text-xs text-[var(--color-text-secondary)]">
-            <span>{post.score} points</span>
-            <span>•</span>
-            <span>{(post.comment_count ?? 0).toLocaleString()} comments</span>
-          </div>
-          <div className="mt-3">
-            <button
-              onClick={() => navigate(getPostUrl(post))}
-              className="text-sm font-semibold text-[var(--color-primary)] hover:underline"
-            >
-              View post →
-            </button>
-          </div>
-        </article>
-      ),
+      node: (() => {
+        const savedPostExtras = post as SavedPost & Partial<PlatformPost>;
+        const detailedPost = omniPostDetails[post.id];
+        const omniPost: PlatformPost = {
+          id: post.id,
+          title: detailedPost?.title ?? post.title,
+          author_id: detailedPost?.author_id ?? savedPostExtras.author_id ?? 0,
+          author_username:
+            detailedPost?.author_username ??
+            post.author_username ??
+            savedPostExtras.author_username ??
+            'Unknown',
+          hub_name: detailedPost?.hub_name ?? post.hub_name ?? savedPostExtras.hub_name ?? 'unknown',
+          score: detailedPost?.score ?? post.score,
+          comment_count:
+            detailedPost?.comment_count ??
+            detailedPost?.num_comments ??
+            post.comment_count ??
+            savedPostExtras.comment_count ??
+            0,
+          crossposted_at:
+            detailedPost?.crossposted_at ??
+            post.crossposted_at ??
+            savedPostExtras.crossposted_at ??
+            null,
+          created_at:
+            detailedPost?.created_at ??
+            post.created_at ??
+            savedPostExtras.created_at ??
+            new Date().toISOString(),
+          body: detailedPost?.body ?? savedPostExtras.body ?? null,
+          media_url: detailedPost?.media_url ?? savedPostExtras.media_url ?? null,
+          media_type: detailedPost?.media_type ?? savedPostExtras.media_type ?? null,
+          thumbnail_url: detailedPost?.thumbnail_url ?? savedPostExtras.thumbnail_url ?? null,
+          nsfw: detailedPost?.nsfw ?? savedPostExtras.nsfw ?? undefined,
+          target_subreddit: detailedPost?.target_subreddit ?? savedPostExtras.target_subreddit ?? null,
+          hub_display_title:
+            detailedPost?.hub_display_title ?? savedPostExtras.hub_display_title ?? null,
+          hub_id: detailedPost?.hub_id ?? savedPostExtras.hub_id ?? null,
+        };
+        const isSavePending =
+          unsavePostMutation.isPending && unsavePostMutation.variables === post.id;
+
+        return (
+          <HubPostCard
+            post={omniPost}
+            useRelativeTime={useRelativeTime}
+            currentUserId={user?.id}
+            currentUserRole={user?.role}
+            hubDisplayTitle={omniPost.hub_display_title ?? null}
+            isSaved={true}
+            isSavePending={isSavePending}
+            onShare={() => {
+              const shareUrl = `${window.location.origin}${getPostUrl(omniPost)}`;
+              navigator.clipboard
+                .writeText(shareUrl)
+                .then(() => alert('Post link copied to clipboard!'))
+                .catch(() => alert('Unable to copy link. Please try again.'));
+            }}
+            onToggleSave={(shouldSave) => {
+              if (!shouldSave) {
+                unsavePostMutation.mutate(post.id);
+              }
+            }}
+          />
+        );
+      })(),
     })),
     ...savedSiteComments.map((comment) => ({
       key: `omni-comment-${comment.comment_id}`,
@@ -384,11 +494,14 @@ export function SavedItemsView({
           num_comments: mergedPost.num_comments ?? 0,
           created_utc: mergedPost.created_utc ?? Date.parse(post.saved_at) / 1000,
           thumbnail: mergedPost.thumbnail ?? undefined,
-          url: undefined,
-          selftext: undefined,
-          is_self: false,
-          post_hint: undefined,
-          is_video: false,
+          url: mergedPost.url ?? undefined,
+          selftext: mergedPost.selftext ?? undefined,
+          is_self: mergedPost.is_self ?? false,
+          post_hint: mergedPost.post_hint ?? undefined,
+          is_video: mergedPost.is_video ?? false,
+          preview: mergedPost.preview ?? undefined,
+          media: mergedPost.media ?? undefined,
+          secure_media: mergedPost.secure_media ?? undefined,
           link_flair_text: mergedPost.link_flair_text ?? undefined,
           link_flair_background_color: mergedPost.link_flair_background_color ?? undefined,
           link_flair_text_color: mergedPost.link_flair_text_color ?? undefined,
@@ -447,6 +560,48 @@ export function SavedItemsView({
         );
       })(),
     })),
+    ...savedRedditAPIComments.map((comment) => ({
+      key: `reddit-api-comment-${comment.reddit_comment_id}`,
+      timestamp: toTimestamp(comment.saved_at),
+      node: (() => {
+        const permalink = `/r/${comment.subreddit}/comments/${comment.reddit_post_id}`;
+        return (
+          <article className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
+            <div className="mb-2 text-[11px] font-semibold uppercase text-[var(--color-text-muted)]">
+              Reddit Comment
+            </div>
+            <div className="text-xs text-[var(--color-text-secondary)]">
+              <div className="mb-1">
+                on <Link to={permalink} className="text-[var(--color-primary)] hover:underline">{comment.post_title || 'a post'}</Link>{comment.post_author && ` by u/${comment.post_author}`} in r/{comment.subreddit}
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="font-semibold">u/{comment.comment_author}</span>
+                <span>•</span>
+                <span>{comment.score} pts</span>
+                {comment.created_utc && (
+                  <>
+                    <span>•</span>
+                    <span>{new Date(comment.created_utc * 1000).toLocaleString()}</span>
+                  </>
+                )}
+              </div>
+            </div>
+            <p className="mt-2 text-sm text-[var(--color-text-primary)] whitespace-pre-wrap">{comment.comment_body}</p>
+            <div className="mt-3 flex items-center gap-4 text-xs">
+              <button
+                onClick={() => savedService.unsaveRedditAPIComment(comment.reddit_comment_id).then(() => invalidateSavedQueries())}
+                className="text-[var(--color-text-muted)] hover:text-cyan-500 transition-colors"
+              >
+                Unsave
+              </button>
+              <Link to={permalink} className="text-[var(--color-primary)] hover:underline">
+                Full comments →
+              </Link>
+            </div>
+          </article>
+        );
+      })(),
+    })),
   ].sort((a, b) => b.timestamp - a.timestamp);
 
   const {
@@ -460,56 +615,80 @@ export function SavedItemsView({
     resetPage: resetRedditPage,
   } = usePagination(redditItems, PAGE_SIZE);
 
-  const renderActiveTab = () => {
-    if (activeTab === 'omni') {
-      if (omniItems.length === 0) {
-        return <p className="text-sm text-[var(--color-text-secondary)]">No saved Omni posts or comments yet.</p>;
-      }
-      return (
-        <>
-          <div className="space-y-3">
-            {pagedOmniItems.map((item) => (
-              <Fragment key={item.key}>{item.node}</Fragment>
-            ))}
-          </div>
-          <PaginationControls
-            pageIndex={omniPageIndex}
-            totalPages={omniTotalPages}
-            onPrev={goToPrevOmni}
-            onNext={goToNextOmni}
-            canGoPrev={canOmniGoPrev}
-            canGoNext={canOmniGoNext}
-          />
-        </>
-      );
+  // Filter items based on content type and source
+  const filteredItems = useMemo(() => {
+    let items: typeof omniItems = [];
+
+    // Determine which source items to include
+    if (sourceFilter === 'both') {
+      items = [...omniItems, ...redditItems];
+    } else if (sourceFilter === 'omni') {
+      items = omniItems;
+    } else if (sourceFilter === 'reddit') {
+      items = redditItems;
     }
 
-    if (redditItems.length === 0) {
-      return <p className="text-sm text-[var(--color-text-secondary)]">No saved Reddit posts or comments yet.</p>;
+    // Filter by content type
+    if (contentType === 'posts') {
+      items = items.filter(item =>
+        item.key.includes('-post-') ||
+        (item.key.includes('reddit-post-') && !item.key.includes('reddit-api-comment-'))
+      );
+    } else if (contentType === 'comments') {
+      items = items.filter(item => item.key.includes('-comment-'));
+    }
+    // If contentType === 'both', don't filter by type
+
+    return items.sort((a, b) => b.timestamp - a.timestamp);
+  }, [omniItems, redditItems, contentType, sourceFilter]);
+
+  const {
+    currentItems: pagedItems,
+    pageIndex,
+    totalPages,
+    canGoPrev,
+    canGoNext,
+    goToPrev,
+    goToNext,
+    resetPage,
+  } = usePagination(filteredItems, PAGE_SIZE);
+
+  const renderContent = () => {
+    if (filteredItems.length === 0) {
+      const typeText = contentType === 'both' ? 'items' : contentType === 'posts' ? 'posts' : 'comments';
+      const sourceText = sourceFilter === 'both' ? 'Omni or Reddit' : sourceFilter === 'omni' ? 'Omni' : 'Reddit';
+      return <p className="text-sm text-[var(--color-text-secondary)]">No saved {sourceText} {typeText} yet.</p>;
     }
 
     return (
       <>
         <div className="space-y-3">
-          {pagedRedditItems.map((item) => (
+          {pagedItems.map((item) => (
             <Fragment key={item.key}>{item.node}</Fragment>
           ))}
         </div>
         <PaginationControls
-          pageIndex={redditPageIndex}
-          totalPages={redditTotalPages}
-          onPrev={goToPrevReddit}
-          onNext={goToNextReddit}
-          canGoPrev={canRedditGoPrev}
-          canGoNext={canRedditGoNext}
+          pageIndex={pageIndex}
+          totalPages={totalPages}
+          onPrev={goToPrev}
+          onNext={goToNext}
+          canGoPrev={canGoPrev}
+          canGoNext={canGoNext}
         />
       </>
     );
   };
 
-  const tabButtonClass = (tab: TabKey) =>
+  const contentTypeButtonClass = (type: ContentType) =>
     `flex-1 rounded-md px-4 py-2 text-sm font-semibold transition ${
-      activeTab === tab
+      contentType === type
+        ? 'bg-[var(--color-primary)] text-white shadow'
+        : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
+    }`;
+
+  const sourceFilterButtonClass = (filter: SourceFilter) =>
+    `flex-1 rounded-md px-4 py-2 text-sm font-semibold transition ${
+      sourceFilter === filter
         ? 'bg-[var(--color-primary)] text-white shadow'
         : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
     }`;
@@ -529,27 +708,74 @@ export function SavedItemsView({
         </div>
       )}
 
-      <div className="mb-6 inline-flex w-full max-w-sm rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-1">
-        <button
-          type="button"
-          className={tabButtonClass('omni')}
-          onClick={() => {
-            setActiveTab('omni');
-            resetOmniPage();
-          }}
-        >
-          Omni
-        </button>
-        <button
-          type="button"
-          className={tabButtonClass('reddit')}
-          onClick={() => {
-            setActiveTab('reddit');
-            resetRedditPage();
-          }}
-        >
-          Reddit
-        </button>
+      <div className="mb-6 flex flex-wrap gap-4">
+        {/* Content Type Toggle */}
+        <div className="inline-flex rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-1">
+          <button
+            type="button"
+            className={contentTypeButtonClass('posts')}
+            onClick={() => {
+              setContentType('posts');
+              resetPage();
+            }}
+          >
+            Posts
+          </button>
+          <button
+            type="button"
+            className={contentTypeButtonClass('comments')}
+            onClick={() => {
+              setContentType('comments');
+              resetPage();
+            }}
+          >
+            Comments
+          </button>
+          <button
+            type="button"
+            className={contentTypeButtonClass('both')}
+            onClick={() => {
+              setContentType('both');
+              resetPage();
+            }}
+          >
+            Both
+          </button>
+        </div>
+
+        {/* Source Filter */}
+        <div className="inline-flex rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-1">
+          <button
+            type="button"
+            className={sourceFilterButtonClass('omni')}
+            onClick={() => {
+              setSourceFilter('omni');
+              resetPage();
+            }}
+          >
+            Omni
+          </button>
+          <button
+            type="button"
+            className={sourceFilterButtonClass('reddit')}
+            onClick={() => {
+              setSourceFilter('reddit');
+              resetPage();
+            }}
+          >
+            Reddit
+          </button>
+          <button
+            type="button"
+            className={sourceFilterButtonClass('both')}
+            onClick={() => {
+              setSourceFilter('both');
+              resetPage();
+            }}
+          >
+            Both
+          </button>
+        </div>
       </div>
 
       {isLoading && (
@@ -592,7 +818,7 @@ export function SavedItemsView({
         </div>
       )}
 
-      {!isLoading && !error && renderActiveTab()}
+      {!isLoading && !error && renderContent()}
     </>
   );
 

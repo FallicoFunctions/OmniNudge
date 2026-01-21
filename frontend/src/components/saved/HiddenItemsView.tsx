@@ -8,8 +8,13 @@ import { usePagination } from '../../hooks/usePagination';
 import { PaginationControls } from '../common/PaginationControls';
 import { sanitizeHttpUrl } from '../../utils/crosspostHelpers';
 import { RedditPostCard } from '../reddit/RedditPostCard';
+import { HubPostCard } from '../hubs/HubPostCard';
 import { useSettings } from '../../contexts/SettingsContext';
 import { ErrorMessage, LoadingMessage } from '../common/StatusMessage';
+import type { PlatformPost } from '../../types/posts';
+import { getPostUrl } from '../../utils/postUrl';
+import { postsService } from '../../services/postsService';
+import { useAuth } from '../../contexts/AuthContext';
 
 type RedditListingData = {
   data?: {
@@ -20,6 +25,11 @@ type RedditListingData = {
         score?: number;
         num_comments?: number;
         thumbnail?: string;
+        url?: string;
+        selftext?: string;
+        is_self?: boolean;
+        post_hint?: string;
+        is_video?: boolean;
         created_utc?: number;
         link_flair_text?: string | null;
         link_flair_background_color?: string | null;
@@ -104,6 +114,7 @@ export function HiddenItemsView({
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { useRelativeTime } = useSettings();
+  const { user } = useAuth();
   const emptyData: HiddenItemsResponse = { type: 'all', hidden_posts: [], hidden_reddit_posts: [] };
   const [loadError, setLoadError] = useState<Error | null>(null);
   const [activeTab, setActiveTab] = useState<TabKey>('omni');
@@ -131,6 +142,8 @@ export function HiddenItemsView({
     [data?.hidden_reddit_posts]
   );
   const [postDetails, setPostDetails] = useState<Record<string, Partial<SavedRedditPost>>>({});
+  const [omniPostDetails, setOmniPostDetails] = useState<Record<number, PlatformPost>>({});
+  const fetchingOmniDetailsRef = useRef<Set<number>>(new Set());
   const visibleHiddenRedditPosts = useMemo(
     () =>
       hiddenRedditPosts.filter(
@@ -184,6 +197,11 @@ export function HiddenItemsView({
             [postKey]: {
               title: remotePost.title,
               author: remotePost.author,
+              url: remotePost.url,
+              selftext: remotePost.selftext,
+              is_self: remotePost.is_self,
+              post_hint: remotePost.post_hint,
+              is_video: remotePost.is_video,
               score:
                 typeof remotePost.score === 'number' ? remotePost.score : prev[postKey]?.score,
               num_comments:
@@ -204,6 +222,9 @@ export function HiddenItemsView({
                 remotePost.over_18 ??
                 prev[postKey]?.over18 ??
                 null,
+              preview: remotePost.preview ?? prev[postKey]?.preview ?? null,
+              media: remotePost.media ?? prev[postKey]?.media ?? null,
+              secure_media: remotePost.secure_media ?? prev[postKey]?.secure_media ?? null,
             },
           }));
         })
@@ -218,6 +239,42 @@ export function HiddenItemsView({
     // Execute all fetches concurrently
     Promise.all(fetchPromises);
   }, [postsNeedingDetails, postDetails]);
+
+  useEffect(() => {
+    const missingOmniPosts = hiddenPosts.filter((post) => {
+      if (omniPostDetails[post.id] || fetchingOmniDetailsRef.current.has(post.id)) {
+        return false;
+      }
+      return true;
+    });
+
+    if (missingOmniPosts.length === 0) {
+      return;
+    }
+
+    missingOmniPosts.forEach((post) => {
+      fetchingOmniDetailsRef.current.add(post.id);
+    });
+
+    Promise.all(
+      missingOmniPosts.map((post) =>
+        postsService
+          .getPost(post.id)
+          .then((details) => {
+            setOmniPostDetails((prev) => ({
+              ...prev,
+              [post.id]: details,
+            }));
+          })
+          .catch((fetchError) => {
+            console.error('Failed to refresh hidden Omni post details', fetchError);
+          })
+          .finally(() => {
+            fetchingOmniDetailsRef.current.delete(post.id);
+          })
+      )
+    );
+  }, [hiddenPosts, omniPostDetails]);
 
   const invalidateHiddenQueries = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: ['hidden-items', 'all'] });
@@ -311,39 +368,68 @@ export function HiddenItemsView({
     .map((post) => ({
       key: `hidden-omni-post-${post.id}`,
       timestamp: toTimestamp(post.crossposted_at ?? post.created_at),
-      node: (
-        <article className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
-          <div className="mb-2 text-[11px] font-semibold uppercase text-[var(--color-text-muted)]">Omni Post</div>
-          <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--color-text-secondary)]">
-            <span className="rounded-full bg-[var(--color-surface-elevated)] px-2 py-1">h/{post.hub_name}</span>
-            <span>•</span>
-            <span>u/{post.author_username}</span>
-            <span>•</span>
-            <span>{new Date(post.crossposted_at ?? post.created_at).toLocaleDateString()}</span>
-          </div>
-          <h3 className="mt-2 text-lg font-semibold text-[var(--color-text-primary)]">{post.title}</h3>
-          <div className="mt-2 flex gap-4 text-xs text-[var(--color-text-secondary)]">
-            <span>{post.score} points</span>
-            <span>•</span>
-            <span>{(post.comment_count ?? 0).toLocaleString()} comments</span>
-          </div>
-          <div className="mt-3 flex gap-3">
-            <button
-              onClick={() => navigate('/posts')}
-              className="text-sm font-semibold text-[var(--color-primary)] hover:underline"
-            >
-              View posts feed →
-            </button>
-            <button
-              onClick={() => unhidePostMutation.mutate(post.id)}
-              className="text-sm font-semibold text-[var(--color-primary)] hover:underline"
-              disabled={unhidePostMutation.isPending}
-            >
-              {unhidePostMutation.isPending ? 'Unhiding…' : 'Unhide'}
-            </button>
-          </div>
-        </article>
-      ),
+      node: (() => {
+        const hiddenPostExtras = post as SavedPost & Partial<PlatformPost>;
+        const detailedPost = omniPostDetails[post.id];
+        const omniPost: PlatformPost = {
+          id: post.id,
+          title: detailedPost?.title ?? post.title,
+          author_id: detailedPost?.author_id ?? hiddenPostExtras.author_id ?? 0,
+          author_username:
+            detailedPost?.author_username ??
+            post.author_username ??
+            hiddenPostExtras.author_username ??
+            'Unknown',
+          hub_name: detailedPost?.hub_name ?? post.hub_name ?? hiddenPostExtras.hub_name ?? 'unknown',
+          score: detailedPost?.score ?? post.score,
+          comment_count:
+            detailedPost?.comment_count ??
+            detailedPost?.num_comments ??
+            post.comment_count ??
+            hiddenPostExtras.comment_count ??
+            0,
+          crossposted_at:
+            detailedPost?.crossposted_at ??
+            post.crossposted_at ??
+            hiddenPostExtras.crossposted_at ??
+            null,
+          created_at:
+            detailedPost?.created_at ??
+            post.created_at ??
+            hiddenPostExtras.created_at ??
+            new Date().toISOString(),
+          body: detailedPost?.body ?? hiddenPostExtras.body ?? null,
+          media_url: detailedPost?.media_url ?? hiddenPostExtras.media_url ?? null,
+          media_type: detailedPost?.media_type ?? hiddenPostExtras.media_type ?? null,
+          thumbnail_url: detailedPost?.thumbnail_url ?? hiddenPostExtras.thumbnail_url ?? null,
+          nsfw: detailedPost?.nsfw ?? hiddenPostExtras.nsfw ?? undefined,
+          target_subreddit: detailedPost?.target_subreddit ?? hiddenPostExtras.target_subreddit ?? null,
+          hub_display_title:
+            detailedPost?.hub_display_title ?? hiddenPostExtras.hub_display_title ?? null,
+          hub_id: detailedPost?.hub_id ?? hiddenPostExtras.hub_id ?? null,
+        };
+
+        return (
+          <HubPostCard
+            post={omniPost}
+            useRelativeTime={useRelativeTime}
+            currentUserId={user?.id}
+            currentUserRole={user?.role}
+            hubDisplayTitle={omniPost.hub_display_title ?? null}
+            isSaved={false}
+            onShare={() => {
+              const shareUrl = `${window.location.origin}${getPostUrl(omniPost)}`;
+              navigator.clipboard
+                .writeText(shareUrl)
+                .then(() => alert('Post link copied to clipboard!'))
+                .catch(() => alert('Unable to copy link. Please try again.'));
+            }}
+            onHide={() => unhidePostMutation.mutate(post.id)}
+            isHiding={unhidePostMutation.isPending}
+            hideLabel="Unhide"
+          />
+        );
+      })(),
     }))
     .sort((a, b) => b.timestamp - a.timestamp);
 
@@ -377,11 +463,14 @@ export function HiddenItemsView({
           num_comments: mergedPost.num_comments ?? 0,
           created_utc: mergedPost.created_utc ?? Date.parse(post.saved_at) / 1000,
           thumbnail: mergedPost.thumbnail ?? undefined,
-          url: undefined,
-          selftext: undefined,
-          is_self: false,
-          post_hint: undefined,
-          is_video: false,
+          url: mergedPost.url ?? undefined,
+          selftext: mergedPost.selftext ?? undefined,
+          is_self: mergedPost.is_self ?? false,
+          post_hint: mergedPost.post_hint ?? undefined,
+          is_video: mergedPost.is_video ?? false,
+          preview: mergedPost.preview ?? undefined,
+          media: mergedPost.media ?? undefined,
+          secure_media: mergedPost.secure_media ?? undefined,
           link_flair_text: mergedPost.link_flair_text ?? undefined,
           link_flair_background_color: mergedPost.link_flair_background_color ?? undefined,
           link_flair_text_color: mergedPost.link_flair_text_color ?? undefined,

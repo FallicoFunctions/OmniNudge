@@ -14,8 +14,6 @@ import { postsService } from '../services/postsService';
 import { useAuth } from '../contexts/AuthContext';
 import { useSettings } from '../contexts/SettingsContext';
 import { useRedditBlocklist } from '../contexts/RedditBlockContext';
-import { formatTimestamp } from '../utils/timeFormat';
-import { VoteButtons } from '../components/VoteButtons';
 import {
   createLocalCrosspostPayload,
   createRedditCrosspostPayload,
@@ -44,6 +42,7 @@ import { FeedSearchBars } from '../components/common/FeedSearchBars';
 import { OffsetPaginationControls } from '../components/common/OffsetPaginationControls';
 import { VirtualizedList } from '../components/common/VirtualizedList';
 import { RedditPostSlideshow } from '../components/slideshow/RedditPostSlideshow';
+import { HubPostCard } from '../components/hubs/HubPostCard';
 
 interface FeedRedditPost extends RedditCrosspostSource {
   id: string;
@@ -900,22 +899,6 @@ export default function RedditPage() {
   const renderCombinedPost = (item: (typeof filteredCombinedPosts)[number]) => {
     if (item.type === 'platform') {
       const post = item.post;
-      const previewImage = post.thumbnail_url || post.media_url;
-      const displaySubreddit =
-        post.target_subreddit || post.crosspost_origin_subreddit || subreddit;
-      const displayAuthor =
-        post.author_username ||
-        post.author?.username ||
-        (post.author_id === user?.id ? user?.username : undefined) ||
-        'unknown';
-      const createdTimestamp = post.crossposted_at ?? post.created_at;
-      const createdLabel = createdTimestamp
-        ? formatTimestamp(createdTimestamp, useRelativeTime)
-        : 'unknown time';
-      const commentLabel = `${post.num_comments.toLocaleString()} Comments`;
-      const pointsLabel = `${post.score.toLocaleString()} points`;
-      const postUrl = getLocalPostUrl(post);
-      const canDelete = user?.id === post.author_id;
       const isDeleting =
         deleteLocalPostMutation.isPending &&
         deleteLocalPostMutation.variables === post.id;
@@ -923,104 +906,38 @@ export default function RedditPage() {
       const isSavePendingLocal =
         savedLocalToggleMutation.isPending &&
         savedLocalToggleMutation.variables?.postId === post.id;
+      const isHidingLocal =
+        hideLocalPostMutation.isPending &&
+        hideLocalPostMutation.variables === post.id;
+      const normalizedPost: PlatformPost = {
+        ...post,
+        author_username:
+          post.author_username ||
+          post.author?.username ||
+          (post.author_id === user?.id ? user?.username : undefined) ||
+          'unknown',
+        hub_name:
+          post.hub_name ||
+          post.hub?.name ||
+          'unknown',
+      };
 
       return (
-        <article className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)]">
-          <div className="flex gap-3 p-3">
-            <VoteButtons
-              postId={post.id}
-              initialScore={post.score}
-              initialUserVote={post.user_vote ?? null}
-              layout="vertical"
-              size="small"
-            />
-            {previewImage && (
-              <img
-                src={previewImage}
-                alt=""
-                loading="lazy"
-                decoding="async"
-                className="h-16 w-16 flex-shrink-0 rounded object-cover"
-              />
-            )}
-            <div className="flex-1 text-left">
-              <div className="mb-1 inline-flex items-center gap-2">
-                <span className="inline-block rounded bg-blue-600 px-2 py-0.5 text-[10px] font-bold uppercase text-white">
-                  Omni
-                </span>
-                {post.nsfw && (
-                  <span className="inline-block rounded bg-red-600 px-2 py-0.5 text-[10px] font-bold uppercase text-white">
-                    NSFW
-                  </span>
-                )}
-                {displaySubreddit && (
-                  <span className="text-[11px] font-medium text-[var(--color-text-secondary)]">
-                    r/{displaySubreddit}
-                  </span>
-                )}
-              </div>
-              <Link to={postUrl}>
-                <h3 className="text-base font-semibold text-[var(--color-text-primary)] hover:text-[var(--color-primary)]">
-                  {post.title}
-                </h3>
-              </Link>
-              <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-[var(--color-text-secondary)]">
-                <span>u/{displayAuthor}</span>
-                <span>•</span>
-                <span>{pointsLabel}</span>
-                <span>•</span>
-                <span>submitted {createdLabel}</span>
-              </div>
-              <div className="mt-1 flex flex-wrap items-center gap-3 text-[11px] text-[var(--color-text-secondary)]">
-                <Link
-                  to={postUrl}
-                  className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
-                >
-                  {commentLabel}
-                </Link>
-                <button
-                  type="button"
-                  onClick={() => handleShareLocalPost(post)}
-                  className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
-                >
-                  Share
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleToggleSaveLocalPost(post.id, isSavedLocal)}
-                  disabled={isSavePendingLocal}
-                  className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] disabled:opacity-50"
-                >
-                  {isSavePendingLocal ? 'Saving...' : isSavedLocal ? 'Unsave' : 'Save'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleSetHideTarget({ type: 'platform', post })}
-                  className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
-                >
-                  Hide
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleCrosspostSelection({ type: 'platform', post })}
-                  className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
-                >
-                  Crosspost
-                </button>
-                {canDelete && (
-                  <button
-                    type="button"
-                    onClick={() => handleDeleteLocalPost(post.id)}
-                    disabled={isDeleting}
-                    className="text-red-600 hover:text-red-500 disabled:opacity-60"
-                  >
-                    {isDeleting ? 'Deleting...' : 'Delete'}
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
-        </article>
+        <HubPostCard
+          post={normalizedPost}
+          useRelativeTime={useRelativeTime}
+          currentUserId={user?.id}
+          currentUserRole={user?.role}
+          isSaved={isSavedLocal}
+          isSavePending={isSavePendingLocal}
+          isHiding={isHidingLocal}
+          isDeleting={isDeleting}
+          onShare={() => handleShareLocalPost(post)}
+          onToggleSave={() => handleToggleSaveLocalPost(post.id, isSavedLocal)}
+          onHide={() => handleSetHideTarget({ type: 'platform', post })}
+          onCrosspost={() => handleCrosspostSelection({ type: 'platform', post })}
+          onDelete={() => handleDeleteLocalPost(post.id)}
+        />
       );
     }
 

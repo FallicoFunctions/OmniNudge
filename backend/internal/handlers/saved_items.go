@@ -63,10 +63,10 @@ func (h *SavedItemsHandler) GetSavedItems(c *gin.Context) {
 	filterType := c.DefaultQuery("type", "all")
 	validTypes := map[string]bool{
 		"all": true, "posts": true, "reddit_posts": true,
-		"post_comments": true, "reddit_comments": true,
+		"post_comments": true, "reddit_comments": true, "reddit_api_comments": true,
 	}
 	if !validTypes[filterType] {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid type filter. Use all, posts, reddit_posts, post_comments, or reddit_comments"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid type filter. Use all, posts, reddit_posts, post_comments, reddit_comments, or reddit_api_comments"})
 		return
 	}
 
@@ -121,6 +121,18 @@ func (h *SavedItemsHandler) GetSavedItems(c *gin.Context) {
 			comments = []*models.RedditPostComment{}
 		}
 		response["saved_reddit_comments"] = comments
+	}
+
+	if filterType == "all" || filterType == "reddit_api_comments" {
+		apiComments, err := h.savedRepo.GetSavedRedditAPIComments(c.Request.Context(), intUserID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch saved Reddit API comments", "details": err.Error()})
+			return
+		}
+		if apiComments == nil {
+			apiComments = []*models.SavedRedditAPIComment{}
+		}
+		response["saved_reddit_api_comments"] = apiComments
 	}
 
 response["type"] = filterType
@@ -374,6 +386,75 @@ func (h *SavedItemsHandler) UnsaveRedditComment(c *gin.Context) {
 	}
 
 	if err := h.savedRepo.RemoveRedditComment(c.Request.Context(), userID.(int), commentID); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to unsave comment", "details": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"saved": false})
+}
+
+// SaveRedditAPIComment handles POST /api/v1/reddit/api-comments/save
+func (h *SavedItemsHandler) SaveRedditAPIComment(c *gin.Context) {
+	userID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
+
+	var req struct {
+		Subreddit       string  `json:"subreddit" binding:"required"`
+		RedditPostID    string  `json:"reddit_post_id" binding:"required"`
+		RedditCommentID string  `json:"reddit_comment_id" binding:"required"`
+		PostTitle       *string `json:"post_title"`
+		PostAuthor      *string `json:"post_author"`
+		CommentAuthor   string  `json:"comment_author" binding:"required"`
+		CommentBody     string  `json:"comment_body" binding:"required"`
+		Score           int     `json:"score"`
+		CreatedUTC      *int64  `json:"created_utc"`
+		ParentID        *string `json:"parent_id"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request", "details": err.Error()})
+		return
+	}
+
+	comment := &models.RedditAPICommentDetails{
+		Subreddit:       req.Subreddit,
+		RedditPostID:    req.RedditPostID,
+		RedditCommentID: req.RedditCommentID,
+		PostTitle:       req.PostTitle,
+		PostAuthor:      req.PostAuthor,
+		CommentAuthor:   req.CommentAuthor,
+		CommentBody:     req.CommentBody,
+		Score:           req.Score,
+		CreatedUTC:      req.CreatedUTC,
+		ParentID:        req.ParentID,
+	}
+
+	if err := h.savedRepo.SaveRedditAPIComment(c.Request.Context(), userID.(int), comment); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save comment", "details": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"saved": true})
+}
+
+// UnsaveRedditAPIComment handles DELETE /api/v1/reddit/api-comments/:commentId/save
+func (h *SavedItemsHandler) UnsaveRedditAPIComment(c *gin.Context) {
+	userID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
+
+	redditCommentID := c.Param("commentId")
+	if redditCommentID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid comment ID"})
+		return
+	}
+
+	if err := h.savedRepo.RemoveRedditAPIComment(c.Request.Context(), userID.(int), redditCommentID); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to unsave comment", "details": err.Error()})
 		return
 	}
