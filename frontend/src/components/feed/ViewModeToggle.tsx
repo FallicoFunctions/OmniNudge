@@ -1,22 +1,39 @@
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useMultiColumnFeed } from '../../contexts/MultiColumnFeedContext';
 
 export function ViewModeToggle() {
-  const { state, setViewMode } = useMultiColumnFeed();
+  const { state, setViewMode, setLastStandardPath } = useMultiColumnFeed();
+  const navigate = useNavigate();
+  const location = useLocation();
 
   const modes = [
     { value: 'standard', label: 'Standard', icon: '☰' },
-    { value: 'multi-column', label: 'Columns', icon: '|||' },
-    { value: 'vertical-omniscroll', label: 'OmniScroll', icon: '⇅' },
+    { value: 'multi-column', label: 'OmniScroll', icon: '|||' },
   ] as const;
 
   const isSlimMode = state.viewMode === 'multi-column' || state.viewMode === 'vertical-omniscroll';
 
   return (
     <div className="view-mode-toggle flex items-center gap-1 bg-[var(--color-surface)] rounded-md p-1 border border-[var(--color-border)]">
-      {modes.map(mode => (
+      {modes.map((mode) => (
         <button
           key={mode.value}
-          onClick={() => setViewMode(mode.value)}
+          onClick={() => {
+            setViewMode(mode.value);
+            if (mode.value === 'multi-column' && location.pathname !== '/') {
+              setLastStandardPath(`${location.pathname}${location.search}${location.hash}`);
+              navigate('/');
+              return;
+            }
+            if (
+              mode.value === 'standard' &&
+              state.viewMode !== 'standard' &&
+              state.lastStandardPath &&
+              location.pathname === '/'
+            ) {
+              navigate(state.lastStandardPath);
+            }
+          }}
           className={`px-2 py-1 text-xs rounded transition-colors ${
             state.viewMode === mode.value
               ? 'bg-cyan-500 text-black font-semibold'

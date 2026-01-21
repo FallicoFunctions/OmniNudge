@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { formatDistanceToNow } from 'date-fns';
 import { VoteButtons } from './VoteButtons';
 import { CommentEntry } from './CommentEntry';
+import { MarkdownRenderer } from '../common/MarkdownRenderer';
 import { savedService } from '../../services/savedService';
 import { getSavedRedditAPICommentIdSet } from '../../utils/savedItems';
 
@@ -173,7 +174,10 @@ export function CommentThread({
               </div>
 
               {/* Comment body */}
-              <div className="text-xs mt-1 text-[var(--color-text)] whitespace-pre-wrap break-words">{comment.content}</div>
+              <MarkdownRenderer
+                content={comment.content}
+                className="mt-1 text-xs text-[var(--color-text)]"
+              />
 
               {/* Actions */}
               <div className="flex items-center gap-2 mt-1">
