@@ -121,6 +121,15 @@ export function CompactPostCard({ post, feedType, isExpanded = false, onToggleEx
   const titleAreaRef = useRef<HTMLDivElement>(null);
   const [isTitleAreaHovered, setIsTitleAreaHovered] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  const handleVideoMouseEnter = () => {
+    videoRef.current?.play().catch(() => {});
+  };
+
+  const handleVideoMouseLeave = () => {
+    videoRef.current?.pause();
+  };
   // Handle messages differently
   if (feedType === 'messages') {
     const conversation = post as Conversation;
@@ -382,16 +391,22 @@ export function CompactPostCard({ post, feedType, isExpanded = false, onToggleEx
       ) : displayMedia ? (
         <div className="w-full">
           {isVideo ? (
-            <HlsVideo
-              src={displayMedia.startsWith('http') ? displayMedia : resolveMediaUrl(displayMedia)}
-              poster={videoPoster}
-              className="w-full h-auto"
-              style={{ display: 'block', maxHeight: 'calc(100vh - 200px)', objectFit: 'contain' }}
-              controls
-              loop
-              playsInline
-              preload="metadata"
-            />
+            <div
+              onMouseEnter={handleVideoMouseEnter}
+              onMouseLeave={handleVideoMouseLeave}
+            >
+              <HlsVideo
+                ref={videoRef}
+                src={displayMedia.startsWith('http') ? displayMedia : resolveMediaUrl(displayMedia)}
+                poster={videoPoster}
+                className="w-full h-auto"
+                style={{ display: 'block', maxHeight: 'calc(100vh - 200px)', objectFit: 'contain' }}
+                controls
+                loop
+                playsInline
+                preload="metadata"
+              />
+            </div>
           ) : (
             <img
               src={displayMedia.startsWith('http') ? displayMedia : resolveMediaUrl(displayMedia)}

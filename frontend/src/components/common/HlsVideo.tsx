@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, forwardRef } from 'react';
 import { loadHls } from '../../utils/hlsLoader';
 
 interface HlsVideoProps extends React.VideoHTMLAttributes<HTMLVideoElement> {
@@ -10,9 +10,19 @@ interface HlsVideoProps extends React.VideoHTMLAttributes<HTMLVideoElement> {
  * Safari supports HLS natively, other browsers need HLS.js library.
  * This allows Reddit videos (which use HLS streaming) to play with audio on all browsers.
  */
-export function HlsVideo({ src, ...props }: HlsVideoProps) {
-  const videoRef = useRef<HTMLVideoElement>(null);
+export const HlsVideo = forwardRef<HTMLVideoElement, HlsVideoProps>(function HlsVideo({ src, ...props }, ref) {
+  const internalRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<{ destroy: () => void } | null>(null);
+
+  // Merge internal ref with forwarded ref
+  const setRefs = (el: HTMLVideoElement | null) => {
+    internalRef.current = el;
+    if (typeof ref === 'function') {
+      ref(el);
+    } else if (ref) {
+      ref.current = el;
+    }
+  };
 
   // Detect if browser supports native HLS (Safari)
   const canNativeHls =
@@ -26,7 +36,7 @@ export function HlsVideo({ src, ...props }: HlsVideoProps) {
   const isHlsUrl = src.includes('.m3u8') || src.includes('/HLSPlaylist.m3u8');
 
   useEffect(() => {
-    const videoEl = videoRef.current;
+    const videoEl = internalRef.current;
     if (!videoEl || !isHlsUrl || canNativeHls) return;
 
     // Load HLS.js for non-Safari browsers with HLS URLs
@@ -54,5 +64,5 @@ export function HlsVideo({ src, ...props }: HlsVideoProps) {
     };
   }, [src, isHlsUrl, canNativeHls]);
 
-  return <video ref={videoRef} {...props} src={canNativeHls || !isHlsUrl ? src : undefined} />;
-}
+  return <video ref={setRefs} {...props} src={canNativeHls || !isHlsUrl ? src : undefined} />;
+});
