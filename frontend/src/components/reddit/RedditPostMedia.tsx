@@ -1,4 +1,4 @@
-import type { RefObject } from 'react';
+import type { RefObject, CSSProperties } from 'react';
 
 type VideoData = {
   url: string;
@@ -19,7 +19,27 @@ type RedditPostMediaProps = {
   videoData?: VideoData;
   videoRef: RefObject<HTMLVideoElement | null>;
   posterUrl?: string | null;
+  embedUrl?: string | null;
+  externalVideoUrl?: string | null;
 };
+
+function getEmbedSizing(url?: string | null): { className: string; style?: CSSProperties } {
+  if (!url) {
+    return { className: 'w-full aspect-video block' };
+  }
+  if (url.includes('tiktok.com')) {
+    return {
+      className: 'mx-auto block',
+      style: {
+        height: 'min(80vh, 720px)',
+        aspectRatio: '9 / 16',
+        width: 'auto',
+        maxWidth: '100%',
+      },
+    };
+  }
+  return { className: 'w-full aspect-video block' };
+}
 
 export function RedditPostMedia({
   inlineImage,
@@ -34,10 +54,44 @@ export function RedditPostMedia({
   videoData,
   videoRef,
   posterUrl,
+  embedUrl,
+  externalVideoUrl,
 }: RedditPostMediaProps) {
+  const isEmbeddableVideo = Boolean(embedUrl || externalVideoUrl);
+  const embedSizing = getEmbedSizing(embedUrl ?? externalVideoUrl ?? undefined);
   return (
     <>
-      {inlineImage ? (
+      {embedUrl ? (
+        <div className="mb-4 flex flex-col items-start gap-2">
+          <div className="relative w-full">
+            <div className="overflow-hidden rounded border border-[var(--color-border)] transition-all duration-200">
+              <iframe
+                src={embedUrl}
+                title={decodedTitle}
+                className={embedSizing.className}
+                style={embedSizing.style}
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                allowFullScreen
+              />
+            </div>
+          </div>
+        </div>
+      ) : externalVideoUrl ? (
+        <div className="mb-4 flex flex-col items-start gap-2">
+          <div className="relative w-full">
+            <div className="overflow-hidden rounded border border-[var(--color-border)] transition-all duration-200">
+              <video
+                controls
+                className={embedSizing.className}
+                style={embedSizing.style}
+                src={externalVideoUrl}
+                preload="metadata"
+                playsInline
+              />
+            </div>
+          </div>
+        </div>
+      ) : inlineImage ? (
         <div className="mb-4 flex flex-col items-start gap-2">
           <div className="relative w-full">
             <div

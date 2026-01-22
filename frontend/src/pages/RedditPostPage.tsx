@@ -181,6 +181,122 @@ function getVideoUrl(post: RedditPostData): VideoSource | undefined {
   return undefined;
 }
 
+function getYouTubeEmbed(url?: string | null): string | null {
+  if (!url) return null;
+  const match =
+    url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([A-Za-z0-9_-]{11})/) ||
+    url.match(/youtube\.com\/shorts\/([A-Za-z0-9_-]{11})/);
+  if (!match?.[1]) return null;
+  const startMatch = url.match(/[?&]t=(\d+)/);
+  const start = startMatch ? parseInt(startMatch[1], 10) : null;
+  return `https://www.youtube-nocookie.com/embed/${match[1]}${start ? `?start=${start}` : ''}`;
+}
+
+function getVimeoEmbed(url?: string | null): string | null {
+  if (!url) return null;
+  const match = url.match(/vimeo\.com\/(?:video\/)?([0-9]+)/i);
+  return match?.[1] ? `https://player.vimeo.com/video/${match[1]}` : null;
+}
+
+function getTiktokEmbed(url?: string | null): string | null {
+  if (!url) return null;
+  const match = url.match(/tiktok\.com\/(?:@[^/]+\/video\/|v\/)([0-9]+)/i);
+  return match?.[1] ? `https://www.tiktok.com/embed/v2/${match[1]}` : null;
+}
+
+function getTwitchEmbed(url?: string | null): string | null {
+  if (!url || typeof window === 'undefined') return null;
+  const clipMatch = url.match(/twitch\.tv\/(?:[^/]+)\/clip\/([a-zA-Z0-9]+)/i);
+  if (clipMatch?.[1]) {
+    return `https://player.twitch.tv/?clip=${clipMatch[1]}&parent=${window.location.hostname}`;
+  }
+  const vodMatch = url.match(/twitch\.tv\/videos\/([0-9]+)/i);
+  if (vodMatch?.[1]) {
+    return `https://player.twitch.tv/?video=${vodMatch[1]}&parent=${window.location.hostname}`;
+  }
+  return null;
+}
+
+function getDailymotionEmbed(url?: string | null): string | null {
+  if (!url) return null;
+  const match = url.match(/dailymotion\.com\/video\/([a-zA-Z0-9]+)/i);
+  return match?.[1] ? `https://www.dailymotion.com/embed/video/${match[1]}` : null;
+}
+
+function getStreamableEmbed(url?: string | null): string | null {
+  if (!url) return null;
+  const match = url.match(/streamable\.com\/(?:e\/)?([a-z0-9]+)/i);
+  return match?.[1] ? `https://streamable.com/e/${match[1]}` : null;
+}
+
+function getRedgifsEmbed(url?: string | null): string | null {
+  if (!url) return null;
+  const match = url.match(/redgifs\.com\/(?:watch|ifr)\/([a-zA-Z0-9_-]+)/i);
+  if (match?.[1]) return `https://www.redgifs.com/ifr/${match[1]}`;
+  const gfyMatch = url.match(/gfycat\.com\/([a-zA-Z0-9_-]+)/i);
+  return gfyMatch?.[1] ? `https://www.redgifs.com/ifr/${gfyMatch[1]}` : null;
+}
+
+function getGiphyEmbed(url?: string | null): string | null {
+  if (!url) return null;
+  const idMatch = url.match(/giphy\.com\/gifs\/[^/]*-?([a-zA-Z0-9]+)$/i);
+  return idMatch?.[1] ? `https://giphy.com/embed/${idMatch[1]}` : null;
+}
+
+function getTenorEmbed(url?: string | null): string | null {
+  if (!url) return null;
+  const match = url.match(/tenor\.com\/view\/[^/-]+-([a-z0-9]+)$/i);
+  return match?.[1] ? `https://tenor.com/embed/${match[1]}` : null;
+}
+
+function getImgurMp4(url?: string | null): string | null {
+  if (!url) return null;
+  const match = url.match(/i\.imgur\.com\/([a-zA-Z0-9]+)\.(?:gifv|gif)/i);
+  if (match?.[1]) {
+    return `https://i.imgur.com/${match[1]}.mp4`;
+  }
+  return null;
+}
+
+type ExternalMedia = { kind: 'iframe'; src: string } | { kind: 'video'; src: string };
+
+function getExternalVideoMedia(url?: string | null): ExternalMedia | null {
+  const sanitized = sanitizeHttpUrl(url);
+  if (!sanitized) return null;
+
+  const youtube = getYouTubeEmbed(sanitized);
+  if (youtube) return { kind: 'iframe', src: youtube };
+
+  const vimeo = getVimeoEmbed(sanitized);
+  if (vimeo) return { kind: 'iframe', src: vimeo };
+
+  const tiktok = getTiktokEmbed(sanitized);
+  if (tiktok) return { kind: 'iframe', src: tiktok };
+
+  const twitch = getTwitchEmbed(sanitized);
+  if (twitch) return { kind: 'iframe', src: twitch };
+
+  const dailymotion = getDailymotionEmbed(sanitized);
+  if (dailymotion) return { kind: 'iframe', src: dailymotion };
+
+  const streamable = getStreamableEmbed(sanitized);
+  if (streamable) return { kind: 'iframe', src: streamable };
+
+  const redgifs = getRedgifsEmbed(sanitized);
+  if (redgifs) return { kind: 'iframe', src: redgifs };
+
+  const giphy = getGiphyEmbed(sanitized);
+  if (giphy) return { kind: 'iframe', src: giphy };
+
+  const tenor = getTenorEmbed(sanitized);
+  if (tenor) return { kind: 'iframe', src: tenor };
+
+  const imgurMp4 = getImgurMp4(sanitized);
+  if (imgurMp4) return { kind: 'video', src: imgurMp4 };
+
+  return null;
+}
+
 // Component to render a single Reddit comment with replies
 type EmbedPayload = {
   author: string;
@@ -1225,6 +1341,9 @@ export default function RedditPostPage() {
         sanitizeHttpUrl(post.secure_media?.oembed?.thumbnail_url)
       : undefined;
   const sanitizedExternalLink = post?.url ? sanitizeHttpUrl(post.url) : undefined;
+  const externalMedia = getExternalVideoMedia(sanitizedExternalLink);
+  const embedUrl = externalMedia?.kind === 'iframe' ? externalMedia.src : null;
+  const externalVideoUrl = externalMedia?.kind === 'video' ? externalMedia.src : null;
   const sanitizedPostImage =
     post?.post_hint === 'image' ? sanitizedExternalLink : undefined;
   const externalDomain = getDisplayDomain(sanitizedExternalLink);
@@ -1236,7 +1355,7 @@ export default function RedditPostPage() {
       inlineImage = galleryImages[galleryIndex] ?? null;
     } else if (sanitizedPostImage) {
       inlineImage = sanitizedPostImage;
-    } else if (!post.is_video) {
+    } else if (!post.is_video && !externalMedia) {
       inlineImage = previewSource ?? sanitizedThumbnail ?? oembedThumbnail ?? null;
     }
   }
@@ -1870,6 +1989,8 @@ export default function RedditPostPage() {
                 videoData={videoData}
                 videoRef={videoRef}
                 posterUrl={posterUrl}
+                embedUrl={embedUrl}
+                externalVideoUrl={externalVideoUrl}
               />
 
               {post.selftext && <PostBodyMarkdown content={post.selftext} className="mb-4" />}
