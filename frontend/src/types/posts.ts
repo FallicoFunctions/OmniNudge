@@ -57,6 +57,8 @@ export interface CreatePostRequest {
   media_type?: string;
   thumbnail_url?: string;
   gallery_images?: GalleryImage[];
+  hub_name?: string;
+  subreddit_name?: string;
   hub_id?: number;
   target_subreddit?: string;
   send_replies_to_inbox?: boolean;

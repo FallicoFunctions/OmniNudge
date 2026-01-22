@@ -24,7 +24,7 @@ interface CompactPostCardProps {
   onToggleExpand?: () => void;
   shouldPreloadVideo?: boolean;
   defaultVideoAspectRatio?: number;
-  scrollRoot?: React.RefObject<HTMLElement>;
+  scrollRoot?: React.RefObject<HTMLDivElement | null>;
   onVideoVisibilityChange?: (postIndex: number, isVisible: boolean) => void;
 }
 
@@ -433,7 +433,6 @@ export function CompactPostCard({
       {isExpanded && (
         <ExpandedPost
           post={actualPost}
-          feedType={feedType}
           onCollapse={handleCollapse}
         />
       )}

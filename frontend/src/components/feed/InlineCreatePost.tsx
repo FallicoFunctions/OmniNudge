@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { postsService } from '../../services/postsService';
-import { mediaService } from '../../services/mediaService';
+import { mediaService, type MediaFile } from '../../services/mediaService';
 import type { CreatePostRequest, GalleryImage } from '../../types/posts';
 import { getPostUrl } from '../../utils/postUrl';
 
@@ -58,7 +58,7 @@ export function InlineCreatePost({ feedType, feedSource, onClose }: InlineCreate
     try {
       if (files.length === 1) {
         const response = await mediaService.uploadMedia(files[0]);
-        const normalizedUrl = normalizeUploadedMediaUrl(response.url || response.storage_path);
+        const normalizedUrl = normalizeUploadedMediaUrl(response.storage_url || response.storage_path);
         setMediaUrl(normalizedUrl);
         setMediaItems([
           {
@@ -69,12 +69,15 @@ export function InlineCreatePost({ feedType, feedSource, onClose }: InlineCreate
         setMediaPreviews([pendingItems[0].previewUrl]);
       } else {
         const responses = await mediaService.batchUploadMedia(files);
-        const galleryImages: GalleryImage[] = responses.map((r, index) => ({
-          url: normalizeUploadedMediaUrl(r.url || r.storage_path),
+        const successfulUploads = responses.uploads
+          .map((upload, index) => (upload ? { upload, index } : null))
+          .filter((item): item is { upload: MediaFile; index: number } => Boolean(item));
+        const galleryImages: GalleryImage[] = successfulUploads.map(({ upload, index }) => ({
+          url: normalizeUploadedMediaUrl(upload.storage_url || upload.storage_path),
           media_type: files[index].type.startsWith('video/') ? 'video' : 'image',
         }));
         setMediaItems(galleryImages);
-        setMediaPreviews(pendingItems.map((item) => item.previewUrl));
+        setMediaPreviews(successfulUploads.map(({ index }) => pendingItems[index].previewUrl));
       }
     } catch (error) {
       console.error('Failed to upload media:', error);
@@ -103,8 +106,9 @@ export function InlineCreatePost({ feedType, feedSource, onClose }: InlineCreate
         body: activeTab === 'text' && body.trim() ? body.trim() : undefined,
         media_url: activeTab === 'link' && mediaUrl ? mediaUrl : undefined,
         gallery_images: activeTab === 'link' && mediaItems.length > 1 ? mediaItems : undefined,
-        is_nsfw: isNsfw,
+        nsfw: isNsfw,
         send_replies_to_inbox: true,
+        post_type: activeTab,
       };
 
       if (feedType === 'hub') {

@@ -461,17 +461,6 @@ export function SavedItemsView({
     })),
   ].sort((a, b) => b.timestamp - a.timestamp);
 
-  const {
-    currentItems: pagedOmniItems,
-    pageIndex: omniPageIndex,
-    totalPages: omniTotalPages,
-    canGoPrev: canOmniGoPrev,
-    canGoNext: canOmniGoNext,
-    goToPrev: goToPrevOmni,
-    goToNext: goToNextOmni,
-    resetPage: resetOmniPage,
-  } = usePagination(omniItems, PAGE_SIZE);
-
   const redditItems = [
     ...visibleSavedRedditPosts.map((post) => ({
       key: `reddit-post-${post.subreddit}-${post.reddit_post_id}`,
@@ -603,17 +592,6 @@ export function SavedItemsView({
       })(),
     })),
   ].sort((a, b) => b.timestamp - a.timestamp);
-
-  const {
-    currentItems: pagedRedditItems,
-    pageIndex: redditPageIndex,
-    totalPages: redditTotalPages,
-    canGoPrev: canRedditGoPrev,
-    canGoNext: canRedditGoNext,
-    goToPrev: goToPrevReddit,
-    goToNext: goToNextReddit,
-    resetPage: resetRedditPage,
-  } = usePagination(redditItems, PAGE_SIZE);
 
   // Filter items based on content type and source
   const filteredItems = useMemo(() => {

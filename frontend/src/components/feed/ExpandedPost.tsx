@@ -9,16 +9,14 @@ import { postsService } from '../../services/postsService';
 
 interface ExpandedPostProps {
   post: any; // Can be RedditPost or PlatformPost
-  feedType: 'home' | 'subreddit' | 'hub';
   onCollapse: () => void;
 }
 
-export function ExpandedPost({ post, feedType, onCollapse }: ExpandedPostProps) {
+export function ExpandedPost({ post, onCollapse }: ExpandedPostProps) {
   const [comments, setComments] = useState<any[]>([]);
   const [isLoadingComments, setIsLoadingComments] = useState(true);
   const [commentError, setCommentError] = useState<string | null>(null);
   const [hasMoreComments, setHasMoreComments] = useState(false);
-  const [commentCursor, setCommentCursor] = useState<string | null>(null);
 
   const isRedditPost = 'subreddit' in post;
   const postType: 'reddit' | 'hub' = isRedditPost ? 'reddit' : 'hub';
@@ -63,7 +61,6 @@ export function ExpandedPost({ post, feedType, onCollapse }: ExpandedPostProps) 
 
   // Gallery state for carousel
   const [galleryIndex, setGalleryIndex] = useState(0);
-  const [isGalleryHovered, setIsGalleryHovered] = useState(false);
 
   const handleGalleryNavigate = (direction: 'prev' | 'next') => {
     if (!galleryImages || galleryImages.length <= 1) return;
@@ -83,7 +80,7 @@ export function ExpandedPost({ post, feedType, onCollapse }: ExpandedPostProps) 
       try {
         if (postType === 'reddit') {
           // Fetch from Reddit API (same endpoint as normal post page)
-          const response = await api.get(`/reddit/r/${post.subreddit}/comments/${post.id}`);
+          const response = await api.get<any>(`/reddit/r/${post.subreddit}/comments/${post.id}`);
           console.log('Reddit API response:', response);
 
           // Reddit API returns [postListing, commentsListing]
@@ -96,7 +93,7 @@ export function ExpandedPost({ post, feedType, onCollapse }: ExpandedPostProps) 
           const flattenComments = (comments: any[]): any[] => {
             const flattened: any[] = [];
 
-            const traverse = (comment: any, depth = 0) => {
+            const traverse = (comment: any) => {
               if (comment.kind === 'more') return;
               if (!comment.data || !comment.data.body) return;
 
@@ -117,7 +114,7 @@ export function ExpandedPost({ post, feedType, onCollapse }: ExpandedPostProps) 
               });
             };
 
-            comments.forEach(c => traverse(c, 0));
+            comments.forEach((c) => traverse(c));
             return flattened;
           };
 
@@ -266,7 +263,6 @@ export function ExpandedPost({ post, feedType, onCollapse }: ExpandedPostProps) 
           className="w-full"
           currentIndex={galleryIndex}
           onNavigate={handleGalleryNavigate}
-          onHoverChange={setIsGalleryHovered}
         />
       ) : displayMedia ? (
         <div className="w-full">
@@ -304,7 +300,6 @@ export function ExpandedPost({ post, feedType, onCollapse }: ExpandedPostProps) 
       <CommentEntry
         postId={post.id}
         postType={postType}
-        subreddit={isRedditPost ? post.subreddit : undefined}
         onCommentPosted={(comment) => handleCommentPosted(null, comment)}
         placeholder="Add a comment..."
       />

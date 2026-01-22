@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { formatDistanceToNow } from 'date-fns';
 import { messagesService } from '../../services/messagesService';
@@ -357,9 +357,14 @@ export function ExpandedMessage({ conversation, onCollapse }: ExpandedMessagePro
         return;
       }
 
+      let mediaFileId: number | undefined;
       let mediaUrl: string | undefined;
       let mediaType: string | undefined;
+      let mediaSize: number | undefined;
       let messageType: Message['message_type'] = 'text';
+      let mediaEncryptionKey: string | undefined;
+      let mediaEncryptionIv: string | undefined;
+      let senderMediaEncryptionKey: string | undefined;
 
       if (selectedFile) {
         if (selectedFile.size > MAX_UPLOAD_SIZE) {
@@ -369,11 +374,18 @@ export function ExpandedMessage({ conversation, onCollapse }: ExpandedMessagePro
 
         setUploadingMedia(true);
         try {
-          const encryptedFile = await encryptFile(selectedFile, keys.privateKey);
-          const uploadedUrl = await mediaService.uploadMedia(encryptedFile, selectedFile.type);
-          mediaUrl = uploadedUrl;
+          const encryptedFile = await encryptFile(selectedFile);
+          const uploadResponse = await mediaService.uploadMedia(
+            new File([encryptedFile.encryptedData], selectedFile.name, { type: selectedFile.type })
+          );
+          mediaFileId = uploadResponse.id;
+          mediaUrl = uploadResponse.storage_url;
           mediaType = selectedFile.type;
+          mediaSize = selectedFile.size;
           messageType = inferMessageTypeFromFile(selectedFile);
+          mediaEncryptionKey = await encryptKeyWithPublicKey(encryptedFile.rawKey, recipientPublicKey);
+          senderMediaEncryptionKey = await encryptKeyWithPublicKey(encryptedFile.rawKey, keys.publicKey);
+          mediaEncryptionIv = arrayBufferToBase64(encryptedFile.iv.slice().buffer);
         } catch (error) {
           console.error('Failed to upload media:', error);
           alert('Failed to upload media');
@@ -392,9 +404,14 @@ export function ExpandedMessage({ conversation, onCollapse }: ExpandedMessagePro
         encrypted_content: encryptedForRecipient,
         sender_encrypted_content: encryptedForSelf,
         encryption_version: 'v1',
+        media_file_id: mediaFileId,
         media_url: mediaUrl,
         media_type: mediaType,
+        media_size: mediaSize,
         message_type: messageType,
+        media_encryption_key: mediaEncryptionKey,
+        media_encryption_iv: mediaEncryptionIv,
+        sender_media_encryption_key: senderMediaEncryptionKey,
       });
     } catch (error) {
       console.error('Failed to send message:', error);

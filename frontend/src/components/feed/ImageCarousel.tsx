@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useRef } from 'react';
 import { resolveMediaUrl } from '../../utils/mediaUrl';
 import type { GalleryImage } from '../../types/posts';
 

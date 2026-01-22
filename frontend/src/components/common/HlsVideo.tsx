@@ -1,5 +1,5 @@
 import { useEffect, useRef, forwardRef, useImperativeHandle, useCallback } from 'react';
-import { loadHls } from '../../utils/hlsLoader';
+import { loadHls, type HlsInstance } from '../../utils/hlsLoader';
 
 interface HlsVideoProps extends React.VideoHTMLAttributes<HTMLVideoElement> {
   src: string;
@@ -23,13 +23,7 @@ export const HlsVideo = forwardRef<HlsVideoHandle, HlsVideoProps>(function HlsVi
   ref
 ) {
   const internalRef = useRef<HTMLVideoElement>(null);
-  const hlsRef = useRef<{
-    destroy: () => void;
-    loadSource: (source: string) => void;
-    attachMedia: (media: HTMLVideoElement) => void;
-    startLoad: (startPosition?: number) => void;
-    stopLoad: () => void;
-  } | null>(null);
+  const hlsRef = useRef<HlsInstance | null>(null);
   const pendingStartLoadRef = useRef<number | null>(null);
 
   // Merge internal ref with forwarded ref
@@ -53,7 +47,7 @@ export const HlsVideo = forwardRef<HlsVideoHandle, HlsVideoProps>(function HlsVi
       return;
     }
     if (hlsRef.current) {
-      hlsRef.current.startLoad(startPosition);
+      hlsRef.current.startLoad?.(startPosition);
       pendingStartLoadRef.current = null;
     } else {
       pendingStartLoadRef.current = startPosition;
@@ -62,7 +56,7 @@ export const HlsVideo = forwardRef<HlsVideoHandle, HlsVideoProps>(function HlsVi
 
   const stopLoad = useCallback(() => {
     if (hlsRef.current) {
-      hlsRef.current.stopLoad();
+      hlsRef.current.stopLoad?.();
     }
   }, []);
 
@@ -97,7 +91,7 @@ export const HlsVideo = forwardRef<HlsVideoHandle, HlsVideoProps>(function HlsVi
         hls.attachMedia(videoEl);
         hlsRef.current = hls;
         if (pendingStartLoadRef.current !== null) {
-          hls.startLoad(pendingStartLoadRef.current);
+          hls.startLoad?.(pendingStartLoadRef.current);
           pendingStartLoadRef.current = null;
         }
       } catch (err) {

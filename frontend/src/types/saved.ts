@@ -28,6 +28,14 @@ export interface SavedRedditPost {
   num_comments?: number;
   thumbnail?: string | null;
   created_utc?: number | null;
+  url?: string;
+  selftext?: string;
+  is_self?: boolean;
+  post_hint?: string;
+  is_video?: boolean;
+  preview?: unknown;
+  media?: unknown;
+  secure_media?: unknown;
   link_flair_text?: string | null;
   link_flair_background_color?: string | null;
   link_flair_text_color?: string | null;
