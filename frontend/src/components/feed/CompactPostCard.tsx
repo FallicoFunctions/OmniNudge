@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { formatDistanceToNow } from 'date-fns';
 import { getPostUrl } from '../../utils/postUrl';
 import { resolveMediaUrl } from '../../utils/mediaUrl';
-import { HlsVideo } from '../common/HlsVideo';
+import { HlsVideo, type HlsVideoHandle } from '../common/HlsVideo';
 import { ImageCarousel } from './ImageCarousel';
 import { ExpandedPost } from './ExpandedPost';
 import { ExpandedMessage } from './ExpandedMessage';
@@ -19,8 +19,13 @@ import type { Conversation, Message } from '../../types/messages';
 interface CompactPostCardProps {
   post: PlatformPost | any; // Can be RedditPost, PlatformPost, or Conversation
   feedType: 'home' | 'subreddit' | 'hub' | 'messages';
+  postIndex: number;
   isExpanded?: boolean;
   onToggleExpand?: () => void;
+  shouldPreloadVideo?: boolean;
+  defaultVideoAspectRatio?: number;
+  scrollRoot?: React.RefObject<HTMLElement>;
+  onVideoVisibilityChange?: (postIndex: number, isVisible: boolean) => void;
 }
 
 function DecryptedMessagePreview({
@@ -114,21 +119,33 @@ function DecryptedMessagePreview({
   return <>{preview}</>;
 }
 
-export function CompactPostCard({ post, feedType, isExpanded = false, onToggleExpand }: CompactPostCardProps) {
+export function CompactPostCard({
+  post,
+  feedType,
+  postIndex,
+  isExpanded = false,
+  onToggleExpand,
+  shouldPreloadVideo = false,
+  defaultVideoAspectRatio = 16 / 9,
+  scrollRoot,
+  onVideoVisibilityChange,
+}: CompactPostCardProps) {
   const { user } = useAuth();
   const [galleryIndex, setGalleryIndex] = useState(0);
   const [isGalleryHovered, setIsGalleryHovered] = useState(false);
   const titleAreaRef = useRef<HTMLDivElement>(null);
   const [isTitleAreaHovered, setIsTitleAreaHovered] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
-  const videoRef = useRef<HTMLVideoElement>(null);
+  const videoRef = useRef<HlsVideoHandle>(null);
+  const videoContainerRef = useRef<HTMLDivElement>(null);
+  const hasStartedLoadRef = useRef(false);
 
   const handleVideoMouseEnter = () => {
-    videoRef.current?.play().catch(() => {});
+    videoRef.current?.video?.play().catch(() => {});
   };
 
   const handleVideoMouseLeave = () => {
-    videoRef.current?.pause();
+    videoRef.current?.video?.pause();
   };
   // Handle messages differently
   if (feedType === 'messages') {
@@ -318,6 +335,21 @@ export function CompactPostCard({ post, feedType, isExpanded = false, onToggleEx
     displayMedia = thumbnail;
   }
 
+  const previewDimensions = actualPost.preview?.images?.[0]?.source;
+  const oembedDimensions = actualPost.secure_media?.oembed || actualPost.media?.oembed;
+  const explicitVideoWidth =
+    redditVideo?.width ||
+    previewDimensions?.width ||
+    oembedDimensions?.thumbnail_width;
+  const explicitVideoHeight =
+    redditVideo?.height ||
+    previewDimensions?.height ||
+    oembedDimensions?.thumbnail_height;
+  const videoAspectRatio =
+    explicitVideoWidth && explicitVideoHeight
+      ? explicitVideoWidth / explicitVideoHeight
+      : defaultVideoAspectRatio;
+
   // URL generation
   let postUrl = '#';
   if (isHubPost || source === 'hub') {
@@ -344,9 +376,6 @@ export function CompactPostCard({ post, feedType, isExpanded = false, onToggleEx
     sourceBadge = `r/${actualPost.subreddit || 'unknown'}`;
   }
 
-  // Get video poster/preview image
-  const videoPoster = isVideo && thumbnail ? (thumbnail.startsWith('http') ? thumbnail : resolveMediaUrl(thumbnail)) : undefined;
-
   const handleTitleClick = (e: React.MouseEvent) => {
     e.preventDefault();
     if (onToggleExpand) {
@@ -363,6 +392,40 @@ export function CompactPostCard({ post, feedType, isExpanded = false, onToggleEx
       }, 100);
     }
   };
+
+  useEffect(() => {
+    if (!isVideo || !shouldPreloadVideo || hasStartedLoadRef.current) return;
+    hasStartedLoadRef.current = true;
+    videoRef.current?.startLoad(-1);
+    videoRef.current?.video?.load();
+  }, [isVideo, shouldPreloadVideo]);
+
+  useEffect(() => {
+    if (!isVideo || !onVideoVisibilityChange) return;
+    const target = videoContainerRef.current;
+    if (!target) return;
+
+    if (!('IntersectionObserver' in window)) {
+      onVideoVisibilityChange(postIndex, true);
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          onVideoVisibilityChange(postIndex, entry.isIntersecting);
+        });
+      },
+      {
+        root: scrollRoot?.current ?? null,
+        rootMargin: '200px 0px',
+        threshold: 0.1,
+      }
+    );
+
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [isVideo, onVideoVisibilityChange, postIndex, scrollRoot]);
 
   return (
     <article ref={cardRef} className="compact-post-card">
@@ -391,21 +454,25 @@ export function CompactPostCard({ post, feedType, isExpanded = false, onToggleEx
       ) : displayMedia ? (
         <div className="w-full">
           {isVideo ? (
-            <div
-              onMouseEnter={handleVideoMouseEnter}
-              onMouseLeave={handleVideoMouseLeave}
-            >
-              <HlsVideo
-                ref={videoRef}
-                src={displayMedia.startsWith('http') ? displayMedia : resolveMediaUrl(displayMedia)}
-                poster={videoPoster}
-                className="w-full h-auto"
-                style={{ display: 'block', maxHeight: 'calc(100vh - 200px)', objectFit: 'contain' }}
-                controls
-                loop
-                playsInline
-                preload="metadata"
-              />
+            <div onMouseEnter={handleVideoMouseEnter} onMouseLeave={handleVideoMouseLeave}>
+              <div
+                ref={videoContainerRef}
+                className="relative w-full overflow-hidden bg-black/10"
+                style={{ aspectRatio: videoAspectRatio, maxHeight: 'calc(100vh - 200px)' }}
+              >
+                <HlsVideo
+                  ref={videoRef}
+                  src={displayMedia.startsWith('http') ? displayMedia : resolveMediaUrl(displayMedia)}
+                  className="absolute inset-0 w-full h-full object-contain"
+                  style={{ display: 'block' }}
+                  controls
+                  loop
+                  playsInline
+                  preload={shouldPreloadVideo ? 'auto' : 'metadata'}
+                  autoStartLoad={false}
+                  maxBufferLength={5}
+                />
+              </div>
             </div>
           ) : (
             <img

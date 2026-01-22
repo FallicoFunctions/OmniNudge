@@ -1,8 +1,16 @@
-import { useEffect, useRef, forwardRef } from 'react';
+import { useEffect, useRef, forwardRef, useImperativeHandle, useCallback } from 'react';
 import { loadHls } from '../../utils/hlsLoader';
 
 interface HlsVideoProps extends React.VideoHTMLAttributes<HTMLVideoElement> {
   src: string;
+  autoStartLoad?: boolean;
+  maxBufferLength?: number;
+}
+
+export interface HlsVideoHandle {
+  video: HTMLVideoElement | null;
+  startLoad: (startPosition?: number) => void;
+  stopLoad: () => void;
 }
 
 /**
@@ -10,18 +18,23 @@ interface HlsVideoProps extends React.VideoHTMLAttributes<HTMLVideoElement> {
  * Safari supports HLS natively, other browsers need HLS.js library.
  * This allows Reddit videos (which use HLS streaming) to play with audio on all browsers.
  */
-export const HlsVideo = forwardRef<HTMLVideoElement, HlsVideoProps>(function HlsVideo({ src, ...props }, ref) {
+export const HlsVideo = forwardRef<HlsVideoHandle, HlsVideoProps>(function HlsVideo(
+  { src, autoStartLoad = true, maxBufferLength, ...props },
+  ref
+) {
   const internalRef = useRef<HTMLVideoElement>(null);
-  const hlsRef = useRef<{ destroy: () => void } | null>(null);
+  const hlsRef = useRef<{
+    destroy: () => void;
+    loadSource: (source: string) => void;
+    attachMedia: (media: HTMLVideoElement) => void;
+    startLoad: (startPosition?: number) => void;
+    stopLoad: () => void;
+  } | null>(null);
+  const pendingStartLoadRef = useRef<number | null>(null);
 
   // Merge internal ref with forwarded ref
   const setRefs = (el: HTMLVideoElement | null) => {
     internalRef.current = el;
-    if (typeof ref === 'function') {
-      ref(el);
-    } else if (ref) {
-      ref.current = el;
-    }
   };
 
   // Detect if browser supports native HLS (Safari)
@@ -35,6 +48,36 @@ export const HlsVideo = forwardRef<HTMLVideoElement, HlsVideoProps>(function Hls
 
   const isHlsUrl = src.includes('.m3u8') || src.includes('/HLSPlaylist.m3u8');
 
+  const startLoad = useCallback((startPosition = -1) => {
+    if (!isHlsUrl || canNativeHls) {
+      return;
+    }
+    if (hlsRef.current) {
+      hlsRef.current.startLoad(startPosition);
+      pendingStartLoadRef.current = null;
+    } else {
+      pendingStartLoadRef.current = startPosition;
+    }
+  }, [isHlsUrl, canNativeHls]);
+
+  const stopLoad = useCallback(() => {
+    if (hlsRef.current) {
+      hlsRef.current.stopLoad();
+    }
+  }, []);
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      get video() {
+        return internalRef.current;
+      },
+      startLoad,
+      stopLoad,
+    }),
+    [startLoad, stopLoad]
+  );
+
   useEffect(() => {
     const videoEl = internalRef.current;
     if (!videoEl || !isHlsUrl || canNativeHls) return;
@@ -46,10 +89,17 @@ export const HlsVideo = forwardRef<HTMLVideoElement, HlsVideoProps>(function Hls
         const Hls = await loadHls();
         if (!mounted || !Hls?.isSupported || !Hls.isSupported()) return;
 
-        const hls = new Hls();
+        const hls = new Hls({
+          autoStartLoad,
+          ...(typeof maxBufferLength === 'number' ? { maxBufferLength } : {}),
+        });
         hls.loadSource(src);
         hls.attachMedia(videoEl);
         hlsRef.current = hls;
+        if (pendingStartLoadRef.current !== null) {
+          hls.startLoad(pendingStartLoadRef.current);
+          pendingStartLoadRef.current = null;
+        }
       } catch (err) {
         console.error('Failed to load HLS player', err);
       }
@@ -62,7 +112,7 @@ export const HlsVideo = forwardRef<HTMLVideoElement, HlsVideoProps>(function Hls
         hlsRef.current = null;
       }
     };
-  }, [src, isHlsUrl, canNativeHls]);
+  }, [src, isHlsUrl, canNativeHls, autoStartLoad, maxBufferLength]);
 
   return <video ref={setRefs} {...props} src={canNativeHls || !isHlsUrl ? src : undefined} />;
 });
