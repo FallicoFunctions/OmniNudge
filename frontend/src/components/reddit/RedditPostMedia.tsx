@@ -57,7 +57,6 @@ export function RedditPostMedia({
   embedUrl,
   externalVideoUrl,
 }: RedditPostMediaProps) {
-  const isEmbeddableVideo = Boolean(embedUrl || externalVideoUrl);
   const embedSizing = getEmbedSizing(embedUrl ?? externalVideoUrl ?? undefined);
   return (
     <>

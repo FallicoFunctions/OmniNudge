@@ -50,6 +50,7 @@ interface RedditComment {
     body_html?: string;
     created_utc: number;
     score: number;
+    parent_id?: string;
     replies?: RedditListing<RedditComment> | string;
     depth?: number;
   };

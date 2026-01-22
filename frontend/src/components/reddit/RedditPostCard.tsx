@@ -265,6 +265,32 @@ function getWistiaEmbed(url?: string | null): string | null {
   return match?.[1] ? `https://fast.wistia.net/embed/iframe/${match[1]}` : null;
 }
 
+function withAutoplayParams(src: string, muted: boolean): string {
+  try {
+    const url = new URL(src);
+    if (!url.searchParams.has('autoplay')) {
+      url.searchParams.set('autoplay', '1');
+    }
+    if (muted) {
+      if (!url.searchParams.has('mute') && !url.searchParams.has('muted')) {
+        url.searchParams.set('mute', '1');
+        url.searchParams.set('muted', '1');
+      }
+    } else {
+      url.searchParams.set('mute', '0');
+      url.searchParams.set('muted', '0');
+    }
+    if (!url.searchParams.has('playsinline')) {
+      url.searchParams.set('playsinline', '1');
+    }
+    return url.toString();
+  } catch {
+    const joiner = src.includes('?') ? '&' : '?';
+    const muteValue = muted ? '1' : '0';
+    return `${src}${joiner}autoplay=1&mute=${muteValue}&muted=${muteValue}&playsinline=1`;
+  }
+}
+
 type InlineMedia =
   | { kind: 'redgifs'; src: string }
   | { kind: 'iframe'; src: string }
@@ -506,6 +532,7 @@ export function RedditPostCard({
   const preferHls = true;
   const redditVideoSource = useMemo(() => getRedditVideoSource(post, preferHls), [post, preferHls]);
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const inlineVideoRef = useRef<HTMLVideoElement | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const autoplayRequestedRef = useRef(false);
   const autoplayWithSoundRef = useRef(false);
@@ -778,6 +805,15 @@ export function RedditPostCard({
     audioEl.currentTime = 0;
   }, [isInlinePreviewOpen]);
 
+  useEffect(() => {
+    if (!isInlinePreviewOpen || inlineMedia?.kind !== 'video') return;
+    const videoEl = inlineVideoRef.current;
+    if (!videoEl) return;
+    videoEl.muted = false;
+    videoEl.volume = 1.0;
+    videoEl.play().catch(() => {});
+  }, [isInlinePreviewOpen, inlineMedia]);
+
   return (
     <article
       className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)]"
@@ -1029,7 +1065,10 @@ export function RedditPostCard({
                     <div className="relative w-full bg-black">
                       <iframe
                         title={`${post.title} - Redgifs video`}
-                        src={inlineMedia.src}
+                        key={`${post.id}-redgifs-${isInlinePreviewOpen ? 'open' : 'closed'}`}
+                        src={
+                          isInlinePreviewOpen ? withAutoplayParams(inlineMedia.src, false) : inlineMedia.src
+                        }
                         className="h-[70vh] w-full"
                         frameBorder="0"
                         scrolling="no"
@@ -1042,7 +1081,10 @@ export function RedditPostCard({
                     <div className="relative w-full bg-black">
                       <iframe
                         title={`${post.title} - Embedded media`}
-                        src={inlineMedia.src}
+                        key={`${post.id}-embed-${isInlinePreviewOpen ? 'open' : 'closed'}`}
+                        src={
+                          isInlinePreviewOpen ? withAutoplayParams(inlineMedia.src, false) : inlineMedia.src
+                        }
                         className="h-[70vh] w-full"
                         frameBorder="0"
                         scrolling="no"
@@ -1053,6 +1095,7 @@ export function RedditPostCard({
                     </div>
                   ) : inlineMedia?.kind === 'video' ? (
                     <video
+                      ref={inlineVideoRef}
                       src={inlineMedia.src}
                       className="max-h-[70vh] w-full bg-black"
                       controls

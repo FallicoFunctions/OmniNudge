@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { useMemo, useState, type CSSProperties } from 'react';
+import { useMemo, useState, useRef, useEffect, type CSSProperties } from 'react';
 import type { PointerEvent } from 'react';
 import { formatTimestamp } from '../../utils/timeFormat';
 import { resolveMediaUrl } from '../../utils/mediaUrl';
@@ -128,6 +128,32 @@ function getExternalVideoMedia(url?: string | null): ExternalMedia | null {
   return null;
 }
 
+function withAutoplayParams(src: string, muted: boolean): string {
+  try {
+    const url = new URL(src);
+    if (!url.searchParams.has('autoplay')) {
+      url.searchParams.set('autoplay', '1');
+    }
+    if (muted) {
+      if (!url.searchParams.has('mute') && !url.searchParams.has('muted')) {
+        url.searchParams.set('mute', '1');
+        url.searchParams.set('muted', '1');
+      }
+    } else {
+      url.searchParams.set('mute', '0');
+      url.searchParams.set('muted', '0');
+    }
+    if (!url.searchParams.has('playsinline')) {
+      url.searchParams.set('playsinline', '1');
+    }
+    return url.toString();
+  } catch {
+    const joiner = src.includes('?') ? '&' : '?';
+    const muteValue = muted ? '1' : '0';
+    return `${src}${joiner}autoplay=1&mute=${muteValue}&muted=${muteValue}&playsinline=1`;
+  }
+}
+
 
 interface PlatformPostCardProps {
   post: PlatformPost;
@@ -191,6 +217,7 @@ export function PlatformPostCard({
   onDelete,
 }: PlatformPostCardProps) {
   const [expandedTextMap, setExpandedTextMap] = useState<Record<number, boolean>>({});
+  const previewVideoRef = useRef<HTMLVideoElement | null>(null);
   const { blockNsfwThumbnails } = useSettings();
 
   const toggleTextPreview = (postId: number) => {
@@ -242,6 +269,15 @@ export function PlatformPostCard({
       (post.media_url && post.media_type?.startsWith('video'))
   );
   const isInlinePreviewOpen = !!(hasInlinePreview && expandedTextMap[post.id]);
+
+  useEffect(() => {
+    if (!isInlinePreviewOpen) return;
+    const videoEl = previewVideoRef.current;
+    if (!videoEl) return;
+    videoEl.muted = false;
+    videoEl.volume = 1.0;
+    videoEl.play().catch(() => {});
+  }, [isInlinePreviewOpen, externalMedia, post.media_url]);
 
   const getPreviewSizing = (src: string): { className: string; style?: CSSProperties } => {
     if (src.includes('tiktok.com')) {
@@ -457,7 +493,12 @@ export function PlatformPostCard({
                   {externalMedia ? (
                     externalMedia.kind === 'iframe' ? (
                       <iframe
-                        src={externalMedia.src}
+                        key={`${post.id}-${isInlinePreviewOpen ? 'open' : 'closed'}`}
+                        src={
+                          isInlinePreviewOpen
+                            ? withAutoplayParams(externalMedia.src, false)
+                            : externalMedia.src
+                        }
                         title={post.title}
                         className={getPreviewSizing(externalMedia.src).className}
                         style={getPreviewSizing(externalMedia.src).style}
@@ -466,6 +507,7 @@ export function PlatformPostCard({
                       />
                     ) : (
                       <video
+                        ref={previewVideoRef}
                         src={externalMedia.src}
                         className={getPreviewSizing(externalMedia.src).className}
                         style={getPreviewSizing(externalMedia.src).style}
@@ -476,6 +518,7 @@ export function PlatformPostCard({
                     )
                   ) : post.media_url && post.media_type?.startsWith('video') ? (
                     <video
+                      ref={previewVideoRef}
                       src={resolveMediaUrl(post.media_url)}
                       className="max-h-[70vh] w-full bg-black"
                       controls

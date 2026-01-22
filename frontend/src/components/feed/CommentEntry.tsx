@@ -1,11 +1,9 @@
 import { useState, useRef, useEffect } from 'react';
-import { redditService } from '../../services/redditService';
 import { postsService } from '../../services/postsService';
 
 interface CommentEntryProps {
   postId: string | number;
   postType: 'reddit' | 'hub';
-  subreddit?: string; // Required for Reddit posts
   parentId?: number;
   onCommentPosted: (comment: any) => void;
   onCancel?: () => void;
@@ -15,7 +13,6 @@ interface CommentEntryProps {
 export function CommentEntry({
   postId,
   postType,
-  subreddit,
   parentId,
   onCommentPosted,
   onCancel,
@@ -49,7 +46,7 @@ export function CommentEntry({
       score: 1,
       username: 'You',
       created_at: new Date().toISOString(),
-      parent_comment_id: parentId || null,
+      parent_comment_id: parentId ?? undefined,
       user_vote: 1,
       ups: 1,
       downs: 0,
@@ -68,7 +65,7 @@ export function CommentEntry({
       } else {
         newComment = await postsService.createComment(postId as number, {
           body: content.trim(),
-          parent_comment_id: parentId || null,
+          parent_comment_id: parentId ?? undefined,
         });
       }
 

@@ -167,13 +167,13 @@ export function PostDetailMedia({
   const resolvedThumbnailUrl = resolveMediaUrl(thumbnailUrl);
   const isEmbeddableVideo = Boolean(embedUrl || externalVideoUrl);
   const embedSizing = getEmbedSizing(embedUrl ?? externalVideoUrl ?? undefined);
+  const isGalleryVideo =
+    (galleryItem?.media_type ?? '').startsWith('video') ||
+    /\.(mp4|webm|mov|m4v|ogg)$/i.test(galleryItem?.url ?? '');
   const isPlayableVideo = isEmbeddableVideo || isVideoMedia || (hasGallery && isGalleryVideo);
   const containerClasses = isEmbeddableVideo
     ? embedSizing.className
     : `w-full ${imageExpanded ? 'max-h-[80vh]' : 'max-h-[320px]'}`;
-  const isGalleryVideo =
-    (galleryItem?.media_type ?? '').startsWith('video') ||
-    /\.(mp4|webm|mov|m4v|ogg)$/i.test(galleryItem?.url ?? '');
 
   if (!displayImage && !resolvedThumbnailUrl && !embedUrl && !externalVideoUrl) {
     return null;

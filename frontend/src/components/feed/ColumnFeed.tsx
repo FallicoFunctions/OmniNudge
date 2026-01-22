@@ -59,7 +59,7 @@ function inferMessageTypeFromFile(file: File): Message['message_type'] {
 }
 
 export function ColumnFeed({ columnId, config, isActive, showBorder }: ColumnFeedProps) {
-  const scrollRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement | null>(null);
   const [expandedPostIds, setExpandedPostIds] = useState<Set<string>>(new Set());
   const queryClient = useQueryClient();
   const usernameInputRef = useRef<HTMLInputElement>(null);

@@ -2,11 +2,18 @@ export interface HlsInstance {
   loadSource: (url: string) => void;
   attachMedia: (media: HTMLMediaElement) => void;
   destroy: () => void;
+  startLoad?: (startPosition?: number) => void;
+  stopLoad?: () => void;
   on?: (event: string, handler: (...args: unknown[]) => void) => void;
 }
 
+export interface HlsConfig {
+  autoStartLoad?: boolean;
+  maxBufferLength?: number;
+}
+
 export interface HlsConstructor {
-  new (): HlsInstance;
+  new (config?: HlsConfig): HlsInstance;
   isSupported: () => boolean;
 }
 

@@ -151,7 +151,6 @@ export function CommentThread({
           timeAgo = 'recently';
         }
 
-        const hasReplies = (comment.replies && comment.replies.length > 0) || (comment.reply_count && comment.reply_count > 0);
         const showFirstChild = depth === 0 && comment.replies && comment.replies.length > 0;
         const remainingReplies = comment.replies ? comment.replies.length - 1 : (comment.reply_count || 0);
 
@@ -213,7 +212,6 @@ export function CommentThread({
                   <CommentEntry
                     postId={postId}
                     postType={postType}
-                    subreddit={subreddit}
                     parentId={typeof comment.id === 'number' ? comment.id : undefined}
                     onCommentPosted={(newComment) => handleReplyPosted(comment.id, newComment)}
                     onCancel={() => setReplyingTo(null)}
