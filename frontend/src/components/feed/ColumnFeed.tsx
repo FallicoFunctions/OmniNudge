@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState } from 'react';
+import { useRef, useEffect, useState, useMemo, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useColumnFeed } from '../../hooks/useColumnFeed';
 import { CompactPostCard } from './CompactPostCard';
@@ -13,6 +13,42 @@ interface ColumnFeedProps {
   config: ColumnConfig;
   isActive: boolean;
   showBorder: boolean;
+}
+
+function extractVideoDimensions(post: any) {
+  const actualPost = post?.post ?? post;
+  const redditVideo = actualPost?.secure_media?.reddit_video || actualPost?.media?.reddit_video;
+  if (redditVideo?.width && redditVideo?.height) {
+    return { width: redditVideo.width, height: redditVideo.height };
+  }
+
+  const previewSource = actualPost?.preview?.images?.[0]?.source;
+  if (previewSource?.width && previewSource?.height) {
+    return { width: previewSource.width, height: previewSource.height };
+  }
+
+  const oembed = actualPost?.secure_media?.oembed || actualPost?.media?.oembed;
+  if (oembed?.thumbnail_width && oembed?.thumbnail_height) {
+    return { width: oembed.thumbnail_width, height: oembed.thumbnail_height };
+  }
+
+  return null;
+}
+
+function isVideoPost(post: any) {
+  const actualPost = post?.post ?? post;
+  const redditVideo = actualPost?.secure_media?.reddit_video || actualPost?.media?.reddit_video;
+  const redditHlsUrl = redditVideo?.hls_url;
+  const mediaUrl = actualPost?.media_url || actualPost?.url;
+  return Boolean(
+    actualPost?.is_video ||
+      redditHlsUrl ||
+      mediaUrl?.includes('.mp4') ||
+      mediaUrl?.includes('.webm') ||
+      mediaUrl?.includes('v.redd.it') ||
+      mediaUrl?.includes('redgifs.com') ||
+      mediaUrl?.includes('gfycat.com')
+  );
 }
 
 function inferMessageTypeFromFile(file: File): Message['message_type'] {
@@ -59,6 +95,67 @@ export function ColumnFeed({ columnId, config, isActive, showBorder }: ColumnFee
     if (Array.isArray(page)) return page; // Generic array format
     return [];
   }) ?? [];
+
+  const videoPostIndices = useMemo(() => {
+    const indices: number[] = [];
+    allPosts.forEach((post, index) => {
+      if (isVideoPost(post)) {
+        indices.push(index);
+      }
+    });
+    return indices;
+  }, [allPosts]);
+
+  const videoIndexByPostIndex = useMemo(() => {
+    const map = new Map<number, number>();
+    videoPostIndices.forEach((postIndex, videoIndex) => {
+      map.set(postIndex, videoIndex);
+    });
+    return map;
+  }, [videoPostIndices]);
+
+  const defaultVideoAspectRatio = useMemo(() => {
+    const sampleLimit = 20;
+    let portrait = 0;
+    let landscape = 0;
+
+    for (let i = 0; i < allPosts.length; i += 1) {
+      const post = allPosts[i];
+      if (!isVideoPost(post)) continue;
+      const dims = extractVideoDimensions(post);
+      if (!dims) continue;
+      if (dims.height >= dims.width) {
+        portrait += 1;
+      } else {
+        landscape += 1;
+      }
+      if (portrait + landscape >= sampleLimit) break;
+    }
+
+    const total = portrait + landscape;
+    if (total === 0) return 16 / 9;
+    return portrait / total >= 0.6 ? 9 / 16 : 16 / 9;
+  }, [allPosts]);
+
+  const visibleVideoIndicesRef = useRef<Set<number>>(new Set());
+  const [anchorVideoIndex, setAnchorVideoIndex] = useState(0);
+
+  const handleVideoVisibilityChange = useCallback(
+    (postIndex: number, isVisible: boolean) => {
+      const videoIndex = videoIndexByPostIndex.get(postIndex);
+      if (videoIndex === undefined) return;
+      const visibleSet = visibleVideoIndicesRef.current;
+      if (isVisible) {
+        visibleSet.add(videoIndex);
+      } else {
+        visibleSet.delete(videoIndex);
+      }
+      if (visibleSet.size === 0) return;
+      const minVisible = Math.min(...Array.from(visibleSet.values()));
+      setAnchorVideoIndex(minVisible);
+    },
+    [videoIndexByPostIndex]
+  );
 
   useEffect(() => {
     if (!showNewMessageInput) return;
@@ -379,13 +476,23 @@ export function ColumnFeed({ columnId, config, isActive, showBorder }: ColumnFee
       )}
       {allPosts.map((post, index) => {
         const postId = post.id || `${config.feedType}-${index}`;
+        const videoIndex = videoIndexByPostIndex.get(index);
+        const shouldPreloadVideo =
+          typeof videoIndex === 'number' &&
+          videoIndex >= anchorVideoIndex &&
+          videoIndex < anchorVideoIndex + 10;
         return (
           <CompactPostCard
             key={postId}
             post={post}
             feedType={config.feedType}
+            postIndex={index}
             isExpanded={expandedPostIds.has(postId)}
             onToggleExpand={() => handleToggleExpand(postId)}
+            shouldPreloadVideo={shouldPreloadVideo}
+            defaultVideoAspectRatio={defaultVideoAspectRatio}
+            scrollRoot={scrollRef}
+            onVideoVisibilityChange={handleVideoVisibilityChange}
           />
         );
       })}
