@@ -1,14 +1,18 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useMultiColumnFeed } from '../../contexts/MultiColumnFeedContext';
 import { useColumnFeed } from '../../hooks/useColumnFeed';
-import { VerticalOmniScrollPost } from './VerticalOmniScrollPost';
-import { OmniScrollControls } from './OmniScrollControls';
+import { StandardScrollPost } from './StandardScrollPost';
+import { StandardScrollControls } from './StandardScrollControls';
+import type { CombinedFeedItem } from '../../services/feedService';
+import type { RedditApiPost } from '../../types/reddit';
+import type { LocalSubredditPost } from '../../services/hubsService';
+import type { PlatformPost } from '../../types/posts';
 
-interface VerticalOmniScrollProps {
+interface StandardScrollProps {
   onClose: () => void;
 }
 
-export function VerticalOmniScroll({ onClose }: VerticalOmniScrollProps) {
+export function StandardScroll({ onClose }: StandardScrollProps) {
   const { state } = useMultiColumnFeed();
 
   // Use first column config for the feed source
@@ -22,7 +26,7 @@ export function VerticalOmniScroll({ onClose }: VerticalOmniScrollProps) {
   };
 
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading } = useColumnFeed(
-    'omniscroll',
+    'standard-scroll',
     config
   );
 
@@ -36,8 +40,41 @@ export function VerticalOmniScroll({ onClose }: VerticalOmniScrollProps) {
   const autoAdvanceTimerRef = useRef<NodeJS.Timeout | null>(null);
   const lastScrollTimeRef = useRef<number>(0);
 
+  type StandardScrollItem = CombinedFeedItem | RedditApiPost | LocalSubredditPost | PlatformPost;
+
   // Flatten all posts from all pages
-  const allPosts = data?.pages.flatMap((page: any) => page.data || []) || [];
+  const allPosts = useMemo<StandardScrollItem[]>(() => {
+    const pages = data?.pages ?? [];
+    return pages.flatMap((page) => {
+      if (Array.isArray(page)) return page as StandardScrollItem[];
+      if (!page || typeof page !== 'object') return [];
+      if ('data' in page) {
+        const items = (page as { data?: StandardScrollItem[] }).data;
+        if (Array.isArray(items)) {
+          return items;
+        }
+      }
+      if ('posts' in page && Array.isArray((page as { posts?: unknown }).posts)) {
+        return (page as { posts: StandardScrollItem[] }).posts;
+      }
+      return [];
+    });
+  }, [data?.pages]);
+
+  const getPostId = useCallback((post: StandardScrollItem, index: number) => {
+    if (post && typeof post === 'object') {
+      if ('post' in post) {
+        const inner = (post as CombinedFeedItem).post as { id?: string | number };
+        if (inner?.id !== undefined) {
+          return inner.id;
+        }
+      }
+      if ('id' in post && (post as { id?: string | number }).id !== undefined) {
+        return (post as { id: string | number }).id;
+      }
+    }
+    return `standard-scroll-${index}`;
+  }, []);
 
   // Auto-advance logic
   const handleNext = useCallback(() => {
@@ -192,12 +229,12 @@ export function VerticalOmniScroll({ onClose }: VerticalOmniScrollProps) {
   }
 
   return (
-    <div className="view-mode-vertical-omniscroll fixed inset-0 bg-black z-50 overflow-hidden">
+    <div className="view-mode-standard-scroll fixed inset-0 bg-black z-50 overflow-hidden">
       {/* Close button */}
       <button
         onClick={onClose}
         className="absolute top-4 right-4 text-white hover:text-cyan-500 transition-colors z-20"
-        aria-label="Close OmniScroll"
+        aria-label="Close Scroll"
       >
         <svg
           xmlns="http://www.w3.org/2000/svg"
@@ -211,7 +248,7 @@ export function VerticalOmniScroll({ onClose }: VerticalOmniScrollProps) {
       </button>
 
       {/* Controls */}
-      <OmniScrollControls
+      <StandardScrollControls
         autoAdvance={autoAdvance}
         autoAdvanceInterval={autoAdvanceInterval}
         currentIndex={currentIndex}
@@ -233,8 +270,8 @@ export function VerticalOmniScroll({ onClose }: VerticalOmniScrollProps) {
         }}
       >
         {allPosts.map((post, index) => (
-          <VerticalOmniScrollPost
-            key={`${post.id}-${index}`}
+          <StandardScrollPost
+            key={`${getPostId(post, index)}-${index}`}
             post={post}
             feedType={config.feedType}
             isActive={index === currentIndex}

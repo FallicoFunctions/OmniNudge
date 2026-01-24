@@ -10,14 +10,6 @@
   display: none;
 }
 
-/* Multi-column feed view specific styles */
-.multi-column-feed {
-  --column-gap: 0px;
-  --column-border: 1px solid rgba(0, 229, 255, 0.1);
-  --column-hover-bg: rgba(0, 229, 255, 0.05);
-  --column-active-ring: rgba(0, 229, 255, 0.5);
-}
-
 /* Compact post card styles */
 .compact-post-card {
   margin: 0;
@@ -56,9 +48,9 @@
   --ac-text-muted: #8a8a9a;
 }
 
-/* Apply Altered Carbon theme to multi-column and omniscroll modes */
-.view-mode-multi-column,
-.view-mode-vertical-omniscroll {
+/* Apply Altered Carbon theme to omniscroll and standard scroll modes */
+.view-mode-omniscroll,
+.view-mode-standard-scroll {
   --color-primary: var(--ac-cyan);
   --color-background: var(--ac-dark-bg);
   --color-surface: var(--ac-surface);
@@ -66,17 +58,6 @@
   --color-text: var(--ac-text);
   --color-text-muted: var(--ac-text-muted);
   --color-hover: rgba(0, 229, 255, 0.1);
-}
-
-/* Vertical OmniScroll specific styles */
-.omniscroll-container {
-  scroll-behavior: smooth;
-  scroll-snap-type: y mandatory;
-}
-
-.omniscroll-post {
-  scroll-snap-align: start;
-  scroll-snap-stop: always;
 }
 
 /* Glowing cyan accents */

@@ -36,16 +36,6 @@ export function RedditMediaSlideshow() {
     enabled: false,
   });
 
-  useEffect(() => {
-    if (data?.posts) {
-      const mediaOnly = extractMediaFromPosts(data.posts);
-      setMediaItems(mediaOnly);
-      if (mediaOnly.length > 0) {
-        setIsOpen(true);
-      }
-    }
-  }, [data]);
-
   const extractMediaFromPosts = (posts: RedditApiPost[]): RedditMediaItem[] => {
     return posts
       .filter((post) => {
@@ -74,6 +64,16 @@ export function RedditMediaSlideshow() {
       })
       .filter((item) => item.mediaUrl); // Remove items without media URLs
   };
+
+  useEffect(() => {
+    if (data?.posts) {
+      const mediaOnly = extractMediaFromPosts(data.posts);
+      setMediaItems(mediaOnly);
+      if (mediaOnly.length > 0) {
+        setIsOpen(true);
+      }
+    }
+  }, [data]);
 
   const handleLoadSlideshow = () => {
     setSubreddit(inputValue.trim());

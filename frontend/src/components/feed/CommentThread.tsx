@@ -19,6 +19,11 @@ interface Comment {
   reply_count?: number;
 }
 
+type CommentUpdate =
+  | Comment
+  | { __replaceTempId: string }
+  | { __removeTempId: string };
+
 interface CommentThreadProps {
   comments: Comment[];
   postId: string | number;
@@ -29,7 +34,7 @@ interface CommentThreadProps {
   depth?: number;
   maxDepth?: number;
   onVote: (commentId: number | string, vote: number) => void;
-  onCommentPosted: (parentId: number | string, comment: Comment) => void;
+  onCommentPosted: (parentId: number | string, comment: CommentUpdate) => void;
   onLoadReplies?: (commentId: number | string) => void;
 }
 
@@ -67,7 +72,7 @@ export function CommentThread({
     setReplyingTo(replyingTo === commentId ? null : commentId);
   };
 
-  const handleReplyPosted = (parentId: number | string, comment: Comment) => {
+  const handleReplyPosted = (parentId: number | string, comment: CommentUpdate) => {
     onCommentPosted(parentId, comment);
     setReplyingTo(null);
   };
@@ -165,7 +170,7 @@ export function CommentThread({
             <div className="border-b border-[var(--color-border)] p-1">
               {/* Metadata */}
               <div className="flex items-center gap-1.5 text-[10px] text-[var(--color-text-muted)]">
-                <span className="font-semibold text-[var(--color-text)]">{comment.username}</span>
+                <span className="font-semibold text-[var(--color-primary)]">{comment.username}</span>
                 <span>•</span>
                 <span>{!isNaN(comment.score) ? comment.score : 0} pts</span>
                 <span>•</span>
@@ -175,7 +180,7 @@ export function CommentThread({
               {/* Comment body */}
               <MarkdownRenderer
                 content={comment.content}
-                className="mt-1 text-xs text-[var(--color-text)]"
+                className="mt-1 text-xs text-[var(--color-primary)]"
               />
 
               {/* Actions */}

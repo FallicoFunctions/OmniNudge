@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { formatDistanceToNow } from 'date-fns';
 import { getPostUrl } from '../../utils/postUrl';
@@ -15,9 +15,11 @@ import { hubsService } from '../../services/hubsService';
 import type { PlatformPost } from '../../types/posts';
 import type { CombinedFeedItem } from '../../services/feedService';
 import type { Conversation, Message } from '../../types/messages';
+import type { LocalSubredditPost } from '../../services/hubsService';
+import type { RedditApiPost } from '../../types/reddit';
 
 interface CompactPostCardProps {
-  post: PlatformPost | any; // Can be RedditPost, PlatformPost, or Conversation
+  post: PlatformPost | RedditApiPost | LocalSubredditPost | CombinedFeedItem | Conversation;
   feedType: 'home' | 'subreddit' | 'hub' | 'messages';
   postIndex: number;
   isExpanded?: boolean;
@@ -27,6 +29,43 @@ interface CompactPostCardProps {
   scrollRoot?: React.RefObject<HTMLDivElement | null>;
   onVideoVisibilityChange?: (postIndex: number, isVisible: boolean) => void;
 }
+
+type PostSource = 'home' | 'subreddit' | 'hub' | 'messages' | 'reddit';
+
+type PostWithMedia = {
+  id?: number | string;
+  title?: string;
+  author_username?: string | null;
+  author?: { username?: string | null } | string | null;
+  score?: number;
+  comment_count?: number;
+  num_comments?: number;
+  nsfw?: boolean;
+  over_18?: boolean;
+  over18?: boolean;
+  media_url?: string | null;
+  url?: string | null;
+  thumbnail_url?: string | null;
+  thumbnail?: string | null;
+  preview?: { images?: Array<{ source?: { url?: string; width?: number; height?: number } }> };
+  is_video?: boolean;
+  is_gallery?: boolean;
+  gallery_images?: PlatformPost['gallery_images'];
+  secure_media?: {
+    reddit_video?: { hls_url?: string; width?: number; height?: number };
+    oembed?: { thumbnail_width?: number; thumbnail_height?: number };
+  };
+  media?: {
+    reddit_video?: { hls_url?: string; width?: number; height?: number };
+    oembed?: { thumbnail_width?: number; thumbnail_height?: number };
+  };
+  created_at?: string;
+  created_utc?: number;
+  crossposted_at?: string;
+  subreddit?: string;
+  hub_name?: string | null;
+  hub?: { name?: string | null } | null;
+};
 
 function DecryptedMessagePreview({
   message,
@@ -139,6 +178,21 @@ export function CompactPostCard({
   const videoRef = useRef<HlsVideoHandle>(null);
   const videoContainerRef = useRef<HTMLDivElement>(null);
   const hasStartedLoadRef = useRef(false);
+  const isMessageFeed = feedType === 'messages';
+  const conversation = isMessageFeed ? (post as Conversation) : null;
+  const otherUser = conversation?.other_user;
+  const lastMessage = conversation?.latest_message;
+  const isOwnMessage = lastMessage?.sender_id === user?.id;
+  const isModMail = conversation?.conversation_type === 'mod_mail';
+  const hubName = conversation?.hub_name ?? '';
+
+  const { data: hubDetails } = useQuery({
+    queryKey: ['hub-details', hubName],
+    queryFn: () => hubsService.getHub(hubName),
+    enabled: Boolean(isMessageFeed && isModMail && hubName),
+  });
+  const hubDisplayTitle = hubDetails?.title?.trim() || hubName;
+  const modMailTitle = `${hubDisplayTitle || 'Hub'} - Mod Mail - ${conversation?.subject || 'Untitled'}`;
 
   const handleVideoMouseEnter = () => {
     videoRef.current?.video?.play().catch(() => {});
@@ -147,101 +201,40 @@ export function CompactPostCard({
   const handleVideoMouseLeave = () => {
     videoRef.current?.video?.pause();
   };
-  // Handle messages differently
-  if (feedType === 'messages') {
-    const conversation = post as Conversation;
-    const otherUser = conversation.other_user;
-    const lastMessage = conversation.latest_message;
-    const isOwnMessage = lastMessage?.sender_id === user?.id;
-    const isModMail = conversation.conversation_type === 'mod_mail';
-    const hubName = conversation.hub_name ?? '';
-    const { data: hubDetails } = useQuery({
-      queryKey: ['hub-details', hubName],
-      queryFn: () => hubsService.getHub(hubName),
-      enabled: isModMail && !!hubName,
-    });
-    const hubDisplayTitle = hubDetails?.title?.trim() || hubName;
-    const modMailTitle = `${hubDisplayTitle || 'Hub'} - Mod Mail - ${conversation.subject || 'Untitled'}`;
+  // Non-message post derived values
+  const isRedditPost = !isMessageFeed && ('subreddit' in post || 'permalink' in post);
+  const isHubPost = !isMessageFeed && 'hub_name' in post && !('subreddit' in post);
+  const isCombinedItem = !isMessageFeed && 'source' in post && 'post' in post;
 
-    return (
-      <article className="compact-post-card">
-        {isExpanded ? (
-          <ExpandedMessage conversation={conversation} onCollapse={onToggleExpand!} />
-        ) : (
-          <div
-            onClick={onToggleExpand}
-            className="block hover:bg-[var(--color-hover)] transition-colors cursor-pointer"
-          >
-            <div className="flex items-start gap-2 p-2">
-              {/* Avatar */}
-              <div className="flex-shrink-0 w-10 h-10 rounded-full bg-[var(--color-background)] overflow-hidden">
-                {otherUser?.avatar_url ? (
-                  <img
-                    src={resolveMediaUrl(otherUser.avatar_url)}
-                    alt={otherUser.username || 'User'}
-                    className="w-full h-full object-cover"
-                    loading="lazy"
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center text-[var(--color-text-muted)]">
-                    {(otherUser?.username?.[0] || '?').toUpperCase()}
-                  </div>
-                )}
-              </div>
+  let actualPost: PostWithMedia | null = null;
+  let source: PostSource = feedType;
 
-              {/* Content */}
-              <div className="flex-1 min-w-0">
-                <h3 className="text-sm font-medium leading-tight text-[var(--color-text)]">
-                  {isModMail ? modMailTitle : otherUser?.username || 'Unknown User'}
-                </h3>
-                {lastMessage && lastMessage.encrypted_content && (
-                  <p className="text-xs text-[var(--color-text-muted)] mt-1 line-clamp-1">
-                    <DecryptedMessagePreview
-                      message={lastMessage}
-                      isOwnMessage={!!isOwnMessage}
-                      userId={user?.id}
-                    />
-                  </p>
-                )}
-                <div className="text-xs text-[var(--color-text-muted)] mt-1">
-                  {conversation.last_message_at && formatDistanceToNow(new Date(conversation.last_message_at), { addSuffix: true })}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-        <div className="border-b border-[var(--color-border)]" />
-      </article>
-    );
+  if (!isMessageFeed) {
+    if (isCombinedItem) {
+      const combinedItem = post as CombinedFeedItem;
+      actualPost = combinedItem.post as PostWithMedia;
+      source = combinedItem.source === 'reddit' ? 'reddit' : 'hub';
+    } else {
+      actualPost = post as PostWithMedia;
+    }
   }
 
   // Determine post type and extract data
-  const isRedditPost = 'subreddit' in post || 'permalink' in post;
-  const isHubPost = 'hub_name' in post && !('subreddit' in post);
-  const isCombinedItem = 'source' in post && 'post' in post;
-
-  let actualPost = post;
-  let source: 'home' | 'subreddit' | 'hub' | 'messages' | 'reddit' = feedType;
-
-  // Unwrap CombinedFeedItem if needed
-  if (isCombinedItem) {
-    const combinedItem = post as CombinedFeedItem;
-    actualPost = combinedItem.post;
-    source = combinedItem.source as any; // CombinedFeedItem can have 'reddit' source
-  }
-
-  const title = actualPost.title || 'Untitled';
-  const author = actualPost.author_username || actualPost.author?.username || actualPost.author || 'Unknown';
-  const score = actualPost.score ?? 0;
-  const commentCount = actualPost.comment_count ?? actualPost.num_comments ?? 0;
-  const nsfw = actualPost.nsfw || actualPost.over_18 || actualPost.over18 || false;
+  const title = actualPost?.title || 'Untitled';
+  const author =
+    actualPost?.author_username ||
+    (typeof actualPost?.author === 'string' ? actualPost.author : actualPost?.author?.username) ||
+    'Unknown';
+  const score = actualPost?.score ?? 0;
+  const commentCount = actualPost?.comment_count ?? actualPost?.num_comments ?? 0;
+  const nsfw = actualPost?.nsfw || actualPost?.over_18 || actualPost?.over18 || false;
 
   // Media handling - prioritize actual media over thumbnails
-  let mediaUrl = actualPost.media_url || actualPost.url;
-  let thumbnail = actualPost.thumbnail_url || actualPost.thumbnail;
+  const mediaUrl = actualPost?.media_url || actualPost?.url;
+  let thumbnail = actualPost?.thumbnail_url || actualPost?.thumbnail;
 
   // For Reddit posts, check for high-resolution preview image
-  if (isRedditPost || source === 'reddit') {
+  if (actualPost && (isRedditPost || source === 'reddit')) {
     const previewUrl = actualPost.preview?.images?.[0]?.source?.url;
     if (previewUrl) {
       // Decode HTML entities in preview URL
@@ -257,11 +250,11 @@ export function CompactPostCard({
   }
 
   // Check for gallery posts
-  const galleryImages = actualPost.gallery_images;
-  const isGallery = actualPost.is_gallery || (galleryImages && galleryImages.length > 0);
+  const galleryImages = actualPost?.gallery_images;
+  const isGallery = Boolean(actualPost?.is_gallery || (galleryImages && galleryImages.length > 0));
 
   // Gallery navigation functions
-  const handleGalleryNavigate = (direction: 'prev' | 'next') => {
+  const handleGalleryNavigate = useCallback((direction: 'prev' | 'next') => {
     if (!galleryImages || galleryImages.length <= 1) return;
 
     if (direction === 'prev') {
@@ -269,7 +262,7 @@ export function CompactPostCard({
     } else {
       setGalleryIndex((prev) => (prev === galleryImages.length - 1 ? 0 : prev + 1));
     }
-  };
+  }, [galleryImages]);
 
   // Keyboard navigation for gallery when hovering over image or title area
   useEffect(() => {
@@ -290,15 +283,15 @@ export function CompactPostCard({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isGallery, isGalleryHovered, isTitleAreaHovered, galleryImages, galleryIndex]);
+  }, [isGallery, isGalleryHovered, isTitleAreaHovered, galleryImages, galleryIndex, handleGalleryNavigate]);
 
   // For Reddit videos, get HLS URL (has audio+video in one stream)
-  const redditVideo = actualPost.secure_media?.reddit_video || actualPost.media?.reddit_video;
+  const redditVideo = actualPost?.secure_media?.reddit_video || actualPost?.media?.reddit_video;
   const redditHlsUrl = redditVideo?.hls_url;
   const isRedditVideo = Boolean(redditHlsUrl);
 
   // Determine media type and URL
-  const isVideo = actualPost.is_video ||
+  const isVideo = actualPost?.is_video ||
     isRedditVideo ||
     mediaUrl?.includes('.mp4') ||
     mediaUrl?.includes('.webm') ||
@@ -315,7 +308,7 @@ export function CompactPostCard({
   );
 
   // Determine what media to display
-  let displayMedia = null;
+  let displayMedia: string | null = null;
   if (isVideo) {
     // For Reddit videos, use HLS URL (contains audio+video)
     if (isRedditVideo && redditHlsUrl) {
@@ -335,8 +328,8 @@ export function CompactPostCard({
     displayMedia = thumbnail;
   }
 
-  const previewDimensions = actualPost.preview?.images?.[0]?.source;
-  const oembedDimensions = actualPost.secure_media?.oembed || actualPost.media?.oembed;
+  const previewDimensions = actualPost?.preview?.images?.[0]?.source;
+  const oembedDimensions = actualPost?.secure_media?.oembed || actualPost?.media?.oembed;
   const explicitVideoWidth =
     redditVideo?.width ||
     previewDimensions?.width ||
@@ -352,28 +345,32 @@ export function CompactPostCard({
 
   // URL generation
   let postUrl = '#';
-  if (isHubPost || source === 'hub') {
-    postUrl = getPostUrl(actualPost as PlatformPost);
-  } else if (isRedditPost || source === 'reddit') {
-    postUrl = `/r/${actualPost.subreddit}/comments/${actualPost.id}`;
+  if (actualPost) {
+    if (isHubPost || source === 'hub') {
+      postUrl = getPostUrl(actualPost as PlatformPost);
+    } else if (isRedditPost || source === 'reddit') {
+      postUrl = `/r/${actualPost.subreddit}/comments/${actualPost.id}`;
+    }
   }
 
   // Time formatting
   let timeAgo = '';
-  if (actualPost.created_at) {
+  if (actualPost?.created_at) {
     timeAgo = formatDistanceToNow(new Date(actualPost.created_at), { addSuffix: true });
-  } else if (actualPost.created_utc) {
+  } else if (actualPost?.created_utc) {
     timeAgo = formatDistanceToNow(new Date(actualPost.created_utc * 1000), { addSuffix: true });
-  } else if (actualPost.crossposted_at) {
+  } else if (actualPost?.crossposted_at) {
     timeAgo = formatDistanceToNow(new Date(actualPost.crossposted_at), { addSuffix: true });
   }
 
   // Source badge
   let sourceBadge = '';
-  if (isHubPost || source === 'hub') {
-    sourceBadge = `h/${actualPost.hub_name || actualPost.hub?.name || 'unknown'}`;
-  } else if (isRedditPost || source === 'reddit') {
-    sourceBadge = `r/${actualPost.subreddit || 'unknown'}`;
+  if (actualPost) {
+    if (isHubPost || source === 'hub') {
+      sourceBadge = `h/${actualPost.hub_name || actualPost.hub?.name || 'unknown'}`;
+    } else if (isRedditPost || source === 'reddit') {
+      sourceBadge = `r/${actualPost.subreddit || 'unknown'}`;
+    }
   }
 
   const handleTitleClick = (e: React.MouseEvent) => {
@@ -427,14 +424,64 @@ export function CompactPostCard({
     return () => observer.disconnect();
   }, [isVideo, onVideoVisibilityChange, postIndex, scrollRoot]);
 
+  if (isMessageFeed && conversation) {
+    return (
+      <article className="compact-post-card">
+        {isExpanded ? (
+          <ExpandedMessage conversation={conversation} onCollapse={onToggleExpand!} />
+        ) : (
+          <div
+            onClick={onToggleExpand}
+            className="block hover:bg-[var(--color-hover)] transition-colors cursor-pointer"
+          >
+            <div className="flex items-start gap-2 p-2">
+              {/* Avatar */}
+              <div className="flex-shrink-0 w-10 h-10 rounded-full bg-[var(--color-background)] overflow-hidden">
+                {otherUser?.avatar_url ? (
+                  <img
+                    src={resolveMediaUrl(otherUser.avatar_url)}
+                    alt={otherUser.username || 'User'}
+                    className="w-full h-full object-cover"
+                    loading="lazy"
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-[var(--color-text-muted)]">
+                    {(otherUser?.username?.[0] || '?').toUpperCase()}
+                  </div>
+                )}
+              </div>
+
+              {/* Content */}
+              <div className="flex-1 min-w-0">
+                <h3 className="text-sm font-medium leading-tight text-[var(--color-primary)]">
+                  {isModMail ? modMailTitle : otherUser?.username || 'Unknown User'}
+                </h3>
+                {lastMessage && lastMessage.encrypted_content && (
+                  <p className="text-xs text-[var(--color-text-muted)] mt-1 line-clamp-1">
+                    <DecryptedMessagePreview
+                      message={lastMessage}
+                      isOwnMessage={!!isOwnMessage}
+                      userId={user?.id}
+                    />
+                  </p>
+                )}
+                <div className="text-xs text-[var(--color-text-muted)] mt-1">
+                  {conversation.last_message_at && formatDistanceToNow(new Date(conversation.last_message_at), { addSuffix: true })}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+        <div className="border-b border-[var(--color-border)]" />
+      </article>
+    );
+  }
+
   return (
     <article ref={cardRef} className="compact-post-card">
       {/* Expanded view */}
-      {isExpanded && (
-        <ExpandedPost
-          post={actualPost}
-          onCollapse={handleCollapse}
-        />
+      {isExpanded && actualPost && actualPost.id !== undefined && (
+        <ExpandedPost post={actualPost as { id: string | number }} onCollapse={handleCollapse} />
       )}
 
       {/* Compact view - hide when expanded */}
@@ -461,7 +508,9 @@ export function CompactPostCard({
               >
                 <HlsVideo
                   ref={videoRef}
-                  src={displayMedia.startsWith('http') ? displayMedia : resolveMediaUrl(displayMedia)}
+                  src={(displayMedia ?? '').startsWith('http')
+                    ? (displayMedia ?? '')
+                    : resolveMediaUrl(displayMedia ?? '') ?? ''}
                   className="absolute inset-0 w-full h-full object-contain"
                   style={{ display: 'block' }}
                   controls

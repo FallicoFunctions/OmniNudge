@@ -127,7 +127,7 @@ function CommentsSection({
                 post #{comment.post_id}
               </Link>
             </div>
-            <MarkdownRenderer content={comment.content} />
+            <MarkdownRenderer content={comment.content} className="text-[var(--color-text-primary)]" />
             <div className="mt-2 text-xs font-medium text-[var(--color-text-secondary)]">
               {comment.score.toLocaleString()} points
             </div>
@@ -362,7 +362,7 @@ export default function UserProfilePage() {
         </div>
         {profile.bio && (
           <div className="mt-4 rounded-md bg-[var(--color-surface-elevated)] p-4 text-sm text-[var(--color-text-primary)]">
-            <MarkdownRenderer content={profile.bio} />
+            <MarkdownRenderer content={profile.bio} className="text-[var(--color-text-primary)]" />
           </div>
         )}
       </Panel>

@@ -391,7 +391,7 @@ export function MarkdownRenderer({ content, className = '' }: MarkdownRendererPr
 
   return (
     <div
-      className={`markdown-content text-left text-sm text-[var(--color-text-primary)] ${className}`}
+      className={`markdown-content text-left text-sm ${className}`}
       dangerouslySetInnerHTML={{ __html: renderedHtml }}
     />
   );

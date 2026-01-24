@@ -285,7 +285,7 @@ export default function RedditUserPage() {
                 <span className="font-semibold">r/{comment.subreddit}</span>
               )}
             </div>
-            <MarkdownRenderer content={comment.body} className="text-left text-sm" />
+            <MarkdownRenderer content={comment.body} className="text-left text-sm text-[var(--color-text-primary)]" />
             <div className="mt-2 flex flex-wrap items-center gap-3 text-[11px] text-[var(--color-text-secondary)]">
               <Link
                 to={localPermalink}

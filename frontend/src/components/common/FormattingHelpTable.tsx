@@ -45,7 +45,7 @@ export function FormattingHelpTable() {
               </pre>
             </td>
             <td className="border border-[var(--color-border)] bg-white px-1 py-1">
-              <MarkdownRenderer content={example.output} className="leading-tight" />
+              <MarkdownRenderer content={example.output} className="leading-tight text-[var(--color-text-primary)]" />
             </td>
           </tr>
         ))}

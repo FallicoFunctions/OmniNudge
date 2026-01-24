@@ -66,13 +66,18 @@ export function useColumnFeed(columnId: string, config: ColumnConfig) {
           throw new Error(`Unknown feed type: ${config.feedType}`);
       }
     },
-    getNextPageParam: (lastPage: any) => {
+    getNextPageParam: (lastPage: unknown) => {
       // Handle different response formats
-      if ('next_cursor' in lastPage && lastPage.next_cursor) {
-        return lastPage.next_cursor;
-      }
-      if ('data' in lastPage && lastPage.data && 'after' in lastPage.data && lastPage.data.after) {
-        return lastPage.data.after; // Reddit format
+      if (lastPage && typeof lastPage === 'object') {
+        if ('next_cursor' in lastPage && lastPage.next_cursor) {
+          return lastPage.next_cursor as string;
+        }
+        if ('data' in lastPage) {
+          const data = (lastPage as { data?: { after?: string | null } }).data;
+          if (data?.after) {
+            return data.after; // Reddit format
+          }
+        }
       }
       return undefined;
     },

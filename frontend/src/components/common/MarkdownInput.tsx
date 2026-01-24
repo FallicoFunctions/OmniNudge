@@ -60,7 +60,7 @@ export function MarkdownInput({
       ) : (
         <div className="w-full rounded-lg border bg-white p-3">
           {value.trim() ? (
-            <MarkdownRenderer content={value} />
+            <MarkdownRenderer content={value} className="text-[var(--color-text-primary)]" />
           ) : (
             <div className="text-sm text-gray-500">Nothing to preview yet.</div>
           )}

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-interface OmniScrollControlsProps {
+interface StandardScrollControlsProps {
   autoAdvance: boolean;
   autoAdvanceInterval: number;
   currentIndex: number;
@@ -12,7 +12,7 @@ interface OmniScrollControlsProps {
   onPrevious: () => void;
 }
 
-export function OmniScrollControls({
+export function StandardScrollControls({
   autoAdvance,
   autoAdvanceInterval,
   currentIndex,
@@ -22,7 +22,7 @@ export function OmniScrollControls({
   onChangeInterval,
   onNext,
   onPrevious,
-}: OmniScrollControlsProps) {
+}: StandardScrollControlsProps) {
   const [showSettings, setShowSettings] = useState(false);
 
   const intervals = [

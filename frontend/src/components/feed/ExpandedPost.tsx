@@ -6,37 +6,102 @@ import { CommentEntry } from './CommentEntry';
 import { CommentThread } from './CommentThread';
 import { api } from '../../lib/api';
 import { postsService } from '../../services/postsService';
+import type { PlatformPost, PostComment } from '../../types/posts';
+
+type ExpandedPostData = {
+  id: number | string;
+  title?: string;
+  author?: string;
+  author_username?: string;
+  subreddit?: string;
+  hub_name?: string | null;
+  hub?: { name?: string | null } | null;
+  gallery_images?: PlatformPost['gallery_images'];
+  is_gallery?: boolean;
+  secure_media?: {
+    reddit_video?: { hls_url?: string };
+  };
+  media?: {
+    reddit_video?: { hls_url?: string };
+  };
+  media_url?: string | null;
+  url?: string | null;
+  thumbnail_url?: string | null;
+  thumbnail?: string | null;
+  is_video?: boolean;
+  selftext?: string | null;
+  body?: string | null;
+  content?: string | null;
+};
 
 interface ExpandedPostProps {
-  post: any; // Can be RedditPost or PlatformPost
+  post: ExpandedPostData;
   onCollapse: () => void;
 }
 
+interface ThreadComment {
+  id: number | string;
+  username: string;
+  content: string;
+  created_at: string;
+  score: number;
+  user_vote?: number | null;
+  parent_comment_id?: number | null;
+  replies?: ThreadComment[];
+  reply_count?: number;
+  __replaceTempId?: string;
+  __removeTempId?: string;
+}
+
+type CommentUpdate =
+  | ThreadComment
+  | { __removeTempId: string }
+  | { __replaceTempId: string };
+
+interface RedditCommentNode {
+  kind?: string;
+  data?: {
+    id?: string;
+    author?: string;
+    body?: string;
+    created_utc?: number;
+    score?: number;
+    replies?: unknown;
+  };
+}
+
+interface RedditListing {
+  data?: {
+    children?: RedditCommentNode[];
+  };
+}
+
 export function ExpandedPost({ post, onCollapse }: ExpandedPostProps) {
-  const [comments, setComments] = useState<any[]>([]);
+  const [comments, setComments] = useState<ThreadComment[]>([]);
   const [isLoadingComments, setIsLoadingComments] = useState(true);
   const [commentError, setCommentError] = useState<string | null>(null);
   const [hasMoreComments, setHasMoreComments] = useState(false);
 
-  const isRedditPost = 'subreddit' in post;
+  const postData = post as ExpandedPostData;
+  const isRedditPost = Boolean(postData.subreddit);
   const postType: 'reddit' | 'hub' = isRedditPost ? 'reddit' : 'hub';
 
   // Extract media info
-  const galleryImages = post.gallery_images;
-  const isGallery = post.is_gallery || (galleryImages && galleryImages.length > 0);
+  const galleryImages = postData.gallery_images;
+  const isGallery = Boolean(postData.is_gallery || (galleryImages && galleryImages.length > 0));
 
-  const redditVideo = post.secure_media?.reddit_video || post.media?.reddit_video;
+  const redditVideo = postData.secure_media?.reddit_video || postData.media?.reddit_video;
   const redditHlsUrl = redditVideo?.hls_url;
   const isRedditVideo = Boolean(redditHlsUrl);
 
-  let mediaUrl = post.media_url || post.url;
-  let thumbnail = post.thumbnail_url || post.thumbnail;
+  const mediaUrl = postData.media_url || postData.url;
+  let thumbnail = postData.thumbnail_url || postData.thumbnail;
 
   if (thumbnail === 'self' || thumbnail === 'default' || thumbnail === 'nsfw' || thumbnail === 'spoiler') {
     thumbnail = null;
   }
 
-  const isVideo = post.is_video ||
+  const isVideo = postData.is_video ||
     isRedditVideo ||
     mediaUrl?.includes('.mp4') ||
     mediaUrl?.includes('.webm') ||
@@ -80,32 +145,36 @@ export function ExpandedPost({ post, onCollapse }: ExpandedPostProps) {
       try {
         if (postType === 'reddit') {
           // Fetch from Reddit API (same endpoint as normal post page)
-          const response = await api.get<any>(`/reddit/r/${post.subreddit}/comments/${post.id}`);
+          const response = await api.get<unknown>(`/reddit/r/${postData.subreddit}/comments/${postData.id}`);
           console.log('Reddit API response:', response);
 
           // Reddit API returns [postListing, commentsListing]
-          const commentsListing = response[1];
+          const commentsListing = Array.isArray(response) ? (response[1] as RedditListing) : undefined;
           const redditComments = commentsListing?.data?.children || [];
 
           console.log('Reddit comments received:', redditComments);
 
           // Flatten and normalize Reddit API comments
-          const flattenComments = (comments: any[]): any[] => {
-            const flattened: any[] = [];
+          const flattenComments = (comments: RedditCommentNode[]): ThreadComment[] => {
+            const flattened: ThreadComment[] = [];
 
-            const traverse = (comment: any) => {
+            const traverse = (comment: RedditCommentNode) => {
               if (comment.kind === 'more') return;
               if (!comment.data || !comment.data.body) return;
 
-              const replies = comment.data.replies && typeof comment.data.replies !== 'string'
-                ? comment.data.replies.data?.children || []
-                : [];
+              const repliesListing =
+                comment.data.replies && typeof comment.data.replies !== 'string'
+                  ? (comment.data.replies as RedditListing)
+                  : undefined;
+              const replies = repliesListing?.data?.children || [];
 
               flattened.push({
-                id: comment.data.id,
-                username: comment.data.author,
+                id: comment.data.id ?? '',
+                username: comment.data.author ?? 'Unknown',
                 content: comment.data.body,
-                created_at: new Date(comment.data.created_utc * 1000).toISOString(),
+                created_at: comment.data.created_utc
+                  ? new Date(comment.data.created_utc * 1000).toISOString()
+                  : new Date().toISOString(),
                 score: comment.data.score || 0,
                 user_vote: null,
                 parent_comment_id: null,
@@ -122,14 +191,14 @@ export function ExpandedPost({ post, onCollapse }: ExpandedPostProps) {
           setComments(normalizedComments);
           setHasMoreComments(false);
         } else {
-          const data = await postsService.getComments(post.id);
+          const data = await postsService.getComments(postData.id as number);
           console.log('Hub comments received:', data);
 
-          const normalizedComments = Array.isArray(data) ? data.map((c: any) => ({
+          const normalizedComments = (data as PostCommentWithBody[]).map((c) => ({
             ...c,
             score: c.score || 0,
             content: c.content || c.body || '',
-          })) : [];
+          }));
 
           setComments(normalizedComments);
           setHasMoreComments(false);
@@ -143,12 +212,12 @@ export function ExpandedPost({ post, onCollapse }: ExpandedPostProps) {
     };
 
     fetchComments();
-  }, [post.id, postType]);
+  }, [postData.id, postType, postData.subreddit]);
 
   const handleVote = async (commentId: number | string, vote: number) => {
     // Optimistic update first
     setComments(prevComments => {
-      const updateComment = (comments: any[]): any[] => {
+      const updateComment = (comments: ThreadComment[]): ThreadComment[] => {
         return comments.map(comment => {
           if (comment.id === commentId) {
             const oldVote = comment.user_vote || 0;
@@ -181,7 +250,7 @@ export function ExpandedPost({ post, onCollapse }: ExpandedPostProps) {
       console.error('Failed to vote on comment:', err);
       // Revert optimistic update on error
       setComments(prevComments => {
-        const revertComment = (comments: any[]): any[] => {
+        const revertComment = (comments: ThreadComment[]): ThreadComment[] => {
           return comments.map(comment => {
             if (comment.id === commentId) {
               const scoreDelta = -(vote - (comment.user_vote || 0));
@@ -205,34 +274,77 @@ export function ExpandedPost({ post, onCollapse }: ExpandedPostProps) {
     }
   };
 
-  const handleCommentPosted = (parentId: number | string | null, newComment: any) => {
+  const handleCommentPosted = (parentId: number | string | null, newComment: CommentUpdate) => {
+    const removeById = (comments: ThreadComment[], targetId: string): ThreadComment[] => {
+      return comments
+        .filter(comment => String(comment.id) !== targetId)
+        .map(comment => ({
+          ...comment,
+          replies: comment.replies ? removeById(comment.replies, targetId) : comment.replies,
+        }));
+    };
+
+    const replaceById = (comments: ThreadComment[], targetId: string, replacement: ThreadComment): ThreadComment[] => {
+      return comments.map(comment => {
+        if (String(comment.id) === targetId) {
+          return { ...replacement };
+        }
+        if (comment.replies) {
+          return { ...comment, replies: replaceById(comment.replies, targetId, replacement) };
+        }
+        return comment;
+      });
+    };
+
+    if ('__removeTempId' in newComment) {
+      const removeId = newComment.__removeTempId;
+      if (removeId) {
+        setComments(prev => removeById(prev, removeId));
+        return;
+      }
+    }
+
+    if ('__replaceTempId' in newComment) {
+      const replaceId = newComment.__replaceTempId;
+      if (replaceId) {
+        const replacement = { ...(newComment as ThreadComment) };
+        delete replacement.__replaceTempId;
+        delete replacement.__removeTempId;
+        setComments(prev => replaceById(prev, replaceId, replacement));
+        return;
+      }
+    }
+
+    const comment = newComment as ThreadComment;
     if (parentId === null) {
       // Top-level comment
-      setComments(prev => [newComment, ...prev]);
-    } else {
-      // Reply to existing comment
-      setComments(prevComments => {
-        const addReply = (comments: any[]): any[] => {
-          return comments.map(comment => {
-            if (comment.id === parentId) {
-              return {
-                ...comment,
-                replies: [newComment, ...(comment.replies || [])],
-                reply_count: (comment.reply_count || 0) + 1
-              };
-            }
-            if (comment.replies) {
-              return {
-                ...comment,
-                replies: addReply(comment.replies)
-              };
-            }
-            return comment;
-          });
-        };
-        return addReply(prevComments);
-      });
+      setComments(prev => [comment, ...prev]);
+      return;
     }
+
+    // Reply to existing comment
+      const commentToAdd = comment;
+    setComments(prevComments => {
+      const addReply = (comments: ThreadComment[]): ThreadComment[] => {
+        return comments.map(comment => {
+          if (comment.id === parentId) {
+            return {
+              ...comment,
+              replies: [commentToAdd, ...(comment.replies || [])],
+              reply_count: (comment.reply_count || 0) + 1
+            };
+          }
+          if (comment.replies) {
+            return {
+              ...comment,
+              replies: addReply(comment.replies)
+            };
+          }
+          return comment;
+        });
+      };
+      return addReply(prevComments);
+    });
   };
 
   const loadMoreComments = () => {
@@ -259,7 +371,7 @@ export function ExpandedPost({ post, onCollapse }: ExpandedPostProps) {
       {isGallery && galleryImages && galleryImages.length > 0 ? (
         <ImageCarousel
           images={galleryImages}
-          title={post.title || 'Gallery'}
+          title={postData.title || 'Gallery'}
           className="w-full"
           currentIndex={galleryIndex}
           onNavigate={handleGalleryNavigate}
@@ -268,7 +380,7 @@ export function ExpandedPost({ post, onCollapse }: ExpandedPostProps) {
         <div className="w-full">
           {isVideo ? (
             <HlsVideo
-              src={displayMedia.startsWith('http') ? displayMedia : resolveMediaUrl(displayMedia)}
+              src={displayMedia.startsWith('http') ? displayMedia : resolveMediaUrl(displayMedia) ?? ''}
               poster={videoPoster}
               className="w-full h-auto"
               style={{ display: 'block', maxHeight: 'calc(100vh - 200px)', objectFit: 'contain' }}
@@ -280,7 +392,7 @@ export function ExpandedPost({ post, onCollapse }: ExpandedPostProps) {
           ) : (
             <img
               src={displayMedia.startsWith('http') ? displayMedia : resolveMediaUrl(displayMedia)}
-              alt={post.title || 'Post image'}
+              alt={postData.title || 'Post image'}
               className="w-full h-auto"
               style={{ display: 'block', maxHeight: 'calc(100vh - 200px)', objectFit: 'contain' }}
               loading="lazy"
@@ -290,15 +402,15 @@ export function ExpandedPost({ post, onCollapse }: ExpandedPostProps) {
       ) : null}
 
       {/* Post body */}
-      {(post.selftext || post.body || post.content) && (
-        <div className="p-2 text-xs text-[var(--color-text)] border-b border-[var(--color-border)]">
-          {post.selftext || post.body || post.content}
+      {(postData.selftext || postData.body || postData.content) && (
+        <div className="p-2 text-xs text-[var(--color-primary)] border-b border-[var(--color-border)]">
+          {postData.selftext || postData.body || postData.content}
         </div>
       )}
 
       {/* Comment entry */}
       <CommentEntry
-        postId={post.id}
+        postId={postData.id}
         postType={postType}
         onCommentPosted={(comment) => handleCommentPosted(null, comment)}
         placeholder="Add a comment..."
@@ -335,11 +447,11 @@ export function ExpandedPost({ post, onCollapse }: ExpandedPostProps) {
         {comments.length > 0 && (
           <CommentThread
             comments={comments.slice(0, 25)}
-            postId={post.id}
+            postId={postData.id}
             postType={postType}
-            subreddit={isRedditPost ? post.subreddit : undefined}
-            postTitle={post.title}
-            postAuthor={post.author || post.author_username}
+            subreddit={isRedditPost ? postData.subreddit : undefined}
+            postTitle={postData.title}
+            postAuthor={postData.author || postData.author_username}
             depth={0}
             maxDepth={1}
             onVote={handleVote}
@@ -359,3 +471,4 @@ export function ExpandedPost({ post, onCollapse }: ExpandedPostProps) {
     </div>
   );
 }
+type PostCommentWithBody = PostComment & { body?: string | null };

@@ -144,7 +144,7 @@ export default function HubWikiPage() {
           ) : (
             <>
               {wikiPage?.content?.trim() ? (
-                <MarkdownRenderer content={wikiPage.content} />
+                <MarkdownRenderer content={wikiPage.content} className="text-[var(--color-text-primary)]" />
               ) : (
                 <p className="text-sm text-[var(--color-text-secondary)]">
                   This wiki page is empty.

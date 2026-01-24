@@ -3,7 +3,7 @@ import { useMultiColumnFeed } from '../../contexts/MultiColumnFeedContext';
 import { ColumnFeed } from './ColumnFeed';
 import { ColumnConfigPanel } from './ColumnConfigPanel';
 
-export function MultiColumnFeedView() {
+export function OmniScrollView() {
   const { state, setActiveColumn } = useMultiColumnFeed();
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -38,7 +38,7 @@ export function MultiColumnFeedView() {
   }, [state.columnCount, state.columns, setActiveColumn]);
 
   return (
-    <div className="multi-column-container view-mode-multi-column h-screen flex flex-col bg-[var(--color-background)]">
+    <div className="multi-column-container view-mode-omniscroll h-screen flex flex-col bg-[var(--color-background)]">
       {/* Column config panels - collapsible */}
       <div className="config-panels flex border-b border-[var(--color-border)] bg-[var(--color-surface)]">
         {state.columns.map(col => (
