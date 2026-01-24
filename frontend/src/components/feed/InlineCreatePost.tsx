@@ -198,7 +198,7 @@ export function InlineCreatePost({ feedType, feedSource, onClose }: InlineCreate
           onChange={(e) => setTitle(e.target.value)}
           placeholder="Post title..."
           maxLength={300}
-          className="w-full px-2 py-1.5 bg-[var(--color-background)] text-[var(--color-text)] border border-[var(--color-border)] rounded focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 placeholder:text-[var(--color-text-muted)]"
+          className="w-full px-2 py-1.5 bg-[var(--color-background)] text-[var(--color-primary)] border border-[var(--color-border)] rounded focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 placeholder:text-[var(--color-text-muted)]"
         />
 
         {/* Link Tab Content */}
@@ -255,7 +255,7 @@ export function InlineCreatePost({ feedType, feedSource, onClose }: InlineCreate
             placeholder="Post body (optional)..."
             rows={6}
             maxLength={10000}
-            className="w-full px-2 py-1.5 bg-[var(--color-background)] text-[var(--color-text)] border border-[var(--color-border)] rounded focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 placeholder:text-[var(--color-text-muted)] resize-none"
+            className="w-full px-2 py-1.5 bg-[var(--color-background)] text-[var(--color-primary)] border border-[var(--color-border)] rounded focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 placeholder:text-[var(--color-text-muted)] resize-none"
           />
         )}
 
@@ -268,7 +268,7 @@ export function InlineCreatePost({ feedType, feedSource, onClose }: InlineCreate
             onChange={(e) => setIsNsfw(e.target.checked)}
             className="w-3 h-3 cursor-pointer accent-cyan-500"
           />
-          <label htmlFor="inline-nsfw" className="text-[var(--color-text)] cursor-pointer">
+          <label htmlFor="inline-nsfw" className="text-[var(--color-primary)] cursor-pointer">
             NSFW (18+)
           </label>
         </div>

@@ -27,8 +27,8 @@ import { TOP_TIME_OPTIONS } from '../constants/topTimeRange';
 import type { TopTimeRange } from '../constants/topTimeRange';
 import { RedditPostSlideshow } from '../components/slideshow/RedditPostSlideshow';
 import { useMultiColumnFeed } from '../contexts/MultiColumnFeedContext';
-import { MultiColumnFeedView } from '../components/feed/MultiColumnFeedView';
-import { VerticalOmniScroll } from '../components/feed/VerticalOmniScroll';
+import { OmniScrollView } from '../components/feed/OmniScrollView';
+import { StandardScroll } from '../components/feed/StandardScroll';
 
 type SortOption = 'hot' | 'new' | 'top' | 'rising' | 'controversial';
 
@@ -679,14 +679,14 @@ export default function HomePage() {
     return () => observer.disconnect();
   }, [useInfiniteScrollHome, hasNextPage, isFetchingNextPage, fetchNextPage]);
 
-  // Multi-column view mode
-  if (multiColumnState.viewMode === 'multi-column') {
-    return <MultiColumnFeedView />;
+  // OmniScroll view mode
+  if (multiColumnState.viewMode === 'omniscroll') {
+    return <OmniScrollView />;
   }
 
-  // Vertical OmniScroll view mode
-  if (multiColumnState.viewMode === 'vertical-omniscroll') {
-    return <VerticalOmniScroll onClose={() => setViewMode('standard')} />;
+  // Standard scroll view mode
+  if (multiColumnState.viewMode === 'standard-scroll') {
+    return <StandardScroll onClose={() => setViewMode('standard')} />;
   }
 
   // Standard view mode

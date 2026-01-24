@@ -12,7 +12,7 @@ export interface ColumnConfig {
 }
 
 export interface MultiColumnFeedState {
-  viewMode: 'standard' | 'multi-column' | 'vertical-omniscroll';
+  viewMode: 'standard' | 'omniscroll' | 'standard-scroll';
   columns: ColumnConfig[];
   activeColumnId: string | null; // Which column mouse is over
   columnCount: number; // 2 or 3
@@ -34,6 +34,19 @@ export interface MultiColumnFeedContextValue {
 const MultiColumnFeedContext = createContext<MultiColumnFeedContextValue | null>(null);
 
 const STORAGE_KEY = 'multiColumnFeedState';
+
+const normalizeViewMode = (viewMode: unknown): MultiColumnFeedState['viewMode'] => {
+  if (viewMode === 'multi-column') {
+    return 'omniscroll';
+  }
+  if (viewMode === 'vertical-omniscroll') {
+    return 'standard-scroll';
+  }
+  if (viewMode === 'omniscroll' || viewMode === 'standard-scroll' || viewMode === 'standard') {
+    return viewMode;
+  }
+  return 'standard';
+};
 
 function createDefaultColumns(): ColumnConfig[] {
   return [
@@ -77,7 +90,7 @@ export function MultiColumnFeedProvider({ children }: { children: ReactNode }) {
         // Validate the loaded state
         if (parsed.columns && Array.isArray(parsed.columns) && parsed.columns.length > 0) {
           return {
-            viewMode: parsed.viewMode || 'standard',
+            viewMode: normalizeViewMode(parsed.viewMode),
             columnCount: parsed.columnCount || parsed.columns.length,
             columns: parsed.columns,
             activeColumnId: null, // Don't persist active column

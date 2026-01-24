@@ -5,7 +5,7 @@ interface AsyncActionState {
   error: string | null;
 }
 
-interface UseAsyncActionReturn<T extends any[]> {
+interface UseAsyncActionReturn<T extends unknown[]> {
   isLoading: boolean;
   error: string | null;
   execute: (...args: T) => Promise<void>;
@@ -22,7 +22,7 @@ interface UseAsyncActionReturn<T extends any[]> {
  *   onSuccess();
  * });
  */
-export function useAsyncAction<T extends any[]>(
+export function useAsyncAction<T extends unknown[]>(
   action: (...args: T) => Promise<void>,
   onError?: (error: Error) => void
 ): UseAsyncActionReturn<T> {

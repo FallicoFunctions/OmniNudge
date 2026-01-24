@@ -94,7 +94,7 @@ function useDecryptedContent(message: Message, isOwnMessage: boolean, currentUse
         }
         const decrypted = await decryptMessage(cipherText, keys.privateKey);
         setDecryptedContent(decrypted);
-      } catch (error) {
+      } catch {
         setDecryptedContent(cipherText);
       }
     };

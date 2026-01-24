@@ -7,6 +7,10 @@ import { messagesService } from '../../services/messagesService';
 import { usersService } from '../../services/usersService';
 import { mediaService } from '../../services/mediaService';
 import type { Message } from '../../types/messages';
+import type { CombinedFeedItem } from '../../services/feedService';
+import type { RedditApiPost } from '../../types/reddit';
+import type { LocalSubredditPost } from '../../services/hubsService';
+import type { Conversation } from '../../types/messages';
 
 interface ColumnFeedProps {
   columnId: string;
@@ -15,9 +19,48 @@ interface ColumnFeedProps {
   showBorder: boolean;
 }
 
-function extractVideoDimensions(post: any) {
-  const actualPost = post?.post ?? post;
-  const redditVideo = actualPost?.secure_media?.reddit_video || actualPost?.media?.reddit_video;
+type ColumnFeedItem = CombinedFeedItem | RedditApiPost | LocalSubredditPost | Conversation;
+
+type MediaCandidate = {
+  secure_media?: {
+    reddit_video?: { width?: number; height?: number; hls_url?: string };
+    oembed?: { thumbnail_width?: number; thumbnail_height?: number };
+  };
+  media?: {
+    reddit_video?: { width?: number; height?: number; hls_url?: string };
+    oembed?: { thumbnail_width?: number; thumbnail_height?: number };
+  };
+  preview?: { images?: Array<{ source?: { width?: number; height?: number } }> };
+  media_url?: string | null;
+  url?: string | null;
+  is_video?: boolean;
+};
+
+const unwrapPost = (post: ColumnFeedItem) => {
+  if (post && typeof post === 'object' && 'post' in post) {
+    return (post as CombinedFeedItem).post;
+  }
+  return post;
+};
+
+const getPostId = (post: ColumnFeedItem, index: number, feedType: ColumnFeedProps['config']['feedType']) => {
+  if (post && typeof post === 'object') {
+    if ('post' in post) {
+      const inner = (post as CombinedFeedItem).post as { id?: string | number };
+      if (inner?.id !== undefined) {
+        return inner.id;
+      }
+    }
+    if ('id' in post && (post as { id?: string | number }).id !== undefined) {
+      return (post as { id: string | number }).id;
+    }
+  }
+  return `${feedType}-${index}`;
+};
+
+function extractVideoDimensions(post: ColumnFeedItem) {
+  const actualPost = unwrapPost(post) as MediaCandidate;
+  const redditVideo = actualPost.secure_media?.reddit_video || actualPost.media?.reddit_video;
   if (redditVideo?.width && redditVideo?.height) {
     return { width: redditVideo.width, height: redditVideo.height };
   }
@@ -35,13 +78,13 @@ function extractVideoDimensions(post: any) {
   return null;
 }
 
-function isVideoPost(post: any) {
-  const actualPost = post?.post ?? post;
-  const redditVideo = actualPost?.secure_media?.reddit_video || actualPost?.media?.reddit_video;
+function isVideoPost(post: ColumnFeedItem) {
+  const actualPost = unwrapPost(post) as MediaCandidate;
+  const redditVideo = actualPost.secure_media?.reddit_video || actualPost.media?.reddit_video;
   const redditHlsUrl = redditVideo?.hls_url;
-  const mediaUrl = actualPost?.media_url || actualPost?.url;
+  const mediaUrl = actualPost.media_url || actualPost.url;
   return Boolean(
-    actualPost?.is_video ||
+    actualPost.is_video ||
       redditHlsUrl ||
       mediaUrl?.includes('.mp4') ||
       mediaUrl?.includes('.webm') ||
@@ -86,15 +129,27 @@ export function ColumnFeed({ columnId, config, isActive, showBorder }: ColumnFee
   } = useColumnFeed(columnId, config);
 
   // Flatten all pages into single array
-  const allPosts = data?.pages.flatMap((page: any) => {
-    if ('posts' in page) return page.posts; // Home/hub format (CombinedFeedItem[])
-    if ('data' in page && page.data?.children) {
-      return page.data.children.map((child: any) => child.data); // Reddit format
-    }
-    if ('conversations' in page) return page.conversations; // Messages format
-    if (Array.isArray(page)) return page; // Generic array format
-    return [];
-  }) ?? [];
+  const allPosts = useMemo<ColumnFeedItem[]>(() => {
+    const pages = data?.pages ?? [];
+    return pages.flatMap((page) => {
+      if (Array.isArray(page)) return page as ColumnFeedItem[];
+      if (!page || typeof page !== 'object') return [];
+
+      if ('posts' in page && Array.isArray((page as { posts?: unknown }).posts)) {
+        return (page as { posts: ColumnFeedItem[] }).posts;
+      }
+      if ('data' in page) {
+        const children = (page as { data?: { children?: Array<{ data?: ColumnFeedItem }> } }).data?.children;
+        if (Array.isArray(children)) {
+          return children.map((child) => child.data).filter(Boolean) as ColumnFeedItem[];
+        }
+      }
+      if ('conversations' in page && Array.isArray((page as { conversations?: unknown }).conversations)) {
+        return (page as { conversations: ColumnFeedItem[] }).conversations;
+      }
+      return [];
+    });
+  }, [data?.pages]);
 
   const videoPostIndices = useMemo(() => {
     const indices: number[] = [];
@@ -164,7 +219,9 @@ export function ColumnFeed({ columnId, config, isActive, showBorder }: ColumnFee
 
   useEffect(() => {
     if (!pendingOpenConversationId) return;
-    const hasConversation = allPosts.some((post) => post.id === pendingOpenConversationId);
+    const hasConversation = allPosts.some((post, index) => {
+      return String(getPostId(post, index, config.feedType)) === String(pendingOpenConversationId);
+    });
     if (!hasConversation) return;
     setExpandedPostIds((prev) => {
       const next = new Set(prev);
@@ -172,7 +229,7 @@ export function ColumnFeed({ columnId, config, isActive, showBorder }: ColumnFee
       return next;
     });
     setPendingOpenConversationId(null);
-  }, [allPosts, pendingOpenConversationId]);
+  }, [allPosts, pendingOpenConversationId, config.feedType]);
 
   // Infinite scroll: Load more when scrolled near bottom
   useEffect(() => {
@@ -275,7 +332,7 @@ export function ColumnFeed({ columnId, config, isActive, showBorder }: ColumnFee
       setPendingRecipient(trimmed);
       setShowNewMessageInput(false);
       setNewUsernameError(null);
-    } catch (error) {
+    } catch {
       setNewUsernameError('Username is invalid.');
     }
   };
@@ -333,7 +390,7 @@ export function ColumnFeed({ columnId, config, isActive, showBorder }: ColumnFee
       setShowNewMessageInput(false);
       setPendingOpenConversationId(message.conversation_id);
       queryClient.invalidateQueries({ queryKey: ['column-feed', columnId] });
-    } catch (error) {
+    } catch {
       setComposerError('Failed to send message. Please try again.');
     } finally {
       setUploadingMedia(false);
@@ -364,7 +421,7 @@ export function ColumnFeed({ columnId, config, isActive, showBorder }: ColumnFee
               setComposerError(null);
               setPendingRecipient(null);
             }}
-            className="w-full px-3 py-2 text-xs font-semibold text-left text-[var(--color-text)] hover:bg-[var(--color-hover)] transition-colors"
+            className="w-full px-3 py-2 text-xs font-semibold text-left text-[var(--color-primary)] hover:bg-[var(--color-hover)] transition-colors"
           >
             Send Message
           </button>
@@ -475,7 +532,7 @@ export function ColumnFeed({ columnId, config, isActive, showBorder }: ColumnFee
         </div>
       )}
       {allPosts.map((post, index) => {
-        const postId = post.id || `${config.feedType}-${index}`;
+        const postId = String(getPostId(post, index, config.feedType));
         const videoIndex = videoIndexByPostIndex.get(index);
         const shouldPreloadVideo =
           typeof videoIndex === 'number' &&

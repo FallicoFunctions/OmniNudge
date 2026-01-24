@@ -101,7 +101,7 @@ export function ColumnConfigPanel({ columnId, config }: ColumnConfigPanelProps) 
         >
           <div className="flex items-center gap-2 flex-1 min-w-0">
             <span className="w-2 h-2 rounded-full bg-cyan-500 pulse-indicator"></span>
-            <span className="truncate font-semibold text-[var(--color-text)]">
+            <span className="truncate font-semibold text-[var(--color-primary)]">
               {getFeedLabel()}
             </span>
           </div>
@@ -214,7 +214,7 @@ export function ColumnConfigPanel({ columnId, config }: ColumnConfigPanelProps) 
                   currentCursor: '',
                 });
               }}
-              className="w-full px-2 py-1.5 text-xs bg-[var(--color-background)] text-[var(--color-text)] border border-cyan-500/30 rounded focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition-cyber"
+              className="w-full px-2 py-1.5 text-xs bg-[var(--color-background)] text-[var(--color-primary)] border border-cyan-500/30 rounded focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition-cyber"
             >
               <option value="home">🏠 Home Feed</option>
               <option value="subreddit">📱 Subreddit</option>
@@ -254,7 +254,7 @@ export function ColumnConfigPanel({ columnId, config }: ColumnConfigPanelProps) 
                   });
                 }}
                 placeholder={config.feedType === 'subreddit' ? 'gaming' : 'technology'}
-                className="w-full px-2 py-1.5 text-xs bg-[var(--color-background)] text-[var(--color-text)] border border-cyan-500/30 rounded placeholder:text-[var(--color-text-muted)] focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition-cyber"
+                className="w-full px-2 py-1.5 text-xs bg-[var(--color-background)] text-[var(--color-primary)] border border-cyan-500/30 rounded placeholder:text-[var(--color-text-muted)] focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition-cyber"
               />
             </div>
           )}
@@ -288,7 +288,7 @@ export function ColumnConfigPanel({ columnId, config }: ColumnConfigPanelProps) 
                     currentCursor: '',
                   });
                 }}
-                className="w-full px-2 py-1.5 text-xs bg-[var(--color-background)] text-[var(--color-text)] border border-cyan-500/30 rounded focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition-cyber"
+                className="w-full px-2 py-1.5 text-xs bg-[var(--color-background)] text-[var(--color-primary)] border border-cyan-500/30 rounded focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition-cyber"
               >
                 <option value="hot">🔥 Hot</option>
                 <option value="new">✨ New</option>
@@ -329,7 +329,7 @@ export function ColumnConfigPanel({ columnId, config }: ColumnConfigPanelProps) 
                       currentCursor: '',
                     });
                   }}
-                  className="w-full px-2 py-1.5 text-xs bg-[var(--color-background)] text-[var(--color-text)] border border-cyan-500/30 rounded focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition-cyber"
+                  className="w-full px-2 py-1.5 text-xs bg-[var(--color-background)] text-[var(--color-primary)] border border-cyan-500/30 rounded focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition-cyber"
                 >
                   <option value="hour">⏰ Hour</option>
                   <option value="day">📅 Day</option>

@@ -499,7 +499,7 @@ function RedditCommentView({
             {authorBlocked ? (
               <div className="mt-1 text-sm italic text-[var(--color-text-muted)]">[BLOCKED]</div>
             ) : (
-              <MarkdownRenderer content={comment.data.body ?? ''} className="mt-1" />
+              <MarkdownRenderer content={comment.data.body ?? ''} className="mt-1 text-[var(--color-text-primary)]" />
             )}
 
             {/* Action buttons - left aligned */}
@@ -889,7 +889,7 @@ function LocalCommentView({
               </div>
             </form>
           ) : (
-            <MarkdownRenderer content={comment.content} className="mt-2" />
+            <MarkdownRenderer content={comment.content} className="mt-2 text-[var(--color-text-primary)]" />
           ))}
 
           {!isCollapsed && actionError && (

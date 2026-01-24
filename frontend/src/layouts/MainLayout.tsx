@@ -59,7 +59,7 @@ export default function MainLayout() {
   const [openBugReportAfterAuth, setOpenBugReportAfterAuth] = useState(false);
 
   // Determine if slim mode
-  const isSlimMode = multiColumnState.viewMode === 'multi-column' || multiColumnState.viewMode === 'vertical-omniscroll';
+  const isSlimMode = multiColumnState.viewMode === 'omniscroll' || multiColumnState.viewMode === 'standard-scroll';
   const navHeight = isSlimMode ? 'h-9' : 'h-16';
 
   // Initialize WebSocket connection for real-time messaging

@@ -151,6 +151,13 @@ export default function ModMailConversationPage() {
     enabled: !!conversation?.hub_name,
   });
 
+  const hubName = conversation?.hub_name || '';
+  const { data: hubDetails } = useQuery({
+    queryKey: ['hub-details', hubName],
+    queryFn: () => hubsService.getHub(hubName),
+    enabled: !!hubName,
+  });
+
   // Fetch messages
   const {
     data: messagesData,
@@ -264,7 +271,7 @@ export default function ModMailConversationPage() {
         recipient_keys: encrypted.recipientKeys,
       };
     },
-    [conversation?.participants, user?.id]
+    [conversation?.participants, recipientsData?.recipient_ids, user?.id]
   );
 
   const sendMutation = useMutation({
@@ -342,13 +349,6 @@ export default function ModMailConversationPage() {
     sendMutation.mutate(messageText);
   };
 
-  // Extract hub name from conversation (assuming it's in metadata or participants)
-  const hubName = conversation?.hub_name || '';
-  const { data: hubDetails } = useQuery({
-    queryKey: ['hub-details', hubName],
-    queryFn: () => hubsService.getHub(hubName),
-    enabled: !!hubName,
-  });
   const hubDisplayTitle = hubDetails?.title?.trim() || hubName;
   const status = conversation?.status || 'open';
   const subject = conversation?.subject || 'Mod Mail Conversation';

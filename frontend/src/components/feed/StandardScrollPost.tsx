@@ -5,10 +5,40 @@ import { resolveMediaUrl } from '../../utils/mediaUrl';
 import { sanitizeHttpUrl } from '../../utils/crosspostHelpers';
 import type { PlatformPost } from '../../types/posts';
 import type { CombinedFeedItem } from '../../services/feedService';
+import type { LocalSubredditPost } from '../../services/hubsService';
+import type { RedditApiPost } from '../../types/reddit';
 
 const IMAGE_URL_REGEX = /\.(jpe?g|png|gif|webp)$/i;
 
-function getExpandableImageUrl(post: any): string | undefined {
+type ScrollSource = 'home' | 'subreddit' | 'hub' | 'messages' | 'reddit';
+
+type ScrollPost = {
+  id?: string | number;
+  title?: string;
+  author_username?: string | null;
+  author?: { username?: string | null } | string | null;
+  score?: number;
+  comment_count?: number;
+  num_comments?: number;
+  nsfw?: boolean;
+  over_18?: boolean;
+  over18?: boolean;
+  media_url?: string | null;
+  url?: string | null;
+  thumbnail_url?: string | null;
+  thumbnail?: string | null;
+  post_hint?: string | null;
+  preview?: { images?: Array<{ source?: { url?: string } }> };
+  is_video?: boolean;
+  subreddit?: string;
+  hub_name?: string | null;
+  hub?: { name?: string | null } | null;
+  created_at?: string | null;
+  created_utc?: number | null;
+  crossposted_at?: string | null;
+};
+
+function getExpandableImageUrl(post: ScrollPost): string | undefined {
   // Gallery posts are handled separately, don't return thumbnail as preview
   const isGalleryPost = post.url?.includes('/gallery/');
   if (isGalleryPost) {
@@ -35,30 +65,33 @@ function getExpandableImageUrl(post: any): string | undefined {
   return undefined;
 }
 
-interface VerticalOmniScrollPostProps {
-  post: any;
+interface StandardScrollPostProps {
+  post: CombinedFeedItem | RedditApiPost | LocalSubredditPost | PlatformPost;
   feedType: 'home' | 'subreddit' | 'hub' | 'messages';
   isActive: boolean;
 }
 
-export function VerticalOmniScrollPost({ post, feedType, isActive }: VerticalOmniScrollPostProps) {
+export function StandardScrollPost({ post, feedType, isActive }: StandardScrollPostProps) {
   // Determine post type and extract data
   const isRedditPost = 'subreddit' in post || 'permalink' in post;
   const isHubPost = 'hub_name' in post && !('subreddit' in post);
   const isCombinedItem = 'source' in post && 'post' in post;
 
-  let actualPost = post;
-  let source: 'home' | 'subreddit' | 'hub' | 'messages' | 'reddit' = feedType;
+  let actualPost: ScrollPost = post as ScrollPost;
+  let source: ScrollSource = feedType;
 
   // Unwrap CombinedFeedItem if needed
   if (isCombinedItem) {
     const combinedItem = post as CombinedFeedItem;
-    actualPost = combinedItem.post;
-    source = combinedItem.source as any; // CombinedFeedItem can have 'reddit' source
+    actualPost = combinedItem.post as ScrollPost;
+    source = combinedItem.source === 'reddit' ? 'reddit' : 'hub';
   }
 
   const title = actualPost.title || 'Untitled';
-  const author = actualPost.author_username || actualPost.author?.username || actualPost.author || 'Unknown';
+  const author =
+    actualPost.author_username ||
+    (typeof actualPost.author === 'string' ? actualPost.author : actualPost.author?.username) ||
+    'Unknown';
   const score = actualPost.score ?? 0;
   const commentCount = actualPost.comment_count ?? actualPost.num_comments ?? 0;
   const nsfw = actualPost.nsfw || actualPost.over_18 || actualPost.over18 || false;
@@ -70,7 +103,7 @@ export function VerticalOmniScrollPost({ post, feedType, isActive }: VerticalOmn
   // For Reddit posts, use the same logic as RedditPostCard
   if (isRedditPost || source === 'reddit') {
     const expandableImageUrl = getExpandableImageUrl(actualPost);
-    console.log('[OmniScroll Debug]', {
+    console.log('[StandardScroll Debug]', {
       postId: actualPost.id,
       title: title.substring(0, 50),
       hasPreviewField: 'preview' in actualPost,

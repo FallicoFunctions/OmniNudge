@@ -5,10 +5,29 @@ interface CommentEntryProps {
   postId: string | number;
   postType: 'reddit' | 'hub';
   parentId?: number;
-  onCommentPosted: (comment: any) => void;
+  onCommentPosted: (comment: CommentPayload) => void;
   onCancel?: () => void;
   placeholder?: string;
 }
+
+interface CommentPayloadBase {
+  id: number | string;
+  content: string;
+  score: number;
+  username: string;
+  created_at: string;
+  parent_comment_id?: number | null;
+  user_vote?: number;
+  ups?: number;
+  downs?: number;
+  reply_count?: number;
+  replies?: CommentPayloadBase[];
+}
+
+type CommentPayload =
+  | (CommentPayloadBase & { __replaceTempId?: string; __removeTempId?: string })
+  | { __replaceTempId: string }
+  | { __removeTempId: string };
 
 export function CommentEntry({
   postId,

@@ -274,7 +274,7 @@ export function CommentItem<T extends LocalCommentBase>({
               </div>
             </form>
           ) : (
-            <MarkdownRenderer content={comment.content} className="mt-1" />
+            <MarkdownRenderer content={comment.content} className="mt-1 text-[var(--color-text-primary)]" />
           ))}
 
           {!isCollapsed && actionError && (

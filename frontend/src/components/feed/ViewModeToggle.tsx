@@ -8,10 +8,10 @@ export function ViewModeToggle() {
 
   const modes = [
     { value: 'standard', label: 'Standard', icon: '☰' },
-    { value: 'multi-column', label: 'OmniScroll', icon: '|||' },
+    { value: 'omniscroll', label: 'Scroll', icon: '|||' },
   ] as const;
 
-  const isSlimMode = state.viewMode === 'multi-column' || state.viewMode === 'vertical-omniscroll';
+  const isSlimMode = state.viewMode === 'omniscroll' || state.viewMode === 'standard-scroll';
 
   return (
     <div className="view-mode-toggle flex items-center gap-1 bg-[var(--color-surface)] rounded-md p-1 border border-[var(--color-border)]">
@@ -20,7 +20,7 @@ export function ViewModeToggle() {
           key={mode.value}
           onClick={() => {
             setViewMode(mode.value);
-            if (mode.value === 'multi-column' && location.pathname !== '/') {
+            if (mode.value === 'omniscroll' && location.pathname !== '/') {
               setLastStandardPath(`${location.pathname}${location.search}${location.hash}`);
               navigate('/');
               return;

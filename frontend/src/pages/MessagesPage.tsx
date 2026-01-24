@@ -26,6 +26,8 @@ import { RedditPostSlideshow } from '../components/slideshow/RedditPostSlideshow
 import { redditService } from '../services/redditService';
 import { hubsService } from '../services/hubsService';
 import { useHubSubredditAutocomplete } from '../hooks/useHubSubredditAutocomplete';
+import type { LocalSubredditPost } from '../services/hubsService';
+import type { RedditApiPost } from '../types/reddit';
 
 const MAX_UPLOAD_SIZE = 25 * 1024 * 1024; // 25MB
 
@@ -588,7 +590,7 @@ export default function MessagesPage() {
   const [redditSlideshowModalOpen, setRedditSlideshowModalOpen] = useState(false);
   const [redditSlideshowInput, setRedditSlideshowInput] = useState('');
   const [redditSlideshowAutocompleteOpen, setRedditSlideshowAutocompleteOpen] = useState(false);
-  const [redditSlideshowPosts, setRedditSlideshowPosts] = useState<any[]>([]);
+  const [redditSlideshowPosts, setRedditSlideshowPosts] = useState<Array<RedditApiPost | LocalSubredditPost>>([]);
   const [redditSlideshowOpen, setRedditSlideshowOpen] = useState(false);
   const [isLoadingRedditPosts, setIsLoadingRedditPosts] = useState(false);
   const queryClient = useQueryClient();
@@ -899,7 +901,7 @@ export default function MessagesPage() {
       const isHub = trimmed.startsWith('h/');
       const name = trimmed.replace(/^[hr]\//, '');
 
-      let posts: any[];
+      let posts: Array<RedditApiPost | LocalSubredditPost> = [];
 
       if (isHub) {
         // Fetch hub posts
@@ -1990,7 +1992,7 @@ export default function MessagesPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 px-4">
           <div className="w-full max-w-md rounded-lg bg-[var(--color-surface)] p-6 shadow-lg">
             <div className="flex items-start justify-between mb-4">
-              <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">Browse Reddit/Hub OmniScroll</h3>
+              <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">Browse Reddit/Hub Scroll</h3>
               <button
                 onClick={() => setRedditSlideshowModalOpen(false)}
                 className="text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
@@ -2069,7 +2071,7 @@ export default function MessagesPage() {
                   disabled={!redditSlideshowTrimmedInput || isLoadingRedditPosts}
                   className="rounded-md bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)] disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  {isLoadingRedditPosts ? 'Loading...' : 'Load OmniScroll'}
+                  {isLoadingRedditPosts ? 'Loading...' : 'Load Scroll'}
                 </button>
               </div>
             </div>

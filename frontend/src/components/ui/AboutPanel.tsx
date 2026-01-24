@@ -4,7 +4,7 @@ import { LoadingMessage, ErrorMessage, EmptyMessage } from '../common/StatusMess
 export interface AboutPanelStat {
   label: string;
   value: string | number | null | undefined;
-  format?: (value: any) => string;
+  format?: (value: string | number) => string;
 }
 
 interface AboutPanelProps {
