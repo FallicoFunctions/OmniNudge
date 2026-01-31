@@ -13,8 +13,9 @@ export const postsService = {
     return api.get<PostsResponse>(`/posts/feed?page=${page}&per_page=${perPage}`);
   },
 
-  async getPost(id: number): Promise<PlatformPost> {
-    return api.get<PlatformPost>(`/posts/${id}`);
+  async getPost(id: number, hubName?: string): Promise<PlatformPost> {
+    const hubQuery = hubName ? `?hub=${encodeURIComponent(hubName)}` : '';
+    return api.get<PlatformPost>(`/posts/${id}${hubQuery}`);
   },
 
   async createPost(data: CreatePostRequest): Promise<PlatformPost> {

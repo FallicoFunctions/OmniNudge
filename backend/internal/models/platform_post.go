@@ -404,7 +404,7 @@ func buildHubPostsBaseQuery(pinnedFilter *bool, userIDParamIndex int) string {
 		LEFT JOIN users u ON p.author_id = u.id
 		LEFT JOIN post_votes pv ON pv.post_id = p.id AND pv.user_id = ` + userIDParam + `
 		LEFT JOIN post_comments pc ON pc.post_id = p.id AND pc.user_id = ` + userIDParam + ` AND pc.parent_comment_id IS NULL AND pc.is_deleted = FALSE
-		WHERE p.hub_id = $1 AND p.is_deleted = FALSE AND u.shadow_banned = FALSE AND (p.target_subreddit IS NULL OR p.target_subreddit = '')` + buildHubPinnedClause(pinnedFilter)
+		WHERE p.hub_id = $1 AND p.is_deleted = FALSE AND u.shadow_banned = FALSE` + buildHubPinnedClause(pinnedFilter)
 }
 
 func (r *PlatformPostRepository) getByHubWithUser(
@@ -750,6 +750,33 @@ func (r *PlatformPostRepository) IncrementViewCount(ctx context.Context, postID 
 	query := `UPDATE platform_posts SET view_count = view_count + 1 WHERE id = $1`
 	_, err := r.pool.Exec(ctx, query, postID)
 	return err
+}
+
+// GetUserVotedPostIDs returns the subset of postIDs the user has already voted on.
+func (r *PlatformPostRepository) GetUserVotedPostIDs(ctx context.Context, userID int, postIDs []int) ([]int, error) {
+	if len(postIDs) == 0 {
+		return []int{}, nil
+	}
+
+	rows, err := r.pool.Query(ctx, `
+		SELECT post_id
+		FROM post_votes
+		WHERE user_id = $1 AND post_id = ANY($2)
+	`, userID, postIDs)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var ids []int
+	for rows.Next() {
+		var id int
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
 }
 
 // UpdateCreatedAt overrides the stored created_at timestamp for a post.

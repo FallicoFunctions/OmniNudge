@@ -157,6 +157,87 @@ func (r *PostCommentRepository) GetByID(ctx context.Context, id int) (*PostComme
 	return comment, nil
 }
 
+// GetUserCommentedPostIDs returns post IDs where the user has already left a top-level comment.
+func (r *PostCommentRepository) GetUserCommentedPostIDs(ctx context.Context, userID int, postIDs []int) ([]int, error) {
+	if len(postIDs) == 0 {
+		return []int{}, nil
+	}
+
+	rows, err := r.pool.Query(ctx, `
+		SELECT DISTINCT post_id
+		FROM post_comments
+		WHERE user_id = $1 AND post_id = ANY($2) AND parent_comment_id IS NULL
+	`, userID, postIDs)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var ids []int
+	for rows.Next() {
+		var id int
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
+}
+
+// GetUserVotedCommentIDs returns the subset of commentIDs the user has already voted on.
+func (r *PostCommentRepository) GetUserVotedCommentIDs(ctx context.Context, userID int, commentIDs []int) ([]int, error) {
+	if len(commentIDs) == 0 {
+		return []int{}, nil
+	}
+
+	rows, err := r.pool.Query(ctx, `
+		SELECT comment_id
+		FROM comment_votes
+		WHERE user_id = $1 AND comment_id = ANY($2)
+	`, userID, commentIDs)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var ids []int
+	for rows.Next() {
+		var id int
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
+}
+
+// GetUserRepliedCommentIDs returns the subset of commentIDs the user has already replied to.
+func (r *PostCommentRepository) GetUserRepliedCommentIDs(ctx context.Context, userID int, commentIDs []int) ([]int, error) {
+	if len(commentIDs) == 0 {
+		return []int{}, nil
+	}
+
+	rows, err := r.pool.Query(ctx, `
+		SELECT DISTINCT parent_comment_id
+		FROM post_comments
+		WHERE user_id = $1 AND parent_comment_id = ANY($2)
+	`, userID, commentIDs)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var ids []int
+	for rows.Next() {
+		var id int
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
+}
+
 // GetByPostID retrieves all top-level comments for a post
 func (r *PostCommentRepository) GetByPostID(ctx context.Context, postID int, sortBy string, limit, offset int, userID *int) ([]*PostComment, error) {
 	var orderClause string

@@ -410,6 +410,7 @@ func main() {
 			protected.PUT("/settings", settingsHandler.UpdateSettings)
 			protected.GET("/users/me/saved", savedItemsHandler.GetSavedItems)
 			protected.GET("/users/me/hidden", savedItemsHandler.GetHiddenItems)
+			protected.GET("/hubs/agent-targets", hubsHandler.GetAgentTargets)
 
 			// Theme customization routes with rate limiting
 			themeCreationLimiter := middleware.ThemeCreationRateLimiter()
@@ -569,6 +570,7 @@ func main() {
 			// Agent activity tracking
 			protected.POST("/users/me/agent/post", usersHandler.UpdateLastAgentPostAt)
 			protected.POST("/users/me/agent/browse", usersHandler.UpdateLastAgentBrowseAt)
+			protected.POST("/users/me/agent/state", usersHandler.GetAgentState)
 
 			// User blocking
 			protected.POST("/users/block", blockingHandler.BlockUser)

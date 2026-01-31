@@ -149,7 +149,7 @@ type CreatePostRequest struct {
 	MediaType          *string               `json:"media_type"`
 	ThumbnailURL       *string               `json:"thumbnail_url"`
 	GalleryImages      []models.GalleryImage `json:"gallery_images"`        // Optional: gallery images
-	HubID              *int                  `json:"hub_id"`                // Optional: post to specific hub
+	HubID              *int                  `json:"hub_id" binding:"required"` // Required: post to specific hub
 	TargetSubreddit    *string               `json:"target_subreddit"`      // Optional: associate with subreddit
 	SendRepliesToInbox bool                  `json:"send_replies_to_inbox"` // Notification preference
 	PostType           string                `json:"post_type"`             // "link" or "text"
@@ -190,9 +190,9 @@ func (h *PostsHandler) CreatePost(c *gin.Context) {
 		return
 	}
 
-	// Validate: must have hub_id OR target_subreddit
-	if req.HubID == nil && req.TargetSubreddit == nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Must provide either hub_id or target_subreddit"})
+	// Validate: hub_id is required for all platform posts
+	if req.HubID == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "hub_id is required"})
 		return
 	}
 
@@ -264,7 +264,7 @@ func (h *PostsHandler) CreatePost(c *gin.Context) {
 			}
 		}
 	}
-	// If posting to subreddit only, hubID remains nil
+	// hubID remains set for all posts (target_subreddit is optional)
 
 	post := &models.PlatformPost{
 		AuthorID:        userID.(int),
@@ -331,6 +331,7 @@ func (h *PostsHandler) GetPost(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid post ID"})
 		return
 	}
+	hubNameParam := strings.TrimSpace(c.Query("hub"))
 
 	// Get optional user ID for vote information
 	var userID *int
@@ -348,6 +349,18 @@ func (h *PostsHandler) GetPost(c *gin.Context) {
 	if post == nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Post not found"})
 		return
+	}
+
+	if hubNameParam != "" {
+		hub, err := h.hubRepo.GetByName(c.Request.Context(), hubNameParam)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch hub", "details": err.Error()})
+			return
+		}
+		if hub == nil || post.HubID == nil || *post.HubID != hub.ID {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Post not found in hub"})
+			return
+		}
 	}
 
 	// Increment view count

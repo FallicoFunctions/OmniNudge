@@ -53,16 +53,17 @@ func NewHubsHandlerWithAccessRequest(hubRepo *models.HubRepository, postRepo *mo
 
 // CreateHubRequest payload
 type CreateHubRequest struct {
-	Name            string  `json:"name" binding:"required,max=100"`
-	Title           *string `json:"title"`
-	Description     *string `json:"description"`
-	Type            string  `json:"type"`            // public or private
-	ContentOptions  string  `json:"content_options"` // any, links_only, text_only, images_only, videos_only, custom
-	AllowTextPosts  *bool   `json:"allow_text_posts"`
-	AllowLinkPosts  *bool   `json:"allow_link_posts"`
-	AllowImagePosts *bool   `json:"allow_image_posts"`
-	AllowVideoPosts *bool   `json:"allow_video_posts"`
-	NSFW            bool    `json:"nsfw"`
+	Name            string   `json:"name" binding:"required,max=100"`
+	Title           *string  `json:"title"`
+	Description     *string  `json:"description"`
+	Type            string   `json:"type"`            // public or private
+	ContentOptions  string   `json:"content_options"` // any, links_only, text_only, images_only, videos_only, custom
+	AllowTextPosts  *bool    `json:"allow_text_posts"`
+	AllowLinkPosts  *bool    `json:"allow_link_posts"`
+	AllowImagePosts *bool    `json:"allow_image_posts"`
+	AllowVideoPosts *bool    `json:"allow_video_posts"`
+	NSFW            bool     `json:"nsfw"`
+	DenyKeywords    []string `json:"deny_keywords"`
 }
 
 // Create handles POST /api/v1/hubs
@@ -155,6 +156,13 @@ func (h *HubsHandler) Create(c *gin.Context) {
 		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create hub", "details": err.Error()})
 		return
+	}
+
+	if len(req.DenyKeywords) > 0 {
+		if err := h.hubRepo.UpsertHubTopicFilters(c.Request.Context(), hub.ID, req.DenyKeywords); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save hub deny keywords", "details": err.Error()})
+			return
+		}
 	}
 
 	if h.settingsRepo != nil {
@@ -518,6 +526,17 @@ func (h *HubsHandler) GetUserHubs(c *gin.Context) {
 		"hubs":    hubsResponse(hubs),
 		"user_id": userID,
 	})
+}
+
+// GetAgentTargets handles GET /api/v1/hubs/agent-targets
+func (h *HubsHandler) GetAgentTargets(c *gin.Context) {
+	targets, err := h.hubRepo.ListAgentTargets(c.Request.Context())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch hub targets", "details": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"hubs": targets})
 }
 
 // CrosspostRequest represents a crosspost request
