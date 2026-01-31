@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient, useInfiniteQuery, type InfiniteData } from '@tanstack/react-query';
-import { feedService, type CombinedFeedItem, type HomeFeedResponse, type RedditPost } from '../services/feedService';
+import { feedService, type HomeFeedResponse, type RedditPost } from '../services/feedService';
 import { useAuth } from '../contexts/AuthContext';
 import { useSettings } from '../contexts/SettingsContext';
 import type { PlatformPost } from '../types/posts';
@@ -12,7 +12,6 @@ import { postsService } from '../services/postsService';
 import { subscriptionService } from '../services/subscriptionService';
 import { hubsService } from '../services/hubsService';
 import { OffsetPaginationControls } from '../components/common/OffsetPaginationControls';
-import { VirtualizedList } from '../components/common/VirtualizedList';
 import { useSavedItems } from '../hooks/useSavedItems';
 import { useHiddenItems } from '../hooks/useHiddenItems';
 import { getHiddenRedditPostIdSet, getSavedPostIdSet, getSavedRedditPostIdSet } from '../utils/savedItems';
@@ -985,15 +984,8 @@ export default function HomePage() {
           )}
         </div>
       ) : (
-        <VirtualizedList
-          items={displayedPosts}
-          estimateSize={120}
-          getKey={(item) =>
-            item.source === 'hub'
-              ? `hub-${(item.post as PlatformPost).id}`
-              : `reddit-${(item.post as RedditPost).id}`
-          }
-          renderItem={(item: CombinedFeedItem) => {
+        <div className="space-y-4">
+          {displayedPosts.map((item) => {
             if (item.source === 'hub') {
               const post = item.post as PlatformPost;
               const isSaved = savedPostIds.has(post.id);
@@ -1004,7 +996,7 @@ export default function HomePage() {
                 deletePostMutation.isPending && deletePostMutation.variables?.postId === post.id;
 
               return (
-                <div className="pb-4">
+                <div key={`hub-${post.id}`}>
                   <HubPostCard
                     post={post}
                     useRelativeTime={useRelativeTime}
@@ -1032,7 +1024,7 @@ export default function HomePage() {
             const pendingShouldSave = toggleSaveRedditPostMutation.variables?.shouldSave;
 
             return (
-              <div className="pb-4">
+              <div key={`reddit-${post.id}`}>
                 <RedditPostCard
                   post={post}
                   useRelativeTime={useRelativeTime}
@@ -1049,8 +1041,8 @@ export default function HomePage() {
                 />
               </div>
             );
-          }}
-        />
+          })}
+        </div>
       )}
 
       {/* Pagination Controls */}

@@ -13,7 +13,6 @@ import { HubPostCard } from '../components/hubs/HubPostCard';
 import { CrosspostModal } from '../components/common/CrosspostModal';
 import { EmptyMessage, LoadingMessage } from '../components/common/StatusMessage';
 import { OffsetPaginationControls } from '../components/common/OffsetPaginationControls';
-import { VirtualizedList } from '../components/common/VirtualizedList';
 import { useHiddenItems } from '../hooks/useHiddenItems';
 import { useSavedItems } from '../hooks/useSavedItems';
 import type { PlatformPost } from '../types/posts';
@@ -624,13 +623,8 @@ export default function SearchResultsPage() {
           {visiblePosts.length === 0 && (
             <EmptyMessage className="text-sm">No posts found.</EmptyMessage>
           )}
-          <VirtualizedList
-            items={visiblePosts}
-            estimateSize={120}
-            getKey={(item, idx) =>
-              item.type === 'reddit' ? `sr-reddit-${item.post.id}-${idx}` : `sr-local-${item.post.id}-${idx}`
-            }
-            renderItem={(item) => {
+          <div className="space-y-3">
+            {visiblePosts.map((item, idx) => {
               if (item.type === 'reddit') {
                 const post = item.post;
                 const postKey = `${post.subreddit}-${post.id}`;
@@ -641,7 +635,7 @@ export default function SearchResultsPage() {
                 const pendingShouldSave = toggleSaveRedditPostMutation.variables?.shouldSave;
 
                 return (
-                  <div className="pb-3">
+                  <div key={`sr-reddit-${post.id}-${idx}`}>
                     <RedditPostCard
                       post={post}
                       useRelativeTime={useRelativeTime}
@@ -677,7 +671,7 @@ export default function SearchResultsPage() {
               const post = item.post;
 
               return (
-                <div className="pb-3">
+                <div key={`sr-local-${post.id}-${idx}`}>
                   <HubPostCard
                     post={post}
                     useRelativeTime={useRelativeTime}
@@ -717,8 +711,8 @@ export default function SearchResultsPage() {
                   />
                 </div>
               );
-            }}
-          />
+            })}
+          </div>
           <OffsetPaginationControls
             showDivider={false}
             className="mt-2"
