@@ -41,7 +41,6 @@ import { getHiddenPostIdSet, getSavedPostIdSet, getSavedRedditPostIdSet } from '
 import { EmptyMessage, LoadingMessage } from '../components/common/StatusMessage';
 import { FeedSearchBars } from '../components/common/FeedSearchBars';
 import { OffsetPaginationControls } from '../components/common/OffsetPaginationControls';
-import { VirtualizedList } from '../components/common/VirtualizedList';
 import { RedditPostSlideshow } from '../components/slideshow/RedditPostSlideshow';
 import { HubPostCard } from '../components/hubs/HubPostCard';
 
@@ -1278,14 +1277,15 @@ export default function RedditPage() {
           {scopedSearchResults ? (
             scopedSearchResults.length > 0 ? (
               <>
-                <VirtualizedList
-                  items={scopedSearchResults}
-                  estimateSize={120}
-                  getKey={(item) =>
-                    item.type === 'platform' ? `scoped-local-${item.post.id}` : `scoped-reddit-${item.post.id}`
-                  }
-                  renderItem={(item) => <div className="pb-3">{renderCombinedPost(item)}</div>}
-                />
+                <div className="space-y-3">
+                  {scopedSearchResults.map((item) => (
+                    <div
+                      key={item.type === 'platform' ? `scoped-local-${item.post.id}` : `scoped-reddit-${item.post.id}`}
+                    >
+                      {renderCombinedPost(item)}
+                    </div>
+                  ))}
+                </div>
                 <OffsetPaginationControls
                   showDivider={false}
                   className="mt-4"
@@ -1304,14 +1304,13 @@ export default function RedditPage() {
               <div className="text-center text-[var(--color-text-secondary)]">No search results</div>
             )
           ) : filteredCombinedPosts.length > 0 ? (
-            <VirtualizedList
-              items={filteredCombinedPosts}
-              estimateSize={120}
-              getKey={(item) =>
-                item.type === 'platform' ? `local-${item.post.id}` : `reddit-${item.post.id}`
-              }
-              renderItem={(item) => <div className="pb-3">{renderCombinedPost(item)}</div>}
-            />
+            <div className="space-y-3">
+              {filteredCombinedPosts.map((item) => (
+                <div key={item.type === 'platform' ? `local-${item.post.id}` : `reddit-${item.post.id}`}>
+                  {renderCombinedPost(item)}
+                </div>
+              ))}
+            </div>
           ) : (
             !isLoading && (
               <div className="text-center">

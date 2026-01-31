@@ -26,7 +26,6 @@ import { useHubSettings } from '../hooks/useHubSettings';
 import { useHubSubredditAutocomplete } from '../hooks/useHubSubredditAutocomplete';
 import { useHubActiveUsers } from '../hooks/useHubActiveUsers';
 import { OffsetPaginationControls } from '../components/common/OffsetPaginationControls';
-import { VirtualizedList } from '../components/common/VirtualizedList';
 import { subscriptionService } from '../services/subscriptionService';
 import { useSavedItems } from '../hooks/useSavedItems';
 import { useHiddenItems } from '../hooks/useHiddenItems';
@@ -1187,13 +1186,11 @@ export default function HubsPage() {
                   )}
                 </div>
               )}
-              <VirtualizedList
-                items={effectivePosts}
-                estimateSize={120}
-                className=""
-                getKey={(post) => post.id}
-                renderItem={(post: LocalSubredditPost) => renderPostCard(post)}
-              />
+              <div className="space-y-4">
+                {effectivePosts.map((post) => (
+                  <div key={post.id}>{renderPostCard(post)}</div>
+                ))}
+              </div>
             </>
           ) : (
             <div className="py-12 text-center">
