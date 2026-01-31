@@ -1,5 +1,6 @@
 import { useState, type CSSProperties } from 'react';
 import type { GalleryImage } from '../../types/posts';
+import { HlsVideo } from '../common/HlsVideo';
 import { resolveMediaUrl } from '../../utils/mediaUrl';
 
 type PostDetailMediaProps = {
@@ -171,6 +172,10 @@ export function PostDetailMedia({
     (galleryItem?.media_type ?? '').startsWith('video') ||
     /\.(mp4|webm|mov|m4v|ogg)$/i.test(galleryItem?.url ?? '');
   const isPlayableVideo = isEmbeddableVideo || isVideoMedia || (hasGallery && isGalleryVideo);
+  const isHlsVideo = Boolean(
+    (displayImage ?? resolvedThumbnailUrl)?.toLowerCase().includes('.m3u8') ||
+      (mediaUrl ?? '').toLowerCase().includes('.m3u8')
+  );
   const containerClasses = isEmbeddableVideo
     ? embedSizing.className
     : `w-full ${imageExpanded ? 'max-h-[80vh]' : 'max-h-[320px]'}`;
@@ -219,12 +224,24 @@ export function PostDetailMedia({
             />
           ) : displayImage ? (
             isVideoMedia || (hasGallery && isGalleryVideo) ? (
-              <video
-                controls
-                className={containerClasses}
-                src={displayImage}
-                preload="metadata"
-              />
+              isHlsVideo ? (
+                <HlsVideo
+                  src={displayImage ?? ''}
+                  className={containerClasses}
+                  poster={resolvedThumbnailUrl ?? undefined}
+                  preload="metadata"
+                  controls
+                  playsInline
+                />
+              ) : (
+                <video
+                  controls
+                  className={containerClasses}
+                  src={displayImage}
+                  preload="metadata"
+                  playsInline
+                />
+              )
             ) : (
               <img
                 src={displayImage}

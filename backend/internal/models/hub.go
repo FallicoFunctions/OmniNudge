@@ -25,6 +25,15 @@ type Hub struct {
 	NSFW            bool      `json:"nsfw"`
 }
 
+// HubTarget represents a hub with topic filter metadata for agent classification.
+type HubTarget struct {
+	ID           int      `json:"id"`
+	Name         string   `json:"name"`
+	Title        *string  `json:"title,omitempty"`
+	Description  *string  `json:"description,omitempty"`
+	DenyKeywords []string `json:"deny_keywords"`
+}
+
 // HubRepository manages hubs
 type HubRepository struct {
 	pool *pgxpool.Pool
@@ -124,6 +133,43 @@ func (r *HubRepository) List(ctx context.Context, limit, offset int, includeNsfw
 		hubs = append(hubs, h)
 	}
 	return hubs, rows.Err()
+}
+
+// ListAgentTargets returns hubs with topic filter metadata for agent classification.
+func (r *HubRepository) ListAgentTargets(ctx context.Context) ([]*HubTarget, error) {
+	rows, err := r.pool.Query(ctx, `
+		SELECT h.id, h.name, h.title, h.description, COALESCE(htf.deny_keywords, '{}'::text[])
+		FROM hubs h
+		LEFT JOIN hub_topic_filters htf ON h.id = htf.hub_id
+		WHERE h.type = 'public'
+		ORDER BY h.name ASC
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var targets []*HubTarget
+	for rows.Next() {
+		t := &HubTarget{}
+		if err := rows.Scan(&t.ID, &t.Name, &t.Title, &t.Description, &t.DenyKeywords); err != nil {
+			return nil, err
+		}
+		targets = append(targets, t)
+	}
+
+	return targets, rows.Err()
+}
+
+// UpsertHubTopicFilters stores deny keywords for a hub.
+func (r *HubRepository) UpsertHubTopicFilters(ctx context.Context, hubID int, denyKeywords []string) error {
+	_, err := r.pool.Exec(ctx, `
+		INSERT INTO hub_topic_filters (hub_id, deny_keywords)
+		VALUES ($1, $2)
+		ON CONFLICT (hub_id) DO UPDATE
+		SET deny_keywords = EXCLUDED.deny_keywords
+	`, hubID, denyKeywords)
+	return err
 }
 
 // ListByPrefix returns paginated hubs filtered by name prefix.

@@ -38,6 +38,7 @@ import { PostEditModal } from '../components/posts/PostEditModal';
 import { CommunityHeader } from '../components/common/CommunityHeader';
 import { CommunityHeaderControlsRow } from '../components/common/CommunityHeaderControlsRow';
 import { FeedSearchBars } from '../components/common/FeedSearchBars';
+import NotFoundPage from './NotFoundPage';
 import { SubredditSuggestionItem } from '../components/subreddit/SubredditSuggestionItem';
 import { useSubredditAutocomplete } from '../hooks/useSubredditAutocomplete';
 import { SubredditModeratorsPanel } from '../components/subreddit/SubredditModeratorsPanel';
@@ -48,7 +49,11 @@ import { useHubSubredditAutocomplete } from '../hooks/useHubSubredditAutocomplet
 import { CombinedSuggestionItem } from '../components/common/CombinedSuggestionItem';
 
 export default function PostDetailPage() {
-  const { postId, commentId } = useParams<{ postId: string; commentId?: string }>();
+  const { postId, commentId, hubname } = useParams<{
+    postId: string;
+    commentId?: string;
+    hubname?: string;
+  }>();
   const navigate = useNavigate();
   const location = useLocation();
   const queryClient = useQueryClient();
@@ -84,14 +89,20 @@ export default function PostDetailPage() {
   const focusedCommentId = commentId ? Number(commentId) : null;
 
   type PostResponse = PlatformPost | { post: PlatformPost };
-  const { data: postDataRaw, isLoading: loadingPost } = useQuery<PostResponse>({
-    queryKey: ['posts', parsedPostId],
+  const {
+    data: postDataRaw,
+    isLoading: loadingPost,
+    isError: postLoadError,
+    error: postLoadErrorDetails,
+  } = useQuery<PostResponse>({
+    queryKey: ['posts', parsedPostId, hubname ?? ''],
     queryFn: async () => {
-      const response = await postsService.getPost(parsedPostId);
+      const response = await postsService.getPost(parsedPostId, hubname);
       console.log('[PostDetailPage] Raw post response:', response);
       return response;
     },
     enabled: Number.isFinite(parsedPostId),
+    retry: false,
   });
 
   // Unwrap the response if it's wrapped in a "post" property
@@ -235,7 +246,7 @@ export default function PostDetailPage() {
       console.log('[PostDetailPage] Comments response:', response);
       return response;
     },
-    enabled: Number.isFinite(parsedPostId),
+    enabled: Number.isFinite(parsedPostId) && !postLoadError,
   });
   const commentsList = useMemo(() => postComments ?? [], [postComments]);
 
@@ -445,7 +456,10 @@ export default function PostDetailPage() {
     isError: hubDetailsError,
   } = useHubDetails(hubName, Boolean(hubName));
   const { data: hubSettings } = useHubSettings(hubName, Boolean(hubName));
-  const hubDisplayTitle = hubSettings?.display_title?.trim() || null;
+  const hubDisplayTitle =
+    hubSettings?.display_title?.trim() ||
+    hubDetails?.title?.trim() ||
+    null;
   const { data: hubActiveUsersData } = useHubActiveUsers(hubName, user);
 
   const {
@@ -610,6 +624,22 @@ export default function PostDetailPage() {
         <LoadingMessage>Loading post...</LoadingMessage>
         </div>
     );
+  }
+
+  if (postLoadError) {
+    const message = postLoadErrorDetails instanceof Error ? postLoadErrorDetails.message : 'Failed to load post';
+    if (message.toLowerCase().includes('not found')) {
+      return <NotFoundPage />;
+    }
+    return (
+      <div className="mx-auto max-w-4xl px-4 py-8">
+        <div className="text-[var(--color-text-secondary)]">Failed to load post: {message}</div>
+      </div>
+    );
+  }
+
+  if (hubname && hubName && hubname.toLowerCase() !== hubName.toLowerCase()) {
+    return <NotFoundPage />;
   }
 
   return (

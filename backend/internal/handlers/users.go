@@ -58,6 +58,20 @@ type ModeratedHubResponse struct {
 	Title *string `json:"title,omitempty"`
 }
 
+// AgentStateRequest is used to fetch persistent interaction state for the authenticated user.
+type AgentStateRequest struct {
+	PostIDs    []int `json:"post_ids"`
+	CommentIDs []int `json:"comment_ids"`
+}
+
+// AgentStateResponse returns which items the user has already interacted with.
+type AgentStateResponse struct {
+	VotedPosts      []int `json:"voted_posts"`
+	CommentedPosts  []int `json:"commented_posts"`
+	VotedComments   []int `json:"voted_comments"`
+	RepliedComments []int `json:"replied_comments"`
+}
+
 // GetUserProfile handles GET /api/v1/users/:username
 func (h *UsersHandler) GetUserProfile(c *gin.Context) {
 	username := c.Param("username")
@@ -136,6 +150,54 @@ func (h *UsersHandler) GetUserPosts(c *gin.Context) {
 		"posts":  posts,
 		"limit":  limit,
 		"offset": offset,
+	})
+}
+
+// GetAgentState handles POST /api/v1/users/me/agent/state
+func (h *UsersHandler) GetAgentState(c *gin.Context) {
+	userID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
+
+	var req AgentStateRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body", "details": err.Error()})
+		return
+	}
+
+	uid := userID.(int)
+
+	votedPosts, err := h.postRepo.GetUserVotedPostIDs(c.Request.Context(), uid, req.PostIDs)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch voted posts"})
+		return
+	}
+
+	commentedPosts, err := h.commentRepo.GetUserCommentedPostIDs(c.Request.Context(), uid, req.PostIDs)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch commented posts"})
+		return
+	}
+
+	votedComments, err := h.commentRepo.GetUserVotedCommentIDs(c.Request.Context(), uid, req.CommentIDs)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch voted comments"})
+		return
+	}
+
+	repliedComments, err := h.commentRepo.GetUserRepliedCommentIDs(c.Request.Context(), uid, req.CommentIDs)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch replied comments"})
+		return
+	}
+
+	c.JSON(http.StatusOK, AgentStateResponse{
+		VotedPosts:      votedPosts,
+		CommentedPosts:  commentedPosts,
+		VotedComments:   votedComments,
+		RepliedComments: repliedComments,
 	})
 }
 
