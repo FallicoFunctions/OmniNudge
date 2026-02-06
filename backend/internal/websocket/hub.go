@@ -50,6 +50,17 @@ func (h *Hub) Run() {
 			h.mu.Unlock()
 			log.Printf("Client registered: user_id=%d", client.UserID)
 
+			// Send initial state to newly connected client
+			onlineUserIDs := h.GetOnlineUsers()
+			client.Send <- &Message{
+				RecipientID: client.UserID,
+				Type:        "initial_state",
+				Payload: map[string]interface{}{
+					"online_users": onlineUserIDs,
+				},
+			}
+			log.Printf("Sent initial state to user_id=%d with %d online users", client.UserID, len(onlineUserIDs))
+
 			// Broadcast user_online event to all other connected users
 			h.broadcastUserStatus(client.UserID, true)
 

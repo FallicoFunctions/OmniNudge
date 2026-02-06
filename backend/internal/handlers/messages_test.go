@@ -76,11 +76,12 @@ func setupMessagesHandlerTest(t *testing.T) (*MessagesHandler, *database.Databas
 
 	// Create handler with mock hub
 	messageRepo := models.NewMessageRepository(db.Pool)
+	userSettingsRepo := models.NewUserSettingsRepository(db.Pool)
 	hub := &mockHub{
 		broadcastCalls: make([]*websocket.Message, 0),
 		onlineUsers:    make(map[int]bool),
 	}
-	handler := NewMessagesHandler(db.Pool, messageRepo, convRepo, hub)
+	handler := NewMessagesHandler(db.Pool, messageRepo, convRepo, userSettingsRepo, hub)
 
 	cleanup := func() {
 		db.Close()

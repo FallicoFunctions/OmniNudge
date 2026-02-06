@@ -2,6 +2,7 @@ import { lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import { SettingsProvider } from './contexts/SettingsContext';
+import { WebSocketProvider } from './contexts/WebSocketContext';
 import { RedditBlockProvider } from './contexts/RedditBlockContext';
 import { MessagingProvider } from './contexts/MessagingContext';
 import { MultiColumnFeedProvider } from './contexts/MultiColumnFeedContext';
@@ -42,9 +43,10 @@ function App() {
     <BrowserRouter>
       <AuthProvider>
         <SettingsProvider>
-          <RedditBlockProvider>
-            <MessagingProvider>
-              <MultiColumnFeedProvider>
+          <WebSocketProvider>
+            <RedditBlockProvider>
+              <MessagingProvider>
+                <MultiColumnFeedProvider>
                 <Suspense
                   fallback={
                     <div className="flex min-h-screen items-center justify-center">
@@ -174,9 +176,10 @@ function App() {
                   <Route path="*" element={<Navigate to="/404" replace />} />
                   </Routes>
                 </Suspense>
-              </MultiColumnFeedProvider>
-            </MessagingProvider>
-          </RedditBlockProvider>
+                </MultiColumnFeedProvider>
+              </MessagingProvider>
+            </RedditBlockProvider>
+          </WebSocketProvider>
         </SettingsProvider>
       </AuthProvider>
     </BrowserRouter>

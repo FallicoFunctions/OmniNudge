@@ -570,3 +570,29 @@ article:focus-visible,
 *:focus:not(:focus-visible) {
   outline: none;
 }
+
+/* Typing indicator animation */
+@keyframes bounce-dot {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+.animate-bounce-dot {
+  animation: bounce-dot 1s ease-in-out infinite;
+}
+
+.animation-delay-0 {
+  animation-delay: 0ms;
+}
+
+.animation-delay-100 {
+  animation-delay: 100ms;
+}
+
+.animation-delay-200 {
+  animation-delay: 200ms;
+}
