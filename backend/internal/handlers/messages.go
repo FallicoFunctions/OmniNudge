@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -17,6 +18,7 @@ type MessagesHandler struct {
 	pool             *pgxpool.Pool
 	messageRepo      *models.MessageRepository
 	conversationRepo *models.ConversationRepository
+	userSettingsRepo *models.UserSettingsRepository
 	hub              HubInterface
 }
 
@@ -31,12 +33,14 @@ func NewMessagesHandler(
 	pool *pgxpool.Pool,
 	messageRepo *models.MessageRepository,
 	conversationRepo *models.ConversationRepository,
+	userSettingsRepo *models.UserSettingsRepository,
 	hub HubInterface,
 ) *MessagesHandler {
 	return &MessagesHandler{
 		pool:             pool,
 		messageRepo:      messageRepo,
 		conversationRepo: conversationRepo,
+		userSettingsRepo: userSettingsRepo,
 		hub:              hub,
 	}
 }
@@ -285,7 +289,16 @@ func (h *MessagesHandler) SendMessage(c *gin.Context) {
 	if h.hub != nil {
 		if h.hub.IsUserOnline(recipientID) {
 			// Mark as delivered immediately for online recipient
-			_ = h.messageRepo.MarkAsDelivered(c.Request.Context(), message.ID)
+			err := h.messageRepo.MarkAsDelivered(c.Request.Context(), message.ID)
+			if err != nil {
+				log.Printf("Failed to mark message as delivered: %v", err)
+			}
+
+			// Reload to get delivered_at timestamp
+			updatedMsg, err := h.messageRepo.GetByID(c.Request.Context(), message.ID)
+			if err == nil && updatedMsg != nil {
+				message = updatedMsg
+			}
 
 			h.hub.Broadcast(&websocket.Message{
 				RecipientID: recipientID,
@@ -300,6 +313,7 @@ func (h *MessagesHandler) SendMessage(c *gin.Context) {
 				Payload: gin.H{
 					"message_id":      message.ID,
 					"conversation_id": message.ConversationID,
+					"delivered_at":    message.DeliveredAt,
 				},
 			})
 		}
@@ -446,12 +460,20 @@ func (h *MessagesHandler) GetMessages(c *gin.Context) {
 		delivered, err := h.messageRepo.MarkUndeliveredAsDelivered(c.Request.Context(), conversationID, userID.(int))
 		if err == nil {
 			for _, dm := range delivered {
+				// Reload message to get delivered_at timestamp
+				updatedMsg, err := h.messageRepo.GetByID(c.Request.Context(), dm.ID)
+				var deliveredAt interface{}
+				if err == nil && updatedMsg != nil {
+					deliveredAt = updatedMsg.DeliveredAt
+				}
+
 				go h.hub.Broadcast(&websocket.Message{
 					RecipientID: dm.SenderID,
 					Type:        "message_delivered",
 					Payload: gin.H{
 						"message_id":      dm.ID,
 						"conversation_id": conversationID,
+						"delivered_at":    deliveredAt,
 					},
 				})
 			}
@@ -583,15 +605,47 @@ func (h *MessagesHandler) MarkAsRead(c *gin.Context) {
 		unreadMessages = append(unreadMessages, msg)
 	}
 
+	// Check if user has read receipts enabled before marking as read
+	userSettings, err := h.userSettingsRepo.GetByUserID(c.Request.Context(), userID.(int))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get user settings", "details": err.Error()})
+		return
+	}
+
+	// If settings don't exist, create defaults (which have read receipts enabled by default)
+	if userSettings == nil {
+		userSettings, err = h.userSettingsRepo.CreateDefault(c.Request.Context(), userID.(int))
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create user settings", "details": err.Error()})
+			return
+		}
+	}
+
+	// If user has disabled read receipts, return success without marking as read or broadcasting
+	if !userSettings.ShowReadReceipts {
+		log.Printf("[MarkAsRead] User %d has read receipts disabled, skipping read receipt update", userID.(int))
+		c.JSON(http.StatusOK, gin.H{"message": "Read receipts disabled"})
+		return
+	}
+
 	// Mark all messages as read for this user
 	if err := h.messageRepo.MarkAllAsRead(c.Request.Context(), conversationID, userID.(int)); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to mark messages as read", "details": err.Error()})
 		return
 	}
 
+	// Reload messages to get read_at timestamps
+	updatedMessages := make(map[int]interface{})
+	for _, msg := range unreadMessages {
+		if updated, err := h.messageRepo.GetByID(c.Request.Context(), msg.ID); err == nil && updated != nil {
+			updatedMessages[msg.ID] = updated.ReadAt
+		}
+	}
+
 	// Notify senders about individual message read events (concurrent for better performance)
 	if h.hub != nil {
 		for _, msg := range unreadMessages {
+			readAt := updatedMessages[msg.ID]
 			go h.hub.Broadcast(&websocket.Message{
 				RecipientID: msg.SenderID,
 				Type:        "message_read",
@@ -599,6 +653,7 @@ func (h *MessagesHandler) MarkAsRead(c *gin.Context) {
 					"message_id":      msg.ID,
 					"conversation_id": conversationID,
 					"reader_id":       userID.(int),
+					"read_at":         readAt,
 				},
 			})
 		}
@@ -687,9 +742,39 @@ func (h *MessagesHandler) MarkSingleMessageAsRead(c *gin.Context) {
 		return
 	}
 
+	// Check if user has read receipts enabled before marking as read
+	userSettings, err := h.userSettingsRepo.GetByUserID(c.Request.Context(), userID.(int))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get user settings", "details": err.Error()})
+		return
+	}
+
+	// If settings don't exist, create defaults (which have read receipts enabled by default)
+	if userSettings == nil {
+		userSettings, err = h.userSettingsRepo.CreateDefault(c.Request.Context(), userID.(int))
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create user settings", "details": err.Error()})
+			return
+		}
+	}
+
+	// If user has disabled read receipts, return success without marking as read or broadcasting
+	if !userSettings.ShowReadReceipts {
+		log.Printf("[MarkSingleMessageAsRead] User %d has read receipts disabled, skipping read receipt update", userID.(int))
+		c.JSON(http.StatusOK, gin.H{"message": "Read receipts disabled"})
+		return
+	}
+
 	// Mark message as read
 	if err := h.messageRepo.MarkAsRead(c.Request.Context(), messageID); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to mark message as read", "details": err.Error()})
+		return
+	}
+
+	// Reload to get read_at timestamp
+	updatedMsg, err := h.messageRepo.GetByID(c.Request.Context(), messageID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to reload message", "details": err.Error()})
 		return
 	}
 
@@ -702,6 +787,7 @@ func (h *MessagesHandler) MarkSingleMessageAsRead(c *gin.Context) {
 				"message_id":      messageID,
 				"conversation_id": message.ConversationID,
 				"reader_id":       userID.(int),
+				"read_at":         updatedMsg.ReadAt,
 			},
 		})
 	}

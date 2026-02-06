@@ -98,6 +98,7 @@ func newTestDeps(t *testing.T) *TestDeps {
 	redditPostRepo := models.NewRedditPostRepository(db.Pool)
 	feedRepo := models.NewFeedRepository(db.Pool)
 	hubSettingsRepo := repository.NewHubSettingsRepository(db.Pool)
+	userSettingsRepo := models.NewUserSettingsRepository(db.Pool)
 	hub := websocket.NewHub()
 	go hub.Run()
 
@@ -119,7 +120,7 @@ func newTestDeps(t *testing.T) *TestDeps {
 		redditPostRepo,
 	)
 	conversationsHandler := handlers.NewConversationsHandler(db.Pool, conversationRepo, messageRepo, userRepo)
-	messagesHandler := handlers.NewMessagesHandler(db.Pool, messageRepo, conversationRepo, hub)
+	messagesHandler := handlers.NewMessagesHandler(db.Pool, messageRepo, conversationRepo, userSettingsRepo, hub)
 	usersHandler := handlers.NewUsersHandler(userRepo, postRepo, commentRepo, nil, modRepo)
 	thumbnailService := services.NewThumbnailService()
 	mediaHandler := handlers.NewMediaHandler(models.NewMediaFileRepository(db.Pool), thumbnailService)

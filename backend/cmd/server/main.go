@@ -158,7 +158,7 @@ func main() {
 	// Initialize CSS sanitizer
 	cssSanitizer := services.NewCSSSanitizer()
 
-	messagesHandler := handlers.NewMessagesHandler(db.Pool, messageRepo, conversationRepo, hub)
+	messagesHandler := handlers.NewMessagesHandler(db.Pool, messageRepo, conversationRepo, userSettingsRepo, hub)
 	usersHandler := handlers.NewUsersHandler(userRepo, postRepo, commentRepo, authService, hubModRepo)
 	mediaHandler := handlers.NewMediaHandler(mediaRepo, thumbnailService)
 	hubsHandler := handlers.NewHubsHandlerWithAccessRequest(hubRepo, postRepo, hubModRepo, hubSubRepo, hubSettingsRepo, hubAccessRequestRepo)

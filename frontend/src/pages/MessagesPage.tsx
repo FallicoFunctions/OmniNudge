@@ -5,6 +5,11 @@ import { messagesService } from '../services/messagesService';
 import { mediaService } from '../services/mediaService';
 import { useAuth } from '../contexts/AuthContext';
 import { useMessagingContext } from '../contexts/MessagingContext';
+import { useWebSocket } from '../contexts/WebSocketContext';
+import { useSettings } from '../contexts/SettingsContext';
+import { MessageStatusIndicator } from '../components/messages/MessageStatusIndicator';
+import { OnlineStatusIndicator } from '../components/messages/OnlineStatusIndicator';
+import { TypingIndicator } from '../components/messages/TypingIndicator';
 import type { Conversation, Message, SendMessageRequest } from '../types/messages';
 import type { ModMailConversation } from '../types/modmail';
 import { API_BASE_URL } from '../lib/api';
@@ -598,6 +603,12 @@ export default function MessagesPage() {
   const [searchParams] = useSearchParams();
   const toUsernameParam = searchParams.get('to');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { sendTypingIndicator } = useWebSocket();
+  const { typingIndicators, readReceipts } = useSettings();
+  const [searchQuery, setSearchQuery] = useState('');
+  const typingTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
+  const currentConversationRef = useRef<number | null>(null);
+  const currentRecipientRef = useRef<number>(0);
 
   const {
     data: conversationsData,
@@ -650,13 +661,36 @@ export default function MessagesPage() {
   };
 
   // Filter conversations based on active tab
-  const conversations = useMemo(() => {
+  const unfilteredConversations = useMemo(() => {
     if (!allConversations.length) return undefined;
     if (activeTab === 'archived') {
       return allConversations.filter((c) => c.archived_at !== null);
     }
     return allConversations.filter((c) => c.archived_at === null);
   }, [allConversations, activeTab]);
+
+  // Apply search filter
+  const conversations = useMemo(() => {
+    if (!unfilteredConversations) return undefined;
+    if (!searchQuery.trim()) return unfilteredConversations;
+
+    const query = searchQuery.toLowerCase();
+    return unfilteredConversations.filter((conv) => {
+      // Search by username (DM)
+      if (conv.other_user?.username?.toLowerCase().includes(query)) {
+        return true;
+      }
+      // Search by hub name (mod mail)
+      if (conv.hub_name?.toLowerCase().includes(query)) {
+        return true;
+      }
+      // Search by subject (mod mail)
+      if (conv.subject?.toLowerCase().includes(query)) {
+        return true;
+      }
+      return false;
+    });
+  }, [unfilteredConversations, searchQuery]);
 
   // Prune stale message queries for conversations that no longer exist
   useEffect(() => {
@@ -1241,6 +1275,11 @@ export default function MessagesPage() {
 
   const markConversationAsRead = useCallback(
     async (conversationId: number) => {
+      if (!readReceipts) {
+        console.log('[Messages] Read receipts disabled, not marking as read');
+        return;
+      }
+
       try {
         await messagesService.markAsRead(conversationId);
         queryClient.setQueryData<Conversation[] | undefined>(['conversations'], (prev) => {
@@ -1255,7 +1294,7 @@ export default function MessagesPage() {
         console.error('Failed to mark conversation as read', error);
       }
     },
-    [queryClient]
+    [queryClient, readReceipts]
   );
 
   // Sync selected conversation with global messaging context
@@ -1330,6 +1369,15 @@ export default function MessagesPage() {
     return () => document.removeEventListener('click', handleClick);
   }, [conversationMenuOpen]);
 
+  // Cleanup typing timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
+    };
+  }, []);
+
   return (
     <>
       <div className="flex h-[calc(100vh-4rem)]">
@@ -1374,9 +1422,25 @@ export default function MessagesPage() {
               Archived
             </button>
           </div>
+
+          {/* Search input */}
+          <div className="p-3 border-b border-[var(--color-border)]">
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search conversations..."
+              className="w-full px-3 py-2 text-sm border border-[var(--color-border)] rounded-lg bg-[var(--color-surface)] text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+            />
+            {searchQuery && conversations && (
+              <p className="mt-1.5 text-xs text-[var(--color-text-secondary)]">
+                {conversations.length} conversation{conversations.length !== 1 ? 's' : ''} found
+              </p>
+            )}
+          </div>
         </div>
 
-        <div className="overflow-y-auto" style={{ height: 'calc(100% - 116px)' }}>
+        <div className="overflow-y-auto" style={{ height: 'calc(100% - 180px)' }}>
           {loadingConversations && (
             <div className="p-4 text-center">
               <LoadingMessage className="text-sm">Loading...</LoadingMessage>
@@ -1406,11 +1470,16 @@ export default function MessagesPage() {
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-2">
-                      <span className={`font-medium text-[var(--color-text-primary)] ${conversation.unread_count > 0 ? 'font-semibold' : ''}`}>
-                        {conversation.conversation_type === 'mod_mail'
-                          ? `${getHubDisplayTitle(conversation.hub_name)} - Mod Mail - ${conversation.subject || 'Untitled'}`
-                          : conversation.other_user?.username || 'Unknown'}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className={`font-medium text-[var(--color-text-primary)] ${conversation.unread_count > 0 ? 'font-semibold' : ''}`}>
+                          {conversation.conversation_type === 'mod_mail'
+                            ? `${getHubDisplayTitle(conversation.hub_name)} - Mod Mail - ${conversation.subject || 'Untitled'}`
+                            : conversation.other_user?.username || 'Unknown'}
+                        </span>
+                        {conversation.other_user?.id && (
+                          <OnlineStatusIndicator userId={conversation.other_user.id} />
+                        )}
+                      </div>
                       {conversation.latest_message?.sent_at && (
                         <span className="text-xs text-[var(--color-text-muted)] flex-shrink-0">
                           {formatRelativeTime(conversation.latest_message.sent_at)}
@@ -1516,13 +1585,20 @@ export default function MessagesPage() {
             {/* Chat Header */}
             <div className="border-b border-[var(--color-border)] p-4">
               <div className="flex items-center justify-between">
-                <h3 className="font-semibold text-[var(--color-text-primary)]">
-                  {isCreatingChat
-                    ? 'New Chat'
-                    : selectedConversation?.conversation_type === 'mod_mail'
-                    ? `${getHubDisplayTitle(selectedConversation?.hub_name)} - Mod Mail - ${selectedConversation?.subject || 'Untitled'}`
-                    : selectedConversation?.other_user?.username || 'Unknown'}
-                </h3>
+                <div className="flex items-center gap-2">
+                  <h3 className="font-semibold text-[var(--color-text-primary)]">
+                    {isCreatingChat
+                      ? 'New Chat'
+                      : selectedConversation?.conversation_type === 'mod_mail'
+                      ? `${getHubDisplayTitle(selectedConversation?.hub_name)} - Mod Mail - ${selectedConversation?.subject || 'Untitled'}`
+                      : selectedConversation?.other_user?.username || 'Unknown'}
+                  </h3>
+                  {!isCreatingChat &&
+                   selectedConversation?.conversation_type === 'dm' &&
+                   selectedConversation?.other_user?.id && (
+                    <OnlineStatusIndicator userId={selectedConversation.other_user.id} />
+                  )}
+                </div>
 
                 {/* Slideshow buttons */}
                 <div className="flex items-center gap-2">
@@ -1666,6 +1742,12 @@ export default function MessagesPage() {
                                 </>
                               )}
                               <span>{new Date(message.sent_at).toLocaleString()}</span>
+                              {isOwnMessage && (
+                                <MessageStatusIndicator
+                                  message={message}
+                                  isSending={message.id < 0}
+                                />
+                              )}
                             </div>
                           </div>
                           <div className="relative">
@@ -1756,6 +1838,20 @@ export default function MessagesPage() {
                 </div>
               )}
 
+              {/* Typing Indicator */}
+              {typingIndicators && selectedConversationId && selectedConversation && (
+                <TypingIndicator
+                  conversationId={selectedConversationId}
+                  participants={
+                    selectedConversation.conversation_type === 'dm'
+                      ? selectedConversation.other_user
+                        ? [{ id: selectedConversation.other_user.id, username: selectedConversation.other_user.username }]
+                        : []
+                      : modMailConversation?.participants?.map(p => ({ id: p.user_id, username: p.username })) || []
+                  }
+                />
+              )}
+
               <form onSubmit={handleSendMessage} className="flex gap-2">
                 <input
                   type="file"
@@ -1784,7 +1880,39 @@ export default function MessagesPage() {
                 <input
                   type="text"
                   value={messageText}
-                  onChange={(e) => setMessageText(e.target.value)}
+                  onChange={(e) => {
+                    setMessageText(e.target.value);
+
+                    // Send typing indicator if enabled
+                    if (typingIndicators && selectedConversationId && selectedConversation) {
+                      // Only send typing indicators for DM conversations
+                      // Mod mail requires broadcasting to multiple participants (not yet implemented)
+                      if (selectedConversation.conversation_type === 'dm') {
+                        const recipientId = selectedConversation.other_user?.id || 0;
+
+                        // Update refs to track current conversation/recipient
+                        currentConversationRef.current = selectedConversationId;
+                        currentRecipientRef.current = recipientId;
+
+                        sendTypingIndicator(selectedConversationId, recipientId, true);
+
+                        // Clear existing timeout
+                        if (typingTimeoutRef.current) {
+                          clearTimeout(typingTimeoutRef.current);
+                        }
+
+                        // Stop typing after 3 seconds of inactivity
+                        typingTimeoutRef.current = setTimeout(() => {
+                          // Use refs to get current values (not stale closure values)
+                          const convId = currentConversationRef.current;
+                          const recId = currentRecipientRef.current;
+                          if (convId !== null) {
+                            sendTypingIndicator(convId, recId, false);
+                          }
+                        }, 3000);
+                      }
+                    }
+                  }}
                   placeholder="Type a message..."
                   className="flex-1 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-2 text-sm text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
                 />

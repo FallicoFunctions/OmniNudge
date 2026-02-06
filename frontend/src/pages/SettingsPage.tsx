@@ -35,6 +35,12 @@ export default function SettingsPage() {
     setBlockNsfwThumbnails,
     accessRequestCooldownDisplay,
     setAccessRequestCooldownDisplay,
+    readReceipts,
+    setReadReceipts,
+    typingIndicators,
+    setTypingIndicators,
+    notificationSound,
+    setNotificationSound,
   } = useSettings();
   const [publicKey, setPublicKey] = useState<string | null>(null);
   const [showPublicKey, setShowPublicKey] = useState(false);
@@ -116,6 +122,105 @@ export default function SettingsPage() {
                 }`}
               />
             </button>
+          </div>
+        </Panel>
+
+        {/* Messaging Settings */}
+        <Panel as="section">
+          <h3 className="mb-4 text-xl font-semibold text-[var(--color-text-primary)]">
+            Messaging Privacy
+          </h3>
+          <p className="text-sm text-[var(--color-text-secondary)]">
+            Control what information you share with other users during conversations.
+          </p>
+
+          <div className="mt-4 space-y-4">
+            {/* Read Receipts Toggle */}
+            <div className="flex items-center justify-between rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4">
+              <div className="pr-4">
+                <p className="text-base font-semibold text-[var(--color-text-primary)]">
+                  Read receipts
+                </p>
+                <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+                  Let others know when you've read their messages. When disabled, others won't see read status for your messages.
+                </p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={readReceipts}
+                onClick={() => setReadReceipts(!readReceipts)}
+                className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${
+                  readReceipts ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
+                }`}
+              >
+                <span className="sr-only">Toggle read receipts</span>
+                <span
+                  aria-hidden="true"
+                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                    readReceipts ? 'translate-x-5' : 'translate-x-0'
+                  }`}
+                />
+              </button>
+            </div>
+
+            {/* Typing Indicators Toggle */}
+            <div className="flex items-center justify-between rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4">
+              <div className="pr-4">
+                <p className="text-base font-semibold text-[var(--color-text-primary)]">
+                  Typing indicators
+                </p>
+                <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+                  Show others when you're typing. When disabled, you won't send or see typing indicators.
+                </p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={typingIndicators}
+                onClick={() => setTypingIndicators(!typingIndicators)}
+                className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${
+                  typingIndicators ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
+                }`}
+              >
+                <span className="sr-only">Toggle typing indicators</span>
+                <span
+                  aria-hidden="true"
+                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                    typingIndicators ? 'translate-x-5' : 'translate-x-0'
+                  }`}
+                />
+              </button>
+            </div>
+
+            {/* Notification Sound Toggle */}
+            <div className="flex items-center justify-between rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4">
+              <div className="pr-4">
+                <p className="text-base font-semibold text-[var(--color-text-primary)]">
+                  Message notification sound
+                </p>
+                <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+                  Play a sound when you receive a new message. Only plays when you're actively using the app.
+                </p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={notificationSound}
+                onClick={() => setNotificationSound(!notificationSound)}
+                className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${
+                  notificationSound ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
+                }`}
+              >
+                <span className="sr-only">Toggle message notification sound</span>
+                <span
+                  aria-hidden="true"
+                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                    notificationSound ? 'translate-x-5' : 'translate-x-0'
+                  }`}
+                />
+              </button>
+            </div>
           </div>
         </Panel>
 

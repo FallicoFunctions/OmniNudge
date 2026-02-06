@@ -30,6 +30,12 @@ interface SettingsContextType {
   setBlockNsfwThumbnails: (value: boolean) => void;
   accessRequestCooldownDisplay: 'days' | 'date' | 'both';
   setAccessRequestCooldownDisplay: (value: 'days' | 'date' | 'both') => void;
+  readReceipts: boolean;
+  setReadReceipts: (value: boolean) => void;
+  typingIndicators: boolean;
+  setTypingIndicators: (value: boolean) => void;
+  notificationSound: boolean;
+  setNotificationSound: (value: boolean) => void;
 }
 
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
@@ -49,10 +55,13 @@ interface StoredSettings {
   blockAllNsfw?: boolean;
   blockNsfwThumbnails?: boolean;
   accessRequestCooldownDisplay?: 'days' | 'date' | 'both';
+  readReceipts?: boolean;
+  typingIndicators?: boolean;
+  notificationSound?: boolean;
   settingsVersion?: number;
 }
 
-const CURRENT_SETTINGS_VERSION = 4;
+const CURRENT_SETTINGS_VERSION = 5;
 
 const getStoredSettings = (): StoredSettings => {
   if (typeof window === 'undefined' || !window.localStorage) {
@@ -72,6 +81,9 @@ const getStoredSettings = (): StoredSettings => {
           useInfiniteScroll: false,
           accessRequestCooldownDisplay: parsed.accessRequestCooldownDisplay ?? 'days',
           blockNsfwThumbnails: parsed.blockNsfwThumbnails ?? true,
+          readReceipts: parsed.readReceipts ?? true,
+          typingIndicators: parsed.typingIndicators ?? true,
+          notificationSound: parsed.notificationSound ?? true,
           settingsVersion: CURRENT_SETTINGS_VERSION,
         };
         localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(migrated));
@@ -144,6 +156,18 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     const settings = getStoredSettings();
     return settings.accessRequestCooldownDisplay ?? 'days';
   });
+  const [readReceipts, setReadReceiptsState] = useState<boolean>(() => {
+    const settings = getStoredSettings();
+    return settings.readReceipts ?? true;
+  });
+  const [typingIndicators, setTypingIndicatorsState] = useState<boolean>(() => {
+    const settings = getStoredSettings();
+    return settings.typingIndicators ?? true;
+  });
+  const [notificationSound, setNotificationSoundState] = useState<boolean>(() => {
+    const settings = getStoredSettings();
+    return settings.notificationSound ?? true;
+  });
 
   // Persist to localStorage whenever settings change
   useEffect(() => {
@@ -163,6 +187,9 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         blockAllNsfw,
         blockNsfwThumbnails,
         accessRequestCooldownDisplay,
+        readReceipts,
+        typingIndicators,
+        notificationSound,
         settingsVersion: CURRENT_SETTINGS_VERSION,
       };
       localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings));
@@ -184,6 +211,9 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     blockAllNsfw,
     blockNsfwThumbnails,
     accessRequestCooldownDisplay,
+    readReceipts,
+    typingIndicators,
+    notificationSound,
   ]);
 
   const setUseRelativeTime = (value: boolean) => {
@@ -236,6 +266,18 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     setAccessRequestCooldownDisplayState(value);
   };
 
+  const setReadReceipts = (value: boolean) => {
+    setReadReceiptsState(value);
+  };
+
+  const setTypingIndicators = (value: boolean) => {
+    setTypingIndicatorsState(value);
+  };
+
+  const setNotificationSound = (value: boolean) => {
+    setNotificationSoundState(value);
+  };
+
   return (
     <SettingsContext.Provider
       value={{
@@ -267,6 +309,12 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         setBlockNsfwThumbnails,
         accessRequestCooldownDisplay,
         setAccessRequestCooldownDisplay,
+        readReceipts,
+        setReadReceipts,
+        typingIndicators,
+        setTypingIndicators,
+        notificationSound,
+        setNotificationSound,
       }}
     >
       {children}

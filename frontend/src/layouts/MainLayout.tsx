@@ -3,11 +3,9 @@ import { Link, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../contexts/AuthContext';
 import { useSettings } from '../contexts/SettingsContext';
-import { useMessagingContext } from '../contexts/MessagingContext';
 import { useMultiColumnFeed } from '../contexts/MultiColumnFeedContext';
 import { usersService } from '../services/usersService';
 import { messagesService } from '../services/messagesService';
-import { useMessagingWebSocket } from '../hooks/useMessagingWebSocket';
 import type { UserProfile } from '../types/users';
 import AuthModal from '../pages/AuthModal';
 import BugReportModal from '../components/bugReports/BugReportModal';
@@ -15,6 +13,8 @@ import { subscriptionService } from '../services/subscriptionService';
 import { LoadingMessage } from '../components/common/StatusMessage';
 import { ViewModeToggle } from '../components/feed/ViewModeToggle';
 import { HamburgerMenu } from '../components/navigation/HamburgerMenu';
+import { ConnectionStatusIndicator } from '../components/common/ConnectionStatusIndicator';
+import { useNotificationSound } from '../hooks/useNotificationSound';
 
 const AboutContent = lazy(() =>
   import('../components/about/AboutContent').then((module) => ({
@@ -48,7 +48,6 @@ export default function MainLayout() {
         subreddit: string;
       }
   >(null);
-  const { activeConversationId } = useMessagingContext();
   const navigate = useNavigate();
   const location = useLocation();
   const queryClient = useQueryClient();
@@ -59,12 +58,12 @@ export default function MainLayout() {
   const [bugReportUrl, setBugReportUrl] = useState('');
   const [openBugReportAfterAuth, setOpenBugReportAfterAuth] = useState(false);
 
+  // Enable notification sounds globally
+  useNotificationSound();
+
   // Determine if slim mode
   const isSlimMode = multiColumnState.viewMode === 'omniscroll' || multiColumnState.viewMode === 'standard-scroll';
   const navHeight = isSlimMode ? 'h-9' : 'h-16';
-
-  // Initialize WebSocket connection for real-time messaging
-  useMessagingWebSocket({ activeConversationId });
 
   const handleLogout = () => {
     logout();
@@ -518,6 +517,9 @@ export default function MainLayout() {
           }}
         />
       )}
+
+      {/* WebSocket connection status indicator */}
+      <ConnectionStatusIndicator />
     </div>
   );
 }
