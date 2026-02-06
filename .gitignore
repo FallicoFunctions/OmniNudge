@@ -1,4 +1,32 @@
+# Cache directories
 .gocache/
-claude.md
+
+# macOS system files
 .DS_Store
+
+# Personal files
+claude.md
 Nick_Fallico_Resume.html
+
+# Development & planning documents
+DESIGN_AUDIT.md
+*_PLAN.md
+*_CHECKLIST.md
+
+# Deployment guides (keep versioned guides in docs/)
+DEPLOYMENT_GUIDE.md
+DEPLOYMENT_CHECKLIST.md
+PRE_DEPLOYMENT_CHECKLIST.md
+QUICK_DEPLOY.md
+INSTALLATION_GUIDE.md
+
+# Summary documents (temporary documentation)
+*_SUMMARY.md
+*_QUICKSTART.md
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
