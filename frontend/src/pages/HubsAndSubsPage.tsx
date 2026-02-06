@@ -22,6 +22,9 @@ export default function HubsAndSubsPage() {
   const [pageIndex, setPageIndex] = useState(0);
   const [inputValue, setInputValue] = useState('');
   const [isAutocompleteOpen, setIsAutocompleteOpen] = useState(false);
+  // BROWSE-1: Search and sort functionality
+  const [searchQuery, setSearchQuery] = useState('');
+  const [sortBy, setSortBy] = useState<'alphabetical' | 'popular' | 'newest'>('alphabetical');
 
   const { data: hubsResponse, isLoading: isHubsLoading, error: hubsError } = useQuery({
     queryKey: ['all-hubs', selectedLetter, pageIndex, showNsfw],
@@ -64,16 +67,36 @@ export default function HubsAndSubsPage() {
   const shouldShowSuggestions =
     isAutocompleteOpen && trimmedInputValue.length >= SUBREDDIT_AUTOCOMPLETE_MIN_LENGTH;
 
-  // Filter hubs
+  // Filter and sort hubs - BROWSE-1: Enhanced with search and sorting
   const filteredHubs = useMemo(() => {
     if (!hubsResponse?.hubs || !Array.isArray(hubsResponse.hubs)) {
       return [];
     }
 
-    return hubsResponse.hubs
-      .filter((hub) => showNsfw || !hub.nsfw)
-      .sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
-  }, [hubsResponse, showNsfw]);
+    let hubs = hubsResponse.hubs
+      .filter((hub) => showNsfw || !hub.nsfw);
+
+    // Apply search filter
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      hubs = hubs.filter((hub) =>
+        hub.name.toLowerCase().includes(query) ||
+        hub.title?.toLowerCase().includes(query) ||
+        hub.description?.toLowerCase().includes(query)
+      );
+    }
+
+    // Apply sorting
+    if (sortBy === 'alphabetical') {
+      hubs.sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
+    } else if (sortBy === 'popular') {
+      hubs.sort((a, b) => (b.subscriber_count || 0) - (a.subscriber_count || 0));
+    } else if (sortBy === 'newest') {
+      hubs.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    }
+
+    return hubs;
+  }, [hubsResponse, showNsfw, searchQuery, sortBy]);
 
   const hasMoreHubs = (hubsResponse?.hubs?.length ?? 0) >= ITEMS_PER_PAGE;
 
@@ -243,28 +266,66 @@ export default function HubsAndSubsPage() {
         </div>
       </div>
 
-      {/* Toggle Controls */}
-      <div className="flex gap-6 mb-4">
-        <button
-          type="button"
-          onClick={handleNsfwToggle}
-          role="switch"
-          aria-checked={showNsfw}
-          className="flex items-center gap-3"
-        >
-          <div
-            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-              showNsfw ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
-            }`}
-          >
-            <span
-              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                showNsfw ? 'translate-x-6' : 'translate-x-1'
-              }`}
+      {/* BROWSE-1: Search and Sort Controls */}
+      <div className="space-y-4 mb-6">
+        {/* Search input */}
+        <div className="flex gap-4 items-center">
+          <div className="flex-1 max-w-md">
+            <input
+              type="text"
+              placeholder="Search hubs by name or description..."
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setPageIndex(0); // Reset to first page on search
+              }}
+              className="w-full px-4 py-2 border border-[var(--color-border)] rounded-lg bg-[var(--color-surface-elevated)] text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
             />
           </div>
-          <span className="text-sm font-medium text-[var(--color-text-primary)]">Show NSFW</span>
-        </button>
+
+          {/* Sort dropdown */}
+          <select
+            value={sortBy}
+            onChange={(e) => {
+              setSortBy(e.target.value as any);
+              setPageIndex(0);
+            }}
+            className="px-4 py-2 border border-[var(--color-border)] rounded-lg bg-[var(--color-surface-elevated)] text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
+          >
+            <option value="alphabetical">A-Z</option>
+            <option value="popular">Most Popular</option>
+            <option value="newest">Newest</option>
+          </select>
+
+          {/* NSFW toggle */}
+          <button
+            type="button"
+            onClick={handleNsfwToggle}
+            role="switch"
+            aria-checked={showNsfw}
+            className="flex items-center gap-3"
+          >
+            <div
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                showNsfw ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
+              }`}
+            >
+              <span
+                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                  showNsfw ? 'translate-x-6' : 'translate-x-1'
+                }`}
+              />
+            </div>
+            <span className="text-sm font-medium text-[var(--color-text-primary)]">Show NSFW</span>
+          </button>
+        </div>
+
+        {/* Results summary */}
+        {searchQuery && (
+          <div className="text-sm text-[var(--color-text-secondary)]">
+            Found {filteredHubs.length} hub{filteredHubs.length !== 1 ? 's' : ''} matching "{searchQuery}"
+          </div>
+        )}
       </div>
 
       {/* Alphabet Filter */}
@@ -300,6 +361,7 @@ export default function HubsAndSubsPage() {
       )}
 
       {/* Items Grid */}
+      {/* BROWSE-2: Enhanced hub cards with member counts, badges, and descriptions */}
       {!isLoading && !hasError && (
         <>
           {filteredHubs.length === 0 ? (
@@ -307,14 +369,48 @@ export default function HubsAndSubsPage() {
               <EmptyMessage>No hubs found.</EmptyMessage>
             </div>
           ) : (
-            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-x-4 gap-y-2 mb-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
               {filteredHubs.map((hub) => (
                 <Link
                   key={hub.name}
                   to={`/h/${hub.name}`}
-                  className="text-[var(--color-primary)] hover:underline text-sm"
+                  className="block p-4 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] hover:border-[var(--color-primary)] hover:shadow-md transition-all group"
                 >
-                  h/{hub.name}
+                  {/* Hub name and badges */}
+                  <div className="flex items-start justify-between gap-2 mb-2">
+                    <h3 className="text-base font-semibold text-[var(--color-primary)] group-hover:underline">
+                      h/{hub.name}
+                    </h3>
+                    <div className="flex gap-1 flex-shrink-0">
+                      {hub.nsfw && (
+                        <span className="px-2 py-0.5 bg-red-100 text-red-800 text-xs font-semibold rounded">
+                          NSFW
+                        </span>
+                      )}
+                      {hub.type === 'private' && (
+                        <span className="px-2 py-0.5 bg-gray-100 text-gray-700 text-xs font-semibold rounded flex items-center gap-1">
+                          🔒 Private
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Description */}
+                  {(hub.description || hub.title) && (
+                    <p className="text-sm text-[var(--color-text-secondary)] line-clamp-2 mb-3">
+                      {hub.description || hub.title}
+                    </p>
+                  )}
+
+                  {/* Stats */}
+                  <div className="flex items-center gap-4 text-xs text-[var(--color-text-muted)]">
+                    <span className="flex items-center gap-1">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                      </svg>
+                      {hub.subscriber_count?.toLocaleString() || 0} members
+                    </span>
+                  </div>
                 </Link>
               ))}
             </div>

@@ -15,7 +15,8 @@ import HiddenItemsView from '../components/saved/HiddenItemsView';
 import SubscribedView from '../components/subscriptions/SubscribedView';
 import { getPostUrl } from '../utils/postUrl';
 import { Panel } from '../components/common/Panel';
-import { ErrorMessage, LoadingMessage } from '../components/common/StatusMessage';
+import { ErrorMessage } from '../components/common/StatusMessage';
+import { Skeleton } from '../components/common/LoadingStates';
 
 const BASE_TABS = [
   { key: 'overview', label: 'Overview' },
@@ -33,6 +34,10 @@ type TabKey = (typeof BASE_TABS)[number]['key'] | (typeof PRIVATE_TABS)[number][
 
 interface PostNavigationState {
   originPath: string;
+}
+
+function formatPoints(count: number): string {
+  return `${count.toLocaleString()} ${count === 1 ? 'point' : 'points'}`;
 }
 
 function PostsSection({
@@ -56,15 +61,16 @@ function PostsSection({
           className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)]"
         >
           <div className="flex gap-3 p-4">
+            {/* REDDIT-2: Show thumbnails consistently with standard size */}
             {post.thumbnail_url && (
               <img
                 src={resolveMediaUrl(post.thumbnail_url)}
-                alt=""
-                className="h-16 w-16 flex-shrink-0 rounded object-cover"
+                alt={`Preview image for ${post.title}`}
+                className="h-24 w-24 flex-shrink-0 rounded-lg object-cover"
               />
             )}
             <div className="flex-1">
-              <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--color-text-secondary)]">
+              <div className="text-xs text-[var(--color-text-secondary)]">
                 <Link
                   to={`/h/${post.hub_name}`}
                   state={linkState}
@@ -72,9 +78,9 @@ function PostsSection({
                 >
                   h/{post.hub_name}
                 </Link>
-                <span>•</span>
-                <span>{post.score.toLocaleString()} points</span>
-                <span>•</span>
+                <span> · </span>
+                <span>{formatPoints(post.score)}</span>
+                <span> · </span>
                 <span>posted {formatTimestamp(post.created_at, useRelativeTime)}</span>
               </div>
               <Link to={getPostUrl(post)} state={linkState}>
@@ -118,7 +124,7 @@ function CommentsSection({
         >
           <div className="p-4">
             <div className="mb-2 text-xs text-[var(--color-text-secondary)]">
-              Commented {formatTimestamp(comment.created_at, useRelativeTime)} on{' '}
+              <span>On </span>
               <Link
                 to={`/posts/${comment.post_id}`}
                 state={linkState}
@@ -126,10 +132,25 @@ function CommentsSection({
               >
                 post #{comment.post_id}
               </Link>
+              <span> · </span>
+              <span>{formatPoints(comment.score)}</span>
+              <span> · </span>
+              <span>{formatTimestamp(comment.created_at, useRelativeTime)}</span>
             </div>
             <MarkdownRenderer content={comment.content} className="text-[var(--color-text-primary)]" />
-            <div className="mt-2 text-xs font-medium text-[var(--color-text-secondary)]">
-              {comment.score.toLocaleString()} points
+
+            {/* Prominent "View thread" link */}
+            <div className="mt-3 pt-3 border-t border-[var(--color-border)]">
+              <Link
+                to={`/posts/${comment.post_id}`}
+                state={linkState}
+                className="inline-flex items-center gap-1.5 text-sm font-medium text-[var(--color-primary)] hover:text-[var(--color-primary-dark)] hover:underline transition"
+              >
+                View thread
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                </svg>
+              </Link>
             </div>
           </div>
         </article>
@@ -264,9 +285,12 @@ export default function UserProfilePage() {
               <button
                 type="button"
                 onClick={() => setActiveTab('posts')}
-                className="text-xs font-medium text-[var(--color-primary)] hover:underline"
+                className="flex items-center gap-1 text-sm font-medium text-[var(--color-primary)] hover:underline transition"
               >
                 View all
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
               </button>
             )}
           </div>
@@ -285,9 +309,12 @@ export default function UserProfilePage() {
               <button
                 type="button"
                 onClick={() => setActiveTab('comments')}
-                className="text-xs font-medium text-[var(--color-primary)] hover:underline"
+                className="flex items-center gap-1 text-sm font-medium text-[var(--color-primary)] hover:underline transition"
               >
                 View all
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
               </button>
             )}
           </div>
@@ -304,7 +331,31 @@ export default function UserProfilePage() {
   if (profileQuery.isLoading) {
     return (
       <div className="mx-auto w-full max-w-5xl px-4 py-8">
-        <LoadingMessage>Loading profile...</LoadingMessage>
+        <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-6">
+          <div className="flex items-start gap-6">
+            {/* Avatar skeleton */}
+            <Skeleton variant="circular" width="80px" height="80px" />
+
+            {/* Profile info skeleton */}
+            <div className="flex-1 space-y-3">
+              <Skeleton variant="text" width="200px" height="28px" />
+              <Skeleton variant="text" width="150px" height="16px" />
+              <div className="flex gap-4 mt-4">
+                <Skeleton variant="text" width="100px" height="14px" />
+                <Skeleton variant="text" width="100px" height="14px" />
+              </div>
+            </div>
+          </div>
+
+          {/* Tabs skeleton */}
+          <div className="mt-6 border-t border-[var(--color-border)] pt-4">
+            <div className="flex gap-4 mb-4">
+              <Skeleton variant="text" width="80px" height="20px" />
+              <Skeleton variant="text" width="80px" height="20px" />
+              <Skeleton variant="text" width="80px" height="20px" />
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
@@ -377,13 +428,16 @@ export default function UserProfilePage() {
               <Link
                 key={hub.id}
                 to={`/h/${hub.name}`}
-                className="inline-flex items-center gap-2 rounded-full border border-[var(--color-border)] px-3 py-1 text-sm font-medium text-[var(--color-text-primary)] hover:border-[var(--color-primary)] hover:text-[var(--color-primary)]"
+                className="inline-flex items-center gap-1.5 rounded-full border border-[var(--color-border)] px-4 py-1.5 text-sm font-medium text-[var(--color-text-primary)] hover:border-[var(--color-primary)] hover:text-[var(--color-primary)] transition"
               >
-                h/{hub.name}
+                <span className="font-semibold">h/{hub.name}</span>
                 {hub.title && (
-                  <span className="text-xs font-normal text-[var(--color-text-secondary)]">
-                    {hub.title}
-                  </span>
+                  <>
+                    <span className="text-[var(--color-text-muted)]">·</span>
+                    <span className="max-w-[200px] truncate text-xs font-normal text-[var(--color-text-secondary)]">
+                      {hub.title}
+                    </span>
+                  </>
                 )}
               </Link>
             ))}

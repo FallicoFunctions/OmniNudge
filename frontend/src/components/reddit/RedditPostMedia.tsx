@@ -108,7 +108,7 @@ export function RedditPostMedia({
                 loading="lazy"
                 decoding="async"
                 className={`w-full object-contain transition-transform duration-200 ${
-                  imageExpanded ? 'max-h-[80vh]' : 'max-h-[320px] hover:scale-[1.03]'
+                  imageExpanded ? 'max-h-[500px]' : 'max-h-[320px] hover:scale-[1.03]'
                 }`}
               />
             </div>
@@ -169,10 +169,11 @@ export function RedditPostMedia({
             WebkitPerspective: 1000,
           } as React.CSSProperties}
         >
+          {/* REDDIT-4: Limit video height to prevent page domination */}
           <video
             ref={videoRef}
             controls
-            className="w-full max-h-[600px] rounded border border-[var(--color-border)]"
+            className="w-full max-h-[500px] rounded border border-[var(--color-border)]"
             preload="metadata"
             poster={posterUrl ?? undefined}
             style={{

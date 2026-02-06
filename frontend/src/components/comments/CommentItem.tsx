@@ -224,7 +224,7 @@ export function CommentItem<T extends LocalCommentBase>({
             <span className="rounded bg-blue-500 px-1.5 py-0.5 text-[10px] font-bold text-white">
               Omni
             </span>
-            <span>•</span>
+            <span>·</span>
             <span
               className={`font-semibold ${
                 comment.user_vote === 1
@@ -234,9 +234,9 @@ export function CommentItem<T extends LocalCommentBase>({
                   : 'text-[var(--color-text-primary)]'
               }`}
             >
-              {comment.score} {comment.score === 1 ? 'point' : 'points'}
+              {comment.score.toLocaleString()} {comment.score === 1 ? 'point' : 'points'}
             </span>
-            <span>•</span>
+            <span>·</span>
             <span>{formattedTimestamp}</span>
             {isCollapsed && replies.length > 0 && (
               <span className="ml-2 text-[var(--color-text-muted)]">
@@ -283,60 +283,81 @@ export function CommentItem<T extends LocalCommentBase>({
             </div>
           )}
 
-          {!isCollapsed && <div className="mt-2 flex flex-wrap items-center gap-3 text-left text-xs text-[var(--color-text-secondary)]">
-            <button onClick={() => handlers.permalink(comment)} className="hover:text-[var(--color-primary)]">
-              permalink
+          {!isCollapsed && <div className="mt-2 flex flex-wrap items-center gap-2 text-left text-xs">
+            {/* Primary action: Reply */}
+            <button
+              onClick={() => onReplySelect(comment.id)}
+              className="font-semibold text-[var(--color-primary)] hover:text-[var(--color-primary-dark)] transition"
+            >
+              Reply
             </button>
-            {handlers.embed && (
-              <button onClick={() => handlers.embed?.(comment)} className="hover:text-[var(--color-primary)]">
-                embed
-              </button>
-            )}
+
+            {/* Secondary actions: Save, Edit, Inbox toggle */}
             <button
               onClick={handleToggleSave}
               disabled={savePending}
-              className="hover:text-[var(--color-primary)] disabled:opacity-50"
+              className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] disabled:opacity-50"
             >
-              {isSaved ? 'unsave' : 'save'}
+              {isSaved ? 'Unsave' : 'Save'}
             </button>
             {isOwner && (
               <>
-                <button onClick={() => setIsEditing(true)} className="hover:text-[var(--color-primary)]">
-                  edit
+                <button onClick={() => setIsEditing(true)} className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]">
+                  Edit
                 </button>
                 <button
                   onClick={handleInboxToggle}
                   disabled={inboxPending}
-                  className="hover:text-[var(--color-primary)] disabled:opacity-50"
+                  className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] disabled:opacity-50"
                 >
-                  {inboxDisabled ? 'enable inbox replies' : 'disable inbox replies'}
+                  {inboxDisabled ? 'Enable inbox' : 'Disable inbox'}
                 </button>
               </>
             )}
+
+            {/* Divider before tertiary actions */}
+            <span className="text-[var(--color-border)] select-none">·</span>
+
+            {/* Tertiary actions: Permalink, Embed */}
+            <button
+              onClick={() => handlers.permalink(comment)}
+              className="text-[11px] text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]"
+              title="Get permanent link to this comment"
+            >
+              Permalink
+            </button>
+            {handlers.embed && (
+              <button
+                onClick={() => handlers.embed?.(comment)}
+                className="text-[11px] text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]"
+                title="Get embed code for this comment"
+              >
+                Embed
+              </button>
+            )}
+
+            {/* Divider before destructive actions */}
+            {(canModerate || !isOwner) && <span className="text-[var(--color-border)] select-none">·</span>}
+
+            {/* Destructive actions: Delete, Report */}
             {canModerate && (
               <button
                 onClick={handleDelete}
                 disabled={deletePending}
-                className="text-red-500 hover:text-red-600 disabled:opacity-50"
+                className="text-[11px] text-red-600 hover:text-red-700 disabled:opacity-50"
               >
-                delete
+                Delete
               </button>
             )}
             {!isOwner && (
               <button
                 onClick={handleReport}
                 disabled={reportPending}
-                className="text-red-500 hover:text-red-600 disabled:opacity-50"
+                className="text-[11px] text-red-600 hover:text-red-700 disabled:opacity-50"
               >
-                report
+                Report
               </button>
             )}
-            <button
-              onClick={() => onReplySelect(comment.id)}
-              className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
-            >
-              Reply
-            </button>
           </div>}
 
           {!isCollapsed && isReplying && (
@@ -370,7 +391,7 @@ export function CommentItem<T extends LocalCommentBase>({
       </div>
 
       {!isCollapsed && replies.length > 0 && (
-        <div className="ml-6 mt-3 space-y-3 border-l-2 border-[var(--color-border)] pl-4">
+        <div className="ml-6 mt-3 space-y-3 border-l-[3px] border-[var(--color-border)] pl-5">
           {replies.map((reply) => (
             <CommentItem
               key={reply.id}

@@ -17,6 +17,10 @@ import { getRedditDashAudioUrl } from '../../utils/redditVideoAudio';
 import { useSettings } from '../../contexts/SettingsContext';
 import { PostBodyMarkdown } from '../posts/PostBodyMarkdown';
 
+function formatPoints(count: number): string {
+  return `${count.toLocaleString()} ${count === 1 ? 'point' : 'points'}`;
+}
+
 interface RedditPostCardProps {
   post: RedditCrosspostSource & {
     id: string;
@@ -829,7 +833,7 @@ export function RedditPostCard({
           <div className="relative h-14 w-14 flex-shrink-0">
             <img
               src={thumbnail}
-              alt=""
+              alt={`Preview image for ${post.title}`}
               loading="lazy"
               decoding="async"
               className={`h-full w-full rounded object-cover ${shouldBlurThumbnail ? 'blur-sm' : ''}`}
@@ -869,6 +873,10 @@ export function RedditPostCard({
                 {decodeHtmlEntities(post.title)}
               </Link>
             )}
+            {/* FEED-7: Reddit source badge for visual distinction */}
+            <span className="inline-flex items-center rounded bg-orange-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-orange-800 dark:bg-orange-900/30 dark:text-orange-400">
+              Reddit
+            </span>
             {post.over18 && (
               <FlairBadge text="NSFW" backgroundColor="#dc2626" textColor="#fff" className="uppercase" />
             )}
@@ -945,24 +953,24 @@ export function RedditPostCard({
               </button>
             )}
             <div className="flex-1">
-              <div className="flex flex-wrap items-center gap-2">
+              <div className="text-xs text-[var(--color-text-secondary)]">
                 <Link
                   to={`/r/${post.subreddit}`}
-                  className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+                  className="hover:text-[var(--color-primary)]"
                 >
                   r/{post.subreddit}
                 </Link>
-                <span>•</span>
+                <span> · </span>
                 <Link
                   to={`/user/${post.author}`}
-                  className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+                  className="hover:text-[var(--color-primary)]"
                 >
                   u/{post.author}
                 </Link>
-                <span>•</span>
-                <span>{post.score.toLocaleString()} points</span>
-                <span>•</span>
-                <span>submitted {formatTimestamp(post.created_utc, useRelativeTime)}</span>
+                <span> · </span>
+                <span>{formatPoints(post.score)}</span>
+                <span> · </span>
+                <span>posted {formatTimestamp(post.created_utc, useRelativeTime)}</span>
               </div>
               {expandedImageMap[post.id] && (
                 <div className="mt-3 overflow-hidden rounded border border-[var(--color-border)] bg-[var(--color-surface-elevated)]">

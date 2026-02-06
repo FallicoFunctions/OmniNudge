@@ -19,6 +19,7 @@ import {
 } from '../utils/encryption';
 import { getOwnKeys, getUserPublicKey } from '../services/keyManagementService';
 import { encryptionService } from '../services/encryptionService';
+import { formatRelativeTime } from '../utils/timeFormat';
 import { EmptyMessage, LoadingMessage } from '../components/common/StatusMessage';
 import { MediaSlideshow } from '../components/slideshow/MediaSlideshow';
 import { MediaUploadZone } from '../components/slideshow/MediaUploadZone';
@@ -1401,15 +1402,25 @@ export default function MessagesPage() {
                 }}
                 className="w-full p-4 text-left"
               >
-                <div className="flex items-center justify-between">
-                  <span className="font-medium text-[var(--color-text-primary)] flex-1 pr-2">
-                    {conversation.conversation_type === 'mod_mail'
-                      ? `${getHubDisplayTitle(conversation.hub_name)} - Mod Mail - ${conversation.subject || 'Untitled'}`
-                      : conversation.other_user?.username || 'Unknown'}
-                  </span>
-                  <div className="flex items-center gap-2">
+                {/* MSG-2: Enhanced conversation preview with timestamp and better spacing */}
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className={`font-medium text-[var(--color-text-primary)] ${conversation.unread_count > 0 ? 'font-semibold' : ''}`}>
+                        {conversation.conversation_type === 'mod_mail'
+                          ? `${getHubDisplayTitle(conversation.hub_name)} - Mod Mail - ${conversation.subject || 'Untitled'}`
+                          : conversation.other_user?.username || 'Unknown'}
+                      </span>
+                      {conversation.latest_message?.sent_at && (
+                        <span className="text-xs text-[var(--color-text-muted)] flex-shrink-0">
+                          {formatRelativeTime(conversation.latest_message.sent_at)}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 flex-shrink-0">
                     {conversation.unread_count > 0 && conversation.id !== selectedConversationId && (
-                      <span className="rounded-full bg-[var(--color-primary)] px-2 py-0.5 text-xs text-white">
+                      <span className="rounded-full bg-[var(--color-primary)] px-2.5 py-1 text-xs font-semibold text-white">
                         {conversation.unread_count}
                       </span>
                     )}
@@ -1434,7 +1445,7 @@ export default function MessagesPage() {
                       message={conversation.latest_message}
                       isOwnMessage={conversation.latest_message.sender_id === user?.id}
                       currentUserId={user?.id}
-                      className="mt-1 truncate text-sm text-[var(--color-text-secondary)]"
+                      className="mt-1 text-sm text-[var(--color-text-secondary)] line-clamp-2"
                     />
                   )}
               </button>
@@ -1547,6 +1558,7 @@ export default function MessagesPage() {
                     <button
                       onClick={() => setSlideshowOpen(true)}
                       className="px-3 py-1.5 bg-[var(--color-primary)] text-white rounded-md text-sm font-medium hover:bg-[var(--color-primary-dark)] transition-colors flex items-center gap-2"
+                      title="View all media from this conversation in a slideshow"
                     >
                       <svg
                         xmlns="http://www.w3.org/2000/svg"
@@ -1562,7 +1574,7 @@ export default function MessagesPage() {
                           d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
                         />
                       </svg>
-                      Scroll ({conversationMediaMessages.length})
+                      Media Gallery ({conversationMediaMessages.length})
                     </button>
                   )}
                 </div>
@@ -1611,8 +1623,9 @@ export default function MessagesPage() {
                         data-message-menu-container={message.id}
                       >
                         <div className={`flex items-start gap-2 ${isOwnMessage ? 'flex-row-reverse' : ''}`}>
+                          {/* MSG-1: Dynamic bubble width for natural message sizing */}
                           <div
-                            className={`max-w-md rounded-lg px-4 py-2 ${
+                            className={`min-w-[120px] max-w-[70%] rounded-lg px-4 py-2 ${
                               isOwnMessage
                                 ? 'bg-[var(--color-primary)] text-white'
                                 : 'bg-[var(--color-surface-elevated)] text-[var(--color-text-primary)]'

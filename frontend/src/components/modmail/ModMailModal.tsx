@@ -6,6 +6,7 @@ import { getOwnKeys, getUserPublicKey } from '../../services/keyManagementServic
 import { encryptForMultipleRecipients, type MultiRecipientEncryptionResult } from '../../utils/encryption';
 import { useAuth } from '../../contexts/AuthContext';
 import { Modal } from '../common/Modal';
+import { ModalCloseButton } from '../ui/ModalCloseButton';
 
 interface ModMailModalProps {
   hubName: string;
@@ -157,27 +158,21 @@ export function ModMailModal({ hubName, onClose }: ModMailModalProps) {
       isOpen
       onClose={onClose}
       overlayClassName="bg-black/40"
-      className="bg-[var(--color-surface-elevated)] rounded-lg shadow-xl max-w-2xl w-full p-6"
+      className="relative bg-[var(--color-surface-elevated)] rounded-lg shadow-xl max-w-2xl w-full p-6"
     >
-        <div className="flex justify-between items-start mb-4">
-          <div>
-            <h3 className="text-xl font-semibold">Message the Moderators</h3>
-            <p className="text-[var(--color-text-secondary)] text-sm mt-1">
-              Send a message to the moderators of h/{hubName}
-            </p>
-          </div>
-          <button
-            onClick={onClose}
-            className="text-[var(--color-text-secondary)] hover:text-[var(--color-text)]"
-            aria-label="Close"
-          >
-            ✕
-          </button>
+        {/* MODAL-3: Standard close button */}
+        <ModalCloseButton onClose={onClose} />
+
+        <div className="mb-4 pr-12">
+          <h3 className="text-xl font-semibold">Message the Moderators</h3>
+          <p className="text-[var(--color-text-secondary)] text-sm mt-1">
+            Send a message to the moderators of h/{hubName}
+          </p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label htmlFor="subject" className="block text-sm font-medium mb-2">
+            <label htmlFor="subject" className="block text-sm font-semibold mb-2">
               Subject
             </label>
             <input
@@ -192,7 +187,7 @@ export function ModMailModal({ hubName, onClose }: ModMailModalProps) {
           </div>
 
           <div>
-            <label htmlFor="message" className="block text-sm font-medium mb-2">
+            <label htmlFor="message" className="block text-sm font-semibold mb-2">
               Message
             </label>
             <textarea

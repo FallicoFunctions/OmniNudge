@@ -167,8 +167,19 @@ function BansTab({ hubName }: { hubName: string }) {
       )}
 
       {bans && bans.length === 0 && (
-        <div className="text-center py-12">
-          <EmptyMessage>No banned users.</EmptyMessage>
+        <div className="text-center py-12 px-4">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-[var(--color-surface-elevated)] mb-4">
+            <svg className="w-8 h-8 text-[var(--color-text-secondary)]" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+            </svg>
+          </div>
+          <h3 className="text-lg font-semibold text-[var(--color-text-primary)] mb-2">No banned users</h3>
+          <p className="text-sm text-[var(--color-text-secondary)] max-w-md mx-auto mb-4">
+            Users you ban from this hub will appear here. Banned users cannot view or participate in your hub.
+          </p>
+          <p className="text-xs text-[var(--color-text-muted)]">
+            Use the "Ban User" button above to ban a user by username.
+          </p>
         </div>
       )}
 
@@ -562,8 +573,17 @@ function ModLogTab({ hubName }: { hubName: string }) {
       <h2 className="text-xl font-semibold mb-4">Moderation Log</h2>
 
       {logs.length === 0 && (
-        <div className="text-center py-12">
-          <EmptyMessage>No moderation actions yet.</EmptyMessage>
+        <div className="text-center py-12 px-4">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-[var(--color-surface-elevated)] mb-4">
+            <svg className="w-8 h-8 text-[var(--color-text-secondary)]" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+          </div>
+          <h3 className="text-lg font-semibold text-[var(--color-text-primary)] mb-2">No moderation actions yet</h3>
+          <p className="text-sm text-[var(--color-text-secondary)] max-w-md mx-auto">
+            Once you or your moderators take actions (removing posts, banning users, editing settings, etc.),
+            they'll appear here as an audit log for transparency and accountability.
+          </p>
         </div>
       )}
 

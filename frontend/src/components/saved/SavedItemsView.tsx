@@ -660,15 +660,15 @@ export function SavedItemsView({
   const contentTypeButtonClass = (type: ContentType) =>
     `flex-1 rounded-md px-4 py-2 text-sm font-semibold transition ${
       contentType === type
-        ? 'bg-[var(--color-primary)] text-white shadow'
-        : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
+        ? 'bg-[var(--color-primary)] text-white border-2 border-[var(--color-primary)] shadow'
+        : 'border-2 border-[var(--color-border)] text-[var(--color-text-secondary)] hover:border-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
     }`;
 
   const sourceFilterButtonClass = (filter: SourceFilter) =>
     `flex-1 rounded-md px-4 py-2 text-sm font-semibold transition ${
       sourceFilter === filter
-        ? 'bg-[var(--color-primary)] text-white shadow'
-        : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
+        ? 'bg-[var(--color-primary)] text-white border-2 border-[var(--color-primary)] shadow'
+        : 'border-2 border-[var(--color-border)] text-[var(--color-text-secondary)] hover:border-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
     }`;
 
   const wrapperClassName = withContainer
@@ -686,73 +686,83 @@ export function SavedItemsView({
         </div>
       )}
 
-      <div className="mb-6 flex flex-wrap gap-4">
+      <div className="mb-6 space-y-4">
         {/* Content Type Toggle */}
-        <div className="inline-flex rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-1">
-          <button
-            type="button"
-            className={contentTypeButtonClass('posts')}
-            onClick={() => {
-              setContentType('posts');
-              resetPage();
-            }}
-          >
-            Posts
-          </button>
-          <button
-            type="button"
-            className={contentTypeButtonClass('comments')}
-            onClick={() => {
-              setContentType('comments');
-              resetPage();
-            }}
-          >
-            Comments
-          </button>
-          <button
-            type="button"
-            className={contentTypeButtonClass('both')}
-            onClick={() => {
-              setContentType('both');
-              resetPage();
-            }}
-          >
-            Both
-          </button>
+        <div>
+          <label className="mb-2 block text-sm font-medium text-[var(--color-text-secondary)]">
+            Show:
+          </label>
+          <div className="inline-flex gap-2 rounded-lg bg-[var(--color-surface-elevated)] p-1">
+            <button
+              type="button"
+              className={contentTypeButtonClass('posts')}
+              onClick={() => {
+                setContentType('posts');
+                resetPage();
+              }}
+            >
+              Posts
+            </button>
+            <button
+              type="button"
+              className={contentTypeButtonClass('comments')}
+              onClick={() => {
+                setContentType('comments');
+                resetPage();
+              }}
+            >
+              Comments
+            </button>
+            <button
+              type="button"
+              className={contentTypeButtonClass('both')}
+              onClick={() => {
+                setContentType('both');
+                resetPage();
+              }}
+            >
+              Both
+            </button>
+          </div>
         </div>
 
         {/* Source Filter */}
-        <div className="inline-flex rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-1">
-          <button
-            type="button"
-            className={sourceFilterButtonClass('omni')}
-            onClick={() => {
-              setSourceFilter('omni');
-              resetPage();
-            }}
-          >
-            Omni
-          </button>
-          <button
-            type="button"
-            className={sourceFilterButtonClass('reddit')}
-            onClick={() => {
-              setSourceFilter('reddit');
-              resetPage();
-            }}
-          >
-            Reddit
-          </button>
-          <button
-            type="button"
-            className={sourceFilterButtonClass('both')}
-            onClick={() => {
-              setSourceFilter('both');
-              resetPage();
-            }}
-          >
-            Both
-          </button>
+        <div>
+          <label className="mb-2 block text-sm font-medium text-[var(--color-text-secondary)]">
+            Source:
+          </label>
+          <div className="inline-flex gap-2 rounded-lg bg-[var(--color-surface-elevated)] p-1">
+            <button
+              type="button"
+              className={sourceFilterButtonClass('omni')}
+              onClick={() => {
+                setSourceFilter('omni');
+                resetPage();
+              }}
+            >
+              Omni
+            </button>
+            <button
+              type="button"
+              className={sourceFilterButtonClass('reddit')}
+              onClick={() => {
+                setSourceFilter('reddit');
+                resetPage();
+              }}
+            >
+              Reddit
+            </button>
+            <button
+              type="button"
+              className={sourceFilterButtonClass('both')}
+              onClick={() => {
+                setSourceFilter('both');
+                resetPage();
+              }}
+            >
+              Both
+            </button>
+          </div>
         </div>
       </div>
 

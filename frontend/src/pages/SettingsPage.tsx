@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import ThemeSelector from '../components/themes/ThemeSelector';
+import ThemeEditor from '../components/themes/ThemeEditor';
 import { Panel } from '../components/common/Panel';
 import { useSettings } from '../contexts/SettingsContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -45,6 +46,7 @@ export default function SettingsPage() {
   const [emailError, setEmailError] = useState<string | null>(null);
   const [emailSuccess, setEmailSuccess] = useState(false);
   const [isUpdatingEmail, setIsUpdatingEmail] = useState(false);
+  const [isThemeEditorOpen, setIsThemeEditorOpen] = useState(false);
 
   useEffect(() => {
     setPublicKey(getOwnPublicKeyBase64());
@@ -59,21 +61,31 @@ export default function SettingsPage() {
         </p>
       </div>
 
-      <div className="space-y-6">
+      <div className="space-y-8">
+        {/* SETTINGS-5: Category header for Appearance */}
+        <div className="border-b border-[var(--color-border)] pb-2">
+          <h2 className="text-2xl font-bold text-[var(--color-text-primary)]">Appearance</h2>
+        </div>
+
         {/* Theme Selection */}
         <Panel as="section">
-          <h2 className="mb-4 text-xl font-semibold text-[var(--color-text-primary)]">Theme</h2>
+          <h3 className="mb-4 text-xl font-semibold text-[var(--color-text-primary)]">Theme</h3>
           <p className="mb-4 text-sm text-[var(--color-text-secondary)]">
             Choose an active theme or create your own.
           </p>
-          <ThemeSelector />
+          <ThemeSelector onCreateNewTheme={() => setIsThemeEditorOpen(true)} />
         </Panel>
+
+        {/* SETTINGS-5: Category header for Notifications */}
+        <div className="border-b border-[var(--color-border)] pb-2 pt-4">
+          <h2 className="text-2xl font-bold text-[var(--color-text-primary)]">Notifications</h2>
+        </div>
 
         {/* Messaging Notifications */}
         <Panel as="section">
-          <h2 className="mb-4 text-xl font-semibold text-[var(--color-text-primary)]">
+          <h3 className="mb-4 text-xl font-semibold text-[var(--color-text-primary)]">
             Archived Chat Notifications
-          </h2>
+          </h3>
           <p className="text-sm text-[var(--color-text-secondary)]">
             Control whether you get notifications when new messages arrive in conversations you’ve archived.
           </p>
@@ -107,18 +119,23 @@ export default function SettingsPage() {
           </div>
         </Panel>
 
+        {/* SETTINGS-5: Category header for Preferences */}
+        <div className="border-b border-[var(--color-border)] pb-2 pt-4">
+          <h2 className="text-2xl font-bold text-[var(--color-text-primary)]">Preferences</h2>
+        </div>
+
         {/* Date & Time Settings */}
         <Panel as="section">
-          <h2 className="mb-4 text-xl font-semibold text-[var(--color-text-primary)]">
+          <h3 className="mb-4 text-xl font-semibold text-[var(--color-text-primary)]">
             Date & Time Display
-          </h2>
+          </h3>
 
           <div className="space-y-4">
             <div className="flex items-start justify-between">
               <div className="flex-1">
                 <label
                   htmlFor="relative-time-toggle"
-                  className="block text-sm font-medium text-[var(--color-text-primary)]"
+                  className="block text-sm font-semibold text-[var(--color-text-primary)]"
                 >
                   Use Relative Time
                 </label>
@@ -169,7 +186,7 @@ export default function SettingsPage() {
             <div className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4">
               <label
                 htmlFor="access-request-cooldown-display"
-                className="block text-sm font-medium text-[var(--color-text-primary)]"
+                className="block text-sm font-semibold text-[var(--color-text-primary)]"
               >
                 Access Request Cooldown Format
               </label>
@@ -383,7 +400,7 @@ export default function SettingsPage() {
               <div className="flex-1">
                 <label
                   htmlFor="infinite-scroll-home-toggle"
-                  className="block text-sm font-medium text-[var(--color-text-primary)]"
+                  className="block text-sm font-semibold text-[var(--color-text-primary)]"
                 >
                   Home Feed
                 </label>
@@ -423,7 +440,7 @@ export default function SettingsPage() {
               <div className="flex-1">
                 <label
                   htmlFor="infinite-scroll-hubs-toggle"
-                  className="block text-sm font-medium text-[var(--color-text-primary)]"
+                  className="block text-sm font-semibold text-[var(--color-text-primary)]"
                 >
                   Hub Pages
                 </label>
@@ -463,7 +480,7 @@ export default function SettingsPage() {
               <div className="flex-1">
                 <label
                   htmlFor="infinite-scroll-subs-toggle"
-                  className="block text-sm font-medium text-[var(--color-text-primary)]"
+                  className="block text-sm font-semibold text-[var(--color-text-primary)]"
                 >
                   Subreddit Pages
                 </label>
@@ -508,7 +525,7 @@ export default function SettingsPage() {
               <div className="flex-1">
                 <label
                   htmlFor="block-all-nsfw-toggle"
-                  className="block text-sm font-medium text-[var(--color-text-primary)]"
+                  className="block text-sm font-semibold text-[var(--color-text-primary)]"
                 >
                   Block All NSFW Content
                 </label>
@@ -542,7 +559,7 @@ export default function SettingsPage() {
               <div className="flex-1">
                 <label
                   htmlFor="search-include-nsfw-default-toggle"
-                  className="block text-sm font-medium text-[var(--color-text-primary)]"
+                  className="block text-sm font-semibold text-[var(--color-text-primary)]"
                 >
                   Default “Include NSFW” in Search
                 </label>
@@ -580,7 +597,7 @@ export default function SettingsPage() {
               <div className="flex-1">
                 <label
                   htmlFor="block-nsfw-thumbnails-toggle"
-                  className="block text-sm font-medium text-[var(--color-text-primary)]"
+                  className="block text-sm font-semibold text-[var(--color-text-primary)]"
                 >
                   Block NSFW post thumbnails
                 </label>
@@ -708,7 +725,7 @@ export default function SettingsPage() {
                 <div>
                   <label
                     htmlFor="email"
-                    className="block text-sm font-medium text-[var(--color-text-primary)]"
+                    className="block text-sm font-semibold text-[var(--color-text-primary)]"
                   >
                     New Email Address
                   </label>
@@ -726,7 +743,7 @@ export default function SettingsPage() {
                 <div>
                   <label
                     htmlFor="emailConfirm"
-                    className="block text-sm font-medium text-[var(--color-text-primary)]"
+                    className="block text-sm font-semibold text-[var(--color-text-primary)]"
                   >
                     Confirm New Email Address
                   </label>
@@ -779,7 +796,7 @@ export default function SettingsPage() {
               <div>
                 <div className="flex items-center justify-between rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4">
                   <div>
-                    <p className="text-sm font-medium text-[var(--color-text-primary)]">Current Email</p>
+                    <p className="text-sm font-semibold text-[var(--color-text-primary)]">Current Email</p>
                     <p className="mt-1 text-base text-[var(--color-text-secondary)]">
                       {user?.email || 'No email set'}
                     </p>
@@ -803,6 +820,12 @@ export default function SettingsPage() {
           </div>
         </Panel>
       </div>
+
+      {/* Theme Editor Modal */}
+      <ThemeEditor
+        isOpen={isThemeEditorOpen}
+        onClose={() => setIsThemeEditorOpen(false)}
+      />
     </div>
   );
 }

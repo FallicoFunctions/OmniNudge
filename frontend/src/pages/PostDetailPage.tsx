@@ -29,7 +29,7 @@ import SubredditAboutPanel from '../components/reddit/SubredditAboutPanel';
 import { useSubredditAbout } from '../hooks/useSubredditAbout';
 import { useSavedItems } from '../hooks/useSavedItems';
 import { getSavedCommentIdSet, getSavedPostIdSet } from '../utils/savedItems';
-import { LoadingMessage } from '../components/common/StatusMessage';
+import { PostCardSkeleton, CommentSkeleton } from '../components/common/LoadingStates';
 import { PostDetailMedia } from '../components/posts/PostDetailMedia';
 import { PostHeader } from '../components/posts/PostHeader';
 import { canModerateContent } from '../utils/permissions';
@@ -621,7 +621,7 @@ export default function PostDetailPage() {
   if (loadingPost) {
     return (
         <div className="mx-auto max-w-4xl px-4 py-8">
-        <LoadingMessage>Loading post...</LoadingMessage>
+        <PostCardSkeleton />
         </div>
     );
   }
@@ -1052,7 +1052,13 @@ export default function PostDetailPage() {
               </button>
             </form>
 
-            {loadingComments && <LoadingMessage>Loading comments...</LoadingMessage>}
+            {loadingComments && (
+              <div className="space-y-3">
+                <CommentSkeleton showReplies={true} />
+                <CommentSkeleton showReplies={true} />
+                <CommentSkeleton showReplies={false} />
+              </div>
+            )}
 
             {commentNotFound && (
               <div className="mb-4 rounded border border-yellow-200 bg-yellow-50 p-3 text-sm text-yellow-900">

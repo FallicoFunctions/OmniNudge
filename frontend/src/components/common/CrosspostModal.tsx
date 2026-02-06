@@ -1,4 +1,5 @@
 import { Modal } from './Modal';
+import { ModalCloseButton } from '../ui/ModalCloseButton';
 
 type CrosspostOption = {
   id: number;
@@ -46,17 +47,14 @@ export function CrosspostModal({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      className="w-full max-w-md rounded-lg bg-white p-4 shadow-lg"
+      className="relative w-full max-w-md rounded-lg bg-white p-6 shadow-lg"
       overlayClassName="bg-black/50"
     >
-      <div className="flex items-start justify-between">
-        <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">Submit a Crosspost</h3>
-        <button
-          onClick={onClose}
-          className="text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
-        >
-          ✕
-        </button>
+      {/* MODAL-3: Standard close button */}
+      <ModalCloseButton onClose={onClose} />
+
+      <div className="pr-12 mb-4">
+        <h3 className="text-xl font-semibold text-[var(--color-text-primary)]">Submit a Crosspost</h3>
       </div>
       <div className="mt-3 rounded border border-yellow-200 bg-yellow-50 p-3 text-sm text-yellow-800">
         <p>You can crosspost to an OmniHub, a subreddit, or both. At least one destination is required.</p>

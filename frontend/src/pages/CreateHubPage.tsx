@@ -3,6 +3,8 @@ import { useMutation } from '@tanstack/react-query';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { hubsService, type CreateHubRequest } from '../services/hubsService';
 import { MarkdownInput } from '../components/common/MarkdownInput';
+import { FieldError, FormError } from '../components/common/ErrorStates';
+import { FormField } from '../components/forms/FormField';
 
 export default function CreateHubPage() {
   const navigate = useNavigate();
@@ -86,58 +88,94 @@ export default function CreateHubPage() {
     <div className="max-w-2xl mx-auto p-6">
       <h1 className="text-3xl font-bold mb-6">Create a Hub</h1>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Name */}
-        <div>
-          <label className="block text-sm font-medium mb-2">
-            Name <span className="text-red-500">*</span>
-          </label>
-          <input
-            type="text"
-            value={name}
-            onChange={(e) => validateName(e.target.value)}
-            className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-            placeholder="e.g., books or bookclub"
-            required
-          />
-          {nameError && <p className="mt-1 text-sm text-red-600">{nameError}</p>}
-          <p className="mt-1 text-sm text-gray-500">
-            No spaces allowed. Use lowercase letters, numbers, and underscores. Once chosen, this cannot be changed.
+      <form onSubmit={handleSubmit} className="space-y-8">
+        {/* Section: Basic Information */}
+        <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-6">
+          <h2 className="text-xl font-semibold mb-2 text-[var(--color-text-primary)]">Basic Information</h2>
+          <p className="text-sm text-[var(--color-text-secondary)] mb-6">
+            Set up your hub's name and description. The name cannot be changed later.
           </p>
+
+          <div className="space-y-6">
+            {/* Name */}
+            <FormField
+              label="Name"
+              required={true}
+              error={nameError}
+              helperText="No spaces allowed. Use lowercase letters, numbers, and underscores. Once chosen, this cannot be changed."
+            >
+              <div className="relative">
+                <input
+                  id="hub-name"
+                  type="text"
+                  value={name}
+                  onChange={(e) => validateName(e.target.value)}
+                  className={`w-full px-3 py-2 border rounded-lg bg-[var(--color-surface-elevated)] text-[var(--color-text-primary)] focus:ring-2 focus:outline-none ${
+                    nameError
+                      ? 'border-red-300 focus:ring-red-500 focus:border-red-500'
+                      : name.length >= 3
+                      ? 'border-green-300 focus:ring-green-500 focus:border-green-500'
+                      : 'border-[var(--color-border)] focus:ring-[var(--color-primary)]'
+                  }`}
+                  placeholder="e.g., books or bookclub"
+                  required
+                  aria-invalid={nameError ? 'true' : 'false'}
+                  aria-describedby={nameError ? 'name-error' : undefined}
+                />
+                {/* Success indicator */}
+                {!nameError && name.length >= 3 && (
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                    <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                  </div>
+                )}
+              </div>
+            </FormField>
+
+            {/* Title */}
+            <FormField
+              label="Title"
+              required={false}
+              helperText="Display title for your hub"
+            >
+              <input
+                id="hub-title"
+                type="text"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                className="w-full px-3 py-2 border border-[var(--color-border)] rounded-lg bg-[var(--color-surface-elevated)] text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:ring-2 focus:ring-[var(--color-primary)] focus:border-[var(--color-primary)] focus:outline-none"
+                placeholder="e.g., Books: Made from trees or pixels"
+                maxLength={500}
+              />
+            </FormField>
+
+            {/* Description */}
+            <MarkdownInput
+              label="About (optional, Markdown supported)"
+              value={description}
+              onChange={setDescription}
+              rows={6}
+              maxLength={10000}
+              placeholder="Describe your hub..."
+              helperText={`${description.length}/10,000 characters. Appears in search results and social media links.`}
+            />
+          </div>
         </div>
 
-        {/* Title */}
-        <div>
-          <label className="block text-sm font-medium mb-2">Title (optional)</label>
-          <input
-            type="text"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-            placeholder="e.g., Books: Made from trees or pixels"
-            maxLength={500}
-          />
-          <p className="mt-1 text-sm text-gray-500">
-            Display title for your hub (optional)
+        {/* Section: Privacy & Visibility */}
+        <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-6">
+          <h2 className="text-xl font-semibold mb-2 text-[var(--color-text-primary)]">Privacy & Visibility</h2>
+          <p className="text-sm text-[var(--color-text-secondary)] mb-6">
+            Control who can access your hub and whether it contains adult content.
           </p>
-        </div>
 
-        {/* Description */}
-        <MarkdownInput
-          label="About (optional, Markdown supported)"
-          value={description}
-          onChange={setDescription}
-          rows={6}
-          maxLength={10000}
-          placeholder="Describe your hub..."
-          helperText={`${description.length}/10,000 characters. Appears in search results and social media links.`}
-        />
-
-        {/* Type */}
-        <div>
-          <label className="block text-sm font-medium mb-2">
-            Type <span className="text-red-500">*</span>
-          </label>
+          <div className="space-y-6">
+            {/* Type */}
+            <div>
+              <label className="block text-sm font-semibold text-[var(--color-text-primary)] mb-2">
+                Type <span className="text-red-500 ml-1">*</span>
+              </label>
           <div className="space-y-2">
             <label className="flex items-center">
               <input
@@ -165,14 +203,42 @@ export default function CreateHubPage() {
                 - Only approved members can view and submit
               </span>
             </label>
+              </div>
+            </div>
+
+            {/* NSFW */}
+            <div>
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={isNsfw}
+                  onChange={(e) => setIsNsfw(e.target.checked)}
+                  className="mt-1 h-4 w-4 rounded border-[var(--color-border)] text-[var(--color-primary)] focus:ring-[var(--color-primary)]"
+                />
+                <div>
+                  <span className="font-medium text-[var(--color-text-primary)]">Mark as NSFW (18+)</span>
+                  <p className="text-sm text-[var(--color-text-secondary)] mt-1">
+                    This hub contains adult content and should only be viewed by users 18 years or older.
+                    NSFW hubs are hidden from default feeds and search results unless users explicitly opt-in.
+                  </p>
+                </div>
+              </label>
+            </div>
           </div>
         </div>
 
-        {/* Content Options */}
-        <div>
-          <label className="block text-sm font-medium mb-2">
-            Content Options <span className="text-red-500">*</span>
-          </label>
+        {/* Section: Content Rules */}
+        <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-6">
+          <h2 className="text-xl font-semibold mb-2 text-[var(--color-text-primary)]">Content Rules</h2>
+          <p className="text-sm text-[var(--color-text-secondary)] mb-6">
+            Choose what types of posts are allowed in your hub.
+          </p>
+
+          {/* Content Options */}
+          <div>
+            <label className="block text-sm font-semibold text-[var(--color-text-primary)] mb-2">
+              Allowed Post Types <span className="text-red-500 ml-1">*</span>
+            </label>
           <div className="space-y-3">
             <label className="flex items-center">
               <input
@@ -269,27 +335,9 @@ export default function CreateHubPage() {
                 - Video posts allowed
               </span>
             </label>
-          </div>
-          {contentError && <p className="mt-2 text-sm text-red-600">{contentError}</p>}
-        </div>
-
-        {/* NSFW */}
-        <div>
-          <label className="flex items-start gap-3 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={isNsfw}
-              onChange={(e) => setIsNsfw(e.target.checked)}
-              className="mt-1 h-4 w-4 rounded border-[var(--color-border)] text-[var(--color-primary)] focus:ring-[var(--color-primary)]"
-            />
-            <div>
-              <span className="font-medium text-[var(--color-text-primary)]">Mark as NSFW (18+)</span>
-              <p className="text-sm text-[var(--color-text-secondary)] mt-1">
-                This hub contains adult content and should only be viewed by users 18 years or older.
-                NSFW hubs are hidden from default feeds and search results unless users explicitly opt-in.
-              </p>
             </div>
-          </label>
+            {contentError && <FieldError message={contentError} />}
+          </div>
         </div>
 
         {/* Submit */}
@@ -318,11 +366,10 @@ export default function CreateHubPage() {
         </div>
 
         {createHubMutation.isError && (
-          <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
-            <p className="text-red-600">
-              Error: {(createHubMutation.error as Error).message}
-            </p>
-          </div>
+          <FormError
+            title="Failed to create hub"
+            message={(createHubMutation.error as Error).message}
+          />
         )}
       </form>
     </div>

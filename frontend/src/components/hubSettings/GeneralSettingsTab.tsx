@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { HubSettings, UpdateHubSettingsRequest, PrivacyType } from '../../types/hubSettings';
 import { MarkdownInput } from '../common/MarkdownInput';
 import { hubSettingsService } from '../../services/hubSettingsService';
+import { FormField } from '../forms/FormField';
 
 interface Props {
   settings: HubSettings;
@@ -74,22 +75,20 @@ export default function GeneralSettingsTab({ settings, onSave, isHubOwnerOrAdmin
       </div>
 
       {/* Display Title */}
-      <div>
-        <label className="block text-sm font-medium text-[var(--color-text-primary)] mb-2">
-          Display Title
-        </label>
+      <FormField
+        label="Display Title"
+        required={false}
+        helperText="Custom title shown on the hub page"
+      >
         <input
           type="text"
           value={displayTitle}
           onChange={(e) => setDisplayTitle(e.target.value)}
           placeholder="Leave empty to use hub name"
-          className="w-full px-3 py-2 border border-[var(--color-border)] rounded bg-[var(--color-background)] text-[var(--color-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+          className="w-full px-3 py-2 border border-[var(--color-border)] rounded-lg bg-[var(--color-surface-elevated)] text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:border-[var(--color-primary)]"
           maxLength={300}
         />
-        <p className="text-xs text-[var(--color-text-secondary)] mt-1">
-          Custom title shown on the hub page (optional)
-        </p>
-      </div>
+      </FormField>
 
       {/* Sidebar Description */}
       <div>
@@ -105,10 +104,10 @@ export default function GeneralSettingsTab({ settings, onSave, isHubOwnerOrAdmin
 
       {/* Privacy Type */}
       <div>
-        <label className="block text-sm font-medium text-[var(--color-text-primary)] mb-2">
+        <label className="block text-sm font-semibold text-[var(--color-text-primary)] mb-2">
           Hub Privacy
           {!isHubOwnerOrAdmin && (
-            <span className="ml-2 text-xs text-[var(--color-text-secondary)]">(Owner only)</span>
+            <span className="ml-2 text-xs font-normal text-[var(--color-text-secondary)]">(Owner only)</span>
           )}
         </label>
         <select
@@ -132,10 +131,10 @@ export default function GeneralSettingsTab({ settings, onSave, isHubOwnerOrAdmin
       <div className="border-t border-[var(--color-border)] pt-6">
         <div className="flex items-start justify-between">
           <div className="flex-1 pr-4">
-            <label className="block text-sm font-medium text-[var(--color-text-primary)] mb-2">
+            <label className="block text-sm font-semibold text-[var(--color-text-primary)] mb-2">
               NSFW (18+)
               {!isHubOwnerOrAdmin && (
-                <span className="ml-2 text-xs text-[var(--color-text-secondary)]">(Owner only)</span>
+                <span className="ml-2 text-xs font-normal text-[var(--color-text-secondary)]">(Owner only)</span>
               )}
             </label>
             <p className="text-sm text-[var(--color-text-secondary)]">

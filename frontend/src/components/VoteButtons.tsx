@@ -19,6 +19,10 @@ export function VoteButtons({
 }: VoteButtonsProps) {
   const [score, setScore] = useState(initialScore);
   const [userVote, setUserVote] = useState<number | null>(initialUserVote ?? null);
+  const [floatingText, setFloatingText] = useState<{
+    value: string;
+    key: number;
+  } | null>(null);
   const queryClient = useQueryClient();
 
   const voteMutation = useMutation({
@@ -62,6 +66,9 @@ export function VoteButtons({
       voteMutation.mutate(0);
     } else {
       // Add upvote (or toggle from downvote)
+      // MISC-9: Show floating feedback animation
+      setFloatingText({ value: '+1', key: Date.now() });
+      setTimeout(() => setFloatingText(null), 1000);
       voteMutation.mutate(1);
     }
   };
@@ -74,41 +81,56 @@ export function VoteButtons({
       voteMutation.mutate(0);
     } else {
       // Add downvote (or toggle from upvote)
+      // MISC-9: Show floating feedback animation
+      setFloatingText({ value: '-1', key: Date.now() });
+      setTimeout(() => setFloatingText(null), 1000);
       voteMutation.mutate(-1);
     }
   };
 
   const sizeClasses = {
     small: 'text-sm gap-0.5',
-    medium: 'text-base gap-0',
+    medium: 'text-base gap-1',
     large: 'text-lg gap-1.5',
   };
 
   const buttonSizeClasses = {
-    small: 'p-0.5 text-base',
-    medium: 'p-0 text-base',
-    large: 'p-1.5 text-xl',
+    small: 'p-1 text-base min-w-[32px] min-h-[32px]',
+    medium: 'p-2 text-base min-w-[40px] min-h-[40px]',
+    large: 'p-2 text-xl min-w-[48px] min-h-[48px]',
   };
 
   const scoreSizeClasses = {
-    small: 'text-xs font-medium',
-    medium: 'text-xs font-semibold',
-    large: 'text-base font-bold',
+    small: 'text-sm font-semibold',
+    medium: 'text-base font-bold',
+    large: 'text-lg font-bold',
   };
 
   if (layout === 'horizontal') {
     return (
-      <div className={`flex items-center ${sizeClasses[size]}`}>
+      <div className={`relative flex items-center ${sizeClasses[size]}`}>
+        {/* MISC-9: Floating vote feedback */}
+        {floatingText && (
+          <div
+            key={floatingText.key}
+            className={`absolute -top-8 left-1/2 -translate-x-1/2 font-bold animate-float-up pointer-events-none ${
+              floatingText.value === '+1' ? 'text-orange-500' : 'text-blue-500'
+            }`}
+          >
+            {floatingText.value}
+          </div>
+        )}
         <button
           onClick={handleUpvote}
           disabled={voteMutation.isPending}
           className={`
-            rounded transition-colors ${buttonSizeClasses[size]}
+            rounded transition-all duration-150 ${buttonSizeClasses[size]}
             ${
               userVote === 1
-                ? 'text-orange-500 hover:text-orange-600'
-                : 'text-[var(--color-text-secondary)] hover:text-orange-500 hover:bg-[var(--color-surface-elevated)]'
+                ? 'text-orange-500 hover:text-orange-600 scale-110'
+                : 'text-[var(--color-text-secondary)] hover:text-orange-500 hover:bg-[var(--color-surface-elevated)] hover:scale-105'
             }
+            active:scale-95
             disabled:opacity-50 disabled:cursor-not-allowed
           `}
           aria-label="Upvote"
@@ -126,12 +148,13 @@ export function VoteButtons({
           onClick={handleDownvote}
           disabled={voteMutation.isPending}
           className={`
-            rounded transition-colors ${buttonSizeClasses[size]}
+            rounded transition-all duration-150 ${buttonSizeClasses[size]}
             ${
               userVote === -1
-                ? 'text-blue-500 hover:text-blue-600'
-                : 'text-[var(--color-text-secondary)] hover:text-blue-500 hover:bg-[var(--color-surface-elevated)]'
+                ? 'text-blue-500 hover:text-blue-600 scale-110'
+                : 'text-[var(--color-text-secondary)] hover:text-blue-500 hover:bg-[var(--color-surface-elevated)] hover:scale-105'
             }
+            active:scale-95
             disabled:opacity-50 disabled:cursor-not-allowed
           `}
           aria-label="Downvote"
@@ -144,17 +167,29 @@ export function VoteButtons({
 
   // Vertical layout (default)
   return (
-    <div className={`flex flex-col items-center ${sizeClasses[size]}`}>
+    <div className={`relative flex flex-col items-center ${sizeClasses[size]}`}>
+      {/* MISC-9: Floating vote feedback */}
+      {floatingText && (
+        <div
+          key={floatingText.key}
+          className={`absolute -top-6 left-1/2 -translate-x-1/2 font-bold animate-float-up pointer-events-none ${
+            floatingText.value === '+1' ? 'text-orange-500' : 'text-blue-500'
+          }`}
+        >
+          {floatingText.value}
+        </div>
+      )}
       <button
         onClick={handleUpvote}
         disabled={voteMutation.isPending}
         className={`
-          rounded transition-colors ${buttonSizeClasses[size]}
+          rounded transition-all duration-150 ${buttonSizeClasses[size]}
           ${
             userVote === 1
-              ? 'text-orange-500 hover:text-orange-600'
-              : 'text-[var(--color-text-secondary)] hover:text-orange-500 hover:bg-[var(--color-surface-elevated)]'
+              ? 'text-orange-500 hover:text-orange-600 scale-110'
+              : 'text-[var(--color-text-secondary)] hover:text-orange-500 hover:bg-[var(--color-surface-elevated)] hover:scale-105'
           }
+          active:scale-95
           disabled:opacity-50 disabled:cursor-not-allowed
         `}
         aria-label="Upvote"
@@ -172,12 +207,13 @@ export function VoteButtons({
         onClick={handleDownvote}
         disabled={voteMutation.isPending}
         className={`
-          rounded transition-colors ${buttonSizeClasses[size]}
+          rounded transition-all duration-150 ${buttonSizeClasses[size]}
           ${
             userVote === -1
-              ? 'text-blue-500 hover:text-blue-600'
-              : 'text-[var(--color-text-secondary)] hover:text-blue-500 hover:bg-[var(--color-surface-elevated)]'
+              ? 'text-blue-500 hover:text-blue-600 scale-110'
+              : 'text-[var(--color-text-secondary)] hover:text-blue-500 hover:bg-[var(--color-surface-elevated)] hover:scale-105'
           }
+          active:scale-95
           disabled:opacity-50 disabled:cursor-not-allowed
         `}
         aria-label="Downvote"

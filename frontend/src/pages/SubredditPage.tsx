@@ -39,6 +39,7 @@ import { useSubredditAutocomplete } from '../hooks/useSubredditAutocomplete';
 import { useSubredditActiveUsers } from '../hooks/useSubredditActiveUsers';
 import { getHiddenPostIdSet, getSavedPostIdSet, getSavedRedditPostIdSet } from '../utils/savedItems';
 import { EmptyMessage, LoadingMessage } from '../components/common/StatusMessage';
+import { PostCardSkeleton } from '../components/common/LoadingStates';
 import { FeedSearchBars } from '../components/common/FeedSearchBars';
 import { OffsetPaginationControls } from '../components/common/OffsetPaginationControls';
 import { RedditPostSlideshow } from '../components/slideshow/RedditPostSlideshow';
@@ -1261,8 +1262,12 @@ export default function RedditPage() {
 
       {/* Posts List */}
       {isLoading && (
-        <div className="text-center">
-          <LoadingMessage>Loading posts...</LoadingMessage>
+        <div className="space-y-4">
+          <PostCardSkeleton />
+          <PostCardSkeleton />
+          <PostCardSkeleton />
+          <PostCardSkeleton />
+          <PostCardSkeleton />
         </div>
       )}
 

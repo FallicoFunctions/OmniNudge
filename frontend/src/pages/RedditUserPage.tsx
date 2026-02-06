@@ -340,12 +340,17 @@ export default function RedditUserPage() {
     );
   };
 
+  // REDDIT-3: Add confirmation before blocking
   const handleBlockToggle = () => {
     if (!username) return;
     if (isProfileBlocked) {
-      unblockRedditUser(username);
+      if (window.confirm(`Unblock u/${username}?`)) {
+        unblockRedditUser(username);
+      }
     } else {
-      blockRedditUser(username);
+      if (window.confirm(`Block u/${username}? You will no longer see posts or comments from this user.`)) {
+        blockRedditUser(username);
+      }
     }
   };
 
@@ -373,13 +378,14 @@ export default function RedditUserPage() {
                   ))}
                 </div>
               </div>
+              {/* REDDIT-3: De-emphasized block button as text link */}
               <button
                 type="button"
                 onClick={handleBlockToggle}
-                className={`rounded border px-3 py-1 text-sm font-medium ${
+                className={`text-sm ${
                   isProfileBlocked
-                    ? 'border-red-400 text-red-500 hover:bg-red-50'
-                    : 'border-[var(--color-border)] text-[var(--color-text-secondary)] hover:border-[var(--color-primary)]'
+                    ? 'text-red-600 hover:text-red-700 hover:underline'
+                    : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)] hover:underline'
                 }`}
               >
                 {isProfileBlocked ? 'Unblock user' : 'Block user'}

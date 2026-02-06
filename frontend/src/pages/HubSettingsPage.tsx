@@ -95,12 +95,15 @@ export default function HubSettingsPage() {
     );
   }
 
-  const tabs: { id: TabType; label: string }[] = [
-    { id: 'general', label: 'General' },
-    { id: 'content', label: 'Content & Posts' },
-    { id: 'moderation', label: 'Moderation' },
-    { id: 'moderators', label: 'Moderators' },
-    { id: 'theme', label: 'Theme' },
+  // SETTINGS-1: Add counts and grouping to tabs
+  const moderatorCount = moderatorsData?.moderators?.length || 0;
+
+  const tabs: { id: TabType; label: string; group?: string }[] = [
+    { id: 'general', label: 'General', group: 'settings' },
+    { id: 'content', label: 'Content & Posts', group: 'settings' },
+    { id: 'moderation', label: 'Moderation', group: 'settings' },
+    { id: 'moderators', label: `Moderators (${moderatorCount})`, group: 'team' },
+    { id: 'theme', label: 'Theme', group: 'appearance' },
   ];
 
   return (
@@ -151,22 +154,31 @@ export default function HubSettingsPage() {
           </div>
         )}
 
-        {/* Tabs */}
+        {/* Tabs - SETTINGS-1: Grouped with visual separators */}
         <div className="border-b border-[var(--color-border)] mb-6">
-          <div className="flex space-x-8">
-            {tabs.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`pb-4 px-2 border-b-2 transition-colors ${
-                  activeTab === tab.id
-                    ? 'border-[var(--color-primary)] text-[var(--color-primary)] font-medium'
-                    : 'border-transparent text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:border-[var(--color-border)]'
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
+          <div className="flex flex-wrap items-center gap-x-8 gap-y-2">
+            {tabs.map((tab, index) => {
+              const prevGroup = index > 0 ? tabs[index - 1].group : null;
+              const showDivider = tab.group && prevGroup && tab.group !== prevGroup;
+
+              return (
+                <div key={tab.id} className="flex items-center gap-x-8">
+                  {showDivider && (
+                    <div className="h-6 w-px bg-[var(--color-border)]" />
+                  )}
+                  <button
+                    onClick={() => setActiveTab(tab.id)}
+                    className={`pb-4 px-2 border-b-2 transition-colors whitespace-nowrap ${
+                      activeTab === tab.id
+                        ? 'border-[var(--color-primary)] text-[var(--color-primary)] font-medium'
+                        : 'border-transparent text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:border-[var(--color-border)]'
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                </div>
+              );
+            })}
           </div>
         </div>
 

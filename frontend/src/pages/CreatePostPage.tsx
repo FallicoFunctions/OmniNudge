@@ -561,75 +561,80 @@ export default function CreatePostPage() {
             {(allowImagePosts || allowVideoPosts) && (
               <div className="mt-4">
                 <label className="block text-sm font-medium mb-2">{mediaLabel}</label>
+                {/* FORM-7: Improved upload dropzone - compact when empty, expands with content */}
                 <div
                   onDragOver={(event) => event.preventDefault()}
                   onDrop={handleMediaDrop}
-                  className="flex flex-col items-center justify-center gap-3 rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 px-4 py-6 text-center"
+                  className={`flex flex-col items-center justify-center gap-3 rounded-lg border-2 border-dashed border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-4 text-center transition-all ${
+                    mediaItems.length === 0 ? 'h-[100px]' : 'py-4'
+                  }`}
                 >
                   {mediaItems.length > 0 ? (
                     <>
-                      <div className="grid w-full grid-cols-1 gap-3 sm:grid-cols-2">
+                      <div className="grid w-full grid-cols-2 gap-3 sm:grid-cols-4">
                         {mediaItems.map((item, index) => {
                           const previewUrl = mediaPreviews[index] ?? item.url;
                           const isVideo = (item.media_type ?? '').startsWith('video');
                           return (
                             <div
                               key={`${item.url}-${index}`}
-                              className="flex flex-col items-center gap-2 rounded-md border border-gray-200 bg-white p-3"
+                              className="relative group"
                             >
                               {isVideo ? (
-                                <video src={previewUrl} controls className="max-h-36 w-full rounded" />
+                                <video src={previewUrl} className="w-full h-24 rounded object-cover" />
                               ) : (
                                 <img
                                   src={previewUrl}
                                   alt="Uploaded preview"
-                                  className="max-h-36 w-full rounded object-contain"
+                                  className="w-full h-24 rounded object-cover"
                                 />
                               )}
                               <button
                                 type="button"
                                 onClick={() => removeMediaItem(index)}
-                                className="text-xs text-blue-600 hover:text-blue-800"
+                                className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 text-xs leading-none hover:bg-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
                                 disabled={isUploadingMedia}
+                                title="Remove"
                               >
-                                Remove
+                                ✕
                               </button>
                             </div>
                           );
                         })}
                       </div>
-                      <div className="flex gap-2">
+                      <div className="flex gap-2 text-sm">
                         <button
                           type="button"
                           onClick={() => mediaInputRef.current?.click()}
-                          className="px-3 py-1.5 rounded-md border border-gray-300 text-sm text-gray-700 hover:bg-gray-100"
+                          className="text-[var(--color-primary)] hover:underline"
                           disabled={isUploadingMedia}
                         >
-                          Add more
+                          + Add More
                         </button>
+                        <span className="text-[var(--color-text-muted)]">|</span>
                         <button
                           type="button"
                           onClick={clearMediaSelection}
-                          className="px-3 py-1.5 rounded-md text-sm text-red-600 hover:text-red-700"
+                          className="text-red-600 hover:underline"
                           disabled={isUploadingMedia}
                         >
-                          Clear all
+                          Clear All
                         </button>
                       </div>
                     </>
                   ) : (
                     <>
-                      <div className="text-sm text-gray-500">
-                        Drag and drop a file here, or
+                      <div className="text-sm text-[var(--color-text-secondary)]">
+                        Drag and drop, or{' '}
+                        <button
+                          type="button"
+                          onClick={() => mediaInputRef.current?.click()}
+                          className="text-[var(--color-primary)] hover:underline font-medium"
+                          disabled={isUploadingMedia}
+                        >
+                          {isUploadingMedia ? 'Uploading...' : 'Choose File'}
+                        </button>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => mediaInputRef.current?.click()}
-                        className="px-4 py-2 rounded-md bg-blue-600 text-white hover:bg-blue-700"
-                        disabled={isUploadingMedia}
-                      >
-                        {isUploadingMedia ? 'Uploading...' : 'Choose File'}
-                      </button>
                     </>
                   )}
                   <input

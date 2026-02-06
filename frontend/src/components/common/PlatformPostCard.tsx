@@ -172,7 +172,6 @@ interface PlatformPostCardProps {
   showPinnedGrabber?: boolean;
   showOmniBadge?: boolean; // For local crossposts on subreddit pages
   voteButtonSize?: 'small' | 'medium';
-  thumbnailSize?: 'small' | 'medium';
   showTextPreview?: boolean;
   onShare?: () => void;
   onToggleSave?: (shouldSave: boolean) => void;
@@ -203,7 +202,6 @@ export function PlatformPostCard({
   showPinnedGrabber = false,
   showOmniBadge = false,
   voteButtonSize = 'medium',
-  thumbnailSize = 'medium',
   showTextPreview = true,
   onShare,
   onToggleSave,
@@ -251,9 +249,8 @@ export function PlatformPostCard({
     post.crossposted_at ?? post.created_at,
     useRelativeTime
   );
-  const commentsLabel = `${(post.comment_count ?? post.num_comments ?? 0).toLocaleString()} Comment${
-    (post.comment_count ?? post.num_comments ?? 0) === 1 ? '' : 's'
-  }`;
+  const commentCount = post.comment_count ?? post.num_comments ?? 0;
+  const commentsLabel = `${commentCount.toLocaleString()} comment${commentCount === 1 ? '' : 's'}`;
 
   const canEdit = currentUserId === post.author_id;
   const canDelete = canModerateContent(currentUserId, post.author_id, currentUserRole, isModerator);
@@ -294,10 +291,10 @@ export function PlatformPostCard({
     return { className: 'aspect-video w-full' };
   };
 
-  const thumbnailClass = thumbnailSize === 'small' ? 'h-16 w-16' : 'h-14 w-14';
+  // FEED-4: Fixed thumbnail size for consistency (96x96px)
+  const thumbnailClass = 'h-24 w-24'; // 96px x 96px fixed size
   const shouldBlurThumbnail = Boolean(post.nsfw && blockNsfwThumbnails);
-  const thumbnailOverlayClass =
-    thumbnailSize === 'small' ? 'text-[30px]' : 'text-[26px]';
+  const thumbnailOverlayClass = 'text-[32px]';
 
   return (
     <article className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)]">
@@ -314,10 +311,10 @@ export function PlatformPostCard({
           <div className={`relative ${thumbnailClass} flex-shrink-0`}>
             <img
               src={resolveMediaUrl(post.thumbnail_url)}
-              alt=""
+              alt={`Preview image for ${post.title}`}
               loading="lazy"
               decoding="async"
-              className={`h-full w-full rounded object-cover ${shouldBlurThumbnail ? 'blur-sm' : ''}`}
+              className={`h-full w-full rounded-lg object-cover ${shouldBlurThumbnail ? 'blur-sm' : ''}`}
             />
             {shouldBlurThumbnail && (
               <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
@@ -354,7 +351,7 @@ export function PlatformPostCard({
             {post.is_pinned && <PinnedBadge />}
           </div>
 
-          <div className="flex flex-wrap items-center gap-2 text-[11px] leading-tight text-[var(--color-text-secondary)]">
+          <div className="text-[11px] leading-tight text-[var(--color-text-secondary)]">
             {resolvedHubName ? (
               <Link
                 to={`/h/${resolvedHubName}`}
@@ -365,12 +362,12 @@ export function PlatformPostCard({
             ) : (
               <span className="font-semibold text-[var(--color-text-primary)]">h/unknown</span>
             )}
-            <span>•</span>
+            <span> · </span>
             <span>{displayAuthor}</span>
-            <span>•</span>
+            <span> · </span>
             <span>{pointsLabel}</span>
-            <span>•</span>
-            <span>submitted {submittedLabel}</span>
+            <span> · </span>
+            <span>posted {submittedLabel}</span>
           </div>
 
           <div className="mt-1 flex items-start gap-3 text-[11px] text-[var(--color-text-secondary)]">
@@ -412,20 +409,29 @@ export function PlatformPostCard({
               </button>
             )}
             <div className="flex-1">
-              <div className="flex flex-wrap items-center gap-3">
+              <div className="flex flex-wrap items-center gap-3 text-sm">
+                {/* Primary Action: Comments - Most prominent */}
                 <Link
                   to={postUrl}
                   state={originState}
-                  className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+                  className="flex items-center gap-1.5 font-medium text-[var(--color-text-primary)] hover:text-[var(--color-primary)]"
                 >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                  </svg>
                   {commentsLabel}
                 </Link>
+
+                {/* Secondary Actions: Share, Save */}
                 {onShare && (
                   <button
                     type="button"
                     onClick={onShare}
-                    className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+                    className="flex items-center gap-1 text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
                   >
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                    </svg>
                     Share
                   </button>
                 )}
@@ -434,17 +440,26 @@ export function PlatformPostCard({
                     type="button"
                     onClick={() => onToggleSave(!isSaved)}
                     disabled={isSavePending}
-                    className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] disabled:opacity-60"
+                    className="flex items-center gap-1 text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] disabled:opacity-60"
                   >
+                    <svg className="w-3.5 h-3.5" fill={isSaved ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+                    </svg>
                     {isSavePending ? 'Saving...' : isSaved ? 'Unsave' : 'Save'}
                   </button>
+                )}
+
+                {/* Tertiary Actions: Hide, Crosspost - Smaller, de-emphasized */}
+                {(onHide || onCrosspost || (onTogglePin && canPin)) && (
+                  <span className="text-[var(--color-border)]">|</span>
                 )}
                 {onHide && (
                   <button
                     type="button"
                     onClick={onHide}
                     disabled={isHiding}
-                    className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] disabled:opacity-60"
+                    title={hideLabel}
+                    className="text-xs text-[var(--color-text-muted)] hover:text-[var(--color-primary)] disabled:opacity-60"
                   >
                     {isHiding ? 'Hiding...' : hideLabel}
                   </button>
@@ -453,7 +468,8 @@ export function PlatformPostCard({
                   <button
                     type="button"
                     onClick={onCrosspost}
-                    className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+                    title="Crosspost to another hub"
+                    className="text-xs text-[var(--color-text-muted)] hover:text-[var(--color-primary)]"
                   >
                     Crosspost
                   </button>
@@ -463,16 +479,22 @@ export function PlatformPostCard({
                     type="button"
                     onClick={onTogglePin}
                     disabled={isPinning}
-                    className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] disabled:opacity-60"
+                    title={post.is_pinned ? "Unpin from top" : "Pin to top"}
+                    className="text-xs text-[var(--color-text-muted)] hover:text-[var(--color-primary)] disabled:opacity-60"
                   >
                     {isPinning ? 'Updating...' : post.is_pinned ? 'Unpin' : 'Pin'}
                   </button>
+                )}
+
+                {/* Mod/Owner Actions: Edit, Delete - Separated */}
+                {((canEdit && onEdit) || (canDelete && onDelete)) && (
+                  <span className="text-[var(--color-border)]">|</span>
                 )}
                 {canEdit && onEdit && (
                   <button
                     type="button"
                     onClick={onEdit}
-                    className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+                    className="text-xs text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
                   >
                     Edit
                   </button>
@@ -482,7 +504,7 @@ export function PlatformPostCard({
                     type="button"
                     onClick={onDelete}
                     disabled={isDeleting}
-                    className="text-red-600 hover:text-red-500 disabled:opacity-60"
+                    className="text-xs text-red-600 hover:text-red-500 font-medium disabled:opacity-60"
                   >
                     {isDeleting ? 'Deleting...' : 'Delete'}
                   </button>
