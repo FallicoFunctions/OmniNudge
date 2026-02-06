@@ -1,6 +1,8 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useMemo } from 'react';
 import { Turnstile, type TurnstileInstance } from '@marsidev/react-turnstile';
 import { useAuth } from '../contexts/AuthContext';
+import { ModalCloseButton } from '../components/ui/ModalCloseButton';
+import { calculatePasswordStrength } from '../utils/passwordStrength';
 
 interface AuthModalProps {
   mode: 'login' | 'signup';
@@ -17,6 +19,14 @@ export default function AuthModal({ mode, onClose, onSwitch, onSuccess }: AuthMo
   const [email, setEmail] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+
+  // FORM-5: Calculate password strength for signup mode
+  const passwordStrength = useMemo(() => {
+    if (!isLogin && password) {
+      return calculatePasswordStrength(password);
+    }
+    return null;
+  }, [isLogin, password]);
   const [keepLoggedIn, setKeepLoggedIn] = useState(false);
   const [turnstileToken, setTurnstileToken] = useState('');
   const turnstileRef = useRef<TurnstileInstance | null>(null);
@@ -65,18 +75,15 @@ export default function AuthModal({ mode, onClose, onSwitch, onSuccess }: AuthMo
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
-      <div className="w-full max-w-lg rounded-lg bg-[var(--color-surface)] p-4 shadow-xl">
-        <div className="flex items-center justify-between border-b border-[var(--color-border)] pb-2">
-          <h2 className="text-lg font-semibold text-[var(--color-text-primary)]">
+      {/* MODAL-1 & MODAL-3: Compact modal with standard close button */}
+      <div className="relative w-full max-w-md rounded-lg bg-[var(--color-surface)] p-6 shadow-xl">
+        {/* Standard close button */}
+        <ModalCloseButton onClose={onClose} />
+
+        <div className="border-b border-[var(--color-border)] pb-3 mb-4">
+          <h2 className="text-xl font-semibold text-[var(--color-text-primary)]">
             {isLogin ? 'Login' : 'Sign Up'}
           </h2>
-          <button
-            type="button"
-            onClick={onClose}
-            className="text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
-          >
-            Close
-          </button>
         </div>
         <div className="mt-4 max-h-[80vh] overflow-y-auto px-1 pb-2">
           <div className="text-center">
@@ -148,6 +155,39 @@ export default function AuthModal({ mode, onClose, onSwitch, onSuccess }: AuthMo
                 placeholder="Password"
                 autoComplete={isLogin ? 'current-password' : 'new-password'}
               />
+
+              {/* FORM-5: Password strength indicator for signup */}
+              {!isLogin && passwordStrength && password.length > 0 && (
+                <div className="mt-2 space-y-2">
+                  {/* Strength bar */}
+                  <div className="flex gap-1">
+                    {[0, 1, 2, 3, 4].map((i) => (
+                      <div
+                        key={i}
+                        className="h-1 flex-1 rounded transition-colors"
+                        style={{
+                          backgroundColor: i <= passwordStrength.score ? passwordStrength.color : '#e5e7eb'
+                        }}
+                      />
+                    ))}
+                  </div>
+
+                  {/* Strength label */}
+                  <div className="text-sm font-medium" style={{ color: passwordStrength.color }}>
+                    {passwordStrength.label}
+                  </div>
+
+                  {/* Requirements checklist */}
+                  {passwordStrength.feedback.length > 0 && (
+                    <ul className="text-xs text-[var(--color-text-secondary)] space-y-1">
+                      {passwordStrength.feedback.map((item) => (
+                        <li key={item}>• {item}</li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
+
               <p className="mt-1 text-xs text-[var(--color-text-secondary)]">
                 Your email is encrypted at rest. Your password is stored as a one-way hash (we can't read it).
               </p>

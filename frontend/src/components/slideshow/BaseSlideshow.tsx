@@ -110,10 +110,11 @@ export function BaseSlideshow({
       onClick={onClose}
     >
       {/* Single header row with counter, controls, and close button */}
-      <div className="absolute top-0 left-0 right-0 flex items-center justify-between px-4 py-1 z-10">
+      {/* MSG-3: Improved lightbox header with clearer counter */}
+      <div className="absolute top-0 left-0 right-0 flex items-center justify-between px-4 py-3 z-10">
         {/* Media counter - left */}
-        <div className="text-white text-lg font-medium bg-black bg-opacity-50 px-3 py-1 rounded">
-          {currentIndex + 1} / {items.length}
+        <div className="text-white text-base font-semibold bg-black/60 backdrop-blur-sm px-4 py-2 rounded-lg">
+          Image {currentIndex + 1} of {items.length}
         </div>
 
         {/* Controls (if provided) - center */}
@@ -133,12 +134,12 @@ export function BaseSlideshow({
         {/* Close button - right */}
         <button
           onClick={onClose}
-          className="text-white hover:text-[var(--color-primary)] transition-colors p-2"
-          aria-label="Close slideshow"
+          className="bg-black/60 backdrop-blur-sm hover:bg-red-600/80 text-white transition-colors p-2 rounded-lg"
+          aria-label="Close slideshow (Esc)"
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"
-            className="h-8 w-8"
+            className="h-6 w-6"
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
@@ -153,24 +154,24 @@ export function BaseSlideshow({
         </button>
       </div>
 
-      {/* Previous button */}
+      {/* Previous button - MSG-3: More prominent navigation */}
       {items.length > 1 && (
         <button
           onClick={(e) => {
             e.stopPropagation();
             handlePrevious();
           }}
-          className="absolute left-4 top-1/2 -translate-y-1/2 text-white hover:text-[var(--color-primary)] transition-colors z-10 p-2"
-          aria-label="Previous slide"
+          className="absolute left-4 top-1/2 -translate-y-1/2 bg-black/60 backdrop-blur-sm hover:bg-white/20 text-white transition-colors z-10 p-3 rounded-full"
+          aria-label="Previous (←)"
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"
-            className="h-12 w-12"
+            className="h-8 w-8"
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
           >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M15 19l-7-7 7-7" />
           </svg>
         </button>
       )}
@@ -183,24 +184,24 @@ export function BaseSlideshow({
         {currentItem.content}
       </div>
 
-      {/* Next button */}
+      {/* Next button - MSG-3: More prominent navigation */}
       {items.length > 1 && (
         <button
           onClick={(e) => {
             e.stopPropagation();
             handleNext();
           }}
-          className="absolute right-4 top-1/2 -translate-y-1/2 text-white hover:text-[var(--color-primary)] transition-colors z-10 p-2"
-          aria-label="Next slide"
+          className="absolute right-4 top-1/2 -translate-y-1/2 bg-black/60 backdrop-blur-sm hover:bg-white/20 text-white transition-colors z-10 p-3 rounded-full"
+          aria-label="Next (→)"
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"
-            className="h-12 w-12"
+            className="h-8 w-8"
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
           >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M9 5l7 7-7 7" />
           </svg>
         </button>
       )}

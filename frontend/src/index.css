@@ -18,9 +18,9 @@
   --color-surface-elevated: #ffffff;
 
   /* Text Colors */
-  --color-text-primary: #111827;
-  --color-text-secondary: #6b7280;
-  --color-text-muted: #9ca3af;
+  --color-text-primary: #111827;    /* ~16:1 contrast on white - WCAG AAA */
+  --color-text-secondary: #6b7280;  /* ~4.6:1 contrast on white - WCAG AA */
+  --color-text-muted: #737373;      /* Changed from #9ca3af for WCAG AA compliance - exactly 4.5:1 on white */
 
   /* Border Colors */
   --color-border: #e5e7eb;
@@ -34,21 +34,36 @@
 
   /* Typography */
   --font-family-base: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  --font-size-xs: 0.75rem;
-  --font-size-sm: 0.875rem;
-  --font-size-base: 1rem;
-  --font-size-lg: 1.125rem;
-  --font-size-xl: 1.25rem;
-  --font-size-2xl: 1.5rem;
-  --font-size-3xl: 1.875rem;
 
-  /* Spacing */
-  --spacing-xs: 0.25rem;
-  --spacing-sm: 0.5rem;
-  --spacing-md: 1rem;
-  --spacing-lg: 1.5rem;
-  --spacing-xl: 2rem;
-  --spacing-2xl: 3rem;
+  /* Font Sizes */
+  --font-size-xs: 0.75rem;    /* 12px - Timestamps, metadata */
+  --font-size-sm: 0.875rem;   /* 14px - Secondary text, labels */
+  --font-size-base: 1rem;     /* 16px - Primary text */
+  --font-size-lg: 1.125rem;   /* 18px - Card headers */
+  --font-size-xl: 1.25rem;    /* 20px - Section headers */
+  --font-size-2xl: 1.5rem;    /* 24px - Page titles */
+  --font-size-3xl: 1.875rem;  /* 30px - Hero titles */
+
+  /* Line Heights */
+  --line-height-tight: 1.2;
+  --line-height-snug: 1.3;
+  --line-height-normal: 1.4;
+  --line-height-relaxed: 1.5;
+
+  /* Font Weights */
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+
+  /* Spacing System */
+  --spacing-xs: 0.25rem;    /* 4px - Minimal spacing */
+  --spacing-sm: 0.5rem;     /* 8px - Tight (within components, label to input) */
+  --spacing-base: 0.75rem;  /* 12px - Close (related items, button groups) */
+  --spacing-md: 1rem;       /* 16px - Normal (between components, cards in list) */
+  --spacing-lg: 1.5rem;     /* 24px - Loose (between sections) */
+  --spacing-xl: 2rem;       /* 32px - Section (major page sections) */
+  --spacing-2xl: 3rem;      /* 48px - Page (between major content blocks) */
 
   /* Layout */
   --border-radius-sm: 0.25rem;
@@ -120,6 +135,27 @@ body.theme-transitioning {
   }
   100% {
     opacity: 1;
+  }
+}
+
+/* Modal transition animations (MODAL-5) */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
   }
 }
 
@@ -197,6 +233,18 @@ body.theme-transitioning {
   }
 }
 
+/* Float up animation (MISC-9: Vote feedback) */
+@keyframes float-up {
+  0% {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -20px);
+  }
+}
+
 /* Utility animation classes */
 .animate-fade-in {
   animation: fadeIn 0.3s ease-out;
@@ -212,6 +260,10 @@ body.theme-transitioning {
 
 .animate-spin {
   animation: spin 1s linear infinite;
+}
+
+.animate-float-up {
+  animation: float-up 1s ease-out forwards;
 }
 
 .sr-only {
@@ -296,6 +348,16 @@ td .markdown-content pre {
   text-decoration: underline;
 }
 
+/* MISC-7: External link icon indicator */
+.markdown-content a[target="_blank"]:not(.inline-image-placeholder)::after {
+  content: " ↗";
+  font-size: 0.75em;
+  vertical-align: super;
+  display: inline-block;
+  margin-left: 0.1em;
+  opacity: 0.7;
+}
+
 .markdown-content a.inline-image-placeholder {
   color: var(--color-primary);
   text-decoration: none;
@@ -339,4 +401,172 @@ td .markdown-content pre {
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
   border: 0;
+}
+
+/* Typography System - Semantic Classes */
+.text-display {
+  font-size: var(--font-size-3xl);
+  line-height: var(--line-height-tight);
+  font-weight: var(--font-weight-bold);
+}
+
+.text-h1 {
+  font-size: var(--font-size-2xl);
+  line-height: var(--line-height-snug);
+  font-weight: var(--font-weight-bold);
+}
+
+.text-h2 {
+  font-size: var(--font-size-xl);
+  line-height: var(--line-height-normal);
+  font-weight: var(--font-weight-semibold);
+}
+
+.text-h3 {
+  font-size: var(--font-size-lg);
+  line-height: var(--line-height-normal);
+  font-weight: var(--font-weight-semibold);
+}
+
+.text-body {
+  font-size: var(--font-size-base);
+  line-height: var(--line-height-relaxed);
+  font-weight: var(--font-weight-normal);
+}
+
+.text-small {
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-relaxed);
+  font-weight: var(--font-weight-normal);
+}
+
+.text-tiny {
+  font-size: var(--font-size-xs);
+  line-height: var(--line-height-relaxed);
+  font-weight: var(--font-weight-normal);
+}
+
+/* Font Weight Utilities (TYPE-2: Standardized font weight system)
+ * Use these consistent weights throughout the application:
+ * - Normal (400): Body text, paragraphs, descriptions, long-form content
+ * - Medium (500): Emphasized text, links, subtle highlights, de-emphasized buttons
+ * - Semibold (600): Labels, form fields, buttons, card metadata, navigation items
+ * - Bold (700): Headings (h1-h3), important emphasis, alerts, primary buttons
+ */
+.font-normal {
+  font-weight: var(--font-weight-normal);
+}
+
+.font-medium {
+  font-weight: var(--font-weight-medium);
+}
+
+.font-semibold {
+  font-weight: var(--font-weight-semibold);
+}
+
+.font-bold {
+  font-weight: var(--font-weight-bold);
+}
+
+/* Spacing System - Gap Utilities */
+.gap-tight {
+  gap: var(--spacing-sm);
+}
+
+.gap-close {
+  gap: var(--spacing-base);
+}
+
+.gap-normal {
+  gap: var(--spacing-md);
+}
+
+.gap-loose {
+  gap: var(--spacing-lg);
+}
+
+.gap-section {
+  gap: var(--spacing-xl);
+}
+
+/* Spacing System - Margin Bottom Utilities (for vertical rhythm) */
+.mb-tight {
+  margin-bottom: var(--spacing-sm);
+}
+
+.mb-close {
+  margin-bottom: var(--spacing-base);
+}
+
+.mb-normal {
+  margin-bottom: var(--spacing-md);
+}
+
+.mb-loose {
+  margin-bottom: var(--spacing-lg);
+}
+
+.mb-section {
+  margin-bottom: var(--spacing-xl);
+}
+
+/* Spacing System - Padding Utilities (for card interiors) */
+/* Standard card padding based on card type:
+   - Compact (12px): List items, dense layouts
+   - Default (16px): Post cards, user cards, standard content cards
+   - Comfortable (24px): Featured cards, hero sections */
+.p-compact {
+  padding: var(--spacing-base);  /* 12px */
+}
+
+.p-default {
+  padding: var(--spacing-md);    /* 16px */
+}
+
+.p-comfortable {
+  padding: var(--spacing-lg);    /* 24px */
+}
+
+/* Enhanced Focus States for Keyboard Navigation (WCAG 2.4.7) */
+/* Use :focus-visible to show focus only for keyboard, not mouse clicks */
+
+/* Input fields: prominent outline + glow */
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.2);
+}
+
+/* Buttons: outline + subtle scale */
+button:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+  transform: scale(1.02);
+  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.2);
+}
+
+/* Links: underline + color change */
+a:focus-visible {
+  outline: 2px dotted var(--color-primary);
+  outline-offset: 2px;
+  text-decoration: underline;
+  text-decoration-style: dotted;
+}
+
+/* Cards and interactive containers: outline + glow */
+[role="button"]:focus-visible,
+[role="link"]:focus-visible,
+article:focus-visible,
+.card:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.2);
+}
+
+/* Remove default focus outline when :focus-visible is supported */
+*:focus:not(:focus-visible) {
+  outline: none;
 }

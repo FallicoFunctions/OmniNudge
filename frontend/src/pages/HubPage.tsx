@@ -33,6 +33,7 @@ import { CrosspostModal } from '../components/common/CrosspostModal';
 import { RedditPostSlideshow } from '../components/slideshow/RedditPostSlideshow';
 import { getHiddenPostIdSet, getSavedPostIdSet } from '../utils/savedItems';
 import { EmptyMessage, ErrorMessage, LoadingMessage } from '../components/common/StatusMessage';
+import { PostCardSkeleton } from '../components/common/LoadingStates';
 import { FeedSearchBars } from '../components/common/FeedSearchBars';
 import { CombinedSuggestionItem } from '../components/common/CombinedSuggestionItem';
 import { searchPlatformPosts } from '../services/platformSearchService';
@@ -913,8 +914,14 @@ export default function HubsPage() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <LoadingMessage className="text-lg">Loading...</LoadingMessage>
+      <div className="mx-auto max-w-6xl px-4 py-6">
+        <div className="space-y-4">
+          <PostCardSkeleton />
+          <PostCardSkeleton />
+          <PostCardSkeleton />
+          <PostCardSkeleton />
+          <PostCardSkeleton />
+        </div>
       </div>
     );
   }

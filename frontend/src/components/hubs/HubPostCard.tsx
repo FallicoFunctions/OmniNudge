@@ -35,7 +35,6 @@ export function HubPostCard(props: HubPostCardProps) {
       {...props}
       showOmniBadge={false}
       voteButtonSize="medium"
-      thumbnailSize="medium"
       showTextPreview={true}
     />
   );

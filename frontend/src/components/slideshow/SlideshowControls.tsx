@@ -19,21 +19,21 @@ export function SlideshowControls({
   onChangeInterval,
 }: SlideshowControlsProps) {
   return (
-    <div className="flex items-center gap-2">
-      {/* Auto-advance toggle */}
+    // MSG-3: Improved slideshow controls with better visibility and clarity
+    <div className="flex items-center gap-3 bg-black/60 backdrop-blur-sm rounded-lg px-4 py-2">
+      {/* Auto-advance toggle with label */}
       <button
         onClick={onToggleAutoAdvance}
-        className={`p-1.5 rounded transition-colors ${
+        className={`flex items-center gap-2 px-3 py-1.5 rounded-md transition-colors ${
           autoAdvance
-            ? 'text-[var(--color-primary)]'
-            : 'text-white hover:text-gray-300'
+            ? 'bg-[var(--color-primary)] text-white'
+            : 'bg-white/20 text-white hover:bg-white/30'
         }`}
-        aria-label={autoAdvance ? 'Pause auto-advance' : 'Start auto-advance'}
-        title={autoAdvance ? 'Pause' : 'Auto-play'}
+        aria-label={autoAdvance ? 'Pause slideshow' : 'Play slideshow'}
       >
         <svg
           xmlns="http://www.w3.org/2000/svg"
-          className="h-6 w-6"
+          className="h-5 w-5"
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"
@@ -62,25 +62,28 @@ export function SlideshowControls({
             </>
           )}
         </svg>
+        <span className="text-sm font-medium">{autoAdvance ? 'Pause' : 'Play'}</span>
       </button>
 
-      {/* Interval selector */}
-      <div className="flex gap-1">
-        {INTERVAL_OPTIONS.map((option) => (
-          <button
-            key={option.value}
-            onClick={() => onChangeInterval(option.value)}
-            className={`px-2 py-1 rounded text-xs font-medium transition-colors ${
-              autoAdvanceInterval === option.value
-                ? 'bg-[var(--color-primary)] text-white'
-                : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-            }`}
-            aria-label={`Set interval to ${option.label}`}
-            title={`Interval: ${option.label}`}
-          >
-            {option.label}
-          </button>
-        ))}
+      {/* Interval selector with label */}
+      <div className="flex items-center gap-2">
+        <span className="text-white text-sm font-medium">Speed:</span>
+        <div className="flex gap-1">
+          {INTERVAL_OPTIONS.map((option) => (
+            <button
+              key={option.value}
+              onClick={() => onChangeInterval(option.value)}
+              className={`px-2.5 py-1 rounded text-xs font-semibold transition-colors ${
+                autoAdvanceInterval === option.value
+                  ? 'bg-[var(--color-primary)] text-white'
+                  : 'bg-white/20 text-white hover:bg-white/30'
+              }`}
+              aria-label={`Set speed to ${option.label}`}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
       </div>
     </div>
   );

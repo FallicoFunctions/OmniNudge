@@ -62,7 +62,7 @@ export default function ModerationSettingsTab({ settings, onSave }: Props) {
 
       {/* Spam Filter */}
       <div>
-        <label className="block text-sm font-medium text-[var(--color-text-primary)] mb-2">
+        <label className="block text-sm font-semibold text-[var(--color-text-primary)] mb-2">
           Spam Filter Strength
         </label>
         <select
@@ -81,7 +81,7 @@ export default function ModerationSettingsTab({ settings, onSave }: Props) {
 
       {/* Banned Words */}
       <div>
-        <label className="block text-sm font-medium text-[var(--color-text-primary)] mb-2">
+        <label className="block text-sm font-semibold text-[var(--color-text-primary)] mb-2">
           Banned Words & Phrases
         </label>
         <textarea
@@ -99,7 +99,7 @@ export default function ModerationSettingsTab({ settings, onSave }: Props) {
 
       {/* Account Age Filter */}
       <div>
-        <label className="block text-sm font-medium text-[var(--color-text-primary)] mb-2">
+        <label className="block text-sm font-semibold text-[var(--color-text-primary)] mb-2">
           Minimum Account Age (days)
         </label>
         <input
@@ -117,7 +117,7 @@ export default function ModerationSettingsTab({ settings, onSave }: Props) {
 
       {/* Minimum Karma */}
       <div>
-        <label className="block text-sm font-medium text-[var(--color-text-primary)] mb-2">
+        <label className="block text-sm font-semibold text-[var(--color-text-primary)] mb-2">
           Minimum Account Karma
         </label>
         <input
@@ -133,21 +133,37 @@ export default function ModerationSettingsTab({ settings, onSave }: Props) {
         </p>
       </div>
 
-      {/* Access Request Cooldown */}
+      {/* Access Request Cooldown - SETTINGS-4: Improved clarity and validation */}
       <div>
-        <label className="block text-sm font-medium text-[var(--color-text-primary)] mb-2">
-          Access Request Cooldown (days)
+        <label htmlFor="access-cooldown" className="block text-sm font-semibold text-[var(--color-text-primary)] mb-2">
+          Access Request Cooldown
         </label>
-        <input
-          type="number"
-          value={accessRequestCooldownDays}
-          onChange={(e) => setAccessRequestCooldownDays(e.target.value)}
-          min="0"
-          placeholder="0"
-          className="w-full px-3 py-2 border border-[var(--color-border)] rounded bg-[var(--color-background)] text-[var(--color-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
-        />
+        <div className="flex items-center gap-2">
+          <input
+            id="access-cooldown"
+            type="number"
+            value={accessRequestCooldownDays}
+            onChange={(e) => {
+              const val = parseInt(e.target.value);
+              // Clamp between 0 and 365
+              if (!isNaN(val)) {
+                setAccessRequestCooldownDays(Math.max(0, Math.min(365, val)).toString());
+              } else {
+                setAccessRequestCooldownDays(e.target.value); // Allow empty for typing
+              }
+            }}
+            min="0"
+            max="365"
+            placeholder="0"
+            className="w-32 px-3 py-2 border border-[var(--color-border)] rounded bg-[var(--color-background)] text-[var(--color-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+          />
+          <span className="text-sm text-[var(--color-text-secondary)]">days</span>
+        </div>
         <p className="text-xs text-[var(--color-text-secondary)] mt-1">
-          How long a denied user must wait before requesting access again (0 = no cooldown)
+          How long a denied user must wait before requesting access again.
+        </p>
+        <p className="text-xs text-[var(--color-text-muted)] mt-0.5">
+          Range: 0 days (no cooldown) to 365 days (1 year)
         </p>
       </div>
 

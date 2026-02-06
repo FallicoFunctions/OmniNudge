@@ -39,12 +39,14 @@ export function FlairBadge({ text, backgroundColor, textColor, className = '' }:
 
   return (
     <span
-      className={`inline-flex items-center rounded border px-2 py-0.5 text-[10px] font-semibold ${className}`}
+      className={`inline-flex items-center rounded px-1 py-0.5 text-xs font-medium ${className}`}
       style={{
         backgroundColor: bg,
         color: fg,
         borderColor: bg === 'var(--color-surface-elevated)' ? 'var(--color-border)' : bg,
+        opacity: 0.9,
       }}
+      title={`Flair: ${trimmed}`}
     >
       {trimmed}
     </span>

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Modal } from '../common/Modal';
 import { MarkdownInput } from '../common/MarkdownInput';
+import { ModalCloseButton } from '../ui/ModalCloseButton';
 
 type PostEditModalProps = {
   isOpen: boolean;
@@ -36,12 +37,15 @@ export function PostEditModal({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      className="w-full max-w-2xl rounded-lg bg-white p-6 shadow-xl"
+      className="relative w-full max-w-2xl rounded-lg bg-white p-6 shadow-xl"
       overlayClassName="bg-black/40"
     >
+      {/* MODAL-3: Standard close button */}
+      <ModalCloseButton onClose={onClose} />
+
       <div className="space-y-4">
-        <div>
-          <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">Edit post</h3>
+        <div className="pr-12">
+          <h3 className="text-xl font-semibold text-[var(--color-text-primary)]">Edit post</h3>
           <p className="text-sm text-[var(--color-text-secondary)]">
             Update the title or body, then save your changes.
           </p>

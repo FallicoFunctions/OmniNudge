@@ -15,7 +15,7 @@ import { OffsetPaginationControls } from '../components/common/OffsetPaginationC
 import { useSavedItems } from '../hooks/useSavedItems';
 import { useHiddenItems } from '../hooks/useHiddenItems';
 import { getHiddenRedditPostIdSet, getSavedPostIdSet, getSavedRedditPostIdSet } from '../utils/savedItems';
-import { LoadingMessage } from '../components/common/StatusMessage';
+import { PostCardSkeleton } from '../components/common/LoadingStates';
 import { FeedSearchBars } from '../components/common/FeedSearchBars';
 import { CreateActionButtons } from '../components/common/CreateActionButtons';
 import { CombinedSuggestionItem } from '../components/common/CombinedSuggestionItem';
@@ -830,9 +830,9 @@ export default function HomePage() {
           )}
         </div>
         <div className="flex items-center gap-2">
-          <div className="flex items-center gap-3 rounded-full border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-1 text-sm">
-            <span className="text-xs font-semibold uppercase text-[var(--color-text-secondary)]">
-              Omni posts only
+          <div className="flex items-center gap-2 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-2 text-sm">
+            <span className="text-xs font-medium text-[var(--color-text-muted)]">
+              Show:
             </span>
             <button
               type="button"
@@ -842,6 +842,7 @@ export default function HomePage() {
               className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-1 ${
                 omniOnly ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
               }`}
+              title={omniOnly ? 'Showing Omni posts only. Click to show all posts.' : 'Showing all posts. Click to show Omni posts only.'}
             >
               <span className="sr-only">Toggle Omni posts filter</span>
               <span
@@ -851,6 +852,9 @@ export default function HomePage() {
                 }`}
               />
             </button>
+            <span className={`text-xs font-semibold transition-colors ${omniOnly ? 'text-[var(--color-primary)]' : 'text-[var(--color-text-secondary)]'}`}>
+              {omniOnly ? 'Omni Only' : 'All Posts'}
+            </span>
           </div>
           <form onSubmit={handlePostSearchSubmit} className="flex w-full gap-2 md:w-96">
             <div className="relative flex-1">
@@ -944,8 +948,12 @@ export default function HomePage() {
 
       {/* Posts */}
       {isLoading ? (
-        <div className="text-center">
-          <LoadingMessage>Loading feed...</LoadingMessage>
+        <div className="space-y-4">
+          <PostCardSkeleton />
+          <PostCardSkeleton />
+          <PostCardSkeleton />
+          <PostCardSkeleton />
+          <PostCardSkeleton />
         </div>
       ) : displayedPosts.length === 0 ? (
         <div className="text-center text-[var(--color-text-secondary)]">

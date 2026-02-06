@@ -1,3 +1,4 @@
+import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { subscriptionService } from '../../services/subscriptionService';
@@ -17,6 +18,9 @@ export default function SubscribedView({
   className = '',
 }: SubscribedViewProps) {
   const { useRelativeTime } = useSettings();
+  // PROFILE-5: Search and sort functionality
+  const [searchQuery, setSearchQuery] = useState('');
+  const [sortBy, setSortBy] = useState<'alphabetical' | 'recent'>('alphabetical');
 
   const hubsQuery = useQuery({
     queryKey: ['user-hub-subscriptions'],
@@ -28,10 +32,60 @@ export default function SubscribedView({
     queryFn: () => subscriptionService.getUserSubredditSubscriptions(),
   });
 
-  const hubs = hubsQuery.data ?? [];
-  const subreddits = subredditsQuery.data ?? [];
+  const allHubs = hubsQuery.data ?? [];
+  const allSubreddits = subredditsQuery.data ?? [];
   const isLoading = hubsQuery.isLoading || subredditsQuery.isLoading;
   const hasError = hubsQuery.isError || subredditsQuery.isError;
+
+  // Filter and sort hubs
+  const hubs = useMemo(() => {
+    let filtered = allHubs;
+
+    // Apply search
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter((sub) => {
+        const hubName = sub.hub?.name || sub.hub_name || '';
+        const hubTitle = sub.hub?.title || '';
+        return hubName.toLowerCase().includes(query) || hubTitle.toLowerCase().includes(query);
+      });
+    }
+
+    // Apply sort
+    if (sortBy === 'alphabetical') {
+      filtered.sort((a, b) => {
+        const nameA = (a.hub?.name || a.hub_name || '').toLowerCase();
+        const nameB = (b.hub?.name || b.hub_name || '').toLowerCase();
+        return nameA.localeCompare(nameB);
+      });
+    } else if (sortBy === 'recent') {
+      filtered.sort((a, b) => new Date(b.subscribed_at).getTime() - new Date(a.subscribed_at).getTime());
+    }
+
+    return filtered;
+  }, [allHubs, searchQuery, sortBy]);
+
+  // Filter and sort subreddits
+  const subreddits = useMemo(() => {
+    let filtered = allSubreddits;
+
+    // Apply search
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter((sub) =>
+        sub.subreddit_name.toLowerCase().includes(query)
+      );
+    }
+
+    // Apply sort
+    if (sortBy === 'alphabetical') {
+      filtered.sort((a, b) => a.subreddit_name.toLowerCase().localeCompare(b.subreddit_name.toLowerCase()));
+    } else if (sortBy === 'recent') {
+      filtered.sort((a, b) => new Date(b.subscribed_at).getTime() - new Date(a.subscribed_at).getTime());
+    }
+
+    return filtered;
+  }, [allSubreddits, searchQuery, sortBy]);
 
   const content = (
     <div className={className}>
@@ -45,12 +99,41 @@ export default function SubscribedView({
         <LoadingMessage className="text-sm">Loading subscriptions...</LoadingMessage>
       ) : hasError ? (
         <ErrorMessage className="text-sm text-[var(--color-error)]">Failed to load subscriptions.</ErrorMessage>
-      ) : hubs.length === 0 && subreddits.length === 0 ? (
+      ) : allHubs.length === 0 && allSubreddits.length === 0 ? (
         <EmptyMessage className="text-sm">
           No subscriptions yet. Subscribe to hubs or subreddits to see them here.
         </EmptyMessage>
       ) : (
-        <div className="grid gap-6 lg:grid-cols-2">
+        <>
+          {/* PROFILE-5: Search and sort controls */}
+          <div className="flex gap-4 mb-6 flex-wrap">
+            <div className="flex-1 min-w-[200px]">
+              <input
+                type="text"
+                placeholder="Search subscriptions..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full px-4 py-2 border border-[var(--color-border)] rounded-lg bg-[var(--color-surface-elevated)] text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
+              />
+            </div>
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as any)}
+              className="px-4 py-2 border border-[var(--color-border)] rounded-lg bg-[var(--color-surface-elevated)] text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
+            >
+              <option value="alphabetical">A-Z</option>
+              <option value="recent">Recently Joined</option>
+            </select>
+          </div>
+
+          {/* Results summary */}
+          {searchQuery && (
+            <div className="mb-4 text-sm text-[var(--color-text-secondary)]">
+              Found {hubs.length + subreddits.length} subscription{hubs.length + subreddits.length !== 1 ? 's' : ''} matching "{searchQuery}"
+            </div>
+          )}
+
+          <div className="grid gap-6 lg:grid-cols-2">
           {/* Hubs Column */}
           <section>
             <h3 className="mb-3 text-lg font-semibold text-[var(--color-text-primary)]">
@@ -119,6 +202,7 @@ export default function SubscribedView({
             )}
           </section>
         </div>
+        </>
       )}
     </div>
   );

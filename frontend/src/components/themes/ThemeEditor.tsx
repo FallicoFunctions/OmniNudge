@@ -383,6 +383,7 @@ const ThemeEditor = ({ isOpen, onClose, initialTheme = null }: ThemeEditorProps)
       if (setAsActive) {
         await selectTheme(result);
       }
+      // MISC-2: Success feedback visible for at least 2 seconds before auto-close
       setStatusMessage({
         type: 'success',
         text: initialTheme ? 'Theme updated successfully!' : 'Theme created successfully!',
@@ -390,7 +391,7 @@ const ThemeEditor = ({ isOpen, onClose, initialTheme = null }: ThemeEditorProps)
       setTimeout(() => {
         setStatusMessage(null);
         onClose();
-      }, 900);
+      }, 2000);
     } catch (submitError) {
       const message =
         submitError instanceof Error ? submitError.message : 'Unable to save theme.';
@@ -662,7 +663,7 @@ const ThemeEditor = ({ isOpen, onClose, initialTheme = null }: ThemeEditorProps)
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-      <div className="relative h-[90vh] w-full max-w-5xl overflow-hidden rounded-2xl bg-[var(--color-surface)] shadow-2xl">
+      <div className="relative flex h-[90vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-[var(--color-surface)] shadow-2xl">
         <header className="flex items-start justify-between border-b border-[var(--color-border)] px-6 py-4">
           <div>
             <p className="text-xs uppercase tracking-wide text-[var(--color-text-secondary)]">
@@ -685,7 +686,7 @@ const ThemeEditor = ({ isOpen, onClose, initialTheme = null }: ThemeEditorProps)
           </button>
         </header>
 
-        <div className="flex h-full flex-col">
+        <div className="flex min-h-0 flex-1 flex-col">
           <div className="flex gap-2 border-b border-[var(--color-border)] px-6 py-3">
             {steps.map((step, index) => (
               <div
