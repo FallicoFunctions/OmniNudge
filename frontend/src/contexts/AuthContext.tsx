@@ -7,6 +7,7 @@ import { initializeKeys, getOwnPublicKeyBase64, getOwnKeys } from '../services/k
 import { encryptionService } from '../services/encryptionService';
 import { encryptPrivateKeyWithPassword, decryptPrivateKeyWithPassword } from '../services/keySyncService';
 import { exportKeyPair } from '../utils/encryption';
+import { analyticsService } from '../services/analyticsService';
 
 interface AuthContextType {
   user: User | null;
@@ -135,6 +136,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(response.user);
     persistOmniFeedStateForUser(response.user.id, resolveDefaultOmniFeedState());
 
+    // Track login event
+    analyticsService.identify(response.user.id.toString(), {
+      username: response.user.username,
+    });
+    analyticsService.track('user_login', {
+      keep_logged_in: credentials.keep_logged_in ?? false,
+    });
+
     // Initialize encryption keys with password for cross-browser sync (non-blocking)
     // Small delay to ensure token is fully persisted in storage
     setTimeout(() => {
@@ -151,6 +160,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(response.user);
     persistOmniFeedStateForUser(response.user.id, resolveDefaultOmniFeedState());
 
+    // Track signup event
+    analyticsService.identify(response.user.id.toString(), {
+      username: response.user.username,
+    });
+    analyticsService.track('user_signup', {
+      has_email: !!data.email,
+    });
+
     // Initialize encryption keys with password for cross-browser sync (non-blocking)
     initializeEncryptionKeys(data.password, response.user.public_key || undefined).catch((err) => {
       console.error('Background encryption key init failed:', err);
@@ -158,6 +175,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = () => {
+    // Track logout event before clearing user
+    analyticsService.track('user_logout');
+    analyticsService.reset();
+
     removeAuthToken();
     localStorage.removeItem(OMNI_FEED_STORAGE_KEY);
     setUser(null);

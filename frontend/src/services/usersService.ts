@@ -28,4 +28,8 @@ export const usersService = {
   async updateEmail(email: string, emailConfirm: string): Promise<void> {
     await api.put('/users/email', { email, email_confirm: emailConfirm });
   },
+
+  async resendVerification(): Promise<void> {
+    await api.post('/auth/resend-verification', {});
+  },
 };

@@ -2,20 +2,26 @@ package config
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"strconv"
 	"strings"
+
+	"github.com/joho/godotenv"
 )
 
 // Config holds all configuration for the application
 type Config struct {
-	Server     ServerConfig
-	Database   DatabaseConfig
-	Reddit     RedditConfig
-	JWT        JWTConfig
-	Redis      RedisConfig
-	Encryption EncryptionConfig
-	Turnstile  TurnstileConfig
+	Server      ServerConfig
+	Database    DatabaseConfig
+	Reddit      RedditConfig
+	JWT         JWTConfig
+	Redis       RedisConfig
+	Encryption  EncryptionConfig
+	Turnstile   TurnstileConfig
+	Firebase    FirebaseConfig
+	SMTP        SMTPConfig
+	FrontendURL string
 }
 
 // RedditConfig holds Reddit OAuth configuration
@@ -68,8 +74,28 @@ type TurnstileConfig struct {
 	Secret string
 }
 
+// FirebaseConfig holds Firebase Cloud Messaging configuration
+type FirebaseConfig struct {
+	CredentialsPath string
+}
+
+// SMTPConfig holds email (SMTP) configuration
+type SMTPConfig struct {
+	Host        string
+	Port        string
+	User        string
+	Password    string
+	FromAddress string
+	FromName    string
+}
+
 // Load reads configuration from environment variables with sensible defaults
 func Load() (*Config, error) {
+	// Load .env file if it exists (ignore error if file doesn't exist)
+	if err := godotenv.Load(); err != nil {
+		log.Println("No .env file found, using environment variables")
+	}
+
 	cfg := &Config{
 		Server: ServerConfig{
 			Port: getEnv("SERVER_PORT", "8080"),
@@ -104,6 +130,20 @@ func Load() (*Config, error) {
 		Turnstile: TurnstileConfig{
 			Secret: getEnv("TURNSTILE_SECRET_KEY", ""),
 		},
+		Firebase: FirebaseConfig{
+			CredentialsPath: getEnv("FIREBASE_CREDENTIALS_PATH", ""),
+		},
+		SMTP: SMTPConfig{
+			// Mailgun HTTP API (preferred)
+			Host:        getEnv("MAILGUN_API_KEY", getEnv("SMTP_HOST", "")),
+			User:        getEnv("MAILGUN_DOMAIN", getEnv("SMTP_USER", "")),
+			// SMTP fallback
+			Port:        getEnv("SMTP_PORT", "587"),
+			Password:    getEnv("SMTP_PASSWORD", ""),
+			FromAddress: getEnv("SMTP_FROM_ADDRESS", "noreply@omninudge.com"),
+			FromName:    getEnv("SMTP_FROM_NAME", "OmniNudge"),
+		},
+		FrontendURL: getEnv("FRONTEND_URL", "http://localhost:5176"),
 	}
 
 	return cfg, nil

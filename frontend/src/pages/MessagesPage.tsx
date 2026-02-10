@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient, useQueries } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { messagesService } from '../services/messagesService';
 import { mediaService } from '../services/mediaService';
 import { useAuth } from '../contexts/AuthContext';
@@ -10,6 +11,8 @@ import { useSettings } from '../contexts/SettingsContext';
 import { MessageStatusIndicator } from '../components/messages/MessageStatusIndicator';
 import { OnlineStatusIndicator } from '../components/messages/OnlineStatusIndicator';
 import { TypingIndicator } from '../components/messages/TypingIndicator';
+import { HighlightedText } from '../components/messages/HighlightedText';
+import { useDebounce } from '../hooks/useDebounce';
 import type { Conversation, Message, SendMessageRequest } from '../types/messages';
 import type { ModMailConversation } from '../types/modmail';
 import { API_BASE_URL } from '../lib/api';
@@ -67,6 +70,7 @@ function DecryptedMediaViewerWrapper({
   onClose,
   currentUserId,
 }: DecryptedMediaViewerWrapperProps) {
+  const { t } = useTranslation();
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
 
   // Decrypt the current message's media
@@ -115,7 +119,7 @@ function DecryptedMediaViewerWrapper({
       <button
         onClick={onClose}
         className="absolute top-4 right-4 text-white hover:text-[var(--color-primary)] transition-colors z-10 p-2"
-        aria-label="Close viewer"
+        aria-label={t('messages.viewer.closeLabel')}
       >
         <svg
           xmlns="http://www.w3.org/2000/svg"
@@ -136,7 +140,7 @@ function DecryptedMediaViewerWrapper({
       {/* Media counter */}
       {messages.length > 1 && (
         <div className="absolute top-4 left-4 text-white text-lg font-medium z-10 bg-black bg-opacity-50 px-3 py-1 rounded">
-          {currentIndex + 1} / {messages.length}
+          {t('messages.viewer.counter', { current: currentIndex + 1, total: messages.length })}
         </div>
       )}
 
@@ -148,7 +152,7 @@ function DecryptedMediaViewerWrapper({
             handlePrevious();
           }}
           className="absolute left-4 top-1/2 -translate-y-1/2 text-white hover:text-[var(--color-primary)] transition-colors z-10 p-2"
-          aria-label="Previous media"
+          aria-label={t('messages.viewer.previousLabel')}
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -168,7 +172,7 @@ function DecryptedMediaViewerWrapper({
         onClick={(e) => e.stopPropagation()}
       >
         {!mediaSrc ? (
-          <div className="text-white text-lg">Decrypting media...</div>
+          <div className="text-white text-lg">{t('messages.viewer.decrypting')}</div>
         ) : mediaType === 'image' ? (
           <img
             src={mediaSrc}
@@ -206,7 +210,7 @@ function DecryptedMediaViewerWrapper({
             handleNext();
           }}
           className="absolute right-4 top-1/2 -translate-y-1/2 text-white hover:text-[var(--color-primary)] transition-colors z-10 p-2"
-          aria-label="Next media"
+          aria-label={t('messages.viewer.nextLabel')}
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -334,15 +338,26 @@ function DecryptedMessageContent({
   isOwnMessage,
   currentUserId,
   className,
+  highlightText,
 }: {
   message: Message;
   isOwnMessage: boolean;
   currentUserId?: number;
   className?: string;
+  highlightText?: string;
 }) {
   const decryptedContent = useDecryptedContent(message, isOwnMessage, currentUserId);
 
   if (!decryptedContent) return null;
+
+  // If highlighting is enabled, use HighlightedText component
+  if (highlightText && highlightText.trim()) {
+    return (
+      <p className={className}>
+        <HighlightedText text={decryptedContent} highlight={highlightText} />
+      </p>
+    );
+  }
 
   return <p className={className}>{decryptedContent}</p>;
 }
@@ -470,6 +485,7 @@ function useDecryptedMedia(message: Message, isOwnMessage: boolean): string | nu
 }
 
 const MessageMediaPreview = ({ message, isOwnMessage, onMediaClick }: MessageMediaPreviewProps) => {
+  const { t } = useTranslation();
   const mediaSrc = useDecryptedMedia(message, isOwnMessage);
   const filename = message.media_url?.split('/').pop() ?? 'attachment';
 
@@ -478,7 +494,7 @@ const MessageMediaPreview = ({ message, isOwnMessage, onMediaClick }: MessageMed
   if (!mediaSrc) {
     return (
       <div className="mb-2 text-xs text-[var(--color-text-secondary)]">
-        {message.media_encryption_key ? 'Decrypting media…' : 'Preparing media…'}
+        {message.media_encryption_key ? t('messages.viewer.decrypting') : t('common.loading')}
       </div>
     );
   }
@@ -544,13 +560,14 @@ interface DownloadButtonProps {
 }
 
 const DownloadButton = ({ message, isOwnMessage, onClose }: DownloadButtonProps) => {
+  const { t } = useTranslation();
   const mediaSrc = useDecryptedMedia(message, isOwnMessage);
   const filename = message.media_url?.split('/').pop() ?? 'download';
 
   const handleDownload = () => {
     onClose();
     if (!mediaSrc) {
-      alert('Media is still decrypting. Please wait and try again.');
+      alert(t('messages.media.stillDecrypting'));
       return;
     }
 
@@ -570,12 +587,13 @@ const DownloadButton = ({ message, isOwnMessage, onClose }: DownloadButtonProps)
       onClick={handleDownload}
       disabled={!mediaSrc}
     >
-      Download
+      {t('common.download', 'Download')}
     </button>
   );
 };
 
 export default function MessagesPage() {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const { setActiveConversationId } = useMessagingContext();
   const [selectedConversationId, setSelectedConversationId] = useState<number | null>(null);
@@ -606,6 +624,10 @@ export default function MessagesPage() {
   const { sendTypingIndicator } = useWebSocket();
   const { typingIndicators, readReceipts } = useSettings();
   const [searchQuery, setSearchQuery] = useState('');
+  const [messageSearchQuery, setMessageSearchQuery] = useState('');
+  const debouncedMessageSearch = useDebounce(messageSearchQuery, 300);
+  const [decryptedContentMap, setDecryptedContentMap] = useState<Map<number, string>>(new Map());
+  const [isDecryptingForSearch, setIsDecryptingForSearch] = useState(false);
   const typingTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
   const currentConversationRef = useRef<number | null>(null);
   const currentRecipientRef = useRef<number>(0);
@@ -909,7 +931,7 @@ export default function MessagesPage() {
     const file = e.target.files?.[0];
     if (file) {
       if (file.size > MAX_UPLOAD_SIZE) {
-        alert('File too large. Maximum size is 25MB.');
+        alert(t('messages.media.fileTooLarge'));
         return;
       }
       setSelectedFile(file);
@@ -952,7 +974,7 @@ export default function MessagesPage() {
       setRedditSlideshowOpen(true);
     } catch (error) {
       console.error('Failed to load slideshow posts:', error);
-      alert('Failed to load posts. Please try again.');
+      alert(t('messages.errors.loadPostsFailed'));
     } finally {
       setIsLoadingRedditPosts(false);
     }
@@ -973,13 +995,13 @@ export default function MessagesPage() {
       // Get recipient's ID for encryption
       const conversation = conversations?.find((c) => c.id === selectedConversationId);
       if (!conversation) {
-        alert('Conversation not found');
+        alert(t('messages.errors.conversationNotFound'));
         return;
       }
 
       const recipientId = conversation.user1_id === user?.id ? conversation.user2_id : conversation.user1_id;
       if (!recipientId) {
-        alert('Recipient not found');
+        alert(t('messages.errors.recipientNotFound'));
         return;
       }
 
@@ -1015,7 +1037,7 @@ export default function MessagesPage() {
           const senderEncryptedKey = await encryptKeyWithPublicKey(encryptedFile.rawKey, ownKeys.publicKey);
 
           // Create auto-generated caption
-          const captionText = `[${messageType === 'image' ? 'Image' : 'Video'}]`;
+          const captionText = `[${messageType === 'image' ? t('common.media.image') : t('common.media.video')}]`;
           const encryptedCaption = await encryptMessage(captionText, recipientPublicKey);
           const senderEncryptedCaption = await encryptMessage(captionText, ownKeys.publicKey);
 
@@ -1036,7 +1058,7 @@ export default function MessagesPage() {
           });
         } catch (error) {
           console.error('Failed to upload file:', file.name, error);
-          alert(`Failed to upload ${file.name}`);
+          alert(t('messages.media.uploadFailedFile', { filename: file.name }));
         }
       }
 
@@ -1045,7 +1067,7 @@ export default function MessagesPage() {
       await queryClient.invalidateQueries({ queryKey: ['conversations'] });
     } catch (error) {
       console.error('Multi-file upload error:', error);
-      alert(error instanceof Error ? error.message : 'Failed to upload files');
+      alert(error instanceof Error ? error.message : t('messages.media.uploadFailed'));
     } finally {
       setUploadingMedia(false);
     }
@@ -1243,7 +1265,7 @@ export default function MessagesPage() {
     } catch (error) {
       setUploadingMedia(false);
       console.error('Failed to send message:', error);
-      alert('Failed to upload media. Please try again.');
+      alert(t('messages.media.uploadFailed'));
     }
   };
 
@@ -1264,6 +1286,90 @@ export default function MessagesPage() {
     const isModMail = selectedConversation?.conversation_type === 'mod_mail';
     return isModMail ? [...messages] : [...messages].reverse();
   }, [messages, selectedConversation?.conversation_type]);
+
+  // Decrypt all messages for search functionality
+  useEffect(() => {
+    if (!debouncedMessageSearch.trim() || orderedMessages.length === 0) {
+      setDecryptedContentMap(new Map());
+      setIsDecryptingForSearch(false);
+      return;
+    }
+
+    const decryptAllMessages = async () => {
+      setIsDecryptingForSearch(true);
+      const map = new Map<number, string>();
+
+      await Promise.all(
+        orderedMessages.map(async (msg) => {
+          if (!msg.encrypted_content) return;
+
+          try {
+            const isOwn = msg.sender_id === user?.id;
+            const cipherText = isOwn
+              ? msg.sender_encrypted_content ?? msg.encrypted_content
+              : msg.encrypted_content;
+
+            if (!cipherText) return;
+
+            // Handle multi-recipient (mod mail) messages
+            if (msg.is_multi_recipient && msg.shared_encryption_iv && msg.recipient_keys) {
+              const keys = await getOwnKeys();
+              const encryptedKey = user?.id ? msg.recipient_keys?.[user.id] : null;
+              if (keys?.privateKey && encryptedKey) {
+                const decrypted = await decryptMultiRecipientContent(
+                  cipherText,
+                  encryptedKey,
+                  msg.shared_encryption_iv,
+                  keys.privateKey
+                );
+                map.set(msg.id, decrypted);
+                return;
+              }
+            }
+
+            // Handle standard encrypted messages
+            const shouldAttemptDecrypt = Boolean(
+              (isOwn && msg.sender_encrypted_content) || (!isOwn && msg.encryption_version === 'v1')
+            );
+
+            if (!shouldAttemptDecrypt) {
+              map.set(msg.id, cipherText);
+              return;
+            }
+
+            const keys = await getOwnKeys();
+            if (!keys) {
+              map.set(msg.id, cipherText);
+              return;
+            }
+
+            const decrypted = await decryptMessage(cipherText, keys.privateKey);
+            map.set(msg.id, decrypted);
+          } catch (error) {
+            console.warn('[Search] Failed to decrypt message:', msg.id, error);
+            // Skip this message in search if decryption fails
+          }
+        })
+      );
+
+      setDecryptedContentMap(map);
+      setIsDecryptingForSearch(false);
+    };
+
+    decryptAllMessages();
+  }, [orderedMessages, debouncedMessageSearch, user?.id]);
+
+  // Filter messages based on search query
+  const filteredMessages = useMemo(() => {
+    if (!debouncedMessageSearch.trim()) return orderedMessages;
+
+    const query = debouncedMessageSearch.toLowerCase();
+    return orderedMessages.filter((msg) => {
+      const content = decryptedContentMap.get(msg.id);
+      return content?.toLowerCase().includes(query);
+    });
+  }, [orderedMessages, debouncedMessageSearch, decryptedContentMap]);
+
   const messagesContainerRef = useRef<HTMLDivElement | null>(null);
   const scrollToLatestMessage = useCallback(() => {
     const container = messagesContainerRef.current;
@@ -1333,6 +1439,19 @@ export default function MessagesPage() {
     setDeleteDialogMessage(null);
   }, [selectedConversationId]);
 
+  // Keyboard shortcut: Escape to clear message search
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && messageSearchQuery) {
+        e.preventDefault();
+        setMessageSearchQuery('');
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [messageSearchQuery]);
+
   useEffect(() => {
     if (messageMenuOpen === null) return;
     const handleClick = (event: MouseEvent) => {
@@ -1385,7 +1504,7 @@ export default function MessagesPage() {
       <div className="w-80 flex-shrink-0 overflow-hidden border-r border-[var(--color-border)] bg-[var(--color-surface)]">
         <div className="border-b border-[var(--color-border)] p-4">
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-lg font-semibold text-[var(--color-text-primary)]">Messages</h2>
+            <h2 className="text-lg font-semibold text-[var(--color-text-primary)]">{t('messages.title')}</h2>
             <button
               onClick={() => {
                 setIsCreatingChat(true);
@@ -1396,7 +1515,7 @@ export default function MessagesPage() {
               }}
               className="rounded-md bg-[var(--color-primary)] px-3 py-1 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)]"
             >
-              New Chat
+              {t('messages.newConversation')}
             </button>
           </div>
           {/* Tabs */}
@@ -1409,7 +1528,7 @@ export default function MessagesPage() {
                   : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
               }`}
             >
-              Active
+              {t('messages.tabs.active', 'Active')}
             </button>
             <button
               onClick={() => setActiveTab('archived')}
@@ -1419,7 +1538,7 @@ export default function MessagesPage() {
                   : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
               }`}
             >
-              Archived
+              {t('messages.tabs.archived', 'Archived')}
             </button>
           </div>
 
@@ -1429,7 +1548,7 @@ export default function MessagesPage() {
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search conversations..."
+              placeholder={t('messages.search.conversations')}
               className="w-full px-3 py-2 text-sm border border-[var(--color-border)] rounded-lg bg-[var(--color-surface)] text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
             />
             {searchQuery && conversations && (
@@ -1443,7 +1562,7 @@ export default function MessagesPage() {
         <div className="overflow-y-auto" style={{ height: 'calc(100% - 180px)' }}>
           {loadingConversations && (
             <div className="p-4 text-center">
-              <LoadingMessage className="text-sm">Loading...</LoadingMessage>
+              <LoadingMessage className="text-sm">{t('common.loading')}</LoadingMessage>
             </div>
           )}
 
@@ -1529,7 +1648,7 @@ export default function MessagesPage() {
                         archiveConversationMutation.mutate(conversation.id);
                       }}
                     >
-                      Archive
+                      {t('messages.archive', 'Archive')}
                     </button>
                   ) : (
                     <button
@@ -1539,7 +1658,7 @@ export default function MessagesPage() {
                         unarchiveConversationMutation.mutate(conversation.id);
                       }}
                     >
-                      Unarchive
+                      {t('messages.unarchive', 'Unarchive')}
                     </button>
                   )}
                   <button
@@ -1550,7 +1669,7 @@ export default function MessagesPage() {
                       setDeleteConversationDialog(conversation);
                     }}
                   >
-                    Delete
+                    {t('common.delete')}
                   </button>
                 </div>
               )}
@@ -1559,7 +1678,7 @@ export default function MessagesPage() {
 
           {conversations?.length === 0 && (
             <div className="p-4 text-center">
-              <EmptyMessage className="text-sm">No conversations yet. Start a new chat!</EmptyMessage>
+              <EmptyMessage className="text-sm">{t('messages.noConversations', 'No conversations yet. Start a new chat!')}</EmptyMessage>
             </div>
           )}
 
@@ -1571,7 +1690,7 @@ export default function MessagesPage() {
                 disabled={isFetchingMoreConversations}
                 className="w-full rounded-md border border-[var(--color-border)] px-3 py-2 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)] disabled:opacity-60"
               >
-                {isFetchingMoreConversations ? 'Loading…' : 'Load more conversations'}
+                {isFetchingMoreConversations ? t('common.loading') : t('messages.loadMore', 'Load more conversations')}
               </button>
             </div>
           )}
@@ -1588,10 +1707,10 @@ export default function MessagesPage() {
                 <div className="flex items-center gap-2">
                   <h3 className="font-semibold text-[var(--color-text-primary)]">
                     {isCreatingChat
-                      ? 'New Chat'
+                      ? t('messages.newConversation')
                       : selectedConversation?.conversation_type === 'mod_mail'
-                      ? `${getHubDisplayTitle(selectedConversation?.hub_name)} - Mod Mail - ${selectedConversation?.subject || 'Untitled'}`
-                      : selectedConversation?.other_user?.username || 'Unknown'}
+                      ? `${getHubDisplayTitle(selectedConversation?.hub_name)} - ${t('messages.modMail', 'Mod Mail')} - ${selectedConversation?.subject || t('messages.untitled', 'Untitled')}`
+                      : selectedConversation?.other_user?.username || t('messages.unknown', 'Unknown')}
                   </h3>
                   {!isCreatingChat &&
                    selectedConversation?.conversation_type === 'dm' &&
@@ -1625,7 +1744,7 @@ export default function MessagesPage() {
                           d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
                         />
                       </svg>
-                      Browse Reddit/Hub
+                      {t('messages.browseRedditHub', 'Browse Reddit/Hub')}
                     </button>
                   )}
 
@@ -1634,7 +1753,7 @@ export default function MessagesPage() {
                     <button
                       onClick={() => setSlideshowOpen(true)}
                       className="px-3 py-1.5 bg-[var(--color-primary)] text-white rounded-md text-sm font-medium hover:bg-[var(--color-primary-dark)] transition-colors flex items-center gap-2"
-                      title="View all media from this conversation in a slideshow"
+                      title={t('messages.media.viewAllTitle')}
                     >
                       <svg
                         xmlns="http://www.w3.org/2000/svg"
@@ -1650,26 +1769,96 @@ export default function MessagesPage() {
                           d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
                         />
                       </svg>
-                      Media Gallery ({conversationMediaMessages.length})
+                      {t('messages.mediaGallery', 'Media Gallery')} ({conversationMediaMessages.length})
                     </button>
                   )}
                 </div>
               </div>
             </div>
 
+            {/* Message Search Bar */}
+            {!isCreatingChat && (
+              <div className="border-b border-[var(--color-border)] p-3 bg-[var(--color-surface-elevated)]">
+                <div className="relative flex items-center gap-2">
+                  {/* Search Icon */}
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-4 w-4 absolute left-3 text-[var(--color-text-muted)] pointer-events-none"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                    />
+                  </svg>
+
+                  {/* Search Input */}
+                  <input
+                    type="text"
+                    value={messageSearchQuery}
+                    onChange={(e) => setMessageSearchQuery(e.target.value)}
+                    placeholder={t('messages.search.inConversation')}
+                    className="w-full pl-9 pr-20 py-2 text-sm border border-[var(--color-border)] rounded-md bg-[var(--color-surface)] text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent"
+                  />
+
+                  {/* Clear Button */}
+                  {messageSearchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => setMessageSearchQuery('')}
+                      className="absolute right-16 p-1 rounded-full hover:bg-[var(--color-surface-hover)] text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] transition-colors"
+                      aria-label={t('messages.search.clearLabel')}
+                    >
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="h-4 w-4"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M6 18L18 6M6 6l12 12"
+                        />
+                      </svg>
+                    </button>
+                  )}
+
+                  {/* Result Count */}
+                  {debouncedMessageSearch && (
+                    <div className="absolute right-3 flex items-center gap-1 text-xs text-[var(--color-text-muted)] bg-[var(--color-surface-elevated)] px-2 py-1 rounded">
+                      {isDecryptingForSearch ? (
+                        <span>{t('messages.searching', 'Searching...')}</span>
+                      ) : (
+                        <span>
+                          {filteredMessages.length} {filteredMessages.length === 1 ? t('messages.match', 'match') : t('messages.matches', 'matches')}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* Messages */}
             <div ref={messagesContainerRef} className="flex-1 overflow-y-auto p-4">
               {isCreatingChat ? (
                 <div className="text-center text-sm text-[var(--color-text-secondary)]">
-                  Enter a username and message to start a conversation
+                  {t('messages.startConversation', 'Enter a username and message to start a conversation')}
                 </div>
               ) : loadingMessages ? (
                 <div className="text-center">
-                  <LoadingMessage className="text-sm">Loading messages...</LoadingMessage>
+                  <LoadingMessage className="text-sm">{t('messages.loadingMessages', 'Loading messages...')}</LoadingMessage>
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {hasMoreMessages && (
+                  {hasMoreMessages && !debouncedMessageSearch && (
                     <div className="flex justify-center">
                       <button
                         type="button"
@@ -1677,11 +1866,11 @@ export default function MessagesPage() {
                         disabled={isFetchingMoreMessages}
                         className="rounded-md border border-[var(--color-border)] px-3 py-1 text-xs font-semibold text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-elevated)] disabled:opacity-60"
                       >
-                        {isFetchingMoreMessages ? 'Loading…' : 'Load more messages'}
+                        {isFetchingMoreMessages ? t('common.loading') : t('messages.loadMoreMessages', 'Load more messages')}
                       </button>
                     </div>
                   )}
-                  {orderedMessages.map((message) => {
+                  {filteredMessages.map((message) => {
                     const isOwnMessage = message.sender_id === user?.id;
 
                     // For mod_mail, get sender info from participants
@@ -1689,7 +1878,7 @@ export default function MessagesPage() {
                     const participant = isModMail
                       ? modMailConversation?.participants?.find((p) => p.user_id === message.sender_id)
                       : null;
-                    const senderUsername = participant?.username || (isOwnMessage ? 'You' : 'User');
+                    const senderUsername = participant?.username || (isOwnMessage ? t('messages.you', 'You') : t('messages.user', 'User'));
                     const isModerator = participant?.is_moderator || false;
 
                     return (
@@ -1720,6 +1909,7 @@ export default function MessagesPage() {
                                 isOwnMessage={isOwnMessage}
                                 currentUserId={user?.id}
                                 className="text-sm mb-1"
+                                highlightText={debouncedMessageSearch}
                               />
                             )}
                             <div
@@ -1753,7 +1943,7 @@ export default function MessagesPage() {
                           <div className="relative">
                             <button
                               type="button"
-                              aria-label="Message options"
+                              aria-label={t('messages.messageOptions.ariaLabel')}
                               className="rounded-full border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-2 py-1 text-xs font-semibold text-[var(--color-text-secondary)] transition hover:bg-[var(--color-surface)] hover:text-[var(--color-text-primary)]"
                               onClick={(event) => {
                                 event.stopPropagation();
@@ -1777,7 +1967,7 @@ export default function MessagesPage() {
                                     setDeleteDialogMessage(message);
                                   }}
                                 >
-                                  Delete
+                                  {t('common.delete')}
                                 </button>
                               </div>
                             )}
@@ -1787,9 +1977,38 @@ export default function MessagesPage() {
                     );
                   })}
 
+                  {filteredMessages.length === 0 && orderedMessages.length > 0 && debouncedMessageSearch && (
+                    <div className="text-center py-8">
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="h-12 w-12 mx-auto text-[var(--color-text-muted)] mb-3"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                        />
+                      </svg>
+                      <p className="text-sm text-[var(--color-text-secondary)]">
+                        {t('messages.noMatches', 'No messages found matching "{{query}}"', { query: debouncedMessageSearch })}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => setMessageSearchQuery('')}
+                        className="mt-2 text-sm text-[var(--color-primary)] hover:underline"
+                      >
+                        {t('messages.search.clearLabel')}
+                      </button>
+                    </div>
+                  )}
+
                   {orderedMessages.length === 0 && (
                     <div className="text-center text-sm text-[var(--color-text-secondary)]">
-                      No messages yet. Send the first message!
+                      {t('messages.noMessages')}
                     </div>
                   )}
                 </div>
@@ -1803,7 +2022,7 @@ export default function MessagesPage() {
                   type="text"
                   value={newChatUsername}
                   onChange={(e) => setNewChatUsername(e.target.value)}
-                  placeholder="Enter username..."
+                  placeholder={t('messages.compose.enterUsername')}
                   className="mb-2 block w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-2 text-sm text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
                 />
               )}
@@ -1812,12 +2031,12 @@ export default function MessagesPage() {
               {showMultiUpload && !isCreatingChat && (
                 <div className="mb-4">
                   <div className="mb-2 flex items-center justify-between">
-                    <h4 className="font-medium text-[var(--color-text-primary)]">Upload Multiple Files</h4>
+                    <h4 className="font-medium text-[var(--color-text-primary)]">{t('messages.uploadMultiple', 'Upload Multiple Files')}</h4>
                     <button
                       onClick={() => setShowMultiUpload(false)}
                       className="text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
                     >
-                      Cancel
+                      {t('common.cancel')}
                     </button>
                   </div>
                   <MediaUploadZone onFilesSelected={handleMultiFileUpload} />
@@ -1863,7 +2082,7 @@ export default function MessagesPage() {
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
                   className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-2 text-sm text-[var(--color-text-primary)] hover:bg-[var(--color-surface)]"
-                  title="Attach single file"
+                  title={t('messages.compose.attachSingle')}
                 >
                   📎
                 </button>
@@ -1872,7 +2091,7 @@ export default function MessagesPage() {
                     type="button"
                     onClick={() => setShowMultiUpload(!showMultiUpload)}
                     className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-2 text-sm text-[var(--color-text-primary)] hover:bg-[var(--color-surface)]"
-                    title="Upload multiple files"
+                    title={t('messages.compose.attachMultiple')}
                   >
                     📷+
                   </button>
@@ -1885,35 +2104,58 @@ export default function MessagesPage() {
 
                     // Send typing indicator if enabled
                     if (typingIndicators && selectedConversationId && selectedConversation) {
-                      // Only send typing indicators for DM conversations
-                      // Mod mail requires broadcasting to multiple participants (not yet implemented)
-                      if (selectedConversation.conversation_type === 'dm') {
-                        const recipientId = selectedConversation.other_user?.id || 0;
+                      // Update refs to track current conversation
+                      currentConversationRef.current = selectedConversationId;
 
-                        // Update refs to track current conversation/recipient
-                        currentConversationRef.current = selectedConversationId;
+                      if (selectedConversation.conversation_type === 'dm') {
+                        // DM: Send to the other user
+                        const recipientId = selectedConversation.other_user?.id || 0;
                         currentRecipientRef.current = recipientId;
 
                         sendTypingIndicator(selectedConversationId, recipientId, true);
+                      } else if (selectedConversation.conversation_type === 'mod_mail' && modMailConversation?.participants) {
+                        // Mod mail: Send to all participants except self
+                        const otherParticipants = modMailConversation.participants.filter(
+                          p => p.user_id !== user?.id
+                        );
 
-                        // Clear existing timeout
-                        if (typingTimeoutRef.current) {
-                          clearTimeout(typingTimeoutRef.current);
-                        }
+                        // Send typing indicator to each participant
+                        otherParticipants.forEach(participant => {
+                          sendTypingIndicator(selectedConversationId, participant.user_id, true);
+                        });
 
-                        // Stop typing after 3 seconds of inactivity
-                        typingTimeoutRef.current = setTimeout(() => {
-                          // Use refs to get current values (not stale closure values)
-                          const convId = currentConversationRef.current;
-                          const recId = currentRecipientRef.current;
-                          if (convId !== null) {
-                            sendTypingIndicator(convId, recId, false);
-                          }
-                        }, 3000);
+                        // Store first recipient for cleanup (or 0 if no participants)
+                        currentRecipientRef.current = otherParticipants[0]?.user_id || 0;
                       }
+
+                      // Clear existing timeout
+                      if (typingTimeoutRef.current) {
+                        clearTimeout(typingTimeoutRef.current);
+                      }
+
+                      // Stop typing after 3 seconds of inactivity
+                      typingTimeoutRef.current = setTimeout(() => {
+                        // Use refs to get current values (not stale closure values)
+                        const convId = currentConversationRef.current;
+                        const recId = currentRecipientRef.current;
+
+                        if (convId !== null && selectedConversation) {
+                          if (selectedConversation.conversation_type === 'dm') {
+                            sendTypingIndicator(convId, recId, false);
+                          } else if (selectedConversation.conversation_type === 'mod_mail' && modMailConversation?.participants) {
+                            // Send stop typing to all participants
+                            const otherParticipants = modMailConversation.participants.filter(
+                              p => p.user_id !== user?.id
+                            );
+                            otherParticipants.forEach(participant => {
+                              sendTypingIndicator(convId, participant.user_id, false);
+                            });
+                          }
+                        }
+                      }, 3000);
                     }
                   }}
-                  placeholder="Type a message..."
+                  placeholder={t('messages.compose.placeholder')}
                   className="flex-1 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-2 text-sm text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
                 />
                 <button
@@ -1923,14 +2165,14 @@ export default function MessagesPage() {
                   }
                   className="rounded-md bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)] disabled:opacity-50"
                 >
-                  {uploadingMedia ? 'Uploading...' : 'Send'}
+                  {uploadingMedia ? t('messages.uploading', 'Uploading...') : t('messages.send')}
                 </button>
               </form>
             </div>
           </>
         ) : (
           <div className="flex flex-1 items-center justify-center text-[var(--color-text-secondary)]">
-            Select a conversation or start a new chat
+            {t('messages.selectConversation', 'Select a conversation or start a new chat')}
           </div>
         )}
       </div>
@@ -1950,11 +2192,11 @@ export default function MessagesPage() {
             className="w-full max-w-md rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6 shadow-2xl"
             onClick={(event) => event.stopPropagation()}
           >
-            <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">Delete message?</h3>
+            <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">{t('messages.deleteMessage', 'Delete message?')}</h3>
             <p className="mt-2 text-sm text-[var(--color-text-secondary)]">
               {canDeleteForBoth
-                ? 'Do you want to remove this message for yourself only or for both participants?'
-                : 'This will remove the message for you only.'}
+                ? t('messages.deleteForBothPrompt', 'Do you want to remove this message for yourself only or for both participants?')
+                : t('messages.deleteForSelfOnly', 'This will remove the message for you only.')}
             </p>
             <div className="mt-6 flex flex-col gap-3">
               <button
@@ -1964,8 +2206,8 @@ export default function MessagesPage() {
                 disabled={deleteMessageMutation.isPending}
               >
                 {deleteMessageMutation.isPending && deleteScopeInFlight === 'self'
-                  ? 'Deleting...'
-                  : 'Delete for me'}
+                  ? t('messages.deleting', 'Deleting...')
+                  : t('messages.deleteForMe', 'Delete for me')}
               </button>
               {canDeleteForBoth && (
                 <button
@@ -1975,8 +2217,8 @@ export default function MessagesPage() {
                   disabled={deleteMessageMutation.isPending}
                 >
                   {deleteMessageMutation.isPending && deleteScopeInFlight === 'both'
-                    ? 'Deleting for both...'
-                    : 'Delete for both users'}
+                    ? t('messages.deletingForBoth', 'Deleting for both...')
+                    : t('messages.deleteForBoth', 'Delete for both users')}
                 </button>
               )}
               <button
@@ -1989,7 +2231,7 @@ export default function MessagesPage() {
                 }}
                 disabled={deleteMessageMutation.isPending}
               >
-                Cancel
+                {t('common.cancel')}
               </button>
             </div>
           </div>
@@ -2011,11 +2253,11 @@ export default function MessagesPage() {
             className="w-full max-w-md rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6 shadow-2xl"
             onClick={(event) => event.stopPropagation()}
           >
-            <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">Delete conversation?</h3>
+            <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">{t('messages.deleteConversation')}</h3>
             {deleteConversationDialog.conversation_type === 'mod_mail' ? (
               <>
                 <p className="mt-2 text-sm text-[var(--color-text-secondary)]">
-                  This will delete the conversation from your messages. The conversation will remain accessible to moderators in mod tools for moderation audits.
+                  {t('messages.deleteModMailPrompt', 'This will delete the conversation from your messages. The conversation will remain accessible to moderators in mod tools for moderation audits.')}
                 </p>
                 <div className="mt-6 flex flex-col gap-3">
                   <button
@@ -2029,7 +2271,7 @@ export default function MessagesPage() {
                     }}
                     disabled={deleteConversationMutation.isPending}
                   >
-                    {deleteConversationMutation.isPending ? 'Deleting...' : 'Delete'}
+                    {deleteConversationMutation.isPending ? t('messages.deleting', 'Deleting...') : t('common.delete')}
                   </button>
                   <button
                     type="button"
@@ -2041,14 +2283,14 @@ export default function MessagesPage() {
                     }}
                     disabled={deleteConversationMutation.isPending}
                   >
-                    Cancel
+                    {t('common.cancel')}
                   </button>
                 </div>
               </>
             ) : (
               <>
                 <p className="mt-2 text-sm text-[var(--color-text-secondary)]">
-                  Choose how you want to delete this conversation.
+                  {t('messages.deleteConversationPrompt', 'Choose how you want to delete this conversation.')}
                 </p>
                 <div className="mt-6 flex flex-col gap-3">
                   <button
@@ -2063,8 +2305,8 @@ export default function MessagesPage() {
                     disabled={deleteConversationMutation.isPending}
                   >
                     {deleteConversationMutation.isPending
-                      ? 'Deleting...'
-                      : 'Delete for me (Other user will still see your messages)'}
+                      ? t('messages.deleting', 'Deleting...')
+                      : t('messages.deleteConversationForMe', 'Delete for me (Other user will still see your messages)')}
                   </button>
                   <button
                     type="button"
@@ -2077,7 +2319,7 @@ export default function MessagesPage() {
                     }}
                     disabled={deleteConversationMutation.isPending}
                   >
-                    {deleteConversationMutation.isPending ? 'Deleting for both...' : 'Delete for both'}
+                    {deleteConversationMutation.isPending ? t('messages.deletingForBoth', 'Deleting for both...') : t('messages.deleteForBoth', 'Delete for both')}
                   </button>
                   <button
                     type="button"
@@ -2089,7 +2331,7 @@ export default function MessagesPage() {
                     }}
                     disabled={deleteConversationMutation.isPending}
                   >
-                    Cancel
+                    {t('common.cancel')}
                   </button>
                 </div>
               </>
@@ -2133,7 +2375,7 @@ export default function MessagesPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 px-4">
           <div className="w-full max-w-md rounded-lg bg-[var(--color-surface)] p-6 shadow-lg">
             <div className="flex items-start justify-between mb-4">
-              <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">Browse Reddit/Hub Scroll</h3>
+              <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">{t('messages.browseRedditHub', 'Browse Reddit/Hub Scroll')}</h3>
               <button
                 onClick={() => setRedditSlideshowModalOpen(false)}
                 className="text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
@@ -2145,7 +2387,7 @@ export default function MessagesPage() {
             <div className="space-y-4">
               <div className="relative">
                 <label className="mb-2 block text-sm font-medium text-[var(--color-text-secondary)]">
-                  Enter subreddit or hub name
+                  {t('messages.enterSubredditHub', 'Enter subreddit or hub name')}
                 </label>
                 <input
                   type="text"
@@ -2158,7 +2400,7 @@ export default function MessagesPage() {
                   }}
                   onFocus={() => setRedditSlideshowAutocompleteOpen(true)}
                   onBlur={() => setTimeout(() => setRedditSlideshowAutocompleteOpen(false), 200)}
-                  placeholder="e.g., r/pics or h/gaming"
+                  placeholder={t('messages.compose.hubSubredditPlaceholder')}
                   className="w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-2 text-sm text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') {
@@ -2172,7 +2414,7 @@ export default function MessagesPage() {
                   <div className="absolute left-0 right-0 top-full z-50 mt-1 max-h-60 overflow-auto rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] shadow-lg">
                     {redditSlideshowAutocompleteLoading ? (
                       <div className="p-3 text-center text-sm text-[var(--color-text-secondary)]">
-                        Loading suggestions...
+                        {t('messages.loadingSuggestions', 'Loading suggestions...')}
                       </div>
                     ) : redditSlideshowSuggestions.length > 0 ? (
                       redditSlideshowSuggestions.map((suggestion) => (
@@ -2193,7 +2435,7 @@ export default function MessagesPage() {
                       ))
                     ) : (
                       <div className="p-3 text-center text-sm text-[var(--color-text-secondary)]">
-                        No suggestions found
+                        {t('messages.noSuggestions', 'No suggestions found')}
                       </div>
                     )}
                   </div>
@@ -2205,14 +2447,14 @@ export default function MessagesPage() {
                   onClick={() => setRedditSlideshowModalOpen(false)}
                   className="rounded-md border border-[var(--color-border)] px-4 py-2 text-sm font-semibold text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-elevated)]"
                 >
-                  Cancel
+                  {t('common.cancel')}
                 </button>
                 <button
                   onClick={handleLoadRedditSlideshow}
                   disabled={!redditSlideshowTrimmedInput || isLoadingRedditPosts}
                   className="rounded-md bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)] disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  {isLoadingRedditPosts ? 'Loading...' : 'Load Scroll'}
+                  {isLoadingRedditPosts ? t('common.loading') : t('messages.loadScroll', 'Load Scroll')}
                 </button>
               </div>
             </div>
@@ -2237,13 +2479,14 @@ export default function MessagesPage() {
 
 // Helper component to decrypt and display media in slideshow
 function DecryptedSlideshowItem({ message, isOwnMessage }: { message: Message; isOwnMessage: boolean }) {
+  const { t } = useTranslation();
   const mediaSrc = useDecryptedMedia(message, isOwnMessage);
   const mediaType = inferMessageTypeFromMessage(message);
 
   if (!mediaSrc) {
     return (
       <div className="flex items-center justify-center h-full">
-        <div className="text-white text-lg">Decrypting...</div>
+        <div className="text-white text-lg">{t('messages.viewer.decrypting')}</div>
       </div>
     );
   }
@@ -2284,7 +2527,7 @@ function DecryptedSlideshowItem({ message, isOwnMessage }: { message: Message; i
 
   return (
     <div className="flex items-center justify-center h-full">
-      <div className="text-white text-lg">Unsupported media type</div>
+      <div className="text-white text-lg">{t('messages.unsupportedMedia', 'Unsupported media type')}</div>
     </div>
   );
 }

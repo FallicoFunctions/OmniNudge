@@ -1,0 +1,596 @@
+{
+  "common": {
+    "loading": "Loading...",
+    "error": "Error",
+    "success": "Success",
+    "cancel": "Cancel",
+    "save": "Save",
+    "delete": "Delete",
+    "edit": "Edit",
+    "submit": "Submit",
+    "close": "Close",
+    "back": "Back",
+    "next": "Next",
+    "confirm": "Confirm",
+    "search": "Search",
+    "filter": "Filter",
+    "sort": "Sort",
+    "settings": "Settings",
+    "logout": "Logout",
+    "login": "Login",
+    "register": "Register",
+    "username": "Username",
+    "password": "Password",
+    "email": "Email",
+    "badges": {
+      "admin": "Admin",
+      "moderator": "Mod",
+      "op": "OP"
+    },
+    "accessibility": {
+      "toggleArchivedNotifications": "Toggle archived chat notifications",
+      "togglePushNotifications": "Toggle push notifications",
+      "toggleReadReceipts": "Toggle read receipts",
+      "toggleTypingIndicators": "Toggle typing indicators",
+      "toggleNotificationSound": "Toggle message notification sound",
+      "toggleOmniFeed": "Toggle Omni posts filter",
+      "toggleInfiniteScroll": "Toggle infinite scroll",
+      "expandCommentThread": "Expand comment thread",
+      "collapseCommentThread": "Collapse comment thread",
+      "removeFile": "Remove file"
+    },
+    "time": {
+      "submitted": "submitted",
+      "ago": "ago",
+      "on": "on"
+    },
+    "media": {
+      "image": "Image",
+      "video": "Video",
+      "audio": "Audio",
+      "file": "File"
+    }
+  },
+  "nav": {
+    "home": "Home",
+    "messages": "Messages",
+    "notifications": "Notifications",
+    "profile": "Profile",
+    "admin": "Admin",
+    "hubs": "Hubs",
+    "search": "Search"
+  },
+  "home": {
+    "feed": {
+      "yourFeed": "Your Feed",
+      "popularPosts": "Popular Posts",
+      "omniFeedDescription": "Posts from your Omni hubs (Reddit is filtered out)",
+      "subscribedFeedDescription": "Posts from your subscribed hubs and subreddits",
+      "popularOmniDescription": "Popular posts shared within Omni hubs",
+      "popularAllDescription": "Popular posts from all hubs and subreddits",
+      "showingPopular": "Currently showing popular Omni content.",
+      "hidePopularButton": "Hide popular content"
+    },
+    "sort": {
+      "hot": "Hot",
+      "new": "New",
+      "top": "Top",
+      "rising": "Rising",
+      "controversial": "Controversial",
+      "scroll": "Scroll"
+    },
+    "filter": {
+      "showLabel": "Show:",
+      "omniOnly": "Omni Only",
+      "allPosts": "All Posts",
+      "omniOnlyTooltip": "Showing Omni posts only. Click to show all posts.",
+      "allPostsTooltip": "Showing all posts. Click to show Omni posts only."
+    },
+    "search": {
+      "enterHubOrSubreddit": "Enter hub or subreddit...",
+      "searchPosts": "Search posts...",
+      "includeNsfw": "Include NSFW results",
+      "nsfwBlocked": "NSFW content is blocked in settings.",
+      "noResults": "No hubs or subreddits found.",
+      "searchButton": "Search"
+    },
+    "timeRange": {
+      "label": "Time range",
+      "hour": "Past Hour",
+      "day": "Past Day",
+      "week": "Past Week",
+      "month": "Past Month",
+      "year": "Past Year",
+      "allTime": "All Time",
+      "custom": "Custom Range",
+      "to": "to",
+      "selectBothDates": "Select both start and end dates to apply this filter."
+    },
+    "empty": {
+      "noSubscriptions": "You have zero subscriptions. Posts from your subscriptions will appear here. Click the button below to view the current popular content.",
+      "viewPopularButton": "View current popular content",
+      "noOmniPosts": "No Omni posts from your subscriptions yet.",
+      "noPosts": "No posts from your subscriptions yet.",
+      "subscribeMessage": "Subscribe to hubs and subreddits to see posts from them here.",
+      "noOmniAvailable": "No Omni posts available.",
+      "noPostsAvailable": "No posts available."
+    },
+    "pagination": {
+      "loadingMore": "Loading more posts..."
+    }
+  },
+  "messages": {
+    "title": "Messages",
+    "newConversation": "New Conversation",
+    "typeMessage": "Type a message...",
+    "send": "Send",
+    "noMessages": "No messages yet",
+    "typing": "{{username}} is typing...",
+    "online": "Online",
+    "offline": "Offline",
+    "lastSeen": "Last seen {{time}}",
+    "encrypted": "End-to-end encrypted",
+    "deleteConversation": "Delete Conversation",
+    "deleteConfirm": "Are you sure you want to delete this conversation?",
+    "viewer": {
+      "closeLabel": "Close viewer",
+      "previousLabel": "Previous media",
+      "nextLabel": "Next media",
+      "decrypting": "Decrypting media...",
+      "counter": "{{current}} / {{total}}"
+    },
+    "search": {
+      "conversations": "Search conversations...",
+      "inConversation": "Search in conversation...",
+      "clearLabel": "Clear search"
+    },
+    "media": {
+      "viewAllTitle": "View all media from this conversation in a slideshow",
+      "stillDecrypting": "Media is still decrypting. Please wait and try again.",
+      "fileTooLarge": "File too large. Maximum size is 25MB.",
+      "uploadFailed": "Failed to upload media. Please try again.",
+      "uploadFailedFile": "Failed to upload {{filename}}"
+    },
+    "compose": {
+      "enterUsername": "Enter username...",
+      "placeholder": "Type a message...",
+      "attachSingle": "Attach single file",
+      "attachMultiple": "Upload multiple files",
+      "hubSubredditPlaceholder": "e.g., r/pics or h/gaming"
+    },
+    "errors": {
+      "loadPostsFailed": "Failed to load posts. Please try again.",
+      "conversationNotFound": "Conversation not found",
+      "recipientNotFound": "Recipient not found"
+    },
+    "messageOptions": {
+      "ariaLabel": "Message options"
+    }
+  },
+  "posts": {
+    "title": "Posts",
+    "newPost": "New Post",
+    "comments": "Comments",
+    "comment_one": "{{count}} comment",
+    "comment_other": "{{count}} comments",
+    "upvote": "Upvote",
+    "downvote": "Downvote",
+    "share": "Share",
+    "save": "Save",
+    "hide": "Hide",
+    "report": "Report",
+    "delete": "Delete",
+    "edit": "Edit",
+    "postedBy": "Posted by {{username}}",
+    "postedIn": "in {{hub}}",
+    "timeAgo": "{{time}} ago",
+    "points": "{{count}} point",
+    "points_plural": "{{count}} points",
+    "actions": {
+      "upvote": "Upvote",
+      "downvote": "Downvote",
+      "reply": "Reply",
+      "edit": "Edit",
+      "delete": "Delete",
+      "save": "Save",
+      "unsave": "Unsave",
+      "hide": "Hide",
+      "share": "Share",
+      "crosspost": "Crosspost",
+      "report": "Report",
+      "pin": "Pin",
+      "unpin": "Unpin",
+      "inbox": "Inbox",
+      "disableInbox": "Disable inbox",
+      "permalink": "Permalink",
+      "embed": "Embed"
+    },
+    "status": {
+      "saving": "Saving...",
+      "saved": "Saved",
+      "hiding": "Hiding...",
+      "deleting": "Deleting...",
+      "pinning": "Pinning...",
+      "reporting": "Reporting..."
+    },
+    "badges": {
+      "omni": "Omni",
+      "pinned": "Pinned"
+    }
+  },
+  "comments": {
+    "title": "Comments",
+    "noComments": "No comments yet",
+    "writeComment": "Write your reply...",
+    "actions": {
+      "reply": "Reply",
+      "edit": "Edit",
+      "delete": "Delete",
+      "save": "Save",
+      "unsave": "Unsave",
+      "report": "Report",
+      "permalink": "Permalink",
+      "collapse": "Collapse",
+      "expand": "Expand",
+      "disableInbox": "Disable inbox replies",
+      "enableInbox": "Enable inbox replies"
+    },
+    "status": {
+      "saving": "Saving...",
+      "deleting": "Deleting...",
+      "reporting": "Reporting...",
+      "inboxPending": "Updating inbox..."
+    },
+    "labels": {
+      "editComment": "Edit comment",
+      "replyCount": "{{count}} reply",
+      "replyCount_plural": "{{count}} replies"
+    },
+    "errors": {
+      "voteFailed": "Failed to vote.",
+      "replyFailed": "Failed to post reply.",
+      "editFailed": "Failed to update comment.",
+      "deleteFailed": "Failed to delete comment.",
+      "inboxFailed": "Failed to update inbox setting.",
+      "saveFailed": "Failed to update save state.",
+      "reportFailed": "Failed to report comment."
+    },
+    "confirm": {
+      "delete": "Delete this comment? This action cannot be undone."
+    }
+  },
+  "settings": {
+    "title": "Settings",
+    "subtitle": "Customize your OmniNudge experience",
+    "general": "General",
+    "privacy": "Privacy",
+    "notifications": "Notifications",
+    "appearance": "Appearance",
+    "language": "Language",
+    "account": "Account",
+    "theme": "Theme",
+    "darkMode": "Dark Mode",
+    "lightMode": "Light Mode",
+    "autoDetect": "Auto-detect",
+    "emailNotifications": "Email Notifications",
+    "pushNotifications": "Push Notifications",
+    "readReceipts": "Read Receipts",
+    "typingIndicators": "Typing Indicators",
+    "notificationSound": "Notification Sound",
+    "changeEmail": "Change Email",
+    "changePassword": "Change Password",
+    "deleteAccount": "Delete Account",
+    "exportData": "Export Data",
+    "categories": {
+      "appearance": "Appearance",
+      "notifications": "Notifications",
+      "preferences": "Preferences",
+      "accountPrivacy": "Account & Privacy"
+    },
+    "themeSection": {
+      "title": "Theme",
+      "description": "Choose an active theme or create your own."
+    },
+    "archivedNotifications": {
+      "title": "Archived Chat Notifications",
+      "description": "Control whether you get notifications when new messages arrive in conversations you've archived.",
+      "toggleLabel": "Notify for archived conversations",
+      "toggleHelp": "When off, archived chats stay quiet; you'll still see messages when you open them."
+    },
+    "pushNotificationsSection": {
+      "title": "Push Notifications",
+      "description": "Get browser notifications when you receive new messages, even when OmniNudge is closed.",
+      "notSupported": "Push notifications are not supported in your browser. Try using Chrome, Firefox, or Edge.",
+      "toggleLabel": "Enable push notifications",
+      "toggleHelpOn": "You will receive notifications when the app is closed",
+      "toggleHelpOff": "Click to allow browser notifications"
+    },
+    "messagingPrivacy": {
+      "title": "Messaging Privacy",
+      "description": "Control what information you share with other users during conversations.",
+      "readReceipts": "Read receipts",
+      "readReceiptsHelp": "Let others know when you've read their messages. When disabled, others won't see read status for your messages.",
+      "typingIndicators": "Typing indicators",
+      "typingIndicatorsHelp": "Show others when you're typing. When disabled, you won't send or see typing indicators.",
+      "notificationSound": "Message notification sound",
+      "notificationSoundHelp": "Play a sound when you receive a new message. Only plays when you're actively using the app."
+    },
+    "dateTime": {
+      "title": "Date & Time Display",
+      "useRelativeTime": "Use Relative Time",
+      "useRelativeTimeHelp": "Display timestamps as relative time (e.g., \"4 hours ago\") instead of absolute dates (e.g., \"12/2/2025\")",
+      "previewLabel": "Preview:",
+      "relativePreview": "Relative: submitted 4 hours ago",
+      "absolutePreview": "Absolute: submitted on 12/2/2025",
+      "cooldownFormat": "Access Request Cooldown Format",
+      "cooldownFormatHelp": "Choose how cooldown time is shown on private hub access requests.",
+      "cooldownDays": "Show days remaining",
+      "cooldownDate": "Show the date",
+      "cooldownBoth": "Show days + date"
+    },
+    "themeSelector": {
+      "title": "Theme Selector Behavior",
+      "description": "Choose whether the theme dropdown should stay open after you pick a theme or close automatically.",
+      "stayOpen": "Stay Open (Default)",
+      "stayOpenHelp": "Keep browsing other themes without reopening the dropdown.",
+      "autoClose": "Auto-Close After Selection",
+      "autoCloseHelp": "Close the dropdown as soon as you activate a theme."
+    },
+    "savedItems": {
+      "title": "Saved Items Alerts",
+      "description": "When Reddit moderators remove a post you've saved, OmniNudge automatically cleans it from your Saved tab. You can choose whether to see a reminder the next time you open Saved Items.",
+      "notifyLabel": "Notify me about removed Reddit posts",
+      "notifyHelp": "When enabled, you'll see a one-time banner letting you know how many removed posts were cleaned up."
+    },
+    "omniFeed": {
+      "title": "Omni Feed Defaults",
+      "description": "Decide whether your Omni feed should automatically start in \"Omni posts only\" mode every time you sign in. You can still toggle it on the fly from the feed toolbar.",
+      "defaultOmniLabel": "Default to Omni posts only",
+      "defaultOmniHelp": "When enabled, the Omni feed filter starts in Omni-only mode on login instead of blending Reddit items.",
+      "stayOnPostLabel": "Stay on post after hiding",
+      "stayOnPostHelp": "When enabled, hiding a post keeps you on the detail view. When disabled, you'll be sent back to the feed or hub you came from."
+    },
+    "pageNavigation": {
+      "title": "Page Navigation",
+      "description": "Control how you browse content on different pages. Choose between infinite scroll (automatically load more as you scroll) or pagination (use Previous/Next buttons).",
+      "homeFeed": "Home Feed",
+      "hubPages": "Hub Pages",
+      "subredditPages": "Subreddit Pages",
+      "infiniteScroll": "Infinite Scroll: Posts load automatically as you scroll",
+      "pagination": "Pagination: Use Previous/Next buttons"
+    },
+    "nsfw": {
+      "title": "NSFW Preferences",
+      "blockAll": "Block All NSFW Content",
+      "blockAllHelp": "Hide NSFW posts, hubs, subreddits, and users from search and feeds. Manually navigating to an NSFW page will show a warning instead of content.",
+      "defaultInclude": "Default \"Include NSFW\" in Search",
+      "defaultIncludeHelp": "When enabled, the search dropdown will pre-check \"Include NSFW results\" (unless NSFW is fully blocked above).",
+      "blockThumbnails": "Block NSFW post thumbnails",
+      "blockThumbnailsHelp": "Blur NSFW post thumbnails and overlay an 18+ warning."
+    },
+    "security": {
+      "title": "Security",
+      "description": "Your public key is used for end-to-end encrypted features. It isn't shown on your public profile.",
+      "showKey": "Show public key",
+      "hideKey": "Hide public key",
+      "copy": "Copy",
+      "copied": "Copied!",
+      "copyFailed": "Copy failed",
+      "noKey": "No public key found for this account."
+    },
+    "email": {
+      "title": "Email",
+      "description": "Manage your email address associated with this account.",
+      "newEmail": "New Email Address",
+      "confirmEmail": "Confirm New Email Address",
+      "currentEmail": "Current Email",
+      "noEmail": "No email set",
+      "updateButton": "Update Email",
+      "addButton": "Add Email",
+      "updating": "Updating...",
+      "saveChanges": "Save Changes",
+      "emailMismatch": "Email addresses do not match",
+      "invalidEmail": "Please enter a valid email address",
+      "updateSuccess": "Email updated successfully",
+      "verificationSent": "Verification email sent to {email}. Please check your inbox and click the verification link to complete the email update.",
+      "pendingVerification": "Verification Pending",
+      "pendingEmail": "Pending Email",
+      "resendVerification": "Resend Verification Email",
+      "resending": "Resending...",
+      "privacyNote": "Your email is encrypted at rest. Your password is stored as a one-way hash (we can't read it)."
+    },
+    "betaFeatures": {
+      "title": "Beta Features",
+      "experimentalTitle": "Experimental Features",
+      "experimentalDescription": "These features are currently in beta testing. You have early access based on your account settings or admin configuration.",
+      "voiceCalls": "Voice Calls",
+      "voiceCallsDescription": "Make 1-on-1 voice calls in conversations",
+      "videoCalls": "Video Calls",
+      "videoCallsDescription": "Make 1-on-1 video calls with screen sharing",
+      "performanceMode": "Performance Mode",
+      "performanceModeDescription": "Lazy loading images for faster page loads",
+      "note": "Beta features may be unstable. Contact support if you experience issues. Feature availability is controlled by feature flags and may change without notice."
+    },
+    "dataExport": {
+      "title": "Export Your Data",
+      "description": "Download a copy of all your data in JSON format. This includes your profile, messages, posts, comments, votes, saved items, and more.",
+      "requestButton": "Request Data Export",
+      "requesting": "Requesting Export...",
+      "successMessage": "Export requested successfully! Export ID: {{exportId}}. You'll receive an email when your export is ready for download (usually within 24 hours).",
+      "included": "What's included?",
+      "includedList": [
+        "Profile information (username, email, bio, avatar)",
+        "All messages (encrypted content preserved)",
+        "Posts and comments you've created",
+        "Your votes and saved items",
+        "Hub subscriptions and created hubs",
+        "Account settings and preferences",
+        "Your encryption keys (for backup)"
+      ],
+      "availabilityNote": "Export files are available for download for 7 days after processing. Processing typically takes less than 24 hours."
+    },
+    "accountDeletion": {
+      "title": "Delete Account",
+      "description": "Permanently delete your account and all associated data. This action has a 30-day grace period during which you can cancel the deletion.",
+      "manageButton": "Manage Account Deletion"
+    }
+  },
+  "errors": {
+    "somethingWentWrong": "Something went wrong",
+    "networkError": "Network error. Please check your connection.",
+    "unauthorized": "Unauthorized. Please log in.",
+    "notFound": "Not found",
+    "serverError": "Server error. Please try again later.",
+    "validationError": "Validation error",
+    "invalidCredentials": "Invalid username or password",
+    "emailTaken": "Email already in use",
+    "usernameTaken": "Username already taken"
+  },
+  "validation": {
+    "required": "This field is required",
+    "invalidEmail": "Invalid email address",
+    "passwordTooShort": "Password must be at least {{min}} characters",
+    "passwordMismatch": "Passwords do not match",
+    "usernameTooShort": "Username must be at least {{min}} characters",
+    "usernameTooLong": "Username must be at most {{max}} characters"
+  },
+  "feedback": {
+    "title": "Send Feedback",
+    "categoryLabel": "What type of feedback is this?",
+    "categoryBug": "Bug Report",
+    "categoryFeature": "Feature Request",
+    "categoryOther": "General Feedback",
+    "messageLabel": "Message",
+    "messagePlaceholder": "Tell us what's on your mind...",
+    "ratingLabel": "Overall satisfaction (optional)",
+    "ratingHelp": "1 = Very Dissatisfied, 5 = Very Satisfied",
+    "sending": "Sending...",
+    "send": "Send Feedback",
+    "successMessage": "Thank you for your feedback!",
+    "errorMessage": "Failed to submit feedback",
+    "buttonAriaLabel": "Send feedback",
+    "buttonTitle": "Send feedback"
+  },
+  "auth": {
+    "title": "OmniNudge",
+    "loginTitle": "Log In",
+    "registerTitle": "Sign Up",
+    "loginSubtitle": "Sign in to your account",
+    "signupSubtitle": "Create your account",
+    "switchToLogin": "Already have an account? Log in",
+    "switchToRegister": "Don't have an account? Sign up",
+    "acceptPrivacy": "I accept the Privacy Policy",
+    "acceptTerms": "I accept the Terms of Service",
+    "emailOptional": "Email (optional)",
+    "forgotPassword": "Forgot password?",
+    "fields": {
+      "username": "Username",
+      "usernameRequired": "*",
+      "usernamePlaceholder": "Username",
+      "email": "Email (optional but required for password reset)",
+      "emailPlaceholder": "you@email.com",
+      "password": "Password",
+      "passwordRequired": "*",
+      "passwordPlaceholder": "Password"
+    },
+    "keepLoggedIn": "Keep me logged in",
+    "policy": {
+      "acceptPrivacy": "I accept the",
+      "privacyPolicy": "Privacy Policy",
+      "acceptTerms": "I accept the",
+      "termsOfService": "Terms of Service",
+      "required": "*"
+    },
+    "security": {
+      "verificationRequired": "Please complete the security verification",
+      "verificationFailed": "Security verification failed. Please try again."
+    },
+    "passwordStrength": {
+      "veryWeak": "Very Weak",
+      "weak": "Weak",
+      "fair": "Fair",
+      "strong": "Strong",
+      "veryStrong": "Very Strong"
+    },
+    "buttons": {
+      "signingIn": "Signing in...",
+      "creatingAccount": "Creating account...",
+      "signIn": "Sign in",
+      "signUp": "Sign up"
+    },
+    "switch": {
+      "noAccount": "Don't have an account?",
+      "hasAccount": "Already have an account?",
+      "signUpLink": "Sign up",
+      "signInLink": "Sign in"
+    },
+    "privacyNote": "Your email is encrypted at rest. Your password is stored as a one-way hash (we can't read it)."
+  },
+  "account": {
+    "exportDataTitle": "Export Your Data",
+    "exportDataDescription": "Download a copy of all your data in JSON format",
+    "requestExport": "Request Data Export",
+    "exportSuccess": "Export requested! ID: {{exportId}}",
+    "deleteAccountTitle": "Delete Account",
+    "deleteAccountWarning": "This action cannot be undone",
+    "confirmDeletion": "Type DELETE to confirm",
+    "betaFeaturesTitle": "Beta Features"
+  },
+  "modals": {
+    "hide": {
+      "title": "Hide this post?",
+      "description": "Are you sure? Hidden posts can be found at your hidden posts page.",
+      "hideButton": "Hide Post",
+      "hiding": "Hiding..."
+    },
+    "delete": {
+      "title": "Delete Post - Reason Required",
+      "moderatorMessage": "As a moderator, you must provide a reason for deleting this post. The author will receive a modmail with your reason.",
+      "reasonLabel": "Reason for deletion",
+      "reasonRequired": "*",
+      "reasonPlaceholder": "E.g., Violates rule 3: No spam...",
+      "deleteButton": "Delete Post",
+      "deleting": "Deleting...",
+      "confirmOwn": "Are you sure you want to delete this post?"
+    },
+    "crosspost": {
+      "title": "Submit a Crosspost",
+      "info": "You can crosspost to an OmniHub, a subreddit, or both. At least one destination is required.",
+      "toHub": "Crosspost to OmniHub (optional)",
+      "toSubreddit": "Crosspost to subreddit (optional)",
+      "selectHub": "Select a hub...",
+      "selectSubreddit": "Select a subreddit...",
+      "titleLabel": "Choose a title",
+      "titleRequired": "*required",
+      "titlePlaceholder": "Enter title...",
+      "sendRepliesLabel": "Send replies to this post to my inbox",
+      "submitButton": "Submit",
+      "submitting": "Submitting..."
+    }
+  },
+  "alerts": {
+    "deletePostFailed": "Failed to delete post: {{message}}",
+    "saveFailed": "Failed to update save status: {{message}}",
+    "hideFailed": "Failed to hide post: {{message}}",
+    "crosspostSuccess": "Crosspost created successfully!",
+    "crosspostFailed": "Failed to create crosspost: {{message}}",
+    "linkCopied": "Post link copied to clipboard!",
+    "linkCopyFailed": "Unable to copy link. Please try again.",
+    "signInToSave": "Please sign in to save posts.",
+    "signInToHide": "Please sign in to hide posts.",
+    "signInToCrosspost": "Please sign in to crosspost.",
+    "provideDeleteReason": "Please provide a reason for deletion"
+  },
+  "moderation": {
+    "deleteReason": "Reason for deletion",
+    "deleteReasonPlaceholder": "E.g., Violates rule 3: No spam...",
+    "modmailNote": "The author will receive a modmail with your reason.",
+    "reasonRequired": "Please provide a reason for deletion"
+  },
+  "slideshow": {
+    "closeLabel": "Close slideshow (Esc)",
+    "previousLabel": "Previous (←)",
+    "nextLabel": "Next (→)",
+    "counter": "{{current}} of {{total}}"
+  }
+}

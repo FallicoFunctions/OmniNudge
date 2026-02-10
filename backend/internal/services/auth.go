@@ -213,10 +213,12 @@ func (s *AuthService) ValidateJWT(tokenString string) (*JWTClaims, error) {
 
 // RegisterRequest represents the registration request payload
 type RegisterRequest struct {
-	Username      string  `json:"username"`
-	Password      string  `json:"password"`
-	Email         *string `json:"email,omitempty"`
-	TurnstileToken string  `json:"turnstile_token"`
+	Username            string  `json:"username"`
+	Password            string  `json:"password"`
+	Email               *string `json:"email,omitempty"`
+	TurnstileToken      string  `json:"turnstile_token"`
+	AcceptPrivacyPolicy bool    `json:"accept_privacy_policy"` // GDPR requirement
+	AcceptTerms         bool    `json:"accept_terms"`          // Legal requirement
 }
 
 // LoginRequest represents the login request payload
@@ -247,6 +249,14 @@ func (s *AuthService) Register(ctx context.Context, userRepo *models.UserReposit
 		}
 	}
 
+	// Validate policy acceptance (GDPR/Legal requirement)
+	if !req.AcceptPrivacyPolicy {
+		return nil, "", errors.New("you must accept the Privacy Policy to create an account")
+	}
+	if !req.AcceptTerms {
+		return nil, "", errors.New("you must accept the Terms of Service to create an account")
+	}
+
 	// Verify Turnstile captcha token
 	if err := s.VerifyTurnstileToken(req.TurnstileToken, ""); err != nil {
 		return nil, "", fmt.Errorf("captcha verification failed: %w", err)
@@ -264,11 +274,19 @@ func (s *AuthService) Register(ctx context.Context, userRepo *models.UserReposit
 		return nil, "", fmt.Errorf("failed to hash password: %w", err)
 	}
 
-	// Create user
+	// Create user with policy acceptance
+	currentTime := time.Now()
+	privacyVersion := "1.0"  // Current privacy policy version
+	termsVersion := "1.0"    // Current terms of service version
+
 	user := &models.User{
-		Username:     username,
-		Email:        req.Email,
-		PasswordHash: hashedPassword,
+		Username:              username,
+		Email:                 req.Email,
+		PasswordHash:          hashedPassword,
+		PrivacyPolicyVersion:  &privacyVersion,
+		TermsOfServiceVersion: &termsVersion,
+		PrivacyAcceptedAt:     &currentTime,
+		TermsAcceptedAt:       &currentTime,
 	}
 
 	if err := userRepo.Create(ctx, user); err != nil {

@@ -21,6 +21,8 @@ export interface RegisterRequest {
   password: string;
   email?: string;
   turnstile_token: string;
+  accept_privacy_policy: boolean;
+  accept_terms: boolean;
 }
 
 export interface AuthResponse {

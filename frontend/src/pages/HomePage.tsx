@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient, useInfiniteQuery, type InfiniteData } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { feedService, type HomeFeedResponse, type RedditPost } from '../services/feedService';
 import { useAuth } from '../contexts/AuthContext';
 import { useSettings } from '../contexts/SettingsContext';
@@ -75,6 +76,7 @@ const persistOmniOnlyState = (userId: number | null | undefined, value: boolean)
 };
 
 export default function HomePage() {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const {
     useRelativeTime,
@@ -428,14 +430,14 @@ export default function HomePage() {
       setDeleteReason('');
     },
     onError: (err) => {
-      alert(`Failed to delete post: ${err.message}`);
+      alert(t('alerts.deletePostFailed', { message: err.message }));
     },
   });
 
   const savedToggleMutation = useMutation<void, Error, { postId: number; shouldSave: boolean }>({
     mutationFn: async ({ postId, shouldSave }) => {
       if (!user) {
-        throw new Error('You must be signed in to save posts.');
+        throw new Error(t('alerts.signInToSave'));
       }
       if (shouldSave) {
         await savedService.savePost(postId);
@@ -447,14 +449,14 @@ export default function HomePage() {
       queryClient.invalidateQueries({ queryKey: savedPostsKey });
     },
     onError: (err) => {
-      alert(`Failed to update save status: ${err.message}`);
+      alert(t('alerts.saveFailed', { message: err.message }));
     },
   });
 
   const hidePostMutation = useMutation<void, Error, number>({
     mutationFn: async (postId: number) => {
       if (!user) {
-        throw new Error('You must be signed in to hide posts.');
+        throw new Error(t('alerts.signInToHide'));
       }
       await savedService.hidePost(postId);
     },
@@ -463,7 +465,7 @@ export default function HomePage() {
       setHideTarget(null);
     },
     onError: (err) => {
-      alert(`Failed to hide post: ${err.message}`);
+      alert(t('alerts.hideFailed', { message: err.message }));
     },
   });
 
@@ -475,7 +477,7 @@ export default function HomePage() {
   >({
     mutationFn: async ({ post, shouldSave }) => {
       if (!user) {
-        throw new Error('You must be signed in to save posts.');
+        throw new Error(t('alerts.signInToSave'));
       }
       if (shouldSave) {
         await savedService.saveRedditPost(post.subreddit, post.id);
@@ -487,14 +489,14 @@ export default function HomePage() {
       queryClient.invalidateQueries({ queryKey: savedRedditPostsKey });
     },
     onError: (err) => {
-      alert(`Failed to update save status: ${err.message}`);
+      alert(t('alerts.saveFailed', { message: err.message }));
     },
   });
 
   const hideRedditPostMutation = useMutation<void, Error, RedditPost>({
     mutationFn: async (post) => {
       if (!user) {
-        throw new Error('You must be signed in to hide posts.');
+        throw new Error(t('alerts.signInToHide'));
       }
       await savedService.hideRedditPost(post.subreddit, post.id);
     },
@@ -504,7 +506,7 @@ export default function HomePage() {
       setHideTarget(null);
     },
     onError: (err) => {
-      alert(`Failed to hide post: ${err.message}`);
+      alert(t('alerts.hideFailed', { message: err.message }));
     },
   });
 
@@ -557,10 +559,10 @@ export default function HomePage() {
       setSelectedSubreddit('');
       setSendRepliesToInbox(true);
       invalidateHomeFeed();
-      alert('Crosspost created successfully!');
+      alert(t('alerts.crosspostSuccess'));
     },
     onError: (error) => {
-      alert(`Failed to create crosspost: ${error.message}`);
+      alert(t('alerts.crosspostFailed', { message: error.message }));
     },
   });
 
@@ -569,13 +571,13 @@ export default function HomePage() {
     const shareUrl = `${window.location.origin}/posts/${postId}`;
     navigator.clipboard
       .writeText(shareUrl)
-      .then(() => alert('Post link copied to clipboard!'))
-      .catch(() => alert('Unable to copy link. Please try again.'));
+      .then(() => alert(t('alerts.linkCopied')))
+      .catch(() => alert(t('alerts.linkCopyFailed')));
   };
 
   const handleToggleSavePost = (postId: number, isCurrentlySaved: boolean) => {
     if (!user) {
-      alert('Please sign in to save posts.');
+      alert(t('alerts.signInToSave'));
       return;
     }
     savedToggleMutation.mutate({ postId, shouldSave: !isCurrentlySaved });
@@ -583,7 +585,7 @@ export default function HomePage() {
 
   const handleHidePost = (post: PlatformPost) => {
     if (!user) {
-      alert('Please sign in to hide posts.');
+      alert(t('alerts.signInToHide'));
       return;
     }
     setHideTarget({ type: 'platform', post });
@@ -598,7 +600,7 @@ export default function HomePage() {
       setDeletePostTarget({ postId: post.id, authorId: post.author_id });
     } else {
       // For own posts, just confirm
-      if (!window.confirm('Are you sure you want to delete this post?')) {
+      if (!window.confirm(t('modals.delete.confirmOwn'))) {
         return;
       }
       deletePostMutation.mutate({ postId: post.id });
@@ -608,7 +610,7 @@ export default function HomePage() {
   const handleConfirmDeletePost = () => {
     if (!deletePostTarget) return;
     if (!deleteReason.trim()) {
-      alert('Please provide a reason for deletion');
+      alert(t('alerts.provideDeleteReason'));
       return;
     }
     deletePostMutation.mutate({ postId: deletePostTarget.postId, reason: deleteReason });
@@ -619,13 +621,13 @@ export default function HomePage() {
     const shareUrl = `${window.location.origin}${post.permalink}`;
     navigator.clipboard
       .writeText(shareUrl)
-      .then(() => alert('Post link copied to clipboard!'))
-      .catch(() => alert('Unable to copy link. Please try again.'));
+      .then(() => alert(t('alerts.linkCopied')))
+      .catch(() => alert(t('alerts.linkCopyFailed')));
   };
 
   const handleHideRedditPost = (post: RedditPost) => {
     if (!user) {
-      alert('Please sign in to hide posts.');
+      alert(t('alerts.signInToHide'));
       return;
     }
     setHideTarget({ type: 'reddit', post });
@@ -633,7 +635,7 @@ export default function HomePage() {
 
   const handleCrosspostRedditPost = (post: RedditPost) => {
     if (!user) {
-      alert('Please sign in to crosspost.');
+      alert(t('alerts.signInToCrosspost'));
       return;
     }
     setCrosspostTarget({ post });
@@ -696,16 +698,16 @@ export default function HomePage() {
         <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
           <div className="text-left md:self-start">
             <h1 className="text-2xl font-bold text-[var(--color-text-primary)]">
-              {user ? 'Your Feed' : 'Popular Posts'}
+              {user ? t('home.feed.yourFeed') : t('home.feed.popularPosts')}
             </h1>
             <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
               {user
                 ? omniOnly
-                  ? 'Posts from your Omni hubs (Reddit is filtered out)'
-                  : 'Posts from your subscribed hubs and subreddits'
+                  ? t('home.feed.omniFeedDescription')
+                  : t('home.feed.subscribedFeedDescription')
                 : omniOnly
-                  ? 'Popular posts shared within Omni hubs'
-                  : 'Popular posts from all hubs and subreddits'}
+                  ? t('home.feed.popularOmniDescription')
+                  : t('home.feed.popularAllDescription')}
             </p>
           </div>
           <div className="flex w-full flex-col gap-3 md:w-auto md:flex-row md:items-start md:justify-end">
@@ -719,7 +721,7 @@ export default function HomePage() {
             />
             <FeedSearchBars
               topValue={inputValue}
-              topPlaceholder="Enter hub or subreddit..."
+              topPlaceholder={t('home.search.enterHubOrSubreddit')}
               onTopChange={handleInputChange}
               onTopFocus={() => setIsAutocompleteOpen(true)}
               onTopBlur={() => setIsAutocompleteOpen(false)}
@@ -727,7 +729,7 @@ export default function HomePage() {
               topSuggestions={suggestions}
               topShouldShowSuggestions={shouldShowSuggestions}
               topIsLoading={isAutocompleteLoading}
-              topEmptyMessage="No hubs or subreddits found."
+              topEmptyMessage={t('home.search.noResults')}
               renderTopSuggestion={(suggestion) => (
                 <CombinedSuggestionItem
                   key={`${suggestion.type}-${suggestion.data.name}`}
@@ -748,13 +750,13 @@ export default function HomePage() {
       </div>
       {user && showPopularFallback && !hasAnySubscriptions && (
         <div className="mb-4 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] p-4 text-sm text-[var(--color-text-secondary)]">
-          Currently showing popular Omni content.{' '}
+          {t('home.feed.showingPopular')}{' '}
           <button
             type="button"
             onClick={() => setShowPopularFallback(false)}
             className="font-semibold text-[var(--color-primary)] hover:underline"
           >
-            Hide popular content
+            {t('home.feed.hidePopularButton')}
           </button>
         </div>
       )}
@@ -771,7 +773,7 @@ export default function HomePage() {
                 : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
             }`}
           >
-            Hot
+            {t('home.sort.hot')}
           </button>
           <button
             type="button"
@@ -782,7 +784,7 @@ export default function HomePage() {
                 : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
             }`}
           >
-            New
+            {t('home.sort.new')}
           </button>
           <button
             type="button"
@@ -793,7 +795,7 @@ export default function HomePage() {
                 : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
             }`}
           >
-            Top
+            {t('home.sort.top')}
           </button>
           <button
             type="button"
@@ -804,7 +806,7 @@ export default function HomePage() {
                 : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
             }`}
           >
-            Rising
+            {t('home.sort.rising')}
           </button>
           <button
             type="button"
@@ -815,7 +817,7 @@ export default function HomePage() {
                 : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
             }`}
           >
-            Controversial
+            {t('home.sort.controversial')}
           </button>
           {displayedPosts.length > 0 && (
             <button
@@ -825,14 +827,14 @@ export default function HomePage() {
               <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
               </svg>
-              Scroll
+              {t('home.sort.scroll')}
             </button>
           )}
         </div>
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-2 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-2 text-sm">
             <span className="text-xs font-medium text-[var(--color-text-muted)]">
-              Show:
+              {t('home.filter.showLabel')}
             </span>
             <button
               type="button"
@@ -842,9 +844,9 @@ export default function HomePage() {
               className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-1 ${
                 omniOnly ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
               }`}
-              title={omniOnly ? 'Showing Omni posts only. Click to show all posts.' : 'Showing all posts. Click to show Omni posts only.'}
+              title={omniOnly ? t('home.filter.omniOnlyTooltip') : t('home.filter.allPostsTooltip')}
             >
-              <span className="sr-only">Toggle Omni posts filter</span>
+              <span className="sr-only">{t('common.accessibility.toggleOmniFeed')}</span>
               <span
                 aria-hidden="true"
                 className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
@@ -853,7 +855,7 @@ export default function HomePage() {
               />
             </button>
             <span className={`text-xs font-semibold transition-colors ${omniOnly ? 'text-[var(--color-primary)]' : 'text-[var(--color-text-secondary)]'}`}>
-              {omniOnly ? 'Omni Only' : 'All Posts'}
+              {omniOnly ? t('home.filter.omniOnly') : t('home.filter.allPosts')}
             </span>
           </div>
           <form onSubmit={handlePostSearchSubmit} className="flex w-full gap-2 md:w-96">
@@ -869,7 +871,7 @@ export default function HomePage() {
                     setIsSearchDropdownOpen(true);
                   }
                 }}
-                placeholder="Search posts..."
+                placeholder={t('home.search.searchPosts')}
                 className="w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-2 text-sm text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
               />
               {isSearchDropdownOpen && (
@@ -882,12 +884,12 @@ export default function HomePage() {
                           checked={includeNsfwSearch}
                           onChange={(e) => setIncludeNsfwSearch(e.target.checked)}
                         />
-                        <span>Include NSFW results</span>
+                        <span>{t('home.search.includeNsfw')}</span>
                       </label>
                     )}
                     {blockAllNsfw && (
                       <div className="text-xs text-[var(--color-text-secondary)]">
-                        NSFW content is blocked in settings.
+                        {t('home.search.nsfwBlocked')}
                       </div>
                     )}
                   </div>
@@ -898,7 +900,7 @@ export default function HomePage() {
               type="submit"
               className="rounded-md bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)]"
             >
-              Search
+              {t('home.search.searchButton')}
             </button>
           </form>
         </div>
@@ -907,7 +909,7 @@ export default function HomePage() {
         <div className="mb-4 space-y-2 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-3">
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
-              Time range
+              {t('home.timeRange.label')}
             </span>
             <select
               value={topTimeRange}
@@ -929,7 +931,7 @@ export default function HomePage() {
                 onChange={(event) => setCustomTopStart(event.target.value)}
                 className="rounded border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-2 py-1 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
               />
-              <span className="text-xs text-[var(--color-text-secondary)]">to</span>
+              <span className="text-xs text-[var(--color-text-secondary)]">{t('home.timeRange.to')}</span>
               <input
                 type="datetime-local"
                 value={customTopEnd}
@@ -938,7 +940,7 @@ export default function HomePage() {
               />
               {requiresValidCustomRange && (
                 <span className="text-xs text-[var(--color-error)]">
-                  Select both start and end dates to apply this filter.
+                  {t('home.timeRange.selectBothDates')}
                 </span>
               )}
             </div>
@@ -961,8 +963,7 @@ export default function HomePage() {
             !hasAnySubscriptions ? (
               <div>
                 <p className="mb-4">
-                  You have zero subscriptions. Posts from your subscriptions will appear here. Click
-                  the button below to view the current popular content.
+                  {t('home.empty.noSubscriptions')}
                 </p>
                 <button
                   type="button"
@@ -972,23 +973,23 @@ export default function HomePage() {
                     requiresValidCustomRange ? 'cursor-not-allowed opacity-60' : ''
                   }`}
                 >
-                  View current popular content
+                  {t('home.empty.viewPopularButton')}
                 </button>
               </div>
             ) : (
               <div>
                 <p className="mb-4">
                   {omniOnly
-                    ? 'No Omni posts from your subscriptions yet.'
-                    : 'No posts from your subscriptions yet.'}
+                    ? t('home.empty.noOmniPosts')
+                    : t('home.empty.noPosts')}
                 </p>
                 <p className="text-sm">
-                  Subscribe to hubs and subreddits to see posts from them here.
+                  {t('home.empty.subscribeMessage')}
                 </p>
               </div>
             )
           ) : (
-            <p>{omniOnly ? 'No Omni posts available.' : 'No posts available.'}</p>
+            <p>{omniOnly ? t('home.empty.noOmniAvailable') : t('home.empty.noPostsAvailable')}</p>
           )}
         </div>
       ) : (
@@ -1059,7 +1060,7 @@ export default function HomePage() {
           <div ref={loadMoreRef} className="h-10" />
           {isFetchingNextPage && (
             <div className="py-3 text-center text-sm text-[var(--color-text-secondary)]">
-              Loading more posts...
+              {t('home.pagination.loadingMore')}
             </div>
           )}
         </>
@@ -1089,24 +1090,24 @@ export default function HomePage() {
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 px-4">
           <div className="w-full max-w-md rounded-lg bg-white p-4 shadow-lg">
             <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">
-              Hide this post?
+              {t('modals.hide.title')}
             </h3>
             <p className="mt-2 text-sm text-[var(--color-text-secondary)]">
-              Are you sure? Hidden posts can be found at your hidden posts page.
+              {t('modals.hide.description')}
             </p>
             <div className="mt-4 flex justify-end gap-2">
               <button
                 onClick={() => setHideTarget(null)}
                 className="rounded border border-[var(--color-border)] px-3 py-1 text-sm hover:bg-[var(--color-surface-elevated)]"
               >
-                Cancel
+                {t('common.cancel')}
               </button>
               <button
                 onClick={handleConfirmHide}
                 disabled={isHidePending}
                 className="rounded bg-[var(--color-primary)] px-3 py-1 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)] disabled:opacity-50"
               >
-                {isHidePending ? 'Hiding...' : 'Hide Post'}
+                {isHidePending ? t('modals.hide.hiding') : t('modals.hide.hideButton')}
               </button>
             </div>
           </div>
@@ -1118,19 +1119,19 @@ export default function HomePage() {
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 px-4">
           <div className="w-full max-w-md rounded-lg bg-white p-4 shadow-lg">
             <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">
-              Delete Post - Reason Required
+              {t('modals.delete.title')}
             </h3>
             <p className="mt-2 text-sm text-[var(--color-text-secondary)]">
-              As a moderator, you must provide a reason for deleting this post. The author will receive a modmail with your reason.
+              {t('modals.delete.moderatorMessage')}
             </p>
             <div className="mt-4">
               <label className="mb-1 block text-xs font-medium text-[var(--color-text-secondary)]">
-                Reason for deletion <span className="text-red-500">*</span>
+                {t('modals.delete.reasonLabel')} <span className="text-red-500">{t('modals.delete.reasonRequired')}</span>
               </label>
               <textarea
                 value={deleteReason}
                 onChange={(e) => setDeleteReason(e.target.value)}
-                placeholder="E.g., Violates rule 3: No spam..."
+                placeholder={t('modals.delete.reasonPlaceholder')}
                 className="w-full rounded border border-[var(--color-border)] bg-[var(--color-surface)] p-2 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
                 rows={4}
               />
@@ -1143,14 +1144,14 @@ export default function HomePage() {
                 }}
                 className="rounded border border-[var(--color-border)] px-3 py-1 text-sm hover:bg-[var(--color-surface-elevated)]"
               >
-                Cancel
+                {t('common.cancel')}
               </button>
               <button
                 onClick={handleConfirmDeletePost}
                 disabled={deletePostMutation.isPending || !deleteReason.trim()}
                 className="rounded bg-red-600 px-3 py-1 text-sm font-semibold text-white hover:bg-red-500 disabled:opacity-50"
               >
-                {deletePostMutation.isPending ? 'Deleting...' : 'Delete Post'}
+                {deletePostMutation.isPending ? t('modals.delete.deleting') : t('modals.delete.deleteButton')}
               </button>
             </div>
           </div>
@@ -1163,7 +1164,7 @@ export default function HomePage() {
           <div className="w-full max-w-md rounded-lg bg-white p-4 shadow-lg">
             <div className="flex items-start justify-between">
               <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">
-                Submit a Crosspost
+                {t('modals.crosspost.title')}
               </h3>
               <button
                 onClick={() => setCrosspostTarget(null)}
@@ -1174,21 +1175,20 @@ export default function HomePage() {
             </div>
             <div className="mt-3 rounded border border-yellow-200 bg-yellow-50 p-3 text-sm text-yellow-800">
               <p>
-                You can crosspost to an OmniHub, a subreddit, or both. At least one destination is
-                required.
+                {t('modals.crosspost.info')}
               </p>
             </div>
             <div className="mt-4 space-y-3">
               <div>
                 <label className="mb-1 block text-xs font-medium text-[var(--color-text-secondary)]">
-                  Crosspost to OmniHub (optional)
+                  {t('modals.crosspost.toHub')}
                 </label>
                 <select
                   value={selectedHub}
                   onChange={(e) => setSelectedHub(e.target.value)}
                   className="w-full rounded border border-[var(--color-border)] bg-[var(--color-surface)] p-2 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
                 >
-                  <option value="">Select a hub...</option>
+                  <option value="">{t('modals.crosspost.selectHub')}</option>
                   {subscribedHubs?.map((sub) => (
                     <option key={sub.hub_id} value={sub.hub_name}>
                       h/{sub.hub_name}
@@ -1198,14 +1198,14 @@ export default function HomePage() {
               </div>
               <div>
                 <label className="mb-1 block text-xs font-medium text-[var(--color-text-secondary)]">
-                  Crosspost to subreddit (optional)
+                  {t('modals.crosspost.toSubreddit')}
                 </label>
                 <select
                   value={selectedSubreddit}
                   onChange={(e) => setSelectedSubreddit(e.target.value)}
                   className="w-full rounded border border-[var(--color-border)] bg-[var(--color-surface)] p-2 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
                 >
-                  <option value="">Select a subreddit...</option>
+                  <option value="">{t('modals.crosspost.selectSubreddit')}</option>
                   {subscribedSubreddits?.map((sub) => (
                     <option key={sub.id} value={sub.subreddit_name}>
                       r/{sub.subreddit_name}
@@ -1215,14 +1215,14 @@ export default function HomePage() {
               </div>
               <div>
                 <label className="mb-1 block text-xs font-medium text-[var(--color-text-secondary)]">
-                  Choose a title <span className="text-red-500">*required</span>
+                  {t('modals.crosspost.titleLabel')} <span className="text-red-500">{t('modals.crosspost.titleRequired')}</span>
                 </label>
                 <input
                   type="text"
                   value={crosspostTitle}
                   onChange={(e) => setCrosspostTitle(e.target.value)}
                   className="w-full rounded border border-[var(--color-border)] bg-[var(--color-surface)] p-2 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
-                  placeholder="Enter title..."
+                  placeholder={t('modals.crosspost.titlePlaceholder')}
                 />
               </div>
               <div className="flex items-start gap-2">
@@ -1237,7 +1237,7 @@ export default function HomePage() {
                   htmlFor="send-replies"
                   className="text-sm text-[var(--color-text-primary)]"
                 >
-                  Send replies to this post to my inbox
+                  {t('modals.crosspost.sendRepliesLabel')}
                 </label>
               </div>
               <div className="flex justify-end gap-2 pt-2">
@@ -1245,7 +1245,7 @@ export default function HomePage() {
                   onClick={() => setCrosspostTarget(null)}
                   className="rounded border border-[var(--color-border)] px-4 py-2 text-sm font-semibold text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-elevated)]"
                 >
-                  Cancel
+                  {t('common.cancel')}
                 </button>
                 <button
                   onClick={() => crosspostMutation.mutate()}
@@ -1256,7 +1256,7 @@ export default function HomePage() {
                   }
                   className="rounded bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)] disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  {crosspostMutation.isPending ? 'Submitting...' : 'Submit'}
+                  {crosspostMutation.isPending ? t('modals.crosspost.submitting') : t('modals.crosspost.submitButton')}
                 </button>
               </div>
             </div>

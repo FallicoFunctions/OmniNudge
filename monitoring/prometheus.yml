@@ -1,0 +1,52 @@
+# Prometheus configuration for OmniNudge
+# This file configures Prometheus to scrape metrics from the OmniNudge backend
+
+global:
+  scrape_interval: 15s # Scrape targets every 15 seconds
+  evaluation_interval: 15s # Evaluate rules every 15 seconds
+
+  # Attach these labels to any time series or alerts
+  external_labels:
+    monitor: 'omninudge'
+    environment: 'production'
+
+# Alertmanager configuration (optional)
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          # - 'alertmanager:9093'
+
+# Load rules once and periodically evaluate them
+rule_files:
+  - "alert_rules.yml"
+
+# Scrape configurations
+scrape_configs:
+  # OmniNudge Backend
+  - job_name: 'omninudge-backend'
+    static_configs:
+      - targets: ['localhost:8080']
+    metrics_path: '/metrics'
+    scrape_interval: 10s
+    scrape_timeout: 5s
+
+  # Prometheus itself
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # Node Exporter (system metrics)
+  - job_name: 'node'
+    static_configs:
+      - targets: ['localhost:9100']
+
+  # PostgreSQL Exporter (database metrics)
+  - job_name: 'postgres'
+    static_configs:
+      - targets: ['localhost:9187']
+
+  # Redis Exporter (cache metrics)
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['localhost:9121']

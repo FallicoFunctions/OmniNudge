@@ -37,11 +37,12 @@ func (h *SettingsHandler) GetSettings(c *gin.Context) {
 }
 
 type updateSettingsRequest struct {
-	NotificationSound    *bool   `json:"notification_sound"`
-	ShowReadReceipts     *bool   `json:"show_read_receipts"`
-	ShowTypingIndicators *bool   `json:"show_typing_indicators"`
-	AutoAppendInvitation *bool   `json:"auto_append_invitation"`
-	Theme                *string `json:"theme"`
+	NotificationSound     *bool   `json:"notification_sound"`
+	ShowReadReceipts      *bool   `json:"show_read_receipts"`
+	ShowTypingIndicators  *bool   `json:"show_typing_indicators"`
+	ShowPushNotifications *bool   `json:"show_push_notifications"` // P0-042
+	AutoAppendInvitation  *bool   `json:"auto_append_invitation"`
+	Theme                 *string `json:"theme"`
 
 	// Notification preferences
 	NotifyCommentReplies   *bool `json:"notify_comment_replies"`
@@ -79,6 +80,9 @@ func (h *SettingsHandler) UpdateSettings(c *gin.Context) {
 	}
 	if req.ShowTypingIndicators != nil {
 		settings.ShowTypingIndicators = *req.ShowTypingIndicators
+	}
+	if req.ShowPushNotifications != nil {
+		settings.ShowPushNotifications = *req.ShowPushNotifications
 	}
 	if req.AutoAppendInvitation != nil {
 		settings.AutoAppendInvitation = *req.AutoAppendInvitation

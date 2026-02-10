@@ -1,0 +1,152 @@
+# Prometheus Alert Rules for OmniNudge
+
+groups:
+  - name: omninudge_alerts
+    interval: 30s
+    rules:
+      # High Error Rate
+      - alert: HighErrorRate
+        expr: rate(omninudge_errors_total[5m]) > 10
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High error rate detected"
+          description: "Error rate is {{ $value }} errors/sec (threshold: 10/sec)"
+
+      # Database Connection Issues
+      - alert: DatabaseConnectionLow
+        expr: omninudge_database_connections_idle < 2
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Low database connection pool"
+          description: "Only {{ $value }} idle connections remaining"
+
+      - alert: DatabaseDown
+        expr: up{job="omninudge-backend"} == 0 or omninudge_database_connections_active == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Database appears to be down"
+          description: "No active database connections detected"
+
+      # High HTTP Error Rate
+      - alert: HighHTTP5xxRate
+        expr: rate(omninudge_http_requests_total{status=~"5.."}[5m]) > 5
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High HTTP 5xx error rate"
+          description: "5xx error rate is {{ $value }}/sec (threshold: 5/sec)"
+
+      # Slow HTTP Requests
+      - alert: SlowHTTPRequests
+        expr: histogram_quantile(0.95, rate(omninudge_http_request_duration_seconds_bucket[5m])) > 2
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Slow HTTP requests detected"
+          description: "95th percentile response time is {{ $value }}s (threshold: 2s)"
+
+      # Redis Issues
+      - alert: RedisHighCacheMissRate
+        expr: rate(omninudge_redis_cache_misses_total[5m]) / (rate(omninudge_redis_cache_hits_total[5m]) + rate(omninudge_redis_cache_misses_total[5m])) > 0.5
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High Redis cache miss rate"
+          description: "Cache miss rate is {{ $value | humanizePercentage }} (threshold: 50%)"
+
+      # Queue Depth
+      - alert: HighQueueDepth
+        expr: omninudge_queue_depth > 1000
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High queue depth"
+          description: "Queue {{ $labels.queue }} has {{ $value }} pending jobs (threshold: 1000)"
+
+      - alert: CriticalQueueDepth
+        expr: omninudge_queue_depth > 5000
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Critical queue depth"
+          description: "Queue {{ $labels.queue }} has {{ $value }} pending jobs (threshold: 5000)"
+
+      # Queue Job Failures
+      - alert: HighQueueJobFailureRate
+        expr: rate(omninudge_queue_jobs_processed_total{status="error"}[5m]) > 1
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High queue job failure rate"
+          description: "Queue {{ $labels.queue }} has {{ $value }} failures/sec"
+
+      # WebSocket Issues
+      - alert: HighWebSocketConnectionCount
+        expr: omninudge_websocket_connections_active > 10000
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High WebSocket connection count"
+          description: "{{ $value }} active WebSocket connections (threshold: 10000)"
+
+      # Email Failures
+      - alert: HighEmailFailureRate
+        expr: rate(omninudge_emails_send_failed_total[5m]) > 0.1
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High email send failure rate"
+          description: "{{ $value }} email failures/sec for type {{ $labels.type }}"
+
+      # Reddit API Issues
+      - alert: RedditAPIRateLimited
+        expr: rate(omninudge_reddit_api_errors_total{type="rate_limit"}[5m]) > 0
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Reddit API rate limiting detected"
+          description: "Being rate limited by Reddit API"
+
+      - alert: RedditAPIHighErrorRate
+        expr: rate(omninudge_reddit_api_errors_total[5m]) > 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High Reddit API error rate"
+          description: "Reddit API error rate is {{ $value }}/sec"
+
+      # Service Health
+      - alert: ServiceDown
+        expr: up{job="omninudge-backend"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "OmniNudge backend is down"
+          description: "Backend service has been down for more than 1 minute"
+
+      # Memory/Resource Alerts
+      - alert: HighGoroutineCount
+        expr: omninudge_system_goroutines > 10000
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High goroutine count"
+          description: "{{ $value }} goroutines running (threshold: 10000)"
