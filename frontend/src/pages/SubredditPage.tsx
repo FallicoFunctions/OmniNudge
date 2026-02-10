@@ -1051,7 +1051,7 @@ export default function RedditPage() {
   }, [useInfiniteScrollSubs, hasMoreRedditPages, isFetchingNextPage, fetchNextPage]);
 
   return (
-    <div className="mx-auto w-full max-w-7xl px-4 py-8">
+    <div className="mx-auto w-full max-w-7xl px-0 py-8 md:px-4">
       {/* Header with subreddit identity, filters, and search */}
       <CommunityHeader
         communityType="subreddit"
