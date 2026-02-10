@@ -1,4 +1,5 @@
-import { useState, useRef, useMemo } from 'react';
+import { useState, useRef, useMemo, useEffect } from 'react';
+import { lockScroll, unlockScroll } from '../utils/scrollLock';
 import { Turnstile, type TurnstileInstance } from '@marsidev/react-turnstile';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
@@ -48,6 +49,12 @@ export default function AuthModal({ mode, onClose, onSwitch, onSuccess }: AuthMo
   const [acknowledgedNoEmail, setAcknowledgedNoEmail] = useState(false);
 
   const turnstileSiteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY;
+
+  // Lock body scroll while modal is open — prevents iOS Safari scroll freeze after modal closes
+  useEffect(() => {
+    lockScroll();
+    return () => unlockScroll();
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

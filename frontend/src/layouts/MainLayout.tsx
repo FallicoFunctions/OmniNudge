@@ -15,6 +15,9 @@ import { ViewModeToggle } from '../components/feed/ViewModeToggle';
 import { HamburgerMenu } from '../components/navigation/HamburgerMenu';
 import { ConnectionStatusIndicator } from '../components/common/ConnectionStatusIndicator';
 import { useNotificationSound } from '../hooks/useNotificationSound';
+import { useMediaQuery } from '../hooks/useMediaQuery';
+import { MobileTabBar } from '../components/mobile/MobileTabBar';
+import { ErrorBoundary } from '../components/ErrorBoundary';
 
 const AboutContent = lazy(() =>
   import('../components/about/AboutContent').then((module) => ({
@@ -65,6 +68,9 @@ export default function MainLayout() {
   const isSlimMode = multiColumnState.viewMode === 'omniscroll' || multiColumnState.viewMode === 'standard-scroll';
   const navHeight = isSlimMode ? 'h-9' : 'h-16';
 
+  // Mobile detection - 767px = Tailwind md: breakpoint (768px) - 1
+  const isMobile = useMediaQuery('(max-width: 767px)');
+
   const handleLogout = () => {
     logout();
     // User stays on current page after logout
@@ -86,6 +92,14 @@ export default function MainLayout() {
       }, 0) ?? 0,
     [conversations, notifyArchivedMessages]
   );
+
+  // Reset iOS Safari scroll state on every route change.
+  // When navigating away from a fixed-height overflow-hidden page (e.g. MessagesPage),
+  // iOS does not re-evaluate the body's scrollability in an SPA. scrollTo(0,0)
+  // forces a re-evaluation so the next page scrolls normally.
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [location.pathname]);
 
   useEffect(() => {
     if (!user) {
@@ -230,11 +244,13 @@ export default function MainLayout() {
                 </>
               )}
 
-              {/* View Mode Toggle */}
-              <ViewModeToggle />
+              {/* View Mode Toggle - hidden on mobile */}
+              <div className="hidden md:block">
+                <ViewModeToggle />
+              </div>
             </div>
 
-            <div className={`flex items-center ${isSlimMode ? 'gap-2' : 'gap-4'}`}>
+            <div className={`hidden md:flex items-center ${isSlimMode ? 'gap-2' : 'gap-4'}`}>
               {user ? (
                 <>
                   {!isSlimMode && (
@@ -433,9 +449,28 @@ export default function MainLayout() {
       </nav>
 
       {/* Main Content */}
-      <main id="main-content">
+      <main
+        id="main-content"
+        className={isMobile ? 'pb-[calc(56px+env(safe-area-inset-bottom))]' : ''}
+      >
         <Outlet />
       </main>
+
+      {/* Mobile tab bar - only shows on mobile (<768px) */}
+      {isMobile && (
+        <ErrorBoundary
+          fallback={
+            <div className="fixed bottom-0 left-0 right-0 p-4 bg-red-50 dark:bg-red-900/20 border-t border-red-200 dark:border-red-800 text-center">
+              <p className="text-sm text-red-600 dark:text-red-400">Navigation error. Please reload the page.</p>
+            </div>
+          }
+        >
+          <MobileTabBar
+            unreadCount={unreadTotal}
+            onOpenAuthModal={(mode) => setAuthModal(mode)}
+          />
+        </ErrorBoundary>
+      )}
 
       {showAboutModal && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 px-4 py-6">

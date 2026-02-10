@@ -290,7 +290,6 @@ func main() {
 	featureFlagsHandler := handlers.NewFeatureFlagHandler(featureFlagService)
 	accountDeletionHandler := handlers.NewAccountDeletionHandler(db.Pool, queueClient)
 	dataExportHandler := handlers.NewDataExportHandler(db.Pool, queueClient)
-	feedbackHandler := handlers.NewFeedbackHandler(db.Pool)
 	analyticsHandler := handlers.NewAnalyticsHandler(analyticsService)
 	dataRetentionHandler := handlers.NewDataRetentionHandler(db.Pool)
 	pushNotificationHandler := handlers.NewPushNotificationHandler(db.Pool, firebaseService)
@@ -537,13 +536,6 @@ func main() {
 		{
 			bugReports.POST("", bugReportsHandler.CreateBugReport)   // Anyone can report bugs
 			bugReports.GET("/known", bugReportsHandler.GetKnownBugs) // Public list of known bugs
-		}
-
-		// User feedback routes (P0-035: optional auth for feedback)
-		feedback := api.Group("/feedback")
-		feedback.Use(middleware.AuthOptional(authService))
-		{
-			feedback.POST("", feedbackHandler.SubmitFeedback) // Anyone can submit feedback
 		}
 
 		// Analytics routes (P0-027: track events, optional auth for user context)
@@ -865,11 +857,6 @@ func main() {
 				admin.DELETE("/features/:key/overrides/:user_id", featureFlagsHandler.RemoveUserOverride)
 				admin.GET("/features/:key/audit", featureFlagsHandler.GetAuditLog)
 				admin.POST("/features/:key/rollout", featureFlagsHandler.SetRolloutPercentage)
-
-				// User feedback management (P0-035)
-				admin.GET("/feedback", feedbackHandler.ListFeedback)
-				admin.GET("/feedback/stats", feedbackHandler.GetFeedbackStats)
-				admin.PUT("/feedback/:id", feedbackHandler.UpdateFeedbackStatus)
 
 				// Analytics management (P0-027)
 				admin.GET("/analytics/dashboard", analyticsHandler.GetDashboard)

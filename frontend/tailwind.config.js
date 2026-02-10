@@ -17,6 +17,20 @@ export default {
         'text-secondary': 'var(--color-text-secondary)',
         border: 'var(--color-border)',
       },
+      animation: {
+        'slide-up': 'slideUp 250ms ease-out',
+        'scale-in': 'scaleIn 150ms ease-out',
+      },
+      keyframes: {
+        slideUp: {
+          '0%': { transform: 'translateY(100%)' },
+          '100%': { transform: 'translateY(0)' }
+        },
+        scaleIn: {
+          '0%': { transform: 'scale(0)' },
+          '100%': { transform: 'scale(1)' }
+        },
+      },
     },
   },
   plugins: [],

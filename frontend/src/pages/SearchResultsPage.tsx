@@ -109,6 +109,7 @@ export default function SearchResultsPage() {
     hasMoreReddit: false,
     hasMoreOmni: false,
   });
+  const [searchError, setSearchError] = useState<string | null>(null);
   const [crosspostTarget, setCrosspostTarget] = useState<CrosspostTarget | null>(null);
   const [crosspostTitle, setCrosspostTitle] = useState('');
   const [selectedHub, setSelectedHub] = useState('');
@@ -321,6 +322,7 @@ export default function SearchResultsPage() {
   ) => {
     if (!q.trim()) return;
     setIsLoading(true);
+    setSearchError(null);
     try {
       const tabTarget = opts?.tab ?? activeTab;
       const targetPage =
@@ -405,6 +407,9 @@ export default function SearchResultsPage() {
       nextParams.set('sort', opts?.sort ?? sort);
       nextParams.set('include_nsfw', includeNsfw ? 'true' : 'false');
       navigate(`/search?${nextParams.toString()}`, { replace: true });
+    } catch (err) {
+      console.error('Search failed:', err);
+      setSearchError(err instanceof Error ? err.message : 'Search failed. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -617,6 +622,12 @@ export default function SearchResultsPage() {
       </div>
 
       {isLoading && <LoadingMessage className="text-sm">Loading...</LoadingMessage>}
+
+      {!isLoading && searchError && (
+        <div className="rounded-md border border-[var(--color-error)] bg-[var(--color-error)]/10 px-4 py-3 text-sm text-[var(--color-error)]">
+          {searchError}
+        </div>
+      )}
 
       {!isLoading && activeTab === 'posts' && (
         <div className="space-y-3">

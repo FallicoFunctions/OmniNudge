@@ -58,7 +58,28 @@
     "profile": "Profile",
     "admin": "Admin",
     "hubs": "Hubs",
-    "search": "Search"
+    "search": "Search",
+    "create": "Create",
+    "menu": "Menu"
+  },
+  "menu": {
+    "profile": "Profile",
+    "settings": "Settings",
+    "hubs": "Browse Hubs",
+    "about": "About",
+    "admin": "Admin Panel",
+    "logout": "Log Out",
+    "logoutConfirm": "Are you sure you want to log out?"
+  },
+  "create": {
+    "post": "Create Post",
+    "hub": "Create Hub",
+    "crosspost": "Crosspost from Reddit"
+  },
+  "ariaLabels": {
+    "mobileNav": "Mobile navigation",
+    "unreadMessages": "{{count}} unread messages",
+    "closeMenu": "Close menu"
   },
   "home": {
     "feed": {

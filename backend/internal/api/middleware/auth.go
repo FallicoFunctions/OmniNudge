@@ -92,7 +92,7 @@ func CORS() gin.HandlerFunc {
 			"http://localhost:5177",
 			"http://localhost:5178",
 			"http://localhost:5179",
-		}
+			}
 
 		allowed := false
 		for _, o := range allowedOrigins {
