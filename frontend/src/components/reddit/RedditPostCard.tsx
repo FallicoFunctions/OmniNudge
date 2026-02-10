@@ -854,25 +854,28 @@ export function RedditPostCard({
           </div>
         )}
         <div className="flex-1 text-left">
-          <div className="flex flex-wrap items-center gap-2">
-            {isExternalLink ? (
-              <a
-                href={sanitizedExternalUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex-1 text-base font-semibold text-[var(--color-text-primary)] hover:text-[var(--color-primary)]"
-              >
-                {decodeHtmlEntities(post.title)}
-              </a>
-            ) : (
-              <Link
-                to={postUrl}
-                state={linkState}
-                className="flex-1 text-base font-semibold text-[var(--color-text-primary)] hover:text-[var(--color-primary)]"
-              >
-                {decodeHtmlEntities(post.title)}
-              </Link>
-            )}
+          {/* Title */}
+          {isExternalLink ? (
+            <a
+              href={sanitizedExternalUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="block text-base font-semibold text-[var(--color-text-primary)] hover:text-[var(--color-primary)]"
+            >
+              {decodeHtmlEntities(post.title)}
+            </a>
+          ) : (
+            <Link
+              to={postUrl}
+              state={linkState}
+              className="block text-base font-semibold text-[var(--color-text-primary)] hover:text-[var(--color-primary)]"
+            >
+              {decodeHtmlEntities(post.title)}
+            </Link>
+          )}
+
+          {/* Badges row */}
+          <div className="mt-2 flex flex-wrap items-center gap-2">
             {/* FEED-7: Reddit source badge for visual distinction */}
             <span className="inline-flex items-center rounded bg-orange-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-orange-800 dark:bg-orange-900/30 dark:text-orange-400">
               Reddit
