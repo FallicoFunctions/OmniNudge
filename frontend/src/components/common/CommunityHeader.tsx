@@ -83,7 +83,7 @@ export function CommunityHeader({
     <div className="mb-0 flex flex-col gap-4">
       {/* Row 1: Community name, buttons, and search */}
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <div className="flex flex-1 items-center justify-between gap-4">
+        <div className="flex w-full flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div className="flex items-center gap-3">
             {iconUrl && (
               <img
@@ -191,7 +191,9 @@ export function CommunityHeader({
             )}
           </div>
         </div>
-        {searchBars}
+        <div className="hidden lg:block">
+          {searchBars}
+        </div>
       </div>
       {/* Row 2: Sort controls and post search */}
       {sortControls}
