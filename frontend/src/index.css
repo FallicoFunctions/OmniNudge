@@ -1,6 +1,9 @@
 /* Import Altered Carbon theme */
 @import './styles/altered-carbon-theme.css';
 
+/* Import RTL support */
+@import './styles/rtl.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -595,4 +598,28 @@ article:focus-visible,
 
 .animation-delay-200 {
   animation-delay: 200ms;
+}
+
+/* Loading state animations (P0-029) */
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+@keyframes progress {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(400%);
+  }
+}
+
+.animate-progress {
+  animation: progress 1.5s ease-in-out infinite;
+  width: 25%;
 }

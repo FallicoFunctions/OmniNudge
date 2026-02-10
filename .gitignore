@@ -8,21 +8,36 @@
 claude.md
 Nick_Fallico_Resume.html
 
+# Temporary review and session documentation
+*_REVIEW_*.md
+*_SESSION*.md
+*_SUMMARY*.md
+*_PROGRESS_UPDATE_*.md
+ANALYTICS_FIXES_APPLIED.md
+ANALYTICS_REVIEW_FLAWS.md
+ANALYTICS_REVIEW_SUMMARY.md
+PHASE_0_AUDIT_REPORT.md
+PHASE_0_EXTENDED_SESSION_COMPLETE.md
+PHASE_0_FINAL_STATUS.md
+PHASE_0_REAL_STATUS.md
+PHASE_0_ALL_POSSIBLE_TASKS_COMPLETE.md
+
+# Temporary completion docs (one-time status updates)
+SENDGRID_PASSWORD_RESET_COMPLETE.md
+PHASE_0_REDIS_CONFIGURATION_COMPLETE.md
+MULTI_RECIPIENT_ENCRYPTION_VERIFICATION.md
+
 # Development & planning documents
 DESIGN_AUDIT.md
 *_PLAN.md
-*_CHECKLIST.md
 
-# Deployment guides (keep versioned guides in docs/)
-DEPLOYMENT_GUIDE.md
-DEPLOYMENT_CHECKLIST.md
-PRE_DEPLOYMENT_CHECKLIST.md
+# Duplicate/consolidated guides (keeping one canonical version)
+SMTP_READY_TO_CONFIGURE.md
+SENDGRID_IMMEDIATE_SETUP.md
 QUICK_DEPLOY.md
-INSTALLATION_GUIDE.md
 
-# Summary documents (temporary documentation)
-*_SUMMARY.md
-*_QUICKSTART.md
+# Deprecated planning docs (but NOT Phase 2 tickets!)
+PHASE1_USER_TEST_PLAN.md
 
 # IDE and editor files
 .vscode/
@@ -30,3 +45,39 @@ INSTALLATION_GUIDE.md
 *.swp
 *.swo
 *~
+
+# Firebase credentials (KEEP SECRET!)
+firebase-admin-key.json
+Firebase_Cloud_Messaging_API.txt
+
+# Documentation files (keep only README.md tracked)
+# All other docs are internal/dev notes
+/*.md
+!README.md
+/*.txt
+
+# Claude instructions
+.claude.md
+
+# GitHub workflows (keep if needed, ignore if not)
+# .github/
+
+# Additional config files
+.golangci.yml
+.husky/
+COMPLETE_PHASE_0_SETUP_SCRIPT.sh
+PHASE_0_VERIFICATION_SQL.sql
+
+# Backend documentation (internal notes)
+backend/*.md
+backend/*.txt
+!backend/README.md
+
+# Backup files
+*.bak
+*.bak[0-9]
+*.bak[0-9][0-9]
+
+# Temporary build/migration tools
+backend/cmd/migrate/
+backend/cmd/worker/

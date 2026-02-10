@@ -1,4 +1,4 @@
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import { SettingsProvider } from './contexts/SettingsContext';
@@ -9,6 +9,9 @@ import { MultiColumnFeedProvider } from './contexts/MultiColumnFeedContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import MainLayout from './layouts/MainLayout';
 import { LoadingMessage } from './components/common/StatusMessage';
+import { FeedbackButton } from './components/FeedbackButton';
+import { usePageTracking } from './hooks/useAnalytics';
+import { analyticsService } from './services/analyticsService';
 import './App.css';
 
 const HomePage = lazy(() => import('./pages/HomePage'));
@@ -28,26 +31,46 @@ const PostDetailPage = lazy(() => import('./pages/PostDetailPage'));
 const AboutPage = lazy(() => import('./pages/AboutPage'));
 const TermsPage = lazy(() => import('./pages/TermsPage'));
 const PrivacyPage = lazy(() => import('./pages/PrivacyPage'));
+const CCPAPage = lazy(() => import('./pages/CCPAPage'));
 const MessagesPage = lazy(() => import('./pages/MessagesPage'));
 const SettingsPage = lazy(() => import('./pages/SettingsPage'));
 const ModToolsPage = lazy(() => import('./pages/ModToolsPage'));
 const HubSettingsPage = lazy(() => import('./pages/HubSettingsPage'));
 const ModMailConversationPage = lazy(() => import('./pages/ModMailConversationPage'));
 const AdminPage = lazy(() => import('./pages/AdminPage'));
+const FeatureFlagsAdminPage = lazy(() => import('./pages/FeatureFlagsAdminPage'));
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
 const BugReportingPage = lazy(() => import('./pages/BugReportingPage'));
 const PrivateHubPage = lazy(() => import('./pages/PrivateHubPage'));
+const ResetPasswordPage = lazy(() => import('./pages/ResetPasswordPage'));
+const VerifyEmailPage = lazy(() => import('./pages/VerifyEmailPage'));
+
+// Initialize analytics on app load
+function AnalyticsWrapper({ children }: { children: React.ReactNode }) {
+  usePageTracking(); // Track page views
+
+  useEffect(() => {
+    // Initialize analytics service
+    analyticsService.init({
+      enabled: import.meta.env.PROD, // Only enable in production
+      debug: import.meta.env.DEV,
+    });
+  }, []);
+
+  return <>{children}</>;
+}
 
 function App() {
   return (
     <BrowserRouter>
-      <AuthProvider>
-        <SettingsProvider>
-          <WebSocketProvider>
-            <RedditBlockProvider>
-              <MessagingProvider>
-                <MultiColumnFeedProvider>
-                <Suspense
+      <AnalyticsWrapper>
+        <AuthProvider>
+          <SettingsProvider>
+            <WebSocketProvider>
+              <RedditBlockProvider>
+                <MessagingProvider>
+                  <MultiColumnFeedProvider>
+                  <Suspense
                   fallback={
                     <div className="flex min-h-screen items-center justify-center">
                       <LoadingMessage>Loading page...</LoadingMessage>
@@ -94,7 +117,10 @@ function App() {
                     <Route path="/about" element={<AboutPage />} />
                     <Route path="/terms" element={<TermsPage />} />
                     <Route path="/privacy" element={<PrivacyPage />} />
+                    <Route path="/ccpa" element={<CCPAPage />} />
                     <Route path="/bug-reporting" element={<BugReportingPage />} />
+                    <Route path="/reset-password" element={<ResetPasswordPage />} />
+                    <Route path="/verify-email" element={<VerifyEmailPage />} />
 
                     {/* PROTECTED routes - require auth */}
                     <Route
@@ -169,6 +195,14 @@ function App() {
                         </ProtectedRoute>
                       }
                     />
+                    <Route
+                      path="/admin/feature-flags"
+                      element={
+                        <ProtectedRoute>
+                          <FeatureFlagsAdminPage />
+                        </ProtectedRoute>
+                      }
+                    />
                   </Route>
 
                   {/* 404 */}
@@ -176,12 +210,16 @@ function App() {
                   <Route path="*" element={<Navigate to="/404" replace />} />
                   </Routes>
                 </Suspense>
-                </MultiColumnFeedProvider>
-              </MessagingProvider>
-            </RedditBlockProvider>
-          </WebSocketProvider>
-        </SettingsProvider>
-      </AuthProvider>
+
+                  {/* Global feedback button - appears on all pages */}
+                  <FeedbackButton />
+                  </MultiColumnFeedProvider>
+                </MessagingProvider>
+              </RedditBlockProvider>
+            </WebSocketProvider>
+          </SettingsProvider>
+        </AuthProvider>
+      </AnalyticsWrapper>
     </BrowserRouter>
   );
 }

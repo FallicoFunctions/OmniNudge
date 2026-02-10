@@ -1,6 +1,7 @@
 package websocket
 
 import (
+	"context"
 	"encoding/json"
 	"log"
 	"time"
@@ -23,6 +24,10 @@ const (
 
 	// Minimum gap between typing events per user (ms)
 	typingDebounce = 800 * time.Millisecond
+
+	// Rate limiting (P0-004)
+	maxMessagesPerMinute = 60         // Max messages per minute per connection
+	rateLimitWindow      = time.Minute // Rate limit reset window
 )
 
 // Client represents a WebSocket client connection
@@ -40,6 +45,36 @@ type Client struct {
 
 	// Last typing event timestamp
 	lastTyping time.Time
+
+	// Connection metadata for security (P0-004)
+	RemoteAddr string // IP address
+	UserAgent  string // Browser user agent
+	ConnectedAt time.Time // Connection timestamp
+
+	// Rate limiting (P0-004)
+	messageCount int       // Messages sent in current window
+	lastReset    time.Time // Last rate limit window reset
+
+	// Authorization (P0-008b)
+	Authorizer *Authorizer
+}
+
+// NewClient creates a new WebSocket client with security metadata
+func NewClient(hub *Hub, conn *websocket.Conn, userID int, remoteAddr, userAgent string, authorizer *Authorizer) *Client {
+	now := time.Now()
+	return &Client{
+		Hub:          hub,
+		Conn:         conn,
+		Send:         make(chan *Message, 256),
+		UserID:       userID,
+		RemoteAddr:   remoteAddr,
+		UserAgent:    userAgent,
+		ConnectedAt:  now,
+		lastReset:    now,
+		lastTyping:   time.Time{},
+		messageCount: 0,
+		Authorizer:   authorizer,
+	}
 }
 
 // Start begins read and write pumps for the client
@@ -48,11 +83,34 @@ func (c *Client) Start() {
 	go c.readPump()
 }
 
+// checkRateLimit checks if the client has exceeded the rate limit
+func (c *Client) checkRateLimit() bool {
+	now := time.Now()
+
+	// Reset counter if window expired
+	if now.Sub(c.lastReset) > rateLimitWindow {
+		c.messageCount = 0
+		c.lastReset = now
+	}
+
+	// Increment and check
+	c.messageCount++
+	if c.messageCount > maxMessagesPerMinute {
+		log.Printf("[SECURITY] Rate limit exceeded for user_id=%d from %s (UserAgent: %s)",
+			c.UserID, c.RemoteAddr, c.UserAgent)
+		return false
+	}
+
+	return true
+}
+
 // readPump pumps messages from the WebSocket connection to the hub
 func (c *Client) readPump() {
 	defer func() {
 		c.Hub.unregister <- c
 		c.Conn.Close()
+		log.Printf("[AUDIT] WebSocket disconnected: user_id=%d, duration=%v, remote_addr=%s",
+			c.UserID, time.Since(c.ConnectedAt), c.RemoteAddr)
 	}()
 
 	c.Conn.SetReadDeadline(time.Now().Add(pongWait))
@@ -69,6 +127,20 @@ func (c *Client) readPump() {
 				log.Printf("WebSocket error: %v", err)
 			}
 			break
+		}
+
+		// Rate limiting check (P0-004)
+		if !c.checkRateLimit() {
+			// Send rate limit error
+			c.Send <- &Message{
+				RecipientID: c.UserID,
+				Type:        "error",
+				Payload: map[string]interface{}{
+					"code":    "RATE_LIMIT_EXCEEDED",
+					"message": "Too many messages. Please slow down.",
+				},
+			}
+			continue
 		}
 
 		// Parse incoming message
@@ -94,6 +166,35 @@ func (c *Client) readPump() {
 			if err := json.Unmarshal(incomingMsg.Payload, &typingData); err != nil {
 				log.Printf("Failed to parse typing data: %v", err)
 				continue
+			}
+
+			// Authorization check (P0-008b): verify user is in conversation
+			if c.Authorizer != nil && typingData.ConversationID != 0 {
+				canAccess, err := c.Authorizer.CanAccessConversation(context.Background(), c.UserID, typingData.ConversationID)
+				if err != nil {
+					log.Printf("Authorization error: %v", err)
+					c.Send <- &Message{
+						RecipientID: c.UserID,
+						Type:        "error",
+						Payload: map[string]interface{}{
+							"code":    "AUTHORIZATION_ERROR",
+							"message": "Failed to verify conversation access",
+						},
+					}
+					continue
+				}
+				if !canAccess {
+					log.Printf("[SECURITY] Unauthorized typing event: user_id=%d, conversation_id=%d", c.UserID, typingData.ConversationID)
+					c.Send <- &Message{
+						RecipientID: c.UserID,
+						Type:        "error",
+						Payload: map[string]interface{}{
+							"code":    "UNAUTHORIZED",
+							"message": "You are not a member of this conversation",
+						},
+					}
+					continue
+				}
 			}
 
 			// Debounce typing events to avoid flooding

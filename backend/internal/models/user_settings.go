@@ -16,6 +16,7 @@ type UserSettings struct {
 	NotificationSound    bool      `json:"notification_sound"`
 	ShowReadReceipts     bool      `json:"show_read_receipts"`
 	ShowTypingIndicators bool      `json:"show_typing_indicators"`
+	ShowPushNotifications bool     `json:"show_push_notifications"` // P0-042: Push notification preference
 	AutoAppendInvitation bool      `json:"auto_append_invitation"`
 	Theme                string    `json:"theme"`
 
@@ -51,7 +52,7 @@ func NewUserSettingsRepository(pool *pgxpool.Pool) *UserSettingsRepository {
 func (r *UserSettingsRepository) GetByUserID(ctx context.Context, userID int) (*UserSettings, error) {
 	query := `
 		SELECT user_id, notification_sound, show_read_receipts, show_typing_indicators,
-		       auto_append_invitation, theme,
+		       show_push_notifications, auto_append_invitation, theme,
 		       notify_comment_replies, notify_post_milestone, notify_post_velocity,
 		       notify_comment_milestone, notify_comment_velocity, daily_digest,
 		       media_gallery_filter, active_theme_id, advanced_mode_enabled, updated_at
@@ -65,6 +66,7 @@ func (r *UserSettingsRepository) GetByUserID(ctx context.Context, userID int) (*
 		&settings.NotificationSound,
 		&settings.ShowReadReceipts,
 		&settings.ShowTypingIndicators,
+		&settings.ShowPushNotifications,
 		&settings.AutoAppendInvitation,
 		&settings.Theme,
 		&settings.NotifyCommentReplies,
@@ -95,7 +97,7 @@ func (r *UserSettingsRepository) CreateDefault(ctx context.Context, userID int) 
 		VALUES ($1)
 		ON CONFLICT (user_id) DO NOTHING
 		RETURNING user_id, notification_sound, show_read_receipts, show_typing_indicators,
-		          auto_append_invitation, theme,
+		          show_push_notifications, auto_append_invitation, theme,
 		          notify_comment_replies, notify_post_milestone, notify_post_velocity,
 		          notify_comment_milestone, notify_comment_velocity, daily_digest,
 		          media_gallery_filter, active_theme_id, advanced_mode_enabled, updated_at
@@ -107,6 +109,7 @@ func (r *UserSettingsRepository) CreateDefault(ctx context.Context, userID int) 
 		&settings.NotificationSound,
 		&settings.ShowReadReceipts,
 		&settings.ShowTypingIndicators,
+		&settings.ShowPushNotifications,
 		&settings.AutoAppendInvitation,
 		&settings.Theme,
 		&settings.NotifyCommentReplies,
@@ -139,21 +142,22 @@ func (r *UserSettingsRepository) Update(ctx context.Context, settings *UserSetti
 		SET notification_sound = $2,
 		    show_read_receipts = $3,
 		    show_typing_indicators = $4,
-		    auto_append_invitation = $5,
-		    theme = $6,
-		    notify_comment_replies = $7,
-		    notify_post_milestone = $8,
-		    notify_post_velocity = $9,
-		    notify_comment_milestone = $10,
-		    notify_comment_velocity = $11,
-		    daily_digest = $12,
-		    media_gallery_filter = $13,
-		    active_theme_id = $14,
-		    advanced_mode_enabled = $15,
+		    show_push_notifications = $5,
+		    auto_append_invitation = $6,
+		    theme = $7,
+		    notify_comment_replies = $8,
+		    notify_post_milestone = $9,
+		    notify_post_velocity = $10,
+		    notify_comment_milestone = $11,
+		    notify_comment_velocity = $12,
+		    daily_digest = $13,
+		    media_gallery_filter = $14,
+		    active_theme_id = $15,
+		    advanced_mode_enabled = $16,
 		    updated_at = CURRENT_TIMESTAMP
 		WHERE user_id = $1
 		RETURNING user_id, notification_sound, show_read_receipts, show_typing_indicators,
-		          auto_append_invitation, theme,
+		          show_push_notifications, auto_append_invitation, theme,
 		          notify_comment_replies, notify_post_milestone, notify_post_velocity,
 		          notify_comment_milestone, notify_comment_velocity, daily_digest,
 		          media_gallery_filter, active_theme_id, advanced_mode_enabled, updated_at
@@ -165,6 +169,7 @@ func (r *UserSettingsRepository) Update(ctx context.Context, settings *UserSetti
 		settings.NotificationSound,
 		settings.ShowReadReceipts,
 		settings.ShowTypingIndicators,
+		settings.ShowPushNotifications,
 		settings.AutoAppendInvitation,
 		settings.Theme,
 		settings.NotifyCommentReplies,
@@ -181,6 +186,7 @@ func (r *UserSettingsRepository) Update(ctx context.Context, settings *UserSetti
 		&updated.NotificationSound,
 		&updated.ShowReadReceipts,
 		&updated.ShowTypingIndicators,
+		&updated.ShowPushNotifications,
 		&updated.AutoAppendInvitation,
 		&updated.Theme,
 		&updated.NotifyCommentReplies,

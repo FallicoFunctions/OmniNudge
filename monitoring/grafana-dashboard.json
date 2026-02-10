@@ -1,0 +1,144 @@
+{
+  "dashboard": {
+    "title": "OmniNudge Monitoring Dashboard",
+    "tags": ["omninudge", "backend", "monitoring"],
+    "timezone": "browser",
+    "schemaVersion": 36,
+    "version": 1,
+    "refresh": "10s",
+    "panels": [
+      {
+        "id": 1,
+        "title": "HTTP Request Rate",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(omninudge_http_requests_total[5m])",
+            "legendFormat": "{{method}} {{path}} ({{status}})"
+          }
+        ],
+        "gridPos": {"x": 0, "y": 0, "w": 12, "h": 8}
+      },
+      {
+        "id": 2,
+        "title": "HTTP Response Time (p95)",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(omninudge_http_request_duration_seconds_bucket[5m]))",
+            "legendFormat": "{{method}} {{path}}"
+          }
+        ],
+        "gridPos": {"x": 12, "y": 0, "w": 12, "h": 8}
+      },
+      {
+        "id": 3,
+        "title": "Active WebSocket Connections",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "omninudge_websocket_connections_active",
+            "legendFormat": "Active Connections"
+          }
+        ],
+        "gridPos": {"x": 0, "y": 8, "w": 8, "h": 6}
+      },
+      {
+        "id": 4,
+        "title": "Database Connection Pool",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "omninudge_database_connections_active",
+            "legendFormat": "Active"
+          },
+          {
+            "expr": "omninudge_database_connections_idle",
+            "legendFormat": "Idle"
+          }
+        ],
+        "gridPos": {"x": 8, "y": 8, "w": 8, "h": 6}
+      },
+      {
+        "id": 5,
+        "title": "Redis Cache Hit Rate",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(omninudge_redis_cache_hits_total[5m]) / (rate(omninudge_redis_cache_hits_total[5m]) + rate(omninudge_redis_cache_misses_total[5m]))",
+            "legendFormat": "Hit Rate"
+          }
+        ],
+        "gridPos": {"x": 16, "y": 8, "w": 8, "h": 6}
+      },
+      {
+        "id": 6,
+        "title": "Queue Depth",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "omninudge_queue_depth",
+            "legendFormat": "{{queue}}"
+          }
+        ],
+        "gridPos": {"x": 0, "y": 14, "w": 12, "h": 6}
+      },
+      {
+        "id": 7,
+        "title": "Error Rate",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(omninudge_errors_total[5m])",
+            "legendFormat": "{{type}} ({{severity}})"
+          }
+        ],
+        "gridPos": {"x": 12, "y": 14, "w": 12, "h": 6}
+      },
+      {
+        "id": 8,
+        "title": "Users Online",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "omninudge_users_online"
+          }
+        ],
+        "gridPos": {"x": 0, "y": 20, "w": 6, "h": 4}
+      },
+      {
+        "id": 9,
+        "title": "Total Messages",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "omninudge_messages_total"
+          }
+        ],
+        "gridPos": {"x": 6, "y": 20, "w": 6, "h": 4}
+      },
+      {
+        "id": 10,
+        "title": "Total Users",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "omninudge_users_total"
+          }
+        ],
+        "gridPos": {"x": 12, "y": 20, "w": 6, "h": 4}
+      },
+      {
+        "id": 11,
+        "title": "Active Conversations",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "omninudge_conversations_active"
+          }
+        ],
+        "gridPos": {"x": 18, "y": 20, "w": 6, "h": 4}
+      }
+    ]
+  }
+}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"log"
 	"strings"
 	"time"
 
@@ -18,6 +19,7 @@ type User struct {
 	UsernameNormalized string  `json:"-"`               // Lowercase username for case-insensitive lookups
 	Email              *string `json:"email,omitempty"` // Decrypted email (for API responses)
 	EmailEncrypted     bool    `json:"-"`               // Whether email is encrypted in DB
+	EmailVerified      bool    `json:"email_verified"`  // Whether email has been verified
 	EncryptedEmail     *string `json:"-"`               // Encrypted email (stored in DB)
 	PasswordHash       string  `json:"-"`               // Never expose password hash in JSON
 
@@ -55,6 +57,12 @@ type User struct {
 	// Agent activity tracking
 	LastAgentPostAt   *time.Time `json:"last_agent_post_at,omitempty"`
 	LastAgentBrowseAt *time.Time `json:"last_agent_browse_at,omitempty"`
+
+	// Policy acceptance (GDPR/Legal compliance)
+	PrivacyPolicyVersion  *string    `json:"-"` // Version of privacy policy accepted
+	TermsOfServiceVersion *string    `json:"-"` // Version of terms accepted
+	PrivacyAcceptedAt     *time.Time `json:"-"` // When privacy policy was accepted
+	TermsAcceptedAt       *time.Time `json:"-"` // When terms were accepted
 }
 
 // UserRepository handles database operations for users
@@ -65,6 +73,11 @@ type UserRepository struct {
 // NewUserRepository creates a new user repository
 func NewUserRepository(pool *pgxpool.Pool) *UserRepository {
 	return &UserRepository{pool: pool}
+}
+
+// GetPool returns the database connection pool
+func (r *UserRepository) GetPool() *pgxpool.Pool {
+	return r.pool
 }
 
 // Create creates a new user with username/password
@@ -137,7 +150,7 @@ func (r *UserRepository) GetByID(ctx context.Context, id int) (*User, error) {
 	user := &User{}
 
 	query := `
-		SELECT id, username, email, email_encrypted, reddit_id, reddit_username, public_key, encrypted_private_key, avatar_url, bio, karma, role,
+		SELECT id, username, email, email_encrypted, email_verified, reddit_id, reddit_username, public_key, encrypted_private_key, avatar_url, bio, karma, role,
 		       shadow_banned, banned, deleted, ban_reason, show_ban_reason, banned_at, banned_by, created_at, last_seen,
 		       last_agent_post_at, last_agent_browse_at
 		FROM users WHERE id = $1
@@ -148,6 +161,7 @@ func (r *UserRepository) GetByID(ctx context.Context, id int) (*User, error) {
 		&user.Username,
 		&user.EncryptedEmail,
 		&user.EmailEncrypted,
+		&user.EmailVerified,
 		&user.RedditID,
 		&user.RedditUsername,
 		&user.PublicKey,
@@ -180,9 +194,14 @@ func (r *UserRepository) GetByID(ctx context.Context, id int) (*User, error) {
 	if user.EncryptedEmail != nil && user.EmailEncrypted {
 		decrypted, err := utils.DecryptEmail(*user.EncryptedEmail)
 		if err != nil {
-			return nil, err
+			// Log the error but don't block user operations
+			// This can happen if encryption key changed
+			log.Printf("WARNING: Failed to decrypt email for user_id=%d: %v (key mismatch?)", user.ID, err)
+			// Set email to nil - user can re-add it in settings
+			user.Email = nil
+		} else {
+			user.Email = &decrypted
 		}
-		user.Email = &decrypted
 	} else if user.EncryptedEmail != nil {
 		// Email is not encrypted (legacy data)
 		user.Email = user.EncryptedEmail
@@ -235,7 +254,7 @@ func (r *UserRepository) GetByUsername(ctx context.Context, username string) (*U
 	normalizedUsername := strings.ToLower(strings.TrimSpace(username))
 
 	return r.queryUser(ctx, `
-		SELECT id, username, email, email_encrypted, password_hash, reddit_id, reddit_username, public_key, encrypted_private_key, avatar_url, bio, karma, role,
+		SELECT id, username, email, email_encrypted, email_verified, password_hash, reddit_id, reddit_username, public_key, encrypted_private_key, avatar_url, bio, karma, role,
 		       shadow_banned, banned, deleted, ban_reason, show_ban_reason, banned_at, banned_by, created_at, last_seen,
 		       last_agent_post_at, last_agent_browse_at
 		FROM users WHERE username_normalized = $1
@@ -250,6 +269,7 @@ func (r *UserRepository) queryUser(ctx context.Context, query string, arg interf
 		&user.Username,
 		&user.EncryptedEmail,
 		&user.EmailEncrypted,
+		&user.EmailVerified,
 		&user.PasswordHash,
 		&user.RedditID,
 		&user.RedditUsername,
@@ -283,9 +303,14 @@ func (r *UserRepository) queryUser(ctx context.Context, query string, arg interf
 	if user.EncryptedEmail != nil && user.EmailEncrypted {
 		decrypted, err := utils.DecryptEmail(*user.EncryptedEmail)
 		if err != nil {
-			return nil, err
+			// Log the error but don't block user operations
+			// This can happen if encryption key changed
+			log.Printf("WARNING: Failed to decrypt email for user_id=%d: %v (key mismatch?)", user.ID, err)
+			// Set email to nil - user can re-add it in settings
+			user.Email = nil
+		} else {
+			user.Email = &decrypted
 		}
-		user.Email = &decrypted
 	} else if user.EncryptedEmail != nil {
 		// Email is not encrypted (legacy data)
 		user.Email = user.EncryptedEmail
@@ -299,7 +324,7 @@ func (r *UserRepository) GetByRedditID(ctx context.Context, redditID string) (*U
 	user := &User{}
 
 	query := `
-		SELECT id, username, email, email_encrypted, reddit_id, reddit_username, public_key, encrypted_private_key, avatar_url, bio, karma, role,
+		SELECT id, username, email, email_encrypted, email_verified, reddit_id, reddit_username, public_key, encrypted_private_key, avatar_url, bio, karma, role,
 		       shadow_banned, banned, deleted, ban_reason, show_ban_reason, banned_at, banned_by, created_at, last_seen,
 		       last_agent_post_at, last_agent_browse_at
 		FROM users WHERE reddit_id = $1
@@ -310,6 +335,7 @@ func (r *UserRepository) GetByRedditID(ctx context.Context, redditID string) (*U
 		&user.Username,
 		&user.EncryptedEmail,
 		&user.EmailEncrypted,
+		&user.EmailVerified,
 		&user.RedditID,
 		&user.RedditUsername,
 		&user.PublicKey,
@@ -342,15 +368,94 @@ func (r *UserRepository) GetByRedditID(ctx context.Context, redditID string) (*U
 	if user.EncryptedEmail != nil && user.EmailEncrypted {
 		decrypted, err := utils.DecryptEmail(*user.EncryptedEmail)
 		if err != nil {
-			return nil, err
+			// Log the error but don't block user operations
+			// This can happen if encryption key changed
+			log.Printf("WARNING: Failed to decrypt email for user_id=%d: %v (key mismatch?)", user.ID, err)
+			// Set email to nil - user can re-add it in settings
+			user.Email = nil
+		} else {
+			user.Email = &decrypted
 		}
-		user.Email = &decrypted
 	} else if user.EncryptedEmail != nil {
 		// Email is not encrypted (legacy data)
 		user.Email = user.EncryptedEmail
 	}
 
 	return user, nil
+}
+
+// GetByEmail retrieves a user by their email address
+// Note: Email is encrypted in database, so this requires decryption
+func (r *UserRepository) GetByEmail(ctx context.Context, email string) (*User, error) {
+	// NOTE: Since AES-CFB encryption uses random IVs, we can't compare encrypted emails directly.
+	// Instead, we fetch all users and decrypt their emails to find a match.
+	// TODO: Add an email_hash column for efficient lookups.
+
+	query := `
+		SELECT id, username, email, email_encrypted, email_verified, reddit_id, reddit_username, public_key, encrypted_private_key, avatar_url, bio, karma, role,
+		       shadow_banned, banned, deleted, ban_reason, show_ban_reason, banned_at, banned_by, created_at, last_seen,
+		       last_agent_post_at, last_agent_browse_at, password_hash
+		FROM users WHERE email IS NOT NULL AND deleted = false
+	`
+
+	rows, err := r.pool.Query(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		user := &User{}
+		err = rows.Scan(
+		&user.ID,
+		&user.Username,
+		&user.EncryptedEmail,
+		&user.EmailEncrypted,
+		&user.EmailVerified,
+		&user.RedditID,
+		&user.RedditUsername,
+		&user.PublicKey,
+		&user.EncryptedPrivateKey,
+		&user.AvatarURL,
+		&user.Bio,
+		&user.Karma,
+		&user.Role,
+		&user.ShadowBanned,
+		&user.Banned,
+		&user.Deleted,
+		&user.BanReason,
+		&user.ShowBanReason,
+		&user.BannedAt,
+		&user.BannedBy,
+		&user.CreatedAt,
+		&user.LastSeen,
+		&user.LastAgentPostAt,
+		&user.LastAgentBrowseAt,
+		&user.PasswordHash,
+		)
+		if err != nil {
+			continue // Skip this user if scan fails
+		}
+
+		// Decrypt the stored email and compare
+		if user.EncryptedEmail != nil {
+			decryptedEmail, err := utils.DecryptEmail(*user.EncryptedEmail)
+			if err != nil {
+				continue // Skip if decryption fails
+			}
+			if decryptedEmail == email {
+				// Populate email field for API response
+				user.Email = &decryptedEmail
+				return user, nil // Found matching user
+			}
+		}
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return nil, fmt.Errorf("no rows in result set")
 }
 
 // UpdateLastSeen updates the last_seen timestamp for a user

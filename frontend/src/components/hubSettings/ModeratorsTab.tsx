@@ -13,7 +13,7 @@ interface Props {
 export default function ModeratorsTab({ hubName, isOwner }: Props) {
   const queryClient = useQueryClient();
   const [showAddModal, setShowAddModal] = useState(false);
-  const [newModUserId, setNewModUserId] = useState('');
+  const [newModUsername, setNewModUsername] = useState('');
   const [newModRole, setNewModRole] = useState<ModeratorRole>('moderator');
 
   // Fetch moderators
@@ -24,12 +24,12 @@ export default function ModeratorsTab({ hubName, isOwner }: Props) {
 
   // Add moderator mutation
   const addModMutation = useMutation({
-    mutationFn: (data: { user_id: number; role: ModeratorRole }) =>
+    mutationFn: (data: { username: string; role: ModeratorRole }) =>
       hubSettingsService.addModerator(hubName, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['hubModerators', hubName] });
       setShowAddModal(false);
-      setNewModUserId('');
+      setNewModUsername('');
       setNewModRole('moderator');
     },
   });
@@ -52,9 +52,9 @@ export default function ModeratorsTab({ hubName, isOwner }: Props) {
   });
 
   const handleAddModerator = () => {
-    const userId = parseInt(newModUserId);
-    if (!isNaN(userId)) {
-      addModMutation.mutate({ user_id: userId, role: newModRole });
+    const username = newModUsername.trim();
+    if (username) {
+      addModMutation.mutate({ username, role: newModRole });
     }
   };
 
@@ -210,13 +210,13 @@ export default function ModeratorsTab({ hubName, isOwner }: Props) {
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-[var(--color-text-primary)] mb-2">
-                  User ID
+                  Username
                 </label>
                 <input
-                  type="number"
-                  value={newModUserId}
-                  onChange={(e) => setNewModUserId(e.target.value)}
-                  placeholder="Enter user ID..."
+                  type="text"
+                  value={newModUsername}
+                  onChange={(e) => setNewModUsername(e.target.value)}
+                  placeholder="Enter username..."
                   className="w-full px-3 py-2 border border-[var(--color-border)] rounded bg-[var(--color-background)] text-[var(--color-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
                 />
               </div>
@@ -243,14 +243,16 @@ export default function ModeratorsTab({ hubName, isOwner }: Props) {
               </button>
               <button
                 onClick={handleAddModerator}
-                disabled={!newModUserId || addModMutation.isPending}
+                disabled={!newModUsername.trim() || addModMutation.isPending}
                 className="px-4 py-2 rounded bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-strong)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 {addModMutation.isPending ? 'Adding...' : 'Add Moderator'}
               </button>
             </div>
             {addModMutation.isError && (
-              <p className="text-red-600 text-sm mt-2">Failed to add moderator</p>
+              <p className="text-red-600 text-sm mt-2">
+                Failed to add moderator. Please check the username and try again.
+              </p>
             )}
           </div>
         </div>

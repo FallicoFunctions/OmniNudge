@@ -58,13 +58,15 @@ var upgrader = ws.Upgrader{
 
 // WebSocketHandler handles WebSocket connections
 type WebSocketHandler struct {
-	hub *websocket.Hub
+	hub        *websocket.Hub
+	authorizer *websocket.Authorizer
 }
 
 // NewWebSocketHandler creates a new WebSocket handler
-func NewWebSocketHandler(hub *websocket.Hub) *WebSocketHandler {
+func NewWebSocketHandler(hub *websocket.Hub, authorizer *websocket.Authorizer) *WebSocketHandler {
 	return &WebSocketHandler{
-		hub: hub,
+		hub:        hub,
+		authorizer: authorizer,
 	}
 }
 
@@ -106,13 +108,19 @@ func (h *WebSocketHandler) HandleWebSocket(c *gin.Context) {
 	}
 	log.Printf("WebSocket upgraded successfully for user_id=%d", uid)
 
-	// Create new client
-	client := &websocket.Client{
-		UserID: uid,
-		Conn:   conn,
-		Send:   make(chan *websocket.Message, 256),
-		Hub:    h.hub,
-	}
+	// Create new client with security metadata (P0-004) and authorization (P0-008b)
+	client := websocket.NewClient(
+		h.hub,
+		conn,
+		uid,
+		c.ClientIP(),
+		c.Request.UserAgent(),
+		h.authorizer,
+	)
+
+	// Audit log connection (P0-004)
+	log.Printf("[AUDIT] WebSocket connected: user_id=%d, remote_addr=%s, user_agent=%s",
+		uid, client.RemoteAddr, client.UserAgent)
 
 	// Register client with hub
 	h.hub.Register(client)

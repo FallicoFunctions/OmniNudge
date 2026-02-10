@@ -15,12 +15,14 @@ import (
 type HubSettingsHandler struct {
 	hubRepo      *models.HubRepository
 	settingsRepo *repository.HubSettingsRepository
+	userRepo     *models.UserRepository
 }
 
-func NewHubSettingsHandler(hubRepo *models.HubRepository, settingsRepo *repository.HubSettingsRepository) *HubSettingsHandler {
+func NewHubSettingsHandler(hubRepo *models.HubRepository, settingsRepo *repository.HubSettingsRepository, userRepo *models.UserRepository) *HubSettingsHandler {
 	return &HubSettingsHandler{
 		hubRepo:      hubRepo,
 		settingsRepo: settingsRepo,
+		userRepo:     userRepo,
 	}
 }
 
@@ -183,8 +185,8 @@ func (h *HubSettingsHandler) AddHubModerator(c *gin.Context) {
 	}
 
 	var req struct {
-		UserID int                  `json:"user_id" binding:"required"`
-		Role   models.ModeratorRole `json:"role" binding:"required"`
+		Username string               `json:"username" binding:"required"`
+		Role     models.ModeratorRole `json:"role" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
@@ -197,7 +199,18 @@ func (h *HubSettingsHandler) AddHubModerator(c *gin.Context) {
 		return
 	}
 
-	if err := h.settingsRepo.AddModerator(c.Request.Context(), hubID, req.UserID, req.Role); err != nil {
+	// Look up user by username (case-insensitive)
+	targetUser, err := h.userRepo.GetByUsername(c.Request.Context(), req.Username)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to look up user"})
+		return
+	}
+	if targetUser == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		return
+	}
+
+	if err := h.settingsRepo.AddModerator(c.Request.Context(), hubID, targetUser.ID, req.Role); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to add moderator"})
 		return
 	}

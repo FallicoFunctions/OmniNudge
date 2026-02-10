@@ -13,6 +13,7 @@ import (
 
 	"github.com/omninudge/backend/internal/models"
 	"github.com/omninudge/backend/internal/services"
+	"github.com/omninudge/backend/internal/api/middleware"
 	"github.com/gin-gonic/gin"
 )
 
@@ -80,7 +81,34 @@ func (h *MediaHandler) UploadMedia(c *gin.Context) {
 	if detected := http.DetectContentType(sniff[:n]); detected != "" {
 		contentType = detected
 	}
-	// Content type restriction removed - allow all file types
+
+	// Validate MIME type (P0-008 Security Audit)
+	if !middleware.ValidateMIMEType(contentType, middleware.AllowedMediaTypes) {
+		_ = os.Remove(storagePath)
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "File type not allowed",
+			"type":  contentType,
+			"allowed": []string{
+				"Images: JPEG, PNG, GIF, WebP",
+				"Audio: MP3, M4A, OGG, WAV, WebM, Opus",
+				"Video: MP4, WebM, MOV, MKV",
+			},
+		})
+		return
+	}
+
+	// Validate file size for MIME type
+	maxSizeForType := middleware.GetMaxSizeForMIME(contentType)
+	if total > maxSizeForType {
+		_ = os.Remove(storagePath)
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":    "File too large for this type",
+			"type":     contentType,
+			"size":     total,
+			"max_size": maxSizeForType,
+		})
+		return
+	}
 
 	if n > 0 {
 		if _, err := dst.Write(sniff[:n]); err != nil {
@@ -249,6 +277,19 @@ func (h *MediaHandler) processSingleUpload(ctx context.Context, userID int, head
 	contentType := header.Header.Get("Content-Type")
 	if detected := http.DetectContentType(sniff[:n]); detected != "" {
 		contentType = detected
+	}
+
+	// Validate MIME type (P0-008 Security Audit)
+	if !middleware.ValidateMIMEType(contentType, middleware.AllowedMediaTypes) {
+		_ = os.Remove(storagePath)
+		return nil, fmt.Errorf("file type not allowed: %s", contentType)
+	}
+
+	// Validate file size for MIME type
+	maxSizeForType := middleware.GetMaxSizeForMIME(contentType)
+	if header.Size > maxSizeForType {
+		_ = os.Remove(storagePath)
+		return nil, fmt.Errorf("file too large for type %s: %d bytes (max: %d)", contentType, header.Size, maxSizeForType)
 	}
 
 	// Write file

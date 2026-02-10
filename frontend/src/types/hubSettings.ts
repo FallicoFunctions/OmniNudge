@@ -102,7 +102,7 @@ export interface UpdateHubSettingsRequest {
 }
 
 export interface AddModeratorRequest {
-  user_id: number;
+  username: string;
   role: ModeratorRole;
 }
 

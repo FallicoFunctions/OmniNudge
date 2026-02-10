@@ -39,7 +39,7 @@ export default function MainLayout() {
   const { user, logout } = useAuth();
   const { notifyArchivedMessages } = useSettings();
   const { state: multiColumnState } = useMultiColumnFeed();
-  const [authModal, setAuthModal] = useState<'login' | 'signup' | null>(null);
+  const [authModal, setAuthModal] = useState<'login' | 'signup' | 'forgot-password' | null>(null);
   const [pendingRedirect, setPendingRedirect] = useState<{ to: string; state?: unknown } | null>(null);
   const [pendingAction, setPendingAction] = useState<
     | null

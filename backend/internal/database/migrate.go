@@ -188,3 +188,26 @@ func executeStatements(ctx context.Context, pool execer, content string) error {
 type execer interface {
 	Exec(ctx context.Context, sql string, arguments ...any) (pgconn.CommandTag, error)
 }
+
+// GetPendingMigrations returns a list of pending migrations
+func GetPendingMigrations(applied map[string]bool) ([]string, error) {
+	// Get all up migration files
+	files, err := fs.ReadDir(migrationsFS, "migrations")
+	if err != nil {
+		return nil, fmt.Errorf("failed to read migrations directory: %w", err)
+	}
+
+	// Filter and sort up migrations
+	var upMigrations []string
+	for _, file := range files {
+		if strings.HasSuffix(file.Name(), ".up.sql") {
+			version := strings.TrimSuffix(file.Name(), ".up.sql")
+			if !applied[version] {
+				upMigrations = append(upMigrations, version)
+			}
+		}
+	}
+	sort.Strings(upMigrations)
+
+	return upMigrations, nil
+}

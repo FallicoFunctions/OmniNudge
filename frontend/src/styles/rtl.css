@@ -1,0 +1,133 @@
+/**
+ * P0-020/P0-021: RTL (Right-to-Left) Support
+ *
+ * Uses CSS logical properties for bidirectional text support.
+ * Automatically adapts layout for RTL languages (Arabic, Hebrew, etc.)
+ */
+
+/* Apply RTL direction when html has dir="rtl" */
+html[dir="rtl"] {
+  direction: rtl;
+}
+
+/* Use logical properties instead of physical properties */
+/* These automatically flip for RTL */
+
+/* Margins - use logical properties */
+.ml-1 { margin-inline-start: 0.25rem; }
+.ml-2 { margin-inline-start: 0.5rem; }
+.ml-3 { margin-inline-start: 0.75rem; }
+.ml-4 { margin-inline-start: 1rem; }
+.mr-1 { margin-inline-end: 0.25rem; }
+.mr-2 { margin-inline-end: 0.5rem; }
+.mr-3 { margin-inline-end: 0.75rem; }
+.mr-4 { margin-inline-end: 1rem; }
+
+/* Padding - use logical properties */
+.pl-1 { padding-inline-start: 0.25rem; }
+.pl-2 { padding-inline-start: 0.5rem; }
+.pl-3 { padding-inline-start: 0.75rem; }
+.pl-4 { padding-inline-start: 1rem; }
+.pl-6 { padding-inline-start: 1.5rem; }
+.pr-1 { padding-inline-end: 0.25rem; }
+.pr-2 { padding-inline-end: 0.5rem; }
+.pr-3 { padding-inline-end: 0.75rem; }
+.pr-4 { padding-inline-end: 1rem; }
+
+/* Text alignment */
+.text-left { text-align: start; }
+.text-right { text-align: end; }
+
+/* Border radius - use logical properties */
+.rounded-l { border-start-start-radius: 0.25rem; border-end-start-radius: 0.25rem; }
+.rounded-r { border-start-end-radius: 0.25rem; border-end-end-radius: 0.25rem; }
+
+/* Transforms for arrows and icons that should flip in RTL */
+html[dir="rtl"] .rtl-flip {
+  transform: scaleX(-1);
+}
+
+/* Flexbox - row-reverse in RTL */
+html[dir="rtl"] .flex-row {
+  flex-direction: row-reverse;
+}
+
+/* Grid - reverse column order in RTL */
+html[dir="rtl"] .grid {
+  direction: rtl;
+}
+
+/* Float - swap left/right in RTL */
+html[dir="rtl"] .float-left {
+  float: right;
+}
+
+html[dir="rtl"] .float-right {
+  float: left;
+}
+
+/* Position - swap left/right in RTL */
+html[dir="rtl"] .left-0 {
+  left: auto;
+  right: 0;
+}
+
+html[dir="rtl"] .right-0 {
+  right: auto;
+  left: 0;
+}
+
+/* Chevrons and arrows should flip in RTL */
+html[dir="rtl"] .icon-chevron-right,
+html[dir="rtl"] .icon-chevron-left,
+html[dir="rtl"] .icon-arrow-right,
+html[dir="rtl"] .icon-arrow-left {
+  transform: scaleX(-1);
+}
+
+/* Specific component adjustments for RTL */
+html[dir="rtl"] .sidebar {
+  border-left: none;
+  border-right: 1px solid var(--color-border);
+}
+
+html[dir="rtl"] .dropdown-menu {
+  left: auto;
+  right: 0;
+}
+
+/* Navigation arrows */
+html[dir="rtl"] .nav-next::after {
+  content: "←";
+}
+
+html[dir="rtl"] .nav-prev::before {
+  content: "→";
+}
+
+/* Ensure proper text rendering for RTL scripts */
+html[dir="rtl"] {
+  font-feature-settings: "liga" 1, "calt" 1;
+  text-rendering: optimizeLegibility;
+}
+
+/* Fix for inputs in RTL */
+html[dir="rtl"] input[type="text"],
+html[dir="rtl"] input[type="email"],
+html[dir="rtl"] input[type="password"],
+html[dir="rtl"] input[type="search"],
+html[dir="rtl"] textarea {
+  text-align: start;
+}
+
+/* Numbered lists should use RTL numbering */
+html[dir="rtl"] ol {
+  list-style-position: inside;
+}
+
+/* Fix for checkboxes and radio buttons in RTL */
+html[dir="rtl"] input[type="checkbox"],
+html[dir="rtl"] input[type="radio"] {
+  margin-inline-start: 0;
+  margin-inline-end: 0.5rem;
+}

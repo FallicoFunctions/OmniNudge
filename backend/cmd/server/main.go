@@ -10,11 +10,14 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/omninudge/backend/internal/api/middleware"
 	"github.com/omninudge/backend/internal/config"
 	"github.com/omninudge/backend/internal/database"
 	"github.com/omninudge/backend/internal/handlers"
 	"github.com/omninudge/backend/internal/models"
+	"github.com/omninudge/backend/internal/queue"
+	"github.com/omninudge/backend/internal/monitoring"
 	"github.com/omninudge/backend/internal/repository"
 	"github.com/omninudge/backend/internal/services"
 	"github.com/omninudge/backend/internal/utils"
@@ -71,6 +74,7 @@ func main() {
 	batchRepo := models.NewNotificationBatchRepository(db.Pool)
 	slideshowRepo := models.NewSlideshowRepository(db.Pool)
 	redditPostRepo := models.NewRedditPostRepository(db.Pool)
+	passwordResetRepo := models.NewPasswordResetRepository(db.Pool)
 	feedRepo := models.NewFeedRepository(db.Pool)
 	themeRepo := models.NewUserThemeRepository(db.Pool)
 	themeOverrideRepo := models.NewUserThemeOverrideRepository(db.Pool)
@@ -127,6 +131,15 @@ func main() {
 		cfg.Reddit.ClientSecret,
 	)
 
+	// Initialize job queue client (P0-002)
+	var queueClient *queue.QueueClient
+	if cfg.Redis.Addr != "" {
+		queueClient = queue.NewQueueClient(cfg.Redis.Addr, cfg.Redis.Password)
+		log.Println("Job queue client initialized")
+	} else {
+		log.Println("Warning: Job queue disabled (Redis not configured)")
+	}
+
 	// Initialize notification services
 	notificationService := services.NewNotificationService(
 		db.Pool,
@@ -140,13 +153,83 @@ func main() {
 	)
 	baselineCalculatorService := services.NewBaselineCalculatorService(db.Pool, baselineRepo)
 
+	// Initialize feature flag service (P0-012)
+	featureFlagService := services.NewFeatureFlagService(db.Pool)
+
+	// Initialize analytics service (P0-027)
+	analyticsService := services.NewAnalyticsService(db.Pool)
+
+	// Initialize Firebase Cloud Messaging (P0-042)
+	var firebaseService *services.FirebaseService
+	if cfg.Firebase.CredentialsPath != "" {
+		var err error
+		firebaseService, err = services.NewFirebaseService(cfg.Firebase.CredentialsPath)
+		if err != nil {
+			log.Printf("Warning: Failed to initialize Firebase: %v", err)
+		}
+	} else {
+		log.Println("Firebase credentials not configured, push notifications disabled")
+	}
+
+	// Initialize email service (P0-036)
+	emailService := services.NewEmailService(
+		cfg.SMTP.Host,
+		cfg.SMTP.Port,
+		cfg.SMTP.User,
+		cfg.SMTP.Password,
+		cfg.SMTP.FromAddress,
+		cfg.SMTP.FromName,
+	)
+	if cfg.SMTP.Host != "" {
+		log.Println("Email service initialized")
+	} else {
+		log.Println("Warning: SMTP not configured, emails will not be sent")
+	}
+
+	// Start job queue worker (P0-002: background job processing)
+	if queueClient != nil && cfg.Redis.Addr != "" {
+		jobWorker := queue.NewWorker(cfg.Redis.Addr, cfg.Redis.Password, 10) // 10 concurrent workers
+
+		// Register job handlers
+		jobWorker.RegisterAllHandlers(queue.JobHandlers{
+			EmailSend:  queue.NewEmailHandler(emailService),
+			DataExport: queue.NewDataExportHandler(db.Pool),
+			// Other handlers still use placeholders for now
+			VirusScan:           queue.HandleVirusScan,
+			Transcription:       queue.HandleTranscription,
+			Notification:        queue.HandleNotification,
+			ThumbnailGeneration: queue.HandleThumbnailGeneration,
+			ContentModeration:   queue.HandleContentModeration,
+		})
+
+		// Start worker in background
+		go func() {
+			log.Println("Starting job queue worker...")
+			if err := jobWorker.Start(); err != nil {
+				log.Printf("Job queue worker error: %v", err)
+			}
+		}()
+		log.Println("Job queue worker started with 10 concurrent workers")
+	}
+
 	// Start background workers
 	workerCtx := context.Background()
 	workerManager := workers.NewWorkerManager(notificationService, baselineCalculatorService)
 	workerManager.Start(workerCtx)
 
+	// Start account cleanup worker (P0-017: permanently delete accounts after grace period)
+	accountCleanupWorker := workers.NewAccountCleanupWorker(db.Pool)
+	go accountCleanupWorker.Start(workerCtx)
+
+	// Start data retention worker (P0-034: automated data deletion per retention policy)
+	dataRetentionWorker := workers.NewDataRetentionWorker(db.Pool)
+	go dataRetentionWorker.Start(workerCtx)
+
+	// Initialize repositories for email verification
+	emailVerificationRepo := models.NewEmailVerificationRepository(db.Pool)
+
 	// Initialize handlers
-	authHandler := handlers.NewAuthHandler(authService, userRepo)
+	authHandler := handlers.NewAuthHandler(authService, userRepo, emailService, passwordResetRepo, emailVerificationRepo, cfg.FrontendURL)
 	settingsHandler := handlers.NewSettingsHandler(userSettingsRepo)
 	postsHandler := handlers.NewPostsHandler(db.Pool, postRepo, hubRepo, userRepo, hubModRepo, feedRepo, hubSettingsRepo)
 	commentsHandler := handlers.NewCommentsHandler(db.Pool, commentRepo, postRepo, hubRepo, userRepo, hubModRepo)
@@ -158,7 +241,7 @@ func main() {
 	// Initialize CSS sanitizer
 	cssSanitizer := services.NewCSSSanitizer()
 
-	messagesHandler := handlers.NewMessagesHandler(db.Pool, messageRepo, conversationRepo, userSettingsRepo, hub)
+	messagesHandler := handlers.NewMessagesHandler(db.Pool, messageRepo, conversationRepo, userSettingsRepo, hub, firebaseService)
 	usersHandler := handlers.NewUsersHandler(userRepo, postRepo, commentRepo, authService, hubModRepo)
 	mediaHandler := handlers.NewMediaHandler(mediaRepo, thumbnailService)
 	hubsHandler := handlers.NewHubsHandlerWithAccessRequest(hubRepo, postRepo, hubModRepo, hubSubRepo, hubSettingsRepo, hubAccessRequestRepo)
@@ -173,7 +256,9 @@ func main() {
 		commentRepo,
 	)
 	adminHandler := handlers.NewAdminHandler(userRepo, hubModRepo, db.Pool)
-	wsHandler := handlers.NewWebSocketHandler(hub)
+	// Create authorizer for WebSocket message authorization (P0-008b)
+	wsAuthorizer := websocket.NewAuthorizer(db.Pool)
+	wsHandler := handlers.NewWebSocketHandler(hub, wsAuthorizer)
 	notificationsHandler := handlers.NewNotificationsHandler(notificationRepo)
 	searchHandler := handlers.NewSearchHandler(db.Pool)
 	blockingHandler := handlers.NewBlockingHandler(db.Pool, userRepo)
@@ -196,10 +281,26 @@ func main() {
 	)
 	bugReportsHandler := handlers.NewBugReportsHandler(bugReportRepo, knownBugRepo, mediaRepo)
 	modMailHandler := handlers.NewModMailHandler(db.Pool, conversationRepo, messageRepo, userRepo, hubModRepo, hubRepo)
-	hubSettingsHandler := handlers.NewHubSettingsHandler(hubRepo, hubSettingsRepo)
+	hubSettingsHandler := handlers.NewHubSettingsHandler(hubRepo, hubSettingsRepo, userRepo)
 	hubThemesHandler := handlers.NewHubThemesHandler(hubThemesRepo, hubSettingsRepo)
 	hubWikiHandler := handlers.NewHubWikiHandler(hubRepo, hubSettingsRepo, hubWikiRepo)
 	accessRequestHandler := handlers.NewAccessRequestHandler(hubAccessRequestRepo, hubRepo, hubSettingsRepo, userRepo)
+	jobsHandler := handlers.NewJobsHandler(queueClient)
+	audioEncoderHandler := handlers.NewAudioEncoderHandler(mediaRepo, queueClient)
+	featureFlagsHandler := handlers.NewFeatureFlagHandler(featureFlagService)
+	accountDeletionHandler := handlers.NewAccountDeletionHandler(db.Pool, queueClient)
+	dataExportHandler := handlers.NewDataExportHandler(db.Pool, queueClient)
+	feedbackHandler := handlers.NewFeedbackHandler(db.Pool)
+	analyticsHandler := handlers.NewAnalyticsHandler(analyticsService)
+	dataRetentionHandler := handlers.NewDataRetentionHandler(db.Pool)
+	pushNotificationHandler := handlers.NewPushNotificationHandler(db.Pool, firebaseService)
+
+	// Check ffmpeg availability for iOS audio encoding (P0-003)
+	if err := handlers.CheckFFmpegAvailability(); err != nil {
+		log.Printf("Warning: FFmpeg not available - iOS voice recording will not work: %v", err)
+	} else {
+		log.Println("FFmpeg available for audio encoding")
+	}
 
 	// Inject notification service into handlers
 	postsHandler.SetNotificationService(notificationService)
@@ -211,6 +312,11 @@ func main() {
 	// Apply CORS middleware BEFORE static files
 	router.Use(middleware.CORS())
 
+	// Apply security headers (CSP, X-Frame-Options, etc.)
+	router.Use(middleware.SecurityHeaders())
+
+	// Apply monitoring middleware
+	router.Use(monitoring.MetricsMiddleware())
 	// Serve static files with CORS headers
 	router.Static("/uploads", "./uploads")
 
@@ -234,6 +340,30 @@ func main() {
 		})
 	})
 
+	// Prometheus metrics endpoint
+	router.GET("/metrics", gin.WrapH(promhttp.Handler()))
+
+	// Detailed health check endpoints (for monitoring)
+	router.GET("/health/liveness", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"status": "alive"})
+	})
+
+	router.GET("/health/readiness", func(c *gin.Context) {
+		ctx, cancel := context.WithTimeout(c.Request.Context(), 2*time.Second)
+		defer cancel()
+
+		ready := true
+		if err := db.Health(ctx); err != nil {
+			ready = false
+		}
+
+		if ready {
+			c.JSON(http.StatusOK, gin.H{"status": "ready"})
+		} else {
+			c.JSON(http.StatusServiceUnavailable, gin.H{"status": "not ready"})
+		}
+	})
+
 	// API v1 routes
 	api := router.Group("/api/v1")
 	{
@@ -243,6 +373,12 @@ func main() {
 				"message": "pong",
 			})
 		})
+
+		// Frontend logs endpoint (no auth required - allow error reporting from unauthenticated users)
+		logs := api.Group("/logs")
+		{
+			logs.POST("/frontend", handlers.HandleFrontendLogs)
+		}
 
 		// Auth routes (no auth required)
 		auth := api.Group("/auth")
@@ -254,6 +390,15 @@ func main() {
 			// Reddit OAuth (for future use)
 			auth.GET("/reddit", authHandler.RedditLogin)
 			auth.GET("/reddit/callback", authHandler.RedditCallback)
+
+			// Password reset
+			auth.POST("/forgot-password", authHandler.ForgotPassword)
+			auth.POST("/reset-password", authHandler.ResetPassword)
+			auth.GET("/validate-reset-token", authHandler.ValidateResetToken)
+
+			// Email verification
+			auth.GET("/verify-email", authHandler.VerifyEmail)
+			auth.POST("/resend-verification", authHandler.ResendVerification)
 		}
 
 		// Combined feed routes (optional auth)
@@ -394,6 +539,26 @@ func main() {
 			bugReports.GET("/known", bugReportsHandler.GetKnownBugs) // Public list of known bugs
 		}
 
+		// User feedback routes (P0-035: optional auth for feedback)
+		feedback := api.Group("/feedback")
+		feedback.Use(middleware.AuthOptional(authService))
+		{
+			feedback.POST("", feedbackHandler.SubmitFeedback) // Anyone can submit feedback
+		}
+
+		// Analytics routes (P0-027: track events, optional auth for user context)
+		analytics := api.Group("/analytics")
+		analytics.Use(middleware.AuthOptional(authService))
+		{
+			analytics.POST("/track", analyticsHandler.TrackEvent)
+		}
+
+		// Job status routes (P0-002: job status queryable via API)
+		jobs := api.Group("/jobs")
+		{
+			jobs.GET("/:queue/:id", jobsHandler.GetJobStatus)
+		}
+
 		// Protected routes (auth required)
 		protected := api.Group("")
 		protected.Use(middleware.AuthRequired(authService))
@@ -409,6 +574,26 @@ func main() {
 			protected.GET("/settings", settingsHandler.GetSettings)
 			protected.PUT("/settings", settingsHandler.UpdateSettings)
 			protected.GET("/users/me/saved", savedItemsHandler.GetSavedItems)
+
+			// Feature flags (P0-012: check if feature enabled for user)
+			protected.GET("/features/:key", featureFlagsHandler.GetFlag)
+
+			// Account deletion (P0-017: GDPR right to erasure)
+			protected.POST("/account/delete", accountDeletionHandler.RequestAccountDeletion)
+			protected.POST("/account/cancel-deletion", accountDeletionHandler.CancelAccountDeletion)
+			protected.GET("/account/deletion-status", accountDeletionHandler.GetAccountDeletionStatus)
+
+			// GDPR Data Export (P0-016: GDPR right to data portability)
+			protected.POST("/account/export", dataExportHandler.RequestDataExport)
+			protected.GET("/account/export/:export_id", dataExportHandler.GetExportStatus)
+			protected.GET("/account/exports", dataExportHandler.ListExportRequests)
+
+			// Push notifications (P0-042: device token registration)
+			protected.POST("/devices/register", pushNotificationHandler.RegisterDeviceToken)
+			protected.DELETE("/devices/unregister", pushNotificationHandler.UnregisterDeviceToken)
+			protected.GET("/devices", pushNotificationHandler.GetUserDevices)
+			protected.POST("/devices/test", pushNotificationHandler.TestNotification)
+
 			protected.GET("/users/me/hidden", savedItemsHandler.GetHiddenItems)
 			protected.GET("/hubs/agent-targets", hubsHandler.GetAgentTargets)
 
@@ -560,10 +745,12 @@ func main() {
 			protected.POST("/media/upload", uploadRateLimiter.Middleware(), mediaHandler.UploadMedia)
 			// Batch media upload (no individual rate limiting, processes multiple files concurrently)
 			protected.POST("/media/batch-upload", mediaHandler.BatchUploadMedia)
+			// Audio encoding for iOS Safari (P0-003)
+			protected.POST("/media/encode-audio", audioEncoderHandler.EncodeAudio)
 
 			// User profile management
 			protected.PUT("/users/profile", usersHandler.UpdateProfile)
-			protected.PUT("/users/email", usersHandler.UpdateEmail)
+			protected.PUT("/users/email", authHandler.UpdateEmail)
 			protected.POST("/users/change-password", usersHandler.ChangePassword)
 			protected.POST("/users/me/ping", usersHandler.Ping)
 
@@ -670,6 +857,28 @@ func main() {
 				admin.POST("/known-bugs", bugReportsHandler.CreateKnownBug)
 				admin.PUT("/known-bugs/:id", bugReportsHandler.UpdateKnownBug)
 				admin.DELETE("/known-bugs/:id", bugReportsHandler.DeleteKnownBug)
+
+				// Feature flags management (P0-012)
+				admin.GET("/features", featureFlagsHandler.ListFlags)
+				admin.PUT("/features/:key", featureFlagsHandler.UpdateFlag)
+				admin.POST("/features/:key/overrides", featureFlagsHandler.SetUserOverride)
+				admin.DELETE("/features/:key/overrides/:user_id", featureFlagsHandler.RemoveUserOverride)
+				admin.GET("/features/:key/audit", featureFlagsHandler.GetAuditLog)
+				admin.POST("/features/:key/rollout", featureFlagsHandler.SetRolloutPercentage)
+
+				// User feedback management (P0-035)
+				admin.GET("/feedback", feedbackHandler.ListFeedback)
+				admin.GET("/feedback/stats", feedbackHandler.GetFeedbackStats)
+				admin.PUT("/feedback/:id", feedbackHandler.UpdateFeedbackStatus)
+
+				// Analytics management (P0-027)
+				admin.GET("/analytics/dashboard", analyticsHandler.GetDashboard)
+
+				// Data retention management (P0-034)
+				admin.GET("/retention/status", dataRetentionHandler.GetRetentionStatus)
+				admin.GET("/retention/policy", dataRetentionHandler.GetRetentionPolicy)
+				admin.PUT("/retention/policy/:data_type", dataRetentionHandler.UpdateRetentionPolicy)
+				admin.GET("/retention/history", dataRetentionHandler.GetRetentionHistory)
 			}
 
 			// WebSocket endpoint for real-time messaging
