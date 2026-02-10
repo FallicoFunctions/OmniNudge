@@ -9,7 +9,6 @@ import { MultiColumnFeedProvider } from './contexts/MultiColumnFeedContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import MainLayout from './layouts/MainLayout';
 import { LoadingMessage } from './components/common/StatusMessage';
-import { FeedbackButton } from './components/FeedbackButton';
 import { usePageTracking } from './hooks/useAnalytics';
 import { analyticsService } from './services/analyticsService';
 import './App.css';
@@ -211,9 +210,7 @@ function App() {
                   </Routes>
                 </Suspense>
 
-                  {/* Global feedback button - appears on all pages */}
-                  <FeedbackButton />
-                  </MultiColumnFeedProvider>
+</MultiColumnFeedProvider>
                 </MessagingProvider>
               </RedditBlockProvider>
             </WebSocketProvider>

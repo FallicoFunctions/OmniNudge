@@ -58,7 +58,28 @@
     "profile": "Perfil",
     "admin": "Administración",
     "hubs": "Comunidades",
-    "search": "Buscar"
+    "search": "Buscar",
+    "create": "Crear",
+    "menu": "Menú"
+  },
+  "menu": {
+    "profile": "Perfil",
+    "settings": "Ajustes",
+    "hubs": "Explorar Hubs",
+    "about": "Acerca de",
+    "admin": "Panel Admin",
+    "logout": "Cerrar Sesión",
+    "logoutConfirm": "¿Estás seguro de que quieres cerrar sesión?"
+  },
+  "create": {
+    "post": "Crear Publicación",
+    "hub": "Crear Hub",
+    "crosspost": "Compartir de Reddit"
+  },
+  "ariaLabels": {
+    "mobileNav": "Navegación móvil",
+    "unreadMessages": "{{count}} mensajes sin leer",
+    "closeMenu": "Cerrar menú"
   },
   "home": {
     "feed": {

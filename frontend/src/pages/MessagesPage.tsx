@@ -13,6 +13,7 @@ import { OnlineStatusIndicator } from '../components/messages/OnlineStatusIndica
 import { TypingIndicator } from '../components/messages/TypingIndicator';
 import { HighlightedText } from '../components/messages/HighlightedText';
 import { useDebounce } from '../hooks/useDebounce';
+import { useMediaQuery } from '../hooks/useMediaQuery';
 import type { Conversation, Message, SendMessageRequest } from '../types/messages';
 import type { ModMailConversation } from '../types/modmail';
 import { API_BASE_URL } from '../lib/api';
@@ -631,6 +632,9 @@ export default function MessagesPage() {
   const typingTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
   const currentConversationRef = useRef<number | null>(null);
   const currentRecipientRef = useRef<number>(0);
+  const isMobile = useMediaQuery('(max-width: 767px)');
+  const isInChat = Boolean(selectedConversationId || isCreatingChat);
+  const [showMessageSearch, setShowMessageSearch] = useState(false);
 
   const {
     data: conversationsData,
@@ -742,10 +746,10 @@ export default function MessagesPage() {
       ? conversations.some((c) => c.id === selectedConversationId)
       : false;
 
-    if (!selectedConversationId || !currentExists) {
+    if (!isMobile && (!selectedConversationId || !currentExists)) {
       setSelectedConversationId(conversations[0].id);
     }
-  }, [conversations, isCreatingChat, selectedConversationId]);
+  }, [conversations, isCreatingChat, selectedConversationId, isMobile]);
 
   const selectedConversation = conversations?.find((c) => c.id === selectedConversationId);
   const selectedConversationExists = Boolean(selectedConversation);
@@ -801,7 +805,7 @@ export default function MessagesPage() {
     queryKey: ['modMailConversation', selectedConversationId],
     queryFn: async () => {
       const token = localStorage.getItem('auth_token');
-      const response = await fetch(`http://localhost:8080/api/v1/mod-mail/${selectedConversationId}`, {
+      const response = await fetch(`${API_BASE_URL}/mod-mail/${selectedConversationId}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
@@ -1437,6 +1441,7 @@ export default function MessagesPage() {
   useEffect(() => {
     setMessageMenuOpen(null);
     setDeleteDialogMessage(null);
+    setShowMessageSearch(false);
   }, [selectedConversationId]);
 
   // Keyboard shortcut: Escape to clear message search
@@ -1499,9 +1504,14 @@ export default function MessagesPage() {
 
   return (
     <>
-      <div className="flex h-[calc(100vh-4rem)]">
+      <div
+        className="relative flex overflow-hidden"
+        style={{ height: isMobile ? 'calc(100dvh - 4rem - 56px - env(safe-area-inset-bottom))' : 'calc(100vh - 4rem)' }}
+      >
       {/* Conversations List */}
-      <div className="w-80 flex-shrink-0 overflow-hidden border-r border-[var(--color-border)] bg-[var(--color-surface)]">
+      <div className={isMobile
+        ? `absolute inset-0 overflow-hidden border-r border-[var(--color-border)] bg-[var(--color-surface)] will-change-transform transition-transform duration-[250ms] ease-in-out ${isInChat ? '-translate-x-full' : 'translate-x-0'}`
+        : 'w-80 flex-shrink-0 overflow-hidden border-r border-[var(--color-border)] bg-[var(--color-surface)]'}>
         <div className="border-b border-[var(--color-border)] p-4">
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-lg font-semibold text-[var(--color-text-primary)]">{t('messages.title')}</h2>
@@ -1513,7 +1523,7 @@ export default function MessagesPage() {
                 setMessageText('');
                 setSelectedFile(null);
               }}
-              className="rounded-md bg-[var(--color-primary)] px-3 py-1 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)]"
+              className="rounded-md bg-[var(--color-primary)] px-3 py-2 md:py-1 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)] active:bg-[var(--color-primary-dark)]"
             >
               {t('messages.newConversation')}
             </button>
@@ -1572,7 +1582,7 @@ export default function MessagesPage() {
               className={`relative w-full border-b border-[var(--color-border)] transition-colors ${
                 selectedConversationId === conversation.id
                   ? 'bg-[var(--color-surface-elevated)]'
-                  : 'hover:bg-[var(--color-surface-elevated)]'
+                  : 'hover:bg-[var(--color-surface-elevated)] active:bg-[var(--color-surface-elevated)]'
               }`}
               data-conversation-menu-container={conversation.id}
             >
@@ -1698,14 +1708,33 @@ export default function MessagesPage() {
       </div>
 
       {/* Chat Area */}
-      <div className="flex flex-1 flex-col overflow-hidden bg-[var(--color-surface)]">
+      <div className={isMobile
+        ? `absolute inset-0 flex flex-col overflow-hidden bg-[var(--color-surface)] will-change-transform transition-transform duration-[250ms] ease-in-out ${isInChat ? 'translate-x-0' : 'translate-x-full'}`
+        : 'flex flex-1 flex-col overflow-hidden bg-[var(--color-surface)]'}>
         {selectedConversationId || isCreatingChat ? (
           <>
             {/* Chat Header */}
-            <div className="border-b border-[var(--color-border)] p-4">
+            <div className="border-b border-[var(--color-border)] p-3 md:p-4">
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <h3 className="font-semibold text-[var(--color-text-primary)]">
+                <div className="flex flex-1 min-w-0 items-center gap-1 md:gap-2">
+                  {/* Back button — mobile only */}
+                  {isMobile && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedConversationId(null);
+                        setIsCreatingChat(false);
+                        setShowMessageSearch(false);
+                      }}
+                      className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full active:bg-[var(--color-surface-elevated)]"
+                      aria-label="Back to conversations"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-[var(--color-text-primary)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                      </svg>
+                    </button>
+                  )}
+                  <h3 className="min-w-0 font-semibold text-[var(--color-text-primary)] truncate">
                     {isCreatingChat
                       ? t('messages.newConversation')
                       : selectedConversation?.conversation_type === 'mod_mail'
@@ -1728,23 +1757,13 @@ export default function MessagesPage() {
                         setRedditSlideshowModalOpen(true);
                         setRedditSlideshowInput('');
                       }}
-                      className="px-3 py-1.5 bg-[var(--color-surface-elevated)] text-[var(--color-text-primary)] border border-[var(--color-border)] rounded-md text-sm font-medium hover:bg-[var(--color-surface-hover)] transition-colors flex items-center gap-2"
+                      className="flex items-center gap-2 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-1.5 text-sm font-medium text-[var(--color-text-primary)] transition-colors hover:bg-[var(--color-surface-hover)] active:bg-[var(--color-surface-hover)]"
+                      aria-label={t('messages.browseRedditHub', 'Browse Reddit/Hub')}
                     >
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        className="h-5 w-5"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                        />
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                       </svg>
-                      {t('messages.browseRedditHub', 'Browse Reddit/Hub')}
+                      <span className="hidden md:inline">{t('messages.browseRedditHub', 'Browse Reddit/Hub')}</span>
                     </button>
                   )}
 
@@ -1752,7 +1771,8 @@ export default function MessagesPage() {
                   {!isCreatingChat && conversationMediaMessages.length >= 2 && (
                     <button
                       onClick={() => setSlideshowOpen(true)}
-                      className="px-3 py-1.5 bg-[var(--color-primary)] text-white rounded-md text-sm font-medium hover:bg-[var(--color-primary-dark)] transition-colors flex items-center gap-2"
+                      className="flex items-center gap-2 rounded-md bg-[var(--color-primary)] px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-[var(--color-primary-dark)] active:bg-[var(--color-primary-dark)]"
+                      aria-label={t('messages.media.viewAllTitle')}
                       title={t('messages.media.viewAllTitle')}
                     >
                       <svg
@@ -1769,7 +1789,25 @@ export default function MessagesPage() {
                           d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
                         />
                       </svg>
-                      {t('messages.mediaGallery', 'Media Gallery')} ({conversationMediaMessages.length})
+                      <span className="hidden md:inline">{t('messages.mediaGallery', 'Media Gallery')} ({conversationMediaMessages.length})</span>
+                    </button>
+                  )}
+                  {/* Search toggle — mobile only */}
+                  {isMobile && !isCreatingChat && (
+                    <button
+                      type="button"
+                      onClick={() => setShowMessageSearch((prev) => !prev)}
+                      className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-md border transition-colors active:opacity-80 ${
+                        showMessageSearch
+                          ? 'border-[var(--color-primary)] bg-[var(--color-primary)] text-white'
+                          : 'border-[var(--color-border)] bg-[var(--color-surface-elevated)] text-[var(--color-text-primary)]'
+                      }`}
+                      aria-label="Search messages"
+                      aria-pressed={showMessageSearch}
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                      </svg>
                     </button>
                   )}
                 </div>
@@ -1777,7 +1815,7 @@ export default function MessagesPage() {
             </div>
 
             {/* Message Search Bar */}
-            {!isCreatingChat && (
+            {!isCreatingChat && (!isMobile || showMessageSearch) && (
               <div className="border-b border-[var(--color-border)] p-3 bg-[var(--color-surface-elevated)]">
                 <div className="relative flex items-center gap-2">
                   {/* Search Icon */}
@@ -1810,7 +1848,7 @@ export default function MessagesPage() {
                     <button
                       type="button"
                       onClick={() => setMessageSearchQuery('')}
-                      className="absolute right-16 p-1 rounded-full hover:bg-[var(--color-surface-hover)] text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] transition-colors"
+                      className="absolute right-16 p-1 rounded-full hover:bg-[var(--color-surface-hover)] active:bg-[var(--color-surface-hover)] text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] transition-colors"
                       aria-label={t('messages.search.clearLabel')}
                     >
                       <svg
@@ -1864,7 +1902,7 @@ export default function MessagesPage() {
                         type="button"
                         onClick={() => fetchMoreMessages()}
                         disabled={isFetchingMoreMessages}
-                        className="rounded-md border border-[var(--color-border)] px-3 py-1 text-xs font-semibold text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-elevated)] disabled:opacity-60"
+                        className="rounded-md border border-[var(--color-border)] px-3 py-1 text-xs font-semibold text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-elevated)] active:bg-[var(--color-surface-elevated)] disabled:opacity-60"
                       >
                         {isFetchingMoreMessages ? t('common.loading') : t('messages.loadMoreMessages', 'Load more messages')}
                       </button>
@@ -1944,7 +1982,7 @@ export default function MessagesPage() {
                             <button
                               type="button"
                               aria-label={t('messages.messageOptions.ariaLabel')}
-                              className="rounded-full border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-2 py-1 text-xs font-semibold text-[var(--color-text-secondary)] transition hover:bg-[var(--color-surface)] hover:text-[var(--color-text-primary)]"
+                              className="rounded-full border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-2 py-1 text-xs font-semibold text-[var(--color-text-secondary)] transition hover:bg-[var(--color-surface)] active:bg-[var(--color-surface)] hover:text-[var(--color-text-primary)]"
                               onClick={(event) => {
                                 event.stopPropagation();
                                 setMessageMenuOpen((prev) => (prev === message.id ? null : message.id));
@@ -2081,7 +2119,7 @@ export default function MessagesPage() {
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
-                  className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-2 text-sm text-[var(--color-text-primary)] hover:bg-[var(--color-surface)]"
+                  className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-2 text-sm text-[var(--color-text-primary)] hover:bg-[var(--color-surface)] active:bg-[var(--color-surface)]"
                   title={t('messages.compose.attachSingle')}
                 >
                   📎
@@ -2090,7 +2128,7 @@ export default function MessagesPage() {
                   <button
                     type="button"
                     onClick={() => setShowMultiUpload(!showMultiUpload)}
-                    className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-2 text-sm text-[var(--color-text-primary)] hover:bg-[var(--color-surface)]"
+                    className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-2 text-sm text-[var(--color-text-primary)] hover:bg-[var(--color-surface)] active:bg-[var(--color-surface)]"
                     title={t('messages.compose.attachMultiple')}
                   >
                     📷+
@@ -2163,7 +2201,7 @@ export default function MessagesPage() {
                   disabled={
                     sendMessageMutation.isPending || uploadingMedia || (isCreatingChat && !newChatUsername.trim())
                   }
-                  className="rounded-md bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)] disabled:opacity-50"
+                  className="rounded-md bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)] active:bg-[var(--color-primary-dark)] disabled:opacity-50"
                 >
                   {uploadingMedia ? t('messages.uploading', 'Uploading...') : t('messages.send')}
                 </button>

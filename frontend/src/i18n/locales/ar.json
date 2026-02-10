@@ -58,7 +58,28 @@
     "profile": "الملف الشخصي",
     "admin": "الإدارة",
     "hubs": "المجتمعات",
-    "search": "بحث"
+    "search": "بحث",
+    "create": "إنشاء",
+    "menu": "القائمة"
+  },
+  "menu": {
+    "profile": "الملف الشخصي",
+    "settings": "الإعدادات",
+    "hubs": "تصفح المراكز",
+    "about": "حول",
+    "admin": "لوحة الإدارة",
+    "logout": "تسجيل الخروج",
+    "logoutConfirm": "هل أنت متأكد أنك تريد تسجيل الخروج؟"
+  },
+  "create": {
+    "post": "إنشاء منشور",
+    "hub": "إنشاء مركز",
+    "crosspost": "مشاركة من Reddit"
+  },
+  "ariaLabels": {
+    "mobileNav": "التنقل عبر الهاتف المحمول",
+    "unreadMessages": "{{count}} رسائل غير مقروءة",
+    "closeMenu": "إغلاق القائمة"
   },
   "home": {
     "feed": {
