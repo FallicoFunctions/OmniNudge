@@ -1148,28 +1148,93 @@ export default function RedditPage() {
                     />
                   </button>
                 </div>
-                <FeedSearchBars
-                  containerClassName="w-full md:w-96"
-                  showTopForm={false}
-                  topValue={inputValue}
-                  topPlaceholder="Enter hub or subreddit..."
-                  onTopChange={handleInputChange}
-                  onTopFocus={() => setIsAutocompleteOpen(true)}
-                  onTopBlur={() => setIsAutocompleteOpen(false)}
-                  onTopSubmit={handleSubredditSubmit}
-                  topSuggestions={suggestionItems}
-                  topShouldShowSuggestions={shouldShowSuggestions}
-                  topIsLoading={isAutocompleteLoading}
-                  topEmptyMessage="No hubs or subreddits found."
-                  renderTopSuggestion={(suggestion) => (
-                    <SubredditSuggestionItem
-                      key={suggestion.name}
-                      suggestion={suggestion}
-                      onSelect={handleSelectSubredditSuggestion}
-                    />
-                  )}
-                  postValue={postSearchInput}
-                  postPlaceholder="Search posts..."
+                {/* Mobile: Show both subreddit navigation + post search */}
+                <div className="block w-full lg:hidden">
+                  <FeedSearchBars
+                    containerClassName="w-full"
+                    showTopForm={true}
+                    topValue={inputValue}
+                    topPlaceholder="Enter hub or subreddit..."
+                    onTopChange={handleInputChange}
+                    onTopFocus={() => setIsAutocompleteOpen(true)}
+                    onTopBlur={() => setIsAutocompleteOpen(false)}
+                    onTopSubmit={handleSubredditSubmit}
+                    topSuggestions={suggestionItems}
+                    topShouldShowSuggestions={shouldShowSuggestions}
+                    topIsLoading={isAutocompleteLoading}
+                    topEmptyMessage="No hubs or subreddits found."
+                    renderTopSuggestion={(suggestion) => (
+                      <SubredditSuggestionItem
+                        key={suggestion.name}
+                        suggestion={suggestion}
+                        onSelect={handleSelectSubredditSuggestion}
+                      />
+                    )}
+                    postValue={postSearchInput}
+                    postPlaceholder="Search posts..."
+                    onPostChange={(value) => {
+                      setPostSearchInput(value);
+                      if (!isSearchDropdownOpen) {
+                        setIsSearchDropdownOpen(true);
+                      }
+                    }}
+                    onPostFocus={() => setIsSearchDropdownOpen(true)}
+                    onPostBlur={() => setTimeout(() => setIsSearchDropdownOpen(false), 120)}
+                    onPostSubmit={handlePostSearchSubmit}
+                    postDropdownOpen={isSearchDropdownOpen}
+                    postDropdownContent={
+                      <div className="space-y-2 text-sm text-[var(--color-text-primary)]">
+                        <label className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={limitSearchToContext}
+                            onChange={(e) => setLimitSearchToContext(e.target.checked)}
+                          />
+                          <span>Limit search to r/{subreddit}</span>
+                        </label>
+                        {!blockAllNsfw && (
+                          <label className="flex items-center gap-2">
+                            <input
+                              type="checkbox"
+                              checked={includeNsfwSearch}
+                              onChange={(e) => setIncludeNsfwSearch(e.target.checked)}
+                            />
+                            <span>Include NSFW results</span>
+                          </label>
+                        )}
+                        {blockAllNsfw && (
+                          <div className="text-xs text-[var(--color-text-secondary)]">
+                            NSFW content is blocked in settings.
+                          </div>
+                        )}
+                      </div>
+                    }
+                  />
+                </div>
+                {/* Desktop: Show only post search (subreddit nav is in header) */}
+                <div className="hidden lg:block lg:w-96">
+                  <FeedSearchBars
+                    containerClassName="w-full"
+                    showTopForm={false}
+                    topValue={inputValue}
+                    topPlaceholder="Enter hub or subreddit..."
+                    onTopChange={handleInputChange}
+                    onTopFocus={() => setIsAutocompleteOpen(true)}
+                    onTopBlur={() => setIsAutocompleteOpen(false)}
+                    onTopSubmit={handleSubredditSubmit}
+                    topSuggestions={suggestionItems}
+                    topShouldShowSuggestions={shouldShowSuggestions}
+                    topIsLoading={isAutocompleteLoading}
+                    topEmptyMessage="No hubs or subreddits found."
+                    renderTopSuggestion={(suggestion) => (
+                      <SubredditSuggestionItem
+                        key={suggestion.name}
+                        suggestion={suggestion}
+                        onSelect={handleSelectSubredditSuggestion}
+                      />
+                    )}
+                    postValue={postSearchInput}
+                    postPlaceholder="Search posts..."
                   onPostChange={(value) => {
                     setPostSearchInput(value);
                     if (!isSearchDropdownOpen) {
@@ -1208,6 +1273,7 @@ export default function RedditPage() {
                     </div>
                   }
                 />
+                </div>
               </>
             }
           />
