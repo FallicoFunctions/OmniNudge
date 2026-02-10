@@ -32,15 +32,29 @@ createRoot(document.getElementById('root')!).render(
 
 if (import.meta.env.PROD && 'serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    // Register main service worker
-    navigator.serviceWorker.register('/service-worker.js').catch(() => {
-      // Ignore registration errors to avoid blocking app load.
+    // EMERGENCY FIX: Unregister all service workers and clear caches
+    // This fixes module import errors caused by stale service worker caches
+    navigator.serviceWorker.getRegistrations().then((registrations) => {
+      registrations.forEach((registration) => {
+        registration.unregister();
+      });
     });
 
-    // Register Firebase Cloud Messaging service worker
-    navigator.serviceWorker.register('/firebase-messaging-sw.js').catch(() => {
-      // Ignore registration errors to avoid blocking app load.
-    });
+    if ('caches' in window) {
+      caches.keys().then((names) => {
+        names.forEach((name) => caches.delete(name));
+      });
+    }
+
+    // Service worker registration temporarily disabled
+    // Will re-enable after fixing cache invalidation strategy
+
+    // Register Firebase Cloud Messaging service worker (still needed for notifications)
+    setTimeout(() => {
+      navigator.serviceWorker.register('/firebase-messaging-sw.js').catch(() => {
+        // Ignore registration errors to avoid blocking app load.
+      });
+    }, 2000); // Delay to ensure unregistration completes
   });
 }
 
