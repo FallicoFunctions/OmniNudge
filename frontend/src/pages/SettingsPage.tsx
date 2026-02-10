@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useLocation } from 'react-router-dom';
 import ThemeSelector from '../components/themes/ThemeSelector';
 import ThemeEditor from '../components/themes/ThemeEditor';
 import { LanguageSelector } from '../components/settings/LanguageSelector';
@@ -15,6 +16,7 @@ import { FEATURE_FLAGS } from '../config/featureFlags';
 
 export default function SettingsPage() {
   const { t } = useTranslation();
+  const location = useLocation();
   const {
     useRelativeTime,
     setUseRelativeTime,
@@ -52,7 +54,7 @@ export default function SettingsPage() {
   const [publicKey, setPublicKey] = useState<string | null>(null);
   const [showPublicKey, setShowPublicKey] = useState(false);
   const [copyStatus, setCopyStatus] = useState<'idle' | 'copied' | 'error'>('idle');
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const [isEditingEmail, setIsEditingEmail] = useState(false);
   const [emailInput, setEmailInput] = useState('');
   const [emailConfirmInput, setEmailConfirmInput] = useState('');
@@ -80,6 +82,21 @@ export default function SettingsPage() {
     requestPermission: enablePush,
     unregister: disablePush
   } = usePushNotifications();
+
+  // Track if we've already processed email verification to prevent infinite loop
+  const hasProcessedVerification = useRef(false);
+
+  // Refresh user data if arriving from email verification
+  useEffect(() => {
+    const state = location.state as { emailVerified?: boolean } | null;
+    if (state?.emailVerified && !hasProcessedVerification.current) {
+      console.log('[SettingsPage] Email just verified, refreshing user data...');
+      hasProcessedVerification.current = true;
+      refreshUser();
+      // Clear the state flag so it doesn't persist in history
+      window.history.replaceState({}, document.title);
+    }
+  }, [location.state, refreshUser]);
 
   useEffect(() => {
     setPublicKey(getOwnPublicKeyBase64());

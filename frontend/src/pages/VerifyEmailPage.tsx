@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../lib/api';
 import { Button } from '../components/ui/Button';
@@ -12,7 +12,15 @@ export default function VerifyEmailPage() {
   const [message, setMessage] = useState('');
   const [purpose, setPurpose] = useState('');
 
+  // Prevent duplicate verification requests
+  const hasVerified = useRef(false);
+
   useEffect(() => {
+    // Guard: only verify once
+    if (hasVerified.current) {
+      return;
+    }
+
     if (!token) {
       setStatus('error');
       setMessage('Invalid verification link');
@@ -20,6 +28,9 @@ export default function VerifyEmailPage() {
     }
 
     const verifyEmail = async () => {
+      // Mark as verifying to prevent duplicate calls
+      hasVerified.current = true;
+
       try {
         const response = await api.get<{ purpose: string; verified: boolean; username: string }>(`/auth/verify-email?token=${token}`);
         console.log('Verification response:', response);
@@ -33,8 +44,8 @@ export default function VerifyEmailPage() {
             console.log('Navigating to /');
             navigate('/', { replace: true });
           } else if (response.purpose === 'update_email') {
-            console.log('Navigating to /settings');
-            navigate('/settings', { replace: true });
+            console.log('Navigating to /settings with emailVerified flag');
+            navigate('/settings', { replace: true, state: { emailVerified: true } });
           } else {
             console.warn('Unknown purpose:', response.purpose, '- staying on verification page');
           }
