@@ -1,4 +1,4 @@
-const CACHE_NAME = 'omninudge-v1';
+const CACHE_NAME = 'omninudge-v2';
 const SHELL_ASSETS = ['/', '/index.html', '/vite.svg'];
 
 self.addEventListener('install', (event) => {
