@@ -11,7 +11,6 @@ import { trackEvent } from '../../utils/analytics';
 interface MoreMenuSheetProps {
   isOpen: boolean;
   onClose: () => void;
-  onOpenAuthModal?: (mode: 'login' | 'signup') => void;
 }
 
 /**
@@ -25,7 +24,7 @@ interface MoreMenuSheetProps {
  * Note: This component checks for route existence before navigating.
  * Verify that /about route exists, or remove if not implemented.
  */
-export function MoreMenuSheet({ isOpen, onClose, onOpenAuthModal }: MoreMenuSheetProps) {
+export function MoreMenuSheet({ isOpen, onClose }: MoreMenuSheetProps) {
   const navigate = useNavigate();
   const { t } = useTranslation();
   const { user, isAuthenticated, logout } = useAuth();

@@ -467,7 +467,6 @@ export default function MainLayout() {
         >
           <MobileTabBar
             unreadCount={unreadTotal}
-            onOpenAuthModal={(mode) => setAuthModal(mode)}
           />
         </ErrorBoundary>
       )}

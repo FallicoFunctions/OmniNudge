@@ -11,7 +11,6 @@ import { MOBILE_Z_INDEX, MOBILE_TIMING, MOBILE_SIZES } from '../../constants/mob
 
 interface MobileTabBarProps {
   unreadCount?: number;
-  onOpenAuthModal?: (mode: 'login' | 'signup') => void;
 }
 
 /**
@@ -23,7 +22,7 @@ interface MobileTabBarProps {
  * - Unread message badge
  * - Bottom sheet menus for Create and Menu tabs
  */
-export function MobileTabBar({ unreadCount, onOpenAuthModal }: MobileTabBarProps) {
+export function MobileTabBar({ unreadCount }: MobileTabBarProps) {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, isAuthenticated } = useAuth();
@@ -212,7 +211,6 @@ export function MobileTabBar({ unreadCount, onOpenAuthModal }: MobileTabBarProps
       <MoreMenuSheet
         isOpen={showMoreMenu}
         onClose={() => setShowMoreMenu(false)}
-        onOpenAuthModal={onOpenAuthModal}
       />
     </>
   );
