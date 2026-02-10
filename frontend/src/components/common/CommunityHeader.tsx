@@ -80,10 +80,10 @@ export function CommunityHeader({
   if (!communityName) return null;
 
   return (
-    <div className="mb-0 flex flex-col gap-4 px-4 md:px-0">
+    <div className="mb-0 flex flex-col gap-4">
       {/* Row 1: Community name, buttons, and search */}
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <div className="flex w-full flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div className="flex w-full flex-col gap-4 px-4 md:flex-row md:items-center md:justify-between">
           <div className="flex items-center gap-3">
             {iconUrl && (
               <img
@@ -191,7 +191,7 @@ export function CommunityHeader({
             )}
           </div>
         </div>
-        <div className="hidden lg:block">
+        <div className="hidden px-4 lg:block">
           {searchBars}
         </div>
       </div>
