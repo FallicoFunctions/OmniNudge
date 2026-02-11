@@ -26,6 +26,7 @@ import { Panel } from '../components/common/Panel';
 import { FeedSearchBars } from '../components/common/FeedSearchBars';
 import SubredditAboutPanel from '../components/reddit/SubredditAboutPanel';
 import { CommunityHeader } from '../components/common/CommunityHeader';
+import { MobileOnly } from '../components/common/MobileOnly';
 import { SubredditSuggestionItem } from '../components/subreddit/SubredditSuggestionItem';
 import { useSubredditAbout } from '../hooks/useSubredditAbout';
 import { useSavedItems } from '../hooks/useSavedItems';
@@ -1849,6 +1850,68 @@ export default function RedditPostPage() {
           />
         }
       />
+      <MobileOnly>
+        <FeedSearchBars
+          containerClassName="w-full px-4 flex flex-col gap-4 mt-4"
+          showTopForm={true}
+          topValue={subredditInputValue}
+          topPlaceholder="Enter hub or subreddit..."
+          onTopChange={handleSubredditInputChange}
+          onTopFocus={() => setIsAutocompleteOpen(true)}
+          onTopBlur={() => setIsAutocompleteOpen(false)}
+          onTopSubmit={handleSubredditSubmit}
+          topSuggestions={subredditSuggestions}
+          topShouldShowSuggestions={shouldShowSuggestions}
+          topIsLoading={isAutocompleteLoading}
+          topEmptyMessage="No hubs or subreddits found."
+          renderTopSuggestion={(suggestion) => (
+            <SubredditSuggestionItem
+              key={suggestion.name}
+              suggestion={suggestion}
+              onSelect={handleSelectSubredditSuggestion}
+            />
+          )}
+          postValue={postSearchInput}
+          postPlaceholder="Search posts..."
+          onPostChange={(value) => {
+            setPostSearchInput(value);
+            if (!isSearchDropdownOpen) {
+              setIsSearchDropdownOpen(true);
+            }
+          }}
+          onPostFocus={() => setIsSearchDropdownOpen(true)}
+          onPostBlur={() => setTimeout(() => setIsSearchDropdownOpen(false), 120)}
+          onPostSubmit={handlePostSearchSubmit}
+          postDropdownOpen={isSearchDropdownOpen}
+          postDropdownContent={
+            <div className="space-y-2 text-sm text-[var(--color-text-primary)]">
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={limitSearchToContext}
+                  onChange={(e) => setLimitSearchToContext(e.target.checked)}
+                />
+                <span>Limit search to r/{subreddit}</span>
+              </label>
+              {!blockAllNsfw && (
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={includeNsfwSearch}
+                    onChange={(e) => setIncludeNsfwSearch(e.target.checked)}
+                  />
+                  <span>Include NSFW results</span>
+                </label>
+              )}
+              {blockAllNsfw && (
+                <div className="text-xs text-[var(--color-text-secondary)]">
+                  NSFW content is blocked in settings.
+                </div>
+              )}
+            </div>
+          }
+        />
+      </MobileOnly>
       <div className="mt-4 grid gap-6 px-4 md:px-0 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="min-w-0 space-y-6">
           {/* Post Content Section */}
@@ -2017,7 +2080,7 @@ export default function RedditPostPage() {
               })()}
 
               {/* Post Stats */}
-              <div className="flex gap-4 text-xs text-[var(--color-text-secondary)]">
+              <div className="flex flex-wrap gap-4 text-xs text-[var(--color-text-secondary)]">
                 <span>{post.score} points</span>
                 <span>•</span>
                 <span>{post.num_comments} comments</span>
