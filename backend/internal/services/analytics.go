@@ -105,6 +105,9 @@ const (
 
 	// Feature usage
 	EventFeatureUsed = "feature_used"
+
+	// Automated Rollback Protective Events
+	EventErrorOccurred = "error_occurred"
 )
 
 // StartSession creates a new session record
@@ -286,4 +289,55 @@ func (s *AnalyticsService) GetFunnelConversion(ctx context.Context, startEvent, 
 	`, startEvent, endEvent, windowDays).Scan(&conversion)
 
 	return conversion, err
+}
+
+// GetFeatureErrorRate returns the error rate for a specific feature flag key
+func (s *AnalyticsService) GetFeatureErrorRate(ctx context.Context, featureKey string, window time.Duration) (float64, int, error) {
+	var errorCount, totalCount int
+
+	// Query to count errors vs total events where the feature was active
+	// properties->'active_flags' is expected to be a list of keys
+	query := `
+		SELECT 
+			COUNT(*) FILTER (WHERE event_name = 'error_occurred') as errors,
+			COUNT(*) as total
+		FROM analytics_events
+		WHERE created_at >= NOW() - ($1 || ' seconds')::interval
+		  AND properties->'active_flags' ? $2
+	`
+
+	err := s.db.QueryRow(ctx, query, int(window.Seconds()), featureKey).Scan(&errorCount, &totalCount)
+	if err != nil {
+		return 0, 0, err
+	}
+
+	if totalCount == 0 {
+		return 0, 0, nil
+	}
+
+	return float64(errorCount) / float64(totalCount), totalCount, nil
+}
+
+// GetSystemErrorRate returns the baseline error rate for the entire system
+func (s *AnalyticsService) GetSystemErrorRate(ctx context.Context, window time.Duration) (float64, error) {
+	var errorCount, totalCount int
+
+	query := `
+		SELECT 
+			COUNT(*) FILTER (WHERE event_name = 'error_occurred') as errors,
+			COUNT(*) as total
+		FROM analytics_events
+		WHERE created_at >= NOW() - ($1 || ' seconds')::interval
+	`
+
+	err := s.db.QueryRow(ctx, query, int(window.Seconds())).Scan(&errorCount, &totalCount)
+	if err != nil {
+		return 0, err
+	}
+
+	if totalCount == 0 {
+		return 0, nil
+	}
+
+	return float64(errorCount) / float64(totalCount), nil
 }

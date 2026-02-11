@@ -150,10 +150,6 @@ export default function AdminFeatureFlags() {
                                                 min="0"
                                                 max="100"
                                                 defaultValue={flags?.find(f => f.key === selectedFlag)?.percentage ?? 100}
-                                                onChange={(e) => {
-                                                    // Debounce or update on blur would be better, but simple onChange for now
-                                                    console.log('Percentage change:', e.target.value);
-                                                }}
                                                 onMouseUp={(e) => {
                                                     updateFlagMutation.mutate({
                                                         key: selectedFlag,
@@ -166,6 +162,95 @@ export default function AdminFeatureFlags() {
                                                 {flags?.find(f => f.key === selectedFlag)?.percentage ?? 100}%
                                             </span>
                                         </div>
+                                    </div>
+
+                                    <div className="border-t pt-4">
+                                        <div className="flex items-center justify-between">
+                                            <label className="block text-sm font-medium text-gray-700">Automated Rollback</label>
+                                            <button
+                                                onClick={() => {
+                                                    const flag = flags?.find(f => f.key === selectedFlag);
+                                                    updateFlagMutation.mutate({
+                                                        key: selectedFlag,
+                                                        data: { auto_rollback: !flag?.auto_rollback }
+                                                    });
+                                                }}
+                                                className={`relative inline-flex flex-shrink-0 h-6 w-11 border-2 border-transparent rounded-full cursor-pointer transition-colors ease-in-out duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 ${flags?.find(f => f.key === selectedFlag)?.auto_rollback ? 'bg-indigo-600' : 'bg-gray-200'}`}
+                                            >
+                                                <span className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow transform ring-0 transition ease-in-out duration-200 ${flags?.find(f => f.key === selectedFlag)?.auto_rollback ? 'translate-x-5' : 'translate-x-0'}`} />
+                                            </button>
+                                        </div>
+
+                                        {flags?.find(f => f.key === selectedFlag)?.auto_rollback && (
+                                            <div className="mt-4 space-y-3 bg-gray-50 p-3 rounded-md">
+                                                <div>
+                                                    <label className="block text-xs font-medium text-gray-500">Error Rate Threshold (%)</label>
+                                                    <input
+                                                        type="number"
+                                                        step="0.1"
+                                                        defaultValue={(flags?.find(f => f.key === selectedFlag)?.rollback?.threshold ?? 0.01) * 100}
+                                                        onBlur={(e) => {
+                                                            const val = parseFloat(e.target.value) / 100;
+                                                            const currentFlag = flags?.find(f => f.key === selectedFlag);
+                                                            updateFlagMutation.mutate({
+                                                                key: selectedFlag,
+                                                                data: {
+                                                                    rollback: {
+                                                                        ...(currentFlag?.rollback || { metric_type: 'error_rate', min_sample_size: 100, window_seconds: 60 }),
+                                                                        threshold: val
+                                                                    }
+                                                                }
+                                                            });
+                                                        }}
+                                                        className="mt-1 block w-full text-sm border-gray-300 rounded-md p-1"
+                                                    />
+                                                </div>
+                                                <div className="flex space-x-2">
+                                                    <div className="flex-1">
+                                                        <label className="block text-xs font-medium text-gray-500">Min Samples</label>
+                                                        <input
+                                                            type="number"
+                                                            defaultValue={flags?.find(f => f.key === selectedFlag)?.rollback?.min_sample_size ?? 100}
+                                                            onBlur={(e) => {
+                                                                const val = parseInt(e.target.value);
+                                                                const currentFlag = flags?.find(f => f.key === selectedFlag);
+                                                                updateFlagMutation.mutate({
+                                                                    key: selectedFlag,
+                                                                    data: {
+                                                                        rollback: {
+                                                                            ...(currentFlag?.rollback || { metric_type: 'error_rate', threshold: 0.01, window_seconds: 60 }),
+                                                                            min_sample_size: val
+                                                                        }
+                                                                    }
+                                                                });
+                                                            }}
+                                                            className="mt-1 block w-full text-sm border-gray-300 rounded-md p-1"
+                                                        />
+                                                    </div>
+                                                    <div className="flex-1">
+                                                        <label className="block text-xs font-medium text-gray-500">Window (sec)</label>
+                                                        <input
+                                                            type="number"
+                                                            defaultValue={flags?.find(f => f.key === selectedFlag)?.rollback?.window_seconds ?? 60}
+                                                            onBlur={(e) => {
+                                                                const val = parseInt(e.target.value);
+                                                                const currentFlag = flags?.find(f => f.key === selectedFlag);
+                                                                updateFlagMutation.mutate({
+                                                                    key: selectedFlag,
+                                                                    data: {
+                                                                        rollback: {
+                                                                            ...(currentFlag?.rollback || { metric_type: 'error_rate', threshold: 0.01, min_sample_size: 100 }),
+                                                                            window_seconds: val
+                                                                        }
+                                                                    }
+                                                                });
+                                                            }}
+                                                            className="mt-1 block w-full text-sm border-gray-300 rounded-md p-1"
+                                                        />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             </div>

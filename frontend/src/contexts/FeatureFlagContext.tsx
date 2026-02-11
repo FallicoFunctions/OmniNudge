@@ -21,6 +21,15 @@ export function FeatureFlagProvider({ children }: { children: ReactNode }) {
         try {
             const allFlags = await featureFlagService.getAllFlagsWithStatus();
             setFlags(allFlags);
+
+            // Sync with analytics service
+            const enabledFlags = Object.entries(allFlags)
+                .filter(([_, enabled]) => enabled)
+                .map(([key]) => key);
+
+            import('../services/analyticsService').then(({ analyticsService }) => {
+                analyticsService.setActiveFeatureFlags(enabledFlags);
+            });
         } catch (error) {
             console.error('Failed to fetch feature flags:', error);
         } finally {

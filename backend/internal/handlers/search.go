@@ -5,9 +5,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/omninudge/backend/internal/models"
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/omninudge/backend/internal/models"
 )
 
 // SearchHandler handles full-text search requests
@@ -59,11 +59,12 @@ func (h *SearchHandler) SearchPosts(c *gin.Context) {
 	orderClause := `
 		ORDER BY rank DESC, created_at DESC, id DESC
 	`
-	if sort == "new" {
+	switch sort {
+	case "new":
 		orderClause = `
 		ORDER BY created_at DESC, rank DESC, id DESC
 		`
-	} else if sort == "old" {
+	case "old":
 		orderClause = `
 		ORDER BY created_at ASC, rank DESC, id DESC
 		`
@@ -300,11 +301,12 @@ func (h *SearchHandler) SearchUsers(c *gin.Context) {
 	orderClause := `
 		ORDER BY rank DESC, created_at DESC, id DESC
 	`
-	if sort == "new" {
+	switch sort {
+	case "new":
 		orderClause = `
 		ORDER BY created_at DESC, rank DESC, id DESC
 		`
-	} else if sort == "old" {
+	case "old":
 		orderClause = `
 		ORDER BY created_at ASC, rank DESC, id DESC
 		`
@@ -418,11 +420,12 @@ func (h *SearchHandler) SearchHubs(c *gin.Context) {
 	orderClause := `
 		ORDER BY rank DESC, created_at DESC, id DESC
 	`
-	if sort == "new" {
+	switch sort {
+	case "new":
 		orderClause = `
 		ORDER BY created_at DESC, rank DESC, id DESC
 		`
-	} else if sort == "old" {
+	case "old":
 		orderClause = `
 		ORDER BY created_at ASC, rank DESC, id DESC
 		`

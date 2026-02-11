@@ -227,7 +227,12 @@ func main() {
 
 	// Start background workers
 	workerCtx := context.Background()
-	workerManager := workers.NewWorkerManager(notificationService, baselineCalculatorService)
+	workerManager := workers.NewWorkerManager(
+		notificationService,
+		baselineCalculatorService,
+		analyticsService,
+		featureFlagService,
+	)
 	workerManager.Start(workerCtx)
 
 	// Start account cleanup worker (P0-017: permanently delete accounts after grace period)
@@ -304,6 +309,7 @@ func main() {
 	accountDeletionHandler := handlers.NewAccountDeletionHandler(db.Pool, queueClient)
 	dataExportHandler := handlers.NewDataExportHandler(db.Pool, queueClient)
 	analyticsHandler := handlers.NewAnalyticsHandler(analyticsService)
+	logHandler := handlers.NewLogHandler(analyticsService)
 	dataRetentionHandler := handlers.NewDataRetentionHandler(db.Pool)
 	pushNotificationHandler := handlers.NewPushNotificationHandler(db.Pool, firebaseService)
 
@@ -389,7 +395,7 @@ func main() {
 		// Frontend logs endpoint (no auth required - allow error reporting from unauthenticated users)
 		logs := api.Group("/logs")
 		{
-			logs.POST("/frontend", handlers.HandleFrontendLogs)
+			logs.POST("/frontend", logHandler.HandleFrontendLogs)
 		}
 
 		// Auth routes (no auth required)

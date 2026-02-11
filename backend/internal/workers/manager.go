@@ -12,22 +12,32 @@ import (
 type WorkerManager struct {
 	notificationService *services.NotificationService
 	baselineService     *services.BaselineCalculatorService
+	analyticsService    *services.AnalyticsService
+	featureFlagService  *services.FeatureFlagService
 }
 
 // NewWorkerManager creates a new worker manager
 func NewWorkerManager(
 	notificationService *services.NotificationService,
-	baselineService     *services.BaselineCalculatorService,
+	baselineService *services.BaselineCalculatorService,
+	analyticsService *services.AnalyticsService,
+	featureFlagService *services.FeatureFlagService,
 ) *WorkerManager {
 	return &WorkerManager{
 		notificationService: notificationService,
 		baselineService:     baselineService,
+		analyticsService:    analyticsService,
+		featureFlagService:  featureFlagService,
 	}
 }
 
 // Start starts all background workers
 func (wm *WorkerManager) Start(ctx context.Context) {
 	log.Println("Starting background workers...")
+
+	// Start rollout monitor (every minute)
+	rolloutMonitor := NewRolloutMonitor(wm.analyticsService, wm.featureFlagService)
+	go rolloutMonitor.Run(ctx)
 
 	// Start notification batch processor (every 15 minutes)
 	go wm.runNotificationBatchProcessor(ctx)
