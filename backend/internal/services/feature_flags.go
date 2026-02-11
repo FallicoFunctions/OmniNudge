@@ -2,277 +2,361 @@ package services
 
 import (
 	"context"
+	"encoding/binary"
 	"encoding/json"
+	"errors"
 	"fmt"
-	"log"
-	"sync"
+	"hash/fnv"
+	"regexp"
 	"time"
 
-	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/omninudge/backend/internal/models"
+	"github.com/omninudge/backend/internal/repository"
+	"github.com/omninudge/backend/internal/websocket"
+	"github.com/redis/go-redis/v9"
 )
 
-// FeatureFlag represents a feature toggle
-type FeatureFlag struct {
-	Key         string                 `json:"key"`
-	Enabled     bool                   `json:"enabled"`
-	Description string                 `json:"description"`
-	Overrides   map[int]bool           `json:"overrides"` // user_id -> enabled
-	Metadata    map[string]interface{} `json:"metadata"`
-	CreatedAt   time.Time              `json:"created_at"`
-	UpdatedAt   time.Time              `json:"updated_at"`
+// FeatureFlagService manages feature flags with Redis caching and percentage rollout
+type FeatureFlagService struct {
+	repo  *repository.FeatureFlagRepository
+	redis *redis.Client
+	hub   *websocket.Hub
+	env   string // Current environment: "dev", "staging", "prod"
 }
 
-// FeatureFlagService manages feature flags with caching
-type FeatureFlagService struct {
-	db    *pgxpool.Pool
-	cache map[string]*FeatureFlag
-	mu    sync.RWMutex
-	ttl   time.Duration
-}
+// Cache key constants
+const (
+	cacheFlagMeta   = "flag:meta:%s"           // flag:meta:feature_groups
+	cacheFlagResult = "flag:result:%s:user:%d" // flag:result:feature_groups:user:123
+	cacheFlagsList  = "flags:all:%s"           // flags:all:prod
+	cacheTTL        = 5 * time.Minute
+)
 
 // NewFeatureFlagService creates a new feature flag service
-func NewFeatureFlagService(db *pgxpool.Pool) *FeatureFlagService {
-	svc := &FeatureFlagService{
-		db:    db,
-		cache: make(map[string]*FeatureFlag),
-		ttl:   5 * time.Minute, // Cache flags for 5 minutes
+func NewFeatureFlagService(repo *repository.FeatureFlagRepository, redisClient *redis.Client, hub *websocket.Hub, environment string) *FeatureFlagService {
+	if environment == "" {
+		environment = "prod"
 	}
-
-	// Start background cache refresh
-	go svc.refreshCache()
-
-	return svc
+	return &FeatureFlagService{
+		repo:  repo,
+		redis: redisClient,
+		hub:   hub,
+		env:   environment,
+	}
 }
 
-// IsEnabled checks if a feature is enabled for a user
-func (s *FeatureFlagService) IsEnabled(ctx context.Context, key string, userID int) (bool, error) {
-	flag, err := s.GetFlag(ctx, key)
-	if err != nil {
-		// If flag doesn't exist, default to disabled
-		if err.Error() == "flag not found" {
-			return false, nil
+// IsEnabled checks if a feature flag is enabled for a user
+func (s *FeatureFlagService) IsEnabled(ctx context.Context, key string, userID *int64) (bool, error) {
+	// 1. Try cache first (if userID provided)
+	if userID != nil {
+		cacheKey := fmt.Sprintf(cacheFlagResult, key, *userID)
+		if cached, err := s.redis.Get(ctx, cacheKey).Bool(); err == nil {
+			return cached, nil
 		}
+	}
+
+	// 2. Get flag from DB (with Redis cache fallback)
+	flag, err := s.GetFeatureFlag(ctx, key)
+	if err != nil {
 		return false, err
 	}
 
-	// Check user override first
-	if override, exists := flag.Overrides[userID]; exists {
-		return override, nil
+	// 3. Check environment match
+	if flag.Environment != "all" && flag.Environment != s.env {
+		return false, nil
 	}
 
-	// Return global setting
+	// 4. Check user override (if userID provided)
+	if userID != nil {
+		override, err := s.repo.GetUserOverride(ctx, key, *userID)
+		if err != nil {
+			return false, err
+		}
+		if override != nil {
+			result := *override
+			s.cacheResult(ctx, key, *userID, result)
+			return result, nil
+		}
+	}
+
+	// 5. Check percentage rollout (only if enabled=true and userID provided)
+	if flag.Enabled && flag.Percentage != nil && userID != nil {
+		bucket := bucketUser(*userID)
+		result := bucket < *flag.Percentage
+		s.cacheResult(ctx, key, *userID, result)
+		return result, nil
+	}
+
+	// 6. Return global enabled value
+	if userID != nil {
+		s.cacheResult(ctx, key, *userID, flag.Enabled)
+	}
 	return flag.Enabled, nil
 }
 
-// GetFlag retrieves a flag (from cache if available)
-func (s *FeatureFlagService) GetFlag(ctx context.Context, key string) (*FeatureFlag, error) {
-	// Check cache first
-	s.mu.RLock()
-	if flag, exists := s.cache[key]; exists {
-		s.mu.RUnlock()
-		return flag, nil
-	}
-	s.mu.RUnlock()
-
-	// Load from database
-	var flag FeatureFlag
-	var overridesJSON, metadataJSON []byte
-
-	err := s.db.QueryRow(ctx, `
-		SELECT key, enabled, description, overrides, metadata, created_at, updated_at
-		FROM feature_flags
-		WHERE key = $1
-	`, key).Scan(
-		&flag.Key,
-		&flag.Enabled,
-		&flag.Description,
-		&overridesJSON,
-		&metadataJSON,
-		&flag.CreatedAt,
-		&flag.UpdatedAt,
-	)
-
-	if err != nil {
-		return nil, fmt.Errorf("flag not found")
-	}
-
-	// Parse JSON fields
-	if err := json.Unmarshal(overridesJSON, &flag.Overrides); err != nil {
-		flag.Overrides = make(map[int]bool)
-	}
-	if err := json.Unmarshal(metadataJSON, &flag.Metadata); err != nil {
-		flag.Metadata = make(map[string]interface{})
-	}
-
-	// Update cache
-	s.mu.Lock()
-	s.cache[key] = &flag
-	s.mu.Unlock()
-
-	return &flag, nil
+// bucketUser uses FNV-1a hash for consistent bucketing (0-99)
+func bucketUser(userID int64) int {
+	h := fnv.New32a()
+	binary.Write(h, binary.BigEndian, userID)
+	return int(h.Sum32() % 100)
 }
 
-// SetFlag creates or updates a flag
-func (s *FeatureFlagService) SetFlag(ctx context.Context, flag *FeatureFlag, changedBy int) error {
-	overridesJSON, _ := json.Marshal(flag.Overrides)
-	metadataJSON, _ := json.Marshal(flag.Metadata)
-
-	_, err := s.db.Exec(ctx, `
-		INSERT INTO feature_flags (key, enabled, description, overrides, metadata, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
-		ON CONFLICT (key) DO UPDATE
-		SET enabled = $2, description = $3, overrides = $4, metadata = $5, updated_at = NOW()
-	`, flag.Key, flag.Enabled, flag.Description, overridesJSON, metadataJSON)
-
-	if err != nil {
-		return fmt.Errorf("failed to set flag: %w", err)
+// CreateFlag creates a new feature flag
+func (s *FeatureFlagService) CreateFlag(ctx context.Context, flag *models.FeatureFlag, createdBy int64) error {
+	if err := validateFlagKey(flag.Key); err != nil {
+		return err
 	}
 
-	// Log audit trail
-	s.logAudit(ctx, flag.Key, changedBy, flag.Enabled)
+	if flag.Environment == "" {
+		flag.Environment = "all"
+	}
+
+	if err := s.repo.CreateFlag(ctx, flag); err != nil {
+		return err
+	}
+
+	// Audit log
+	audit := &models.FeatureFlagAudit{
+		FlagKey:    flag.Key,
+		ChangeType: "created",
+		ChangedBy:  createdBy,
+		NewValue:   map[string]interface{}{"enabled": flag.Enabled, "percentage": flag.Percentage},
+	}
+	s.repo.CreateAuditLog(ctx, audit)
 
 	// Invalidate cache
-	s.mu.Lock()
-	delete(s.cache, flag.Key)
-	s.mu.Unlock()
+	s.invalidateCache(ctx, flag.Key)
 
 	return nil
 }
 
-// SetUserOverride sets a user-specific override
-func (s *FeatureFlagService) SetUserOverride(ctx context.Context, key string, userID int, enabled bool, changedBy int) error {
-	flag, err := s.GetFlag(ctx, key)
+// UpdateFlag updates a feature flag
+func (s *FeatureFlagService) UpdateFlag(ctx context.Context, key string, updates map[string]interface{}, changedBy int64) error {
+	// Get current flag
+	oldFlag, err := s.repo.GetFlag(ctx, key)
 	if err != nil {
 		return err
 	}
 
-	if flag.Overrides == nil {
-		flag.Overrides = make(map[int]bool)
+	// Apply updates
+	newFlag := *oldFlag
+	if enabled, ok := updates["enabled"].(bool); ok {
+		newFlag.Enabled = enabled
 	}
-	flag.Overrides[userID] = enabled
+	if percentage, ok := updates["percentage"].(*int); ok {
+		newFlag.Percentage = percentage
+	}
+	if description, ok := updates["description"].(string); ok {
+		newFlag.Description = description
+	}
 
-	return s.SetFlag(ctx, flag, changedBy)
-}
-
-// RemoveUserOverride removes a user-specific override
-func (s *FeatureFlagService) RemoveUserOverride(ctx context.Context, key string, userID int, changedBy int) error {
-	flag, err := s.GetFlag(ctx, key)
-	if err != nil {
+	// Update DB
+	if err := s.repo.UpdateFlag(ctx, &newFlag); err != nil {
 		return err
 	}
 
-	if flag.Overrides != nil {
-		delete(flag.Overrides, userID)
+	// Audit log (track what changed)
+	if oldFlag.Enabled != newFlag.Enabled {
+		audit := &models.FeatureFlagAudit{
+			FlagKey:    key,
+			ChangeType: "enabled",
+			ChangedBy:  changedBy,
+			OldValue:   map[string]interface{}{"enabled": oldFlag.Enabled},
+			NewValue:   map[string]interface{}{"enabled": newFlag.Enabled},
+		}
+		s.repo.CreateAuditLog(ctx, audit)
 	}
 
-	return s.SetFlag(ctx, flag, changedBy)
+	if oldFlag.Percentage != newFlag.Percentage {
+		audit := &models.FeatureFlagAudit{
+			FlagKey:    key,
+			ChangeType: "percentage_changed",
+			ChangedBy:  changedBy,
+			OldValue:   map[string]interface{}{"percentage": oldFlag.Percentage},
+			NewValue:   map[string]interface{}{"percentage": newFlag.Percentage},
+		}
+		s.repo.CreateAuditLog(ctx, audit)
+	}
+
+	// Invalidate cache (best-effort, ignore Redis errors)
+	s.invalidateCache(ctx, key)
+
+	// Broadcast WebSocket event (includes percentage)
+	if s.hub != nil {
+		s.hub.BroadcastFeatureFlagUpdate(key, newFlag.Enabled, newFlag.Percentage)
+	}
+
+	return nil
 }
 
-// ListFlags returns all flags
-func (s *FeatureFlagService) ListFlags(ctx context.Context) ([]*FeatureFlag, error) {
-	rows, err := s.db.Query(ctx, `
-		SELECT key, enabled, description, overrides, metadata, created_at, updated_at
-		FROM feature_flags
-		ORDER BY key
-	`)
+// DeleteFlag removes a feature flag
+func (s *FeatureFlagService) DeleteFlag(ctx context.Context, key string, deletedBy int64) error {
+	if err := s.repo.DeleteFlag(ctx, key); err != nil {
+		return err
+	}
+
+	// Audit log
+	audit := &models.FeatureFlagAudit{
+		FlagKey:    key,
+		ChangeType: "deleted",
+		ChangedBy:  deletedBy,
+	}
+	s.repo.CreateAuditLog(ctx, audit)
+
+	// Invalidate cache
+	s.invalidateCache(ctx, key)
+
+	return nil
+}
+
+// SetUserOverride sets a per-user override
+func (s *FeatureFlagService) SetUserOverride(ctx context.Context, key string, userID int64, enabled bool, changedBy int64) error {
+	if err := s.repo.SetUserOverride(ctx, key, userID, enabled); err != nil {
+		return err
+	}
+
+	// Audit log
+	audit := &models.FeatureFlagAudit{
+		FlagKey:    key,
+		ChangeType: "override_set",
+		ChangedBy:  changedBy,
+		NewValue:   map[string]interface{}{"user_id": userID, "enabled": enabled},
+	}
+	s.repo.CreateAuditLog(ctx, audit)
+
+	// Invalidate cache for this user
+	cacheKey := fmt.Sprintf(cacheFlagResult, key, userID)
+	s.redis.Del(ctx, cacheKey) // Ignore errors
+
+	return nil
+}
+
+// RemoveUserOverride removes a per-user override
+func (s *FeatureFlagService) RemoveUserOverride(ctx context.Context, key string, userID int64, changedBy int64) error {
+	if err := s.repo.RemoveUserOverride(ctx, key, userID); err != nil {
+		return err
+	}
+
+	// Audit log
+	audit := &models.FeatureFlagAudit{
+		FlagKey:    key,
+		ChangeType: "override_removed",
+		ChangedBy:  changedBy,
+		OldValue:   map[string]interface{}{"user_id": userID},
+	}
+	s.repo.CreateAuditLog(ctx, audit)
+
+	// Invalidate cache for this user
+	cacheKey := fmt.Sprintf(cacheFlagResult, key, userID)
+	s.redis.Del(ctx, cacheKey) // Ignore errors
+
+	return nil
+}
+
+// ListFlags returns all flags for the current environment
+func (s *FeatureFlagService) ListFlags(ctx context.Context) ([]*models.FeatureFlag, error) {
+	// Try cache first
+	cacheKey := fmt.Sprintf(cacheFlagsList, s.env)
+	if cached, err := s.redis.Get(ctx, cacheKey).Result(); err == nil {
+		var flags []*models.FeatureFlag
+		if json.Unmarshal([]byte(cached), &flags) == nil {
+			return flags, nil
+		}
+	}
+
+	// Fallback to DB
+	flags, err := s.repo.ListFlags(ctx, s.env)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
 
-	var flags []*FeatureFlag
-	for rows.Next() {
-		var flag FeatureFlag
-		var overridesJSON, metadataJSON []byte
-
-		err := rows.Scan(
-			&flag.Key,
-			&flag.Enabled,
-			&flag.Description,
-			&overridesJSON,
-			&metadataJSON,
-			&flag.CreatedAt,
-			&flag.UpdatedAt,
-		)
-		if err != nil {
-			continue
-		}
-
-		json.Unmarshal(overridesJSON, &flag.Overrides)
-		json.Unmarshal(metadataJSON, &flag.Metadata)
-
-		flags = append(flags, &flag)
+	// Cache result (best-effort)
+	if data, err := json.Marshal(flags); err == nil {
+		s.redis.Set(ctx, cacheKey, data, cacheTTL)
 	}
 
 	return flags, nil
 }
 
-// logAudit logs flag changes to audit table
-func (s *FeatureFlagService) logAudit(ctx context.Context, key string, changedBy int, enabled bool) {
-	_, err := s.db.Exec(ctx, `
-		INSERT INTO feature_flag_audit (flag_key, changed_by, enabled, changed_at)
-		VALUES ($1, $2, $3, NOW())
-	`, key, changedBy, enabled)
-
-	if err != nil {
-		log.Printf("Failed to log feature flag audit: %v", err)
-	}
-}
-
-// refreshCache periodically reloads all flags from database
-func (s *FeatureFlagService) refreshCache() {
-	ticker := time.NewTicker(s.ttl)
-	defer ticker.Stop()
-
-	for range ticker.C {
-		ctx := context.Background()
-		flags, err := s.ListFlags(ctx)
-		if err != nil {
-			log.Printf("Failed to refresh feature flag cache: %v", err)
-			continue
-		}
-
-		s.mu.Lock()
-		s.cache = make(map[string]*FeatureFlag)
-		for _, flag := range flags {
-			s.cache[flag.Key] = flag
-		}
-		s.mu.Unlock()
-	}
-}
-
-// GetAuditLog returns recent changes to a flag
-func (s *FeatureFlagService) GetAuditLog(ctx context.Context, key string, limit int) ([]AuditEntry, error) {
-	rows, err := s.db.Query(ctx, `
-		SELECT a.flag_key, a.changed_by, u.username, a.enabled, a.changed_at
-		FROM feature_flag_audit a
-		LEFT JOIN users u ON a.changed_by = u.id
-		WHERE a.flag_key = $1
-		ORDER BY a.changed_at DESC
-		LIMIT $2
-	`, key, limit)
+// GetUserFlags returns only enabled flags for a specific user
+func (s *FeatureFlagService) GetUserFlags(ctx context.Context, userID int64) (map[string]bool, error) {
+	flags, err := s.ListFlags(ctx)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
 
-	var entries []AuditEntry
-	for rows.Next() {
-		var entry AuditEntry
-		err := rows.Scan(&entry.FlagKey, &entry.ChangedBy, &entry.Username, &entry.Enabled, &entry.ChangedAt)
-		if err != nil {
-			continue
+	result := make(map[string]bool)
+	for _, flag := range flags {
+		enabled, err := s.IsEnabled(ctx, flag.Key, &userID)
+		if err == nil && enabled {
+			result[flag.Key] = true
 		}
-		entries = append(entries, entry)
 	}
 
-	return entries, nil
+	return result, nil
 }
 
-type AuditEntry struct {
-	FlagKey   string    `json:"flag_key"`
-	ChangedBy int       `json:"changed_by"`
-	Username  string    `json:"username"`
-	Enabled   bool      `json:"enabled"`
-	ChangedAt time.Time `json:"changed_at"`
+// GetAuditLog retrieves audit log for a flag
+func (s *FeatureFlagService) GetAuditLog(ctx context.Context, key string, limit int) ([]*models.FeatureFlagAudit, error) {
+	return s.repo.GetAuditLog(ctx, key, limit)
+}
+
+// Helper methods
+
+// GetFeatureFlag retrieves a flag with Redis caching
+func (s *FeatureFlagService) GetFeatureFlag(ctx context.Context, key string) (*models.FeatureFlag, error) {
+	// Try Redis cache first
+	cacheKey := fmt.Sprintf(cacheFlagMeta, key)
+	if cached, err := s.redis.Get(ctx, cacheKey).Result(); err == nil {
+		var flag models.FeatureFlag
+		if json.Unmarshal([]byte(cached), &flag) == nil {
+			return &flag, nil
+		}
+	}
+
+	// Fallback to DB
+	flag, err := s.repo.GetFlag(ctx, key)
+	if err != nil {
+		return nil, err
+	}
+
+	// Cache in Redis (best-effort)
+	if data, err := json.Marshal(flag); err == nil {
+		s.redis.Set(ctx, cacheKey, data, cacheTTL)
+	}
+
+	return flag, nil
+}
+
+// cacheResult caches the result of IsEnabled for a user
+func (s *FeatureFlagService) cacheResult(ctx context.Context, key string, userID int64, result bool) {
+	cacheKey := fmt.Sprintf(cacheFlagResult, key, userID)
+	s.redis.Set(ctx, cacheKey, result, cacheTTL) // Ignore errors
+}
+
+// invalidateCache invalidates all cache entries for a flag
+func (s *FeatureFlagService) invalidateCache(ctx context.Context, key string) {
+	// Delete flag metadata
+	s.redis.Del(ctx, fmt.Sprintf(cacheFlagMeta, key))
+
+	// Delete all user results for this flag (pattern match)
+	pattern := fmt.Sprintf("flag:result:%s:user:*", key)
+	iter := s.redis.Scan(ctx, 0, pattern, 0).Iterator()
+	for iter.Next(ctx) {
+		s.redis.Del(ctx, iter.Val())
+	}
+
+	// Delete flags list cache
+	s.redis.Del(ctx, fmt.Sprintf(cacheFlagsList, s.env))
+}
+
+// validateFlagKey validates flag key format
+func validateFlagKey(key string) error {
+	if len(key) < 3 || len(key) > 50 {
+		return errors.New("flag key must be 3-50 characters")
+	}
+	if !regexp.MustCompile(`^[a-z][a-z0-9_]*$`).MatchString(key) {
+		return errors.New("flag key must be lowercase with underscores")
+	}
+	return nil
 }

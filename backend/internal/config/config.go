@@ -22,6 +22,7 @@ type Config struct {
 	Firebase    FirebaseConfig
 	SMTP        SMTPConfig
 	FrontendURL string
+	AppEnv      string
 }
 
 // RedditConfig holds Reddit OAuth configuration
@@ -135,8 +136,8 @@ func Load() (*Config, error) {
 		},
 		SMTP: SMTPConfig{
 			// Mailgun HTTP API (preferred)
-			Host:        getEnv("MAILGUN_API_KEY", getEnv("SMTP_HOST", "")),
-			User:        getEnv("MAILGUN_DOMAIN", getEnv("SMTP_USER", "")),
+			Host: getEnv("MAILGUN_API_KEY", getEnv("SMTP_HOST", "")),
+			User: getEnv("MAILGUN_DOMAIN", getEnv("SMTP_USER", "")),
 			// SMTP fallback
 			Port:        getEnv("SMTP_PORT", "587"),
 			Password:    getEnv("SMTP_PASSWORD", ""),
@@ -144,6 +145,7 @@ func Load() (*Config, error) {
 			FromName:    getEnv("SMTP_FROM_NAME", "OmniNudge"),
 		},
 		FrontendURL: getEnv("FRONTEND_URL", "http://localhost:5176"),
+		AppEnv:      getEnv("APP_ENV", "development"),
 	}
 
 	return cfg, nil

@@ -24,9 +24,9 @@ func (s *AnalyticsService) TrackEvent(ctx context.Context, event Event) error {
 	propertiesJSON, _ := json.Marshal(event.Properties)
 
 	_, err := s.db.Exec(ctx, `
-		INSERT INTO analytics_events (event_name, user_id, anonymous_id, properties, user_agent, ip_address)
-		VALUES ($1, $2, $3, $4, $5, $6)
-	`, event.Name, event.UserID, event.AnonymousID, propertiesJSON, event.UserAgent, event.IPAddress)
+		INSERT INTO analytics_events (event_name, user_id, anonymous_id, session_id, properties, user_agent, ip_address)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
+	`, event.Name, event.UserID, event.AnonymousID, event.SessionID, propertiesJSON, event.UserAgent, event.IPAddress)
 
 	if err != nil {
 		log.Printf("Failed to track event %s: %v", event.Name, err)
@@ -56,6 +56,7 @@ type Event struct {
 	Name        string                 `json:"name"`
 	UserID      *int                   `json:"user_id,omitempty"`
 	AnonymousID *uuid.UUID             `json:"anonymous_id,omitempty"`
+	SessionID   *uuid.UUID             `json:"session_id,omitempty"`
 	Properties  map[string]interface{} `json:"properties"`
 	UserAgent   string                 `json:"user_agent,omitempty"`
 	IPAddress   string                 `json:"ip_address,omitempty"`
@@ -64,35 +65,35 @@ type Event struct {
 // Standard Events - Keep consistent across app
 const (
 	// Auth events
-	EventSignup         = "signup"
-	EventLogin          = "login"
-	EventLogout         = "logout"
-	EventPasswordReset  = "password_reset"
+	EventSignup        = "signup"
+	EventLogin         = "login"
+	EventLogout        = "logout"
+	EventPasswordReset = "password_reset"
 
 	// Messaging events
-	EventMessageSent      = "message_sent"
-	EventMessageReceived  = "message_received"
+	EventMessageSent         = "message_sent"
+	EventMessageReceived     = "message_received"
 	EventConversationCreated = "conversation_created"
-	EventTypingStarted    = "typing_started"
+	EventTypingStarted       = "typing_started"
 
 	// Post events
-	EventPostCreated   = "post_created"
-	EventPostViewed    = "post_viewed"
-	EventPostUpvoted   = "post_upvoted"
-	EventPostDownvoted = "post_downvoted"
+	EventPostCreated    = "post_created"
+	EventPostViewed     = "post_viewed"
+	EventPostUpvoted    = "post_upvoted"
+	EventPostDownvoted  = "post_downvoted"
 	EventCommentCreated = "comment_created"
 
 	// Hub events
-	EventHubCreated     = "hub_created"
-	EventHubJoined      = "hub_joined"
-	EventHubLeft        = "hub_left"
-	EventHubViewed      = "hub_viewed"
+	EventHubCreated = "hub_created"
+	EventHubJoined  = "hub_joined"
+	EventHubLeft    = "hub_left"
+	EventHubViewed  = "hub_viewed"
 
 	// Call events
-	EventCallStarted    = "call_started"
-	EventCallConnected  = "call_connected"
-	EventCallEnded      = "call_ended"
-	EventCallFailed     = "call_failed"
+	EventCallStarted   = "call_started"
+	EventCallConnected = "call_connected"
+	EventCallEnded     = "call_ended"
+	EventCallFailed    = "call_failed"
 
 	// Search events
 	EventSearchPerformed = "search_performed"
@@ -105,6 +106,119 @@ const (
 	// Feature usage
 	EventFeatureUsed = "feature_used"
 )
+
+// StartSession creates a new session record
+func (s *AnalyticsService) StartSession(ctx context.Context, sessionID, anonymousID uuid.UUID, userID *int, userAgent, ipAddress string) error {
+	_, err := s.db.Exec(ctx, `
+		INSERT INTO analytics_sessions (id, user_id, anonymous_id, start_time, user_agent, ip_address)
+		VALUES ($1, $2, $3, NOW(), $4, $5)
+	`, sessionID, userID, anonymousID, userAgent, ipAddress)
+	return err
+}
+
+// EndSession updates the session end time and calculates duration
+func (s *AnalyticsService) EndSession(ctx context.Context, sessionID uuid.UUID) error {
+	_, err := s.db.Exec(ctx, `
+		UPDATE analytics_sessions
+		SET end_time = NOW(),
+		    duration = EXTRACT(EPOCH FROM (NOW() - start_time))::INTEGER
+		WHERE id = $1
+	`, sessionID)
+	return err
+}
+
+// AliasUser links an anonymous ID to a user ID (post-signup/login)
+func (s *AnalyticsService) AliasUser(ctx context.Context, userID int, anonymousID uuid.UUID) error {
+	// 1. Update past sessions
+	_, err := s.db.Exec(ctx, `
+		UPDATE analytics_sessions
+		SET user_id = $1
+		WHERE anonymous_id = $2 AND user_id IS NULL
+	`, userID, anonymousID)
+	if err != nil {
+		return err
+	}
+
+	// 2. Update past events
+	_, err = s.db.Exec(ctx, `
+		UPDATE analytics_events
+		SET user_id = $1
+		WHERE anonymous_id = $2 AND user_id IS NULL
+	`, userID, anonymousID)
+	return err
+}
+
+// GetDailyActiveUsers returns DAU data from materialized view
+func (s *AnalyticsService) GetDailyActiveUsers(ctx context.Context, days int) ([]map[string]interface{}, error) {
+	rows, err := s.db.Query(ctx, `
+		SELECT date, dau, mobile_dau, desktop_dau
+		FROM analytics_daily_active_users
+		WHERE date >= CURRENT_DATE - ($1 || ' days')::INTERVAL
+		ORDER BY date DESC
+	`, days)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var results []map[string]interface{}
+	for rows.Next() {
+		var date time.Time
+		var dau, mobile, desktop int
+		if err := rows.Scan(&date, &dau, &mobile, &desktop); err != nil {
+			return nil, err
+		}
+		results = append(results, map[string]interface{}{
+			"date":    date.Format("2006-01-02"),
+			"total":   dau,
+			"mobile":  mobile,
+			"desktop": desktop,
+		})
+	}
+	return results, nil
+}
+
+// GetTopEvents returns top events from materialized view
+func (s *AnalyticsService) GetTopEvents(ctx context.Context, limit int) ([]map[string]interface{}, error) {
+	// Query raw table to get accurate unique user counts over the last 24 hours
+	rows, err := s.db.Query(ctx, `
+		SELECT event_name, COUNT(*) as count, COUNT(DISTINCT user_id) as users
+		FROM analytics_events
+		WHERE created_at >= NOW() - INTERVAL '24 hours'
+		GROUP BY event_name
+		ORDER BY count DESC
+		LIMIT $1
+	`, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var results []map[string]interface{}
+	for rows.Next() {
+		var name string
+		var count, users int
+		if err := rows.Scan(&name, &count, &users); err != nil {
+			return nil, err
+		}
+		results = append(results, map[string]interface{}{
+			"name":  name,
+			"count": count,
+			"users": users,
+		})
+	}
+	return results, nil
+}
+
+// RefreshMaterializedViews refreshes the analytics views
+func (s *AnalyticsService) RefreshMaterializedViews(ctx context.Context) error {
+	_, err := s.db.Exec(ctx, `REFRESH MATERIALIZED VIEW CONCURRENTLY analytics_daily_active_users`)
+	if err != nil {
+		return err
+	}
+	_, err = s.db.Exec(ctx, `REFRESH MATERIALIZED VIEW CONCURRENTLY analytics_top_events`)
+	return err
+}
 
 // GetEventStats returns event counts over time period
 func (s *AnalyticsService) GetEventStats(ctx context.Context, eventName string, since time.Time) (int64, error) {

@@ -12,16 +12,9 @@ import (
 // TestSQLInjectionPrevention tests that SQL injection attempts are safely handled
 func TestSQLInjectionPrevention(t *testing.T) {
 	// Setup test database
-	cfg := &database.Config{
-		Host:     "localhost",
-		Port:     5432,
-		User:     "omnin_test",
-		Password: "test123",
-		Database: "omninudge_test",
-		SSLMode:  "disable",
-	}
-
-	db, err := database.New(cfg)
+	// Setup test database using DSN string
+	dsn := "postgres://omnin_test:test1234@localhost:5432/omninudge_test?sslmode=disable"
+	db, err := database.New(dsn)
 	if err != nil {
 		t.Skip("Database not available for SQL injection tests")
 		return
@@ -31,13 +24,13 @@ func TestSQLInjectionPrevention(t *testing.T) {
 	ctx := context.Background()
 
 	// Run migrations
-	if err := db.RunMigrations(); err != nil {
+	if err := db.Migrate(ctx); err != nil {
 		t.Fatalf("Failed to run migrations: %v", err)
 	}
 
 	// Test 1: SQL injection in username search
 	t.Run("Username SQL Injection", func(t *testing.T) {
-		userRepo := models.NewUserRepository(db.Pool())
+		userRepo := models.NewUserRepository(db.Pool)
 
 		// Malicious input: attempt to bypass authentication
 		maliciousUsername := "admin' OR '1'='1"
@@ -51,14 +44,15 @@ func TestSQLInjectionPrevention(t *testing.T) {
 
 	// Test 2: SQL injection in comment search
 	t.Run("Comment SQL Injection", func(t *testing.T) {
-		commentRepo := models.NewPostCommentRepository(db.Pool())
+		commentRepo := models.NewPostCommentRepository(db.Pool)
 
 		// Malicious input: attempt UNION attack
-		maliciousQuery := "test'; DROP TABLE users; --"
+		// maliciousQuery := "test'; DROP TABLE users; --" // Unused
 
 		// Attempt to search with malicious query
 		// If not properly protected, this would drop the users table
-		comments, err := commentRepo.GetByPostID(ctx, 1, 10, 0)
+		// GetByPostID(ctx, postID, sortBy, limit, offset, userID)
+		comments, err := commentRepo.GetByPostID(ctx, 1, "new", 10, 0, nil)
 
 		// The query should safely handle the input
 		// Either return empty results or error, but NOT execute the DROP
@@ -71,13 +65,13 @@ func TestSQLInjectionPrevention(t *testing.T) {
 
 		// Verify users table still exists
 		var count int
-		err = db.Pool().QueryRow(ctx, "SELECT COUNT(*) FROM users").Scan(&count)
+		err = db.Pool.QueryRow(ctx, "SELECT COUNT(*) FROM users").Scan(&count)
 		assert.NoError(t, err, "Users table should still exist after injection attempt")
 	})
 
 	// Test 3: SQL injection in hub name
 	t.Run("Hub Name SQL Injection", func(t *testing.T) {
-		hubRepo := models.NewHubRepository(db.Pool())
+		hubRepo := models.NewHubRepository(db.Pool)
 
 		// Malicious input: attempt to extract data
 		maliciousHubName := "test'; SELECT password_hash FROM users WHERE '1'='1"
@@ -102,7 +96,7 @@ func TestSQLInjectionPrevention(t *testing.T) {
 			LIMIT 10
 		`
 
-		rows, err := db.Pool().Query(ctx, query, "%"+maliciousSearch+"%")
+		rows, err := db.Pool.Query(ctx, query, "%"+maliciousSearch+"%")
 		if rows != nil {
 			defer rows.Close()
 		}
@@ -112,7 +106,7 @@ func TestSQLInjectionPrevention(t *testing.T) {
 
 		// Verify no users were promoted to admin
 		var adminCount int
-		err = db.Pool().QueryRow(ctx, "SELECT COUNT(*) FROM users WHERE role = 'admin'").Scan(&adminCount)
+		err = db.Pool.QueryRow(ctx, "SELECT COUNT(*) FROM users WHERE role = 'admin'").Scan(&adminCount)
 		assert.NoError(t, err)
 		assert.Equal(t, 0, adminCount, "No users should have been promoted to admin via injection")
 	})
@@ -138,7 +132,7 @@ func TestSQLInjectionPrevention(t *testing.T) {
 
 	// Test 6: Second-order SQL injection
 	t.Run("Second Order SQL Injection", func(t *testing.T) {
-		userRepo := models.NewUserRepository(db.Pool())
+		userRepo := models.NewUserRepository(db.Pool)
 
 		// Create user with malicious bio
 		maliciousBio := "'; DROP TABLE posts; --"
@@ -160,11 +154,11 @@ func TestSQLInjectionPrevention(t *testing.T) {
 
 		// Verify posts table still exists
 		var count int
-		err = db.Pool().QueryRow(ctx, "SELECT COUNT(*) FROM posts").Scan(&count)
+		err = db.Pool.QueryRow(ctx, "SELECT COUNT(*) FROM posts").Scan(&count)
 		assert.NoError(t, err, "Posts table should still exist")
 
 		// Cleanup
-		_ = db.Pool().Exec(ctx, "DELETE FROM users WHERE id = $1", user.ID)
+		_, _ = db.Pool.Exec(ctx, "DELETE FROM users WHERE id = $1", user.ID)
 	})
 
 	// Test 7: SQL injection in LIKE clause
@@ -177,7 +171,7 @@ func TestSQLInjectionPrevention(t *testing.T) {
 			WHERE username LIKE $1
 		`
 
-		rows, err := db.Pool().Query(ctx, query, maliciousSearch)
+		rows, err := db.Pool.Query(ctx, query, maliciousSearch)
 		if rows != nil {
 			defer rows.Close()
 		}
@@ -190,12 +184,12 @@ func TestSQLInjectionPrevention(t *testing.T) {
 	t.Run("IN Clause SQL Injection", func(t *testing.T) {
 		// Malicious input for IN clause
 		maliciousIDs := []int{1, 2, 3} // Safe - integers
-		maliciousIDString := "1,2,3); DROP TABLE users; --" // Would be unsafe if concatenated
+		// maliciousIDString := "1,2,3); DROP TABLE users; --" // Unused
 
 		// Safe approach: Use ANY with array parameter
 		query := `SELECT id, username FROM users WHERE id = ANY($1)`
 
-		rows, err := db.Pool().Query(ctx, query, maliciousIDs)
+		rows, err := db.Pool.Query(ctx, query, maliciousIDs)
 		if rows != nil {
 			defer rows.Close()
 		}
@@ -204,7 +198,7 @@ func TestSQLInjectionPrevention(t *testing.T) {
 
 		// Verify users table still exists
 		var count int
-		err = db.Pool().QueryRow(ctx, "SELECT COUNT(*) FROM users").Scan(&count)
+		err = db.Pool.QueryRow(ctx, "SELECT COUNT(*) FROM users").Scan(&count)
 		assert.NoError(t, err, "Users table should still exist")
 
 		// Demonstrate unsafe approach (DON'T DO THIS)
@@ -221,24 +215,24 @@ func TestPreparedStatementUsage(t *testing.T) {
 		// All repository methods MUST use parameterized queries with $1, $2, etc.
 
 		examples := []struct {
-			name     string
-			safe     string
-			unsafe   string
+			name   string
+			safe   string
+			unsafe string
 		}{
 			{
-				name:     "User Lookup",
-				safe:     "SELECT * FROM users WHERE username = $1",
-				unsafe:   "SELECT * FROM users WHERE username = '" + "admin" + "'",
+				name:   "User Lookup",
+				safe:   "SELECT * FROM users WHERE username = $1",
+				unsafe: "SELECT * FROM users WHERE username = '" + "admin" + "'",
 			},
 			{
-				name:     "Post Creation",
-				safe:     "INSERT INTO posts (title, content) VALUES ($1, $2)",
-				unsafe:   "INSERT INTO posts (title, content) VALUES ('" + "title" + "', '" + "content" + "')",
+				name:   "Post Creation",
+				safe:   "INSERT INTO posts (title, content) VALUES ($1, $2)",
+				unsafe: "INSERT INTO posts (title, content) VALUES ('" + "title" + "', '" + "content" + "')",
 			},
 			{
-				name:     "Comment Update",
-				safe:     "UPDATE comments SET content = $1 WHERE id = $2",
-				unsafe:   "UPDATE comments SET content = '" + "content" + "' WHERE id = " + "1",
+				name:   "Comment Update",
+				safe:   "UPDATE comments SET content = $1 WHERE id = $2",
+				unsafe: "UPDATE comments SET content = '" + "content" + "' WHERE id = " + "1",
 			},
 		}
 
