@@ -1,4 +1,5 @@
 import { lazy, Suspense, useEffect } from 'react';
+import i18n from './i18n/config';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import { SettingsProvider } from './contexts/SettingsContext';
@@ -74,7 +75,7 @@ function App() {
                       <Suspense
                         fallback={
                           <div className="flex min-h-screen items-center justify-center">
-                            <LoadingMessage>Loading page...</LoadingMessage>
+                            <LoadingMessage>{i18n.t('common.loading')}</LoadingMessage>
                           </div>
                         }
                       >
