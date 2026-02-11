@@ -1059,7 +1059,7 @@ export default function RedditPage() {
         iconUrl={subredditIcon}
         isSubscribed={subscriptionStatus?.is_subscribed ?? false}
         isNsfw={subredditAbout?.over18 ?? false}
-        searchBars={
+        hubSearch={
           <FeedSearchBars
             showPostForm={false}
             topValue={inputValue}
@@ -1084,6 +1084,68 @@ export default function RedditPage() {
             onPostChange={() => {}}
             onPostSubmit={(e) => e.preventDefault()}
             postDropdownOpen={false}
+          />
+        }
+        postSearch={
+          <FeedSearchBars
+            containerClassName="w-full"
+            showTopForm={false}
+            topValue={inputValue}
+            topPlaceholder="Enter hub or subreddit..."
+            onTopChange={handleInputChange}
+            onTopFocus={() => setIsAutocompleteOpen(true)}
+            onTopBlur={() => setIsAutocompleteOpen(false)}
+            onTopSubmit={handleSubredditSubmit}
+            topSuggestions={suggestionItems}
+            topShouldShowSuggestions={shouldShowSuggestions}
+            topIsLoading={isAutocompleteLoading}
+            topEmptyMessage="No hubs or subreddits found."
+            renderTopSuggestion={(suggestion) => (
+              <SubredditSuggestionItem
+                key={suggestion.name}
+                suggestion={suggestion}
+                onSelect={handleSelectSubredditSuggestion}
+              />
+            )}
+            postValue={postSearchInput}
+            postPlaceholder="Search posts..."
+            onPostChange={(value) => {
+              setPostSearchInput(value);
+              if (!isSearchDropdownOpen) {
+                setIsSearchDropdownOpen(true);
+              }
+            }}
+            onPostFocus={() => setIsSearchDropdownOpen(true)}
+            onPostBlur={() => setTimeout(() => setIsSearchDropdownOpen(false), 120)}
+            onPostSubmit={handlePostSearchSubmit}
+            postDropdownOpen={isSearchDropdownOpen}
+            postDropdownContent={
+              <div className="space-y-2 text-sm text-[var(--color-text-primary)]">
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={limitSearchToContext}
+                    onChange={(e) => setLimitSearchToContext(e.target.checked)}
+                  />
+                  <span>Limit search to r/{subreddit}</span>
+                </label>
+                {!blockAllNsfw && (
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={includeNsfwSearch}
+                      onChange={(e) => setIncludeNsfwSearch(e.target.checked)}
+                    />
+                    <span>Include NSFW results</span>
+                  </label>
+                )}
+                {blockAllNsfw && (
+                  <div className="text-xs text-[var(--color-text-secondary)]">
+                    NSFW content is blocked in settings.
+                  </div>
+                )}
+              </div>
+            }
           />
         }
         sortControls={
@@ -1211,69 +1273,6 @@ export default function RedditPage() {
                     }
                   />
                 </div>
-                {/* Desktop: Show only post search (subreddit nav is in header) */}
-                <div className="hidden lg:block lg:w-96">
-                  <FeedSearchBars
-                    containerClassName="w-full"
-                    showTopForm={false}
-                    topValue={inputValue}
-                    topPlaceholder="Enter hub or subreddit..."
-                    onTopChange={handleInputChange}
-                    onTopFocus={() => setIsAutocompleteOpen(true)}
-                    onTopBlur={() => setIsAutocompleteOpen(false)}
-                    onTopSubmit={handleSubredditSubmit}
-                    topSuggestions={suggestionItems}
-                    topShouldShowSuggestions={shouldShowSuggestions}
-                    topIsLoading={isAutocompleteLoading}
-                    topEmptyMessage="No hubs or subreddits found."
-                    renderTopSuggestion={(suggestion) => (
-                      <SubredditSuggestionItem
-                        key={suggestion.name}
-                        suggestion={suggestion}
-                        onSelect={handleSelectSubredditSuggestion}
-                      />
-                    )}
-                    postValue={postSearchInput}
-                    postPlaceholder="Search posts..."
-                  onPostChange={(value) => {
-                    setPostSearchInput(value);
-                    if (!isSearchDropdownOpen) {
-                      setIsSearchDropdownOpen(true);
-                    }
-                  }}
-                  onPostFocus={() => setIsSearchDropdownOpen(true)}
-                  onPostBlur={() => setTimeout(() => setIsSearchDropdownOpen(false), 120)}
-                  onPostSubmit={handlePostSearchSubmit}
-                  postDropdownOpen={isSearchDropdownOpen}
-                  postDropdownContent={
-                    <div className="space-y-2 text-sm text-[var(--color-text-primary)]">
-                      <label className="flex items-center gap-2">
-                        <input
-                          type="checkbox"
-                          checked={limitSearchToContext}
-                          onChange={(e) => setLimitSearchToContext(e.target.checked)}
-                        />
-                        <span>Limit search to r/{subreddit}</span>
-                      </label>
-                      {!blockAllNsfw && (
-                        <label className="flex items-center gap-2">
-                          <input
-                            type="checkbox"
-                            checked={includeNsfwSearch}
-                            onChange={(e) => setIncludeNsfwSearch(e.target.checked)}
-                          />
-                          <span>Include NSFW results</span>
-                        </label>
-                      )}
-                      {blockAllNsfw && (
-                        <div className="text-xs text-[var(--color-text-secondary)]">
-                          NSFW content is blocked in settings.
-                        </div>
-                      )}
-                    </div>
-                  }
-                />
-                </div>
               </>
             }
           />
@@ -1344,7 +1343,7 @@ export default function RedditPage() {
       )}
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
-        <div>
+        <div className="min-w-0">
           {scopedSearchResults ? (
             scopedSearchResults.length > 0 ? (
               <>

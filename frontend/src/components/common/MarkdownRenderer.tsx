@@ -311,7 +311,7 @@ function convertMarkdown(markdown?: string | null): string {
         bodyRows.push(parseTableRow(rowLine));
         index = rowIndex;
       }
-      html.push('<table><thead><tr>');
+      html.push('<div class="table-wrapper"><table><thead><tr>');
       headerCells.forEach((cell) => {
         html.push(`<th>${formatInline(cell)}</th>`);
       });
@@ -323,7 +323,7 @@ function convertMarkdown(markdown?: string | null): string {
         });
         html.push('</tr>');
       });
-      html.push('</tbody></table>');
+      html.push('</tbody></table></div>');
       continue;
     }
 
