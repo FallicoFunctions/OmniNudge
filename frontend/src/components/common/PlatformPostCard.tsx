@@ -1,5 +1,7 @@
 import { Link, useLocation } from 'react-router-dom';
 import { useMemo, useState, useRef, useEffect, type CSSProperties } from 'react';
+import { useTranslation } from 'react-i18next';
+import { useFormat } from '../../hooks/useFormat';
 import type { PointerEvent } from 'react';
 import { formatTimestamp } from '../../utils/timeFormat';
 import { resolveMediaUrl } from '../../utils/mediaUrl';
@@ -214,6 +216,8 @@ export function PlatformPostCard({
   onEdit,
   onDelete,
 }: PlatformPostCardProps) {
+  const { t } = useTranslation();
+  const { formatNumber } = useFormat();
   const [expandedTextMap, setExpandedTextMap] = useState<Record<number, boolean>>({});
   const previewVideoRef = useRef<HTMLVideoElement | null>(null);
   const { blockNsfwThumbnails } = useSettings();
@@ -241,16 +245,22 @@ export function PlatformPostCard({
   const displayAuthor =
     post.author_username ||
     post.author?.username ||
-    (post.author_id === currentUserId ? 'You' : undefined) ||
-    'Unknown';
+    (post.author_id === currentUserId ? t('posts.you') : undefined) ||
+    t('posts.unknownAuthor');
 
-  const pointsLabel = `${post.score.toLocaleString()} point${post.score === 1 ? '' : 's'}`;
+  const pointsLabel = t('posts.point', {
+    count: post.score,
+    formattedCount: formatNumber(post.score),
+  });
   const submittedLabel = formatTimestamp(
     post.crossposted_at ?? post.created_at,
     useRelativeTime
   );
   const commentCount = post.comment_count ?? post.num_comments ?? 0;
-  const commentsLabel = `${commentCount.toLocaleString()} comment${commentCount === 1 ? '' : 's'}`;
+  const commentsLabel = t('posts.comment', {
+    count: commentCount,
+    formattedCount: formatNumber(commentCount),
+  });
 
   const canEdit = currentUserId === post.author_id;
   const canDelete = canModerateContent(currentUserId, post.author_id, currentUserRole, isModerator);
@@ -261,9 +271,9 @@ export function PlatformPostCard({
   const externalMedia = useMemo(() => getExternalVideoMedia(post.media_url), [post.media_url]);
   const hasInlinePreview = Boolean(
     post.thumbnail_url ||
-      hasBody ||
-      externalMedia ||
-      (post.media_url && post.media_type?.startsWith('video'))
+    hasBody ||
+    externalMedia ||
+    (post.media_url && post.media_type?.startsWith('video'))
   );
   const isInlinePreviewOpen = !!(hasInlinePreview && expandedTextMap[post.id]);
 
@@ -273,7 +283,7 @@ export function PlatformPostCard({
     if (!videoEl) return;
     videoEl.muted = false;
     videoEl.volume = 1.0;
-    videoEl.play().catch(() => {});
+    videoEl.play().catch(() => { });
   }, [isInlinePreviewOpen, externalMedia, post.media_url]);
 
   const getPreviewSizing = (src: string): { className: string; style?: CSSProperties } => {
@@ -367,7 +377,7 @@ export function PlatformPostCard({
             <span> · </span>
             <span>{pointsLabel}</span>
             <span> · </span>
-            <span>posted {submittedLabel}</span>
+            <span>{t('posts.posted_at', { time: submittedLabel })}</span>
           </div>
 
           <div className="mt-1 flex items-start gap-3 text-[11px] text-[var(--color-text-secondary)]">
@@ -376,11 +386,11 @@ export function PlatformPostCard({
                 type="button"
                 onClick={() => toggleTextPreview(post.id)}
                 aria-pressed={!!expandedTextMap[post.id]}
-                aria-label={isInlinePreviewOpen ? 'Hide preview' : 'Show preview'}
+                aria-label={isInlinePreviewOpen ? t('posts.aria.hidePreview') : t('posts.aria.showPreview')}
                 className="flex h-7 w-7 items-center justify-center rounded border border-[var(--color-border)] bg-[var(--color-surface-elevated)] text-[var(--color-text-secondary)] hover:border-[var(--color-primary)] hover:text-[var(--color-primary)]"
               >
                 <span className="sr-only">
-                  {isInlinePreviewOpen ? 'Hide preview' : 'Show preview'}
+                  {isInlinePreviewOpen ? t('posts.aria.hidePreview') : t('posts.aria.showPreview')}
                 </span>
                 {isInlinePreviewOpen ? (
                   <svg
@@ -432,7 +442,7 @@ export function PlatformPostCard({
                     <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
                     </svg>
-                    Share
+                    {t('posts.share')}
                   </button>
                 )}
                 {onToggleSave && (
@@ -445,7 +455,7 @@ export function PlatformPostCard({
                     <svg className="w-3.5 h-3.5" fill={isSaved ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
                     </svg>
-                    {isSavePending ? 'Saving...' : isSaved ? 'Unsave' : 'Save'}
+                    {isSavePending ? t('posts.status.saving') : isSaved ? t('posts.unsave') : t('posts.save')}
                   </button>
                 )}
 
@@ -461,7 +471,7 @@ export function PlatformPostCard({
                     title={hideLabel}
                     className="text-xs text-[var(--color-text-muted)] hover:text-[var(--color-primary)] disabled:opacity-60"
                   >
-                    {isHiding ? 'Hiding...' : hideLabel}
+                    {isHiding ? t('posts.status.hiding') : hideLabel || t('common.hide')}
                   </button>
                 )}
                 {onCrosspost && (
@@ -471,7 +481,7 @@ export function PlatformPostCard({
                     title="Crosspost to another hub"
                     className="text-xs text-[var(--color-text-muted)] hover:text-[var(--color-primary)]"
                   >
-                    Crosspost
+                    {t('posts.actions.crosspost')}
                   </button>
                 )}
                 {onTogglePin && canPin && (
@@ -482,7 +492,7 @@ export function PlatformPostCard({
                     title={post.is_pinned ? "Unpin from top" : "Pin to top"}
                     className="text-xs text-[var(--color-text-muted)] hover:text-[var(--color-primary)] disabled:opacity-60"
                   >
-                    {isPinning ? 'Updating...' : post.is_pinned ? 'Unpin' : 'Pin'}
+                    {isPinning ? t('posts.status.updating') : post.is_pinned ? t('posts.unspin') : t('posts.pin')}
                   </button>
                 )}
 
@@ -496,7 +506,7 @@ export function PlatformPostCard({
                     onClick={onEdit}
                     className="text-xs text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
                   >
-                    Edit
+                    {t('common.edit')}
                   </button>
                 )}
                 {canDelete && onDelete && (
@@ -506,7 +516,7 @@ export function PlatformPostCard({
                     disabled={isDeleting}
                     className="text-xs text-red-600 hover:text-red-500 font-medium disabled:opacity-60"
                   >
-                    {isDeleting ? 'Deleting...' : 'Delete'}
+                    {isDeleting ? t('posts.status.deleting') : t('common.delete')}
                   </button>
                 )}
               </div>

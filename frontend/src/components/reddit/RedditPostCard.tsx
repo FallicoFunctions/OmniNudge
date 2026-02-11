@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type SyntheticEvent } from 'react';
+import { useTranslation } from 'react-i18next';
+import { useFormat } from '../../hooks/useFormat';
 import { flushSync } from 'react-dom';
 import { Link } from 'react-router-dom';
 import { formatTimestamp } from '../../utils/timeFormat';
@@ -17,9 +19,7 @@ import { getRedditDashAudioUrl } from '../../utils/redditVideoAudio';
 import { useSettings } from '../../contexts/SettingsContext';
 import { PostBodyMarkdown } from '../posts/PostBodyMarkdown';
 
-function formatPoints(count: number): string {
-  return `${count.toLocaleString()} ${count === 1 ? 'point' : 'points'}`;
-}
+
 
 interface RedditPostCardProps {
   post: RedditCrosspostSource & {
@@ -439,9 +439,11 @@ export function RedditPostCard({
   onToggleSave,
   onHide,
   onCrosspost,
-  hideLabel = 'Hide',
+  hideLabel,
   linkState,
 }: RedditPostCardProps) {
+  const { t } = useTranslation();
+  const { formatNumber } = useFormat();
   const [expandedImageMap, setExpandedImageMap] = useState<Record<string, boolean>>({});
   const [galleryImages, setGalleryImages] = useState<string[]>([]);
   const [isLoadingGallery, setIsLoadingGallery] = useState(false);
@@ -521,7 +523,14 @@ export function RedditPostCard({
   const isExternalLink = Boolean(
     sanitizedExternalUrl && externalDomain && !isRedditDomain(externalDomain)
   );
-  const commentLabel = `${post.num_comments.toLocaleString()} Comments`;
+  const commentLabel = t('posts.comment', {
+    count: post.num_comments,
+    formattedCount: formatNumber(post.num_comments),
+  });
+  const pointsLabel = t('posts.point', {
+    count: post.score,
+    formattedCount: formatNumber(post.score),
+  });
   const previewImageUrl = getExpandableImageUrl(post);
   const inlineMedia = getInlineMedia(sanitizedExternalUrl);
   const canNativeHls =
@@ -815,7 +824,7 @@ export function RedditPostCard({
     if (!videoEl) return;
     videoEl.muted = false;
     videoEl.volume = 1.0;
-    videoEl.play().catch(() => {});
+    videoEl.play().catch(() => { });
   }, [isInlinePreviewOpen, inlineMedia]);
 
   return (
@@ -971,7 +980,7 @@ export function RedditPostCard({
                   u/{post.author}
                 </Link>
                 <span> · </span>
-                <span>{formatPoints(post.score)}</span>
+                <span>{pointsLabel}</span>
                 <span> · </span>
                 <span>posted {formatTimestamp(post.created_utc, useRelativeTime)}</span>
               </div>
@@ -1130,20 +1139,20 @@ export function RedditPostCard({
                 </div>
               )}
               <div className="mt-1 flex flex-wrap items-center gap-3">
-            <Link
-              to={postUrl}
-              state={linkState}
-              className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
-            >
-              {commentLabel}
-            </Link>
+                <Link
+                  to={postUrl}
+                  state={linkState}
+                  className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+                >
+                  {commentLabel}
+                </Link>
                 {onShare && (
                   <button
                     type="button"
                     onClick={onShare}
                     className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
                   >
-                    Share
+                    {t('posts.share')}
                   </button>
                 )}
                 {onToggleSave && (
@@ -1155,11 +1164,11 @@ export function RedditPostCard({
                   >
                     {isSaveActionPending
                       ? pendingShouldSave
-                        ? 'Saving...'
-                        : 'Unsaving...'
+                        ? t('posts.status.saving')
+                        : t('posts.status.unsaving')
                       : isSaved
-                      ? 'Unsave'
-                      : 'Save'}
+                        ? t('posts.unsave')
+                        : t('posts.save')}
                   </button>
                 )}
                 {onHide && (
@@ -1168,7 +1177,7 @@ export function RedditPostCard({
                     onClick={onHide}
                     className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
                   >
-                    {hideLabel}
+                    {hideLabel || t('common.hide')}
                   </button>
                 )}
                 {onCrosspost && (
@@ -1177,7 +1186,7 @@ export function RedditPostCard({
                     onClick={onCrosspost}
                     className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
                   >
-                    Crosspost
+                    {t('posts.actions.crosspost')}
                   </button>
                 )}
               </div>

@@ -384,6 +384,7 @@ func main() {
 
 	// API v1 routes
 	api := router.Group("/api/v1")
+	api.Use(middleware.I18nMiddleware())
 	{
 		// Ping endpoint (no auth required)
 		api.GET("/ping", func(c *gin.Context) {

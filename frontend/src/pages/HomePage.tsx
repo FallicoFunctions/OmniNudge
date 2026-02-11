@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient, useInfiniteQuery, type InfiniteData } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
+import { useFormat } from '../hooks/useFormat';
 import { feedService, type HomeFeedResponse, type RedditPost } from '../services/feedService';
 import { useAuth } from '../contexts/AuthContext';
 import { useSettings } from '../contexts/SettingsContext';
@@ -77,6 +78,7 @@ const persistOmniOnlyState = (userId: number | null | undefined, value: boolean)
 
 export default function HomePage() {
   const { t } = useTranslation();
+  const { formatNumber } = useFormat();
   const { user } = useAuth();
   const {
     useRelativeTime,
@@ -740,7 +742,7 @@ export default function HomePage() {
               )}
               postValue=""
               postPlaceholder=""
-              onPostChange={() => {}}
+              onPostChange={() => { }}
               onPostSubmit={(e) => e.preventDefault()}
               postDropdownOpen={false}
               showPostForm={false}
@@ -767,55 +769,50 @@ export default function HomePage() {
           <button
             type="button"
             onClick={() => handleSortChange('hot')}
-            className={`px-4 py-2 text-sm font-semibold ${
-              sort === 'hot'
-                ? 'text-[var(--color-primary)]'
-                : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
-            }`}
+            className={`px-4 py-2 text-sm font-semibold ${sort === 'hot'
+              ? 'text-[var(--color-primary)]'
+              : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
+              }`}
           >
             {t('home.sort.hot')}
           </button>
           <button
             type="button"
             onClick={() => handleSortChange('new')}
-            className={`px-4 py-2 text-sm font-semibold ${
-              sort === 'new'
-                ? 'text-[var(--color-primary)]'
-                : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
-            }`}
+            className={`px-4 py-2 text-sm font-semibold ${sort === 'new'
+              ? 'text-[var(--color-primary)]'
+              : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
+              }`}
           >
             {t('home.sort.new')}
           </button>
           <button
             type="button"
             onClick={() => handleSortChange('top')}
-            className={`px-4 py-2 text-sm font-semibold ${
-              sort === 'top'
-                ? 'text-[var(--color-primary)]'
-                : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
-            }`}
+            className={`px-4 py-2 text-sm font-semibold ${sort === 'top'
+              ? 'text-[var(--color-primary)]'
+              : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
+              }`}
           >
             {t('home.sort.top')}
           </button>
           <button
             type="button"
             onClick={() => handleSortChange('rising')}
-            className={`px-4 py-2 text-sm font-semibold ${
-              sort === 'rising'
-                ? 'text-[var(--color-primary)]'
-                : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
-            }`}
+            className={`px-4 py-2 text-sm font-semibold ${sort === 'rising'
+              ? 'text-[var(--color-primary)]'
+              : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
+              }`}
           >
             {t('home.sort.rising')}
           </button>
           <button
             type="button"
             onClick={() => handleSortChange('controversial')}
-            className={`px-4 py-2 text-sm font-semibold ${
-              sort === 'controversial'
-                ? 'text-[var(--color-primary)]'
-                : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
-            }`}
+            className={`px-4 py-2 text-sm font-semibold ${sort === 'controversial'
+              ? 'text-[var(--color-primary)]'
+              : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
+              }`}
           >
             {t('home.sort.controversial')}
           </button>
@@ -841,17 +838,15 @@ export default function HomePage() {
               role="switch"
               aria-checked={omniOnly}
               onClick={() => setOmniOnly((prev) => !prev)}
-              className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-1 ${
-                omniOnly ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
-              }`}
+              className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-1 ${omniOnly ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
+                }`}
               title={omniOnly ? t('home.filter.omniOnlyTooltip') : t('home.filter.allPostsTooltip')}
             >
               <span className="sr-only">{t('common.accessibility.toggleOmniFeed')}</span>
               <span
                 aria-hidden="true"
-                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                  omniOnly ? 'translate-x-5' : 'translate-x-0'
-                }`}
+                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${omniOnly ? 'translate-x-5' : 'translate-x-0'
+                  }`}
               />
             </button>
             <span className={`text-xs font-semibold transition-colors ${omniOnly ? 'text-[var(--color-primary)]' : 'text-[var(--color-text-secondary)]'}`}>
@@ -969,9 +964,8 @@ export default function HomePage() {
                   type="button"
                   onClick={() => setShowPopularFallback(true)}
                   disabled={requiresValidCustomRange}
-                  className={`rounded-md bg-[var(--color-primary)] px-4 py-2 text-white transition hover:opacity-90 ${
-                    requiresValidCustomRange ? 'cursor-not-allowed opacity-60' : ''
-                  }`}
+                  className={`rounded-md bg-[var(--color-primary)] px-4 py-2 text-white transition hover:opacity-90 ${requiresValidCustomRange ? 'cursor-not-allowed opacity-60' : ''
+                    }`}
                 >
                   {t('home.empty.viewPopularButton')}
                 </button>

@@ -1,0 +1,636 @@
+{
+  "common": {
+    "loading": "جاري التحميل...",
+    "error": "خطأ",
+    "success": "نجاح",
+    "cancel": "إلغاء",
+    "save": "حفظ",
+    "delete": "حذف",
+    "edit": "تعديل",
+    "submit": "إرسال",
+    "close": "إغلاق",
+    "copied": "تم النسخ!",
+    "back": "عودة",
+    "next": "التالي",
+    "confirm": "تأكيد",
+    "search": "بحث",
+    "filter": "تصفية",
+    "sort": "ترتيب",
+    "settings": "الإعدادات",
+    "logout": "تسجيل الخروج",
+    "login": "تسجيل الدخول",
+    "register": "إنشاء حساب",
+    "username": "اسم المستخدم",
+    "password": "كلمة المرور",
+    "email": "البريد الإلكتروني",
+    "badges": {
+      "admin": "مشرف",
+      "moderator": "مراقب",
+      "op": "صاحب الموضوع"
+    },
+    "accessibility": {
+      "toggleArchivedNotifications": "تبديل إشعارات الدردشة المؤرشفة",
+      "togglePushNotifications": "تبديل الإشعارات الفورية",
+      "toggleReadReceipts": "تبديل تأكيدات القراءة",
+      "toggleTypingIndicators": "تبديل مؤشرات الكتابة",
+      "toggleNotificationSound": "تبديل صوت إشعار الرسائل",
+      "toggleOmniFeed": "تبديل تصفية منشورات Omni",
+      "toggleInfiniteScroll": "تبديل التمرير اللانهائي",
+      "expandCommentThread": "توسيع سلسلة التعليقات",
+      "collapseCommentThread": "طي سلسلة التعليقات",
+      "removeFile": "حذف الملف"
+    },
+    "time": {
+      "submitted": "تم الإرسال",
+      "ago": "منذ",
+      "on": "في"
+    },
+    "media": {
+      "image": "صورة",
+      "video": "فيديو",
+      "audio": "صوت",
+      "file": "ملف"
+    }
+  },
+  "nav": {
+    "home": "الرئيسية",
+    "messages": "الرسائل",
+    "notifications": "الإشعارات",
+    "profile": "الملف الشخصي",
+    "admin": "الإدارة",
+    "hubs": "المجموعات",
+    "search": "بحث",
+    "create": "إنشاء",
+    "menu": "القائمة"
+  },
+  "menu": {
+    "profile": "الملف الشخصي",
+    "settings": "الإعدادات",
+    "hubs": "تصفح المجموعات",
+    "about": "حول",
+    "admin": "لوحة الإدارة",
+    "logout": "تسجيل الخروج",
+    "logoutConfirm": "هل أنت متأكد أنك تريد تسجيل الخروج؟"
+  },
+  "create": {
+    "post": "إنشاء منشور",
+    "hub": "إنشاء مجموعة",
+    "crosspost": "نشر من Reddit"
+  },
+  "ariaLabels": {
+    "mobileNav": "التنقل عبر الهاتف",
+    "unreadMessages": "{{count}} رسائل غير مقروءة",
+    "closeMenu": "إغلاق القائمة"
+  },
+  "home": {
+    "feed": {
+      "yourFeed": "خلاصتك",
+      "popularPosts": "المنشورات الشائعة",
+      "omniFeedDescription": "منشورات من مجموعات Omni الخاصة بك (تمت تصفية Reddit)",
+      "subscribedFeedDescription": "منشورات من المجموعات والمجتمعات المشترك بها",
+      "popularOmniDescription": "المنشورات الشائعة المشتركة داخل مجموعات Omni",
+      "popularAllDescription": "المنشورات الشائعة من جميع المجموعات والمجتمعات",
+      "showingPopular": "يتم الآن عرض محتوى Omni الشائع.",
+      "hidePopularButton": "إخفاء المحتوى الشائع"
+    },
+    "sort": {
+      "hot": "نشط",
+      "new": "جديد",
+      "top": "الأفضل",
+      "rising": "صاعد",
+      "controversial": "مثير للجدل",
+      "scroll": "تمرير"
+    },
+    "filter": {
+      "showLabel": "عرض:",
+      "omniOnly": "Omni فقط",
+      "allPosts": "كل المنشورات",
+      "omniOnlyTooltip": "عرض منشورات Omni فقط. انقر لعرض الكل.",
+      "allPostsTooltip": "عرض كل المنشورات. انقر لعرض منشورات Omni فقط."
+    },
+    "search": {
+      "enterHubOrSubreddit": "أدخل اسم المجموعة أو المجتمع...",
+      "searchPosts": "بحث في المنشورات...",
+      "searchButton": "بحث",
+      "limitToSubreddit": "قصر البحث على r/{{subreddit}}",
+      "limitToHub": "قصر البحث على h/{{hub}}",
+      "includeNsfw": "تضمين نتائج للكبار (NSFW)",
+      "nsfwBlocked": "تم حظر محتوى للكبار في الإعدادات."
+    },
+    "timeRange": {
+      "label": "النطاق الزمني",
+      "hour": "الساعة الماضية",
+      "day": "اليوم الماضي",
+      "week": "الأسبوع الماضي",
+      "month": "الشهر الماضي",
+      "year": "العام الماضي",
+      "allTime": "كل الوقت",
+      "custom": "نطاق مخصص",
+      "to": "إلى",
+      "selectBothDates": "اختر كلا التاريخين لتطبيق هذه التصفية."
+    },
+    "empty": {
+      "noSubscriptions": "ليس لديك اشتراكات. ستظهر هنا المنشورات من اشتراكاتك. انقر فوق الزر أدناه لعرض المحتوى الشائع الحالي.",
+      "viewPopularButton": "عرض المحتوى الشائع الحالي",
+      "noOmniPosts": "لا توجد منشورات Omni من اشتراكاتك بعد.",
+      "noPosts": "لا توجد منشورات من اشتراكاتك بعد.",
+      "subscribeMessage": "اشترك في المجموعات والمجتمعات لرؤية منشوراتها هنا.",
+      "noOmniAvailable": "لا توجد منشورات Omni متاحة.",
+      "noPostsAvailable": "لا توجد منشورات متاحة."
+    },
+    "pagination": {
+      "loadingMore": "جاري تحميل المزيد من المنشورات..."
+    }
+  },
+  "messages": {
+    "title": "الرسائل",
+    "newConversation": "محادثة جديدة",
+    "typeMessage": "اكتب رسالة...",
+    "send": "إرسال",
+    "noMessages": "لا توجد رسائل بعد",
+    "typing": "{{username}} يكتب الآن...",
+    "online": "متصل",
+    "offline": "غير متصل",
+    "lastSeen": "آخر ظهور {{time}}",
+    "encrypted": "مشفر من طرف إلى طرف",
+    "deleteConversation": "حذف المحادثة",
+    "deleteConfirm": "هل أنت متأكد أنك تريد حذف هذه المحادثة؟",
+    "viewer": {
+      "closeLabel": "إغلاق العارض",
+      "previousLabel": "الوسائط السابقة",
+      "nextLabel": "الوسائط التالية",
+      "decrypting": "جاري فك تشفير الوسائط...",
+      "counter": "{{current}} / {{total}}"
+    },
+    "search": {
+      "conversations": "بحث في المحادثات...",
+      "inConversation": "بحث في المحادثة...",
+      "clearLabel": "مسح البحث"
+    },
+    "media": {
+      "viewAllTitle": "عرض كافة الوسائط من هذه المحادثة في عرض شرائح",
+      "stillDecrypting": "الوسائط لا تزال قيد فك التشفير. يرجى الانتظار والمحاولة مرة أخرى.",
+      "fileTooLarge": "الملف كبير جداً. الحجم الأقصى هو 25 ميجابايت.",
+      "uploadFailed": "فشل تحميل الوسائط. يرجى المحاولة مرة أخرى.",
+      "uploadFailedFile": "فشل تحميل {{filename}}"
+    },
+    "compose": {
+      "enterUsername": "أدخل اسم المستخدم...",
+      "placeholder": "اكتب رسالة...",
+      "attachSingle": "إرفاق ملف واحد",
+      "attachMultiple": "تحميل ملفات متعددة",
+      "hubSubredditPlaceholder": "مثال: r/pics أو h/gaming"
+    },
+    "errors": {
+      "loadPostsFailed": "فشل تحميل المنشورات. يرجى المحاولة مرة أخرى.",
+      "conversationNotFound": "المحادثة غير موجودة",
+      "recipientNotFound": "المستلم غير موجود"
+    },
+    "messageOptions": {
+      "ariaLabel": "خيارات الرسالة"
+    }
+  },
+  "posts": {
+    "title": "المنشورات",
+    "newPost": "منشور جديد",
+    "comments": "التعليقات",
+    "comment_one": "تعليق واحد",
+    "comment_other": "{{formattedCount}} تعليقات",
+    "point_one": "نقطة واحدة",
+    "point_other": "{{formattedCount}} نقاط",
+    "upvote": "تصويت للأعلى",
+    "downvote": "تصويت للأسفل",
+    "share": "مشاركة",
+    "save": "حفظ",
+    "hide": "إخفاء",
+    "report": "إبلاغ",
+    "delete": "حذف",
+    "edit": "تعديل",
+    "postedBy": "نشر بواسطة {{username}}",
+    "postedIn": "في {{hub}}",
+    "timeAgo": "منذ {{time}}",
+    "points": "نقطة واحدة",
+    "points_plural": "{{count}} نقاط",
+    "actions": {
+      "upvote": "تصويت للأعلى",
+      "downvote": "تصويت للأسفل",
+      "reply": "رد",
+      "edit": "تعديل",
+      "delete": "حذف",
+      "save": "حفظ",
+      "unsave": "إلغاء الحفظ",
+      "hide": "إخفاء",
+      "share": "مشاركة",
+      "crosspost": "نشر في مكان آخر",
+      "report": "إبلاغ",
+      "pin": "تثبيت",
+      "unpin": "إلغاء التثبيت",
+      "inbox": "صندوق الوارد",
+      "disableInbox": "تعطيل صندوق الوارد",
+      "permalink": "الرابط الدائم",
+      "embed": "تضمين",
+      "copyEmbed": "نسخ كود التضمين"
+    },
+    "embed": {
+      "title": "تضمين التعليق",
+      "instruction": "انسخ مقتطف HTML هذا لمشاركة التعليق خارج OmniNudge."
+    },
+    "viewingThread": "أنت تشاهد سلسلة تعليق واحد فقط.",
+    "status": {
+      "saving": "جاري الحفظ...",
+      "saved": "تم الحفظ",
+      "hiding": "جاري الإخفاء...",
+      "deleting": "جاري الحذف...",
+      "pinning": "جاري التثبيت...",
+      "reporting": "جاري الإبلاغ..."
+    },
+    "errors": {
+      "loadPostsFailed": "فشل تحميل المنشورات. يرجى المحاولة مرة أخرى.",
+      "invalidUrl": "رابط منشور غير صالح",
+      "loadFailed": "فشل تحميل المنشور"
+    },
+    "badges": {
+      "omni": "Omni",
+      "pinned": "مثبت"
+    }
+  },
+  "comments": {
+    "title": "التعليقات",
+    "noComments": "لا توجد تعليقات بعد",
+    "writeComment": "اكتب ردك...",
+    "actions": {
+      "reply": "رد",
+      "edit": "تعديل",
+      "delete": "حذف",
+      "save": "حفظ",
+      "unsave": "إلغاء الحفظ",
+      "report": "إبلاغ",
+      "permalink": "الرابط الدائم",
+      "collapse": "طي",
+      "expand": "توسيع",
+      "disableInbox": "تعطيل الردود في صندوق الوارد",
+      "enableInbox": "تفعيل الردود في صندوق الوارد"
+    },
+    "status": {
+      "saving": "جاري الحفظ...",
+      "deleting": "جاري الحذف...",
+      "reporting": "جاري الإبلاغ...",
+      "inboxPending": "جاري تحديث صندوق الوارد..."
+    },
+    "labels": {
+      "editComment": "تعديل التعليق",
+      "replyCount": "رد واحد",
+      "replyCount_plural": "{{count}} ردود"
+    },
+    "errors": {
+      "voteFailed": "فشل التصويت.",
+      "replyFailed": "فشل نشر الرد.",
+      "editFailed": "فشل تحديث التعليق.",
+      "deleteFailed": "فشل حذف التعليق.",
+      "inboxFailed": "فشل تحديث إعدادات صندوق الوارد.",
+      "saveFailed": "فشل تحديث حالة الحفظ.",
+      "reportFailed": "فشل الإبلاغ عن التعليق."
+    },
+    "confirm": {
+      "delete": "هل تريد حذف هذا التعليق؟ لا يمكن التراجع عن هذا الإجراء."
+    }
+  },
+  "settings": {
+    "title": "الإعدادات",
+    "subtitle": "خصص تجربتك في OmniNudge",
+    "general": "عام",
+    "privacy": "الخصوصية",
+    "notifications": "الإشعارات",
+    "appearance": "المظهر",
+    "language": "اللغة",
+    "language_label": "اختر اللغة",
+    "language_help": "اختر لغتك المفضلة. الإنجليزية والإسبانية والعربية مدعومة حاليًا مع دعم كامل لتخطيط RTL.",
+    "language_footer": "OmniNudge هو مشروع يقوده المجتمع. الترجمات مقدمة من المجتمع وقد تكون غير مكتملة.",
+    "account": "الحساب",
+    "theme": "السمة",
+    "darkMode": "الوضع الداكن",
+    "lightMode": "الوضع الفاتح",
+    "autoDetect": "كشف تلقائي",
+    "emailNotifications": "إشعارات البريد الإلكتروني",
+    "pushNotifications": "الإشعارات الفورية",
+    "readReceipts": "تأكيدات القراءة",
+    "typingIndicators": "مؤشرات الكتابة",
+    "notificationSound": "صوت الإشعارات",
+    "changeEmail": "تغيير البريد الإلكتروني",
+    "changePassword": "تغيير كلمة المرور",
+    "deleteAccount": "حذف الحساب",
+    "exportData": "تصدير البيانات",
+    "categories": {
+      "appearance": "المظهر",
+      "notifications": "الإشعارات",
+      "preferences": "التفضيلات",
+      "accountPrivacy": "الحساب والخصوصية"
+    },
+    "themeSection": {
+      "title": "السمة",
+      "description": "اختر سمة نشطة أو أنشئ سمة خاصة بك."
+    },
+    "archivedNotifications": {
+      "title": "إشعارات الدردشة المؤرشفة",
+      "description": "تحكم في ما إذا كنت ستتلقى إشعارات عند وصول رسائل جديدة في المحادثات التي أرشفتها.",
+      "toggleLabel": "إشعار للمحادثات المؤرشفة",
+      "toggleHelp": "عند الإيقاف، تظل الدردشات المؤرشفة صامتة؛ ستظل ترى الرسائل عند فتحها."
+    },
+    "pushNotificationsSection": {
+      "title": "الإشعارات الفورية",
+      "description": "احصل على إشعارات المتصفح عند تلقي رسائل جديدة، حتى عندما يكون OmniNudge مغلقاً.",
+      "notSupported": "الإشعارات الفورية غير مدعومة في متصفحك. جرب استخدام Chrome أو Firefox أو Edge.",
+      "toggleLabel": "تفعيل الإشعارات الفورية",
+      "toggleHelpOn": "ستتلقى إشعارات عندما يكون التطبيق مغلقاً",
+      "toggleHelpOff": "انقر للسماح بإشعارات المتصفح"
+    },
+    "messagingPrivacy": {
+      "title": "خصوصية المراسلة",
+      "description": "تحكم في المعلومات التي تشاركها مع المستخدمين الآخرين أثناء المحادثات.",
+      "readReceipts": "تأكيدات القراءة",
+      "readReceiptsHelp": "دع الآخرين يعرفون متى قرأت رسائلهم. عند التعطيل، لن يرى الآخرون حالة القراءة لرسائلك.",
+      "typingIndicators": "مؤشرات الكتابة",
+      "typingIndicatorsHelp": "أظهر للآخرين متى تكتب. عند التعطيل، لن ترسل أو ترى مؤشرات الكتابة.",
+      "notificationSound": "صوت إشعارات الرسائل",
+      "notificationSoundHelp": "تشغيل صوت عند تلقي رسالة جديدة. يتم التشغيل فقط عند استخدام التطبيق بنشاط."
+    },
+    "dateTime": {
+      "title": "عروض التاريخ والوقت",
+      "useRelativeTime": "استخدام الوقت النسبي",
+      "useRelativeTimeHelp": "عرض الطوابع الزمنية كوقت نسبي (مثلاً، \"منذ 4 ساعات\") بدلاً من تواريخ مطلقة (مثلاً، \"12/2/2025\")",
+      "previewLabel": "معاينة:",
+      "relativePreview": "نسبي: تم الإرسال منذ 4 ساعات",
+      "absolutePreview": "مطلق: تم الإرسال في 12/2/2025",
+      "cooldownFormat": "تنسيق وقت انتظار طلب الوصول",
+      "cooldownFormatHelp": "اختر كيفية عرض وقت الانتظار في طلبات الوصول للمجموعات الخاصة.",
+      "cooldownDays": "عرض الأيام المتبقية",
+      "cooldownDate": "عرض التاريخ",
+      "cooldownBoth": "عرض الأيام + التاريخ"
+    },
+    "themeSelector": {
+      "title": "سلوك محدد السمات",
+      "description": "اختر ما إذا كان يجب أن تظل قائمة السمات المنسدلة مفتوحة بعد اختيار السمة أو تُغلق تلقائياً.",
+      "stayOpen": "البقاء مفتوحاً (افتراضي)",
+      "stayOpenHelp": "استمر في تصفح السمات الأخرى دون إعادة فتح القائمة.",
+      "autoClose": "إغلاق تلقائي بعد الاختيار",
+      "autoCloseHelp": "أغلق القائمة المنسدلة بمجرد تفعيل السمة."
+    },
+    "savedItems": {
+      "title": "تنبيهات العناصر المحفوظة",
+      "description": "عندما يقوم مراقبو Reddit بحذف منشور قمت بحفظه، يقوم OmniNudge بتنظيفه تلقائياً من علامة تبويب المحفوظات. يمكنك اختيار ما إذا كنت ستحصل على تذكير في المرة التالية التي تفتح فيها العناصر المحفوظة.",
+      "notifyLabel": "أخبرني عن منشورات Reddit المحذوفة",
+      "notifyHelp": "عند التفعيل، سترى لافتة لمرة واحدة تخبرك بعدد المنشورات المحذوفة التي تم تنظيفها."
+    },
+    "omniFeed": {
+      "title": "الوضع الافتراضي لخلاصة Omni",
+      "description": "قرر ما إذا كانت خلاصة Omni يجب أن تبدأ تلقائياً في وضع \"منشورات Omni فقط\" في كل مرة تقوم فيها بتسجيل الدخول. لا يزال بإمكانك تبديله أثناء التنقل من شريط أدوات الخلاصات.",
+      "defaultOmniLabel": "الافتراضي لمنشورات Omni فقط",
+      "defaultOmniHelp": "عند التفعيل، يبدأ فلتر خلاصة Omni في وضع Omni فقط عند تسجيل الدخول بدلاً من مزج عناصر Reddit.",
+      "stayOnPostLabel": "البقاء في المنشور بعد الإخفاء",
+      "stayOnPostHelp": "عند التفعيل، فإن إخفاء المنشور يبقيك في عرض التفاصيل. عند التعطيل، سيتم توجيهك مرة أخرى إلى الخلاصة أو المجموعة التي أتيت منها."
+    },
+    "pageNavigation": {
+      "title": "التنقل في الصفحة",
+      "description": "تحكم في كيفية تصفح المحتوى على صفحات مختلفة. اختر بين التمرير اللانهائي (تحميل المزيد تلقائياً أثناء التمرير) أو الترقيم (استخدام أزرار السابق/التالي).",
+      "homeFeed": "خلاصة الصفحة الرئيسية",
+      "hubPages": "صفحات المجموعات",
+      "subredditPages": "صفحات المجتمعات",
+      "infiniteScroll": "التمرير اللانهائي: يتم تحميل المنشورات تلقائياً أثناء التمرير",
+      "pagination": "الترقيم: استخدام أزرار السابق/التالي"
+    },
+    "nsfw": {
+      "title": "تفضلات المحتوى للكبار (NSFW)",
+      "blockAll": "حظر كافة محتويات الكبار",
+      "blockAllHelp": "إخفاء المنشورات والمجموعات والمجتمعات والمستخدمين المصنفين NSFW من البحث والخلاصات. التنقل يدوياً إلى صفحة NSFW سيظهر تحذيراً بدلاً من المحتوى.",
+      "defaultInclude": "الافتراضي \"تضمين نتائج للكبار\" في البحث",
+      "defaultIncludeHelp": "عند التفعيل، سيقوم مربع البحث بالتحديد المسبق لـ \"تضمين نتائج للكبار\" (ما لم يتم حظر NSFW بالكامل أعلاه).",
+      "blockThumbnails": "حظر الصور المصغرة لمنشورات الكبار",
+      "blockThumbnailsHelp": "تعتيم الصور المصغرة لمنشورات الكبار ووضع تحذير +18."
+    },
+    "security": {
+      "title": "الأمان",
+      "description": "يتم استخدام مفتاحك العام لميزات التشفير من طرف إلى طرف. لا يتم عرضه في ملفك الشخصي العام.",
+      "showKey": "إظهار المفتاح العام",
+      "hideKey": "إخفاء المفتاح العام",
+      "copy": "نسخ",
+      "copied": "تم النسخ!",
+      "copyFailed": "فشل النسخ",
+      "noKey": "لم يتم العثور على مفتاح عام لهذا الحساب."
+    },
+    "email": {
+      "title": "البريد الإلكتروني",
+      "description": "إدارة عنوان بريدك الإلكتروني المرتبط بهذا الحساب.",
+      "newEmail": "عنوان بريد إلكتروني جديد",
+      "confirmEmail": "تأكيد عنوان البريد الإلكتروني الجديد",
+      "currentEmail": "البريد الإلكتروني الحالي",
+      "noEmail": "لم يتم تعيين بريد إلكتروني",
+      "updateButton": "تحديث البريد الإلكتروني",
+      "addButton": "إضافة بريد إلكتروني",
+      "updating": "جاري التحديث...",
+      "saveChanges": "حفظ التغييرات",
+      "emailMismatch": "عناوين البريد الإلكتروني غير متطابقة",
+      "invalidEmail": "يرجى إدخال عنوان بريد إلكتروني صالح",
+      "updateSuccess": "تم تحديث البريد الإلكتروني بنجاح",
+      "verificationSent": "تم إرسال بريد التحقق إلى {email}. يرجى التحقق من صندوق الوارد والنقر فوق رابط التحقق لإكمال تحديث البريد الإلكتروني.",
+      "pendingVerification": "التحقق قيد الانتظار",
+      "pendingEmail": "البريد الإلكتروني المعلق",
+      "resendVerification": "إعادة إرسال بريد التحقق",
+      "resending": "جاري إعادة الإرسال...",
+      "privacyNote": "بريدك الإلكتروني مشفر أثناء الراحة. يتم تخزين كلمة المرور الخاصة بك كهاش أحادي الاتجاه (لا يمكننا قراءتها)."
+    },
+    "betaFeatures": {
+      "title": "ميزات بيتا",
+      "experimentalTitle": "ميزات تجريبية",
+      "experimentalDescription": "هذه الميزات حالياً في مرحلة البيتا. لديك وصول مبكر بناءً على إعدادات حسابك أو تكوين الإدارة.",
+      "voiceCalls": "المكالمات الصوتية",
+      "voiceCallsDescription": "إجراء مكالمات صوتية 1 لـ 1 في المحادثات",
+      "videoCalls": "مكالمات الفيديو",
+      "videoCallsDescription": "إجراء مكالمات فيديو 1 لـ 1 مع مشاركة الشاشة",
+      "performanceMode": "وضع الأداء",
+      "performanceModeDescription": "تحميل الصور بكسل لتنزيل أسرع للصفحات",
+      "note": "قد تكون ميزات البيتا غير مستقرة. اتصل بالدعم إذا واجهت مشاكل. يتم التحكم في توفر الميزات بواسطة علامات الميزات وقد تتغير دون إشعار."
+    },
+    "dataExport": {
+      "title": "تصدير بياناتك",
+      "description": "قم بتنزيل نسخة من كافة بياناتك بتنسيق JSON. يتضمن ذلك ملفك الشخصي والرسائل والمنشورات والتعليقات والتصويتات والعناصر المحفوظة والمزيد.",
+      "requestButton": "طلب تصدير البيانات",
+      "requesting": "جاري طلب التصدير...",
+      "successMessage": "تم طلب التصدير بنجاح! رقم الطلب: {{exportId}}. ستتلقى بريداً إلكترونياً عندما يكون التصدير جاهزاً للتنزيل (عادة خلال 24 ساعة).",
+      "included": "ماذا يتم تضمينه؟",
+      "includedList": [
+        "معلومات الملف الشخصي (اسم المستخدم، البريد، السيرة، الصورة)",
+        "كافة الرسائل (الحفاظ على المحتوى المشفر)",
+        "المنشورات والتعليقات التي أنشأتها",
+        "تصويتاتك وعناصرك المحفوظة",
+        "اشتراكات المجموعات والمجموعات المنشأة",
+        "إعدادات الحساب والتفضيلات",
+        "مفاتيح التشفير الخاصة بك (للنسخ الاحتياطي)"
+      ],
+      "availabilityNote": "تتوفر ملفات التصدير للتنزيل لمدة 7 أيام بعد المعالجة. تستغرق المعالجة عادةً أقل من 24 ساعة."
+    },
+    "accountDeletion": {
+      "title": "حذف الحساب",
+      "description": "احذف حسابك وكافة البيانات المرتبطة به بشكل دائم. يتضمن هذا الإجراء فترة سماح مدتها 30 يوماً يمكنك خلالها إلغاء الحذف.",
+      "manageButton": "إدارة حذف الحساب"
+    }
+  },
+  "errors": {
+    "somethingWentWrong": "حدث خطأ ما",
+    "networkError": "خطأ في الشبكة. يرجى التحقق من اتصالك.",
+    "unauthorized": "غير مصرح به. يرجى تسجيل الدخول.",
+    "notFound": "غير موجود",
+    "serverError": "خطأ في الخادم. يرجى المحاولة مرة أخرى لاحقاً.",
+    "validationError": "خطأ في التحقق",
+    "invalidCredentials": "اسم المستخدم أو كلمة المرور غير صالحة",
+    "emailTaken": "البريد الإلكتروني مستخدم بالفعل",
+    "usernameTaken": "اسم المستخدم مأخوذ بالفعل"
+  },
+  "validation": {
+    "required": "هذا الحقل مطلوب",
+    "invalidEmail": "بريد إلكتروني غير صالح",
+    "passwordTooShort": "يجب أن تتكون كلمة المرور من {{min}} أحرف على الأقل",
+    "passwordMismatch": "كلمات المرور غير متطابقة",
+    "usernameTooShort": "يجب أن يتكون اسم المستخدم من {{min}} أحرف على الأقل",
+    "usernameTooLong": "يجب أن يتكون اسم المستخدم من {{max}} حرفاً على الأكثر"
+  },
+  "feedback": {
+    "title": "إرسال الملاحظات",
+    "categoryLabel": "ما هو نوع هذه الملاحظات؟",
+    "categoryBug": "تقرير عن خطأ",
+    "categoryFeature": "طلب ميزة",
+    "categoryOther": "ملاحظات عامة",
+    "messageLabel": "الرسالة",
+    "messagePlaceholder": "أخبرنا بما يدور في ذهنك...",
+    "ratingLabel": "الرضا العام (اختياري)",
+    "ratingHelp": "1 = غير راضٍ تماماً، 5 = راضٍ تماماً",
+    "sending": "جاري الإرسال...",
+    "send": "إرسال الملاحظات",
+    "successMessage": "شكراً لك على ملاحظاتك!",
+    "errorMessage": "فشل في إرسال الملاحظات",
+    "buttonAriaLabel": "إرسال الملاحظات",
+    "buttonTitle": "إرسال الملاحظات"
+  },
+  "auth": {
+    "title": "OmniNudge",
+    "loginTitle": "تسجيل الدخول",
+    "registerTitle": "إنشاء حساب",
+    "loginSubtitle": "سجل الدخول إلى حسابك",
+    "signupSubtitle": "أنشئ حسابك",
+    "switchToLogin": "هل لديك حساب بالفعل؟ سجل الدخول",
+    "switchToRegister": "ليس لديك حساب؟ أنشئ واحداً",
+    "acceptPrivacy": "أوافق على سياسة الخصوصية",
+    "acceptTerms": "أوافق على شروط الخدمة",
+    "emailOptional": "البريد الإلكتروني (اختياري)",
+    "forgotPassword": "هل نسيت كلمة المرور؟",
+    "fields": {
+      "username": "اسم المستخدم",
+      "usernameRequired": "*",
+      "usernamePlaceholder": "اسم المستخدم",
+      "email": "البريد الإلكتروني (اختياري ولكنه مطلوب لاستعادة كلمة المرور)",
+      "emailPlaceholder": "you@email.com",
+      "password": "كلمة المرور",
+      "passwordRequired": "*",
+      "passwordPlaceholder": "كلمة المرور"
+    },
+    "keepLoggedIn": "ابقني مسجلاً للدخول",
+    "policy": {
+      "acceptPrivacy": "أوافق على",
+      "privacyPolicy": "سياسة الخصوصية",
+      "acceptTerms": "أوافق على",
+      "termsOfService": "شروط الخدمة",
+      "required": "*"
+    },
+    "security": {
+      "verificationRequired": "يرجى إكمال التحقق الأمني",
+      "verificationFailed": "فشل التحقق الأمني. يرجى المحاولة مرة أخرى."
+    },
+    "passwordStrength": {
+      "veryWeak": "ضعيفة جداً",
+      "weak": "ضعيفة",
+      "fair": "متوسطة",
+      "strong": "قوية",
+      "veryStrong": "قوية جداً"
+    },
+    "buttons": {
+      "signingIn": "جاري تسجيل الدخول...",
+      "creatingAccount": "جاري إنشاء الحساب...",
+      "signIn": "تسجيل الدخول",
+      "signUp": "إنشاء حساب"
+    },
+    "switch": {
+      "noAccount": "ليس لديك حساب؟",
+      "hasAccount": "لديك حساب بالفعل؟",
+      "signUpLink": "أنشئ حساباً",
+      "signInLink": "سجل الدخول"
+    },
+    "privacyNote": "بريدك مشفر أثناء الراحة. كلمة مرورك مخزنة كهاش أحادي الاتجاه (لا يمكننا قراءتها)."
+  },
+  "account": {
+    "exportDataTitle": "تصدير بياناتك",
+    "exportDataDescription": "قم بتنزيل نسخة من كافة بياناتك بتنسيق JSON",
+    "requestExport": "طلب تصدير البيانات",
+    "exportSuccess": "تم طلب التصدير! الرقم المرجعي: {{exportId}}",
+    "deleteAccountTitle": "حذف الحساب",
+    "deleteAccountWarning": "لا يمكن التراجع عن هذا الإجراء",
+    "confirmDeletion": "اكتب DELETE للتأكيد",
+    "betaFeaturesTitle": "ميزات بيتا"
+  },
+  "modals": {
+    "hide": {
+      "title": "إخفاء هذا المنشور؟",
+      "description": "هل أنت متأكد؟ يمكن العثور على المنشورات المخفية في صفحة المنشورات المخفية الخاصة بك.",
+      "hideButton": "إخفاء المنشور",
+      "hiding": "جاري الإخفاء..."
+    },
+    "delete": {
+      "title": "حذف المنشور - السبب مطلوب",
+      "titleComm": "حذف التعليق - السبب مطلوب",
+      "moderatorMessage": "بصفتك مراقباً، يجب عليك تقديم سبب لحذف هذا المحتوى. سيتلقى المؤلف رسالة بريدية بالسبب.",
+      "reasonLabel": "سبب الحذف",
+      "reasonRequired": "*",
+      "reasonPlaceholder": "مثال: انتهاك القاعدة 3: لا رسائل مزعجة...",
+      "deleteButton": "حذف المنشور",
+      "deleting": "جاري الحذف...",
+      "confirmOwn": "هل أنت متأكد أنك تريد حذف هذا المنشور؟"
+    },
+    "crosspost": {
+      "title": "نشر في مكان آخر",
+      "info": "يمكنك النشر في مجموعة OmniHub أو مجتمع subreddit أو كليهما. مطلوب وجهة واحدة على الأقل.",
+      "toHub": "نشر في OmniHub (اختياري)",
+      "toSubreddit": "نشر في مجتمع subreddit (اختياري)",
+      "selectHub": "اختر مجموعة...",
+      "selectSubreddit": "اختر مجتمعاً...",
+      "titleLabel": "اختر عنواناً",
+      "titleRequired": "*مطلوب",
+      "titlePlaceholder": "أدخل العنوان...",
+      "sendRepliesLabel": "إرسال الردود على هذا المنشور إلى صندوق الوارد الخاص بي",
+      "submitButton": "إرسال",
+      "submitting": "جاري الإرسال..."
+    }
+  },
+  "alerts": {
+    "deletePostFailed": "فشل حذف المنشور: {{message}}",
+    "saveFailed": "فشل تحديث حالة الحفظ: {{message}}",
+    "hideFailed": "فشل إخفاء المنشور: {{message}}",
+    "crosspostSuccess": "تم النشر بنجاح!",
+    "crosspostFailed": "فشل النشر: {{message}}",
+    "linkCopied": "تم نسخ رابط المنشور!",
+    "linkCopyFailed": "تعذر نسخ الرابط. يرجى المحاولة مرة أخرى.",
+    "signInToSave": "يرجى تسجيل الدخول لحفظ المنشورات.",
+    "signInToHide": "يرجى تسجيل الدخول لإخفاء المنشورات.",
+    "signInToCrosspost": "يرجى تسجيل الدخول للنشر في مكان آخر.",
+    "provideDeleteReason": "يرجى تقديم سبب للحذف"
+  },
+  "moderation": {
+    "deleteReason": "سبب الحذف",
+    "deleteReasonPlaceholder": "مثال: انتهاك القاعدة 3: لا رسائل مزعجة...",
+    "modmailNote": "سيتلقى المؤلف رسالة بريدية بالسبب.",
+    "reasonRequired": "يرجى تقديم سبب للحذف"
+  },
+  "slideshow": {
+    "closeLabel": "إغلاق العرض (Esc)",
+    "previousLabel": "السابق (←)",
+    "nextLabel": "التالي (→)",
+    "counter": "{{current}} من {{total}}"
+  }
+}

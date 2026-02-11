@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
+import { useFormat } from '../hooks/useFormat';
 import { useAuth } from '../contexts/AuthContext';
 import { useSettings } from '../contexts/SettingsContext';
 import { postsService } from '../services/postsService';
@@ -59,6 +61,8 @@ export default function PostDetailPage() {
   const location = useLocation();
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const { t } = useTranslation();
+  const { formatNumber } = useFormat();
   const { useRelativeTime, stayOnPostAfterHide, searchIncludeNsfwByDefault, blockAllNsfw } = useSettings();
 
   const [commentText, setCommentText] = useState('');
@@ -591,8 +595,8 @@ export default function PostDetailPage() {
     const shouldWarn = isPostSaved;
     const confirmed = shouldWarn
       ? window.confirm(
-          'Hiding this post will remove it from your Saved list and add it to your Hidden items. Are you sure you want to continue?'
-        )
+        'Hiding this post will remove it from your Saved list and add it to your Hidden items. Are you sure you want to continue?'
+      )
       : window.confirm('Hide this post?');
     if (!confirmed) {
       return;
@@ -616,27 +620,27 @@ export default function PostDetailPage() {
   if (!postId || Number.isNaN(parsedPostId)) {
     return (
       <div className="mx-auto max-w-4xl px-0 py-8 md:px-4">
-        <div className="text-[var(--color-text-secondary)]">Invalid post URL</div>
+        <div className="text-[var(--color-text-secondary)]">{t('posts.errors.invalidUrl')}</div>
       </div>
     );
   }
 
   if (loadingPost) {
     return (
-        <div className="mx-auto max-w-4xl px-0 py-8 md:px-4">
+      <div className="mx-auto max-w-4xl px-0 py-8 md:px-4">
         <PostCardSkeleton />
-        </div>
+      </div>
     );
   }
 
   if (postLoadError) {
-    const message = postLoadErrorDetails instanceof Error ? postLoadErrorDetails.message : 'Failed to load post';
+    const message = postLoadErrorDetails instanceof Error ? postLoadErrorDetails.message : t('posts.errors.loadFailed');
     if (message.toLowerCase().includes('not found')) {
       return <NotFoundPage />;
     }
     return (
       <div className="mx-auto max-w-4xl px-0 py-8 md:px-4">
-        <div className="text-[var(--color-text-secondary)]">Failed to load post: {message}</div>
+        <div className="text-[var(--color-text-secondary)]">{t('posts.errors.loadFailed')}: {message}</div>
       </div>
     );
   }
@@ -658,7 +662,35 @@ export default function PostDetailPage() {
             <FeedSearchBars
               showPostForm={false}
               topValue={subredditInputValue}
-              topPlaceholder="Enter hub or subreddit..."
+              topPlaceholder={t('home.search.enterHubOrSubreddit')}
+              onTopChange={handleSubredditInputChange}
+              onTopFocus={() => setIsAutocompleteOpen(true)}
+              onTopBlur={() => setIsAutocompleteOpen(false)}
+              onTopSubmit={handleSubredditSubmit}
+              topSuggestions={subredditSuggestions}
+              topShouldShowSuggestions={shouldShowSuggestions}
+              topIsLoading={isAutocompleteLoading}
+              topEmptyMessage={t('home.search.noResults')}
+              renderTopSuggestion={(suggestion) => (
+                <SubredditSuggestionItem
+                  key={suggestion.name}
+                  suggestion={suggestion}
+                  onSelect={handleSelectSubredditSuggestion}
+                />
+              )}
+              postValue=""
+              postPlaceholder=""
+              onPostChange={() => { }}
+              onPostSubmit={(event) => event.preventDefault()}
+              postDropdownOpen={false}
+            />
+          }
+          postSearch={
+            <FeedSearchBars
+              containerClassName="w-full md:w-96"
+              showTopForm={false}
+              topValue={subredditInputValue}
+              topPlaceholder={t('home.search.enterHubOrSubreddit')}
               onTopChange={handleSubredditInputChange}
               onTopFocus={() => setIsAutocompleteOpen(true)}
               onTopBlur={() => setIsAutocompleteOpen(false)}
@@ -674,74 +706,46 @@ export default function PostDetailPage() {
                   onSelect={handleSelectSubredditSuggestion}
                 />
               )}
-              postValue=""
-              postPlaceholder=""
-              onPostChange={() => {}}
-              onPostSubmit={(event) => event.preventDefault()}
-              postDropdownOpen={false}
-            />
-          }
-          postSearch={
-            <FeedSearchBars
-              containerClassName="w-full md:w-96"
-              showTopForm={false}
-              topValue={subredditInputValue}
-              topPlaceholder="Enter hub or subreddit..."
-                  onTopChange={handleSubredditInputChange}
-                  onTopFocus={() => setIsAutocompleteOpen(true)}
-                  onTopBlur={() => setIsAutocompleteOpen(false)}
-                  onTopSubmit={handleSubredditSubmit}
-                  topSuggestions={subredditSuggestions}
-                  topShouldShowSuggestions={shouldShowSuggestions}
-                  topIsLoading={isAutocompleteLoading}
-                  topEmptyMessage="No hubs or subreddits found."
-                  renderTopSuggestion={(suggestion) => (
-                    <SubredditSuggestionItem
-                      key={suggestion.name}
-                      suggestion={suggestion}
-                      onSelect={handleSelectSubredditSuggestion}
+              postValue={postSearchInput}
+              postPlaceholder="Search posts..."
+              onPostChange={(value) => {
+                setPostSearchInput(value);
+                if (!isSearchDropdownOpen) {
+                  setIsSearchDropdownOpen(true);
+                }
+              }}
+              onPostFocus={() => setIsSearchDropdownOpen(true)}
+              onPostBlur={() => setTimeout(() => setIsSearchDropdownOpen(false), 120)}
+              onPostSubmit={handlePostSearchSubmit}
+              postDropdownOpen={isSearchDropdownOpen}
+              postDropdownContent={
+                <div className="space-y-2 text-sm text-[var(--color-text-primary)]">
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={limitSearchToContext}
+                      onChange={(e) => setLimitSearchToContext(e.target.checked)}
                     />
+                    <span>Limit search to r/{normalizedSubreddit}</span>
+                  </label>
+                  {!blockAllNsfw && (
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={includeNsfwSearch}
+                        onChange={(e) => setIncludeNsfwSearch(e.target.checked)}
+                      />
+                      <span>Include NSFW results</span>
+                    </label>
                   )}
-                  postValue={postSearchInput}
-                  postPlaceholder="Search posts..."
-                  onPostChange={(value) => {
-                    setPostSearchInput(value);
-                    if (!isSearchDropdownOpen) {
-                      setIsSearchDropdownOpen(true);
-                    }
-                  }}
-                  onPostFocus={() => setIsSearchDropdownOpen(true)}
-                  onPostBlur={() => setTimeout(() => setIsSearchDropdownOpen(false), 120)}
-                  onPostSubmit={handlePostSearchSubmit}
-                  postDropdownOpen={isSearchDropdownOpen}
-                  postDropdownContent={
-                    <div className="space-y-2 text-sm text-[var(--color-text-primary)]">
-                      <label className="flex items-center gap-2">
-                        <input
-                          type="checkbox"
-                          checked={limitSearchToContext}
-                          onChange={(e) => setLimitSearchToContext(e.target.checked)}
-                        />
-                        <span>Limit search to r/{normalizedSubreddit}</span>
-                      </label>
-                      {!blockAllNsfw && (
-                        <label className="flex items-center gap-2">
-                          <input
-                            type="checkbox"
-                            checked={includeNsfwSearch}
-                            onChange={(e) => setIncludeNsfwSearch(e.target.checked)}
-                          />
-                          <span>Include NSFW results</span>
-                        </label>
-                      )}
-                      {blockAllNsfw && (
-                        <div className="text-xs text-[var(--color-text-secondary)]">
-                          NSFW content is blocked in settings.
-                        </div>
-                      )}
+                  {blockAllNsfw && (
+                    <div className="text-xs text-[var(--color-text-secondary)]">
+                      NSFW content is blocked in settings.
                     </div>
-                  }
-                />
+                  )}
+                </div>
+              }
+            />
           }
         />
       )}
@@ -787,7 +791,7 @@ export default function PostDetailPage() {
                     checked={limitSearchToContext}
                     onChange={(e) => setLimitSearchToContext(e.target.checked)}
                   />
-                  <span>Limit search to r/{normalizedSubreddit}</span>
+                  <span>{t('home.search.limitToSubreddit', { subreddit: normalizedSubreddit })}</span>
                 </label>
                 {!blockAllNsfw && (
                   <label className="flex items-center gap-2">
@@ -796,12 +800,12 @@ export default function PostDetailPage() {
                       checked={includeNsfwSearch}
                       onChange={(e) => setIncludeNsfwSearch(e.target.checked)}
                     />
-                    <span>Include NSFW results</span>
+                    <span>{t('home.search.includeNsfw')}</span>
                   </label>
                 )}
                 {blockAllNsfw && (
                   <div className="text-xs text-[var(--color-text-secondary)]">
-                    NSFW content is blocked in settings.
+                    {t('home.search.nsfwBlocked')}
                   </div>
                 )}
               </div>
@@ -820,6 +824,35 @@ export default function PostDetailPage() {
             <FeedSearchBars
               showPostForm={false}
               topValue={hubInputValue}
+              topPlaceholder={t('home.search.enterHubOrSubreddit')}
+              onTopChange={handleHubInputChange}
+              onTopFocus={() => setHubIsAutocompleteOpen(true)}
+              onTopBlur={() => setHubIsAutocompleteOpen(false)}
+              onTopSubmit={handleHubSubmit}
+              topSuggestions={hubSuggestions}
+              topShouldShowSuggestions={shouldShowHubSuggestions}
+              topIsLoading={isHubAutocompleteLoading}
+              topEmptyMessage={t('home.search.noResults')}
+              renderTopSuggestion={(suggestion) => (
+                <CombinedSuggestionItem
+                  key={`${suggestion.type}-${suggestion.data.name}`}
+                  suggestion={suggestion}
+                  onSelectHub={handleSelectHubSuggestion}
+                  onSelectSubreddit={handleSelectHubSubredditSuggestion}
+                />
+              )}
+              postValue=""
+              postPlaceholder=""
+              onPostChange={() => { }}
+              onPostSubmit={(event) => event.preventDefault()}
+              postDropdownOpen={false}
+            />
+          }
+          postSearch={
+            <FeedSearchBars
+              containerClassName="w-full md:w-96"
+              showTopForm={false}
+              topValue={hubInputValue}
               topPlaceholder="Enter hub or subreddit..."
               onTopChange={handleHubInputChange}
               onTopFocus={() => setHubIsAutocompleteOpen(true)}
@@ -837,75 +870,46 @@ export default function PostDetailPage() {
                   onSelectSubreddit={handleSelectHubSubredditSuggestion}
                 />
               )}
-              postValue=""
-              postPlaceholder=""
-              onPostChange={() => {}}
-              onPostSubmit={(event) => event.preventDefault()}
-              postDropdownOpen={false}
-            />
-          }
-          postSearch={
-            <FeedSearchBars
-              containerClassName="w-full md:w-96"
-              showTopForm={false}
-              topValue={hubInputValue}
-              topPlaceholder="Enter hub or subreddit..."
-                  onTopChange={handleHubInputChange}
-                  onTopFocus={() => setHubIsAutocompleteOpen(true)}
-                  onTopBlur={() => setHubIsAutocompleteOpen(false)}
-                  onTopSubmit={handleHubSubmit}
-                  topSuggestions={hubSuggestions}
-                  topShouldShowSuggestions={shouldShowHubSuggestions}
-                  topIsLoading={isHubAutocompleteLoading}
-                  topEmptyMessage="No hubs or subreddits found."
-                  renderTopSuggestion={(suggestion) => (
-                    <CombinedSuggestionItem
-                      key={`${suggestion.type}-${suggestion.data.name}`}
-                      suggestion={suggestion}
-                      onSelectHub={handleSelectHubSuggestion}
-                      onSelectSubreddit={handleSelectHubSubredditSuggestion}
+              postValue={hubPostSearchInput}
+              postPlaceholder="Search posts..."
+              onPostChange={(value) => {
+                setHubPostSearchInput(value);
+                if (!hubIsSearchDropdownOpen) {
+                  setHubIsSearchDropdownOpen(true);
+                }
+              }}
+              onPostFocus={() => setHubIsSearchDropdownOpen(true)}
+              onPostBlur={() => setTimeout(() => setHubIsSearchDropdownOpen(false), 120)}
+              onPostSubmit={handleHubPostSearchSubmit}
+              postDropdownOpen={hubIsSearchDropdownOpen}
+              postDropdownContent={
+                <div className="space-y-2 text-sm text-[var(--color-text-primary)]">
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={hubLimitSearchToContext}
+                      onChange={(e) => setHubLimitSearchToContext(e.target.checked)}
                     />
+                    <span>{t('home.search.limitToHub', { hub: hubName })}</span>
+                  </label>
+                  {!blockAllNsfw && (
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={hubIncludeNsfwSearch}
+                        onChange={(e) => setHubIncludeNsfwSearch(e.target.checked)}
+                      />
+                      <span>{t('home.search.includeNsfw')}</span>
+                    </label>
                   )}
-                  postValue={hubPostSearchInput}
-                  postPlaceholder="Search posts..."
-                  onPostChange={(value) => {
-                    setHubPostSearchInput(value);
-                    if (!hubIsSearchDropdownOpen) {
-                      setHubIsSearchDropdownOpen(true);
-                    }
-                  }}
-                  onPostFocus={() => setHubIsSearchDropdownOpen(true)}
-                  onPostBlur={() => setTimeout(() => setHubIsSearchDropdownOpen(false), 120)}
-                  onPostSubmit={handleHubPostSearchSubmit}
-                  postDropdownOpen={hubIsSearchDropdownOpen}
-                  postDropdownContent={
-                    <div className="space-y-2 text-sm text-[var(--color-text-primary)]">
-                      <label className="flex items-center gap-2">
-                        <input
-                          type="checkbox"
-                          checked={hubLimitSearchToContext}
-                          onChange={(e) => setHubLimitSearchToContext(e.target.checked)}
-                        />
-                        <span>Limit search to h/{hubName}</span>
-                      </label>
-                      {!blockAllNsfw && (
-                        <label className="flex items-center gap-2">
-                          <input
-                            type="checkbox"
-                            checked={hubIncludeNsfwSearch}
-                            onChange={(e) => setHubIncludeNsfwSearch(e.target.checked)}
-                          />
-                          <span>Include NSFW results</span>
-                        </label>
-                      )}
-                      {blockAllNsfw && (
-                        <div className="text-xs text-[var(--color-text-secondary)]">
-                          NSFW content is blocked in settings.
-                        </div>
-                      )}
+                  {blockAllNsfw && (
+                    <div className="text-xs text-[var(--color-text-secondary)]">
+                      {t('home.search.nsfwBlocked')}
                     </div>
-                  }
-                />
+                  )}
+                </div>
+              }
+            />
           }
         />
       )}
@@ -990,25 +994,25 @@ export default function PostDetailPage() {
                 metadataItems={[
                   ...(hubName
                     ? [
-                        <Link
-                          key="hub"
-                          to={`/h/${hubName}`}
-                          className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
-                        >
-                          {hubDisplayTitle ?? `h/${hubName}`}
-                        </Link>,
-                      ]
+                      <Link
+                        key="hub"
+                        to={`/h/${hubName}`}
+                        className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+                      >
+                        {hubDisplayTitle ?? `h/${hubName}`}
+                      </Link>,
+                    ]
                     : []),
                   ...(targetSubreddit
                     ? [
-                        <Link
-                          key="subreddit"
-                          to={`/r/${targetSubreddit}`}
-                          className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
-                        >
-                          r/{targetSubreddit}
-                        </Link>,
-                      ]
+                      <Link
+                        key="subreddit"
+                        to={`/r/${targetSubreddit}`}
+                        className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+                      >
+                        r/{targetSubreddit}
+                      </Link>,
+                    ]
                     : []),
                   <span key="author">
                     Posted by{' '}
@@ -1048,10 +1052,15 @@ export default function PostDetailPage() {
                   size="medium"
                 />
                 <div className="flex flex-wrap gap-4 text-xs text-[var(--color-text-secondary)]">
-                  <span>{(postData.comment_count ?? postData.num_comments ?? 0).toLocaleString()} comments</span>
+                  <span>
+                    {t('posts.comment', {
+                      count: (postData.comment_count ?? postData.num_comments ?? 0),
+                      formattedCount: formatNumber(postData.comment_count ?? postData.num_comments ?? 0)
+                    })}
+                  </span>
                   <span>•</span>
                   <button onClick={handleSharePost} className="hover:underline">
-                    share
+                    {t('posts.actions.share')}
                   </button>
                   <span>•</span>
                   <button
@@ -1060,18 +1069,18 @@ export default function PostDetailPage() {
                     className="hover:underline disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {savePostMutation.isPending
-                      ? 'saving...'
+                      ? t('posts.status.saving')
                       : isPostSaved
-                        ? 'unsave'
-                        : 'save'}
+                        ? t('posts.actions.unsave')
+                        : t('posts.actions.save')}
                   </button>
                   <span>•</span>
                   <button onClick={handleHidePost} className="hover:underline">
-                    hide
+                    {t('posts.actions.hide')}
                   </button>
                   <span>•</span>
                   <button onClick={handleCrosspost} className="hover:underline">
-                    crosspost
+                    {t('posts.actions.crosspost')}
                   </button>
                   {canPinPost && postData && (
                     <>
@@ -1119,7 +1128,7 @@ export default function PostDetailPage() {
           )}
 
           <Panel>
-            <h2 className="mb-4 text-xl font-semibold text-[var(--color-text-primary)]">Comments</h2>
+            <h2 className="mb-4 text-xl font-semibold text-[var(--color-text-primary)]">{t('comments.title')}</h2>
             <form
               onSubmit={(e) => {
                 e.preventDefault();
@@ -1162,9 +1171,9 @@ export default function PostDetailPage() {
                     </a>{' '}
                     for formatting. See below for formatting help.
                   </p>
-              <div className="mt-2">
-                <FormattingHelpTable />
-              </div>
+                  <div className="mt-2">
+                    <FormattingHelpTable />
+                  </div>
                 </div>
               )}
               <button
@@ -1192,7 +1201,7 @@ export default function PostDetailPage() {
 
             {focusedCommentId && !commentNotFound && (
               <div className="mb-4 rounded border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800">
-                <div>You are viewing a single comment&apos;s thread.</div>
+                <div>{t('posts.viewingThread')}</div>
                 <button
                   onClick={() =>
                     navigate(hubName ? `/h/${hubName}/comments/${postId}` : `/posts/${postId}`)
@@ -1241,26 +1250,26 @@ export default function PostDetailPage() {
         {(hubName || targetSubreddit) && (
           <aside className="min-w-0 space-y-4">
             {hubName && (
-            <>
-            <HubAboutPanel
-              hubDetails={hubDetails}
-              displayTitle={hubDisplayTitle}
-              sidebarMarkdown={hubSettings?.sidebar_markdown ?? null}
-              isLoading={loadingHubDetails}
-              isError={hubDetailsError}
-              showStats
-              activeOmniUsers={hubActiveUsersData?.active_users ?? null}
-            />
+              <>
+                <HubAboutPanel
+                  hubDetails={hubDetails}
+                  displayTitle={hubDisplayTitle}
+                  sidebarMarkdown={hubSettings?.sidebar_markdown ?? null}
+                  isLoading={loadingHubDetails}
+                  isError={hubDetailsError}
+                  showStats
+                  activeOmniUsers={hubActiveUsersData?.active_users ?? null}
+                />
 
-            <HubModeratorsPanel
-              moderators={hubModerators}
-              isLoading={loadingHubModerators}
-              isError={hubModeratorsError}
-              hubName={hubName}
-              showMessageButton={Boolean(user && hubName)}
-              onMessageMods={() => setShowModMailModal(true)}
-            />
-            </>
+                <HubModeratorsPanel
+                  moderators={hubModerators}
+                  isLoading={loadingHubModerators}
+                  isError={hubModeratorsError}
+                  hubName={hubName}
+                  showMessageButton={Boolean(user && hubName)}
+                  onMessageMods={() => setShowModMailModal(true)}
+                />
+              </>
             )}
 
             {targetSubreddit && (
@@ -1284,7 +1293,7 @@ export default function PostDetailPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
           <div className="w-full max-w-lg rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-6 shadow-2xl">
             <div className="mb-3 flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">Embed Comment</h3>
+              <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">{t('posts.embed.title')}</h3>
               <button
                 onClick={() => {
                   setEmbedTarget(null);
@@ -1297,7 +1306,7 @@ export default function PostDetailPage() {
               </button>
             </div>
             <p className="text-sm text-[var(--color-text-secondary)]">
-              Copy this HTML snippet to share the comment outside OmniNudge.
+              {t('posts.embed.instruction')}
             </p>
             <textarea
               value={embedCode}
@@ -1310,7 +1319,7 @@ export default function PostDetailPage() {
                 onClick={copyEmbedCode}
                 className="rounded bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)]"
               >
-                {embedCopied ? 'Copied!' : 'Copy embed code'}
+                {embedCopied ? t('common.copied') : t('posts.actions.copyEmbed')}
               </button>
               <button
                 onClick={() => {
@@ -1319,7 +1328,7 @@ export default function PostDetailPage() {
                 }}
                 className="rounded border border-[var(--color-border)] px-4 py-2 text-sm font-semibold text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-elevated)]"
               >
-                Close
+                {t('common.close')}
               </button>
             </div>
           </div>
@@ -1347,14 +1356,14 @@ export default function PostDetailPage() {
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 px-4">
           <div className="w-full max-w-md rounded-lg bg-white p-4 shadow-lg">
             <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">
-              Delete Comment - Reason Required
+              {t('modals.delete.titleComm')}
             </h3>
             <p className="mt-2 text-sm text-[var(--color-text-secondary)]">
-              As a moderator, you must provide a reason for deleting this comment. The author will receive a modmail with your reason.
+              {t('modals.delete.moderatorMessage')}
             </p>
             <div className="mt-4">
               <label className="mb-1 block text-xs font-medium text-[var(--color-text-secondary)]">
-                Reason for deletion <span className="text-red-500">*</span>
+                {t('moderation.deleteReason')} <span className="text-red-500">*</span>
               </label>
               <textarea
                 value={deleteCommentReason}
@@ -1372,14 +1381,14 @@ export default function PostDetailPage() {
                 }}
                 className="rounded border border-[var(--color-border)] px-3 py-1 text-sm hover:bg-[var(--color-surface-elevated)]"
               >
-                Cancel
+                {t('common.cancel')}
               </button>
               <button
                 onClick={handleConfirmDeleteComment}
                 disabled={!deleteCommentReason.trim()}
                 className="rounded bg-red-600 px-3 py-1 text-sm font-semibold text-white hover:bg-red-500 disabled:opacity-50"
               >
-                Delete Comment
+                {t('comments.actions.delete')}
               </button>
             </div>
           </div>
@@ -1389,19 +1398,19 @@ export default function PostDetailPage() {
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 px-4">
           <div className="w-full max-w-md rounded-lg bg-white p-4 shadow-lg">
             <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">
-              Delete Post - Reason Required
+              {t('modals.delete.title')}
             </h3>
             <p className="mt-2 text-sm text-[var(--color-text-secondary)]">
-              As a moderator, you must provide a reason for deleting this post. The author will receive a modmail with your reason.
+              {t('modals.delete.moderatorMessage')}
             </p>
             <div className="mt-4">
               <label className="mb-1 block text-xs font-medium text-[var(--color-text-secondary)]">
-                Reason for deletion <span className="text-red-500">*</span>
+                {t('moderation.deleteReason')} <span className="text-red-500">*</span>
               </label>
               <textarea
                 value={deletePostReason}
                 onChange={(e) => setDeletePostReason(e.target.value)}
-                placeholder="E.g., Violates rule 2: Be respectful..."
+                placeholder={t('moderation.deleteReasonPlaceholder')}
                 className="w-full rounded border border-[var(--color-border)] bg-[var(--color-surface)] p-2 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
                 rows={4}
               />
@@ -1414,14 +1423,14 @@ export default function PostDetailPage() {
                 }}
                 className="rounded border border-[var(--color-border)] px-3 py-1 text-sm hover:bg-[var(--color-surface-elevated)]"
               >
-                Cancel
+                {t('common.cancel')}
               </button>
               <button
                 onClick={handleConfirmDeletePost}
                 disabled={!deletePostReason.trim() || deletePostMutation.isPending}
                 className="rounded bg-red-600 px-3 py-1 text-sm font-semibold text-white hover:bg-red-500 disabled:opacity-50"
               >
-                {deletePostMutation.isPending ? 'Deleting...' : 'Delete Post'}
+                {deletePostMutation.isPending ? t('posts.status.deleting') : t('posts.actions.delete')}
               </button>
             </div>
           </div>

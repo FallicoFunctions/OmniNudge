@@ -9,6 +9,7 @@
     "edit": "Edit",
     "submit": "Submit",
     "close": "Close",
+    "copied": "Copied!",
     "back": "Back",
     "next": "Next",
     "confirm": "Confirm",
@@ -110,10 +111,11 @@
     "search": {
       "enterHubOrSubreddit": "Enter hub or subreddit...",
       "searchPosts": "Search posts...",
+      "searchButton": "Search",
+      "limitToSubreddit": "Limit search to r/{{subreddit}}",
+      "limitToHub": "Limit search to h/{{hub}}",
       "includeNsfw": "Include NSFW results",
-      "nsfwBlocked": "NSFW content is blocked in settings.",
-      "noResults": "No hubs or subreddits found.",
-      "searchButton": "Search"
+      "nsfwBlocked": "NSFW content is blocked in settings."
     },
     "timeRange": {
       "label": "Time range",
@@ -181,6 +183,8 @@
     },
     "errors": {
       "loadPostsFailed": "Failed to load posts. Please try again.",
+      "invalidUrl": "Invalid post URL",
+      "loadFailed": "Failed to load post",
       "conversationNotFound": "Conversation not found",
       "recipientNotFound": "Recipient not found"
     },
@@ -192,8 +196,8 @@
     "title": "Posts",
     "newPost": "New Post",
     "comments": "Comments",
-    "comment_one": "{{count}} comment",
-    "comment_other": "{{count}} comments",
+    "comment_one": "{{formattedCount}} comment",
+    "comment_other": "{{formattedCount}} comments",
     "upvote": "Upvote",
     "downvote": "Downvote",
     "share": "Share",
@@ -224,8 +228,14 @@
       "inbox": "Inbox",
       "disableInbox": "Disable inbox",
       "permalink": "Permalink",
-      "embed": "Embed"
+      "embed": "Embed",
+      "copyEmbed": "Copy embed code"
     },
+    "embed": {
+      "title": "Embed Comment",
+      "instruction": "Copy this HTML snippet to share the comment outside OmniNudge."
+    },
+    "viewingThread": "You are viewing a single comment's thread.",
     "status": {
       "saving": "Saving...",
       "saved": "Saved",
@@ -288,6 +298,9 @@
     "notifications": "Notifications",
     "appearance": "Appearance",
     "language": "Language",
+    "language_label": "Select Language",
+    "language_help": "Choose your preferred language. English, Español, and العربية (Arabic) are currently supported with full RTL layout support.",
+    "language_footer": "OmniNudge is a community-driven project. Translations are provided by the community and may be incomplete.",
     "account": "Account",
     "theme": "Theme",
     "darkMode": "Dark Mode",
@@ -566,6 +579,7 @@
     },
     "delete": {
       "title": "Delete Post - Reason Required",
+      "titleComm": "Delete Comment - Reason Required",
       "moderatorMessage": "As a moderator, you must provide a reason for deleting this post. The author will receive a modmail with your reason.",
       "reasonLabel": "Reason for deletion",
       "reasonRequired": "*",

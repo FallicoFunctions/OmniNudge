@@ -20,7 +20,7 @@ export function LanguageSelector() {
   return (
     <div className="space-y-2">
       <label className="block text-sm font-semibold text-[var(--color-text-primary)]">
-        {t('settings.language')}
+        {t('settings.language_label')}
       </label>
       <select
         value={i18n.language}
@@ -34,7 +34,10 @@ export function LanguageSelector() {
         ))}
       </select>
       <p className="text-xs text-[var(--color-text-secondary)]">
-        {t('settings.language')} selector - English, Español, and العربية (Arabic) available with RTL support.
+        {t('settings.language_help')}
+      </p>
+      <p className="mt-4 text-[10px] text-[var(--color-text-secondary)] opacity-60">
+        {t('settings.language_footer')}
       </p>
     </div>
   );
