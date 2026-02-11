@@ -36,6 +36,7 @@ import { canModerateContent } from '../utils/permissions';
 import { isUserHubModerator } from '../utils/moderation';
 import { PostEditModal } from '../components/posts/PostEditModal';
 import { CommunityHeader } from '../components/common/CommunityHeader';
+import { MobileOnly } from '../components/common/MobileOnly';
 import { FeedSearchBars } from '../components/common/FeedSearchBars';
 import NotFoundPage from './NotFoundPage';
 import { SubredditSuggestionItem } from '../components/subreddit/SubredditSuggestionItem';
@@ -741,6 +742,70 @@ export default function PostDetailPage() {
           }
         />
       )}
+      {normalizedSubreddit && (
+        <MobileOnly>
+          <FeedSearchBars
+            containerClassName="w-full px-4 flex flex-col gap-4 mt-4"
+            showTopForm={true}
+            topValue={subredditInputValue}
+            topPlaceholder="Enter hub or subreddit..."
+            onTopChange={handleSubredditInputChange}
+            onTopFocus={() => setIsAutocompleteOpen(true)}
+            onTopBlur={() => setIsAutocompleteOpen(false)}
+            onTopSubmit={handleSubredditSubmit}
+            topSuggestions={subredditSuggestions}
+            topShouldShowSuggestions={shouldShowSuggestions}
+            topIsLoading={isAutocompleteLoading}
+            topEmptyMessage="No hubs or subreddits found."
+            renderTopSuggestion={(suggestion) => (
+              <SubredditSuggestionItem
+                key={suggestion.name}
+                suggestion={suggestion}
+                onSelect={handleSelectSubredditSuggestion}
+              />
+            )}
+            postValue={postSearchInput}
+            postPlaceholder="Search posts..."
+            onPostChange={(value) => {
+              setPostSearchInput(value);
+              if (!isSearchDropdownOpen) {
+                setIsSearchDropdownOpen(true);
+              }
+            }}
+            onPostFocus={() => setIsSearchDropdownOpen(true)}
+            onPostBlur={() => setTimeout(() => setIsSearchDropdownOpen(false), 120)}
+            onPostSubmit={handlePostSearchSubmit}
+            postDropdownOpen={isSearchDropdownOpen}
+            postDropdownContent={
+              <div className="space-y-2 text-sm text-[var(--color-text-primary)]">
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={limitSearchToContext}
+                    onChange={(e) => setLimitSearchToContext(e.target.checked)}
+                  />
+                  <span>Limit search to r/{normalizedSubreddit}</span>
+                </label>
+                {!blockAllNsfw && (
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={includeNsfwSearch}
+                      onChange={(e) => setIncludeNsfwSearch(e.target.checked)}
+                    />
+                    <span>Include NSFW results</span>
+                  </label>
+                )}
+                {blockAllNsfw && (
+                  <div className="text-xs text-[var(--color-text-secondary)]">
+                    NSFW content is blocked in settings.
+                  </div>
+                )}
+              </div>
+            }
+          />
+        </MobileOnly>
+      )}
       {hubName && (
         <CommunityHeader
           communityType="hub"
@@ -840,6 +905,71 @@ export default function PostDetailPage() {
                 />
           }
         />
+      )}
+      {hubName && (
+        <MobileOnly>
+          <FeedSearchBars
+            containerClassName="w-full px-4 flex flex-col gap-4 mt-4"
+            showTopForm={true}
+            topValue={hubInputValue}
+            topPlaceholder="Enter hub or subreddit..."
+            onTopChange={handleHubInputChange}
+            onTopFocus={() => setHubIsAutocompleteOpen(true)}
+            onTopBlur={() => setHubIsAutocompleteOpen(false)}
+            onTopSubmit={handleHubSubmit}
+            topSuggestions={hubSuggestions}
+            topShouldShowSuggestions={shouldShowHubSuggestions}
+            topIsLoading={isHubAutocompleteLoading}
+            topEmptyMessage="No hubs or subreddits found."
+            renderTopSuggestion={(suggestion) => (
+              <CombinedSuggestionItem
+                key={`${suggestion.type}-${suggestion.data.name}`}
+                suggestion={suggestion}
+                onSelectHub={handleSelectHubSuggestion}
+                onSelectSubreddit={handleSelectHubSubredditSuggestion}
+              />
+            )}
+            postValue={hubPostSearchInput}
+            postPlaceholder="Search posts..."
+            onPostChange={(value) => {
+              setHubPostSearchInput(value);
+              if (!hubIsSearchDropdownOpen) {
+                setHubIsSearchDropdownOpen(true);
+              }
+            }}
+            onPostFocus={() => setHubIsSearchDropdownOpen(true)}
+            onPostBlur={() => setTimeout(() => setHubIsSearchDropdownOpen(false), 120)}
+            onPostSubmit={handleHubPostSearchSubmit}
+            postDropdownOpen={hubIsSearchDropdownOpen}
+            postDropdownContent={
+              <div className="space-y-2 text-sm text-[var(--color-text-primary)]">
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={hubLimitSearchToContext}
+                    onChange={(e) => setHubLimitSearchToContext(e.target.checked)}
+                  />
+                  <span>Limit search to h/{hubName}</span>
+                </label>
+                {!blockAllNsfw && (
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={hubIncludeNsfwSearch}
+                      onChange={(e) => setHubIncludeNsfwSearch(e.target.checked)}
+                    />
+                    <span>Include NSFW results</span>
+                  </label>
+                )}
+                {blockAllNsfw && (
+                  <div className="text-xs text-[var(--color-text-secondary)]">
+                    NSFW content is blocked in settings.
+                  </div>
+                )}
+              </div>
+            }
+          />
+        </MobileOnly>
       )}
       <div className="mt-4 grid gap-6 px-4 md:px-0 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="min-w-0 space-y-6">

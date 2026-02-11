@@ -6,6 +6,7 @@ import { hubsService, type HubPostsResponse, type LocalSubredditPost } from '../
 import { useAuth } from '../contexts/AuthContext';
 import { CommunityHeader } from '../components/common/CommunityHeader';
 import { CommunityHeaderControlsRow } from '../components/common/CommunityHeaderControlsRow';
+import { MobileOnly } from '../components/common/MobileOnly';
 import { postsService } from '../services/postsService';
 import { moderationService } from '../services/moderationService';
 import { useSettings } from '../contexts/SettingsContext';
@@ -1107,6 +1108,71 @@ export default function HubsPage() {
                   </button>
                 )}
               </>
+            }
+            right={
+              <MobileOnly>
+                <FeedSearchBars
+                  containerClassName="w-full px-4 flex flex-col gap-4 mt-4"
+                  showTopForm={true}
+                  topValue={inputValue}
+                  topPlaceholder="Enter hub or subreddit..."
+                  onTopChange={handleTopChange}
+                  onTopFocus={() => setIsAutocompleteOpen(true)}
+                  onTopBlur={() => setIsAutocompleteOpen(false)}
+                  onTopSubmit={handleTopSubmit}
+                  topSuggestions={suggestions}
+                  topShouldShowSuggestions={shouldShowSuggestions}
+                  topIsLoading={isAutocompleteLoading}
+                  topEmptyMessage="No hubs or subreddits found."
+                  renderTopSuggestion={(suggestion) => (
+                    <CombinedSuggestionItem
+                      key={`${suggestion.type}-${suggestion.data.name}`}
+                      suggestion={suggestion}
+                      onSelectHub={handleSelectHubSuggestion}
+                      onSelectSubreddit={handleSelectSubredditSuggestion}
+                    />
+                  )}
+                  postValue={postSearchInput}
+                  postPlaceholder="Search posts..."
+                  onPostChange={(value) => {
+                    setPostSearchInput(value);
+                    if (!isSearchDropdownOpen) {
+                      setIsSearchDropdownOpen(true);
+                    }
+                  }}
+                  onPostFocus={() => setIsSearchDropdownOpen(true)}
+                  onPostBlur={() => setTimeout(() => setIsSearchDropdownOpen(false), 120)}
+                  onPostSubmit={handlePostSearchSubmit}
+                  postDropdownOpen={isSearchDropdownOpen}
+                  postDropdownContent={
+                    <div className="space-y-2 text-sm text-[var(--color-text-primary)]">
+                      <label className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={limitSearchToContext}
+                          onChange={(e) => setLimitSearchToContext(e.target.checked)}
+                        />
+                        <span>Limit search to h/{hubname}</span>
+                      </label>
+                      {!blockAllNsfw && (
+                        <label className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={includeNsfwSearch}
+                            onChange={(e) => setIncludeNsfwSearch(e.target.checked)}
+                          />
+                          <span>Include NSFW results</span>
+                        </label>
+                      )}
+                      {blockAllNsfw && (
+                        <div className="text-xs text-[var(--color-text-secondary)]">
+                          NSFW content is blocked in settings.
+                        </div>
+                      )}
+                    </div>
+                  }
+                />
+              </MobileOnly>
             }
           />
         }

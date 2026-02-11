@@ -1213,7 +1213,7 @@ export default function RedditPage() {
                 {/* Mobile: Show both subreddit navigation + post search */}
                 <div className="block w-full lg:hidden">
                   <FeedSearchBars
-                    containerClassName="w-full"
+                    containerClassName="w-full px-4 flex flex-col gap-4 mt-4"
                     showTopForm={true}
                     topValue={inputValue}
                     topPlaceholder="Enter hub or subreddit..."
