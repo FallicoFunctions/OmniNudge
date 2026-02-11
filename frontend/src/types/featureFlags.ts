@@ -4,8 +4,17 @@ export interface FeatureFlag {
   description: string;
   percentage?: number; // 0-100
   environment?: 'all' | 'dev' | 'staging' | 'prod';
+  auto_rollback?: boolean;
+  rollback?: RollbackTrigger;
   created_at?: string;
   updated_at?: string;
+}
+
+export interface RollbackTrigger {
+  metric_type: 'error_rate' | 'latency';
+  threshold: number;
+  min_sample_size: number;
+  window_seconds: number;
 }
 
 export interface FeatureFlagOverride {

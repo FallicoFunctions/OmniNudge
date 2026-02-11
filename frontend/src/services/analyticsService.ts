@@ -37,7 +37,7 @@ export type EventName =
   | 'error_occurred';
 
 export interface EventProperties {
-  [key: string]: string | number | boolean | null | undefined;
+  [key: string]: string | number | boolean | null | undefined | string[];
 }
 
 export interface AnalyticsConfig {
@@ -53,6 +53,7 @@ class AnalyticsService {
 
   private anonymousId: string;
   private sessionId: string;
+  private activeFlags: string[] = [];
   private queue: Array<{ event: EventName; properties?: EventProperties }> = [];
   private isInitialized = false;
 
@@ -85,6 +86,16 @@ class AnalyticsService {
   }
 
   /**
+   * Set currently active feature flags to be included in all events
+   */
+  setActiveFeatureFlags(flags: string[]) {
+    this.activeFlags = flags;
+    if (this.config.debug) {
+      console.log('[Analytics] Active Flags Updated:', flags);
+    }
+  }
+
+  /**
    * Track an event
    */
   async track(event: EventName, properties?: EventProperties) {
@@ -102,7 +113,10 @@ class AnalyticsService {
 
     const payload = {
       event,
-      properties,
+      properties: {
+        ...properties,
+        active_flags: this.activeFlags,
+      },
       anonymous_id: this.anonymousId,
       session_id: this.sessionId,
     };

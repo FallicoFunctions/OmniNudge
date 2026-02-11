@@ -461,12 +461,13 @@ func (h *ConversationsHandler) ArchiveConversation(c *gin.Context) {
 	}
 
 	// Check permissions based on conversation type
-	if conversation.ConversationType == "dm" {
+	switch conversation.ConversationType {
+	case "dm":
 		if !conversation.IsParticipant(userID.(int)) {
 			c.JSON(http.StatusForbidden, gin.H{"error": "You are not a participant in this conversation"})
 			return
 		}
-	} else if conversation.ConversationType == "mod_mail" {
+	case "mod_mail":
 		// For mod mail, check if user is a participant in conversation_participants table
 		var count int
 		err := h.pool.QueryRow(c.Request.Context(), `

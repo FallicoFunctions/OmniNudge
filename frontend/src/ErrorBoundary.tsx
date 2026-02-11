@@ -1,5 +1,6 @@
 import { Component } from 'react';
 import type { ErrorInfo, ReactNode } from 'react';
+import { analyticsService } from './services/analyticsService';
 
 interface Props {
   children: ReactNode;
@@ -22,6 +23,12 @@ class ErrorBoundary extends Component<Props, State> {
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     console.error('Uncaught error:', error, errorInfo);
+
+    // Track as analytics event for automated rollbacks
+    analyticsService.track('error_occurred', {
+      error_message: error.message,
+      component_stack: errorInfo.componentStack,
+    });
 
     // If this is a Context error, it might be a lazy loading issue
     // Log additional info for debugging

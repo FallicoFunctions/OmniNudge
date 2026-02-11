@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
+	"github.com/omninudge/backend/internal/services"
 )
 
 // FrontendLogEntry represents a log entry from the frontend
@@ -21,8 +23,17 @@ type FrontendLogEntry struct {
 	UserAgent string                 `json:"user_agent"`
 }
 
+// LogHandler handles frontend log submissions
+type LogHandler struct {
+	analytics *services.AnalyticsService
+}
+
+func NewLogHandler(analytics *services.AnalyticsService) *LogHandler {
+	return &LogHandler{analytics: analytics}
+}
+
 // HandleFrontendLogs handles frontend log submissions
-func HandleFrontendLogs(c *gin.Context) {
+func (h *LogHandler) HandleFrontendLogs(c *gin.Context) {
 	var entry FrontendLogEntry
 	if err := c.ShouldBindJSON(&entry); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid log entry"})
@@ -73,6 +84,22 @@ func HandleFrontendLogs(c *gin.Context) {
 
 	// Log to stdout (will be captured by Filebeat for ELK stack)
 	log.Printf("[FRONTEND_%s] %s", entry.Level, string(logJSON))
+
+	// If it's an error, also track as an analytics event for automated rollbacks
+	if entry.Level == "error" && h.analytics != nil {
+		event := services.Event{
+			Name:       services.EventErrorOccurred,
+			UserID:     nil, // We could parse entry.UserID if it's an int
+			Properties: logData,
+			UserAgent:  entry.UserAgent,
+		}
+		// Try to parse SessionID
+		if sid, err := uuid.Parse(entry.SessionID); err == nil {
+			event.SessionID = &sid
+		}
+
+		h.analytics.TrackEvent(c.Request.Context(), event)
+	}
 
 	c.JSON(http.StatusOK, gin.H{"status": "logged"})
 }

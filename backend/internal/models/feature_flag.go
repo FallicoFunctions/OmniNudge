@@ -4,14 +4,24 @@ import "time"
 
 // FeatureFlag represents a feature flag configuration
 type FeatureFlag struct {
-	Key         string                 `json:"key" db:"key"`
-	Enabled     bool                   `json:"enabled" db:"enabled"`
-	Description string                 `json:"description" db:"description"`
-	Percentage  *int                   `json:"percentage,omitempty" db:"percentage"` // 0-100, nil = not using percentage rollout
-	Environment string                 `json:"environment" db:"environment"`          // 'all', 'dev', 'staging', 'prod'
-	Metadata    map[string]interface{} `json:"metadata" db:"metadata"`
-	CreatedAt   time.Time              `json:"created_at" db:"created_at"`
-	UpdatedAt   time.Time              `json:"updated_at" db:"updated_at"`
+	Key          string                 `json:"key" db:"key"`
+	Enabled      bool                   `json:"enabled" db:"enabled"`
+	Description  string                 `json:"description" db:"description"`
+	Percentage   *int                   `json:"percentage,omitempty" db:"percentage"` // 0-100, nil = not using percentage rollout
+	Environment  string                 `json:"environment" db:"environment"`         // 'all', 'dev', 'staging', 'prod'
+	AutoRollback bool                   `json:"auto_rollback" db:"auto_rollback"`
+	Rollback     *RollbackTrigger       `json:"rollback,omitempty" db:"rollback"`
+	Metadata     map[string]interface{} `json:"metadata" db:"metadata"`
+	CreatedAt    time.Time              `json:"created_at" db:"created_at"`
+	UpdatedAt    time.Time              `json:"updated_at" db:"updated_at"`
+}
+
+// RollbackTrigger defines conditions for automated feature rollback
+type RollbackTrigger struct {
+	MetricType    string  `json:"metric_type"`     // 'error_rate', 'latency'
+	Threshold     float64 `json:"threshold"`       // e.g., 0.01 for 1%
+	MinSampleSize int     `json:"min_sample_size"` // e.g., 100
+	WindowSeconds int     `json:"window_seconds"`  // e.g., 60
 }
 
 // FeatureFlagOverride represents a per-user override

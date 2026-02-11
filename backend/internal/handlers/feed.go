@@ -69,17 +69,17 @@ type feedCursor struct {
 }
 
 type homeFeedResponse struct {
-	Posts        []CombinedFeedItem `json:"posts"`
-	Sort         string             `json:"sort"`
-	Limit        int                `json:"limit"`
-	Offset       int                `json:"offset"`
-	OmniOnly     bool               `json:"omni_only"`
-	Total        int                `json:"total"`
-	HasMore      bool               `json:"has_more"`
-	NextCursor   string             `json:"next_cursor,omitempty"`
-	TimeRange   string             `json:"time_range,omitempty"`
-	TimeRangeStart *time.Time       `json:"time_range_start,omitempty"`
-	TimeRangeEnd   *time.Time       `json:"time_range_end,omitempty"`
+	Posts          []CombinedFeedItem `json:"posts"`
+	Sort           string             `json:"sort"`
+	Limit          int                `json:"limit"`
+	Offset         int                `json:"offset"`
+	OmniOnly       bool               `json:"omni_only"`
+	Total          int                `json:"total"`
+	HasMore        bool               `json:"has_more"`
+	NextCursor     string             `json:"next_cursor,omitempty"`
+	TimeRange      string             `json:"time_range,omitempty"`
+	TimeRangeStart *time.Time         `json:"time_range_start,omitempty"`
+	TimeRangeEnd   *time.Time         `json:"time_range_end,omitempty"`
 }
 
 // GetHomeFeed returns combined hub + Reddit posts using interleaved lazy fetching
@@ -158,7 +158,6 @@ func (h *FeedHandler) GetHomeFeed(c *gin.Context) {
 		// Use interleaved fetch
 		page, newCursor, err = h.fetchInterleavedFeed(
 			c.Request.Context(),
-			uidInt,
 			subscribedHubIDs,
 			subredditNames,
 			cursor,
@@ -258,86 +257,6 @@ func (h *FeedHandler) GetHomeFeed(c *gin.Context) {
 }
 
 // fetchSubscribedFeeds fetches posts from subscribed hubs and subreddits
-func (h *FeedHandler) fetchSubscribedFeeds(
-	ctx context.Context,
-	userID int,
-	sortBy string,
-	limit int,
-	includeReddit bool,
-	startTime, endTime *time.Time,
-	redditTimeFilter string,
-) ([]*models.PlatformPost, []services.RedditPost, error) {
-	// Fetch subscribed hub IDs
-	subscribedHubIDs, err := h.hubSubRepo.GetSubscribedHubIDs(ctx, userID)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	// Fetch posts from subscribed hubs (or popular if no subscriptions)
-	var hubPosts []*models.PlatformPost
-	if len(subscribedHubIDs) > 0 {
-		hubPosts, err = h.postRepo.GetPopularFeed(ctx, subscribedHubIDs, sortBy, limit, 0, startTime, endTime)
-		if err != nil {
-			return nil, nil, err
-		}
-	} else {
-		hubPosts = []*models.PlatformPost{}
-	}
-
-	if !includeReddit {
-		return hubPosts, []services.RedditPost{}, nil
-	}
-
-	// Fetch subscribed subreddits
-	subredditSubs, err := h.subredditSubRepo.GetUserSubscriptions(ctx, userID)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	var redditPosts []services.RedditPost
-	if len(subredditSubs) == 0 {
-		return hubPosts, []services.RedditPost{}, nil
-	}
-
-	// Fetch from all subscribed subreddits concurrently for better performance
-	log.Printf("[Feed] Fetching from %d subscribed subreddits concurrently (limit=%d per subreddit)", len(subredditSubs), limit)
-
-	type subredditResult struct {
-		subreddit string
-		posts     []services.RedditPost
-		err       error
-	}
-
-	resultsChan := make(chan subredditResult, len(subredditSubs))
-
-	// Launch concurrent fetchers
-	for _, sub := range subredditSubs {
-		go func(subName string) {
-			listing, err := h.redditClient.GetSubredditPosts(ctx, subName, sortBy, redditTimeFilter, limit, "")
-			if err != nil {
-				resultsChan <- subredditResult{subreddit: subName, err: err}
-				return
-			}
-			posts := extractRedditPosts(listing)
-			posts = filterRedditPostsByTimeRange(posts, startTime, endTime)
-			resultsChan <- subredditResult{subreddit: subName, posts: posts}
-		}(sub.SubredditName)
-	}
-
-	// Collect results
-	for i := 0; i < len(subredditSubs); i++ {
-		result := <-resultsChan
-		if result.err != nil {
-			log.Printf("[Feed] Error fetching r/%s: %v", result.subreddit, result.err)
-			continue
-		}
-		redditPosts = append(redditPosts, result.posts...)
-		log.Printf("[Feed] Fetched %d posts from r/%s (total so far: %d)", len(result.posts), result.subreddit, len(redditPosts))
-	}
-	log.Printf("[Feed] Total Reddit posts fetched: %d from %d subreddits", len(redditPosts), len(subredditSubs))
-
-	return hubPosts, redditPosts, nil
-}
 
 // fetchPopularFeeds fetches popular posts from all hubs and r/popular
 func (h *FeedHandler) fetchPopularFeeds(
@@ -472,17 +391,6 @@ func getItemCreatedAt(item CombinedFeedItem) int64 {
 	}
 }
 
-func getItemCursorID(item CombinedFeedItem) string {
-	switch post := item.Post.(type) {
-	case *models.PlatformPost:
-		return "hub:" + strconv.Itoa(post.ID)
-	case services.RedditPost:
-		return "reddit:" + post.ID
-	default:
-		return ""
-	}
-}
-
 func encodeFeedCursor(cursor *feedCursor) string {
 	if cursor == nil {
 		return ""
@@ -509,13 +417,6 @@ func decodeFeedCursor(encoded string) (*feedCursor, error) {
 	return &cursor, nil
 }
 
-func sliceWithHasMore(items []CombinedFeedItem, limit int) ([]CombinedFeedItem, bool) {
-	if len(items) <= limit {
-		return items, false
-	}
-	return items[:limit], true
-}
-
 func sliceWithHasMoreOffset(items []CombinedFeedItem, limit, offset int) ([]CombinedFeedItem, bool) {
 	if offset > len(items) {
 		return []CombinedFeedItem{}, false
@@ -526,44 +427,6 @@ func sliceWithHasMoreOffset(items []CombinedFeedItem, limit, offset int) ([]Comb
 	}
 	hasMore := end < len(items)
 	return items[offset:end], hasMore
-}
-
-func (h *FeedHandler) buildHomeFeedCacheKey(
-	sortBy string,
-	limit int,
-	offset int,
-	cursor string,
-	omniOnly bool,
-	forcePopular bool,
-	timeRangeKey string,
-	startTime, endTime *time.Time,
-	authenticated bool,
-	userID interface{},
-) string {
-	if h.cache == nil || h.cacheTTL <= 0 {
-		return ""
-	}
-	userKey := "guest"
-	if authenticated {
-		if uid, ok := userID.(int); ok {
-			userKey = "user:" + strconv.Itoa(uid)
-		}
-	}
-	key := "feed:home:v2:" + userKey +
-		":sort=" + sortBy +
-		":limit=" + strconv.Itoa(limit) +
-		":offset=" + strconv.Itoa(offset) +
-		":cursor=" + cursor +
-		":omni=" + strconv.FormatBool(omniOnly) +
-		":popular=" + strconv.FormatBool(forcePopular) +
-		":range=" + timeRangeKey
-	if startTime != nil {
-		key += ":start=" + startTime.UTC().Format(time.RFC3339)
-	}
-	if endTime != nil {
-		key += ":end=" + endTime.UTC().Format(time.RFC3339)
-	}
-	return key
 }
 
 // fetchSubredditWithCache fetches posts from a subreddit with caching
@@ -610,7 +473,6 @@ func (h *FeedHandler) fetchSubredditWithCache(
 // fetchInterleavedFeed fetches posts in a round-robin fashion from subscribed sources
 func (h *FeedHandler) fetchInterleavedFeed(
 	ctx context.Context,
-	userID int,
 	subscribedHubIDs []int,
 	subscriptions []string,
 	cursor *feedCursor,

@@ -21,17 +21,17 @@ func NewFeatureFlagRepository(pool *pgxpool.Pool) *FeatureFlagRepository {
 // GetFlag retrieves a single flag by key
 func (r *FeatureFlagRepository) GetFlag(ctx context.Context, key string) (*models.FeatureFlag, error) {
 	query := `
-		SELECT key, enabled, description, percentage, environment, metadata, created_at, updated_at
+		SELECT key, enabled, description, percentage, environment, auto_rollback, rollback, metadata, created_at, updated_at
 		FROM feature_flags
 		WHERE key = $1
 	`
 
 	var flag models.FeatureFlag
-	var metadataJSON []byte
+	var metadataJSON, rollbackJSON []byte
 
 	err := r.pool.QueryRow(ctx, query, key).Scan(
 		&flag.Key, &flag.Enabled, &flag.Description, &flag.Percentage,
-		&flag.Environment, &metadataJSON, &flag.CreatedAt, &flag.UpdatedAt,
+		&flag.Environment, &flag.AutoRollback, &rollbackJSON, &metadataJSON, &flag.CreatedAt, &flag.UpdatedAt,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -43,6 +43,9 @@ func (r *FeatureFlagRepository) GetFlag(ctx context.Context, key string) (*model
 	if len(metadataJSON) > 0 {
 		json.Unmarshal(metadataJSON, &flag.Metadata)
 	}
+	if len(rollbackJSON) > 0 {
+		json.Unmarshal(rollbackJSON, &flag.Rollback)
+	}
 
 	return &flag, nil
 }
@@ -50,7 +53,7 @@ func (r *FeatureFlagRepository) GetFlag(ctx context.Context, key string) (*model
 // ListFlags retrieves all flags for a specific environment
 func (r *FeatureFlagRepository) ListFlags(ctx context.Context, environment string) ([]*models.FeatureFlag, error) {
 	query := `
-		SELECT key, enabled, description, percentage, environment, metadata, created_at, updated_at
+		SELECT key, enabled, description, percentage, environment, auto_rollback, rollback, metadata, created_at, updated_at
 		FROM feature_flags
 		WHERE environment = $1 OR environment = 'all'
 		ORDER BY key
@@ -65,11 +68,11 @@ func (r *FeatureFlagRepository) ListFlags(ctx context.Context, environment strin
 	var flags []*models.FeatureFlag
 	for rows.Next() {
 		var flag models.FeatureFlag
-		var metadataJSON []byte
+		var metadataJSON, rollbackJSON []byte
 
 		err := rows.Scan(
 			&flag.Key, &flag.Enabled, &flag.Description, &flag.Percentage,
-			&flag.Environment, &metadataJSON, &flag.CreatedAt, &flag.UpdatedAt,
+			&flag.Environment, &flag.AutoRollback, &rollbackJSON, &metadataJSON, &flag.CreatedAt, &flag.UpdatedAt,
 		)
 		if err != nil {
 			return nil, err
@@ -77,6 +80,9 @@ func (r *FeatureFlagRepository) ListFlags(ctx context.Context, environment strin
 
 		if len(metadataJSON) > 0 {
 			json.Unmarshal(metadataJSON, &flag.Metadata)
+		}
+		if len(rollbackJSON) > 0 {
+			json.Unmarshal(rollbackJSON, &flag.Rollback)
 		}
 
 		flags = append(flags, &flag)
@@ -88,15 +94,16 @@ func (r *FeatureFlagRepository) ListFlags(ctx context.Context, environment strin
 // CreateFlag creates a new feature flag
 func (r *FeatureFlagRepository) CreateFlag(ctx context.Context, flag *models.FeatureFlag) error {
 	metadataJSON, _ := json.Marshal(flag.Metadata)
+	rollbackJSON, _ := json.Marshal(flag.Rollback)
 
 	query := `
-		INSERT INTO feature_flags (key, enabled, description, percentage, environment, metadata)
-		VALUES ($1, $2, $3, $4, $5, $6)
+		INSERT INTO feature_flags (key, enabled, description, percentage, environment, auto_rollback, rollback, metadata)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 	`
 
 	_, err := r.pool.Exec(ctx, query,
 		flag.Key, flag.Enabled, flag.Description, flag.Percentage,
-		flag.Environment, metadataJSON,
+		flag.Environment, flag.AutoRollback, rollbackJSON, metadataJSON,
 	)
 	return err
 }
@@ -104,16 +111,18 @@ func (r *FeatureFlagRepository) CreateFlag(ctx context.Context, flag *models.Fea
 // UpdateFlag updates an existing feature flag
 func (r *FeatureFlagRepository) UpdateFlag(ctx context.Context, flag *models.FeatureFlag) error {
 	metadataJSON, _ := json.Marshal(flag.Metadata)
+	rollbackJSON, _ := json.Marshal(flag.Rollback)
 
 	query := `
 		UPDATE feature_flags
-		SET enabled = $2, description = $3, percentage = $4, environment = $5, metadata = $6, updated_at = NOW()
+		SET enabled = $2, description = $3, percentage = $4, environment = $5, 
+		    auto_rollback = $6, rollback = $7, metadata = $8, updated_at = NOW()
 		WHERE key = $1
 	`
 
 	result, err := r.pool.Exec(ctx, query,
 		flag.Key, flag.Enabled, flag.Description, flag.Percentage,
-		flag.Environment, metadataJSON,
+		flag.Environment, flag.AutoRollback, rollbackJSON, metadataJSON,
 	)
 	if err != nil {
 		return err
