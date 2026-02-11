@@ -2,19 +2,27 @@ package workers
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/omninudge/backend/internal/services"
 )
 
 // AccountCleanupWorker permanently deletes accounts after grace period
 type AccountCleanupWorker struct {
-	db *pgxpool.Pool
+	db       *pgxpool.Pool
+	scrubber *services.ScrubberService
+	storage  services.StorageService
 }
 
-func NewAccountCleanupWorker(db *pgxpool.Pool) *AccountCleanupWorker {
-	return &AccountCleanupWorker{db: db}
+func NewAccountCleanupWorker(db *pgxpool.Pool, scrubber *services.ScrubberService, storage services.StorageService) *AccountCleanupWorker {
+	return &AccountCleanupWorker{
+		db:       db,
+		scrubber: scrubber,
+		storage:  storage,
+	}
 }
 
 // Start runs the cleanup worker (call once at startup)
@@ -24,16 +32,49 @@ func (w *AccountCleanupWorker) Start(ctx context.Context) {
 
 	// Run immediately on startup
 	w.cleanupExpiredAccounts(ctx)
+	w.cleanupExpiredExports(ctx)
 
 	for {
 		select {
 		case <-ticker.C:
 			w.cleanupExpiredAccounts(ctx)
+			w.cleanupExpiredExports(ctx)
 		case <-ctx.Done():
 			log.Println("Account cleanup worker stopped")
 			return
 		}
 	}
+}
+
+func (w *AccountCleanupWorker) cleanupExpiredExports(ctx context.Context) {
+	log.Println("[CLEANUP] Starting expired export cleanup")
+
+	// Find expired exports in DB
+	rows, err := w.db.Query(ctx, `
+		SELECT export_id, user_id FROM data_export_requests
+		WHERE status = 'completed' AND expires_at < NOW()
+	`)
+	if err != nil {
+		log.Printf("[CLEANUP] Failed to query expired exports: %v", err)
+	} else {
+		defer rows.Close()
+		for rows.Next() {
+			var exportID string
+			var userID int
+			if err := rows.Scan(&exportID, &userID); err == nil {
+				// Delete from storage
+				storageKey := fmt.Sprintf("exports/%d/%s.zip", userID, exportID)
+				if err := w.storage.Delete(ctx, storageKey); err != nil {
+					log.Printf("[CLEANUP] Warning: failed to delete expired export file %s: %v", storageKey, err)
+				} else {
+					log.Printf("[CLEANUP] Deleted expired export file: %s", storageKey)
+				}
+			}
+		}
+	}
+
+	// Also purge old session keys just in case
+	_, _ = w.db.Exec(ctx, "DELETE FROM export_session_keys WHERE expires_at < NOW()")
 }
 
 func (w *AccountCleanupWorker) cleanupExpiredAccounts(ctx context.Context) {
@@ -79,64 +120,19 @@ func (w *AccountCleanupWorker) cleanupExpiredAccounts(ctx context.Context) {
 }
 
 func (w *AccountCleanupWorker) permanentlyDeleteAccount(ctx context.Context, userID int) error {
-	tx, err := w.db.Begin(ctx)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback(ctx)
-
-	// Delete user's messages (cascade will handle most relations)
-	_, err = tx.Exec(ctx, "DELETE FROM messages WHERE sender_id = $1", userID)
-	if err != nil {
-		return err
+	// Use the central ScrubberService for irreversible deletion
+	if err := w.scrubber.ScrubUser(ctx, userID); err != nil {
+		return fmt.Errorf("scrubber failed: %w", err)
 	}
 
-	// TODO: Delete S3 files (profile avatars, uploaded media) before deleting posts
-	// This requires S3 service integration to be implemented
-	// Query media_files for s3_key values, then call S3 DeleteObject for each
-
-	// Delete user's posts
-	_, err = tx.Exec(ctx, "DELETE FROM platform_posts WHERE user_id = $1", userID)
-	if err != nil {
-		return err
-	}
-
-	// Delete user's comments
-	_, err = tx.Exec(ctx, "DELETE FROM post_comments WHERE user_id = $1", userID)
-	if err != nil {
-		return err
-	}
-
-	// Remove from conversations
-	_, err = tx.Exec(ctx, "DELETE FROM conversation_participants WHERE user_id = $1", userID)
-	if err != nil {
-		return err
-	}
-
-	// Delete encryption keys (important for security)
-	_, err = tx.Exec(ctx, `
-		UPDATE users
-		SET public_key = NULL, encrypted_private_key = NULL
-		WHERE id = $1
-	`, userID)
-	if err != nil {
-		return err
-	}
-
-	// Delete user account (hard delete)
-	_, err = tx.Exec(ctx, "DELETE FROM users WHERE id = $1", userID)
-	if err != nil {
-		return err
-	}
-
-	// Log permanent deletion
-	_, err = tx.Exec(ctx, `
+	// Log permanent deletion (Scrubber might already do this, but keeping it for audit)
+	_, err := w.db.Exec(ctx, `
 		INSERT INTO account_deletion_log (user_id, requested_at, reason)
 		VALUES ($1, NOW(), 'permanently_deleted')
 	`, userID)
 	if err != nil {
-		return err
+		log.Printf("[CLEANUP] Warning: Failed to log permanent deletion for user %d: %v", userID, err)
 	}
 
-	return tx.Commit(ctx)
+	return nil
 }

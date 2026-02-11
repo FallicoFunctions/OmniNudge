@@ -4,110 +4,114 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"mime/multipart"
 	"os"
 	"path/filepath"
 	"time"
-
-	"github.com/google/uuid"
 )
 
-// StorageService defines the interface for file storage operations
+// StorageService defines the interface for file storage
 type StorageService interface {
-	Upload(ctx context.Context, file multipart.File, header *multipart.FileHeader) (*UploadedFile, error)
-	Delete(ctx context.Context, path string) error
-	GetURL(path string) string
+	Upload(ctx context.Context, key string, body io.Reader) (string, error)
+	Download(ctx context.Context, key string) (io.ReadCloser, error)
+	Delete(ctx context.Context, key string) error
+	GetSignedURL(ctx context.Context, key string, expires time.Duration) (string, error)
+	List(ctx context.Context, prefix string) ([]string, error)
 }
 
-// UploadedFile represents a successfully uploaded file
-type UploadedFile struct {
-	Filename    string
-	StoragePath string
-	URL         string
-	FileSize    int64
-	FileType    string
-}
-
-// LocalStorageService implements file storage using the local filesystem
+// LocalStorageService implements StorageService using local filesystem
 type LocalStorageService struct {
-	basePath  string
-	baseURL   string
-	uploadsDir string
+	baseDir string
+	baseURL string
 }
 
-// NewLocalStorageService creates a new local filesystem storage service
-func NewLocalStorageService(basePath, baseURL string) *LocalStorageService {
-	// Default to ./uploads if not specified
-	if basePath == "" {
-		basePath = "./uploads"
+func NewLocalStorageService(baseDir string, baseURL string) (*LocalStorageService, error) {
+	if err := os.MkdirAll(baseDir, 0755); err != nil {
+		return nil, fmt.Errorf("failed to create base directory: %w", err)
 	}
-	if baseURL == "" {
-		baseURL = "http://localhost:8080"
-	}
-
-	uploadsDir := filepath.Join(basePath, "media")
-
 	return &LocalStorageService{
-		basePath:   basePath,
-		baseURL:    baseURL,
-		uploadsDir: uploadsDir,
-	}
-}
-
-// Upload saves a file to the local filesystem
-func (s *LocalStorageService) Upload(ctx context.Context, file multipart.File, header *multipart.FileHeader) (*UploadedFile, error) {
-	// Generate unique filename
-	ext := filepath.Ext(header.Filename)
-	filename := fmt.Sprintf("%s%s", uuid.New().String(), ext)
-
-	// Organize by year/month
-	now := time.Now()
-	dateDir := filepath.Join(fmt.Sprintf("%d", now.Year()), fmt.Sprintf("%02d", now.Month()))
-	fullDir := filepath.Join(s.uploadsDir, dateDir)
-
-	// Create directory if it doesn't exist
-	if err := os.MkdirAll(fullDir, 0755); err != nil {
-		return nil, fmt.Errorf("failed to create upload directory: %w", err)
-	}
-
-	// Create the file
-	destPath := filepath.Join(fullDir, filename)
-	dst, err := os.Create(destPath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create file: %w", err)
-	}
-	defer dst.Close()
-
-	// Copy the uploaded file data
-	written, err := io.Copy(dst, file)
-	if err != nil {
-		return nil, fmt.Errorf("failed to write file: %w", err)
-	}
-
-	// Generate storage path (relative to basePath)
-	storagePath := filepath.Join("media", dateDir, filename)
-
-	// Generate URL (using forward slashes for URLs)
-	urlPath := filepath.ToSlash(storagePath)
-	url := fmt.Sprintf("%s/uploads/%s", s.baseURL, urlPath)
-
-	return &UploadedFile{
-		Filename:    filename,
-		StoragePath: storagePath,
-		URL:         url,
-		FileSize:    written,
-		FileType:    header.Header.Get("Content-Type"),
+		baseDir: baseDir,
+		baseURL: baseURL,
 	}, nil
 }
 
-// Delete removes a file from the local filesystem
-func (s *LocalStorageService) Delete(ctx context.Context, path string) error {
-	fullPath := filepath.Join(s.basePath, path)
-	return os.Remove(fullPath)
+func (s *LocalStorageService) Upload(ctx context.Context, key string, body io.Reader) (string, error) {
+	path := filepath.Join(s.baseDir, key)
+	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		return "", err
+	}
+
+	f, err := os.Create(path)
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+
+	if _, err := io.Copy(f, body); err != nil {
+		return "", err
+	}
+
+	return fmt.Sprintf("%s/%s", s.baseURL, key), nil
 }
 
-// GetURL returns the URL for accessing a file
-func (s *LocalStorageService) GetURL(path string) string {
-	urlPath := filepath.ToSlash(path)
-	return fmt.Sprintf("%s/uploads/%s", s.baseURL, urlPath)
+func (s *LocalStorageService) Download(ctx context.Context, key string) (io.ReadCloser, error) {
+	return os.Open(filepath.Join(s.baseDir, key))
+}
+
+func (s *LocalStorageService) Delete(ctx context.Context, key string) error {
+	return os.Remove(filepath.Join(s.baseDir, key))
+}
+
+func (s *LocalStorageService) GetSignedURL(ctx context.Context, key string, expires time.Duration) (string, error) {
+	// For local storage, we just return the URL (could implement a temporary symlink strategy if needed)
+	return fmt.Sprintf("%s/%s?expires=%d", s.baseURL, key, time.Now().Add(expires).Unix()), nil
+}
+
+func (s *LocalStorageService) List(ctx context.Context, prefix string) ([]string, error) {
+	var keys []string
+	searchDir := filepath.Join(s.baseDir, prefix)
+
+	err := filepath.Walk(searchDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if !info.IsDir() {
+			rel, err := filepath.Rel(s.baseDir, path)
+			if err == nil {
+				keys = append(keys, rel)
+			}
+		}
+		return nil
+	})
+
+	return keys, err
+}
+
+// S3StorageService (Placeholder for future AWS integration)
+type S3StorageService struct {
+	bucket string
+	region string
+}
+
+func NewS3StorageService(bucket, region string) *S3StorageService {
+	return &S3StorageService{bucket: bucket, region: region}
+}
+
+func (s *S3StorageService) Upload(ctx context.Context, key string, body io.Reader) (string, error) {
+	return "", fmt.Errorf("S3 upload not implemented")
+}
+
+func (s *S3StorageService) Download(ctx context.Context, key string) (io.ReadCloser, error) {
+	return nil, fmt.Errorf("S3 download not implemented")
+}
+
+func (s *S3StorageService) Delete(ctx context.Context, key string) error {
+	return fmt.Errorf("S3 delete not implemented")
+}
+
+func (s *S3StorageService) GetSignedURL(ctx context.Context, key string, expires time.Duration) (string, error) {
+	return "", fmt.Errorf("S3 signed URL not implemented")
+}
+
+func (s *S3StorageService) List(ctx context.Context, prefix string) ([]string, error) {
+	return nil, fmt.Errorf("S3 list not implemented")
 }

@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"crypto/rand"
+	"encoding/base64"
 	"encoding/hex"
 	"fmt"
 	"net/http"
@@ -11,18 +12,21 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/omninudge/backend/internal/queue"
+	"github.com/omninudge/backend/internal/utils"
 )
 
 // DataExportHandler handles GDPR data export requests
 type DataExportHandler struct {
-	db    *pgxpool.Pool
-	queue *queue.QueueClient
+	db        *pgxpool.Pool
+	queue     *queue.QueueClient
+	masterKey []byte
 }
 
-func NewDataExportHandler(db *pgxpool.Pool, queueClient *queue.QueueClient) *DataExportHandler {
+func NewDataExportHandler(db *pgxpool.Pool, queueClient *queue.QueueClient, masterKey string) *DataExportHandler {
 	return &DataExportHandler{
-		db:    db,
-		queue: queueClient,
+		db:        db,
+		queue:     queueClient,
+		masterKey: []byte(masterKey),
 	}
 }
 
@@ -32,12 +36,30 @@ func (h *DataExportHandler) RequestDataExport(c *gin.Context) {
 	userID := c.GetInt("user_id")
 
 	var req struct {
+		Password       string   `json:"password" binding:"required"`
 		DataTypes      []string `json:"data_types"`      // e.g., ["messages", "posts", "comments", "profile"]
 		IncludeDeleted bool     `json:"include_deleted"` // Include soft-deleted data
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request: password is required"})
+		return
+	}
+
+	// 1. Re-authenticate user with password
+	var username, passwordHash string
+	var encryptedPrivateKey *string
+	err := h.db.QueryRow(c.Request.Context(), `
+		SELECT username, password_hash, encrypted_private_key FROM users WHERE id = $1
+	`, userID).Scan(&username, &passwordHash, &encryptedPrivateKey)
+
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch user data"})
+		return
+	}
+
+	if err := utils.CheckPassword(passwordHash, req.Password); err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid password"})
 		return
 	}
 
@@ -52,7 +74,15 @@ func (h *DataExportHandler) RequestDataExport(c *gin.Context) {
 			"saved",
 			"hubs",
 			"settings",
-			"encryption_keys",
+		}
+	}
+
+	// 2. Prepare E2E session keys if messages are being exported
+	usesE2E := false
+	for _, dt := range req.DataTypes {
+		if dt == "messages" {
+			usesE2E = true
+			break
 		}
 	}
 
@@ -63,9 +93,59 @@ func (h *DataExportHandler) RequestDataExport(c *gin.Context) {
 		return
 	}
 
+	if usesE2E && encryptedPrivateKey != nil {
+		// Decrypt private key using password (using username as salt as per schema)
+		// NOTE: In production, a dedicated salt should be used.
+		privKeyPEM, err := utils.DecryptWithPassword(*encryptedPrivateKey, req.Password, base64.StdEncoding.EncodeToString([]byte(username)))
+		if err != nil {
+			fmt.Printf("[EXPORT] Private key decryption failed for user %d: %v\n", userID, err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to decrypt encryption keys. Please update your security settings."})
+			return
+		}
+
+		// Fetch group keys for the user
+		rows, err := h.db.Query(c.Request.Context(), `
+			SELECT gk.id, gkm.encrypted_key_for_user
+			FROM group_encryption_keys gk
+			JOIN group_key_members gkm ON gk.id = gkm.group_key_id
+			WHERE gkm.user_id = $1
+		`, userID)
+		if err != nil {
+			fmt.Printf("[EXPORT] Failed to fetch group keys: %v\n", err)
+		} else {
+			defer rows.Close()
+			for rows.Next() {
+				var keyID int
+				var encryptedKey string
+				if err := rows.Scan(&keyID, &encryptedKey); err != nil {
+					continue
+				}
+
+				// Decrypt group key with user's RSA private key
+				rawKey, err := utils.DecryptRSA(encryptedKey, privKeyPEM)
+				if err != nil {
+					continue
+				}
+
+				// Re-encrypt with system master key for temporary storage
+				encryptedWithSystem, err := utils.EncryptWithSystemKey(rawKey, h.masterKey)
+				if err != nil {
+					continue
+				}
+
+				// Store in export_session_keys
+				_, _ = h.db.Exec(c.Request.Context(), `
+					INSERT INTO export_session_keys (export_id, user_id, group_key_id, encrypted_key)
+					VALUES ($1, $2, $3, $4)
+					ON CONFLICT (export_id, group_key_id) DO UPDATE SET encrypted_key = EXCLUDED.encrypted_key
+				`, exportID, userID, keyID, encryptedWithSystem)
+			}
+		}
+	}
+
 	// Create export request record
 	expiresAt := time.Now().Add(7 * 24 * time.Hour) // Export available for 7 days
-	_, err = h.db.Exec(context.Background(), `
+	_, err = h.db.Exec(c.Request.Context(), `
 		INSERT INTO data_export_requests (
 			user_id, export_id, data_types, include_deleted, status, expires_at
 		) VALUES ($1, $2, $3, $4, 'pending', $5)
@@ -85,9 +165,9 @@ func (h *DataExportHandler) RequestDataExport(c *gin.Context) {
 			IncludeDeleted: req.IncludeDeleted,
 		}
 
-		if err := h.queue.EnqueueDataExport(context.Background(), payload); err != nil {
+		if err := h.queue.EnqueueDataExport(c.Request.Context(), payload); err != nil {
 			// Update status to failed
-			_, _ = h.db.Exec(context.Background(), `
+			_, _ = h.db.Exec(c.Request.Context(), `
 				UPDATE data_export_requests
 				SET status = 'failed', completed_at = NOW()
 				WHERE export_id = $1

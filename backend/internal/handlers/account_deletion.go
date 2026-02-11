@@ -52,7 +52,7 @@ func (h *AccountDeletionHandler) RequestAccountDeletion(c *gin.Context) {
 	var email *string
 	var username string
 	err := h.db.QueryRow(context.Background(), `
-		SELECT password, email, username FROM users WHERE id = $1
+		SELECT password_hash, email, username FROM users WHERE id = $1
 	`, userID).Scan(&storedPasswordHash, &email, &username)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to verify user"})
@@ -124,11 +124,11 @@ This is an automated message. Please do not reply to this email.`,
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"message":                 "Account scheduled for deletion",
-		"deletion_date":           deletionDate.Format(time.RFC3339),
-		"grace_period_days":       30,
-		"recovery_instructions":   "To cancel deletion, log in before " + deletionDate.Format("2006-01-02"),
-		"email_sent":              email != nil && *email != "",
+		"message":               "Account scheduled for deletion",
+		"deletion_date":         deletionDate.Format(time.RFC3339),
+		"grace_period_days":     30,
+		"recovery_instructions": "To cancel deletion, log in before " + deletionDate.Format("2006-01-02"),
+		"email_sent":            email != nil && *email != "",
 	})
 }
 
@@ -247,10 +247,10 @@ func (h *AccountDeletionHandler) GetAccountDeletionStatus(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"pending_deletion":     true,
-		"deletion_requested":   deletedAt.Format(time.RFC3339),
-		"permanent_deletion":   permanentDeletionAt.Format(time.RFC3339),
-		"days_until_deletion":  daysUntilDeletion,
+		"pending_deletion":    true,
+		"deletion_requested":  deletedAt.Format(time.RFC3339),
+		"permanent_deletion":  permanentDeletionAt.Format(time.RFC3339),
+		"days_until_deletion": daysUntilDeletion,
 		"can_cancel":          daysUntilDeletion > 0,
 	})
 }
