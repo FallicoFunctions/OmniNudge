@@ -1,18 +1,24 @@
 package queue
 
 import (
+	"archive/zip"
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/hibiken/asynq"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/omninudge/backend/internal/services"
+	"github.com/omninudge/backend/internal/utils"
 )
 
 // NewDataExportHandler creates a GDPR data export job handler
-func NewDataExportHandler(db *pgxpool.Pool) JobHandler {
+func NewDataExportHandler(db *pgxpool.Pool, storage services.StorageService, masterKey string, email *services.EmailService) JobHandler {
 	return func(ctx context.Context, task *asynq.Task) error {
 		var payload DataExportPayload
 		if err := json.Unmarshal(task.Payload(), &payload); err != nil {
@@ -32,13 +38,38 @@ func NewDataExportHandler(db *pgxpool.Pool) JobHandler {
 			return fmt.Errorf("failed to update status: %w", err)
 		}
 
-		// Collect all requested data
-		exportData := make(map[string]interface{})
-		exportData["export_id"] = payload.ExportID
-		exportData["user_id"] = payload.UserID
-		exportData["exported_at"] = time.Now().Format(time.RFC3339)
-		exportData["data_types"] = payload.DataTypes
+		// Create temporary directory for export
+		tempDir := filepath.Join(os.TempDir(), "omninudge_export_"+payload.ExportID)
+		if err := os.MkdirAll(tempDir, 0755); err != nil {
+			return updateExportFailed(ctx, db, payload.ExportID, fmt.Sprintf("Failed to create temp dir: %v", err))
+		}
+		defer os.RemoveAll(tempDir)
 
+		// 1. Fetch encrypted session keys for E2E decryption
+		// Map conversation_id -> list of keys (historic and current)
+		sessionKeys := make(map[int][][]byte)
+		rows, err := db.Query(ctx, `
+			SELECT gek.conversation_id, esk.encrypted_key
+			FROM export_session_keys esk
+			JOIN group_encryption_keys gek ON esk.group_key_id = gek.id
+			WHERE esk.export_id = $1 AND esk.user_id = $2
+		`, payload.ExportID, payload.UserID)
+		if err == nil {
+			defer rows.Close()
+			for rows.Next() {
+				var convID int
+				var encryptedKey string
+				if err := rows.Scan(&convID, &encryptedKey); err == nil {
+					// Decrypt session key using system master key
+					rawKey, err := utils.DecryptWithSystemKey(encryptedKey, []byte(masterKey))
+					if err == nil {
+						sessionKeys[convID] = append(sessionKeys[convID], []byte(rawKey))
+					}
+				}
+			}
+		}
+
+		// 2. Export each data type to its own JSON file
 		for _, dataType := range payload.DataTypes {
 			var data interface{}
 			var err error
@@ -47,7 +78,7 @@ func NewDataExportHandler(db *pgxpool.Pool) JobHandler {
 			case "profile":
 				data, err = exportProfileData(ctx, db, payload.UserID)
 			case "messages":
-				data, err = exportMessagesData(ctx, db, payload.UserID, payload.IncludeDeleted)
+				data, err = exportMessagesData(ctx, db, payload.UserID, payload.IncludeDeleted, sessionKeys)
 			case "posts":
 				data, err = exportPostsData(ctx, db, payload.UserID, payload.IncludeDeleted)
 			case "comments":
@@ -69,27 +100,71 @@ func NewDataExportHandler(db *pgxpool.Pool) JobHandler {
 
 			if err != nil {
 				log.Printf("[DATA EXPORT] Failed to export %s: %v", dataType, err)
-				// Continue with other data types
-				exportData[dataType] = map[string]string{"error": err.Error()}
-			} else {
-				exportData[dataType] = data
+				data = map[string]string{"error": err.Error()}
 			}
+
+			// Save to JSON file
+			filePath := filepath.Join(tempDir, dataType+".json")
+			file, err := os.Create(filePath)
+			if err != nil {
+				log.Printf("[DATA EXPORT] Failed to create file %s: %v", filePath, err)
+				continue
+			}
+
+			encoder := json.NewEncoder(file)
+			encoder.SetIndent("", "  ")
+			if err := encoder.Encode(data); err != nil {
+				log.Printf("[DATA EXPORT] Failed to encode %s: %v", dataType, err)
+			}
+			file.Close()
 		}
 
-		// Convert to JSON
-		jsonData, err := json.MarshalIndent(exportData, "", "  ")
+		// 3. Create ZIP archive
+		zipPath := filepath.Join(os.TempDir(), "export_"+payload.ExportID+".zip")
+		zipFile, err := os.Create(zipPath)
 		if err != nil {
-			return updateExportFailed(ctx, db, payload.ExportID, fmt.Sprintf("Failed to marshal JSON: %v", err))
+			return updateExportFailed(ctx, db, payload.ExportID, fmt.Sprintf("Failed to create ZIP: %v", err))
+		}
+		defer os.Remove(zipPath)
+
+		zipWriter := zip.NewWriter(zipFile)
+		files, _ := os.ReadDir(tempDir)
+		for _, f := range files {
+			fPath := filepath.Join(tempDir, f.Name())
+			fileToZip, err := os.Open(fPath)
+			if err != nil {
+				continue
+			}
+
+			w, err := zipWriter.Create(f.Name())
+			if err != nil {
+				fileToZip.Close()
+				continue
+			}
+
+			_, _ = io.Copy(w, fileToZip)
+			fileToZip.Close()
+		}
+		zipWriter.Close()
+		zipFile.Close()
+
+		// 4. Upload to storage
+		finalZip, err := os.Open(zipPath)
+		if err != nil {
+			return updateExportFailed(ctx, db, payload.ExportID, fmt.Sprintf("Failed to open ZIP for upload: %v", err))
+		}
+		defer finalZip.Close()
+
+		fileInfo, _ := os.Stat(zipPath)
+		fileSize := fileInfo.Size()
+
+		storageKey := fmt.Sprintf("exports/%d/%s.zip", payload.UserID, payload.ExportID)
+		downloadURL, err := storage.Upload(ctx, storageKey, finalZip)
+		if err != nil {
+			return updateExportFailed(ctx, db, payload.ExportID, fmt.Sprintf("Failed to upload to storage: %v", err))
 		}
 
-		fileSize := int64(len(jsonData))
-
-		// TODO: Upload to S3 and get download URL
-		// For now, we'll just log the data size and mark as completed
-		log.Printf("[DATA EXPORT] Export complete: user_id=%d export_id=%s size=%d bytes",
-			payload.UserID, payload.ExportID, fileSize)
-
-		// Update status to completed
+		// 5. Update status to completed
 		_, err = db.Exec(ctx, `
 			UPDATE data_export_requests
 			SET
@@ -98,13 +173,31 @@ func NewDataExportHandler(db *pgxpool.Pool) JobHandler {
 				file_size_bytes = $1,
 				download_url = $2
 			WHERE export_id = $3
-		`, fileSize, fmt.Sprintf("TODO: S3 URL for export_%s.json", payload.ExportID), payload.ExportID)
+		`, fileSize, downloadURL, payload.ExportID)
 
 		if err != nil {
 			return fmt.Errorf("failed to update completion status: %w", err)
 		}
 
-		// TODO: Send email notification with download link
+		// 6. Purge temporary session keys
+		_, _ = db.Exec(context.Background(), `
+			DELETE FROM export_session_keys WHERE export_id = $1
+		`, payload.ExportID)
+
+		// 7. Send email notification
+		var userEmail string
+		_ = db.QueryRow(ctx, "SELECT email FROM users WHERE id = $1", payload.UserID).Scan(&userEmail)
+
+		if userEmail != "" && email != nil {
+			subject := "Your OmniNudge Data Export is Ready"
+			body := fmt.Sprintf("Your data export request (%s) is complete.\nYou can download it here: %s\n\nThis link will expire in 7 days.",
+				payload.ExportID, downloadURL)
+
+			_ = email.SendEmail([]string{userEmail}, subject, body, "")
+		}
+
+		log.Printf("[DATA EXPORT] Export complete: user_id=%d export_id=%s size=%d bytes",
+			payload.UserID, payload.ExportID, fileSize)
 
 		return nil
 	}
@@ -144,16 +237,17 @@ func exportProfileData(ctx context.Context, db *pgxpool.Pool, userID int) (inter
 	return profile, err
 }
 
-func exportMessagesData(ctx context.Context, db *pgxpool.Pool, userID int, includeDeleted bool) (interface{}, error) {
+func exportMessagesData(ctx context.Context, db *pgxpool.Pool, userID int, includeDeleted bool, conversationKeys map[int][][]byte) (interface{}, error) {
 	query := `
-		SELECT id, sender_id, recipient_id, content_encrypted, created_at, deleted_at
+		SELECT id, conversation_id, sender_id, recipient_id, encrypted_content, 
+		       sender_encrypted_content, shared_encryption_iv, created_at, deleted_for_sender, deleted_for_recipient
 		FROM messages
 		WHERE (sender_id = $1 OR recipient_id = $1)
 	`
 	if !includeDeleted {
-		query += " AND deleted_at IS NULL"
+		query += " AND (CASE WHEN sender_id = $1 THEN NOT deleted_for_sender ELSE NOT deleted_for_recipient END)"
 	}
-	query += " ORDER BY created_at DESC LIMIT 10000"
+	query += " ORDER BY created_at DESC LIMIT 50000"
 
 	rows, err := db.Query(ctx, query, userID)
 	if err != nil {
@@ -162,20 +256,52 @@ func exportMessagesData(ctx context.Context, db *pgxpool.Pool, userID int, inclu
 	defer rows.Close()
 
 	type Message struct {
-		ID              int        `json:"id"`
-		SenderID        int        `json:"sender_id"`
-		RecipientID     int        `json:"recipient_id"`
-		ContentEncrypted string    `json:"content_encrypted"`
-		CreatedAt       time.Time  `json:"created_at"`
-		DeletedAt       *time.Time `json:"deleted_at,omitempty"`
+		ID               int       `json:"id"`
+		ConversationID   int       `json:"conversation_id"`
+		SenderID         int       `json:"sender_id"`
+		RecipientID      int       `json:"recipient_id"`
+		Content          string    `json:"content"`
+		ContentEncrypted string    `json:"content_encrypted_base64"`
+		CreatedAt        time.Time `json:"created_at"`
 	}
 
 	messages := []Message{}
 	for rows.Next() {
 		var msg Message
-		if err := rows.Scan(&msg.ID, &msg.SenderID, &msg.RecipientID, &msg.ContentEncrypted, &msg.CreatedAt, &msg.DeletedAt); err != nil {
+		var encryptedContent, senderEncryptedContent, sharedIV string
+		var deletedSender, deletedRecipient bool
+
+		if err := rows.Scan(
+			&msg.ID, &msg.ConversationID, &msg.SenderID, &msg.RecipientID,
+			&encryptedContent, &senderEncryptedContent, &sharedIV,
+			&msg.CreatedAt, &deletedSender, &deletedRecipient,
+		); err != nil {
 			continue
 		}
+
+		msg.ContentEncrypted = encryptedContent
+		if msg.SenderID == userID {
+			msg.ContentEncrypted = senderEncryptedContent
+		}
+
+		// Try to decrypt if we have session keys
+		decrypted := false
+		if keys, ok := conversationKeys[msg.ConversationID]; ok {
+			// Try all keys for this conversation (solving historic key decryption)
+			for _, key := range keys {
+				plaintext, err := utils.DecryptAESGCM(msg.ContentEncrypted, key, sharedIV)
+				if err == nil {
+					msg.Content = plaintext
+					decrypted = true
+					break // Stop on first successful decryption
+				}
+			}
+		}
+
+		if !decrypted {
+			msg.Content = "[Encrypted Content - Key Unavailable]"
+		}
+
 		messages = append(messages, msg)
 	}
 
@@ -441,9 +567,9 @@ func exportSettingsData(ctx context.Context, db *pgxpool.Pool, userID int) (inte
 
 func exportEncryptionKeysData(ctx context.Context, db *pgxpool.Pool, userID int) (interface{}, error) {
 	var keys struct {
-		PublicKey            *string `json:"public_key"`
-		EncryptedPrivateKey  *string `json:"encrypted_private_key"`
-		Note                 string  `json:"note"`
+		PublicKey           *string `json:"public_key"`
+		EncryptedPrivateKey *string `json:"encrypted_private_key"`
+		Note                string  `json:"note"`
 	}
 
 	err := db.QueryRow(ctx, `

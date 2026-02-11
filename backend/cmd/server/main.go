@@ -172,6 +172,18 @@ func main() {
 	// Initialize analytics service (P0-027)
 	analyticsService := services.NewAnalyticsService(db.Pool)
 
+	// Initialize storage service (P0-016)
+	storageService, err := services.NewLocalStorageService("./uploads/exports", cfg.FrontendURL+"/uploads/exports")
+	if err != nil {
+		log.Fatalf("Failed to initialize storage service: %v", err)
+	}
+
+	// Initialize scrubber service (P0-017)
+	scrubberService := services.NewScrubberService(db.Pool, storageService)
+
+	// Inject storage service into appropriate handlers/workers if needed
+	_ = storageService // Will be used by export worker
+
 	// Initialize Firebase Cloud Messaging (P0-042)
 	var firebaseService *services.FirebaseService
 	if cfg.Firebase.CredentialsPath != "" {
@@ -206,7 +218,7 @@ func main() {
 		// Register job handlers
 		jobWorker.RegisterAllHandlers(queue.JobHandlers{
 			EmailSend:  queue.NewEmailHandler(emailService),
-			DataExport: queue.NewDataExportHandler(db.Pool),
+			DataExport: queue.NewDataExportHandler(db.Pool, storageService, cfg.Encryption.Key, emailService),
 			// Other handlers still use placeholders for now
 			VirusScan:           queue.HandleVirusScan,
 			Transcription:       queue.HandleTranscription,
@@ -236,7 +248,7 @@ func main() {
 	workerManager.Start(workerCtx)
 
 	// Start account cleanup worker (P0-017: permanently delete accounts after grace period)
-	accountCleanupWorker := workers.NewAccountCleanupWorker(db.Pool)
+	accountCleanupWorker := workers.NewAccountCleanupWorker(db.Pool, scrubberService, storageService)
 	go accountCleanupWorker.Start(workerCtx)
 
 	// Start data retention worker (P0-034: automated data deletion per retention policy)
@@ -307,7 +319,7 @@ func main() {
 	audioEncoderHandler := handlers.NewAudioEncoderHandler(mediaRepo, queueClient)
 	featureFlagsHandler := handlers.NewFeatureFlagHandler(featureFlagService)
 	accountDeletionHandler := handlers.NewAccountDeletionHandler(db.Pool, queueClient)
-	dataExportHandler := handlers.NewDataExportHandler(db.Pool, queueClient)
+	dataExportHandler := handlers.NewDataExportHandler(db.Pool, queueClient, cfg.Encryption.Key)
 	analyticsHandler := handlers.NewAnalyticsHandler(analyticsService)
 	logHandler := handlers.NewLogHandler(analyticsService)
 	dataRetentionHandler := handlers.NewDataRetentionHandler(db.Pool)
