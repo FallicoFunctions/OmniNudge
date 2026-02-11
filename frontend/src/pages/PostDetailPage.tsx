@@ -49,10 +49,11 @@ import { useHubSubredditAutocomplete } from '../hooks/useHubSubredditAutocomplet
 import { CombinedSuggestionItem } from '../components/common/CombinedSuggestionItem';
 
 export default function PostDetailPage() {
-  const { postId, commentId, hubname } = useParams<{
+  const { postId, commentId, hubname, subreddit } = useParams<{
     postId: string;
     commentId?: string;
     hubname?: string;
+    subreddit?: string;
   }>();
   const navigate = useNavigate();
   const location = useLocation();
@@ -119,7 +120,9 @@ export default function PostDetailPage() {
     () => postData?.target_subreddit ?? postData?.crosspost_origin_subreddit ?? null,
     [postData]
   );
-  const normalizedSubreddit = targetSubreddit?.trim() ?? '';
+  // Use URL param as fallback for posts accessed via /r/:subreddit/comments/:postId
+  // This handles old posts (created before migration 024) that have target_subreddit = NULL
+  const normalizedSubreddit = targetSubreddit?.trim() || subreddit?.trim() || '';
 
   useEffect(() => {
     if (!normalizedSubreddit) return;

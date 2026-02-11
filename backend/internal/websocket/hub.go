@@ -168,3 +168,25 @@ func (h *Hub) broadcastUserStatus(userID int, isOnline bool) {
 		}
 	}
 }
+
+// FeatureFlagUpdatedEvent represents a feature flag update event
+type FeatureFlagUpdatedEvent struct {
+	Type       string `json:"type"` // "feature_flag_updated"
+	Key        string `json:"key"`
+	Enabled    bool   `json:"enabled"`
+	Percentage *int   `json:"percentage,omitempty"`
+}
+
+func (h *Hub) BroadcastFeatureFlagUpdate(key string, enabled bool, percentage *int) {
+	event := FeatureFlagUpdatedEvent{
+		Type:       "feature_flag_updated",
+		Key:        key,
+		Enabled:    enabled,
+		Percentage: percentage,
+	}
+	h.Broadcast(&Message{
+		RecipientID: 0, // Broadcast to all
+		Type:        "feature_flag_updated",
+		Payload:     event,
+	})
+}

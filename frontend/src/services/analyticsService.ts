@@ -1,8 +1,11 @@
+import { v4 as uuidv4 } from 'uuid';
+import { api } from '../lib/api';
+
 /**
  * P0-027: Analytics Service
  *
  * Frontend event tracking service.
- * Provider-agnostic - ready for Mixpanel, Amplitude, PostHog, or custom backend.
+ * Connects to backend analytics endpoints and manages session lifecycle.
  */
 
 export type EventName =
@@ -39,27 +42,39 @@ export interface EventProperties {
 
 export interface AnalyticsConfig {
   enabled: boolean;
-  provider?: 'mixpanel' | 'amplitude' | 'posthog' | 'custom';
-  apiKey?: string;
   debug?: boolean;
 }
 
 class AnalyticsService {
   private config: AnalyticsConfig = {
-    enabled: false,
+    enabled: true, // Default to true, respect user preferences elsewhere if needed
     debug: import.meta.env.DEV,
   };
 
+  private anonymousId: string;
+  private sessionId: string;
   private queue: Array<{ event: EventName; properties?: EventProperties }> = [];
+  private isInitialized = false;
+
+  constructor() {
+    this.anonymousId = this.getOrCreateAnonymousId();
+    this.sessionId = this.startNewSession();
+    this.setupSessionListeners();
+  }
 
   /**
    * Initialize analytics with configuration
    */
-  init(config: AnalyticsConfig) {
+  init(config: Partial<AnalyticsConfig>) {
     this.config = { ...this.config, ...config };
-    
+    this.isInitialized = true;
+
     if (this.config.debug) {
-      console.log('[Analytics] Initialized with config:', this.config);
+      console.log('[Analytics] Initialized:', {
+        config: this.config,
+        anonymousId: this.anonymousId,
+        sessionId: this.sessionId
+      });
     }
 
     // Flush queued events
@@ -72,88 +87,188 @@ class AnalyticsService {
   /**
    * Track an event
    */
-  track(event: EventName, properties?: EventProperties) {
-    // Queue events if not initialized
+  async track(event: EventName, properties?: EventProperties) {
     if (!this.config.enabled) {
       if (this.config.debug) {
-        console.log('[Analytics] Event queued (not enabled):', event, properties);
+        console.log('[Analytics] Skipped (disabled):', event);
       }
+      return;
+    }
+
+    if (!this.isInitialized) {
       this.queue.push({ event, properties });
       return;
     }
 
-    // Debug logging
+    const payload = {
+      event,
+      properties,
+      anonymous_id: this.anonymousId,
+      session_id: this.sessionId,
+    };
+
     if (this.config.debug) {
-      console.log('[Analytics] Track:', event, properties);
+      console.log('[Analytics] Track:', payload);
     }
 
-    // TODO: Integrate with provider when ready
-    // switch (this.config.provider) {
-    //   case 'mixpanel':
-    //     mixpanel.track(event, properties);
-    //     break;
-    //   case 'amplitude':
-    //     amplitude.track(event, properties);
-    //     break;
-    //   case 'posthog':
-    //     posthog.capture(event, properties);
-    //     break;
-    //   case 'custom':
-    //     // Send to custom backend endpoint
-    //     break;
-    // }
+    try {
+      await api.post('/analytics/track', payload);
+      // Update activity on track
+      this.updateActivityTimestamp();
+    } catch (error) {
+      // Fail silently for analytics to avoid disrupting UX
+      if (this.config.debug) {
+        console.error('[Analytics] Failed to track event:', error);
+      }
+    }
   }
 
   /**
-   * Identify a user
+   * Identify a user (Alias anonymous ID to User ID)
    */
-  identify(userId: string, traits?: EventProperties) {
+  async identify(userId: string, traits?: EventProperties) {
     if (!this.config.enabled) return;
 
     if (this.config.debug) {
       console.log('[Analytics] Identify:', userId, traits);
     }
 
-    // TODO: Integrate with provider
+    try {
+      await api.post('/analytics/identify', {
+        anonymous_id: this.anonymousId,
+      });
+
+      // Optionally track traits as a separate event or user property update
+      if (traits) {
+        this.setUserProperties(traits);
+      }
+    } catch (error) {
+      if (this.config.debug) {
+        console.error('[Analytics] Failed to identify user:', error);
+      }
+    }
   }
 
   /**
    * Reset user identity (on logout)
+   * We keep the anonymous ID but might want to rotate session
    */
   reset() {
-    if (!this.config.enabled) return;
-
     if (this.config.debug) {
       console.log('[Analytics] Reset');
     }
-
-    // TODO: Integrate with provider
+    // Rotate session on logout to separate authenticated from unauthenticated activity
+    this.sessionId = this.startNewSession();
   }
 
   /**
    * Set user properties
+   * (Currently just tracks a 'user_properties_updated' event for simplicity, 
+   * or could be expanded to a dedicated endpoint)
    */
   setUserProperties(properties: EventProperties) {
-    if (!this.config.enabled) return;
-
-    if (this.config.debug) {
-      console.log('[Analytics] Set user properties:', properties);
-    }
-
-    // TODO: Integrate with provider
+    // For now, tracking as an event. Ideally, use a dedicated endpoint if needed.
+    this.track('user_properties_updated' as any, properties);
   }
 
   /**
    * Track page view
    */
   page(path: string, properties?: EventProperties) {
-    if (!this.config.enabled) return;
+    this.track('page_view' as any, { ...properties, path });
+  }
 
-    if (this.config.debug) {
-      console.log('[Analytics] Page view:', path, properties);
+  // --- Session Management ---
+
+  private getOrCreateAnonymousId(): string {
+    const STORAGE_KEY = 'omni_analytics_aid';
+    let id = localStorage.getItem(STORAGE_KEY);
+    if (!id) {
+      id = uuidv4();
+      localStorage.setItem(STORAGE_KEY, id);
     }
+    return id;
+  }
 
-    // TODO: Integrate with provider
+  private startNewSession(): string {
+    const id = uuidv4();
+    this.sessionId = id;
+    this.startSessionBackend(id);
+    return id;
+  }
+
+  private async startSessionBackend(sessionId: string) {
+    try {
+      this.updateActivityTimestamp();
+      // Don't await this, let it happen in background
+      api.post('/analytics/session/start', {
+        session_id: sessionId,
+        anonymous_id: this.anonymousId,
+      }).catch(err => {
+        if (this.config.debug) console.warn('[Analytics] Failed to start session:', err);
+      });
+    } catch (e) {
+      // Ignore
+    }
+  }
+
+  private updateActivityTimestamp() {
+    localStorage.setItem('omni_analytics_last_active', Date.now().toString());
+  }
+
+  private setupSessionListeners() {
+    const SESSION_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
+
+    const checkSessionTimeout = () => {
+      const lastActiveStr = localStorage.getItem('omni_analytics_last_active');
+      if (lastActiveStr) {
+        const lastActive = parseInt(lastActiveStr, 10);
+        const now = Date.now();
+        if (now - lastActive > SESSION_TIMEOUT_MS) {
+          if (this.config.debug) console.log('[Analytics] Session timed out, starting new one');
+          this.endSessionBackend(); // End old one if possible
+          this.startNewSession();   // Start new one
+        }
+      }
+      this.updateActivityTimestamp();
+    };
+
+    // Handle visibility change to end/resume sessions
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden') {
+        this.endSessionBackend();
+      } else {
+        // Check if session expired and start new one
+        checkSessionTimeout();
+      }
+    });
+
+    // Update activity on user interactions to keep session alive
+    const updateActivity = () => {
+      this.updateActivityTimestamp();
+    };
+    // Debounce or just set it; localStorage is fast enough for low freq events
+    // but maybe don't add too many listeners. 
+    // Just relying on track() and visibility change is often enough, 
+    // but adding a few key ones covers "reading" time.
+    window.addEventListener('click', updateActivity);
+    window.addEventListener('keydown', updateActivity);
+  }
+
+  private endSessionBackend() {
+    // specific endpoint for ending session
+    // utilizing beacon if possible in future, but for now standard fetch/api
+    const data = { session_id: this.sessionId };
+    const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
+    const url = `${import.meta.env.VITE_API_URL || '/api/v1'}/analytics/session/end`;
+
+    // Use navigator.sendBeacon if available for reliable flush
+    if (navigator.sendBeacon) {
+      navigator.sendBeacon(url, blob);
+    } else {
+      // Fallback
+      api.post('/analytics/session/end', data).catch(() => { });
+    }
   }
 }
 

@@ -159,16 +159,14 @@ export default function SettingsPage() {
               role="switch"
               aria-checked={notifyArchivedMessages}
               onClick={() => setNotifyArchivedMessages(!notifyArchivedMessages)}
-              className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${
-                notifyArchivedMessages ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
-              }`}
+              className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${notifyArchivedMessages ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
+                }`}
             >
               <span className="sr-only">{t('common.accessibility.toggleArchivedNotifications')}</span>
               <span
                 aria-hidden="true"
-                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                  notifyArchivedMessages ? 'translate-x-5' : 'translate-x-0'
-                }`}
+                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${notifyArchivedMessages ? 'translate-x-5' : 'translate-x-0'
+                  }`}
               />
             </button>
           </div>
@@ -208,16 +206,14 @@ export default function SettingsPage() {
                 role="switch"
                 aria-checked={pushEnabled}
                 onClick={() => pushEnabled ? disablePush() : enablePush()}
-                className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${
-                  pushEnabled ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
-                }`}
+                className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${pushEnabled ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
+                  }`}
               >
                 <span className="sr-only">{t('common.accessibility.togglePushNotifications')}</span>
                 <span
                   aria-hidden="true"
-                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                    pushEnabled ? 'translate-x-5' : 'translate-x-0'
-                  }`}
+                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${pushEnabled ? 'translate-x-5' : 'translate-x-0'
+                    }`}
                 />
               </button>
             </div>
@@ -249,16 +245,14 @@ export default function SettingsPage() {
                 role="switch"
                 aria-checked={readReceipts}
                 onClick={() => setReadReceipts(!readReceipts)}
-                className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${
-                  readReceipts ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
-                }`}
+                className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${readReceipts ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
+                  }`}
               >
                 <span className="sr-only">{t('common.accessibility.toggleReadReceipts')}</span>
                 <span
                   aria-hidden="true"
-                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                    readReceipts ? 'translate-x-5' : 'translate-x-0'
-                  }`}
+                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${readReceipts ? 'translate-x-5' : 'translate-x-0'
+                    }`}
                 />
               </button>
             </div>
@@ -278,16 +272,14 @@ export default function SettingsPage() {
                 role="switch"
                 aria-checked={typingIndicators}
                 onClick={() => setTypingIndicators(!typingIndicators)}
-                className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${
-                  typingIndicators ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
-                }`}
+                className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${typingIndicators ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
+                  }`}
               >
                 <span className="sr-only">{t('common.accessibility.toggleTypingIndicators')}</span>
                 <span
                   aria-hidden="true"
-                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                    typingIndicators ? 'translate-x-5' : 'translate-x-0'
-                  }`}
+                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${typingIndicators ? 'translate-x-5' : 'translate-x-0'
+                    }`}
                 />
               </button>
             </div>
@@ -307,16 +299,14 @@ export default function SettingsPage() {
                 role="switch"
                 aria-checked={notificationSound}
                 onClick={() => setNotificationSound(!notificationSound)}
-                className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${
-                  notificationSound ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
-                }`}
+                className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${notificationSound ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
+                  }`}
               >
                 <span className="sr-only">{t('common.accessibility.toggleNotificationSound')}</span>
                 <span
                   aria-hidden="true"
-                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                    notificationSound ? 'translate-x-5' : 'translate-x-0'
-                  }`}
+                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${notificationSound ? 'translate-x-5' : 'translate-x-0'
+                    }`}
                 />
               </button>
             </div>
@@ -363,16 +353,14 @@ export default function SettingsPage() {
                   role="switch"
                   aria-checked={useRelativeTime}
                   onClick={() => setUseRelativeTime(!useRelativeTime)}
-                  className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${
-                    useRelativeTime ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
-                  }`}
+                  className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${useRelativeTime ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
+                    }`}
                 >
                   <span className="sr-only">{t('settings.dateTime.useRelativeTime')}</span>
                   <span
                     aria-hidden="true"
-                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                      useRelativeTime ? 'translate-x-5' : 'translate-x-0'
-                    }`}
+                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${useRelativeTime ? 'translate-x-5' : 'translate-x-0'
+                      }`}
                   />
                 </button>
               </div>
@@ -399,6 +387,7 @@ export default function SettingsPage() {
                 <option value="days">{t('settings.dateTime.cooldownDays')}</option>
                 <option value="date">{t('settings.dateTime.cooldownDate')}</option>
                 <option value="both">{t('settings.dateTime.cooldownBoth')}</option>
+                <option value="both">{t('settings.dateTime.cooldownBoth')}</option>
               </select>
             </div>
           </div>
@@ -415,11 +404,10 @@ export default function SettingsPage() {
           <div className="mt-4 grid gap-4 sm:grid-cols-2">
             <label
               htmlFor="theme-selector-stay-open"
-              className={`flex cursor-pointer flex-col rounded-lg border p-4 ${
-                !autoCloseThemeSelector
+              className={`flex cursor-pointer flex-col rounded-lg border p-4 ${!autoCloseThemeSelector
                   ? 'border-[var(--color-primary)] bg-[var(--color-surface-elevated)] shadow-sm'
                   : 'border-[var(--color-border)]'
-              }`}
+                }`}
             >
               <div className="flex items-center justify-between">
                 <div>
@@ -443,11 +431,10 @@ export default function SettingsPage() {
 
             <label
               htmlFor="theme-selector-auto-close"
-              className={`flex cursor-pointer flex-col rounded-lg border p-4 ${
-                autoCloseThemeSelector
+              className={`flex cursor-pointer flex-col rounded-lg border p-4 ${autoCloseThemeSelector
                   ? 'border-[var(--color-primary)] bg-[var(--color-surface-elevated)] shadow-sm'
                   : 'border-[var(--color-border)]'
-              }`}
+                }`}
             >
               <div className="flex items-center justify-between">
                 <div>
@@ -491,16 +478,14 @@ export default function SettingsPage() {
               role="switch"
               aria-checked={notifyRemovedSavedPosts}
               onClick={() => setNotifyRemovedSavedPosts(!notifyRemovedSavedPosts)}
-              className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${
-                notifyRemovedSavedPosts ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
-              }`}
+              className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${notifyRemovedSavedPosts ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
+                }`}
             >
               <span className="sr-only">{t('settings.savedItems.notifyLabel')}</span>
               <span
                 aria-hidden="true"
-                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                  notifyRemovedSavedPosts ? 'translate-x-5' : 'translate-x-0'
-                }`}
+                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${notifyRemovedSavedPosts ? 'translate-x-5' : 'translate-x-0'
+                  }`}
               />
             </button>
           </div>
@@ -526,16 +511,14 @@ export default function SettingsPage() {
               role="switch"
               aria-checked={defaultOmniPostsOnly}
               onClick={() => setDefaultOmniPostsOnly(!defaultOmniPostsOnly)}
-              className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${
-                defaultOmniPostsOnly ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
-              }`}
+              className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${defaultOmniPostsOnly ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
+                }`}
             >
               <span className="sr-only">{t('common.accessibility.toggleOmniFeed')}</span>
               <span
                 aria-hidden="true"
-                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                  defaultOmniPostsOnly ? 'translate-x-5' : 'translate-x-0'
-                }`}
+                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${defaultOmniPostsOnly ? 'translate-x-5' : 'translate-x-0'
+                  }`}
               />
             </button>
           </div>
@@ -555,16 +538,14 @@ export default function SettingsPage() {
                 role="switch"
                 aria-checked={stayOnPostAfterHide}
                 onClick={() => setStayOnPostAfterHide(!stayOnPostAfterHide)}
-                className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${
-                  stayOnPostAfterHide ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
-                }`}
+                className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${stayOnPostAfterHide ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
+                  }`}
               >
                 <span className="sr-only">{t('settings.omniFeed.stayOnPostLabel')}</span>
                 <span
                   aria-hidden="true"
-                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                    stayOnPostAfterHide ? 'translate-x-5' : 'translate-x-0'
-                  }`}
+                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${stayOnPostAfterHide ? 'translate-x-5' : 'translate-x-0'
+                    }`}
                 />
               </button>
             </div>
@@ -602,16 +583,14 @@ export default function SettingsPage() {
                   role="switch"
                   aria-checked={useInfiniteScrollHome}
                   onClick={() => setUseInfiniteScrollHome(!useInfiniteScrollHome)}
-                  className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${
-                    useInfiniteScrollHome ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
-                  }`}
+                  className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${useInfiniteScrollHome ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
+                    }`}
                 >
                   <span className="sr-only">{t('common.accessibility.toggleInfiniteScroll')}</span>
                   <span
                     aria-hidden="true"
-                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                      useInfiniteScrollHome ? 'translate-x-5' : 'translate-x-0'
-                    }`}
+                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${useInfiniteScrollHome ? 'translate-x-5' : 'translate-x-0'
+                      }`}
                   />
                 </button>
               </div>
@@ -638,16 +617,14 @@ export default function SettingsPage() {
                   role="switch"
                   aria-checked={useInfiniteScrollHubs}
                   onClick={() => setUseInfiniteScrollHubs(!useInfiniteScrollHubs)}
-                  className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${
-                    useInfiniteScrollHubs ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
-                  }`}
+                  className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${useInfiniteScrollHubs ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
+                    }`}
                 >
                   <span className="sr-only">{t('common.accessibility.toggleInfiniteScroll')}</span>
                   <span
                     aria-hidden="true"
-                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                      useInfiniteScrollHubs ? 'translate-x-5' : 'translate-x-0'
-                    }`}
+                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${useInfiniteScrollHubs ? 'translate-x-5' : 'translate-x-0'
+                      }`}
                   />
                 </button>
               </div>
@@ -674,16 +651,14 @@ export default function SettingsPage() {
                   role="switch"
                   aria-checked={useInfiniteScrollSubs}
                   onClick={() => setUseInfiniteScrollSubs(!useInfiniteScrollSubs)}
-                  className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${
-                    useInfiniteScrollSubs ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
-                  }`}
+                  className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${useInfiniteScrollSubs ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
+                    }`}
                 >
                   <span className="sr-only">{t('common.accessibility.toggleInfiniteScroll')}</span>
                   <span
                     aria-hidden="true"
-                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                      useInfiniteScrollSubs ? 'translate-x-5' : 'translate-x-0'
-                    }`}
+                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${useInfiniteScrollSubs ? 'translate-x-5' : 'translate-x-0'
+                      }`}
                   />
                 </button>
               </div>
@@ -714,16 +689,14 @@ export default function SettingsPage() {
                   role="switch"
                   aria-checked={blockAllNsfw}
                   onClick={() => setBlockAllNsfw(!blockAllNsfw)}
-                  className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${
-                    blockAllNsfw ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
-                  }`}
+                  className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${blockAllNsfw ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
+                    }`}
                 >
                   <span className="sr-only">{t('settings.nsfw.blockAll')}</span>
                   <span
                     aria-hidden="true"
-                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                      blockAllNsfw ? 'translate-x-5' : 'translate-x-0'
-                    }`}
+                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${blockAllNsfw ? 'translate-x-5' : 'translate-x-0'
+                      }`}
                   />
                 </button>
               </div>
@@ -751,17 +724,15 @@ export default function SettingsPage() {
                     if (blockAllNsfw) return;
                     setSearchIncludeNsfwByDefault(!searchIncludeNsfwByDefault);
                   }}
-                  className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${
-                    searchIncludeNsfwByDefault && !blockAllNsfw ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
-                  } ${blockAllNsfw ? 'opacity-60' : ''}`}
+                  className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${searchIncludeNsfwByDefault && !blockAllNsfw ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
+                    } ${blockAllNsfw ? 'opacity-60' : ''}`}
                   aria-disabled={blockAllNsfw}
                 >
                   <span className="sr-only">{t('settings.nsfw.defaultInclude')}</span>
                   <span
                     aria-hidden="true"
-                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                      searchIncludeNsfwByDefault && !blockAllNsfw ? 'translate-x-5' : 'translate-x-0'
-                    }`}
+                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${searchIncludeNsfwByDefault && !blockAllNsfw ? 'translate-x-5' : 'translate-x-0'
+                      }`}
                   />
                 </button>
               </div>
@@ -786,16 +757,14 @@ export default function SettingsPage() {
                   role="switch"
                   aria-checked={blockNsfwThumbnails}
                   onClick={() => setBlockNsfwThumbnails(!blockNsfwThumbnails)}
-                  className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${
-                    blockNsfwThumbnails ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
-                  }`}
+                  className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${blockNsfwThumbnails ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
+                    }`}
                 >
                   <span className="sr-only">{t('settings.nsfw.blockThumbnails')}</span>
                   <span
                     aria-hidden="true"
-                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                      blockNsfwThumbnails ? 'translate-x-5' : 'translate-x-0'
-                    }`}
+                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${blockNsfwThumbnails ? 'translate-x-5' : 'translate-x-0'
+                      }`}
                   />
                 </button>
               </div>
@@ -1038,7 +1007,7 @@ export default function SettingsPage() {
         </Panel>
 
         {/* Beta Features (P0-012: Feature Flag Integration Demo) */}
-        {(voiceCallsEnabled.enabled || videoCallsEnabled.enabled || lazyLoadImagesEnabled.enabled) && (
+        {(voiceCallsEnabled || videoCallsEnabled || lazyLoadImagesEnabled) && (
           <>
             <div className="border-b border-[var(--color-border)] pb-2 pt-4">
               <h2 className="text-2xl font-bold text-[var(--color-text-primary)]">{t('settings.betaFeatures.title')}</h2>
@@ -1051,7 +1020,7 @@ export default function SettingsPage() {
               </p>
 
               <div className="mt-4 space-y-4">
-                {voiceCallsEnabled.enabled && (
+                {voiceCallsEnabled && (
                   <div className="rounded-md border border-[var(--color-primary)] bg-blue-50 p-4">
                     <div className="flex items-center gap-2">
                       <span className="text-lg">🎙️</span>
@@ -1065,7 +1034,7 @@ export default function SettingsPage() {
                   </div>
                 )}
 
-                {videoCallsEnabled.enabled && (
+                {videoCallsEnabled && (
                   <div className="rounded-md border border-[var(--color-primary)] bg-blue-50 p-4">
                     <div className="flex items-center gap-2">
                       <span className="text-lg">📹</span>
@@ -1079,7 +1048,7 @@ export default function SettingsPage() {
                   </div>
                 )}
 
-                {lazyLoadImagesEnabled.enabled && (
+                {lazyLoadImagesEnabled && (
                   <div className="rounded-md border border-green-600 bg-green-50 p-4">
                     <div className="flex items-center gap-2">
                       <span className="text-lg">⚡</span>

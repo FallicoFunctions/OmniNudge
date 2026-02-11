@@ -21,13 +21,14 @@ func NewRolloutService(featureFlags *FeatureFlagService) *RolloutService {
 // Uses consistent hashing to ensure same user always gets same result
 func (s *RolloutService) IsFeatureEnabledForUser(ctx context.Context, featureKey string, userID int) (bool, error) {
 	// Check if user has an override first
-	enabled, err := s.featureFlags.IsEnabled(ctx, featureKey, userID)
+	uid := int64(userID)
+	enabled, err := s.featureFlags.IsEnabled(ctx, featureKey, &uid)
 	if err != nil {
 		return false, err
 	}
 
 	// If feature is globally disabled, respect that
-	flag, err := s.featureFlags.GetFlag(ctx, featureKey)
+	flag, err := s.featureFlags.GetFeatureFlag(ctx, featureKey)
 	if err != nil {
 		return false, nil // Default to disabled if flag doesn't exist
 	}
@@ -85,29 +86,29 @@ func GetRolloutStages() []RolloutStage {
 
 // RollbackTriggers defines when to automatically rollback
 type RollbackTriggers struct {
-	ErrorRateThreshold  float64 `json:"error_rate_threshold"`   // e.g., 1.0 = 1%
-	CrashRateThreshold  float64 `json:"crash_rate_threshold"`   // e.g., 0.1 = 0.1%
-	ComplaintThreshold  int     `json:"complaint_threshold"`    // Number of complaints
-	LatencyIncreaseMax  float64 `json:"latency_increase_max"`   // Max % increase in latency
-	EngagementDropMax   float64 `json:"engagement_drop_max"`    // Max % drop in engagement
+	ErrorRateThreshold float64 `json:"error_rate_threshold"` // e.g., 1.0 = 1%
+	CrashRateThreshold float64 `json:"crash_rate_threshold"` // e.g., 0.1 = 0.1%
+	ComplaintThreshold int     `json:"complaint_threshold"`  // Number of complaints
+	LatencyIncreaseMax float64 `json:"latency_increase_max"` // Max % increase in latency
+	EngagementDropMax  float64 `json:"engagement_drop_max"`  // Max % drop in engagement
 }
 
 // GetDefaultRollbackTriggers returns recommended rollback triggers
 func GetDefaultRollbackTriggers() RollbackTriggers {
 	return RollbackTriggers{
-		ErrorRateThreshold: 1.0,   // 1% error rate
-		CrashRateThreshold: 0.1,   // 0.1% crash rate
-		ComplaintThreshold: 10,    // 10 user complaints
-		LatencyIncreaseMax: 20.0,  // 20% latency increase
-		EngagementDropMax:  10.0,  // 10% engagement drop
+		ErrorRateThreshold: 1.0,  // 1% error rate
+		CrashRateThreshold: 0.1,  // 0.1% crash rate
+		ComplaintThreshold: 10,   // 10 user complaints
+		LatencyIncreaseMax: 20.0, // 20% latency increase
+		EngagementDropMax:  10.0, // 10% engagement drop
 	}
 }
 
 // FeatureMetrics defines success metrics for a feature
 type FeatureMetrics struct {
 	FeatureKey          string   `json:"feature_key"`
-	EngagementMetrics   []string `json:"engagement_metrics"`   // e.g., ["messages_sent", "calls_made"]
-	RetentionTarget     float64  `json:"retention_target"`     // Target retention rate
-	NPSTarget           float64  `json:"nps_target"`           // Target NPS score
+	EngagementMetrics   []string `json:"engagement_metrics"`    // e.g., ["messages_sent", "calls_made"]
+	RetentionTarget     float64  `json:"retention_target"`      // Target retention rate
+	NPSTarget           float64  `json:"nps_target"`            // Target NPS score
 	PerformanceBudgetMS int      `json:"performance_budget_ms"` // Max latency in ms
 }

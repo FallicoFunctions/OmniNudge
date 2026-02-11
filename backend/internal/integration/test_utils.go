@@ -112,7 +112,7 @@ func newTestDeps(t *testing.T) *TestDeps {
 	)
 
 	// Handlers
-	authHandler := handlers.NewAuthHandler(authService, userRepo)
+	authHandler := handlers.NewAuthHandler(authService, userRepo, nil, nil, nil, "http://test-frontend")
 	postsHandler := handlers.NewPostsHandler(db.Pool, postRepo, hubRepo, userRepo, modRepo, feedRepo, hubSettingsRepo)
 	commentsHandler := handlers.NewCommentsHandler(db.Pool, commentRepo, postRepo, hubRepo, userRepo, modRepo)
 	redditHandler := handlers.NewRedditHandler(
@@ -120,7 +120,7 @@ func newTestDeps(t *testing.T) *TestDeps {
 		redditPostRepo,
 	)
 	conversationsHandler := handlers.NewConversationsHandler(db.Pool, conversationRepo, messageRepo, userRepo)
-	messagesHandler := handlers.NewMessagesHandler(db.Pool, messageRepo, conversationRepo, userSettingsRepo, hub)
+	messagesHandler := handlers.NewMessagesHandler(db.Pool, messageRepo, conversationRepo, userSettingsRepo, hub, nil)
 	usersHandler := handlers.NewUsersHandler(userRepo, postRepo, commentRepo, nil, modRepo)
 	thumbnailService := services.NewThumbnailService()
 	mediaHandler := handlers.NewMediaHandler(models.NewMediaFileRepository(db.Pool), thumbnailService)
@@ -128,7 +128,8 @@ func newTestDeps(t *testing.T) *TestDeps {
 	hubsHandler := handlers.NewHubsHandler(hubRepo, postRepo, modRepo, hubSubRepo, hubSettingsRepo)
 	moderationHandler := handlers.NewModerationHandler(reportRepo, modRepo)
 	adminHandler := handlers.NewAdminHandler(userRepo, modRepo, db.Pool)
-	wsHandler := handlers.NewWebSocketHandler(hub)
+	authorizer := websocket.NewAuthorizer(db.Pool)
+	wsHandler := handlers.NewWebSocketHandler(hub, authorizer)
 
 	router := gin.New()
 	router.Use(gin.Recovery())

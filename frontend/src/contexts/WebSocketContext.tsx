@@ -300,6 +300,15 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
           break;
         }
 
+        case 'feature_flag_updated': {
+          const { key, enabled, percentage } = data.payload;
+          console.log('[WebSocket] Feature flag updated:', key, enabled, percentage);
+          window.dispatchEvent(new CustomEvent('feature-flag-updated', {
+            detail: { key, enabled, percentage }
+          }));
+          break;
+        }
+
         default:
           console.log('[WebSocket] Unknown message type:', data.type);
       }

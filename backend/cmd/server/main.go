@@ -10,19 +10,20 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/omninudge/backend/internal/api/middleware"
 	"github.com/omninudge/backend/internal/config"
 	"github.com/omninudge/backend/internal/database"
 	"github.com/omninudge/backend/internal/handlers"
 	"github.com/omninudge/backend/internal/models"
-	"github.com/omninudge/backend/internal/queue"
 	"github.com/omninudge/backend/internal/monitoring"
+	"github.com/omninudge/backend/internal/queue"
 	"github.com/omninudge/backend/internal/repository"
 	"github.com/omninudge/backend/internal/services"
 	"github.com/omninudge/backend/internal/utils"
 	"github.com/omninudge/backend/internal/websocket"
 	"github.com/omninudge/backend/internal/workers"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/redis/go-redis/v9"
 )
 
 func main() {
@@ -153,8 +154,20 @@ func main() {
 	)
 	baselineCalculatorService := services.NewBaselineCalculatorService(db.Pool, baselineRepo)
 
+	// Initialize feature flag repository
+	featureFlagRepo := repository.NewFeatureFlagRepository(db.Pool)
+
+	// Initialize Redis client for feature flags
+	var redisClient *redis.Client
+	if cfg.Redis.Addr != "" {
+		redisClient = redis.NewClient(&redis.Options{
+			Addr:     cfg.Redis.Addr,
+			Password: cfg.Redis.Password,
+		})
+	}
+
 	// Initialize feature flag service (P0-012)
-	featureFlagService := services.NewFeatureFlagService(db.Pool)
+	featureFlagService := services.NewFeatureFlagService(featureFlagRepo, redisClient, hub, cfg.AppEnv)
 
 	// Initialize analytics service (P0-027)
 	analyticsService := services.NewAnalyticsService(db.Pool)
@@ -543,6 +556,9 @@ func main() {
 		analytics.Use(middleware.AuthOptional(authService))
 		{
 			analytics.POST("/track", analyticsHandler.TrackEvent)
+			analytics.POST("/session/start", analyticsHandler.StartSession)
+			analytics.POST("/session/end", analyticsHandler.EndSession)
+			analytics.POST("/identify", analyticsHandler.Identify)
 		}
 
 		// Job status routes (P0-002: job status queryable via API)
@@ -568,7 +584,7 @@ func main() {
 			protected.GET("/users/me/saved", savedItemsHandler.GetSavedItems)
 
 			// Feature flags (P0-012: check if feature enabled for user)
-			protected.GET("/features/:key", featureFlagsHandler.GetFlag)
+			protected.GET("/feature-flags", featureFlagsHandler.GetUserFlags)
 
 			// Account deletion (P0-017: GDPR right to erasure)
 			protected.POST("/account/delete", accountDeletionHandler.RequestAccountDeletion)
@@ -851,15 +867,18 @@ func main() {
 				admin.DELETE("/known-bugs/:id", bugReportsHandler.DeleteKnownBug)
 
 				// Feature flags management (P0-012)
-				admin.GET("/features", featureFlagsHandler.ListFlags)
-				admin.PUT("/features/:key", featureFlagsHandler.UpdateFlag)
-				admin.POST("/features/:key/overrides", featureFlagsHandler.SetUserOverride)
-				admin.DELETE("/features/:key/overrides/:user_id", featureFlagsHandler.RemoveUserOverride)
-				admin.GET("/features/:key/audit", featureFlagsHandler.GetAuditLog)
-				admin.POST("/features/:key/rollout", featureFlagsHandler.SetRolloutPercentage)
+				admin.GET("/feature-flags", featureFlagsHandler.ListFlags)
+				admin.GET("/feature-flags/:key", featureFlagsHandler.GetFeatureFlag)
+				admin.POST("/feature-flags", featureFlagsHandler.CreateFlag)
+				admin.PUT("/feature-flags/:key", featureFlagsHandler.UpdateFlag)
+				admin.DELETE("/feature-flags/:key", featureFlagsHandler.DeleteFlag)
+				admin.POST("/feature-flags/:key/overrides", featureFlagsHandler.SetOverride)
+				admin.DELETE("/feature-flags/:key/overrides/:userID", featureFlagsHandler.RemoveOverride)
+				admin.GET("/feature-flags/:key/audit", featureFlagsHandler.GetAuditLog)
 
 				// Analytics management (P0-027)
 				admin.GET("/analytics/dashboard", analyticsHandler.GetDashboard)
+				admin.POST("/analytics/refresh", analyticsHandler.RefreshAnalytics)
 
 				// Data retention management (P0-034)
 				admin.GET("/retention/status", dataRetentionHandler.GetRetentionStatus)

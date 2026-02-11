@@ -81,7 +81,7 @@ func setupMessagesHandlerTest(t *testing.T) (*MessagesHandler, *database.Databas
 		broadcastCalls: make([]*websocket.Message, 0),
 		onlineUsers:    make(map[int]bool),
 	}
-	handler := NewMessagesHandler(db.Pool, messageRepo, convRepo, userSettingsRepo, hub)
+	handler := NewMessagesHandler(db.Pool, messageRepo, convRepo, userSettingsRepo, hub, nil)
 
 	cleanup := func() {
 		db.Close()
