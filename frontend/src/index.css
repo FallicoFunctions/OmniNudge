@@ -375,10 +375,16 @@ td .markdown-content pre {
   background-color: var(--color-surface);
 }
 
+.markdown-content .table-wrapper {
+  overflow-x: auto;
+  margin: 0.75rem 0;
+  -webkit-overflow-scrolling: touch; /* Smooth scroll on iOS */
+}
+
 .markdown-content table {
   border-collapse: collapse;
   width: 100%;
-  margin: 0.75rem 0;
+  margin: 0; /* Wrapper handles margin */
   font-size: 0.85rem;
 }
 

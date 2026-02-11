@@ -42,7 +42,7 @@ export function CreateActionButtons({
   };
 
   return (
-    <div className={`flex flex-wrap items-center gap-2 ${className}`}>
+    <div className={`flex flex-wrap items-center gap-2 lg:flex-nowrap ${className}`}>
       {extraButtons}
       <button
         type="button"

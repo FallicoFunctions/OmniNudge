@@ -612,7 +612,7 @@ export default function PostDetailPage() {
 
   if (!postId || Number.isNaN(parsedPostId)) {
     return (
-      <div className="mx-auto max-w-4xl px-4 py-8">
+      <div className="mx-auto max-w-4xl px-0 py-8 md:px-4">
         <div className="text-[var(--color-text-secondary)]">Invalid post URL</div>
       </div>
     );
@@ -620,7 +620,7 @@ export default function PostDetailPage() {
 
   if (loadingPost) {
     return (
-        <div className="mx-auto max-w-4xl px-4 py-8">
+        <div className="mx-auto max-w-4xl px-0 py-8 md:px-4">
         <PostCardSkeleton />
         </div>
     );
@@ -632,7 +632,7 @@ export default function PostDetailPage() {
       return <NotFoundPage />;
     }
     return (
-      <div className="mx-auto max-w-4xl px-4 py-8">
+      <div className="mx-auto max-w-4xl px-0 py-8 md:px-4">
         <div className="text-[var(--color-text-secondary)]">Failed to load post: {message}</div>
       </div>
     );
@@ -643,7 +643,7 @@ export default function PostDetailPage() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-7xl px-4 py-8">
+    <div className="mx-auto w-full max-w-7xl px-0 py-8 md:px-4">
       {normalizedSubreddit && (
         <CommunityHeader
           communityType="subreddit"
@@ -651,7 +651,7 @@ export default function PostDetailPage() {
           iconUrl={subredditIcon}
           isSubscribed={subredditSubscriptionStatus?.is_subscribed ?? false}
           isNsfw={subredditAbout?.over18 ?? false}
-          searchBars={
+          hubSearch={
             <FeedSearchBars
               showPostForm={false}
               topValue={subredditInputValue}
@@ -678,14 +678,12 @@ export default function PostDetailPage() {
               postDropdownOpen={false}
             />
           }
-          sortControls={
-            <CommunityHeaderControlsRow
-              right={
-                <FeedSearchBars
-                  containerClassName="w-full md:w-96"
-                  showTopForm={false}
-                  topValue={subredditInputValue}
-                  topPlaceholder="Enter hub or subreddit..."
+          postSearch={
+            <FeedSearchBars
+              containerClassName="w-full md:w-96"
+              showTopForm={false}
+              topValue={subredditInputValue}
+              topPlaceholder="Enter hub or subreddit..."
                   onTopChange={handleSubredditInputChange}
                   onTopFocus={() => setIsAutocompleteOpen(true)}
                   onTopBlur={() => setIsAutocompleteOpen(false)}
@@ -741,8 +739,6 @@ export default function PostDetailPage() {
                     </div>
                   }
                 />
-              }
-            />
           }
         />
       )}
@@ -753,7 +749,7 @@ export default function PostDetailPage() {
           displayTitle={hubDisplayTitle}
           isNsfw={hubDetails?.nsfw ?? hubSettings?.nsfw ?? false}
           isModerator={isModerator}
-          searchBars={
+          hubSearch={
             <FeedSearchBars
               showPostForm={false}
               topValue={hubInputValue}
@@ -781,14 +777,12 @@ export default function PostDetailPage() {
               postDropdownOpen={false}
             />
           }
-          sortControls={
-            <CommunityHeaderControlsRow
-              right={
-                <FeedSearchBars
-                  containerClassName="w-full md:w-96"
-                  showTopForm={false}
-                  topValue={hubInputValue}
-                  topPlaceholder="Enter hub or subreddit..."
+          postSearch={
+            <FeedSearchBars
+              containerClassName="w-full md:w-96"
+              showTopForm={false}
+              topValue={hubInputValue}
+              topPlaceholder="Enter hub or subreddit..."
                   onTopChange={handleHubInputChange}
                   onTopFocus={() => setHubIsAutocompleteOpen(true)}
                   onTopBlur={() => setHubIsAutocompleteOpen(false)}
@@ -845,13 +839,11 @@ export default function PostDetailPage() {
                     </div>
                   }
                 />
-              }
-            />
           }
         />
       )}
-      <div className="mt-4 grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
-        <div className="space-y-6">
+      <div className="mt-4 grid gap-6 px-4 md:px-0 lg:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="min-w-0 space-y-6">
           {postData && (
             <Panel>
               <PostHeader
@@ -915,7 +907,7 @@ export default function PostDetailPage() {
               {bodyText && <PostBodyMarkdown content={bodyText} className="mb-4" />}
 
               {/* Vote Buttons and Post Stats */}
-              <div className="flex items-center gap-4">
+              <div className="flex flex-wrap items-center gap-4">
                 <VoteButtons
                   postId={postData.id}
                   initialScore={postData.score}
@@ -923,7 +915,7 @@ export default function PostDetailPage() {
                   layout="horizontal"
                   size="medium"
                 />
-                <div className="flex gap-4 text-xs text-[var(--color-text-secondary)]">
+                <div className="flex flex-wrap gap-4 text-xs text-[var(--color-text-secondary)]">
                   <span>{(postData.comment_count ?? postData.num_comments ?? 0).toLocaleString()} comments</span>
                   <span>•</span>
                   <button onClick={handleSharePost} className="hover:underline">
@@ -1115,7 +1107,7 @@ export default function PostDetailPage() {
         </div>
 
         {(hubName || targetSubreddit) && (
-          <aside className="space-y-4">
+          <aside className="min-w-0 space-y-4">
             {hubName && (
             <>
             <HubAboutPanel

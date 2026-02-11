@@ -23,7 +23,8 @@ interface CommunityHeaderProps {
   isNsfw?: boolean;
 
   // Content slots
-  searchBars?: ReactNode;
+  hubSearch?: ReactNode;
+  postSearch?: ReactNode;
   sortControls?: ReactNode;
 }
 
@@ -36,7 +37,8 @@ export function CommunityHeader({
   iconUrl,
   isSubscribed,
   isNsfw = false,
-  searchBars,
+  hubSearch,
+  postSearch,
   sortControls,
 }: CommunityHeaderProps) {
   const navigate = useNavigate();
@@ -80,10 +82,10 @@ export function CommunityHeader({
   if (!communityName) return null;
 
   return (
-    <div className="mb-0 flex flex-col gap-4">
-      {/* Row 1: Community name, buttons, and search */}
+    <div className="mb-0 flex flex-col gap-4 lg:gap-1">
+      {/* Row 1: Community name and hub search */}
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <div className="flex w-full flex-col gap-4 px-4 md:flex-row md:items-center md:justify-between">
+        <div className="px-4">
           <div className="flex items-center gap-3">
             {iconUrl && (
               <img
@@ -95,7 +97,7 @@ export function CommunityHeader({
               />
             )}
             <div className="flex items-center gap-2">
-              <h1 className="text-3xl font-bold">
+              <h1 className="text-3xl font-bold lg:whitespace-nowrap">
                 <Link to={defaultReturnTo} className="no-underline hover:text-blue-600">
                   {headerLabel}
                 </Link>
@@ -107,7 +109,16 @@ export function CommunityHeader({
               )}
             </div>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
+        </div>
+        <div className="hidden px-4 lg:block">
+          {hubSearch}
+        </div>
+      </div>
+
+      {/* Row 2: Action buttons and post search */}
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div className="px-4">
+          <div className="flex flex-wrap items-center gap-2 lg:flex-nowrap">
             {shouldShowSubscribe && (
               <>
                 {user ? (
@@ -133,7 +144,7 @@ export function CommunityHeader({
                         })
                       )
                     }
-                    className="px-4 py-2 bg-[var(--color-surface-elevated)] text-[var(--color-text-primary)] rounded hover:bg-[var(--color-border)]"
+                    className="whitespace-nowrap px-4 py-2 bg-[var(--color-surface-elevated)] text-[var(--color-text-primary)] rounded hover:bg-[var(--color-border)]"
                   >
                     Subscribe
                   </button>
@@ -143,7 +154,7 @@ export function CommunityHeader({
             {isModerator && isHub && !isSpecialCommunity && (
               <button
                 onClick={() => navigate(`/h/${communityName}/mod`)}
-                className="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700"
+                className="whitespace-nowrap px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700"
               >
                 Mod Tools
               </button>
@@ -192,10 +203,11 @@ export function CommunityHeader({
           </div>
         </div>
         <div className="hidden px-4 lg:block">
-          {searchBars}
+          {postSearch}
         </div>
       </div>
-      {/* Row 2: Sort controls and post search */}
+
+      {/* Row 3: Sort controls */}
       {sortControls}
     </div>
   );

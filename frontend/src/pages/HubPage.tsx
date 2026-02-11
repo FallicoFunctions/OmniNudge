@@ -972,14 +972,14 @@ export default function HubsPage() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-7xl px-4 py-8">
+    <div className="mx-auto w-full max-w-7xl px-0 py-8 md:px-4">
       <CommunityHeader
         communityType="hub"
         communityName={hubname}
         displayTitle={hubDisplayTitle}
         isNsfw={hubDetails?.nsfw ?? hubSettings?.nsfw ?? false}
         isModerator={isModerator}
-        searchBars={
+        hubSearch={
           <FeedSearchBars
             topValue={inputValue}
             topPlaceholder="Enter hub or subreddit..."
@@ -1005,6 +1005,69 @@ export default function HubsPage() {
             onPostSubmit={(e) => e.preventDefault()}
             postDropdownOpen={false}
             showPostForm={false}
+          />
+        }
+        postSearch={
+          <FeedSearchBars
+            containerClassName="w-full md:w-96"
+            showTopForm={false}
+            topValue={inputValue}
+            topPlaceholder="Enter hub or subreddit..."
+            onTopChange={handleTopChange}
+            onTopFocus={() => setIsAutocompleteOpen(true)}
+            onTopBlur={() => setIsAutocompleteOpen(false)}
+            onTopSubmit={handleTopSubmit}
+            topSuggestions={suggestions}
+            topShouldShowSuggestions={shouldShowSuggestions}
+            topIsLoading={isAutocompleteLoading}
+            topEmptyMessage="No hubs or subreddits found."
+            renderTopSuggestion={(suggestion) => (
+              <CombinedSuggestionItem
+                key={`${suggestion.type}-${suggestion.data.name}`}
+                suggestion={suggestion}
+                onSelectHub={handleSelectHubSuggestion}
+                onSelectSubreddit={handleSelectSubredditSuggestion}
+              />
+            )}
+            postValue={postSearchInput}
+            postPlaceholder="Search posts..."
+            onPostChange={(value) => {
+              setPostSearchInput(value);
+              if (!isSearchDropdownOpen) {
+                setIsSearchDropdownOpen(true);
+              }
+            }}
+            onPostFocus={() => setIsSearchDropdownOpen(true)}
+            onPostBlur={() => setTimeout(() => setIsSearchDropdownOpen(false), 120)}
+            onPostSubmit={handlePostSearchSubmit}
+            postDropdownOpen={isSearchDropdownOpen}
+            postDropdownContent={
+              <div className="space-y-2 text-sm text-[var(--color-text-primary)]">
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={limitSearchToContext}
+                    onChange={(e) => setLimitSearchToContext(e.target.checked)}
+                  />
+                  <span>Limit search to h/{hubname}</span>
+                </label>
+                {!blockAllNsfw && (
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={includeNsfwSearch}
+                      onChange={(e) => setIncludeNsfwSearch(e.target.checked)}
+                    />
+                    <span>Include NSFW results</span>
+                  </label>
+                )}
+                {blockAllNsfw && (
+                  <div className="text-xs text-[var(--color-text-secondary)]">
+                    NSFW content is blocked in settings.
+                  </div>
+                )}
+              </div>
+            }
           />
         }
         sortControls={
@@ -1044,69 +1107,6 @@ export default function HubsPage() {
                   </button>
                 )}
               </>
-            }
-            right={
-              <FeedSearchBars
-                containerClassName="w-full md:w-96"
-                showTopForm={false}
-                topValue={inputValue}
-                topPlaceholder="Enter hub or subreddit..."
-                onTopChange={handleTopChange}
-                onTopFocus={() => setIsAutocompleteOpen(true)}
-                onTopBlur={() => setIsAutocompleteOpen(false)}
-                onTopSubmit={handleTopSubmit}
-                topSuggestions={suggestions}
-                topShouldShowSuggestions={shouldShowSuggestions}
-                topIsLoading={isAutocompleteLoading}
-                topEmptyMessage="No hubs or subreddits found."
-                renderTopSuggestion={(suggestion) => (
-                  <CombinedSuggestionItem
-                    key={`${suggestion.type}-${suggestion.data.name}`}
-                    suggestion={suggestion}
-                    onSelectHub={handleSelectHubSuggestion}
-                    onSelectSubreddit={handleSelectSubredditSuggestion}
-                  />
-                )}
-                postValue={postSearchInput}
-                postPlaceholder="Search posts..."
-                onPostChange={(value) => {
-                  setPostSearchInput(value);
-                  if (!isSearchDropdownOpen) {
-                    setIsSearchDropdownOpen(true);
-                  }
-                }}
-                onPostFocus={() => setIsSearchDropdownOpen(true)}
-                onPostBlur={() => setTimeout(() => setIsSearchDropdownOpen(false), 120)}
-                onPostSubmit={handlePostSearchSubmit}
-                postDropdownOpen={isSearchDropdownOpen}
-                postDropdownContent={
-                  <div className="space-y-2 text-sm text-[var(--color-text-primary)]">
-                    <label className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        checked={limitSearchToContext}
-                        onChange={(e) => setLimitSearchToContext(e.target.checked)}
-                      />
-                      <span>Limit search to h/{hubname}</span>
-                    </label>
-                    {!blockAllNsfw && (
-                      <label className="flex items-center gap-2">
-                        <input
-                          type="checkbox"
-                          checked={includeNsfwSearch}
-                          onChange={(e) => setIncludeNsfwSearch(e.target.checked)}
-                        />
-                        <span>Include NSFW results</span>
-                      </label>
-                    )}
-                    {blockAllNsfw && (
-                      <div className="text-xs text-[var(--color-text-secondary)]">
-                        NSFW content is blocked in settings.
-                      </div>
-                    )}
-                  </div>
-                }
-              />
             }
           />
         }
@@ -1156,7 +1156,7 @@ export default function HubsPage() {
       )}
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_300px]">
-        <div>
+        <div className="min-w-0">
           {/* Posts List */}
           {effectivePosts.length > 0 || hasPinnedPosts ? (
             <>
@@ -1242,7 +1242,7 @@ export default function HubsPage() {
         </div>
 
         {showHubSidebar && (
-          <aside className="space-y-4">
+          <aside className="min-w-0 space-y-4">
             <HubAboutPanel
               hubDetails={hubDetails}
               displayTitle={hubDisplayTitle}

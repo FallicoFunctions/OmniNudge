@@ -8,9 +8,9 @@ interface PostHeaderProps {
 
 export function PostHeader({ title, titleBadges, metadataItems }: PostHeaderProps) {
   return (
-    <div className="mb-4 text-left">
+    <div className="mb-4 max-w-full text-left">
       {/* Title */}
-      <h1 className="text-left text-2xl font-bold text-[var(--color-text-primary)]">
+      <h1 className="break-words text-left text-2xl font-bold text-[var(--color-text-primary)]">
         {title}
       </h1>
 
@@ -23,7 +23,7 @@ export function PostHeader({ title, titleBadges, metadataItems }: PostHeaderProp
 
       <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-[var(--color-text-secondary)]">
         {metadataItems.map((item, index) => (
-          <span key={index} className="flex items-center gap-2">
+          <span key={index} className="flex items-center gap-2 break-words">
             {index > 0 && <span>•</span>}
             {item}
           </span>

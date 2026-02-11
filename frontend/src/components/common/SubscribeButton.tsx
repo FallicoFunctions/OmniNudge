@@ -58,7 +58,7 @@ export function SubscribeButton({
     <button
       onClick={handleClick}
       disabled={subscribeMutation.isPending}
-      className={`px-4 py-1.5 rounded font-medium text-sm transition-colors ${
+      className={`whitespace-nowrap px-4 py-1.5 rounded font-medium text-sm transition-colors ${
         isSubscribed
           ? 'bg-red-600 text-white hover:bg-red-700 dark:bg-red-500 dark:text-white dark:hover:bg-red-600'
           : 'bg-blue-600 text-white hover:bg-blue-700'
