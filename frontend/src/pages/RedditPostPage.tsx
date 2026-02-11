@@ -26,7 +26,6 @@ import { Panel } from '../components/common/Panel';
 import { FeedSearchBars } from '../components/common/FeedSearchBars';
 import SubredditAboutPanel from '../components/reddit/SubredditAboutPanel';
 import { CommunityHeader } from '../components/common/CommunityHeader';
-import { CommunityHeaderControlsRow } from '../components/common/CommunityHeaderControlsRow';
 import { SubredditSuggestionItem } from '../components/subreddit/SubredditSuggestionItem';
 import { useSubredditAbout } from '../hooks/useSubredditAbout';
 import { useSavedItems } from '../hooks/useSavedItems';

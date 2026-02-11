@@ -36,7 +36,6 @@ import { canModerateContent } from '../utils/permissions';
 import { isUserHubModerator } from '../utils/moderation';
 import { PostEditModal } from '../components/posts/PostEditModal';
 import { CommunityHeader } from '../components/common/CommunityHeader';
-import { CommunityHeaderControlsRow } from '../components/common/CommunityHeaderControlsRow';
 import { FeedSearchBars } from '../components/common/FeedSearchBars';
 import NotFoundPage from './NotFoundPage';
 import { SubredditSuggestionItem } from '../components/subreddit/SubredditSuggestionItem';
