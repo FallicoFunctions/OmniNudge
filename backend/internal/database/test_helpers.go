@@ -100,3 +100,21 @@ func ensureTestDatabase(ctx context.Context, db *Database) error {
 
 	return fmt.Errorf("refusing to reset non-test database %q; set TEST_DATABASE_URL or use a *_test database", name)
 }
+
+// DropSchema drops and recreates the public schema to ensure a completely clean start.
+func DropSchema(ctx context.Context, db *Database) error {
+	if db == nil || db.Pool == nil {
+		return fmt.Errorf("nil database")
+	}
+
+	if err := ensureTestDatabase(ctx, db); err != nil {
+		return err
+	}
+
+	_, err := db.Pool.Exec(ctx, `
+		DROP SCHEMA public CASCADE;
+		CREATE SCHEMA public;
+		GRANT ALL ON SCHEMA public TO public;
+	`)
+	return err
+}

@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"net/http"
 	"strconv"
@@ -22,7 +21,7 @@ type MessagesHandler struct {
 	conversationRepo *models.ConversationRepository
 	userSettingsRepo *models.UserSettingsRepository
 	hub              HubInterface
-	firebase         *services.FirebaseService
+	notifService     *services.NotificationService
 }
 
 // HubInterface defines the methods we need from the WebSocket hub
@@ -38,7 +37,7 @@ func NewMessagesHandler(
 	conversationRepo *models.ConversationRepository,
 	userSettingsRepo *models.UserSettingsRepository,
 	hub HubInterface,
-	firebase *services.FirebaseService,
+	notifService *services.NotificationService,
 ) *MessagesHandler {
 	return &MessagesHandler{
 		pool:             pool,
@@ -46,7 +45,7 @@ func NewMessagesHandler(
 		conversationRepo: conversationRepo,
 		userSettingsRepo: userSettingsRepo,
 		hub:              hub,
-		firebase:         firebase,
+		notifService:     notifService,
 	}
 }
 
@@ -58,100 +57,7 @@ func (h *MessagesHandler) isAdmin(ctx context.Context, userID int) (bool, error)
 	return isAdmin, err
 }
 
-// sendPushNotification sends a push notification to an offline user (P0-042)
-func (h *MessagesHandler) sendPushNotification(ctx context.Context, message *models.Message, recipientID int) {
-	// Check if Firebase service is available
-	if h.firebase == nil {
-		log.Printf("[Push] Firebase service not initialized, skipping push notification")
-		return
-	}
-
-	// Check if recipient has push notifications enabled
-	settings, err := h.userSettingsRepo.GetByUserID(ctx, recipientID)
-	if err != nil {
-		log.Printf("[Push] Failed to get user settings for user %d: %v", recipientID, err)
-		return
-	}
-
-	// If settings don't exist, create defaults (push notifications enabled by default)
-	if settings == nil {
-		settings, err = h.userSettingsRepo.CreateDefault(ctx, recipientID)
-		if err != nil {
-			log.Printf("[Push] Failed to create default settings for user %d: %v", recipientID, err)
-			return
-		}
-	}
-
-	// Check if user has push notifications enabled
-	if !settings.ShowPushNotifications {
-		log.Printf("[Push] User %d has push notifications disabled", recipientID)
-		return
-	}
-
-	// Get sender's username
-	var senderUsername string
-	err = h.pool.QueryRow(ctx, `SELECT username FROM users WHERE id = $1`, message.SenderID).Scan(&senderUsername)
-	if err != nil {
-		log.Printf("[Push] Failed to get sender username: %v", err)
-		senderUsername = "Someone" // Fallback
-	}
-
-	// Get all device tokens for the recipient
-	rows, err := h.pool.Query(ctx, `
-		SELECT token FROM device_tokens
-		WHERE user_id = $1
-		ORDER BY last_used_at DESC
-	`, recipientID)
-	if err != nil {
-		log.Printf("[Push] Failed to query device tokens for user %d: %v", recipientID, err)
-		return
-	}
-	defer rows.Close()
-
-	var tokens []string
-	for rows.Next() {
-		var token string
-		if err := rows.Scan(&token); err != nil {
-			continue
-		}
-		tokens = append(tokens, token)
-	}
-
-	if len(tokens) == 0 {
-		log.Printf("[Push] No device tokens found for user %d", recipientID)
-		return
-	}
-
-	// Prepare notification content
-	title := fmt.Sprintf("New message from %s", senderUsername)
-	body := "You have a new message" // Don't include content for privacy
-
-	// Add conversation data
-	data := map[string]string{
-		"type":            "message",
-		"conversation_id": strconv.Itoa(message.ConversationID),
-		"message_id":      strconv.Itoa(message.ID),
-		"sender_id":       strconv.Itoa(message.SenderID),
-	}
-
-	// Send push notification
-	if len(tokens) == 1 {
-		err = h.firebase.SendNotification(ctx, tokens[0], title, body, data)
-		if err != nil {
-			log.Printf("[Push] Failed to send notification to user %d: %v", recipientID, err)
-		} else {
-			log.Printf("[Push] Sent notification to user %d (1 device)", recipientID)
-		}
-	} else {
-		response, err := h.firebase.SendMulticast(ctx, tokens, title, body, data)
-		if err != nil {
-			log.Printf("[Push] Failed to send multicast notification to user %d: %v", recipientID, err)
-		} else {
-			log.Printf("[Push] Sent notification to user %d (%d devices, %d successful, %d failed)",
-				recipientID, len(tokens), response.SuccessCount, response.FailureCount)
-		}
-	}
-}
+// sendPushNotification is deprecated and removed in favor of NotificationService.SendMessagePush
 
 // SendMessageRequest represents the request body for sending a message
 type SendMessageRequest struct {
@@ -416,9 +322,9 @@ func (h *MessagesHandler) SendMessage(c *gin.Context) {
 					"delivered_at":    message.DeliveredAt,
 				},
 			})
-		} else {
-			// Recipient is offline - send push notification (P0-042)
-			go h.sendPushNotification(c.Request.Context(), message, recipientID)
+		} else if h.notifService != nil {
+			// Recipient is offline - send push notification via service (P0-042-FLAW: centralized)
+			h.notifService.SendMessagePush(c.Request.Context(), message.SenderID, recipientID, message)
 		}
 	}
 

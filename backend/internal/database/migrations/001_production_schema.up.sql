@@ -15,7 +15,7 @@ SET lock_timeout = 0;
 SET idle_in_transaction_session_timeout = 0;
 SET client_encoding = 'UTF8';
 SET standard_conforming_strings = on;
-SELECT pg_catalog.set_config('search_path', '', false);
+SELECT pg_catalog.set_config('search_path', 'public', false);
 SET check_function_bodies = false;
 SET xmloption = content;
 SET client_min_messages = warning;
@@ -25,7 +25,7 @@ SET row_security = off;
 -- Name: calculate_hot_score(integer, integer, timestamp with time zone); Type: FUNCTION; Schema: public; Owner: -
 --
 
-CREATE FUNCTION public.calculate_hot_score(ups integer, downs integer, created_at timestamp with time zone) RETURNS double precision
+CREATE OR REPLACE FUNCTION public.calculate_hot_score(ups integer, downs integer, created_at timestamp with time zone) RETURNS double precision
     LANGUAGE plpgsql IMMUTABLE
     AS $$
 DECLARE
@@ -62,7 +62,7 @@ $$;
 -- Name: record_comment_vote_activity(); Type: FUNCTION; Schema: public; Owner: -
 --
 
-CREATE FUNCTION public.record_comment_vote_activity() RETURNS trigger
+CREATE OR REPLACE FUNCTION public.record_comment_vote_activity() RETURNS trigger
     LANGUAGE plpgsql
     AS $$
 BEGIN
@@ -88,7 +88,7 @@ $$;
 -- Name: record_post_vote_activity(); Type: FUNCTION; Schema: public; Owner: -
 --
 
-CREATE FUNCTION public.record_post_vote_activity() RETURNS trigger
+CREATE OR REPLACE FUNCTION public.record_post_vote_activity() RETURNS trigger
     LANGUAGE plpgsql
     AS $$
 BEGIN
@@ -114,7 +114,7 @@ $$;
 -- Name: update_comment_search_vector(); Type: FUNCTION; Schema: public; Owner: -
 --
 
-CREATE FUNCTION public.update_comment_search_vector() RETURNS trigger
+CREATE OR REPLACE FUNCTION public.update_comment_search_vector() RETURNS trigger
     LANGUAGE plpgsql
     AS $$
 BEGIN
@@ -128,7 +128,7 @@ $$;
 -- Name: update_hot_score_trigger(); Type: FUNCTION; Schema: public; Owner: -
 --
 
-CREATE FUNCTION public.update_hot_score_trigger() RETURNS trigger
+CREATE OR REPLACE FUNCTION public.update_hot_score_trigger() RETURNS trigger
     LANGUAGE plpgsql
     AS $$
 BEGIN
@@ -142,7 +142,7 @@ $$;
 -- Name: update_hub_search_vector(); Type: FUNCTION; Schema: public; Owner: -
 --
 
-CREATE FUNCTION public.update_hub_search_vector() RETURNS trigger
+CREATE OR REPLACE FUNCTION public.update_hub_search_vector() RETURNS trigger
     LANGUAGE plpgsql
     AS $$
 BEGIN
@@ -158,7 +158,7 @@ $$;
 -- Name: update_post_search_vector(); Type: FUNCTION; Schema: public; Owner: -
 --
 
-CREATE FUNCTION public.update_post_search_vector() RETURNS trigger
+CREATE OR REPLACE FUNCTION public.update_post_search_vector() RETURNS trigger
     LANGUAGE plpgsql
     AS $$
 BEGIN
@@ -175,7 +175,7 @@ $$;
 -- Name: update_theme_install_count(); Type: FUNCTION; Schema: public; Owner: -
 --
 
-CREATE FUNCTION public.update_theme_install_count() RETURNS trigger
+CREATE OR REPLACE FUNCTION public.update_theme_install_count() RETURNS trigger
     LANGUAGE plpgsql
     AS $$
 BEGIN
@@ -195,7 +195,7 @@ $$;
 -- Name: update_theme_rating(); Type: FUNCTION; Schema: public; Owner: -
 --
 
-CREATE FUNCTION public.update_theme_rating() RETURNS trigger
+CREATE OR REPLACE FUNCTION public.update_theme_rating() RETURNS trigger
     LANGUAGE plpgsql
     AS $$
 BEGIN
@@ -224,7 +224,7 @@ $$;
 -- Name: update_user_search_vector(); Type: FUNCTION; Schema: public; Owner: -
 --
 
-CREATE FUNCTION public.update_user_search_vector() RETURNS trigger
+CREATE OR REPLACE FUNCTION public.update_user_search_vector() RETURNS trigger
     LANGUAGE plpgsql
     AS $$
 BEGIN
@@ -1587,10 +1587,10 @@ ALTER SEQUENCE public.saved_reddit_posts_id_seq OWNED BY public.saved_reddit_pos
 -- Name: schema_migrations; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.schema_migrations (
-    version character varying(255) NOT NULL,
-    applied_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP
-);
+-- CREATE TABLE public.schema_migrations (
+--     version character varying(255) NOT NULL,
+--     applied_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP
+-- );
 
 
 --
@@ -2699,8 +2699,8 @@ ALTER TABLE ONLY public.saved_reddit_posts
 -- Name: schema_migrations schema_migrations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.schema_migrations
-    ADD CONSTRAINT schema_migrations_pkey PRIMARY KEY (version);
+-- ALTER TABLE ONLY public.schema_migrations
+--     ADD CONSTRAINT schema_migrations_pkey PRIMARY KEY (version);
 
 
 --

@@ -18,7 +18,7 @@ var migrationsFS embed.FS
 func (db *DB) Migrate(ctx context.Context) error {
 	// Create migrations tracking table if it doesn't exist
 	_, err := db.Pool.Exec(ctx, `
-		CREATE TABLE IF NOT EXISTS schema_migrations (
+		CREATE TABLE IF NOT EXISTS public.schema_migrations (
 			version VARCHAR(255) PRIMARY KEY,
 			applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 		)
@@ -29,7 +29,7 @@ func (db *DB) Migrate(ctx context.Context) error {
 
 	// Get list of applied migrations
 	applied := make(map[string]bool)
-	rows, err := db.Pool.Query(ctx, "SELECT version FROM schema_migrations")
+	rows, err := db.Pool.Query(ctx, "SELECT version FROM public.schema_migrations")
 	if err != nil {
 		return fmt.Errorf("failed to query migrations: %w", err)
 	}
@@ -81,7 +81,7 @@ func (db *DB) Migrate(ctx context.Context) error {
 			if err := executeStatements(ctx, db.Pool, contentStr); err != nil {
 				return fmt.Errorf("failed to execute migration %s: %w", filename, err)
 			}
-			if _, err := db.Pool.Exec(ctx, "INSERT INTO schema_migrations (version) VALUES ($1)", version); err != nil {
+			if _, err := db.Pool.Exec(ctx, "INSERT INTO public.schema_migrations (version) VALUES ($1)", version); err != nil {
 				return fmt.Errorf("failed to record migration %s: %w", filename, err)
 			}
 			fmt.Printf("Applied migration: %s\n", version)
@@ -99,7 +99,7 @@ func (db *DB) Migrate(ctx context.Context) error {
 			return fmt.Errorf("failed to execute migration %s: %w", filename, err)
 		}
 
-		if _, err := tx.Exec(ctx, "INSERT INTO schema_migrations (version) VALUES ($1)", version); err != nil {
+		if _, err := tx.Exec(ctx, "INSERT INTO public.schema_migrations (version) VALUES ($1)", version); err != nil {
 			tx.Rollback(ctx)
 			return fmt.Errorf("failed to record migration %s: %w", filename, err)
 		}
@@ -119,7 +119,7 @@ func (db *DB) MigrateDown(ctx context.Context) error {
 	// Get the last applied migration
 	var version string
 	err := db.Pool.QueryRow(ctx, `
-		SELECT version FROM schema_migrations
+		SELECT version FROM public.schema_migrations
 		ORDER BY applied_at DESC
 		LIMIT 1
 	`).Scan(&version)
@@ -140,7 +140,7 @@ func (db *DB) MigrateDown(ctx context.Context) error {
 		if err := executeStatements(ctx, db.Pool, contentStr); err != nil {
 			return fmt.Errorf("failed to execute rollback %s: %w", downFile, err)
 		}
-		if _, err := db.Pool.Exec(ctx, "DELETE FROM schema_migrations WHERE version = $1", version); err != nil {
+		if _, err := db.Pool.Exec(ctx, "DELETE FROM public.schema_migrations WHERE version = $1", version); err != nil {
 			return fmt.Errorf("failed to remove migration record %s: %w", version, err)
 		}
 		fmt.Printf("Rolled back migration: %s\n", version)
@@ -158,7 +158,7 @@ func (db *DB) MigrateDown(ctx context.Context) error {
 		return fmt.Errorf("failed to execute rollback %s: %w", downFile, err)
 	}
 
-	if _, err := tx.Exec(ctx, "DELETE FROM schema_migrations WHERE version = $1", version); err != nil {
+	if _, err := tx.Exec(ctx, "DELETE FROM public.schema_migrations WHERE version = $1", version); err != nil {
 		tx.Rollback(ctx)
 		return fmt.Errorf("failed to remove migration record %s: %w", version, err)
 	}

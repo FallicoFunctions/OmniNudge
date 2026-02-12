@@ -21,6 +21,21 @@ func NewScrubberService(db *pgxpool.Pool, storage StorageService) *ScrubberServi
 	}
 }
 
+// ScrubMediaFile deletes a single media file from storage and removes its DB record.
+// Idempotent: returns nil if the file does not exist.
+func (s *ScrubberService) ScrubMediaFile(ctx context.Context, mediaFileID int) error {
+	var storagePath string
+	err := s.db.QueryRow(ctx, "SELECT storage_path FROM media_files WHERE id = $1", mediaFileID).Scan(&storagePath)
+	if err != nil {
+		return nil // not found or already deleted
+	}
+	if delErr := s.storage.Delete(ctx, storagePath); delErr != nil {
+		log.Printf("[SCRUBBER] Warning: failed to delete media file %s from storage: %v", storagePath, delErr)
+	}
+	_, err = s.db.Exec(ctx, "DELETE FROM media_files WHERE id = $1", mediaFileID)
+	return err
+}
+
 // ScrubUser permanently deletes all data associated with a user
 func (s *ScrubberService) ScrubUser(ctx context.Context, userID int) error {
 	tx, err := s.db.Begin(ctx)
