@@ -21,8 +21,18 @@ type Config struct {
 	Turnstile   TurnstileConfig
 	Firebase    FirebaseConfig
 	SMTP        SMTPConfig
+	Retention   RetentionConfig
 	FrontendURL string
 	AppEnv      string
+}
+
+// RetentionConfig holds data retention settings
+type RetentionConfig struct {
+	MessageRetentionYears int
+	LogRetentionYears     int
+	ArchiveRetentionYears int
+	DeletionGraceDays     int
+	DryRun                bool
 }
 
 // RedditConfig holds Reddit OAuth configuration
@@ -143,6 +153,13 @@ func Load() (*Config, error) {
 			Password:    getEnv("SMTP_PASSWORD", ""),
 			FromAddress: getEnv("SMTP_FROM_ADDRESS", "noreply@omninudge.com"),
 			FromName:    getEnv("SMTP_FROM_NAME", "OmniNudge"),
+		},
+		Retention: RetentionConfig{
+			MessageRetentionYears: getEnvAsInt("RETENTION_MESSAGE_YEARS", 3),
+			LogRetentionYears:     getEnvAsInt("RETENTION_LOG_YEARS", 1),
+			ArchiveRetentionYears: getEnvAsInt("RETENTION_ARCHIVE_YEARS", 1),
+			DeletionGraceDays:     getEnvAsInt("RETENTION_GRACE_DAYS", 30),
+			DryRun:                getEnvAsBool("RETENTION_DRY_RUN", false),
 		},
 		FrontendURL: getEnv("FRONTEND_URL", "http://localhost:5176"),
 		AppEnv:      getEnv("APP_ENV", "development"),

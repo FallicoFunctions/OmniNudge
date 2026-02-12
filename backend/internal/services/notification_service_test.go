@@ -41,6 +41,7 @@ func setupNotificationTest(t *testing.T) (*NotificationService, *database.Databa
 	settingsRepo := models.NewUserSettingsRepository(db.Pool)
 	postRepo := models.NewPlatformPostRepository(db.Pool)
 	commentRepo := models.NewPostCommentRepository(db.Pool)
+	tokenRepo := models.NewDeviceTokenRepository(db.Pool)
 	hub := websocket.NewHub()
 
 	service := NewNotificationService(
@@ -51,6 +52,8 @@ func setupNotificationTest(t *testing.T) (*NotificationService, *database.Databa
 		settingsRepo,
 		postRepo,
 		commentRepo,
+		tokenRepo,
+		nil, // firebase
 		hub,
 	)
 

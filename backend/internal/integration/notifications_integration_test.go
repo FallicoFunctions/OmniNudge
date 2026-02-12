@@ -12,12 +12,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gin-gonic/gin"
 	"github.com/omninudge/backend/internal/database"
 	"github.com/omninudge/backend/internal/handlers"
 	"github.com/omninudge/backend/internal/models"
 	"github.com/omninudge/backend/internal/services"
 	"github.com/omninudge/backend/internal/websocket"
-	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -29,6 +29,9 @@ func setupNotificationIntegrationTest(t *testing.T) (*gin.Engine, *database.Data
 	require.NoError(t, err)
 
 	ctx := context.Background()
+	err = database.DropSchema(ctx, db)
+	require.NoError(t, err)
+
 	err = db.Migrate(ctx)
 	require.NoError(t, err)
 
@@ -45,6 +48,7 @@ func setupNotificationIntegrationTest(t *testing.T) (*gin.Engine, *database.Data
 	baselineRepo := models.NewUserBaselineRepository(db.Pool)
 	batchRepo := models.NewNotificationBatchRepository(db.Pool)
 	settingsRepo := models.NewUserSettingsRepository(db.Pool)
+	tokenRepo := models.NewDeviceTokenRepository(db.Pool)
 
 	// Initialize WebSocket hub
 	hub := websocket.NewHub()
@@ -58,6 +62,8 @@ func setupNotificationIntegrationTest(t *testing.T) (*gin.Engine, *database.Data
 		settingsRepo,
 		postRepo,
 		commentRepo,
+		tokenRepo,
+		nil, // firebase
 		hub,
 	)
 
@@ -394,4 +400,41 @@ func TestNotificationDisabledBySettings(t *testing.T) {
 	notifications, err := notifRepo.GetByUserID(ctx, authorID, 10, 0, false)
 	require.NoError(t, err)
 	assert.Len(t, notifications, 0, "Should not create notification when disabled")
+}
+func TestSendMessagePush(t *testing.T) {
+	_, db, notifService, cleanup := setupNotificationIntegrationTest(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	senderID, recipientID, _, _ := createIntegrationTestData(t, db)
+
+	// Register a device token for recipient
+	tokenRepo := models.NewDeviceTokenRepository(db.Pool)
+	err := tokenRepo.Upsert(ctx, &models.DeviceToken{
+		UserID:     recipientID,
+		Token:      "recipient_token_1",
+		DeviceType: "ios",
+	})
+	require.NoError(t, err)
+
+	message := &models.Message{
+		ID:               1001,
+		ConversationID:   500,
+		SenderID:         senderID,
+		EncryptedContent: "Encrypted: Hello there!",
+	}
+
+	// Trigger push (this is async)
+	notifService.SendMessagePush(ctx, senderID, recipientID, message)
+
+	// Since we can't easily wait for the async push without a mock/hook,
+	// we just verify it doesn't panic and we can still fetch settings/tokens.
+	// In a real test, we would mock FirebaseService to verify s.firebase.SendMulticast was called.
+
+	// Let's at least verify a notification RECORD is not created in DB for chat pushes
+	// (they are fire-and-forget push only, no persistent DB record currently)
+	notifRepo := models.NewNotificationRepository(db.Pool)
+	notifications, err := notifRepo.GetByUserID(ctx, recipientID, 10, 0, false)
+	require.NoError(t, err)
+	assert.Len(t, notifications, 0, "Chat pushes should not create persistent DB notification records")
 }

@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"fmt"
 	"log"
 
 	firebase "firebase.google.com/go/v4"
@@ -52,6 +53,12 @@ func (s *FirebaseService) SendNotification(ctx context.Context, token, title, bo
 	// Send the message
 	response, err := s.client.Send(ctx, message)
 	if err != nil {
+		if messaging.IsRegistrationTokenNotRegistered(err) {
+			return fmt.Errorf("registration-token-not-registered")
+		}
+		if messaging.IsInvalidArgument(err) {
+			return fmt.Errorf("invalid-registration-token")
+		}
 		log.Printf("Failed to send FCM message: %v", err)
 		return err
 	}

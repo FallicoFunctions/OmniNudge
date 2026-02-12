@@ -31,97 +31,115 @@ type RetentionStatus struct {
 func (h *DataRetentionHandler) GetRetentionStatus(c *gin.Context) {
 	ctx := c.Request.Context()
 
+	// Load retention periods from DB so the status reflects admin-configured values
+	settingsRows, err := h.db.Query(ctx, `
+		SELECT data_type, retention_days FROM retention_settings WHERE enabled = TRUE
+	`)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load retention settings"})
+		return
+	}
+	defer settingsRows.Close()
+
+	retention := map[string]int{
+		// Defaults — overwritten by DB values below
+		"messages":               1095,
+		"call_logs":              365,
+		"archived_conversations": 365,
+		"analytics_events":       730,
+		"deleted_users":          30,
+	}
+	for settingsRows.Next() {
+		var dataType string
+		var days int
+		if err := settingsRows.Scan(&dataType, &days); err == nil {
+			retention[dataType] = days
+		}
+	}
+
 	var status []RetentionStatus
 
-	// Messages (3 year retention)
-	messagesCutoff := time.Now().AddDate(-3, 0, 0)
+	// Messages
+	messagesCutoff := time.Now().AddDate(0, 0, -retention["messages"])
 	var messagesCount int64
-	err := h.db.QueryRow(ctx, `
-		SELECT COUNT(*) FROM messages WHERE created_at < $1
-	`, messagesCutoff).Scan(&messagesCount)
-	if err != nil {
+	if err := h.db.QueryRow(ctx, `SELECT COUNT(*) FROM messages WHERE sent_at < $1`, messagesCutoff).Scan(&messagesCount); err != nil {
 		messagesCount = 0
 	}
 	status = append(status, RetentionStatus{
 		DataType:        "messages",
-		RetentionPeriod: "3 years",
+		RetentionPeriod: formatRetentionPeriod(retention["messages"]),
 		Cutoff:          messagesCutoff,
 		Count:           messagesCount,
-		SizeEstimate:    estimateSize(messagesCount, 2000), // ~2KB per message
+		SizeEstimate:    estimateSize(messagesCount, 2000),
 	})
 
-	// Call logs (1 year retention)
-	callLogsCutoff := time.Now().AddDate(-1, 0, 0)
+	// Call logs
+	callLogsCutoff := time.Now().AddDate(0, 0, -retention["call_logs"])
 	var callLogsCount int64
-	err = h.db.QueryRow(ctx, `
-		SELECT COUNT(*) FROM call_logs WHERE created_at < $1
-	`, callLogsCutoff).Scan(&callLogsCount)
-	if err != nil {
-		// Table may not exist yet
-		callLogsCount = 0
+	if err := h.db.QueryRow(ctx, `SELECT COUNT(*) FROM call_logs WHERE created_at < $1`, callLogsCutoff).Scan(&callLogsCount); err != nil {
+		callLogsCount = 0 // table may not exist yet
 	}
 	status = append(status, RetentionStatus{
 		DataType:        "call_logs",
-		RetentionPeriod: "1 year",
+		RetentionPeriod: formatRetentionPeriod(retention["call_logs"]),
 		Cutoff:          callLogsCutoff,
 		Count:           callLogsCount,
-		SizeEstimate:    estimateSize(callLogsCount, 1000), // ~1KB per call log
+		SizeEstimate:    estimateSize(callLogsCount, 1000),
 	})
 
-	// Archived conversations (1 year retention)
-	archivedCutoff := time.Now().AddDate(-1, 0, 0)
+	// Archived conversations
+	archivedCutoff := time.Now().AddDate(0, 0, -retention["archived_conversations"])
 	var archivedCount int64
-	err = h.db.QueryRow(ctx, `
+	if err := h.db.QueryRow(ctx, `
 		SELECT COUNT(*) FROM conversations
-		WHERE archived_at IS NOT NULL AND archived_at < $1
-	`, archivedCutoff).Scan(&archivedCount)
-	if err != nil {
+		WHERE status = 'archived' AND archived_at < $1
+	`, archivedCutoff).Scan(&archivedCount); err != nil {
 		archivedCount = 0
 	}
 	status = append(status, RetentionStatus{
 		DataType:        "archived_conversations",
-		RetentionPeriod: "1 year",
+		RetentionPeriod: formatRetentionPeriod(retention["archived_conversations"]),
 		Cutoff:          archivedCutoff,
 		Count:           archivedCount,
-		SizeEstimate:    estimateSize(archivedCount, 5000), // ~5KB per conversation
+		SizeEstimate:    estimateSize(archivedCount, 5000),
 	})
 
-	// Analytics events (2 year anonymization)
-	analyticsCutoff := time.Now().AddDate(-2, 0, 0)
+	// Analytics events (pending anonymization)
+	analyticsCutoff := time.Now().AddDate(0, 0, -retention["analytics_events"])
 	var analyticsCount int64
-	err = h.db.QueryRow(ctx, `
+	if err := h.db.QueryRow(ctx, `
 		SELECT COUNT(*) FROM analytics_events
 		WHERE created_at < $1 AND user_id IS NOT NULL
-	`, analyticsCutoff).Scan(&analyticsCount)
-	if err != nil {
+	`, analyticsCutoff).Scan(&analyticsCount); err != nil {
 		analyticsCount = 0
 	}
 	status = append(status, RetentionStatus{
 		DataType:        "analytics_events (to anonymize)",
-		RetentionPeriod: "2 years",
+		RetentionPeriod: formatRetentionPeriod(retention["analytics_events"]),
 		Cutoff:          analyticsCutoff,
 		Count:           analyticsCount,
-		SizeEstimate:    estimateSize(analyticsCount, 500), // ~500B per event
+		SizeEstimate:    estimateSize(analyticsCount, 500),
 	})
 
-	// Soft-deleted users (30 day retention)
-	usersCutoff := time.Now().AddDate(0, 0, -30)
+	// Soft-deleted users pending permanent deletion.
+	// Use NOW() to match the AccountCleanupWorker's query: we want to show all
+	// users whose grace period has elapsed, not only those overdue by retention["deleted_users"] days.
+	usersCutoff := time.Now()
 	var usersCount int64
-	err = h.db.QueryRow(ctx, `
+	if err := h.db.QueryRow(ctx, `
 		SELECT COUNT(*) FROM users
 		WHERE deleted_at IS NOT NULL
-		AND permanent_deletion_at IS NOT NULL
-		AND permanent_deletion_at < NOW()
-	`, usersCutoff).Scan(&usersCount)
-	if err != nil {
+		  AND permanent_deletion_at IS NOT NULL
+		  AND permanent_deletion_at < $1
+	`, usersCutoff).Scan(&usersCount); err != nil {
 		usersCount = 0
 	}
 	status = append(status, RetentionStatus{
 		DataType:        "deleted_users",
-		RetentionPeriod: "30 days",
+		RetentionPeriod: formatRetentionPeriod(retention["deleted_users"]),
 		Cutoff:          usersCutoff,
 		Count:           usersCount,
-		SizeEstimate:    estimateSize(usersCount, 10000), // ~10KB per user with all data
+		SizeEstimate:    estimateSize(usersCount, 10000),
 	})
 
 	c.JSON(http.StatusOK, gin.H{
@@ -266,7 +284,7 @@ func (h *DataRetentionHandler) UpdateRetentionPolicy(c *gin.Context) {
 // GET /api/v1/admin/retention/history
 func (h *DataRetentionHandler) GetRetentionHistory(c *gin.Context) {
 	ctx := c.Request.Context()
-	dataType := c.Query("data_type") // Optional filter
+	dataType := c.Query("data_type") // optional filter
 
 	query := `
 		SELECT
@@ -282,21 +300,15 @@ func (h *DataRetentionHandler) GetRetentionHistory(c *gin.Context) {
 		LEFT JOIN users u ON rsa.changed_by = u.id
 	`
 
-	var rows interface{ Close() }
-	var err error
-
+	var args []interface{}
 	if dataType != "" {
 		query += ` WHERE rsa.data_type = $1 ORDER BY rsa.changed_at DESC LIMIT 50`
-		rows_result, err2 := h.db.Query(ctx, query, dataType)
-		rows = rows_result
-		err = err2
+		args = append(args, dataType)
 	} else {
 		query += ` ORDER BY rsa.changed_at DESC LIMIT 100`
-		rows_result, err2 := h.db.Query(ctx, query)
-		rows = rows_result
-		err = err2
 	}
 
+	rows, err := h.db.Query(ctx, query, args...)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch retention history"})
 		return
@@ -304,40 +316,32 @@ func (h *DataRetentionHandler) GetRetentionHistory(c *gin.Context) {
 	defer rows.Close()
 
 	type HistoryEntry struct {
-		DataType           string     `json:"data_type"`
-		OldRetentionDays   int        `json:"old_retention_days"`
-		NewRetentionDays   int        `json:"new_retention_days"`
-		OldEnabled         bool       `json:"old_enabled"`
-		NewEnabled         bool       `json:"new_enabled"`
-		ChangedAt          time.Time  `json:"changed_at"`
-		Reason             *string    `json:"reason"`
-		ChangedByUsername  *string    `json:"changed_by_username"`
+		DataType          string    `json:"data_type"`
+		OldRetentionDays  int       `json:"old_retention_days"`
+		NewRetentionDays  int       `json:"new_retention_days"`
+		OldEnabled        bool      `json:"old_enabled"`
+		NewEnabled        bool      `json:"new_enabled"`
+		ChangedAt         time.Time `json:"changed_at"`
+		Reason            *string   `json:"reason"`
+		ChangedByUsername *string   `json:"changed_by_username"`
 	}
 
 	var history []HistoryEntry
-	// Type assertion to access rows
-	if pgRows, ok := rows.(interface {
-		Next() bool
-		Scan(...interface{}) error
-		Close()
-	}); ok {
-		for pgRows.Next() {
-			var entry HistoryEntry
-			err := pgRows.Scan(
-				&entry.DataType,
-				&entry.OldRetentionDays,
-				&entry.NewRetentionDays,
-				&entry.OldEnabled,
-				&entry.NewEnabled,
-				&entry.ChangedAt,
-				&entry.Reason,
-				&entry.ChangedByUsername,
-			)
-			if err != nil {
-				continue
-			}
-			history = append(history, entry)
+	for rows.Next() {
+		var entry HistoryEntry
+		if err := rows.Scan(
+			&entry.DataType,
+			&entry.OldRetentionDays,
+			&entry.NewRetentionDays,
+			&entry.OldEnabled,
+			&entry.NewEnabled,
+			&entry.ChangedAt,
+			&entry.Reason,
+			&entry.ChangedByUsername,
+		); err != nil {
+			continue
 		}
+		history = append(history, entry)
 	}
 
 	c.JSON(http.StatusOK, gin.H{

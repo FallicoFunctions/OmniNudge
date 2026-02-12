@@ -84,6 +84,7 @@ func main() {
 	savedItemsRepo := models.NewSavedItemsRepository(db.Pool)
 	hubSubRepo := models.NewHubSubscriptionRepository(db.Pool)
 	subredditSubRepo := models.NewSubredditSubscriptionRepository(db.Pool)
+	tokenRepo := models.NewDeviceTokenRepository(db.Pool)
 
 	// Moderation Phase 1 repositories
 	hubBanRepo := models.NewHubBanRepository(db.Pool)
@@ -141,6 +142,18 @@ func main() {
 		log.Println("Warning: Job queue disabled (Redis not configured)")
 	}
 
+	// Initialize Firebase Cloud Messaging (P0-042)
+	var firebaseService *services.FirebaseService
+	if cfg.Firebase.CredentialsPath != "" {
+		var err error
+		firebaseService, err = services.NewFirebaseService(cfg.Firebase.CredentialsPath)
+		if err != nil {
+			log.Printf("Warning: Failed to initialize Firebase: %v", err)
+		}
+	} else {
+		log.Println("Firebase credentials not configured, push notifications disabled")
+	}
+
 	// Initialize notification services
 	notificationService := services.NewNotificationService(
 		db.Pool,
@@ -150,6 +163,8 @@ func main() {
 		userSettingsRepo,
 		postRepo,
 		commentRepo,
+		tokenRepo,
+		firebaseService,
 		hub,
 	)
 	baselineCalculatorService := services.NewBaselineCalculatorService(db.Pool, baselineRepo)
@@ -183,18 +198,6 @@ func main() {
 
 	// Inject storage service into appropriate handlers/workers if needed
 	_ = storageService // Will be used by export worker
-
-	// Initialize Firebase Cloud Messaging (P0-042)
-	var firebaseService *services.FirebaseService
-	if cfg.Firebase.CredentialsPath != "" {
-		var err error
-		firebaseService, err = services.NewFirebaseService(cfg.Firebase.CredentialsPath)
-		if err != nil {
-			log.Printf("Warning: Failed to initialize Firebase: %v", err)
-		}
-	} else {
-		log.Println("Firebase credentials not configured, push notifications disabled")
-	}
 
 	// Initialize email service (P0-036)
 	emailService := services.NewEmailService(
@@ -252,8 +255,8 @@ func main() {
 	go accountCleanupWorker.Start(workerCtx)
 
 	// Start data retention worker (P0-034: automated data deletion per retention policy)
-	dataRetentionWorker := workers.NewDataRetentionWorker(db.Pool)
-	go dataRetentionWorker.Start(workerCtx)
+	retentionWorker := workers.NewRetentionWorker(db.Pool, scrubberService, storageService, cfg.Retention)
+	go retentionWorker.Start(workerCtx)
 
 	// Initialize repositories for email verification
 	emailVerificationRepo := models.NewEmailVerificationRepository(db.Pool)
@@ -271,7 +274,7 @@ func main() {
 	// Initialize CSS sanitizer
 	cssSanitizer := services.NewCSSSanitizer()
 
-	messagesHandler := handlers.NewMessagesHandler(db.Pool, messageRepo, conversationRepo, userSettingsRepo, hub, firebaseService)
+	messagesHandler := handlers.NewMessagesHandler(db.Pool, messageRepo, conversationRepo, userSettingsRepo, hub, notificationService)
 	usersHandler := handlers.NewUsersHandler(userRepo, postRepo, commentRepo, authService, hubModRepo)
 	mediaHandler := handlers.NewMediaHandler(mediaRepo, thumbnailService)
 	hubsHandler := handlers.NewHubsHandlerWithAccessRequest(hubRepo, postRepo, hubModRepo, hubSubRepo, hubSettingsRepo, hubAccessRequestRepo)
@@ -323,7 +326,7 @@ func main() {
 	analyticsHandler := handlers.NewAnalyticsHandler(analyticsService)
 	logHandler := handlers.NewLogHandler(analyticsService)
 	dataRetentionHandler := handlers.NewDataRetentionHandler(db.Pool)
-	pushNotificationHandler := handlers.NewPushNotificationHandler(db.Pool, firebaseService)
+	pushNotificationHandler := handlers.NewPushNotificationHandler(db.Pool, tokenRepo, firebaseService)
 
 	// Check ffmpeg availability for iOS audio encoding (P0-003)
 	if err := handlers.CheckFFmpegAvailability(); err != nil {
@@ -619,7 +622,7 @@ func main() {
 			protected.POST("/devices/register", pushNotificationHandler.RegisterDeviceToken)
 			protected.DELETE("/devices/unregister", pushNotificationHandler.UnregisterDeviceToken)
 			protected.GET("/devices", pushNotificationHandler.GetUserDevices)
-			protected.POST("/devices/test", pushNotificationHandler.TestNotification)
+			protected.POST("/devices/test", middleware.RequireRole("admin"), pushNotificationHandler.TestNotification)
 
 			protected.GET("/users/me/hidden", savedItemsHandler.GetHiddenItems)
 			protected.GET("/hubs/agent-targets", hubsHandler.GetAgentTargets)
