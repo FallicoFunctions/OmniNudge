@@ -1,5 +1,7 @@
 import type { UserTheme } from '../../types/theme';
+import { useTranslation } from 'react-i18next';
 import { getThemeVariable } from '../../utils/theme';
+import { useFormat } from '../../hooks/useFormat';
 
 interface ThemePreviewCardProps {
   theme: UserTheme;
@@ -9,14 +11,16 @@ interface ThemePreviewCardProps {
 }
 
 const ThemePreviewCard = ({ theme, isActive, onSelect, onEdit }: ThemePreviewCardProps) => {
+  const { t } = useTranslation();
+  const { formatNumber } = useFormat();
   const installs = theme.install_count ?? 0;
-  const rating = theme.average_rating ?? 0;
+  const rating = theme.average_rating;
 
   const palette = [
-    { label: 'Primary', value: getThemeVariable(theme, '--color-primary', '#3b82f6') },
-    { label: 'Surface', value: getThemeVariable(theme, '--color-surface', '#ffffff') },
-    { label: 'Background', value: getThemeVariable(theme, '--color-background', '#f3f4f6') },
-    { label: 'Accent', value: getThemeVariable(theme, '--color-success', '#10b981') },
+    { id: 'primary', label: t('themes.previewCard.palette.primary'), value: getThemeVariable(theme, '--color-primary', '#3b82f6') },
+    { id: 'surface', label: t('themes.previewCard.palette.surface'), value: getThemeVariable(theme, '--color-surface', '#ffffff') },
+    { id: 'background', label: t('themes.previewCard.palette.background'), value: getThemeVariable(theme, '--color-background', '#f3f4f6') },
+    { id: 'accent', label: t('themes.previewCard.palette.accent'), value: getThemeVariable(theme, '--color-success', '#10b981') },
   ];
 
   const previewStyles = {
@@ -49,7 +53,7 @@ const ThemePreviewCard = ({ theme, isActive, onSelect, onEdit }: ThemePreviewCar
         </div>
         {isActive && (
           <span className="rounded-full bg-[var(--color-primary)]/10 px-3 py-1 text-xs font-semibold text-[var(--color-primary)]">
-            Active
+            {t('themes.previewCard.badges.active')}
           </span>
         )}
       </header>
@@ -74,10 +78,10 @@ const ThemePreviewCard = ({ theme, isActive, onSelect, onEdit }: ThemePreviewCar
                   className="text-sm font-semibold"
                   style={{ color: previewStyles.textPrimary }}
                 >
-                  Header
+                  {t('themes.previewCard.preview.header')}
                 </p>
                 <p className="text-xs" style={{ color: previewStyles.textSecondary }}>
-                  Navigation · Profile
+                  {t('themes.previewCard.preview.subheader')}
                 </p>
               </div>
               <span
@@ -87,7 +91,7 @@ const ThemePreviewCard = ({ theme, isActive, onSelect, onEdit }: ThemePreviewCar
                   color: '#fff',
                 }}
               >
-                CTA
+                {t('themes.previewCard.preview.cta')}
               </span>
             </div>
             <div className="mt-4 space-y-2">
@@ -101,10 +105,10 @@ const ThemePreviewCard = ({ theme, isActive, onSelect, onEdit }: ThemePreviewCar
                     className="text-sm font-medium"
                     style={{ color: previewStyles.textPrimary }}
                   >
-                    Content block {index}
+                    {t('themes.previewCard.preview.contentBlock', { index })}
                   </div>
                   <div className="mt-1 text-xs" style={{ color: previewStyles.textSecondary }}>
-                    Secondary text preview
+                    {t('themes.previewCard.preview.secondaryText')}
                   </div>
                 </div>
               ))}
@@ -115,7 +119,7 @@ const ThemePreviewCard = ({ theme, isActive, onSelect, onEdit }: ThemePreviewCar
 
       <div className="mt-4 flex flex-wrap items-center gap-3">
         {palette.map((swatch) => (
-          <div key={swatch.label} className="flex flex-col items-center gap-1 text-center">
+          <div key={swatch.id} className="flex flex-col items-center gap-1 text-center">
             <span
               className="h-8 w-8 rounded-full border border-[var(--color-border)]"
               style={{ backgroundColor: swatch.value }}
@@ -128,8 +132,18 @@ const ThemePreviewCard = ({ theme, isActive, onSelect, onEdit }: ThemePreviewCar
       </div>
 
       <div className="mt-4 flex items-center justify-between text-sm text-[var(--color-text-secondary)]">
-        <span>⭐ {rating.toFixed(1)}</span>
-        <span>{installs.toLocaleString()} installs</span>
+        <span>
+          ⭐{' '}
+          {typeof rating === 'number'
+            ? formatNumber(rating, { minimumFractionDigits: 1, maximumFractionDigits: 1 })
+            : t('themes.previewCard.ratingFallback')}
+        </span>
+        <span>
+          {t('themes.previewCard.installs', {
+            count: installs,
+            formattedCount: formatNumber(installs),
+          })}
+        </span>
       </div>
 
       <div className="mt-4 flex gap-2">
@@ -139,7 +153,7 @@ const ThemePreviewCard = ({ theme, isActive, onSelect, onEdit }: ThemePreviewCar
           onClick={() => onSelect?.(theme)}
           disabled={isActive}
         >
-          {isActive ? 'Selected' : 'Use Theme'}
+          {isActive ? t('themes.previewCard.actions.selected') : t('themes.previewCard.actions.useTheme')}
         </button>
         {onEdit && (
           <button
@@ -147,7 +161,7 @@ const ThemePreviewCard = ({ theme, isActive, onSelect, onEdit }: ThemePreviewCar
             className="rounded-lg border border-[var(--color-border)] px-4 py-2 text-sm font-semibold text-[var(--color-text-primary)]"
             onClick={() => onEdit(theme)}
           >
-            Edit
+            {t('themes.previewCard.actions.edit')}
           </button>
         )}
       </div>

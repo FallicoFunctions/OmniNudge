@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Inbox,
   Search,
@@ -79,118 +80,152 @@ export function EmptyState({
 
 // Pre-configured empty state variants
 export function EmptyInbox({ onCompose }: { onCompose?: () => void }) {
+  const { t } = useTranslation();
   return (
     <EmptyState
       icon={Inbox}
-      title="No messages yet"
-      description="Start a conversation to see your messages here."
-      action={onCompose ? { label: 'New Message', onClick: onCompose } : undefined}
+      title={t('emptyStates.inbox.title')}
+      description={t('emptyStates.inbox.description')}
+      action={
+        onCompose
+          ? { label: t('emptyStates.inbox.actions.newMessage'), onClick: onCompose }
+          : undefined
+      }
     />
   );
 }
 
 export function EmptySearchResults({ query }: { query?: string }) {
+  const { t } = useTranslation();
   return (
     <EmptyState
       icon={Search}
-      title="No results found"
+      title={t('emptyStates.searchResults.title')}
       description={
         query
-          ? `We couldn't find anything matching "${query}". Try different keywords.`
-          : 'Try adjusting your search to find what you\'re looking for.'
+          ? t('emptyStates.searchResults.descriptionWithQuery', { query })
+          : t('emptyStates.searchResults.descriptionNoQuery')
       }
     />
   );
 }
 
 export function EmptyNotifications() {
+  const { t } = useTranslation();
   return (
     <EmptyState
       icon={Bell}
-      title="No notifications"
-      description="You're all caught up! We'll notify you when something new happens."
+      title={t('emptyStates.notifications.title')}
+      description={t('emptyStates.notifications.description')}
     />
   );
 }
 
 export function EmptyConversations({ onCreate }: { onCreate?: () => void }) {
+  const { t } = useTranslation();
   return (
     <EmptyState
       icon={MessageSquare}
-      title="No conversations"
-      description="Start chatting with friends and communities."
-      action={onCreate ? { label: 'Start Conversation', onClick: onCreate } : undefined}
+      title={t('emptyStates.conversations.title')}
+      description={t('emptyStates.conversations.description')}
+      action={
+        onCreate
+          ? { label: t('emptyStates.conversations.actions.start'), onClick: onCreate }
+          : undefined
+      }
     />
   );
 }
 
 export function EmptyPosts({ onCreate }: { onCreate?: () => void }) {
+  const { t } = useTranslation();
   return (
     <EmptyState
       icon={FileText}
-      title="No posts yet"
-      description="Be the first to share something with the community."
-      action={onCreate ? { label: 'Create Post', onClick: onCreate } : undefined}
+      title={t('emptyStates.posts.title')}
+      description={t('emptyStates.posts.description')}
+      action={
+        onCreate
+          ? { label: t('emptyStates.posts.actions.create'), onClick: onCreate }
+          : undefined
+      }
     />
   );
 }
 
 export function EmptyGallery({ onUpload }: { onUpload?: () => void }) {
+  const { t } = useTranslation();
   return (
     <EmptyState
       icon={Image}
-      title="No images yet"
-      description="Upload your first image to get started."
-      action={onUpload ? { label: 'Upload Image', onClick: onUpload } : undefined}
+      title={t('emptyStates.gallery.title')}
+      description={t('emptyStates.gallery.description')}
+      action={
+        onUpload
+          ? { label: t('emptyStates.gallery.actions.upload'), onClick: onUpload }
+          : undefined
+      }
     />
   );
 }
 
 export function EmptyMembers({ onInvite }: { onInvite?: () => void }) {
+  const { t } = useTranslation();
   return (
     <EmptyState
       icon={Users}
-      title="No members yet"
-      description="Invite people to join your community."
-      action={onInvite ? { label: 'Invite Members', onClick: onInvite } : undefined}
+      title={t('emptyStates.members.title')}
+      description={t('emptyStates.members.description')}
+      action={
+        onInvite
+          ? { label: t('emptyStates.members.actions.invite'), onClick: onInvite }
+          : undefined
+      }
     />
   );
 }
 
 export function ErrorState({
-  title = 'Something went wrong',
-  description = 'We encountered an error. Please try again.',
+  title,
+  description,
   onRetry,
 }: {
   title?: string;
   description?: string;
   onRetry?: () => void;
 }) {
+  const { t } = useTranslation();
+  const resolvedTitle = title ?? t('emptyStates.error.title');
+  const resolvedDescription = description ?? t('emptyStates.error.description');
   return (
     <EmptyState
       icon={AlertCircle}
-      title={title}
-      description={description}
-      action={onRetry ? { label: 'Try Again', onClick: onRetry } : undefined}
+      title={resolvedTitle}
+      description={resolvedDescription}
+      action={
+        onRetry ? { label: t('emptyStates.error.actions.tryAgain'), onClick: onRetry } : undefined
+      }
     />
   );
 }
 
 export function PermissionDenied({
-  resource = 'this content',
+  resource,
   onRequestAccess,
 }: {
   resource?: string;
   onRequestAccess?: () => void;
 }) {
+  const { t } = useTranslation();
+  const resolvedResource = resource ?? t('emptyStates.permissionDenied.defaultResource');
   return (
     <EmptyState
       icon={Lock}
-      title="Access Denied"
-      description={`You don't have permission to view ${resource}.`}
+      title={t('emptyStates.permissionDenied.title')}
+      description={t('emptyStates.permissionDenied.description', { resource: resolvedResource })}
       action={
         onRequestAccess
-          ? { label: 'Request Access', onClick: onRequestAccess }
+          ? { label: t('emptyStates.permissionDenied.actions.requestAccess'), onClick: onRequestAccess }
           : undefined
       }
     />

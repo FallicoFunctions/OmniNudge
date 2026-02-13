@@ -46,12 +46,15 @@ func New(databaseURL string) (*DB, error) {
 	return &DB{Pool: pool}, nil
 }
 
-// Close closes the database connection pool
+// Close closes the database connection pool. Safe to call multiple times.
 func (db *DB) Close() {
-	if db.Pool != nil {
-		db.releaseTestLock()
-		db.Pool.Close()
+	if db.Pool == nil {
+		return
 	}
+	db.releaseTestLock()
+	pool := db.Pool
+	db.Pool = nil // prevent double-close panic in pgxpool
+	pool.Close()
 }
 
 // Health checks if the database connection is healthy

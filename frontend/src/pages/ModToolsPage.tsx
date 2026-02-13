@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { moderationService } from '../services/moderationService';
 import { accessRequestService, type AccessRequest } from '../services/accessRequestService';
 import { EmptyMessage, LoadingMessage } from '../components/common/StatusMessage';
 import { OffsetPaginationControls } from '../components/common/OffsetPaginationControls';
 import { modMailService } from '../services/modMailService';
+import { useFormat } from '../hooks/useFormat';
 import type {
   HubBan,
   CreateBanRequest,
@@ -18,6 +20,7 @@ import type { ModMailConversation } from '../types/modmail';
 type TabType = 'bans' | 'removal_reasons' | 'mod_log' | 'mod_mail' | 'requests';
 
 export default function ModToolsPage() {
+  const { t } = useTranslation();
   const { hubName } = useParams<{ hubName: string }>();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<TabType>('bans');
@@ -31,9 +34,9 @@ export default function ModToolsPage() {
     <div className="max-w-6xl mx-auto p-6">
       <div className="mb-6 flex justify-between items-start">
         <div>
-          <h1 className="text-3xl font-bold">Mod Tools - h/{hubName}</h1>
+          <h1 className="text-3xl font-bold">{t('modToolsPage.header.title', { hub: hubName })}</h1>
           <p className="text-[var(--color-text-secondary)] mt-2">
-            Manage users, content, and moderation settings
+            {t('modToolsPage.header.subtitle')}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -41,13 +44,13 @@ export default function ModToolsPage() {
             onClick={() => navigate(`/h/${hubName}`)}
             className="px-4 py-2 rounded bg-[var(--color-surface-elevated)] text-[var(--color-text-primary)] hover:bg-[var(--color-border)] transition-colors"
           >
-            Exit
+            {t('modToolsPage.actions.exit')}
           </button>
           <button
             onClick={() => navigate(`/h/${hubName}/settings`)}
             className="px-4 py-2 rounded bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-strong)] transition-colors"
           >
-            Hub Settings
+            {t('modToolsPage.actions.hubSettings')}
           </button>
         </div>
       </div>
@@ -63,7 +66,7 @@ export default function ModToolsPage() {
                 : 'border-transparent text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:border-gray-300'
             }`}
           >
-            User Bans
+            {t('modToolsPage.tabs.userBans')}
           </button>
           <button
             onClick={() => setActiveTab('removal_reasons')}
@@ -73,7 +76,7 @@ export default function ModToolsPage() {
                 : 'border-transparent text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:border-gray-300'
             }`}
           >
-            Removal Reasons
+            {t('modToolsPage.tabs.removalReasons')}
           </button>
           <button
             onClick={() => setActiveTab('mod_log')}
@@ -83,7 +86,7 @@ export default function ModToolsPage() {
                 : 'border-transparent text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:border-gray-300'
             }`}
           >
-            Mod Log
+            {t('modToolsPage.tabs.modLog')}
           </button>
           <button
             onClick={() => setActiveTab('mod_mail')}
@@ -93,7 +96,7 @@ export default function ModToolsPage() {
                 : 'border-transparent text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:border-gray-300'
             }`}
           >
-            Mod Mail
+            {t('modToolsPage.tabs.modMail')}
           </button>
           <button
             onClick={() => setActiveTab('requests')}
@@ -103,7 +106,7 @@ export default function ModToolsPage() {
                 : 'border-transparent text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:border-gray-300'
             }`}
           >
-            Requests
+            {t('modToolsPage.tabs.requests')}
           </button>
         </nav>
       </div>
@@ -121,6 +124,8 @@ export default function ModToolsPage() {
 // ===== BANS TAB =====
 
 function BansTab({ hubName }: { hubName: string }) {
+  const { t } = useTranslation();
+  const { formatDate } = useFormat();
   const queryClient = useQueryClient();
   const [showAddForm, setShowAddForm] = useState(false);
 
@@ -139,7 +144,7 @@ function BansTab({ hubName }: { hubName: string }) {
   if (isLoading) {
     return (
       <div className="text-center py-8">
-        <LoadingMessage>Loading...</LoadingMessage>
+        <LoadingMessage>{t('common.loading')}</LoadingMessage>
       </div>
     );
   }
@@ -147,12 +152,12 @@ function BansTab({ hubName }: { hubName: string }) {
   return (
     <div>
       <div className="flex justify-between items-center mb-4">
-        <h2 className="text-xl font-semibold">Banned Users</h2>
+        <h2 className="text-xl font-semibold">{t('modToolsPage.bans.title')}</h2>
         <button
           onClick={() => setShowAddForm(!showAddForm)}
           className="px-4 py-2 bg-[var(--color-primary)] text-white rounded-lg hover:opacity-90"
         >
-          {showAddForm ? 'Cancel' : 'Ban User'}
+          {showAddForm ? t('common.cancel') : t('modToolsPage.bans.actions.banUser')}
         </button>
       </div>
 
@@ -173,12 +178,14 @@ function BansTab({ hubName }: { hubName: string }) {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
             </svg>
           </div>
-          <h3 className="text-lg font-semibold text-[var(--color-text-primary)] mb-2">No banned users</h3>
+          <h3 className="text-lg font-semibold text-[var(--color-text-primary)] mb-2">
+            {t('modToolsPage.bans.empty.title')}
+          </h3>
           <p className="text-sm text-[var(--color-text-secondary)] max-w-md mx-auto mb-4">
-            Users you ban from this hub will appear here. Banned users cannot view or participate in your hub.
+            {t('modToolsPage.bans.empty.description')}
           </p>
           <p className="text-xs text-[var(--color-text-muted)]">
-            Use the "Ban User" button above to ban a user by username.
+            {t('modToolsPage.bans.empty.help')}
           </p>
         </div>
       )}
@@ -191,26 +198,32 @@ function BansTab({ hubName }: { hubName: string }) {
           >
             <div className="flex justify-between items-start">
               <div>
-                <div className="font-medium">{ban.username || `User #${ban.user_id}`}</div>
+                <div className="font-medium">
+                  {ban.username || t('common.userNumber', { id: ban.user_id })}
+                </div>
                 <div className="text-sm text-[var(--color-text-secondary)] mt-1">
-                  {ban.reason || 'No reason provided'}
+                  {ban.reason || t('modToolsPage.bans.noReason')}
                 </div>
                 {ban.note && (
                   <div className="text-xs text-[var(--color-text-secondary)] mt-1 italic">
-                    Mod note: {ban.note}
+                    {t('modToolsPage.bans.modNote', { note: ban.note })}
                   </div>
                 )}
                 <div className="text-xs text-[var(--color-text-secondary)] mt-2">
                   {ban.ban_type === 'permanent' ? (
-                    <span className="text-red-600 font-medium">Permanent ban</span>
+                    <span className="text-red-600 font-medium">{t('modToolsPage.bans.permanent')}</span>
                   ) : (
                     <span>
-                      Temporary until {new Date(ban.expires_at!).toLocaleString()}
+                      {t('modToolsPage.bans.temporaryUntil', {
+                        date: formatDate(ban.expires_at!, { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }),
+                      })}
                     </span>
                   )}
                   {' • '}
-                  Banned by {ban.banned_by_name || `#${ban.banned_by}`} on{' '}
-                  {new Date(ban.created_at).toLocaleDateString()}
+                  {t('modToolsPage.bans.bannedByOn', {
+                    moderator: ban.banned_by_name || `#${ban.banned_by}`,
+                    date: formatDate(ban.created_at, { month: 'short', day: 'numeric', year: 'numeric' }),
+                  })}
                 </div>
               </div>
               <button
@@ -218,7 +231,7 @@ function BansTab({ hubName }: { hubName: string }) {
                 disabled={unbanMutation.isPending}
                 className="px-3 py-1 text-sm bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50"
               >
-                Unban
+                {t('modToolsPage.bans.actions.unban')}
               </button>
             </div>
           </div>
@@ -229,6 +242,7 @@ function BansTab({ hubName }: { hubName: string }) {
 }
 
 function AddBanForm({ hubName, onSuccess }: { hubName: string; onSuccess: () => void }) {
+  const { t } = useTranslation();
   const [userId, setUserId] = useState('');
   const [reason, setReason] = useState('');
   const [note, setNote] = useState('');
@@ -245,12 +259,12 @@ function AddBanForm({ hubName, onSuccess }: { hubName: string; onSuccess: () => 
 
     const userIdNum = parseInt(userId);
     if (isNaN(userIdNum)) {
-      alert('Invalid user ID');
+      alert(t('modToolsPage.bans.form.errors.invalidUserId'));
       return;
     }
 
     if (banType === 'temporary' && !expiresAt) {
-      alert('Expiration date required for temporary bans');
+      alert(t('modToolsPage.bans.form.errors.expirationRequired'));
       return;
     }
 
@@ -265,12 +279,12 @@ function AddBanForm({ hubName, onSuccess }: { hubName: string; onSuccess: () => 
 
   return (
     <form onSubmit={handleSubmit} className="mb-6 p-4 border border-[var(--color-border)] rounded-lg bg-[var(--color-surface)]">
-      <h3 className="font-medium mb-4">Ban User</h3>
+      <h3 className="font-medium mb-4">{t('modToolsPage.bans.form.title')}</h3>
 
       <div className="space-y-4">
         <div>
           <label className="block text-sm font-medium mb-1">
-            User ID <span className="text-red-500">*</span>
+            {t('modToolsPage.bans.form.fields.userId.label')} <span className="text-red-500">*</span>
           </label>
           <input
             type="number"
@@ -282,21 +296,21 @@ function AddBanForm({ hubName, onSuccess }: { hubName: string; onSuccess: () => 
         </div>
 
         <div>
-          <label className="block text-sm font-medium mb-1">Ban Type</label>
+          <label className="block text-sm font-medium mb-1">{t('modToolsPage.bans.form.fields.banType.label')}</label>
           <select
             value={banType}
             onChange={(e) => setBanType(e.target.value as 'permanent' | 'temporary')}
             className="w-full px-3 py-2 border border-[var(--color-border)] rounded-lg"
           >
-            <option value="permanent">Permanent</option>
-            <option value="temporary">Temporary</option>
+            <option value="permanent">{t('modToolsPage.bans.form.fields.banType.permanent')}</option>
+            <option value="temporary">{t('modToolsPage.bans.form.fields.banType.temporary')}</option>
           </select>
         </div>
 
         {banType === 'temporary' && (
           <div>
             <label className="block text-sm font-medium mb-1">
-              Expires At <span className="text-red-500">*</span>
+              {t('modToolsPage.bans.form.fields.expiresAt.label')} <span className="text-red-500">*</span>
             </label>
             <input
               type="datetime-local"
@@ -309,24 +323,24 @@ function AddBanForm({ hubName, onSuccess }: { hubName: string; onSuccess: () => 
         )}
 
         <div>
-          <label className="block text-sm font-medium mb-1">Reason (visible to user)</label>
+          <label className="block text-sm font-medium mb-1">{t('modToolsPage.bans.form.fields.reason.label')}</label>
           <textarea
             value={reason}
             onChange={(e) => setReason(e.target.value)}
             className="w-full px-3 py-2 border border-[var(--color-border)] rounded-lg"
             rows={2}
-            placeholder="Optional public reason for the ban"
+            placeholder={t('modToolsPage.bans.form.fields.reason.placeholder')}
           />
         </div>
 
         <div>
-          <label className="block text-sm font-medium mb-1">Mod Note (private)</label>
+          <label className="block text-sm font-medium mb-1">{t('modToolsPage.bans.form.fields.note.label')}</label>
           <textarea
             value={note}
             onChange={(e) => setNote(e.target.value)}
             className="w-full px-3 py-2 border border-[var(--color-border)] rounded-lg"
             rows={2}
-            placeholder="Optional private note for mod team"
+            placeholder={t('modToolsPage.bans.form.fields.note.placeholder')}
           />
         </div>
 
@@ -335,7 +349,7 @@ function AddBanForm({ hubName, onSuccess }: { hubName: string; onSuccess: () => 
           disabled={banMutation.isPending}
           className="w-full px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
         >
-          {banMutation.isPending ? 'Banning...' : 'Ban User'}
+          {banMutation.isPending ? t('modToolsPage.bans.form.actions.banning') : t('modToolsPage.bans.actions.banUser')}
         </button>
       </div>
     </form>
@@ -345,6 +359,8 @@ function AddBanForm({ hubName, onSuccess }: { hubName: string; onSuccess: () => 
 // ===== REMOVAL REASONS TAB =====
 
 function RemovalReasonsTab({ hubName }: { hubName: string }) {
+  const { t } = useTranslation();
+  const { formatDate } = useFormat();
   const queryClient = useQueryClient();
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingReason, setEditingReason] = useState<RemovalReason | null>(null);
@@ -364,7 +380,7 @@ function RemovalReasonsTab({ hubName }: { hubName: string }) {
   if (isLoading) {
     return (
       <div className="text-center py-8">
-        <LoadingMessage>Loading...</LoadingMessage>
+        <LoadingMessage>{t('common.loading')}</LoadingMessage>
       </div>
     );
   }
@@ -372,7 +388,7 @@ function RemovalReasonsTab({ hubName }: { hubName: string }) {
   return (
     <div>
       <div className="flex justify-between items-center mb-4">
-        <h2 className="text-xl font-semibold">Removal Reason Templates</h2>
+        <h2 className="text-xl font-semibold">{t('modToolsPage.removalReasons.title')}</h2>
         <button
           onClick={() => {
             setShowAddForm(!showAddForm);
@@ -380,7 +396,7 @@ function RemovalReasonsTab({ hubName }: { hubName: string }) {
           }}
           className="px-4 py-2 bg-[var(--color-primary)] text-white rounded-lg hover:opacity-90"
         >
-          {showAddForm ? 'Cancel' : 'Add Template'}
+          {showAddForm ? t('common.cancel') : t('modToolsPage.removalReasons.addTemplate')}
         </button>
       </div>
 
@@ -402,7 +418,7 @@ function RemovalReasonsTab({ hubName }: { hubName: string }) {
 
       {reasons && reasons.length === 0 && (
         <div className="text-center py-12">
-          <EmptyMessage>No removal reason templates.</EmptyMessage>
+          <EmptyMessage>{t('modToolsPage.removalReasons.empty')}</EmptyMessage>
         </div>
       )}
 
@@ -419,7 +435,9 @@ function RemovalReasonsTab({ hubName }: { hubName: string }) {
                   {reason.message}
                 </div>
                 <div className="text-xs text-[var(--color-text-secondary)] mt-2">
-                  Last updated {new Date(reason.updated_at).toLocaleDateString()}
+                  {t('modToolsPage.removalReasons.lastUpdated', {
+                    date: formatDate(reason.updated_at, { month: 'short', day: 'numeric', year: 'numeric' }),
+                  })}
                 </div>
               </div>
               <div className="flex space-x-2">
@@ -427,18 +445,18 @@ function RemovalReasonsTab({ hubName }: { hubName: string }) {
                   onClick={() => setEditingReason(reason)}
                   className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
                 >
-                  Edit
+                  {t('common.edit')}
                 </button>
                 <button
                   onClick={() => {
-                    if (confirm('Delete this removal reason?')) {
+                    if (window.confirm(t('modToolsPage.removalReasons.confirmDelete'))) {
                       deleteMutation.mutate(reason.id);
                     }
                   }}
                   disabled={deleteMutation.isPending}
                   className="px-3 py-1 text-sm bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50"
                 >
-                  Delete
+                  {t('common.delete')}
                 </button>
               </div>
             </div>
@@ -460,6 +478,7 @@ function RemovalReasonForm({
   onSuccess: () => void;
   onCancel: () => void;
 }) {
+  const { t } = useTranslation();
   const [title, setTitle] = useState(reason?.title || '');
   const [message, setMessage] = useState(reason?.message || '');
 
@@ -487,12 +506,15 @@ function RemovalReasonForm({
 
   return (
     <form onSubmit={handleSubmit} className="mb-6 p-4 border border-[var(--color-border)] rounded-lg bg-[var(--color-surface)]">
-      <h3 className="font-medium mb-4">{reason ? 'Edit' : 'Create'} Removal Reason</h3>
+      <h3 className="font-medium mb-4">
+        {reason ? t('modToolsPage.removalReasons.form.editTitle') : t('modToolsPage.removalReasons.form.createTitle')}
+      </h3>
 
       <div className="space-y-4">
         <div>
           <label className="block text-sm font-medium mb-1">
-            Title <span className="text-red-500">*</span>
+            {t('modToolsPage.removalReasons.form.fields.title.label')}{' '}
+            <span className="text-red-500">*</span>
           </label>
           <input
             type="text"
@@ -501,13 +523,14 @@ function RemovalReasonForm({
             className="w-full px-3 py-2 border border-[var(--color-border)] rounded-lg"
             maxLength={100}
             required
-            placeholder="e.g., Spam"
+            placeholder={t('modToolsPage.removalReasons.form.fields.title.placeholder')}
           />
         </div>
 
         <div>
           <label className="block text-sm font-medium mb-1">
-            Message <span className="text-red-500">*</span>
+            {t('modToolsPage.removalReasons.form.fields.message.label')}{' '}
+            <span className="text-red-500">*</span>
           </label>
           <textarea
             value={message}
@@ -515,7 +538,7 @@ function RemovalReasonForm({
             className="w-full px-3 py-2 border border-[var(--color-border)] rounded-lg"
             rows={3}
             required
-            placeholder="Message shown to user when content is removed"
+            placeholder={t('modToolsPage.removalReasons.form.fields.message.placeholder')}
           />
         </div>
 
@@ -525,14 +548,14 @@ function RemovalReasonForm({
             disabled={createMutation.isPending || updateMutation.isPending}
             className="flex-1 px-4 py-2 bg-[var(--color-primary)] text-white rounded-lg hover:opacity-90 disabled:opacity-50"
           >
-            {(createMutation.isPending || updateMutation.isPending) ? 'Saving...' : 'Save'}
+            {(createMutation.isPending || updateMutation.isPending) ? t('modToolsPage.removalReasons.form.saving') : t('common.save')}
           </button>
           <button
             type="button"
             onClick={onCancel}
             className="px-4 py-2 border border-[var(--color-border)] rounded-lg hover:bg-[var(--color-surface-elevated)]"
           >
-            Cancel
+            {t('common.cancel')}
           </button>
         </div>
       </div>
@@ -543,6 +566,8 @@ function RemovalReasonForm({
 // ===== MOD LOG TAB =====
 
 function ModLogTab({ hubName }: { hubName: string }) {
+  const { t } = useTranslation();
+  const { formatDate } = useFormat();
   const [cursorStack, setCursorStack] = useState(['']);
   const limit = 50;
   const currentCursor = cursorStack[cursorStack.length - 1] ?? '';
@@ -559,7 +584,7 @@ function ModLogTab({ hubName }: { hubName: string }) {
   if (isLoading) {
     return (
       <div className="text-center py-8">
-        <LoadingMessage>Loading...</LoadingMessage>
+        <LoadingMessage>{t('common.loading')}</LoadingMessage>
       </div>
     );
   }
@@ -570,7 +595,7 @@ function ModLogTab({ hubName }: { hubName: string }) {
 
   return (
     <div>
-      <h2 className="text-xl font-semibold mb-4">Moderation Log</h2>
+      <h2 className="text-xl font-semibold mb-4">{t('modToolsPage.modLog.title')}</h2>
 
       {logs.length === 0 && (
         <div className="text-center py-12 px-4">
@@ -579,10 +604,11 @@ function ModLogTab({ hubName }: { hubName: string }) {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>
           </div>
-          <h3 className="text-lg font-semibold text-[var(--color-text-primary)] mb-2">No moderation actions yet</h3>
+          <h3 className="text-lg font-semibold text-[var(--color-text-primary)] mb-2">
+            {t('modToolsPage.modLog.empty.title')}
+          </h3>
           <p className="text-sm text-[var(--color-text-secondary)] max-w-md mx-auto">
-            Once you or your moderators take actions (removing posts, banning users, editing settings, etc.),
-            they'll appear here as an audit log for transparency and accountability.
+            {t('modToolsPage.modLog.empty.description')}
           </p>
         </div>
       )}
@@ -595,11 +621,16 @@ function ModLogTab({ hubName }: { hubName: string }) {
           >
             <div className="flex justify-between items-start">
               <div>
-                <span className="font-medium">{log.moderator_name || `Mod #${log.moderator_id}`}</span>
-                <span className="text-[var(--color-text-secondary)]"> {getActionDescription(log)}</span>
+                <span className="font-medium">
+                  {log.moderator_name || t('modToolsPage.modLog.moderatorFallback', { id: log.moderator_id })}
+                </span>
+                <span className="text-[var(--color-text-secondary)]">
+                  {' '}
+                  {getActionDescription(t, log)}
+                </span>
               </div>
               <div className="text-xs text-[var(--color-text-secondary)]">
-                {new Date(log.created_at).toLocaleString()}
+                {formatDate(log.created_at, { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })}
               </div>
             </div>
             {log.details && Object.keys(log.details).length > 0 && (
@@ -624,42 +655,36 @@ function ModLogTab({ hubName }: { hubName: string }) {
               setCursorStack((prev) => [...prev, nextCursor]);
             }
           }}
-          centerContent={<span className="px-4 py-2">Page {cursorStack.length}</span>}
+          centerContent={<span className="px-4 py-2">{t('searchPage.pagination.page', { page: cursorStack.length })}</span>}
         />
       )}
     </div>
   );
 }
 
-function getActionDescription(log: ModLog): string {
-  const actions: Record<string, string> = {
-    ban_user: 'banned user',
-    unban_user: 'unbanned user',
-    remove_post: 'removed post',
-    approve_post: 'approved post',
-    remove_comment: 'removed comment',
-    approve_comment: 'approved comment',
-    lock_post: 'locked post',
-    unlock_post: 'unlocked post',
-    pin_post: 'pinned post',
-    unpin_post: 'unpinned post',
-    create_removal_reason: 'created removal reason',
-    update_removal_reason: 'updated removal reason',
-    delete_removal_reason: 'deleted removal reason',
-  };
+type Translate = (key: string, options?: Record<string, unknown>) => string;
 
-  const description = actions[log.action] || log.action;
+function getActionDescription(t: Translate, log: ModLog): string {
+  const action = t(`modToolsPage.modLog.actions.${log.action}`, {
+    defaultValue: String(log.action),
+  });
 
   if (log.target_type && log.target_id) {
-    return `${description} (${log.target_type} #${log.target_id})`;
+    return t('modToolsPage.modLog.actionWithTarget', {
+      action,
+      type: log.target_type,
+      id: log.target_id,
+    });
   }
 
-  return description;
+  return action;
 }
 
 // ===== MOD MAIL TAB =====
 
 function ModMailTab({ hubName }: { hubName: string }) {
+  const { t } = useTranslation();
+  const { formatDate } = useFormat();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [statusFilter, setStatusFilter] = useState<'open' | 'archived' | 'resolved' | 'all'>('open');
@@ -680,33 +705,35 @@ function ModMailTab({ hubName }: { hubName: string }) {
   if (isLoading) {
     return (
       <div className="text-center py-8">
-        <LoadingMessage>Loading mod mail...</LoadingMessage>
+        <LoadingMessage>{t('modToolsPage.modMail.loading')}</LoadingMessage>
       </div>
     );
   }
 
   const conversations = data?.conversations || [];
+  const statusLabelWithSpace =
+    statusFilter === 'all' ? '' : `${t(`modToolsPage.modMail.status.${statusFilter}`)} `;
 
   return (
     <div>
       <div className="flex justify-between items-center mb-4">
-        <h2 className="text-xl font-semibold">Mod Mail</h2>
+        <h2 className="text-xl font-semibold">{t('modToolsPage.modMail.title')}</h2>
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value as 'open' | 'archived' | 'resolved' | 'all')}
           className="px-3 py-2 border border-[var(--color-border)] rounded bg-[var(--color-surface)] text-sm"
         >
-          <option value="open">Open</option>
-          <option value="archived">Archived</option>
-          <option value="resolved">Resolved</option>
-          <option value="all">All</option>
+          <option value="open">{t('modToolsPage.modMail.status.open')}</option>
+          <option value="archived">{t('modToolsPage.modMail.status.archived')}</option>
+          <option value="resolved">{t('modToolsPage.modMail.status.resolved')}</option>
+          <option value="all">{t('modToolsPage.modMail.status.all')}</option>
         </select>
       </div>
 
       {conversations.length === 0 && (
         <div className="text-center py-12">
           <EmptyMessage>
-            No {statusFilter !== 'all' ? statusFilter : ''} mod mail conversations.
+            {t('modToolsPage.modMail.empty', { status: statusLabelWithSpace })}
           </EmptyMessage>
         </div>
       )}
@@ -735,22 +762,32 @@ function ModMailTab({ hubName }: { hubName: string }) {
                         : 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200'
                     }`}
                   >
-                    {conv.status}
+                    {t(`modToolsPage.modMail.statusBadge.${conv.status}`, { defaultValue: conv.status })}
                   </span>
                   {conv.unread_count > 0 && (
                     <span className="px-2 py-0.5 text-xs bg-red-500 text-white rounded-full">
-                      {conv.unread_count} new
+                      {t('modToolsPage.modMail.unread', { count: conv.unread_count })}
                     </span>
                   )}
                 </div>
                 <div className="text-sm text-[var(--color-text-secondary)] mt-1">
-                  <span>From: {conv.participants.find((p) => !p.is_moderator)?.username || 'Unknown'}</span>
+                  <span>
+                    {t('modToolsPage.modMail.from', {
+                      username:
+                        conv.participants.find((p) => !p.is_moderator)?.username ||
+                        t('modToolsPage.common.unknown'),
+                    })}
+                  </span>
                   <span className="mx-2">•</span>
-                  <span>{new Date(conv.created_at).toLocaleDateString()}</span>
+                  <span>{formatDate(conv.created_at, { month: 'short', day: 'numeric', year: 'numeric' })}</span>
                   {conv.latest_message && (
                     <>
                       <span className="mx-2">•</span>
-                      <span>Last reply: {new Date(conv.latest_message.sent_at).toLocaleString()}</span>
+                      <span>
+                        {t('modToolsPage.modMail.lastReply', {
+                          date: formatDate(conv.latest_message.sent_at, { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }),
+                        })}
+                      </span>
                     </>
                   )}
                 </div>
@@ -763,14 +800,14 @@ function ModMailTab({ hubName }: { hubName: string }) {
                       className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
                       disabled={updateStatusMutation.isPending}
                     >
-                      Resolve
+                      {t('modToolsPage.modMail.actions.resolve')}
                     </button>
                     <button
                       onClick={() => updateStatusMutation.mutate({ conversationId: conv.id, status: 'archived' })}
                       className="px-3 py-1 text-sm bg-gray-600 text-white rounded hover:bg-gray-700"
                       disabled={updateStatusMutation.isPending}
                     >
-                      Archive
+                      {t('modToolsPage.modMail.actions.archive')}
                     </button>
                   </>
                 )}
@@ -780,7 +817,7 @@ function ModMailTab({ hubName }: { hubName: string }) {
                     className="px-3 py-1 text-sm bg-green-600 text-white rounded hover:bg-green-700"
                     disabled={updateStatusMutation.isPending}
                   >
-                    Reopen
+                    {t('modToolsPage.modMail.actions.reopen')}
                   </button>
                 )}
               </div>
@@ -795,6 +832,8 @@ function ModMailTab({ hubName }: { hubName: string }) {
 // ===== ACCESS REQUESTS TAB =====
 
 function AccessRequestsTab({ hubName }: { hubName: string }) {
+  const { t } = useTranslation();
+  const { formatDate } = useFormat();
   const queryClient = useQueryClient();
   const [usernameInput, setUsernameInput] = useState('');
   const [addUserStatus, setAddUserStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle');
@@ -814,7 +853,7 @@ function AccessRequestsTab({ hubName }: { hubName: string }) {
     },
     onError: (error: Error) => {
       setAddUserStatus('error');
-      setAddUserError(error.message || 'Failed to grant access');
+      setAddUserError(error.message || t('modToolsPage.requests.errors.grantFailed'));
     },
   });
 
@@ -835,7 +874,7 @@ function AccessRequestsTab({ hubName }: { hubName: string }) {
   if (isLoading) {
     return (
       <div className="text-center py-8">
-        <LoadingMessage>Loading...</LoadingMessage>
+        <LoadingMessage>{t('common.loading')}</LoadingMessage>
       </div>
     );
   }
@@ -844,12 +883,14 @@ function AccessRequestsTab({ hubName }: { hubName: string }) {
 
   return (
     <div>
-      <h2 className="text-xl font-semibold mb-4">Access Requests</h2>
+      <h2 className="text-xl font-semibold mb-4">{t('modToolsPage.requests.title')}</h2>
 
       <div className="mb-6 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4">
-        <h3 className="text-sm font-semibold text-[var(--color-text-primary)]">Grant access by username</h3>
+        <h3 className="text-sm font-semibold text-[var(--color-text-primary)]">
+          {t('modToolsPage.requests.grantByUsername.title')}
+        </h3>
         <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
-          Add a user directly to this private hub even if their request was denied.
+          {t('modToolsPage.requests.grantByUsername.description')}
         </p>
         <form
           onSubmit={(event) => {
@@ -871,7 +912,7 @@ function AccessRequestsTab({ hubName }: { hubName: string }) {
                 setAddUserStatus('idle');
               }
             }}
-            placeholder="Enter username (e.g. TestUser)"
+            placeholder={t('modToolsPage.requests.grantByUsername.placeholder')}
             className="flex-1 rounded border border-[var(--color-border)] bg-[var(--color-background)] px-3 py-2 text-sm text-[var(--color-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
           />
           <button
@@ -879,11 +920,11 @@ function AccessRequestsTab({ hubName }: { hubName: string }) {
             disabled={addUserMutation.isPending || usernameInput.trim().length === 0}
             className="rounded bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--color-primary-strong)] disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {addUserMutation.isPending ? 'Granting...' : 'Grant Access'}
+            {addUserMutation.isPending ? t('modToolsPage.requests.grantByUsername.granting') : t('modToolsPage.requests.grantByUsername.grantButton')}
           </button>
         </form>
         {addUserStatus === 'success' && (
-          <p className="mt-2 text-sm text-green-600">Access granted successfully.</p>
+          <p className="mt-2 text-sm text-green-600">{t('modToolsPage.requests.grantByUsername.success')}</p>
         )}
         {addUserStatus === 'error' && (
           <p className="mt-2 text-sm text-red-600">{addUserError}</p>
@@ -892,7 +933,7 @@ function AccessRequestsTab({ hubName }: { hubName: string }) {
 
       {pendingRequests.length === 0 && (
         <div className="text-center py-12">
-          <EmptyMessage>No pending access requests.</EmptyMessage>
+          <EmptyMessage>{t('modToolsPage.requests.empty')}</EmptyMessage>
         </div>
       )}
 
@@ -905,9 +946,11 @@ function AccessRequestsTab({ hubName }: { hubName: string }) {
             <div className="flex justify-between items-start">
               <div className="flex-1">
                 <div className="flex items-center gap-2">
-                  <span className="font-medium">{request.username || `User #${request.user_id}`}</span>
+                  <span className="font-medium">
+                    {request.username || t('common.userNumber', { id: request.user_id })}
+                  </span>
                   <span className="px-2 py-0.5 text-xs bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200 rounded">
-                    Pending
+                    {t('modToolsPage.requests.status.pending')}
                   </span>
                 </div>
                 {request.message && (
@@ -916,31 +959,33 @@ function AccessRequestsTab({ hubName }: { hubName: string }) {
                   </div>
                 )}
                 <div className="text-xs text-[var(--color-text-secondary)] mt-2">
-                  Requested on {new Date(request.created_at).toLocaleDateString()}
+                  {t('modToolsPage.requests.requestedOn', {
+                    date: formatDate(request.created_at, { month: 'short', day: 'numeric', year: 'numeric' }),
+                  })}
                 </div>
               </div>
               <div className="ml-4 flex gap-2">
                 <button
                   onClick={() => {
-                    if (confirm('Approve this access request?')) {
+                    if (window.confirm(t('modToolsPage.requests.confirmApprove'))) {
                       approveMutation.mutate(request.id);
                     }
                   }}
                   disabled={approveMutation.isPending || denyMutation.isPending}
                   className="px-3 py-1 text-sm bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50"
                 >
-                  Approve
+                  {t('modToolsPage.requests.actions.approve')}
                 </button>
                 <button
                   onClick={() => {
-                    if (confirm('Deny this access request?')) {
+                    if (window.confirm(t('modToolsPage.requests.confirmDeny'))) {
                       denyMutation.mutate(request.id);
                     }
                   }}
                   disabled={approveMutation.isPending || denyMutation.isPending}
                   className="px-3 py-1 text-sm bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50"
                 >
-                  Deny
+                  {t('modToolsPage.requests.actions.deny')}
                 </button>
               </div>
             </div>

@@ -1,69 +1,64 @@
 # Internationalization (i18n)
 
-## Usage
+## Current Locale Files
 
-### In Components
+- `/public/locales/en.json` (fallback + source of key parity)
+- `/public/locales/es.json`
+- `/public/locales/ar.json`
+
+## Component Usage
 
 ```tsx
 import { useTranslation } from 'react-i18next';
 
-function MyComponent() {
+export function Example() {
   const { t } = useTranslation();
 
   return (
     <div>
-      <h1>{t('common.title')}</h1>
-      <p>{t('messages.comment', { count: 5 })}</p>
+      <h1>{t('common.loading')}</h1>
+      <p>{t('posts.comment', { count: 3, formattedCount: '3' })}</p>
     </div>
   );
 }
 ```
 
-### With Custom Hook
+## Formatting Usage
 
 ```tsx
-import { useTranslations } from '../hooks/useTranslations';
+import { useFormat } from '../hooks/useFormat';
 
-function MyComponent() {
-  const { t } = useTranslations();
-  return <button>{t('common.save')}</button>;
+export function ExampleStats({ count }: { count: number }) {
+  const { formatNumber } = useFormat();
+  return <span>{formatNumber(count)}</span>;
 }
 ```
 
-## Adding Translations
+## Translation Contribution Workflow
 
-1. Add key-value pairs to `src/i18n/locales/en.json`
-2. Follow existing structure (nested objects for namespacing)
-3. Use interpolation for dynamic values: `"Hello {{name}}"`
-4. Use pluralization: `"comment_one": "{{count}} comment"`, `"comment_other": "{{count}} comments"`
+1. Add the new key in `/public/locales/en.json`.
+2. Add the same key in `/public/locales/es.json` and `/public/locales/ar.json`.
+3. Keep interpolation tokens identical across locales.
+4. For plurals, use i18next suffix format:
+   - `key_one`
+   - `key_other`
+5. Run checks:
+   - `npm run i18n:check`
+   - `npm run i18n:guard`
+6. Run tests: `npm test`
 
-## Adding New Languages
+## Adding a New Language
 
-1. Create `src/i18n/locales/{lang}.json` (copy en.json structure)
-2. Translate all strings
-3. Add language to `config.ts` resources object:
-   ```ts
-   import fr from './locales/fr.json';
-   const resources = {
-     en: { translation: en },
-     fr: { translation: fr },
-   };
-   ```
-4. Add to LanguageSelector dropdown
+1. Copy `/public/locales/en.json` to `/public/locales/{lang}.json`.
+2. Translate values while preserving key structure and interpolation tokens.
+3. Register the language in `/src/i18n/languageUtils.ts`:
+   - `SUPPORTED_LANGUAGES`
+   - `LANGUAGE_OPTIONS`
+4. If language is RTL, add it to the RTL set in `/src/i18n/languageUtils.ts`.
+5. Verify with `npm run i18n:check`.
 
-## Translation Keys Structure
+## Guardrails
 
-- `common.*` - Universal UI elements (buttons, labels)
-- `nav.*` - Navigation items
-- `messages.*` - Messaging feature
-- `posts.*` - Posts and comments
-- `settings.*` - Settings page
-- `errors.*` - Error messages
-- `validation.*` - Form validation
-
-## Best Practices
-
-- Never hardcode user-facing strings
-- Use descriptive keys: `messages.typeMessage` not `msg1`
-- Group related translations under same namespace
-- Test with long translations (German) and RTL languages (Arabic)
+- `npm run i18n:check`: validates locale key parity + interpolation parity.
+- `npm run i18n:guard`: prevents regressions for hardcoded alert/confirm/toast patterns.
+- Missing keys emit warnings in development mode from `/src/i18n/config.ts`.

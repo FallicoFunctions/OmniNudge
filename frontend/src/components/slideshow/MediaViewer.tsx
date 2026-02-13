@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 
 export interface MediaItem {
   id: string | number;
@@ -19,6 +20,7 @@ interface MediaViewerProps {
 }
 
 export function MediaViewer({ media, className = '', onLoad, onError, autoplay = false }: MediaViewerProps) {
+  const { t } = useTranslation();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -34,7 +36,7 @@ export function MediaViewer({ media, className = '', onLoad, onError, autoplay =
 
   const handleError = (err: Error) => {
     setLoading(false);
-    setError(err.message || 'Failed to load media');
+    setError(err.message || t('mediaViewer.errors.failedToLoad'));
     onError?.(err);
   };
 
@@ -42,7 +44,7 @@ export function MediaViewer({ media, className = '', onLoad, onError, autoplay =
     return (
       <div className={`flex items-center justify-center bg-[var(--color-surface)] rounded ${className}`}>
         <div className="text-center p-8">
-          <div className="text-[var(--color-error)] text-lg mb-2">Failed to load media</div>
+          <div className="text-[var(--color-error)] text-lg mb-2">{t('mediaViewer.errors.failedToLoad')}</div>
           <div className="text-[var(--color-text-secondary)] text-sm">{error}</div>
         </div>
       </div>
@@ -60,10 +62,10 @@ export function MediaViewer({ media, className = '', onLoad, onError, autoplay =
       {media.type === 'image' && (
         <img
           src={media.url}
-          alt="Media content"
+          alt={t('mediaViewer.mediaAlt')}
           className="max-w-full max-h-full object-contain"
           onLoad={handleLoad}
-          onError={() => handleError(new Error('Image failed to load'))}
+          onError={() => handleError(new Error(t('mediaViewer.errors.imageFailed')))}
           style={{ display: loading ? 'none' : 'block' }}
         />
       )}
@@ -75,7 +77,7 @@ export function MediaViewer({ media, className = '', onLoad, onError, autoplay =
           autoPlay={autoplay}
           className="max-w-full max-h-full"
           onLoadedData={handleLoad}
-          onError={() => handleError(new Error('Video failed to load'))}
+          onError={() => handleError(new Error(t('mediaViewer.errors.videoFailed')))}
           style={{ display: loading ? 'none' : 'block' }}
         />
       )}
@@ -88,7 +90,7 @@ export function MediaViewer({ media, className = '', onLoad, onError, autoplay =
             autoPlay={autoplay}
             className="w-full max-w-md"
             onLoadedData={handleLoad}
-            onError={() => handleError(new Error('Audio failed to load'))}
+            onError={() => handleError(new Error(t('mediaViewer.errors.audioFailed')))}
           />
         </div>
       )}

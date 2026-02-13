@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { postsService } from '../services/postsService';
 
 interface VoteButtonsProps {
@@ -17,6 +18,7 @@ export function VoteButtons({
   layout = 'vertical',
   size = 'medium',
 }: VoteButtonsProps) {
+  const { t } = useTranslation();
   const [score, setScore] = useState(initialScore);
   const [userVote, setUserVote] = useState<number | null>(initialUserVote ?? null);
   const [floatingText, setFloatingText] = useState<{
@@ -133,7 +135,7 @@ export function VoteButtons({
             active:scale-95
             disabled:opacity-50 disabled:cursor-not-allowed
           `}
-          aria-label="Upvote"
+          aria-label={t('posts.actions.upvote')}
         >
           ▲
         </button>
@@ -157,7 +159,7 @@ export function VoteButtons({
             active:scale-95
             disabled:opacity-50 disabled:cursor-not-allowed
           `}
-          aria-label="Downvote"
+          aria-label={t('posts.actions.downvote')}
         >
           ▼
         </button>
@@ -192,7 +194,7 @@ export function VoteButtons({
           active:scale-95
           disabled:opacity-50 disabled:cursor-not-allowed
         `}
-        aria-label="Upvote"
+        aria-label={t('posts.actions.upvote')}
       >
         ▲
       </button>
@@ -216,7 +218,7 @@ export function VoteButtons({
           active:scale-95
           disabled:opacity-50 disabled:cursor-not-allowed
         `}
-        aria-label="Downvote"
+        aria-label={t('posts.actions.downvote')}
       >
         ▼
       </button>

@@ -3,7 +3,6 @@ import { useTranslation } from 'react-i18next';
 import { useFormat } from '../../hooks/useFormat';
 import { flushSync } from 'react-dom';
 import { Link } from 'react-router-dom';
-import { formatTimestamp } from '../../utils/timeFormat';
 import { FlairBadge } from './FlairBadge';
 import {
   getDisplayDomain,
@@ -19,7 +18,11 @@ import { getRedditDashAudioUrl } from '../../utils/redditVideoAudio';
 import { useSettings } from '../../contexts/SettingsContext';
 import { PostBodyMarkdown } from '../posts/PostBodyMarkdown';
 
-
+const debugLog = (...args: unknown[]) => {
+  if (import.meta.env.DEV) {
+    console.debug(...args);
+  }
+};
 
 interface RedditPostCardProps {
   post: RedditCrosspostSource & {
@@ -198,7 +201,9 @@ function getVimeoEmbed(url?: string | null): string | null {
 
 function getSpotifyEmbed(url?: string | null): string | null {
   if (!url) return null;
-  const match = url.match(/open\.spotify\.com\/(track|album|playlist|episode|show)\/([a-zA-Z0-9]+)/i);
+  const match = url.match(
+    /open\.spotify\.com\/(track|album|playlist|episode|show)\/([a-zA-Z0-9]+)/i
+  );
   if (!match) return null;
   const [, type, id] = match;
   return `https://open.spotify.com/embed/${type}/${id}`;
@@ -213,7 +218,10 @@ function getSoundCloudOEmbedHtml(url?: string | null): string | null {
 
 function getAppleMusicEmbed(url?: string | null): string | null {
   if (!url) return null;
-  if (!url.toLowerCase().includes('music.apple.com') && !url.toLowerCase().includes('podcasts.apple.com')) {
+  if (
+    !url.toLowerCase().includes('music.apple.com') &&
+    !url.toLowerCase().includes('podcasts.apple.com')
+  ) {
     return null;
   }
   return `https://embed.music.apple.com${url.substring(url.indexOf('.com') + 4)}`;
@@ -443,11 +451,28 @@ export function RedditPostCard({
   linkState,
 }: RedditPostCardProps) {
   const { t } = useTranslation();
-  const { formatNumber } = useFormat();
+  const { formatNumber, formatDate, formatRelativeTime } = useFormat();
   const [expandedImageMap, setExpandedImageMap] = useState<Record<string, boolean>>({});
   const [galleryImages, setGalleryImages] = useState<string[]>([]);
   const [isLoadingGallery, setIsLoadingGallery] = useState(false);
   const isGalleryPost = post.url?.includes('/gallery/');
+
+  const submittedLabel = useMemo(() => {
+    const d = new Date(post.created_utc * 1000);
+    if (Number.isNaN(d.getTime())) return t('common.time.recently');
+
+    if (useRelativeTime) {
+      return formatRelativeTime(d);
+    }
+
+    return formatDate(d, {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+    });
+  }, [formatDate, formatRelativeTime, post.created_utc, t, useRelativeTime]);
 
   const toggleInlinePreview = async (postId: string) => {
     // For gallery posts, fetch images from API
@@ -483,7 +508,7 @@ export function RedditPostCard({
         }));
       });
 
-      console.log('[RedditPostCard] Preview expand', {
+      debugLog('[RedditPostCard] Preview expand', {
         postId,
         isFirefox,
         videoKind: redditVideoSource.kind,
@@ -494,7 +519,7 @@ export function RedditPostCard({
       // Let the video's onPlay handler manage audio playback to avoid conflicts
       if (isFirefox && redditAudioUrl) {
         const audioEl = audioRef.current;
-        console.log('[RedditPostCard] Audio element on expand - preparing (not playing)', {
+        debugLog('[RedditPostCard] Audio element on expand - preparing (not playing)', {
           exists: Boolean(audioEl),
           src: audioEl?.src,
         });
@@ -552,7 +577,9 @@ export function RedditPostCard({
   const audioBlockedRef = useRef(false);
   const audioUnavailableRef = useRef(false);
   const hasSelftext = Boolean(post.selftext && post.selftext.trim());
-  const hasInlineMedia = Boolean(isGalleryPost || previewImageUrl || inlineMedia || redditVideoSource || hasSelftext);
+  const hasInlineMedia = Boolean(
+    isGalleryPost || previewImageUrl || inlineMedia || redditVideoSource || hasSelftext
+  );
   const isInlinePreviewOpen = !!(hasInlineMedia && expandedImageMap[post.id]);
   const redditAudioUrl =
     redditVideoSource && redditVideoSource.kind === 'mp4'
@@ -566,7 +593,8 @@ export function RedditPostCard({
       videoEl as HTMLVideoElement & { webkitAudioDecodedByteCount?: number }
     ).webkitAudioDecodedByteCount;
     if (typeof webkitAudioDecodedByteCount === 'number') return webkitAudioDecodedByteCount > 0;
-    const audioTracks = (videoEl as HTMLVideoElement & { audioTracks?: { length: number } }).audioTracks;
+    const audioTracks = (videoEl as HTMLVideoElement & { audioTracks?: { length: number } })
+      .audioTracks;
     if (audioTracks && typeof audioTracks.length === 'number') return audioTracks.length > 0;
     return redditVideoSource?.hasAudio ?? true;
   };
@@ -582,7 +610,7 @@ export function RedditPostCard({
     const audioEl = audioRef.current;
     if (!audioEl) return;
     const videoEl = event.currentTarget;
-    console.log('[RedditPostCard] Video play', {
+    debugLog('[RedditPostCard] Video play', {
       currentTime: videoEl.currentTime,
       muted: videoEl.muted,
       volume: videoEl.volume,
@@ -602,10 +630,10 @@ export function RedditPostCard({
       playPromise
         .then(() => {
           audioBlockedRef.current = false;
-          console.log('[RedditPostCard] Audio play ok');
+          debugLog('[RedditPostCard] Audio play ok');
         })
         .catch((error) => {
-          console.log('[RedditPostCard] Audio play error', {
+          debugLog('[RedditPostCard] Audio play error', {
             name: error?.name,
             message: error?.message,
           });
@@ -684,16 +712,16 @@ export function RedditPostCard({
     const preferSound = autoplayWithSoundRef.current;
     const startMuted = isFirefox && redditVideoSource?.kind === 'hls';
 
-    console.log('[attemptAutoplay] Called', {
+    debugLog('[attemptAutoplay] Called', {
       videoType: redditVideoSource?.kind,
       readyState: videoEl.readyState,
       startMuted,
       preferSound,
-      isFirefox
+      isFirefox,
     });
 
     const play = (muted: boolean) => {
-      console.log('[attemptAutoplay] play() called with muted:', muted);
+      debugLog('[attemptAutoplay] play() called with muted:', muted);
       videoEl.muted = muted;
       if (!muted) {
         videoEl.volume = 1.0;
@@ -702,18 +730,18 @@ export function RedditPostCard({
       if (playPromise) {
         playPromise
           .then(() => {
-            console.log('[attemptAutoplay] Play succeeded, muted:', muted);
+            debugLog('[attemptAutoplay] Play succeeded, muted:', muted);
             autoplayRequestedRef.current = false;
             if (muted && preferSound) {
-              console.log('[attemptAutoplay] Unmuting video after successful play');
+              debugLog('[attemptAutoplay] Unmuting video after successful play');
               videoEl.muted = false;
               videoEl.play().catch(() => undefined);
             }
           })
           .catch((error) => {
-            console.log('[attemptAutoplay] Play failed:', error?.name, error?.message);
+            debugLog('[attemptAutoplay] Play failed:', error?.name, error?.message);
             if (!muted && error?.name === 'NotAllowedError') {
-              console.log('[attemptAutoplay] Retrying with muted=true');
+              debugLog('[attemptAutoplay] Retrying with muted=true');
               play(true);
             }
           });
@@ -721,14 +749,14 @@ export function RedditPostCard({
     };
 
     if (videoEl.readyState >= 2) {
-      console.log('[attemptAutoplay] Video ready, playing immediately');
+      debugLog('[attemptAutoplay] Video ready, playing immediately');
       play(startMuted || !preferSound);
       return;
     }
 
-    console.log('[attemptAutoplay] Video not ready, waiting for canplay event');
+    debugLog('[attemptAutoplay] Video not ready, waiting for canplay event');
     const handleCanPlay = () => {
-      console.log('[attemptAutoplay] canplay event fired');
+      debugLog('[attemptAutoplay] canplay event fired');
       videoEl.removeEventListener('canplay', handleCanPlay);
       play(startMuted || !preferSound);
     };
@@ -747,16 +775,16 @@ export function RedditPostCard({
     const videoEl = videoRef.current;
     if (!videoEl) return;
 
-    console.log('[HLS Effect] Starting HLS setup', { url: redditVideoSource.url });
+    debugLog('[HLS Effect] Starting HLS setup', { url: redditVideoSource.url });
 
     let hlsInstance: { destroy: () => void } | null = null;
     let mounted = true;
     (async () => {
       try {
-        console.log('[HLS Effect] Loading HLS library...');
+        debugLog('[HLS Effect] Loading HLS library...');
         const Hls = await loadHls();
         if (Hls?.isSupported && Hls.isSupported()) {
-          console.log('[HLS Effect] HLS supported, creating instance');
+          debugLog('[HLS Effect] HLS supported, creating instance');
           const instance = new Hls();
           instance.loadSource(redditVideoSource.url);
           instance.attachMedia(videoEl);
@@ -767,7 +795,7 @@ export function RedditPostCard({
               const HlsEvents = (Hls as unknown as { Events?: { MANIFEST_PARSED: string } }).Events;
               if (HlsEvents) {
                 instance.on(HlsEvents.MANIFEST_PARSED, () => {
-                  console.log('[HLS Effect] MANIFEST_PARSED - calling attemptAutoplay');
+                  debugLog('[HLS Effect] MANIFEST_PARSED - calling attemptAutoplay');
                   attemptAutoplay();
                 });
               }
@@ -784,7 +812,7 @@ export function RedditPostCard({
     })();
 
     return () => {
-      console.log('[HLS Effect] Cleanup');
+      debugLog('[HLS Effect] Cleanup');
       mounted = false;
       if (hlsInstance) {
         hlsInstance.destroy();
@@ -799,7 +827,7 @@ export function RedditPostCard({
 
     // Only handle native HLS here; HLS.js is handled by the MANIFEST_PARSED event
     if (redditVideoSource.kind === 'hls' && canNativeHls) {
-      console.log('[Native HLS Effect] Attempting autoplay');
+      debugLog('[Native HLS Effect] Attempting autoplay');
       // Small delay to ensure video element is mounted
       const timer = setTimeout(() => {
         attemptAutoplay();
@@ -824,25 +852,27 @@ export function RedditPostCard({
     if (!videoEl) return;
     videoEl.muted = false;
     videoEl.volume = 1.0;
-    videoEl.play().catch(() => { });
+    videoEl.play().catch(() => {});
   }, [isInlinePreviewOpen, inlineMedia]);
 
   return (
     <article
       className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)]"
-      style={{
-        transform: 'translate3d(0,0,0)',
-        WebkitTransform: 'translate3d(0,0,0)',
-        backfaceVisibility: 'hidden',
-        WebkitBackfaceVisibility: 'hidden',
-      } as React.CSSProperties}
+      style={
+        {
+          transform: 'translate3d(0,0,0)',
+          WebkitTransform: 'translate3d(0,0,0)',
+          backfaceVisibility: 'hidden',
+          WebkitBackfaceVisibility: 'hidden',
+        } as React.CSSProperties
+      }
     >
       <div className="flex gap-3 p-3">
         {thumbnail && (
           <div className="relative h-14 w-14 flex-shrink-0">
             <img
               src={thumbnail}
-              alt={`Preview image for ${post.title}`}
+              alt={t('posts.media.previewImageAlt', { title: post.title })}
               loading="lazy"
               decoding="async"
               className={`h-full w-full rounded object-cover ${shouldBlurThumbnail ? 'blur-sm' : ''}`}
@@ -863,68 +893,77 @@ export function RedditPostCard({
           </div>
         )}
         <div className="flex-1 text-left">
-          {/* Title */}
-          {isExternalLink ? (
-            <a
-              href={sanitizedExternalUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="block text-base font-semibold text-[var(--color-text-primary)] hover:text-[var(--color-primary)]"
-            >
-              {decodeHtmlEntities(post.title)}
-            </a>
-          ) : (
-            <Link
-              to={postUrl}
-              state={linkState}
-              className="block text-base font-semibold text-[var(--color-text-primary)] hover:text-[var(--color-primary)]"
-            >
-              {decodeHtmlEntities(post.title)}
-            </Link>
-          )}
-
-          {/* Badges row */}
-          <div className="mt-2 flex flex-wrap items-center gap-2">
-            {/* FEED-7: Reddit source badge for visual distinction */}
-            <span className="inline-flex items-center rounded bg-orange-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-orange-800 dark:bg-orange-900/30 dark:text-orange-400">
-              Reddit
-            </span>
-            {post.over18 && (
-              <FlairBadge text="NSFW" backgroundColor="#dc2626" textColor="#fff" className="uppercase" />
-            )}
-            <FlairBadge
-              text={decodeHtmlEntities(post.link_flair_text)}
-              backgroundColor={post.link_flair_background_color}
-              textColor={post.link_flair_text_color}
-            />
-            {post.stickied && <PinnedBadge />}
-            {isExternalLink && (
-              <a
-                href={sanitizedExternalUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 rounded border border-[var(--color-border)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary)] hover:border-[var(--color-primary)] hover:text-[var(--color-primary)]"
-              >
-                {externalDomain ?? 'external'}
-                <svg
-                  className="h-3 w-3"
-                  viewBox="0 0 20 20"
-                  fill="currentColor"
-                  aria-hidden="true"
+          <div className="flex items-start gap-2">
+            <div className="min-w-0 flex-1">
+              {/* Title */}
+              {isExternalLink ? (
+                <a
+                  href={sanitizedExternalUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block text-base font-semibold text-[var(--color-text-primary)] hover:text-[var(--color-primary)]"
                 >
-                  <path
-                    fillRule="evenodd"
-                    d="M4.25 5.5a.75.75 0 00-.75.75v8.5c0 .414.336.75.75.75h8.5a.75.75 0 00.75-.75v-4a.75.75 0 011.5 0v4A2.25 2.25 0 0112.75 17h-8.5A2.25 2.25 0 012 14.75v-8.5A2.25 2.25 0 014.25 4h5a.75.75 0 010 1.5h-5z"
-                    clipRule="evenodd"
-                  />
-                  <path
-                    fillRule="evenodd"
-                    d="M6.194 12.753a.75.75 0 001.06.053L16.5 4.44v2.81a.75.75 0 001.5 0v-4.5a.75.75 0 00-.75-.75h-4.5a.75.75 0 000 1.5h2.553l-9.056 8.194a.75.75 0 00-.053 1.06z"
-                    clipRule="evenodd"
-                  />
-                </svg>
-              </a>
-            )}
+                  {decodeHtmlEntities(post.title)}
+                </a>
+              ) : (
+                <Link
+                  to={postUrl}
+                  state={linkState}
+                  className="block text-base font-semibold text-[var(--color-text-primary)] hover:text-[var(--color-primary)]"
+                >
+                  {decodeHtmlEntities(post.title)}
+                </Link>
+              )}
+            </div>
+
+            {/* Flairs/Badges (top-right) */}
+            <div className="flex max-w-[50%] flex-wrap items-center justify-end gap-2 pt-0.5 text-right">
+              {/* FEED-7: Reddit source badge for visual distinction */}
+              <span className="inline-flex items-center rounded bg-orange-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-orange-800 dark:bg-orange-900/30 dark:text-orange-400">
+                {t('posts.badges.reddit')}
+              </span>
+              {post.over18 && (
+                <FlairBadge
+                  text={t('posts.badges.nsfw')}
+                  backgroundColor="#dc2626"
+                  textColor="#fff"
+                  className="uppercase"
+                />
+              )}
+              <FlairBadge
+                text={decodeHtmlEntities(post.link_flair_text)}
+                backgroundColor={post.link_flair_background_color}
+                textColor={post.link_flair_text_color}
+              />
+              {post.stickied && <PinnedBadge />}
+              {isExternalLink && (
+                <a
+                  href={sanitizedExternalUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 rounded border border-[var(--color-border)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary)] hover:border-[var(--color-primary)] hover:text-[var(--color-primary)]"
+                >
+                  {externalDomain ?? t('posts.media.externalLinkLabel')}
+                  <svg
+                    className="h-3 w-3"
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                    aria-hidden="true"
+                  >
+                    <path
+                      fillRule="evenodd"
+                      d="M4.25 5.5a.75.75 0 00-.75.75v8.5c0 .414.336.75.75.75h8.5a.75.75 0 00.75-.75v-4a.75.75 0 011.5 0v4A2.25 2.25 0 0112.75 17h-8.5A2.25 2.25 0 012 14.75v-8.5A2.25 2.25 0 014.25 4h5a.75.75 0 010 1.5h-5z"
+                      clipRule="evenodd"
+                    />
+                    <path
+                      fillRule="evenodd"
+                      d="M6.194 12.753a.75.75 0 001.06.053L16.5 4.44v2.81a.75.75 0 001.5 0v-4.5a.75.75 0 00-.75-.75h-4.5a.75.75 0 000 1.5h2.553l-9.056 8.194a.75.75 0 00-.053 1.06z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
+                </a>
+              )}
+            </div>
           </div>
           <div className="mt-1 flex items-start gap-3 text-[11px] text-[var(--color-text-secondary)]">
             {hasInlineMedia && (
@@ -932,11 +971,13 @@ export function RedditPostCard({
                 type="button"
                 onClick={() => toggleInlinePreview(post.id)}
                 aria-pressed={!!expandedImageMap[post.id]}
-                aria-label={isInlinePreviewOpen ? 'Hide image preview' : 'Show image preview'}
+                aria-label={
+                  isInlinePreviewOpen ? t('posts.aria.hidePreview') : t('posts.aria.showPreview')
+                }
                 className="flex h-7 w-7 items-center justify-center rounded border border-[var(--color-border)] bg-[var(--color-surface-elevated)] text-[var(--color-text-secondary)] hover:border-[var(--color-primary)] hover:text-[var(--color-primary)]"
               >
                 <span className="sr-only">
-                  {isInlinePreviewOpen ? 'Hide image preview' : 'Show image preview'}
+                  {isInlinePreviewOpen ? t('posts.aria.hidePreview') : t('posts.aria.showPreview')}
                 </span>
                 {isInlinePreviewOpen ? (
                   <svg
@@ -966,30 +1007,24 @@ export function RedditPostCard({
             )}
             <div className="flex-1">
               <div className="text-xs text-[var(--color-text-secondary)]">
-                <Link
-                  to={`/r/${post.subreddit}`}
-                  className="hover:text-[var(--color-primary)]"
-                >
+                <Link to={`/r/${post.subreddit}`} className="hover:text-[var(--color-primary)]">
                   r/{post.subreddit}
                 </Link>
                 <span> · </span>
-                <Link
-                  to={`/user/${post.author}`}
-                  className="hover:text-[var(--color-primary)]"
-                >
+                <Link to={`/user/${post.author}`} className="hover:text-[var(--color-primary)]">
                   u/{post.author}
                 </Link>
                 <span> · </span>
                 <span>{pointsLabel}</span>
                 <span> · </span>
-                <span>posted {formatTimestamp(post.created_utc, useRelativeTime)}</span>
+                <span>{t('posts.submittedAt', { time: submittedLabel })}</span>
               </div>
               {expandedImageMap[post.id] && (
                 <div className="mt-3 overflow-hidden rounded border border-[var(--color-border)] bg-[var(--color-surface-elevated)]">
                   {isGalleryPost ? (
                     isLoadingGallery ? (
                       <div className="flex items-center justify-center p-8 text-[var(--color-text-secondary)]">
-                        Loading gallery images...
+                        {t('posts.media.loadingGalleryImages')}
                       </div>
                     ) : galleryImages.length > 0 ? (
                       <div className="space-y-2 p-2">
@@ -997,7 +1032,10 @@ export function RedditPostCard({
                           <img
                             key={index}
                             src={imageUrl}
-                            alt={`${post.title} - Image ${index + 1}`}
+                            alt={t('posts.media.galleryImageAlt', {
+                              title: post.title,
+                              index: index + 1,
+                            })}
                             loading="lazy"
                             decoding="async"
                             className="max-h-[70vh] w-full object-contain"
@@ -1006,7 +1044,7 @@ export function RedditPostCard({
                       </div>
                     ) : (
                       <div className="flex items-center justify-center p-8 text-[var(--color-text-secondary)]">
-                        No images found in this gallery
+                        {t('posts.media.noGalleryImages')}
                       </div>
                     )
                   ) : redditVideoSource ? (
@@ -1018,28 +1056,37 @@ export function RedditPostCard({
                         playsInline
                         preload="metadata"
                         onLoadedMetadata={() => {
-                          console.log('[RedditPostCard] onLoadedMetadata event', {
+                          debugLog('[RedditPostCard] onLoadedMetadata event', {
                             videoKind: redditVideoSource.kind,
                             autoplayRequested: autoplayRequestedRef.current,
                             canNativeHls,
                           });
                           // For MP4 and native HLS videos, autoplay when metadata is loaded
                           // (HLS.js videos are handled by MANIFEST_PARSED event)
-                          if (autoplayRequestedRef.current && (redditVideoSource.kind !== 'hls' || canNativeHls)) {
+                          if (
+                            autoplayRequestedRef.current &&
+                            (redditVideoSource.kind !== 'hls' || canNativeHls)
+                          ) {
                             const videoEl = videoRef.current;
                             if (videoEl) {
-                              console.log('[RedditPostCard] Calling play() directly from onLoadedMetadata');
+                              debugLog(
+                                '[RedditPostCard] Calling play() directly from onLoadedMetadata'
+                              );
                               videoEl.muted = false;
                               videoEl.volume = 1.0;
                               const playPromise = videoEl.play();
                               if (playPromise) {
                                 playPromise
                                   .then(() => {
-                                    console.log('[RedditPostCard] Video play succeeded');
+                                    debugLog('[RedditPostCard] Video play succeeded');
                                     autoplayRequestedRef.current = false;
                                   })
                                   .catch((error) => {
-                                    console.log('[RedditPostCard] Video play failed:', error?.name, error?.message);
+                                    debugLog(
+                                      '[RedditPostCard] Video play failed:',
+                                      error?.name,
+                                      error?.message
+                                    );
                                     if (error?.name === 'NotAllowedError') {
                                       // Try again muted
                                       videoEl.muted = true;
@@ -1062,9 +1109,12 @@ export function RedditPostCard({
                           <source src={redditVideoSource.url} type="video/mp4" />
                         )}
                         {redditVideoSource.kind === 'hls' && canNativeHls && (
-                          <source src={redditVideoSource.url} type="application/vnd.apple.mpegurl" />
+                          <source
+                            src={redditVideoSource.url}
+                            type="application/vnd.apple.mpegurl"
+                          />
                         )}
-                        Your browser does not support the video tag.
+                        {t('posts.media.videoUnsupported')}
                       </video>
                       {redditAudioUrl && (
                         <audio
@@ -1077,17 +1127,19 @@ export function RedditPostCard({
                       )}
                       {!redditVideoSource.hasAudio && (
                         <div className="p-2 text-xs text-[var(--color-text-secondary)]">
-                          Note: This video may not have audio.
+                          {t('posts.media.videoMayNotHaveAudio')}
                         </div>
                       )}
                     </div>
                   ) : inlineMedia?.kind === 'redgifs' ? (
                     <div className="relative w-full bg-black">
                       <iframe
-                        title={`${post.title} - Redgifs video`}
+                        title={t('posts.media.redgifsEmbedTitle', { title: post.title })}
                         key={`${post.id}-redgifs-${isInlinePreviewOpen ? 'open' : 'closed'}`}
                         src={
-                          isInlinePreviewOpen ? withAutoplayParams(inlineMedia.src, false) : inlineMedia.src
+                          isInlinePreviewOpen
+                            ? withAutoplayParams(inlineMedia.src, false)
+                            : inlineMedia.src
                         }
                         className="h-[70vh] w-full"
                         frameBorder="0"
@@ -1100,10 +1152,12 @@ export function RedditPostCard({
                   ) : inlineMedia?.kind === 'iframe' ? (
                     <div className="relative w-full bg-black">
                       <iframe
-                        title={`${post.title} - Embedded media`}
+                        title={t('posts.media.embeddedMediaTitle', { title: post.title })}
                         key={`${post.id}-embed-${isInlinePreviewOpen ? 'open' : 'closed'}`}
                         src={
-                          isInlinePreviewOpen ? withAutoplayParams(inlineMedia.src, false) : inlineMedia.src
+                          isInlinePreviewOpen
+                            ? withAutoplayParams(inlineMedia.src, false)
+                            : inlineMedia.src
                         }
                         className="h-[70vh] w-full"
                         frameBorder="0"
@@ -1167,7 +1221,7 @@ export function RedditPostCard({
                         ? t('posts.status.saving')
                         : t('posts.status.unsaving')
                       : isSaved
-                        ? t('posts.unsave')
+                        ? t('posts.actions.unsave')
                         : t('posts.save')}
                   </button>
                 )}
@@ -1177,7 +1231,7 @@ export function RedditPostCard({
                     onClick={onHide}
                     className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
                   >
-                    {hideLabel || t('common.hide')}
+                    {hideLabel || t('posts.hide')}
                   </button>
                 )}
                 {onCrosspost && (

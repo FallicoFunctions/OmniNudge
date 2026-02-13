@@ -19,6 +19,7 @@ import (
 func setupSubscriptionsTest(t *testing.T) (*SubscriptionsHandler, *models.HubSubscriptionRepository, *models.SubredditSubscriptionRepository, *models.HubRepository, func()) {
 	db, err := database.NewTest()
 	require.NoError(t, err)
+	t.Cleanup(db.Close)
 
 	ctx := context.Background()
 	err = db.Migrate(ctx)

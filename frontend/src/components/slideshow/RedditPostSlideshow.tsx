@@ -1,4 +1,5 @@
 import { useMemo, useState, useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { BaseSlideshow } from './BaseSlideshow';
 import type { SlideshowItem } from './BaseSlideshow';
 import { SlideshowControls } from './SlideshowControls';
@@ -122,6 +123,7 @@ export function RedditPostSlideshow({
   onClose,
   includeTextPosts = true,
 }: RedditPostSlideshowProps) {
+  const { t } = useTranslation();
   const [galleryData, setGalleryData] = useState<Record<string, string[]>>({});
   const [loadingGalleries, setLoadingGalleries] = useState(true);
 
@@ -361,7 +363,7 @@ export function RedditPostSlideshow({
     return (
       <div className="fixed inset-0 z-50 bg-black bg-opacity-95 flex items-center justify-center">
         <div className="text-center">
-          <div className="text-white text-xl mb-4">Loading gallery images...</div>
+          <div className="text-white text-xl mb-4">{t('redditPostSlideshow.loadingGalleryImages')}</div>
           <button
             onClick={onClose}
             className="px-4 py-2 bg-[var(--color-primary)] text-white rounded-md hover:bg-[var(--color-primary-hover)] transition-colors"
@@ -377,7 +379,7 @@ export function RedditPostSlideshow({
     return (
       <div className="fixed inset-0 z-50 bg-black bg-opacity-95 flex items-center justify-center">
         <div className="text-center">
-          <div className="text-white text-xl mb-4">No media posts found</div>
+          <div className="text-white text-xl mb-4">{t('redditPostSlideshow.noMediaPostsFound')}</div>
           <button
             onClick={onClose}
             className="px-4 py-2 bg-[var(--color-primary)] text-white rounded-md hover:bg-[var(--color-primary-hover)] transition-colors"

@@ -17,7 +17,6 @@ import type { CommentActionHandlers } from '../components/comments/CommentItem';
 import { MarkdownInput } from '../components/common/MarkdownInput';
 import { PostBodyMarkdown } from '../components/posts/PostBodyMarkdown';
 import { FormattingHelpTable } from '../components/common/FormattingHelpTable';
-import { formatTimestamp } from '../utils/timeFormat';
 import { decodeHtmlEntities } from '../utils/text';
 import { VoteButtons } from '../components/VoteButtons';
 import { ModMailModal } from '../components/modmail/ModMailModal';
@@ -62,8 +61,19 @@ export default function PostDetailPage() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const { t } = useTranslation();
-  const { formatNumber } = useFormat();
+  const { formatNumber, formatDate, formatRelativeTime } = useFormat();
   const { useRelativeTime, stayOnPostAfterHide, searchIncludeNsfwByDefault, blockAllNsfw } = useSettings();
+
+  const formatSubmittedAt = (timestamp: string | number | Date) => {
+    const d = new Date(timestamp);
+    if (Number.isNaN(d.getTime())) return t('common.time.recently');
+
+    if (useRelativeTime) {
+      return formatRelativeTime(d);
+    }
+
+    return formatDate(d, { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
+  };
 
   const [commentText, setCommentText] = useState('');
   const [showFormattingHelp, setShowFormattingHelp] = useState(false);
@@ -103,7 +113,6 @@ export default function PostDetailPage() {
     queryKey: ['posts', parsedPostId, hubname ?? ''],
     queryFn: async () => {
       const response = await postsService.getPost(parsedPostId, hubname);
-      console.log('[PostDetailPage] Raw post response:', response);
       return response;
     },
     enabled: Number.isFinite(parsedPostId),
@@ -114,7 +123,6 @@ export default function PostDetailPage() {
   const postData = useMemo<PlatformPost | null>(() => {
     if (!postDataRaw) return null;
     const unwrapped = 'post' in postDataRaw ? postDataRaw.post : postDataRaw;
-    console.log('[PostDetailPage] Unwrapped post data:', unwrapped);
     return unwrapped;
   }, [postDataRaw]);
   const decodedTitle = postData ? decodeHtmlEntities(postData.title) : '';
@@ -297,10 +305,10 @@ export default function PostDetailPage() {
   const savePostMutation = useMutation({
     mutationFn: async (shouldSave: boolean) => {
       if (!user) {
-        throw new Error('You must be signed in to save posts.');
+        throw new Error(t('alerts.signInToSave'));
       }
       if (!Number.isFinite(parsedPostId)) {
-        throw new Error('Invalid post');
+        throw new Error(t('posts.errors.invalidPost'));
       }
       if (shouldSave) {
         await savedService.savePost(parsedPostId);
@@ -316,10 +324,10 @@ export default function PostDetailPage() {
   const hidePostMutation = useMutation({
     mutationFn: async () => {
       if (!user) {
-        throw new Error('You must be signed in to hide posts.');
+        throw new Error(t('alerts.signInToHide'));
       }
       if (!Number.isFinite(parsedPostId)) {
-        throw new Error('Invalid post');
+        throw new Error(t('posts.errors.invalidPost'));
       }
       await savedService.hidePost(parsedPostId);
       await queryClient.invalidateQueries({ queryKey: savedPostsKey });
@@ -344,7 +352,7 @@ export default function PostDetailPage() {
       setEditPostTarget(null);
     },
     onError: (err) => {
-      alert(`Failed to update post: ${err.message}`);
+      alert(t('alerts.updatePostFailed', { message: err.message }));
     },
   });
 
@@ -370,7 +378,7 @@ export default function PostDetailPage() {
         setDeleteCommentTarget({ commentId: comment.id, authorId: comment.user_id });
       } else {
         // For own comments, just confirm and delete
-        if (!window.confirm('Are you sure you want to delete this comment?')) {
+        if (!window.confirm(t('modals.delete.confirmComment'))) {
           return;
         }
         await postsService.deleteComment(comment.id);
@@ -390,13 +398,13 @@ export default function PostDetailPage() {
       await queryClient.invalidateQueries({ queryKey: savedSiteCommentsKey });
     },
     report: async (comment) => {
-      const reason = window.prompt('Reason for reporting (optional):') ?? '';
+      const reason = window.prompt(t('posts.report.reasonPrompt')) ?? '';
       await api.post('/reports', {
         target_type: 'comment',
         target_id: comment.id,
         reason,
       });
-      alert('Thanks! The moderation team has been notified.');
+      alert(t('posts.report.success'));
     },
     permalink: (comment) => {
       const url = hubName
@@ -413,7 +421,7 @@ export default function PostDetailPage() {
   const handleConfirmDeleteComment = async () => {
     if (!deleteCommentTarget) return;
     if (!deleteCommentReason.trim()) {
-      alert('Please provide a reason for deletion');
+      alert(t('alerts.provideDeleteReason'));
       return;
     }
     try {
@@ -422,7 +430,11 @@ export default function PostDetailPage() {
       setDeleteCommentTarget(null);
       setDeleteCommentReason('');
     } catch (err) {
-      alert(`Failed to delete comment: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      alert(
+        t('alerts.deleteCommentFailed', {
+          message: err instanceof Error ? err.message : t('common.error'),
+        })
+      );
     }
   };
 
@@ -518,9 +530,9 @@ export default function PostDetailPage() {
     if (!postData) return;
     try {
       await navigator.clipboard.writeText(window.location.href);
-      alert('Post link copied to clipboard!');
+      alert(t('alerts.linkCopied'));
     } catch {
-      alert('Unable to copy link. Please try again.');
+      alert(t('alerts.linkCopyFailed'));
     }
   };
 
@@ -529,7 +541,7 @@ export default function PostDetailPage() {
       await savePostMutation.mutateAsync(!isPostSaved);
     } catch (error) {
       const err = error as Error;
-      alert(`Failed to ${isPostSaved ? 'unsave' : 'save'} post: ${err.message}`);
+      alert(t('alerts.saveFailed', { message: err.message }));
     }
   };
 
@@ -545,7 +557,7 @@ export default function PostDetailPage() {
       navigate(originPathFromState ?? (hubName ? `/h/${hubName}` : '/'));
     },
     onError: (err) => {
-      alert(`Failed to delete post: ${err.message}`);
+      alert(t('alerts.deletePostFailed', { message: err.message }));
     },
   });
 
@@ -572,7 +584,7 @@ export default function PostDetailPage() {
       setDeletePostTarget({ postId: postData.id, authorId: postData.author_id });
       return;
     }
-    if (!window.confirm('Are you sure you want to delete this post?')) {
+    if (!window.confirm(t('modals.delete.confirmOwn'))) {
       return;
     }
     deletePostMutation.mutate({ postId: postData.id });
@@ -581,7 +593,7 @@ export default function PostDetailPage() {
   const handleConfirmDeletePost = () => {
     if (!deletePostTarget) return;
     if (!deletePostReason.trim()) {
-      alert('Please provide a reason for deletion');
+      alert(t('alerts.provideDeleteReason'));
       return;
     }
     deletePostMutation.mutate({ postId: deletePostTarget.postId, reason: deletePostReason });
@@ -589,15 +601,15 @@ export default function PostDetailPage() {
 
   const handleHidePost = async () => {
     if (!user) {
-      alert('You need to be signed in to hide posts.');
+      alert(t('alerts.signInToHide'));
       return;
     }
     const shouldWarn = isPostSaved;
     const confirmed = shouldWarn
       ? window.confirm(
-        'Hiding this post will remove it from your Saved list and add it to your Hidden items. Are you sure you want to continue?'
+        t('modals.hide.confirmSaved')
       )
-      : window.confirm('Hide this post?');
+      : window.confirm(t('modals.hide.confirmSimple'));
     if (!confirmed) {
       return;
     }
@@ -608,13 +620,13 @@ export default function PostDetailPage() {
       }
     } catch (error) {
       const err = error as Error;
-      alert(`Failed to hide post: ${err.message}`);
+      alert(t('alerts.hideFailed', { message: err.message }));
     }
   };
 
   const handleCrosspost = async () => {
     // TODO: Implement crosspost functionality
-    alert('Crosspost functionality coming soon!');
+    alert(t('posts.actions.crosspostSoon'));
   };
 
   if (!postId || Number.isNaN(parsedPostId)) {
@@ -698,7 +710,7 @@ export default function PostDetailPage() {
               topSuggestions={subredditSuggestions}
               topShouldShowSuggestions={shouldShowSuggestions}
               topIsLoading={isAutocompleteLoading}
-              topEmptyMessage="No hubs or subreddits found."
+              topEmptyMessage={t('home.search.noResults')}
               renderTopSuggestion={(suggestion) => (
                 <SubredditSuggestionItem
                   key={suggestion.name}
@@ -707,7 +719,7 @@ export default function PostDetailPage() {
                 />
               )}
               postValue={postSearchInput}
-              postPlaceholder="Search posts..."
+              postPlaceholder={t('home.search.searchPosts')}
               onPostChange={(value) => {
                 setPostSearchInput(value);
                 if (!isSearchDropdownOpen) {
@@ -726,7 +738,7 @@ export default function PostDetailPage() {
                       checked={limitSearchToContext}
                       onChange={(e) => setLimitSearchToContext(e.target.checked)}
                     />
-                    <span>Limit search to r/{normalizedSubreddit}</span>
+                    <span>{t('home.search.limitToSubreddit', { subreddit: normalizedSubreddit })}</span>
                   </label>
                   {!blockAllNsfw && (
                     <label className="flex items-center gap-2">
@@ -735,12 +747,12 @@ export default function PostDetailPage() {
                         checked={includeNsfwSearch}
                         onChange={(e) => setIncludeNsfwSearch(e.target.checked)}
                       />
-                      <span>Include NSFW results</span>
+                      <span>{t('home.search.includeNsfw')}</span>
                     </label>
                   )}
                   {blockAllNsfw && (
                     <div className="text-xs text-[var(--color-text-secondary)]">
-                      NSFW content is blocked in settings.
+                      {t('home.search.nsfwBlocked')}
                     </div>
                   )}
                 </div>
@@ -755,7 +767,7 @@ export default function PostDetailPage() {
             containerClassName="w-full px-4 flex flex-col gap-4 mt-4"
             showTopForm={true}
             topValue={subredditInputValue}
-            topPlaceholder="Enter hub or subreddit..."
+            topPlaceholder={t('home.search.enterHubOrSubreddit')}
             onTopChange={handleSubredditInputChange}
             onTopFocus={() => setIsAutocompleteOpen(true)}
             onTopBlur={() => setIsAutocompleteOpen(false)}
@@ -763,7 +775,7 @@ export default function PostDetailPage() {
             topSuggestions={subredditSuggestions}
             topShouldShowSuggestions={shouldShowSuggestions}
             topIsLoading={isAutocompleteLoading}
-            topEmptyMessage="No hubs or subreddits found."
+            topEmptyMessage={t('home.search.noResults')}
             renderTopSuggestion={(suggestion) => (
               <SubredditSuggestionItem
                 key={suggestion.name}
@@ -772,7 +784,7 @@ export default function PostDetailPage() {
               />
             )}
             postValue={postSearchInput}
-            postPlaceholder="Search posts..."
+            postPlaceholder={t('home.search.searchPosts')}
             onPostChange={(value) => {
               setPostSearchInput(value);
               if (!isSearchDropdownOpen) {
@@ -853,7 +865,7 @@ export default function PostDetailPage() {
               containerClassName="w-full md:w-96"
               showTopForm={false}
               topValue={hubInputValue}
-              topPlaceholder="Enter hub or subreddit..."
+              topPlaceholder={t('home.search.enterHubOrSubreddit')}
               onTopChange={handleHubInputChange}
               onTopFocus={() => setHubIsAutocompleteOpen(true)}
               onTopBlur={() => setHubIsAutocompleteOpen(false)}
@@ -861,7 +873,7 @@ export default function PostDetailPage() {
               topSuggestions={hubSuggestions}
               topShouldShowSuggestions={shouldShowHubSuggestions}
               topIsLoading={isHubAutocompleteLoading}
-              topEmptyMessage="No hubs or subreddits found."
+              topEmptyMessage={t('home.search.noResults')}
               renderTopSuggestion={(suggestion) => (
                 <CombinedSuggestionItem
                   key={`${suggestion.type}-${suggestion.data.name}`}
@@ -871,7 +883,7 @@ export default function PostDetailPage() {
                 />
               )}
               postValue={hubPostSearchInput}
-              postPlaceholder="Search posts..."
+              postPlaceholder={t('home.search.searchPosts')}
               onPostChange={(value) => {
                 setHubPostSearchInput(value);
                 if (!hubIsSearchDropdownOpen) {
@@ -919,7 +931,7 @@ export default function PostDetailPage() {
             containerClassName="w-full px-4 flex flex-col gap-4 mt-4"
             showTopForm={true}
             topValue={hubInputValue}
-            topPlaceholder="Enter hub or subreddit..."
+            topPlaceholder={t('home.search.enterHubOrSubreddit')}
             onTopChange={handleHubInputChange}
             onTopFocus={() => setHubIsAutocompleteOpen(true)}
             onTopBlur={() => setHubIsAutocompleteOpen(false)}
@@ -927,7 +939,7 @@ export default function PostDetailPage() {
             topSuggestions={hubSuggestions}
             topShouldShowSuggestions={shouldShowHubSuggestions}
             topIsLoading={isHubAutocompleteLoading}
-            topEmptyMessage="No hubs or subreddits found."
+            topEmptyMessage={t('home.search.noResults')}
             renderTopSuggestion={(suggestion) => (
               <CombinedSuggestionItem
                 key={`${suggestion.type}-${suggestion.data.name}`}
@@ -937,7 +949,7 @@ export default function PostDetailPage() {
               />
             )}
             postValue={hubPostSearchInput}
-            postPlaceholder="Search posts..."
+            postPlaceholder={t('home.search.searchPosts')}
             onPostChange={(value) => {
               setHubPostSearchInput(value);
               if (!hubIsSearchDropdownOpen) {
@@ -956,7 +968,7 @@ export default function PostDetailPage() {
                     checked={hubLimitSearchToContext}
                     onChange={(e) => setHubLimitSearchToContext(e.target.checked)}
                   />
-                  <span>Limit search to h/{hubName}</span>
+                  <span>{t('home.search.limitToHub', { hub: hubName })}</span>
                 </label>
                 {!blockAllNsfw && (
                   <label className="flex items-center gap-2">
@@ -965,12 +977,12 @@ export default function PostDetailPage() {
                       checked={hubIncludeNsfwSearch}
                       onChange={(e) => setHubIncludeNsfwSearch(e.target.checked)}
                     />
-                    <span>Include NSFW results</span>
+                    <span>{t('home.search.includeNsfw')}</span>
                   </label>
                 )}
                 {blockAllNsfw && (
                   <div className="text-xs text-[var(--color-text-secondary)]">
-                    NSFW content is blocked in settings.
+                    {t('home.search.nsfwBlocked')}
                   </div>
                 )}
               </div>
@@ -1015,7 +1027,7 @@ export default function PostDetailPage() {
                     ]
                     : []),
                   <span key="author">
-                    Posted by{' '}
+                    {t('posts.postedByLabel')}{' '}
                     <Link
                       to={`/users/${postData?.author?.username ?? postData?.author_username}`}
                       className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
@@ -1024,7 +1036,9 @@ export default function PostDetailPage() {
                     </Link>
                   </span>,
                   <span key="submitted">
-                    submitted {formatTimestamp(postData.crossposted_at ?? postData.created_at, useRelativeTime)}
+                    {t('posts.submittedAt', {
+                      time: formatSubmittedAt(postData.crossposted_at ?? postData.created_at),
+                    })}
                   </span>,
                 ]}
               />
@@ -1096,10 +1110,10 @@ export default function PostDetailPage() {
                         className="hover:underline disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         {togglePinMutation.isPending
-                          ? 'updating...'
+                          ? t('posts.status.updating')
                           : postData.is_pinned
-                            ? 'unpin'
-                            : 'pin'}
+                            ? t('posts.actions.unpin')
+                            : t('posts.actions.pin')}
                       </button>
                     </>
                   )}
@@ -1110,7 +1124,7 @@ export default function PostDetailPage() {
                         onClick={() => postData && setEditPostTarget(postData)}
                         className="hover:underline"
                       >
-                        edit
+                        {t('common.edit')}
                       </button>
                     </>
                   )}
@@ -1118,7 +1132,7 @@ export default function PostDetailPage() {
                     <>
                       <span>•</span>
                       <button onClick={handleDeletePost} className="text-red-600 hover:underline">
-                        delete
+                        {t('common.delete')}
                       </button>
                     </>
                   )}
@@ -1142,10 +1156,10 @@ export default function PostDetailPage() {
               className="mb-6"
             >
               <MarkdownInput
-                label="Add a comment"
+                label={t('comments.addComment')}
                 value={commentText}
                 onChange={setCommentText}
-                placeholder="Share your thoughts..."
+                placeholder={t('comments.shareThoughts')}
                 rows={4}
               />
               <div className="mt-2 flex justify-start text-xs text-[var(--color-text-secondary)]">
@@ -1154,22 +1168,22 @@ export default function PostDetailPage() {
                   onClick={() => setShowFormattingHelp((prev) => !prev)}
                   className="hover:text-[var(--color-primary)]"
                 >
-                  {showFormattingHelp ? 'hide formatting' : 'formatting help'}
+                  {showFormattingHelp ? t('comments.formatting.hide') : t('comments.formatting.show')}
                 </button>
               </div>
               {showFormattingHelp && (
                 <div className="mt-2 w-[70%] rounded border border-[var(--color-border)] bg-[var(--color-surface)] p-2 text-[13px] text-[var(--color-text-primary)] shadow-sm">
                   <p className="text-sm text-[var(--color-text-primary)]">
-                    OmniNudge uses a slightly-customized version of{' '}
+                    {t('comments.formatting.description')}{' '}
                     <a
                       href="https://www.markdownguide.org/basic-syntax/"
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-[var(--color-primary)] underline"
                     >
-                      Markdown
+                      {t('comments.formatting.markdownLinkText')}
                     </a>{' '}
-                    for formatting. See below for formatting help.
+                    {t('comments.formatting.descriptionSuffix')}
                   </p>
                   <div className="mt-2">
                     <FormattingHelpTable />
@@ -1181,7 +1195,7 @@ export default function PostDetailPage() {
                 disabled={handleCreateComment.isPending || !commentText.trim()}
                 className="mt-2 rounded-md bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)] disabled:opacity-50"
               >
-                {handleCreateComment.isPending ? 'Posting...' : 'Add Comment'}
+                {handleCreateComment.isPending ? t('comments.status.posting') : t('comments.addComment')}
               </button>
             </form>
 
@@ -1195,7 +1209,7 @@ export default function PostDetailPage() {
 
             {commentNotFound && (
               <div className="mb-4 rounded border border-yellow-200 bg-yellow-50 p-3 text-sm text-yellow-900">
-                We couldn&apos;t find that comment. It may have been removed.
+                {t('comments.errors.notFound')}
               </div>
             )}
 
@@ -1208,14 +1222,14 @@ export default function PostDetailPage() {
                   }
                   className="mt-1 font-semibold text-[var(--color-primary)] hover:underline"
                 >
-                  View the rest of the comments →
+                  {t('comments.viewRest')}
                 </button>
               </div>
             )}
 
             {commentsList.length === 0 && !loadingComments && (
               <div className="text-sm text-[var(--color-text-secondary)]">
-                No comments yet. Be the first to comment on this post!
+                {t('comments.emptyBeFirstOnPost')}
               </div>
             )}
 
@@ -1300,7 +1314,7 @@ export default function PostDetailPage() {
                   setEmbedCopied(false);
                 }}
                 className="text-xl text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
-                aria-label="Close embed modal"
+                aria-label={t('posts.embed.closeLabel')}
               >
                 ×
               </button>
@@ -1368,7 +1382,7 @@ export default function PostDetailPage() {
               <textarea
                 value={deleteCommentReason}
                 onChange={(e) => setDeleteCommentReason(e.target.value)}
-                placeholder="E.g., Violates rule 2: Be respectful..."
+                placeholder={t('moderation.deleteReasonPlaceholder')}
                 className="w-full rounded border border-[var(--color-border)] bg-[var(--color-surface)] p-2 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
                 rows={4}
               />

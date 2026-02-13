@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next';
+import { resolveSupportedLanguage } from '../i18n/languageUtils';
 
 /**
  * Hook for accessing translations with type safety
@@ -9,10 +10,11 @@ import { useTranslation } from 'react-i18next';
  */
 export function useTranslations() {
   const { t, i18n } = useTranslation();
+  const currentLanguage = resolveSupportedLanguage(i18n.resolvedLanguage || i18n.language);
 
   return {
     t,
-    currentLanguage: i18n.language,
+    currentLanguage,
     changeLanguage: (lang: string) => i18n.changeLanguage(lang),
   };
 }

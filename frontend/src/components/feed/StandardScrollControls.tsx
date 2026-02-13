@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 interface StandardScrollControlsProps {
   autoAdvance: boolean;
@@ -23,6 +24,7 @@ export function StandardScrollControls({
   onNext,
   onPrevious,
 }: StandardScrollControlsProps) {
+  const { t } = useTranslation();
   const [showSettings, setShowSettings] = useState(false);
 
   const intervals = [
@@ -62,7 +64,7 @@ export function StandardScrollControls({
               ? 'bg-cyan-500 text-black hover:bg-cyan-400'
               : 'bg-gray-800/80 text-white hover:bg-gray-700/80'
           } backdrop-blur-sm`}
-          title={autoAdvance ? 'Pause auto-advance' : 'Enable auto-advance'}
+          title={autoAdvance ? t('standardScrollControls.titles.pauseAutoAdvance') : t('standardScrollControls.titles.enableAutoAdvance')}
         >
           {autoAdvance ? (
             <svg
@@ -97,7 +99,7 @@ export function StandardScrollControls({
         <button
           onClick={() => setShowSettings(!showSettings)}
           className="px-4 py-2 rounded-lg bg-gray-800/80 text-white hover:bg-gray-700/80 backdrop-blur-sm transition-all"
-          title="Settings"
+          title={t('standardScrollControls.titles.settings')}
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -129,8 +131,8 @@ export function StandardScrollControls({
                 d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z"
                 clipRule="evenodd"
               />
-            </svg>
-            Auto-advance Interval
+          </svg>
+            {t('standardScrollControls.settingsPanel.title')}
           </h3>
 
           <div className="grid grid-cols-2 gap-2">
@@ -151,9 +153,9 @@ export function StandardScrollControls({
 
           <div className="mt-4 pt-4 border-t border-gray-700">
             <div className="text-gray-400 text-xs space-y-1">
-              <p><kbd className="px-1.5 py-0.5 bg-gray-800 rounded text-cyan-400">↑↓</kbd> Navigate</p>
-              <p><kbd className="px-1.5 py-0.5 bg-gray-800 rounded text-cyan-400">Space</kbd> Toggle auto</p>
-              <p><kbd className="px-1.5 py-0.5 bg-gray-800 rounded text-cyan-400">Esc</kbd> Exit</p>
+              <p><kbd className="px-1.5 py-0.5 bg-gray-800 rounded text-cyan-400">↑↓</kbd> {t('standardScrollControls.help.navigate')}</p>
+              <p><kbd className="px-1.5 py-0.5 bg-gray-800 rounded text-cyan-400">{t('standardScrollControls.keys.space')}</kbd> {t('standardScrollControls.help.toggleAuto')}</p>
+              <p><kbd className="px-1.5 py-0.5 bg-gray-800 rounded text-cyan-400">{t('standardScrollControls.keys.escape')}</kbd> {t('standardScrollControls.help.exit')}</p>
             </div>
           </div>
         </div>
@@ -164,7 +166,7 @@ export function StandardScrollControls({
         onClick={onPrevious}
         disabled={currentIndex === 0}
         className="absolute left-4 top-1/2 -translate-y-1/2 z-20 text-white hover:text-cyan-400 disabled:opacity-30 disabled:hover:text-white transition-colors p-2"
-        aria-label="Previous post"
+        aria-label={t('standardScrollControls.aria.previousPost')}
       >
         <svg
           xmlns="http://www.w3.org/2000/svg"
@@ -181,7 +183,7 @@ export function StandardScrollControls({
         onClick={onNext}
         disabled={currentIndex >= totalPosts - 1 && !hasMore}
         className="absolute right-4 top-1/2 -translate-y-1/2 z-20 text-white hover:text-cyan-400 disabled:opacity-30 disabled:hover:text-white transition-colors p-2"
-        aria-label="Next post"
+        aria-label={t('standardScrollControls.aria.nextPost')}
       >
         <svg
           xmlns="http://www.w3.org/2000/svg"

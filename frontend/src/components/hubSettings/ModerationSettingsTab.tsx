@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import type {
   HubSettings,
   UpdateHubSettingsRequest,
@@ -11,6 +12,7 @@ interface Props {
 }
 
 export default function ModerationSettingsTab({ settings, onSave }: Props) {
+  const { t } = useTranslation();
   const initialBannedWords = (settings.banned_words ?? []).join(', ');
   const [bannedWords, setBannedWords] = useState(initialBannedWords);
   const [spamFilterStrength, setSpamFilterStrength] = useState<SpamFilterStrength>(
@@ -53,54 +55,53 @@ export default function ModerationSettingsTab({ settings, onSave }: Props) {
     <div className="space-y-6">
       <div>
         <h2 className="text-xl font-bold text-[var(--color-text-primary)] mb-4">
-          Moderation & Auto-Moderation
+          {t('hubSettings.moderation.title')}
         </h2>
         <p className="text-[var(--color-text-secondary)] mb-6">
-          Configure automated moderation rules and content filters
+          {t('hubSettings.moderation.subtitle')}
         </p>
       </div>
 
       {/* Spam Filter */}
       <div>
         <label className="block text-sm font-semibold text-[var(--color-text-primary)] mb-2">
-          Spam Filter Strength
+          {t('hubSettings.moderation.spamFilter.label')}
         </label>
         <select
           value={spamFilterStrength}
           onChange={(e) => setSpamFilterStrength(e.target.value as SpamFilterStrength)}
           className="w-full px-3 py-2 border border-[var(--color-border)] rounded bg-[var(--color-background)] text-[var(--color-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
         >
-          <option value="low">Low - Minimal filtering</option>
-          <option value="medium">Medium - Balanced (Recommended)</option>
-          <option value="high">High - Aggressive filtering</option>
+          <option value="low">{t('hubSettings.moderation.spamFilter.options.low')}</option>
+          <option value="medium">{t('hubSettings.moderation.spamFilter.options.medium')}</option>
+          <option value="high">{t('hubSettings.moderation.spamFilter.options.high')}</option>
         </select>
         <p className="text-xs text-[var(--color-text-secondary)] mt-1">
-          Higher settings may catch more spam but could also flag legitimate content
+          {t('hubSettings.moderation.spamFilter.helper')}
         </p>
       </div>
 
       {/* Banned Words */}
       <div>
         <label className="block text-sm font-semibold text-[var(--color-text-primary)] mb-2">
-          Banned Words & Phrases
+          {t('hubSettings.moderation.bannedWords.label')}
         </label>
         <textarea
           value={bannedWords}
           onChange={(e) => setBannedWords(e.target.value)}
-          placeholder="Enter words separated by commas..."
+          placeholder={t('hubSettings.moderation.bannedWords.placeholder')}
           rows={4}
           className="w-full px-3 py-2 border border-[var(--color-border)] rounded bg-[var(--color-background)] text-[var(--color-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] font-mono text-sm"
         />
         <p className="text-xs text-[var(--color-text-secondary)] mt-1">
-          Posts and comments containing these words will be automatically removed. Separate with
-          commas.
+          {t('hubSettings.moderation.bannedWords.helper')}
         </p>
       </div>
 
       {/* Account Age Filter */}
       <div>
         <label className="block text-sm font-semibold text-[var(--color-text-primary)] mb-2">
-          Minimum Account Age (days)
+          {t('hubSettings.moderation.accountAge.label')}
         </label>
         <input
           type="number"
@@ -111,14 +112,14 @@ export default function ModerationSettingsTab({ settings, onSave }: Props) {
           className="w-full px-3 py-2 border border-[var(--color-border)] rounded bg-[var(--color-background)] text-[var(--color-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
         />
         <p className="text-xs text-[var(--color-text-secondary)] mt-1">
-          Require accounts to be at least this many days old to post (0 = no restriction)
+          {t('hubSettings.moderation.accountAge.helper')}
         </p>
       </div>
 
       {/* Minimum Karma */}
       <div>
         <label className="block text-sm font-semibold text-[var(--color-text-primary)] mb-2">
-          Minimum Account Karma
+          {t('hubSettings.moderation.karma.label')}
         </label>
         <input
           type="number"
@@ -129,14 +130,14 @@ export default function ModerationSettingsTab({ settings, onSave }: Props) {
           className="w-full px-3 py-2 border border-[var(--color-border)] rounded bg-[var(--color-background)] text-[var(--color-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
         />
         <p className="text-xs text-[var(--color-text-secondary)] mt-1">
-          Require accounts to have at least this much karma to post (0 = no restriction)
+          {t('hubSettings.moderation.karma.helper')}
         </p>
       </div>
 
       {/* Access Request Cooldown - SETTINGS-4: Improved clarity and validation */}
       <div>
         <label htmlFor="access-cooldown" className="block text-sm font-semibold text-[var(--color-text-primary)] mb-2">
-          Access Request Cooldown
+          {t('hubSettings.moderation.accessCooldown.label')}
         </label>
         <div className="flex items-center gap-2">
           <input
@@ -157,23 +158,23 @@ export default function ModerationSettingsTab({ settings, onSave }: Props) {
             placeholder="0"
             className="w-32 px-3 py-2 border border-[var(--color-border)] rounded bg-[var(--color-background)] text-[var(--color-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
           />
-          <span className="text-sm text-[var(--color-text-secondary)]">days</span>
+          <span className="text-sm text-[var(--color-text-secondary)]">
+            {t('hubSettings.moderation.units.days')}
+          </span>
         </div>
         <p className="text-xs text-[var(--color-text-secondary)] mt-1">
-          How long a denied user must wait before requesting access again.
+          {t('hubSettings.moderation.accessCooldown.helper')}
         </p>
         <p className="text-xs text-[var(--color-text-muted)] mt-0.5">
-          Range: 0 days (no cooldown) to 365 days (1 year)
+          {t('hubSettings.moderation.accessCooldown.range')}
         </p>
       </div>
 
       {/* Info Box */}
       <div className="bg-blue-50 border border-blue-200 rounded p-4">
-        <h4 className="font-medium text-blue-900 mb-2">About Auto-Moderation</h4>
+        <h4 className="font-medium text-blue-900 mb-2">{t('hubSettings.moderation.info.title')}</h4>
         <p className="text-sm text-blue-800">
-          These filters help reduce spam and unwanted content. Content flagged by auto-moderation
-          will appear in the moderation queue for manual review. You can always approve flagged
-          content from the Mod Tools page.
+          {t('hubSettings.moderation.info.description')}
         </p>
       </div>
 
@@ -184,7 +185,7 @@ export default function ModerationSettingsTab({ settings, onSave }: Props) {
           disabled={!hasChanges}
           className="px-6 py-2 rounded bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-strong)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
-          Save Changes
+          {t('hubSettings.common.actions.saveChanges')}
         </button>
       </div>
     </div>

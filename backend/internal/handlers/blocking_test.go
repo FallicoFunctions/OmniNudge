@@ -31,6 +31,7 @@ func uniqueBlockName(base string) string {
 func setupBlockingHandlerTest(t *testing.T) (*BlockingHandler, *database.Database, int, int, string, string, func()) {
 	db, err := database.NewTest()
 	require.NoError(t, err)
+	t.Cleanup(db.Close)
 
 	ctx := context.Background()
 	err = db.Migrate(ctx)

@@ -1,4 +1,6 @@
 import type { CombinedSuggestion } from '../../hooks/useHubSubredditAutocomplete';
+import { useTranslation } from 'react-i18next';
+import { useFormat } from '../../hooks/useFormat';
 
 interface CombinedSuggestionItemProps {
   suggestion: CombinedSuggestion;
@@ -11,6 +13,9 @@ export function CombinedSuggestionItem({
   onSelectHub,
   onSelectSubreddit,
 }: CombinedSuggestionItemProps) {
+  const { t } = useTranslation();
+  const { formatNumber } = useFormat();
+
   if (suggestion.type === 'hub') {
     const hub = suggestion.data;
     return (
@@ -36,7 +41,7 @@ export function CombinedSuggestionItem({
           </div>
           {typeof hub.subscriber_count === 'number' && hub.subscriber_count > 0 && (
             <span className="ml-auto text-[11px] text-[var(--color-text-secondary)]">
-              {hub.subscriber_count.toLocaleString()} subs
+              {formatNumber(hub.subscriber_count)} {t('common.units.subscribersShort')}
             </span>
           )}
         </button>
@@ -78,7 +83,7 @@ export function CombinedSuggestionItem({
         </div>
         {typeof subreddit.subscribers === 'number' && subreddit.subscribers > 0 && (
           <span className="ml-auto text-[11px] text-[var(--color-text-secondary)]">
-            {subreddit.subscribers.toLocaleString()} subs
+            {formatNumber(subreddit.subscribers)} {t('common.units.subscribersShort')}
           </span>
         )}
       </button>

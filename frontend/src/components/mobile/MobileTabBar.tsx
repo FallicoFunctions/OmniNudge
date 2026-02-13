@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Home, Search, Plus, MessageCircle, Menu } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { TabBarItem } from './TabBarItem';
 import { CreateMenuSheet } from './CreateMenuSheet';
 import { MoreMenuSheet } from './MoreMenuSheet';
@@ -23,6 +24,7 @@ interface MobileTabBarProps {
  * - Bottom sheet menus for Create and Menu tabs
  */
 export function MobileTabBar({ unreadCount }: MobileTabBarProps) {
+  const { t } = useTranslation();
   const location = useLocation();
   const navigate = useNavigate();
   const { user, isAuthenticated } = useAuth();
@@ -147,7 +149,7 @@ export function MobileTabBar({ unreadCount }: MobileTabBarProps) {
           paddingBottom: 'env(safe-area-inset-bottom)'
         }}
         role="navigation"
-        aria-label="Mobile navigation"
+        aria-label={t('ariaLabels.mobileNav')}
       >
         <div className="flex h-14 items-stretch">
           <TabBarItem

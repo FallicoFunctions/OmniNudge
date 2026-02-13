@@ -1,6 +1,35 @@
 import { PageShell } from '../common/PageShell';
+import { Trans, useTranslation } from 'react-i18next';
 
 export function AboutContent({ className = '' }: { className?: string }) {
+  const { t } = useTranslation();
+
+  const visionItems = [
+    'aboutPage.vision.items.socialMediaIntegration',
+    'aboutPage.vision.items.officeSuite',
+    'aboutPage.vision.items.gamingEcosystem',
+    'aboutPage.vision.items.mediaHosting',
+    'aboutPage.vision.items.teamCommunication',
+    'aboutPage.vision.items.financeCrypto',
+    'aboutPage.vision.items.aiIntegration',
+    'aboutPage.vision.items.mobileDesktop',
+  ] as const;
+
+  const messagingFeatureItems = [
+    'aboutPage.roadmap.messaging.items.timeActivatedAutoDeletion',
+    'aboutPage.roadmap.messaging.items.voiceNotes',
+    'aboutPage.roadmap.messaging.items.voiceVideoCalls',
+    'aboutPage.roadmap.messaging.items.screenSharing',
+    'aboutPage.roadmap.messaging.items.audioPlayer',
+  ] as const;
+
+  const socialUpgradeItems = [
+    'aboutPage.roadmap.social.items.friendsFollowers',
+    'aboutPage.roadmap.social.items.multipleProfiles',
+    'aboutPage.roadmap.social.items.karmaPointSystem',
+    'aboutPage.roadmap.social.items.awardsBadges',
+  ] as const;
+
   return (
     <div className={className}>
       {/* Hero Section */}
@@ -8,13 +37,13 @@ export function AboutContent({ className = '' }: { className?: string }) {
         <div className="max-w-3xl mx-auto text-center">
           <h1 className="text-display font-bold text-[var(--color-text-primary)] mb-4">
             OmniNudge
-            <span className="text-sm font-normal text-[var(--color-text-secondary)] ml-2">(beta)</span>
+            <span className="text-sm font-normal text-[var(--color-text-secondary)] ml-2">{t('aboutPage.betaLabel')}</span>
           </h1>
           <p className="text-h3 text-[var(--color-text-secondary)] mb-6">
-            The all-in-one platform for everything you do online
+            {t('aboutPage.hero.title')}
           </p>
           <p className="text-body text-[var(--color-text-secondary)]">
-            A Reddit-like community platform with end-to-end encrypted messaging, building toward an integrated ecosystem of social media, productivity, and communication tools.
+            {t('aboutPage.hero.description')}
           </p>
         </div>
       </div>
@@ -29,37 +58,40 @@ export function AboutContent({ className = '' }: { className?: string }) {
             </svg>
           </div>
           <h2 className="text-h2 font-semibold text-[var(--color-text-primary)] mb-3">
-            Available Today
+            {t('aboutPage.availableToday.title')}
           </h2>
           <ul className="space-y-3 text-small text-[var(--color-text-secondary)]">
             <li className="flex items-start gap-2">
               <svg className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
               </svg>
-              <span>Create and manage communities (hubs) like subreddits</span>
+              <span>{t('aboutPage.availableToday.items.createCommunities')}</span>
             </li>
             <li className="flex items-start gap-2">
               <svg className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
               </svg>
-              <span>Browse Reddit posts and subscribe to subreddits</span>
+              <span>{t('aboutPage.availableToday.items.browseReddit')}</span>
             </li>
             <li className="flex items-start gap-2">
               <svg className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
               </svg>
-              <span>End-to-end encrypted messaging with any file type</span>
+              <span>{t('aboutPage.availableToday.items.encryptedMessaging')}</span>
             </li>
             <li className="flex items-start gap-2">
               <svg className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
               </svg>
-              <span>Post and comment in communities (visible to OmniNudge users)</span>
+              <span>{t('aboutPage.availableToday.items.postAndComment')}</span>
             </li>
           </ul>
           <div className="mt-4 pt-4 border-t border-[var(--color-border)]">
             <p className="text-xs text-orange-700 bg-orange-50 rounded-lg p-3">
-              <strong>Note:</strong> Reddit API access may be restricted at any time due to third-party app policies.
+              <Trans
+                i18nKey="aboutPage.availableToday.note"
+                components={{ strong: <strong /> }}
+              />
             </p>
           </div>
         </div>
@@ -72,47 +104,21 @@ export function AboutContent({ className = '' }: { className?: string }) {
             </svg>
           </div>
           <h2 className="text-h2 font-semibold text-[var(--color-text-primary)] mb-3">
-            The Vision
+            {t('aboutPage.vision.title')}
           </h2>
           <p className="text-small text-[var(--color-text-secondary)] mb-4">
-            Building the last platform you'll ever need — an all-encompassing digital ecosystem that combines:
+            {t('aboutPage.vision.description')}
           </p>
           <div className="grid grid-cols-2 gap-2 text-xs text-[var(--color-text-secondary)]">
-            <div className="flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-purple-600"></span>
-              <span>Social media integration</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-purple-600"></span>
-              <span>Office suite</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-purple-600"></span>
-              <span>Gaming ecosystem</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-purple-600"></span>
-              <span>Media hosting</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-purple-600"></span>
-              <span>Team communication</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-purple-600"></span>
-              <span>Finance & crypto</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-purple-600"></span>
-              <span>AI integration</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-purple-600"></span>
-              <span>Mobile & desktop</span>
-            </div>
+            {visionItems.map((key) => (
+              <div key={key} className="flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-purple-600"></span>
+                <span>{t(key)}</span>
+              </div>
+            ))}
           </div>
           <p className="mt-4 text-xs italic text-[var(--color-text-muted)]">
-            "This platform will never be finished."
+            {t('aboutPage.vision.quote')}
           </p>
         </div>
       </div>
@@ -123,7 +129,7 @@ export function AboutContent({ className = '' }: { className?: string }) {
           <svg className="w-6 h-6 text-[var(--color-primary)]" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
           </svg>
-          What's Next
+          {t('aboutPage.roadmap.title')}
         </h2>
 
         <div className="grid md:grid-cols-2 gap-8">
@@ -131,15 +137,15 @@ export function AboutContent({ className = '' }: { className?: string }) {
           <div>
             <h3 className="text-small font-semibold text-[var(--color-text-primary)] mb-3 flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-blue-600"></span>
-              Enhanced Messaging
+              {t('aboutPage.roadmap.messaging.title')}
             </h3>
             <ul className="space-y-2">
-              {['Time-activated auto-deletion', 'Voice notes', 'Voice and video calls', 'Screen sharing', 'Audio player'].map((feature) => (
-                <li key={feature} className="text-small text-[var(--color-text-secondary)] flex items-center gap-2">
+              {messagingFeatureItems.map((key) => (
+                <li key={key} className="text-small text-[var(--color-text-secondary)] flex items-center gap-2">
                   <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                   </svg>
-                  {feature}
+                  {t(key)}
                 </li>
               ))}
             </ul>
@@ -149,15 +155,15 @@ export function AboutContent({ className = '' }: { className?: string }) {
           <div>
             <h3 className="text-small font-semibold text-[var(--color-text-primary)] mb-3 flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-green-600"></span>
-              Social Media Upgrades
+              {t('aboutPage.roadmap.social.title')}
             </h3>
             <ul className="space-y-2">
-              {['Friends and followers', 'Multiple profiles for different niches', 'Karma point system', 'Awards and badges'].map((feature) => (
-                <li key={feature} className="text-small text-[var(--color-text-secondary)] flex items-center gap-2">
+              {socialUpgradeItems.map((key) => (
+                <li key={key} className="text-small text-[var(--color-text-secondary)] flex items-center gap-2">
                   <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                   </svg>
-                  {feature}
+                  {t(key)}
                 </li>
               ))}
             </ul>
@@ -175,13 +181,13 @@ export function AboutContent({ className = '' }: { className?: string }) {
           </div>
           <div className="flex-1">
             <h2 className="text-h2 font-semibold text-[var(--color-text-primary)] mb-3">
-              Unmatched Customization
+              {t('aboutPage.customization.title')}
             </h2>
             <p className="text-small text-[var(--color-text-secondary)] mb-3">
-              Remember MySpace? We're bringing that level of personalization back. Customize everything from your profile to your browsing experience with advanced theming and the most comprehensive settings of any platform.
+              {t('aboutPage.customization.paragraph1')}
             </p>
             <p className="text-small text-[var(--color-text-secondary)]">
-              Don't want complexity? No problem. Simple defaults and intuitive settings for everyone.
+              {t('aboutPage.customization.paragraph2')}
             </p>
           </div>
         </div>
@@ -196,7 +202,7 @@ export function AboutContent({ className = '' }: { className?: string }) {
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
-          Bug Reporting
+          {t('aboutPage.footer.bugReporting')}
         </a>
         <a
           href="/terms"
@@ -205,7 +211,7 @@ export function AboutContent({ className = '' }: { className?: string }) {
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
           </svg>
-          Terms of Service
+          {t('aboutPage.footer.termsOfService')}
         </a>
         <a
           href="/privacy"
@@ -214,7 +220,7 @@ export function AboutContent({ className = '' }: { className?: string }) {
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
           </svg>
-          Privacy Policy
+          {t('aboutPage.footer.privacyPolicy')}
         </a>
       </div>
     </div>

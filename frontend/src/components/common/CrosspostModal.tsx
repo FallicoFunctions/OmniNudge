@@ -1,4 +1,5 @@
 import { Modal } from './Modal';
+import { useTranslation } from 'react-i18next';
 import { ModalCloseButton } from '../ui/ModalCloseButton';
 
 type CrosspostOption = {
@@ -43,6 +44,8 @@ export function CrosspostModal({
   isSubmitting = false,
   isSubmitDisabled = false,
 }: CrosspostModalProps) {
+  const { t } = useTranslation();
+
   return (
     <Modal
       isOpen={isOpen}
@@ -54,22 +57,22 @@ export function CrosspostModal({
       <ModalCloseButton onClose={onClose} />
 
       <div className="pr-12 mb-4">
-        <h3 className="text-xl font-semibold text-[var(--color-text-primary)]">Submit a Crosspost</h3>
+        <h3 className="text-xl font-semibold text-[var(--color-text-primary)]">{t('modals.crosspost.title')}</h3>
       </div>
       <div className="mt-3 rounded border border-yellow-200 bg-yellow-50 p-3 text-sm text-yellow-800">
-        <p>You can crosspost to an OmniHub, a subreddit, or both. At least one destination is required.</p>
+        <p>{t('modals.crosspost.info')}</p>
       </div>
       <div className="mt-4 space-y-3">
         <div>
           <label className="mb-1 block text-xs font-medium text-[var(--color-text-secondary)]">
-            Crosspost to OmniHub (optional)
+            {t('modals.crosspost.toHub')}
           </label>
           <select
             value={hubValue}
             onChange={(e) => onHubChange(e.target.value)}
             className="w-full rounded border border-[var(--color-border)] bg-[var(--color-surface)] p-2 text-sm text-[var(--color-text-primary)]"
           >
-            <option value="">Select a hub...</option>
+            <option value="">{t('modals.crosspost.selectHub')}</option>
             {hubOptions.map((hub) => (
               <option key={hub.id} value={hub.name}>
                 h/{hub.name}
@@ -79,14 +82,14 @@ export function CrosspostModal({
         </div>
         <div>
           <label className="mb-1 block text-xs font-medium text-[var(--color-text-secondary)]">
-            Crosspost to subreddit (optional)
+            {t('modals.crosspost.toSubreddit')}
           </label>
           {allowSubredditInput ? (
             <input
               type="text"
               value={subredditValue}
               onChange={(e) => onSubredditChange(e.target.value)}
-              placeholder="e.g., cats, technology, AskReddit"
+              placeholder={t('messages.compose.hubSubredditPlaceholder')}
               className="w-full rounded border border-[var(--color-border)] bg-[var(--color-surface)] p-2 text-sm text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)]"
             />
           ) : (
@@ -95,7 +98,7 @@ export function CrosspostModal({
               onChange={(e) => onSubredditChange(e.target.value)}
               className="w-full rounded border border-[var(--color-border)] bg-[var(--color-surface)] p-2 text-sm text-[var(--color-text-primary)]"
             >
-              <option value="">Select a subreddit...</option>
+              <option value="">{t('modals.crosspost.selectSubreddit')}</option>
               {subredditOptions.map((subreddit) => (
                 <option key={subreddit.id} value={subreddit.name}>
                   r/{subreddit.name}
@@ -106,14 +109,14 @@ export function CrosspostModal({
         </div>
         <div>
           <label className="mb-1 block text-xs font-medium text-[var(--color-text-secondary)]">
-            Choose a title <span className="text-red-500">*required</span>
+            {t('modals.crosspost.titleLabel')} <span className="text-red-500">{t('modals.crosspost.titleRequired')}</span>
           </label>
           <input
             type="text"
             value={titleValue}
             onChange={(e) => onTitleChange(e.target.value)}
             className="w-full rounded border border-[var(--color-border)] bg-[var(--color-surface)] p-2 text-sm text-[var(--color-text-primary)]"
-            placeholder="Enter title..."
+            placeholder={t('modals.crosspost.titlePlaceholder')}
           />
         </div>
         <div className="flex items-start gap-2">
@@ -125,7 +128,7 @@ export function CrosspostModal({
             className="mt-0.5"
           />
           <label htmlFor="send-replies" className="text-sm text-[var(--color-text-primary)]">
-            Send replies to this post to my inbox
+            {t('modals.crosspost.sendRepliesLabel')}
           </label>
         </div>
       </div>
@@ -134,14 +137,14 @@ export function CrosspostModal({
           onClick={onClose}
           className="rounded border border-[var(--color-border)] px-3 py-1 text-sm hover:bg-[var(--color-surface-elevated)]"
         >
-          Cancel
+          {t('common.cancel')}
         </button>
         <button
           onClick={onSubmit}
           disabled={isSubmitting || isSubmitDisabled}
           className="rounded bg-[var(--color-primary)] px-3 py-1 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)] disabled:opacity-50"
         >
-          {isSubmitting ? 'Posting…' : 'Submit'}
+          {isSubmitting ? t('modals.crosspost.submitting') : t('modals.crosspost.submitButton')}
         </button>
       </div>
     </Modal>

@@ -1,10 +1,11 @@
 import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { subscriptionService } from '../../services/subscriptionService';
-import { formatTimestamp } from '../../utils/timeFormat';
 import { useSettings } from '../../contexts/SettingsContext';
 import { EmptyMessage, ErrorMessage, LoadingMessage } from '../common/StatusMessage';
+import { useFormat } from '../../hooks/useFormat';
 
 interface SubscribedViewProps {
   withContainer?: boolean;
@@ -17,10 +18,27 @@ export default function SubscribedView({
   showHeading = true,
   className = '',
 }: SubscribedViewProps) {
+  type SortOption = 'alphabetical' | 'recent';
+
+  const { t } = useTranslation();
   const { useRelativeTime } = useSettings();
+  const { formatDate, formatRelativeTime } = useFormat();
   // PROFILE-5: Search and sort functionality
   const [searchQuery, setSearchQuery] = useState('');
-  const [sortBy, setSortBy] = useState<'alphabetical' | 'recent'>('alphabetical');
+  const [sortBy, setSortBy] = useState<SortOption>('alphabetical');
+
+  const formatSubscribedAt = useMemo(() => {
+    return (timestamp: string | number | Date) => {
+      const d = new Date(timestamp);
+      if (Number.isNaN(d.getTime())) return t('common.time.recently');
+
+      if (useRelativeTime) {
+        return formatRelativeTime(d);
+      }
+
+      return formatDate(d, { month: 'short', day: 'numeric', year: 'numeric' });
+    };
+  }, [formatDate, formatRelativeTime, t, useRelativeTime]);
 
   const hubsQuery = useQuery({
     queryKey: ['user-hub-subscriptions'],
@@ -32,14 +50,14 @@ export default function SubscribedView({
     queryFn: () => subscriptionService.getUserSubredditSubscriptions(),
   });
 
-  const allHubs = hubsQuery.data ?? [];
-  const allSubreddits = subredditsQuery.data ?? [];
+  const allHubs = useMemo(() => hubsQuery.data ?? [], [hubsQuery.data]);
+  const allSubreddits = useMemo(() => subredditsQuery.data ?? [], [subredditsQuery.data]);
   const isLoading = hubsQuery.isLoading || subredditsQuery.isLoading;
   const hasError = hubsQuery.isError || subredditsQuery.isError;
 
   // Filter and sort hubs
   const hubs = useMemo(() => {
-    let filtered = allHubs;
+    let filtered = [...allHubs];
 
     // Apply search
     if (searchQuery.trim()) {
@@ -67,7 +85,7 @@ export default function SubscribedView({
 
   // Filter and sort subreddits
   const subreddits = useMemo(() => {
-    let filtered = allSubreddits;
+    let filtered = [...allSubreddits];
 
     // Apply search
     if (searchQuery.trim()) {
@@ -91,17 +109,17 @@ export default function SubscribedView({
     <div className={className}>
       {showHeading && (
         <h2 className="mb-4 text-2xl font-bold text-[var(--color-text-primary)]">
-          Subscriptions
+          {t('subscriptions.title')}
         </h2>
       )}
 
       {isLoading ? (
-        <LoadingMessage className="text-sm">Loading subscriptions...</LoadingMessage>
+        <LoadingMessage className="text-sm">{t('subscriptions.loading')}</LoadingMessage>
       ) : hasError ? (
-        <ErrorMessage className="text-sm text-[var(--color-error)]">Failed to load subscriptions.</ErrorMessage>
+        <ErrorMessage className="text-sm text-[var(--color-error)]">{t('subscriptions.loadFailed')}</ErrorMessage>
       ) : allHubs.length === 0 && allSubreddits.length === 0 ? (
         <EmptyMessage className="text-sm">
-          No subscriptions yet. Subscribe to hubs or subreddits to see them here.
+          {t('subscriptions.emptyAll')}
         </EmptyMessage>
       ) : (
         <>
@@ -110,7 +128,7 @@ export default function SubscribedView({
             <div className="flex-1 min-w-[200px]">
               <input
                 type="text"
-                placeholder="Search subscriptions..."
+                placeholder={t('subscriptions.searchPlaceholder')}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full px-4 py-2 border border-[var(--color-border)] rounded-lg bg-[var(--color-surface-elevated)] text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
@@ -118,18 +136,21 @@ export default function SubscribedView({
             </div>
             <select
               value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as any)}
+              onChange={(e) => setSortBy(e.target.value as SortOption)}
               className="px-4 py-2 border border-[var(--color-border)] rounded-lg bg-[var(--color-surface-elevated)] text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
             >
-              <option value="alphabetical">A-Z</option>
-              <option value="recent">Recently Joined</option>
+              <option value="alphabetical">{t('subscriptions.sort.alphabetical')}</option>
+              <option value="recent">{t('subscriptions.sort.recent')}</option>
             </select>
           </div>
 
           {/* Results summary */}
           {searchQuery && (
             <div className="mb-4 text-sm text-[var(--color-text-secondary)]">
-              Found {hubs.length + subreddits.length} subscription{hubs.length + subreddits.length !== 1 ? 's' : ''} matching "{searchQuery}"
+              {t('subscriptions.searchResults', {
+                subscriptionCount: hubs.length + subreddits.length,
+                query: searchQuery,
+              })}
             </div>
           )}
 
@@ -137,14 +158,14 @@ export default function SubscribedView({
           {/* Hubs Column */}
           <section>
             <h3 className="mb-3 text-lg font-semibold text-[var(--color-text-primary)]">
-              Hubs ({hubs.length})
+              {t('subscriptions.hubsTitle', { count: hubs.length })}
             </h3>
             {hubs.length === 0 ? (
-              <EmptyMessage className="text-sm">No hub subscriptions yet.</EmptyMessage>
+              <EmptyMessage className="text-sm">{t('subscriptions.emptyHubs')}</EmptyMessage>
             ) : (
               <div className="space-y-2">
                 {hubs.map((subscription) => {
-                  const hubName = subscription.hub?.name || subscription.hub_name || 'Unknown';
+                  const hubName = subscription.hub?.name || subscription.hub_name || t('subscriptions.unknownHub');
                   const hubTitle = subscription.hub?.title;
 
                   return (
@@ -164,7 +185,9 @@ export default function SubscribedView({
                         </p>
                       )}
                       <p className="mt-2 text-xs text-[var(--color-text-secondary)]">
-                        Subscribed {formatTimestamp(subscription.subscribed_at, useRelativeTime)}
+                        {t('subscriptions.subscribedAt', {
+                          time: formatSubscribedAt(subscription.subscribed_at),
+                        })}
                       </p>
                     </article>
                   );
@@ -176,10 +199,10 @@ export default function SubscribedView({
           {/* Subreddits Column */}
           <section>
             <h3 className="mb-3 text-lg font-semibold text-[var(--color-text-primary)]">
-              Subreddits ({subreddits.length})
+              {t('subscriptions.subredditsTitle', { count: subreddits.length })}
             </h3>
             {subreddits.length === 0 ? (
-              <EmptyMessage className="text-sm">No subreddit subscriptions yet.</EmptyMessage>
+              <EmptyMessage className="text-sm">{t('subscriptions.emptySubreddits')}</EmptyMessage>
             ) : (
               <div className="space-y-2">
                 {subreddits.map((subscription) => (
@@ -194,7 +217,9 @@ export default function SubscribedView({
                       r/{subscription.subreddit_name}
                     </Link>
                     <p className="mt-2 text-xs text-[var(--color-text-secondary)]">
-                      Subscribed {formatTimestamp(subscription.subscribed_at, useRelativeTime)}
+                      {t('subscriptions.subscribedAt', {
+                        time: formatSubscribedAt(subscription.subscribed_at),
+                      })}
                     </p>
                   </article>
                 ))}

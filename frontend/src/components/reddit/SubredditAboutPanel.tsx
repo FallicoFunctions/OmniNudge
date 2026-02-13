@@ -1,4 +1,6 @@
 import type { RefObject } from 'react';
+import { useTranslation } from 'react-i18next';
+import { useFormat } from '../../hooks/useFormat';
 import { LoadingMessage, ErrorMessage, EmptyMessage } from '../common/StatusMessage';
 import type { RedditSubredditAbout } from '../../types/reddit';
 
@@ -21,23 +23,25 @@ export default function SubredditAboutPanel({
   sidebarRef,
   activeOmniUsers,
 }: SubredditAboutPanelProps) {
-  console.log('SubredditAboutPanel - about:', about, 'over18:', about?.over18);
+  const { t } = useTranslation();
+  const { formatNumber, formatDate } = useFormat();
+
   return (
     <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
-          About this subreddit
+          {t('subredditAboutPanel.title')}
         </h3>
         {about?.over18 && (
           <span className="rounded bg-red-600 px-2 py-0.5 text-xs font-semibold text-white">
-            NSFW
+            {t('posts.badges.nsfw')}
           </span>
         )}
       </div>
       {isLoading ? (
-        <LoadingMessage>Loading details…</LoadingMessage>
+        <LoadingMessage>{t('subredditAboutPanel.loading')}</LoadingMessage>
       ) : isError ? (
-        <ErrorMessage>Unable to load subreddit details.</ErrorMessage>
+        <ErrorMessage>{t('subredditAboutPanel.errors.unableToLoad')}</ErrorMessage>
       ) : about ? (
         <>
           {iconUrl && (
@@ -59,31 +63,37 @@ export default function SubredditAboutPanel({
               {about.public_description}
             </p>
           ) : (
-            <EmptyMessage>No description provided.</EmptyMessage>
+            <EmptyMessage>{t('subredditAboutPanel.emptyDescription')}</EmptyMessage>
           )}
           <div className="mt-4 space-y-2 text-xs text-[var(--color-text-secondary)]">
             <div className="flex items-center justify-between">
-              <span className="font-semibold text-[var(--color-text-primary)]">Members</span>
+              <span className="font-semibold text-[var(--color-text-primary)]">
+                {t('subredditAboutPanel.labels.members')}
+              </span>
               <span>
-                {typeof about.subscribers === 'number' ? about.subscribers.toLocaleString() : '—'}
+                {typeof about.subscribers === 'number' ? formatNumber(about.subscribers) : '—'}
               </span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="font-semibold text-[var(--color-text-primary)]">Active Omni Users</span>
+              <span className="font-semibold text-[var(--color-text-primary)]">
+                {t('subredditAboutPanel.labels.activeOmniUsers')}
+              </span>
               <span>
-                {typeof activeOmniUsers === 'number' ? activeOmniUsers.toLocaleString() : '—'}
+                {typeof activeOmniUsers === 'number' ? formatNumber(activeOmniUsers) : '—'}
               </span>
             </div>
             {about.created_utc && (
               <div className="flex items-center justify-between">
-                <span className="font-semibold text-[var(--color-text-primary)]">Created</span>
-                <span>{new Date(about.created_utc * 1000).toLocaleDateString()}</span>
+                <span className="font-semibold text-[var(--color-text-primary)]">
+                  {t('subredditAboutPanel.labels.created')}
+                </span>
+                <span>{formatDate(new Date(about.created_utc * 1000), { month: 'short', day: 'numeric', year: 'numeric' })}</span>
               </div>
             )}
           </div>
         </>
       ) : (
-        <EmptyMessage>No details available.</EmptyMessage>
+        <EmptyMessage>{t('subredditAboutPanel.empty')}</EmptyMessage>
       )}
     </div>
   );

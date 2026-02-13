@@ -1,6 +1,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { savedService } from '../../services/savedService';
 import type { HiddenItemsResponse, SavedPost, SavedRedditPost } from '../../types/saved';
 import { api } from '../../lib/api';
@@ -111,6 +112,7 @@ export function HiddenItemsView({
   showHeading = true,
   className = '',
 }: HiddenItemsViewProps) {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { useRelativeTime } = useSettings();
@@ -314,7 +316,7 @@ export function HiddenItemsView({
     },
     onSuccess: () => invalidateHiddenQueries(),
     onError: (mutationError: Error) => {
-      alert(`Failed to unhide post: ${mutationError.message}`);
+      alert(t('alerts.unhideFailed', { message: mutationError.message }));
     },
   });
 
@@ -324,7 +326,7 @@ export function HiddenItemsView({
     },
     onSuccess: () => invalidateHiddenQueries(),
     onError: (mutationError: Error) => {
-      alert(`Failed to unhide Reddit post: ${mutationError.message}`);
+      alert(t('alerts.unhideFailed', { message: mutationError.message }));
     },
   });
 
@@ -341,7 +343,7 @@ export function HiddenItemsView({
       setSaveConfirmTarget(null);
     },
     onError: (mutationError: Error) => {
-      alert(`Failed to save post: ${mutationError.message}`);
+      alert(t('alerts.saveFailed', { message: mutationError.message }));
     },
   });
 
@@ -349,8 +351,8 @@ export function HiddenItemsView({
     const shareUrl = `${window.location.origin}/r/${post.subreddit}/comments/${post.reddit_post_id}`;
     navigator.clipboard
       .writeText(shareUrl)
-      .then(() => alert('Post link copied to clipboard!'))
-      .catch(() => alert('Unable to copy link. Please try again.'));
+      .then(() => alert(t('alerts.linkCopied')))
+      .catch(() => alert(t('alerts.linkCopyFailed')));
   };
 
   const toTimestamp = (value?: string | number | null) => {
@@ -379,8 +381,12 @@ export function HiddenItemsView({
             detailedPost?.author_username ??
             post.author_username ??
             hiddenPostExtras.author_username ??
-            'Unknown',
-          hub_name: detailedPost?.hub_name ?? post.hub_name ?? hiddenPostExtras.hub_name ?? 'unknown',
+            t('posts.unknownAuthor'),
+          hub_name:
+            detailedPost?.hub_name ??
+            post.hub_name ??
+            hiddenPostExtras.hub_name ??
+            t('posts.unknownHub'),
           score: detailedPost?.score ?? post.score,
           comment_count:
             detailedPost?.comment_count ??
@@ -421,12 +427,12 @@ export function HiddenItemsView({
               const shareUrl = `${window.location.origin}${getPostUrl(omniPost)}`;
               navigator.clipboard
                 .writeText(shareUrl)
-                .then(() => alert('Post link copied to clipboard!'))
-                .catch(() => alert('Unable to copy link. Please try again.'));
+                .then(() => alert(t('alerts.linkCopied')))
+                .catch(() => alert(t('alerts.linkCopyFailed')));
             }}
             onHide={() => unhidePostMutation.mutate(post.id)}
             isHiding={unhidePostMutation.isPending}
-            hideLabel="Unhide"
+            hideLabel={t('posts.actions.unhide')}
           />
         );
       })(),
@@ -457,7 +463,7 @@ export function HiddenItemsView({
         const redditPost = {
           id: post.reddit_post_id,
           title: mergedPost.title || `r/${post.subreddit}`,
-          author: mergedPost.author || 'unknown',
+          author: mergedPost.author || t('posts.unknownAuthor'),
           subreddit: post.subreddit,
           score: mergedPost.score ?? 0,
           num_comments: mergedPost.num_comments ?? 0,
@@ -491,7 +497,7 @@ export function HiddenItemsView({
               reddit_post_id: post.reddit_post_id,
             })}
             onCrosspost={() => navigate(`/r/${post.subreddit}/comments/${post.reddit_post_id}`, { state: { isHidden: true } })}
-            hideLabel="Unhide"
+            hideLabel={t('posts.actions.unhide')}
           />
         );
       })(),
@@ -512,7 +518,7 @@ export function HiddenItemsView({
   const renderActiveTab = () => {
     if (activeTab === 'omni') {
       if (omniItems.length === 0) {
-        return <p className="text-sm text-[var(--color-text-secondary)]">No hidden Omni posts or comments yet.</p>;
+        return <p className="text-sm text-[var(--color-text-secondary)]">{t('hidden.empty.omni')}</p>;
       }
       return (
         <>
@@ -534,7 +540,7 @@ export function HiddenItemsView({
     }
 
     if (redditItems.length === 0) {
-      return <p className="text-sm text-[var(--color-text-secondary)]">No hidden Reddit posts or comments yet.</p>;
+      return <p className="text-sm text-[var(--color-text-secondary)]">{t('hidden.empty.reddit')}</p>;
     }
 
     return (
@@ -571,8 +577,8 @@ export function HiddenItemsView({
     <>
       {showHeading && (
         <div className="mb-6">
-          <h1 className="text-3xl font-bold text-[var(--color-text-primary)]">Hidden Items</h1>
-          <p className="mt-2 text-sm text-[var(--color-text-secondary)]">Posts you&apos;ve hidden across OmniNudge.</p>
+          <h1 className="text-3xl font-bold text-[var(--color-text-primary)]">{t('hidden.headingTitle')}</h1>
+          <p className="mt-2 text-sm text-[var(--color-text-secondary)]">{t('hidden.headingDescription')}</p>
         </div>
       )}
 
@@ -585,7 +591,7 @@ export function HiddenItemsView({
             resetOmniPage();
           }}
         >
-          Omni
+          {t('hidden.tabs.omni')}
         </button>
         <button
           type="button"
@@ -595,20 +601,20 @@ export function HiddenItemsView({
             resetRedditPage();
           }}
         >
-          Reddit
+          {t('hidden.tabs.reddit')}
         </button>
       </div>
 
       {isLoading && (
         <div className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
-          <LoadingMessage className="mt-0 text-sm">Loading hidden content...</LoadingMessage>
+          <LoadingMessage className="mt-0 text-sm">{t('hidden.loading')}</LoadingMessage>
         </div>
       )}
 
       {loadError && (
         <div className="rounded-md border border-yellow-200 bg-yellow-50 p-4">
           <ErrorMessage className="mt-0 text-sm text-yellow-800">
-            Unable to load hidden items right now. Showing the latest cached data.
+            {t('hidden.loadError')}
           </ErrorMessage>
         </div>
       )}
@@ -618,17 +624,16 @@ export function HiddenItemsView({
       {saveConfirmTarget && (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 px-4">
           <div className="w-full max-w-md rounded-lg bg-white p-4 shadow-lg">
-            <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">Save this post?</h3>
+            <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">{t('hidden.modal.saveTitle')}</h3>
             <p className="mt-2 text-sm text-[var(--color-text-secondary)]">
-              Saving this post will remove it from your Hidden list and add it to your Saved items. Are you
-              sure you want to continue?
+              {t('hidden.modal.saveDescription')}
             </p>
             <div className="mt-4 flex justify-end gap-2">
               <button
                 onClick={() => setSaveConfirmTarget(null)}
                 className="rounded border border-[var(--color-border)] px-3 py-1 text-sm hover:bg-[var(--color-surface-elevated)]"
               >
-                Cancel
+                {t('common.cancel')}
               </button>
               <button
                 onClick={() =>
@@ -641,7 +646,7 @@ export function HiddenItemsView({
                 disabled={resaveRedditPostMutation.isPending}
                 className="rounded bg-[var(--color-primary)] px-3 py-1 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)] disabled:opacity-50"
               >
-                {resaveRedditPostMutation.isPending ? 'Saving…' : 'Move to Saved'}
+                {resaveRedditPostMutation.isPending ? t('posts.status.saving') : t('hidden.modal.moveToSaved')}
               </button>
             </div>
           </div>

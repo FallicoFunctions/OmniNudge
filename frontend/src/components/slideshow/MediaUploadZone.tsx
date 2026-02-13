@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react';
 import type { DragEvent, ChangeEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 
 interface MediaUploadZoneProps {
   onFilesSelected: (files: File[]) => void;
@@ -17,6 +18,7 @@ export function MediaUploadZone({
   acceptedTypes = DEFAULT_ACCEPTED_TYPES,
   maxFiles = 10,
 }: MediaUploadZoneProps) {
+  const { t } = useTranslation();
   const [dragActive, setDragActive] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [errors, setErrors] = useState<string[]>([]);
@@ -28,12 +30,17 @@ export function MediaUploadZone({
 
     for (const file of files) {
       if (file.size > maxFileSize) {
-        errors.push(`${file.name}: File size exceeds ${Math.round(maxFileSize / (1024 * 1024))}MB`);
+        errors.push(
+          t('mediaUploadZone.errors.fileTooLarge', {
+            name: file.name,
+            size: Math.round(maxFileSize / (1024 * 1024)),
+          })
+        );
         continue;
       }
 
       if (!acceptedTypes.includes(file.type)) {
-        errors.push(`${file.name}: Unsupported file type`);
+        errors.push(t('mediaUploadZone.errors.unsupportedType', { name: file.name }));
         continue;
       }
 
@@ -41,7 +48,7 @@ export function MediaUploadZone({
     }
 
     if (valid.length + selectedFiles.length > maxFiles) {
-      errors.push(`Maximum ${maxFiles} files allowed`);
+      errors.push(t('mediaUploadZone.errors.tooManyFiles', { max: maxFiles }));
       return { valid: valid.slice(0, maxFiles - selectedFiles.length), errors };
     }
 
@@ -139,10 +146,16 @@ export function MediaUploadZone({
             />
           </svg>
           <p className="text-sm text-gray-600">
-            <span className="font-semibold text-[var(--color-primary)]">Click to upload</span> or drag and drop
+            <span className="font-semibold text-[var(--color-primary)]">
+              {t('mediaUploadZone.instructions.clickToUpload')}
+            </span>{' '}
+            {t('mediaUploadZone.instructions.orDragAndDrop')}
           </p>
           <p className="text-xs text-gray-500">
-            Images and videos up to {Math.round(maxFileSize / (1024 * 1024))}MB (max {maxFiles} files)
+            {t('mediaUploadZone.instructions.summary', {
+              size: Math.round(maxFileSize / (1024 * 1024)),
+              max: maxFiles,
+            })}
           </p>
         </div>
       </div>
@@ -163,13 +176,13 @@ export function MediaUploadZone({
         <div className="mt-4">
           <div className="flex items-center justify-between mb-2">
             <p className="text-sm font-medium text-gray-700">
-              Selected files ({selectedFiles.length})
+              {t('mediaUploadZone.selected.title', { count: selectedFiles.length })}
             </p>
             <button
               onClick={clearAll}
               className="text-sm text-red-600 hover:text-red-700"
             >
-              Clear all
+              {t('mediaUploadZone.actions.clearAll')}
             </button>
           </div>
 
@@ -212,7 +225,7 @@ export function MediaUploadZone({
                     removeFile(index);
                   }}
                   className="absolute top-1 right-1 bg-red-600 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                  aria-label="Remove file"
+                  aria-label={t('common.accessibility.removeFile')}
                 >
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
@@ -244,7 +257,7 @@ export function MediaUploadZone({
               onClick={handleUpload}
               className="px-6 py-2 bg-[var(--color-primary)] text-white rounded-lg font-medium hover:bg-[var(--color-primary-dark)] transition-colors"
             >
-              Upload {selectedFiles.length} file{selectedFiles.length !== 1 ? 's' : ''}
+              {t('mediaUploadZone.actions.upload', { count: selectedFiles.length })}
             </button>
           </div>
         </div>

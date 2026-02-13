@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, lazy, Suspense } from 'react';
 import { Link, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
 import { useSettings } from '../contexts/SettingsContext';
 import { useMultiColumnFeed } from '../contexts/MultiColumnFeedContext';
@@ -39,6 +40,7 @@ const prefetchRoutes = {
 };
 
 export default function MainLayout() {
+  const { t } = useTranslation();
   const { user, logout } = useAuth();
   const { notifyArchivedMessages } = useSettings();
   const { state: multiColumnState } = useMultiColumnFeed();
@@ -179,7 +181,7 @@ export default function MainLayout() {
         href="#main-content"
         className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[70] focus:rounded-md focus:bg-[var(--color-primary)] focus:px-4 focus:py-2 focus:text-white focus:shadow-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2"
       >
-        Skip to main content
+        {t('mainLayout.skipToMainContent')}
       </a>
 
       {/* Navigation Bar */}
@@ -215,7 +217,7 @@ export default function MainLayout() {
                       onMouseEnter={() => prefetchRoutes.messages()}
                       className="relative rounded-md px-3 py-2 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
                     >
-                      Messages
+                      {t('nav.messages')}
                       {unreadTotal > 0 && (
                         <span className="absolute -right-2 -top-1 rounded-full bg-[var(--color-primary)] px-2 py-0.5 text-xs text-white">
                           {unreadTotal}
@@ -228,14 +230,14 @@ export default function MainLayout() {
                       onMouseEnter={() => prefetchRoutes.hubs()}
                       className="rounded-md px-3 py-2 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
                     >
-                      Browse Hubs
+                      {t('menu.hubs')}
                     </button>
                     <Link
                       to="/about"
                       onMouseEnter={() => prefetchRoutes.about()}
                       className="rounded-md px-3 py-2 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
                     >
-                      About
+                      {t('menu.about')}
                     </Link>
                   </div>
 
@@ -265,7 +267,7 @@ export default function MainLayout() {
                         onMouseEnter={() => prefetchRoutes.bugReporting()}
                         className="rounded-md px-3 py-2 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
                       >
-                        Bug Reporting
+                        {t('mainLayout.bugReporting')}
                       </button>
 
                       {/* Divider */}
@@ -288,13 +290,13 @@ export default function MainLayout() {
                         to="/settings"
                         onMouseEnter={() => prefetchRoutes.settings()}
                         className="flex items-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
-                        aria-label="Settings"
+                        aria-label={t('common.settings')}
                       >
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                         </svg>
-                        Settings
+                        {t('common.settings')}
                       </Link>
                     </>
                   )}
@@ -304,20 +306,20 @@ export default function MainLayout() {
                     <HamburgerMenu
                       items={[
                         {
-                          label: 'Messages',
+                          label: t('nav.messages'),
                           to: '/messages',
                           badge: unreadTotal,
                         },
                         {
-                          label: 'Browse Hubs',
+                          label: t('menu.hubs'),
                           to: '/hubs',
                         },
                         {
-                          label: 'About',
+                          label: t('menu.about'),
                           to: '/about',
                         },
                         {
-                          label: 'Bug Reporting',
+                          label: t('mainLayout.bugReporting'),
                           onClick: () => {
                             setBugReportUrl(window.location.href);
                             setShowBugReportModal(true);
@@ -333,7 +335,7 @@ export default function MainLayout() {
                           ),
                         },
                         {
-                          label: 'Settings',
+                          label: t('common.settings'),
                           to: '/settings',
                           icon: (
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -345,14 +347,14 @@ export default function MainLayout() {
                         ...(user.role === 'admin'
                           ? [
                               {
-                                label: 'Admin',
+                                label: t('nav.admin'),
                                 to: '/admin',
                                 className: 'bg-red-600 text-white hover:bg-red-700',
                               },
                             ]
                           : []),
                         {
-                          label: 'Logout',
+                          label: t('common.logout'),
                           onClick: handleLogout,
                         },
                       ]}
@@ -366,7 +368,7 @@ export default function MainLayout() {
                       onMouseEnter={() => prefetchRoutes.admin()}
                       className="rounded-md bg-red-600 px-3 py-2 text-sm font-medium text-white hover:bg-red-700"
                     >
-                      Admin
+                      {t('nav.admin')}
                     </Link>
                   )}
 
@@ -376,7 +378,7 @@ export default function MainLayout() {
                       onClick={handleLogout}
                       className="rounded-md bg-[var(--color-surface-elevated)] px-3 py-2 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-border)]"
                     >
-                      Logout
+                      {t('common.logout')}
                     </button>
                   )}
                 </>
@@ -395,7 +397,7 @@ export default function MainLayout() {
                         onMouseEnter={() => prefetchRoutes.bugReporting()}
                         className="rounded-md px-3 py-2 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
                       >
-                        Bug Reporting
+                        {t('mainLayout.bugReporting')}
                       </button>
 
                       {/* Divider */}
@@ -408,7 +410,7 @@ export default function MainLayout() {
                     onClick={() => setAuthModal('login')}
                     className={`rounded-md ${isSlimMode ? 'px-2 py-1 text-xs' : 'px-3 py-2 text-sm'} font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]`}
                   >
-                    Login
+                    {t('common.login')}
                   </button>
                   {!isSlimMode ? (
                     <button
@@ -416,17 +418,17 @@ export default function MainLayout() {
                       onClick={() => setAuthModal('signup')}
                       className="rounded-md bg-[var(--color-primary)] px-3 py-2 text-sm font-medium text-white hover:opacity-90"
                     >
-                      Sign Up
+                      {t('auth.registerTitle')}
                     </button>
                   ) : (
                     <HamburgerMenu
                       items={[
                         {
-                          label: 'About',
+                          label: t('menu.about'),
                           to: '/about',
                         },
                         {
-                          label: 'Bug Reporting',
+                          label: t('mainLayout.bugReporting'),
                           onClick: () => {
                             setBugReportUrl(window.location.href);
                             setOpenBugReportAfterAuth(true);
@@ -434,7 +436,7 @@ export default function MainLayout() {
                           },
                         },
                         {
-                          label: 'Sign Up',
+                          label: t('auth.registerTitle'),
                           onClick: () => setAuthModal('signup'),
                           className: 'bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-dark)]',
                         },
@@ -461,7 +463,7 @@ export default function MainLayout() {
         <ErrorBoundary
           fallback={
             <div className="fixed bottom-0 left-0 right-0 p-4 bg-red-50 dark:bg-red-900/20 border-t border-red-200 dark:border-red-800 text-center">
-              <p className="text-sm text-red-600 dark:text-red-400">Navigation error. Please reload the page.</p>
+              <p className="text-sm text-red-600 dark:text-red-400">{t('mainLayout.mobileNavigationError')}</p>
             </div>
           }
         >
@@ -478,7 +480,7 @@ export default function MainLayout() {
               <Suspense
                 fallback={
                   <div className="py-6">
-                    <LoadingMessage>Loading...</LoadingMessage>
+                    <LoadingMessage>{t('common.loading')}</LoadingMessage>
                   </div>
                 }
               >
@@ -493,7 +495,7 @@ export default function MainLayout() {
                   onChange={(event) => setDontShowAgain(event.target.checked)}
                   className="h-4 w-4"
                 />
-                Don&apos;t Show This Again
+                {t('mainLayout.dontShowThisAgain')}
               </label>
               <button
                 type="button"
@@ -505,7 +507,7 @@ export default function MainLayout() {
                 }}
                 className="rounded-md bg-[var(--color-primary)] px-5 py-2 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)]"
               >
-                Continue
+                {t('common.continue')}
               </button>
             </div>
           </div>

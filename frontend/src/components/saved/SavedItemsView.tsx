@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { savedService } from '../../services/savedService';
 import type { SavedPost, SavedPostComment, SavedRedditPost, SavedRedditAPIComment } from '../../types/saved';
 import type { LocalRedditComment } from '../../types/reddit';
@@ -16,6 +17,7 @@ import { ErrorMessage, LoadingMessage } from '../common/StatusMessage';
 import type { PlatformPost } from '../../types/posts';
 import { postsService } from '../../services/postsService';
 import { useAuth } from '../../contexts/AuthContext';
+import { useFormat } from '../../hooks/useFormat';
 
 type RedditListingData = {
   data?: {
@@ -93,6 +95,8 @@ export function SavedItemsView({
   showHeading = true,
   className = '',
 }: SavedItemsViewProps) {
+  const { t } = useTranslation();
+  const { formatNumber, formatDate } = useFormat();
   const navigate = useNavigate();
   const location = useLocation();
   const queryClient = useQueryClient();
@@ -105,6 +109,9 @@ export function SavedItemsView({
   const [contentType, setContentType] = useState<ContentType>('posts');
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>('both');
   const [removedNoticeDismissed, setRemovedNoticeDismissed] = useState(false);
+
+  const formatSavedTimestamp = (value: string | number | Date) =>
+    formatDate(value, { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
   const { data, isLoading, error } = useQuery({
     queryKey: ['saved-items', 'all'],
     queryFn: () => savedService.getSavedItems(),
@@ -291,7 +298,7 @@ export function SavedItemsView({
       invalidateSavedQueries();
     },
     onError: (mutationError: Error) => {
-      alert(`Failed to unsave post: ${mutationError.message}`);
+      alert(t('alerts.unsaveFailed', { message: mutationError.message }));
     },
   });
 
@@ -303,7 +310,7 @@ export function SavedItemsView({
       invalidateSavedQueries();
     },
     onError: (mutationError: Error) => {
-      alert(`Failed to unsave post: ${mutationError.message}`);
+      alert(t('alerts.unsaveFailed', { message: mutationError.message }));
     },
   });
 
@@ -321,7 +328,7 @@ export function SavedItemsView({
       setHideTargetPost(null);
     },
     onError: (mutationError) => {
-      alert(`Failed to hide post: ${mutationError.message}`);
+      alert(t('alerts.hideFailed', { message: mutationError.message }));
     },
   });
 
@@ -338,8 +345,8 @@ export function SavedItemsView({
     const shareUrl = `${window.location.origin}/r/${post.subreddit}/comments/${post.reddit_post_id}`;
     navigator.clipboard
       .writeText(shareUrl)
-      .then(() => alert('Post link copied to clipboard!'))
-      .catch(() => alert('Unable to copy link. Please try again.'));
+      .then(() => alert(t('alerts.linkCopied')))
+      .catch(() => alert(t('alerts.linkCopyFailed')));
   };
 
   const toTimestamp = (value?: string | number | null) => {
@@ -368,8 +375,12 @@ export function SavedItemsView({
             detailedPost?.author_username ??
             post.author_username ??
             savedPostExtras.author_username ??
-            'Unknown',
-          hub_name: detailedPost?.hub_name ?? post.hub_name ?? savedPostExtras.hub_name ?? 'unknown',
+            t('posts.unknownAuthor'),
+          hub_name:
+            detailedPost?.hub_name ??
+            post.hub_name ??
+            savedPostExtras.hub_name ??
+            t('posts.unknownHub'),
           score: detailedPost?.score ?? post.score,
           comment_count:
             detailedPost?.comment_count ??
@@ -413,8 +424,8 @@ export function SavedItemsView({
               const shareUrl = `${window.location.origin}${getPostUrl(omniPost)}`;
               navigator.clipboard
                 .writeText(shareUrl)
-                .then(() => alert('Post link copied to clipboard!'))
-                .catch(() => alert('Unable to copy link. Please try again.'));
+                .then(() => alert(t('alerts.linkCopied')))
+                .catch(() => alert(t('alerts.linkCopyFailed')));
             }}
             onToggleSave={(shouldSave) => {
               if (!shouldSave) {
@@ -431,16 +442,16 @@ export function SavedItemsView({
       node: (
         <article className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
           <div className="mb-2 text-[11px] font-semibold uppercase text-[var(--color-text-muted)]">
-            Omni Comment
+            {t('saved.labels.omniComment')}
           </div>
           <div className="text-xs text-[var(--color-text-secondary)]">
             <div className="flex flex-wrap items-center gap-2">
               <span className="font-semibold">u/{comment.username}</span>
               <span>•</span>
-              <span>{new Date(comment.created_at).toLocaleString()}</span>
+              <span>{formatSavedTimestamp(comment.created_at)}</span>
             </div>
             <div className="mt-1">
-              <span className="font-semibold">Post:</span>{' '}
+              <span className="font-semibold">{t('saved.labels.post')}</span>{' '}
               <Link to={getPostUrl({ id: comment.post_id, target_subreddit: null, hub_name: comment.hub_name })} className="text-[var(--color-primary)] hover:underline">
                 {comment.post_title}
               </Link>
@@ -448,12 +459,17 @@ export function SavedItemsView({
           </div>
           <p className="mt-2 text-sm text-[var(--color-text-primary)]">{comment.content}</p>
           <div className="mt-3 flex items-center gap-4 text-xs text-[var(--color-text-secondary)]">
-            <span>{comment.score} points</span>
+            <span>
+              {t('posts.point', {
+                count: comment.score,
+                formattedCount: formatNumber(comment.score),
+              })}
+            </span>
             <Link
               to={getPostCommentUrl({ id: comment.post_id, target_subreddit: null, hub_name: comment.hub_name }, comment.comment_id)}
               className="text-[var(--color-primary)] hover:underline"
             >
-              View thread →
+              {t('saved.labels.viewThread')}
             </Link>
           </div>
         </article>
@@ -477,7 +493,7 @@ export function SavedItemsView({
         const redditPost = {
           id: post.reddit_post_id,
           title: mergedPost.title || `r/${post.subreddit}`,
-          author: mergedPost.author || 'unknown',
+          author: mergedPost.author || t('posts.unknownAuthor'),
           subreddit: post.subreddit,
           score: mergedPost.score ?? 0,
           num_comments: mergedPost.num_comments ?? 0,
@@ -524,25 +540,30 @@ export function SavedItemsView({
         return (
           <article className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
             <div className="mb-2 text-[11px] font-semibold uppercase text-[var(--color-text-muted)]">
-              Reddit Comment
+              {t('saved.labels.redditComment')}
             </div>
             <div className="text-xs text-[var(--color-text-secondary)]">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="font-semibold">u/{comment.username}</span>
                 <span>•</span>
-                <span>{new Date(comment.created_at).toLocaleString()}</span>
+                <span>{formatSavedTimestamp(comment.created_at)}</span>
               </div>
               {comment.reddit_post_title && (
                 <div className="mt-1">
-                  <span className="font-semibold">Post:</span> <span>{comment.reddit_post_title}</span>
+                  <span className="font-semibold">{t('saved.labels.post')}</span> <span>{comment.reddit_post_title}</span>
                 </div>
               )}
             </div>
             <p className="mt-2 text-sm text-[var(--color-text-primary)]">{comment.content}</p>
             <div className="mt-3 flex items-center gap-4 text-xs text-[var(--color-text-secondary)]">
-              <span>{comment.score} points</span>
+              <span>
+                {t('posts.point', {
+                  count: comment.score,
+                  formattedCount: formatNumber(comment.score),
+                })}
+              </span>
               <Link to={permalink} className="text-[var(--color-primary)] hover:underline">
-                View thread →
+                {t('saved.labels.viewThread')}
               </Link>
             </div>
           </article>
@@ -557,20 +578,30 @@ export function SavedItemsView({
         return (
           <article className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
             <div className="mb-2 text-[11px] font-semibold uppercase text-[var(--color-text-muted)]">
-              Reddit Comment
+              {t('saved.labels.redditComment')}
             </div>
             <div className="text-xs text-[var(--color-text-secondary)]">
               <div className="mb-1">
-                on <Link to={permalink} className="text-[var(--color-primary)] hover:underline">{comment.post_title || 'a post'}</Link>{comment.post_author && ` by u/${comment.post_author}`} in r/{comment.subreddit}
+                {t('saved.labels.on')}{' '}
+                <Link to={permalink} className="text-[var(--color-primary)] hover:underline">
+                  {comment.post_title || t('saved.labels.postFallback')}
+                </Link>
+                {comment.post_author ? ` ${t('saved.labels.byAuthor', { author: comment.post_author })}` : ''}
+                {` ${t('saved.labels.inSubreddit', { subreddit: comment.subreddit })}`}
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 <span className="font-semibold">u/{comment.comment_author}</span>
                 <span>•</span>
-                <span>{comment.score} pts</span>
+                <span>
+                  {t('posts.point', {
+                    count: comment.score,
+                    formattedCount: formatNumber(comment.score),
+                  })}
+                </span>
                 {comment.created_utc && (
                   <>
                     <span>•</span>
-                    <span>{new Date(comment.created_utc * 1000).toLocaleString()}</span>
+                    <span>{formatSavedTimestamp(new Date(comment.created_utc * 1000))}</span>
                   </>
                 )}
               </div>
@@ -581,10 +612,10 @@ export function SavedItemsView({
                 onClick={() => savedService.unsaveRedditAPIComment(comment.reddit_comment_id).then(() => invalidateSavedQueries())}
                 className="text-[var(--color-text-muted)] hover:text-cyan-500 transition-colors"
               >
-                Unsave
+                {t('posts.actions.unsave')}
               </button>
               <Link to={permalink} className="text-[var(--color-primary)] hover:underline">
-                Full comments →
+                {t('saved.labels.fullComments')}
               </Link>
             </div>
           </article>
@@ -633,9 +664,23 @@ export function SavedItemsView({
 
   const renderContent = () => {
     if (filteredItems.length === 0) {
-      const typeText = contentType === 'both' ? 'items' : contentType === 'posts' ? 'posts' : 'comments';
-      const sourceText = sourceFilter === 'both' ? 'Omni or Reddit' : sourceFilter === 'omni' ? 'Omni' : 'Reddit';
-      return <p className="text-sm text-[var(--color-text-secondary)]">No saved {sourceText} {typeText} yet.</p>;
+      const typeText =
+        contentType === 'both'
+          ? t('saved.empty.types.items')
+          : contentType === 'posts'
+            ? t('saved.empty.types.posts')
+            : t('saved.empty.types.comments');
+      const sourceText =
+        sourceFilter === 'both'
+          ? t('saved.empty.sources.omniOrReddit')
+          : sourceFilter === 'omni'
+            ? t('saved.empty.sources.omni')
+            : t('saved.empty.sources.reddit');
+      return (
+        <p className="text-sm text-[var(--color-text-secondary)]">
+          {t('saved.empty.message', { source: sourceText, type: typeText })}
+        </p>
+      );
     }
 
     return (
@@ -679,9 +724,9 @@ export function SavedItemsView({
     <>
       {showHeading && (
         <div className="mb-6">
-          <h1 className="text-3xl font-bold text-[var(--color-text-primary)]">Saved Items</h1>
+          <h1 className="text-3xl font-bold text-[var(--color-text-primary)]">{t('saved.headingTitle')}</h1>
           <p className="mt-2 text-sm text-[var(--color-text-secondary)]">
-            Posts, comments, and replies you&apos;ve saved across OmniNudge.
+            {t('saved.headingDescription')}
           </p>
         </div>
       )}
@@ -690,7 +735,7 @@ export function SavedItemsView({
         {/* Content Type Toggle */}
         <div>
           <label className="mb-2 block text-sm font-medium text-[var(--color-text-secondary)]">
-            Show:
+            {t('saved.filters.show')}
           </label>
           <div className="inline-flex gap-2 rounded-lg bg-[var(--color-surface-elevated)] p-1">
             <button
@@ -701,7 +746,7 @@ export function SavedItemsView({
                 resetPage();
               }}
             >
-              Posts
+              {t('saved.filters.posts')}
             </button>
             <button
               type="button"
@@ -711,7 +756,7 @@ export function SavedItemsView({
                 resetPage();
               }}
             >
-              Comments
+              {t('saved.filters.comments')}
             </button>
             <button
               type="button"
@@ -721,7 +766,7 @@ export function SavedItemsView({
                 resetPage();
               }}
             >
-              Both
+              {t('saved.filters.both')}
             </button>
           </div>
         </div>
@@ -729,7 +774,7 @@ export function SavedItemsView({
         {/* Source Filter */}
         <div>
           <label className="mb-2 block text-sm font-medium text-[var(--color-text-secondary)]">
-            Source:
+            {t('saved.filters.source')}
           </label>
           <div className="inline-flex gap-2 rounded-lg bg-[var(--color-surface-elevated)] p-1">
             <button
@@ -740,7 +785,7 @@ export function SavedItemsView({
                 resetPage();
               }}
             >
-              Omni
+              {t('saved.filters.omni')}
             </button>
             <button
               type="button"
@@ -750,7 +795,7 @@ export function SavedItemsView({
                 resetPage();
               }}
             >
-              Reddit
+              {t('saved.filters.reddit')}
             </button>
             <button
               type="button"
@@ -760,7 +805,7 @@ export function SavedItemsView({
                 resetPage();
               }}
             >
-              Both
+              {t('saved.filters.both')}
             </button>
           </div>
         </div>
@@ -768,13 +813,13 @@ export function SavedItemsView({
 
       {isLoading && (
         <div className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
-          <LoadingMessage className="mt-0 text-sm">Loading saved content...</LoadingMessage>
+          <LoadingMessage className="mt-0 text-sm">{t('saved.loading')}</LoadingMessage>
         </div>
       )}
 
       {error && (
         <div className="rounded-md border border-red-200 bg-red-50 p-4">
-          <ErrorMessage className="mt-0 text-sm text-red-800">Unable to load saved items.</ErrorMessage>
+          <ErrorMessage className="mt-0 text-sm text-red-800">{t('saved.loadError')}</ErrorMessage>
         </div>
       )}
 
@@ -782,16 +827,10 @@ export function SavedItemsView({
         <div className="mb-4 rounded-md border border-yellow-200 bg-yellow-50 p-4 text-sm text-yellow-900">
           <div className="flex items-start justify-between gap-4">
             <div>
-              {autoRemovedRedditPosts.length === 1 ? (
-                <span>1 saved Reddit post was removed by moderators and has been cleaned up.</span>
-              ) : (
-                <span>
-                  {autoRemovedRedditPosts.length} saved Reddit posts were removed by moderators and have been cleaned up.
-                </span>
-              )}
+              <span>{t('saved.removedByModerators', { count: autoRemovedRedditPosts.length })}</span>
               <div className="mt-1 text-xs">
                 <Link to="/settings" className="text-[var(--color-primary)] hover:underline">
-                  Manage this alert in Settings
+                  {t('saved.manageAlertInSettings')}
                 </Link>
               </div>
             </div>
@@ -800,7 +839,7 @@ export function SavedItemsView({
               onClick={() => setRemovedNoticeDismissed(true)}
               className="rounded border border-yellow-400 px-2 py-1 text-xs font-semibold text-yellow-900 hover:bg-yellow-100"
             >
-              Dismiss
+              {t('saved.dismiss')}
             </button>
           </div>
         </div>
@@ -817,17 +856,16 @@ export function SavedItemsView({
       {hideTargetPost && (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 px-4">
           <div className="w-full max-w-md rounded-lg bg-white p-4 shadow-lg">
-            <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">Hide this post?</h3>
+            <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">{t('modals.hide.title')}</h3>
             <p className="mt-2 text-sm text-[var(--color-text-secondary)]">
-              Hiding this post will remove it from your Saved list and add it to your Hidden items. Are you
-              sure you want to continue?
+              {t('modals.hide.confirmSaved')}
             </p>
             <div className="mt-4 flex justify-end gap-2">
               <button
                 onClick={() => setHideTargetPost(null)}
                 className="rounded border border-[var(--color-border)] px-3 py-1 text-sm hover:bg-[var(--color-surface-elevated)]"
               >
-                Cancel
+                {t('common.cancel')}
               </button>
               <button
                 onClick={() =>
@@ -840,7 +878,7 @@ export function SavedItemsView({
                 disabled={hideRedditPostMutation.isPending}
                 className="rounded bg-[var(--color-primary)] px-3 py-1 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)] disabled:opacity-50"
               >
-                {hideRedditPostMutation.isPending ? 'Hiding...' : 'Hide Post'}
+                {hideRedditPostMutation.isPending ? t('modals.hide.hiding') : t('modals.hide.hideButton')}
               </button>
             </div>
           </div>

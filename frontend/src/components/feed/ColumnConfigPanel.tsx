@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { useMultiColumnFeed } from '../../contexts/MultiColumnFeedContext';
 import type { ColumnConfig } from '../../contexts/MultiColumnFeedContext';
 import { subscriptionService } from '../../services/subscriptionService';
@@ -12,13 +13,20 @@ interface ColumnConfigPanelProps {
 }
 
 export function ColumnConfigPanel({ columnId, config }: ColumnConfigPanelProps) {
+  const { t } = useTranslation();
   const { updateColumnConfig } = useMultiColumnFeed();
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [isExpanded, setIsExpanded] = useState(false);
   const [showCreatePost, setShowCreatePost] = useState(false);
 
-  console.log('[ColumnConfigPanel] Render:', columnId, 'isExpanded:', isExpanded, 'showCreatePost:', showCreatePost);
+  const debugLog = (...args: unknown[]) => {
+    if (import.meta.env.DEV) {
+      console.log(...args);
+    }
+  };
+
+  debugLog('[ColumnConfigPanel] Render:', columnId, 'isExpanded:', isExpanded, 'showCreatePost:', showCreatePost);
 
   // Check if user can subscribe (must be logged in and have a feedSource)
   const canSubscribe = user && config.feedSource && (config.feedType === 'hub' || config.feedType === 'subreddit');
@@ -70,15 +78,15 @@ export function ColumnConfigPanel({ columnId, config }: ColumnConfigPanelProps) 
   const getFeedLabel = () => {
     switch (config.feedType) {
       case 'home':
-        return config.omniOnly ? 'Home (Omni Only)' : 'Home Feed';
+        return config.omniOnly ? t('columnConfigPanel.feedLabel.homeOmniOnly') : t('columnConfigPanel.feedLabel.home');
       case 'subreddit':
-        return config.feedSource ? `r/${config.feedSource}` : 'Subreddit (not set)';
+        return config.feedSource ? `r/${config.feedSource}` : t('columnConfigPanel.feedLabel.subredditNotSet');
       case 'hub':
-        return config.feedSource ? `h/${config.feedSource}` : 'Hub (not set)';
+        return config.feedSource ? `h/${config.feedSource}` : t('columnConfigPanel.feedLabel.hubNotSet');
       case 'messages':
-        return 'Messages';
+        return t('columnConfigPanel.feedLabel.messages');
       default:
-        return 'Unknown';
+        return t('columnConfigPanel.feedLabel.unknown');
     }
   };
 
@@ -94,7 +102,7 @@ export function ColumnConfigPanel({ columnId, config }: ColumnConfigPanelProps) 
           onClick={(e) => {
             e.preventDefault();
             e.stopPropagation();
-            console.log('[ColumnConfigPanel] Arrow clicked for column:', columnId, 'current isExpanded:', isExpanded);
+            debugLog('[ColumnConfigPanel] Arrow clicked for column:', columnId, 'current isExpanded:', isExpanded);
             setIsExpanded(!isExpanded);
           }}
           className="flex-1 px-3 py-2 text-xs text-left flex items-center justify-between hover:bg-[var(--color-hover)] transition-cyber"
@@ -123,7 +131,7 @@ export function ColumnConfigPanel({ columnId, config }: ColumnConfigPanelProps) 
             onClick={(e) => {
               e.preventDefault();
               e.stopPropagation();
-              console.log('[ColumnConfigPanel] Create post clicked for column:', columnId);
+              debugLog('[ColumnConfigPanel] Create post clicked for column:', columnId);
               setShowCreatePost(!showCreatePost);
             }}
             className={`px-3 py-2 text-xs transition-colors border-l border-[var(--color-border)] ${
@@ -131,7 +139,7 @@ export function ColumnConfigPanel({ columnId, config }: ColumnConfigPanelProps) 
                 ? 'text-cyan-400 bg-cyan-400/10'
                 : 'text-[var(--color-text-muted)] hover:text-cyan-400 hover:bg-cyan-400/10'
             }`}
-            title="Create Post"
+            title={t('columnConfigPanel.title.createPost')}
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -165,7 +173,7 @@ export function ColumnConfigPanel({ columnId, config }: ColumnConfigPanelProps) 
                 ? 'text-cyan-400 hover:text-red-400 hover:bg-red-400/10'
                 : 'text-[var(--color-text-muted)] hover:text-cyan-400 hover:bg-cyan-400/10'
             } disabled:opacity-50`}
-            title={isSubscribed ? 'Unsubscribe' : 'Subscribe'}
+            title={isSubscribed ? t('columnConfigPanel.title.unsubscribe') : t('columnConfigPanel.title.subscribe')}
           >
             {subscribeMutation.isPending ? '...' : isSubscribed ? '✓' : '+'}
           </button>
@@ -201,7 +209,7 @@ export function ColumnConfigPanel({ columnId, config }: ColumnConfigPanelProps) 
                   d="M4 6h16M4 12h16M4 18h16"
                 />
               </svg>
-              Feed Type
+              {t('columnConfigPanel.feedTypeLabel')}
             </label>
             <select
               value={config.feedType}
@@ -216,10 +224,10 @@ export function ColumnConfigPanel({ columnId, config }: ColumnConfigPanelProps) 
               }}
               className="w-full px-2 py-1.5 text-xs bg-[var(--color-background)] text-[var(--color-primary)] border border-cyan-500/30 rounded focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition-cyber"
             >
-              <option value="home">🏠 Home Feed</option>
-              <option value="subreddit">📱 Subreddit</option>
-              <option value="hub">🌐 Hub</option>
-              <option value="messages">💬 Messages</option>
+              <option value="home">{t('columnConfigPanel.feedTypeOption.home')}</option>
+              <option value="subreddit">{t('columnConfigPanel.feedTypeOption.subreddit')}</option>
+              <option value="hub">{t('columnConfigPanel.feedTypeOption.hub')}</option>
+              <option value="messages">{t('columnConfigPanel.feedTypeOption.messages')}</option>
             </select>
           </div>
 
@@ -241,7 +249,9 @@ export function ColumnConfigPanel({ columnId, config }: ColumnConfigPanelProps) 
                     d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14"
                   />
                 </svg>
-                {config.feedType === 'subreddit' ? 'Subreddit' : 'Hub'} Name
+                {config.feedType === 'subreddit'
+                  ? t('columnConfigPanel.sourceLabel.subreddit')
+                  : t('columnConfigPanel.sourceLabel.hub')}
               </label>
               <input
                 type="text"
@@ -253,7 +263,11 @@ export function ColumnConfigPanel({ columnId, config }: ColumnConfigPanelProps) 
                     currentCursor: '',
                   });
                 }}
-                placeholder={config.feedType === 'subreddit' ? 'gaming' : 'technology'}
+                placeholder={
+                  config.feedType === 'subreddit'
+                    ? t('columnConfigPanel.sourcePlaceholder.subreddit')
+                    : t('columnConfigPanel.sourcePlaceholder.hub')
+                }
                 className="w-full px-2 py-1.5 text-xs bg-[var(--color-background)] text-[var(--color-primary)] border border-cyan-500/30 rounded placeholder:text-[var(--color-text-muted)] focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition-cyber"
               />
             </div>
@@ -277,7 +291,7 @@ export function ColumnConfigPanel({ columnId, config }: ColumnConfigPanelProps) 
                     d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12"
                   />
                 </svg>
-                Sort By
+                {t('columnConfigPanel.sortByLabel')}
               </label>
               <select
                 value={config.sort}
@@ -290,11 +304,11 @@ export function ColumnConfigPanel({ columnId, config }: ColumnConfigPanelProps) 
                 }}
                 className="w-full px-2 py-1.5 text-xs bg-[var(--color-background)] text-[var(--color-primary)] border border-cyan-500/30 rounded focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition-cyber"
               >
-                <option value="hot">🔥 Hot</option>
-                <option value="new">✨ New</option>
-                <option value="top">⬆️ Top</option>
-                <option value="rising">📈 Rising</option>
-                <option value="controversial">⚡ Controversial</option>
+                <option value="hot">{t('columnConfigPanel.sortOption.hot')}</option>
+                <option value="new">{t('columnConfigPanel.sortOption.new')}</option>
+                <option value="top">{t('columnConfigPanel.sortOption.top')}</option>
+                <option value="rising">{t('columnConfigPanel.sortOption.rising')}</option>
+                <option value="controversial">{t('columnConfigPanel.sortOption.controversial')}</option>
               </select>
             </div>
           )}
@@ -318,7 +332,7 @@ export function ColumnConfigPanel({ columnId, config }: ColumnConfigPanelProps) 
                       d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
                     />
                   </svg>
-                  Time Range
+                  {t('columnConfigPanel.timeRangeLabel')}
                 </label>
                 <select
                   value={config.timeRange}
@@ -331,12 +345,12 @@ export function ColumnConfigPanel({ columnId, config }: ColumnConfigPanelProps) 
                   }}
                   className="w-full px-2 py-1.5 text-xs bg-[var(--color-background)] text-[var(--color-primary)] border border-cyan-500/30 rounded focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition-cyber"
                 >
-                  <option value="hour">⏰ Hour</option>
-                  <option value="day">📅 Day</option>
-                  <option value="week">📆 Week</option>
-                  <option value="month">🗓️ Month</option>
-                  <option value="year">📊 Year</option>
-                  <option value="all">♾️ All Time</option>
+                  <option value="hour">{t('columnConfigPanel.timeRangeOption.hour')}</option>
+                  <option value="day">{t('columnConfigPanel.timeRangeOption.day')}</option>
+                  <option value="week">{t('columnConfigPanel.timeRangeOption.week')}</option>
+                  <option value="month">{t('columnConfigPanel.timeRangeOption.month')}</option>
+                  <option value="year">{t('columnConfigPanel.timeRangeOption.year')}</option>
+                  <option value="all">{t('columnConfigPanel.timeRangeOption.all')}</option>
                 </select>
               </div>
             )}
@@ -361,7 +375,7 @@ export function ColumnConfigPanel({ columnId, config }: ColumnConfigPanelProps) 
                 htmlFor={`omni-only-${columnId}`}
                 className="text-xs text-[var(--color-text)] cursor-pointer font-medium"
               >
-                <span className="text-cyan-400">🌐</span> Omni-only (no Reddit)
+                {t('columnConfigPanel.omniOnlyLabel')}
               </label>
             </div>
           )}

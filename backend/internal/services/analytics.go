@@ -115,6 +115,11 @@ func (s *AnalyticsService) StartSession(ctx context.Context, sessionID, anonymou
 	_, err := s.db.Exec(ctx, `
 		INSERT INTO analytics_sessions (id, user_id, anonymous_id, start_time, user_agent, ip_address)
 		VALUES ($1, $2, $3, NOW(), $4, $5)
+		ON CONFLICT (id) DO UPDATE SET
+			user_id = COALESCE(analytics_sessions.user_id, EXCLUDED.user_id),
+			anonymous_id = COALESCE(analytics_sessions.anonymous_id, EXCLUDED.anonymous_id),
+			user_agent = COALESCE(analytics_sessions.user_agent, EXCLUDED.user_agent),
+			ip_address = COALESCE(analytics_sessions.ip_address, EXCLUDED.ip_address)
 	`, sessionID, userID, anonymousID, userAgent, ipAddress)
 	return err
 }

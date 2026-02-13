@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { useSettings } from '../contexts/SettingsContext';
 import { useAuth } from '../contexts/AuthContext';
 import { siteWideSearch, type RedditUserSearchResult } from '../services/searchService';
@@ -32,6 +33,7 @@ type HideTarget =
   | { type: 'platform'; post: PlatformPost };
 
 export default function SearchResultsPage() {
+  const { t } = useTranslation();
   const location = useLocation();
   const navigate = useNavigate();
   const params = new URLSearchParams(location.search);
@@ -148,7 +150,7 @@ export default function SearchResultsPage() {
       queryClient.invalidateQueries({ queryKey: savedPostsKey });
     },
     onError: (mutationError: Error) => {
-      alert(`Failed to update save: ${mutationError.message}`);
+      alert(t('alerts.saveFailed', { message: mutationError.message }));
     },
   });
 
@@ -161,7 +163,7 @@ export default function SearchResultsPage() {
       setHideTarget(null);
     },
     onError: (mutationError: Error) => {
-      alert(`Failed to hide post: ${mutationError.message}`);
+      alert(t('alerts.hideFailed', { message: mutationError.message }));
     },
   });
 
@@ -192,7 +194,7 @@ export default function SearchResultsPage() {
       queryClient.invalidateQueries({ queryKey: savedRedditPostsKey });
     },
     onError: (mutationError: Error) => {
-      alert(`Failed to update save: ${mutationError.message}`);
+      alert(t('alerts.saveFailed', { message: mutationError.message }));
     },
   });
 
@@ -211,7 +213,7 @@ export default function SearchResultsPage() {
       setHideTarget(null);
     },
     onError: (mutationError: Error) => {
-      alert(`Failed to hide post: ${mutationError.message}`);
+      alert(t('alerts.hideFailed', { message: mutationError.message }));
     },
   });
 
@@ -247,10 +249,10 @@ export default function SearchResultsPage() {
   const crosspostMutation = useMutation({
     mutationFn: async () => {
       if (!crosspostTarget) {
-        throw new Error('No post selected for crosspost');
+        throw new Error(t('alerts.crosspostNoSource'));
       }
       if (!selectedHub && !selectedSubreddit) {
-        throw new Error('Please select at least one destination (hub or subreddit)');
+        throw new Error(t('alerts.crosspostMissingDestination'));
       }
 
       const post = crosspostTarget.post;
@@ -292,16 +294,16 @@ export default function SearchResultsPage() {
       setSelectedHub('');
       setSelectedSubreddit('');
       setSendRepliesToInbox(true);
-      alert('Crosspost created successfully!');
+      alert(t('alerts.crosspostSuccess'));
     },
     onError: (error) => {
-      alert(`Failed to create crosspost: ${error.message}`);
+      alert(t('alerts.crosspostFailed', { message: error.message }));
     },
   });
 
   const handleCrosspostRedditPost = (post: RedditApiPost) => {
     if (!user) {
-      alert('Please sign in to crosspost.');
+      alert(t('alerts.signInToCrosspost'));
       return;
     }
     setCrosspostTarget({ post });
@@ -409,7 +411,7 @@ export default function SearchResultsPage() {
       navigate(`/search?${nextParams.toString()}`, { replace: true });
     } catch (err) {
       console.error('Search failed:', err);
-      setSearchError(err instanceof Error ? err.message : 'Search failed. Please try again.');
+      setSearchError(err instanceof Error ? err.message : t('searchPage.errors.generic'));
     } finally {
       setIsLoading(false);
     }
@@ -480,9 +482,9 @@ export default function SearchResultsPage() {
     <div className="mx-auto w-full max-w-7xl px-4 py-8">
       <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="text-left">
-          <h1 className="text-2xl font-bold text-[var(--color-text-primary)]">Search</h1>
+          <h1 className="text-2xl font-bold text-[var(--color-text-primary)]">{t('nav.search')}</h1>
           <p className="text-sm text-[var(--color-text-secondary)]">
-            Site-wide results across Reddit and Omni
+            {t('searchPage.subtitle')}
           </p>
         </div>
         <div className="flex flex-col gap-2 sm:flex-row">
@@ -495,7 +497,7 @@ export default function SearchResultsPage() {
                 handleSearch(query);
               }
             }}
-            placeholder="Search..."
+            placeholder={t('searchPage.inputPlaceholder')}
             className="w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-2 text-sm text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
           />
           <button
@@ -503,7 +505,7 @@ export default function SearchResultsPage() {
             onClick={() => handleSearch(query)}
             className="rounded-md bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)]"
           >
-            Search
+            {t('common.search')}
           </button>
         </div>
       </div>
@@ -521,7 +523,7 @@ export default function SearchResultsPage() {
               handleSearch(query, { tab: 'posts' });
             }}
           >
-            Posts
+            {t('searchPage.tabs.posts')}
           </button>
           <button
             className={`rounded-md px-3 py-2 text-sm font-semibold ${
@@ -539,7 +541,7 @@ export default function SearchResultsPage() {
               handleSearch(query, { tab: 'communities' });
             }}
           >
-            Communities
+            {t('searchPage.tabs.communities')}
           </button>
           <button
             className={`rounded-md px-3 py-2 text-sm font-semibold ${
@@ -552,12 +554,12 @@ export default function SearchResultsPage() {
               handleSearch(query, { tab: 'users' });
             }}
           >
-            Users
+            {t('searchPage.tabs.users')}
           </button>
         </div>
 
         <div className="flex items-center gap-2">
-          <label className="text-sm font-medium text-[var(--color-text-primary)]">Sort</label>
+          <label className="text-sm font-medium text-[var(--color-text-primary)]">{t('common.sort')}</label>
           {(['relevance', 'new', 'old'] as const).map((opt) => (
             <button
               key={opt}
@@ -571,13 +573,19 @@ export default function SearchResultsPage() {
                 handleSearch(query, { sort: opt });
               }}
             >
-              {opt === 'relevance' ? 'Relevance' : opt === 'new' ? 'Newest' : 'Oldest'}
+              {opt === 'relevance'
+                ? t('searchPage.sort.relevance')
+                : opt === 'new'
+                ? t('searchPage.sort.newest')
+                : t('searchPage.sort.oldest')}
             </button>
           ))}
         </div>
 
         <div className="flex items-center gap-2">
-          <label className="text-sm font-medium text-[var(--color-text-primary)]">Omni only</label>
+          <label className="text-sm font-medium text-[var(--color-text-primary)]">
+            {t('searchPage.omniOnly')}
+          </label>
           <button
             type="button"
             role="switch"
@@ -587,7 +595,7 @@ export default function SearchResultsPage() {
               postSource === 'omni' ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
             }`}
           >
-            <span className="sr-only">Omni only</span>
+            <span className="sr-only">{t('searchPage.omniOnly')}</span>
             <span
               aria-hidden="true"
               className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
@@ -599,7 +607,9 @@ export default function SearchResultsPage() {
 
         {!blockAllNsfw && (
           <div className="flex items-center gap-2">
-            <label className="text-sm font-medium text-[var(--color-text-primary)]">Include NSFW</label>
+            <label className="text-sm font-medium text-[var(--color-text-primary)]">
+              {t('searchPage.includeNsfw')}
+            </label>
             <button
               type="button"
               role="switch"
@@ -609,7 +619,7 @@ export default function SearchResultsPage() {
                 includeNsfw ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
               }`}
             >
-              <span className="sr-only">Include NSFW</span>
+              <span className="sr-only">{t('searchPage.includeNsfw')}</span>
               <span
                 aria-hidden="true"
                 className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
@@ -621,7 +631,7 @@ export default function SearchResultsPage() {
         )}
       </div>
 
-      {isLoading && <LoadingMessage className="text-sm">Loading...</LoadingMessage>}
+      {isLoading && <LoadingMessage className="text-sm">{t('common.loading')}</LoadingMessage>}
 
       {!isLoading && searchError && (
         <div className="rounded-md border border-[var(--color-error)] bg-[var(--color-error)]/10 px-4 py-3 text-sm text-[var(--color-error)]">
@@ -632,7 +642,7 @@ export default function SearchResultsPage() {
       {!isLoading && activeTab === 'posts' && (
         <div className="space-y-3">
           {visiblePosts.length === 0 && (
-            <EmptyMessage className="text-sm">No posts found.</EmptyMessage>
+            <EmptyMessage className="text-sm">{t('searchPage.empty.posts')}</EmptyMessage>
           )}
           <div className="space-y-3">
             {visiblePosts.map((item, idx) => {
@@ -657,19 +667,19 @@ export default function SearchResultsPage() {
                         const shareUrl = `${window.location.origin}/r/${post.subreddit}/comments/${post.id}`;
                         navigator.clipboard
                           .writeText(shareUrl)
-                          .then(() => alert('Post link copied to clipboard!'))
-                          .catch(() => alert('Unable to copy link. Please try again.'));
+                          .then(() => alert(t('alerts.linkCopied')))
+                          .catch(() => alert(t('alerts.linkCopyFailed')));
                       }}
                       onToggleSave={(shouldSave) => {
                         if (!user) {
-                          alert('Please sign in to save posts.');
+                          alert(t('alerts.signInToSave'));
                           return;
                         }
                         toggleSaveRedditPostMutation.mutate({ post, shouldSave });
                       }}
                       onHide={() => {
                         if (!user) {
-                          alert('Please sign in to hide posts.');
+                          alert(t('alerts.signInToHide'));
                           return;
                         }
                         setHideTarget({ type: 'reddit', post });
@@ -702,19 +712,19 @@ export default function SearchResultsPage() {
                       const shareUrl = `${window.location.origin}${getPostUrl(post)}`;
                       navigator.clipboard
                         .writeText(shareUrl)
-                        .then(() => alert('Post link copied to clipboard!'))
-                        .catch(() => alert('Unable to copy link. Please try again.'));
+                        .then(() => alert(t('alerts.linkCopied')))
+                        .catch(() => alert(t('alerts.linkCopyFailed')));
                     }}
                     onToggleSave={(shouldSave) => {
                       if (!user) {
-                        alert('Please sign in to save posts.');
+                        alert(t('alerts.signInToSave'));
                         return;
                       }
                       toggleSaveMutation.mutate({ postId: post.id, shouldSave });
                     }}
                     onHide={() => {
                       if (!user) {
-                        alert('Please sign in to hide posts.');
+                        alert(t('alerts.signInToHide'));
                         return;
                       }
                       setHideTarget({ type: 'platform', post });
@@ -735,7 +745,9 @@ export default function SearchResultsPage() {
             }
             onNext={() => handleSearch(query, { page: posts.page + 1, tab: activeTab, sort })}
             centerContent={
-              <span className="text-sm text-[var(--color-text-secondary)]">Page {posts.page}</span>
+              <span className="text-sm text-[var(--color-text-secondary)]">
+                {t('searchPage.pagination.page', { page: posts.page })}
+              </span>
             }
           />
         </div>
@@ -765,15 +777,17 @@ export default function SearchResultsPage() {
               }
               centerContent={
                 <div className="text-sm text-[var(--color-text-secondary)]">
-                  Page {communities.page}
+                  {t('searchPage.pagination.page', { page: communities.page })}
                 </div>
               }
             />
 
           <div>
-            <h3 className="text-sm font-semibold text-[var(--color-text-primary)]">Subreddits</h3>
+            <h3 className="text-sm font-semibold text-[var(--color-text-primary)]">
+              {t('searchPage.communities.subreddits')}
+            </h3>
             {filteredSubreddits.length === 0 ? (
-              <EmptyMessage className="text-sm">No subreddits found.</EmptyMessage>
+              <EmptyMessage className="text-sm">{t('searchPage.empty.subreddits')}</EmptyMessage>
             ) : (
               <ul className="mt-2 space-y-2">
                 {filteredSubreddits.map((sr) => (
@@ -795,9 +809,11 @@ export default function SearchResultsPage() {
             )}
           </div>
           <div>
-            <h3 className="text-sm font-semibold text-[var(--color-text-primary)]">Hubs</h3>
+            <h3 className="text-sm font-semibold text-[var(--color-text-primary)]">
+              {t('searchPage.communities.hubs')}
+            </h3>
             {filteredHubs.length === 0 ? (
-              <EmptyMessage className="text-sm">No hubs found.</EmptyMessage>
+              <EmptyMessage className="text-sm">{t('searchPage.empty.hubs')}</EmptyMessage>
             ) : (
               <ul className="mt-2 space-y-2">
                 {filteredHubs.map((hub) => (
@@ -848,17 +864,17 @@ export default function SearchResultsPage() {
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 px-4">
           <div className="w-full max-w-md rounded-lg bg-white p-4 shadow-lg">
             <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">
-              Hide this post?
+              {t('modals.hide.title')}
             </h3>
             <p className="mt-2 text-sm text-[var(--color-text-secondary)]">
-              Are you sure? Hidden posts can be found at your hidden posts page.
+              {t('modals.hide.description')}
             </p>
             <div className="mt-4 flex justify-end gap-2">
               <button
                 onClick={() => setHideTarget(null)}
                 className="rounded border border-[var(--color-border)] px-3 py-1 text-sm hover:bg-[var(--color-surface-elevated)]"
               >
-                Cancel
+                {t('common.cancel')}
               </button>
               <button
                 onClick={() => {
@@ -877,11 +893,11 @@ export default function SearchResultsPage() {
               >
                 {hideTarget.type === 'platform'
                   ? hidePostMutation.isPending
-                    ? 'Hiding...'
-                    : 'Hide Post'
+                    ? t('modals.hide.hiding')
+                    : t('modals.hide.hideButton')
                   : hideRedditPostMutation.isPending
-                  ? 'Hiding...'
-                  : 'Hide Post'}
+                  ? t('modals.hide.hiding')
+                  : t('modals.hide.hideButton')}
               </button>
             </div>
           </div>
@@ -891,9 +907,11 @@ export default function SearchResultsPage() {
       {!isLoading && activeTab === 'users' && (
         <div className="grid gap-4 md:grid-cols-2">
           <div>
-            <h3 className="text-sm font-semibold text-[var(--color-text-primary)]">Reddit users</h3>
+            <h3 className="text-sm font-semibold text-[var(--color-text-primary)]">
+              {t('searchPage.users.reddit')}
+            </h3>
             {filteredRedditUsers.length === 0 ? (
-              <EmptyMessage className="text-sm">No Reddit users found.</EmptyMessage>
+              <EmptyMessage className="text-sm">{t('searchPage.empty.redditUsers')}</EmptyMessage>
             ) : (
               <ul className="mt-2 space-y-2">
                 {filteredRedditUsers.map((user, idx) => (
@@ -914,15 +932,17 @@ export default function SearchResultsPage() {
                   }
                   className="rounded bg-[var(--color-primary)] px-3 py-2 text-sm font-medium text-white hover:opacity-90"
                 >
-                  Load more Reddit users
+                  {t('searchPage.users.loadMoreReddit')}
                 </button>
               </div>
             )}
           </div>
           <div>
-            <h3 className="text-sm font-semibold text-[var(--color-text-primary)]">Omni users</h3>
+            <h3 className="text-sm font-semibold text-[var(--color-text-primary)]">
+              {t('searchPage.users.omni')}
+            </h3>
             {filteredOmniUsers.length === 0 ? (
-              <EmptyMessage className="text-sm">No Omni users found.</EmptyMessage>
+              <EmptyMessage className="text-sm">{t('searchPage.empty.omniUsers')}</EmptyMessage>
             ) : (
               <ul className="mt-2 space-y-2">
                 {filteredOmniUsers.map((user) => (
@@ -943,7 +963,7 @@ export default function SearchResultsPage() {
                   }
                   className="rounded bg-[var(--color-primary)] px-3 py-2 text-sm font-medium text-white hover:opacity-90"
                 >
-                  Load more users
+                  {t('searchPage.users.loadMoreOmni')}
                 </button>
               </div>
             )}

@@ -1,5 +1,6 @@
 import { useRef, useEffect, useState, useMemo, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { useColumnFeed } from '../../hooks/useColumnFeed';
 import { CompactPostCard } from './CompactPostCard';
 import type { ColumnConfig } from '../../contexts/MultiColumnFeedContext';
@@ -102,6 +103,7 @@ function inferMessageTypeFromFile(file: File): Message['message_type'] {
 }
 
 export function ColumnFeed({ columnId, config, isActive, showBorder }: ColumnFeedProps) {
+  const { t } = useTranslation();
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const [expandedPostIds, setExpandedPostIds] = useState<Set<string>>(new Set());
   const queryClient = useQueryClient();
@@ -272,7 +274,7 @@ export function ColumnFeed({ columnId, config, isActive, showBorder }: ColumnFee
         }`}
         style={{ height: '100%' }}
       >
-        <div className="text-sm text-[var(--color-text-muted)]">Loading...</div>
+        <div className="text-sm text-[var(--color-text-muted)]">{t('common.loading')}</div>
       </div>
     );
   }
@@ -286,7 +288,7 @@ export function ColumnFeed({ columnId, config, isActive, showBorder }: ColumnFee
         style={{ height: '100%' }}
       >
         <div className="text-sm text-red-500">
-          Error: {error instanceof Error ? error.message : 'Failed to load feed'}
+          {t('common.error')}: {error instanceof Error ? error.message : t('columnFeed.errors.loadFailed')}
         </div>
       </div>
     );
@@ -300,7 +302,7 @@ export function ColumnFeed({ columnId, config, isActive, showBorder }: ColumnFee
         }`}
         style={{ height: '100%' }}
       >
-        <div className="text-sm text-[var(--color-text-muted)]">No posts to display</div>
+        <div className="text-sm text-[var(--color-text-muted)]">{t('columnFeed.noPostsToDisplay')}</div>
       </div>
     );
   }
@@ -320,11 +322,11 @@ export function ColumnFeed({ columnId, config, isActive, showBorder }: ColumnFee
   const handleUsernameSubmit = async () => {
     const trimmed = newUsername.trim();
     if (!trimmed) {
-      setNewUsernameError('Username is required.');
+      setNewUsernameError(t('columnFeed.newMessage.usernameRequired'));
       return;
     }
     if (trimmed.includes('@') || trimmed.includes('/') || /\s/.test(trimmed)) {
-      setNewUsernameError('Username is invalid.');
+      setNewUsernameError(t('columnFeed.newMessage.usernameInvalid'));
       return;
     }
     try {
@@ -333,7 +335,7 @@ export function ColumnFeed({ columnId, config, isActive, showBorder }: ColumnFee
       setShowNewMessageInput(false);
       setNewUsernameError(null);
     } catch {
-      setNewUsernameError('Username is invalid.');
+      setNewUsernameError(t('columnFeed.newMessage.usernameInvalid'));
     }
   };
 

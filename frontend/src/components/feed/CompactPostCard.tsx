@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { formatDistanceToNow } from 'date-fns';
+import { useTranslation } from 'react-i18next';
 import { getPostUrl } from '../../utils/postUrl';
 import { resolveMediaUrl } from '../../utils/mediaUrl';
 import { HlsVideo, type HlsVideoHandle } from '../common/HlsVideo';
@@ -17,6 +17,7 @@ import type { CombinedFeedItem } from '../../services/feedService';
 import type { Conversation, Message } from '../../types/messages';
 import type { LocalSubredditPost } from '../../services/hubsService';
 import type { RedditApiPost } from '../../types/reddit';
+import { useFormat } from '../../hooks/useFormat';
 
 interface CompactPostCardProps {
   post: PlatformPost | RedditApiPost | LocalSubredditPost | CombinedFeedItem | Conversation;
@@ -169,6 +170,8 @@ export function CompactPostCard({
   scrollRoot,
   onVideoVisibilityChange,
 }: CompactPostCardProps) {
+  const { t } = useTranslation();
+  const { formatNumber, formatRelativeTime } = useFormat();
   const { user } = useAuth();
   const [galleryIndex, setGalleryIndex] = useState(0);
   const [isGalleryHovered, setIsGalleryHovered] = useState(false);
@@ -192,7 +195,10 @@ export function CompactPostCard({
     enabled: Boolean(isMessageFeed && isModMail && hubName),
   });
   const hubDisplayTitle = hubDetails?.title?.trim() || hubName;
-  const modMailTitle = `${hubDisplayTitle || 'Hub'} - Mod Mail - ${conversation?.subject || 'Untitled'}`;
+  const modMailTitle = t('posts.compact.modMailTitle', {
+    hub: hubDisplayTitle || t('posts.compact.hubFallback'),
+    subject: conversation?.subject || t('posts.compact.untitled'),
+  });
 
   const handleVideoMouseEnter = () => {
     videoRef.current?.video?.play().catch(() => {});
@@ -220,13 +226,21 @@ export function CompactPostCard({
   }
 
   // Determine post type and extract data
-  const title = actualPost?.title || 'Untitled';
+  const title = actualPost?.title || t('posts.compact.untitled');
   const author =
     actualPost?.author_username ||
     (typeof actualPost?.author === 'string' ? actualPost.author : actualPost?.author?.username) ||
-    'Unknown';
+    t('posts.unknownAuthor');
   const score = actualPost?.score ?? 0;
   const commentCount = actualPost?.comment_count ?? actualPost?.num_comments ?? 0;
+  const pointsLabel = t('posts.point', {
+    count: score,
+    formattedCount: formatNumber(score),
+  });
+  const commentsLabel = t('posts.comment', {
+    count: commentCount,
+    formattedCount: formatNumber(commentCount),
+  });
   const nsfw = actualPost?.nsfw || actualPost?.over_18 || actualPost?.over18 || false;
 
   // Media handling - prioritize actual media over thumbnails
@@ -356,20 +370,20 @@ export function CompactPostCard({
   // Time formatting
   let timeAgo = '';
   if (actualPost?.created_at) {
-    timeAgo = formatDistanceToNow(new Date(actualPost.created_at), { addSuffix: true });
+    timeAgo = formatRelativeTime(new Date(actualPost.created_at));
   } else if (actualPost?.created_utc) {
-    timeAgo = formatDistanceToNow(new Date(actualPost.created_utc * 1000), { addSuffix: true });
+    timeAgo = formatRelativeTime(new Date(actualPost.created_utc * 1000));
   } else if (actualPost?.crossposted_at) {
-    timeAgo = formatDistanceToNow(new Date(actualPost.crossposted_at), { addSuffix: true });
+    timeAgo = formatRelativeTime(new Date(actualPost.crossposted_at));
   }
 
   // Source badge
   let sourceBadge = '';
   if (actualPost) {
     if (isHubPost || source === 'hub') {
-      sourceBadge = `h/${actualPost.hub_name || actualPost.hub?.name || 'unknown'}`;
+      sourceBadge = `h/${actualPost.hub_name || actualPost.hub?.name || t('posts.compact.unknownSource')}`;
     } else if (isRedditPost || source === 'reddit') {
-      sourceBadge = `r/${actualPost.subreddit || 'unknown'}`;
+      sourceBadge = `r/${actualPost.subreddit || t('posts.compact.unknownSource')}`;
     }
   }
 
@@ -440,7 +454,7 @@ export function CompactPostCard({
                 {otherUser?.avatar_url ? (
                   <img
                     src={resolveMediaUrl(otherUser.avatar_url)}
-                    alt={otherUser.username || 'User'}
+                    alt={otherUser.username || t('posts.compact.user')}
                     className="w-full h-full object-cover"
                     loading="lazy"
                   />
@@ -454,7 +468,7 @@ export function CompactPostCard({
               {/* Content */}
               <div className="flex-1 min-w-0">
                 <h3 className="text-sm font-medium leading-tight text-[var(--color-primary)]">
-                  {isModMail ? modMailTitle : otherUser?.username || 'Unknown User'}
+                  {isModMail ? modMailTitle : otherUser?.username || t('posts.compact.unknownUser')}
                 </h3>
                 {lastMessage && lastMessage.encrypted_content && (
                   <p className="text-xs text-[var(--color-text-muted)] mt-1 line-clamp-1">
@@ -466,7 +480,7 @@ export function CompactPostCard({
                   </p>
                 )}
                 <div className="text-xs text-[var(--color-text-muted)] mt-1">
-                  {conversation.last_message_at && formatDistanceToNow(new Date(conversation.last_message_at), { addSuffix: true })}
+                  {conversation.last_message_at && formatRelativeTime(new Date(conversation.last_message_at))}
                 </div>
               </div>
             </div>
@@ -546,7 +560,7 @@ export function CompactPostCard({
           {/* Title */}
           <Link to={postUrl} onClick={handleTitleClick} className="hover:underline">
             <h3 className="text-sm font-medium leading-tight line-clamp-2" style={{ color: 'var(--ac-text, #e8e8f0)' }}>
-              {nsfw && <span className="text-red-500 text-xs mr-1">NSFW</span>}
+              {nsfw && <span className="text-red-500 text-xs mr-1">{t('posts.badges.nsfw')}</span>}
               {title}
             </h3>
           </Link>
@@ -562,9 +576,9 @@ export function CompactPostCard({
           <div className="flex items-center gap-1.5 mt-1 text-xs flex-wrap" style={{ color: 'var(--ac-text-muted, #8a8a9a)' }}>
             <span className="truncate" style={{ maxWidth: '80px' }}>{author}</span>
             <span>•</span>
-            <span>{score.toLocaleString()} pts</span>
+            <span>{pointsLabel}</span>
             <span>•</span>
-            <span>{commentCount.toLocaleString()} comment{commentCount !== 1 ? 's' : ''}</span>
+            <span>{commentsLabel}</span>
             {timeAgo && (
               <>
                 <span>•</span>
@@ -583,7 +597,7 @@ export function CompactPostCard({
                 // Upvote functionality placeholder
               }}
               className="text-[var(--color-text-muted)] hover:text-cyan-500 transition-colors"
-              aria-label="Upvote"
+              aria-label={t('posts.actions.upvote')}
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -597,7 +611,7 @@ export function CompactPostCard({
               </svg>
             </button>
             <span className="text-xs font-semibold" style={{ color: 'var(--ac-text, #e8e8f0)' }}>
-              {score}
+              {formatNumber(score)}
             </span>
             <button
               onClick={(e) => {
@@ -605,7 +619,7 @@ export function CompactPostCard({
                 // Downvote functionality placeholder
               }}
               className="text-[var(--color-text-muted)] hover:text-red-500 transition-colors"
-              aria-label="Downvote"
+              aria-label={t('posts.actions.downvote')}
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"

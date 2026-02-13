@@ -1,4 +1,6 @@
 import type { RefObject } from 'react';
+import { useTranslation } from 'react-i18next';
+import { useFormat } from '../../hooks/useFormat';
 import { LoadingMessage, ErrorMessage, EmptyMessage } from '../common/StatusMessage';
 
 export interface AboutPanelStat {
@@ -29,9 +31,14 @@ export const AboutPanel: React.FC<AboutPanelProps> = ({
   htmlDescription,
   htmlRef,
   stats,
-  emptyMessage = 'No details available.',
-  errorMessage = 'Unable to load details.',
+  emptyMessage,
+  errorMessage,
 }) => {
+  const { t } = useTranslation();
+  const { formatNumber } = useFormat();
+  const resolvedEmptyMessage = emptyMessage ?? t('common.noDetailsAvailable');
+  const resolvedErrorMessage = errorMessage ?? t('common.unableToLoadDetails');
+
   const formatStatValue = (stat: AboutPanelStat): string => {
     if (stat.value === null || stat.value === undefined) {
       return '—';
@@ -40,7 +47,7 @@ export const AboutPanel: React.FC<AboutPanelProps> = ({
       return stat.format(stat.value);
     }
     if (typeof stat.value === 'number') {
-      return stat.value.toLocaleString();
+      return formatNumber(stat.value);
     }
     return String(stat.value);
   };
@@ -53,9 +60,9 @@ export const AboutPanel: React.FC<AboutPanelProps> = ({
         {title}
       </h3>
       {isLoading ? (
-        <LoadingMessage>Loading details…</LoadingMessage>
+        <LoadingMessage>{t('common.loadingDetails')}</LoadingMessage>
       ) : isError ? (
-        <ErrorMessage>{errorMessage}</ErrorMessage>
+        <ErrorMessage>{resolvedErrorMessage}</ErrorMessage>
       ) : hasContent ? (
         <>
           {icon && (
@@ -89,7 +96,7 @@ export const AboutPanel: React.FC<AboutPanelProps> = ({
           )}
         </>
       ) : (
-        <EmptyMessage>{emptyMessage}</EmptyMessage>
+        <EmptyMessage>{resolvedEmptyMessage}</EmptyMessage>
       )}
     </div>
   );

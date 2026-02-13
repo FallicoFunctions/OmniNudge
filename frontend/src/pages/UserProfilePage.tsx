@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
+import { Trans, useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import { usersService } from '../services/usersService';
 import { useSettings } from '../contexts/SettingsContext';
 import { useAuth } from '../contexts/AuthContext';
-import { formatTimestamp } from '../utils/timeFormat';
 import { resolveMediaUrl } from '../utils/mediaUrl';
 import type { PlatformPost, PostComment } from '../types/posts';
 import type { UserProfile } from '../types/users';
@@ -17,17 +18,18 @@ import { getPostUrl } from '../utils/postUrl';
 import { Panel } from '../components/common/Panel';
 import { ErrorMessage } from '../components/common/StatusMessage';
 import { Skeleton } from '../components/common/LoadingStates';
+import { useFormat } from '../hooks/useFormat';
 
 const BASE_TABS = [
-  { key: 'overview', label: 'Overview' },
-  { key: 'posts', label: 'Posts' },
-  { key: 'comments', label: 'Comments' },
+  { key: 'overview', labelKey: 'userProfilePage.tabs.overview' },
+  { key: 'posts', labelKey: 'userProfilePage.tabs.posts' },
+  { key: 'comments', labelKey: 'userProfilePage.tabs.comments' },
 ] as const;
 
 const PRIVATE_TABS = [
-  { key: 'saved', label: 'Saved' },
-  { key: 'hidden', label: 'Hidden' },
-  { key: 'subscribed', label: 'Subscribed' },
+  { key: 'saved', labelKey: 'userProfilePage.tabs.saved' },
+  { key: 'hidden', labelKey: 'userProfilePage.tabs.hidden' },
+  { key: 'subscribed', labelKey: 'userProfilePage.tabs.subscribed' },
 ] as const;
 
 type TabKey = (typeof BASE_TABS)[number]['key'] | (typeof PRIVATE_TABS)[number]['key'];
@@ -36,21 +38,23 @@ interface PostNavigationState {
   originPath: string;
 }
 
-function formatPoints(count: number): string {
-  return `${count.toLocaleString()} ${count === 1 ? 'point' : 'points'}`;
-}
-
 function PostsSection({
   posts,
   useRelativeTime,
   linkState,
+  t,
+  formatNumber,
+  formatTimestampLabel,
 }: {
   posts: PlatformPost[];
   useRelativeTime: boolean;
   linkState: PostNavigationState;
+  t: TFunction;
+  formatNumber: (value: number) => string;
+  formatTimestampLabel: (timestamp: string | number | Date, useRelativeTime: boolean) => string;
 }) {
   if (!posts.length) {
-    return <p className="text-sm text-[var(--color-text-secondary)]">No posts yet.</p>;
+    return <p className="text-sm text-[var(--color-text-secondary)]">{t('userProfilePage.posts.empty')}</p>;
   }
 
   return (
@@ -65,7 +69,7 @@ function PostsSection({
             {post.thumbnail_url && (
               <img
                 src={resolveMediaUrl(post.thumbnail_url)}
-                alt={`Preview image for ${post.title}`}
+                alt={t('posts.media.previewImageAlt', { title: post.title })}
                 className="h-24 w-24 flex-shrink-0 rounded-lg object-cover"
               />
             )}
@@ -79,9 +83,14 @@ function PostsSection({
                   h/{post.hub_name}
                 </Link>
                 <span> · </span>
-                <span>{formatPoints(post.score)}</span>
+                <span>
+                  {t('posts.point', {
+                    count: post.score,
+                    formattedCount: formatNumber(post.score),
+                  })}
+                </span>
                 <span> · </span>
-                <span>posted {formatTimestamp(post.created_at, useRelativeTime)}</span>
+                <span>{t('posts.submittedAt', { time: formatTimestampLabel(post.created_at, useRelativeTime) })}</span>
               </div>
               <Link to={getPostUrl(post)} state={linkState}>
                 <h3 className="mt-1 text-lg font-semibold text-[var(--color-text-primary)] hover:text-[var(--color-primary)]">
@@ -92,7 +101,10 @@ function PostsSection({
                 <PostBodyMarkdown content={post.body} className="mt-2 text-[var(--color-text-secondary)]" />
               )}
               <div className="mt-2 text-xs font-medium text-[var(--color-text-secondary)]">
-                {(post.comment_count ?? post.num_comments ?? 0).toLocaleString()} Comments
+                {t('posts.comment', {
+                  count: post.comment_count ?? post.num_comments ?? 0,
+                  formattedCount: formatNumber(post.comment_count ?? post.num_comments ?? 0),
+                })}
               </div>
             </div>
           </div>
@@ -106,13 +118,19 @@ function CommentsSection({
   comments,
   useRelativeTime,
   linkState,
+  t,
+  formatNumber,
+  formatTimestampLabel,
 }: {
   comments: PostComment[];
   useRelativeTime: boolean;
   linkState: PostNavigationState;
+  t: TFunction;
+  formatNumber: (value: number) => string;
+  formatTimestampLabel: (timestamp: string | number | Date, useRelativeTime: boolean) => string;
 }) {
   if (!comments.length) {
-    return <p className="text-sm text-[var(--color-text-secondary)]">No comments yet.</p>;
+    return <p className="text-sm text-[var(--color-text-secondary)]">{t('comments.noComments')}</p>;
   }
 
   return (
@@ -124,18 +142,28 @@ function CommentsSection({
         >
           <div className="p-4">
             <div className="mb-2 text-xs text-[var(--color-text-secondary)]">
-              <span>On </span>
-              <Link
-                to={`/posts/${comment.post_id}`}
-                state={linkState}
-                className="font-medium text-[var(--color-text-primary)] hover:text-[var(--color-primary)]"
-              >
-                post #{comment.post_id}
-              </Link>
+              <Trans
+                i18nKey="userProfilePage.comments.onPost"
+                values={{ id: comment.post_id }}
+                components={{
+                  link: (
+                    <Link
+                      to={`/posts/${comment.post_id}`}
+                      state={linkState}
+                      className="font-medium text-[var(--color-text-primary)] hover:text-[var(--color-primary)]"
+                    />
+                  ),
+                }}
+              />
               <span> · </span>
-              <span>{formatPoints(comment.score)}</span>
+              <span>
+                {t('posts.point', {
+                  count: comment.score,
+                  formattedCount: formatNumber(comment.score),
+                })}
+              </span>
               <span> · </span>
-              <span>{formatTimestamp(comment.created_at, useRelativeTime)}</span>
+              <span>{formatTimestampLabel(comment.created_at, useRelativeTime)}</span>
             </div>
             <MarkdownRenderer content={comment.content} className="text-[var(--color-text-primary)]" />
 
@@ -146,7 +174,7 @@ function CommentsSection({
                 state={linkState}
                 className="inline-flex items-center gap-1.5 text-sm font-medium text-[var(--color-primary)] hover:text-[var(--color-primary-dark)] hover:underline transition"
               >
-                View thread
+                {t('userProfilePage.actions.viewThread')}
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
                 </svg>
@@ -160,6 +188,8 @@ function CommentsSection({
 }
 
 export default function UserProfilePage() {
+  const { t } = useTranslation();
+  const { formatNumber, formatDate, formatRelativeTime } = useFormat();
   const location = useLocation();
   const { username } = useParams<{ username: string }>();
   const { user } = useAuth();
@@ -181,6 +211,17 @@ export default function UserProfilePage() {
     !canViewPrivateTabs && (activeTab === 'saved' || activeTab === 'hidden' || activeTab === 'subscribed')
       ? 'overview'
       : activeTab;
+
+  const formatTimestampLabel = (timestamp: string | number | Date, useRelativeTimeEnabled: boolean) => {
+    const d = new Date(timestamp);
+    if (Number.isNaN(d.getTime())) return t('common.time.recently');
+
+    if (useRelativeTimeEnabled) {
+      return formatRelativeTime(d);
+    }
+
+    return formatDate(d, { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
+  };
 
   const profileQuery = useQuery<UserProfile>({
     queryKey: ['user-profile', username],
@@ -231,12 +272,21 @@ export default function UserProfilePage() {
     };
   }, [user, username, refetchProfile]);
 
-  const createdLabel = profile ? formatTimestamp(profile.created_at, useRelativeTime) : '';
-  const lastSeenLabel = profile ? formatTimestamp(profile.last_seen, useRelativeTime) : '';
+  const createdLabel = profile ? formatTimestampLabel(profile.created_at, useRelativeTime) : '';
+  const lastSeenLabel = profile ? formatTimestampLabel(profile.last_seen, useRelativeTime) : '';
 
   const renderActiveTab = () => {
     if (resolvedActiveTab === 'posts') {
-      return <PostsSection posts={posts} useRelativeTime={useRelativeTime} linkState={originState} />;
+      return (
+        <PostsSection
+          posts={posts}
+          useRelativeTime={useRelativeTime}
+          linkState={originState}
+          t={t}
+          formatNumber={formatNumber}
+          formatTimestampLabel={formatTimestampLabel}
+        />
+      );
     }
 
     if (resolvedActiveTab === 'comments') {
@@ -245,13 +295,16 @@ export default function UserProfilePage() {
           comments={comments}
           useRelativeTime={useRelativeTime}
           linkState={originState}
+          t={t}
+          formatNumber={formatNumber}
+          formatTimestampLabel={formatTimestampLabel}
         />
       );
     }
 
     if (resolvedActiveTab === 'saved') {
       if (!canViewPrivateTabs) {
-        return <p className="text-sm text-[var(--color-text-secondary)]">Saved items are private.</p>;
+        return <p className="text-sm text-[var(--color-text-secondary)]">{t('userProfilePage.private.saved')}</p>;
       }
       return (
         <SavedItemsView withContainer={false} showHeading={false} className="space-y-6" />
@@ -260,7 +313,7 @@ export default function UserProfilePage() {
 
     if (resolvedActiveTab === 'hidden') {
       if (!canViewPrivateTabs) {
-        return <p className="text-sm text-[var(--color-text-secondary)]">Hidden items are private.</p>;
+        return <p className="text-sm text-[var(--color-text-secondary)]">{t('userProfilePage.private.hidden')}</p>;
       }
       return (
         <HiddenItemsView withContainer={false} showHeading={false} className="space-y-6" />
@@ -269,7 +322,9 @@ export default function UserProfilePage() {
 
     if (resolvedActiveTab === 'subscribed') {
       if (!canViewPrivateTabs) {
-        return <p className="text-sm text-[var(--color-text-secondary)]">Subscriptions are private.</p>;
+        return (
+          <p className="text-sm text-[var(--color-text-secondary)]">{t('userProfilePage.private.subscribed')}</p>
+        );
       }
       return (
         <SubscribedView withContainer={false} showHeading={false} className="space-y-6" />
@@ -280,14 +335,14 @@ export default function UserProfilePage() {
       <div className="grid gap-6 lg:grid-cols-2">
         <section>
           <div className="mb-2 flex items-center justify-between">
-            <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">Recent Posts</h3>
+            <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">{t('userProfilePage.headings.recentPosts')}</h3>
             {posts.length > 0 && (
               <button
                 type="button"
                 onClick={() => setActiveTab('posts')}
                 className="flex items-center gap-1 text-sm font-medium text-[var(--color-primary)] hover:underline transition"
               >
-                View all
+                {t('userProfilePage.actions.viewAll')}
                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                 </svg>
@@ -298,12 +353,15 @@ export default function UserProfilePage() {
             posts={posts.slice(0, 5)}
             useRelativeTime={useRelativeTime}
             linkState={originState}
+            t={t}
+            formatNumber={formatNumber}
+            formatTimestampLabel={formatTimestampLabel}
           />
         </section>
         <section>
           <div className="mb-2 flex items-center justify-between">
             <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">
-              Recent Comments
+              {t('userProfilePage.headings.recentComments')}
             </h3>
             {comments.length > 0 && (
               <button
@@ -311,7 +369,7 @@ export default function UserProfilePage() {
                 onClick={() => setActiveTab('comments')}
                 className="flex items-center gap-1 text-sm font-medium text-[var(--color-primary)] hover:underline transition"
               >
-                View all
+                {t('userProfilePage.actions.viewAll')}
                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                 </svg>
@@ -322,6 +380,9 @@ export default function UserProfilePage() {
             comments={comments.slice(0, 5)}
             useRelativeTime={useRelativeTime}
             linkState={originState}
+            t={t}
+            formatNumber={formatNumber}
+            formatTimestampLabel={formatTimestampLabel}
           />
         </section>
       </div>
@@ -363,7 +424,7 @@ export default function UserProfilePage() {
   if (profileQuery.isError || !profile) {
     return (
       <div className="mx-auto w-full max-w-5xl px-4 py-8">
-        <ErrorMessage>Unable to load user profile.</ErrorMessage>
+        <ErrorMessage>{t('userProfilePage.errors.loadFailed')}</ErrorMessage>
       </div>
     );
   }
@@ -376,7 +437,7 @@ export default function UserProfilePage() {
             {profile.avatar_url ? (
               <img
                 src={profile.avatar_url}
-                alt={`Avatar for ${profile.username}`}
+                alt={t('userProfilePage.aria.avatarAlt', { username: profile.username })}
                 className="h-16 w-16 rounded-full object-cover"
               />
             ) : (
@@ -388,25 +449,25 @@ export default function UserProfilePage() {
               <h1 className="text-2xl font-bold text-[var(--color-text-primary)]">
                 {profile.username}
               </h1>
-              <p className="text-sm text-[var(--color-text-secondary)]">Joined {createdLabel}</p>
+              <p className="text-sm text-[var(--color-text-secondary)]">{t('userProfilePage.labels.joined', { time: createdLabel })}</p>
               <p className="text-xs text-[var(--color-text-secondary)]">
-                Last seen {lastSeenLabel}
+                {t('userProfilePage.labels.lastSeen', { time: lastSeenLabel })}
               </p>
             </div>
           </div>
           <div className="flex flex-col gap-2 text-sm text-[var(--color-text-secondary)] md:items-end md:text-right">
             <div>
               <span className="font-semibold text-[var(--color-text-primary)]">
-                {profile.karma.toLocaleString()}
+                {formatNumber(profile.karma)}
               </span>{' '}
-              karma
+              {t('userProfilePage.labels.karma')}
             </div>
             {canMessageUser && (
               <Link
                 to={`/messages?to=${encodeURIComponent(profile.username)}`}
                 className="inline-flex items-center justify-center rounded-md border border-[var(--color-border)] px-4 py-2 text-sm font-semibold text-[var(--color-text-primary)] hover:border-[var(--color-primary)] hover:text-[var(--color-primary)]"
               >
-                Message
+                {t('userProfilePage.actions.message')}
               </Link>
             )}
           </div>
@@ -421,7 +482,7 @@ export default function UserProfilePage() {
       {profile.moderated_hubs && profile.moderated_hubs.length > 0 && (
         <div className="mt-6 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
           <h3 className="text-sm font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
-            Moderator of
+            {t('userProfilePage.headings.moderatorOf')}
           </h3>
           <div className="mt-3 flex flex-wrap gap-2">
             {profile.moderated_hubs.map((hub) => (
@@ -458,7 +519,7 @@ export default function UserProfilePage() {
                   : 'border-transparent text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
               }`}
             >
-              {tab.label}
+              {t(tab.labelKey)}
             </button>
           ))}
         </div>

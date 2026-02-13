@@ -42,6 +42,7 @@ export function TabBarItem({
   const badgeLabel = badge && badge > 0
     ? t('ariaLabels.unreadMessages', { count: badge })
     : '';
+  const longPressHint = onLongPress ? t('ariaLabels.longPressForMoreOptions') : '';
 
   // Animate badge only when count changes
   useEffect(() => {
@@ -85,7 +86,7 @@ export function TabBarItem({
         ${active ? 'text-[var(--color-primary)]' : 'text-[var(--color-text-secondary)]'}
       `}
       style={{ touchAction: 'manipulation' }}
-      aria-label={`${label}${badgeLabel ? ` - ${badgeLabel}` : ''}${onLongPress ? '. Long press for more options' : ''}`}
+      aria-label={`${label}${badgeLabel ? ` - ${badgeLabel}` : ''}${longPressHint ? ` ${longPressHint}` : ''}`}
       aria-current={active ? 'page' : undefined}
       data-testid={testId}
     >

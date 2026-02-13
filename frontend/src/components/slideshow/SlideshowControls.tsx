@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next';
+
 interface SlideshowControlsProps {
   autoAdvance: boolean;
   autoAdvanceInterval: number;
@@ -18,6 +20,8 @@ export function SlideshowControls({
   onToggleAutoAdvance,
   onChangeInterval,
 }: SlideshowControlsProps) {
+  const { t } = useTranslation();
+
   return (
     // MSG-3: Improved slideshow controls with better visibility and clarity
     <div className="flex items-center gap-3 bg-black/60 backdrop-blur-sm rounded-lg px-4 py-2">
@@ -29,7 +33,9 @@ export function SlideshowControls({
             ? 'bg-[var(--color-primary)] text-white'
             : 'bg-white/20 text-white hover:bg-white/30'
         }`}
-        aria-label={autoAdvance ? 'Pause slideshow' : 'Play slideshow'}
+        aria-label={
+          autoAdvance ? t('slideshowControls.aria.pauseSlideshow') : t('slideshowControls.aria.playSlideshow')
+        }
       >
         <svg
           xmlns="http://www.w3.org/2000/svg"
@@ -62,12 +68,14 @@ export function SlideshowControls({
             </>
           )}
         </svg>
-        <span className="text-sm font-medium">{autoAdvance ? 'Pause' : 'Play'}</span>
+        <span className="text-sm font-medium">
+          {autoAdvance ? t('slideshowControls.actions.pause') : t('slideshowControls.actions.play')}
+        </span>
       </button>
 
       {/* Interval selector with label */}
       <div className="flex items-center gap-2">
-        <span className="text-white text-sm font-medium">Speed:</span>
+        <span className="text-white text-sm font-medium">{t('slideshowControls.labels.speed')}</span>
         <div className="flex gap-1">
           {INTERVAL_OPTIONS.map((option) => (
             <button
@@ -78,7 +86,7 @@ export function SlideshowControls({
                   ? 'bg-[var(--color-primary)] text-white'
                   : 'bg-white/20 text-white hover:bg-white/30'
               }`}
-              aria-label={`Set speed to ${option.label}`}
+              aria-label={t('slideshowControls.aria.setSpeed', { speed: option.label })}
             >
               {option.label}
             </button>
