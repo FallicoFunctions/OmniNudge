@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Trans, useTranslation } from 'react-i18next';
 import { api } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
+import { useFormat } from '../../hooks/useFormat';
 
 interface DeletionStatus {
   pending_deletion: boolean;
@@ -11,7 +13,20 @@ interface DeletionStatus {
   can_cancel?: boolean;
 }
 
+const CONFIRM_PHRASE = 'DELETE MY ACCOUNT';
+
+function getErrorMessage(err: unknown): string | null {
+  if (err instanceof Error && err.message) return err.message;
+  if (typeof err === 'object' && err !== null && 'message' in err) {
+    const message = (err as { message?: unknown }).message;
+    if (typeof message === 'string' && message) return message;
+  }
+  return null;
+}
+
 export function DeleteAccountSection() {
+  const { t } = useTranslation();
+  const { formatDate, formatNumber } = useFormat();
   const { logout } = useAuth();
   const queryClient = useQueryClient();
   const [showModal, setShowModal] = useState(false);
@@ -45,8 +60,8 @@ export function DeleteAccountSection() {
       // Log user out after deletion
       setTimeout(() => logout(), 2000);
     },
-    onError: (err: any) => {
-      setError(err.message || 'Failed to delete account');
+    onError: (err: unknown) => {
+      setError(getErrorMessage(err) || t('settings.deleteAccountSection.errors.deleteFailed'));
     },
   });
 
@@ -62,8 +77,10 @@ export function DeleteAccountSection() {
 
   const handleDelete = () => {
     setError('');
-    if (confirmText !== 'DELETE MY ACCOUNT') {
-      setError('Please type "DELETE MY ACCOUNT" to confirm');
+    if (confirmText !== CONFIRM_PHRASE) {
+      setError(
+        t('settings.deleteAccountSection.errors.confirmMismatch', { phrase: CONFIRM_PHRASE })
+      );
       return;
     }
     deleteMutation.mutate();
@@ -71,21 +88,30 @@ export function DeleteAccountSection() {
 
   // Pending deletion banner
   if (status?.pending_deletion) {
+    const days = status.days_until_deletion ?? 0;
+    const formattedCount = formatNumber(days);
+    const formattedDate = status.permanent_deletion
+      ? formatDate(status.permanent_deletion, { dateStyle: 'medium' })
+      : '';
+    const dateSuffix = status.permanent_deletion
+      ? t('settings.deleteAccountSection.pending.onDate', { formattedDate })
+      : '';
+
     return (
       <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-6">
         <h3 className="text-lg font-semibold text-red-900 dark:text-red-100 mb-2">
-          Account Scheduled for Deletion
+          {t('settings.deleteAccountSection.pending.title')}
         </h3>
         <p className="text-red-800 dark:text-red-200 mb-4">
-          Your account will be permanently deleted in{' '}
-          <span className="font-bold">{status.days_until_deletion} days</span>
-          {status.permanent_deletion && (
-            <> on {new Date(status.permanent_deletion).toLocaleDateString()}</>
-          )}.
+          <Trans
+            i18nKey="settings.deleteAccountSection.pending.body"
+            count={days}
+            values={{ formattedCount, dateSuffix }}
+            components={{ strong: <span className="font-bold" /> }}
+          />
         </p>
         <p className="text-sm text-red-700 dark:text-red-300 mb-4">
-          During the grace period, you can cancel the deletion and restore your account.
-          After the deletion date, all your data will be permanently removed and cannot be recovered.
+          {t('settings.deleteAccountSection.pending.gracePeriod')}
         </p>
         {status.can_cancel && (
           <button
@@ -93,7 +119,9 @@ export function DeleteAccountSection() {
             disabled={cancelMutation.isPending}
             className="px-4 py-2 bg-primary text-white rounded hover:bg-primary-dark disabled:opacity-50"
           >
-            {cancelMutation.isPending ? 'Cancelling...' : 'Cancel Deletion'}
+            {cancelMutation.isPending
+              ? t('settings.deleteAccountSection.pending.actions.cancelling')
+              : t('settings.deleteAccountSection.pending.actions.cancel')}
           </button>
         )}
       </div>
@@ -104,16 +132,16 @@ export function DeleteAccountSection() {
     <div className="space-y-4">
       <div className="border-t border-border pt-6">
         <h3 className="text-lg font-semibold text-red-600 dark:text-red-400 mb-2">
-          Danger Zone
+          {t('settings.deleteAccountSection.dangerZone.title')}
         </h3>
         <p className="text-sm text-secondary mb-4">
-          Once you delete your account, there is no going back. Please be certain.
+          {t('settings.deleteAccountSection.dangerZone.description')}
         </p>
         <button
           onClick={() => setShowModal(true)}
           className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
         >
-          Delete Account
+          {t('settings.deleteAccountSection.dangerZone.action')}
         </button>
       </div>
 
@@ -121,47 +149,59 @@ export function DeleteAccountSection() {
       {showModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-card rounded-lg max-w-md w-full p-6">
-            <h2 className="text-2xl font-bold mb-4">Delete Account</h2>
+            <h2 className="text-2xl font-bold mb-4">
+              {t('settings.deleteAccountSection.modal.title')}
+            </h2>
 
             <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded p-4 mb-4">
               <p className="text-sm text-red-800 dark:text-red-200 mb-2">
-                <strong>Warning:</strong> This action will:
+                <Trans
+                  i18nKey="settings.deleteAccountSection.modal.warningIntro"
+                  components={{ strong: <strong /> }}
+                />
               </p>
               <ul className="text-sm text-red-700 dark:text-red-300 list-disc list-inside space-y-1">
-                <li>Delete all your messages and posts</li>
-                <li>Remove you from all conversations and groups</li>
-                <li>Delete all your files and media</li>
-                <li>Erase your encryption keys (messages cannot be recovered)</li>
+                <li>{t('settings.deleteAccountSection.modal.effects.messagesPosts')}</li>
+                <li>{t('settings.deleteAccountSection.modal.effects.conversationsGroups')}</li>
+                <li>{t('settings.deleteAccountSection.modal.effects.filesMedia')}</li>
+                <li>{t('settings.deleteAccountSection.modal.effects.encryptionKeys')}</li>
               </ul>
               <p className="text-sm text-red-800 dark:text-red-200 mt-2">
-                You have a <strong>30-day grace period</strong> to cancel the deletion.
+                <Trans
+                  i18nKey="settings.deleteAccountSection.modal.graceNote"
+                  components={{ strong: <strong /> }}
+                />
               </p>
             </div>
 
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-semibold mb-2">
-                  Confirm Password
+                  {t('settings.deleteAccountSection.modal.fields.passwordLabel')}
                 </label>
                 <input
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="w-full px-3 py-2 border border-border rounded bg-input text-primary"
-                  placeholder="Enter your password"
+                  placeholder={t('settings.deleteAccountSection.modal.fields.passwordPlaceholder')}
                 />
               </div>
 
               <div>
                 <label className="block text-sm font-semibold mb-2">
-                  Type "DELETE MY ACCOUNT" to confirm
+                  {t('settings.deleteAccountSection.modal.fields.confirmLabel', {
+                    phrase: CONFIRM_PHRASE,
+                  })}
                 </label>
                 <input
                   type="text"
                   value={confirmText}
                   onChange={(e) => setConfirmText(e.target.value)}
                   className="w-full px-3 py-2 border border-border rounded bg-input text-primary font-mono"
-                  placeholder="DELETE MY ACCOUNT"
+                  placeholder={t('settings.deleteAccountSection.modal.fields.confirmPlaceholder', {
+                    phrase: CONFIRM_PHRASE,
+                  })}
                 />
               </div>
 
@@ -181,14 +221,16 @@ export function DeleteAccountSection() {
                   }}
                   className="flex-1 px-4 py-2 border border-border rounded hover:bg-secondary/10"
                 >
-                  Cancel
+                  {t('settings.deleteAccountSection.modal.actions.cancel')}
                 </button>
                 <button
                   onClick={handleDelete}
-                  disabled={deleteMutation.isPending || !password || confirmText !== 'DELETE MY ACCOUNT'}
+                  disabled={deleteMutation.isPending || !password || confirmText !== CONFIRM_PHRASE}
                   className="flex-1 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {deleteMutation.isPending ? 'Deleting...' : 'Delete Account'}
+                  {deleteMutation.isPending
+                    ? t('settings.deleteAccountSection.modal.actions.deleting')
+                    : t('settings.deleteAccountSection.modal.actions.delete')}
                 </button>
               </div>
             </div>

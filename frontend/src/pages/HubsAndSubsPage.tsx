@@ -1,11 +1,13 @@
 import { useState, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { hubsService, type Hub } from '../services/hubsService';
 import { redditService } from '../services/redditService';
 import type { SubredditSuggestion } from '../types/reddit';
 import { EmptyMessage, ErrorMessage, LoadingMessage } from '../components/common/StatusMessage';
 import { OffsetPaginationControls } from '../components/common/OffsetPaginationControls';
+import { useFormat } from '../hooks/useFormat';
 
 type CombinedSuggestion =
   | { type: 'subreddit'; data: SubredditSuggestion }
@@ -16,6 +18,8 @@ const ITEMS_PER_PAGE = 90;
 const SUBREDDIT_AUTOCOMPLETE_MIN_LENGTH = 2;
 
 export default function HubsAndSubsPage() {
+  const { t } = useTranslation();
+  const { formatNumber } = useFormat();
   const navigate = useNavigate();
   const [selectedLetter, setSelectedLetter] = useState('A');
   const [showNsfw, setShowNsfw] = useState(false);
@@ -24,7 +28,8 @@ export default function HubsAndSubsPage() {
   const [isAutocompleteOpen, setIsAutocompleteOpen] = useState(false);
   // BROWSE-1: Search and sort functionality
   const [searchQuery, setSearchQuery] = useState('');
-  const [sortBy, setSortBy] = useState<'alphabetical' | 'popular' | 'newest'>('alphabetical');
+  type SortBy = 'alphabetical' | 'popular' | 'newest';
+  const [sortBy, setSortBy] = useState<SortBy>('alphabetical');
 
   const { data: hubsResponse, isLoading: isHubsLoading, error: hubsError } = useQuery({
     queryKey: ['all-hubs', selectedLetter, pageIndex, showNsfw],
@@ -144,9 +149,9 @@ export default function HubsAndSubsPage() {
       <div className="mb-6">
         <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-[var(--color-text-primary)]">Browse Hubs</h1>
+            <h1 className="text-3xl font-bold text-[var(--color-text-primary)]">{t('menu.hubs')}</h1>
             <p className="text-sm text-[var(--color-text-secondary)] mt-1">
-              Explore Omni hubs
+              {t('hubsBrowse.subtitle')}
             </p>
           </div>
 
@@ -160,18 +165,18 @@ export default function HubsAndSubsPage() {
                   onFocus={() => setIsAutocompleteOpen(true)}
                   onBlur={() => setIsAutocompleteOpen(false)}
                   onChange={(e) => handleInputChange(e.target.value)}
-                  placeholder="Search hubs or subreddits..."
+                  placeholder={t('hubsBrowse.search.placeholder')}
                   className="w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-2 text-sm text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
                 />
                 {shouldShowSuggestions && (
                   <div className="absolute left-0 right-0 top-full z-30 mt-1 overflow-hidden rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] shadow-lg">
                     {isAutocompleteLoading ? (
                       <div className="px-3 py-2">
-                        <LoadingMessage className="mt-0 text-sm">Searching...</LoadingMessage>
+                        <LoadingMessage className="mt-0 text-sm">{t('hubsBrowse.search.searching')}</LoadingMessage>
                       </div>
                     ) : suggestionItems.length === 0 ? (
                       <div className="px-3 py-2">
-                        <EmptyMessage className="mt-0 text-sm">No hubs or subreddits found.</EmptyMessage>
+                        <EmptyMessage className="mt-0 text-sm">{t('hubsBrowse.search.noResults')}</EmptyMessage>
                       </div>
                     ) : (
                       <ul>
@@ -205,7 +210,10 @@ export default function HubsAndSubsPage() {
                                   </div>
                                   {typeof hub.subscriber_count === 'number' && hub.subscriber_count > 0 && (
                                     <span className="ml-auto text-[11px] text-[var(--color-text-secondary)]">
-                                      {hub.subscriber_count.toLocaleString()} subs
+                                      {t('hubsBrowse.memberCount', {
+                                        count: hub.subscriber_count,
+                                        formattedCount: formatNumber(hub.subscriber_count),
+                                      })}
                                     </span>
                                   )}
                                 </button>
@@ -241,7 +249,10 @@ export default function HubsAndSubsPage() {
                                   </div>
                                   {typeof subreddit.subscribers === 'number' && subreddit.subscribers > 0 && (
                                     <span className="ml-auto text-[11px] text-[var(--color-text-secondary)]">
-                                      {subreddit.subscribers.toLocaleString()} subs
+                                      {t('hubsBrowse.memberCount', {
+                                        count: subreddit.subscribers,
+                                        formattedCount: formatNumber(subreddit.subscribers),
+                                      })}
                                     </span>
                                   )}
                                 </button>
@@ -261,7 +272,8 @@ export default function HubsAndSubsPage() {
         {/* Informational Note */}
         <div className="mt-4 rounded-lg border-l-4 border-blue-500 bg-blue-50 p-4 dark:bg-blue-900/20">
           <p className="text-sm text-blue-800 dark:text-blue-200">
-            <strong>Note:</strong> Reddit's API does not provide a comprehensive list of subreddits. Use the search bar above with autocomplete to find and navigate to specific subreddits.
+            <strong>{t('hubsBrowse.note.title')} </strong>
+            {t('hubsBrowse.note.body')}
           </p>
         </div>
       </div>
@@ -273,7 +285,7 @@ export default function HubsAndSubsPage() {
           <div className="flex-1 max-w-md">
             <input
               type="text"
-              placeholder="Search hubs by name or description..."
+              placeholder={t('hubsBrowse.filter.searchPlaceholder')}
               value={searchQuery}
               onChange={(e) => {
                 setSearchQuery(e.target.value);
@@ -287,14 +299,14 @@ export default function HubsAndSubsPage() {
           <select
             value={sortBy}
             onChange={(e) => {
-              setSortBy(e.target.value as any);
+              setSortBy(e.target.value as SortBy);
               setPageIndex(0);
             }}
             className="px-4 py-2 border border-[var(--color-border)] rounded-lg bg-[var(--color-surface-elevated)] text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
           >
-            <option value="alphabetical">A-Z</option>
-            <option value="popular">Most Popular</option>
-            <option value="newest">Newest</option>
+            <option value="alphabetical">{t('hubsBrowse.sort.alphabetical')}</option>
+            <option value="popular">{t('hubsBrowse.sort.popular')}</option>
+            <option value="newest">{t('hubsBrowse.sort.newest')}</option>
           </select>
 
           {/* NSFW toggle */}
@@ -316,14 +328,20 @@ export default function HubsAndSubsPage() {
                 }`}
               />
             </div>
-            <span className="text-sm font-medium text-[var(--color-text-primary)]">Show NSFW</span>
+            <span className="text-sm font-medium text-[var(--color-text-primary)]">
+              {t('hubsBrowse.filter.showNsfw')}
+            </span>
           </button>
         </div>
 
         {/* Results summary */}
         {searchQuery && (
           <div className="text-sm text-[var(--color-text-secondary)]">
-            Found {filteredHubs.length} hub{filteredHubs.length !== 1 ? 's' : ''} matching "{searchQuery}"
+            {t('hubsBrowse.filter.resultsSummary', {
+              count: filteredHubs.length,
+              formattedCount: formatNumber(filteredHubs.length),
+              query: searchQuery,
+            })}
           </div>
         )}
       </div>
@@ -349,14 +367,14 @@ export default function HubsAndSubsPage() {
       {/* Loading State */}
       {isLoading && (
         <div className="flex justify-center py-12">
-          <LoadingMessage>Loading hubs...</LoadingMessage>
+          <LoadingMessage>{t('hubsBrowse.loading')}</LoadingMessage>
         </div>
       )}
 
       {/* Error State */}
       {hasError && !isLoading && (
         <div className="p-4">
-          <ErrorMessage>Error loading communities. Please try again later.</ErrorMessage>
+          <ErrorMessage>{t('hubsBrowse.errorLoading')}</ErrorMessage>
         </div>
       )}
 
@@ -366,7 +384,7 @@ export default function HubsAndSubsPage() {
         <>
           {filteredHubs.length === 0 ? (
             <div className="text-center py-12">
-              <EmptyMessage>No hubs found.</EmptyMessage>
+              <EmptyMessage>{t('hubsBrowse.empty')}</EmptyMessage>
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
@@ -384,12 +402,13 @@ export default function HubsAndSubsPage() {
                     <div className="flex gap-1 flex-shrink-0">
                       {hub.nsfw && (
                         <span className="px-2 py-0.5 bg-red-100 text-red-800 text-xs font-semibold rounded">
-                          NSFW
+                          {t('hubsBrowse.badge.nsfw')}
                         </span>
                       )}
                       {hub.type === 'private' && (
                         <span className="px-2 py-0.5 bg-gray-100 text-gray-700 text-xs font-semibold rounded flex items-center gap-1">
-                          🔒 Private
+                          <span aria-hidden="true">🔒</span>
+                          {t('hubsBrowse.badge.private')}
                         </span>
                       )}
                     </div>
@@ -408,7 +427,10 @@ export default function HubsAndSubsPage() {
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
                       </svg>
-                      {hub.subscriber_count?.toLocaleString() || 0} members
+                      {t('hubsBrowse.memberCount', {
+                        count: hub.subscriber_count ?? 0,
+                        formattedCount: formatNumber(hub.subscriber_count ?? 0),
+                      })}
                     </span>
                   </div>
                 </Link>
@@ -427,7 +449,10 @@ export default function HubsAndSubsPage() {
             onNext={() => setPageIndex((prev) => prev + 1)}
             centerContent={
               <span className="text-sm text-[var(--color-text-secondary)]">
-                Page {pageIndex + 1}
+                {t('hubsBrowse.pagination.page', {
+                  page: pageIndex + 1,
+                  formattedPage: formatNumber(pageIndex + 1),
+                })}
               </span>
             }
           />

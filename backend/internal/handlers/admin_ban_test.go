@@ -11,6 +11,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/omninudge/backend/internal/database"
 	"github.com/omninudge/backend/internal/models"
 	"github.com/omninudge/backend/internal/utils"
 	"github.com/stretchr/testify/assert"
@@ -26,8 +27,15 @@ func setupAdminBanTestEnv(t *testing.T) (*gin.Engine, *models.UserRepository, *p
 	require.NoError(t, err)
 
 	ctx := context.Background()
-	pool, err := pgxpool.New(ctx, "postgres://Nick@localhost:5432/omninudge_test?sslmode=disable")
+	db, err := database.NewTest()
 	require.NoError(t, err)
+	t.Cleanup(db.Close)
+
+	// Ensure the test DB schema exists and is up-to-date, and avoid cross-package races.
+	require.NoError(t, db.Migrate(ctx))
+	require.NoError(t, database.ResetTestData(ctx, db))
+
+	pool := db.Pool
 
 	userRepo := models.NewUserRepository(pool)
 	hubModRepo := models.NewHubModeratorRepository(pool)
@@ -56,9 +64,7 @@ func setupAdminBanTestEnv(t *testing.T) (*gin.Engine, *models.UserRepository, *p
 	}
 
 	cleanup := func() {
-		_, _ = pool.Exec(ctx, "DELETE FROM ban_history")
-		_, _ = pool.Exec(ctx, "DELETE FROM users WHERE username LIKE 'adminbantest_%'")
-		pool.Close()
+		_ = database.ResetTestData(ctx, db)
 	}
 
 	return router, userRepo, pool, cleanup

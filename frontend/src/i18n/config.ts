@@ -2,6 +2,26 @@ import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
 import LanguageDetector from 'i18next-browser-languagedetector';
 import HttpBackend from 'i18next-http-backend';
+import { SUPPORTED_LANGUAGES, syncDocumentLanguageAttributes } from './languageUtils';
+
+const isDev = import.meta.env.DEV;
+const loggedMissingTranslations = new Set<string>();
+
+function logMissingTranslation(key: string, language: string | readonly string[] | undefined): void {
+  if (!isDev) {
+    return;
+  }
+
+  const resolvedLanguage = Array.isArray(language) ? language[0] : language;
+  const languageLabel = resolvedLanguage || 'unknown';
+  const cacheKey = `${languageLabel}:${key}`;
+  if (loggedMissingTranslations.has(cacheKey)) {
+    return;
+  }
+
+  loggedMissingTranslations.add(cacheKey);
+  console.warn(`[i18n] Missing translation key "${key}" for language "${languageLabel}"`);
+}
 
 i18n
   .use(HttpBackend) // Load translations from /locales
@@ -9,7 +29,17 @@ i18n
   .use(initReactI18next) // Pass i18n instance to react-i18next
   .init({
     fallbackLng: 'en',
-    debug: import.meta.env.DEV, // Enable debug in development
+    supportedLngs: [...SUPPORTED_LANGUAGES],
+    nonExplicitSupportedLngs: true,
+    load: 'languageOnly',
+    debug: isDev, // Enable debug in development
+    missingKeyHandler: (lng, _ns, key) => {
+      logMissingTranslation(key, lng);
+    },
+    parseMissingKeyHandler: (key) => {
+      logMissingTranslation(key, i18n.resolvedLanguage || i18n.language);
+      return key;
+    },
     interpolation: {
       escapeValue: false, // React already escapes by default
     },
@@ -24,20 +54,18 @@ i18n
     },
   });
 
-// RTL languages
-const RTL_LANGUAGES = ['ar', 'he', 'fa', 'ur'];
+function applyLanguageToDocument(language: string | null | undefined): void {
+  syncDocumentLanguageAttributes(language);
+}
 
-// Update HTML dir attribute when language changes
-i18n.on('languageChanged', (lng) => {
-  const dir = RTL_LANGUAGES.includes(lng) ? 'rtl' : 'ltr';
-  document.documentElement.setAttribute('dir', dir);
-  document.documentElement.setAttribute('lang', lng);
+i18n.on('initialized', () => {
+  applyLanguageToDocument(i18n.resolvedLanguage || i18n.language || 'en');
 });
 
-// Set initial direction
-const currentLang = i18n.language || 'en';
-const initialDir = RTL_LANGUAGES.includes(currentLang) ? 'rtl' : 'ltr';
-document.documentElement.setAttribute('dir', initialDir);
-document.documentElement.setAttribute('lang', currentLang);
+i18n.on('languageChanged', (lng) => {
+  applyLanguageToDocument(lng);
+});
+
+applyLanguageToDocument(i18n.resolvedLanguage || i18n.language || 'en');
 
 export default i18n;

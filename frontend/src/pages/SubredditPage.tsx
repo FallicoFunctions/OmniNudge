@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, useRef, useCallback } from 'react';
 import { useMutation, useQuery, useQueryClient, useInfiniteQuery } from '@tanstack/react-query';
 import { Link, useNavigate, useParams, useLocation } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { redditService } from '../services/redditService';
 import { savedService } from '../services/savedService';
 import { hubsService } from '../services/hubsService';
@@ -44,6 +45,7 @@ import { FeedSearchBars } from '../components/common/FeedSearchBars';
 import { OffsetPaginationControls } from '../components/common/OffsetPaginationControls';
 import { RedditPostSlideshow } from '../components/slideshow/RedditPostSlideshow';
 import { HubPostCard } from '../components/hubs/HubPostCard';
+import { CrosspostModal } from '../components/common/CrosspostModal';
 
 interface FeedRedditPost extends RedditCrosspostSource {
   id: string;
@@ -99,6 +101,7 @@ function getThumbnailUrl(post: FeedRedditPost): string | null {
 }
 
 export default function RedditPage() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
   const { subreddit: routeSubreddit } = useParams<{ subreddit?: string }>();
@@ -231,6 +234,26 @@ export default function RedditPage() {
     enabled: !!user,
   });
 
+  const hubOptions = useMemo(
+    () =>
+      subscribedHubs
+        ?.map((sub) => {
+          const name = sub.hub_name || sub.hub?.name;
+          return name ? { id: sub.hub_id, name } : null;
+        })
+        .filter((option): option is { id: number; name: string } => Boolean(option)) ?? [],
+    [subscribedHubs]
+  );
+
+  const subredditOptions = useMemo(
+    () =>
+      subscribedSubreddits?.map((sub) => ({
+        id: sub.id,
+        name: sub.subreddit_name,
+      })) ?? [],
+    [subscribedSubreddits]
+  );
+
   // Check subscription status for current subreddit
   const { data: subscriptionStatus } = useQuery({
     queryKey: ['subreddit-subscription', subreddit],
@@ -354,7 +377,7 @@ export default function RedditPage() {
       queryClient.invalidateQueries({ queryKey: savedRedditPostsKey });
     },
     onError: (saveError) => {
-      alert(`Failed to update save status: ${saveError.message}`);
+      alert(t('alerts.saveFailed', { message: saveError.message }));
     },
   });
 
@@ -367,7 +390,7 @@ export default function RedditPage() {
       setHideTarget(null);
     },
     onError: (hideError) => {
-      alert(`Failed to hide post: ${hideError.message}`);
+      alert(t('alerts.hideFailed', { message: hideError.message }));
     },
   });
 
@@ -380,7 +403,7 @@ export default function RedditPage() {
       setHideTarget(null);
     },
     onError: (hideError) => {
-      alert(`Failed to hide post: ${hideError.message}`);
+      alert(t('alerts.hideFailed', { message: hideError.message }));
     },
   });
 
@@ -392,12 +415,12 @@ export default function RedditPage() {
       queryClient.invalidateQueries({ queryKey: localPostsQueryKey });
     },
     onError: (deleteError) => {
-      alert(`Failed to delete local post: ${deleteError.message}`);
+      alert(t('alerts.deletePostFailed', { message: deleteError.message }));
     },
   });
 
   const handleDeleteLocalPost = (postId: number) => {
-    if (!window.confirm('Are you sure you want to delete this local post?')) {
+    if (!window.confirm(t('modals.delete.confirmOwn'))) {
       return;
     }
     deleteLocalPostMutation.mutate(postId);
@@ -410,7 +433,7 @@ export default function RedditPage() {
       queryClient.invalidateQueries({ queryKey: savedLocalPostsKey });
     },
     onError: (saveError) => {
-      alert(`Failed to update save status: ${saveError.message}`);
+      alert(t('alerts.saveFailed', { message: saveError.message }));
     },
   });
 
@@ -422,8 +445,8 @@ export default function RedditPage() {
     const shareUrl = `${window.location.origin}${getLocalPostUrl(post)}`;
     navigator.clipboard
       .writeText(shareUrl)
-      .then(() => alert('Post link copied to clipboard!'))
-      .catch(() => alert('Unable to copy link. Please try again.'));
+      .then(() => alert(t('alerts.linkCopied')))
+      .catch(() => alert(t('alerts.linkCopyFailed')));
   };
 
   const handleSetHideTarget = (target: HideTarget) => {
@@ -462,10 +485,10 @@ export default function RedditPage() {
   const crosspostMutation = useMutation({
     mutationFn: async () => {
       if (!crosspostTarget) {
-        throw new Error('No post selected for crosspost');
+        throw new Error(t('alerts.crosspostNoSource'));
       }
       if (!selectedHub && !selectedSubreddit) {
-        throw new Error('Please select at least one destination (hub or subreddit)');
+        throw new Error(t('alerts.crosspostMissingDestination'));
       }
 
       const sourceTitle = crosspostTarget.post.title;
@@ -527,10 +550,10 @@ export default function RedditPage() {
         predicate: (query) =>
           Array.isArray(query.queryKey) && query.queryKey[0] === 'subreddit-posts',
       });
-      alert('Crosspost created successfully!');
+      alert(t('alerts.crosspostSuccess'));
     },
     onError: (error) => {
-      alert(`Failed to create crosspost: ${error.message}`);
+      alert(t('alerts.crosspostFailed', { message: error.message }));
     },
   });
 
@@ -737,8 +760,8 @@ export default function RedditPage() {
     const shareUrl = `${window.location.origin}/r/${post.subreddit}/comments/${post.id}`;
     navigator.clipboard
       .writeText(shareUrl)
-      .then(() => alert('Post link copied to clipboard!'))
-      .catch(() => alert('Unable to copy link. Please try again.'));
+      .then(() => alert(t('alerts.linkCopied')))
+      .catch(() => alert(t('alerts.linkCopyFailed')));
   };
 
   const shouldShowSubredditSidebar = Boolean(subreddit && subreddit !== '');
@@ -887,7 +910,7 @@ export default function RedditPage() {
         const host = parsed.hostname.replace(/^www\./i, '').replace(/^old\./i, '');
         if (host === 'reddit.com' && parsed.pathname.startsWith('/message')) {
           event.preventDefault();
-          alert('Native Reddit messaging features are not available on OmniNudge.');
+          alert(t('alerts.redditMessagingUnavailable'));
         }
       } catch {
         // ignore malformed URLs
@@ -898,7 +921,7 @@ export default function RedditPage() {
     return () => {
       el.removeEventListener('click', handleClick);
     };
-  }, [sidebarHtml]);
+  }, [sidebarHtml, t]);
 
   const filteredCombinedPosts = useMemo(() => {
     const query = postSearchQuery.trim().toLowerCase();
@@ -1063,7 +1086,7 @@ export default function RedditPage() {
           <FeedSearchBars
             showPostForm={false}
             topValue={inputValue}
-            topPlaceholder="Enter hub or subreddit..."
+            topPlaceholder={t('home.search.enterHubOrSubreddit')}
             onTopChange={handleInputChange}
             onTopFocus={() => setIsAutocompleteOpen(true)}
             onTopBlur={() => setIsAutocompleteOpen(false)}
@@ -1071,7 +1094,7 @@ export default function RedditPage() {
             topSuggestions={suggestionItems}
             topShouldShowSuggestions={shouldShowSuggestions}
             topIsLoading={isAutocompleteLoading}
-            topEmptyMessage="No hubs or subreddits found."
+            topEmptyMessage={t('home.search.noResults')}
             renderTopSuggestion={(suggestion) => (
               <SubredditSuggestionItem
                 key={suggestion.name}
@@ -1091,7 +1114,7 @@ export default function RedditPage() {
             containerClassName="w-full"
             showTopForm={false}
             topValue={inputValue}
-            topPlaceholder="Enter hub or subreddit..."
+            topPlaceholder={t('home.search.enterHubOrSubreddit')}
             onTopChange={handleInputChange}
             onTopFocus={() => setIsAutocompleteOpen(true)}
             onTopBlur={() => setIsAutocompleteOpen(false)}
@@ -1099,7 +1122,7 @@ export default function RedditPage() {
             topSuggestions={suggestionItems}
             topShouldShowSuggestions={shouldShowSuggestions}
             topIsLoading={isAutocompleteLoading}
-            topEmptyMessage="No hubs or subreddits found."
+            topEmptyMessage={t('home.search.noResults')}
             renderTopSuggestion={(suggestion) => (
               <SubredditSuggestionItem
                 key={suggestion.name}
@@ -1108,7 +1131,7 @@ export default function RedditPage() {
               />
             )}
             postValue={postSearchInput}
-            postPlaceholder="Search posts..."
+            postPlaceholder={t('home.search.searchPosts')}
             onPostChange={(value) => {
               setPostSearchInput(value);
               if (!isSearchDropdownOpen) {
@@ -1127,7 +1150,7 @@ export default function RedditPage() {
                     checked={limitSearchToContext}
                     onChange={(e) => setLimitSearchToContext(e.target.checked)}
                   />
-                  <span>Limit search to r/{subreddit}</span>
+                  <span>{t('home.search.limitToSubreddit', { subreddit })}</span>
                 </label>
                 {!blockAllNsfw && (
                   <label className="flex items-center gap-2">
@@ -1136,12 +1159,12 @@ export default function RedditPage() {
                       checked={includeNsfwSearch}
                       onChange={(e) => setIncludeNsfwSearch(e.target.checked)}
                     />
-                    <span>Include NSFW results</span>
+                    <span>{t('home.search.includeNsfw')}</span>
                   </label>
                 )}
                 {blockAllNsfw && (
                   <div className="text-xs text-[var(--color-text-secondary)]">
-                    NSFW content is blocked in settings.
+                    {t('home.search.nsfwBlocked')}
                   </div>
                 )}
               </div>
@@ -1162,7 +1185,7 @@ export default function RedditPage() {
                         : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
                     }`}
                   >
-                    {sortOption.charAt(0).toUpperCase() + sortOption.slice(1)}
+                    {t(`home.sort.${sortOption}`)}
                   </button>
                 ))}
                 {hasWiki && (
@@ -1170,7 +1193,7 @@ export default function RedditPage() {
                     to={`/r/${subreddit}/wiki/index`}
                     className="px-4 py-2 text-sm font-semibold text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
                   >
-                    Wiki
+                    {t('hubPage.controls.wiki')}
                   </Link>
                 )}
                 {visiblePosts.length > 0 && (
@@ -1181,7 +1204,7 @@ export default function RedditPage() {
                     <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                     </svg>
-                    Scroll
+                    {t('home.sort.scroll')}
                   </button>
                 )}
               </>
@@ -1190,7 +1213,7 @@ export default function RedditPage() {
               <>
                 <div className="flex items-center gap-3 rounded-full border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-1 text-sm">
                   <span className="text-xs font-semibold uppercase text-[var(--color-text-secondary)]">
-                    Omni posts only
+                    {t('home.filter.omniOnly')}
                   </span>
                   <button
                     type="button"
@@ -1201,7 +1224,7 @@ export default function RedditPage() {
                       showOmniOnly ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
                     }`}
                   >
-                    <span className="sr-only">Toggle Omni posts filter</span>
+                    <span className="sr-only">{t('home.filter.omniOnly')}</span>
                     <span
                       aria-hidden="true"
                       className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
@@ -1216,7 +1239,7 @@ export default function RedditPage() {
                     containerClassName="w-full px-4 flex flex-col gap-4 mt-4"
                     showTopForm={true}
                     topValue={inputValue}
-                    topPlaceholder="Enter hub or subreddit..."
+                    topPlaceholder={t('home.search.enterHubOrSubreddit')}
                     onTopChange={handleInputChange}
                     onTopFocus={() => setIsAutocompleteOpen(true)}
                     onTopBlur={() => setIsAutocompleteOpen(false)}
@@ -1224,7 +1247,7 @@ export default function RedditPage() {
                     topSuggestions={suggestionItems}
                     topShouldShowSuggestions={shouldShowSuggestions}
                     topIsLoading={isAutocompleteLoading}
-                    topEmptyMessage="No hubs or subreddits found."
+                    topEmptyMessage={t('home.search.noResults')}
                     renderTopSuggestion={(suggestion) => (
                       <SubredditSuggestionItem
                         key={suggestion.name}
@@ -1233,7 +1256,7 @@ export default function RedditPage() {
                       />
                     )}
                     postValue={postSearchInput}
-                    postPlaceholder="Search posts..."
+                    postPlaceholder={t('home.search.searchPosts')}
                     onPostChange={(value) => {
                       setPostSearchInput(value);
                       if (!isSearchDropdownOpen) {
@@ -1249,10 +1272,10 @@ export default function RedditPage() {
                         <label className="flex items-center gap-2">
                           <input
                             type="checkbox"
-                            checked={limitSearchToContext}
-                            onChange={(e) => setLimitSearchToContext(e.target.checked)}
-                          />
-                          <span>Limit search to r/{subreddit}</span>
+                          checked={limitSearchToContext}
+                          onChange={(e) => setLimitSearchToContext(e.target.checked)}
+                        />
+                          <span>{t('home.search.limitToSubreddit', { subreddit })}</span>
                         </label>
                         {!blockAllNsfw && (
                           <label className="flex items-center gap-2">
@@ -1261,12 +1284,12 @@ export default function RedditPage() {
                               checked={includeNsfwSearch}
                               onChange={(e) => setIncludeNsfwSearch(e.target.checked)}
                             />
-                            <span>Include NSFW results</span>
+                            <span>{t('home.search.includeNsfw')}</span>
                           </label>
                         )}
                         {blockAllNsfw && (
                           <div className="text-xs text-[var(--color-text-secondary)]">
-                            NSFW content is blocked in settings.
+                            {t('home.search.nsfwBlocked')}
                           </div>
                         )}
                       </div>
@@ -1285,7 +1308,7 @@ export default function RedditPage() {
           <div className="flex flex-wrap items-center gap-2">
             <div className="flex items-center gap-2">
               <span className="text-xs font-semibold uppercase text-[var(--color-text-secondary)]">
-                Time range
+                {t('home.timeRange.label')}
               </span>
               <select
                 value={topTimeRange}
@@ -1307,7 +1330,7 @@ export default function RedditPage() {
                   onChange={(event) => setCustomTopStart(event.target.value)}
                   className="rounded border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-2 py-1 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
                 />
-                <span className="text-xs text-[var(--color-text-secondary)]">to</span>
+                <span className="text-xs text-[var(--color-text-secondary)]">{t('home.timeRange.to')}</span>
                 <input
                   type="datetime-local"
                   value={customTopEnd}
@@ -1316,7 +1339,7 @@ export default function RedditPage() {
                 />
                 {!isCustomRangeValid && (
                   <span className="text-xs text-[var(--color-error)]">
-                    Select both start and end dates to apply this filter.
+                    {t('home.timeRange.selectBothDates')}
                   </span>
                 )}
               </div>
@@ -1338,7 +1361,9 @@ export default function RedditPage() {
 
       {error && (
         <div className="rounded-md bg-red-50 p-4 text-sm text-red-800 dark:bg-red-900/20 dark:text-red-400">
-          Failed to load posts: {error instanceof Error ? error.message : 'Unknown error'}
+          {t('subredditPage.errors.loadPosts', {
+            message: error instanceof Error ? error.message : t('subredditPage.errors.unknown'),
+          })}
         </div>
       )}
 
@@ -1365,13 +1390,15 @@ export default function RedditPage() {
                   onNext={() => fetchScopedSearchPage(scopedSearchPage + 1, scopedSearchAfter)}
                   centerContent={
                     <span className="text-sm text-[var(--color-text-secondary)]">
-                      Page {scopedSearchPage}
+                      {t('searchPage.pagination.page', { page: scopedSearchPage })}
                     </span>
                   }
                 />
               </>
             ) : (
-              <div className="text-center text-[var(--color-text-secondary)]">No search results</div>
+              <div className="text-center text-[var(--color-text-secondary)]">
+                {t('subredditPage.empty.searchNoResults')}
+              </div>
             )
           ) : filteredCombinedPosts.length > 0 ? (
             <div className="space-y-3">
@@ -1386,10 +1413,10 @@ export default function RedditPage() {
               <div className="text-center">
                 <EmptyMessage>
                   {postSearchQuery
-                    ? `No posts match "${postSearchQuery}"`
+                    ? t('subredditPage.empty.noMatches', { query: postSearchQuery })
                     : showOmniOnly
-                    ? `No Omni posts found in r/${subreddit}`
-                    : `No posts found in r/${subreddit}`}
+                    ? t('subredditPage.empty.noOmniPosts', { subreddit })
+                    : t('subredditPage.empty.noPosts', { subreddit })}
                 </EmptyMessage>
               </div>
             )
@@ -1402,7 +1429,7 @@ export default function RedditPage() {
           {/* Loading indicator for infinite scroll */}
           {useInfiniteScrollSubs && infiniteRedditQuery.isFetchingNextPage && (
             <div className="mt-6 text-center">
-              <LoadingMessage>Loading more posts...</LoadingMessage>
+              <LoadingMessage>{t('posts.loadingMore')}</LoadingMessage>
             </div>
           )}
 
@@ -1419,7 +1446,7 @@ export default function RedditPage() {
               onNext={handleNextPage}
               centerContent={
                 <span className="text-sm text-[var(--color-text-secondary)]">
-                  Page {currentPage}
+                  {t('searchPage.pagination.page', { page: currentPage })}
                 </span>
               }
             />
@@ -1442,126 +1469,46 @@ export default function RedditPage() {
       {hideTarget && (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 px-4">
           <div className="w-full max-w-md rounded-lg bg-white p-4 shadow-lg">
-            <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">Hide this post?</h3>
+            <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">{t('modals.hide.title')}</h3>
             <p className="mt-2 text-sm text-[var(--color-text-secondary)]">
-              Are you sure? Hidden posts can be found at{' '}
-              <Link to="/hidden" className="text-[var(--color-primary)] hover:underline">
-                your hidden posts page
-              </Link>.
+              {t('modals.hide.description')}
             </p>
             <div className="mt-4 flex justify-end gap-2">
               <button
                 onClick={() => setHideTarget(null)}
                 className="rounded border border-[var(--color-border)] px-3 py-1 text-sm hover:bg-[var(--color-surface-elevated)]"
               >
-                Cancel
+                {t('common.cancel')}
               </button>
               <button
                 onClick={handleConfirmHide}
                 disabled={isHidePending}
                 className="rounded bg-[var(--color-primary)] px-3 py-1 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)] disabled:opacity-50"
               >
-                {isHidePending ? 'Hiding...' : 'Hide Post'}
+                {isHidePending ? t('modals.hide.hiding') : t('modals.hide.hideButton')}
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Crosspost Modal */}
-      {crosspostTarget && (
-        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 px-4">
-          <div className="w-full max-w-md rounded-lg bg-white p-4 shadow-lg">
-            <div className="flex items-start justify-between">
-              <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">Submit a Crosspost</h3>
-              <button
-                onClick={resetCrosspostState}
-                className="text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
-              >
-                ✕
-              </button>
-            </div>
-            <div className="mt-3 rounded border border-yellow-200 bg-yellow-50 p-3 text-sm text-yellow-800">
-              <p>You can crosspost to an OmniHub, a subreddit, or both. At least one destination is required.</p>
-            </div>
-            <div className="mt-4 space-y-3">
-              <div>
-                <label className="mb-1 block text-xs font-medium text-[var(--color-text-secondary)]">
-                  Crosspost to OmniHub (optional)
-                </label>
-                <select
-                  value={selectedHub}
-                  onChange={(e) => setSelectedHub(e.target.value)}
-                  className="w-full rounded border border-[var(--color-border)] bg-[var(--color-surface)] p-2 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
-                >
-                  <option value="">Select a hub...</option>
-                  {subscribedHubs?.map((sub) => (
-                    <option key={sub.hub_id} value={sub.hub_name}>
-                      h/{sub.hub_name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="mb-1 block text-xs font-medium text-[var(--color-text-secondary)]">
-                  Crosspost to subreddit (optional)
-                </label>
-                <select
-                  value={selectedSubreddit}
-                  onChange={(e) => setSelectedSubreddit(e.target.value)}
-                  className="w-full rounded border border-[var(--color-border)] bg-[var(--color-surface)] p-2 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
-                >
-                  <option value="">Select a subreddit...</option>
-                  {subscribedSubreddits?.map((sub) => (
-                    <option key={sub.id} value={sub.subreddit_name}>
-                      r/{sub.subreddit_name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="mb-1 block text-xs font-medium text-[var(--color-text-secondary)]">
-                  Choose a title <span className="text-red-500">*required</span>
-                </label>
-                <input
-                  type="text"
-                  value={crosspostTitle}
-                  onChange={(e) => setCrosspostTitle(e.target.value)}
-                  className="w-full rounded border border-[var(--color-border)] bg-[var(--color-surface)] p-2 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
-                  placeholder="Enter title..."
-                />
-              </div>
-              <div className="flex items-start gap-2">
-                <input
-                  type="checkbox"
-                  id="send-replies"
-                  checked={sendRepliesToInbox}
-                  onChange={(e) => setSendRepliesToInbox(e.target.checked)}
-                  className="mt-0.5"
-                />
-                <label htmlFor="send-replies" className="text-sm text-[var(--color-text-primary)]">
-                  Send replies to this post to my inbox
-                </label>
-              </div>
-              <div className="flex justify-end gap-2 pt-2">
-                <button
-                  onClick={resetCrosspostState}
-                  className="rounded border border-[var(--color-border)] px-4 py-2 text-sm font-semibold text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-elevated)]"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={() => crosspostMutation.mutate()}
-                  disabled={(!selectedHub && !selectedSubreddit) || !crosspostTitle.trim() || crosspostMutation.isPending}
-                  className="rounded bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)] disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {crosspostMutation.isPending ? 'Submitting...' : 'Submit'}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <CrosspostModal
+        isOpen={Boolean(crosspostTarget)}
+        onClose={resetCrosspostState}
+        hubOptions={hubOptions}
+        subredditOptions={subredditOptions}
+        hubValue={selectedHub}
+        subredditValue={selectedSubreddit}
+        titleValue={crosspostTitle}
+        sendRepliesToInbox={sendRepliesToInbox}
+        onHubChange={setSelectedHub}
+        onSubredditChange={setSelectedSubreddit}
+        onTitleChange={setCrosspostTitle}
+        onToggleSendReplies={setSendRepliesToInbox}
+        onSubmit={() => crosspostMutation.mutate()}
+        isSubmitting={crosspostMutation.isPending}
+        isSubmitDisabled={!crosspostTitle.trim() || (!selectedHub && !selectedSubreddit)}
+      />
 
       {/* Slideshow */}
       {slideshowOpen && (scopedSearchResults || filteredCombinedPosts).length > 0 && (

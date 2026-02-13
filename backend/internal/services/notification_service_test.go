@@ -27,6 +27,7 @@ func uniqueNotificationName(base string) string {
 func setupNotificationTest(t *testing.T) (*NotificationService, *database.Database, func()) {
 	db, err := database.NewTest()
 	require.NoError(t, err)
+	t.Cleanup(db.Close)
 
 	ctx := context.Background()
 	err = db.Migrate(ctx)

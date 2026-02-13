@@ -29,6 +29,7 @@ func uniqueSlideshowUsername(base string) string {
 func setupSlideshowHandlerTest(t *testing.T) (*SlideshowHandler, *database.Database, int, int, int, func()) {
 	db, err := database.NewTest()
 	require.NoError(t, err)
+	t.Cleanup(db.Close)
 
 	ctx := context.Background()
 	err = db.Migrate(ctx)

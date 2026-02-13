@@ -28,6 +28,7 @@ func uniqueConversationsUsername(base string) string {
 func setupConversationsHandlerTest(t *testing.T) (*ConversationsHandler, *database.Database, int, int, func()) {
 	db, err := database.NewTest()
 	require.NoError(t, err)
+	t.Cleanup(db.Close)
 
 	ctx := context.Background()
 	err = db.Migrate(ctx)

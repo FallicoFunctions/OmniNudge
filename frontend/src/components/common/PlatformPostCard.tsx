@@ -3,7 +3,6 @@ import { useMemo, useState, useRef, useEffect, type CSSProperties } from 'react'
 import { useTranslation } from 'react-i18next';
 import { useFormat } from '../../hooks/useFormat';
 import type { PointerEvent } from 'react';
-import { formatTimestamp } from '../../utils/timeFormat';
 import { resolveMediaUrl } from '../../utils/mediaUrl';
 import { VoteButtons } from '../VoteButtons';
 import type { PlatformPost } from '../../types/posts';
@@ -208,7 +207,7 @@ export function PlatformPostCard({
   onShare,
   onToggleSave,
   onHide,
-  hideLabel = 'Hide',
+  hideLabel,
   onCrosspost,
   onTogglePin,
   onPinnedPointerDown,
@@ -217,10 +216,23 @@ export function PlatformPostCard({
   onDelete,
 }: PlatformPostCardProps) {
   const { t } = useTranslation();
-  const { formatNumber } = useFormat();
+  const { formatNumber, formatDate, formatRelativeTime } = useFormat();
   const [expandedTextMap, setExpandedTextMap] = useState<Record<number, boolean>>({});
   const previewVideoRef = useRef<HTMLVideoElement | null>(null);
   const { blockNsfwThumbnails } = useSettings();
+  const resolvedHideLabel = hideLabel || t('posts.hide');
+
+  const submittedLabel = useMemo(() => {
+    const raw = post.crossposted_at ?? post.created_at;
+    const d = new Date(raw);
+    if (Number.isNaN(d.getTime())) return t('common.time.recently');
+
+    if (useRelativeTime) {
+      return formatRelativeTime(d);
+    }
+
+    return formatDate(d, { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
+  }, [formatDate, formatRelativeTime, post.created_at, post.crossposted_at, t, useRelativeTime]);
 
   const toggleTextPreview = (postId: number) => {
     setExpandedTextMap((prev) => ({
@@ -252,10 +264,6 @@ export function PlatformPostCard({
     count: post.score,
     formattedCount: formatNumber(post.score),
   });
-  const submittedLabel = formatTimestamp(
-    post.crossposted_at ?? post.created_at,
-    useRelativeTime
-  );
   const commentCount = post.comment_count ?? post.num_comments ?? 0;
   const commentsLabel = t('posts.comment', {
     count: commentCount,
@@ -321,7 +329,7 @@ export function PlatformPostCard({
           <div className={`relative ${thumbnailClass} flex-shrink-0`}>
             <img
               src={resolveMediaUrl(post.thumbnail_url)}
-              alt={`Preview image for ${post.title}`}
+              alt={t('posts.media.previewImageAlt', { title: post.title })}
               loading="lazy"
               decoding="async"
               className={`h-full w-full rounded-lg object-cover ${shouldBlurThumbnail ? 'blur-sm' : ''}`}
@@ -350,12 +358,12 @@ export function PlatformPostCard({
             </Link>
             {showOmniBadge && (
               <span className="inline-flex items-center rounded bg-blue-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-blue-800 dark:bg-blue-900/30 dark:text-blue-400">
-                Omni
+                {t('posts.badges.omni')}
               </span>
             )}
             {post.nsfw && (
               <span className="inline-flex items-center rounded bg-red-600 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">
-                NSFW
+                {t('posts.badges.nsfw')}
               </span>
             )}
             {post.is_pinned && <PinnedBadge />}
@@ -370,14 +378,16 @@ export function PlatformPostCard({
                 {resolvedHubTitle ?? `h/${resolvedHubName}`}
               </Link>
             ) : (
-              <span className="font-semibold text-[var(--color-text-primary)]">h/unknown</span>
+              <span className="font-semibold text-[var(--color-text-primary)]">
+                h/{t('posts.unknownHub')}
+              </span>
             )}
             <span> · </span>
             <span>{displayAuthor}</span>
             <span> · </span>
             <span>{pointsLabel}</span>
             <span> · </span>
-            <span>{t('posts.posted_at', { time: submittedLabel })}</span>
+            <span>{t('posts.submittedAt', { time: submittedLabel })}</span>
           </div>
 
           <div className="mt-1 flex items-start gap-3 text-[11px] text-[var(--color-text-secondary)]">
@@ -455,7 +465,7 @@ export function PlatformPostCard({
                     <svg className="w-3.5 h-3.5" fill={isSaved ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
                     </svg>
-                    {isSavePending ? t('posts.status.saving') : isSaved ? t('posts.unsave') : t('posts.save')}
+                    {isSavePending ? t('posts.status.saving') : isSaved ? t('posts.actions.unsave') : t('posts.save')}
                   </button>
                 )}
 
@@ -468,17 +478,17 @@ export function PlatformPostCard({
                     type="button"
                     onClick={onHide}
                     disabled={isHiding}
-                    title={hideLabel}
+                    title={resolvedHideLabel}
                     className="text-xs text-[var(--color-text-muted)] hover:text-[var(--color-primary)] disabled:opacity-60"
                   >
-                    {isHiding ? t('posts.status.hiding') : hideLabel || t('common.hide')}
+                    {isHiding ? t('posts.status.hiding') : resolvedHideLabel}
                   </button>
                 )}
                 {onCrosspost && (
                   <button
                     type="button"
                     onClick={onCrosspost}
-                    title="Crosspost to another hub"
+                    title={t('posts.actions.crosspostTooltip')}
                     className="text-xs text-[var(--color-text-muted)] hover:text-[var(--color-primary)]"
                   >
                     {t('posts.actions.crosspost')}
@@ -489,10 +499,14 @@ export function PlatformPostCard({
                     type="button"
                     onClick={onTogglePin}
                     disabled={isPinning}
-                    title={post.is_pinned ? "Unpin from top" : "Pin to top"}
+                    title={
+                      post.is_pinned
+                        ? t('posts.actions.unpinFromTop')
+                        : t('posts.actions.pinToTop')
+                    }
                     className="text-xs text-[var(--color-text-muted)] hover:text-[var(--color-primary)] disabled:opacity-60"
                   >
-                    {isPinning ? t('posts.status.updating') : post.is_pinned ? t('posts.unspin') : t('posts.pin')}
+                    {isPinning ? t('posts.status.updating') : post.is_pinned ? t('posts.actions.unpin') : t('posts.actions.pin')}
                   </button>
                 )}
 
@@ -590,8 +604,8 @@ export function PlatformPostCard({
               onPointerDown={(event) => onPinnedPointerDown?.(post.id, event)}
               onPointerUp={(event) => onPinnedPointerUp?.(post.id, event)}
               className="cursor-grab rounded border border-transparent p-1 text-[var(--color-text-secondary)] hover:border-[var(--color-border)] hover:text-[var(--color-primary)] active:cursor-grabbing"
-              aria-label="Reorder pinned post"
-              title="Drag to reorder pinned posts"
+              aria-label={t('posts.aria.reorderPinnedPost')}
+              title={t('posts.aria.dragToReorderPinnedPosts')}
             >
               <svg viewBox="0 0 20 20" className="h-4 w-4" aria-hidden="true">
                 <circle cx="6" cy="5" r="1.5" />

@@ -1,6 +1,7 @@
 {
   "common": {
     "loading": "Loading...",
+    "loadingDetails": "Loading details...",
     "error": "Error",
     "success": "Success",
     "cancel": "Cancel",
@@ -11,6 +12,7 @@
     "close": "Close",
     "copied": "Copied!",
     "back": "Back",
+    "userNumber": "User #{{id}}",
     "next": "Next",
     "confirm": "Confirm",
     "search": "Search",
@@ -43,14 +45,27 @@
     "time": {
       "submitted": "submitted",
       "ago": "ago",
-      "on": "on"
+      "on": "on",
+      "recently": "recently"
     },
     "media": {
       "image": "Image",
       "video": "Video",
       "audio": "Audio",
       "file": "File"
-    }
+    },
+    "units": {
+      "subscribersShort": "subs"
+    },
+    "download": "Download",
+    "continue": "Continue",
+    "retry": "Retry",
+    "noDetailsAvailable": "No details available.",
+    "unableToLoadDetails": "Unable to load details.",
+    "optional": "(optional)",
+    "na": "N/A",
+    "yes": "Yes",
+    "no": "No"
   },
   "nav": {
     "home": "Home",
@@ -72,6 +87,1011 @@
     "logout": "Log Out",
     "logoutConfirm": "Are you sure you want to log out?"
   },
+  "mainLayout": {
+    "skipToMainContent": "Skip to main content",
+    "bugReporting": "Bug Reporting",
+    "mobileNavigationError": "Navigation error. Please reload the page.",
+    "dontShowThisAgain": "Don't Show This Again"
+  },
+  "hubsBrowse": {
+    "subtitle": "Explore Omni hubs",
+    "search": {
+      "placeholder": "Search hubs or subreddits...",
+      "searching": "Searching...",
+      "noResults": "No hubs or subreddits found."
+    },
+    "note": {
+      "title": "Note:",
+      "body": "Reddit's API does not provide a comprehensive list of subreddits. Use the search bar above with autocomplete to find and navigate to specific subreddits."
+    },
+    "filter": {
+      "searchPlaceholder": "Search hubs by name or description...",
+      "showNsfw": "Show NSFW",
+      "resultsSummary": "Found {{formattedCount}} matching hubs for \"{{query}}\""
+    },
+    "sort": {
+      "alphabetical": "A-Z",
+      "popular": "Most Popular",
+      "newest": "Newest"
+    },
+    "loading": "Loading hubs...",
+    "errorLoading": "Error loading communities. Please try again later.",
+    "empty": "No hubs found.",
+    "badge": {
+      "nsfw": "NSFW",
+      "private": "Private"
+    },
+    "memberCount_one": "{{formattedCount}} member",
+    "memberCount_other": "{{formattedCount}} members",
+    "pagination": {
+      "page": "Page {{formattedPage}}"
+    }
+  },
+  "bugReportingPage": {
+    "loginRequired": "Please log in to access bug reporting.",
+    "reportButton": "Report a Bug",
+    "reportHelp": "Found a bug? Help us improve OmniNudge by reporting it!",
+    "knownBugs": {
+      "title": "Known Bugs",
+      "loading": "Loading known bugs...",
+      "static": {
+        "emailPasswordReset": "Email password reset is not enabled yet.",
+        "redditRateLimit": "Reddit API usage is subject to aggressive rate limiting, which can cause delays or missing content in feeds, searches, and comment loading.",
+        "hideButton": "The hide button moves the post to your hidden list but does not remove the post from the feed."
+      }
+    },
+    "fields": {
+      "affectedPages": "Affected Pages:",
+      "workaround": "Workaround:",
+      "fixedInVersion": "Fixed in version: {{version}}"
+    },
+    "status": {
+      "fixed": "Fixed",
+      "in_progress": "In Progress",
+      "investigating": "Investigating",
+      "wont_fix": "Won't Fix"
+    },
+    "severity": {
+      "critical": "Critical",
+      "high": "High",
+      "medium": "Medium",
+      "low": "Low"
+    }
+  },
+  "searchPage": {
+    "subtitle": "Site-wide results across Reddit and Omni",
+    "inputPlaceholder": "Search...",
+    "tabs": {
+      "posts": "Posts",
+      "communities": "Communities",
+      "users": "Users"
+    },
+    "sort": {
+      "relevance": "Relevance",
+      "newest": "Newest",
+      "oldest": "Oldest"
+    },
+    "omniOnly": "Omni only",
+    "includeNsfw": "Include NSFW",
+    "pagination": {
+      "page": "Page {{page}}"
+    },
+    "communities": {
+      "subreddits": "Subreddits",
+      "hubs": "Hubs"
+    },
+    "users": {
+      "reddit": "Reddit users",
+      "omni": "Omni users",
+      "loadMoreReddit": "Load more Reddit users",
+      "loadMoreOmni": "Load more users"
+    },
+    "empty": {
+      "posts": "No posts found.",
+      "subreddits": "No subreddits found.",
+      "hubs": "No hubs found.",
+      "redditUsers": "No Reddit users found.",
+      "omniUsers": "No Omni users found."
+    },
+    "errors": {
+      "generic": "Search failed. Please try again."
+    }
+  },
+  "createHubPage": {
+    "title": "Create a Hub",
+    "sections": {
+      "basic": {
+        "title": "Basic Information",
+        "description": "Set up your hub's name and description. The name cannot be changed later."
+      },
+      "privacy": {
+        "title": "Privacy & Visibility",
+        "description": "Control who can access your hub and whether it contains adult content."
+      },
+      "content": {
+        "title": "Content Rules",
+        "description": "Choose what types of posts are allowed in your hub."
+      }
+    },
+    "fields": {
+      "name": {
+        "label": "Name",
+        "helperText": "No spaces allowed. Use lowercase letters, numbers, and underscores. Once chosen, this cannot be changed.",
+        "placeholder": "e.g., books or bookclub"
+      },
+      "title": {
+        "label": "Title",
+        "helperText": "Display title for your hub",
+        "placeholder": "e.g., Books: Made from trees or pixels"
+      },
+      "description": {
+        "label": "About (optional, Markdown supported)",
+        "placeholder": "Describe your hub...",
+        "helperText": "{{current}}/{{max}} characters. Appears in search results and social media links."
+      },
+      "type": {
+        "label": "Type",
+        "public": {
+          "label": "Public",
+          "description": "- Anyone can view and submit"
+        },
+        "private": {
+          "label": "Private",
+          "description": "- Only approved members can view and submit"
+        }
+      },
+      "nsfw": {
+        "label": "Mark as NSFW (18+)",
+        "description": "This hub contains adult content and should only be viewed by users 18 years or older. NSFW hubs are hidden from default feeds and search results unless users explicitly opt-in."
+      },
+      "allowedPostTypes": {
+        "label": "Allowed Post Types",
+        "or": "or",
+        "options": {
+          "all": {
+            "label": "All",
+            "description": "- Text, links, images, and videos allowed"
+          },
+          "links": {
+            "label": "Links",
+            "description": "- External link posts allowed"
+          },
+          "text": {
+            "label": "Text",
+            "description": "- Text posts allowed"
+          },
+          "images": {
+            "label": "Images",
+            "description": "- Image and gallery posts allowed"
+          },
+          "videos": {
+            "label": "Videos",
+            "description": "- Video posts allowed"
+          }
+        }
+      }
+    },
+    "actions": {
+      "creating": "Creating..."
+    },
+    "errors": {
+      "descriptionTooLong": "Description must be less than {{max}} characters",
+      "selectAtLeastOnePostType": "Select at least one post type.",
+      "submitFailedTitle": "Failed to create hub"
+    },
+    "name": {
+      "errors": {
+        "minLength": "Name must be at least {{min}} characters",
+        "maxLength": "Name must be less than {{max}} characters",
+        "pattern": "Name must be lowercase letters, numbers, and underscores only (no spaces)"
+      }
+    }
+  },
+  "hubPage": {
+    "errors": {
+      "loadPosts": "Error loading posts."
+    },
+    "controls": {
+      "wiki": "Wiki"
+    },
+    "pins": {
+      "dropHereToMoveToBottom": "Drop here to move to bottom"
+    },
+    "empty": {
+      "searchNoResults": "No results for \"{{query}}\" in h/{{hub}}.",
+      "noPosts": "No posts found in this hub."
+    }
+  },
+  "subredditPage": {
+    "errors": {
+      "loadPosts": "Failed to load posts: {{message}}",
+      "unknown": "Unknown error"
+    },
+    "empty": {
+      "searchNoResults": "No search results",
+      "noMatches": "No posts match \"{{query}}\"",
+      "noOmniPosts": "No Omni posts found in r/{{subreddit}}",
+      "noPosts": "No posts found in r/{{subreddit}}"
+    }
+  },
+  "privateHubPage": {
+    "title": "Private Hub",
+    "description": "This hub is private. Request access to view its contents.",
+    "loggedOut": {
+      "description": "This hub is private. You must have approval to view its contents."
+    },
+    "meta": {
+      "status": "Status",
+      "requested": "Requested"
+    },
+    "requestStatus": {
+      "pending": "Pending",
+      "approved": "Approved",
+      "denied": "Denied"
+    },
+    "cooldown": {
+      "days_one": "You can request access again in {{count}} day.",
+      "days_other": "You can request access again in {{count}} days.",
+      "onDate": "You can request access again on {{date}}.",
+      "both_one": "You can request access again in {{count}} day (on {{date}}).",
+      "both_other": "You can request access again in {{count}} days (on {{date}})."
+    },
+    "denials": {
+      "title": "Previous denials",
+      "item": "{{date}} - denied"
+    },
+    "submitted": {
+      "title": "Request Submitted",
+      "description": "Your access request has been submitted to the moderators. You will be notified when they review it.",
+      "pendingDescription": "Your access request is pending review by the moderators.",
+      "pendingNote": "You can submit another request after this one is reviewed."
+    },
+    "form": {
+      "messageLabel": "Message to moderators (optional)",
+      "messagePlaceholder": "Introduce yourself and explain why you'd like to join...",
+      "charCount": "{{current}}/{{max}}",
+      "disclaimer": "By submitting this request, you agree to follow the hub's rules if approved."
+    },
+    "actions": {
+      "requestAccess": "Request Access",
+      "submitAnother": "Submit Another Request",
+      "submitting": "Submitting...",
+      "requestPending": "Request Pending"
+    },
+    "errors": {
+      "submitFailed": "Failed to submit access request"
+    }
+  },
+  "modToolsPage": {
+    "header": {
+      "title": "Mod Tools - h/{{hub}}",
+      "subtitle": "Manage users, content, and moderation settings"
+    },
+    "actions": {
+      "exit": "Exit",
+      "hubSettings": "Hub Settings"
+    },
+    "tabs": {
+      "userBans": "User Bans",
+      "removalReasons": "Removal Reasons",
+      "modLog": "Mod Log",
+      "modMail": "Mod Mail",
+      "requests": "Requests"
+    },
+    "common": {
+      "unknown": "Unknown"
+    },
+    "bans": {
+      "title": "Banned Users",
+      "actions": {
+        "banUser": "Ban User",
+        "unban": "Unban"
+      },
+      "empty": {
+        "title": "No banned users",
+        "description": "Users you ban from this hub will appear here. Banned users cannot view or participate in your hub.",
+        "help": "Use the \"Ban User\" button above to ban a user by username."
+      },
+      "noReason": "No reason provided",
+      "modNote": "Mod note: {{note}}",
+      "permanent": "Permanent ban",
+      "temporaryUntil": "Temporary until {{date}}",
+      "bannedByOn": "Banned by {{moderator}} on {{date}}",
+      "form": {
+        "title": "Ban User",
+        "fields": {
+          "userId": {
+            "label": "User ID"
+          },
+          "banType": {
+            "label": "Ban Type",
+            "permanent": "Permanent",
+            "temporary": "Temporary"
+          },
+          "expiresAt": {
+            "label": "Expires At"
+          },
+          "reason": {
+            "label": "Reason (visible to user)",
+            "placeholder": "Optional public reason for the ban"
+          },
+          "note": {
+            "label": "Mod Note (private)",
+            "placeholder": "Optional private note for mod team"
+          }
+        },
+        "actions": {
+          "banning": "Banning..."
+        },
+        "errors": {
+          "invalidUserId": "Invalid user ID",
+          "expirationRequired": "Expiration date required for temporary bans"
+        }
+      }
+    },
+    "removalReasons": {
+      "title": "Removal Reason Templates",
+      "addTemplate": "Add Template",
+      "empty": "No removal reason templates.",
+      "lastUpdated": "Last updated {{date}}",
+      "confirmDelete": "Delete this removal reason?",
+      "form": {
+        "editTitle": "Edit Removal Reason",
+        "createTitle": "Create Removal Reason",
+        "saving": "Saving...",
+        "fields": {
+          "title": {
+            "label": "Title",
+            "placeholder": "e.g., Spam"
+          },
+          "message": {
+            "label": "Message",
+            "placeholder": "Message shown to user when content is removed"
+          }
+        }
+      }
+    },
+    "modLog": {
+      "title": "Moderation Log",
+      "empty": {
+        "title": "No moderation actions yet",
+        "description": "Once you or your moderators take actions (removing posts, banning users, editing settings, etc.), they'll appear here as an audit log for transparency and accountability."
+      },
+      "moderatorFallback": "Mod #{{id}}",
+      "actionWithTarget": "{{action}} ({{type}} #{{id}})",
+      "actions": {
+        "ban_user": "banned user",
+        "unban_user": "unbanned user",
+        "remove_post": "removed post",
+        "approve_post": "approved post",
+        "remove_comment": "removed comment",
+        "approve_comment": "approved comment",
+        "lock_post": "locked post",
+        "unlock_post": "unlocked post",
+        "pin_post": "pinned post",
+        "unpin_post": "unpinned post",
+        "create_removal_reason": "created removal reason",
+        "update_removal_reason": "updated removal reason",
+        "delete_removal_reason": "deleted removal reason"
+      }
+    },
+    "modMail": {
+      "title": "Mod Mail",
+      "loading": "Loading mod mail...",
+      "status": {
+        "open": "Open",
+        "archived": "Archived",
+        "resolved": "Resolved",
+        "all": "All"
+      },
+      "statusBadge": {
+        "open": "Open",
+        "archived": "Archived",
+        "resolved": "Resolved"
+      },
+      "empty": "No {{status}}mod mail conversations.",
+      "unread_one": "{{count}} new",
+      "unread_other": "{{count}} new",
+      "from": "From: {{username}}",
+      "lastReply": "Last reply: {{date}}",
+      "actions": {
+        "resolve": "Resolve",
+        "archive": "Archive",
+        "reopen": "Reopen"
+      }
+    },
+    "requests": {
+      "title": "Access Requests",
+      "empty": "No pending access requests.",
+      "status": {
+        "pending": "Pending"
+      },
+      "requestedOn": "Requested on {{date}}",
+      "confirmApprove": "Approve this access request?",
+      "confirmDeny": "Deny this access request?",
+      "actions": {
+        "approve": "Approve",
+        "deny": "Deny"
+      },
+      "errors": {
+        "grantFailed": "Failed to grant access"
+      },
+      "grantByUsername": {
+        "title": "Grant access by username",
+        "description": "Add a user directly to this private hub even if their request was denied.",
+        "placeholder": "Enter username (e.g. TestUser)",
+        "grantButton": "Grant Access",
+        "granting": "Granting...",
+        "success": "Access granted successfully."
+      }
+    }
+  },
+  "modMailConversationPage": {
+    "loadingConversation": "Loading conversation...",
+    "subjectFallback": "Mod Mail Conversation",
+    "actions": {
+      "backToModTools": "← Back to Mod Tools",
+      "resolve": "Resolve",
+      "archive": "Archive",
+      "reopen": "Reopen",
+      "sending": "Sending...",
+      "sendReply": "Send Reply"
+    },
+    "status": {
+      "open": "Open",
+      "archived": "Archived",
+      "resolved": "Resolved"
+    },
+    "messages": {
+      "loadMore": "Load more messages",
+      "noneYet": "No messages yet"
+    },
+    "reply": {
+      "placeholder": "Type your reply... (visible to all moderators and the user)",
+      "visibleToAllMods": "All moderators of {{hub}} can see and reply to this conversation"
+    },
+    "badges": {
+      "mod": "MOD"
+    },
+    "encryption": {
+      "noParticipants": "No participants found. Cannot send mod mail.",
+      "noSenderKeys": "You have not set up encryption keys. Cannot send mod mail.",
+      "noRecipientsEnabled": "No recipients have encryption enabled. Cannot send encrypted mod mail.",
+      "missingRecipientKeys": "Some participants (user IDs: {{ids}}) do not have encryption keys set up. They may not be able to read this message until they enable encryption."
+    },
+    "errors": {
+      "fetchConversationFailed": "Failed to fetch conversation",
+      "unableToLoadMessages": "Unable to load messages.",
+      "sendFailed": "Failed to send message. Please try again."
+    }
+  },
+  "hubSettingsPage": {
+    "loading": "Loading settings...",
+    "notFound": "Settings not found.",
+    "accessDenied": {
+      "title": "Access Denied",
+      "description": "You need to be a hub owner or full moderator to access settings."
+    },
+    "header": {
+      "title": "h/{{hub}} Settings",
+      "subtitle": "Configure your hub's appearance, content rules, and moderation settings"
+    },
+    "actions": {
+      "exit": "Exit",
+      "backToModTools": "Back to Mod Tools"
+    },
+    "tabs": {
+      "general": "General",
+      "content": "Content & Posts",
+      "moderation": "Moderation",
+      "moderators": "Moderators ({{count}})",
+      "theme": "Theme"
+    },
+    "saveBanner": {
+      "saving": "Saving changes...",
+      "saved": "✓ Changes saved successfully!",
+      "error": "✗ Failed to save changes. Please try again."
+    }
+  },
+  "hubSettings": {
+    "common": {
+      "ownerOnly": "(Owner only)",
+      "actions": {
+        "saveChanges": "Save Changes"
+      },
+      "status": {
+        "saving": "Saving..."
+      },
+      "errors": {
+        "saveFailed": "Failed to save changes"
+      }
+    },
+    "roles": {
+      "owner": "Owner",
+      "fullModerator": "Moderator",
+      "moderator": "Moderator",
+      "ownerLabel": "Owner:",
+      "fullModeratorLabel": "Moderator (settings access):",
+      "moderatorLabel": "Moderator (content only):",
+      "fullModeratorOption": "Moderator (settings)",
+      "moderatorOption": "Moderator (content only)"
+    },
+    "general": {
+      "title": "General Settings",
+      "subtitle": "Configure basic information and appearance for your hub",
+      "displayTitle": {
+        "label": "Display Title",
+        "helper": "Custom title shown on the hub page",
+        "placeholder": "Leave empty to use hub name"
+      },
+      "sidebar": {
+        "label": "Sidebar Description",
+        "placeholder": "Markdown supported...",
+        "helper": "Displayed in the hub sidebar. Supports Markdown formatting."
+      },
+      "privacy": {
+        "label": "Hub Privacy",
+        "options": {
+          "public": "Public - Anyone can view and post",
+          "restricted": "Restricted - Anyone can view, approved users can post",
+          "private": "Private - Only approved users can view and post"
+        },
+        "descriptions": {
+          "public": "Open to all users",
+          "restricted": "Requires approval to post",
+          "private": "Invite-only hub"
+        }
+      },
+      "nsfw": {
+        "label": "NSFW (18+)",
+        "description": "Mark this hub as NSFW (Not Safe For Work). NSFW hubs are hidden from default feeds and search results unless users explicitly opt-in. Content must be 18+ appropriate.",
+        "toggleA11y": "Toggle NSFW status"
+      }
+    },
+    "content": {
+      "title": "Content & Post Settings",
+      "subtitle": "Control what types of content can be posted in your hub",
+      "allowedPostTypes": {
+        "title": "Allowed Post Types",
+        "text": "Text Posts",
+        "link": "Link Posts",
+        "image": "Image Posts",
+        "video": "Video Posts",
+        "poll": "Poll Posts"
+      },
+      "mediaOptions": {
+        "title": "Media & Content Options",
+        "allowMediaInComments": {
+          "label": "Allow media in comments",
+          "helper": "Let users post images and videos in comments"
+        },
+        "showThumbnails": {
+          "label": "Show thumbnails",
+          "helper": "Display thumbnail previews for link and media posts"
+        },
+        "allowSpoilers": {
+          "label": "Allow spoiler tags",
+          "helper": "Enable spoiler tagging for posts and comments"
+        }
+      },
+      "postRequirements": {
+        "title": "Post Requirements",
+        "requireFlair": {
+          "label": "Require post flair",
+          "helper": "All posts must have a flair before being published"
+        }
+      },
+      "features": {
+        "title": "Features",
+        "enableWiki": {
+          "label": "Enable wiki",
+          "helper": "Allow creation and editing of hub wiki pages"
+        }
+      }
+    },
+    "moderation": {
+      "title": "Moderation & Auto-Moderation",
+      "subtitle": "Configure automated moderation rules and content filters",
+      "spamFilter": {
+        "label": "Spam Filter Strength",
+        "options": {
+          "low": "Low - Minimal filtering",
+          "medium": "Medium - Balanced (Recommended)",
+          "high": "High - Aggressive filtering"
+        },
+        "helper": "Higher settings may catch more spam but could also flag legitimate content"
+      },
+      "bannedWords": {
+        "label": "Banned Words & Phrases",
+        "placeholder": "Enter words separated by commas...",
+        "helper": "Posts and comments containing these words will be automatically removed. Separate with commas."
+      },
+      "accountAge": {
+        "label": "Minimum Account Age (days)",
+        "helper": "Require accounts to be at least this many days old to post (0 = no restriction)"
+      },
+      "karma": {
+        "label": "Minimum Account Karma",
+        "helper": "Require accounts to have at least this much karma to post (0 = no restriction)"
+      },
+      "accessCooldown": {
+        "label": "Access Request Cooldown",
+        "helper": "How long a denied user must wait before requesting access again.",
+        "range": "Range: 0 days (no cooldown) to 365 days (1 year)"
+      },
+      "units": {
+        "days": "days"
+      },
+      "info": {
+        "title": "About Auto-Moderation",
+        "description": "These filters help reduce spam and unwanted content. Content flagged by auto-moderation will appear in the moderation queue for manual review. You can always approve flagged content from the Mod Tools page."
+      }
+    },
+    "moderators": {
+      "title": "Moderator Team",
+      "subtitle": "Manage moderators and their permissions",
+      "actions": {
+        "addModerator": "Add Moderator",
+        "remove": "Remove"
+      },
+      "status": {
+        "adding": "Adding..."
+      },
+      "roles": {
+        "title": "Moderator Roles",
+        "ownerBadge": "👑 Owner",
+        "ownerDescription": "Full control, can manage all settings and moderators",
+        "fullModeratorDescription": "Can change settings and moderate content",
+        "moderatorDescription": "Can moderate content only, cannot change settings"
+      },
+      "table": {
+        "moderator": "Moderator",
+        "role": "Role",
+        "actions": "Actions"
+      },
+      "confirmRemove": "Remove {{username}} as a moderator?",
+      "modal": {
+        "title": "Add Moderator",
+        "usernameLabel": "Username",
+        "usernamePlaceholder": "Enter username...",
+        "roleLabel": "Role"
+      },
+      "errors": {
+        "addFailed": "Failed to add moderator. Please check the username and try again."
+      }
+    },
+    "theme": {
+      "title": "Hub Theme",
+      "subtitle": "Customize your hub's appearance with custom CSS",
+      "activeTheme": {
+        "title": "Active Theme"
+      },
+      "create": {
+        "title": "Create New Theme",
+        "fields": {
+          "name": {
+            "label": "Theme Name",
+            "placeholder": "My Custom Theme"
+          },
+          "description": {
+            "label": "Description (Optional)",
+            "placeholder": "A brief description..."
+          },
+          "css": {
+            "label": "Custom CSS",
+            "placeholder": ".hub-header { background: #333; }\\n.post-title { color: #0066cc; }",
+            "helper": "CSS is automatically sanitized to prevent XSS attacks"
+          }
+        },
+        "scope": {
+          "label": "Apply Theme To",
+          "wholePage": "Whole Page",
+          "headerOnly": "Header Only",
+          "sidebarOnly": "Sidebar Only",
+          "postListOnly": "Post List Only",
+          "postDetailOnly": "Post Detail Only"
+        },
+        "actions": {
+          "previewCss": "Preview CSS",
+          "previewing": "Previewing...",
+          "createAndActivate": "Create & Activate Theme",
+          "creating": "Creating..."
+        },
+        "errors": {
+          "createFailed": "Failed to create theme. Please check your CSS."
+        },
+        "success": {
+          "createdAndActivated": "Theme created and activated successfully!"
+        }
+      },
+      "preview": {
+        "title": "CSS Preview (Sanitized & Scoped)"
+      },
+      "versions": {
+        "title": "Theme Versions",
+        "active": "Active",
+        "versionLine": "Version {{version}} • Created {{date}}",
+        "actions": {
+          "activate": "Activate"
+        },
+        "confirmDelete": "Delete this theme version?"
+      }
+    }
+  },
+  "hubModeratorsPanel": {
+    "title": "Moderators",
+    "loading": "Loading moderators…",
+    "empty": "No moderators listed yet.",
+    "actions": {
+      "messageMods": "Message the Mods"
+    },
+    "errors": {
+      "unableToLoad": "Unable to load moderators."
+    }
+  },
+  "subredditAboutPanel": {
+    "title": "About this subreddit",
+    "loading": "Loading details…",
+    "emptyDescription": "No description provided.",
+    "empty": "No details available.",
+    "labels": {
+      "members": "Members",
+      "activeOmniUsers": "Active Omni Users",
+      "created": "Created"
+    },
+    "errors": {
+      "unableToLoad": "Unable to load subreddit details."
+    }
+  },
+  "mediaViewer": {
+    "mediaAlt": "Media content",
+    "errors": {
+      "failedToLoad": "Failed to load media",
+      "imageFailed": "Image failed to load",
+      "videoFailed": "Video failed to load",
+      "audioFailed": "Audio failed to load"
+    }
+  },
+  "slideshowControls": {
+    "actions": {
+      "pause": "Pause",
+      "play": "Play"
+    },
+    "labels": {
+      "speed": "Speed:"
+    },
+    "aria": {
+      "pauseSlideshow": "Pause slideshow",
+      "playSlideshow": "Play slideshow",
+      "setSpeed": "Set speed to {{speed}}"
+    }
+  },
+  "mediaUploadZone": {
+    "instructions": {
+      "clickToUpload": "Click to upload",
+      "orDragAndDrop": "or drag and drop",
+      "summary": "Images and videos up to {{size}}MB (max {{max}} files)"
+    },
+    "selected": {
+      "title": "Selected files ({{count}})"
+    },
+    "actions": {
+      "clearAll": "Clear all",
+      "upload_one": "Upload {{count}} file",
+      "upload_other": "Upload {{count}} files"
+    },
+    "errors": {
+      "fileTooLarge": "{{name}}: File size exceeds {{size}}MB",
+      "unsupportedType": "{{name}}: Unsupported file type",
+      "tooManyFiles": "Maximum {{max}} files allowed"
+    }
+  },
+  "redditWikiPage": {
+    "header": {
+      "title": "r/{{subreddit}} subreddit"
+    },
+    "tabs": {
+      "view": "view",
+      "history": "history",
+      "talk": "talk"
+    },
+    "loading": {
+      "wikiPage": "Loading wiki page...",
+      "revisionHistory": "Loading revision history...",
+      "discussions": "Loading discussions..."
+    },
+    "errors": {
+      "title": "Something went wrong",
+      "viewNotAccessible": "This wiki page does not exist or is not accessible.",
+      "historyFailed": "We could not load the revision history for this page.",
+      "talkFailed": "We could not load discussions for this page."
+    },
+    "actions": {
+      "backToSubreddit": "← Back to r/{{subreddit}}"
+    },
+    "view": {
+      "revisionBanner": "Viewing revision from {{time}}.",
+      "empty": "This wiki page is empty."
+    },
+    "sidebar": {
+      "aboutTitle": "About This Subreddit",
+      "communityTitle": "Community Info",
+      "labels": {
+        "online": "Online"
+      }
+    },
+    "toc": {
+      "ariaLabel": "Table of contents",
+      "title": "Table of Contents"
+    },
+    "history": {
+      "comparing": "Comparing revisions",
+      "loadingComparison": "Loading comparison…",
+      "olderRevision": "Older revision",
+      "newerRevision": "Newer revision",
+      "noDifferences": "No differences detected between these revisions.",
+      "hidden": "Hidden",
+      "empty": "This page has no recorded revisions.",
+      "absoluteDate": "({{date}})",
+      "revisionId": "Revision ID: {{id}}",
+      "revisionUnavailable": "Revision unavailable.",
+      "noDescriptionProvided": "No description provided",
+      "unknownAuthor": "u/unknown",
+      "headers": {
+        "compare": "Compare",
+        "when": "When",
+        "page": "Page",
+        "author": "Author",
+        "reason": "Reason",
+        "actions": "Actions"
+      },
+      "actions": {
+        "backToHistory": "← Back to history",
+        "view": "View",
+        "newer": "← Newer",
+        "older": "Older →",
+        "compareSelected": "Compare selected"
+      },
+      "aria": {
+        "selectOlder": "Select {{page}} revision from {{time}} as the older version",
+        "selectNewer": "Select {{page}} revision from {{time}} as the newer version"
+      },
+      "errors": {
+        "unableToLoadSelected": "Unable to load the selected revisions."
+      }
+    },
+    "talk": {
+      "postedBy": "Posted by u/{{author}}",
+      "postedByOn": "Posted by u/{{author}} on {{date}}",
+      "empty": "There doesn't seem to be anything here.",
+      "alertNotSupported": "Submitting Reddit discussions is not supported on OmniNudge.",
+      "actions": {
+        "submitDiscussion": "Submit a discussion"
+      }
+    }
+  },
+  "redditUserPage": {
+    "tabs": {
+      "overview": "Overview",
+      "comments": "Comments",
+      "submitted": "Submitted"
+    },
+    "blocked": "[BLOCKED]",
+    "sort": {
+      "label": "Sorted by:"
+    },
+    "activity": {
+      "loading": "Loading activity…",
+      "empty": "No activity found for this tab.",
+      "errors": {
+        "loadFailed": "Failed to load user activity."
+      }
+    },
+    "pagination": {
+      "page": "Page {{page}}"
+    },
+    "block": {
+      "actions": {
+        "block": "Block user",
+        "unblock": "Unblock user"
+      },
+      "confirmBlock": "Block u/{{username}}? You will no longer see posts or comments from this user.",
+      "confirmUnblock": "Unblock u/{{username}}?"
+    },
+    "commentCard": {
+      "commentedOn": "Commented on",
+      "actions": {
+        "context": "context",
+        "fullComments": "full comments",
+        "fullCommentsWithCount": "full comments ({{count}})"
+      }
+    },
+    "userDetails": {
+      "title": "User Details",
+      "postKarma": "Post karma",
+      "commentKarma": "Comment karma",
+      "redditAge": "Reddit age",
+      "accountAge": {
+        "year_one": "{{count}} year",
+        "year_other": "{{count}} years",
+        "month_one": "{{count}} month",
+        "month_other": "{{count}} months",
+        "day_one": "{{count}} day",
+        "day_other": "{{count}} days"
+      }
+    },
+    "moderatorOf": {
+      "title": "Moderator of",
+      "titleSeparator": "— {{title}}",
+      "empty": "No moderator roles listed."
+    },
+    "trophies": {
+      "title": "Trophy Case",
+      "empty": "No trophies displayed."
+    }
+  },
+  "userProfilePage": {
+    "tabs": {
+      "overview": "Overview",
+      "posts": "Posts",
+      "comments": "Comments",
+      "saved": "Saved",
+      "hidden": "Hidden",
+      "subscribed": "Subscribed"
+    },
+    "headings": {
+      "recentPosts": "Recent Posts",
+      "recentComments": "Recent Comments",
+      "moderatorOf": "Moderator of"
+    },
+    "labels": {
+      "joined": "Joined {{time}}",
+      "lastSeen": "Last seen {{time}}",
+      "karma": "karma"
+    },
+    "actions": {
+      "viewAll": "View all",
+      "message": "Message",
+      "viewThread": "View thread"
+    },
+    "posts": {
+      "empty": "No posts yet."
+    },
+    "comments": {
+      "onPost": "On <link>post #{{id}}</link>"
+    },
+    "private": {
+      "saved": "Saved items are private.",
+      "hidden": "Hidden items are private.",
+      "subscribed": "Subscriptions are private."
+    },
+    "errors": {
+      "loadFailed": "Unable to load user profile."
+    },
+    "aria": {
+      "avatarAlt": "Avatar for {{username}}"
+    }
+  },
+  "redditPostPage": {
+    "hiddenPost": {
+      "notice": "This post is hidden from your main feeds. You can unhide it to make it reappear in Reddit listings."
+    },
+    "blockedAuthor": {
+      "notice": "You blocked u/{{username}}. This post is hidden.",
+      "actions": {
+        "unblock": "Unblock user"
+      }
+    },
+    "actions": {
+      "blockUser": "Block user"
+    },
+    "redditComments": {
+      "readOnlyNote": "<strong>Note:</strong> Comments from Reddit are read-only. You can reply to them, but your replies are <strong>only visible on this site</strong>."
+    },
+    "embed": {
+      "viewOnReddit": "View on Reddit"
+    }
+  },
   "create": {
     "post": "Create Post",
     "hub": "Create Hub",
@@ -80,7 +1100,8 @@
   "ariaLabels": {
     "mobileNav": "Mobile navigation",
     "unreadMessages": "{{count}} unread messages",
-    "closeMenu": "Close menu"
+    "closeMenu": "Close menu",
+    "longPressForMoreOptions": "Long press for more options"
   },
   "home": {
     "feed": {
@@ -115,7 +1136,8 @@
       "limitToSubreddit": "Limit search to r/{{subreddit}}",
       "limitToHub": "Limit search to h/{{hub}}",
       "includeNsfw": "Include NSFW results",
-      "nsfwBlocked": "NSFW content is blocked in settings."
+      "nsfwBlocked": "NSFW content is blocked in settings.",
+      "noResults": "No hubs or subreddits found."
     },
     "timeRange": {
       "label": "Time range",
@@ -165,7 +1187,10 @@
     "search": {
       "conversations": "Search conversations...",
       "inConversation": "Search in conversation...",
-      "clearLabel": "Clear search"
+      "clearLabel": "Clear search",
+      "conversationResults_one": "{{count}} conversation found",
+      "conversationResults_other": "{{count}} conversations found",
+      "ariaToggle": "Search messages"
     },
     "media": {
       "viewAllTitle": "View all media from this conversation in a slideshow",
@@ -186,11 +1211,66 @@
       "invalidUrl": "Invalid post URL",
       "loadFailed": "Failed to load post",
       "conversationNotFound": "Conversation not found",
-      "recipientNotFound": "Recipient not found"
+      "recipientNotFound": "Recipient not found",
+      "loadModMailFailed": "Failed to fetch mod-mail conversation",
+      "deleteMessageFailed": "Failed to delete message",
+      "archiveFailed": "Failed to archive conversation",
+      "unarchiveFailed": "Failed to unarchive conversation",
+      "deleteConversationFailed": "Failed to delete conversation",
+      "recipientKeyNotFound": "Recipient public key not found",
+      "encryptionKeysMissing": "Your encryption keys are not set up"
     },
     "messageOptions": {
       "ariaLabel": "Message options"
-    }
+    },
+    "hubFallback": "Hub",
+    "aria": {
+      "backToConversations": "Back to conversations"
+    },
+    "badges": {
+      "mod": "MOD"
+    },
+    "tabs": {
+      "active": "Active",
+      "archived": "Archived"
+    },
+    "archive": "Archive",
+    "unarchive": "Unarchive",
+    "noConversations": "No conversations yet. Start a new chat!",
+    "loadMore": "Load more conversations",
+    "modMail": "Mod Mail",
+    "untitled": "Untitled",
+    "unknown": "Unknown",
+    "browseRedditHub": "Browse Reddit/Hub",
+    "mediaGallery": "Media Gallery",
+    "searching": "Searching...",
+    "match": "match",
+    "matches": "matches",
+    "startConversation": "Enter a username and message to start a conversation",
+    "loadingMessages": "Loading messages...",
+    "loadMoreMessages": "Load more messages",
+    "you": "You",
+    "user": "User",
+    "noMatches": "No messages found matching \"{{query}}\"",
+    "uploadMultiple": "Upload Multiple Files",
+    "uploading": "Uploading...",
+    "selectConversation": "Select a conversation or start a new chat",
+    "deleteMessage": "Delete message?",
+    "deleteForBothPrompt": "Do you want to remove this message for yourself only or for both participants?",
+    "deleteForSelfOnly": "This will remove the message for you only.",
+    "deleting": "Deleting...",
+    "deleteForMe": "Delete for me",
+    "deletingForBoth": "Deleting for both...",
+    "deleteForBoth": "Delete for both users",
+    "deleteModMailPrompt": "This will delete the conversation from your messages. The conversation will remain accessible to moderators in mod tools for moderation audits.",
+    "deleteConversationPrompt": "Choose how you want to delete this conversation.",
+    "deleteConversationForMe": "Delete for me (Other user will still see your messages)",
+    "browseRedditHubScroll": "Browse Reddit/Hub Scroll",
+    "enterSubredditHub": "Enter subreddit or hub name",
+    "loadingSuggestions": "Loading suggestions...",
+    "noSuggestions": "No suggestions found",
+    "loadScroll": "Load Scroll",
+    "unsupportedMedia": "Unsupported media type"
   },
   "posts": {
     "title": "Posts",
@@ -203,7 +1283,10 @@
     "share": "Share",
     "save": "Save",
     "hide": "Hide",
-    "report": "Report",
+    "report": {
+      "reasonPrompt": "Reason for reporting (optional):",
+      "success": "Thanks! The moderation team has been notified."
+    },
     "delete": "Delete",
     "edit": "Edit",
     "postedBy": "Posted by {{username}}",
@@ -219,6 +1302,7 @@
       "delete": "Delete",
       "save": "Save",
       "unsave": "Unsave",
+      "unhide": "Unhide",
       "hide": "Hide",
       "share": "Share",
       "crosspost": "Crosspost",
@@ -229,32 +1313,108 @@
       "disableInbox": "Disable inbox",
       "permalink": "Permalink",
       "embed": "Embed",
-      "copyEmbed": "Copy embed code"
+      "copyEmbed": "Copy embed code",
+      "crosspostSoon": "Crosspost functionality coming soon!",
+      "crosspostTooltip": "Crosspost to another hub",
+      "pinToTop": "Pin to top",
+      "unpinFromTop": "Unpin from top"
     },
     "embed": {
       "title": "Embed Comment",
-      "instruction": "Copy this HTML snippet to share the comment outside OmniNudge."
+      "instruction": "Copy this HTML snippet to share the comment outside OmniNudge.",
+      "previewLabel": "Preview",
+      "closeLabel": "Close embed modal"
     },
     "viewingThread": "You are viewing a single comment's thread.",
     "status": {
       "saving": "Saving...",
       "saved": "Saved",
       "hiding": "Hiding...",
+      "unhiding": "Unhiding...",
       "deleting": "Deleting...",
       "pinning": "Pinning...",
-      "reporting": "Reporting..."
+      "reporting": "Reporting...",
+      "updating": "Updating...",
+      "unsaving": "Unsaving..."
+    },
+    "loading": {
+      "post": "Loading post..."
+    },
+    "media": {
+      "previewImageAlt": "Preview image for {{title}}",
+      "galleryImageAlt": "{{title}} - Image {{index}}",
+      "loadingGalleryImages": "Loading gallery images...",
+      "noGalleryImages": "No images found in this gallery",
+      "galleryTitle": "Gallery",
+      "videoUnsupported": "Your browser does not support the video tag.",
+      "videoMayNotHaveAudio": "Note: This video may not have audio.",
+      "externalLinkLabel": "external",
+      "redgifsEmbedTitle": "{{title}} - Redgifs video",
+      "embeddedMediaTitle": "{{title}} - Embedded media"
     },
     "badges": {
       "omni": "Omni",
-      "pinned": "Pinned"
+      "pinned": "Pinned",
+      "pinnedByModerators": "Pinned by moderators",
+      "reddit": "Reddit",
+      "nsfw": "NSFW"
+    },
+    "point_one": "{{formattedCount}} point",
+    "point_other": "{{formattedCount}} points",
+    "errors": {
+      "loadPostsFailed": "Failed to load posts. Please try again.",
+      "invalidUrl": "Invalid post URL",
+      "loadFailed": "Failed to load post",
+      "invalidPost": "Invalid post"
+    },
+    "postedByLabel": "Posted by",
+    "submittedAt": "submitted {{time}}",
+    "unknownHub": "unknown",
+    "you": "You",
+    "unknownAuthor": "Unknown author",
+    "aria": {
+      "hidePreview": "Hide preview",
+      "showPreview": "Show preview",
+      "reorderPinnedPost": "Reorder pinned post",
+      "dragToReorderPinnedPosts": "Drag to reorder pinned posts"
+    },
+    "compact": {
+      "modMailTitle": "{{hub}} - Mod Mail - {{subject}}",
+      "hubFallback": "Hub",
+      "untitled": "Untitled",
+      "unknownSource": "unknown",
+      "user": "User",
+      "unknownUser": "Unknown user"
     }
   },
   "comments": {
     "title": "Comments",
+    "loading": "Loading comments...",
     "noComments": "No comments yet",
+    "emptyBeFirstOnPost": "No comments yet. Be the first to comment on this post!",
     "writeComment": "Write your reply...",
+    "writeReply": "Write a reply",
+    "postReply": "Post Reply",
+    "replyCount_one": "({{count}} reply)",
+    "replyCount_other": "({{count}} replies)",
+    "viewRest": "View the rest of the comments →",
+    "loadMore": "Load {{count}} more comments",
+    "moreReplies_one": "View {{count}} more reply",
+    "moreReplies_other": "View {{count}} more replies",
+    "sort": {
+      "label": "Sort by",
+      "options": {
+        "best": "Best",
+        "new": "New",
+        "old": "Old",
+        "top": "Top",
+        "controversial": "Controversial",
+        "qa": "Q&A"
+      }
+    },
     "actions": {
       "reply": "Reply",
+      "post": "Post",
       "edit": "Edit",
       "delete": "Delete",
       "save": "Save",
@@ -262,6 +1422,7 @@
       "report": "Report",
       "permalink": "Permalink",
       "collapse": "Collapse",
+      "collapseReplies": "Collapse replies",
       "expand": "Expand",
       "disableInbox": "Disable inbox replies",
       "enableInbox": "Enable inbox replies"
@@ -270,7 +1431,8 @@
       "saving": "Saving...",
       "deleting": "Deleting...",
       "reporting": "Reporting...",
-      "inboxPending": "Updating inbox..."
+      "inboxPending": "Updating inbox...",
+      "posting": "Posting..."
     },
     "labels": {
       "editComment": "Edit comment",
@@ -279,15 +1441,72 @@
     },
     "errors": {
       "voteFailed": "Failed to vote.",
+      "loadFailed": "Failed to load comments.",
+      "postFailed": "Failed to post comment.",
       "replyFailed": "Failed to post reply.",
       "editFailed": "Failed to update comment.",
       "deleteFailed": "Failed to delete comment.",
       "inboxFailed": "Failed to update inbox setting.",
       "saveFailed": "Failed to update save state.",
-      "reportFailed": "Failed to report comment."
+      "reportFailed": "Failed to report comment.",
+      "notFound": "We couldn't find that comment. It may have been removed."
     },
     "confirm": {
       "delete": "Delete this comment? This action cannot be undone."
+    },
+    "addComment": "Add a comment",
+    "shareThoughts": "Share your thoughts...",
+    "formatting": {
+      "show": "formatting help",
+      "hide": "hide formatting",
+      "description": "OmniNudge uses a slightly-customized version of",
+      "markdownLinkText": "Markdown",
+      "descriptionSuffix": "for formatting. See below for formatting help."
+    }
+  },
+  "inlineCreatePost": {
+    "header": {
+      "hub": "Create Post in h/{{name}}",
+      "subreddit": "Create Post in r/{{name}}"
+    },
+    "tabs": {
+      "linkMedia": "Link/Media",
+      "text": "Text"
+    },
+    "placeholders": {
+      "title": "Post title...",
+      "body": "Post body (optional)..."
+    },
+    "actions": {
+      "uploadMedia": "Upload Media",
+      "post": "Post"
+    },
+    "status": {
+      "uploading": "Uploading...",
+      "posting": "Posting..."
+    },
+    "labels": {
+      "nsfw": "NSFW (18+)"
+    },
+    "alerts": {
+      "createFailed": "Failed to create post. Please try again.",
+      "titleRequired": "Please enter a title",
+      "mediaRequired": "Please add media or switch to text post"
+    }
+  },
+  "hubAboutPanel": {
+    "title": "About this hub",
+    "loading": "Loading details...",
+    "emptyDescription": "No description has been added yet.",
+    "empty": "Hub details unavailable.",
+    "labels": {
+      "members": "Members",
+      "activeOmniUsers": "Active Omni Users",
+      "visibility": "Visibility",
+      "created": "Created"
+    },
+    "errors": {
+      "unableToLoad": "Unable to load hub details."
     }
   },
   "settings": {
@@ -324,6 +1543,86 @@
     "themeSection": {
       "title": "Theme",
       "description": "Choose an active theme or create your own."
+    },
+    "themeSettingsSection": {
+      "header": {
+        "label": "Theme Settings",
+        "title": "Personalization Controls",
+        "subtitle": "Quickly review your active theme, switch styles, or jump into advanced customization."
+      },
+      "actions": {
+        "manageThemes": "Manage Themes",
+        "createTheme": "+ Create Theme"
+      },
+      "activeTheme": {
+        "label": "Active Theme",
+        "loading": "Loading theme...",
+        "noActive": "No active theme yet. Choose one from the selector.",
+        "noDescription": "No description provided.",
+        "stats": {
+          "themeId": "Theme ID",
+          "version": "Version",
+          "installs": "Installs",
+          "rating": "Rating",
+          "ratingFallback": "N/A"
+        }
+      },
+      "reminder": {
+        "title": "Friendly Reminder",
+        "body": "Switching themes updates your dashboard immediately and saves the preference to your account so it stays synced across devices."
+      },
+      "advancedMode": {
+        "title": "Advanced Mode",
+        "description": "Unlock CSS overrides and upcoming power-user controls.",
+        "statusEnabled": "Enabled",
+        "statusDisabled": "Disabled",
+        "errorUpdateFailed": "Unable to update advanced mode. Please try again.",
+        "lastSynced": "Last synced: {{formattedDate}}"
+      }
+    },
+    "deleteAccountSection": {
+      "pending": {
+        "title": "Account Scheduled for Deletion",
+        "body_one": "Your account will be permanently deleted in <strong>{{formattedCount}} day</strong>{{dateSuffix}}.",
+        "body_other": "Your account will be permanently deleted in <strong>{{formattedCount}} days</strong>{{dateSuffix}}.",
+        "onDate": " on {{formattedDate}}",
+        "gracePeriod": "During the grace period, you can cancel the deletion and restore your account. After the deletion date, all your data will be permanently removed and cannot be recovered.",
+        "actions": {
+          "cancel": "Cancel Deletion",
+          "cancelling": "Cancelling..."
+        }
+      },
+      "dangerZone": {
+        "title": "Danger Zone",
+        "description": "Once you delete your account, there is no going back. Please be certain.",
+        "action": "Delete Account"
+      },
+      "modal": {
+        "title": "Delete Account",
+        "warningIntro": "<strong>Warning:</strong> This action will:",
+        "effects": {
+          "messagesPosts": "Delete all your messages and posts",
+          "conversationsGroups": "Remove you from all conversations and groups",
+          "filesMedia": "Delete all your files and media",
+          "encryptionKeys": "Erase your encryption keys (messages cannot be recovered)"
+        },
+        "graceNote": "You have a <strong>30-day grace period</strong> to cancel the deletion.",
+        "fields": {
+          "passwordLabel": "Confirm Password",
+          "passwordPlaceholder": "Enter your password",
+          "confirmLabel": "Type \"{{phrase}}\" to confirm",
+          "confirmPlaceholder": "{{phrase}}"
+        },
+        "actions": {
+          "cancel": "Cancel",
+          "delete": "Delete Account",
+          "deleting": "Deleting..."
+        }
+      },
+      "errors": {
+        "confirmMismatch": "Please type \"{{phrase}}\" to confirm",
+        "deleteFailed": "Failed to delete account"
+      }
     },
     "archivedNotifications": {
       "title": "Archived Chat Notifications",
@@ -443,7 +1742,8 @@
       "videoCallsDescription": "Make 1-on-1 video calls with screen sharing",
       "performanceMode": "Performance Mode",
       "performanceModeDescription": "Lazy loading images for faster page loads",
-      "note": "Beta features may be unstable. Contact support if you experience issues. Feature availability is controlled by feature flags and may change without notice."
+      "note": "Beta features may be unstable. Contact support if you experience issues. Feature availability is controlled by feature flags and may change without notice.",
+      "noteWithLabel": "<strong>Note:</strong> Beta features may be unstable. Contact support if you experience issues. Feature availability is controlled by feature flags and may change without notice."
     },
     "dataExport": {
       "title": "Export Your Data",
@@ -558,7 +1858,80 @@
       "signUpLink": "Sign up",
       "signInLink": "Sign in"
     },
-    "privacyNote": "Your email is encrypted at rest. Your password is stored as a one-way hash (we can't read it)."
+    "privacyNote": "Your email is encrypted at rest. Your password is stored as a one-way hash (we can't read it).",
+    "resetPasswordTitle": "Reset Password",
+    "errors": {
+      "acknowledgeNoEmailLimitations": "Please acknowledge that you understand password reset limitations without an email.",
+      "loginFailed": "Login failed",
+      "registrationFailed": "Registration failed"
+    },
+    "forgotPasswordFlow": {
+      "checkEmailTitle": "Check your email",
+      "checkEmailDescription": "If an account exists with a verified email for this username, a password reset link has been sent.",
+      "returnToLogin": "Return to Login",
+      "description": "Enter your username and we'll send a password reset link to your verified email address.",
+      "sending": "Sending...",
+      "sendResetLink": "Send Reset Link",
+      "rememberPassword": "Remember your password?"
+    },
+    "signupNoEmailWarning": {
+      "title": "⚠️ No Email Provided",
+      "description": "Without an email address, you won't be able to reset your password if you forget it. You can add an email now or later in your account settings."
+    },
+    "resetPasswordPage": {
+      "title": "Reset Your Password",
+      "resettingFor": "Resetting password for",
+      "fields": {
+        "newPassword": "New Password",
+        "newPasswordPlaceholder": "Enter new password",
+        "confirmPassword": "Confirm Password",
+        "confirmPasswordPlaceholder": "Confirm new password"
+      },
+      "status": {
+        "validating": "Validating reset link...",
+        "submitting": "Resetting Password...",
+        "redirectingHome": "Redirecting to home page..."
+      },
+      "invalidLinkTitle": "Invalid Reset Link",
+      "actions": {
+        "resetPassword": "Reset Password",
+        "returnToHome": "Return to Home"
+      },
+      "errors": {
+        "invalidLinkRequestNew": "Invalid reset link. Please request a new password reset.",
+        "linkInvalidOrExpiredRequestNew": "This reset link is invalid or has expired. Please request a new password reset.",
+        "linkInvalidOrExpired": "This password reset link is invalid or has expired.",
+        "passwordMinLength": "Password must be at least 8 characters long",
+        "passwordsDoNotMatch": "Passwords do not match",
+        "resetFailedTryAgain": "Failed to reset password. Please try again."
+      },
+      "success": {
+        "title": "Password Reset Successful",
+        "description": "Your password has been successfully reset. You can now log in with your new password."
+      }
+    },
+    "verifyEmailPage": {
+      "status": {
+        "verifying": "Verifying your email...",
+        "redirecting": "Redirecting..."
+      },
+      "success": {
+        "title": "Email Verified!",
+        "description": "Your email has been successfully verified.",
+        "welcome": "Welcome to OmniNudge!"
+      },
+      "error": {
+        "title": "Verification Failed"
+      },
+      "errors": {
+        "invalidLink": "Invalid verification link",
+        "invalidOrExpired": "This verification link is invalid or has expired."
+      },
+      "actions": {
+        "returnToHome": "Return to Home"
+      }
+    },
+    "emailVerificationNote": "We'll send you a verification email if you provide an address."
   },
   "account": {
     "exportDataTitle": "Export Your Data",
@@ -574,8 +1947,11 @@
     "hide": {
       "title": "Hide this post?",
       "description": "Are you sure? Hidden posts can be found at your hidden posts page.",
+      "descriptionWithLink": "Are you sure? Hidden posts can be found at <a>your hidden posts page</a>.",
       "hideButton": "Hide Post",
-      "hiding": "Hiding..."
+      "hiding": "Hiding...",
+      "confirmSaved": "Hiding this post will remove it from your Saved list and add it to your Hidden items. Are you sure you want to continue?",
+      "confirmSimple": "Hide this post?"
     },
     "delete": {
       "title": "Delete Post - Reason Required",
@@ -586,7 +1962,8 @@
       "reasonPlaceholder": "E.g., Violates rule 3: No spam...",
       "deleteButton": "Delete Post",
       "deleting": "Deleting...",
-      "confirmOwn": "Are you sure you want to delete this post?"
+      "confirmOwn": "Are you sure you want to delete this post?",
+      "confirmComment": "Are you sure you want to delete this comment?"
     },
     "crosspost": {
       "title": "Submit a Crosspost",
@@ -605,16 +1982,27 @@
   },
   "alerts": {
     "deletePostFailed": "Failed to delete post: {{message}}",
+    "updatePinnedOrderFailed": "Failed to update pinned order: {{message}}",
     "saveFailed": "Failed to update save status: {{message}}",
     "hideFailed": "Failed to hide post: {{message}}",
     "crosspostSuccess": "Crosspost created successfully!",
     "crosspostFailed": "Failed to create crosspost: {{message}}",
     "linkCopied": "Post link copied to clipboard!",
+    "commentLinkCopied": "Comment link copied to clipboard!",
     "linkCopyFailed": "Unable to copy link. Please try again.",
+    "embedCopied": "Embed code copied to clipboard!",
+    "embedCopyFailed": "Failed to copy embed code.",
+    "redditMessagingUnavailable": "Native Reddit messaging features are not available on OmniNudge.",
+    "unsaveFailed": "Failed to unsave post: {{message}}",
+    "unhideFailed": "Failed to unhide post: {{message}}",
     "signInToSave": "Please sign in to save posts.",
     "signInToHide": "Please sign in to hide posts.",
     "signInToCrosspost": "Please sign in to crosspost.",
-    "provideDeleteReason": "Please provide a reason for deletion"
+    "provideDeleteReason": "Please provide a reason for deletion",
+    "updatePostFailed": "Failed to update post: {{message}}",
+    "deleteCommentFailed": "Failed to delete comment: {{message}}",
+    "crosspostNoSource": "No post selected for crosspost",
+    "crosspostMissingDestination": "Please select at least one destination (hub or subreddit)"
   },
   "moderation": {
     "deleteReason": "Reason for deletion",
@@ -626,6 +2014,930 @@
     "closeLabel": "Close slideshow (Esc)",
     "previousLabel": "Previous (←)",
     "nextLabel": "Next (→)",
-    "counter": "{{current}} of {{total}}"
+    "counter": "{{current}} of {{total}}",
+    "noMediaFound": "No media found",
+    "aria": {
+      "closeEsc": "Close slideshow (Esc)",
+      "previous": "Previous (←)",
+      "next": "Next (→)"
+    }
+  },
+  "notifications": {
+    "push": {
+      "defaultTitle": "Notification",
+      "defaultBody": "You have a new update.",
+      "receivedToast": "{{title}}: {{body}}",
+      "notSupported": "Push notifications are not supported in this browser",
+      "permissionFailed": "Failed to get notification permission",
+      "enabled": "Push notifications enabled!",
+      "enableFailed": "Failed to enable push notifications",
+      "disabled": "Push notifications disabled",
+      "disableFailed": "Failed to disable push notifications"
+    }
+  },
+  "subscriptions": {
+    "title": "Subscriptions",
+    "loading": "Loading subscriptions...",
+    "loadFailed": "Failed to load subscriptions.",
+    "emptyAll": "No subscriptions yet. Subscribe to hubs or subreddits to see them here.",
+    "searchPlaceholder": "Search subscriptions...",
+    "hubsTitle": "Hubs ({{count}})",
+    "subredditsTitle": "Subreddits ({{count}})",
+    "emptyHubs": "No hub subscriptions yet.",
+    "emptySubreddits": "No subreddit subscriptions yet.",
+    "unknownHub": "Unknown",
+    "subscribedAt": "Subscribed {{time}}",
+    "sort": {
+      "alphabetical": "A-Z",
+      "recent": "Recently Joined"
+    },
+    "searchResults": "Found {{subscriptionCount}} subscriptions matching \"{{query}}\""
+  },
+  "saved": {
+    "headingTitle": "Saved Items",
+    "headingDescription": "Posts, comments, and replies you've saved across OmniNudge.",
+    "filters": {
+      "show": "Show:",
+      "source": "Source:",
+      "posts": "Posts",
+      "comments": "Comments",
+      "both": "Both",
+      "omni": "Omni",
+      "reddit": "Reddit"
+    },
+    "loading": "Loading saved content...",
+    "loadError": "Unable to load saved items.",
+    "removedByModerators_one": "{{count}} saved Reddit post was removed by moderators and has been cleaned up.",
+    "removedByModerators_other": "{{count}} saved Reddit posts were removed by moderators and have been cleaned up.",
+    "manageAlertInSettings": "Manage this alert in Settings",
+    "dismiss": "Dismiss",
+    "labels": {
+      "omniComment": "Omni Comment",
+      "redditComment": "Reddit Comment",
+      "post": "Post:",
+      "viewThread": "View thread →",
+      "fullComments": "Full comments →",
+      "on": "on",
+      "postFallback": "a post",
+      "byAuthor": "by u/{{author}}",
+      "inSubreddit": "in r/{{subreddit}}"
+    },
+    "empty": {
+      "message": "No saved {{source}} {{type}} yet.",
+      "types": {
+        "items": "items",
+        "posts": "posts",
+        "comments": "comments"
+      },
+      "sources": {
+        "omniOrReddit": "Omni or Reddit",
+        "omni": "Omni",
+        "reddit": "Reddit"
+      }
+    }
+  },
+  "hidden": {
+    "headingTitle": "Hidden Items",
+    "headingDescription": "Posts you've hidden across OmniNudge.",
+    "tabs": {
+      "omni": "Omni",
+      "reddit": "Reddit"
+    },
+    "loading": "Loading hidden content...",
+    "loadError": "Unable to load hidden items right now. Showing the latest cached data.",
+    "empty": {
+      "omni": "No hidden Omni posts or comments yet.",
+      "reddit": "No hidden Reddit posts or comments yet."
+    },
+    "modal": {
+      "saveTitle": "Save this post?",
+      "saveDescription": "Saving this post will remove it from your Hidden list and add it to your Saved items. Are you sure you want to continue?",
+      "moveToSaved": "Move to Saved"
+    }
+  },
+  "themesPage": {
+    "liveRegion": {
+      "activeTheme": "Active theme {{theme}}",
+      "noActiveTheme": "No active theme selected"
+    },
+    "hero": {
+      "kicker": "Theme System",
+      "noThemeSelected": "No theme selected",
+      "descriptionFallback": "Choose a theme to see the UI update in real-time."
+    },
+    "palette": {
+      "title": "Primary Palette"
+    },
+    "typography": {
+      "title": "Typography Preview",
+      "labels": {
+        "heading": "Heading",
+        "body": "Body",
+        "caption": "Caption"
+      },
+      "sampleText": "The quick brown fox jumps over the lazy dog."
+    },
+    "livePreview": {
+      "kicker": "Live Preview",
+      "title": "Visualize Theme Across Pages",
+      "subtitle": "Toggle between feed, profile, and messages while switching between desktop and mobile modes."
+    },
+    "gallery": {
+      "loading": "Loading gallery…"
+    },
+    "debug": {
+      "kicker": "Debug Info",
+      "loading": "Loading theme data…",
+      "activeThemeId": "Active Theme ID:",
+      "cssVariablesLoaded": "CSS Variables Loaded:",
+      "na": "n/a"
+    },
+    "editor": {
+      "loading": "Loading editor…"
+    }
+  },
+  "themes": {
+    "selector": {
+      "groups": {
+        "predefined": "Predefined Themes",
+        "custom": "My Themes"
+      },
+      "dialog": {
+        "title": "Theme Options"
+      },
+      "actions": {
+        "refresh": "Refresh",
+        "refreshing": "Refreshing…",
+        "close": "Close",
+        "closeAria": "Close theme selector",
+        "createNewTheme": "+ Create New Theme"
+      },
+      "status": {
+        "loadingThemes": "Loading themes…",
+        "noThemes": "No themes available."
+      },
+      "announcements": {
+        "selected": "Theme {{theme}} selected",
+        "refreshed": "Theme list refreshed"
+      },
+      "activeThemeLabel": "Active Theme",
+      "selectThemeFallback": "Select a theme"
+    },
+    "gallery": {
+      "header": {
+        "kicker": "Theme Gallery",
+        "title": "Browse Themes",
+        "subtitle": "Choose from predefined or custom themes, search, and sort to find the perfect match."
+      },
+      "actions": {
+        "refresh": "Refresh",
+        "createTheme": "+ Create Theme"
+      },
+      "filters": {
+        "all": "All",
+        "predefined": "Predefined",
+        "custom": "My Themes"
+      },
+      "sort": {
+        "name": "Name (A-Z)",
+        "newest": "Newest",
+        "popular": "Most Popular"
+      },
+      "search": {
+        "placeholder": "Search themes…"
+      },
+      "status": {
+        "loading": "Loading themes…"
+      },
+      "empty": {
+        "noCustomTitle": "No custom themes yet",
+        "noCustomDescription": "Get started by creating your first custom theme. Personalize colors, fonts, and more!",
+        "noResultsTitle": "No themes found",
+        "noResultsDescription": "No themes match your filters. Try adjusting your search or create a new theme.",
+        "createFirstAction": "Create Your First Theme"
+      }
+    },
+    "previewCard": {
+      "badges": {
+        "active": "Active"
+      },
+      "palette": {
+        "primary": "Primary",
+        "surface": "Surface",
+        "background": "Background",
+        "accent": "Accent"
+      },
+      "preview": {
+        "header": "Header",
+        "subheader": "Navigation · Profile",
+        "cta": "CTA",
+        "contentBlock": "Content block {{index}}",
+        "secondaryText": "Secondary text preview"
+      },
+      "installs_one": "{{formattedCount}} install",
+      "installs_other": "{{formattedCount}} installs",
+      "ratingFallback": "N/A",
+      "actions": {
+        "useTheme": "Use Theme",
+        "selected": "Selected",
+        "edit": "Edit"
+      }
+    },
+    "editor": {
+      "steps": {
+        "stepLabel": "Step {{number}}",
+        "base": {
+          "title": "Choose Base Theme",
+          "description": "Start from a predefined or existing theme."
+        },
+        "info": {
+          "title": "Basic Info",
+          "description": "Name and describe your theme."
+        },
+        "variables": {
+          "title": "Customize Variables",
+          "description": "Tweak colors with live preview."
+        },
+        "review": {
+          "title": "Review & Save",
+          "description": "Double-check details before publishing."
+        }
+      },
+      "header": {
+        "kicker": "Theme Editor",
+        "editTitle": "Edit Theme",
+        "createTitle": "Create New Theme"
+      },
+      "actions": {
+        "close": "Close",
+        "back": "Back",
+        "next": "Next",
+        "saving": "Saving…",
+        "updateTheme": "Update Theme",
+        "createTheme": "Create Theme"
+      },
+      "status": {
+        "updated": "Theme updated successfully!",
+        "created": "Theme created successfully!"
+      },
+      "errors": {
+        "saveFailed": "Unable to save theme."
+      },
+      "base": {
+        "intro": "Choose a predefined theme as your starting point or begin from a clean slate. You can tweak every value later.",
+        "startFromScratch": {
+          "title": "Start from Scratch",
+          "description": "Apply default variables and customize everything yourself."
+        }
+      },
+      "info": {
+        "nameLabel": "Theme Name *",
+        "nameHelper": "Max 100 characters.",
+        "descriptionLabel": "Description",
+        "setActiveAfterSave": "Set as active theme after saving"
+      },
+      "variables": {
+        "variableFallback": "Variable",
+        "descriptionFallback": "Use the color picker to adjust the value.",
+        "loadingColorPicker": "Loading color picker…",
+        "colorPickerAria": "Color picker for {{variable}}"
+      },
+      "review": {
+        "summaryTitle": "Summary",
+        "labels": {
+          "name": "Name:",
+          "description": "Description:",
+          "variables": "Variables:"
+        },
+        "fallbacks": {
+          "untitledTheme": "Untitled Theme",
+          "noDescription": "No description"
+        },
+        "variablesDefined": "{{formattedCount}} defined",
+        "previewPaletteTitle": "Preview Palette",
+        "contrast": {
+          "title": "Accessibility warnings",
+          "warning": "{{label}} contrast ratio {{ratio}}:1 is below 4.5:1.",
+          "labels": {
+            "primaryTextOnBackground": "Primary text on background",
+            "secondaryTextOnSurface": "Secondary text on surface",
+            "primaryTextOnSurface": "Primary text on surface"
+          }
+        }
+      }
+    },
+    "preview": {
+      "pages": {
+        "feed": "Feed",
+        "profile": "Profile",
+        "messages": "Messages"
+      },
+      "devices": {
+        "desktop": "Desktop",
+        "mobile": "Mobile"
+      },
+      "actions": {
+        "fullscreen": "Fullscreen",
+        "exitFullscreen": "Exit Fullscreen"
+      },
+      "sections": {
+        "buttons": "Buttons",
+        "formElements": "Form Elements",
+        "statusIndicators": "Status Indicators"
+      },
+      "buttons": {
+        "primary": "Primary Action",
+        "secondary": "Secondary",
+        "outline": "Outline",
+        "danger": "Danger"
+      },
+      "form": {
+        "projectName": "Project Name",
+        "projectNameDefault": "OmniNudge Preview",
+        "category": "Category",
+        "categoryOptions": {
+          "design": "Design",
+          "marketing": "Marketing",
+          "dev": "Development"
+        },
+        "enableBetaAccess": "Enable Beta Access"
+      },
+      "status": {
+        "live": "Live",
+        "scheduled": "Scheduled",
+        "needsReview": "Needs Review",
+        "blocked": "Blocked",
+        "updates_one": "{{formattedCount}} update",
+        "updates_other": "{{formattedCount}} updates"
+      },
+      "feed": {
+        "creator": "Creator {{index}}",
+        "meta": "2h ago · Boosted",
+        "follow": "Follow",
+        "followAria": "Follow Creator {{index}}",
+        "quote": "\"Building theme systems is fun! This preview updates live as you tweak variables.\""
+      },
+      "profile": {
+        "name": "Explorer",
+        "subtitle": "Community Builder · {{formattedCount}} followers",
+        "message": "Message",
+        "messageAria": "Message {{name}}",
+        "bio": "Working on OmniNudge theme marketplace. I love vibrant palettes and soft gradients.",
+        "stats": {
+          "posts": "Posts",
+          "themes": "Themes",
+          "reactions": "Reactions"
+        }
+      },
+      "messages": {
+        "rooms": {
+          "designSquad": "Design Squad",
+          "productCrew": "Product Crew",
+          "opsUpdates": "Ops Updates"
+        },
+        "unread_one": "{{formattedCount}} unread message",
+        "unread_other": "{{formattedCount}} unread messages",
+        "onlineNow": "Online now",
+        "sample": {
+          "incoming": "Can we brighten the accent color a bit more?",
+          "outgoing": "Absolutely! Adjusting theme variables live now."
+        },
+        "typePlaceholder": "Type your message..."
+      },
+      "aria": {
+        "commonSamples": "Common component samples",
+        "avatarIndicators": "Avatar indicators",
+        "profileStats": "Profile stats"
+      }
+    }
+  },
+  "createPostPage": {
+    "title": "Create a Post",
+    "tabs": {
+      "link": "Link",
+      "media": "Media",
+      "text": "Text"
+    },
+    "fields": {
+      "title": {
+        "label": "Title",
+        "placeholder": "Enter post title"
+      },
+      "urlOrMedia": {
+        "label": "URL or Media",
+        "placeholder": "https://example.com",
+        "help": "Enter a URL or upload an image/video"
+      },
+      "mediaOnly": {
+        "label": "Media"
+      }
+    },
+    "media": {
+      "labels": {
+        "imagesVideos": "Images/Videos",
+        "images": "Images",
+        "videos": "Videos",
+        "media": "Media"
+      },
+      "uploadedPreviewAlt": "Uploaded preview",
+      "actions": {
+        "remove": "Remove",
+        "addMore": "+ Add More",
+        "clearAll": "Clear All",
+        "dragDropPrefix": "Drag and drop, or",
+        "uploading": "Uploading...",
+        "chooseFile": "Choose File"
+      }
+    },
+    "markdown": {
+      "label": "Body (optional, Markdown supported)",
+      "placeholder": "Enter post body...",
+      "helper": "{{formattedCount}}/{{formattedMax}} characters"
+    },
+    "destination": {
+      "label": "Choose where to post",
+      "tabs": {
+        "hubs": "Hubs",
+        "subreddits": "Subreddits"
+      },
+      "hub": {
+        "label": "Enter a hub",
+        "placeholder": "Search for a hub...",
+        "noResults": "No hubs found."
+      },
+      "subreddit": {
+        "label": "Enter a subreddit",
+        "placeholder": "Search for a subreddit...",
+        "noResults": "No subreddits found."
+      },
+      "searching": "Searching..."
+    },
+    "nsfw": {
+      "label": "Mark as NSFW (18+)"
+    },
+    "repliesToInbox": {
+      "label": "Send replies to my inbox"
+    },
+    "actions": {
+      "creating": "Creating...",
+      "createPost": "Create Post"
+    }
+  },
+  "emptyStates": {
+    "inbox": {
+      "title": "No messages yet",
+      "description": "Start a conversation to see your messages here.",
+      "actions": {
+        "newMessage": "New Message"
+      }
+    },
+    "searchResults": {
+      "title": "No results found",
+      "descriptionWithQuery": "We couldn't find anything matching \"{{query}}\". Try different keywords.",
+      "descriptionNoQuery": "Try adjusting your search to find what you're looking for."
+    },
+    "notifications": {
+      "title": "No notifications",
+      "description": "You're all caught up! We'll notify you when something new happens."
+    },
+    "conversations": {
+      "title": "No conversations",
+      "description": "Start chatting with friends and communities.",
+      "actions": {
+        "start": "Start Conversation"
+      }
+    },
+    "posts": {
+      "title": "No posts yet",
+      "description": "Be the first to share something with the community.",
+      "actions": {
+        "create": "Create Post"
+      }
+    },
+    "gallery": {
+      "title": "No images yet",
+      "description": "Upload your first image to get started.",
+      "actions": {
+        "upload": "Upload Image"
+      }
+    },
+    "members": {
+      "title": "No members yet",
+      "description": "Invite people to join your community.",
+      "actions": {
+        "invite": "Invite Members"
+      }
+    },
+    "error": {
+      "title": "Something went wrong",
+      "description": "We encountered an error. Please try again.",
+      "actions": {
+        "tryAgain": "Try Again"
+      }
+    },
+    "permissionDenied": {
+      "title": "Access Denied",
+      "defaultResource": "this content",
+      "description": "You don't have permission to view {{resource}}.",
+      "actions": {
+        "requestAccess": "Request Access"
+      }
+    }
+  },
+  "featureFlagsAdmin": {
+    "loading": "Loading feature flags...",
+    "title": "Feature Flags Management",
+    "createNewFlag": "Create New Flag",
+    "table": {
+      "key": "Key",
+      "status": "Status",
+      "rollout": "Rollout",
+      "environment": "Env",
+      "actions": "Actions"
+    },
+    "toggleEnabledAria": "Toggle enabled for {{key}}",
+    "toggleEnabledTitle": "Toggle enabled",
+    "percent": "{{value}}%",
+    "env": {
+      "all": "All",
+      "dev": "Dev",
+      "staging": "Staging",
+      "prod": "Prod"
+    },
+    "confirmDelete": "Are you sure you want to delete this flag?",
+    "detailsTitle": "Details: {{key}}",
+    "configurationTitle": "Configuration",
+    "rolloutPercentage": "Rollout Percentage",
+    "automatedRollback": "Automated Rollback",
+    "rollback": {
+      "errorRateThreshold": "Error Rate Threshold (%)",
+      "minSamples": "Min Samples",
+      "windowSeconds": "Window (sec)"
+    },
+    "auditLogTitle": "Audit Log",
+    "auditEntry": "{{changeType}} by {{user}}",
+    "selectFlagPrompt": "Select a flag to view details and audit (history)",
+    "createModal": {
+      "title": "Create Feature Flag",
+      "keyLabel": "Key (e.g. new_feature_v2)",
+      "descriptionLabel": "Description",
+      "environmentLabel": "Environment",
+      "createButton": "Create"
+    }
+  },
+  "columnConfigPanel": {
+    "feedLabel": {
+      "homeOmniOnly": "Home (Omni Only)",
+      "home": "Home Feed",
+      "subredditNotSet": "Subreddit (not set)",
+      "hubNotSet": "Hub (not set)",
+      "messages": "Messages",
+      "unknown": "Unknown"
+    },
+    "title": {
+      "createPost": "Create Post",
+      "subscribe": "Subscribe",
+      "unsubscribe": "Unsubscribe"
+    },
+    "feedTypeLabel": "Feed Type",
+    "feedTypeOption": {
+      "home": "🏠 Home Feed",
+      "subreddit": "📱 Subreddit",
+      "hub": "🌐 Hub",
+      "messages": "💬 Messages"
+    },
+    "sourceLabel": {
+      "subreddit": "Subreddit Name",
+      "hub": "Hub Name"
+    },
+    "sourcePlaceholder": {
+      "subreddit": "gaming",
+      "hub": "technology"
+    },
+    "sortByLabel": "Sort By",
+    "sortOption": {
+      "hot": "🔥 Hot",
+      "new": "✨ New",
+      "top": "⬆️ Top",
+      "rising": "📈 Rising",
+      "controversial": "⚡ Controversial"
+    },
+    "timeRangeLabel": "Time Range",
+    "timeRangeOption": {
+      "hour": "⏰ Hour",
+      "day": "📅 Day",
+      "week": "📆 Week",
+      "month": "🗓️ Month",
+      "year": "📊 Year",
+      "all": "♾️ All Time"
+    },
+    "omniOnlyLabel": "🌐 Omni-only (no Reddit)"
+  },
+  "aboutPage": {
+    "betaLabel": "(beta)",
+    "hero": {
+      "title": "The all-in-one platform for everything you do online",
+      "description": "A Reddit-like community platform with end-to-end encrypted messaging, building toward an integrated ecosystem of social media, productivity, and communication tools."
+    },
+    "availableToday": {
+      "title": "Available Today",
+      "items": {
+        "createCommunities": "Create and manage communities (hubs) like subreddits",
+        "browseReddit": "Browse Reddit posts and subscribe to subreddits",
+        "encryptedMessaging": "End-to-end encrypted messaging with any file type",
+        "postAndComment": "Post and comment in communities (visible to OmniNudge users)"
+      },
+      "note": "<strong>Note:</strong> Reddit API access may be restricted at any time due to third-party app policies."
+    },
+    "vision": {
+      "title": "The Vision",
+      "description": "Building the last platform you'll ever need - an all-encompassing digital ecosystem that combines:",
+      "items": {
+        "socialMediaIntegration": "Social media integration",
+        "officeSuite": "Office suite",
+        "gamingEcosystem": "Gaming ecosystem",
+        "mediaHosting": "Media hosting",
+        "teamCommunication": "Team communication",
+        "financeCrypto": "Finance & crypto",
+        "aiIntegration": "AI integration",
+        "mobileDesktop": "Mobile & desktop"
+      },
+      "quote": "\"This platform will never be finished.\""
+    },
+    "roadmap": {
+      "title": "What's Next",
+      "messaging": {
+        "title": "Enhanced Messaging",
+        "items": {
+          "timeActivatedAutoDeletion": "Time-activated auto-deletion",
+          "voiceNotes": "Voice notes",
+          "voiceVideoCalls": "Voice and video calls",
+          "screenSharing": "Screen sharing",
+          "audioPlayer": "Audio player"
+        }
+      },
+      "social": {
+        "title": "Social Media Upgrades",
+        "items": {
+          "friendsFollowers": "Friends and followers",
+          "multipleProfiles": "Multiple profiles for different niches",
+          "karmaPointSystem": "Karma point system",
+          "awardsBadges": "Awards and badges"
+        }
+      }
+    },
+    "customization": {
+      "title": "Unmatched Customization",
+      "paragraph1": "Remember MySpace? We're bringing that level of personalization back. Customize everything from your profile to your browsing experience with advanced theming and the most comprehensive settings of any platform.",
+      "paragraph2": "Don't want complexity? No problem. Simple defaults and intuitive settings for everyone."
+    },
+    "footer": {
+      "bugReporting": "Bug Reporting",
+      "termsOfService": "Terms of Service",
+      "privacyPolicy": "Privacy Policy"
+    }
+  },
+  "notFoundPage": {
+    "title": "Page not found",
+    "description": "The page you're looking for doesn't exist or has been moved.",
+    "goHome": "Go to Home"
+  },
+  "errorBoundary": {
+    "title": "Something went wrong.",
+    "details": "Error details"
+  },
+  "standardScroll": {
+    "loadingFeed": "Loading feed...",
+    "noPostsAvailable": "No posts available",
+    "loadingMorePosts": "Loading more posts...",
+    "endOfFeed": "End of feed",
+    "aria": {
+      "closeScroll": "Close scroll"
+    }
+  },
+  "standardScrollControls": {
+    "titles": {
+      "pauseAutoAdvance": "Pause auto-advance",
+      "enableAutoAdvance": "Enable auto-advance",
+      "settings": "Settings"
+    },
+    "settingsPanel": {
+      "title": "Auto-advance Interval"
+    },
+    "help": {
+      "navigate": "Navigate",
+      "toggleAuto": "Toggle auto",
+      "exit": "Exit"
+    },
+    "aria": {
+      "previousPost": "Previous post",
+      "nextPost": "Next post"
+    },
+    "keys": {
+      "space": "Space",
+      "escape": "Esc"
+    }
+  },
+  "columnFeed": {
+    "errors": {
+      "loadFailed": "Failed to load feed"
+    },
+    "noPostsToDisplay": "No posts to display",
+    "newMessage": {
+      "usernameRequired": "Username is required.",
+      "usernameInvalid": "Username is invalid."
+    }
+  },
+  "redditPostSlideshow": {
+    "loadingGalleryImages": "Loading gallery images...",
+    "noMediaPostsFound": "No media posts found"
+  },
+  "hubWikiPage": {
+    "title": "Wiki",
+    "wikiDisabled": "This hub does not have wiki enabled.",
+    "headerTitle": "h/{{hub}} wiki",
+    "subtitle": {
+      "home": "Hub wiki home",
+      "page": "Page: {{slug}}"
+    },
+    "actions": {
+      "backToHub": "Back to hub",
+      "editWiki": "Edit wiki"
+    },
+    "status": {
+      "loading": "Loading wiki...",
+      "saving": "Saving..."
+    },
+    "errors": {
+      "unableToLoad": "Unable to load wiki page."
+    },
+    "editor": {
+      "label": "Wiki content",
+      "placeholder": "Write wiki content in Markdown..."
+    },
+    "empty": "This wiki page is empty."
+  },
+  "adminPage": {
+    "title": "Admin Dashboard",
+    "subtitle": "Site-wide administration and management",
+    "tabs": {
+      "statistics": "Statistics",
+      "userManagement": "User Management",
+      "hubModerators": "Hub Moderators",
+      "banActivity": "Ban Activity",
+      "bugReports": "Bug Reports"
+    },
+    "roles": {
+      "user": "User",
+      "admin": "Admin"
+    },
+    "status": {
+      "active": "Active",
+      "shadowBanned": "Shadow Banned",
+      "banned": "Banned",
+      "deleted": "Deleted"
+    },
+    "stats": {
+      "loading": "Loading statistics...",
+      "empty": "No statistics available.",
+      "cards": {
+        "totalUsers": "Total Users",
+        "totalPosts": "Total Posts",
+        "totalComments": "Total Comments",
+        "totalHubs": "Total Hubs",
+        "totalConversations": "Total Conversations",
+        "totalMessages": "Total Messages",
+        "totalReports": "Total Reports",
+        "admins": "Admins",
+        "hubModerators": "Hub Moderators"
+      }
+    },
+    "users": {
+      "searchPlaceholder": "Search by username or email...",
+      "filters": {
+        "allRoles": "All Roles",
+        "allStatus": "All Status"
+      },
+      "view": {
+        "card": "Card View",
+        "table": "Table View"
+      },
+      "export": {
+        "csv": "Export CSV",
+        "json": "Export JSON"
+      },
+      "showing": "Showing {{shown}} users",
+      "showingWithTotal": "Showing {{shown}} users (Total {{total}})",
+      "perPage": "Per page:",
+      "loading": "Loading users...",
+      "empty": "No users found.",
+      "csv": {
+        "never": "Never"
+      },
+      "lastSeen": "Last seen",
+      "errors": {
+        "reasonRequired": "Reason is required"
+      },
+      "table": {
+        "id": "ID",
+        "username": "Username",
+        "email": "Email",
+        "role": "Role",
+        "status": "Status",
+        "joined": "Joined",
+        "actions": "Actions"
+      },
+      "actions": {
+        "menu": "Actions",
+        "shadowBan": "Shadow Ban",
+        "ban": "Ban",
+        "unban": "Unban",
+        "softDelete": "Soft Delete",
+        "history": "History",
+        "viewBanHistory": "View Ban History"
+      },
+      "details": {
+        "redditId": "Reddit ID",
+        "karma": "Karma",
+        "bio": "Bio",
+        "avatar": "Avatar",
+        "bannedAt": "Banned at",
+        "bannedById": "Banned by ID",
+        "banReason": "Ban reason",
+        "shownToUser": "(shown to user)"
+      },
+      "banHistory": {
+        "title": "Ban history for {{username}}",
+        "subtitle": "Recent ban/shadow-ban/unban actions",
+        "loading": "Loading...",
+        "empty": "No history found.",
+        "byLine": "{{date}} by {{admin}}"
+      }
+    },
+    "common": {
+      "processing": "Processing..."
+    },
+    "labels": {
+      "reason": "Reason"
+    },
+    "pagination": {
+      "page": "Page {{page}}"
+    },
+    "bugReports": {
+      "title": "Bug Reports",
+      "subtitle": "Click a report to view the screenshot and full details.",
+      "filters": {
+        "allStatuses": "All statuses",
+        "perPage": "{{count}} per page"
+      },
+      "status": {
+        "new": "New",
+        "investigating": "Investigating",
+        "fixed": "Fixed",
+        "wontFix": "Won't fix",
+        "duplicate": "Duplicate"
+      },
+      "loading": "Loading bug reports...",
+      "empty": "No bug reports found.",
+      "anonymous": "Anonymous",
+      "table": {
+        "id": "ID",
+        "status": "Status",
+        "user": "User",
+        "page": "Page",
+        "description": "Description",
+        "submitted": "Submitted"
+      },
+      "details": {
+        "status": "Status",
+        "reporter": "Reporter",
+        "page": "Page",
+        "description": "Description",
+        "screenshot": "Screenshot",
+        "screenshotAlt": "Bug report screenshot",
+        "noScreenshot": "No screenshot available."
+      }
+    },
+    "moderators": {
+      "selectHub": "Select Hub",
+      "selectHubPlaceholder": "-- Select a hub --",
+      "selectHubPrompt": "Select a hub to view and manage moderators",
+      "loading": "Loading moderators...",
+      "empty": "No moderators for this hub",
+      "userId": "User ID: {{id}}",
+      "added": "Added: {{date}}",
+      "remove": "Remove"
+    },
+    "banActivity": {
+      "title": "Site-wide Ban Activity",
+      "subtitle": "All ban, shadow-ban, unban, and delete actions across the site",
+      "showing": "Showing {{shown}} actions",
+      "showingWithTotal": "Showing {{shown}} actions (Total {{total}})",
+      "perPage": "Per page:",
+      "loading": "Loading ban activity...",
+      "empty": "No ban activity found.",
+      "userId": "User ID: {{id}}",
+      "byLine": "{{date}} by {{admin}} (ID: {{id}})"
+    }
   }
 }

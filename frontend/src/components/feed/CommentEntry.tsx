@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { postsService } from '../../services/postsService';
 
 interface CommentEntryProps {
@@ -35,8 +36,9 @@ export function CommentEntry({
   parentId,
   onCommentPosted,
   onCancel,
-  placeholder = 'Add a comment...'
+  placeholder,
 }: CommentEntryProps) {
+  const { t } = useTranslation();
   const [content, setContent] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -53,7 +55,8 @@ export function CommentEntry({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!content.trim() || isSubmitting) return;
+    const trimmedContent = content.trim();
+    if (!trimmedContent || isSubmitting) return;
 
     setIsSubmitting(true);
     setError(null);
@@ -61,9 +64,9 @@ export function CommentEntry({
     const tempId = `temp-${Date.now()}`;
     const optimisticComment = {
       id: tempId,
-      content: content.trim(),
+      content: trimmedContent,
       score: 1,
-      username: 'You',
+      username: t('posts.you'),
       created_at: new Date().toISOString(),
       parent_comment_id: parentId ?? undefined,
       user_vote: 1,
@@ -83,7 +86,7 @@ export function CommentEntry({
         newComment = optimisticComment;
       } else {
         newComment = await postsService.createComment(postId as number, {
-          body: content.trim(),
+          body: trimmedContent,
           parent_comment_id: parentId ?? undefined,
         });
       }
@@ -93,7 +96,7 @@ export function CommentEntry({
         onCommentPosted({ ...newComment, __replaceTempId: tempId });
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to post comment');
+      setError(err instanceof Error ? err.message : t('comments.errors.postFailed'));
       // Remove optimistic comment on error
       onCommentPosted({ __removeTempId: tempId });
     } finally {
@@ -114,7 +117,7 @@ export function CommentEntry({
         value={content}
         onChange={(e) => setContent(e.target.value)}
         onKeyDown={handleKeyDown}
-        placeholder={placeholder}
+        placeholder={placeholder || t('comments.addComment')}
         className="w-full bg-[var(--color-background)] text-xs text-[var(--color-text)] placeholder-[var(--color-text-muted)] border border-[var(--color-border)] rounded px-2 py-1 resize-none focus:outline-none focus:border-cyan-500 min-h-[24px]"
         rows={1}
         disabled={isSubmitting}
@@ -128,7 +131,7 @@ export function CommentEntry({
           disabled={!content.trim() || isSubmitting}
           className="text-[10px] bg-cyan-600 hover:bg-cyan-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white px-2 py-0.5 rounded transition-colors"
         >
-          {isSubmitting ? 'Posting...' : 'Post'}
+          {isSubmitting ? t('comments.status.posting') : t('comments.actions.post')}
         </button>
         {onCancel && (
           <button
@@ -136,7 +139,7 @@ export function CommentEntry({
             onClick={onCancel}
             className="text-[10px] text-[var(--color-text-muted)] hover:text-[var(--color-text)] transition-colors"
           >
-            Cancel
+            {t('common.cancel')}
           </button>
         )}
       </div>

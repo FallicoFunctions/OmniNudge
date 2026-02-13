@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { hubsService } from '../services/hubsService';
 import { useAuth } from '../contexts/AuthContext';
 import { useHubDetails } from '../hooks/useHubDetails';
@@ -12,6 +13,7 @@ import { MarkdownInput } from '../components/common/MarkdownInput';
 import { LoadingMessage, ErrorMessage } from '../components/common/StatusMessage';
 
 export default function HubWikiPage() {
+  const { t } = useTranslation();
   const { hubname, pagePath } = useParams<{ hubname: string; pagePath?: string }>();
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -62,12 +64,12 @@ export default function HubWikiPage() {
   if (hubSettings && !hubSettings.enable_wiki) {
     return (
       <div className="mx-auto w-full max-w-6xl px-4 py-8">
-        <h1 className="text-2xl font-bold text-[var(--color-text-primary)]">Wiki</h1>
+        <h1 className="text-2xl font-bold text-[var(--color-text-primary)]">{t('hubWikiPage.title')}</h1>
         <p className="mt-2 text-sm text-[var(--color-text-secondary)]">
-          This hub does not have wiki enabled.
+          {t('hubWikiPage.wikiDisabled')}
         </p>
         <Link to={`/h/${hub}`} className="mt-4 inline-block text-sm text-[var(--color-primary)]">
-          Back to hub
+          {t('hubWikiPage.actions.backToHub')}
         </Link>
       </div>
     );
@@ -78,10 +80,10 @@ export default function HubWikiPage() {
       <div className="mb-6 flex items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-[var(--color-text-primary)]">
-            h/{hub} wiki
+            {t('hubWikiPage.headerTitle', { hub })}
           </h1>
           <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
-            {slug === 'index' ? 'Hub wiki home' : `Page: ${slug}`}
+            {slug === 'index' ? t('hubWikiPage.subtitle.home') : t('hubWikiPage.subtitle.page', { slug })}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -89,7 +91,7 @@ export default function HubWikiPage() {
             to={`/h/${hub}`}
             className="rounded-md border border-[var(--color-border)] px-3 py-2 text-sm text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
           >
-            Back to hub
+            {t('hubWikiPage.actions.backToHub')}
           </Link>
           {isModerator && !isEditing && (
             <button
@@ -97,16 +99,16 @@ export default function HubWikiPage() {
               onClick={() => setIsEditing(true)}
               className="rounded-md bg-[var(--color-primary)] px-3 py-2 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)]"
             >
-              Edit wiki
+              {t('hubWikiPage.actions.editWiki')}
             </button>
           )}
         </div>
       </div>
 
-      {isLoading && <LoadingMessage>Loading wiki...</LoadingMessage>}
+      {isLoading && <LoadingMessage>{t('hubWikiPage.status.loading')}</LoadingMessage>}
       {isError && (
         <ErrorMessage>
-          {error instanceof Error ? error.message : 'Unable to load wiki page.'}
+          {error instanceof Error ? error.message : t('hubWikiPage.errors.unableToLoad')}
         </ErrorMessage>
       )}
       {!isLoading && !isError && (
@@ -114,10 +116,10 @@ export default function HubWikiPage() {
           {isEditing ? (
             <div className="space-y-4">
               <MarkdownInput
-                label="Wiki content"
+                label={t('hubWikiPage.editor.label')}
                 value={draft}
                 onChange={setDraft}
-                placeholder="Write wiki content in Markdown..."
+                placeholder={t('hubWikiPage.editor.placeholder')}
                 rows={10}
               />
               <div className="flex flex-wrap gap-2">
@@ -127,7 +129,7 @@ export default function HubWikiPage() {
                   disabled={updateMutation.isPending}
                   className="rounded-md bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)] disabled:opacity-60"
                 >
-                  {updateMutation.isPending ? 'Saving...' : 'Save'}
+                  {updateMutation.isPending ? t('hubWikiPage.status.saving') : t('common.save')}
                 </button>
                 <button
                   type="button"
@@ -137,7 +139,7 @@ export default function HubWikiPage() {
                   }}
                   className="rounded-md border border-[var(--color-border)] px-4 py-2 text-sm text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
                 >
-                  Cancel
+                  {t('common.cancel')}
                 </button>
               </div>
             </div>
@@ -147,7 +149,7 @@ export default function HubWikiPage() {
                 <MarkdownRenderer content={wikiPage.content} className="text-[var(--color-text-primary)]" />
               ) : (
                 <p className="text-sm text-[var(--color-text-secondary)]">
-                  This wiki page is empty.
+                  {t('hubWikiPage.empty')}
                 </p>
               )}
             </>

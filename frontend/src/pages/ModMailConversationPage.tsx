@@ -1,7 +1,9 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
+import { useFormat } from '../hooks/useFormat';
 import { messagesService } from '../services/messagesService';
 import { modMailService } from '../services/modMailService';
 import { hubsService } from '../services/hubsService';
@@ -117,8 +119,10 @@ function DecryptedMessageContent({
 export default function ModMailConversationPage() {
   const { conversationId } = useParams<{ conversationId: string }>();
   const { user } = useAuth();
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { formatDate } = useFormat();
   const [messageText, setMessageText] = useState('');
   const [encryptionWarning, setEncryptionWarning] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -137,7 +141,7 @@ export default function ModMailConversationPage() {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to fetch conversation');
+        throw new Error(t('modMailConversationPage.errors.fetchConversationFailed'));
       }
 
       return response.json();
@@ -210,7 +214,7 @@ export default function ModMailConversationPage() {
       );
 
       if (!participantIds.length) {
-        const error = 'CRITICAL: No participants found. Cannot send unencrypted mod mail.';
+        const error = t('modMailConversationPage.encryption.noParticipants');
         setEncryptionWarning(error);
         throw new Error(error);
       }
@@ -237,14 +241,16 @@ export default function ModMailConversationPage() {
 
       // Check if sender has keys (required)
       if (!ownKeys?.publicKey) {
-        const errorMsg = 'CRITICAL: You have not set up encryption keys. Cannot send mod mail.';
+        const errorMsg = t('modMailConversationPage.encryption.noSenderKeys');
         setEncryptionWarning(errorMsg);
         throw new Error(errorMsg);
       }
 
       // Warn if some recipients don't have keys, but allow sending
       if (missing.length > 0) {
-        const warningMsg = `Warning: Some participants (user IDs: ${missing.join(', ')}) do not have encryption keys set up. They will not be able to read this message until they enable encryption.`;
+        const warningMsg = t('modMailConversationPage.encryption.missingRecipientKeys', {
+          ids: missing.join(', '),
+        });
         setEncryptionWarning(warningMsg);
         console.warn('[Mod Mail Encryption]', warningMsg);
       } else {
@@ -253,7 +259,7 @@ export default function ModMailConversationPage() {
 
       // If no recipients have keys, we can't encrypt (need at least sender's key)
       if (cryptoKeys.length === 0) {
-        const errorMsg = 'CRITICAL: No recipients have encryption enabled. Cannot send encrypted mod mail.';
+        const errorMsg = t('modMailConversationPage.encryption.noRecipientsEnabled');
         setEncryptionWarning(errorMsg);
         throw new Error(errorMsg);
       }
@@ -271,7 +277,7 @@ export default function ModMailConversationPage() {
         recipient_keys: encrypted.recipientKeys,
       };
     },
-    [conversation?.participants, recipientsData?.recipient_ids, user?.id]
+    [conversation?.participants, recipientsData?.recipient_ids, t, user?.id]
   );
 
   const sendMutation = useMutation({
@@ -299,7 +305,7 @@ export default function ModMailConversationPage() {
       if (err instanceof Error) {
         setEncryptionWarning(err.message);
       } else {
-        setEncryptionWarning('Failed to send message. Please try again.');
+        setEncryptionWarning(t('modMailConversationPage.errors.sendFailed'));
       }
     },
     onSuccess: () => {
@@ -327,7 +333,7 @@ export default function ModMailConversationPage() {
     return (
       <div className="max-w-4xl mx-auto p-6">
         <div className="text-center py-12">
-          <LoadingMessage>Loading conversation...</LoadingMessage>
+          <LoadingMessage>{t('modMailConversationPage.loadingConversation')}</LoadingMessage>
         </div>
       </div>
     );
@@ -337,7 +343,7 @@ export default function ModMailConversationPage() {
     return (
       <div className="max-w-4xl mx-auto p-6">
         <div className="text-center py-12">
-          <ErrorMessage>Unable to load messages.</ErrorMessage>
+          <ErrorMessage>{t('modMailConversationPage.errors.unableToLoadMessages')}</ErrorMessage>
         </div>
       </div>
     );
@@ -351,7 +357,8 @@ export default function ModMailConversationPage() {
 
   const hubDisplayTitle = hubDetails?.title?.trim() || hubName;
   const status = conversation?.status || 'open';
-  const subject = conversation?.subject || 'Mod Mail Conversation';
+  const subject = conversation?.subject || t('modMailConversationPage.subjectFallback');
+  const statusLabel = t(`modMailConversationPage.status.${status}`, { defaultValue: status });
 
   return (
     <div className="max-w-4xl mx-auto p-6">
@@ -361,7 +368,7 @@ export default function ModMailConversationPage() {
           onClick={() => navigate(-1)}
           className="text-[var(--color-primary)] hover:underline mb-4"
         >
-          ← Back to Mod Tools
+          {t('modMailConversationPage.actions.backToModTools')}
         </button>
         <div className="flex justify-between items-start">
           <div>
@@ -382,7 +389,7 @@ export default function ModMailConversationPage() {
                   : 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200'
               }`}
             >
-              {status}
+              {statusLabel}
             </span>
             {status === 'open' && (
               <>
@@ -391,14 +398,14 @@ export default function ModMailConversationPage() {
                   disabled={updateStatusMutation.isPending}
                   className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
                 >
-                  Resolve
+                  {t('modMailConversationPage.actions.resolve')}
                 </button>
                 <button
                   onClick={() => updateStatusMutation.mutate('archived')}
                   disabled={updateStatusMutation.isPending}
                   className="px-3 py-1 text-sm bg-gray-600 text-white rounded hover:bg-gray-700 disabled:opacity-50"
                 >
-                  Archive
+                  {t('modMailConversationPage.actions.archive')}
                 </button>
               </>
             )}
@@ -408,7 +415,7 @@ export default function ModMailConversationPage() {
                 disabled={updateStatusMutation.isPending}
                 className="px-3 py-1 text-sm bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50"
               >
-                Reopen
+                {t('modMailConversationPage.actions.reopen')}
               </button>
             )}
           </div>
@@ -425,13 +432,13 @@ export default function ModMailConversationPage() {
               disabled={isFetchingMoreMessages}
               className="rounded-md border border-[var(--color-border)] px-3 py-1 text-xs font-semibold text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-elevated)] disabled:opacity-60"
             >
-              {isFetchingMoreMessages ? 'Loading…' : 'Load more messages'}
+              {isFetchingMoreMessages ? t('common.loading') : t('modMailConversationPage.messages.loadMore')}
             </button>
           </div>
         )}
         {messages && messages.length === 0 && (
           <div className="text-center py-12 text-[var(--color-text-secondary)]">
-            No messages yet
+            {t('modMailConversationPage.messages.noneYet')}
           </div>
         )}
         <div className="space-y-4">
@@ -439,7 +446,7 @@ export default function ModMailConversationPage() {
             const isCurrentUser = msg.sender_id === user?.id;
             const participant = conversation?.participants?.find((p) => p.user_id === msg.sender_id);
             const isModerator = participant?.is_moderator || false;
-            const senderUsername = participant?.username || `User #${msg.sender_id}`;
+            const senderUsername = participant?.username || t('common.userNumber', { id: msg.sender_id });
 
             return (
               <div
@@ -467,10 +474,10 @@ export default function ModMailConversationPage() {
                           ? 'bg-white/20 text-white'
                           : 'bg-green-600 text-white'
                       }`}>
-                        MOD
+                        {t('modMailConversationPage.badges.mod')}
                       </span>
                     )}
-                    <span>{new Date(msg.sent_at).toLocaleString()}</span>
+                    <span>{formatDate(msg.sent_at, { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })}</span>
                   </div>
                 </div>
               </div>
@@ -485,7 +492,7 @@ export default function ModMailConversationPage() {
         <textarea
           value={messageText}
           onChange={(e) => setMessageText(e.target.value)}
-          placeholder="Type your reply... (visible to all moderators and the user)"
+          placeholder={t('modMailConversationPage.reply.placeholder')}
           rows={4}
           className="w-full px-3 py-2 border border-[var(--color-border)] rounded bg-[var(--color-background)] text-[var(--color-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] resize-none"
           disabled={sendMutation.isPending}
@@ -497,14 +504,14 @@ export default function ModMailConversationPage() {
         )}
         <div className="flex justify-between items-center mt-3">
           <p className="text-xs text-[var(--color-text-secondary)]">
-            All moderators of {hubDisplayTitle} can see and reply to this conversation
+            {t('modMailConversationPage.reply.visibleToAllMods', { hub: hubDisplayTitle })}
           </p>
           <button
             type="submit"
             disabled={!messageText.trim() || sendMutation.isPending}
             className="px-4 py-2 rounded bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-strong)] disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {sendMutation.isPending ? 'Sending...' : 'Send Reply'}
+            {sendMutation.isPending ? t('modMailConversationPage.actions.sending') : t('modMailConversationPage.actions.sendReply')}
           </button>
         </div>
       </form>

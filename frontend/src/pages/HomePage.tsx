@@ -2,7 +2,6 @@ import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient, useInfiniteQuery, type InfiniteData } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { useFormat } from '../hooks/useFormat';
 import { feedService, type HomeFeedResponse, type RedditPost } from '../services/feedService';
 import { useAuth } from '../contexts/AuthContext';
 import { useSettings } from '../contexts/SettingsContext';
@@ -78,7 +77,6 @@ const persistOmniOnlyState = (userId: number | null | undefined, value: boolean)
 
 export default function HomePage() {
   const { t } = useTranslation();
-  const { formatNumber } = useFormat();
   const { user } = useAuth();
   const {
     useRelativeTime,
@@ -515,10 +513,10 @@ export default function HomePage() {
   const crosspostMutation = useMutation({
     mutationFn: async () => {
       if (!crosspostTarget) {
-        throw new Error('No post selected for crosspost');
+        throw new Error(t('alerts.crosspostNoSource'));
       }
       if (!selectedHub && !selectedSubreddit) {
-        throw new Error('Please select at least one destination (hub or subreddit)');
+        throw new Error(t('alerts.crosspostMissingDestination'));
       }
 
       const post = crosspostTarget.post;

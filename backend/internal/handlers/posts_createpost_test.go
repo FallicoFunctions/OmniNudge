@@ -20,6 +20,7 @@ import (
 func setupPostsCreateTest(t *testing.T) (*PostsHandler, *models.HubRepository, *models.PlatformPostRepository, func()) {
 	db, err := database.NewTest()
 	require.NoError(t, err)
+	t.Cleanup(db.Close)
 
 	ctx := context.Background()
 	err = db.Migrate(ctx)

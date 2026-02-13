@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { hubSettingsService } from '../../services/hubSettingsService';
 import type { ModeratorRole } from '../../types/hubSettings';
 import { LoadingMessage } from '../common/StatusMessage';
@@ -12,6 +13,7 @@ interface Props {
 
 export default function ModeratorsTab({ hubName, isOwner }: Props) {
   const queryClient = useQueryClient();
+  const { t } = useTranslation();
   const [showAddModal, setShowAddModal] = useState(false);
   const [newModUsername, setNewModUsername] = useState('');
   const [newModRole, setNewModRole] = useState<ModeratorRole>('moderator');
@@ -61,7 +63,7 @@ export default function ModeratorsTab({ hubName, isOwner }: Props) {
   if (isLoading) {
     return (
       <div className="text-center py-8">
-        <LoadingMessage>Loading...</LoadingMessage>
+        <LoadingMessage>{t('common.loading')}</LoadingMessage>
       </div>
     );
   }
@@ -73,10 +75,10 @@ export default function ModeratorsTab({ hubName, isOwner }: Props) {
       <div className="flex justify-between items-start">
         <div>
           <h2 className="text-xl font-bold text-[var(--color-text-primary)] mb-2">
-            Moderator Team
+            {t('hubSettings.moderators.title')}
           </h2>
           <p className="text-[var(--color-text-secondary)]">
-            Manage moderators and their permissions
+            {t('hubSettings.moderators.subtitle')}
           </p>
         </div>
         {isOwner && (
@@ -84,35 +86,39 @@ export default function ModeratorsTab({ hubName, isOwner }: Props) {
             onClick={() => setShowAddModal(true)}
             className="px-4 py-2 rounded bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-strong)] transition-colors"
           >
-            Add Moderator
+            {t('hubSettings.moderators.actions.addModerator')}
           </button>
         )}
       </div>
 
       {/* Role Descriptions */}
       <div className="bg-[var(--color-background)] border border-[var(--color-border)] rounded p-4">
-        <h3 className="font-medium text-[var(--color-text-primary)] mb-3">Moderator Roles</h3>
+        <h3 className="font-medium text-[var(--color-text-primary)] mb-3">
+          {t('hubSettings.moderators.roles.title')}
+        </h3>
         <div className="space-y-2 text-sm">
           <div>
-            <span className="font-medium text-[var(--color-text-primary)]">Owner:</span>
+            <span className="font-medium text-[var(--color-text-primary)]">
+              {t('hubSettings.roles.ownerLabel')}
+            </span>
             <span className="text-[var(--color-text-secondary)] ml-2">
-              Full control, can manage all settings and moderators
+              {t('hubSettings.moderators.roles.ownerDescription')}
             </span>
           </div>
           <div>
             <span className="font-medium text-[var(--color-text-primary)]">
-              Moderator (settings access):
+              {t('hubSettings.roles.fullModeratorLabel')}
             </span>
             <span className="text-[var(--color-text-secondary)] ml-2">
-              Can change settings and moderate content
+              {t('hubSettings.moderators.roles.fullModeratorDescription')}
             </span>
           </div>
           <div>
             <span className="font-medium text-[var(--color-text-primary)]">
-              Moderator (content only):
+              {t('hubSettings.roles.moderatorLabel')}
             </span>
             <span className="text-[var(--color-text-secondary)] ml-2">
-              Can moderate content only, cannot change settings
+              {t('hubSettings.moderators.roles.moderatorDescription')}
             </span>
           </div>
         </div>
@@ -124,14 +130,14 @@ export default function ModeratorsTab({ hubName, isOwner }: Props) {
           <thead className="bg-[var(--color-background)]">
             <tr>
               <th className="px-4 py-3 text-left text-sm font-medium text-[var(--color-text-primary)]">
-                Moderator
+                {t('hubSettings.moderators.table.moderator')}
               </th>
               <th className="px-4 py-3 text-left text-sm font-medium text-[var(--color-text-primary)]">
-                Role
+                {t('hubSettings.moderators.table.role')}
               </th>
               {isOwner && (
                 <th className="px-4 py-3 text-right text-sm font-medium text-[var(--color-text-primary)]">
-                  Actions
+                  {t('hubSettings.moderators.table.actions')}
                 </th>
               )}
             </tr>
@@ -167,12 +173,14 @@ export default function ModeratorsTab({ hubName, isOwner }: Props) {
                       }
                       className="px-2 py-1 border border-[var(--color-border)] rounded bg-[var(--color-surface)] text-[var(--color-text-primary)] text-sm"
                     >
-                      <option value="full_moderator">Moderator (settings)</option>
-                      <option value="moderator">Moderator (content only)</option>
+                      <option value="full_moderator">{t('hubSettings.roles.fullModeratorOption')}</option>
+                      <option value="moderator">{t('hubSettings.roles.moderatorOption')}</option>
                     </select>
                   ) : (
                     <span className="inline-flex items-center px-2 py-1 rounded text-sm bg-[var(--color-background)] text-[var(--color-text-primary)]">
-                      {mod.role === 'owner' ? '👑 Owner' : getHubModeratorRoleLabel(mod.role)}
+                      {mod.role === 'owner'
+                        ? t('hubSettings.moderators.roles.ownerBadge')
+                        : getHubModeratorRoleLabel(mod.role, t)}
                     </span>
                   )}
                 </td>
@@ -182,14 +190,18 @@ export default function ModeratorsTab({ hubName, isOwner }: Props) {
                       <button
                         onClick={() => {
                           if (
-                            confirm(`Remove ${mod.username} as a moderator?`)
+                            confirm(
+                              t('hubSettings.moderators.confirmRemove', {
+                                username: mod.username,
+                              })
+                            )
                           ) {
                             removeMutation.mutate(mod.user_id);
                           }
                         }}
                         className="text-red-600 hover:text-red-800 text-sm"
                       >
-                        Remove
+                        {t('hubSettings.moderators.actions.remove')}
                       </button>
                     )}
                   </td>
@@ -205,32 +217,32 @@ export default function ModeratorsTab({ hubName, isOwner }: Props) {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-[var(--color-surface)] rounded-lg p-6 max-w-md w-full mx-4">
             <h3 className="text-xl font-bold text-[var(--color-text-primary)] mb-4">
-              Add Moderator
+              {t('hubSettings.moderators.modal.title')}
             </h3>
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-[var(--color-text-primary)] mb-2">
-                  Username
+                  {t('hubSettings.moderators.modal.usernameLabel')}
                 </label>
                 <input
                   type="text"
                   value={newModUsername}
                   onChange={(e) => setNewModUsername(e.target.value)}
-                  placeholder="Enter username..."
+                  placeholder={t('hubSettings.moderators.modal.usernamePlaceholder')}
                   className="w-full px-3 py-2 border border-[var(--color-border)] rounded bg-[var(--color-background)] text-[var(--color-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
                 />
               </div>
               <div>
                 <label className="block text-sm font-medium text-[var(--color-text-primary)] mb-2">
-                  Role
+                  {t('hubSettings.moderators.modal.roleLabel')}
                 </label>
                 <select
                   value={newModRole}
                   onChange={(e) => setNewModRole(e.target.value as ModeratorRole)}
                   className="w-full px-3 py-2 border border-[var(--color-border)] rounded bg-[var(--color-background)] text-[var(--color-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
                 >
-                  <option value="full_moderator">Moderator (settings)</option>
-                  <option value="moderator">Moderator (content only)</option>
+                  <option value="full_moderator">{t('hubSettings.roles.fullModeratorOption')}</option>
+                  <option value="moderator">{t('hubSettings.roles.moderatorOption')}</option>
                 </select>
               </div>
             </div>
@@ -239,19 +251,21 @@ export default function ModeratorsTab({ hubName, isOwner }: Props) {
                 onClick={() => setShowAddModal(false)}
                 className="px-4 py-2 rounded border border-[var(--color-border)] text-[var(--color-text-primary)] hover:bg-[var(--color-background)] transition-colors"
               >
-                Cancel
+                {t('common.cancel')}
               </button>
               <button
                 onClick={handleAddModerator}
                 disabled={!newModUsername.trim() || addModMutation.isPending}
                 className="px-4 py-2 rounded bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-strong)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
-                {addModMutation.isPending ? 'Adding...' : 'Add Moderator'}
+                {addModMutation.isPending
+                  ? t('hubSettings.moderators.status.adding')
+                  : t('hubSettings.moderators.actions.addModerator')}
               </button>
             </div>
             {addModMutation.isError && (
               <p className="text-red-600 text-sm mt-2">
-                Failed to add moderator. Please check the username and try again.
+                {t('hubSettings.moderators.errors.addFailed')}
               </p>
             )}
           </div>

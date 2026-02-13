@@ -1,8 +1,10 @@
 import { Link, useLocation, useParams, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { redditService } from '../services/redditService';
 import { sanitizeHttpUrl } from '../utils/crosspostHelpers';
+import { useFormat } from '../hooks/useFormat';
 import { Panel } from '../components/common/Panel';
 import { EmptyMessage, ErrorMessage, LoadingMessage } from '../components/common/StatusMessage';
 import type {
@@ -21,6 +23,8 @@ const HISTORY_ROOT_CURSOR = '__root__';
 
 export default function RedditWikiPage({ mode = 'view' }: RedditWikiPageProps = {}) {
   const { subreddit, pagePath = 'index' } = useParams<{ subreddit?: string; pagePath?: string }>();
+  const { t } = useTranslation();
+  const { formatDate, formatNumber, formatRelativeTime } = useFormat();
   const activeTab: WikiTab = mode ?? 'view';
   const currentPage = pagePath || 'index';
   const location = useLocation();
@@ -270,19 +274,19 @@ export default function RedditWikiPage({ mode = 'view' }: RedditWikiPageProps = 
       return [];
     }
     return [
-      { key: 'view' as WikiTab, label: 'view', to: `/r/${subreddit}/wiki/${currentPage}` },
+      { key: 'view' as WikiTab, label: t('redditWikiPage.tabs.view'), to: `/r/${subreddit}/wiki/${currentPage}` },
       {
         key: 'history' as WikiTab,
-        label: 'history',
+        label: t('redditWikiPage.tabs.history'),
         to: `/r/${subreddit}/wiki/revisions/${currentPage}`,
       },
       {
         key: 'talk' as WikiTab,
-        label: 'talk',
+        label: t('redditWikiPage.tabs.talk'),
         to: `/r/${subreddit}/wiki/discussions/${currentPage}`,
       },
     ];
-  }, [subreddit, currentPage]);
+  }, [currentPage, subreddit, t]);
 
   const revisionIndicator = useMemo(() => {
     if (activeTab !== 'view') {
@@ -296,14 +300,14 @@ export default function RedditWikiPage({ mode = 'view' }: RedditWikiPageProps = 
 
     const revision = revisionsList.find((rev) => rev.id === revisionId);
     if (revision) {
-      return formatRelativeTime(revision.timestamp);
+      return formatRelativeTime(new Date(revision.timestamp * 1000));
     }
 
     if (typeof wikiData?.revision_date === 'number') {
-      return formatRelativeTime(wikiData.revision_date);
+      return formatRelativeTime(new Date(wikiData.revision_date * 1000));
     }
     return null;
-  }, [activeTab, revisionsList, searchParams, wikiData?.revision_date]);
+  }, [activeTab, revisionsList, searchParams, wikiData?.revision_date, formatRelativeTime]);
 
   const isCurrentLoading =
     activeTab === 'view'
@@ -329,10 +333,10 @@ export default function RedditWikiPage({ mode = 'view' }: RedditWikiPageProps = 
   if (isCurrentLoading) {
     const loadingMessage =
       activeTab === 'view'
-        ? 'Loading wiki page...'
+        ? t('redditWikiPage.loading.wikiPage')
         : activeTab === 'history'
-        ? 'Loading revision history...'
-        : 'Loading discussions...';
+        ? t('redditWikiPage.loading.revisionHistory')
+        : t('redditWikiPage.loading.discussions');
     return (
       <div className="flex min-h-screen items-center justify-center">
         <LoadingMessage>{loadingMessage}</LoadingMessage>
@@ -343,14 +347,14 @@ export default function RedditWikiPage({ mode = 'view' }: RedditWikiPageProps = 
   if (isCurrentError) {
     const message =
       activeTab === 'view'
-        ? 'This wiki page does not exist or is not accessible.'
+        ? t('redditWikiPage.errors.viewNotAccessible')
         : activeTab === 'history'
-        ? 'We could not load the revision history for this page.'
-        : 'We could not load discussions for this page.';
+        ? t('redditWikiPage.errors.historyFailed')
+        : t('redditWikiPage.errors.talkFailed');
     return (
       <div className="mx-auto max-w-4xl p-6">
         <div className="rounded-lg border border-red-300 bg-red-50 p-4">
-          <h2 className="text-lg font-semibold text-red-800">Something went wrong</h2>
+          <h2 className="text-lg font-semibold text-red-800">{t('redditWikiPage.errors.title')}</h2>
           <ErrorMessage className="mt-2 text-sm text-red-700">
             {currentError instanceof Error ? currentError.message : message}
           </ErrorMessage>
@@ -359,7 +363,7 @@ export default function RedditWikiPage({ mode = 'view' }: RedditWikiPageProps = 
               href={`/r/${subreddit}`}
               className="mt-4 inline-block text-sm font-medium text-red-800 hover:underline"
             >
-              ← Back to r/{subreddit}
+              {t('redditWikiPage.actions.backToSubreddit', { subreddit })}
             </a>
           )}
         </div>
@@ -384,7 +388,7 @@ export default function RedditWikiPage({ mode = 'view' }: RedditWikiPageProps = 
               />
             )}
             <h1 className="text-3xl font-bold text-[var(--color-text-primary)]">
-              r/{subreddit} subreddit
+              {t('redditWikiPage.header.title', { subreddit })}
             </h1>
           </div>
 
@@ -394,37 +398,37 @@ export default function RedditWikiPage({ mode = 'view' }: RedditWikiPageProps = 
               to={`/r/${subreddit}`}
               className="rounded-md bg-[var(--color-surface-elevated)] px-3 py-2 text-sm font-medium capitalize text-[var(--color-text-primary)] hover:bg-[var(--color-border)]"
             >
-              Hot
+              {t('home.sort.hot')}
             </Link>
             <Link
               to={`/r/${subreddit}`}
               className="rounded-md bg-[var(--color-surface-elevated)] px-3 py-2 text-sm font-medium capitalize text-[var(--color-text-primary)] hover:bg-[var(--color-border)]"
             >
-              New
+              {t('home.sort.new')}
             </Link>
             <Link
               to={`/r/${subreddit}`}
               className="rounded-md bg-[var(--color-surface-elevated)] px-3 py-2 text-sm font-medium capitalize text-[var(--color-text-primary)] hover:bg-[var(--color-border)]"
             >
-              Top
+              {t('home.sort.top')}
             </Link>
             <Link
               to={`/r/${subreddit}`}
               className="rounded-md bg-[var(--color-surface-elevated)] px-3 py-2 text-sm font-medium capitalize text-[var(--color-text-primary)] hover:bg-[var(--color-border)]"
             >
-              Rising
+              {t('home.sort.rising')}
             </Link>
             <Link
               to={`/r/${subreddit}`}
               className="rounded-md bg-[var(--color-surface-elevated)] px-3 py-2 text-sm font-medium capitalize text-[var(--color-text-primary)] hover:bg-[var(--color-border)]"
             >
-              Controversial
+              {t('home.sort.controversial')}
             </Link>
             <Link
               to={`/r/${subreddit}/wiki/index`}
               className="rounded-md bg-[var(--color-primary)] px-3 py-2 text-sm font-medium capitalize text-white"
             >
-              Wiki
+              {t('hubPage.controls.wiki')}
             </Link>
           </div>
         </div>
@@ -459,14 +463,14 @@ export default function RedditWikiPage({ mode = 'view' }: RedditWikiPageProps = 
           <div className="lg:clearfix">
             {revisionIndicator && (
               <div className="mb-4 rounded border border-yellow-200 bg-yellow-50 p-3 text-sm text-yellow-900">
-                Viewing revision from {revisionIndicator}.
+                {t('redditWikiPage.view.revisionBanner', { time: revisionIndicator })}
               </div>
             )}
             {subreddit && subredditAbout && (
               <aside className="mb-4 space-y-4 lg:mb-0 lg:float-right lg:ml-6 lg:w-64">
                 <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
                   <div className="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
-                    About This Subreddit
+                    {t('redditWikiPage.sidebar.aboutTitle')}
                   </div>
                   <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">r/{subreddit}</h3>
                   {sidebarDescriptionHtml ? (
@@ -476,36 +480,36 @@ export default function RedditWikiPage({ mode = 'view' }: RedditWikiPageProps = 
                     />
                   ) : (
                     <p className="mt-3 text-sm text-[var(--color-text-secondary)]">
-                      {subredditAbout.public_description || 'No description provided'}
+                      {subredditAbout.public_description || t('subredditAboutPanel.emptyDescription')}
                     </p>
                   )}
                 </div>
                 <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
                   <div className="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
-                    Community Info
+                    {t('redditWikiPage.sidebar.communityTitle')}
                   </div>
                   <div className="mt-4 space-y-2 text-sm text-[var(--color-text-secondary)]">
                     <div className="flex items-center justify-between">
-                      <span className="font-semibold text-[var(--color-text-primary)]">Members</span>
+                      <span className="font-semibold text-[var(--color-text-primary)]">{t('subredditAboutPanel.labels.members')}</span>
                       <span className="text-[var(--color-text-primary)]">
                         {typeof subredditAbout.subscribers === 'number'
-                          ? subredditAbout.subscribers.toLocaleString()
+                          ? formatNumber(subredditAbout.subscribers)
                           : '—'}
                       </span>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className="font-semibold text-[var(--color-text-primary)]">Online</span>
+                      <span className="font-semibold text-[var(--color-text-primary)]">{t('redditWikiPage.sidebar.labels.online')}</span>
                       <span className="text-[var(--color-text-primary)]">
                         {typeof subredditAbout.active_user_count === 'number'
-                          ? subredditAbout.active_user_count.toLocaleString()
+                          ? formatNumber(subredditAbout.active_user_count)
                           : '—'}
                       </span>
                     </div>
                     {subredditAbout.created_utc && (
                       <div className="flex items-center justify-between">
-                        <span className="font-semibold text-[var(--color-text-primary)]">Created</span>
+                        <span className="font-semibold text-[var(--color-text-primary)]">{t('subredditAboutPanel.labels.created')}</span>
                         <span className="text-[var(--color-text-primary)]">
-                          {new Date(subredditAbout.created_utc * 1000).toLocaleDateString()}
+                          {formatDate(new Date(subredditAbout.created_utc * 1000), { month: 'short', day: 'numeric', year: 'numeric' })}
                         </span>
                       </div>
                     )}
@@ -517,10 +521,10 @@ export default function RedditWikiPage({ mode = 'view' }: RedditWikiPageProps = 
             {tocItems.length > 0 && (
               <nav
                 className="mb-4 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4 lg:mb-0 lg:float-right lg:ml-6 lg:w-64"
-                aria-label="Table of contents"
+                aria-label={t('redditWikiPage.toc.ariaLabel')}
               >
                 <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
-                  Table of Contents
+                  {t('redditWikiPage.toc.title')}
                 </div>
                 <ul className="space-y-1 text-sm">
                   {tocItems.map((item) => (
@@ -545,7 +549,7 @@ export default function RedditWikiPage({ mode = 'view' }: RedditWikiPageProps = 
                 dangerouslySetInnerHTML={{ __html: processedHtml }}
               />
             ) : (
-              <EmptyMessage>This wiki page is empty.</EmptyMessage>
+              <EmptyMessage>{t('redditWikiPage.view.empty')}</EmptyMessage>
             )}
             <div className="hidden lg:block clear-both" aria-hidden="true" />
           </div>
@@ -556,28 +560,28 @@ export default function RedditWikiPage({ mode = 'view' }: RedditWikiPageProps = 
             {isCompareMode ? (
               <div className="space-y-4 py-4">
                 <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div className="text-sm font-semibold text-[var(--color-text-primary)]">Comparing revisions</div>
+                  <div className="text-sm font-semibold text-[var(--color-text-primary)]">{t('redditWikiPage.history.comparing')}</div>
                   <button
                     type="button"
                     onClick={handleExitCompare}
                     className="rounded border border-[var(--color-border)] px-4 py-2 text-sm font-semibold text-[var(--color-link,#0079d3)]"
                   >
-                    ← Back to history
+                    {t('redditWikiPage.history.actions.backToHistory')}
                   </button>
                 </div>
                 {compareLoading ? (
                   <div className="py-12 text-center">
-                    <LoadingMessage className="text-sm">Loading comparison…</LoadingMessage>
+                    <LoadingMessage className="text-sm">{t('redditWikiPage.history.loadingComparison')}</LoadingMessage>
                   </div>
                 ) : compareIsError ? (
                   <div className="rounded border border-red-200 bg-red-50 p-4 text-sm text-red-800">
-                    {compareError instanceof Error ? compareError.message : 'Unable to load the selected revisions.'}
+                    {compareError instanceof Error ? compareError.message : t('redditWikiPage.history.errors.unableToLoadSelected')}
                   </div>
                 ) : (
                   <div className="space-y-6">
                     <div className="grid gap-4 md:grid-cols-2">
-                      <RevisionSummaryCard title="Older revision" meta={compareFromMeta} />
-                      <RevisionSummaryCard title="Newer revision" meta={compareToMeta} alignRight />
+                      <RevisionSummaryCard title={t('redditWikiPage.history.olderRevision')} meta={compareFromMeta} />
+                      <RevisionSummaryCard title={t('redditWikiPage.history.newerRevision')} meta={compareToMeta} alignRight />
                     </div>
                     {compareDiffRows.length ? (
                       <div className="overflow-x-auto">
@@ -585,10 +589,10 @@ export default function RedditWikiPage({ mode = 'view' }: RedditWikiPageProps = 
                           {/* Header row */}
                           <div className="grid grid-cols-2 border-b border-[var(--color-border)] bg-[var(--color-surface-secondary,#f4f6fb)]">
                             <div className="border-r border-[var(--color-border)] px-2 py-1 text-xs font-semibold text-[var(--color-text-primary)]">
-                              {compareFromMeta?.timestamp ? formatRelativeTime(compareFromMeta.timestamp) : 'Older revision'}
+                              {compareFromMeta?.timestamp ? formatRelativeTime(new Date(compareFromMeta.timestamp * 1000)) : t('redditWikiPage.history.olderRevision')}
                             </div>
                             <div className="px-2 py-1 text-xs font-semibold text-[var(--color-text-primary)]">
-                              {compareToMeta?.timestamp ? formatRelativeTime(compareToMeta.timestamp) : 'Newer revision'}
+                              {compareToMeta?.timestamp ? formatRelativeTime(new Date(compareToMeta.timestamp * 1000)) : t('redditWikiPage.history.newerRevision')}
                             </div>
                           </div>
                           {/* Diff rows */}
@@ -629,7 +633,7 @@ export default function RedditWikiPage({ mode = 'view' }: RedditWikiPageProps = 
                       </div>
                     ) : (
                       <div className="rounded border border-[var(--color-border)] bg-[var(--color-surface-secondary,#f7f9fc)] p-6 text-center">
-                        <EmptyMessage className="text-sm">No differences detected between these revisions.</EmptyMessage>
+                        <EmptyMessage className="text-sm">{t('redditWikiPage.history.noDifferences')}</EmptyMessage>
                       </div>
                     )}
                   </div>
@@ -638,12 +642,12 @@ export default function RedditWikiPage({ mode = 'view' }: RedditWikiPageProps = 
             ) : (
               <>
                 <div className="hidden grid-cols-[50px_50px_160px_120px_180px_1fr_120px] gap-4 border-b border-[var(--color-border)] py-3 text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)] md:grid">
-                  <span className="col-span-2 text-center">Compare</span>
-                  <span>When</span>
-                  <span>Page</span>
-                  <span>Author</span>
-                  <span>Reason</span>
-                  <span>Actions</span>
+                  <span className="col-span-2 text-center">{t('redditWikiPage.history.headers.compare')}</span>
+                  <span>{t('redditWikiPage.history.headers.when')}</span>
+                  <span>{t('redditWikiPage.history.headers.page')}</span>
+                  <span>{t('redditWikiPage.history.headers.author')}</span>
+                  <span>{t('redditWikiPage.history.headers.reason')}</span>
+                  <span>{t('redditWikiPage.history.headers.actions')}</span>
                 </div>
                 {revisionsList.length ? (
                   revisionsList.map((revision) => {
@@ -657,8 +661,9 @@ export default function RedditWikiPage({ mode = 'view' }: RedditWikiPageProps = 
                       ? displayAuthor
                       : normalizedAuthorName
                       ? `u/${normalizedAuthorName}`
-                      : 'u/unknown';
-                    const changeSummary = revision.reason || 'No description provided';
+                      : t('redditWikiPage.history.unknownAuthor');
+                    const changeSummary = revision.reason || t('redditWikiPage.history.noDescriptionProvided');
+                    const revisionTime = formatRelativeTime(new Date(revision.timestamp * 1000));
                     return (
                       <div
                         key={revision.id}
@@ -671,9 +676,10 @@ export default function RedditWikiPage({ mode = 'view' }: RedditWikiPageProps = 
                             className="h-4 w-4 accent-[#0a66c2]"
                             checked={compareFromId === revision.id}
                             onChange={() => handleCompareSelect('from', revision.id)}
-                            aria-label={`Select ${revision.page} revision from ${formatRelativeTime(
-                              revision.timestamp
-                            )} as the older version`}
+                            aria-label={t('redditWikiPage.history.aria.selectOlder', {
+                              page: revision.page,
+                              time: revisionTime,
+                            })}
                           />
                         </div>
                         <div className="flex items-center justify-center">
@@ -683,12 +689,13 @@ export default function RedditWikiPage({ mode = 'view' }: RedditWikiPageProps = 
                             className="h-4 w-4 accent-[#0a66c2]"
                             checked={compareToId === revision.id}
                             onChange={() => handleCompareSelect('to', revision.id)}
-                            aria-label={`Select ${revision.page} revision from ${formatRelativeTime(
-                              revision.timestamp
-                            )} as the newer version`}
+                            aria-label={t('redditWikiPage.history.aria.selectNewer', {
+                              page: revision.page,
+                              time: revisionTime,
+                            })}
                           />
                         </div>
-                        <div className="text-[var(--color-text-secondary)]">{formatRelativeTime(revision.timestamp)}</div>
+                        <div className="text-[var(--color-text-secondary)]">{revisionTime}</div>
                         <div className="font-semibold">
                           {subreddit ? (
                             <Link
@@ -704,10 +711,10 @@ export default function RedditWikiPage({ mode = 'view' }: RedditWikiPageProps = 
                         {normalizedAuthorName ? (
                           <Link
                             to={`/user/${normalizedAuthorName}`}
-                            className="truncate font-semibold text-[var(--color-link,#0079d3)] hover:underline"
-                          >
-                            {authorName}
-                          </Link>
+                          className="truncate font-semibold text-[var(--color-link,#0079d3)] hover:underline"
+                        >
+                          {authorName}
+                        </Link>
                         ) : (
                           <div className="truncate text-[var(--color-text-secondary)]">{authorName}</div>
                         )}
@@ -719,10 +726,10 @@ export default function RedditWikiPage({ mode = 'view' }: RedditWikiPageProps = 
                             to={`/r/${subreddit}/wiki/${currentPage}?revision=${revision.id}`}
                             className="font-semibold hover:underline"
                           >
-                            View
+                            {t('redditWikiPage.history.actions.view')}
                           </Link>
                           {revision.revision_hidden && (
-                            <span className="text-xs text-[var(--color-text-secondary)]">Hidden</span>
+                            <span className="text-xs text-[var(--color-text-secondary)]">{t('redditWikiPage.history.hidden')}</span>
                           )}
                         </div>
                       </div>
@@ -730,7 +737,7 @@ export default function RedditWikiPage({ mode = 'view' }: RedditWikiPageProps = 
                   })
                 ) : (
                   <p className="py-6 text-sm text-[var(--color-text-secondary)]">
-                    This page has no recorded revisions.
+                    {t('redditWikiPage.history.empty')}
                   </p>
                 )}
                 <div className="flex flex-wrap items-center justify-between gap-3 py-4 text-sm">
@@ -758,7 +765,7 @@ export default function RedditWikiPage({ mode = 'view' }: RedditWikiPageProps = 
                         }}
                         className="rounded border border-[var(--color-border)] px-4 py-2 font-semibold text-[var(--color-link,#0079d3)]"
                       >
-                        ← Newer
+                        {t('redditWikiPage.history.actions.newer')}
                       </button>
                     )}
                   </div>
@@ -773,7 +780,7 @@ export default function RedditWikiPage({ mode = 'view' }: RedditWikiPageProps = 
                           : 'cursor-not-allowed border-[var(--color-border)] text-[var(--color-text-secondary)] opacity-60'
                       }`}
                     >
-                      Compare selected
+                      {t('redditWikiPage.history.actions.compareSelected')}
                     </button>
                   </div>
                   <div className="flex flex-1 justify-end">
@@ -794,7 +801,7 @@ export default function RedditWikiPage({ mode = 'view' }: RedditWikiPageProps = 
                         }}
                         className="rounded border border-[var(--color-border)] px-4 py-2 font-semibold text-[var(--color-link,#0079d3)]"
                       >
-                        Older →
+                        {t('redditWikiPage.history.actions.older')}
                       </button>
                     )}
                   </div>
@@ -819,28 +826,38 @@ export default function RedditWikiPage({ mode = 'view' }: RedditWikiPageProps = 
                     {discussion.title}
                   </Link>
                   <div className="mt-1 text-xs text-[var(--color-text-secondary)]">
-                    Posted by u/{discussion.author}{' '}
                     {discussion.created_utc
-                      ? `on ${new Date(discussion.created_utc * 1000).toLocaleDateString()}`
-                      : ''}
+                      ? t('redditWikiPage.talk.postedByOn', {
+                          author: discussion.author,
+                          date: formatDate(new Date(discussion.created_utc * 1000), { month: 'short', day: 'numeric', year: 'numeric' }),
+                        })
+                      : t('redditWikiPage.talk.postedBy', { author: discussion.author })}
                   </div>
                   <div className="mt-2 text-xs text-[var(--color-text-secondary)]">
-                    {discussion.num_comments ?? 0} comments · {discussion.score ?? 0} points
+                    {t('posts.comment', {
+                      count: discussion.num_comments ?? 0,
+                      formattedCount: formatNumber(discussion.num_comments ?? 0),
+                    })}{' '}
+                    ·{' '}
+                    {t('posts.point', {
+                      count: discussion.score ?? 0,
+                      formattedCount: formatNumber(discussion.score ?? 0),
+                    })}
                   </div>
                 </div>
               ))
             ) : (
               <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-secondary,#f7f9fc)] p-6 text-center">
                 <p className="text-sm text-[var(--color-text-secondary)]">
-                  There doesn&apos;t seem to be anything here.
+                  {t('redditWikiPage.talk.empty')}
                 </p>
                 {subreddit && (
                   <button
                     type="button"
-                    onClick={() => alert('Submitting Reddit discussions is not supported on OmniNudge.')}
+                    onClick={() => alert(t('redditWikiPage.talk.alertNotSupported'))}
                     className="mt-4 inline-flex items-center justify-center rounded-full border border-[var(--color-link,#0079d3)] px-4 py-2 text-sm font-semibold text-[var(--color-link,#0079d3)] hover:bg-[var(--color-link,#0079d3)] hover:text-white"
                   >
-                    Submit a discussion
+                    {t('redditWikiPage.talk.actions.submitDiscussion')}
                   </button>
                 )}
               </div>
@@ -880,6 +897,9 @@ interface RevisionSummaryCardProps {
 }
 
 function RevisionSummaryCard({ title, meta, alignRight = false }: RevisionSummaryCardProps) {
+  const { t } = useTranslation();
+  const { formatDate, formatRelativeTime } = useFormat();
+
   return (
     <div
       className={`rounded border border-[var(--color-border)] bg-[var(--color-surface-secondary,#f7f9fc)] p-4 ${
@@ -891,9 +911,17 @@ function RevisionSummaryCard({ title, meta, alignRight = false }: RevisionSummar
         <>
           {meta.timestamp && (
             <div className="mt-1 text-sm font-semibold text-[var(--color-text-primary)]">
-              {formatRelativeTime(meta.timestamp)}
+              {formatRelativeTime(new Date(meta.timestamp * 1000))}
               <span className="ml-1 text-[var(--color-text-secondary)]">
-                ({formatAbsoluteDate(meta.timestamp)})
+                {t('redditWikiPage.history.absoluteDate', {
+                  date: formatDate(new Date(meta.timestamp * 1000), {
+                    month: 'short',
+                    day: 'numeric',
+                    year: 'numeric',
+                    hour: 'numeric',
+                    minute: '2-digit',
+                  }),
+                })}
               </span>
             </div>
           )}
@@ -905,12 +933,12 @@ function RevisionSummaryCard({ title, meta, alignRight = false }: RevisionSummar
           )}
           {meta.revisionId && (
             <div className="mt-1 text-[10px] uppercase tracking-wide text-[var(--color-text-secondary)]">
-              Revision ID: {meta.revisionId}
+              {t('redditWikiPage.history.revisionId', { id: meta.revisionId })}
             </div>
           )}
         </>
       ) : (
-        <div className="mt-2 text-sm text-[var(--color-text-secondary)]">Revision unavailable.</div>
+        <div className="mt-2 text-sm text-[var(--color-text-secondary)]">{t('redditWikiPage.history.revisionUnavailable')}</div>
       )}
     </div>
   );
@@ -1100,36 +1128,6 @@ function decodeHtmlEntities(text: string): string {
   const textarea = document.createElement('textarea');
   textarea.innerHTML = text;
   return textarea.value;
-}
-
-function formatRelativeTime(epochSeconds: number): string {
-  const diffMs = epochSeconds * 1000 - Date.now();
-  const absMs = Math.abs(diffMs);
-  const rtf = new Intl.RelativeTimeFormat('en', { numeric: 'auto' });
-  const units: { unit: Intl.RelativeTimeFormatUnit; ms: number }[] = [
-    { unit: 'year', ms: 1000 * 60 * 60 * 24 * 365 },
-    { unit: 'month', ms: 1000 * 60 * 60 * 24 * 30 },
-    { unit: 'week', ms: 1000 * 60 * 60 * 24 * 7 },
-    { unit: 'day', ms: 1000 * 60 * 60 * 24 },
-    { unit: 'hour', ms: 1000 * 60 * 60 },
-    { unit: 'minute', ms: 1000 * 60 },
-    { unit: 'second', ms: 1000 },
-  ];
-
-  for (const { unit, ms } of units) {
-    if (absMs >= ms || unit === 'second') {
-      const delta = Math.round(diffMs / ms);
-      return rtf.format(delta, unit);
-    }
-  }
-  return rtf.format(0, 'second');
-}
-
-function formatAbsoluteDate(epochSeconds?: number): string {
-  if (!epochSeconds) {
-    return '';
-  }
-  return new Date(epochSeconds * 1000).toLocaleString();
 }
 
 function extractRevisionMeta(data?: unknown, explicitId?: string): RevisionMeta | null {

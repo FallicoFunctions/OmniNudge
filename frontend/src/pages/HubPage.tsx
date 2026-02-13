@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import type { HTMLAttributes, PointerEvent as ReactPointerEvent } from 'react';
 import { keepPreviousData, useMutation, useQuery, useQueryClient, useInfiniteQuery } from '@tanstack/react-query';
 import { useNavigate, useParams, useLocation, Link, Navigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { hubsService, type HubPostsResponse, type LocalSubredditPost } from '../services/hubsService';
 import { useAuth } from '../contexts/AuthContext';
 import { CommunityHeader } from '../components/common/CommunityHeader';
@@ -47,6 +48,7 @@ import { usePostSearch } from '../hooks/usePostSearch';
 const EMPTY_POSTS: LocalSubredditPost[] = [];
 
 export default function HubsPage() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
   const queryClient = useQueryClient();
@@ -507,7 +509,7 @@ export default function HubsPage() {
       setDeleteReason('');
     },
     onError: (err) => {
-      alert(`Failed to delete post: ${err.message}`);
+      alert(t('alerts.deletePostFailed', { message: err.message }));
     },
   });
 
@@ -531,7 +533,7 @@ export default function HubsPage() {
       queryClient.invalidateQueries({ queryKey: postsQueryKey });
     },
     onError: (err) => {
-      alert(`Failed to update pinned order: ${err.message}`);
+      alert(t('alerts.updatePinnedOrderFailed', { message: err.message }));
       queryClient.invalidateQueries({ queryKey: postsQueryKey });
     },
   });
@@ -549,7 +551,7 @@ export default function HubsPage() {
       setEditPostTarget(null);
     },
     onError: (err) => {
-      alert(`Failed to update post: ${err.message}`);
+      alert(t('alerts.updatePostFailed', { message: err.message }));
     },
   });
 
@@ -562,17 +564,17 @@ export default function HubsPage() {
       setDeletePostTarget({ postId: post.id, authorId: post.author_id });
     } else {
       // For own posts, just confirm
-      if (!window.confirm('Are you sure you want to delete this post?')) {
+      if (!window.confirm(t('modals.delete.confirmOwn'))) {
         return;
       }
       deletePostMutation.mutate({ postId: post.id });
     }
-  }, [deletePostMutation, user]);
+  }, [deletePostMutation, t, user]);
 
   const handleConfirmDeletePost = () => {
     if (!deletePostTarget) return;
     if (!deleteReason.trim()) {
-      alert('Please provide a reason for deletion');
+      alert(t('alerts.provideDeleteReason'));
       return;
     }
     deletePostMutation.mutate({ postId: deletePostTarget.postId, reason: deleteReason });
@@ -582,9 +584,9 @@ export default function HubsPage() {
     const shareUrl = `${window.location.origin}/posts/${postId}`;
     navigator.clipboard
       .writeText(shareUrl)
-      .then(() => alert('Post link copied to clipboard!'))
-      .catch(() => alert('Unable to copy link. Please try again.'));
-  }, []);
+      .then(() => alert(t('alerts.linkCopied')))
+      .catch(() => alert(t('alerts.linkCopyFailed')));
+  }, [t]);
 
   const getPinnedBaseOrder = useCallback(
     () => (pinnedOrderIds.length > 0 ? pinnedOrderIds : sortedPinnedPosts.map((post) => post.id)),
@@ -677,7 +679,7 @@ export default function HubsPage() {
   const savedToggleMutation = useMutation<void, Error, { postId: number; shouldSave: boolean }>({
     mutationFn: async ({ postId, shouldSave }) => {
       if (!user) {
-        throw new Error('You must be signed in to save posts.');
+        throw new Error(t('alerts.signInToSave'));
       }
       if (shouldSave) {
         await savedService.savePost(postId);
@@ -689,14 +691,14 @@ export default function HubsPage() {
       queryClient.invalidateQueries({ queryKey: savedPostsKey });
     },
     onError: (err) => {
-      alert(`Failed to update save status: ${err.message}`);
+      alert(t('alerts.saveFailed', { message: err.message }));
     },
   });
 
   const hidePostMutation = useMutation<void, Error, number>({
     mutationFn: async (postId: number) => {
       if (!user) {
-        throw new Error('You must be signed in to hide posts.');
+        throw new Error(t('alerts.signInToHide'));
       }
       await savedService.hidePost(postId);
     },
@@ -704,28 +706,28 @@ export default function HubsPage() {
       queryClient.invalidateQueries({ queryKey: hiddenPostsKey });
     },
     onError: (err) => {
-      alert(`Failed to hide post: ${err.message}`);
+      alert(t('alerts.hideFailed', { message: err.message }));
     },
   });
 
   const handleToggleSavePost = useCallback((postId: number, isCurrentlySaved: boolean) => {
     if (!user) {
-      alert('Please sign in to save posts.');
+      alert(t('alerts.signInToSave'));
       return;
     }
     savedToggleMutation.mutate({ postId, shouldSave: !isCurrentlySaved });
-  }, [savedToggleMutation, user]);
+  }, [savedToggleMutation, t, user]);
 
   const handleHidePost = useCallback((postId: number) => {
     if (!user) {
-      alert('Please sign in to hide posts.');
+      alert(t('alerts.signInToHide'));
       return;
     }
-    if (!window.confirm('Hide this post?')) {
+    if (!window.confirm(t('modals.hide.confirmSimple'))) {
       return;
     }
     hidePostMutation.mutate(postId);
-  }, [hidePostMutation, user]);
+  }, [hidePostMutation, t, user]);
 
   const resetCrosspostState = () => {
     setCrosspostTarget(null);
@@ -737,7 +739,7 @@ export default function HubsPage() {
 
   const handleCrosspostSelection = useCallback((post: LocalSubredditPost) => {
     if (!user) {
-      alert('Please sign in to crosspost.');
+      alert(t('alerts.signInToCrosspost'));
       return;
     }
     setCrosspostTarget(post);
@@ -747,6 +749,7 @@ export default function HubsPage() {
     setSendRepliesToInbox(true);
   }, [
     user,
+    t,
     setCrosspostTarget,
     setCrosspostTitle,
     setSelectedHub,
@@ -853,10 +856,10 @@ export default function HubsPage() {
   const crosspostMutation = useMutation<void, Error>({
     mutationFn: async () => {
       if (!crosspostTarget) {
-        throw new Error('No post selected for crosspost');
+        throw new Error(t('alerts.crosspostNoSource'));
       }
       if (!selectedHub && !selectedSubreddit) {
-        throw new Error('Please select at least one destination (hub or subreddit)');
+        throw new Error(t('alerts.crosspostMissingDestination'));
       }
       const title = crosspostTitle.trim() || crosspostTarget.title;
       const payload: CrosspostRequest = createLocalCrosspostPayload(
@@ -899,10 +902,10 @@ export default function HubsPage() {
     onSuccess: () => {
       resetCrosspostState();
       queryClient.invalidateQueries({ queryKey: postsQueryKey });
-      alert('Crosspost created successfully!');
+      alert(t('alerts.crosspostSuccess'));
     },
     onError: (error) => {
-      alert(`Failed to create crosspost: ${error.message}`);
+      alert(t('alerts.crosspostFailed', { message: error.message }));
     },
   });
   const handleCrosspostSubmit = () => {
@@ -967,7 +970,7 @@ export default function HubsPage() {
     }
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <ErrorMessage className="text-lg text-red-600">Error loading posts.</ErrorMessage>
+        <ErrorMessage className="text-lg text-red-600">{t('hubPage.errors.loadPosts')}</ErrorMessage>
       </div>
     );
   }
@@ -983,7 +986,7 @@ export default function HubsPage() {
         hubSearch={
           <FeedSearchBars
             topValue={inputValue}
-            topPlaceholder="Enter hub or subreddit..."
+            topPlaceholder={t('home.search.enterHubOrSubreddit')}
             onTopChange={handleTopChange}
             onTopFocus={() => setIsAutocompleteOpen(true)}
             onTopBlur={() => setIsAutocompleteOpen(false)}
@@ -991,7 +994,7 @@ export default function HubsPage() {
             topSuggestions={suggestions}
             topShouldShowSuggestions={shouldShowSuggestions}
             topIsLoading={isAutocompleteLoading}
-            topEmptyMessage="No hubs or subreddits found."
+            topEmptyMessage={t('home.search.noResults')}
             renderTopSuggestion={(suggestion) => (
               <CombinedSuggestionItem
                 key={`${suggestion.type}-${suggestion.data.name}`}
@@ -1013,7 +1016,7 @@ export default function HubsPage() {
             containerClassName="w-full md:w-96"
             showTopForm={false}
             topValue={inputValue}
-            topPlaceholder="Enter hub or subreddit..."
+            topPlaceholder={t('home.search.enterHubOrSubreddit')}
             onTopChange={handleTopChange}
             onTopFocus={() => setIsAutocompleteOpen(true)}
             onTopBlur={() => setIsAutocompleteOpen(false)}
@@ -1021,7 +1024,7 @@ export default function HubsPage() {
             topSuggestions={suggestions}
             topShouldShowSuggestions={shouldShowSuggestions}
             topIsLoading={isAutocompleteLoading}
-            topEmptyMessage="No hubs or subreddits found."
+            topEmptyMessage={t('home.search.noResults')}
             renderTopSuggestion={(suggestion) => (
               <CombinedSuggestionItem
                 key={`${suggestion.type}-${suggestion.data.name}`}
@@ -1031,7 +1034,7 @@ export default function HubsPage() {
               />
             )}
             postValue={postSearchInput}
-            postPlaceholder="Search posts..."
+            postPlaceholder={t('home.search.searchPosts')}
             onPostChange={(value) => {
               setPostSearchInput(value);
               if (!isSearchDropdownOpen) {
@@ -1050,7 +1053,7 @@ export default function HubsPage() {
                     checked={limitSearchToContext}
                     onChange={(e) => setLimitSearchToContext(e.target.checked)}
                   />
-                  <span>Limit search to h/{hubname}</span>
+                  <span>{t('home.search.limitToHub', { hub: hubname })}</span>
                 </label>
                 {!blockAllNsfw && (
                   <label className="flex items-center gap-2">
@@ -1059,12 +1062,12 @@ export default function HubsPage() {
                       checked={includeNsfwSearch}
                       onChange={(e) => setIncludeNsfwSearch(e.target.checked)}
                     />
-                    <span>Include NSFW results</span>
+                    <span>{t('home.search.includeNsfw')}</span>
                   </label>
                 )}
                 {blockAllNsfw && (
                   <div className="text-xs text-[var(--color-text-secondary)]">
-                    NSFW content is blocked in settings.
+                    {t('home.search.nsfwBlocked')}
                   </div>
                 )}
               </div>
@@ -1085,7 +1088,7 @@ export default function HubsPage() {
                         : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
                     }`}
                   >
-                    {sortOption.charAt(0).toUpperCase() + sortOption.slice(1)}
+                    {t(`home.sort.${sortOption}`)}
                   </button>
                 ))}
                 {hasWiki && showHubSidebar && (
@@ -1093,7 +1096,7 @@ export default function HubsPage() {
                     to={`/h/${hubname}/wiki/index`}
                     className={`px-4 py-2 text-sm font-semibold text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]`}
                   >
-                    Wiki
+                    {t('hubPage.controls.wiki')}
                   </Link>
                 )}
                 {(orderedPinnedPosts.length > 0 || effectivePosts.length > 0) && (
@@ -1104,40 +1107,40 @@ export default function HubsPage() {
                     <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                     </svg>
-                    Scroll
+                    {t('home.sort.scroll')}
                   </button>
                 )}
               </>
             }
             right={
               <MobileOnly>
-                <FeedSearchBars
-                  containerClassName="w-full px-4 flex flex-col gap-4 mt-4"
-                  showTopForm={true}
-                  topValue={inputValue}
-                  topPlaceholder="Enter hub or subreddit..."
-                  onTopChange={handleTopChange}
-                  onTopFocus={() => setIsAutocompleteOpen(true)}
-                  onTopBlur={() => setIsAutocompleteOpen(false)}
-                  onTopSubmit={handleTopSubmit}
-                  topSuggestions={suggestions}
-                  topShouldShowSuggestions={shouldShowSuggestions}
-                  topIsLoading={isAutocompleteLoading}
-                  topEmptyMessage="No hubs or subreddits found."
-                  renderTopSuggestion={(suggestion) => (
-                    <CombinedSuggestionItem
-                      key={`${suggestion.type}-${suggestion.data.name}`}
-                      suggestion={suggestion}
+                  <FeedSearchBars
+                    containerClassName="w-full px-4 flex flex-col gap-4 mt-4"
+                    showTopForm={true}
+                    topValue={inputValue}
+                    topPlaceholder={t('home.search.enterHubOrSubreddit')}
+                    onTopChange={handleTopChange}
+                    onTopFocus={() => setIsAutocompleteOpen(true)}
+                    onTopBlur={() => setIsAutocompleteOpen(false)}
+                    onTopSubmit={handleTopSubmit}
+                    topSuggestions={suggestions}
+                    topShouldShowSuggestions={shouldShowSuggestions}
+                    topIsLoading={isAutocompleteLoading}
+                    topEmptyMessage={t('home.search.noResults')}
+                    renderTopSuggestion={(suggestion) => (
+                      <CombinedSuggestionItem
+                        key={`${suggestion.type}-${suggestion.data.name}`}
+                        suggestion={suggestion}
                       onSelectHub={handleSelectHubSuggestion}
                       onSelectSubreddit={handleSelectSubredditSuggestion}
                     />
-                  )}
-                  postValue={postSearchInput}
-                  postPlaceholder="Search posts..."
-                  onPostChange={(value) => {
-                    setPostSearchInput(value);
-                    if (!isSearchDropdownOpen) {
-                      setIsSearchDropdownOpen(true);
+                    )}
+                    postValue={postSearchInput}
+                    postPlaceholder={t('home.search.searchPosts')}
+                    onPostChange={(value) => {
+                      setPostSearchInput(value);
+                      if (!isSearchDropdownOpen) {
+                        setIsSearchDropdownOpen(true);
                     }
                   }}
                   onPostFocus={() => setIsSearchDropdownOpen(true)}
@@ -1149,29 +1152,29 @@ export default function HubsPage() {
                       <label className="flex items-center gap-2">
                         <input
                           type="checkbox"
-                          checked={limitSearchToContext}
-                          onChange={(e) => setLimitSearchToContext(e.target.checked)}
-                        />
-                        <span>Limit search to h/{hubname}</span>
-                      </label>
-                      {!blockAllNsfw && (
-                        <label className="flex items-center gap-2">
-                          <input
+                        checked={limitSearchToContext}
+                        onChange={(e) => setLimitSearchToContext(e.target.checked)}
+                      />
+                      <span>{t('home.search.limitToHub', { hub: hubname })}</span>
+                    </label>
+                    {!blockAllNsfw && (
+                      <label className="flex items-center gap-2">
+                        <input
                             type="checkbox"
-                            checked={includeNsfwSearch}
-                            onChange={(e) => setIncludeNsfwSearch(e.target.checked)}
-                          />
-                          <span>Include NSFW results</span>
-                        </label>
-                      )}
-                      {blockAllNsfw && (
-                        <div className="text-xs text-[var(--color-text-secondary)]">
-                          NSFW content is blocked in settings.
-                        </div>
-                      )}
-                    </div>
-                  }
-                />
+                          checked={includeNsfwSearch}
+                          onChange={(e) => setIncludeNsfwSearch(e.target.checked)}
+                        />
+                        <span>{t('home.search.includeNsfw')}</span>
+                      </label>
+                    )}
+                    {blockAllNsfw && (
+                      <div className="text-xs text-[var(--color-text-secondary)]">
+                        {t('home.search.nsfwBlocked')}
+                      </div>
+                    )}
+                  </div>
+                }
+              />
               </MobileOnly>
             }
           />
@@ -1182,7 +1185,7 @@ export default function HubsPage() {
         <div className="mb-4 mt-4 space-y-2">
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
-              Time range
+              {t('home.timeRange.label')}
             </span>
             <select
               value={topTimeRange}
@@ -1204,7 +1207,7 @@ export default function HubsPage() {
                 onChange={(event) => setCustomTopStart(event.target.value)}
                 className="rounded border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-2 py-1 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
               />
-              <span className="text-xs text-[var(--color-text-secondary)]">to</span>
+              <span className="text-xs text-[var(--color-text-secondary)]">{t('home.timeRange.to')}</span>
               <input
                 type="datetime-local"
                 value={customTopEnd}
@@ -1213,7 +1216,7 @@ export default function HubsPage() {
               />
               {!isCustomRangeValid && (
                 <span className="text-xs text-[var(--color-error)]">
-                  Select both start and end dates to apply this filter.
+                  {t('home.timeRange.selectBothDates')}
                 </span>
               )}
             </div>
@@ -1254,7 +1257,7 @@ export default function HubsPage() {
                       className="flex h-10 items-center justify-center rounded border border-dashed border-[var(--color-border)] text-xs text-[var(--color-text-secondary)]"
                       ref={pinnedDropZoneRef}
                     >
-                      Drop here to move to bottom
+                      {t('hubPage.pins.dropHereToMoveToBottom')}
                     </div>
                   )}
                 </div>
@@ -1269,8 +1272,8 @@ export default function HubsPage() {
             <div className="py-12 text-center">
               <EmptyMessage>
                 {isSearchActive && hubSearchQuery
-                  ? `No results for "${hubSearchQuery}" in h/${hubname}.`
-                  : 'No posts found in this hub.'}
+                  ? t('hubPage.empty.searchNoResults', { query: hubSearchQuery, hub: hubname })
+                  : t('hubPage.empty.noPosts')}
               </EmptyMessage>
             </div>
           )}
@@ -1280,7 +1283,7 @@ export default function HubsPage() {
               <div ref={loadMoreRef} className="h-10" />
               {isFetchingNextPage && (
                 <div className="mt-4 text-center">
-                  <LoadingMessage>Loading more posts...</LoadingMessage>
+                  <LoadingMessage>{t('posts.loadingMore')}</LoadingMessage>
                 </div>
               )}
             </>
@@ -1336,19 +1339,20 @@ export default function HubsPage() {
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 px-4">
           <div className="w-full max-w-md rounded-lg bg-white p-4 shadow-lg">
             <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">
-              Delete Post - Reason Required
+              {t('modals.delete.title')}
             </h3>
             <p className="mt-2 text-sm text-[var(--color-text-secondary)]">
-              As a moderator, you must provide a reason for deleting this post. The author will receive a modmail with your reason.
+              {t('modals.delete.moderatorMessage')}
             </p>
             <div className="mt-4">
               <label className="mb-1 block text-xs font-medium text-[var(--color-text-secondary)]">
-                Reason for deletion <span className="text-red-500">*</span>
+                {t('modals.delete.reasonLabel')}{' '}
+                <span className="text-red-500">{t('modals.delete.reasonRequired')}</span>
               </label>
               <textarea
                 value={deleteReason}
                 onChange={(e) => setDeleteReason(e.target.value)}
-                placeholder="E.g., Violates rule 3: No spam..."
+                placeholder={t('modals.delete.reasonPlaceholder')}
                 className="w-full rounded border border-[var(--color-border)] bg-[var(--color-surface)] p-2 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
                 rows={4}
               />
@@ -1361,14 +1365,14 @@ export default function HubsPage() {
                 }}
                 className="rounded border border-[var(--color-border)] px-3 py-1 text-sm hover:bg-[var(--color-surface-elevated)]"
               >
-                Cancel
+                {t('common.cancel')}
               </button>
               <button
                 onClick={handleConfirmDeletePost}
                 disabled={deletePostMutation.isPending || !deleteReason.trim()}
                 className="rounded bg-red-600 px-3 py-1 text-sm font-semibold text-white hover:bg-red-500 disabled:opacity-50"
               >
-                {deletePostMutation.isPending ? 'Deleting...' : 'Delete Post'}
+                {deletePostMutation.isPending ? t('modals.delete.deleting') : t('modals.delete.deleteButton')}
               </button>
             </div>
           </div>

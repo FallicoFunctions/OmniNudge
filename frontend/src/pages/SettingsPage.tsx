@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
-import { useTranslation } from 'react-i18next';
+import { Trans, useTranslation } from 'react-i18next';
 import { useLocation } from 'react-router-dom';
 import ThemeSelector from '../components/themes/ThemeSelector';
 import ThemeEditor from '../components/themes/ThemeEditor';
@@ -1062,11 +1062,11 @@ export default function SettingsPage() {
                   </div>
                 )}
 
-                <div className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-3">
-                  <p className="text-xs text-[var(--color-text-secondary)]">
-                    <strong>Note:</strong> {t('settings.betaFeatures.note')}
-                  </p>
-                </div>
+	                <div className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-3">
+	                  <p className="text-xs text-[var(--color-text-secondary)]">
+	                    <Trans i18nKey="settings.betaFeatures.noteWithLabel" components={{ strong: <strong /> }} />
+	                  </p>
+	                </div>
               </div>
             </Panel>
           </>

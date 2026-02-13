@@ -2,6 +2,17 @@
  * Date and time helper utilities to eliminate redundant date conversion logic
  */
 
+import i18n from '../i18n/config';
+import { getBaseLanguage, resolveSupportedLanguage } from '../i18n/languageUtils';
+
+function getCurrentLocale(): string {
+  const rawLanguage = i18n.language || i18n.resolvedLanguage || 'en';
+  const resolvedLanguage = i18n.resolvedLanguage || rawLanguage;
+  return getBaseLanguage(rawLanguage) === resolveSupportedLanguage(resolvedLanguage)
+    ? rawLanguage
+    : resolveSupportedLanguage(resolvedLanguage);
+}
+
 /**
  * Convert local date input to ISO string
  * Used for date pickers and time range inputs
@@ -70,7 +81,7 @@ export function isValidDate(dateString: string): boolean {
 export function formatDate(date: Date | string | number): string {
   const d = typeof date === 'string' || typeof date === 'number' ? new Date(date) : date;
   if (Number.isNaN(d.getTime())) return '';
-  return d.toLocaleDateString();
+  return new Intl.DateTimeFormat(getCurrentLocale()).format(d);
 }
 
 /**
@@ -80,5 +91,8 @@ export function formatDate(date: Date | string | number): string {
 export function formatDateTime(date: Date | string | number): string {
   const d = typeof date === 'string' || typeof date === 'number' ? new Date(date) : date;
   if (Number.isNaN(d.getTime())) return '';
-  return d.toLocaleString();
+  return new Intl.DateTimeFormat(getCurrentLocale(), {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  }).format(d);
 }

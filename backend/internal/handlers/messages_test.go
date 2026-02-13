@@ -45,6 +45,7 @@ func (m *mockHub) IsUserOnline(userID int) bool {
 func setupMessagesHandlerTest(t *testing.T) (*MessagesHandler, *database.Database, int, int, int, *mockHub, func()) {
 	db, err := database.NewTest()
 	require.NoError(t, err)
+	t.Cleanup(db.Close)
 
 	ctx := context.Background()
 	err = db.Migrate(ctx)

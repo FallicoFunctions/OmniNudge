@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import ThemePreviewCard from './ThemePreviewCard';
 import { useTheme } from '../../hooks/useTheme';
 import type { UserTheme } from '../../types/theme';
@@ -6,15 +7,15 @@ import EmptyState from '../ui/EmptyState';
 import LoadingSpinner from '../ui/LoadingSpinner';
 
 const filterOptions = [
-  { label: 'All', value: 'all' },
-  { label: 'Predefined', value: 'predefined' },
-  { label: 'My Themes', value: 'custom' },
+  { labelKey: 'themes.gallery.filters.all', value: 'all' },
+  { labelKey: 'themes.gallery.filters.predefined', value: 'predefined' },
+  { labelKey: 'themes.gallery.filters.custom', value: 'custom' },
 ];
 
 const sortOptions = [
-  { label: 'Name (A-Z)', value: 'name' },
-  { label: 'Newest', value: 'newest' },
-  { label: 'Most Popular', value: 'popular' },
+  { labelKey: 'themes.gallery.sort.name', value: 'name' },
+  { labelKey: 'themes.gallery.sort.newest', value: 'newest' },
+  { labelKey: 'themes.gallery.sort.popular', value: 'popular' },
 ];
 
 type FilterValue = (typeof filterOptions)[number]['value'];
@@ -26,6 +27,7 @@ interface ThemeGalleryProps {
 }
 
 const ThemeGallery = ({ onCreateNewTheme, onEditTheme }: ThemeGalleryProps) => {
+  const { t } = useTranslation();
   const {
     predefinedThemes,
     customThemes,
@@ -97,11 +99,13 @@ const ThemeGallery = ({ onCreateNewTheme, onEditTheme }: ThemeGalleryProps) => {
       <header className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
           <p className="text-sm uppercase tracking-wide text-[var(--color-text-secondary)]">
-            Theme Gallery
+            {t('themes.gallery.header.kicker')}
           </p>
-          <h2 className="text-2xl font-bold text-[var(--color-text-primary)]">Browse Themes</h2>
+          <h2 className="text-2xl font-bold text-[var(--color-text-primary)]">
+            {t('themes.gallery.header.title')}
+          </h2>
           <p className="text-sm text-[var(--color-text-secondary)]">
-            Choose from predefined or custom themes, search, and sort to find the perfect match.
+            {t('themes.gallery.header.subtitle')}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -111,14 +115,14 @@ const ThemeGallery = ({ onCreateNewTheme, onEditTheme }: ThemeGalleryProps) => {
             onClick={refreshThemes}
             disabled={isLoading}
           >
-            Refresh
+            {t('themes.gallery.actions.refresh')}
           </button>
           <button
             type="button"
             className="rounded-lg bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white"
             onClick={handleCreateTheme}
           >
-            + Create Theme
+            {t('themes.gallery.actions.createTheme')}
           </button>
         </div>
       </header>
@@ -136,14 +140,14 @@ const ThemeGallery = ({ onCreateNewTheme, onEditTheme }: ThemeGalleryProps) => {
               }`}
               onClick={() => setFilter(option.value)}
             >
-              {option.label}
+              {t(option.labelKey)}
             </button>
           ))}
         </div>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
           <input
             type="search"
-            placeholder="Search themes…"
+            placeholder={t('themes.gallery.search.placeholder')}
             className="rounded-lg border border-[var(--color-border)] px-4 py-2 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
             value={searchQuery}
             onChange={(event) => setSearchQuery(event.target.value)}
@@ -155,7 +159,7 @@ const ThemeGallery = ({ onCreateNewTheme, onEditTheme }: ThemeGalleryProps) => {
           >
             {sortOptions.map((option) => (
               <option key={option.value} value={option.value}>
-                {option.label}
+                {t(option.labelKey)}
               </option>
             ))}
           </select>
@@ -170,21 +174,25 @@ const ThemeGallery = ({ onCreateNewTheme, onEditTheme }: ThemeGalleryProps) => {
 
       {isLoading ? (
         <div className="mt-8">
-          <LoadingSpinner size="lg" message="Loading themes…" />
+          <LoadingSpinner size="lg" message={t('themes.gallery.status.loading')} />
         </div>
       ) : filteredThemes.length === 0 ? (
         <div className="mt-8">
           <EmptyState
             icon="🎨"
-            title={customThemes.length === 0 && filter === 'custom' ? 'No custom themes yet' : 'No themes found'}
+            title={
+              customThemes.length === 0 && filter === 'custom'
+                ? t('themes.gallery.empty.noCustomTitle')
+                : t('themes.gallery.empty.noResultsTitle')
+            }
             description={
               customThemes.length === 0 && filter === 'custom'
-                ? 'Get started by creating your first custom theme. Personalize colors, fonts, and more!'
-                : 'No themes match your filters. Try adjusting your search or create a new theme.'
+                ? t('themes.gallery.empty.noCustomDescription')
+                : t('themes.gallery.empty.noResultsDescription')
             }
             action={
               customThemes.length === 0 && filter === 'custom'
-                ? { label: 'Create Your First Theme', onClick: handleCreateTheme }
+                ? { label: t('themes.gallery.empty.createFirstAction'), onClick: handleCreateTheme }
                 : undefined
             }
           />

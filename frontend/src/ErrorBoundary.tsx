@@ -1,6 +1,7 @@
 import { Component } from 'react';
 import type { ErrorInfo, ReactNode } from 'react';
 import { analyticsService } from './services/analyticsService';
+import i18n from './i18n/config';
 
 interface Props {
   children: ReactNode;
@@ -48,9 +49,9 @@ class ErrorBoundary extends Component<Props, State> {
           fontFamily: 'monospace',
           whiteSpace: 'pre-wrap',
         }}>
-          <h1>Something went wrong.</h1>
+          <h1>{i18n.t('errorBoundary.title')}</h1>
           <details style={{ whiteSpace: 'pre-wrap' }}>
-            <summary>Error details</summary>
+            <summary>{i18n.t('errorBoundary.details')}</summary>
             {this.state.error && this.state.error.toString()}
             <br />
             {this.state.error && this.state.error.stack}

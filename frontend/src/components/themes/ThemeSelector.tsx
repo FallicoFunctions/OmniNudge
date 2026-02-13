@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { useTranslation } from 'react-i18next';
 import { useTheme } from '../../hooks/useTheme';
 import type { UserTheme } from '../../types/theme';
 import { getThemeVariable } from '../../utils/theme';
@@ -12,6 +13,7 @@ interface ThemeSelectorProps {
 }
 
 const ThemeSelector = ({ onCreateNewTheme, variant = 'card' }: ThemeSelectorProps) => {
+  const { t } = useTranslation();
   const {
     activeTheme,
     predefinedThemes,
@@ -30,10 +32,10 @@ const ThemeSelector = ({ onCreateNewTheme, variant = 'card' }: ThemeSelectorProp
 
   const themeGroups = useMemo(
     () => [
-      { label: 'Predefined Themes', themes: predefinedThemes },
-      { label: 'My Themes', themes: customThemes },
+      { label: t('themes.selector.groups.predefined'), themes: predefinedThemes },
+      { label: t('themes.selector.groups.custom'), themes: customThemes },
     ],
-    [predefinedThemes, customThemes]
+    [customThemes, predefinedThemes, t]
   );
 
   const handleSelect = async (theme: UserTheme) => {
@@ -43,14 +45,14 @@ const ThemeSelector = ({ onCreateNewTheme, variant = 'card' }: ThemeSelectorProp
     if (autoCloseThemeSelector) {
       setIsOpen(false);
     }
-    setAnnouncement(`Theme ${theme.theme_name} selected`);
+    setAnnouncement(t('themes.selector.announcements.selected', { theme: theme.theme_name }));
   };
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
     await refreshThemes();
     setIsRefreshing(false);
-    setAnnouncement('Theme list refreshed');
+    setAnnouncement(t('themes.selector.announcements.refreshed'));
   };
 
   const handleCreateTheme = () => {
@@ -81,7 +83,7 @@ const ThemeSelector = ({ onCreateNewTheme, variant = 'card' }: ThemeSelectorProp
         <div className="flex items-center justify-between border-b border-[var(--color-border)] px-4 py-3">
           <div>
             <p className="text-xs font-medium uppercase tracking-wide text-[var(--color-text-secondary)]">
-              Theme Options
+              {t('themes.selector.dialog.title')}
             </p>
             {error && <p className="text-xs text-red-500">{error}</p>}
           </div>
@@ -92,16 +94,19 @@ const ThemeSelector = ({ onCreateNewTheme, variant = 'card' }: ThemeSelectorProp
               onClick={handleRefresh}
               disabled={isRefreshing}
             >
-              {isRefreshing ? 'Refreshing…' : 'Refresh'}
+              {isRefreshing
+                ? t('themes.selector.actions.refreshing')
+                : t('themes.selector.actions.refresh')}
             </button>
             {isMobile && (
               <button
                 type="button"
                 className="rounded-full bg-[var(--color-surface-elevated)] px-3 py-1 text-xs font-semibold text-[var(--color-text-primary)]"
                 onClick={() => setIsOpen(false)}
-                aria-label="Close theme selector"
+                aria-label={t('themes.selector.actions.closeAria')}
               >
-                Close ✕
+                {t('themes.selector.actions.close')}{' '}
+                <span aria-hidden="true">✕</span>
               </button>
             )}
           </div>
@@ -109,7 +114,7 @@ const ThemeSelector = ({ onCreateNewTheme, variant = 'card' }: ThemeSelectorProp
 
         {isLoading ? (
           <div className="px-4 py-6 text-center text-sm text-[var(--color-text-secondary)]">
-            Loading themes…
+            {t('themes.selector.status.loadingThemes')}
           </div>
         ) : (
           <div className="max-h-80 overflow-y-auto px-2 py-2 sm:max-h-96">
@@ -120,7 +125,7 @@ const ThemeSelector = ({ onCreateNewTheme, variant = 'card' }: ThemeSelectorProp
                 </p>
                 {themes.length === 0 ? (
                   <p className="px-2 py-4 text-sm text-[var(--color-text-secondary)]">
-                    No themes available.
+                    {t('themes.selector.status.noThemes')}
                   </p>
                 ) : (
                   themes.map((theme) => {
@@ -186,7 +191,7 @@ const ThemeSelector = ({ onCreateNewTheme, variant = 'card' }: ThemeSelectorProp
             className="mt-1 w-full rounded-lg border border-dashed border-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-[var(--color-primary)]"
             onClick={handleCreateTheme}
           >
-            + Create New Theme
+            {t('themes.selector.actions.createNewTheme')}
           </button>
         </div>
       </div>
@@ -212,9 +217,11 @@ const ThemeSelector = ({ onCreateNewTheme, variant = 'card' }: ThemeSelectorProp
         aria-haspopup="dialog"
       >
         <div>
-          <p className="text-sm text-[var(--color-text-secondary)]">Active Theme</p>
+          <p className="text-sm text-[var(--color-text-secondary)]">
+            {t('themes.selector.activeThemeLabel')}
+          </p>
           <p className="text-base font-semibold text-[var(--color-text-primary)]">
-            {activeTheme?.theme_name ?? 'Select a theme'}
+            {activeTheme?.theme_name ?? t('themes.selector.selectThemeFallback')}
           </p>
         </div>
         <span className="text-lg text-[var(--color-text-muted)]">

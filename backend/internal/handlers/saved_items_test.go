@@ -36,6 +36,7 @@ func (f *fakeRedditClient) GetPostInfo(ctx context.Context, subreddit string, re
 func setupSavedItemsTest(t *testing.T) (*SavedItemsHandler, *models.SavedItemsRepository, *models.PlatformPostRepository, *fakeRedditClient, int, int, func()) {
 	db, err := database.NewTest()
 	require.NoError(t, err)
+	t.Cleanup(db.Close)
 
 	ctx := context.Background()
 	err = db.Migrate(ctx)

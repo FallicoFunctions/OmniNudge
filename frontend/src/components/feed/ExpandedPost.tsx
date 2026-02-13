@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { resolveMediaUrl } from '../../utils/mediaUrl';
 import { HlsVideo } from '../common/HlsVideo';
 import { ImageCarousel } from './ImageCarousel';
@@ -77,6 +78,7 @@ interface RedditListing {
 }
 
 export function ExpandedPost({ post, onCollapse }: ExpandedPostProps) {
+  const { t } = useTranslation();
   const [comments, setComments] = useState<ThreadComment[]>([]);
   const [isLoadingComments, setIsLoadingComments] = useState(true);
   const [commentError, setCommentError] = useState<string | null>(null);
@@ -146,13 +148,10 @@ export function ExpandedPost({ post, onCollapse }: ExpandedPostProps) {
         if (postType === 'reddit') {
           // Fetch from Reddit API (same endpoint as normal post page)
           const response = await api.get<unknown>(`/reddit/r/${postData.subreddit}/comments/${postData.id}`);
-          console.log('Reddit API response:', response);
 
           // Reddit API returns [postListing, commentsListing]
           const commentsListing = Array.isArray(response) ? (response[1] as RedditListing) : undefined;
           const redditComments = commentsListing?.data?.children || [];
-
-          console.log('Reddit comments received:', redditComments);
 
           // Flatten and normalize Reddit API comments
           const flattenComments = (comments: RedditCommentNode[]): ThreadComment[] => {
@@ -170,7 +169,7 @@ export function ExpandedPost({ post, onCollapse }: ExpandedPostProps) {
 
               flattened.push({
                 id: comment.data.id ?? '',
-                username: comment.data.author ?? 'Unknown',
+                username: comment.data.author ?? t('posts.compact.unknownUser'),
                 content: comment.data.body,
                 created_at: comment.data.created_utc
                   ? new Date(comment.data.created_utc * 1000).toISOString()
@@ -192,7 +191,6 @@ export function ExpandedPost({ post, onCollapse }: ExpandedPostProps) {
           setHasMoreComments(false);
         } else {
           const data = await postsService.getComments(postData.id as number);
-          console.log('Hub comments received:', data);
 
           const normalizedComments = (data as PostCommentWithBody[]).map((c) => ({
             ...c,
@@ -205,14 +203,14 @@ export function ExpandedPost({ post, onCollapse }: ExpandedPostProps) {
         }
       } catch (err) {
         console.error('Error fetching comments:', err);
-        setCommentError(err instanceof Error ? err.message : 'Failed to load comments');
+        setCommentError(err instanceof Error ? err.message : t('comments.errors.loadFailed'));
       } finally {
         setIsLoadingComments(false);
       }
     };
 
     fetchComments();
-  }, [postData.id, postType, postData.subreddit]);
+  }, [postData.id, postType, postData.subreddit, t]);
 
   const handleVote = async (commentId: number | string, vote: number) => {
     // Optimistic update first
@@ -349,7 +347,6 @@ export function ExpandedPost({ post, onCollapse }: ExpandedPostProps) {
 
   const loadMoreComments = () => {
     // TODO: Implement pagination
-    console.log('Load more comments');
   };
 
   return (
@@ -363,7 +360,7 @@ export function ExpandedPost({ post, onCollapse }: ExpandedPostProps) {
           <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M19 12H5M12 19l-7-7 7-7" />
           </svg>
-          Back
+          {t('common.back')}
         </button>
       </div>
 
@@ -371,7 +368,7 @@ export function ExpandedPost({ post, onCollapse }: ExpandedPostProps) {
       {isGallery && galleryImages && galleryImages.length > 0 ? (
         <ImageCarousel
           images={galleryImages}
-          title={postData.title || 'Gallery'}
+          title={postData.title || t('posts.media.galleryTitle')}
           className="w-full"
           currentIndex={galleryIndex}
           onNavigate={handleGalleryNavigate}
@@ -392,7 +389,7 @@ export function ExpandedPost({ post, onCollapse }: ExpandedPostProps) {
           ) : (
             <img
               src={displayMedia.startsWith('http') ? displayMedia : resolveMediaUrl(displayMedia)}
-              alt={postData.title || 'Post image'}
+              alt={t('posts.media.previewImageAlt', { title: postData.title || t('posts.compact.untitled') })}
               className="w-full h-auto"
               style={{ display: 'block', maxHeight: 'calc(100vh - 200px)', objectFit: 'contain' }}
               loading="lazy"
@@ -413,14 +410,14 @@ export function ExpandedPost({ post, onCollapse }: ExpandedPostProps) {
         postId={postData.id}
         postType={postType}
         onCommentPosted={(comment) => handleCommentPosted(null, comment)}
-        placeholder="Add a comment..."
+        placeholder={t('comments.addComment')}
       />
 
       {/* Comments */}
       <div className="mt-1">
         {isLoadingComments && (
           <div className="p-2 text-center text-xs text-[var(--color-text-muted)]">
-            Loading comments...
+            {t('comments.loading')}
           </div>
         )}
 
@@ -431,16 +428,14 @@ export function ExpandedPost({ post, onCollapse }: ExpandedPostProps) {
               onClick={() => window.location.reload()}
               className="text-xs text-cyan-500 hover:text-cyan-400"
             >
-              Retry
+              {t('common.retry')}
             </button>
           </div>
         )}
 
         {!isLoadingComments && !commentError && comments.length === 0 && (
           <div className="p-2 text-center text-xs text-[var(--color-text-muted)]">
-            {postType === 'reddit'
-              ? 'No comments yet on this post.'
-              : 'No comments yet. Be the first to comment!'}
+            {t('comments.emptyBeFirstOnPost')}
           </div>
         )}
 
@@ -464,7 +459,7 @@ export function ExpandedPost({ post, onCollapse }: ExpandedPostProps) {
             onClick={loadMoreComments}
             className="w-full p-2 text-xs text-cyan-500 hover:text-cyan-400 border-t border-[var(--color-border)] transition-colors"
           >
-            Load 25 more comments
+            {t('comments.loadMore', { count: 25 })}
           </button>
         )}
       </div>

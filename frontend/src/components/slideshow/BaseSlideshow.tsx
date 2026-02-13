@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
+import { useFormat } from '../../hooks/useFormat';
 
 export interface SlideshowItem {
   id: string | number;
@@ -34,6 +36,8 @@ export function BaseSlideshow({
   onSlideChange,
   renderControls,
 }: BaseSlideshowProps) {
+  const { t } = useTranslation();
+  const { formatNumber } = useFormat();
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const [autoAdvance, setAutoAdvance] = useState(initialAutoAdvance);
   const [autoAdvanceInterval, setAutoAdvanceInterval] = useState(initialInterval);
@@ -97,7 +101,7 @@ export function BaseSlideshow({
   if (!items || items.length === 0) {
     return (
       <div className="fixed inset-0 z-50 bg-black bg-opacity-95 flex items-center justify-center">
-        <div className="text-white text-lg">No media found</div>
+        <div className="text-white text-lg">{t('slideshow.noMediaFound')}</div>
       </div>
     );
   }
@@ -114,7 +118,10 @@ export function BaseSlideshow({
       <div className="absolute top-0 left-0 right-0 flex items-center justify-between px-4 py-3 z-10">
         {/* Media counter - left */}
         <div className="text-white text-base font-semibold bg-black/60 backdrop-blur-sm px-4 py-2 rounded-lg">
-          Image {currentIndex + 1} of {items.length}
+          {t('slideshow.counter.imageOf', {
+            current: formatNumber(currentIndex + 1),
+            total: formatNumber(items.length),
+          })}
         </div>
 
         {/* Controls (if provided) - center */}
@@ -132,11 +139,11 @@ export function BaseSlideshow({
         )}
 
         {/* Close button - right */}
-        <button
-          onClick={onClose}
-          className="bg-black/60 backdrop-blur-sm hover:bg-red-600/80 text-white transition-colors p-2 rounded-lg"
-          aria-label="Close slideshow (Esc)"
-        >
+	        <button
+	          onClick={onClose}
+	          className="bg-black/60 backdrop-blur-sm hover:bg-red-600/80 text-white transition-colors p-2 rounded-lg"
+	          aria-label={t('slideshow.aria.closeEsc')}
+	        >
           <svg
             xmlns="http://www.w3.org/2000/svg"
             className="h-6 w-6"
@@ -155,15 +162,15 @@ export function BaseSlideshow({
       </div>
 
       {/* Previous button - MSG-3: More prominent navigation */}
-      {items.length > 1 && (
-        <button
+	      {items.length > 1 && (
+	        <button
           onClick={(e) => {
             e.stopPropagation();
             handlePrevious();
           }}
           className="absolute left-4 top-1/2 -translate-y-1/2 bg-black/60 backdrop-blur-sm hover:bg-white/20 text-white transition-colors z-10 p-3 rounded-full"
-          aria-label="Previous (←)"
-        >
+	          aria-label={t('slideshow.aria.previous')}
+	        >
           <svg
             xmlns="http://www.w3.org/2000/svg"
             className="h-8 w-8"
@@ -185,15 +192,15 @@ export function BaseSlideshow({
       </div>
 
       {/* Next button - MSG-3: More prominent navigation */}
-      {items.length > 1 && (
-        <button
+	      {items.length > 1 && (
+	        <button
           onClick={(e) => {
             e.stopPropagation();
             handleNext();
           }}
           className="absolute right-4 top-1/2 -translate-y-1/2 bg-black/60 backdrop-blur-sm hover:bg-white/20 text-white transition-colors z-10 p-3 rounded-full"
-          aria-label="Next (→)"
-        >
+	          aria-label={t('slideshow.aria.next')}
+	        >
           <svg
             xmlns="http://www.w3.org/2000/svg"
             className="h-8 w-8"

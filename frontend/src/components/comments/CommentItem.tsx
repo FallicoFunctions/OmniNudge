@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'react';
 import type { LocalCommentBase } from '../../types/comments';
 import { useSettings } from '../../contexts/SettingsContext';
-import { formatRelativeTime } from '../../utils/timeFormat';
+import { useTranslation } from 'react-i18next';
 import { MarkdownInput } from '../common/MarkdownInput';
 import { MarkdownRenderer } from '../common/MarkdownRenderer';
+import { useFormat } from '../../hooks/useFormat';
 
 export interface CommentActionHandlers<T extends LocalCommentBase> {
   vote: (comment: T, value: 1 | -1) => Promise<void>;
@@ -42,6 +43,8 @@ export function CommentItem<T extends LocalCommentBase>({
   currentUserRole,
   isModerator = false,
 }: CommentItemProps<T>) {
+  const { t } = useTranslation();
+  const { formatNumber, formatDate, formatRelativeTime } = useFormat();
   const [replyText, setReplyText] = useState('');
   const [editText, setEditText] = useState(comment.content);
   const [isEditing, setIsEditing] = useState(false);
@@ -71,13 +74,18 @@ export function CommentItem<T extends LocalCommentBase>({
     if (useRelativeTime) {
       return formatRelativeTime(comment.created_at);
     }
-    return new Date(comment.created_at).toLocaleString('en-US', {
+    return formatDate(comment.created_at, {
       month: 'short',
       day: 'numeric',
       hour: 'numeric',
       minute: '2-digit',
     });
-  }, [comment.created_at, useRelativeTime]);
+  }, [comment.created_at, formatDate, formatRelativeTime, useRelativeTime]);
+
+  const pointsLabel = t('posts.point', {
+    count: comment.score,
+    formattedCount: formatNumber(comment.score),
+  });
 
   const handleVote = async (value: 1 | -1) => {
     setActionError(null);
@@ -85,7 +93,7 @@ export function CommentItem<T extends LocalCommentBase>({
     try {
       await handlers.vote(comment, value);
     } catch (err) {
-      setActionError(err instanceof Error ? err.message : 'Failed to vote.');
+      setActionError(err instanceof Error ? err.message : t('comments.errors.voteFailed'));
     } finally {
       setVotePending(false);
     }
@@ -101,7 +109,7 @@ export function CommentItem<T extends LocalCommentBase>({
       setReplyText('');
       onCancelReply();
     } catch (err) {
-      setActionError(err instanceof Error ? err.message : 'Failed to post reply.');
+      setActionError(err instanceof Error ? err.message : t('comments.errors.replyFailed'));
     } finally {
       setReplyPending(false);
     }
@@ -116,20 +124,20 @@ export function CommentItem<T extends LocalCommentBase>({
       await handlers.edit(comment, editText.trim());
       setIsEditing(false);
     } catch (err) {
-      setActionError(err instanceof Error ? err.message : 'Failed to update comment.');
+      setActionError(err instanceof Error ? err.message : t('comments.errors.editFailed'));
     } finally {
       setEditPending(false);
     }
   };
 
   const handleDelete = async () => {
-    if (!window.confirm('Delete this comment? This action cannot be undone.')) return;
+    if (!window.confirm(t('comments.confirm.delete'))) return;
     setActionError(null);
     setDeletePending(true);
     try {
       await handlers.remove(comment);
     } catch (err) {
-      setActionError(err instanceof Error ? err.message : 'Failed to delete comment.');
+      setActionError(err instanceof Error ? err.message : t('comments.errors.deleteFailed'));
     } finally {
       setDeletePending(false);
     }
@@ -141,7 +149,7 @@ export function CommentItem<T extends LocalCommentBase>({
     try {
       await handlers.toggleInbox(comment, !inboxDisabled);
     } catch (err) {
-      setActionError(err instanceof Error ? err.message : 'Failed to update inbox setting.');
+      setActionError(err instanceof Error ? err.message : t('comments.errors.inboxFailed'));
     } finally {
       setInboxPending(false);
     }
@@ -153,7 +161,7 @@ export function CommentItem<T extends LocalCommentBase>({
     try {
       await handlers.toggleSave(comment, !isSaved);
     } catch (err) {
-      setActionError(err instanceof Error ? err.message : 'Failed to update save state.');
+      setActionError(err instanceof Error ? err.message : t('comments.errors.saveFailed'));
     } finally {
       setSavePending(false);
     }
@@ -165,7 +173,7 @@ export function CommentItem<T extends LocalCommentBase>({
     try {
       await handlers.report(comment);
     } catch (err) {
-      setActionError(err instanceof Error ? err.message : 'Failed to report comment.');
+      setActionError(err instanceof Error ? err.message : t('comments.errors.reportFailed'));
     } finally {
       setReportPending(false);
     }
@@ -184,7 +192,7 @@ export function CommentItem<T extends LocalCommentBase>({
                 ? 'text-orange-500'
                 : 'text-[var(--color-text-secondary)] hover:text-orange-500'
             } disabled:opacity-50`}
-            title="Upvote"
+            title={t('posts.actions.upvote')}
           >
             ▲
           </button>
@@ -197,7 +205,7 @@ export function CommentItem<T extends LocalCommentBase>({
                 ? 'text-blue-500'
                 : 'text-[var(--color-text-secondary)] hover:text-blue-500'
             } disabled:opacity-50`}
-            title="Downvote"
+            title={t('posts.actions.downvote')}
           >
             ▼
           </button>
@@ -210,8 +218,12 @@ export function CommentItem<T extends LocalCommentBase>({
               onClick={() => setIsCollapsed(!isCollapsed)}
               className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] transition-transform duration-200"
               style={{ transform: isCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)' }}
-              title={isCollapsed ? 'Expand' : 'Collapse'}
-              aria-label={isCollapsed ? 'Expand comment thread' : 'Collapse comment thread'}
+              title={isCollapsed ? t('comments.actions.expand') : t('comments.actions.collapse')}
+              aria-label={
+                isCollapsed
+                  ? t('common.accessibility.expandCommentThread')
+                  : t('common.accessibility.collapseCommentThread')
+              }
             >
               ▼
             </button>
@@ -222,7 +234,7 @@ export function CommentItem<T extends LocalCommentBase>({
               {comment.username}
             </button>
             <span className="rounded bg-blue-500 px-1.5 py-0.5 text-[10px] font-bold text-white">
-              Omni
+              {t('posts.badges.omni')}
             </span>
             <span>·</span>
             <span
@@ -234,13 +246,13 @@ export function CommentItem<T extends LocalCommentBase>({
                   : 'text-[var(--color-text-primary)]'
               }`}
             >
-              {comment.score.toLocaleString()} {comment.score === 1 ? 'point' : 'points'}
+              {pointsLabel}
             </span>
             <span>·</span>
             <span>{formattedTimestamp}</span>
             {isCollapsed && replies.length > 0 && (
               <span className="ml-2 text-[var(--color-text-muted)]">
-                ({replies.length} {replies.length === 1 ? 'reply' : 'replies'})
+                {t('comments.replyCount', { count: replies.length })}
               </span>
             )}
           </div>
@@ -248,7 +260,7 @@ export function CommentItem<T extends LocalCommentBase>({
           {!isCollapsed && (isEditing ? (
             <form onSubmit={handleEditSubmit} className="mt-1 space-y-2">
               <MarkdownInput
-                label="Edit comment"
+                label={t('comments.labels.editComment')}
                 value={editText}
                 onChange={setEditText}
                 rows={4}
@@ -259,7 +271,7 @@ export function CommentItem<T extends LocalCommentBase>({
                   disabled={editPending || !editText.trim()}
                   className="rounded bg-[var(--color-primary)] px-3 py-1 text-xs font-semibold text-white disabled:opacity-50"
                 >
-                  {editPending ? 'Saving...' : 'Save'}
+                  {editPending ? t('comments.status.saving') : t('common.save')}
                 </button>
                 <button
                   type="button"
@@ -269,7 +281,7 @@ export function CommentItem<T extends LocalCommentBase>({
                   }}
                   className="rounded border border-[var(--color-border)] px-3 py-1 text-xs font-semibold text-[var(--color-text-secondary)]"
                 >
-                  Cancel
+                  {t('common.cancel')}
                 </button>
               </div>
             </form>
@@ -289,7 +301,7 @@ export function CommentItem<T extends LocalCommentBase>({
               onClick={() => onReplySelect(comment.id)}
               className="font-semibold text-[var(--color-primary)] hover:text-[var(--color-primary-dark)] transition"
             >
-              Reply
+              {t('comments.actions.reply')}
             </button>
 
             {/* Secondary actions: Save, Edit, Inbox toggle */}
@@ -298,19 +310,19 @@ export function CommentItem<T extends LocalCommentBase>({
               disabled={savePending}
               className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] disabled:opacity-50"
             >
-              {isSaved ? 'Unsave' : 'Save'}
+              {savePending ? t('comments.status.saving') : isSaved ? t('comments.actions.unsave') : t('comments.actions.save')}
             </button>
             {isOwner && (
               <>
                 <button onClick={() => setIsEditing(true)} className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]">
-                  Edit
+                  {t('comments.actions.edit')}
                 </button>
                 <button
                   onClick={handleInboxToggle}
                   disabled={inboxPending}
                   className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] disabled:opacity-50"
                 >
-                  {inboxDisabled ? 'Enable inbox' : 'Disable inbox'}
+                  {inboxDisabled ? t('comments.actions.enableInbox') : t('comments.actions.disableInbox')}
                 </button>
               </>
             )}
@@ -322,17 +334,17 @@ export function CommentItem<T extends LocalCommentBase>({
             <button
               onClick={() => handlers.permalink(comment)}
               className="text-[11px] text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]"
-              title="Get permanent link to this comment"
+              title={t('comments.actions.permalink')}
             >
-              Permalink
+              {t('comments.actions.permalink')}
             </button>
             {handlers.embed && (
               <button
                 onClick={() => handlers.embed?.(comment)}
                 className="text-[11px] text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]"
-                title="Get embed code for this comment"
+                title={t('posts.actions.embed')}
               >
-                Embed
+                {t('posts.actions.embed')}
               </button>
             )}
 
@@ -346,7 +358,7 @@ export function CommentItem<T extends LocalCommentBase>({
                 disabled={deletePending}
                 className="text-[11px] text-red-600 hover:text-red-700 disabled:opacity-50"
               >
-                Delete
+                {t('comments.actions.delete')}
               </button>
             )}
             {!isOwner && (
@@ -355,7 +367,7 @@ export function CommentItem<T extends LocalCommentBase>({
                 disabled={reportPending}
                 className="text-[11px] text-red-600 hover:text-red-700 disabled:opacity-50"
               >
-                Report
+                {t('comments.actions.report')}
               </button>
             )}
           </div>}
@@ -363,10 +375,10 @@ export function CommentItem<T extends LocalCommentBase>({
           {!isCollapsed && isReplying && (
             <form onSubmit={handleReplySubmit} className="mt-3">
               <MarkdownInput
-                label="Write a reply"
+                label={t('comments.writeReply')}
                 value={replyText}
                 onChange={setReplyText}
-                placeholder="Write your reply..."
+                placeholder={t('comments.writeComment')}
                 rows={3}
               />
               <div className="mt-2 flex gap-2">
@@ -375,14 +387,14 @@ export function CommentItem<T extends LocalCommentBase>({
                   disabled={replyPending || !replyText.trim()}
                   className="rounded-md bg-[var(--color-primary)] px-3 py-1 text-xs font-semibold text-white hover:bg-[var(--color-primary-dark)] disabled:opacity-50"
                 >
-                  {replyPending ? 'Posting...' : 'Post Reply'}
+                  {replyPending ? t('comments.status.posting') : t('comments.postReply')}
                 </button>
                 <button
                   type="button"
                   onClick={onCancelReply}
                   className="rounded-md border border-[var(--color-border)] px-3 py-1 text-xs font-semibold text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-elevated)]"
                 >
-                  Cancel
+                  {t('common.cancel')}
                 </button>
               </div>
             </form>

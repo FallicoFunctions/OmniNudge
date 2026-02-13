@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { hubSettingsService } from '../../services/hubSettingsService';
+import { useFormat } from '../../hooks/useFormat';
 
 interface Props {
   hubName: string;
@@ -8,6 +10,8 @@ interface Props {
 
 export default function ThemeTab({ hubName }: Props) {
   const queryClient = useQueryClient();
+  const { t } = useTranslation();
+  const { formatDate } = useFormat();
   const [themeName, setThemeName] = useState('');
   const [themeDescription, setThemeDescription] = useState('');
   const [cssContent, setCssContent] = useState('');
@@ -100,17 +104,17 @@ export default function ThemeTab({ hubName }: Props) {
     <div className="space-y-6">
       <div>
         <h2 className="text-xl font-bold text-[var(--color-text-primary)] mb-2">
-          Hub Theme
+          {t('hubSettings.theme.title')}
         </h2>
         <p className="text-[var(--color-text-secondary)]">
-          Customize your hub's appearance with custom CSS
+          {t('hubSettings.theme.subtitle')}
         </p>
       </div>
 
       {/* Active Theme Info */}
       {activeTheme && (
         <div className="bg-green-50 border border-green-200 rounded p-4">
-          <h3 className="font-medium text-green-900 mb-1">Active Theme</h3>
+          <h3 className="font-medium text-green-900 mb-1">{t('hubSettings.theme.activeTheme.title')}</h3>
           <p className="text-sm text-green-800">{activeTheme.name}</p>
           {activeTheme.description && (
             <p className="text-xs text-green-700 mt-1">{activeTheme.description}</p>
@@ -120,55 +124,57 @@ export default function ThemeTab({ hubName }: Props) {
 
       {/* Create New Theme */}
       <div className="border border-[var(--color-border)] rounded p-4">
-        <h3 className="font-medium text-[var(--color-text-primary)] mb-4">Create New Theme</h3>
+        <h3 className="font-medium text-[var(--color-text-primary)] mb-4">
+          {t('hubSettings.theme.create.title')}
+        </h3>
 
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-[var(--color-text-primary)] mb-2">
-              Theme Name
+              {t('hubSettings.theme.create.fields.name.label')}
             </label>
             <input
               type="text"
               value={themeName}
               onChange={(e) => setThemeName(e.target.value)}
-              placeholder="My Custom Theme"
+              placeholder={t('hubSettings.theme.create.fields.name.placeholder')}
               className="w-full px-3 py-2 border border-[var(--color-border)] rounded bg-[var(--color-background)] text-[var(--color-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
             />
           </div>
 
           <div>
             <label className="block text-sm font-medium text-[var(--color-text-primary)] mb-2">
-              Description (Optional)
+              {t('hubSettings.theme.create.fields.description.label')}
             </label>
             <input
               type="text"
               value={themeDescription}
               onChange={(e) => setThemeDescription(e.target.value)}
-              placeholder="A brief description..."
+              placeholder={t('hubSettings.theme.create.fields.description.placeholder')}
               className="w-full px-3 py-2 border border-[var(--color-border)] rounded bg-[var(--color-background)] text-[var(--color-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
             />
           </div>
 
           <div>
             <label className="block text-sm font-medium text-[var(--color-text-primary)] mb-2">
-              Custom CSS
+              {t('hubSettings.theme.create.fields.css.label')}
             </label>
             <textarea
               value={cssContent}
               onChange={(e) => setCssContent(e.target.value)}
-              placeholder=".hub-header { background: #333; }&#10;.post-title { color: #0066cc; }"
+              placeholder={t('hubSettings.theme.create.fields.css.placeholder')}
               rows={12}
               className="w-full px-3 py-2 border border-[var(--color-border)] rounded bg-[var(--color-background)] text-[var(--color-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] font-mono text-sm"
             />
             <p className="text-xs text-[var(--color-text-secondary)] mt-1">
-              CSS is automatically sanitized to prevent XSS attacks
+              {t('hubSettings.theme.create.fields.css.helper')}
             </p>
           </div>
 
           {/* Application Scope */}
           <div>
             <label className="block text-sm font-medium text-[var(--color-text-primary)] mb-2">
-              Apply Theme To
+              {t('hubSettings.theme.create.scope.label')}
             </label>
             <div className="space-y-2">
               <label className="flex items-center">
@@ -186,7 +192,7 @@ export default function ThemeTab({ hubName }: Props) {
                   }}
                   className="mr-2"
                 />
-                <span className="text-[var(--color-text-primary)]">Whole Page</span>
+                <span className="text-[var(--color-text-primary)]">{t('hubSettings.theme.create.scope.wholePage')}</span>
               </label>
               {!applyToWholePage && (
                 <>
@@ -197,7 +203,7 @@ export default function ThemeTab({ hubName }: Props) {
                       onChange={(e) => setApplyToHeader(e.target.checked)}
                       className="mr-2"
                     />
-                    <span className="text-[var(--color-text-primary)]">Header Only</span>
+                    <span className="text-[var(--color-text-primary)]">{t('hubSettings.theme.create.scope.headerOnly')}</span>
                   </label>
                   <label className="flex items-center ml-6">
                     <input
@@ -206,7 +212,7 @@ export default function ThemeTab({ hubName }: Props) {
                       onChange={(e) => setApplyToSidebar(e.target.checked)}
                       className="mr-2"
                     />
-                    <span className="text-[var(--color-text-primary)]">Sidebar Only</span>
+                    <span className="text-[var(--color-text-primary)]">{t('hubSettings.theme.create.scope.sidebarOnly')}</span>
                   </label>
                   <label className="flex items-center ml-6">
                     <input
@@ -215,7 +221,7 @@ export default function ThemeTab({ hubName }: Props) {
                       onChange={(e) => setApplyToPostList(e.target.checked)}
                       className="mr-2"
                     />
-                    <span className="text-[var(--color-text-primary)]">Post List Only</span>
+                    <span className="text-[var(--color-text-primary)]">{t('hubSettings.theme.create.scope.postListOnly')}</span>
                   </label>
                   <label className="flex items-center ml-6">
                     <input
@@ -224,7 +230,7 @@ export default function ThemeTab({ hubName }: Props) {
                       onChange={(e) => setApplyToPostDetail(e.target.checked)}
                       className="mr-2"
                     />
-                    <span className="text-[var(--color-text-primary)]">Post Detail Only</span>
+                    <span className="text-[var(--color-text-primary)]">{t('hubSettings.theme.create.scope.postDetailOnly')}</span>
                   </label>
                 </>
               )}
@@ -238,22 +244,26 @@ export default function ThemeTab({ hubName }: Props) {
               disabled={!cssContent || previewMutation.isPending}
               className="px-4 py-2 rounded border border-[var(--color-border)] text-[var(--color-text-primary)] hover:bg-[var(--color-background)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
-              {previewMutation.isPending ? 'Previewing...' : 'Preview CSS'}
+              {previewMutation.isPending
+                ? t('hubSettings.theme.create.actions.previewing')
+                : t('hubSettings.theme.create.actions.previewCss')}
             </button>
             <button
               onClick={() => createMutation.mutate()}
               disabled={!themeName || createMutation.isPending}
               className="px-4 py-2 rounded bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-strong)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
-              {createMutation.isPending ? 'Creating...' : 'Create & Activate Theme'}
+              {createMutation.isPending
+                ? t('hubSettings.theme.create.actions.creating')
+                : t('hubSettings.theme.create.actions.createAndActivate')}
             </button>
           </div>
 
           {createMutation.isError && (
-            <p className="text-red-600 text-sm">Failed to create theme. Please check your CSS.</p>
+            <p className="text-red-600 text-sm">{t('hubSettings.theme.create.errors.createFailed')}</p>
           )}
           {createMutation.isSuccess && (
-            <p className="text-green-600 text-sm">Theme created and activated successfully!</p>
+            <p className="text-green-600 text-sm">{t('hubSettings.theme.create.success.createdAndActivated')}</p>
           )}
         </div>
       </div>
@@ -264,7 +274,7 @@ export default function ThemeTab({ hubName }: Props) {
           <div className="bg-[var(--color-surface)] rounded-lg p-6 max-w-4xl w-full max-h-[80vh] overflow-auto">
             <div className="flex justify-between items-start mb-4">
               <h3 className="text-xl font-bold text-[var(--color-text-primary)]">
-                CSS Preview (Sanitized & Scoped)
+                {t('hubSettings.theme.preview.title')}
               </h3>
               <button
                 onClick={() => setShowPreview(false)}
@@ -284,7 +294,7 @@ export default function ThemeTab({ hubName }: Props) {
       {themes.length > 0 && (
         <div className="border border-[var(--color-border)] rounded overflow-hidden">
           <div className="bg-[var(--color-background)] px-4 py-3 border-b border-[var(--color-border)]">
-            <h3 className="font-medium text-[var(--color-text-primary)]">Theme Versions</h3>
+            <h3 className="font-medium text-[var(--color-text-primary)]">{t('hubSettings.theme.versions.title')}</h3>
           </div>
           <div className="divide-y divide-[var(--color-border)]">
             {themes.map((theme) => (
@@ -296,7 +306,7 @@ export default function ThemeTab({ hubName }: Props) {
                     </span>
                     {theme.is_active && (
                       <span className="px-2 py-0.5 bg-green-100 text-green-800 text-xs rounded">
-                        Active
+                        {t('hubSettings.theme.versions.active')}
                       </span>
                     )}
                   </div>
@@ -306,7 +316,10 @@ export default function ThemeTab({ hubName }: Props) {
                     </p>
                   )}
                   <p className="text-xs text-[var(--color-text-secondary)] mt-1">
-                    Version {theme.version} • Created {new Date(theme.created_at).toLocaleDateString()}
+                    {t('hubSettings.theme.versions.versionLine', {
+                      version: theme.version,
+                      date: formatDate(theme.created_at, { month: 'short', day: 'numeric', year: 'numeric' }),
+                    })}
                   </p>
                 </div>
                 <div className="flex space-x-2">
@@ -316,17 +329,17 @@ export default function ThemeTab({ hubName }: Props) {
                         onClick={() => activateMutation.mutate(theme.id)}
                         className="px-3 py-1 text-sm rounded border border-[var(--color-border)] text-[var(--color-text-primary)] hover:bg-[var(--color-background)]"
                       >
-                        Activate
+                        {t('hubSettings.theme.versions.actions.activate')}
                       </button>
                       <button
                         onClick={() => {
-                          if (confirm('Delete this theme version?')) {
+                          if (confirm(t('hubSettings.theme.versions.confirmDelete'))) {
                             deleteMutation.mutate(theme.id);
                           }
                         }}
                         className="px-3 py-1 text-sm rounded text-red-600 hover:bg-red-50"
                       >
-                        Delete
+                        {t('common.delete')}
                       </button>
                     </>
                   )}

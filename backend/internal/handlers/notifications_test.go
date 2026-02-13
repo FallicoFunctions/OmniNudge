@@ -31,6 +31,7 @@ func uniqueNotifUsername(base string) string {
 func setupNotificationsHandlerTest(t *testing.T) (*NotificationsHandler, *database.Database, int, func()) {
 	db, err := database.NewTest()
 	require.NoError(t, err)
+	t.Cleanup(db.Close)
 
 	ctx := context.Background()
 	err = db.Migrate(ctx)

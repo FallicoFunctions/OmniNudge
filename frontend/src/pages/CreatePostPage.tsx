@@ -12,11 +12,15 @@ import type { HubSettings } from '../types/hubSettings';
 import { getPostUrl } from '../utils/postUrl';
 import { EmptyMessage, LoadingMessage } from '../components/common/StatusMessage';
 import { MarkdownInput } from '../components/common/MarkdownInput';
+import { useTranslation } from 'react-i18next';
+import { useFormat } from '../hooks/useFormat';
 
 const HUB_AUTOCOMPLETE_MIN_LENGTH = 2;
 const SUBREDDIT_AUTOCOMPLETE_MIN_LENGTH = 2;
 
 export default function CreatePostPage() {
+  const { t } = useTranslation();
+  const { formatNumber } = useFormat();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -136,12 +140,12 @@ export default function CreatePostPage() {
   const allowLinkTab = allowLinkPosts || allowImagePosts || allowVideoPosts;
   const mediaLabel =
     allowImagePosts && allowVideoPosts
-      ? 'Images/Videos'
+      ? t('createPostPage.media.labels.imagesVideos')
       : allowImagePosts
-        ? 'Images'
+        ? t('createPostPage.media.labels.images')
         : allowVideoPosts
-          ? 'Videos'
-          : 'Media';
+          ? t('createPostPage.media.labels.videos')
+          : t('createPostPage.media.labels.media');
   const mediaAccept =
     allowImagePosts && allowVideoPosts
       ? 'image/*,video/*'
@@ -483,7 +487,7 @@ export default function CreatePostPage() {
 
   return (
     <div className="max-w-3xl mx-auto p-6">
-      <h1 className="text-3xl font-bold mb-6">Create a Post</h1>
+      <h1 className="text-3xl font-bold mb-6">{t('createPostPage.title')}</h1>
 
       {/* Tabs */}
       <div className="flex gap-2 mb-6 border-b">
@@ -496,7 +500,7 @@ export default function CreatePostPage() {
                 : 'text-gray-600 hover:text-gray-800'
             }`}
           >
-            {allowLinkPosts ? 'Link' : 'Media'}
+            {allowLinkPosts ? t('createPostPage.tabs.link') : t('createPostPage.tabs.media')}
           </button>
         )}
         {allowTextPosts && (
@@ -508,7 +512,7 @@ export default function CreatePostPage() {
                 : 'text-gray-600 hover:text-gray-800'
             }`}
           >
-            Text
+            {t('createPostPage.tabs.text')}
           </button>
         )}
       </div>
@@ -517,14 +521,14 @@ export default function CreatePostPage() {
         {/* Title */}
         <div>
           <label className="block text-sm font-medium mb-2">
-            Title <span className="text-red-500">*</span>
+            {t('createPostPage.fields.title.label')} <span className="text-red-500">*</span>
           </label>
           <input
             type="text"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-            placeholder="Enter post title"
+            placeholder={t('createPostPage.fields.title.placeholder')}
             required
             maxLength={300}
           />
@@ -534,7 +538,9 @@ export default function CreatePostPage() {
         {activeTab === 'link' && (
           <div>
             <label className="block text-sm font-medium mb-2">
-              {allowLinkPosts ? 'URL or Media' : 'Media'}
+              {allowLinkPosts
+                ? t('createPostPage.fields.urlOrMedia.label')
+                : t('createPostPage.fields.mediaOnly.label')}
             </label>
             {allowLinkPosts && (
               <>
@@ -550,11 +556,11 @@ export default function CreatePostPage() {
                     }
                   }}
                   className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-                  placeholder="https://example.com"
+                  placeholder={t('createPostPage.fields.urlOrMedia.placeholder')}
                   disabled={mediaItems.length > 0}
                 />
                 <p className="mt-1 text-sm text-gray-500">
-                  Enter a URL or upload an image/video
+                  {t('createPostPage.fields.urlOrMedia.help')}
                 </p>
               </>
             )}
@@ -585,7 +591,7 @@ export default function CreatePostPage() {
                               ) : (
                                 <img
                                   src={previewUrl}
-                                  alt="Uploaded preview"
+                                  alt={t('createPostPage.media.uploadedPreviewAlt')}
                                   className="w-full h-24 rounded object-cover"
                                 />
                               )}
@@ -594,7 +600,7 @@ export default function CreatePostPage() {
                                 onClick={() => removeMediaItem(index)}
                                 className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 text-xs leading-none hover:bg-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
                                 disabled={isUploadingMedia}
-                                title="Remove"
+                                title={t('createPostPage.media.actions.remove')}
                               >
                                 ✕
                               </button>
@@ -609,7 +615,7 @@ export default function CreatePostPage() {
                           className="text-[var(--color-primary)] hover:underline"
                           disabled={isUploadingMedia}
                         >
-                          + Add More
+                          {t('createPostPage.media.actions.addMore')}
                         </button>
                         <span className="text-[var(--color-text-muted)]">|</span>
                         <button
@@ -618,21 +624,23 @@ export default function CreatePostPage() {
                           className="text-red-600 hover:underline"
                           disabled={isUploadingMedia}
                         >
-                          Clear All
+                          {t('createPostPage.media.actions.clearAll')}
                         </button>
                       </div>
                     </>
                   ) : (
                     <>
                       <div className="text-sm text-[var(--color-text-secondary)]">
-                        Drag and drop, or{' '}
+                        {t('createPostPage.media.actions.dragDropPrefix')}{' '}
                         <button
                           type="button"
                           onClick={() => mediaInputRef.current?.click()}
                           className="text-[var(--color-primary)] hover:underline font-medium"
                           disabled={isUploadingMedia}
                         >
-                          {isUploadingMedia ? 'Uploading...' : 'Choose File'}
+                          {isUploadingMedia
+                            ? t('createPostPage.media.actions.uploading')
+                            : t('createPostPage.media.actions.chooseFile')}
                         </button>
                       </div>
                     </>
@@ -658,20 +666,23 @@ export default function CreatePostPage() {
         {/* Text Tab Content */}
         {activeTab === 'text' && (
           <MarkdownInput
-            label="Body (optional, Markdown supported)"
+            label={t('createPostPage.markdown.label')}
             value={body}
             onChange={setBody}
             rows={10}
-            placeholder="Enter post body..."
+            placeholder={t('createPostPage.markdown.placeholder')}
             maxLength={maxPostBodyLength}
-            helperText={`${body.length}/10,000 characters`}
+            helperText={t('createPostPage.markdown.helper', {
+              formattedCount: formatNumber(body.length),
+              formattedMax: formatNumber(maxPostBodyLength),
+            })}
           />
         )}
 
         {/* Destination Selector */}
         <div>
           <label className="block text-sm font-medium mb-2">
-            Choose where to post <span className="text-red-500">*</span>
+            {t('createPostPage.destination.label')} <span className="text-red-500">*</span>
           </label>
 
           <div className="space-y-3">
@@ -687,7 +698,7 @@ export default function CreatePostPage() {
                       : 'bg-gray-200 text-gray-700'
                   }`}
                 >
-                  Hubs
+                  {t('createPostPage.destination.tabs.hubs')}
                 </button>
                 <button
                   type="button"
@@ -698,14 +709,16 @@ export default function CreatePostPage() {
                       : 'bg-gray-200 text-gray-700'
                   }`}
                 >
-                  Subreddits
+                  {t('createPostPage.destination.tabs.subreddits')}
                 </button>
               </div>
 
               {/* Hub selector */}
               {destination === 'hub' && (
                 <div>
-                  <label className="block text-sm text-gray-600 mb-1">Enter a hub</label>
+                  <label className="block text-sm text-gray-600 mb-1">
+                    {t('createPostPage.destination.hub.label')}
+                  </label>
                   <div className="relative">
                     <input
                       type="text"
@@ -720,7 +733,7 @@ export default function CreatePostPage() {
                       }}
                       onFocus={() => setIsHubAutocompleteOpen(true)}
                       onBlur={() => setIsHubAutocompleteOpen(false)}
-                      placeholder="Search for a hub..."
+                      placeholder={t('createPostPage.destination.hub.placeholder')}
                       className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
                     />
                     {isHubAutocompleteOpen &&
@@ -729,13 +742,13 @@ export default function CreatePostPage() {
                           {isHubAutocompleteLoading ? (
                             <div className="px-3 py-2">
                               <LoadingMessage className="mt-0 text-sm text-gray-500">
-                                Searching...
+                                {t('createPostPage.destination.searching')}
                               </LoadingMessage>
                             </div>
                           ) : hubSuggestions.length === 0 ? (
                             <div className="px-3 py-2">
                               <EmptyMessage className="mt-0 text-sm text-gray-500">
-                                No hubs found.
+                                {t('createPostPage.destination.hub.noResults')}
                               </EmptyMessage>
                             </div>
                           ) : (
@@ -758,7 +771,7 @@ export default function CreatePostPage() {
                                     </div>
                                     {typeof hub.subscriber_count === 'number' && (
                                       <span className="text-xs text-gray-500">
-                                        {hub.subscriber_count.toLocaleString()} subs
+                                        {formatNumber(hub.subscriber_count)} {t('common.units.subscribersShort')}
                                       </span>
                                     )}
                                   </button>
@@ -775,7 +788,9 @@ export default function CreatePostPage() {
               {/* Subreddit selector */}
               {destination === 'subreddit' && (
                 <div>
-                  <label className="block text-sm text-gray-600 mb-1">Enter a subreddit</label>
+                  <label className="block text-sm text-gray-600 mb-1">
+                    {t('createPostPage.destination.subreddit.label')}
+                  </label>
                   <div className="relative">
                     <input
                       type="text"
@@ -783,7 +798,7 @@ export default function CreatePostPage() {
                       onChange={(e) => setSubredditInputValue(e.target.value)}
                       onFocus={() => setIsSubredditAutocompleteOpen(true)}
                       onBlur={() => setIsSubredditAutocompleteOpen(false)}
-                      placeholder="Search for a subreddit..."
+                      placeholder={t('createPostPage.destination.subreddit.placeholder')}
                       className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
                     />
                     {isSubredditAutocompleteOpen &&
@@ -792,13 +807,13 @@ export default function CreatePostPage() {
                           {isSubredditAutocompleteLoading ? (
                             <div className="px-3 py-2">
                               <LoadingMessage className="mt-0 text-sm text-gray-500">
-                                Searching...
+                                {t('createPostPage.destination.searching')}
                               </LoadingMessage>
                             </div>
                           ) : subredditSuggestions.length === 0 ? (
                             <div className="px-3 py-2">
                               <EmptyMessage className="mt-0 text-sm text-gray-500">
-                                No subreddits found.
+                                {t('createPostPage.destination.subreddit.noResults')}
                               </EmptyMessage>
                             </div>
                           ) : (
@@ -835,7 +850,7 @@ export default function CreatePostPage() {
                                     {typeof suggestion.subscribers === 'number' &&
                                       suggestion.subscribers > 0 && (
                                         <span className="ml-auto text-xs text-gray-500">
-                                          {suggestion.subscribers.toLocaleString()} subs
+                                          {formatNumber(suggestion.subscribers)} {t('common.units.subscribersShort')}
                                         </span>
                                       )}
                                   </button>
@@ -855,7 +870,7 @@ export default function CreatePostPage() {
                   onChange={(e) => setIsNsfw(e.target.checked)}
                   className="mr-2"
                 />
-                Mark as NSFW (18+)
+                {t('createPostPage.nsfw.label')}
               </label>
             </div>
           </div>
@@ -870,7 +885,7 @@ export default function CreatePostPage() {
               onChange={(e) => setSendRepliesToInbox(e.target.checked)}
               className="mr-2"
             />
-            <span className="text-sm">Send replies to my inbox</span>
+            <span className="text-sm">{t('createPostPage.repliesToInbox.label')}</span>
           </label>
         </div>
 
@@ -881,7 +896,9 @@ export default function CreatePostPage() {
             disabled={createPostMutation.isPending || isUploadingMedia}
             className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
           >
-            {createPostMutation.isPending ? 'Creating...' : 'Create Post'}
+            {createPostMutation.isPending
+              ? t('createPostPage.actions.creating')
+              : t('createPostPage.actions.createPost')}
           </button>
           <button
             type="button"
@@ -895,14 +912,14 @@ export default function CreatePostPage() {
             }}
             className="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
           >
-            Cancel
+            {t('common.cancel')}
           </button>
         </div>
 
         {createPostMutation.isError && (
           <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
             <p className="text-red-600">
-              Error: {(createPostMutation.error as Error).message}
+              {t('common.error')}: {(createPostMutation.error as Error).message}
             </p>
           </div>
         )}

@@ -30,6 +30,7 @@ func uniqueSearchName(base string) string {
 func setupSearchHandlerTest(t *testing.T) (*SearchHandler, *database.Database, func()) {
 	db, err := database.NewTest()
 	require.NoError(t, err)
+	t.Cleanup(db.Close)
 
 	ctx := context.Background()
 	err = db.Migrate(ctx)

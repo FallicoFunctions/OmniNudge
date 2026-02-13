@@ -1,12 +1,16 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
 import { accessRequestService } from '../services/accessRequestService';
 import { useHubSettings } from '../hooks/useHubSettings';
 import { useSettings } from '../contexts/SettingsContext';
+import { useFormat } from '../hooks/useFormat';
 
 export default function PrivateHubPage() {
+  const { t } = useTranslation();
+  const { formatDate } = useFormat();
   const { hubname } = useParams<{ hubname: string }>();
   const { user } = useAuth();
   const { accessRequestCooldownDisplay } = useSettings();
@@ -52,6 +56,10 @@ export default function PrivateHubPage() {
   const isPendingRequest = requestStatusData?.has_request && requestStatusData.status === 'pending';
   const requestStatusLabel = requestStatusData?.status ?? currentRequest?.status;
   const requestCreatedAt = currentRequest?.created_at;
+  const requestStatusValue = (requestStatusLabel ?? 'pending').toLowerCase();
+  const requestStatusText = t(`privateHubPage.requestStatus.${requestStatusValue}`, {
+    defaultValue: requestStatusValue,
+  });
   const cooldownDays = hubSettings?.access_request_cooldown_days ?? 0;
   const lastDeniedAt = deniedRequests[0]?.updated_at ?? deniedRequests[0]?.created_at;
   const cooldownEndsAt = lastDeniedAt
@@ -63,7 +71,9 @@ export default function PrivateHubPage() {
   const cooldownDaysRemaining = cooldownEndsAt
     ? Math.max(0, Math.ceil((cooldownEndsAt - nowTimestamp) / (24 * 60 * 60 * 1000)))
     : 0;
-  const cooldownDateLabel = cooldownEndsAt ? new Date(cooldownEndsAt).toLocaleDateString() : '';
+  const cooldownDateLabel = cooldownEndsAt
+    ? formatDate(cooldownEndsAt, { month: 'short', day: 'numeric', year: 'numeric' })
+    : '';
   const canSubmitRequest =
     !requestStatusLabel || (requestStatusLabel === 'denied' && !cooldownActive);
 
@@ -76,7 +86,7 @@ export default function PrivateHubPage() {
     },
     onError: (error: Error) => {
       setRequestStatus('error');
-      setErrorMessage(error.message || 'Failed to submit access request');
+      setErrorMessage(error.message || t('privateHubPage.errors.submitFailed'));
     },
   });
 
@@ -101,20 +111,20 @@ export default function PrivateHubPage() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
             </svg>
             <h1 className="text-2xl font-bold text-[var(--color-text-primary)] mb-2">
-              Private Hub
+              {t('privateHubPage.title')}
             </h1>
             <h2 className="text-xl font-semibold text-[var(--color-primary)] mb-4">
               h/{hubname}
             </h2>
             <p className="text-[var(--color-text-secondary)] mb-6">
-              This hub is private. You must have approval to view its contents.
+              {t('privateHubPage.loggedOut.description')}
             </p>
             <button
               type="button"
               onClick={() => window.dispatchEvent(new CustomEvent('open-auth-modal', { detail: 'login' }))}
               className="w-full rounded-lg bg-[var(--color-primary)] px-4 py-3 font-semibold text-white transition-colors hover:bg-[var(--color-primary-dark)]"
             >
-              Request Access
+              {t('privateHubPage.actions.requestAccess')}
             </button>
           </div>
         </div>
@@ -132,32 +142,32 @@ export default function PrivateHubPage() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
               <h1 className="text-2xl font-bold text-[var(--color-text-primary)] mb-2">
-                Request Submitted
+                {t('privateHubPage.submitted.title')}
               </h1>
               <h2 className="text-xl font-semibold text-[var(--color-primary)] mb-4">
                 h/{hubname}
               </h2>
               <p className="text-[var(--color-text-secondary)] mb-4">
-                Your access request is pending review by the moderators.
+                {t('privateHubPage.submitted.pendingDescription')}
               </p>
               <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4 text-left">
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-[var(--color-text-secondary)]">Status</span>
+                  <span className="text-[var(--color-text-secondary)]">{t('privateHubPage.meta.status')}</span>
                   <span className="font-semibold capitalize text-[var(--color-text-primary)]">
-                    {requestStatusLabel ?? 'pending'}
+                    {requestStatusText}
                   </span>
                 </div>
                 {requestCreatedAt && (
                   <div className="mt-2 flex items-center justify-between text-sm">
-                    <span className="text-[var(--color-text-secondary)]">Requested</span>
+                    <span className="text-[var(--color-text-secondary)]">{t('privateHubPage.meta.requested')}</span>
                     <span className="text-[var(--color-text-primary)]">
-                      {new Date(requestCreatedAt).toLocaleDateString()}
+                      {formatDate(requestCreatedAt, { month: 'short', day: 'numeric', year: 'numeric' })}
                     </span>
                   </div>
                 )}
               </div>
               <p className="mt-4 text-xs text-[var(--color-text-muted)]">
-                You can submit another request after this one is reviewed.
+                {t('privateHubPage.submitted.pendingNote')}
               </p>
             </div>
           </div>
@@ -173,13 +183,13 @@ export default function PrivateHubPage() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
             <h1 className="text-2xl font-bold text-[var(--color-text-primary)] mb-2">
-              Request Submitted
+              {t('privateHubPage.submitted.title')}
             </h1>
             <h2 className="text-xl font-semibold text-[var(--color-primary)] mb-4">
               h/{hubname}
             </h2>
             <p className="text-[var(--color-text-secondary)] mb-6">
-              Your access request has been submitted to the moderators. You will be notified when they review it.
+              {t('privateHubPage.submitted.description')}
             </p>
             <button
               onClick={() => {
@@ -188,7 +198,7 @@ export default function PrivateHubPage() {
               }}
               className="px-4 py-2 bg-[var(--color-primary)] text-white rounded-lg hover:bg-[var(--color-primary-dark)] transition-colors"
             >
-              Submit Another Request
+              {t('privateHubPage.actions.submitAnother')}
             </button>
           </div>
         </div>
@@ -205,27 +215,27 @@ export default function PrivateHubPage() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
             </svg>
             <h1 className="text-2xl font-bold text-[var(--color-text-primary)] mb-2">
-              Private Hub
+              {t('privateHubPage.title')}
             </h1>
             <h2 className="text-xl font-semibold text-[var(--color-primary)] mb-4">
               h/{hubname}
             </h2>
             <p className="text-[var(--color-text-secondary)]">
-              This hub is private. Request access to view its contents.
+              {t('privateHubPage.description')}
             </p>
           {requestStatusLabel && (
             <div className="mt-4 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4 text-left">
               <div className="flex items-center justify-between text-sm">
-                <span className="text-[var(--color-text-secondary)]">Status</span>
+                <span className="text-[var(--color-text-secondary)]">{t('privateHubPage.meta.status')}</span>
                 <span className="font-semibold capitalize text-[var(--color-text-primary)]">
-                  {requestStatusLabel}
+                  {requestStatusText}
                 </span>
               </div>
               {requestCreatedAt && (
                 <div className="mt-2 flex items-center justify-between text-sm">
-                  <span className="text-[var(--color-text-secondary)]">Requested</span>
+                  <span className="text-[var(--color-text-secondary)]">{t('privateHubPage.meta.requested')}</span>
                   <span className="text-[var(--color-text-primary)]">
-                    {new Date(requestCreatedAt).toLocaleDateString()}
+                    {formatDate(requestCreatedAt, { month: 'short', day: 'numeric', year: 'numeric' })}
                   </span>
                 </div>
               )}
@@ -234,35 +244,22 @@ export default function PrivateHubPage() {
           {cooldownActive && (
             <div className="mt-4 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4 text-left text-sm text-[var(--color-text-secondary)]">
               {accessRequestCooldownDisplay === 'days' && (
-                <>
-                  You can request access again in{' '}
-                  <span className="font-semibold text-[var(--color-text-primary)]">
-                    {cooldownDaysRemaining} {cooldownDaysRemaining === 1 ? 'day' : 'days'}
-                  </span>
-                  .
-                </>
+                <span className="font-semibold text-[var(--color-text-primary)]">
+                  {t('privateHubPage.cooldown.days', { count: cooldownDaysRemaining })}
+                </span>
               )}
               {accessRequestCooldownDisplay === 'date' && (
-                <>
-                  You can request access again on{' '}
-                  <span className="font-semibold text-[var(--color-text-primary)]">
-                    {cooldownDateLabel}
-                  </span>
-                  .
-                </>
+                <span className="font-semibold text-[var(--color-text-primary)]">
+                  {t('privateHubPage.cooldown.onDate', { date: cooldownDateLabel })}
+                </span>
               )}
               {accessRequestCooldownDisplay === 'both' && (
-                <>
-                  You can request access again in{' '}
-                  <span className="font-semibold text-[var(--color-text-primary)]">
-                    {cooldownDaysRemaining} {cooldownDaysRemaining === 1 ? 'day' : 'days'}
-                  </span>{' '}
-                  (on{' '}
-                  <span className="font-semibold text-[var(--color-text-primary)]">
-                    {cooldownDateLabel}
-                  </span>
-                  ).
-                </>
+                <span className="font-semibold text-[var(--color-text-primary)]">
+                  {t('privateHubPage.cooldown.both', {
+                    count: cooldownDaysRemaining,
+                    date: cooldownDateLabel,
+                  })}
+                </span>
               )}
             </div>
           )}
@@ -276,11 +273,15 @@ export default function PrivateHubPage() {
 
           {deniedRequests.length > 0 && (
             <div className="mb-6 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4 text-left">
-              <h3 className="text-sm font-semibold text-[var(--color-text-primary)]">Previous denials</h3>
+              <h3 className="text-sm font-semibold text-[var(--color-text-primary)]">
+                {t('privateHubPage.denials.title')}
+              </h3>
               <ul className="mt-2 space-y-1 text-sm text-[var(--color-text-secondary)]">
                 {deniedRequests.map((request) => (
                   <li key={request.id}>
-                    {new Date(request.updated_at ?? request.created_at).toLocaleDateString()} - denied
+                    {t('privateHubPage.denials.item', {
+                      date: formatDate(request.updated_at ?? request.created_at, { month: 'short', day: 'numeric', year: 'numeric' }),
+                    })}
                   </li>
                 ))}
               </ul>
@@ -292,18 +293,18 @@ export default function PrivateHubPage() {
               <form onSubmit={handleSubmit}>
                 <div className="mb-4">
                   <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-2">
-                    Message to moderators (optional)
+                    {t('privateHubPage.form.messageLabel')}
                   </label>
                   <textarea
                     value={message}
                     onChange={(e) => setMessage(e.target.value)}
-                    placeholder="Introduce yourself and explain why you'd like to join..."
+                    placeholder={t('privateHubPage.form.messagePlaceholder')}
                     className="w-full px-3 py-2 border border-[var(--color-border)] rounded-lg bg-[var(--color-surface-elevated)] text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
                     rows={4}
                     maxLength={1000}
                   />
                   <p className="text-xs text-[var(--color-text-muted)] mt-1 text-right">
-                    {message.length}/1000
+                    {t('privateHubPage.form.charCount', { current: message.length, max: 1000 })}
                   </p>
                 </div>
 
@@ -318,16 +319,18 @@ export default function PrivateHubPage() {
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                       </svg>
-                      Submitting...
+                      {t('privateHubPage.actions.submitting')}
                     </span>
                   ) : (
-                    isPendingRequest ? 'Request Pending' : 'Request Access'
+                    isPendingRequest
+                      ? t('privateHubPage.actions.requestPending')
+                      : t('privateHubPage.actions.requestAccess')
                   )}
                 </button>
               </form>
 
               <p className="text-xs text-[var(--color-text-muted)] mt-4 text-center">
-                By submitting this request, you agree to follow the hub's rules if approved.
+                {t('privateHubPage.form.disclaimer')}
               </p>
             </>
           )}

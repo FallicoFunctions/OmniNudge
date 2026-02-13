@@ -1,4 +1,6 @@
 import type { SubredditSuggestion } from '../../types/reddit';
+import { useTranslation } from 'react-i18next';
+import { useFormat } from '../../hooks/useFormat';
 
 interface SubredditSuggestionItemProps {
   suggestion: SubredditSuggestion;
@@ -6,6 +8,9 @@ interface SubredditSuggestionItemProps {
 }
 
 export function SubredditSuggestionItem({ suggestion, onSelect }: SubredditSuggestionItemProps) {
+  const { t } = useTranslation();
+  const { formatNumber } = useFormat();
+
   return (
     <li key={suggestion.name}>
       <button
@@ -39,7 +44,7 @@ export function SubredditSuggestionItem({ suggestion, onSelect }: SubredditSugge
         </div>
         {typeof suggestion.subscribers === 'number' && suggestion.subscribers > 0 && (
           <span className="ml-auto text-[11px] text-[var(--color-text-secondary)]">
-            {suggestion.subscribers.toLocaleString()} subs
+            {formatNumber(suggestion.subscribers)} {t('common.units.subscribersShort')}
           </span>
         )}
       </button>

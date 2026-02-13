@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { bugReportService, type KnownBug } from '../services/bugReportService';
 import { useAuth } from '../contexts/AuthContext';
 import BugReportModal from '../components/bugReports/BugReportModal';
@@ -8,6 +9,7 @@ import { Panel } from '../components/common/Panel';
 import { LoadingMessage } from '../components/common/StatusMessage';
 
 export default function BugReportingPage() {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const navigate = useNavigate();
   const [showModal, setShowModal] = useState(false);
@@ -77,18 +79,32 @@ export default function BugReportingPage() {
     return status.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase());
   };
 
+  const getStatusLabel = (status: string) => {
+    return t(`bugReportingPage.status.${status}`, {
+      defaultValue: formatStatus(status),
+    });
+  };
+
+  const getSeverityLabel = (severity: string) => {
+    return t(`bugReportingPage.severity.${severity}`, {
+      defaultValue: severity.toUpperCase(),
+    });
+  };
+
   // Don't render content if not logged in (modal will show)
   if (!user) {
     return (
       <div className="flex min-h-screen items-center justify-center">
-        <div className="text-[var(--color-text-secondary)]">Please log in to access bug reporting.</div>
+        <div className="text-[var(--color-text-secondary)]">{t('bugReportingPage.loginRequired')}</div>
       </div>
     );
   }
 
   return (
     <div className="mx-auto w-full max-w-4xl px-4 py-8">
-      <h1 className="text-3xl font-bold text-[var(--color-text-primary)] mb-6">Bug Reporting</h1>
+      <h1 className="text-3xl font-bold text-[var(--color-text-primary)] mb-6">
+        {t('mainLayout.bugReporting')}
+      </h1>
 
       {/* Report a Bug Button */}
       <div className="mb-8">
@@ -96,31 +112,31 @@ export default function BugReportingPage() {
           onClick={() => setShowModal(true)}
           className="w-full rounded-lg bg-[var(--color-primary)] px-6 py-4 text-lg font-semibold text-white hover:bg-[var(--color-primary-dark)] transition-colors"
         >
-          Report a Bug
+          {t('bugReportingPage.reportButton')}
         </button>
         <p className="mt-2 text-sm text-[var(--color-text-secondary)] text-center">
-          Found a bug? Help us improve OmniNudge by reporting it!
+          {t('bugReportingPage.reportHelp')}
         </p>
       </div>
 
       {/* Known Bugs Section */}
       <Panel className="pb-4">
-        <h2 className="text-2xl font-semibold text-[var(--color-text-primary)] mb-4">Known Bugs</h2>
+        <h2 className="text-2xl font-semibold text-[var(--color-text-primary)] mb-4">
+          {t('bugReportingPage.knownBugs.title')}
+        </h2>
         <div className="mb-4 divide-y divide-[var(--color-border)] text-sm text-[var(--color-text-secondary)]">
           <p className="py-4 last:pb-0">
-            Email password reset is not enabled yet.
+            {t('bugReportingPage.knownBugs.static.emailPasswordReset')}
           </p>
           <p className="py-4 last:pb-0">
-            Reddit API usage is subject to aggressive rate limiting, which can cause delays or
-            missing content in feeds, searches, and comment loading.
+            {t('bugReportingPage.knownBugs.static.redditRateLimit')}
           </p>
           <p className="py-4 last:pb-0">
-            The hide button is moving the post to user's hidden list but is not removing the post
-            from the feed.
+            {t('bugReportingPage.knownBugs.static.hideButton')}
           </p>
         </div>
 
-        {isLoading && <LoadingMessage>Loading known bugs...</LoadingMessage>}
+        {isLoading && <LoadingMessage>{t('bugReportingPage.knownBugs.loading')}</LoadingMessage>}
         {!isLoading && hasKnownBugs && (
           <div className="space-y-4">
             {knownBugs.map((bug: KnownBug) => (
@@ -136,10 +152,10 @@ export default function BugReportingPage() {
                         bug.status
                       )}`}
                     >
-                      {formatStatus(bug.status)}
+                      {getStatusLabel(bug.status)}
                     </span>
                     <span className="inline-block rounded border px-2 py-1 text-xs font-semibold uppercase">
-                      {bug.severity}
+                      {getSeverityLabel(bug.severity)}
                     </span>
                   </div>
                 </div>
@@ -148,7 +164,7 @@ export default function BugReportingPage() {
 
                 {bug.affected_pages && bug.affected_pages.length > 0 && (
                   <div className="mb-2">
-                    <span className="text-xs font-semibold">Affected Pages:</span>
+                    <span className="text-xs font-semibold">{t('bugReportingPage.fields.affectedPages')}</span>
                     <ul className="text-xs ml-4 mt-1">
                       {bug.affected_pages.map((page, idx) => (
                         <li key={idx} className="list-disc">
@@ -161,14 +177,14 @@ export default function BugReportingPage() {
 
                 {bug.workaround && (
                   <div className="mt-3 rounded bg-white/50 p-3">
-                    <span className="text-xs font-semibold">Workaround:</span>
+                    <span className="text-xs font-semibold">{t('bugReportingPage.fields.workaround')}</span>
                     <p className="text-xs mt-1">{bug.workaround}</p>
                   </div>
                 )}
 
                 {bug.fixed_in_version && (
                   <p className="text-xs mt-2 font-semibold">
-                    Fixed in version: {bug.fixed_in_version}
+                    {t('bugReportingPage.fields.fixedInVersion', { version: bug.fixed_in_version })}
                   </p>
                 )}
               </div>

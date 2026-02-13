@@ -26,6 +26,7 @@ func uniqueVelocityName(base string) string {
 func setupVelocityTest(t *testing.T) (*RuleBasedVelocityDetector, *database.Database, func()) {
 	db, err := database.NewTest()
 	require.NoError(t, err)
+	t.Cleanup(db.Close)
 
 	ctx := context.Background()
 	err = db.Migrate(ctx)

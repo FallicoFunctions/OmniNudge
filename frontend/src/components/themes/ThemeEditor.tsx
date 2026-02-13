@@ -1,5 +1,7 @@
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useTheme } from '../../hooks/useTheme';
+import { useFormat } from '../../hooks/useFormat';
 import { themeService } from '../../services/themeService';
 import type { UserTheme } from '../../types/theme';
 import {
@@ -19,11 +21,11 @@ const ColorPicker = lazy(async () => {
   return { default: module.HexColorPicker };
 });
 
-const steps = [
-  { id: 'base', title: 'Choose Base Theme', description: 'Start from a predefined or existing theme.' },
-  { id: 'info', title: 'Basic Info', description: 'Name and describe your theme.' },
-  { id: 'variables', title: 'Customize Variables', description: 'Tweak colors with live preview.' },
-  { id: 'review', title: 'Review & Save', description: 'Double-check details before publishing.' },
+const STEP_DEFS = [
+  { id: 'base', titleKey: 'themes.editor.steps.base.title', descriptionKey: 'themes.editor.steps.base.description' },
+  { id: 'info', titleKey: 'themes.editor.steps.info.title', descriptionKey: 'themes.editor.steps.info.description' },
+  { id: 'variables', titleKey: 'themes.editor.steps.variables.title', descriptionKey: 'themes.editor.steps.variables.description' },
+  { id: 'review', titleKey: 'themes.editor.steps.review.title', descriptionKey: 'themes.editor.steps.review.description' },
 ];
 
 const SIZE_VALUE_REGEX = /^-?\d+(\.\d+)?(px|rem|em|%)$/i;
@@ -41,12 +43,24 @@ interface ThemeEditorProps {
 }
 
 const ThemeEditor = ({ isOpen, onClose, initialTheme = null }: ThemeEditorProps) => {
+  const { t } = useTranslation();
+  const { formatNumber } = useFormat();
   const {
     predefinedThemes,
     customThemes,
     refreshThemes,
     selectTheme,
   } = useTheme();
+
+  const steps = useMemo(
+    () =>
+      STEP_DEFS.map((step) => ({
+        id: step.id,
+        title: t(step.titleKey),
+        description: t(step.descriptionKey),
+      })),
+    [t]
+  );
 
   const [currentStep, setCurrentStep] = useState(0);
   const [selectedBaseThemeId, setSelectedBaseThemeId] = useState<number | null>(null);
@@ -79,9 +93,9 @@ const ThemeEditor = ({ isOpen, onClose, initialTheme = null }: ThemeEditorProps)
     const textSecondary =
       cssVariables['--color-text-secondary'] ?? DEFAULT_THEME_VARIABLES['--color-text-secondary'];
     const combos = [
-      { label: 'Primary text on background', fg: textPrimary, bg: background },
-      { label: 'Secondary text on surface', fg: textSecondary, bg: surface },
-      { label: 'Primary text on surface', fg: textPrimary, bg: surface },
+      { label: t('themes.editor.review.contrast.labels.primaryTextOnBackground'), fg: textPrimary, bg: background },
+      { label: t('themes.editor.review.contrast.labels.secondaryTextOnSurface'), fg: textSecondary, bg: surface },
+      { label: t('themes.editor.review.contrast.labels.primaryTextOnSurface'), fg: textPrimary, bg: surface },
     ];
     return combos
       .map((combo) => {
@@ -91,7 +105,7 @@ const ThemeEditor = ({ isOpen, onClose, initialTheme = null }: ThemeEditorProps)
           : null;
       })
       .filter(Boolean) as { label: string; ratio: number }[];
-  }, [cssVariables]);
+  }, [cssVariables, t]);
 
   const availableThemes = useMemo(
     () => [...predefinedThemes, ...customThemes],
@@ -386,7 +400,9 @@ const ThemeEditor = ({ isOpen, onClose, initialTheme = null }: ThemeEditorProps)
       // MISC-2: Success feedback visible for at least 2 seconds before auto-close
       setStatusMessage({
         type: 'success',
-        text: initialTheme ? 'Theme updated successfully!' : 'Theme created successfully!',
+        text: initialTheme
+          ? t('themes.editor.status.updated')
+          : t('themes.editor.status.created'),
       });
       setTimeout(() => {
         setStatusMessage(null);
@@ -394,7 +410,7 @@ const ThemeEditor = ({ isOpen, onClose, initialTheme = null }: ThemeEditorProps)
       }, 2000);
     } catch (submitError) {
       const message =
-        submitError instanceof Error ? submitError.message : 'Unable to save theme.';
+        submitError instanceof Error ? submitError.message : t('themes.editor.errors.saveFailed');
       setError(message);
     } finally {
       setIsSubmitting(false);
@@ -406,6 +422,7 @@ const ThemeEditor = ({ isOpen, onClose, initialTheme = null }: ThemeEditorProps)
     setAsActive,
     themeDescription,
     themeName,
+    t,
     validateInfoDetails,
     validateVariableSet,
     onClose,
@@ -439,8 +456,7 @@ const ThemeEditor = ({ isOpen, onClose, initialTheme = null }: ThemeEditorProps)
         return (
           <div className="space-y-4">
             <p className="text-sm text-[var(--color-text-secondary)]">
-              Choose a predefined theme as your starting point or begin from a clean slate. You can tweak
-              every value later.
+              {t('themes.editor.base.intro')}
             </p>
             <div className="grid gap-4 md:grid-cols-2">
               {!initialTheme && (
@@ -454,10 +470,10 @@ const ThemeEditor = ({ isOpen, onClose, initialTheme = null }: ThemeEditorProps)
                   onClick={handleStartFromScratch}
                 >
                   <p className="text-base font-semibold text-[var(--color-text-primary)]">
-                    Start from Scratch
+                    {t('themes.editor.base.startFromScratch.title')}
                   </p>
                   <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
-                    Apply default variables and customize everything yourself.
+                    {t('themes.editor.base.startFromScratch.description')}
                   </p>
                 </button>
               )}
@@ -494,7 +510,7 @@ const ThemeEditor = ({ isOpen, onClose, initialTheme = null }: ThemeEditorProps)
           <div className="space-y-4">
             <div>
               <label className="text-sm font-semibold text-[var(--color-text-primary)]">
-                Theme Name *
+                {t('themes.editor.info.nameLabel')}
               </label>
               <input
                 type="text"
@@ -509,7 +525,7 @@ const ThemeEditor = ({ isOpen, onClose, initialTheme = null }: ThemeEditorProps)
                 maxLength={100}
               />
               <p className="mt-1 text-xs text-[var(--color-text-secondary)]">
-                Max 100 characters.
+                {t('themes.editor.info.nameHelper')}
               </p>
               {infoErrors.name && (
                 <p className="text-xs text-red-500">{infoErrors.name}</p>
@@ -517,7 +533,7 @@ const ThemeEditor = ({ isOpen, onClose, initialTheme = null }: ThemeEditorProps)
             </div>
             <div>
               <label className="text-sm font-semibold text-[var(--color-text-primary)]">
-                Description
+                {t('themes.editor.info.descriptionLabel')}
               </label>
               <textarea
                 className="mt-1 w-full rounded-lg border border-[var(--color-border)] px-4 py-2 text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
@@ -541,7 +557,7 @@ const ThemeEditor = ({ isOpen, onClose, initialTheme = null }: ThemeEditorProps)
                 onChange={(event) => setSetAsActive(event.target.checked)}
                 className="h-4 w-4 rounded border-[var(--color-border)] text-[var(--color-primary)] focus:ring-[var(--color-primary)]"
               />
-              Set as active theme after saving
+              {t('themes.editor.info.setActiveAfterSave')}
             </label>
           </div>
         );
@@ -562,22 +578,26 @@ const ThemeEditor = ({ isOpen, onClose, initialTheme = null }: ThemeEditorProps)
                   id={colorPickerLabelId}
                   className="text-sm font-semibold text-[var(--color-text-primary)]"
                 >
-                  {activeVariableDefinition?.label ?? 'Variable'}
+                  {activeVariableDefinition?.label ?? t('themes.editor.variables.variableFallback')}
                 </p>
                 <p className="text-xs text-[var(--color-text-secondary)]">
                   {activeVariableDefinition?.description ??
-                    'Use the color picker to adjust the value.'}
+                    t('themes.editor.variables.descriptionFallback')}
                 </p>
                 <div className="mt-4">
                   <Suspense
                     fallback={
                       <div className="text-xs text-[var(--color-text-secondary)]">
-                        Loading color picker…
+                        {t('themes.editor.variables.loadingColorPicker')}
                       </div>
                     }
                   >
                     <ColorPicker
-                      aria-label={`Color picker for ${activeVariableDefinition?.label ?? 'variable'}`}
+                      aria-label={t('themes.editor.variables.colorPickerAria', {
+                        variable:
+                          activeVariableDefinition?.label ??
+                          t('themes.editor.variables.variableFallback'),
+                      })}
                       aria-describedby={colorPickerLabelId}
                       color={activeVariableValue}
                       onChange={(value) => updateVariable(selectedVariableName, value)}
@@ -596,27 +616,33 @@ const ThemeEditor = ({ isOpen, onClose, initialTheme = null }: ThemeEditorProps)
           <div className="grid gap-6 lg:grid-cols-[1fr_1.2fr]">
             <div className="space-y-4">
               <div className="rounded-xl border border-[var(--color-border)] p-4">
-                <h4 className="text-sm font-semibold text-[var(--color-text-primary)]">Summary</h4>
+                <h4 className="text-sm font-semibold text-[var(--color-text-primary)]">
+                  {t('themes.editor.review.summaryTitle')}
+                </h4>
                 <p className="mt-2 text-sm text-[var(--color-text-secondary)]">
-                  <span className="font-semibold text-[var(--color-text-primary)]">Name:</span>{' '}
-                  {themeName || 'Untitled Theme'}
+                  <span className="font-semibold text-[var(--color-text-primary)]">
+                    {t('themes.editor.review.labels.name')}
+                  </span>{' '}
+                  {themeName || t('themes.editor.review.fallbacks.untitledTheme')}
                 </p>
                 <p className="text-sm text-[var(--color-text-secondary)]">
                   <span className="font-semibold text-[var(--color-text-primary)]">
-                    Description:
+                    {t('themes.editor.review.labels.description')}
                   </span>{' '}
-                  {themeDescription || 'No description'}
+                  {themeDescription || t('themes.editor.review.fallbacks.noDescription')}
                 </p>
                 <p className="text-sm text-[var(--color-text-secondary)]">
                   <span className="font-semibold text-[var(--color-text-primary)]">
-                    Variables:
+                    {t('themes.editor.review.labels.variables')}
                   </span>{' '}
-                  {Object.keys(cssVariables).length} defined
+                  {t('themes.editor.review.variablesDefined', {
+                    formattedCount: formatNumber(Object.keys(cssVariables).length),
+                  })}
                 </p>
               </div>
               <div className="rounded-xl border border-[var(--color-border)] p-4">
                 <h4 className="text-sm font-semibold text-[var(--color-text-primary)]">
-                  Preview Palette
+                  {t('themes.editor.review.previewPaletteTitle')}
                 </h4>
                 <div className="mt-3 flex flex-wrap gap-3">
                   {['--color-primary', '--color-background', '--color-surface', '--color-success'].map(
@@ -635,11 +661,19 @@ const ThemeEditor = ({ isOpen, onClose, initialTheme = null }: ThemeEditorProps)
                 </div>
                 {contrastWarnings.length > 0 && (
                   <div className="mt-4 rounded-lg border border-yellow-400 bg-yellow-50 p-3 text-xs text-yellow-800">
-                    <p className="font-semibold">Accessibility warnings</p>
+                    <p className="font-semibold">
+                      {t('themes.editor.review.contrast.title')}
+                    </p>
                     <ul className="mt-1 list-disc pl-4">
                       {contrastWarnings.map((warning) => (
                         <li key={warning.label}>
-                          {warning.label} contrast ratio {warning.ratio}:1 is below 4.5:1.
+                          {t('themes.editor.review.contrast.warning', {
+                            label: warning.label,
+                            ratio: formatNumber(warning.ratio, {
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2,
+                            }),
+                          })}
                         </li>
                       ))}
                     </ul>
@@ -667,10 +701,12 @@ const ThemeEditor = ({ isOpen, onClose, initialTheme = null }: ThemeEditorProps)
         <header className="flex items-start justify-between border-b border-[var(--color-border)] px-6 py-4">
           <div>
             <p className="text-xs uppercase tracking-wide text-[var(--color-text-secondary)]">
-              Theme Editor
+              {t('themes.editor.header.kicker')}
             </p>
             <h3 className="text-2xl font-bold text-[var(--color-text-primary)]">
-              {initialTheme ? 'Edit Theme' : 'Create New Theme'}
+              {initialTheme
+                ? t('themes.editor.header.editTitle')
+                : t('themes.editor.header.createTitle')}
             </h3>
             <p className="text-sm text-[var(--color-text-secondary)]">
               {steps[currentStep].description}
@@ -682,7 +718,8 @@ const ThemeEditor = ({ isOpen, onClose, initialTheme = null }: ThemeEditorProps)
             onClick={onClose}
             disabled={isSubmitting}
           >
-            Close ✕
+            {t('themes.editor.actions.close')}{' '}
+            <span aria-hidden="true">✕</span>
           </button>
         </header>
 
@@ -697,7 +734,7 @@ const ThemeEditor = ({ isOpen, onClose, initialTheme = null }: ThemeEditorProps)
                     : 'border-transparent bg-[var(--color-surface-elevated)] text-[var(--color-text-secondary)]'
                 }`}
               >
-                Step {index + 1}
+                {t('themes.editor.steps.stepLabel', { number: index + 1 })}
                 <span className="text-sm">{step.title}</span>
               </div>
             ))}
@@ -728,7 +765,7 @@ const ThemeEditor = ({ isOpen, onClose, initialTheme = null }: ThemeEditorProps)
               onClick={goToPreviousStep}
               disabled={currentStep === 0 || isSubmitting}
             >
-              Back
+              {t('themes.editor.actions.back')}
             </button>
             <div className="flex gap-3">
               {currentStep < steps.length - 1 ? (
@@ -738,7 +775,7 @@ const ThemeEditor = ({ isOpen, onClose, initialTheme = null }: ThemeEditorProps)
                   onClick={goToNextStep}
                   disabled={isSubmitting}
                 >
-                  Next
+                  {t('themes.editor.actions.next')}
                 </button>
               ) : (
                 <button
@@ -747,7 +784,11 @@ const ThemeEditor = ({ isOpen, onClose, initialTheme = null }: ThemeEditorProps)
                   onClick={handleSubmit}
                   disabled={isSubmitting}
                 >
-                  {isSubmitting ? 'Saving…' : initialTheme ? 'Update Theme' : 'Create Theme'}
+                  {isSubmitting
+                    ? t('themes.editor.actions.saving')
+                    : initialTheme
+                      ? t('themes.editor.actions.updateTheme')
+                      : t('themes.editor.actions.createTheme')}
                 </button>
               )}
             </div>

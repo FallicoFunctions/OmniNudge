@@ -48,7 +48,7 @@ func NewFeatureFlagService(repo *repository.FeatureFlagRepository, redisClient *
 // IsEnabled checks if a feature flag is enabled for a user
 func (s *FeatureFlagService) IsEnabled(ctx context.Context, key string, userID *int64) (bool, error) {
 	// 1. Try cache first (if userID provided)
-	if userID != nil {
+	if userID != nil && s.redis != nil {
 		cacheKey := fmt.Sprintf(cacheFlagResult, key, *userID)
 		if cached, err := s.redis.Get(ctx, cacheKey).Bool(); err == nil {
 			return cached, nil
@@ -225,8 +225,10 @@ func (s *FeatureFlagService) SetUserOverride(ctx context.Context, key string, us
 	s.repo.CreateAuditLog(ctx, audit)
 
 	// Invalidate cache for this user
-	cacheKey := fmt.Sprintf(cacheFlagResult, key, userID)
-	s.redis.Del(ctx, cacheKey) // Ignore errors
+	if s.redis != nil {
+		cacheKey := fmt.Sprintf(cacheFlagResult, key, userID)
+		s.redis.Del(ctx, cacheKey) // Ignore errors
+	}
 
 	return nil
 }
@@ -247,8 +249,10 @@ func (s *FeatureFlagService) RemoveUserOverride(ctx context.Context, key string,
 	s.repo.CreateAuditLog(ctx, audit)
 
 	// Invalidate cache for this user
-	cacheKey := fmt.Sprintf(cacheFlagResult, key, userID)
-	s.redis.Del(ctx, cacheKey) // Ignore errors
+	if s.redis != nil {
+		cacheKey := fmt.Sprintf(cacheFlagResult, key, userID)
+		s.redis.Del(ctx, cacheKey) // Ignore errors
+	}
 
 	return nil
 }
@@ -257,10 +261,12 @@ func (s *FeatureFlagService) RemoveUserOverride(ctx context.Context, key string,
 func (s *FeatureFlagService) ListFlags(ctx context.Context) ([]*models.FeatureFlag, error) {
 	// Try cache first
 	cacheKey := fmt.Sprintf(cacheFlagsList, s.env)
-	if cached, err := s.redis.Get(ctx, cacheKey).Result(); err == nil {
-		var flags []*models.FeatureFlag
-		if json.Unmarshal([]byte(cached), &flags) == nil {
-			return flags, nil
+	if s.redis != nil {
+		if cached, err := s.redis.Get(ctx, cacheKey).Result(); err == nil {
+			var flags []*models.FeatureFlag
+			if json.Unmarshal([]byte(cached), &flags) == nil {
+				return flags, nil
+			}
 		}
 	}
 
@@ -271,8 +277,10 @@ func (s *FeatureFlagService) ListFlags(ctx context.Context) ([]*models.FeatureFl
 	}
 
 	// Cache result (best-effort)
-	if data, err := json.Marshal(flags); err == nil {
-		s.redis.Set(ctx, cacheKey, data, cacheTTL)
+	if s.redis != nil {
+		if data, err := json.Marshal(flags); err == nil {
+			s.redis.Set(ctx, cacheKey, data, cacheTTL)
+		}
 	}
 
 	return flags, nil
@@ -307,10 +315,12 @@ func (s *FeatureFlagService) GetAuditLog(ctx context.Context, key string, limit 
 func (s *FeatureFlagService) GetFeatureFlag(ctx context.Context, key string) (*models.FeatureFlag, error) {
 	// Try Redis cache first
 	cacheKey := fmt.Sprintf(cacheFlagMeta, key)
-	if cached, err := s.redis.Get(ctx, cacheKey).Result(); err == nil {
-		var flag models.FeatureFlag
-		if json.Unmarshal([]byte(cached), &flag) == nil {
-			return &flag, nil
+	if s.redis != nil {
+		if cached, err := s.redis.Get(ctx, cacheKey).Result(); err == nil {
+			var flag models.FeatureFlag
+			if json.Unmarshal([]byte(cached), &flag) == nil {
+				return &flag, nil
+			}
 		}
 	}
 
@@ -321,8 +331,10 @@ func (s *FeatureFlagService) GetFeatureFlag(ctx context.Context, key string) (*m
 	}
 
 	// Cache in Redis (best-effort)
-	if data, err := json.Marshal(flag); err == nil {
-		s.redis.Set(ctx, cacheKey, data, cacheTTL)
+	if s.redis != nil {
+		if data, err := json.Marshal(flag); err == nil {
+			s.redis.Set(ctx, cacheKey, data, cacheTTL)
+		}
 	}
 
 	return flag, nil
@@ -330,12 +342,18 @@ func (s *FeatureFlagService) GetFeatureFlag(ctx context.Context, key string) (*m
 
 // cacheResult caches the result of IsEnabled for a user
 func (s *FeatureFlagService) cacheResult(ctx context.Context, key string, userID int64, result bool) {
+	if s.redis == nil {
+		return
+	}
 	cacheKey := fmt.Sprintf(cacheFlagResult, key, userID)
 	s.redis.Set(ctx, cacheKey, result, cacheTTL) // Ignore errors
 }
 
 // invalidateCache invalidates all cache entries for a flag
 func (s *FeatureFlagService) invalidateCache(ctx context.Context, key string) {
+	if s.redis == nil {
+		return
+	}
 	// Delete flag metadata
 	s.redis.Del(ctx, fmt.Sprintf(cacheFlagMeta, key))
 

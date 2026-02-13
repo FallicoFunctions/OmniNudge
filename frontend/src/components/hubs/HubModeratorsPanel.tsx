@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { LoadingMessage, ErrorMessage, EmptyMessage } from '../common/StatusMessage';
 import type { HubModerator } from '../../types/hubSettings';
 import { getHubModeratorRoleLabel } from '../../utils/moderation';
@@ -20,26 +21,28 @@ export default function HubModeratorsPanel({
   onMessageMods,
   showMessageButton = false,
 }: HubModeratorsPanelProps) {
+  const { t } = useTranslation();
+
   return (
     <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
-          Moderators
+          {t('hubModeratorsPanel.title')}
         </h3>
         {moderators.length > 0 && (
           <span className="text-xs text-[var(--color-text-secondary)]">{moderators.length}</span>
         )}
       </div>
       {isLoading ? (
-        <LoadingMessage>Loading moderators…</LoadingMessage>
+        <LoadingMessage>{t('hubModeratorsPanel.loading')}</LoadingMessage>
       ) : isError ? (
-        <ErrorMessage>Unable to load moderators.</ErrorMessage>
+        <ErrorMessage>{t('hubModeratorsPanel.errors.unableToLoad')}</ErrorMessage>
       ) : moderators.length === 0 ? (
-        <EmptyMessage>No moderators listed yet.</EmptyMessage>
+        <EmptyMessage>{t('hubModeratorsPanel.empty')}</EmptyMessage>
       ) : (
         <ul className="mt-3 space-y-2">
           {moderators.map((moderator) => {
-            const displayName = moderator.username ?? `User ${moderator.user_id}`;
+            const displayName = moderator.username ?? t('common.userNumber', { id: moderator.user_id });
             return (
               <li key={`${moderator.user_id}-${moderator.role}`} className="flex items-center gap-3">
                 {moderator.avatar_url ? (
@@ -61,7 +64,7 @@ export default function HubModeratorsPanel({
                     {displayName}
                   </Link>
                   <span className="text-[11px] uppercase tracking-wide text-[var(--color-text-secondary)]">
-                    {getHubModeratorRoleLabel(moderator.role)}
+                    {getHubModeratorRoleLabel(moderator.role, t)}
                   </span>
                 </div>
               </li>
@@ -74,7 +77,7 @@ export default function HubModeratorsPanel({
           onClick={onMessageMods}
           className="mt-4 w-full rounded-lg border border-[var(--color-primary)] px-4 py-2 text-sm font-medium text-[var(--color-primary)] transition-colors hover:bg-[var(--color-primary)] hover:text-white"
         >
-          Message the Mods
+          {t('hubModeratorsPanel.actions.messageMods')}
         </button>
       )}
     </div>

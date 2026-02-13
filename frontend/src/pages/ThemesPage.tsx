@@ -1,8 +1,10 @@
 import { Suspense, lazy, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import ThemeSelector from '../components/themes/ThemeSelector';
 import ThemePreview from '../components/themes/ThemePreview';
 import ThemeSettingsSection from '../components/settings/ThemeSettingsSection';
 import { useTheme } from '../hooks/useTheme';
+import { useFormat } from '../hooks/useFormat';
 import type { UserTheme } from '../types/theme';
 import { LoadingMessage } from '../components/common/StatusMessage';
 
@@ -10,6 +12,8 @@ const ThemeGallery = lazy(() => import('../components/themes/ThemeGallery'));
 const ThemeEditor = lazy(() => import('../components/themes/ThemeEditor'));
 
 export default function ThemesPage() {
+  const { t } = useTranslation();
+  const { formatNumber } = useFormat();
   const { activeTheme, isLoading, cssVariables } = useTheme();
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [editingTheme, setEditingTheme] = useState<UserTheme | null>(null);
@@ -38,20 +42,22 @@ export default function ThemesPage() {
     <div className="min-h-screen bg-[var(--color-background)] px-4 py-10 text-[var(--color-text-primary)]">
       <main className="mx-auto flex max-w-5xl flex-col gap-8">
         <div className="sr-only" aria-live="polite">
-          {activeTheme ? `Active theme ${activeTheme.theme_name}` : 'No active theme selected'}
+          {activeTheme
+            ? t('themesPage.liveRegion.activeTheme', { theme: activeTheme.theme_name })
+            : t('themesPage.liveRegion.noActiveTheme')}
         </div>
         <section className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6 shadow-md">
           <header className="mb-6 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
             <div>
               <p className="text-sm uppercase tracking-wide text-[var(--color-text-secondary)]">
-                Theme System
+                {t('themesPage.hero.kicker')}
               </p>
               <h1 className="text-2xl font-bold text-[var(--color-text-primary)]">
-                {activeTheme ? activeTheme.theme_name : 'No theme selected'}
+                {activeTheme ? activeTheme.theme_name : t('themesPage.hero.noThemeSelected')}
               </h1>
               <p className="text-sm text-[var(--color-text-secondary)]">
                 {activeTheme?.theme_description ??
-                  'Choose a theme to see the UI update in real-time.'}
+                  t('themesPage.hero.descriptionFallback')}
               </p>
             </div>
             <ThemeSelector onCreateNewTheme={handleOpenCreate} />
@@ -60,7 +66,7 @@ export default function ThemesPage() {
           <div className="grid gap-4 md:grid-cols-2">
             <article className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4 shadow-sm">
               <p className="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
-                Primary Palette
+                {t('themesPage.palette.title')}
               </p>
               <div className="mt-3 flex gap-3">
                 {['--color-primary', '--color-primary-dark', '--color-primary-light', '--color-success'].map(
@@ -81,20 +87,20 @@ export default function ThemesPage() {
 
             <article className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4 shadow-sm">
               <p className="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
-                Typography Preview
+                {t('themesPage.typography.title')}
               </p>
               <div className="mt-3 flex flex-col gap-2">
                 {[
-                  { label: 'Heading', className: 'text-xl font-semibold' },
-                  { label: 'Body', className: 'text-base' },
-                  { label: 'Caption', className: 'text-sm text-[var(--color-text-secondary)]' },
+                  { label: t('themesPage.typography.labels.heading'), className: 'text-xl font-semibold' },
+                  { label: t('themesPage.typography.labels.body'), className: 'text-base' },
+                  { label: t('themesPage.typography.labels.caption'), className: 'text-sm text-[var(--color-text-secondary)]' },
                 ].map((item) => (
                   <div key={item.label}>
                     <p className="text-xs uppercase tracking-wide text-[var(--color-text-muted)]">
                       {item.label}
                     </p>
                     <p className={item.className}>
-                      The quick brown fox jumps over the lazy dog.
+                      {t('themesPage.typography.sampleText')}
                     </p>
                   </div>
                 ))}
@@ -109,13 +115,13 @@ export default function ThemesPage() {
           <header className="mb-4 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
             <div>
               <p className="text-sm uppercase tracking-wide text-[var(--color-text-secondary)]">
-                Live Preview
+                {t('themesPage.livePreview.kicker')}
               </p>
               <h2 className="text-2xl font-bold text-[var(--color-text-primary)]">
-                Visualize Theme Across Pages
+                {t('themesPage.livePreview.title')}
               </h2>
               <p className="text-sm text-[var(--color-text-secondary)]">
-                Toggle between feed, profile, and messages while switching between desktop and mobile modes.
+                {t('themesPage.livePreview.subtitle')}
               </p>
             </div>
           </header>
@@ -126,7 +132,9 @@ export default function ThemesPage() {
           <Suspense
             fallback={
               <section className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6">
-                <LoadingMessage className="mt-0 text-sm">Loading gallery…</LoadingMessage>
+                <LoadingMessage className="mt-0 text-sm">
+                  {t('themesPage.gallery.loading')}
+                </LoadingMessage>
               </section>
             }
           >
@@ -136,23 +144,25 @@ export default function ThemesPage() {
 
         <section className="rounded-2xl border border-dashed border-[var(--color-border)] bg-[var(--color-surface)] p-6">
           <p className="text-sm uppercase tracking-wide text-[var(--color-text-secondary)]">
-            Debug Info
+            {t('themesPage.debug.kicker')}
           </p>
           {isLoading ? (
-            <LoadingMessage className="mt-2 text-sm">Loading theme data…</LoadingMessage>
+            <LoadingMessage className="mt-2 text-sm">
+              {t('themesPage.debug.loading')}
+            </LoadingMessage>
           ) : (
             <div className="mt-4 space-y-2 text-sm text-[var(--color-text-secondary)]">
               <p>
                 <span className="font-semibold text-[var(--color-text-primary)]">
-                  Active Theme ID:
+                  {t('themesPage.debug.activeThemeId')}
                 </span>{' '}
-                {activeTheme?.id ?? 'n/a'}
+                {activeTheme?.id ?? t('themesPage.debug.na')}
               </p>
               <p>
                 <span className="font-semibold text-[var(--color-text-primary)]">
-                  CSS Variables Loaded:
+                  {t('themesPage.debug.cssVariablesLoaded')}
                 </span>{' '}
-                {Object.keys(cssVariables).length}
+                {formatNumber(Object.keys(cssVariables).length)}
               </p>
             </div>
           )}
@@ -162,7 +172,9 @@ export default function ThemesPage() {
         <Suspense
           fallback={
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 text-white">
-              <LoadingMessage className="mt-0 text-white">Loading editor…</LoadingMessage>
+              <LoadingMessage className="mt-0 text-white">
+                {t('themesPage.editor.loading')}
+              </LoadingMessage>
             </div>
           }
         >

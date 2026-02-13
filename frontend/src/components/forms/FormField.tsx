@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 
 // FORM-2 & FORM-3: Standard form field component with consistent styling
 interface FormFieldProps {
@@ -18,6 +19,8 @@ export function FormField({
   helperText,
   className = '',
 }: FormFieldProps) {
+  const { t } = useTranslation();
+
   return (
     <div className={`space-y-2 ${className}`}>
       {/* Label: 14px (text-sm), semibold (font-semibold) */}
@@ -26,7 +29,7 @@ export function FormField({
         {required ? (
           <span className="text-red-500 ml-1">*</span>
         ) : (
-          <span className="text-[var(--color-text-secondary)] font-normal ml-1">(optional)</span>
+          <span className="text-[var(--color-text-secondary)] font-normal ml-1">{t('common.optional')}</span>
         )}
       </label>
 

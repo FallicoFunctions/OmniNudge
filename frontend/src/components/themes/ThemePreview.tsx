@@ -1,8 +1,10 @@
 import { useMemo, useState } from 'react';
 import type { CSSProperties } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { PageName } from '../../types/theme';
 import { DEFAULT_THEME_VARIABLES } from '../../data/themeVariables';
 import { useDebouncedValue } from '../../hooks/useDebouncedValue';
+import { useFormat } from '../../hooks/useFormat';
 
 type DeviceMode = 'desktop' | 'mobile';
 
@@ -13,15 +15,15 @@ interface ThemePreviewProps {
   showControls?: boolean;
 }
 
-const PAGE_OPTIONS: { id: PageName; label: string }[] = [
-  { id: 'feed', label: 'Feed' },
-  { id: 'profile', label: 'Profile' },
-  { id: 'messages', label: 'Messages' },
+const PAGE_OPTIONS: { id: PageName; labelKey: string }[] = [
+  { id: 'feed', labelKey: 'themes.preview.pages.feed' },
+  { id: 'profile', labelKey: 'themes.preview.pages.profile' },
+  { id: 'messages', labelKey: 'themes.preview.pages.messages' },
 ];
 
-const DEVICE_OPTIONS: { id: DeviceMode; label: string }[] = [
-  { id: 'desktop', label: 'Desktop' },
-  { id: 'mobile', label: 'Mobile' },
+const DEVICE_OPTIONS: { id: DeviceMode; labelKey: string }[] = [
+  { id: 'desktop', labelKey: 'themes.preview.devices.desktop' },
+  { id: 'mobile', labelKey: 'themes.preview.devices.mobile' },
 ];
 
 const ThemePreview = ({
@@ -30,6 +32,8 @@ const ThemePreview = ({
   initialDevice = 'desktop',
   showControls = true,
 }: ThemePreviewProps) => {
+  const { t } = useTranslation();
+  const { formatNumber } = useFormat();
   const [selectedPage, setSelectedPage] = useState<PageName>(initialPage);
   const [deviceMode, setDeviceMode] = useState<DeviceMode>(initialDevice);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -59,7 +63,7 @@ const ThemePreview = ({
       style={{ padding: 'var(--spacing-md)', borderRadius: 'var(--border-radius-xl)' }}
     >
       <p className="text-xs uppercase tracking-wide text-[var(--color-text-secondary)]">
-        Buttons
+        {t('themes.preview.sections.buttons')}
       </p>
       <div
         className="mt-3 grid gap-2 md:grid-cols-2"
@@ -70,28 +74,28 @@ const ThemePreview = ({
           className="rounded-lg bg-[var(--color-primary)] font-semibold text-white"
           style={{ padding: 'var(--spacing-sm)', borderRadius: 'var(--border-radius-lg)' }}
         >
-          Primary Action
+          {t('themes.preview.buttons.primary')}
         </button>
         <button
           type="button"
           className="rounded-lg border border-[var(--color-primary)] font-semibold text-[var(--color-primary)]"
           style={{ padding: 'var(--spacing-sm)', borderRadius: 'var(--border-radius-lg)' }}
         >
-          Secondary
+          {t('themes.preview.buttons.secondary')}
         </button>
         <button
           type="button"
           className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-elevated)] font-semibold text-[var(--color-text-primary)]"
           style={{ padding: 'var(--spacing-sm)', borderRadius: 'var(--border-radius-lg)' }}
         >
-          Outline
+          {t('themes.preview.buttons.outline')}
         </button>
         <button
           type="button"
           className="rounded-lg bg-[var(--color-error)]/10 font-semibold text-[var(--color-error)]"
           style={{ padding: 'var(--spacing-sm)', borderRadius: 'var(--border-radius-lg)' }}
         >
-          Danger
+          {t('themes.preview.buttons.danger')}
         </button>
       </div>
     </div>
@@ -103,32 +107,32 @@ const ThemePreview = ({
       style={{ padding: 'var(--spacing-md)', borderRadius: 'var(--border-radius-xl)' }}
     >
       <p className="text-xs uppercase tracking-wide text-[var(--color-text-secondary)]">
-        Form Elements
+        {t('themes.preview.sections.formElements')}
       </p>
       <div className="mt-3 flex flex-col" style={{ gap: 'var(--spacing-sm)' }}>
         <label className="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
-          Project Name
+          {t('themes.preview.form.projectName')}
           <input
             type="text"
             className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-background)] text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
             style={{ padding: 'var(--spacing-xs) var(--spacing-sm)' }}
-            defaultValue="OmniNudge Preview"
+            defaultValue={t('themes.preview.form.projectNameDefault')}
           />
         </label>
         <label className="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
-          Category
+          {t('themes.preview.form.category')}
           <select
             className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-background)] text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
             style={{ padding: 'var(--spacing-xs) var(--spacing-sm)' }}
             defaultValue="design"
           >
-            <option value="design">Design</option>
-            <option value="marketing">Marketing</option>
-            <option value="dev">Development</option>
+            <option value="design">{t('themes.preview.form.categoryOptions.design')}</option>
+            <option value="marketing">{t('themes.preview.form.categoryOptions.marketing')}</option>
+            <option value="dev">{t('themes.preview.form.categoryOptions.dev')}</option>
           </select>
         </label>
         <label className="flex items-center justify-between text-sm text-[var(--color-text-primary)]">
-          Enable Beta Access
+          {t('themes.preview.form.enableBetaAccess')}
           <span className="relative inline-flex items-center">
             <input type="checkbox" defaultChecked className="peer sr-only" />
             <span className="h-5 w-10 rounded-full bg-[var(--color-border)] transition-all peer-checked:bg-[var(--color-primary)]" />
@@ -145,20 +149,20 @@ const ThemePreview = ({
       style={{ padding: 'var(--spacing-md)', borderRadius: 'var(--border-radius-xl)' }}
     >
       <p className="text-xs uppercase tracking-wide text-[var(--color-text-secondary)]">
-        Status Indicators
+        {t('themes.preview.sections.statusIndicators')}
       </p>
       <div
         className="mt-3 grid gap-3 sm:grid-cols-2"
         style={{ gap: 'var(--spacing-sm)' }}
       >
         {[
-          { label: 'Live', color: 'var(--color-success)' },
-          { label: 'Scheduled', color: 'var(--color-info)' },
-          { label: 'Needs Review', color: 'var(--color-warning)' },
-          { label: 'Blocked', color: 'var(--color-error)' },
+          { id: 'live', label: t('themes.preview.status.live'), color: 'var(--color-success)' },
+          { id: 'scheduled', label: t('themes.preview.status.scheduled'), color: 'var(--color-info)' },
+          { id: 'needsReview', label: t('themes.preview.status.needsReview'), color: 'var(--color-warning)' },
+          { id: 'blocked', label: t('themes.preview.status.blocked'), color: 'var(--color-error)' },
         ].map((status) => (
           <div
-            key={status.label}
+            key={status.id}
             className="flex items-center justify-between rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-elevated)]"
             style={{ padding: 'var(--spacing-sm)', borderRadius: 'var(--border-radius-lg)' }}
           >
@@ -166,7 +170,12 @@ const ThemePreview = ({
               <p className="text-sm font-semibold text-[var(--color-text-primary)]">
                 {status.label}
               </p>
-              <p className="text-xs text-[var(--color-text-secondary)]">8 updates</p>
+              <p className="text-xs text-[var(--color-text-secondary)]">
+                {t('themes.preview.status.updates', {
+                  count: 8,
+                  formattedCount: formatNumber(8),
+                })}
+              </p>
             </div>
             <span
               className="h-8 w-8 rounded-full"
@@ -180,7 +189,11 @@ const ThemePreview = ({
 
   const renderCommonSections = () => (
     <div className="mt-6 space-y-4">
-      <div className="grid gap-4 lg:grid-cols-2" role="region" aria-label="Common component samples">
+      <div
+        className="grid gap-4 lg:grid-cols-2"
+        role="region"
+        aria-label={t('themes.preview.aria.commonSamples')}
+      >
         {renderButtonSamples()}
         {renderFormSamples()}
       </div>
@@ -217,10 +230,14 @@ const ThemePreview = ({
             className="font-semibold text-[var(--color-text-primary)]"
             style={{ fontSize: 'var(--font-size-lg)' }}
           >
-            {selectedPage.charAt(0).toUpperCase() + selectedPage.slice(1)}
+            {t(`themes.preview.pages.${selectedPage}`)}
           </p>
         </div>
-        <div className="flex gap-2" style={{ gap: 'var(--spacing-sm)' }} aria-label="Avatar indicators">
+        <div
+          className="flex gap-2"
+          style={{ gap: 'var(--spacing-sm)' }}
+          aria-label={t('themes.preview.aria.avatarIndicators')}
+        >
           <span
             className="h-8 w-8 rounded-full bg-[var(--color-primary)]/20"
             style={{ borderRadius: 'var(--border-radius-lg)' }}
@@ -252,13 +269,13 @@ const ThemePreview = ({
                     className="font-semibold text-[var(--color-text-primary)]"
                     style={{ fontSize: 'var(--font-size-base)' }}
                   >
-                    Creator {item}
+                    {t('themes.preview.feed.creator', { index: item })}
                   </p>
                   <p
                     className="text-[var(--color-text-secondary)]"
                     style={{ fontSize: 'var(--font-size-sm)' }}
                   >
-                    2h ago · Boosted
+                    {t('themes.preview.feed.meta')}
                   </p>
                 </div>
             <button
@@ -268,16 +285,16 @@ const ThemePreview = ({
                 padding: 'var(--spacing-xs) var(--spacing-sm)',
                 borderRadius: 'var(--border-radius-2xl)',
               }}
-              aria-label={`Follow Creator ${item}`}
+              aria-label={t('themes.preview.feed.followAria', { index: item })}
             >
-              Follow
+              {t('themes.preview.feed.follow')}
             </button>
               </div>
               <p
                 className="text-[var(--color-text-primary)]"
                 style={{ marginTop: 'var(--spacing-sm)', fontSize: 'var(--font-size-base)' }}
               >
-                "Building theme systems is fun! This preview updates live as you tweak variables."
+                {t('themes.preview.feed.quote')}
               </p>
               <div
                 className="flex"
@@ -316,7 +333,7 @@ const ThemePreview = ({
               borderRadius: 'var(--border-radius-2xl)',
               boxShadow: 'var(--shadow-md)',
             }}
-            aria-label="Profile summary"
+                aria-label="Profile summary"
           >
             <div className="flex items-center" style={{ gap: 'var(--spacing-sm)' }}>
               <span
@@ -327,14 +344,16 @@ const ThemePreview = ({
                 <p
                   className="font-semibold text-[var(--color-text-primary)]"
                   style={{ fontSize: 'var(--font-size-xl)' }}
-                >
-                  Explorer
+                  >
+                  {t('themes.preview.profile.name')}
                 </p>
                 <p
                   className="text-[var(--color-text-secondary)]"
                   style={{ fontSize: 'var(--font-size-sm)' }}
-                >
-                  Community Builder · 12k followers
+                  >
+                  {t('themes.preview.profile.subtitle', {
+                    formattedCount: formatNumber(12000, { notation: 'compact' }),
+                  })}
                 </p>
               </div>
               <button
@@ -344,22 +363,28 @@ const ThemePreview = ({
                   padding: 'var(--spacing-xs) var(--spacing-md)',
                   borderRadius: 'var(--border-radius-2xl)',
                 }}
-                aria-label="Message Explorer"
+                aria-label={t('themes.preview.profile.messageAria', {
+                  name: t('themes.preview.profile.name'),
+                })}
               >
-                Message
+                {t('themes.preview.profile.message')}
               </button>
             </div>
             <p
               className="text-[var(--color-text-secondary)]"
               style={{ marginTop: 'var(--spacing-sm)', fontSize: 'var(--font-size-base)' }}
             >
-              Working on OmniNudge theme marketplace. I love vibrant palettes and soft gradients.
+              {t('themes.preview.profile.bio')}
             </p>
           </div>
-          <div className="grid md:grid-cols-3" style={{ gap: 'var(--spacing-md)' }} aria-label="Profile stats">
-            {['Posts', 'Themes', 'Reactions'].map((label) => (
+          <div
+            className="grid md:grid-cols-3"
+            style={{ gap: 'var(--spacing-md)' }}
+            aria-label={t('themes.preview.aria.profileStats')}
+          >
+            {(['posts', 'themes', 'reactions'] as const).map((key) => (
               <div
-                key={label}
+                key={key}
                 className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] text-center"
                 style={{
                   padding: 'var(--spacing-md)',
@@ -368,13 +393,13 @@ const ThemePreview = ({
                 }}
               >
                 <p className="text-xs uppercase tracking-wide text-[var(--color-text-secondary)]">
-                  {label}
+                  {t(`themes.preview.profile.stats.${key}`)}
                 </p>
                 <p
                   className="font-bold text-[var(--color-text-primary)]"
                   style={{ fontSize: 'var(--font-size-lg)' }}
                 >
-                  128
+                  {formatNumber(128)}
                 </p>
               </div>
             ))}
@@ -385,9 +410,9 @@ const ThemePreview = ({
       {selectedPage === 'messages' && (
         <div className="grid gap-4 md:grid-cols-[1fr_1.5fr]" style={{ gap: 'var(--spacing-md)' }}>
           <div className="flex flex-col" style={{ gap: 'var(--spacing-sm)' }}>
-            {['Design Squad', 'Product Crew', 'Ops Updates'].map((room, index) => (
+            {(['designSquad', 'productCrew', 'opsUpdates'] as const).map((roomKey, index) => (
               <div
-                key={room}
+                key={roomKey}
                 className={`rounded-xl border ${
                   index === 0
                     ? 'border-[var(--color-primary)] bg-[var(--color-primary)]/10'
@@ -402,13 +427,16 @@ const ThemePreview = ({
                   className="font-semibold text-[var(--color-text-primary)]"
                   style={{ fontSize: 'var(--font-size-base)' }}
                 >
-                  {room}
+                  {t(`themes.preview.messages.rooms.${roomKey}`)}
                 </p>
                 <p
                   className="text-[var(--color-text-secondary)]"
                   style={{ fontSize: 'var(--font-size-sm)' }}
                 >
-                  2 unread messages
+                  {t('themes.preview.messages.unread', {
+                    count: 2,
+                    formattedCount: formatNumber(2),
+                  })}
                 </p>
               </div>
             ))}
@@ -434,13 +462,13 @@ const ThemePreview = ({
                   className="font-semibold text-[var(--color-text-primary)]"
                   style={{ fontSize: 'var(--font-size-base)' }}
                 >
-                  Design Squad
+                  {t('themes.preview.messages.rooms.designSquad')}
                 </p>
                 <p
                   className="text-[var(--color-text-secondary)]"
                   style={{ fontSize: 'var(--font-size-sm)' }}
                 >
-                  Online now
+                  {t('themes.preview.messages.onlineNow')}
                 </p>
               </div>
             </div>
@@ -456,7 +484,7 @@ const ThemePreview = ({
                   boxShadow: 'var(--shadow-sm)',
                 }}
               >
-                Can we brighten the accent color a bit more?
+                {t('themes.preview.messages.sample.incoming')}
               </p>
               <p
                 className="ml-auto w-3/4 rounded-2xl rounded-br-none bg-[var(--color-primary)] text-white"
@@ -466,7 +494,7 @@ const ThemePreview = ({
                   boxShadow: 'var(--shadow-sm)',
                 }}
               >
-                Absolutely! Adjusting theme variables live now.
+                {t('themes.preview.messages.sample.outgoing')}
               </p>
             </div>
             <div
@@ -481,7 +509,7 @@ const ThemePreview = ({
                 className="text-[var(--color-text-secondary)]"
                 style={{ fontSize: 'var(--font-size-sm)' }}
               >
-                Type your message...
+                {t('themes.preview.messages.typePlaceholder')}
               </p>
             </div>
           </div>
@@ -507,7 +535,7 @@ const ThemePreview = ({
                 }`}
                 onClick={() => setSelectedPage(option.id)}
               >
-                {option.label}
+                {t(option.labelKey)}
               </button>
             ))}
           </div>
@@ -523,7 +551,7 @@ const ThemePreview = ({
                 }`}
                 onClick={() => setDeviceMode(option.id)}
               >
-                {option.label}
+                {t(option.labelKey)}
               </button>
             ))}
             <button
@@ -531,7 +559,9 @@ const ThemePreview = ({
               className="rounded-full border border-[var(--color-border)] px-3 py-1 text-xs font-semibold text-[var(--color-text-primary)]"
               onClick={() => setIsFullscreen((prev) => !prev)}
             >
-              {isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
+              {isFullscreen
+                ? t('themes.preview.actions.exitFullscreen')
+                : t('themes.preview.actions.fullscreen')}
             </button>
           </div>
         </div>

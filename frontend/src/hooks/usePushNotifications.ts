@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { api } from '../lib/api';
 import { requestNotificationPermission, onForegroundMessage } from '../lib/firebase';
 import { useToast } from './useToast';
@@ -17,6 +18,7 @@ interface UsePushNotificationsReturn {
  */
 export function usePushNotifications(): UsePushNotificationsReturn {
   const { toast } = useToast();
+  const { t } = useTranslation();
   const [isSupported, setIsSupported] = useState(false);
   const [isPermissionGranted, setIsPermissionGranted] = useState(false);
   const [isRegistered, setIsRegistered] = useState(false);
@@ -48,7 +50,9 @@ export function usePushNotifications(): UsePushNotificationsReturn {
 
       // Show toast notification
       if (notification) {
-        toast.info(`${notification.title}: ${notification.body}`);
+        const title = notification.title || t('notifications.push.defaultTitle');
+        const body = notification.body || t('notifications.push.defaultBody');
+        toast.info(t('notifications.push.receivedToast', { title, body }));
       }
 
       // Handle data payload (e.g., navigate to message, update UI)
@@ -59,11 +63,11 @@ export function usePushNotifications(): UsePushNotificationsReturn {
     });
 
     return unsubscribe;
-  }, [isRegistered, toast]);
+  }, [isRegistered, t, toast]);
 
   const requestPermission = async () => {
     if (!isSupported) {
-      toast.error('Push notifications are not supported in this browser');
+      toast.error(t('notifications.push.notSupported'));
       return;
     }
 
@@ -72,7 +76,7 @@ export function usePushNotifications(): UsePushNotificationsReturn {
       const token = await requestNotificationPermission();
 
       if (!token) {
-        toast.error('Failed to get notification permission');
+        toast.error(t('notifications.push.permissionFailed'));
         return;
       }
 
@@ -90,10 +94,10 @@ export function usePushNotifications(): UsePushNotificationsReturn {
       setIsRegistered(true);
       setCurrentToken(token);
 
-      toast.success('Push notifications enabled!');
+      toast.success(t('notifications.push.enabled'));
     } catch (error) {
       console.error('Error requesting notification permission:', error);
-      toast.error('Failed to enable push notifications');
+      toast.error(t('notifications.push.enableFailed'));
     }
   };
 
@@ -112,10 +116,10 @@ export function usePushNotifications(): UsePushNotificationsReturn {
       setIsRegistered(false);
       setCurrentToken(null);
 
-      toast.success('Push notifications disabled');
+      toast.success(t('notifications.push.disabled'));
     } catch (error) {
       console.error('Error unregistering device:', error);
-      toast.error('Failed to disable push notifications');
+      toast.error(t('notifications.push.disableFailed'));
     }
   };
 

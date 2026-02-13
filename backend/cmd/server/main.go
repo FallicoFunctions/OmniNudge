@@ -117,13 +117,37 @@ func main() {
 		cfg.Reddit.UserAgent,
 		cfg.Turnstile.Secret,
 	)
-	var cache services.Cache
+
+	// Redis is optional in dev. If it's configured but unreachable, fall back to in-memory cache and disable the job queue
+	// (otherwise Asynq will spam errors and unrelated endpoints can fail).
+	var redisClient *redis.Client
+	redisAvailable := false
 	if cfg.Redis.Addr != "" {
+		rc := redis.NewClient(&redis.Options{
+			Addr:     cfg.Redis.Addr,
+			Password: cfg.Redis.Password,
+		})
+		pingCtx, cancel := context.WithTimeout(context.Background(), 750*time.Millisecond)
+		defer cancel()
+		if err := rc.Ping(pingCtx).Err(); err != nil {
+			log.Printf("Warning: Redis unavailable at %s (disabling Redis-backed cache and job queue): %v", cfg.Redis.Addr, err)
+			_ = rc.Close()
+		} else {
+			redisClient = rc
+			redisAvailable = true
+			log.Printf("Connected to Redis at %s", cfg.Redis.Addr)
+		}
+	} else {
+		log.Println("Redis not configured")
+	}
+
+	var cache services.Cache
+	if redisAvailable {
 		cache = services.NewRedisCache(cfg.Redis.Addr, cfg.Redis.Password, 2*time.Second)
 	} else {
 		// Use in-memory cache as fallback
 		cache = services.NewMemoryCache()
-		log.Println("Using in-memory cache (Redis not configured)")
+		log.Println("Using in-memory cache (Redis unavailable)")
 	}
 	redditClient := services.NewRedditClient(
 		cfg.Reddit.UserAgent,
@@ -135,11 +159,11 @@ func main() {
 
 	// Initialize job queue client (P0-002)
 	var queueClient *queue.QueueClient
-	if cfg.Redis.Addr != "" {
+	if redisAvailable {
 		queueClient = queue.NewQueueClient(cfg.Redis.Addr, cfg.Redis.Password)
 		log.Println("Job queue client initialized")
 	} else {
-		log.Println("Warning: Job queue disabled (Redis not configured)")
+		log.Println("Warning: Job queue disabled (Redis unavailable)")
 	}
 
 	// Initialize Firebase Cloud Messaging (P0-042)
@@ -171,15 +195,6 @@ func main() {
 
 	// Initialize feature flag repository
 	featureFlagRepo := repository.NewFeatureFlagRepository(db.Pool)
-
-	// Initialize Redis client for feature flags
-	var redisClient *redis.Client
-	if cfg.Redis.Addr != "" {
-		redisClient = redis.NewClient(&redis.Options{
-			Addr:     cfg.Redis.Addr,
-			Password: cfg.Redis.Password,
-		})
-	}
 
 	// Initialize feature flag service (P0-012)
 	featureFlagService := services.NewFeatureFlagService(featureFlagRepo, redisClient, hub, cfg.AppEnv)

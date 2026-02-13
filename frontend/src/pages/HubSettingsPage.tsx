@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useParams, Navigate, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { hubSettingsService } from '../services/hubSettingsService';
 import { useAuth } from '../contexts/AuthContext';
 import GeneralSettingsTab from '../components/hubSettings/GeneralSettingsTab';
@@ -16,6 +17,7 @@ type TabType = 'general' | 'content' | 'moderation' | 'moderators' | 'theme';
 export default function HubSettingsPage() {
   const { hubName } = useParams<{ hubName: string }>();
   const { user } = useAuth();
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<TabType>('general');
@@ -67,7 +69,7 @@ export default function HubSettingsPage() {
   if (settingsLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <LoadingMessage>Loading settings...</LoadingMessage>
+        <LoadingMessage>{t('hubSettingsPage.loading')}</LoadingMessage>
       </div>
     );
   }
@@ -75,7 +77,7 @@ export default function HubSettingsPage() {
   if (!settings) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <EmptyMessage>Settings not found.</EmptyMessage>
+        <EmptyMessage>{t('hubSettingsPage.notFound')}</EmptyMessage>
       </div>
     );
   }
@@ -85,10 +87,10 @@ export default function HubSettingsPage() {
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center max-w-md mx-auto p-6">
           <h2 className="text-2xl font-bold text-[var(--color-text-primary)] mb-4">
-            Access Denied
+            {t('hubSettingsPage.accessDenied.title')}
           </h2>
           <p className="text-[var(--color-text-secondary)]">
-            You need to be a hub owner or full moderator to access settings.
+            {t('hubSettingsPage.accessDenied.description')}
           </p>
         </div>
       </div>
@@ -99,11 +101,15 @@ export default function HubSettingsPage() {
   const moderatorCount = moderatorsData?.moderators?.length || 0;
 
   const tabs: { id: TabType; label: string; group?: string }[] = [
-    { id: 'general', label: 'General', group: 'settings' },
-    { id: 'content', label: 'Content & Posts', group: 'settings' },
-    { id: 'moderation', label: 'Moderation', group: 'settings' },
-    { id: 'moderators', label: `Moderators (${moderatorCount})`, group: 'team' },
-    { id: 'theme', label: 'Theme', group: 'appearance' },
+    { id: 'general', label: t('hubSettingsPage.tabs.general'), group: 'settings' },
+    { id: 'content', label: t('hubSettingsPage.tabs.content'), group: 'settings' },
+    { id: 'moderation', label: t('hubSettingsPage.tabs.moderation'), group: 'settings' },
+    {
+      id: 'moderators',
+      label: t('hubSettingsPage.tabs.moderators', { count: moderatorCount }),
+      group: 'team',
+    },
+    { id: 'theme', label: t('hubSettingsPage.tabs.theme'), group: 'appearance' },
   ];
 
   return (
@@ -113,10 +119,10 @@ export default function HubSettingsPage() {
         <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
           <div>
             <h1 className="text-3xl font-bold text-[var(--color-text-primary)] mb-2">
-              h/{hubName} Settings
+              {t('hubSettingsPage.header.title', { hub: hubName })}
             </h1>
             <p className="text-[var(--color-text-secondary)]">
-              Configure your hub's appearance, content rules, and moderation settings
+              {t('hubSettingsPage.header.subtitle')}
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -125,14 +131,14 @@ export default function HubSettingsPage() {
               onClick={() => navigate(`/h/${hubName}`)}
               className="px-4 py-2 rounded bg-[var(--color-surface-elevated)] text-[var(--color-text-primary)] hover:bg-[var(--color-border)] transition-colors"
             >
-              Exit
+              {t('hubSettingsPage.actions.exit')}
             </button>
             <button
               type="button"
               onClick={() => navigate(`/h/${hubName}/mod`)}
               className="px-4 py-2 rounded border border-[var(--color-border)] text-[var(--color-text-primary)] hover:border-[var(--color-primary)] hover:text-[var(--color-primary)] transition-colors"
             >
-              Back to Mod Tools
+              {t('hubSettingsPage.actions.backToModTools')}
             </button>
           </div>
         </div>
@@ -148,9 +154,9 @@ export default function HubSettingsPage() {
                 : 'bg-red-100 text-red-800'
             }`}
           >
-            {saveStatus === 'saving' && 'Saving changes...'}
-            {saveStatus === 'saved' && '✓ Changes saved successfully!'}
-            {saveStatus === 'error' && '✗ Failed to save changes. Please try again.'}
+            {saveStatus === 'saving' && t('hubSettingsPage.saveBanner.saving')}
+            {saveStatus === 'saved' && t('hubSettingsPage.saveBanner.saved')}
+            {saveStatus === 'error' && t('hubSettingsPage.saveBanner.error')}
           </div>
         )}
 

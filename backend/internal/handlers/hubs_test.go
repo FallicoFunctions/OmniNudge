@@ -23,6 +23,7 @@ import (
 func setupHubsTest(t *testing.T) (*HubsHandler, *pgxpool.Pool, *models.HubRepository, *models.PlatformPostRepository, *models.UserRepository, func()) {
 	db, err := database.NewTest()
 	require.NoError(t, err)
+	t.Cleanup(db.Close)
 
 	ctx := context.Background()
 	err = db.Migrate(ctx)
@@ -604,7 +605,9 @@ func TestCrosspostToSubreddit(t *testing.T) {
 		req.Header.Set("Content-Type", "application/json")
 		router.ServeHTTP(w, req)
 
-		assert.Equal(t, http.StatusCreated, w.Code)
+		if w.Code != http.StatusCreated {
+			t.Fatalf("expected %d, got %d: %s", http.StatusCreated, w.Code, w.Body.String())
+		}
 
 		var response map[string]interface{}
 		err := json.Unmarshal(w.Body.Bytes(), &response)

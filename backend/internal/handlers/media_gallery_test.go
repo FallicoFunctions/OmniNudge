@@ -27,6 +27,7 @@ func uniqueMediaGalleryUsername(base string) string {
 func setupMediaGalleryHandlerTest(t *testing.T) (*MediaGalleryHandler, *database.Database, int, int, int, func()) {
 	db, err := database.NewTest()
 	require.NoError(t, err)
+	t.Cleanup(db.Close)
 
 	ctx := context.Background()
 	err = db.Migrate(ctx)

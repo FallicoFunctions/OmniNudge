@@ -1,6 +1,7 @@
 import type { User } from '../types/auth';
 import type { Hub } from '../services/hubsService';
 import type { HubModerator } from '../types/hubSettings';
+import type { TFunction } from 'i18next';
 
 export const isUserHubModerator = (
   user: User | null | undefined,
@@ -18,7 +19,8 @@ export const isUserHubModerator = (
   return false;
 };
 
-export const getHubModeratorRoleLabel = (role: HubModerator['role']): string => {
-  if (role === 'owner') return 'Owner';
-  return 'Moderator';
+export const getHubModeratorRoleLabel = (role: HubModerator['role'], t: TFunction): string => {
+  if (role === 'owner') return t('hubSettings.roles.owner');
+  if (role === 'full_moderator') return t('hubSettings.roles.fullModerator');
+  return t('hubSettings.roles.moderator');
 };

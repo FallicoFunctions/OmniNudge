@@ -1,11 +1,12 @@
 import { useState, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { formatDistanceToNow } from 'date-fns';
+import { useTranslation } from 'react-i18next';
 import { VoteButtons } from './VoteButtons';
 import { CommentEntry } from './CommentEntry';
 import { MarkdownRenderer } from '../common/MarkdownRenderer';
 import { savedService } from '../../services/savedService';
 import { getSavedRedditAPICommentIdSet } from '../../utils/savedItems';
+import { useFormat } from '../../hooks/useFormat';
 
 interface Comment {
   id: number | string;
@@ -51,6 +52,8 @@ export function CommentThread({
   onCommentPosted,
   onLoadReplies
 }: CommentThreadProps) {
+  const { t } = useTranslation();
+  const { formatNumber, formatRelativeTime } = useFormat();
   const queryClient = useQueryClient();
   const [replyingTo, setReplyingTo] = useState<number | string | null>(null);
   const [expandedReplies, setExpandedReplies] = useState<Set<number | string>>(new Set());
@@ -144,20 +147,19 @@ export function CommentThread({
   return (
     <div>
       {comments.map((comment) => {
-        let timeAgo = '';
-        try {
-          const date = new Date(comment.created_at);
-          if (!isNaN(date.getTime())) {
-            timeAgo = formatDistanceToNow(date, { addSuffix: true });
-          } else {
-            timeAgo = 'recently';
-          }
-        } catch {
-          timeAgo = 'recently';
-        }
+        const createdAt = new Date(comment.created_at);
+        const timeAgo = Number.isNaN(createdAt.getTime())
+          ? t('common.time.recently')
+          : formatRelativeTime(createdAt);
 
         const showFirstChild = depth === 0 && comment.replies && comment.replies.length > 0;
         const remainingReplies = comment.replies ? comment.replies.length - 1 : (comment.reply_count || 0);
+        const scoreValue = !isNaN(comment.score) ? comment.score : 0;
+        const pointsLabel = t('posts.point', {
+          count: scoreValue,
+          formattedCount: formatNumber(scoreValue),
+        });
+        const isSaved = typeof comment.id === 'string' ? savedRedditAPICommentIds.has(comment.id) : false;
 
         return (
           <div key={comment.id} className="relative" style={{ marginLeft: depth > 0 ? `${depth * 8}px` : 0 }}>
@@ -172,7 +174,7 @@ export function CommentThread({
               <div className="flex items-center gap-1.5 text-[10px] text-[var(--color-text-muted)]">
                 <span className="font-semibold text-[var(--color-primary)]">{comment.username}</span>
                 <span>•</span>
-                <span>{!isNaN(comment.score) ? comment.score : 0} pts</span>
+                <span>{pointsLabel}</span>
                 <span>•</span>
                 <span>{timeAgo}</span>
               </div>
@@ -198,7 +200,7 @@ export function CommentThread({
                   onClick={() => handleReplyClick(comment.id)}
                   className="text-[10px] text-[var(--color-text-muted)] hover:text-cyan-500 transition-colors"
                 >
-                  Reply
+                  {t('comments.actions.reply')}
                 </button>
                 <button
                   onClick={() => handleSaveComment(comment)}
@@ -206,8 +208,8 @@ export function CommentThread({
                   className="text-[10px] text-[var(--color-text-muted)] hover:text-cyan-500 transition-colors disabled:opacity-50"
                 >
                   {savingComments.has(comment.id)
-                    ? 'Saving...'
-                    : (typeof comment.id === 'string' && savedRedditAPICommentIds.has(comment.id) ? 'Unsave' : 'Save')}
+                    ? t('comments.status.saving')
+                    : (isSaved ? t('comments.actions.unsave') : t('comments.actions.save'))}
                 </button>
               </div>
 
@@ -220,7 +222,7 @@ export function CommentThread({
                     parentId={typeof comment.id === 'number' ? comment.id : undefined}
                     onCommentPosted={(newComment) => handleReplyPosted(comment.id, newComment)}
                     onCancel={() => setReplyingTo(null)}
-                    placeholder="Write a reply..."
+                    placeholder={t('comments.writeComment')}
                   />
                 </div>
               )}
@@ -255,7 +257,7 @@ export function CommentThread({
                   <circle cx="12" cy="12" r="10" />
                   <path d="M12 8v8M8 12h8" />
                 </svg>
-                {remainingReplies} more {remainingReplies === 1 ? 'reply' : 'replies'}
+                {t('comments.moreReplies', { count: remainingReplies })}
               </button>
             )}
 
@@ -281,7 +283,7 @@ export function CommentThread({
                   onClick={() => handleExpandReplies(comment.id)}
                   className="text-[10px] text-cyan-500 hover:text-cyan-400 ml-2 mt-1"
                 >
-                  Collapse replies
+                  {t('comments.actions.collapseReplies')}
                 </button>
               </div>
             )}

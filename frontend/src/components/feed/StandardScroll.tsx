@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useMultiColumnFeed } from '../../contexts/MultiColumnFeedContext';
 import { useColumnFeed } from '../../hooks/useColumnFeed';
 import { StandardScrollPost } from './StandardScrollPost';
@@ -13,6 +14,7 @@ interface StandardScrollProps {
 }
 
 export function StandardScroll({ onClose }: StandardScrollProps) {
+  const { t } = useTranslation();
   const { state } = useMultiColumnFeed();
 
   // Use first column config for the feed source
@@ -201,7 +203,7 @@ export function StandardScroll({ onClose }: StandardScrollProps) {
   if (isLoading) {
     return (
       <div className="fixed inset-0 bg-black z-50 flex items-center justify-center">
-        <div className="text-white text-lg">Loading feed...</div>
+        <div className="text-white text-lg">{t('standardScroll.loadingFeed')}</div>
       </div>
     );
   }
@@ -209,7 +211,7 @@ export function StandardScroll({ onClose }: StandardScrollProps) {
   if (allPosts.length === 0) {
     return (
       <div className="fixed inset-0 bg-black z-50 flex items-center justify-center">
-        <div className="text-white text-lg">No posts available</div>
+        <div className="text-white text-lg">{t('standardScroll.noPostsAvailable')}</div>
         <button
           onClick={onClose}
           className="absolute top-4 right-4 text-white hover:text-cyan-500 transition-colors"
@@ -234,7 +236,7 @@ export function StandardScroll({ onClose }: StandardScrollProps) {
       <button
         onClick={onClose}
         className="absolute top-4 right-4 text-white hover:text-cyan-500 transition-colors z-20"
-        aria-label="Close Scroll"
+        aria-label={t('standardScroll.aria.closeScroll')}
       >
         <svg
           xmlns="http://www.w3.org/2000/svg"
@@ -281,14 +283,14 @@ export function StandardScroll({ onClose }: StandardScrollProps) {
         {/* Loading indicator at bottom */}
         {isFetchingNextPage && (
           <div className="h-screen flex items-center justify-center snap-start">
-            <div className="text-white text-lg">Loading more posts...</div>
+            <div className="text-white text-lg">{t('standardScroll.loadingMorePosts')}</div>
           </div>
         )}
 
         {/* End indicator */}
         {!hasNextPage && allPosts.length > 0 && (
           <div className="h-screen flex items-center justify-center snap-start">
-            <div className="text-white text-lg">End of feed</div>
+            <div className="text-white text-lg">{t('standardScroll.endOfFeed')}</div>
           </div>
         )}
       </div>

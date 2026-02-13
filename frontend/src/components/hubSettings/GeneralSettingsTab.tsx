@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { HubSettings, UpdateHubSettingsRequest, PrivacyType } from '../../types/hubSettings';
 import { MarkdownInput } from '../common/MarkdownInput';
 import { hubSettingsService } from '../../services/hubSettingsService';
@@ -12,6 +13,7 @@ interface Props {
 }
 
 export default function GeneralSettingsTab({ settings, onSave, isHubOwnerOrAdmin, hubName }: Props) {
+  const { t } = useTranslation();
   const [displayTitle, setDisplayTitle] = useState(settings.display_title || '');
   const [sidebarMarkdown, setSidebarMarkdown] = useState(settings.sidebar_markdown || '');
   const [privacyType, setPrivacyType] = useState<PrivacyType>(settings.privacy_type);
@@ -51,7 +53,7 @@ export default function GeneralSettingsTab({ settings, onSave, isHubOwnerOrAdmin
         access_request_cooldown_days: settings.access_request_cooldown_days,
       });
     } catch (error) {
-      setSaveError(error instanceof Error ? error.message : 'Failed to save changes');
+      setSaveError(error instanceof Error ? error.message : t('hubSettings.common.errors.saveFailed'));
     } finally {
       setIsSaving(false);
     }
@@ -67,24 +69,24 @@ export default function GeneralSettingsTab({ settings, onSave, isHubOwnerOrAdmin
     <div className="space-y-6">
       <div>
         <h2 className="text-xl font-bold text-[var(--color-text-primary)] mb-4">
-          General Settings
+          {t('hubSettings.general.title')}
         </h2>
         <p className="text-[var(--color-text-secondary)] mb-6">
-          Configure basic information and appearance for your hub
+          {t('hubSettings.general.subtitle')}
         </p>
       </div>
 
       {/* Display Title */}
       <FormField
-        label="Display Title"
+        label={t('hubSettings.general.displayTitle.label')}
         required={false}
-        helperText="Custom title shown on the hub page"
+        helperText={t('hubSettings.general.displayTitle.helper')}
       >
         <input
           type="text"
           value={displayTitle}
           onChange={(e) => setDisplayTitle(e.target.value)}
-          placeholder="Leave empty to use hub name"
+          placeholder={t('hubSettings.general.displayTitle.placeholder')}
           className="w-full px-3 py-2 border border-[var(--color-border)] rounded-lg bg-[var(--color-surface-elevated)] text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:border-[var(--color-primary)]"
           maxLength={300}
         />
@@ -93,21 +95,23 @@ export default function GeneralSettingsTab({ settings, onSave, isHubOwnerOrAdmin
       {/* Sidebar Description */}
       <div>
         <MarkdownInput
-          label="Sidebar Description"
+          label={t('hubSettings.general.sidebar.label')}
           value={sidebarMarkdown}
           onChange={setSidebarMarkdown}
-          placeholder="Markdown supported..."
+          placeholder={t('hubSettings.general.sidebar.placeholder')}
           rows={8}
-          helperText="Displayed in the hub sidebar. Supports Markdown formatting."
+          helperText={t('hubSettings.general.sidebar.helper')}
         />
       </div>
 
       {/* Privacy Type */}
       <div>
         <label className="block text-sm font-semibold text-[var(--color-text-primary)] mb-2">
-          Hub Privacy
+          {t('hubSettings.general.privacy.label')}
           {!isHubOwnerOrAdmin && (
-            <span className="ml-2 text-xs font-normal text-[var(--color-text-secondary)]">(Owner only)</span>
+            <span className="ml-2 text-xs font-normal text-[var(--color-text-secondary)]">
+              {t('hubSettings.common.ownerOnly')}
+            </span>
           )}
         </label>
         <select
@@ -116,14 +120,14 @@ export default function GeneralSettingsTab({ settings, onSave, isHubOwnerOrAdmin
           disabled={!isHubOwnerOrAdmin}
           className="w-full px-3 py-2 border border-[var(--color-border)] rounded bg-[var(--color-background)] text-[var(--color-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          <option value="public">Public - Anyone can view and post</option>
-          <option value="restricted">Restricted - Anyone can view, approved users can post</option>
-          <option value="private">Private - Only approved users can view and post</option>
+          <option value="public">{t('hubSettings.general.privacy.options.public')}</option>
+          <option value="restricted">{t('hubSettings.general.privacy.options.restricted')}</option>
+          <option value="private">{t('hubSettings.general.privacy.options.private')}</option>
         </select>
         <p className="text-xs text-[var(--color-text-secondary)] mt-1">
-          {privacyType === 'public' && 'Open to all users'}
-          {privacyType === 'restricted' && 'Requires approval to post'}
-          {privacyType === 'private' && 'Invite-only hub'}
+          {privacyType === 'public' && t('hubSettings.general.privacy.descriptions.public')}
+          {privacyType === 'restricted' && t('hubSettings.general.privacy.descriptions.restricted')}
+          {privacyType === 'private' && t('hubSettings.general.privacy.descriptions.private')}
         </p>
       </div>
 
@@ -132,14 +136,15 @@ export default function GeneralSettingsTab({ settings, onSave, isHubOwnerOrAdmin
         <div className="flex items-start justify-between">
           <div className="flex-1 pr-4">
             <label className="block text-sm font-semibold text-[var(--color-text-primary)] mb-2">
-              NSFW (18+)
+              {t('hubSettings.general.nsfw.label')}
               {!isHubOwnerOrAdmin && (
-                <span className="ml-2 text-xs font-normal text-[var(--color-text-secondary)]">(Owner only)</span>
+                <span className="ml-2 text-xs font-normal text-[var(--color-text-secondary)]">
+                  {t('hubSettings.common.ownerOnly')}
+                </span>
               )}
             </label>
             <p className="text-sm text-[var(--color-text-secondary)]">
-              Mark this hub as NSFW (Not Safe For Work). NSFW hubs are hidden from default feeds and
-              search results unless users explicitly opt-in. Content must be 18+ appropriate.
+              {t('hubSettings.general.nsfw.description')}
             </p>
           </div>
           <button
@@ -152,7 +157,7 @@ export default function GeneralSettingsTab({ settings, onSave, isHubOwnerOrAdmin
               isNsfw ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
             } ${!isHubOwnerOrAdmin ? 'opacity-50' : ''}`}
           >
-            <span className="sr-only">Toggle NSFW status</span>
+            <span className="sr-only">{t('hubSettings.general.nsfw.toggleA11y')}</span>
             <span
               aria-hidden="true"
               className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
@@ -173,7 +178,7 @@ export default function GeneralSettingsTab({ settings, onSave, isHubOwnerOrAdmin
           disabled={!hasChanges || isSaving}
           className="px-6 py-2 rounded bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-strong)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
-          {isSaving ? 'Saving...' : 'Save Changes'}
+          {isSaving ? t('hubSettings.common.status.saving') : t('hubSettings.common.actions.saveChanges')}
         </button>
       </div>
     </div>
