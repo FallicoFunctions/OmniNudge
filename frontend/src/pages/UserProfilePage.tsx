@@ -308,7 +308,8 @@ export default function UserProfilePage() {
   }, [user, username, refetchProfile]);
 
   const createdLabel = profile ? formatTimestampLabel(profile.created_at, useRelativeTime) : '';
-  const lastSeenLabel = profile ? formatTimestampLabel(profile.last_seen, useRelativeTime) : '';
+  const lastSeenLabel =
+    profile?.last_seen ? formatTimestampLabel(profile.last_seen, useRelativeTime) : '';
 
   const renderActiveTab = () => {
     if (resolvedActiveTab === 'posts') {
@@ -515,9 +516,11 @@ export default function UserProfilePage() {
               <p className="text-sm text-[var(--color-text-secondary)]">
                 {t('userProfilePage.labels.joined', { time: createdLabel })}
               </p>
-              <p className="text-xs text-[var(--color-text-secondary)]">
-                {t('userProfilePage.labels.lastSeen', { time: lastSeenLabel })}
-              </p>
+              {profile.last_seen && (
+                <p className="text-xs text-[var(--color-text-secondary)]">
+                  {t('userProfilePage.labels.lastSeen', { time: lastSeenLabel })}
+                </p>
+              )}
             </div>
           </div>
           <div className="flex flex-col gap-2 text-sm text-[var(--color-text-secondary)] md:items-end md:text-right">

@@ -98,12 +98,28 @@ func TestCreatePost_ToHub_Success(t *testing.T) {
 }
 
 func TestCreatePost_ToSubreddit_Success(t *testing.T) {
-	handler, _, _, cleanup := setupPostsCreateTest(t)
+	handler, hubRepo, _, cleanup := setupPostsCreateTest(t)
 	defer cleanup()
+
+	ctx := context.Background()
+
+	// Create a hub to attach the platform post to.
+	hub := &models.Hub{
+		Name:           "subreddithub",
+		ContentOptions: "any",
+		CreatedBy:      ptrInt(1),
+	}
+	err := hubRepo.Create(ctx, hub)
+	require.NoError(t, err)
+
+	fetchedHub, err := hubRepo.GetByName(ctx, "subreddithub")
+	require.NoError(t, err)
+	require.NotNil(t, fetchedHub)
 
 	payload := map[string]interface{}{
 		"title":                 "Test Reddit Post",
 		"body":                  "Posting to Reddit",
+		"hub_id":                fetchedHub.ID,
 		"target_subreddit":      "cats",
 		"send_replies_to_inbox": true,
 		"post_type":             "text",
@@ -123,7 +139,7 @@ func TestCreatePost_ToSubreddit_Success(t *testing.T) {
 	assert.Equal(t, http.StatusCreated, w.Code)
 
 	var response map[string]interface{}
-	err := json.Unmarshal(w.Body.Bytes(), &response)
+	err = json.Unmarshal(w.Body.Bytes(), &response)
 	require.NoError(t, err)
 	assert.Equal(t, "Test Reddit Post", response["title"])
 	assert.Equal(t, "cats", response["target_subreddit"])
@@ -156,7 +172,7 @@ func TestCreatePost_NoDestination_Fails(t *testing.T) {
 	var response map[string]interface{}
 	err := json.Unmarshal(w.Body.Bytes(), &response)
 	require.NoError(t, err)
-	assert.Contains(t, response["error"], "hub_id or target_subreddit")
+	assert.Contains(t, response["error"], "hub_id is required")
 }
 
 func TestCreatePost_LinksOnlyHub_RejectsTextPost(t *testing.T) {

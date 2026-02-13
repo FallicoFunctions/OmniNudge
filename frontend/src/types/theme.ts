@@ -57,6 +57,7 @@ export interface UserSettings {
   notification_sound: boolean;
   show_read_receipts: boolean;
   show_typing_indicators: boolean;
+  show_last_seen: boolean;
   auto_append_invitation: boolean;
   theme: string;
   notify_comment_replies: boolean;

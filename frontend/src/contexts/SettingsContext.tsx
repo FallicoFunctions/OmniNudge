@@ -1,5 +1,11 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
 import { SETTINGS_STORAGE_KEY } from '../constants/storageKeys';
+import { userSettingsService } from '../services/userSettingsService';
+
+const hasAuthToken = (): boolean => {
+  if (typeof window === 'undefined') return false;
+  return Boolean(localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token'));
+};
 
 interface SettingsContextType {
   useRelativeTime: boolean;
@@ -34,6 +40,8 @@ interface SettingsContextType {
   setReadReceipts: (value: boolean) => void;
   typingIndicators: boolean;
   setTypingIndicators: (value: boolean) => void;
+  showLastSeen: boolean;
+  setShowLastSeen: (value: boolean) => void;
   notificationSound: boolean;
   setNotificationSound: (value: boolean) => void;
 }
@@ -57,11 +65,12 @@ interface StoredSettings {
   accessRequestCooldownDisplay?: 'days' | 'date' | 'both';
   readReceipts?: boolean;
   typingIndicators?: boolean;
+  showLastSeen?: boolean;
   notificationSound?: boolean;
   settingsVersion?: number;
 }
 
-const CURRENT_SETTINGS_VERSION = 5;
+const CURRENT_SETTINGS_VERSION = 6;
 
 const getStoredSettings = (): StoredSettings => {
   if (typeof window === 'undefined' || !window.localStorage) {
@@ -83,6 +92,7 @@ const getStoredSettings = (): StoredSettings => {
           blockNsfwThumbnails: parsed.blockNsfwThumbnails ?? true,
           readReceipts: parsed.readReceipts ?? true,
           typingIndicators: parsed.typingIndicators ?? true,
+          showLastSeen: parsed.showLastSeen ?? true,
           notificationSound: parsed.notificationSound ?? true,
           settingsVersion: CURRENT_SETTINGS_VERSION,
         };
@@ -164,10 +174,41 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     const settings = getStoredSettings();
     return settings.typingIndicators ?? true;
   });
+  const [showLastSeen, setShowLastSeenState] = useState<boolean>(() => {
+    const settings = getStoredSettings();
+    return settings.showLastSeen ?? true;
+  });
   const [notificationSound, setNotificationSoundState] = useState<boolean>(() => {
     const settings = getStoredSettings();
     return settings.notificationSound ?? true;
   });
+
+  // Hydrate messaging privacy settings from server when authenticated.
+  useEffect(() => {
+    if (!hasAuthToken()) {
+      return;
+    }
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const settings = await userSettingsService.get();
+        if (cancelled) return;
+
+        setReadReceiptsState(settings.show_read_receipts ?? true);
+        setTypingIndicatorsState(settings.show_typing_indicators ?? true);
+        setShowLastSeenState(settings.show_last_seen ?? true);
+        setNotificationSoundState(settings.notification_sound ?? true);
+      } catch (error) {
+        // Best-effort: fall back to localStorage snapshot.
+        console.warn('[Settings] Failed to load server settings, using local settings:', error);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Persist to localStorage whenever settings change
   useEffect(() => {
@@ -189,6 +230,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         accessRequestCooldownDisplay,
         readReceipts,
         typingIndicators,
+        showLastSeen,
         notificationSound,
         settingsVersion: CURRENT_SETTINGS_VERSION,
       };
@@ -213,6 +255,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     accessRequestCooldownDisplay,
     readReceipts,
     typingIndicators,
+    showLastSeen,
     notificationSound,
   ]);
 
@@ -267,15 +310,51 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   };
 
   const setReadReceipts = (value: boolean) => {
+    const previous = readReceipts;
     setReadReceiptsState(value);
+    if (!hasAuthToken()) return;
+    void userSettingsService
+      .update({ show_read_receipts: value })
+      .catch((error) => {
+        console.error('[Settings] Failed to update read receipts setting:', error);
+        setReadReceiptsState(previous);
+      });
   };
 
   const setTypingIndicators = (value: boolean) => {
+    const previous = typingIndicators;
     setTypingIndicatorsState(value);
+    if (!hasAuthToken()) return;
+    void userSettingsService
+      .update({ show_typing_indicators: value })
+      .catch((error) => {
+        console.error('[Settings] Failed to update typing indicators setting:', error);
+        setTypingIndicatorsState(previous);
+      });
+  };
+
+  const setShowLastSeen = (value: boolean) => {
+    const previous = showLastSeen;
+    setShowLastSeenState(value);
+    if (!hasAuthToken()) return;
+    void userSettingsService
+      .update({ show_last_seen: value })
+      .catch((error) => {
+        console.error('[Settings] Failed to update last seen setting:', error);
+        setShowLastSeenState(previous);
+      });
   };
 
   const setNotificationSound = (value: boolean) => {
+    const previous = notificationSound;
     setNotificationSoundState(value);
+    if (!hasAuthToken()) return;
+    void userSettingsService
+      .update({ notification_sound: value })
+      .catch((error) => {
+        console.error('[Settings] Failed to update notification sound setting:', error);
+        setNotificationSoundState(previous);
+      });
   };
 
   return (
@@ -313,6 +392,8 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         setReadReceipts,
         typingIndicators,
         setTypingIndicators,
+        showLastSeen,
+        setShowLastSeen,
         notificationSound,
         setNotificationSound,
       }}

@@ -57,6 +57,7 @@
       "toggleReadReceipts": "Toggle read receipts",
       "toggleTypingIndicators": "Toggle typing indicators",
       "toggleNotificationSound": "Toggle message notification sound",
+      "toggleLastSeen": "Toggle last seen",
       "toggleOmniFeed": "Toggle Omni posts filter",
       "toggleInfiniteScroll": "Toggle infinite scroll",
       "expandCommentThread": "Expand comment thread",
@@ -1824,7 +1825,9 @@
       "typingIndicators": "Typing indicators",
       "typingIndicatorsHelp": "Show others when you're typing. When disabled, you won't send or see typing indicators.",
       "notificationSound": "Message notification sound",
-      "notificationSoundHelp": "Play a sound when you receive a new message. Only plays when you're actively using the app."
+      "notificationSoundHelp": "Play a sound when you receive a new message. Only plays when you're actively using the app.",
+      "lastSeen": "Last seen",
+      "lastSeenHelp": "Show others when you were last active. When disabled, your last seen time may be hidden from public profile views."
     },
     "dateTime": {
       "title": "Date & Time Display",

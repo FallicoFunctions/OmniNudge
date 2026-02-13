@@ -14,27 +14,30 @@ import (
 
 // UsersHandler serves public user profile data and profile management
 type UsersHandler struct {
-	userRepo    *models.UserRepository
-	postRepo    *models.PlatformPostRepository
-	commentRepo *models.PostCommentRepository
-	authService *services.AuthService
-	hubModRepo  *models.HubModeratorRepository
+	userRepo     *models.UserRepository
+	settingsRepo *models.UserSettingsRepository
+	postRepo     *models.PlatformPostRepository
+	commentRepo  *models.PostCommentRepository
+	authService  *services.AuthService
+	hubModRepo   *models.HubModeratorRepository
 }
 
 // NewUsersHandler creates a new UsersHandler
 func NewUsersHandler(
 	userRepo *models.UserRepository,
+	settingsRepo *models.UserSettingsRepository,
 	postRepo *models.PlatformPostRepository,
 	commentRepo *models.PostCommentRepository,
 	authService *services.AuthService,
 	hubModRepo *models.HubModeratorRepository,
 ) *UsersHandler {
 	return &UsersHandler{
-		userRepo:    userRepo,
-		postRepo:    postRepo,
-		commentRepo: commentRepo,
-		authService: authService,
-		hubModRepo:  hubModRepo,
+		userRepo:     userRepo,
+		settingsRepo: settingsRepo,
+		postRepo:     postRepo,
+		commentRepo:  commentRepo,
+		authService:  authService,
+		hubModRepo:   hubModRepo,
 	}
 }
 
@@ -47,7 +50,7 @@ type UserProfileResponse struct {
 	Karma     int                    `json:"karma"`
 	PublicKey *string                `json:"public_key,omitempty"`
 	CreatedAt string                 `json:"created_at"`
-	LastSeen  string                 `json:"last_seen"`
+	LastSeen  *string                `json:"last_seen,omitempty"`
 	Moderated []ModeratedHubResponse `json:"moderated_hubs,omitempty"`
 }
 
@@ -86,6 +89,31 @@ func (h *UsersHandler) GetUserProfile(c *gin.Context) {
 		return
 	}
 
+	// Determine whether to expose last_seen. Default is visible.
+	// If show_last_seen is disabled, only the user themselves can see it (when authenticated via AuthOptional).
+	var viewerID int
+	if v, exists := c.Get("user_id"); exists {
+		if id, ok := v.(int); ok {
+			viewerID = id
+		}
+	}
+	showLastSeen := true
+	if h.settingsRepo != nil {
+		settings, err := h.settingsRepo.GetByUserID(c.Request.Context(), user.ID)
+		// Fail-closed: if we can't load privacy settings, do not expose last_seen to other users.
+		if err != nil {
+			showLastSeen = false
+		} else if settings != nil {
+			showLastSeen = settings.ShowLastSeen
+		}
+	}
+
+	var lastSeenPtr *string
+	if showLastSeen || viewerID == user.ID {
+		formatted := user.LastSeen.Format(time.RFC3339)
+		lastSeenPtr = &formatted
+	}
+
 	var moderatedHubs []ModeratedHubResponse
 	if h.hubModRepo != nil {
 		hubs, err := h.hubModRepo.GetHubsForModerator(c.Request.Context(), user.ID)
@@ -111,7 +139,7 @@ func (h *UsersHandler) GetUserProfile(c *gin.Context) {
 		Karma:     user.Karma,
 		PublicKey: user.PublicKey,
 		CreatedAt: user.CreatedAt.Format(time.RFC3339),
-		LastSeen:  user.LastSeen.Format(time.RFC3339),
+		LastSeen:  lastSeenPtr,
 	}
 	if len(moderatedHubs) > 0 {
 		response.Moderated = moderatedHubs
@@ -303,7 +331,10 @@ func (h *UsersHandler) UpdateProfile(c *gin.Context) {
 		Karma:     user.Karma,
 		PublicKey: user.PublicKey,
 		CreatedAt: user.CreatedAt.Format(time.RFC3339),
-		LastSeen:  user.LastSeen.Format(time.RFC3339),
+		LastSeen: func() *string {
+			formatted := user.LastSeen.Format(time.RFC3339)
+			return &formatted
+		}(),
 	})
 }
 

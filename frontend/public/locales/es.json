@@ -57,6 +57,7 @@
       "toggleReadReceipts": "Alternar confirmaciones de lectura",
       "toggleTypingIndicators": "Alternar indicadores de escritura",
       "toggleNotificationSound": "Alternar sonido de notificación de mensaje",
+      "toggleLastSeen": "Alternar visto por última vez",
       "toggleOmniFeed": "Alternar filtro de posts Omni",
       "toggleInfiniteScroll": "Alternar desplazamiento infinito",
       "expandCommentThread": "Expandir hilo de comentarios",
@@ -1824,7 +1825,9 @@
       "typingIndicators": "Indicadores de escritura",
       "typingIndicatorsHelp": "Muestra a otros cuando estás escribiendo. Cuando está desactivado, no enviarás ni verás indicadores de escritura.",
       "notificationSound": "Sonido de notificación de mensaje",
-      "notificationSoundHelp": "Reproduce un sonido cuando recibas un nuevo mensaje. Solo se reproduce cuando estás usando la app activamente."
+      "notificationSoundHelp": "Reproduce un sonido cuando recibas un nuevo mensaje. Solo se reproduce cuando estás usando la app activamente.",
+      "lastSeen": "Visto por última vez",
+      "lastSeenHelp": "Muestra a otros cuándo estuviste activo por última vez. Cuando está desactivado, tu hora de visto por última vez puede ocultarse en las vistas públicas del perfil."
     },
     "dateTime": {
       "title": "Visualización de Fecha y Hora",

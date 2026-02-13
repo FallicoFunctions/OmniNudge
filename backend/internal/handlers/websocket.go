@@ -58,15 +58,17 @@ var upgrader = ws.Upgrader{
 
 // WebSocketHandler handles WebSocket connections
 type WebSocketHandler struct {
-	hub        *websocket.Hub
-	authorizer *websocket.Authorizer
+	hub          *websocket.Hub
+	authorizer   *websocket.Authorizer
+	settingsRepo websocket.SettingsRepository
 }
 
 // NewWebSocketHandler creates a new WebSocket handler
-func NewWebSocketHandler(hub *websocket.Hub, authorizer *websocket.Authorizer) *WebSocketHandler {
+func NewWebSocketHandler(hub *websocket.Hub, authorizer *websocket.Authorizer, settingsRepo websocket.SettingsRepository) *WebSocketHandler {
 	return &WebSocketHandler{
-		hub:        hub,
-		authorizer: authorizer,
+		hub:          hub,
+		authorizer:   authorizer,
+		settingsRepo: settingsRepo,
 	}
 }
 
@@ -116,6 +118,7 @@ func (h *WebSocketHandler) HandleWebSocket(c *gin.Context) {
 		c.ClientIP(),
 		c.Request.UserAgent(),
 		h.authorizer,
+		h.settingsRepo,
 	)
 
 	// Audit log connection (P0-004)

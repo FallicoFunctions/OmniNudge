@@ -9,7 +9,7 @@ describe('useToast', () => {
     expect(result.current.toasts).toHaveLength(0);
 
     act(() => {
-      result.current.success('Test success message');
+      result.current.toast.success('Test success message');
     });
 
     expect(result.current.toasts).toHaveLength(1);
@@ -17,7 +17,7 @@ describe('useToast', () => {
     expect(result.current.toasts[0].type).toBe('success');
 
     act(() => {
-      result.current.removeToast(result.current.toasts[0].id);
+      result.current.toast.dismiss(result.current.toasts[0].id);
     });
 
     expect(result.current.toasts).toHaveLength(0);
@@ -27,10 +27,10 @@ describe('useToast', () => {
     const { result } = renderHook(() => useToast());
 
     act(() => {
-      result.current.success('Success');
-      result.current.error('Error');
-      result.current.warning('Warning');
-      result.current.info('Info');
+      result.current.toast.success('Success');
+      result.current.toast.error('Error');
+      result.current.toast.warning('Warning');
+      result.current.toast.info('Info');
     });
 
     expect(result.current.toasts).toHaveLength(4);
@@ -44,8 +44,8 @@ describe('useToast', () => {
     const { result } = renderHook(() => useToast());
 
     act(() => {
-      result.current.info('Message 1');
-      result.current.info('Message 2');
+      result.current.toast.info('Message 1');
+      result.current.toast.info('Message 2');
     });
 
     const [toast1, toast2] = result.current.toasts;

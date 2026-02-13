@@ -57,6 +57,7 @@
       "toggleReadReceipts": "تبديل تأكيدات القراءة",
       "toggleTypingIndicators": "تبديل مؤشرات الكتابة",
       "toggleNotificationSound": "تبديل صوت إشعار الرسائل",
+      "toggleLastSeen": "تبديل آخر ظهور",
       "toggleOmniFeed": "تبديل تصفية منشورات Omni",
       "toggleInfiniteScroll": "تبديل التمرير اللانهائي",
       "expandCommentThread": "توسيع سلسلة التعليقات",
@@ -1824,7 +1825,9 @@
       "typingIndicators": "مؤشرات الكتابة",
       "typingIndicatorsHelp": "أظهر للآخرين متى تكتب. عند التعطيل، لن ترسل أو ترى مؤشرات الكتابة.",
       "notificationSound": "صوت إشعارات الرسائل",
-      "notificationSoundHelp": "تشغيل صوت عند تلقي رسالة جديدة. يتم التشغيل فقط عند استخدام التطبيق بنشاط."
+      "notificationSoundHelp": "تشغيل صوت عند تلقي رسالة جديدة. يتم التشغيل فقط عند استخدام التطبيق بنشاط.",
+      "lastSeen": "آخر ظهور",
+      "lastSeenHelp": "أظهر للآخرين متى كنت نشطاً آخر مرة. عند التعطيل، قد يتم إخفاء وقت آخر ظهور من العروض العامة للملف الشخصي."
     },
     "dateTime": {
       "title": "عروض التاريخ والوقت",

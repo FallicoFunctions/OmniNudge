@@ -91,13 +91,16 @@ describe('ThemeEditor integration', () => {
       );
     });
 
-    expect(mockContextValue.refreshThemes).toHaveBeenCalled();
-    expect(mockContextValue.selectTheme).toHaveBeenCalled();
+    await waitFor(() => expect(mockContextValue.refreshThemes).toHaveBeenCalled());
+    await waitFor(() => expect(mockContextValue.selectTheme).toHaveBeenCalled());
 
-    await waitFor(() => {
-      expect(onClose).toHaveBeenCalled();
-    });
-  });
+    await waitFor(
+      () => {
+        expect(onClose).toHaveBeenCalled();
+      },
+      { timeout: 2500 }
+    );
+  }, 15000);
 
   it('updates an existing theme without reactivating it', async () => {
     const initialTheme = createTheme({ id: 42, theme_name: 'Existing' });

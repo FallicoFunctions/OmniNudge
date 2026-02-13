@@ -48,6 +48,8 @@ export default function SettingsPage() {
     setReadReceipts,
     typingIndicators,
     setTypingIndicators,
+    showLastSeen,
+    setShowLastSeen,
     notificationSound,
     setNotificationSound,
   } = useSettings();
@@ -324,6 +326,35 @@ export default function SettingsPage() {
                   aria-hidden="true"
                   className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
                     notificationSound ? 'translate-x-5' : 'translate-x-0'
+                  }`}
+                />
+              </button>
+            </div>
+
+            {/* Last Seen Toggle */}
+            <div className="flex items-center justify-between rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4">
+              <div className="pr-4">
+                <p className="text-base font-semibold text-[var(--color-text-primary)]">
+                  {t('settings.messagingPrivacy.lastSeen')}
+                </p>
+                <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+                  {t('settings.messagingPrivacy.lastSeenHelp')}
+                </p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={showLastSeen}
+                onClick={() => setShowLastSeen(!showLastSeen)}
+                className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${
+                  showLastSeen ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
+                }`}
+              >
+                <span className="sr-only">{t('common.accessibility.toggleLastSeen')}</span>
+                <span
+                  aria-hidden="true"
+                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                    showLastSeen ? 'translate-x-5' : 'translate-x-0'
                   }`}
                 />
               </button>

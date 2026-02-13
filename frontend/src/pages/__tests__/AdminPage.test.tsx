@@ -47,6 +47,11 @@ const createWrapper = () => {
   );
 };
 
+const goToUserManagementTab = async () => {
+  fireEvent.click(screen.getByText('User Management'));
+  await waitFor(() => expect(adminService.listUsers).toHaveBeenCalled());
+};
+
 describe('AdminPage - Ban System', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -107,25 +112,27 @@ describe('AdminPage - Ban System', () => {
 
   it('renders user list with ban status badges', async () => {
     render(<AdminPage />, { wrapper: createWrapper() });
+    await goToUserManagementTab();
 
     await waitFor(() => {
-      expect(screen.getByText('testuser')).toBeInTheDocument();
-      expect(screen.getByText('banneduser')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /testuser/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /banneduser/i })).toBeInTheDocument();
     });
 
     // Check for banned badge
-    expect(screen.getByText('Banned')).toBeInTheDocument();
+    expect(screen.getByText('Banned', { selector: 'span' })).toBeInTheDocument();
   });
 
   it('opens ban modal when ban action is clicked', async () => {
     render(<AdminPage />, { wrapper: createWrapper() });
+    await goToUserManagementTab();
 
     await waitFor(() => {
-      expect(screen.getByText('testuser')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /testuser/i })).toBeInTheDocument();
     });
 
     // Find and click the Actions button for the first user
-    const actionButtons = screen.getAllByText('Actions ▼');
+    const actionButtons = screen.getAllByRole('button', { name: /^Actions/i });
     fireEvent.click(actionButtons[0]);
 
     // Click the Ban option
@@ -142,13 +149,14 @@ describe('AdminPage - Ban System', () => {
     vi.mocked(adminService.banUser).mockResolvedValue({ message: 'User banned' });
 
     render(<AdminPage />, { wrapper: createWrapper() });
+    await goToUserManagementTab();
 
     await waitFor(() => {
-      expect(screen.getByText('testuser')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /testuser/i })).toBeInTheDocument();
     });
 
     // Open action menu and click ban
-    const actionButtons = screen.getAllByText('Actions ▼');
+    const actionButtons = screen.getAllByRole('button', { name: /^Actions/i });
     fireEvent.click(actionButtons[0]);
     const banButton = screen.getByText('Ban');
     fireEvent.click(banButton);
@@ -166,7 +174,7 @@ describe('AdminPage - Ban System', () => {
     fireEvent.click(showReasonCheckbox);
 
     // Submit
-    const confirmButton = screen.getByText('Confirm Ban');
+    const confirmButton = screen.getByRole('button', { name: /^Confirm$/i });
     fireEvent.click(confirmButton);
 
     await waitFor(() => {
@@ -178,13 +186,14 @@ describe('AdminPage - Ban System', () => {
     vi.mocked(adminService.shadowBanUser).mockResolvedValue({ message: 'User shadow banned' });
 
     render(<AdminPage />, { wrapper: createWrapper() });
+    await goToUserManagementTab();
 
     await waitFor(() => {
-      expect(screen.getByText('testuser')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /testuser/i })).toBeInTheDocument();
     });
 
     // Open action menu and click shadow ban
-    const actionButtons = screen.getAllByText('Actions ▼');
+    const actionButtons = screen.getAllByRole('button', { name: /^Actions/i });
     fireEvent.click(actionButtons[0]);
     const shadowBanButton = screen.getByText('Shadow Ban');
     fireEvent.click(shadowBanButton);
@@ -198,7 +207,7 @@ describe('AdminPage - Ban System', () => {
     fireEvent.change(reasonTextarea, { target: { value: 'Suspicious activity' } });
 
     // Submit
-    const confirmButton = screen.getByText('Confirm Shadow Ban');
+    const confirmButton = screen.getByRole('button', { name: /^Confirm$/i });
     fireEvent.click(confirmButton);
 
     await waitFor(() => {
@@ -210,13 +219,14 @@ describe('AdminPage - Ban System', () => {
     vi.mocked(adminService.unbanUser).mockResolvedValue({ message: 'User unbanned' });
 
     render(<AdminPage />, { wrapper: createWrapper() });
+    await goToUserManagementTab();
 
     await waitFor(() => {
-      expect(screen.getByText('banneduser')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /banneduser/i })).toBeInTheDocument();
     });
 
     // Open action menu for banned user and click unban
-    const actionButtons = screen.getAllByText('Actions ▼');
+    const actionButtons = screen.getAllByRole('button', { name: /^Actions/i });
     fireEvent.click(actionButtons[1]); // Second user is banned
     const unbanButton = screen.getByText('Unban');
     fireEvent.click(unbanButton);
@@ -230,7 +240,7 @@ describe('AdminPage - Ban System', () => {
     fireEvent.change(reasonTextarea, { target: { value: 'Appeal approved' } });
 
     // Submit
-    const confirmButton = screen.getByText('Confirm Unban');
+    const confirmButton = screen.getByRole('button', { name: /^Confirm$/i });
     fireEvent.click(confirmButton);
 
     await waitFor(() => {
@@ -262,9 +272,10 @@ describe('AdminPage - Ban System', () => {
     vi.mocked(adminService.listUsers).mockResolvedValue(mockBannedUsers);
 
     render(<AdminPage />, { wrapper: createWrapper() });
+    await goToUserManagementTab();
 
     await waitFor(() => {
-      expect(screen.getByText('testuser')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /banneduser/i })).toBeInTheDocument();
     });
 
     // Change status filter to "Banned"
@@ -277,7 +288,8 @@ describe('AdminPage - Ban System', () => {
         '',
         'banned',
         50,
-        0
+        0,
+        ''
       );
     });
   });
@@ -311,19 +323,20 @@ describe('AdminPage - Ban System', () => {
     vi.mocked(adminService.getBanHistory).mockResolvedValue(mockHistory);
 
     render(<AdminPage />, { wrapper: createWrapper() });
+    await goToUserManagementTab();
 
     await waitFor(() => {
-      expect(screen.getByText('testuser')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /testuser/i })).toBeInTheDocument();
     });
 
     // Open action menu and click "View Ban History"
-    const actionButtons = screen.getAllByText('Actions ▼');
+    const actionButtons = screen.getAllByRole('button', { name: /^Actions/i });
     fireEvent.click(actionButtons[0]);
     const historyButton = screen.getByText('View Ban History');
     fireEvent.click(historyButton);
 
     await waitFor(() => {
-      expect(screen.getByText('Ban History for testuser')).toBeInTheDocument();
+      expect(screen.getByText(/Ban history for testuser/i)).toBeInTheDocument();
       expect(screen.getByText('ban')).toBeInTheDocument();
       expect(screen.getByText('unban')).toBeInTheDocument();
       expect(screen.getByText('Spam')).toBeInTheDocument();
@@ -335,15 +348,17 @@ describe('AdminPage - Ban System', () => {
     vi.mocked(adminService.banUser).mockResolvedValue({ message: 'User banned' });
 
     render(<AdminPage />, { wrapper: createWrapper() });
+    await goToUserManagementTab();
 
     await waitFor(() => {
-      expect(screen.getByText('testuser')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /testuser/i })).toBeInTheDocument();
     });
 
     // Select users via checkboxes
     const checkboxes = screen.getAllByRole('checkbox');
-    fireEvent.click(checkboxes[1]); // First user checkbox
-    fireEvent.click(checkboxes[2]); // Second user checkbox
+    expect(checkboxes.length).toBeGreaterThanOrEqual(2);
+    fireEvent.click(checkboxes[0]); // First user checkbox
+    fireEvent.click(checkboxes[1]); // Second user checkbox
 
     // Click bulk ban button
     const bulkBanButton = screen.getByText('Ban');
@@ -370,9 +385,10 @@ describe('AdminPage - Ban System', () => {
 
   it('toggles between card and table view', async () => {
     render(<AdminPage />, { wrapper: createWrapper() });
+    await goToUserManagementTab();
 
     await waitFor(() => {
-      expect(screen.getByText('testuser')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /testuser/i })).toBeInTheDocument();
     });
 
     // Initially in card view
@@ -406,9 +422,10 @@ describe('AdminPage - Ban System', () => {
     document.createElement = createElementMock;
 
     render(<AdminPage />, { wrapper: createWrapper() });
+    await goToUserManagementTab();
 
     await waitFor(() => {
-      expect(screen.getByText('testuser')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /testuser/i })).toBeInTheDocument();
     });
 
     // Click export CSV button
@@ -450,9 +467,9 @@ describe('AdminPage - Ban System', () => {
     fireEvent.click(banActivityTab);
 
     await waitFor(() => {
-      expect(screen.getByText('ban')).toBeInTheDocument();
-      expect(screen.getByText('Test')).toBeInTheDocument();
-      expect(screen.getByText('admin')).toBeInTheDocument();
+      expect(screen.getByText(/^ban$/i)).toBeInTheDocument();
+      expect(screen.getByText(/Test/)).toBeInTheDocument();
+      expect(screen.getByText(/by admin/i)).toBeInTheDocument();
     });
   });
 
@@ -461,13 +478,14 @@ describe('AdminPage - Ban System', () => {
     global.alert = vi.fn();
 
     render(<AdminPage />, { wrapper: createWrapper() });
+    await goToUserManagementTab();
 
     await waitFor(() => {
-      expect(screen.getByText('testuser')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /testuser/i })).toBeInTheDocument();
     });
 
     // Open ban modal
-    const actionButtons = screen.getAllByText('Actions ▼');
+    const actionButtons = screen.getAllByRole('button', { name: /^Actions/i });
     fireEvent.click(actionButtons[0]);
     const banButton = screen.getByText('Ban');
     fireEvent.click(banButton);
@@ -477,7 +495,7 @@ describe('AdminPage - Ban System', () => {
     });
 
     // Try to submit without reason
-    const confirmButton = screen.getByText('Confirm Ban');
+    const confirmButton = screen.getByRole('button', { name: /^Confirm$/i });
     expect(confirmButton).toBeDisabled();
   });
 });

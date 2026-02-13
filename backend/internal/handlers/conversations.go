@@ -43,10 +43,20 @@ type CreateConversationRequest struct {
 // ConversationWithDetails includes conversation info plus latest message and unread count
 type ConversationWithDetails struct {
 	*models.Conversation
-	OtherUser     *models.User    `json:"other_user,omitempty"`
-	HubName       *string         `json:"hub_name,omitempty"`
-	LatestMessage *models.Message `json:"latest_message,omitempty"`
-	UnreadCount   int             `json:"unread_count"`
+	OtherUser     *ConversationUser `json:"other_user,omitempty"`
+	HubName       *string           `json:"hub_name,omitempty"`
+	LatestMessage *models.Message   `json:"latest_message,omitempty"`
+	UnreadCount   int               `json:"unread_count"`
+}
+
+// ConversationUser exposes a safe subset of user fields for conversation listings.
+// Intentionally excludes presence/last_seen and any sensitive profile/account fields.
+type ConversationUser struct {
+	ID        int     `json:"id"`
+	Username  string  `json:"username"`
+	AvatarURL *string `json:"avatar_url,omitempty"`
+	Bio       *string `json:"bio,omitempty"`
+	Karma     int     `json:"karma"`
 }
 
 // CreateConversation handles POST /api/v1/conversations
@@ -167,7 +177,13 @@ func (h *ConversationsHandler) GetConversations(c *gin.Context) {
 				if otherUserID != 0 {
 					otherUser, err := h.userRepo.GetByID(ctx, otherUserID)
 					if err == nil && otherUser != nil {
-						details.OtherUser = otherUser
+						details.OtherUser = &ConversationUser{
+							ID:        otherUser.ID,
+							Username:  otherUser.Username,
+							AvatarURL: otherUser.AvatarURL,
+							Bio:       otherUser.Bio,
+							Karma:     otherUser.Karma,
+						}
 					}
 				}
 			} else if conversation.ConversationType == "mod_mail" && conversation.HubID != nil {
@@ -352,7 +368,13 @@ func (h *ConversationsHandler) GetConversation(c *gin.Context) {
 	otherUserID := conversation.GetOtherUserID(userID.(int))
 	otherUser, err := h.userRepo.GetByID(c.Request.Context(), otherUserID)
 	if err == nil && otherUser != nil {
-		details.OtherUser = otherUser
+		details.OtherUser = &ConversationUser{
+			ID:        otherUser.ID,
+			Username:  otherUser.Username,
+			AvatarURL: otherUser.AvatarURL,
+			Bio:       otherUser.Bio,
+			Karma:     otherUser.Karma,
+		}
 	}
 
 	// Get latest message
