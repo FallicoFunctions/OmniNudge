@@ -1,3 +1,6 @@
+import type { ButtonHTMLAttributes, ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
+
 /**
  * Reusable loading state components for consistent UX across the app
  * Includes: Skeleton screens, spinners, and progress bars
@@ -10,6 +13,8 @@ interface SpinnerProps {
 }
 
 export function Spinner({ size = 'md', className = '' }: SpinnerProps) {
+  const { t } = useTranslation();
+
   const sizeClasses = {
     sm: 'w-4 h-4 border-2',
     md: 'w-6 h-6 border-2',
@@ -20,17 +25,17 @@ export function Spinner({ size = 'md', className = '' }: SpinnerProps) {
     <div
       className={`animate-spin rounded-full border-[var(--color-border)] border-t-[var(--color-primary)] ${sizeClasses[size]} ${className}`}
       role="status"
-      aria-label="Loading"
+      aria-label={t('common.accessibility.loading')}
     >
-      <span className="sr-only">Loading...</span>
+      <span className="sr-only">{t('common.loading')}</span>
     </div>
   );
 }
 
 // Loading Button - Button with inline spinner
-interface LoadingButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+interface LoadingButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   isLoading: boolean;
-  children: React.ReactNode;
+  children: ReactNode;
   loadingText?: string;
 }
 
@@ -101,12 +106,7 @@ export function Skeleton({
     );
   }
 
-  return (
-    <div
-      className={`${baseClasses} ${variantClasses[variant]} ${className}`}
-      style={style}
-    />
-  );
+  return <div className={`${baseClasses} ${variantClasses[variant]} ${className}`} style={style} />;
 }
 
 // PostCardSkeleton - Skeleton for post cards
@@ -209,8 +209,9 @@ export function ProgressBar({
   progress,
   label,
   showPercentage = true,
-  className = ''
+  className = '',
 }: ProgressBarProps) {
+  const { t } = useTranslation();
   const clampedProgress = Math.min(Math.max(progress, 0), 100);
 
   return (
@@ -218,14 +219,10 @@ export function ProgressBar({
       {(label || showPercentage) && (
         <div className="flex justify-between items-center mb-2">
           {label && (
-            <span className="text-sm font-medium text-[var(--color-text-primary)]">
-              {label}
-            </span>
+            <span className="text-sm font-medium text-[var(--color-text-primary)]">{label}</span>
           )}
           {showPercentage && (
-            <span className="text-sm text-[var(--color-text-secondary)]">
-              {clampedProgress}%
-            </span>
+            <span className="text-sm text-[var(--color-text-secondary)]">{clampedProgress}%</span>
           )}
         </div>
       )}
@@ -237,7 +234,7 @@ export function ProgressBar({
           aria-valuenow={clampedProgress}
           aria-valuemin={0}
           aria-valuemax={100}
-          aria-label={label || 'Progress'}
+          aria-label={label || t('common.progress')}
         />
       </div>
     </div>
@@ -251,23 +248,21 @@ interface LoadingOverlayProps {
   fullScreen?: boolean;
 }
 
-export function LoadingOverlay({
-  isLoading,
-  message = 'Loading...',
-  fullScreen = false
-}: LoadingOverlayProps) {
+export function LoadingOverlay({ isLoading, message, fullScreen = false }: LoadingOverlayProps) {
+  const { t } = useTranslation();
   if (!isLoading) return null;
 
-  const containerClasses = fullScreen
-    ? 'fixed inset-0 z-50'
-    : 'absolute inset-0 z-10';
+  const resolvedMessage = message ?? t('common.loading');
+  const containerClasses = fullScreen ? 'fixed inset-0 z-50' : 'absolute inset-0 z-10';
 
   return (
-    <div className={`${containerClasses} bg-[var(--color-background)]/80 backdrop-blur-sm flex flex-col items-center justify-center`}>
+    <div
+      className={`${containerClasses} bg-[var(--color-background)]/80 backdrop-blur-sm flex flex-col items-center justify-center`}
+    >
       <Spinner size="lg" />
-      {message && (
+      {resolvedMessage && (
         <p className="mt-4 text-sm font-medium text-[var(--color-text-primary)]">
-          {message}
+          {resolvedMessage}
         </p>
       )}
     </div>
@@ -279,13 +274,14 @@ interface LoadingPageProps {
   message?: string;
 }
 
-export function LoadingPage({ message = 'Loading...' }: LoadingPageProps) {
+export function LoadingPage({ message }: LoadingPageProps) {
+  const { t } = useTranslation();
+  const resolvedMessage = message ?? t('common.loading');
+
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-6">
       <Spinner size="lg" />
-      <p className="mt-4 text-lg font-medium text-[var(--color-text-primary)]">
-        {message}
-      </p>
+      <p className="mt-4 text-lg font-medium text-[var(--color-text-primary)]">{resolvedMessage}</p>
     </div>
   );
 }

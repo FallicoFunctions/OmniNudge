@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 
 type OffsetPaginationControlsProps = {
   hasPrev: boolean;
@@ -21,25 +22,23 @@ export function OffsetPaginationControls({
   showDivider = true,
   centerContent,
 }: OffsetPaginationControlsProps) {
+  const { t } = useTranslation();
+
   if (!hasPrev && !hasMore) {
     return null;
   }
 
-  const dividerClasses = showDivider
-    ? 'mt-6 border-t border-[var(--color-border)] pt-4'
-    : '';
+  const dividerClasses = showDivider ? 'mt-6 border-t border-[var(--color-border)] pt-4' : '';
 
   return (
-    <div
-      className={`flex items-center justify-between ${dividerClasses} ${className}`}
-    >
+    <div className={`flex items-center justify-between ${dividerClasses} ${className}`}>
       <button
         type="button"
         onClick={onPrev}
         disabled={!hasPrev || isFetching}
         className="rounded bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)] disabled:cursor-not-allowed disabled:opacity-50"
       >
-        ← Previous
+        {t('pagination.previous')}
       </button>
       {centerContent}
       <button
@@ -48,7 +47,7 @@ export function OffsetPaginationControls({
         disabled={!hasMore || isFetching}
         className="rounded bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)] disabled:cursor-not-allowed disabled:opacity-50"
       >
-        Next →
+        {t('pagination.next')}
       </button>
     </div>
   );

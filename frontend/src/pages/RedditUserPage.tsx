@@ -30,11 +30,7 @@ import type {
 } from '../types/reddit';
 import { useFormat } from '../hooks/useFormat';
 
-const TAB_OPTIONS = [
-  { key: 'overview' },
-  { key: 'comments' },
-  { key: 'submitted' },
-] as const;
+const TAB_OPTIONS = [{ key: 'overview' }, { key: 'comments' }, { key: 'submitted' }] as const;
 
 const SORT_OPTIONS = ['new', 'hot', 'top', 'controversial'] as const;
 
@@ -79,7 +75,13 @@ export default function RedditUserPage() {
       return formatRelativeTime(d);
     }
 
-    return formatDate(d, { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
+    return formatDate(d, {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+    });
   };
 
   const isProfileBlocked = isRedditUserBlocked(username);
@@ -114,10 +116,7 @@ export default function RedditUserPage() {
 
   const { data: hiddenPostsData } = useHiddenItems('reddit_posts', !!user, 1000 * 60 * 5);
 
-  const hiddenPostIds = useMemo(
-    () => getHiddenRedditPostIdSet(hiddenPostsData),
-    [hiddenPostsData]
-  );
+  const hiddenPostIds = useMemo(() => getHiddenRedditPostIdSet(hiddenPostsData), [hiddenPostsData]);
 
   const { data: savedRedditPostsData } = useSavedItems('reddit_posts', !!user, 1000 * 60 * 5);
 
@@ -133,7 +132,11 @@ export default function RedditUserPage() {
     [savedRedditCommentsData]
   );
 
-  const toggleSaveRedditPostMutation = useMutation<void, Error, { post: RedditApiPost; shouldSave: boolean }>({
+  const toggleSaveRedditPostMutation = useMutation<
+    void,
+    Error,
+    { post: RedditApiPost; shouldSave: boolean }
+  >({
     mutationFn: ({ post, shouldSave }) =>
       shouldSave
         ? savedService.saveRedditPost(post.subreddit, post.id, {
@@ -163,14 +166,22 @@ export default function RedditUserPage() {
     },
   });
 
-  const toggleSaveRedditCommentMutation = useMutation<void, Error, { comment: RedditUserComment; shouldSave: boolean }>({
+  const toggleSaveRedditCommentMutation = useMutation<
+    void,
+    Error,
+    { comment: RedditUserComment; shouldSave: boolean }
+  >({
     mutationFn: ({ comment, shouldSave }) => {
       const linkedPostId = comment.link_id?.replace('t3_', '') ?? '';
       // Note: The API expects a numeric ID, but we only have string IDs from Reddit
       // This may need backend adjustment to accept string IDs
       return shouldSave
         ? savedService.saveRedditComment(comment.subreddit, linkedPostId, parseInt(comment.id, 36))
-        : savedService.unsaveRedditComment(comment.subreddit, linkedPostId, parseInt(comment.id, 36));
+        : savedService.unsaveRedditComment(
+            comment.subreddit,
+            linkedPostId,
+            parseInt(comment.id, 36)
+          );
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['saved-items', 'reddit_comments'] });
@@ -238,13 +249,16 @@ export default function RedditUserPage() {
           key={`post-${post.id}`}
           className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] p-4"
         >
-          <div className="text-sm italic text-[var(--color-text-muted)]">{t('redditUserPage.blocked')}</div>
+          <div className="text-sm italic text-[var(--color-text-muted)]">
+            {t('redditUserPage.blocked')}
+          </div>
         </article>
       );
     }
 
     const isSaved = savedRedditPostIds.has(postKey);
-    const isSaveActionPending = toggleSaveRedditPostMutation.isPending &&
+    const isSaveActionPending =
+      toggleSaveRedditPostMutation.isPending &&
       toggleSaveRedditPostMutation.variables?.post.id === post.id;
     const pendingShouldSave = toggleSaveRedditPostMutation.variables?.shouldSave ?? false;
 
@@ -288,7 +302,9 @@ export default function RedditUserPage() {
         className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] p-4 text-left"
       >
         {isProfileBlocked ? (
-          <div className="text-sm italic text-[var(--color-text-muted)]">{t('redditUserPage.blocked')}</div>
+          <div className="text-sm italic text-[var(--color-text-muted)]">
+            {t('redditUserPage.blocked')}
+          </div>
         ) : (
           <>
             <div className="mb-1 text-left text-[11px] text-[var(--color-text-secondary)]">
@@ -302,10 +318,15 @@ export default function RedditUserPage() {
                   {comment.link_title}
                 </Link>
               ) : (
-                <span className="font-semibold">r/{comment.subreddit}</span>
+                <span className="font-semibold">
+                  {t('common.format.subredditPath', { name: comment.subreddit })}
+                </span>
               )}
             </div>
-            <MarkdownRenderer content={comment.body} className="text-left text-sm text-[var(--color-text-primary)]" />
+            <MarkdownRenderer
+              content={comment.body}
+              className="text-left text-sm text-[var(--color-text-primary)]"
+            />
             <div className="mt-2 flex flex-wrap items-center gap-3 text-[11px] text-[var(--color-text-secondary)]">
               <Link
                 to={localPermalink}
@@ -337,7 +358,9 @@ export default function RedditUserPage() {
               </button>
               <button
                 type="button"
-                onClick={() => toggleSaveRedditCommentMutation.mutate({ comment, shouldSave: !isSaved })}
+                onClick={() =>
+                  toggleSaveRedditCommentMutation.mutate({ comment, shouldSave: !isSaved })
+                }
                 disabled={toggleSaveRedditCommentMutation.isPending}
                 className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] disabled:opacity-60"
               >
@@ -345,8 +368,8 @@ export default function RedditUserPage() {
                 toggleSaveRedditCommentMutation.variables?.comment.id === comment.id
                   ? t('posts.status.saving')
                   : isSaved
-                  ? t('posts.actions.unsave')
-                  : t('posts.actions.save')}
+                    ? t('posts.actions.unsave')
+                    : t('posts.actions.save')}
               </button>
             </div>
             <div className="mt-1 text-[11px] text-[var(--color-text-secondary)]">
@@ -357,7 +380,9 @@ export default function RedditUserPage() {
                 })}
               </span>
               <span> • </span>
-              <span>{t('posts.submittedAt', { time: formatUtcTimestamp(comment.created_utc) })}</span>
+              <span>
+                {t('posts.submittedAt', { time: formatUtcTimestamp(comment.created_utc) })}
+              </span>
             </div>
           </>
         )}
@@ -373,11 +398,7 @@ export default function RedditUserPage() {
         unblockRedditUser(username);
       }
     } else {
-      if (
-        window.confirm(
-          t('redditUserPage.block.confirmBlock', { username })
-        )
-      ) {
+      if (window.confirm(t('redditUserPage.block.confirmBlock', { username }))) {
         blockRedditUser(username);
       }
     }
@@ -390,7 +411,9 @@ export default function RedditUserPage() {
           <div className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)]">
             <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[var(--color-border)] p-4">
               <div className="flex items-center gap-4">
-                <h1 className="text-2xl font-bold text-[var(--color-text-primary)]">u/{username}</h1>
+                <h1 className="text-2xl font-bold text-[var(--color-text-primary)]">
+                  u/{username}
+                </h1>
                 <div className="flex gap-2 text-sm font-semibold uppercase">
                   {TAB_OPTIONS.map((tab) => (
                     <button
@@ -417,7 +440,9 @@ export default function RedditUserPage() {
                     : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)] hover:underline'
                 }`}
               >
-                {isProfileBlocked ? t('redditUserPage.block.actions.unblock') : t('redditUserPage.block.actions.block')}
+                {isProfileBlocked
+                  ? t('redditUserPage.block.actions.unblock')
+                  : t('redditUserPage.block.actions.block')}
               </button>
             </div>
             <div className="flex flex-wrap items-center gap-2 border-b border-[var(--color-border)] px-4 py-3 text-sm text-[var(--color-text-secondary)]">
@@ -438,15 +463,21 @@ export default function RedditUserPage() {
             </div>
             <div className="space-y-3 px-4 py-4">
               {listingQuery.isLoading && (
-                <LoadingMessage className="text-sm">{t('redditUserPage.activity.loading')}</LoadingMessage>
+                <LoadingMessage className="text-sm">
+                  {t('redditUserPage.activity.loading')}
+                </LoadingMessage>
               )}
               {listingQuery.isError && (
                 <div className="rounded border border-red-200 bg-red-50 p-3">
-                  <ErrorMessage className="text-sm text-red-700">{t('redditUserPage.activity.errors.loadFailed')}</ErrorMessage>
+                  <ErrorMessage className="text-sm text-red-700">
+                    {t('redditUserPage.activity.errors.loadFailed')}
+                  </ErrorMessage>
                 </div>
               )}
               {!listingQuery.isLoading && !listingQuery.isError && listingItems.length === 0 && (
-                <EmptyMessage className="text-sm">{t('redditUserPage.activity.empty')}</EmptyMessage>
+                <EmptyMessage className="text-sm">
+                  {t('redditUserPage.activity.empty')}
+                </EmptyMessage>
               )}
               {!listingQuery.isLoading && !listingQuery.isError && listingItems.length > 0 && (
                 <>
@@ -481,7 +512,9 @@ export default function RedditUserPage() {
 
         <aside className="w-80 shrink-0 space-y-4">
           <div className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
-            <div className="text-lg font-semibold text-[var(--color-text-primary)]">{t('redditUserPage.userDetails.title')}</div>
+            <div className="text-lg font-semibold text-[var(--color-text-primary)]">
+              {t('redditUserPage.userDetails.title')}
+            </div>
             <div className="mt-3 space-y-2 text-sm text-[var(--color-text-secondary)]">
               <div className="flex justify-between">
                 <span>{t('redditUserPage.userDetails.postKarma')}</span>
@@ -505,7 +538,9 @@ export default function RedditUserPage() {
           </div>
 
           <div className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
-            <div className="text-lg font-semibold text-[var(--color-text-primary)]">{t('redditUserPage.moderatorOf.title')}</div>
+            <div className="text-lg font-semibold text-[var(--color-text-primary)]">
+              {t('redditUserPage.moderatorOf.title')}
+            </div>
             {moderatedData && moderatedData.length > 0 ? (
               <ul className="mt-3 space-y-2 text-sm text-[var(--color-text-secondary)]">
                 {moderatedData.map((sub) => (
@@ -514,19 +549,27 @@ export default function RedditUserPage() {
                       to={`/r/${sub.name}`}
                       className="font-semibold text-[var(--color-primary)] hover:underline"
                     >
-                      r/{sub.name}
+                      {t('common.format.subredditPath', { name: sub.name })}
                     </Link>
-                    {sub.title && <span className="ml-1">{t('redditUserPage.moderatorOf.titleSeparator', { title: sub.title })}</span>}
+                    {sub.title && (
+                      <span className="ml-1">
+                        {t('redditUserPage.moderatorOf.titleSeparator', { title: sub.title })}
+                      </span>
+                    )}
                   </li>
                 ))}
               </ul>
             ) : (
-              <p className="mt-3 text-sm text-[var(--color-text-muted)]">{t('redditUserPage.moderatorOf.empty')}</p>
+              <p className="mt-3 text-sm text-[var(--color-text-muted)]">
+                {t('redditUserPage.moderatorOf.empty')}
+              </p>
             )}
           </div>
 
           <div className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
-            <div className="text-lg font-semibold text-[var(--color-text-primary)]">{t('redditUserPage.trophies.title')}</div>
+            <div className="text-lg font-semibold text-[var(--color-text-primary)]">
+              {t('redditUserPage.trophies.title')}
+            </div>
             {trophiesData && trophiesData.length > 0 ? (
               <div className="mt-3 grid grid-cols-2 gap-3 text-sm text-[var(--color-text-secondary)]">
                 {trophiesData.map((trophy) => (
@@ -543,14 +586,18 @@ export default function RedditUserPage() {
                       <div className="h-10 w-10 rounded bg-[var(--color-border)]" />
                     )}
                     <div>
-                      <div className="font-semibold text-[var(--color-text-primary)]">{trophy.name}</div>
+                      <div className="font-semibold text-[var(--color-text-primary)]">
+                        {trophy.name}
+                      </div>
                       {trophy.description && <div>{trophy.description}</div>}
                     </div>
                   </div>
                 ))}
               </div>
             ) : (
-              <p className="mt-3 text-sm text-[var(--color-text-muted)]">{t('redditUserPage.trophies.empty')}</p>
+              <p className="mt-3 text-sm text-[var(--color-text-muted)]">
+                {t('redditUserPage.trophies.empty')}
+              </p>
             )}
           </div>
         </aside>

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useFormat } from '../../hooks/useFormat';
 import type {
   HubSettings,
   UpdateHubSettingsRequest,
@@ -13,6 +14,7 @@ interface Props {
 
 export default function ModerationSettingsTab({ settings, onSave }: Props) {
   const { t } = useTranslation();
+  const { formatNumber } = useFormat();
   const initialBannedWords = (settings.banned_words ?? []).join(', ');
   const [bannedWords, setBannedWords] = useState(initialBannedWords);
   const [spamFilterStrength, setSpamFilterStrength] = useState<SpamFilterStrength>(
@@ -107,8 +109,8 @@ export default function ModerationSettingsTab({ settings, onSave }: Props) {
           type="number"
           value={newAccountFilterDays}
           onChange={(e) => setNewAccountFilterDays(e.target.value)}
-          min="0"
-          placeholder="0"
+          min={0}
+          placeholder={formatNumber(0)}
           className="w-full px-3 py-2 border border-[var(--color-border)] rounded bg-[var(--color-background)] text-[var(--color-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
         />
         <p className="text-xs text-[var(--color-text-secondary)] mt-1">
@@ -125,8 +127,8 @@ export default function ModerationSettingsTab({ settings, onSave }: Props) {
           type="number"
           value={minAccountKarma}
           onChange={(e) => setMinAccountKarma(e.target.value)}
-          min="0"
-          placeholder="0"
+          min={0}
+          placeholder={formatNumber(0)}
           className="w-full px-3 py-2 border border-[var(--color-border)] rounded bg-[var(--color-background)] text-[var(--color-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
         />
         <p className="text-xs text-[var(--color-text-secondary)] mt-1">
@@ -136,7 +138,10 @@ export default function ModerationSettingsTab({ settings, onSave }: Props) {
 
       {/* Access Request Cooldown - SETTINGS-4: Improved clarity and validation */}
       <div>
-        <label htmlFor="access-cooldown" className="block text-sm font-semibold text-[var(--color-text-primary)] mb-2">
+        <label
+          htmlFor="access-cooldown"
+          className="block text-sm font-semibold text-[var(--color-text-primary)] mb-2"
+        >
           {t('hubSettings.moderation.accessCooldown.label')}
         </label>
         <div className="flex items-center gap-2">
@@ -153,9 +158,9 @@ export default function ModerationSettingsTab({ settings, onSave }: Props) {
                 setAccessRequestCooldownDays(e.target.value); // Allow empty for typing
               }
             }}
-            min="0"
-            max="365"
-            placeholder="0"
+            min={0}
+            max={365}
+            placeholder={formatNumber(0)}
             className="w-32 px-3 py-2 border border-[var(--color-border)] rounded bg-[var(--color-background)] text-[var(--color-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
           />
           <span className="text-sm text-[var(--color-text-secondary)]">
@@ -173,9 +178,7 @@ export default function ModerationSettingsTab({ settings, onSave }: Props) {
       {/* Info Box */}
       <div className="bg-blue-50 border border-blue-200 rounded p-4">
         <h4 className="font-medium text-blue-900 mb-2">{t('hubSettings.moderation.info.title')}</h4>
-        <p className="text-sm text-blue-800">
-          {t('hubSettings.moderation.info.description')}
-        </p>
+        <p className="text-sm text-blue-800">{t('hubSettings.moderation.info.description')}</p>
       </div>
 
       {/* Save Button */}

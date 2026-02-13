@@ -40,7 +40,7 @@ function getLineSnippet(lines, lineNumber) {
   return (lines[lineNumber] ?? '').trim().replace(/\s+/g, ' ');
 }
 
-function isToastLiteralArgument(node) {
+function isHardcodedStringLikeArgument(node) {
   return (
     ts.isStringLiteral(node) ||
     ts.isNoSubstitutionTemplateLiteral(node) ||
@@ -102,7 +102,15 @@ for (const file of files) {
     if (ts.isCallExpression(node)) {
       const expression = node.expression;
       if (ts.isIdentifier(expression) && expression.text === 'alert') {
-        recordFinding('alertCalls', node);
+        const firstArg = node.arguments[0];
+        if (firstArg && isHardcodedStringLikeArgument(firstArg)) {
+          recordFinding('alertCalls', node);
+        }
+      } else if (ts.isIdentifier(expression) && expression.text === 'confirm') {
+        const firstArg = node.arguments[0];
+        if (firstArg && isHardcodedStringLikeArgument(firstArg)) {
+          recordFinding('confirmCalls', node);
+        }
       } else if (ts.isPropertyAccessExpression(expression)) {
         const objectName = ts.isIdentifier(expression.expression)
           ? expression.expression.text
@@ -110,10 +118,13 @@ for (const file of files) {
         const methodName = expression.name.text;
 
         if (objectName === 'window' && methodName === 'confirm') {
-          recordFinding('confirmCalls', node);
+          const firstArg = node.arguments[0];
+          if (firstArg && isHardcodedStringLikeArgument(firstArg)) {
+            recordFinding('confirmCalls', node);
+          }
         } else if (objectName === 'toast' && TOAST_LITERAL_METHODS.has(methodName)) {
           const firstArg = node.arguments[0];
-          if (firstArg && isToastLiteralArgument(firstArg)) {
+          if (firstArg && isHardcodedStringLikeArgument(firstArg)) {
             recordFinding('literalToastCalls', node);
           }
         }

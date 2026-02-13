@@ -1,18 +1,19 @@
 import { MarkdownRenderer } from './MarkdownRenderer';
+import { useTranslation } from 'react-i18next';
 
 const FORMATTING_EXAMPLES = [
   { input: '*italics*', output: '*italics*' },
   { input: '**bold**', output: '**bold**' },
   { input: '`inline code`', output: '`inline code`' },
-  { input: '[OmniNudge!](https://omninudge.com)', output: '[OmniNudge!](https://omninudge.com)' },
+  { input: '[Link](https://example.com)', output: '[Link](https://example.com)' },
   {
     input: '* item 1\n* item 2\n* item 3',
     output: '* item 1\n* item 2\n* item 3',
   },
   { input: '> quoted text', output: '> quoted text' },
   {
-    input: '```\nconsole.log("Hello, OmniNudge!");\n```',
-    output: '```\nconsole.log("Hello, OmniNudge!");\n```',
+    input: '```\nconsole.log(\"Hello!\");\n```',
+    output: '```\nconsole.log(\"Hello!\");\n```',
   },
   {
     input: '| Feature | Works? |\n| --- | --- |\n| Tables | ✅ |\n| Inline code | ✅ |',
@@ -25,15 +26,17 @@ const FORMATTING_EXAMPLES = [
 
 // REDDIT-5: Improved formatting help table with better spacing and readability
 export function FormattingHelpTable() {
+  const { t } = useTranslation();
+
   return (
     <table className="w-full border-collapse text-[13px]">
       <thead>
         <tr className="bg-[#fff9c4] text-[var(--color-text-primary)]">
           <th className="border border-[var(--color-border)] px-3 py-2 text-left font-semibold italic">
-            you type:
+            {t('common.formattingHelpTable.youType')}
           </th>
           <th className="border border-[var(--color-border)] px-3 py-2 text-left font-semibold italic">
-            you see:
+            {t('common.formattingHelpTable.youSee')}
           </th>
         </tr>
       </thead>
@@ -46,7 +49,10 @@ export function FormattingHelpTable() {
               </pre>
             </td>
             <td className="border border-[var(--color-border)] px-3 py-2">
-              <MarkdownRenderer content={example.output} className="leading-tight text-[var(--color-text-primary)]" />
+              <MarkdownRenderer
+                content={example.output}
+                className="leading-tight text-[var(--color-text-primary)]"
+              />
             </td>
           </tr>
         ))}

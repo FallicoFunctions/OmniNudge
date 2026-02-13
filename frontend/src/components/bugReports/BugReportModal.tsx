@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { bugReportService } from '../../services/bugReportService';
 import { api } from '../../lib/api';
 import { Modal } from '../common/Modal';
@@ -17,6 +18,7 @@ export default function BugReportModal({
   initialUrl,
   onNavigateToPage,
 }: BugReportModalProps) {
+  const { t } = useTranslation();
   const [pageUrl, setPageUrl] = useState('');
   const [description, setDescription] = useState('');
   const [screenshot, setScreenshot] = useState<File | null>(null);
@@ -47,8 +49,12 @@ export default function BugReportModal({
       setErrorMessage('');
     },
     onError: (error) => {
+      const message =
+        error instanceof Error ? error.message : t('bugReportModal.errors.unknownError');
       setErrorMessage(
-        `Failed to submit bug report: ${error instanceof Error ? error.message : 'Unknown error'}`
+        t('bugReportModal.errors.submitFailed', {
+          message,
+        })
       );
     },
   });
@@ -57,7 +63,7 @@ export default function BugReportModal({
     e.preventDefault();
 
     if (!screenshot) {
-      setErrorMessage('Screenshot is required');
+      setErrorMessage(t('bugReportModal.errors.screenshotRequired'));
       return;
     }
 
@@ -71,13 +77,17 @@ export default function BugReportModal({
       );
       const screenshotUrl = response.storage_url ?? response.url ?? '';
       if (!screenshotUrl) {
-        throw new Error('Upload response missing file URL');
+        throw new Error(t('bugReportModal.errors.uploadMissingUrl'));
       }
 
       submitBugMutation.mutate(screenshotUrl);
     } catch (error) {
+      const message =
+        error instanceof Error ? error.message : t('bugReportModal.errors.unknownError');
       setErrorMessage(
-        `Failed to upload screenshot: ${error instanceof Error ? error.message : 'Unknown error'}`
+        t('bugReportModal.errors.uploadFailed', {
+          message,
+        })
       );
     } finally {
       setUploading(false);
@@ -92,81 +102,84 @@ export default function BugReportModal({
       onClose={onClose}
       className="w-full max-w-2xl rounded-lg bg-[var(--color-surface)] p-6 shadow-xl"
     >
-        <div className="flex items-center justify-between border-b border-[var(--color-border)] pb-4">
-          <h2 className="text-2xl font-semibold text-[var(--color-text-primary)]">Report a Bug</h2>
-          <button
-            onClick={onClose}
-            className="text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] text-2xl"
-          >
-            ×
-          </button>
-        </div>
+      <div className="flex items-center justify-between border-b border-[var(--color-border)] pb-4">
+        <h2 className="text-2xl font-semibold text-[var(--color-text-primary)]">
+          {t('bugReportModal.title')}
+        </h2>
+        <button
+          onClick={onClose}
+          aria-label={t('common.close')}
+          className="text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] text-2xl"
+        >
+          ×
+        </button>
+      </div>
 
-        {showSuccess ? (
-          <div className="mt-6 space-y-6">
-            <div className="rounded-md border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-900">
-              Bug report submitted successfully! Thank you for helping improve OmniNudge.
-            </div>
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              {onNavigateToPage && (
-                <button
-                  type="button"
-                  onClick={onNavigateToPage}
-                  className="rounded-md border border-[var(--color-border)] px-4 py-2 text-sm font-semibold text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
-                >
-                  Go to Bug Reporting Page
-                </button>
-              )}
+      {showSuccess ? (
+        <div className="mt-6 space-y-6">
+          <div className="rounded-md border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-900">
+            {t('bugReportModal.success.message')}
+          </div>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            {onNavigateToPage && (
               <button
                 type="button"
-                onClick={onClose}
-                className="rounded-md bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)]"
+                onClick={onNavigateToPage}
+                className="rounded-md border border-[var(--color-border)] px-4 py-2 text-sm font-semibold text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
               >
-                OK
+                {t('bugReportModal.success.goToPage')}
               </button>
-            </div>
-          </div>
-        ) : (
-          <form onSubmit={handleSubmit} className="mt-6 space-y-4">
-            {errorMessage && (
-              <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900">
-                {errorMessage}
-              </div>
             )}
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-md bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)]"
+            >
+              {t('bugReportModal.success.ok')}
+            </button>
+          </div>
+        </div>
+      ) : (
+        <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+          {errorMessage && (
+            <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900">
+              {errorMessage}
+            </div>
+          )}
           <div>
             <label className="block text-sm font-medium text-[var(--color-text-primary)] mb-2">
-              Page URL <span className="text-red-500">*</span>
+              {t('bugReportModal.form.pageUrl.label')} <span className="text-red-500">*</span>
             </label>
             <input
               type="url"
               required
               value={pageUrl}
               onChange={(e) => setPageUrl(e.target.value)}
-              placeholder="https://omninudge.com/..."
+              placeholder={t('bugReportModal.form.pageUrl.placeholder')}
               className="w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-2 text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
             />
             <p className="mt-1 text-xs text-[var(--color-text-secondary)]">
-              The URL of the page where you encountered the bug
+              {t('bugReportModal.form.pageUrl.help')}
             </p>
           </div>
 
           <div>
             <label className="block text-sm font-medium text-[var(--color-text-primary)] mb-2">
-              Description <span className="text-red-500">*</span>
+              {t('bugReportModal.form.description.label')} <span className="text-red-500">*</span>
             </label>
             <textarea
               required
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={6}
-              placeholder="Describe the bug in detail. What happened? What did you expect to happen? Steps to reproduce?"
+              placeholder={t('bugReportModal.form.description.placeholder')}
               className="w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-2 text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
             />
           </div>
 
           <div>
             <label className="block text-sm font-medium text-[var(--color-text-primary)] mb-2">
-              Screenshot <span className="text-red-500">*</span>
+              {t('bugReportModal.form.screenshot.label')} <span className="text-red-500">*</span>
             </label>
             <input
               type="file"
@@ -176,7 +189,7 @@ export default function BugReportModal({
                 const file = e.target.files?.[0] || null;
                 if (file && !file.type.startsWith('image/')) {
                   setScreenshot(null);
-                  setErrorMessage('Screenshot must be an image file.');
+                  setErrorMessage(t('bugReportModal.errors.screenshotMustBeImage'));
                   e.target.value = '';
                   return;
                 }
@@ -186,7 +199,7 @@ export default function BugReportModal({
               className="w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-2 text-[var(--color-text-primary)] file:mr-4 file:rounded file:border-0 file:bg-[var(--color-primary)] file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-[var(--color-primary-dark)]"
             />
             <p className="mt-1 text-xs text-[var(--color-text-secondary)]">
-              A screenshot helps us identify and fix the issue faster
+              {t('bugReportModal.form.screenshot.help')}
             </p>
           </div>
 
@@ -197,7 +210,7 @@ export default function BugReportModal({
                 onClick={onNavigateToPage}
                 className="rounded-md border border-[var(--color-border)] px-4 py-2 text-sm font-semibold text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
               >
-                Go to Bug Reporting Page
+                {t('bugReportModal.success.goToPage')}
               </button>
             )}
             <div className="flex items-center justify-end gap-3">
@@ -206,19 +219,21 @@ export default function BugReportModal({
                 onClick={onClose}
                 className="rounded-md border border-[var(--color-border)] px-4 py-2 text-sm font-semibold text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
               >
-                Cancel
+                {t('common.cancel')}
               </button>
               <button
                 type="submit"
                 disabled={uploading || submitBugMutation.isPending}
                 className="rounded-md bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)] disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {uploading || submitBugMutation.isPending ? 'Submitting...' : 'Submit Bug Report'}
+                {uploading || submitBugMutation.isPending
+                  ? t('bugReportModal.actions.submitting')
+                  : t('bugReportModal.actions.submit')}
               </button>
             </div>
           </div>
-          </form>
-        )}
+        </form>
+      )}
     </Modal>
   );
 }

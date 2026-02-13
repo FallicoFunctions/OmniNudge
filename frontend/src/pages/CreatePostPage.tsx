@@ -94,12 +94,9 @@ export default function CreatePostPage() {
 
   const trimmedHubInput = (hubInputValue ?? '').trim();
   const trimmedSubredditInput = (subredditInputValue ?? '').trim();
-  const selectedHubName = destination === 'hub' ? selectedHub?.name ?? '' : '';
+  const selectedHubName = destination === 'hub' ? (selectedHub?.name ?? '') : '';
 
-  const {
-    data: hubSuggestions = [],
-    isFetching: isHubAutocompleteLoading,
-  } = useQuery<Hub[]>({
+  const { data: hubSuggestions = [], isFetching: isHubAutocompleteLoading } = useQuery<Hub[]>({
     queryKey: ['hub-autocomplete', trimmedHubInput],
     queryFn: () => hubsService.searchHubs(trimmedHubInput),
     enabled:
@@ -109,10 +106,9 @@ export default function CreatePostPage() {
     staleTime: 1000 * 60 * 5,
   });
 
-  const {
-    data: subredditSuggestions = [],
-    isFetching: isSubredditAutocompleteLoading,
-  } = useQuery<SubredditSuggestion[]>({
+  const { data: subredditSuggestions = [], isFetching: isSubredditAutocompleteLoading } = useQuery<
+    SubredditSuggestion[]
+  >({
     queryKey: ['subreddit-autocomplete', trimmedSubredditInput],
     queryFn: () => redditService.autocompleteSubreddits(trimmedSubredditInput),
     enabled:
@@ -358,16 +354,21 @@ export default function CreatePostPage() {
     e.preventDefault();
 
     if (!title.trim()) {
-      alert('Title is required');
+      alert(t('createPostPage.errors.titleRequired'));
       return;
     }
     if (body.length > maxPostBodyLength) {
-      alert('Post body must be less than 10,000 characters');
+      alert(
+        t('createPostPage.errors.bodyTooLong', {
+          max: maxPostBodyLength,
+          formattedMax: formatNumber(maxPostBodyLength),
+        })
+      );
       return;
     }
 
     if (isUploadingMedia) {
-      alert('Please wait for the media upload to finish.');
+      alert(t('createPostPage.errors.waitForUpload'));
       return;
     }
 
@@ -393,7 +394,7 @@ export default function CreatePostPage() {
 
         if (!normalizedHubInput) {
           console.log('ERROR: normalizedHubInput is empty!');
-          alert('Please enter a hub name');
+          alert(t('createPostPage.errors.hubNameRequired'));
           return;
         }
 
@@ -403,7 +404,7 @@ export default function CreatePostPage() {
           setSelectedHub({ id: hub.id, name: hub.name });
           setHubInputValue(hub.name);
         } catch {
-          alert('Please select a valid hub from the suggestions');
+          alert(t('createPostPage.errors.hubMustSelectSuggestion'));
           return;
         }
       }
@@ -412,7 +413,7 @@ export default function CreatePostPage() {
     let targetSubreddit: string | undefined;
     if (destination === 'subreddit') {
       if (!trimmedSubredditInput) {
-        alert('Please enter a subreddit');
+        alert(t('createPostPage.errors.subredditRequired'));
         return;
       }
       targetSubreddit = trimmedSubredditInput.replace(/^r\//i, '');
@@ -420,19 +421,19 @@ export default function CreatePostPage() {
 
     if (destination === 'hub' && hubSettings) {
       if (activeTab === 'text' && !allowTextPosts) {
-        alert('This hub does not allow text posts.');
+        alert(t('createPostPage.errors.hubNoTextPosts'));
         return;
       }
 
       if (activeTab === 'link') {
         if (!allowLinkTab) {
-          alert('This hub does not allow link or media posts.');
+          alert(t('createPostPage.errors.hubNoLinkOrMediaPosts'));
           return;
         }
 
         const hasMediaItems = mediaItems.length > 0;
         if (!allowLinkPosts && !hasMediaItems) {
-          alert('This hub does not allow link posts. Upload an image or video instead.');
+          alert(t('createPostPage.errors.hubNoLinkPostsUploadInstead'));
           return;
         }
 
@@ -440,7 +441,7 @@ export default function CreatePostPage() {
           const hasImage = mediaItems.some((item) => (item.media_type ?? '').startsWith('image/'));
           const hasVideo = mediaItems.some((item) => (item.media_type ?? '').startsWith('video/'));
           if ((hasImage && !allowImagePosts) || (hasVideo && !allowVideoPosts)) {
-            alert('This hub does not allow the selected media type.');
+            alert(t('createPostPage.errors.hubNoSelectedMediaType'));
             return;
           }
         }
@@ -448,8 +449,7 @@ export default function CreatePostPage() {
     }
 
     const galleryImages = mediaItems.length > 1 ? mediaItems : undefined;
-    const singleMediaUrl =
-      mediaItems.length === 1 ? mediaItems[0].url : mediaUrl || undefined;
+    const singleMediaUrl = mediaItems.length === 1 ? mediaItems[0].url : mediaUrl || undefined;
     const primaryItem = mediaItems[0];
     const primaryIsVideo = primaryItem?.media_type?.startsWith('video');
     const thumbnailUrl = primaryItem
@@ -582,12 +582,12 @@ export default function CreatePostPage() {
                           const previewUrl = mediaPreviews[index] ?? item.url;
                           const isVideo = (item.media_type ?? '').startsWith('video');
                           return (
-                            <div
-                              key={`${item.url}-${index}`}
-                              className="relative group"
-                            >
+                            <div key={`${item.url}-${index}`} className="relative group">
                               {isVideo ? (
-                                <video src={previewUrl} className="w-full h-24 rounded object-cover" />
+                                <video
+                                  src={previewUrl}
+                                  className="w-full h-24 rounded object-cover"
+                                />
                               ) : (
                                 <img
                                   src={previewUrl}
@@ -693,9 +693,7 @@ export default function CreatePostPage() {
                   type="button"
                   onClick={() => setDestination('hub')}
                   className={`px-3 py-1 text-sm rounded ${
-                    destination === 'hub'
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-gray-200 text-gray-700'
+                    destination === 'hub' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700'
                   }`}
                 >
                   {t('createPostPage.destination.tabs.hubs')}
@@ -763,15 +761,18 @@ export default function CreatePostPage() {
                                   >
                                     <div className="min-w-0 pr-2">
                                       <p className="text-sm font-medium text-gray-900 truncate">
-                                        h/{hub.name}
+                                        {t('common.format.hubPath', { name: hub.name })}
                                       </p>
                                       {hub.title && (
-                                        <p className="text-xs text-gray-500 truncate">{hub.title}</p>
+                                        <p className="text-xs text-gray-500 truncate">
+                                          {hub.title}
+                                        </p>
                                       )}
                                     </div>
                                     {typeof hub.subscriber_count === 'number' && (
                                       <span className="text-xs text-gray-500">
-                                        {formatNumber(hub.subscriber_count)} {t('common.units.subscribersShort')}
+                                        {formatNumber(hub.subscriber_count)}{' '}
+                                        {t('common.units.subscribersShort')}
                                       </span>
                                     )}
                                   </button>
@@ -834,12 +835,14 @@ export default function CreatePostPage() {
                                       />
                                     ) : (
                                       <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gray-200 text-xs text-gray-600">
-                                        r/
+                                        {t('common.prefix.subreddit')}
                                       </div>
                                     )}
                                     <div className="flex min-w-0 flex-col">
                                       <span className="truncate text-sm font-medium text-gray-900">
-                                        r/{suggestion.name}
+                                        {t('common.format.subredditPath', {
+                                          name: suggestion.name,
+                                        })}
                                       </span>
                                       {suggestion.title && (
                                         <span className="truncate text-xs text-gray-500">
@@ -850,7 +853,8 @@ export default function CreatePostPage() {
                                     {typeof suggestion.subscribers === 'number' &&
                                       suggestion.subscribers > 0 && (
                                         <span className="ml-auto text-xs text-gray-500">
-                                          {formatNumber(suggestion.subscribers)} {t('common.units.subscribersShort')}
+                                          {formatNumber(suggestion.subscribers)}{' '}
+                                          {t('common.units.subscribersShort')}
                                         </span>
                                       )}
                                   </button>

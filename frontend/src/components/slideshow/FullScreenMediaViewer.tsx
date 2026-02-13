@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { MediaViewer } from './MediaViewer';
 import type { MediaItem } from './MediaViewer';
 
@@ -8,7 +9,12 @@ interface FullScreenMediaViewerProps {
   onClose: () => void;
 }
 
-export function FullScreenMediaViewer({ media, initialIndex, onClose }: FullScreenMediaViewerProps) {
+export function FullScreenMediaViewer({
+  media,
+  initialIndex,
+  onClose,
+}: FullScreenMediaViewerProps) {
+  const { t } = useTranslation();
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
 
   const handlePrevious = useCallback(() => {
@@ -57,7 +63,7 @@ export function FullScreenMediaViewer({ media, initialIndex, onClose }: FullScre
       <button
         onClick={onClose}
         className="absolute top-4 right-4 text-white hover:text-[var(--color-primary)] transition-colors z-10 p-2"
-        aria-label="Close viewer"
+        aria-label={t('common.accessibility.closeViewer')}
       >
         <svg
           xmlns="http://www.w3.org/2000/svg"
@@ -90,7 +96,7 @@ export function FullScreenMediaViewer({ media, initialIndex, onClose }: FullScre
             handlePrevious();
           }}
           className="absolute left-4 top-1/2 -translate-y-1/2 text-white hover:text-[var(--color-primary)] transition-colors z-10 p-2"
-          aria-label="Previous media"
+          aria-label={t('common.accessibility.previousMedia')}
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -99,7 +105,12 @@ export function FullScreenMediaViewer({ media, initialIndex, onClose }: FullScre
             viewBox="0 0 24 24"
             stroke="currentColor"
           >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M15 19l-7-7 7-7"
+            />
           </svg>
         </button>
       )}
@@ -123,7 +134,7 @@ export function FullScreenMediaViewer({ media, initialIndex, onClose }: FullScre
             handleNext();
           }}
           className="absolute right-4 top-1/2 -translate-y-1/2 text-white hover:text-[var(--color-primary)] transition-colors z-10 p-2"
-          aria-label="Next media"
+          aria-label={t('common.accessibility.nextMedia')}
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"

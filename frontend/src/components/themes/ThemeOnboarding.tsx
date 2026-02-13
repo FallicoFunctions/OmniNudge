@@ -1,39 +1,36 @@
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
+import { useTranslation } from 'react-i18next';
 
 interface OnboardingStep {
-  title: string;
-  description: string;
+  titleKey: string;
+  descriptionKey: string;
   illustration: string;
-  tip?: string;
+  tipKey?: string;
 }
 
 const ONBOARDING_STEPS: OnboardingStep[] = [
   {
-    title: 'Welcome to Theme Customization!',
-    description:
-      'Make OmniNudge truly yours by customizing colors, fonts, and more. Choose from predefined themes or create your own.',
+    titleKey: 'themes.onboarding.steps.welcome.title',
+    descriptionKey: 'themes.onboarding.steps.welcome.description',
     illustration: '🎨',
-    tip: 'You can always access themes from the settings page.',
+    tipKey: 'themes.onboarding.steps.welcome.tip',
   },
   {
-    title: 'Choose a Predefined Theme',
-    description:
-      'Start with one of our 8 beautiful predefined themes. Each theme has a unique color palette and personality.',
+    titleKey: 'themes.onboarding.steps.predefined.title',
+    descriptionKey: 'themes.onboarding.steps.predefined.description',
     illustration: '🌈',
-    tip: 'Hover over themes to see a live preview.',
+    tipKey: 'themes.onboarding.steps.predefined.tip',
   },
   {
-    title: 'Create Your Own Theme',
-    description:
-      'Want something unique? Create a custom theme by modifying CSS variables like colors, fonts, spacing, and more.',
+    titleKey: 'themes.onboarding.steps.custom.title',
+    descriptionKey: 'themes.onboarding.steps.custom.description',
     illustration: '✨',
-    tip: 'Advanced mode unlocks full CSS customization.',
+    tipKey: 'themes.onboarding.steps.custom.tip',
   },
   {
-    title: "You're All Set!",
-    description:
-      "Your theme will sync across all your devices. Have fun customizing and don't hesitate to experiment!",
+    titleKey: 'themes.onboarding.steps.complete.title',
+    descriptionKey: 'themes.onboarding.steps.complete.description',
     illustration: '🚀',
   },
 ];
@@ -47,6 +44,7 @@ interface ThemeOnboardingProps {
 const ThemeOnboarding = ({ onComplete }: ThemeOnboardingProps) => {
   const [isOpen, setIsOpen] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
+  const { t } = useTranslation();
 
   useEffect(() => {
     // Check if user has completed onboarding
@@ -89,6 +87,9 @@ const ThemeOnboarding = ({ onComplete }: ThemeOnboardingProps) => {
   if (!isOpen) return null;
 
   const step = ONBOARDING_STEPS[currentStep];
+  const title = t(step.titleKey);
+  const description = t(step.descriptionKey);
+  const tip = step.tipKey ? t(step.tipKey) : undefined;
   const isFirstStep = currentStep === 0;
   const isLastStep = currentStep === ONBOARDING_STEPS.length - 1;
 
@@ -121,18 +122,15 @@ const ThemeOnboarding = ({ onComplete }: ThemeOnboardingProps) => {
 
         {/* Content */}
         <div className="text-center">
-          <h2
-            id="onboarding-title"
-            className="text-2xl font-bold text-[var(--color-text-primary)]"
-          >
-            {step.title}
+          <h2 id="onboarding-title" className="text-2xl font-bold text-[var(--color-text-primary)]">
+            {title}
           </h2>
-          <p className="mt-3 text-base text-[var(--color-text-secondary)]">{step.description}</p>
+          <p className="mt-3 text-base text-[var(--color-text-secondary)]">{description}</p>
 
-          {step.tip && (
+          {tip && (
             <div className="mt-4 rounded-lg bg-[var(--color-primary)] bg-opacity-10 px-4 py-3">
               <p className="text-sm font-medium text-[var(--color-primary)]">
-                💡 Tip: {step.tip}
+                💡 {t('themes.onboarding.tipLabel')}: {tip}
               </p>
             </div>
           )}
@@ -145,7 +143,7 @@ const ThemeOnboarding = ({ onComplete }: ThemeOnboardingProps) => {
             className="text-sm font-medium text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition"
             onClick={handleSkip}
           >
-            {isLastStep ? '' : 'Skip Tour'}
+            {isLastStep ? '' : t('themes.onboarding.actions.skip')}
           </button>
 
           <div className="flex gap-3">
@@ -155,7 +153,7 @@ const ThemeOnboarding = ({ onComplete }: ThemeOnboardingProps) => {
                 className="rounded-lg border border-[var(--color-border)] px-6 py-2 text-sm font-semibold text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)] transition"
                 onClick={handlePrevious}
               >
-                Back
+                {t('common.back')}
               </button>
             )}
             <button
@@ -163,14 +161,17 @@ const ThemeOnboarding = ({ onComplete }: ThemeOnboardingProps) => {
               className="rounded-lg bg-[var(--color-primary)] px-6 py-2 text-sm font-semibold text-white hover:opacity-90 transition"
               onClick={handleNext}
             >
-              {isLastStep ? "Let's Go!" : 'Next'}
+              {isLastStep ? t('themes.onboarding.actions.letsGo') : t('common.next')}
             </button>
           </div>
         </div>
 
         {/* Step counter */}
         <p className="mt-4 text-center text-xs text-[var(--color-text-muted)]">
-          Step {currentStep + 1} of {ONBOARDING_STEPS.length}
+          {t('themes.onboarding.stepCounter', {
+            current: currentStep + 1,
+            total: ONBOARDING_STEPS.length,
+          })}
         </p>
       </div>
     </div>,

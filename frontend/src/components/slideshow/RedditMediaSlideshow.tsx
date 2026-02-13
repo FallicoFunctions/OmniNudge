@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { BaseSlideshow } from './BaseSlideshow';
 import type { SlideshowItem } from './BaseSlideshow';
 import { SlideshowControls } from './SlideshowControls';
@@ -15,12 +16,19 @@ interface RedditMediaItem {
 }
 
 export function RedditMediaSlideshow() {
+  const { t } = useTranslation();
+
   const [subreddit, setSubreddit] = useState('pics');
   const [sort, setSort] = useState<'hot' | 'new' | 'top' | 'rising'>('hot');
-  const [timeFilter, setTimeFilter] = useState<'hour' | 'day' | 'week' | 'month' | 'year' | 'all'>('day');
+  const [timeFilter, setTimeFilter] = useState<'hour' | 'day' | 'week' | 'month' | 'year' | 'all'>(
+    'day'
+  );
   const [isOpen, setIsOpen] = useState(false);
   const [mediaItems, setMediaItems] = useState<RedditMediaItem[]>([]);
   const [inputValue, setInputValue] = useState('pics');
+
+  const sortOptions = ['hot', 'new', 'top', 'rising'] as const;
+  const timeOptions = ['hour', 'day', 'week', 'month', 'year', 'all'] as const;
 
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['reddit-slideshow', subreddit, sort, timeFilter],
@@ -118,7 +126,7 @@ export function RedditMediaSlideshow() {
           className="text-[var(--color-primary)] hover:underline text-sm"
           onClick={(e) => e.stopPropagation()}
         >
-          View on Reddit →
+          {t('slideshow.redditMedia.viewOnReddit')}
         </a>
       </div>
     ),
@@ -128,21 +136,21 @@ export function RedditMediaSlideshow() {
     <div className="min-h-screen bg-[var(--color-background)] p-8">
       <div className="max-w-4xl mx-auto">
         <h1 className="text-3xl font-bold text-[var(--color-text-primary)] mb-8">
-          Reddit Media Slideshow
+          {t('slideshow.redditMedia.title')}
         </h1>
 
         <div className="bg-[var(--color-surface)] rounded-lg p-6 shadow-sm border border-[var(--color-border)]">
           {/* Subreddit input */}
           <div className="mb-4">
             <label className="block text-sm font-medium text-[var(--color-text-primary)] mb-2">
-              Subreddit
+              {t('slideshow.redditMedia.labels.subreddit')}
             </label>
             <input
               type="text"
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleLoadSlideshow()}
-              placeholder="Enter subreddit name (e.g., pics, aww, funny)"
+              placeholder={t('slideshow.redditMedia.subredditPlaceholder')}
               className="w-full px-4 py-2 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] text-[var(--color-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
             />
           </div>
@@ -150,10 +158,10 @@ export function RedditMediaSlideshow() {
           {/* Sort options */}
           <div className="mb-4">
             <label className="block text-sm font-medium text-[var(--color-text-primary)] mb-2">
-              Sort
+              {t('slideshow.redditMedia.labels.sort')}
             </label>
             <div className="flex gap-2">
-              {['hot', 'new', 'top', 'rising'].map((option) => (
+              {sortOptions.map((option) => (
                 <button
                   key={option}
                   onClick={() => setSort(option as typeof sort)}
@@ -163,7 +171,7 @@ export function RedditMediaSlideshow() {
                       : 'bg-[var(--color-surface-elevated)] text-[var(--color-text-primary)] hover:bg-[var(--color-border)]'
                   }`}
                 >
-                  {option.charAt(0).toUpperCase() + option.slice(1)}
+                  {t(`home.sort.${option}`)}
                 </button>
               ))}
             </div>
@@ -173,10 +181,10 @@ export function RedditMediaSlideshow() {
           {sort === 'top' && (
             <div className="mb-4">
               <label className="block text-sm font-medium text-[var(--color-text-primary)] mb-2">
-                Time Range
+                {t('slideshow.redditMedia.labels.timeRange')}
               </label>
               <div className="flex gap-2 flex-wrap">
-                {['hour', 'day', 'week', 'month', 'year', 'all'].map((option) => (
+                {timeOptions.map((option) => (
                   <button
                     key={option}
                     onClick={() => setTimeFilter(option as typeof timeFilter)}
@@ -186,7 +194,7 @@ export function RedditMediaSlideshow() {
                         : 'bg-[var(--color-surface-elevated)] text-[var(--color-text-primary)] hover:bg-[var(--color-border)]'
                     }`}
                   >
-                    {option.charAt(0).toUpperCase() + option.slice(1)}
+                    {t(`slideshow.redditMedia.timeOptions.${option}`)}
                   </button>
                 ))}
               </div>
@@ -199,20 +207,20 @@ export function RedditMediaSlideshow() {
             disabled={isLoading || !inputValue.trim()}
             className="w-full px-6 py-3 bg-[var(--color-primary)] text-white rounded-md font-semibold hover:bg-[var(--color-primary-dark)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {isLoading ? 'Loading...' : 'Start Slideshow'}
+            {isLoading ? t('common.loading') : t('slideshow.redditMedia.start')}
           </button>
 
           {/* Error message */}
           {error && (
             <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-md text-red-600 text-sm">
-              Failed to load posts. Please check the subreddit name and try again.
+              {t('slideshow.redditMedia.errors.failedToLoad')}
             </div>
           )}
 
           {/* No media found */}
           {data && mediaItems.length === 0 && !isLoading && (
             <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-md text-yellow-700 text-sm">
-              No media posts found in r/{subreddit}. Try a different subreddit or sort option.
+              {t('slideshow.redditMedia.noMedia', { subreddit })}
             </div>
           )}
         </div>

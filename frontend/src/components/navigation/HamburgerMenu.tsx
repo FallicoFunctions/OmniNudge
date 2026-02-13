@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 
 interface MenuItem {
   label: string;
@@ -15,6 +16,7 @@ interface HamburgerMenuProps {
 }
 
 export function HamburgerMenu({ items }: HamburgerMenuProps) {
+  const { t } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -41,7 +43,7 @@ export function HamburgerMenu({ items }: HamburgerMenuProps) {
       <button
         onClick={() => setIsOpen(!isOpen)}
         className="rounded-md bg-[var(--color-surface-elevated)] px-2 py-1 text-xs font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-border)] transition-colors"
-        aria-label="Menu"
+        aria-label={t('nav.menu')}
         aria-expanded={isOpen}
       >
         <svg

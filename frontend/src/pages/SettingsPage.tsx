@@ -80,7 +80,7 @@ export default function SettingsPage() {
     isSupported: pushSupported,
     isRegistered: pushEnabled,
     requestPermission: enablePush,
-    unregister: disablePush
+    unregister: disablePush,
   } = usePushNotifications();
 
   // Track if we've already processed email verification to prevent infinite loop
@@ -105,21 +105,25 @@ export default function SettingsPage() {
   return (
     <div className="mx-auto max-w-4xl px-4 py-8">
       <div className="mb-6">
-        <h1 className="text-3xl font-bold text-[var(--color-text-primary)]">{t('settings.title')}</h1>
-        <p className="mt-2 text-sm text-[var(--color-text-secondary)]">
-          {t('settings.subtitle')}
-        </p>
+        <h1 className="text-3xl font-bold text-[var(--color-text-primary)]">
+          {t('settings.title')}
+        </h1>
+        <p className="mt-2 text-sm text-[var(--color-text-secondary)]">{t('settings.subtitle')}</p>
       </div>
 
       <div className="space-y-8">
         {/* SETTINGS-5: Category header for Appearance */}
         <div className="border-b border-[var(--color-border)] pb-2">
-          <h2 className="text-2xl font-bold text-[var(--color-text-primary)]">{t('settings.categories.appearance')}</h2>
+          <h2 className="text-2xl font-bold text-[var(--color-text-primary)]">
+            {t('settings.categories.appearance')}
+          </h2>
         </div>
 
         {/* Theme Selection */}
         <Panel as="section">
-          <h3 className="mb-4 text-xl font-semibold text-[var(--color-text-primary)]">{t('settings.themeSection.title')}</h3>
+          <h3 className="mb-4 text-xl font-semibold text-[var(--color-text-primary)]">
+            {t('settings.themeSection.title')}
+          </h3>
           <p className="mb-4 text-sm text-[var(--color-text-secondary)]">
             {t('settings.themeSection.description')}
           </p>
@@ -133,7 +137,9 @@ export default function SettingsPage() {
 
         {/* SETTINGS-5: Category header for Notifications */}
         <div className="border-b border-[var(--color-border)] pb-2 pt-4">
-          <h2 className="text-2xl font-bold text-[var(--color-text-primary)]">{t('settings.categories.notifications')}</h2>
+          <h2 className="text-2xl font-bold text-[var(--color-text-primary)]">
+            {t('settings.categories.notifications')}
+          </h2>
         </div>
 
         {/* Messaging Notifications */}
@@ -159,14 +165,18 @@ export default function SettingsPage() {
               role="switch"
               aria-checked={notifyArchivedMessages}
               onClick={() => setNotifyArchivedMessages(!notifyArchivedMessages)}
-              className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${notifyArchivedMessages ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
-                }`}
+              className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${
+                notifyArchivedMessages ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
+              }`}
             >
-              <span className="sr-only">{t('common.accessibility.toggleArchivedNotifications')}</span>
+              <span className="sr-only">
+                {t('common.accessibility.toggleArchivedNotifications')}
+              </span>
               <span
                 aria-hidden="true"
-                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${notifyArchivedMessages ? 'translate-x-5' : 'translate-x-0'
-                  }`}
+                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                  notifyArchivedMessages ? 'translate-x-5' : 'translate-x-0'
+                }`}
               />
             </button>
           </div>
@@ -205,15 +215,17 @@ export default function SettingsPage() {
                 type="button"
                 role="switch"
                 aria-checked={pushEnabled}
-                onClick={() => pushEnabled ? disablePush() : enablePush()}
-                className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${pushEnabled ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
-                  }`}
+                onClick={() => (pushEnabled ? disablePush() : enablePush())}
+                className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${
+                  pushEnabled ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
+                }`}
               >
                 <span className="sr-only">{t('common.accessibility.togglePushNotifications')}</span>
                 <span
                   aria-hidden="true"
-                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${pushEnabled ? 'translate-x-5' : 'translate-x-0'
-                    }`}
+                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                    pushEnabled ? 'translate-x-5' : 'translate-x-0'
+                  }`}
                 />
               </button>
             </div>
@@ -245,14 +257,16 @@ export default function SettingsPage() {
                 role="switch"
                 aria-checked={readReceipts}
                 onClick={() => setReadReceipts(!readReceipts)}
-                className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${readReceipts ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
-                  }`}
+                className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${
+                  readReceipts ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
+                }`}
               >
                 <span className="sr-only">{t('common.accessibility.toggleReadReceipts')}</span>
                 <span
                   aria-hidden="true"
-                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${readReceipts ? 'translate-x-5' : 'translate-x-0'
-                    }`}
+                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                    readReceipts ? 'translate-x-5' : 'translate-x-0'
+                  }`}
                 />
               </button>
             </div>
@@ -272,14 +286,16 @@ export default function SettingsPage() {
                 role="switch"
                 aria-checked={typingIndicators}
                 onClick={() => setTypingIndicators(!typingIndicators)}
-                className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${typingIndicators ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
-                  }`}
+                className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${
+                  typingIndicators ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
+                }`}
               >
                 <span className="sr-only">{t('common.accessibility.toggleTypingIndicators')}</span>
                 <span
                   aria-hidden="true"
-                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${typingIndicators ? 'translate-x-5' : 'translate-x-0'
-                    }`}
+                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                    typingIndicators ? 'translate-x-5' : 'translate-x-0'
+                  }`}
                 />
               </button>
             </div>
@@ -299,14 +315,16 @@ export default function SettingsPage() {
                 role="switch"
                 aria-checked={notificationSound}
                 onClick={() => setNotificationSound(!notificationSound)}
-                className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${notificationSound ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
-                  }`}
+                className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${
+                  notificationSound ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
+                }`}
               >
                 <span className="sr-only">{t('common.accessibility.toggleNotificationSound')}</span>
                 <span
                   aria-hidden="true"
-                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${notificationSound ? 'translate-x-5' : 'translate-x-0'
-                    }`}
+                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                    notificationSound ? 'translate-x-5' : 'translate-x-0'
+                  }`}
                 />
               </button>
             </div>
@@ -315,7 +333,9 @@ export default function SettingsPage() {
 
         {/* SETTINGS-5: Category header for Preferences */}
         <div className="border-b border-[var(--color-border)] pb-2 pt-4">
-          <h2 className="text-2xl font-bold text-[var(--color-text-primary)]">{t('settings.categories.preferences')}</h2>
+          <h2 className="text-2xl font-bold text-[var(--color-text-primary)]">
+            {t('settings.categories.preferences')}
+          </h2>
         </div>
 
         {/* Date & Time Settings */}
@@ -341,7 +361,9 @@ export default function SettingsPage() {
                     <strong>{t('settings.dateTime.previewLabel')}</strong>
                   </div>
                   <div className="mt-1 text-sm text-[var(--color-text-primary)]">
-                    {useRelativeTime ? t('settings.dateTime.relativePreview') : t('settings.dateTime.absolutePreview')}
+                    {useRelativeTime
+                      ? t('settings.dateTime.relativePreview')
+                      : t('settings.dateTime.absolutePreview')}
                   </div>
                 </div>
               </div>
@@ -353,14 +375,16 @@ export default function SettingsPage() {
                   role="switch"
                   aria-checked={useRelativeTime}
                   onClick={() => setUseRelativeTime(!useRelativeTime)}
-                  className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${useRelativeTime ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
-                    }`}
+                  className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${
+                    useRelativeTime ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
+                  }`}
                 >
                   <span className="sr-only">{t('settings.dateTime.useRelativeTime')}</span>
                   <span
                     aria-hidden="true"
-                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${useRelativeTime ? 'translate-x-5' : 'translate-x-0'
-                      }`}
+                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                      useRelativeTime ? 'translate-x-5' : 'translate-x-0'
+                    }`}
                   />
                 </button>
               </div>
@@ -404,10 +428,11 @@ export default function SettingsPage() {
           <div className="mt-4 grid gap-4 sm:grid-cols-2">
             <label
               htmlFor="theme-selector-stay-open"
-              className={`flex cursor-pointer flex-col rounded-lg border p-4 ${!autoCloseThemeSelector
+              className={`flex cursor-pointer flex-col rounded-lg border p-4 ${
+                !autoCloseThemeSelector
                   ? 'border-[var(--color-primary)] bg-[var(--color-surface-elevated)] shadow-sm'
                   : 'border-[var(--color-border)]'
-                }`}
+              }`}
             >
               <div className="flex items-center justify-between">
                 <div>
@@ -431,10 +456,11 @@ export default function SettingsPage() {
 
             <label
               htmlFor="theme-selector-auto-close"
-              className={`flex cursor-pointer flex-col rounded-lg border p-4 ${autoCloseThemeSelector
+              className={`flex cursor-pointer flex-col rounded-lg border p-4 ${
+                autoCloseThemeSelector
                   ? 'border-[var(--color-primary)] bg-[var(--color-surface-elevated)] shadow-sm'
                   : 'border-[var(--color-border)]'
-                }`}
+              }`}
             >
               <div className="flex items-center justify-between">
                 <div>
@@ -459,7 +485,9 @@ export default function SettingsPage() {
         </Panel>
 
         <Panel as="section">
-          <h2 className="mb-4 text-xl font-semibold text-[var(--color-text-primary)]">{t('settings.savedItems.title')}</h2>
+          <h2 className="mb-4 text-xl font-semibold text-[var(--color-text-primary)]">
+            {t('settings.savedItems.title')}
+          </h2>
           <p className="text-sm text-[var(--color-text-secondary)]">
             {t('settings.savedItems.description')}
           </p>
@@ -478,21 +506,25 @@ export default function SettingsPage() {
               role="switch"
               aria-checked={notifyRemovedSavedPosts}
               onClick={() => setNotifyRemovedSavedPosts(!notifyRemovedSavedPosts)}
-              className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${notifyRemovedSavedPosts ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
-                }`}
+              className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${
+                notifyRemovedSavedPosts ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
+              }`}
             >
               <span className="sr-only">{t('settings.savedItems.notifyLabel')}</span>
               <span
                 aria-hidden="true"
-                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${notifyRemovedSavedPosts ? 'translate-x-5' : 'translate-x-0'
-                  }`}
+                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                  notifyRemovedSavedPosts ? 'translate-x-5' : 'translate-x-0'
+                }`}
               />
             </button>
           </div>
         </Panel>
 
         <Panel as="section">
-          <h2 className="mb-4 text-xl font-semibold text-[var(--color-text-primary)]">{t('settings.omniFeed.title')}</h2>
+          <h2 className="mb-4 text-xl font-semibold text-[var(--color-text-primary)]">
+            {t('settings.omniFeed.title')}
+          </h2>
           <p className="text-sm text-[var(--color-text-secondary)]">
             {t('settings.omniFeed.description')}
           </p>
@@ -511,14 +543,16 @@ export default function SettingsPage() {
               role="switch"
               aria-checked={defaultOmniPostsOnly}
               onClick={() => setDefaultOmniPostsOnly(!defaultOmniPostsOnly)}
-              className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${defaultOmniPostsOnly ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
-                }`}
+              className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${
+                defaultOmniPostsOnly ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
+              }`}
             >
               <span className="sr-only">{t('common.accessibility.toggleOmniFeed')}</span>
               <span
                 aria-hidden="true"
-                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${defaultOmniPostsOnly ? 'translate-x-5' : 'translate-x-0'
-                  }`}
+                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                  defaultOmniPostsOnly ? 'translate-x-5' : 'translate-x-0'
+                }`}
               />
             </button>
           </div>
@@ -538,14 +572,16 @@ export default function SettingsPage() {
                 role="switch"
                 aria-checked={stayOnPostAfterHide}
                 onClick={() => setStayOnPostAfterHide(!stayOnPostAfterHide)}
-                className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${stayOnPostAfterHide ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
-                  }`}
+                className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${
+                  stayOnPostAfterHide ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
+                }`}
               >
                 <span className="sr-only">{t('settings.omniFeed.stayOnPostLabel')}</span>
                 <span
                   aria-hidden="true"
-                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${stayOnPostAfterHide ? 'translate-x-5' : 'translate-x-0'
-                    }`}
+                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                    stayOnPostAfterHide ? 'translate-x-5' : 'translate-x-0'
+                  }`}
                 />
               </button>
             </div>
@@ -572,7 +608,9 @@ export default function SettingsPage() {
                   {t('settings.pageNavigation.homeFeed')}
                 </label>
                 <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
-                  {useInfiniteScrollHome ? t('settings.pageNavigation.infiniteScroll') : t('settings.pageNavigation.pagination')}
+                  {useInfiniteScrollHome
+                    ? t('settings.pageNavigation.infiniteScroll')
+                    : t('settings.pageNavigation.pagination')}
                 </p>
               </div>
 
@@ -583,14 +621,16 @@ export default function SettingsPage() {
                   role="switch"
                   aria-checked={useInfiniteScrollHome}
                   onClick={() => setUseInfiniteScrollHome(!useInfiniteScrollHome)}
-                  className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${useInfiniteScrollHome ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
-                    }`}
+                  className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${
+                    useInfiniteScrollHome ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
+                  }`}
                 >
                   <span className="sr-only">{t('common.accessibility.toggleInfiniteScroll')}</span>
                   <span
                     aria-hidden="true"
-                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${useInfiniteScrollHome ? 'translate-x-5' : 'translate-x-0'
-                      }`}
+                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                      useInfiniteScrollHome ? 'translate-x-5' : 'translate-x-0'
+                    }`}
                   />
                 </button>
               </div>
@@ -606,7 +646,9 @@ export default function SettingsPage() {
                   {t('settings.pageNavigation.hubPages')}
                 </label>
                 <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
-                  {useInfiniteScrollHubs ? t('settings.pageNavigation.infiniteScroll') : t('settings.pageNavigation.pagination')}
+                  {useInfiniteScrollHubs
+                    ? t('settings.pageNavigation.infiniteScroll')
+                    : t('settings.pageNavigation.pagination')}
                 </p>
               </div>
 
@@ -617,14 +659,16 @@ export default function SettingsPage() {
                   role="switch"
                   aria-checked={useInfiniteScrollHubs}
                   onClick={() => setUseInfiniteScrollHubs(!useInfiniteScrollHubs)}
-                  className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${useInfiniteScrollHubs ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
-                    }`}
+                  className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${
+                    useInfiniteScrollHubs ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
+                  }`}
                 >
                   <span className="sr-only">{t('common.accessibility.toggleInfiniteScroll')}</span>
                   <span
                     aria-hidden="true"
-                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${useInfiniteScrollHubs ? 'translate-x-5' : 'translate-x-0'
-                      }`}
+                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                      useInfiniteScrollHubs ? 'translate-x-5' : 'translate-x-0'
+                    }`}
                   />
                 </button>
               </div>
@@ -640,7 +684,9 @@ export default function SettingsPage() {
                   {t('settings.pageNavigation.subredditPages')}
                 </label>
                 <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
-                  {useInfiniteScrollSubs ? t('settings.pageNavigation.infiniteScroll') : t('settings.pageNavigation.pagination')}
+                  {useInfiniteScrollSubs
+                    ? t('settings.pageNavigation.infiniteScroll')
+                    : t('settings.pageNavigation.pagination')}
                 </p>
               </div>
 
@@ -651,14 +697,16 @@ export default function SettingsPage() {
                   role="switch"
                   aria-checked={useInfiniteScrollSubs}
                   onClick={() => setUseInfiniteScrollSubs(!useInfiniteScrollSubs)}
-                  className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${useInfiniteScrollSubs ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
-                    }`}
+                  className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${
+                    useInfiniteScrollSubs ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
+                  }`}
                 >
                   <span className="sr-only">{t('common.accessibility.toggleInfiniteScroll')}</span>
                   <span
                     aria-hidden="true"
-                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${useInfiniteScrollSubs ? 'translate-x-5' : 'translate-x-0'
-                      }`}
+                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                      useInfiniteScrollSubs ? 'translate-x-5' : 'translate-x-0'
+                    }`}
                   />
                 </button>
               </div>
@@ -668,7 +716,9 @@ export default function SettingsPage() {
 
         {/* NSFW Search & Visibility */}
         <Panel as="section">
-          <h2 className="mb-4 text-xl font-semibold text-[var(--color-text-primary)]">{t('settings.nsfw.title')}</h2>
+          <h2 className="mb-4 text-xl font-semibold text-[var(--color-text-primary)]">
+            {t('settings.nsfw.title')}
+          </h2>
           <div className="space-y-4">
             <div className="flex items-start justify-between">
               <div className="flex-1">
@@ -689,14 +739,16 @@ export default function SettingsPage() {
                   role="switch"
                   aria-checked={blockAllNsfw}
                   onClick={() => setBlockAllNsfw(!blockAllNsfw)}
-                  className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${blockAllNsfw ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
-                    }`}
+                  className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${
+                    blockAllNsfw ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
+                  }`}
                 >
                   <span className="sr-only">{t('settings.nsfw.blockAll')}</span>
                   <span
                     aria-hidden="true"
-                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${blockAllNsfw ? 'translate-x-5' : 'translate-x-0'
-                      }`}
+                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                      blockAllNsfw ? 'translate-x-5' : 'translate-x-0'
+                    }`}
                   />
                 </button>
               </div>
@@ -724,15 +776,21 @@ export default function SettingsPage() {
                     if (blockAllNsfw) return;
                     setSearchIncludeNsfwByDefault(!searchIncludeNsfwByDefault);
                   }}
-                  className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${searchIncludeNsfwByDefault && !blockAllNsfw ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
-                    } ${blockAllNsfw ? 'opacity-60' : ''}`}
+                  className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${
+                    searchIncludeNsfwByDefault && !blockAllNsfw
+                      ? 'bg-[var(--color-primary)]'
+                      : 'bg-gray-300'
+                  } ${blockAllNsfw ? 'opacity-60' : ''}`}
                   aria-disabled={blockAllNsfw}
                 >
                   <span className="sr-only">{t('settings.nsfw.defaultInclude')}</span>
                   <span
                     aria-hidden="true"
-                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${searchIncludeNsfwByDefault && !blockAllNsfw ? 'translate-x-5' : 'translate-x-0'
-                      }`}
+                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                      searchIncludeNsfwByDefault && !blockAllNsfw
+                        ? 'translate-x-5'
+                        : 'translate-x-0'
+                    }`}
                   />
                 </button>
               </div>
@@ -757,14 +815,16 @@ export default function SettingsPage() {
                   role="switch"
                   aria-checked={blockNsfwThumbnails}
                   onClick={() => setBlockNsfwThumbnails(!blockNsfwThumbnails)}
-                  className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${blockNsfwThumbnails ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
-                    }`}
+                  className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${
+                    blockNsfwThumbnails ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
+                  }`}
                 >
                   <span className="sr-only">{t('settings.nsfw.blockThumbnails')}</span>
                   <span
                     aria-hidden="true"
-                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${blockNsfwThumbnails ? 'translate-x-5' : 'translate-x-0'
-                      }`}
+                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                      blockNsfwThumbnails ? 'translate-x-5' : 'translate-x-0'
+                    }`}
                   />
                 </button>
               </div>
@@ -774,7 +834,9 @@ export default function SettingsPage() {
 
         {/* Security & Keys */}
         <Panel as="section">
-          <h2 className="mb-2 text-xl font-semibold text-[var(--color-text-primary)]">{t('settings.security.title')}</h2>
+          <h2 className="mb-2 text-xl font-semibold text-[var(--color-text-primary)]">
+            {t('settings.security.title')}
+          </h2>
           <p className="text-sm text-[var(--color-text-secondary)]">
             {t('settings.security.description')}
           </p>
@@ -803,7 +865,11 @@ export default function SettingsPage() {
                   }}
                   className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-2 text-sm font-semibold text-[var(--color-text-primary)] hover:border-[var(--color-primary)] hover:text-[var(--color-primary)]"
                 >
-                  {copyStatus === 'copied' ? t('settings.security.copied') : copyStatus === 'error' ? t('settings.security.copyFailed') : t('settings.security.copy')}
+                  {copyStatus === 'copied'
+                    ? t('settings.security.copied')
+                    : copyStatus === 'error'
+                      ? t('settings.security.copyFailed')
+                      : t('settings.security.copy')}
                 </button>
               )}
             </div>
@@ -824,7 +890,9 @@ export default function SettingsPage() {
 
         {/* Email Settings */}
         <Panel as="section">
-          <h2 className="mb-2 text-xl font-semibold text-[var(--color-text-primary)]">{t('settings.email.title')}</h2>
+          <h2 className="mb-2 text-xl font-semibold text-[var(--color-text-primary)]">
+            {t('settings.email.title')}
+          </h2>
           <p className="text-sm text-[var(--color-text-secondary)]">
             {t('settings.email.description')}
           </p>
@@ -858,7 +926,9 @@ export default function SettingsPage() {
                     setEmailConfirmInput('');
                     // Keep success message visible
                   } catch (error) {
-                    setEmailError(error instanceof Error ? error.message : t('settings.email.invalidEmail'));
+                    setEmailError(
+                      error instanceof Error ? error.message : t('settings.email.invalidEmail')
+                    );
                   } finally {
                     setIsUpdatingEmail(false);
                   }
@@ -878,7 +948,7 @@ export default function SettingsPage() {
                     value={emailInput}
                     onChange={(e) => setEmailInput(e.target.value)}
                     className="mt-1 block w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-2 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
-                    placeholder="you@example.com"
+                    placeholder={t('auth.fields.emailPlaceholder')}
                     required
                   />
                 </div>
@@ -896,15 +966,13 @@ export default function SettingsPage() {
                     value={emailConfirmInput}
                     onChange={(e) => setEmailConfirmInput(e.target.value)}
                     className="mt-1 block w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-2 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
-                    placeholder="you@example.com"
+                    placeholder={t('auth.fields.emailPlaceholder')}
                     required
                   />
                 </div>
 
                 {emailError && (
-                  <div className="rounded-md bg-red-50 p-3 text-sm text-red-600">
-                    {emailError}
-                  </div>
+                  <div className="rounded-md bg-red-50 p-3 text-sm text-red-600">{emailError}</div>
                 )}
 
                 {emailSuccess && pendingEmail && (
@@ -922,7 +990,9 @@ export default function SettingsPage() {
                     disabled={isUpdatingEmail}
                     className="rounded-md bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50"
                   >
-                    {isUpdatingEmail ? t('settings.email.updating') : t('settings.email.saveChanges')}
+                    {isUpdatingEmail
+                      ? t('settings.email.updating')
+                      : t('settings.email.saveChanges')}
                   </button>
                   <button
                     type="button"
@@ -942,7 +1012,9 @@ export default function SettingsPage() {
               <div className="space-y-3">
                 <div className="flex items-center justify-between rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4">
                   <div>
-                    <p className="text-sm font-semibold text-[var(--color-text-primary)]">{t('settings.email.currentEmail')}</p>
+                    <p className="text-sm font-semibold text-[var(--color-text-primary)]">
+                      {t('settings.email.currentEmail')}
+                    </p>
                     <p className="mt-1 text-base text-[var(--color-text-secondary)]">
                       {user?.email || t('settings.email.noEmail')}
                     </p>
@@ -967,7 +1039,9 @@ export default function SettingsPage() {
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-1">
-                          <p className="text-sm font-semibold text-amber-900">{t('settings.email.pendingEmail')}</p>
+                          <p className="text-sm font-semibold text-amber-900">
+                            {t('settings.email.pendingEmail')}
+                          </p>
                           <span className="inline-flex items-center gap-1 rounded-full bg-amber-200 px-2 py-0.5 text-xs font-semibold text-amber-900">
                             ⚠️ {t('settings.email.pendingVerification')}
                           </span>
@@ -987,7 +1061,11 @@ export default function SettingsPage() {
                             setEmailSuccess(true);
                             setTimeout(() => setEmailSuccess(false), 3000);
                           } catch (error) {
-                            setEmailError(error instanceof Error ? error.message : 'Failed to resend verification email');
+                            setEmailError(
+                              error instanceof Error
+                                ? error.message
+                                : 'Failed to resend verification email'
+                            );
                             setTimeout(() => setEmailError(null), 5000);
                           } finally {
                             setIsResendingVerification(false);
@@ -996,7 +1074,9 @@ export default function SettingsPage() {
                         disabled={isResendingVerification}
                         className="rounded-md border border-amber-300 bg-white px-3 py-1.5 text-xs font-semibold text-amber-900 hover:bg-amber-100 disabled:opacity-50"
                       >
-                        {isResendingVerification ? t('settings.email.resending') : t('settings.email.resendVerification')}
+                        {isResendingVerification
+                          ? t('settings.email.resending')
+                          : t('settings.email.resendVerification')}
                       </button>
                     </div>
                   </div>
@@ -1010,11 +1090,15 @@ export default function SettingsPage() {
         {(voiceCallsEnabled || videoCallsEnabled || lazyLoadImagesEnabled) && (
           <>
             <div className="border-b border-[var(--color-border)] pb-2 pt-4">
-              <h2 className="text-2xl font-bold text-[var(--color-text-primary)]">{t('settings.betaFeatures.title')}</h2>
+              <h2 className="text-2xl font-bold text-[var(--color-text-primary)]">
+                {t('settings.betaFeatures.title')}
+              </h2>
             </div>
 
             <Panel as="section">
-              <h2 className="mb-2 text-xl font-semibold text-[var(--color-text-primary)]">{t('settings.betaFeatures.experimentalTitle')}</h2>
+              <h2 className="mb-2 text-xl font-semibold text-[var(--color-text-primary)]">
+                {t('settings.betaFeatures.experimentalTitle')}
+              </h2>
               <p className="text-sm text-[var(--color-text-secondary)]">
                 {t('settings.betaFeatures.experimentalDescription')}
               </p>
@@ -1025,7 +1109,9 @@ export default function SettingsPage() {
                     <div className="flex items-center gap-2">
                       <span className="text-lg">🎙️</span>
                       <div>
-                        <h4 className="font-semibold text-[var(--color-text-primary)]">{t('settings.betaFeatures.voiceCalls')}</h4>
+                        <h4 className="font-semibold text-[var(--color-text-primary)]">
+                          {t('settings.betaFeatures.voiceCalls')}
+                        </h4>
                         <p className="text-sm text-[var(--color-text-secondary)]">
                           {t('settings.betaFeatures.voiceCallsDescription')}
                         </p>
@@ -1039,7 +1125,9 @@ export default function SettingsPage() {
                     <div className="flex items-center gap-2">
                       <span className="text-lg">📹</span>
                       <div>
-                        <h4 className="font-semibold text-[var(--color-text-primary)]">{t('settings.betaFeatures.videoCalls')}</h4>
+                        <h4 className="font-semibold text-[var(--color-text-primary)]">
+                          {t('settings.betaFeatures.videoCalls')}
+                        </h4>
                         <p className="text-sm text-[var(--color-text-secondary)]">
                           {t('settings.betaFeatures.videoCallsDescription')}
                         </p>
@@ -1053,7 +1141,9 @@ export default function SettingsPage() {
                     <div className="flex items-center gap-2">
                       <span className="text-lg">⚡</span>
                       <div>
-                        <h4 className="font-semibold text-[var(--color-text-primary)]">{t('settings.betaFeatures.performanceMode')}</h4>
+                        <h4 className="font-semibold text-[var(--color-text-primary)]">
+                          {t('settings.betaFeatures.performanceMode')}
+                        </h4>
                         <p className="text-sm text-[var(--color-text-secondary)]">
                           {t('settings.betaFeatures.performanceModeDescription')}
                         </p>
@@ -1062,11 +1152,14 @@ export default function SettingsPage() {
                   </div>
                 )}
 
-	                <div className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-3">
-	                  <p className="text-xs text-[var(--color-text-secondary)]">
-	                    <Trans i18nKey="settings.betaFeatures.noteWithLabel" components={{ strong: <strong /> }} />
-	                  </p>
-	                </div>
+                <div className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-3">
+                  <p className="text-xs text-[var(--color-text-secondary)]">
+                    <Trans
+                      i18nKey="settings.betaFeatures.noteWithLabel"
+                      components={{ strong: <strong /> }}
+                    />
+                  </p>
+                </div>
               </div>
             </Panel>
           </>
@@ -1074,12 +1167,16 @@ export default function SettingsPage() {
 
         {/* Account & Privacy */}
         <div className="border-b border-[var(--color-border)] pb-2 pt-4">
-          <h2 className="text-2xl font-bold text-[var(--color-text-primary)]">{t('settings.categories.accountPrivacy')}</h2>
+          <h2 className="text-2xl font-bold text-[var(--color-text-primary)]">
+            {t('settings.categories.accountPrivacy')}
+          </h2>
         </div>
 
         {/* Data Export (P0-016: GDPR Right to Data Portability) */}
         <Panel as="section">
-          <h2 className="mb-2 text-xl font-semibold text-[var(--color-text-primary)]">{t('settings.dataExport.title')}</h2>
+          <h2 className="mb-2 text-xl font-semibold text-[var(--color-text-primary)]">
+            {t('settings.dataExport.title')}
+          </h2>
           <p className="text-sm text-[var(--color-text-secondary)]">
             {t('settings.dataExport.description')}
           </p>
@@ -1094,13 +1191,27 @@ export default function SettingsPage() {
 
                 try {
                   const response = await accountService.requestDataExport({
-                    data_types: ['profile', 'messages', 'posts', 'comments', 'votes', 'saved', 'hubs', 'settings', 'encryption_keys'],
-                    include_deleted: false
+                    data_types: [
+                      'profile',
+                      'messages',
+                      'posts',
+                      'comments',
+                      'votes',
+                      'saved',
+                      'hubs',
+                      'settings',
+                      'encryption_keys',
+                    ],
+                    include_deleted: false,
                   });
 
-                  setExportSuccess(t('settings.dataExport.successMessage', { exportId: response.export_id }));
+                  setExportSuccess(
+                    t('settings.dataExport.successMessage', { exportId: response.export_id })
+                  );
                 } catch (error) {
-                  setExportError(error instanceof Error ? error.message : t('settings.dataExport.requestButton'));
+                  setExportError(
+                    error instanceof Error ? error.message : t('settings.dataExport.requestButton')
+                  );
                 } finally {
                   setIsRequestingExport(false);
                 }
@@ -1108,7 +1219,9 @@ export default function SettingsPage() {
               disabled={isRequestingExport}
               className="rounded-md bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50"
             >
-              {isRequestingExport ? t('settings.dataExport.requesting') : t('settings.dataExport.requestButton')}
+              {isRequestingExport
+                ? t('settings.dataExport.requesting')
+                : t('settings.dataExport.requestButton')}
             </button>
 
             {exportError && (
@@ -1124,11 +1237,15 @@ export default function SettingsPage() {
             )}
 
             <div className="mt-4 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4">
-              <h4 className="text-sm font-semibold text-[var(--color-text-primary)]">{t('settings.dataExport.included')}</h4>
+              <h4 className="text-sm font-semibold text-[var(--color-text-primary)]">
+                {t('settings.dataExport.included')}
+              </h4>
               <ul className="mt-2 space-y-1 text-sm text-[var(--color-text-secondary)]">
-                {(t('settings.dataExport.includedList', { returnObjects: true }) as string[]).map((item: string, index: number) => (
-                  <li key={index}>• {item}</li>
-                ))}
+                {(t('settings.dataExport.includedList', { returnObjects: true }) as string[]).map(
+                  (item: string, index: number) => (
+                    <li key={index}>• {item}</li>
+                  )
+                )}
               </ul>
               <p className="mt-3 text-xs text-[var(--color-text-secondary)]">
                 {t('settings.dataExport.availabilityNote')}
@@ -1139,7 +1256,9 @@ export default function SettingsPage() {
 
         {/* Account Deletion */}
         <Panel as="section">
-          <h2 className="mb-2 text-xl font-semibold text-[var(--color-text-primary)]">{t('settings.accountDeletion.title')}</h2>
+          <h2 className="mb-2 text-xl font-semibold text-[var(--color-text-primary)]">
+            {t('settings.accountDeletion.title')}
+          </h2>
           <p className="text-sm text-[var(--color-text-secondary)]">
             {t('settings.accountDeletion.description')}
           </p>
@@ -1156,10 +1275,7 @@ export default function SettingsPage() {
       </div>
 
       {/* Theme Editor Modal */}
-      <ThemeEditor
-        isOpen={isThemeEditorOpen}
-        onClose={() => setIsThemeEditorOpen(false)}
-      />
+      <ThemeEditor isOpen={isThemeEditorOpen} onClose={() => setIsThemeEditorOpen(false)} />
     </div>
   );
 }

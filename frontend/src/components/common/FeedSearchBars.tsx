@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { EmptyMessage, LoadingMessage } from './StatusMessage';
 
 interface FeedSearchBarsProps<T> {
@@ -36,7 +37,7 @@ export function FeedSearchBars<T>({
   showPostForm = true,
   topValue,
   topPlaceholder,
-  topButtonLabel = 'Go',
+  topButtonLabel,
   onTopChange,
   onTopSubmit,
   onTopFocus,
@@ -48,7 +49,7 @@ export function FeedSearchBars<T>({
   renderTopSuggestion,
   postValue,
   postPlaceholder,
-  postButtonLabel = 'Search',
+  postButtonLabel,
   onPostChange,
   onPostSubmit,
   onPostFocus,
@@ -58,6 +59,10 @@ export function FeedSearchBars<T>({
   postFormClassName = 'flex w-full gap-2',
   topFormClassName = 'flex w-full gap-2',
 }: FeedSearchBarsProps<T>) {
+  const { t } = useTranslation();
+  const resolvedTopButtonLabel = topButtonLabel ?? t('common.go');
+  const resolvedPostButtonLabel = postButtonLabel ?? t('common.search');
+
   return (
     <div className={containerClassName}>
       {showTopForm && (
@@ -76,7 +81,9 @@ export function FeedSearchBars<T>({
               <div className="absolute left-0 right-0 top-full z-30 mt-1 overflow-hidden rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] shadow-lg">
                 {topIsLoading ? (
                   <div className="px-3 py-2">
-                    <LoadingMessage className="mt-0 text-sm">Searching...</LoadingMessage>
+                    <LoadingMessage className="mt-0 text-sm">
+                      {t('common.searching')}
+                    </LoadingMessage>
                   </div>
                 ) : topSuggestions.length === 0 ? (
                   <div className="px-3 py-2">
@@ -92,7 +99,7 @@ export function FeedSearchBars<T>({
             type="submit"
             className="rounded-md bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)]"
           >
-            {topButtonLabel}
+            {resolvedTopButtonLabel}
           </button>
         </form>
       )}
@@ -119,7 +126,7 @@ export function FeedSearchBars<T>({
             type="submit"
             className="rounded-md bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)]"
           >
-            {postButtonLabel}
+            {resolvedPostButtonLabel}
           </button>
         </form>
       )}

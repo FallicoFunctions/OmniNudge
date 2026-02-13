@@ -1,30 +1,51 @@
 {
   "common": {
+    "brandName": "OmniNudge",
+    "brandNameShort": "Omni",
     "loading": "Loading...",
     "loadingDetails": "Loading details...",
     "error": "Error",
     "success": "Success",
     "cancel": "Cancel",
     "save": "Save",
+    "subscribe": "Subscribe",
+    "unsubscribe": "Unsubscribe",
     "delete": "Delete",
+    "clear": "Clear",
     "edit": "Edit",
     "submit": "Submit",
     "close": "Close",
+    "progress": "Progress",
     "copied": "Copied!",
     "back": "Back",
     "userNumber": "User #{{id}}",
+    "user": "User",
+    "unknownUser": "Unknown user",
     "next": "Next",
     "confirm": "Confirm",
     "search": "Search",
+    "searching": "Searching...",
     "filter": "Filter",
     "sort": "Sort",
     "settings": "Settings",
+    "modTools": "Mod Tools",
     "logout": "Logout",
     "login": "Login",
     "register": "Register",
+    "go": "Go",
+    "write": "Write",
+    "preview": "Preview",
     "username": "Username",
     "password": "Password",
     "email": "Email",
+    "prefix": {
+      "hub": "h/",
+      "subreddit": "r/"
+    },
+    "format": {
+      "hubPath": "h/{{name}}",
+      "subredditPath": "r/{{name}}"
+    },
     "badges": {
       "admin": "Admin",
       "moderator": "Mod",
@@ -40,7 +61,15 @@
       "toggleInfiniteScroll": "Toggle infinite scroll",
       "expandCommentThread": "Expand comment thread",
       "collapseCommentThread": "Collapse comment thread",
-      "removeFile": "Remove file"
+      "removeFile": "Remove file",
+      "closeModal": "Close modal",
+      "closeEsc": "Close (Esc)",
+      "closeViewer": "Close viewer",
+      "loading": "Loading",
+      "previousImage": "Previous image",
+      "nextImage": "Next image",
+      "previousMedia": "Previous media",
+      "nextMedia": "Next media"
     },
     "time": {
       "submitted": "submitted",
@@ -57,15 +86,34 @@
     "units": {
       "subscribersShort": "subs"
     },
+    "formattingHelpTable": {
+      "youType": "You type:",
+      "youSee": "You see:"
+    },
+    "contact": {
+      "privacyEmail": "privacy@omninudge.com"
+    },
     "download": "Download",
     "continue": "Continue",
     "retry": "Retry",
     "noDetailsAvailable": "No details available.",
     "unableToLoadDetails": "Unable to load details.",
+    "unableToLoad": "Unable to load.",
     "optional": "(optional)",
     "na": "N/A",
     "yes": "Yes",
-    "no": "No"
+    "no": "No",
+    "noResultsFound": "No results found."
+  },
+  "markdownInput": {
+    "emptyPreview": "Nothing to preview yet."
+  },
+  "subreddit": {
+    "moderatorsPanel": {
+      "title": "Moderators",
+      "loading": "Loading moderators...",
+      "fallback": "Public Reddit API does not provide the moderator list."
+    }
   },
   "nav": {
     "home": "Home",
@@ -92,6 +140,22 @@
     "bugReporting": "Bug Reporting",
     "mobileNavigationError": "Navigation error. Please reload the page.",
     "dontShowThisAgain": "Don't Show This Again"
+  },
+  "communityHeader": {
+    "labels": {
+      "hPopular": "h/popular",
+      "hAll": "h/all",
+      "rPopular": "r/popular",
+      "rFrontpage": "r/frontpage"
+    }
+  },
+  "pagination": {
+    "previous": "← Previous",
+    "next": "Next →",
+    "pageOf": "Page {{current}} of {{total}}"
+  },
+  "connectionStatus": {
+    "reconnecting": "Reconnecting to server..."
   },
   "hubsBrowse": {
     "subtitle": "Explore Omni hubs",
@@ -156,6 +220,41 @@
       "high": "High",
       "medium": "Medium",
       "low": "Low"
+    }
+  },
+  "bugReportModal": {
+    "title": "Report a Bug",
+    "success": {
+      "message": "Bug report submitted successfully! Thank you for helping improve OmniNudge.",
+      "goToPage": "Go to Bug Reporting Page",
+      "ok": "OK"
+    },
+    "form": {
+      "pageUrl": {
+        "label": "Page URL",
+        "placeholder": "https://omninudge.com/...",
+        "help": "The URL of the page where you encountered the bug"
+      },
+      "description": {
+        "label": "Description",
+        "placeholder": "Describe the bug in detail. What happened? What did you expect to happen? Steps to reproduce?"
+      },
+      "screenshot": {
+        "label": "Screenshot",
+        "help": "A screenshot helps us identify and fix the issue faster"
+      }
+    },
+    "actions": {
+      "submit": "Submit Bug Report",
+      "submitting": "Submitting..."
+    },
+    "errors": {
+      "unknownError": "Unknown error",
+      "submitFailed": "Failed to submit bug report: {{message}}",
+      "uploadFailed": "Failed to upload screenshot: {{message}}",
+      "screenshotRequired": "Screenshot is required",
+      "uploadMissingUrl": "Upload response missing file URL",
+      "screenshotMustBeImage": "Screenshot must be an image file."
     }
   },
   "searchPage": {
@@ -563,6 +662,37 @@
       "fetchConversationFailed": "Failed to fetch conversation",
       "unableToLoadMessages": "Unable to load messages.",
       "sendFailed": "Failed to send message. Please try again."
+    }
+  },
+  "modMailModal": {
+    "title": "Message the Moderators",
+    "subtitle": "Send a message to the moderators of h/{{hubName}}",
+    "fields": {
+      "subject": {
+        "label": "Subject",
+        "placeholder": "What's this about?"
+      },
+      "message": {
+        "label": "Message",
+        "placeholder": "Write your message to the moderators..."
+      }
+    },
+    "success": {
+      "sent": "Message sent successfully! The moderators will see your message."
+    },
+    "actions": {
+      "send": "Send to Moderators",
+      "sent": "Sent!"
+    },
+    "errors": {
+      "sendFailed": "Failed to send mod mail",
+      "subjectRequired": "Subject is required",
+      "messageRequired": "Message is required"
+    },
+    "encryption": {
+      "noParticipants": "No participants found to encrypt the message for; sending plaintext.",
+      "senderMissingKeys": "CRITICAL: You have not set up encryption keys. Cannot send mod mail.",
+      "noRecipientsEnabled": "CRITICAL: No recipients have encryption enabled. Cannot send encrypted mod mail."
     }
   },
   "hubSettingsPage": {
@@ -1101,7 +1231,11 @@
     "mobileNav": "Mobile navigation",
     "unreadMessages": "{{count}} unread messages",
     "closeMenu": "Close menu",
-    "longPressForMoreOptions": "Long press for more options"
+    "longPressForMoreOptions": "Long press for more options",
+    "tabBarItem": {
+      "badgeSuffix": " - {{badgeLabel}}",
+      "longPressSuffix": " {{longPressHint}}"
+    }
   },
   "home": {
     "feed": {
@@ -1170,9 +1304,24 @@
     "typeMessage": "Type a message...",
     "send": "Send",
     "noMessages": "No messages yet",
+    "status": {
+      "loadingMessages": "Loading messages..."
+    },
+    "empty": {
+      "startConversation": "No messages yet. Start the conversation!"
+    },
+    "actions": {
+      "loadOlder": "Load older messages"
+    },
     "typing": "{{username}} is typing...",
     "online": "Online",
     "offline": "Offline",
+    "deliveryStatus": {
+      "sending": "Sending...",
+      "sent": "Sent",
+      "delivered": "Delivered",
+      "read": "Read"
+    },
     "lastSeen": "Last seen {{time}}",
     "encrypted": "End-to-end encrypted",
     "deleteConversation": "Delete Conversation",
@@ -1195,9 +1344,13 @@
     "media": {
       "viewAllTitle": "View all media from this conversation in a slideshow",
       "stillDecrypting": "Media is still decrypting. Please wait and try again.",
+      "loading": "Loading media...",
       "fileTooLarge": "File too large. Maximum size is 25MB.",
+      "fileTooLargeWithLimit": "File too large. Maximum size is {{limitMb}}MB.",
       "uploadFailed": "Failed to upload media. Please try again.",
-      "uploadFailedFile": "Failed to upload {{filename}}"
+      "uploadFailedFile": "Failed to upload {{filename}}",
+      "fallbackText": "Media",
+      "attachmentFallback": "attachment"
     },
     "compose": {
       "enterUsername": "Enter username...",
@@ -1218,7 +1371,8 @@
       "unarchiveFailed": "Failed to unarchive conversation",
       "deleteConversationFailed": "Failed to delete conversation",
       "recipientKeyNotFound": "Recipient public key not found",
-      "encryptionKeysMissing": "Your encryption keys are not set up"
+      "encryptionKeysMissing": "Your encryption keys are not set up",
+      "sendFailed": "Failed to send message. Please try again."
     },
     "messageOptions": {
       "ariaLabel": "Message options"
@@ -1289,6 +1443,19 @@
     },
     "delete": "Delete",
     "edit": "Edit",
+    "editModal": {
+      "title": "Edit post",
+      "subtitle": "Update the title or body, then save your changes.",
+      "fields": {
+        "title": "Title",
+        "body": "Body"
+      },
+      "placeholder": "Update the post body...",
+      "actions": {
+        "saving": "Saving...",
+        "saveChanges": "Save changes"
+      }
+    },
     "postedBy": "Posted by {{username}}",
     "postedIn": "in {{hub}}",
     "timeAgo": "{{time}} ago",
@@ -1343,14 +1510,22 @@
     "media": {
       "previewImageAlt": "Preview image for {{title}}",
       "galleryImageAlt": "{{title}} - Image {{index}}",
+      "carouselImageAlt": "{{title}} - {{index}}/{{total}}",
       "loadingGalleryImages": "Loading gallery images...",
       "noGalleryImages": "No images found in this gallery",
       "galleryTitle": "Gallery",
       "videoUnsupported": "Your browser does not support the video tag.",
-      "videoMayNotHaveAudio": "Note: This video may not have audio.",
+      "videoMayNotHaveAudio": "Note: This video may not have audio. Reddit serves audio separately.",
+      "watchOnRedditUnavailable": "Watch on Reddit is not available from OmniNudge.",
       "externalLinkLabel": "external",
       "redgifsEmbedTitle": "{{title}} - Redgifs video",
-      "embeddedMediaTitle": "{{title}} - Embedded media"
+      "embeddedMediaTitle": "{{title}} - Embedded media",
+      "viewer": {
+        "clickToShrink": "Click to shrink",
+        "clickToEnlarge": "Click to enlarge",
+        "viewSmaller": "View smaller",
+        "viewFullSize": "View full size"
+      }
     },
     "badges": {
       "omni": "Omni",
@@ -1358,6 +1533,9 @@
       "pinnedByModerators": "Pinned by moderators",
       "reddit": "Reddit",
       "nsfw": "NSFW"
+    },
+    "flairBadge": {
+      "title": "Flair: {{flair}}"
     },
     "point_one": "{{formattedCount}} point",
     "point_other": "{{formattedCount}} points",
@@ -2016,6 +2194,29 @@
     "nextLabel": "Next (→)",
     "counter": "{{current}} of {{total}}",
     "noMediaFound": "No media found",
+    "redditMedia": {
+      "title": "Reddit Media Slideshow",
+      "labels": {
+        "subreddit": "Subreddit",
+        "sort": "Sort",
+        "timeRange": "Time Range"
+      },
+      "subredditPlaceholder": "Enter subreddit name (e.g., pics, aww, funny)",
+      "timeOptions": {
+        "hour": "Hour",
+        "day": "Day",
+        "week": "Week",
+        "month": "Month",
+        "year": "Year",
+        "all": "All"
+      },
+      "start": "Start Slideshow",
+      "viewOnReddit": "View on Reddit →",
+      "errors": {
+        "failedToLoad": "Failed to load posts. Please check the subreddit name and try again."
+      },
+      "noMedia": "No media posts found in r/{{subreddit}}. Try a different subreddit or sort option."
+    },
     "aria": {
       "closeEsc": "Close slideshow (Esc)",
       "previous": "Previous (←)",
@@ -2183,6 +2384,51 @@
       "activeThemeLabel": "Active Theme",
       "selectThemeFallback": "Select a theme"
     },
+    "onboarding": {
+      "tipLabel": "Tip",
+      "actions": {
+        "skip": "Skip Tour",
+        "letsGo": "Let's Go!"
+      },
+      "stepCounter": "Step {{current}} of {{total}}",
+      "steps": {
+        "welcome": {
+          "title": "Welcome to Theme Customization!",
+          "description": "Make OmniNudge truly yours by customizing colors, fonts, and more. Choose from predefined themes or create your own.",
+          "tip": "You can always access themes from the settings page."
+        },
+        "predefined": {
+          "title": "Choose a Predefined Theme",
+          "description": "Start with one of our 8 beautiful predefined themes. Each theme has a unique color palette and personality.",
+          "tip": "Hover over themes to see a live preview."
+        },
+        "custom": {
+          "title": "Create Your Own Theme",
+          "description": "Want something unique? Create a custom theme by modifying CSS variables like colors, fonts, spacing, and more.",
+          "tip": "Advanced mode unlocks full CSS customization."
+        },
+        "complete": {
+          "title": "You're All Set!",
+          "description": "Your theme will sync across all your devices. Have fun customizing and don't hesitate to experiment!"
+        }
+      }
+    },
+    "settingsPanel": {
+      "title": "Theme Customization",
+      "subtitle": "Personalize your OmniNudge experience with custom themes",
+      "actions": {
+        "showTour": "Show Tour"
+      },
+      "noThemeSelected": "No theme selected",
+      "advancedMode": {
+        "title": "Advanced Mode",
+        "description": "Enable full CSS customization and advanced features"
+      },
+      "tabs": {
+        "selector": "Theme Selector",
+        "gallery": "Browse Gallery"
+      }
+    },
     "gallery": {
       "header": {
         "kicker": "Theme Gallery",
@@ -2327,6 +2573,7 @@
       }
     },
     "preview": {
+      "brandName": "OmniNudge",
       "pages": {
         "feed": "Feed",
         "profile": "Profile",
@@ -2375,7 +2622,11 @@
         "meta": "2h ago · Boosted",
         "follow": "Follow",
         "followAria": "Follow Creator {{index}}",
-        "quote": "\"Building theme systems is fun! This preview updates live as you tweak variables.\""
+        "quote": "\"Building theme systems is fun! This preview updates live as you tweak variables.\"",
+        "sampleTags": {
+          "design": "#design",
+          "themes": "#themes"
+        }
       },
       "profile": {
         "name": "Explorer",
@@ -2406,7 +2657,9 @@
       },
       "aria": {
         "commonSamples": "Common component samples",
+        "sectionHeading": "Theme preview section heading",
         "avatarIndicators": "Avatar indicators",
+        "profileSummary": "Profile summary",
         "profileStats": "Profile stats"
       }
     }
@@ -2481,6 +2734,18 @@
     "actions": {
       "creating": "Creating...",
       "createPost": "Create Post"
+    },
+    "errors": {
+      "titleRequired": "Title is required",
+      "bodyTooLong": "Post body must be less than {{formattedMax}} characters",
+      "waitForUpload": "Please wait for the media upload to finish.",
+      "hubNameRequired": "Please enter a hub name",
+      "hubMustSelectSuggestion": "Please select a valid hub from the suggestions",
+      "subredditRequired": "Please enter a subreddit",
+      "hubNoTextPosts": "This hub does not allow text posts.",
+      "hubNoLinkOrMediaPosts": "This hub does not allow link or media posts.",
+      "hubNoLinkPostsUploadInstead": "This hub does not allow link posts. Upload an image or video instead.",
+      "hubNoSelectedMediaType": "This hub does not allow the selected media type."
     }
   },
   "emptyStates": {
@@ -2702,9 +2967,23 @@
     "description": "The page you're looking for doesn't exist or has been moved.",
     "goHome": "Go to Home"
   },
+  "errorPages": {
+    "serverError": {
+      "title": "Server Error"
+    },
+    "networkError": {
+      "title": "Connection Lost"
+    },
+    "maintenance": {
+      "title": "Under Maintenance",
+      "message": "We're performing scheduled maintenance. We'll be back soon!"
+    }
+  },
   "errorBoundary": {
     "title": "Something went wrong.",
-    "details": "Error details"
+    "details": "Error details",
+    "unexpectedError": "An unexpected error occurred.",
+    "reloadPage": "Reload page"
   },
   "standardScroll": {
     "loadingFeed": "Loading feed...",
@@ -2832,11 +3111,38 @@
       "loading": "Loading users...",
       "empty": "No users found.",
       "csv": {
-        "never": "Never"
+        "never": "Never",
+        "headers": {
+          "createdAt": "Created At"
+        }
       },
       "lastSeen": "Last seen",
       "errors": {
         "reasonRequired": "Reason is required"
+      },
+      "confirmations": {
+        "changeRole": "Are you sure you want to change this user's role to \"{{role}}\"?"
+      },
+      "bulk": {
+        "selectedOne": "{{qty}} selected",
+        "selectedMany": "{{qty}} selected",
+        "noSelectionError": "Please select at least one user",
+        "successOne": "Successfully applied action to {{qty}} user",
+        "successMany": "Successfully applied action to {{qty}} users",
+        "error": "Some actions failed. Please check and try again.",
+        "affectsOne": "This will affect {{qty}} selected user",
+        "affectsMany": "This will affect {{qty}} selected users",
+        "confirmButtonOne": "Confirm ({{qty}} user)",
+        "confirmButtonMany": "Confirm ({{qty}} users)"
+      },
+      "modals": {
+        "bulkTitle": "Bulk {{action}} Users",
+        "singleTitle": "{{action}} User",
+        "userLabel": "User:",
+        "reasonLabel": "Reason (required)",
+        "reasonPlaceholder": "Enter reason...",
+        "showReasonToUser": "Show reason to user",
+        "showReasonToUsers": "Show reason to users"
       },
       "table": {
         "id": "ID",
@@ -2926,7 +3232,8 @@
       "empty": "No moderators for this hub",
       "userId": "User ID: {{id}}",
       "added": "Added: {{date}}",
-      "remove": "Remove"
+      "remove": "Remove",
+      "confirmRemove": "Remove {{username}} as moderator?"
     },
     "banActivity": {
       "title": "Site-wide Ban Activity",

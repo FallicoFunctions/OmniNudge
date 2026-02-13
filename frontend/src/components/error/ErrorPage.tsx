@@ -1,4 +1,5 @@
 import { AlertTriangle, Home, RefreshCw } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 interface ErrorPageProps {
   title?: string;
@@ -10,13 +11,17 @@ interface ErrorPageProps {
 }
 
 export function ErrorPage({
-  title = 'Something went wrong',
-  message = 'An unexpected error occurred. Please try again.',
+  title,
+  message,
   statusCode,
   showHomeButton = true,
   showRefreshButton = true,
   onRetry,
 }: ErrorPageProps) {
+  const { t } = useTranslation();
+  const resolvedTitle = title ?? t('errors.somethingWentWrong');
+  const resolvedMessage = message ?? t('emptyStates.error.description');
+
   const handleRefresh = () => {
     if (onRetry) {
       onRetry();
@@ -32,12 +37,10 @@ export function ErrorPage({
           <AlertTriangle size={48} className="text-red-600 dark:text-red-400" />
         </div>
 
-        {statusCode && (
-          <div className="text-6xl font-bold text-primary mb-4">{statusCode}</div>
-        )}
+        {statusCode && <div className="text-6xl font-bold text-primary mb-4">{statusCode}</div>}
 
-        <h1 className="text-3xl font-bold mb-4">{title}</h1>
-        <p className="text-secondary mb-8">{message}</p>
+        <h1 className="text-3xl font-bold mb-4">{resolvedTitle}</h1>
+        <p className="text-secondary mb-8">{resolvedMessage}</p>
 
         <div className="flex gap-3 justify-center">
           {showHomeButton && (
@@ -46,7 +49,7 @@ export function ErrorPage({
               className="inline-flex items-center gap-2 px-6 py-3 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors"
             >
               <Home size={20} />
-              Go Home
+              {t('notFoundPage.goHome')}
             </a>
           )}
           {showRefreshButton && (
@@ -55,7 +58,7 @@ export function ErrorPage({
               className="inline-flex items-center gap-2 px-6 py-3 border border-border rounded-lg hover:bg-secondary/10 transition-colors"
             >
               <RefreshCw size={20} />
-              Try Again
+              {t('emptyStates.error.actions.tryAgain')}
             </button>
           )}
         </div>
@@ -66,10 +69,11 @@ export function ErrorPage({
 
 // 404 Page
 export function NotFoundPage() {
+  const { t } = useTranslation();
   return (
     <ErrorPage
-      title="Page Not Found"
-      message="The page you're looking for doesn't exist or has been moved."
+      title={t('notFoundPage.title')}
+      message={t('notFoundPage.description')}
       statusCode={404}
       showRefreshButton={false}
     />
@@ -78,10 +82,11 @@ export function NotFoundPage() {
 
 // 500 Page
 export function ServerErrorPage({ onRetry }: { onRetry?: () => void }) {
+  const { t } = useTranslation();
   return (
     <ErrorPage
-      title="Server Error"
-      message="Our servers encountered an error. We've been notified and are working on it."
+      title={t('errorPages.serverError.title')}
+      message={t('errors.serverError')}
       statusCode={500}
       onRetry={onRetry}
     />
@@ -90,10 +95,11 @@ export function ServerErrorPage({ onRetry }: { onRetry?: () => void }) {
 
 // Network Error Page
 export function NetworkErrorPage({ onRetry }: { onRetry?: () => void }) {
+  const { t } = useTranslation();
   return (
     <ErrorPage
-      title="Connection Lost"
-      message="Please check your internet connection and try again."
+      title={t('errorPages.networkError.title')}
+      message={t('errors.networkError')}
       showHomeButton={false}
       onRetry={onRetry}
     />
@@ -102,10 +108,11 @@ export function NetworkErrorPage({ onRetry }: { onRetry?: () => void }) {
 
 // Maintenance Page
 export function MaintenancePage() {
+  const { t } = useTranslation();
   return (
     <ErrorPage
-      title="Under Maintenance"
-      message="We're performing scheduled maintenance. We'll be back soon!"
+      title={t('errorPages.maintenance.title')}
+      message={t('errorPages.maintenance.message')}
       showHomeButton={false}
       showRefreshButton={true}
     />

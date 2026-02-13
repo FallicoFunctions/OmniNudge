@@ -1,4 +1,5 @@
 import { useState, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { resolveMediaUrl } from '../../utils/mediaUrl';
 import type { GalleryImage } from '../../types/posts';
 
@@ -12,7 +13,16 @@ interface ImageCarouselProps {
   onNavigate: (direction: 'prev' | 'next') => void;
 }
 
-export function ImageCarousel({ images, title, className = '', style = {}, onHoverChange, currentIndex, onNavigate }: ImageCarouselProps) {
+export function ImageCarousel({
+  images,
+  title,
+  className = '',
+  style = {},
+  onHoverChange,
+  currentIndex,
+  onNavigate,
+}: ImageCarouselProps) {
+  const { t } = useTranslation();
   const [showArrows, setShowArrows] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -78,7 +88,11 @@ export function ImageCarousel({ images, title, className = '', style = {}, onHov
       {/* Main image */}
       <img
         src={getCurrentImageUrl()}
-        alt={`${title} - ${currentIndex + 1}/${images.length}`}
+        alt={t('posts.media.carouselImageAlt', {
+          title,
+          index: currentIndex + 1,
+          total: images.length,
+        })}
         className="w-full h-auto"
         style={{ display: 'block', maxHeight: 'calc(100vh - 200px)', objectFit: 'contain' }}
         loading="lazy"
@@ -91,7 +105,7 @@ export function ImageCarousel({ images, title, className = '', style = {}, onHov
           <button
             onClick={handlePreviousClick}
             className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white rounded-full p-2 transition-all"
-            aria-label="Previous image"
+            aria-label={t('common.accessibility.previousImage')}
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -109,7 +123,7 @@ export function ImageCarousel({ images, title, className = '', style = {}, onHov
           <button
             onClick={handleNextClick}
             className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white rounded-full p-2 transition-all"
-            aria-label="Next image"
+            aria-label={t('common.accessibility.nextImage')}
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"

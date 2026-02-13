@@ -1,6 +1,12 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { useQuery, useMutation, useQueryClient, useInfiniteQuery, type InfiniteData } from '@tanstack/react-query';
+import {
+  useQuery,
+  useMutation,
+  useQueryClient,
+  useInfiniteQuery,
+  type InfiniteData,
+} from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { feedService, type HomeFeedResponse, type RedditPost } from '../services/feedService';
 import { useAuth } from '../contexts/AuthContext';
@@ -15,7 +21,11 @@ import { hubsService } from '../services/hubsService';
 import { OffsetPaginationControls } from '../components/common/OffsetPaginationControls';
 import { useSavedItems } from '../hooks/useSavedItems';
 import { useHiddenItems } from '../hooks/useHiddenItems';
-import { getHiddenRedditPostIdSet, getSavedPostIdSet, getSavedRedditPostIdSet } from '../utils/savedItems';
+import {
+  getHiddenRedditPostIdSet,
+  getSavedPostIdSet,
+  getSavedRedditPostIdSet,
+} from '../utils/savedItems';
 import { PostCardSkeleton } from '../components/common/LoadingStates';
 import { FeedSearchBars } from '../components/common/FeedSearchBars';
 import { CreateActionButtons } from '../components/common/CreateActionButtons';
@@ -32,9 +42,7 @@ import { StandardScroll } from '../components/feed/StandardScroll';
 
 type SortOption = 'hot' | 'new' | 'top' | 'rising' | 'controversial';
 
-type HideTarget =
-  | { type: 'reddit'; post: RedditPost }
-  | { type: 'platform'; post: PlatformPost };
+type HideTarget = { type: 'reddit'; post: RedditPost } | { type: 'platform'; post: PlatformPost };
 type CrosspostTarget = { post: RedditPost };
 type DeletePostTarget = { postId: number; authorId: number };
 
@@ -66,10 +74,7 @@ const persistOmniOnlyState = (userId: number | null | undefined, value: boolean)
     return;
   }
   try {
-    localStorage.setItem(
-      OMNI_FEED_STORAGE_KEY,
-      JSON.stringify({ userId: userId ?? null, value })
-    );
+    localStorage.setItem(OMNI_FEED_STORAGE_KEY, JSON.stringify({ userId: userId ?? null, value }));
   } catch (error) {
     console.error('Failed to save Omni feed toggle state:', error);
   }
@@ -125,7 +130,13 @@ export default function HomePage() {
   const sort = useMemo<SortOption>(() => {
     const params = new URLSearchParams(location.search);
     const sortParam = params.get('sort');
-    if (sortParam === 'hot' || sortParam === 'new' || sortParam === 'top' || sortParam === 'rising' || sortParam === 'controversial') {
+    if (
+      sortParam === 'hot' ||
+      sortParam === 'new' ||
+      sortParam === 'top' ||
+      sortParam === 'rising' ||
+      sortParam === 'controversial'
+    ) {
       return sortParam;
     }
     return 'hot';
@@ -166,78 +177,103 @@ export default function HomePage() {
     [location.pathname, location.search]
   );
 
-  const handleSortChange = useCallback((nextSort: SortOption) => {
-    if (nextSort === sort) {
-      return;
-    }
-    const params = new URLSearchParams(location.search);
-    if (nextSort === 'hot') {
-      params.delete('sort');
-    } else {
-      params.set('sort', nextSort);
-    }
-    const search = params.toString();
-    navigate(`${location.pathname}${search ? `?${search}` : ''}`);
-  }, [sort, location.search, location.pathname, navigate]);
+  const handleSortChange = useCallback(
+    (nextSort: SortOption) => {
+      if (nextSort === sort) {
+        return;
+      }
+      const params = new URLSearchParams(location.search);
+      if (nextSort === 'hot') {
+        params.delete('sort');
+      } else {
+        params.set('sort', nextSort);
+      }
+      const search = params.toString();
+      navigate(`${location.pathname}${search ? `?${search}` : ''}`);
+    },
+    [sort, location.search, location.pathname, navigate]
+  );
 
   // Subreddit search handlers
-  const { trimmedInput, suggestions, shouldShowSuggestions, isLoading: isAutocompleteLoading } =
-    useHubSubredditAutocomplete(inputValue, isAutocompleteOpen);
+  const {
+    trimmedInput,
+    suggestions,
+    shouldShowSuggestions,
+    isLoading: isAutocompleteLoading,
+  } = useHubSubredditAutocomplete(inputValue, isAutocompleteOpen);
 
-  const navigateToSubredditOrHub = useCallback(async (value: string) => {
-    const normalized = value.trim();
-    if (!normalized) {
-      navigate('/r/popular');
+  const navigateToSubredditOrHub = useCallback(
+    async (value: string) => {
+      const normalized = value.trim();
+      if (!normalized) {
+        navigate('/r/popular');
+        setIsAutocompleteOpen(false);
+        return;
+      }
+
+      try {
+        await hubsService.getHub(normalized);
+        navigate(`/h/${normalized}`);
+      } catch {
+        navigate(`/r/${normalized}`);
+      }
       setIsAutocompleteOpen(false);
-      return;
-    }
+    },
+    [navigate]
+  );
 
-    try {
-      await hubsService.getHub(normalized);
-      navigate(`/h/${normalized}`);
-    } catch {
-      navigate(`/r/${normalized}`);
-    }
-    setIsAutocompleteOpen(false);
-  }, [navigate]);
+  const handleSubredditSubmit = useCallback(
+    (e: React.FormEvent) => {
+      e.preventDefault();
+      if (trimmedInput) {
+        navigateToSubredditOrHub(trimmedInput);
+        setInputValue('');
+      }
+    },
+    [trimmedInput, navigateToSubredditOrHub]
+  );
 
-  const handleSubredditSubmit = useCallback((e: React.FormEvent) => {
-    e.preventDefault();
-    if (trimmedInput) {
-      navigateToSubredditOrHub(trimmedInput);
+  const handleInputChange = useCallback(
+    (value: string) => {
+      setInputValue(value);
+      if (!isAutocompleteOpen) {
+        setIsAutocompleteOpen(true);
+      }
+    },
+    [isAutocompleteOpen]
+  );
+
+  const handlePostSearchSubmit = useCallback(
+    (event: React.FormEvent<HTMLFormElement>) => {
+      event.preventDefault();
+      const query = postSearchInput.trim();
+      if (!query) {
+        return;
+      }
+      const includeNsfwParam = includeNsfwSearch && !blockAllNsfw;
+      const nsfwQuery = includeNsfwParam ? '&include_nsfw=true' : '';
+      navigate(`/search?q=${encodeURIComponent(query)}&sort=relevance${nsfwQuery}`);
+    },
+    [postSearchInput, includeNsfwSearch, blockAllNsfw, navigate]
+  );
+
+  const handleSelectSubredditSuggestion = useCallback(
+    (name: string) => {
+      navigate(`/r/${name}`);
       setInputValue('');
-    }
-  }, [trimmedInput, navigateToSubredditOrHub]);
+      setIsAutocompleteOpen(false);
+    },
+    [navigate]
+  );
 
-  const handleInputChange = useCallback((value: string) => {
-    setInputValue(value);
-    if (!isAutocompleteOpen) {
-      setIsAutocompleteOpen(true);
-    }
-  }, [isAutocompleteOpen]);
-
-  const handlePostSearchSubmit = useCallback((event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const query = postSearchInput.trim();
-    if (!query) {
-      return;
-    }
-    const includeNsfwParam = includeNsfwSearch && !blockAllNsfw;
-    const nsfwQuery = includeNsfwParam ? '&include_nsfw=true' : '';
-    navigate(`/search?q=${encodeURIComponent(query)}&sort=relevance${nsfwQuery}`);
-  }, [postSearchInput, includeNsfwSearch, blockAllNsfw, navigate]);
-
-  const handleSelectSubredditSuggestion = useCallback((name: string) => {
-    navigate(`/r/${name}`);
-    setInputValue('');
-    setIsAutocompleteOpen(false);
-  }, [navigate]);
-
-  const handleSelectHubSuggestion = useCallback((name: string) => {
-    navigate(`/h/${name}`);
-    setInputValue('');
-    setIsAutocompleteOpen(false);
-  }, [navigate]);
+  const handleSelectHubSuggestion = useCallback(
+    (name: string) => {
+      navigate(`/h/${name}`);
+      setInputValue('');
+      setIsAutocompleteOpen(false);
+    },
+    [navigate]
+  );
 
   useEffect(() => {
     setOmniOnly(getStoredOmniOnlyState(user?.id ?? null, defaultOmniPostsOnly));
@@ -258,10 +294,21 @@ export default function HomePage() {
     () => ['home-feed', sort, omniOnly, showPopularFallback, timeRangeKey, currentCursor] as const,
     [sort, omniOnly, showPopularFallback, timeRangeKey, currentCursor]
   );
-  const { data: pagedData, isLoading: isPagedLoading, isFetching: isPagedFetching } = useQuery<HomeFeedResponse>({
+  const {
+    data: pagedData,
+    isLoading: isPagedLoading,
+    isFetching: isPagedFetching,
+  } = useQuery<HomeFeedResponse>({
     queryKey: homeFeedQueryKey,
     queryFn: () => {
-      return feedService.getHomeFeed(sort, pageSize, currentCursor, omniOnly, showPopularFallback, timeOptions);
+      return feedService.getHomeFeed(
+        sort,
+        pageSize,
+        currentCursor,
+        omniOnly,
+        showPopularFallback,
+        timeOptions
+      );
     },
     enabled: !useInfiniteScrollHome && (!isCustomTopRange || isCustomRangeValid),
     staleTime: 1000 * 60 * 5,
@@ -740,7 +787,7 @@ export default function HomePage() {
               )}
               postValue=""
               postPlaceholder=""
-              onPostChange={() => { }}
+              onPostChange={() => {}}
               onPostSubmit={(e) => e.preventDefault()}
               postDropdownOpen={false}
               showPostForm={false}
@@ -767,50 +814,55 @@ export default function HomePage() {
           <button
             type="button"
             onClick={() => handleSortChange('hot')}
-            className={`px-4 py-2 text-sm font-semibold ${sort === 'hot'
-              ? 'text-[var(--color-primary)]'
-              : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
-              }`}
+            className={`px-4 py-2 text-sm font-semibold ${
+              sort === 'hot'
+                ? 'text-[var(--color-primary)]'
+                : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
+            }`}
           >
             {t('home.sort.hot')}
           </button>
           <button
             type="button"
             onClick={() => handleSortChange('new')}
-            className={`px-4 py-2 text-sm font-semibold ${sort === 'new'
-              ? 'text-[var(--color-primary)]'
-              : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
-              }`}
+            className={`px-4 py-2 text-sm font-semibold ${
+              sort === 'new'
+                ? 'text-[var(--color-primary)]'
+                : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
+            }`}
           >
             {t('home.sort.new')}
           </button>
           <button
             type="button"
             onClick={() => handleSortChange('top')}
-            className={`px-4 py-2 text-sm font-semibold ${sort === 'top'
-              ? 'text-[var(--color-primary)]'
-              : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
-              }`}
+            className={`px-4 py-2 text-sm font-semibold ${
+              sort === 'top'
+                ? 'text-[var(--color-primary)]'
+                : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
+            }`}
           >
             {t('home.sort.top')}
           </button>
           <button
             type="button"
             onClick={() => handleSortChange('rising')}
-            className={`px-4 py-2 text-sm font-semibold ${sort === 'rising'
-              ? 'text-[var(--color-primary)]'
-              : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
-              }`}
+            className={`px-4 py-2 text-sm font-semibold ${
+              sort === 'rising'
+                ? 'text-[var(--color-primary)]'
+                : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
+            }`}
           >
             {t('home.sort.rising')}
           </button>
           <button
             type="button"
             onClick={() => handleSortChange('controversial')}
-            className={`px-4 py-2 text-sm font-semibold ${sort === 'controversial'
-              ? 'text-[var(--color-primary)]'
-              : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
-              }`}
+            className={`px-4 py-2 text-sm font-semibold ${
+              sort === 'controversial'
+                ? 'text-[var(--color-primary)]'
+                : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
+            }`}
           >
             {t('home.sort.controversial')}
           </button>
@@ -820,7 +872,12 @@ export default function HomePage() {
               className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
             >
               <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                />
               </svg>
               {t('home.sort.scroll')}
             </button>
@@ -836,18 +893,22 @@ export default function HomePage() {
               role="switch"
               aria-checked={omniOnly}
               onClick={() => setOmniOnly((prev) => !prev)}
-              className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-1 ${omniOnly ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
-                }`}
+              className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-1 ${
+                omniOnly ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
+              }`}
               title={omniOnly ? t('home.filter.omniOnlyTooltip') : t('home.filter.allPostsTooltip')}
             >
               <span className="sr-only">{t('common.accessibility.toggleOmniFeed')}</span>
               <span
                 aria-hidden="true"
-                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${omniOnly ? 'translate-x-5' : 'translate-x-0'
-                  }`}
+                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                  omniOnly ? 'translate-x-5' : 'translate-x-0'
+                }`}
               />
             </button>
-            <span className={`text-xs font-semibold transition-colors ${omniOnly ? 'text-[var(--color-primary)]' : 'text-[var(--color-text-secondary)]'}`}>
+            <span
+              className={`text-xs font-semibold transition-colors ${omniOnly ? 'text-[var(--color-primary)]' : 'text-[var(--color-text-secondary)]'}`}
+            >
               {omniOnly ? t('home.filter.omniOnly') : t('home.filter.allPosts')}
             </span>
           </div>
@@ -924,7 +985,9 @@ export default function HomePage() {
                 onChange={(event) => setCustomTopStart(event.target.value)}
                 className="rounded border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-2 py-1 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
               />
-              <span className="text-xs text-[var(--color-text-secondary)]">{t('home.timeRange.to')}</span>
+              <span className="text-xs text-[var(--color-text-secondary)]">
+                {t('home.timeRange.to')}
+              </span>
               <input
                 type="datetime-local"
                 value={customTopEnd}
@@ -955,15 +1018,14 @@ export default function HomePage() {
           {user ? (
             !hasAnySubscriptions ? (
               <div>
-                <p className="mb-4">
-                  {t('home.empty.noSubscriptions')}
-                </p>
+                <p className="mb-4">{t('home.empty.noSubscriptions')}</p>
                 <button
                   type="button"
                   onClick={() => setShowPopularFallback(true)}
                   disabled={requiresValidCustomRange}
-                  className={`rounded-md bg-[var(--color-primary)] px-4 py-2 text-white transition hover:opacity-90 ${requiresValidCustomRange ? 'cursor-not-allowed opacity-60' : ''
-                    }`}
+                  className={`rounded-md bg-[var(--color-primary)] px-4 py-2 text-white transition hover:opacity-90 ${
+                    requiresValidCustomRange ? 'cursor-not-allowed opacity-60' : ''
+                  }`}
                 >
                   {t('home.empty.viewPopularButton')}
                 </button>
@@ -971,13 +1033,9 @@ export default function HomePage() {
             ) : (
               <div>
                 <p className="mb-4">
-                  {omniOnly
-                    ? t('home.empty.noOmniPosts')
-                    : t('home.empty.noPosts')}
+                  {omniOnly ? t('home.empty.noOmniPosts') : t('home.empty.noPosts')}
                 </p>
-                <p className="text-sm">
-                  {t('home.empty.subscribeMessage')}
-                </p>
+                <p className="text-sm">{t('home.empty.subscribeMessage')}</p>
               </div>
             )
           ) : (
@@ -1118,7 +1176,8 @@ export default function HomePage() {
             </p>
             <div className="mt-4">
               <label className="mb-1 block text-xs font-medium text-[var(--color-text-secondary)]">
-                {t('modals.delete.reasonLabel')} <span className="text-red-500">{t('modals.delete.reasonRequired')}</span>
+                {t('modals.delete.reasonLabel')}{' '}
+                <span className="text-red-500">{t('modals.delete.reasonRequired')}</span>
               </label>
               <textarea
                 value={deleteReason}
@@ -1143,7 +1202,9 @@ export default function HomePage() {
                 disabled={deletePostMutation.isPending || !deleteReason.trim()}
                 className="rounded bg-red-600 px-3 py-1 text-sm font-semibold text-white hover:bg-red-500 disabled:opacity-50"
               >
-                {deletePostMutation.isPending ? t('modals.delete.deleting') : t('modals.delete.deleteButton')}
+                {deletePostMutation.isPending
+                  ? t('modals.delete.deleting')
+                  : t('modals.delete.deleteButton')}
               </button>
             </div>
           </div>
@@ -1166,9 +1227,7 @@ export default function HomePage() {
               </button>
             </div>
             <div className="mt-3 rounded border border-yellow-200 bg-yellow-50 p-3 text-sm text-yellow-800">
-              <p>
-                {t('modals.crosspost.info')}
-              </p>
+              <p>{t('modals.crosspost.info')}</p>
             </div>
             <div className="mt-4 space-y-3">
               <div>
@@ -1183,7 +1242,7 @@ export default function HomePage() {
                   <option value="">{t('modals.crosspost.selectHub')}</option>
                   {subscribedHubs?.map((sub) => (
                     <option key={sub.hub_id} value={sub.hub_name}>
-                      h/{sub.hub_name}
+                      {t('common.format.hubPath', { name: sub.hub_name })}
                     </option>
                   ))}
                 </select>
@@ -1200,14 +1259,15 @@ export default function HomePage() {
                   <option value="">{t('modals.crosspost.selectSubreddit')}</option>
                   {subscribedSubreddits?.map((sub) => (
                     <option key={sub.id} value={sub.subreddit_name}>
-                      r/{sub.subreddit_name}
+                      {t('common.format.subredditPath', { name: sub.subreddit_name })}
                     </option>
                   ))}
                 </select>
               </div>
               <div>
                 <label className="mb-1 block text-xs font-medium text-[var(--color-text-secondary)]">
-                  {t('modals.crosspost.titleLabel')} <span className="text-red-500">{t('modals.crosspost.titleRequired')}</span>
+                  {t('modals.crosspost.titleLabel')}{' '}
+                  <span className="text-red-500">{t('modals.crosspost.titleRequired')}</span>
                 </label>
                 <input
                   type="text"
@@ -1225,10 +1285,7 @@ export default function HomePage() {
                   onChange={(e) => setSendRepliesToInbox(e.target.checked)}
                   className="mt-0.5"
                 />
-                <label
-                  htmlFor="send-replies"
-                  className="text-sm text-[var(--color-text-primary)]"
-                >
+                <label htmlFor="send-replies" className="text-sm text-[var(--color-text-primary)]">
                   {t('modals.crosspost.sendRepliesLabel')}
                 </label>
               </div>
@@ -1248,7 +1305,9 @@ export default function HomePage() {
                   }
                   className="rounded bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)] disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  {crosspostMutation.isPending ? t('modals.crosspost.submitting') : t('modals.crosspost.submitButton')}
+                  {crosspostMutation.isPending
+                    ? t('modals.crosspost.submitting')
+                    : t('modals.crosspost.submitButton')}
                 </button>
               </div>
             </div>

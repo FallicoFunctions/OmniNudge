@@ -1,9 +1,13 @@
 import { useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { modMailService } from '../../services/modMailService';
 import { encryptionService } from '../../services/encryptionService';
 import { getOwnKeys, getUserPublicKey } from '../../services/keyManagementService';
-import { encryptForMultipleRecipients, type MultiRecipientEncryptionResult } from '../../utils/encryption';
+import {
+  encryptForMultipleRecipients,
+  type MultiRecipientEncryptionResult,
+} from '../../utils/encryption';
 import { useAuth } from '../../contexts/AuthContext';
 import { Modal } from '../common/Modal';
 import { ModalCloseButton } from '../ui/ModalCloseButton';
@@ -14,6 +18,7 @@ interface ModMailModalProps {
 }
 
 export function ModMailModal({ hubName, onClose }: ModMailModalProps) {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const [subject, setSubject] = useState('');
   const [message, setMessage] = useState('');
@@ -32,13 +37,11 @@ export function ModMailModal({ hubName, onClose }: ModMailModalProps) {
     const recipients = await modMailService.getRecipients(hubName);
     const recipientIds = recipients.recipient_ids ?? [];
     const participantIds = Array.from(
-      new Set(
-        [user?.id, ...recipientIds].filter((id): id is number => typeof id === 'number')
-      )
+      new Set([user?.id, ...recipientIds].filter((id): id is number => typeof id === 'number'))
     );
 
     if (!participantIds.length) {
-      setEncryptionWarning('No participants found to encrypt the message for; sending plaintext.');
+      setEncryptionWarning(t('modMailModal.encryption.noParticipants'));
       return { is_multi_recipient: false, encryption_version: 'plaintext', message };
     }
 
@@ -65,7 +68,7 @@ export function ModMailModal({ hubName, onClose }: ModMailModalProps) {
 
     // Check if sender has keys (required)
     if (!ownKeys?.publicKey) {
-      const errorMsg = 'CRITICAL: You have not set up encryption keys. Cannot send mod mail.';
+      const errorMsg = t('modMailModal.encryption.senderMissingKeys');
       setEncryptionWarning(errorMsg);
       throw new Error(errorMsg);
     }
@@ -79,7 +82,7 @@ export function ModMailModal({ hubName, onClose }: ModMailModalProps) {
 
     // If no recipients have keys, we can't encrypt (need at least sender's key)
     if (cryptoKeys.length === 0) {
-      const errorMsg = 'CRITICAL: No recipients have encryption enabled. Cannot send encrypted mod mail.';
+      const errorMsg = t('modMailModal.encryption.noRecipientsEnabled');
       setEncryptionWarning(errorMsg);
       throw new Error(errorMsg);
     }
@@ -131,7 +134,7 @@ export function ModMailModal({ hubName, onClose }: ModMailModalProps) {
     onError: (err: unknown) => {
       const error = err as { response?: { data?: { error?: string } }; message?: string };
       const friendlyMessage =
-        error?.response?.data?.error || error?.message || 'Failed to send mod mail';
+        error?.response?.data?.error || error?.message || t('modMailModal.errors.sendFailed');
       setError(friendlyMessage);
     },
   });
@@ -141,12 +144,12 @@ export function ModMailModal({ hubName, onClose }: ModMailModalProps) {
     setError('');
 
     if (!subject.trim()) {
-      setError('Subject is required');
+      setError(t('modMailModal.errors.subjectRequired'));
       return;
     }
 
     if (!message.trim()) {
-      setError('Message is required');
+      setError(t('modMailModal.errors.messageRequired'));
       return;
     }
 
@@ -160,82 +163,86 @@ export function ModMailModal({ hubName, onClose }: ModMailModalProps) {
       overlayClassName="bg-black/40"
       className="relative bg-[var(--color-surface-elevated)] rounded-lg shadow-xl max-w-2xl w-full p-6"
     >
-        {/* MODAL-3: Standard close button */}
-        <ModalCloseButton onClose={onClose} />
+      {/* MODAL-3: Standard close button */}
+      <ModalCloseButton onClose={onClose} />
 
-        <div className="mb-4 pr-12">
-          <h3 className="text-xl font-semibold">Message the Moderators</h3>
-          <p className="text-[var(--color-text-secondary)] text-sm mt-1">
-            Send a message to the moderators of h/{hubName}
-          </p>
+      <div className="mb-4 pr-12">
+        <h3 className="text-xl font-semibold">{t('modMailModal.title')}</h3>
+        <p className="text-[var(--color-text-secondary)] text-sm mt-1">
+          {t('modMailModal.subtitle', { hubName })}
+        </p>
+      </div>
+
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <label htmlFor="subject" className="block text-sm font-semibold mb-2">
+            {t('modMailModal.fields.subject.label')}
+          </label>
+          <input
+            id="subject"
+            type="text"
+            value={subject}
+            onChange={(e) => setSubject(e.target.value)}
+            maxLength={300}
+            placeholder={t('modMailModal.fields.subject.placeholder')}
+            className="w-full px-4 py-2 border border-[var(--color-border)] rounded-lg bg-[var(--color-surface)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+          />
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label htmlFor="subject" className="block text-sm font-semibold mb-2">
-              Subject
-            </label>
-            <input
-              id="subject"
-              type="text"
-              value={subject}
-              onChange={(e) => setSubject(e.target.value)}
-              maxLength={300}
-              placeholder="What's this about?"
-              className="w-full px-4 py-2 border border-[var(--color-border)] rounded-lg bg-[var(--color-surface)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
-            />
+        <div>
+          <label htmlFor="message" className="block text-sm font-semibold mb-2">
+            {t('modMailModal.fields.message.label')}
+          </label>
+          <textarea
+            id="message"
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            rows={8}
+            placeholder={t('modMailModal.fields.message.placeholder')}
+            className="w-full px-4 py-2 border border-[var(--color-border)] rounded-lg bg-[var(--color-surface)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] resize-none"
+          />
+        </div>
+
+        {error && (
+          <div className="text-red-600 text-sm bg-red-50 border border-red-200 rounded p-3">
+            {error}
           </div>
+        )}
 
-          <div>
-            <label htmlFor="message" className="block text-sm font-semibold mb-2">
-              Message
-            </label>
-            <textarea
-              id="message"
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              rows={8}
-              placeholder="Write your message to the moderators..."
-              className="w-full px-4 py-2 border border-[var(--color-border)] rounded-lg bg-[var(--color-surface)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] resize-none"
-            />
+        {encryptionWarning && (
+          <div className="text-amber-700 text-sm bg-amber-50 border border-amber-200 rounded p-3">
+            {encryptionWarning}
           </div>
+        )}
 
-          {error && (
-            <div className="text-red-600 text-sm bg-red-50 border border-red-200 rounded p-3">
-              {error}
-            </div>
-          )}
-
-          {encryptionWarning && (
-            <div className="text-amber-700 text-sm bg-amber-50 border border-amber-200 rounded p-3">
-              {encryptionWarning}
-            </div>
-          )}
-
-          {success && (
-            <div className="text-green-600 text-sm bg-green-50 border border-green-200 rounded p-3">
-              Message sent successfully! The moderators will see your message.
-            </div>
-          )}
-
-          <div className="flex justify-end gap-3">
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={createMutation.isPending || success}
-              className="px-4 py-2 rounded border border-[var(--color-border)] bg-[var(--color-surface-elevated)] hover:bg-[var(--color-surface-hover)] disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={createMutation.isPending || success}
-              className="px-4 py-2 rounded bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-strong)] disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {createMutation.isPending ? 'Sending...' : success ? 'Sent!' : 'Send to Moderators'}
-            </button>
+        {success && (
+          <div className="text-green-600 text-sm bg-green-50 border border-green-200 rounded p-3">
+            {t('modMailModal.success.sent')}
           </div>
-        </form>
+        )}
+
+        <div className="flex justify-end gap-3">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={createMutation.isPending || success}
+            className="px-4 py-2 rounded border border-[var(--color-border)] bg-[var(--color-surface-elevated)] hover:bg-[var(--color-surface-hover)] disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {t('common.cancel')}
+          </button>
+          <button
+            type="submit"
+            disabled={createMutation.isPending || success}
+            className="px-4 py-2 rounded bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-strong)] disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {createMutation.isPending
+              ? t('messages.deliveryStatus.sending')
+              : success
+                ? t('modMailModal.actions.sent')
+                : t('modMailModal.actions.send')}
+          </button>
+        </div>
+      </form>
     </Modal>
   );
 }

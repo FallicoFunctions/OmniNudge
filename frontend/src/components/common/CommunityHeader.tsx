@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import type { ReactNode } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { subscriptionService } from '../../services/subscriptionService';
 import { useAuth } from '../../contexts/AuthContext';
 import { SubscribeButton } from './SubscribeButton';
@@ -44,6 +45,7 @@ export function CommunityHeader({
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuth();
+  const { t } = useTranslation();
 
   const isHub = communityType === 'hub';
   const isSubreddit = communityType === 'subreddit';
@@ -54,13 +56,15 @@ export function CommunityHeader({
 
   const headerLabel = useMemo(() => {
     if (isHub) {
-      if (communityName === 'popular') return 'h/popular';
-      if (communityName === 'all') return 'h/all';
+      if (communityName === 'popular') return t('communityHeader.labels.hPopular');
+      if (communityName === 'all') return t('communityHeader.labels.hAll');
       if (displayTitle) return displayTitle;
       return `h/${communityName}`;
     }
+    if (communityName === 'popular') return t('communityHeader.labels.rPopular');
+    if (communityName === 'frontpage') return t('communityHeader.labels.rFrontpage');
     return `r/${communityName}`;
-  }, [isHub, communityName, displayTitle]);
+  }, [isHub, communityName, displayTitle, t]);
 
   const defaultReturnTo = isHub ? `/h/${communityName}` : `/r/${communityName}`;
 
@@ -75,9 +79,7 @@ export function CommunityHeader({
   const shouldShowActions = isSubreddit ? !isSpecialCommunity : true;
 
   // Determine which subscription status to use
-  const subscriptionActive = isHub
-    ? hubSubscriptionStatus?.is_subscribed
-    : isSubscribed;
+  const subscriptionActive = isHub ? hubSubscriptionStatus?.is_subscribed : isSubscribed;
 
   if (!communityName) return null;
 
@@ -104,15 +106,13 @@ export function CommunityHeader({
               </h1>
               {isNsfw && (
                 <span className="rounded bg-red-600 px-2 py-0.5 text-xs font-semibold text-white">
-                  NSFW
+                  {t('posts.badges.nsfw')}
                 </span>
               )}
             </div>
           </div>
         </div>
-        <div className="hidden px-4 lg:block">
-          {hubSearch}
-        </div>
+        <div className="hidden px-4 lg:block">{hubSearch}</div>
       </div>
 
       {/* Row 2: Action buttons and post search */}
@@ -146,7 +146,7 @@ export function CommunityHeader({
                     }
                     className="whitespace-nowrap px-4 py-2 bg-[var(--color-surface-elevated)] text-[var(--color-text-primary)] rounded hover:bg-[var(--color-border)]"
                   >
-                    Subscribe
+                    {t('common.subscribe')}
                   </button>
                 )}
               </>
@@ -156,7 +156,7 @@ export function CommunityHeader({
                 onClick={() => navigate(`/h/${communityName}/mod`)}
                 className="whitespace-nowrap px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700"
               >
-                Mod Tools
+                {t('common.modTools')}
               </button>
             )}
             {isHub ? (
@@ -164,10 +164,16 @@ export function CommunityHeader({
                 user={user}
                 onCreatePost={() =>
                   navigate('/posts/create', {
-                    state: { defaultHub: communityName, returnTo: defaultReturnTo, originPath: location.pathname },
+                    state: {
+                      defaultHub: communityName,
+                      returnTo: defaultReturnTo,
+                      originPath: location.pathname,
+                    },
                   })
                 }
-                onCreateHub={() => navigate('/hubs/create', { state: { returnTo: defaultReturnTo } })}
+                onCreateHub={() =>
+                  navigate('/hubs/create', { state: { returnTo: defaultReturnTo } })
+                }
                 postAuth={{
                   redirectTo: '/posts/create',
                   redirectState: { defaultHub: communityName, returnTo: defaultReturnTo },
@@ -184,10 +190,16 @@ export function CommunityHeader({
                   user={user}
                   onCreatePost={() =>
                     navigate('/posts/create', {
-                      state: { defaultSubreddit: communityName, returnTo: defaultReturnTo, originPath: location.pathname },
+                      state: {
+                        defaultSubreddit: communityName,
+                        returnTo: defaultReturnTo,
+                        originPath: location.pathname,
+                      },
                     })
                   }
-                  onCreateHub={() => navigate('/hubs/create', { state: { returnTo: defaultReturnTo } })}
+                  onCreateHub={() =>
+                    navigate('/hubs/create', { state: { returnTo: defaultReturnTo } })
+                  }
                   postAuth={{
                     redirectTo: '/posts/create',
                     redirectState: { defaultSubreddit: communityName, returnTo: defaultReturnTo },
@@ -202,9 +214,7 @@ export function CommunityHeader({
             )}
           </div>
         </div>
-        <div className="hidden px-4 lg:block">
-          {postSearch}
-        </div>
+        <div className="hidden px-4 lg:block">{postSearch}</div>
       </div>
 
       {/* Row 3: Sort controls */}

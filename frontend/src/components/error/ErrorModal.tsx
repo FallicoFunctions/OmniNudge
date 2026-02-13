@@ -1,4 +1,5 @@
 import { AlertCircle, X } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 interface ErrorModalProps {
   isOpen: boolean;
@@ -17,8 +18,11 @@ export function ErrorModal({
   details,
   onClose,
   onRetry,
-  actionLabel = 'Try Again',
+  actionLabel,
 }: ErrorModalProps) {
+  const { t } = useTranslation();
+  const actionLabelText = actionLabel ?? t('emptyStates.error.actions.tryAgain');
+
   if (!isOpen) return null;
 
   return (
@@ -27,7 +31,7 @@ export function ErrorModal({
         <button
           onClick={onClose}
           className="absolute top-4 right-4 text-secondary hover:text-primary"
-          aria-label="Close"
+          aria-label={t('common.close')}
         >
           <X size={20} />
         </button>
@@ -54,7 +58,7 @@ export function ErrorModal({
             onClick={onClose}
             className="flex-1 px-4 py-2 border border-border rounded hover:bg-secondary/10"
           >
-            Close
+            {t('common.close')}
           </button>
           {onRetry && (
             <button
@@ -64,7 +68,7 @@ export function ErrorModal({
               }}
               className="flex-1 px-4 py-2 bg-primary text-white rounded hover:bg-primary-dark"
             >
-              {actionLabel}
+              {actionLabelText}
             </button>
           )}
         </div>
@@ -78,8 +82,8 @@ export function ConfirmDialog({
   isOpen,
   title,
   message,
-  confirmLabel = 'Confirm',
-  cancelLabel = 'Cancel',
+  confirmLabel,
+  cancelLabel,
   variant = 'danger',
   onConfirm,
   onCancel,
@@ -93,7 +97,12 @@ export function ConfirmDialog({
   onConfirm: () => void;
   onCancel: () => void;
 }) {
+  const { t } = useTranslation();
+
   if (!isOpen) return null;
+
+  const confirmLabelText = confirmLabel ?? t('common.confirm');
+  const cancelLabelText = cancelLabel ?? t('common.cancel');
 
   const variantStyles = {
     danger: 'bg-red-600 hover:bg-red-700',
@@ -112,13 +121,13 @@ export function ConfirmDialog({
             onClick={onCancel}
             className="flex-1 px-4 py-2 border border-border rounded hover:bg-secondary/10"
           >
-            {cancelLabel}
+            {cancelLabelText}
           </button>
           <button
             onClick={onConfirm}
             className={`flex-1 px-4 py-2 text-white rounded ${variantStyles[variant]}`}
           >
-            {confirmLabel}
+            {confirmLabelText}
           </button>
         </div>
       </div>

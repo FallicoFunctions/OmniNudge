@@ -31,7 +31,7 @@ export function TabBarItem({
   onClick,
   onLongPress,
   badge,
-  testId
+  testId,
 }: TabBarItemProps) {
   const { t } = useTranslation();
   const [shouldAnimate, setShouldAnimate] = useState(false);
@@ -39,10 +39,13 @@ export function TabBarItem({
   const longPressTimerRef = useRef<number | null>(null);
 
   const label = t(translationKey);
-  const badgeLabel = badge && badge > 0
-    ? t('ariaLabels.unreadMessages', { count: badge })
-    : '';
+  const badgeLabel = badge && badge > 0 ? t('ariaLabels.unreadMessages', { count: badge }) : '';
   const longPressHint = onLongPress ? t('ariaLabels.longPressForMoreOptions') : '';
+  const badgeSuffix = badgeLabel ? t('ariaLabels.tabBarItem.badgeSuffix', { badgeLabel }) : '';
+  const longPressSuffix = longPressHint
+    ? t('ariaLabels.tabBarItem.longPressSuffix', { longPressHint })
+    : '';
+  const ariaLabel = `${label}${badgeSuffix}${longPressSuffix}`;
 
   // Animate badge only when count changes
   useEffect(() => {
@@ -86,7 +89,7 @@ export function TabBarItem({
         ${active ? 'text-[var(--color-primary)]' : 'text-[var(--color-text-secondary)]'}
       `}
       style={{ touchAction: 'manipulation' }}
-      aria-label={`${label}${badgeLabel ? ` - ${badgeLabel}` : ''}${longPressHint ? ` ${longPressHint}` : ''}`}
+      aria-label={ariaLabel}
       aria-current={active ? 'page' : undefined}
       data-testid={testId}
     >
@@ -105,7 +108,7 @@ export function TabBarItem({
             className={`absolute -top-1 -right-1 flex items-center justify-center px-1 text-[10px] font-semibold text-white bg-[var(--color-error)] rounded-full ${shouldAnimate ? 'animate-scale-in' : ''}`}
             style={{
               minWidth: `${MOBILE_SIZES.BADGE_SIZE}px`,
-              height: `${MOBILE_SIZES.BADGE_SIZE}px`
+              height: `${MOBILE_SIZES.BADGE_SIZE}px`,
             }}
             aria-hidden="true"
           >

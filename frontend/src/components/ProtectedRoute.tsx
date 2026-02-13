@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
 import { StatusMessage } from './common/StatusMessage';
 
@@ -8,6 +9,7 @@ interface ProtectedRouteProps {
 }
 
 export default function ProtectedRoute({ children }: ProtectedRouteProps) {
+  const { t } = useTranslation();
   const { isAuthenticated, isLoading } = useAuth();
   const location = useLocation();
   // Track if the user was ever authenticated in this component's lifetime.
@@ -22,16 +24,18 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated && !wasAuthenticated.current) {
-      window.dispatchEvent(new CustomEvent('open-auth-modal', {
-        detail: { mode: 'login', redirectTo: location.pathname },
-      }));
+      window.dispatchEvent(
+        new CustomEvent('open-auth-modal', {
+          detail: { mode: 'login', redirectTo: location.pathname },
+        })
+      );
     }
   }, [isLoading, isAuthenticated, location.pathname]);
 
   if (isLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[var(--color-background)]">
-        <StatusMessage>Loading...</StatusMessage>
+        <StatusMessage>{t('common.loading')}</StatusMessage>
       </div>
     );
   }

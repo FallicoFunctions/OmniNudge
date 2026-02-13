@@ -62,7 +62,8 @@ export default function PostDetailPage() {
   const { user } = useAuth();
   const { t } = useTranslation();
   const { formatNumber, formatDate, formatRelativeTime } = useFormat();
-  const { useRelativeTime, stayOnPostAfterHide, searchIncludeNsfwByDefault, blockAllNsfw } = useSettings();
+  const { useRelativeTime, stayOnPostAfterHide, searchIncludeNsfwByDefault, blockAllNsfw } =
+    useSettings();
 
   const formatSubmittedAt = (timestamp: string | number | Date) => {
     const d = new Date(timestamp);
@@ -72,7 +73,13 @@ export default function PostDetailPage() {
       return formatRelativeTime(d);
     }
 
-    return formatDate(d, { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
+    return formatDate(d, {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+    });
   };
 
   const [commentText, setCommentText] = useState('');
@@ -82,9 +89,15 @@ export default function PostDetailPage() {
   const [embedCopied, setEmbedCopied] = useState(false);
   const [imageExpanded, setImageExpanded] = useState(false);
   const [showModMailModal, setShowModMailModal] = useState(false);
-  const [deleteCommentTarget, setDeleteCommentTarget] = useState<{ commentId: number; authorId: number } | null>(null);
+  const [deleteCommentTarget, setDeleteCommentTarget] = useState<{
+    commentId: number;
+    authorId: number;
+  } | null>(null);
   const [deleteCommentReason, setDeleteCommentReason] = useState('');
-  const [deletePostTarget, setDeletePostTarget] = useState<{ postId: number; authorId: number } | null>(null);
+  const [deletePostTarget, setDeletePostTarget] = useState<{
+    postId: number;
+    authorId: number;
+  } | null>(null);
   const [deletePostReason, setDeletePostReason] = useState('');
   const [editPostTarget, setEditPostTarget] = useState<PlatformPost | null>(null);
   const [subredditInputValue, setSubredditInputValue] = useState('');
@@ -446,7 +459,12 @@ export default function PostDetailPage() {
       return target ? [target] : [];
     }
     const filtered = commentsList.filter((c) => {
-      console.log('[PostDetailPage] Filtering comment:', c.id, 'parent_comment_id:', c.parent_comment_id);
+      console.log(
+        '[PostDetailPage] Filtering comment:',
+        c.id,
+        'parent_comment_id:',
+        c.parent_comment_id
+      );
       return c.parent_comment_id === null || c.parent_comment_id === undefined;
     });
     console.log('[PostDetailPage] topLevelComments filtered result:', filtered);
@@ -475,10 +493,7 @@ export default function PostDetailPage() {
     isError: hubDetailsError,
   } = useHubDetails(hubName, Boolean(hubName));
   const { data: hubSettings } = useHubSettings(hubName, Boolean(hubName));
-  const hubDisplayTitle =
-    hubSettings?.display_title?.trim() ||
-    hubDetails?.title?.trim() ||
-    null;
+  const hubDisplayTitle = hubSettings?.display_title?.trim() || hubDetails?.title?.trim() || null;
   const { data: hubActiveUsersData } = useHubActiveUsers(hubName, user);
 
   const {
@@ -606,9 +621,7 @@ export default function PostDetailPage() {
     }
     const shouldWarn = isPostSaved;
     const confirmed = shouldWarn
-      ? window.confirm(
-        t('modals.hide.confirmSaved')
-      )
+      ? confirm(t('modals.hide.confirmSaved'))
       : window.confirm(t('modals.hide.confirmSimple'));
     if (!confirmed) {
       return;
@@ -646,13 +659,18 @@ export default function PostDetailPage() {
   }
 
   if (postLoadError) {
-    const message = postLoadErrorDetails instanceof Error ? postLoadErrorDetails.message : t('posts.errors.loadFailed');
+    const message =
+      postLoadErrorDetails instanceof Error
+        ? postLoadErrorDetails.message
+        : t('posts.errors.loadFailed');
     if (message.toLowerCase().includes('not found')) {
       return <NotFoundPage />;
     }
     return (
       <div className="mx-auto max-w-4xl px-0 py-8 md:px-4">
-        <div className="text-[var(--color-text-secondary)]">{t('posts.errors.loadFailed')}: {message}</div>
+        <div className="text-[var(--color-text-secondary)]">
+          {t('posts.errors.loadFailed')}: {message}
+        </div>
       </div>
     );
   }
@@ -692,7 +710,7 @@ export default function PostDetailPage() {
               )}
               postValue=""
               postPlaceholder=""
-              onPostChange={() => { }}
+              onPostChange={() => {}}
               onPostSubmit={(event) => event.preventDefault()}
               postDropdownOpen={false}
             />
@@ -738,7 +756,9 @@ export default function PostDetailPage() {
                       checked={limitSearchToContext}
                       onChange={(e) => setLimitSearchToContext(e.target.checked)}
                     />
-                    <span>{t('home.search.limitToSubreddit', { subreddit: normalizedSubreddit })}</span>
+                    <span>
+                      {t('home.search.limitToSubreddit', { subreddit: normalizedSubreddit })}
+                    </span>
                   </label>
                   {!blockAllNsfw && (
                     <label className="flex items-center gap-2">
@@ -803,7 +823,9 @@ export default function PostDetailPage() {
                     checked={limitSearchToContext}
                     onChange={(e) => setLimitSearchToContext(e.target.checked)}
                   />
-                  <span>{t('home.search.limitToSubreddit', { subreddit: normalizedSubreddit })}</span>
+                  <span>
+                    {t('home.search.limitToSubreddit', { subreddit: normalizedSubreddit })}
+                  </span>
                 </label>
                 {!blockAllNsfw && (
                   <label className="flex items-center gap-2">
@@ -855,7 +877,7 @@ export default function PostDetailPage() {
               )}
               postValue=""
               postPlaceholder=""
-              onPostChange={() => { }}
+              onPostChange={() => {}}
               onPostSubmit={(event) => event.preventDefault()}
               postDropdownOpen={false}
             />
@@ -999,32 +1021,32 @@ export default function PostDetailPage() {
                 titleBadges={
                   postData?.nsfw ? (
                     <span className="inline-flex items-center rounded bg-red-600 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">
-                      NSFW
+                      {t('posts.badges.nsfw')}
                     </span>
                   ) : undefined
                 }
                 metadataItems={[
                   ...(hubName
                     ? [
-                      <Link
-                        key="hub"
-                        to={`/h/${hubName}`}
-                        className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
-                      >
-                        {hubDisplayTitle ?? `h/${hubName}`}
-                      </Link>,
-                    ]
+                        <Link
+                          key="hub"
+                          to={`/h/${hubName}`}
+                          className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+                        >
+                          {hubDisplayTitle ?? `h/${hubName}`}
+                        </Link>,
+                      ]
                     : []),
                   ...(targetSubreddit
                     ? [
-                      <Link
-                        key="subreddit"
-                        to={`/r/${targetSubreddit}`}
-                        className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
-                      >
-                        r/{targetSubreddit}
-                      </Link>,
-                    ]
+                        <Link
+                          key="subreddit"
+                          to={`/r/${targetSubreddit}`}
+                          className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+                        >
+                          {t('common.format.subredditPath', { name: targetSubreddit })}
+                        </Link>,
+                      ]
                     : []),
                   <span key="author">
                     {t('posts.postedByLabel')}{' '}
@@ -1068,8 +1090,10 @@ export default function PostDetailPage() {
                 <div className="flex flex-wrap gap-4 text-xs text-[var(--color-text-secondary)]">
                   <span>
                     {t('posts.comment', {
-                      count: (postData.comment_count ?? postData.num_comments ?? 0),
-                      formattedCount: formatNumber(postData.comment_count ?? postData.num_comments ?? 0)
+                      count: postData.comment_count ?? postData.num_comments ?? 0,
+                      formattedCount: formatNumber(
+                        postData.comment_count ?? postData.num_comments ?? 0
+                      ),
                     })}
                   </span>
                   <span>•</span>
@@ -1142,7 +1166,9 @@ export default function PostDetailPage() {
           )}
 
           <Panel>
-            <h2 className="mb-4 text-xl font-semibold text-[var(--color-text-primary)]">{t('comments.title')}</h2>
+            <h2 className="mb-4 text-xl font-semibold text-[var(--color-text-primary)]">
+              {t('comments.title')}
+            </h2>
             <form
               onSubmit={(e) => {
                 e.preventDefault();
@@ -1168,7 +1194,9 @@ export default function PostDetailPage() {
                   onClick={() => setShowFormattingHelp((prev) => !prev)}
                   className="hover:text-[var(--color-primary)]"
                 >
-                  {showFormattingHelp ? t('comments.formatting.hide') : t('comments.formatting.show')}
+                  {showFormattingHelp
+                    ? t('comments.formatting.hide')
+                    : t('comments.formatting.show')}
                 </button>
               </div>
               {showFormattingHelp && (
@@ -1195,7 +1223,9 @@ export default function PostDetailPage() {
                 disabled={handleCreateComment.isPending || !commentText.trim()}
                 className="mt-2 rounded-md bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)] disabled:opacity-50"
               >
-                {handleCreateComment.isPending ? t('comments.status.posting') : t('comments.addComment')}
+                {handleCreateComment.isPending
+                  ? t('comments.status.posting')
+                  : t('comments.addComment')}
               </button>
             </form>
 
@@ -1243,7 +1273,9 @@ export default function PostDetailPage() {
                     replyingTo={replyingTo}
                     onReplySelect={(commentId) => {
                       if (!user) {
-                        window.dispatchEvent(new CustomEvent('open-auth-modal', { detail: 'login' }));
+                        window.dispatchEvent(
+                          new CustomEvent('open-auth-modal', { detail: 'login' })
+                        );
                         return;
                       }
                       setReplyingTo(commentId);
@@ -1307,7 +1339,9 @@ export default function PostDetailPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
           <div className="w-full max-w-lg rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-6 shadow-2xl">
             <div className="mb-3 flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">{t('posts.embed.title')}</h3>
+              <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">
+                {t('posts.embed.title')}
+              </h3>
               <button
                 onClick={() => {
                   setEmbedTarget(null);
@@ -1444,7 +1478,9 @@ export default function PostDetailPage() {
                 disabled={!deletePostReason.trim() || deletePostMutation.isPending}
                 className="rounded bg-red-600 px-3 py-1 text-sm font-semibold text-white hover:bg-red-500 disabled:opacity-50"
               >
-                {deletePostMutation.isPending ? t('posts.status.deleting') : t('posts.actions.delete')}
+                {deletePostMutation.isPending
+                  ? t('posts.status.deleting')
+                  : t('posts.actions.delete')}
               </button>
             </div>
           </div>

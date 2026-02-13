@@ -3,6 +3,9 @@
  * Includes: Field errors, form errors, page errors, inline errors
  */
 
+import type { ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
+
 // Field Error - For individual form field validation
 interface FieldErrorProps {
   message: string;
@@ -11,11 +14,7 @@ interface FieldErrorProps {
 
 export function FieldError({ message, id }: FieldErrorProps) {
   return (
-    <p
-      id={id}
-      className="mt-1 text-sm text-red-600"
-      role="alert"
-    >
+    <p id={id} className="mt-1 text-sm text-red-600" role="alert">
       {message}
     </p>
   );
@@ -30,6 +29,8 @@ interface FormErrorProps {
 }
 
 export function FormError({ title, message, details, onDismiss }: FormErrorProps) {
+  const { t } = useTranslation();
+
   return (
     <div
       className="rounded-lg border border-red-200 bg-red-50 p-4"
@@ -55,19 +56,9 @@ export function FormError({ title, message, details, onDismiss }: FormErrorProps
 
         {/* Error content */}
         <div className="flex-1">
-          {title && (
-            <h3 className="text-sm font-semibold text-red-800 mb-1">
-              {title}
-            </h3>
-          )}
-          <p className="text-sm text-red-700">
-            {message}
-          </p>
-          {details && (
-            <p className="mt-2 text-xs text-red-600">
-              {details}
-            </p>
-          )}
+          {title && <h3 className="text-sm font-semibold text-red-800 mb-1">{title}</h3>}
+          <p className="text-sm text-red-700">{message}</p>
+          {details && <p className="mt-2 text-xs text-red-600">{details}</p>}
         </div>
 
         {/* Dismiss button */}
@@ -76,10 +67,21 @@ export function FormError({ title, message, details, onDismiss }: FormErrorProps
             type="button"
             onClick={onDismiss}
             className="flex-shrink-0 text-red-600 hover:text-red-800"
-            aria-label="Dismiss error"
+            aria-label={t('common.close')}
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            <svg
+              className="w-5 h-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M6 18L18 6M6 6l12 12"
+              />
             </svg>
           </button>
         )}
@@ -99,15 +101,10 @@ interface PageErrorProps {
   fullPage?: boolean;
 }
 
-export function PageError({
-  title = 'Something went wrong',
-  message,
-  action,
-  fullPage = false
-}: PageErrorProps) {
-  const containerClasses = fullPage
-    ? 'min-h-screen flex items-center justify-center p-6'
-    : 'p-6';
+export function PageError({ title, message, action, fullPage = false }: PageErrorProps) {
+  const { t } = useTranslation();
+  const containerClasses = fullPage ? 'min-h-screen flex items-center justify-center p-6' : 'p-6';
+  const resolvedTitle = title ?? t('errors.somethingWentWrong');
 
   return (
     <div className={containerClasses}>
@@ -132,11 +129,9 @@ export function PageError({
 
         {/* Error text */}
         <h2 className="text-xl font-semibold text-[var(--color-text-primary)] mb-2">
-          {title}
+          {resolvedTitle}
         </h2>
-        <p className="text-[var(--color-text-secondary)] mb-6">
-          {message}
-        </p>
+        <p className="text-[var(--color-text-secondary)] mb-6">{message}</p>
 
         {/* Action button */}
         {action && (
@@ -161,10 +156,7 @@ interface InlineErrorProps {
 
 export function InlineError({ message, className = '' }: InlineErrorProps) {
   return (
-    <div
-      className={`flex items-center gap-2 text-sm text-red-600 ${className}`}
-      role="alert"
-    >
+    <div className={`flex items-center gap-2 text-sm text-red-600 ${className}`} role="alert">
       <svg
         className="w-4 h-4 flex-shrink-0"
         fill="none"
@@ -190,10 +182,10 @@ interface NetworkErrorProps {
   onRetry?: () => void;
 }
 
-export function NetworkError({
-  message = 'Unable to connect. Please check your internet connection.',
-  onRetry
-}: NetworkErrorProps) {
+export function NetworkError({ message, onRetry }: NetworkErrorProps) {
+  const { t } = useTranslation();
+  const resolvedMessage = message ?? t('errors.networkError');
+
   return (
     <div className="rounded-lg border border-orange-200 bg-orange-50 p-4">
       <div className="flex items-start gap-3">
@@ -214,16 +206,14 @@ export function NetworkError({
         </svg>
 
         <div className="flex-1">
-          <p className="text-sm text-orange-800">
-            {message}
-          </p>
+          <p className="text-sm text-orange-800">{resolvedMessage}</p>
           {onRetry && (
             <button
               type="button"
               onClick={onRetry}
               className="mt-2 text-sm font-medium text-orange-700 hover:text-orange-900 underline"
             >
-              Try again
+              {t('emptyStates.error.actions.tryAgain')}
             </button>
           )}
         </div>
@@ -236,7 +226,7 @@ export function NetworkError({
 interface EmptyStateProps {
   title: string;
   message: string;
-  icon?: React.ReactNode;
+  icon?: ReactNode;
   action?: {
     label: string;
     onClick: () => void;
@@ -269,12 +259,8 @@ export function EmptyState({ title, message, icon, action }: EmptyStateProps) {
         </div>
       )}
 
-      <h3 className="text-lg font-semibold text-[var(--color-text-primary)] mb-2">
-        {title}
-      </h3>
-      <p className="text-sm text-[var(--color-text-secondary)] max-w-md mx-auto mb-4">
-        {message}
-      </p>
+      <h3 className="text-lg font-semibold text-[var(--color-text-primary)] mb-2">{title}</h3>
+      <p className="text-sm text-[var(--color-text-secondary)] max-w-md mx-auto mb-4">{message}</p>
 
       {action && (
         <button
@@ -296,6 +282,8 @@ interface SuccessStateProps {
 }
 
 export function SuccessState({ message, onDismiss }: SuccessStateProps) {
+  const { t } = useTranslation();
+
   return (
     <div
       className="rounded-lg border border-green-200 bg-green-50 p-4"
@@ -320,9 +308,7 @@ export function SuccessState({ message, onDismiss }: SuccessStateProps) {
         </svg>
 
         {/* Success message */}
-        <p className="flex-1 text-sm text-green-800">
-          {message}
-        </p>
+        <p className="flex-1 text-sm text-green-800">{message}</p>
 
         {/* Dismiss button */}
         {onDismiss && (
@@ -330,10 +316,21 @@ export function SuccessState({ message, onDismiss }: SuccessStateProps) {
             type="button"
             onClick={onDismiss}
             className="flex-shrink-0 text-green-600 hover:text-green-800"
-            aria-label="Dismiss message"
+            aria-label={t('common.close')}
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            <svg
+              className="w-5 h-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M6 18L18 6M6 6l12 12"
+              />
             </svg>
           </button>
         )}

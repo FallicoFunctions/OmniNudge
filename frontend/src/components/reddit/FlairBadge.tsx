@@ -1,4 +1,5 @@
 import { decodeHtmlEntities } from '../../utils/text';
+import { useTranslation } from 'react-i18next';
 
 interface FlairBadgeProps {
   text?: string | null;
@@ -29,6 +30,7 @@ const resolveTextColor = (value?: string | null) => {
 };
 
 export function FlairBadge({ text, backgroundColor, textColor, className = '' }: FlairBadgeProps) {
+  const { t } = useTranslation();
   const trimmed = decodeHtmlEntities(text)?.trim();
   if (!trimmed) {
     return null;
@@ -46,7 +48,7 @@ export function FlairBadge({ text, backgroundColor, textColor, className = '' }:
         borderColor: bg === 'var(--color-surface-elevated)' ? 'var(--color-border)' : bg,
         opacity: 0.9,
       }}
-      title={`Flair: ${trimmed}`}
+      title={t('posts.flairBadge.title', { flair: trimmed })}
     >
       {trimmed}
     </span>

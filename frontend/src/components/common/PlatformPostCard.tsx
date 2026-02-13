@@ -155,7 +155,6 @@ function withAutoplayParams(src: string, muted: boolean): string {
   }
 }
 
-
 interface PlatformPostCardProps {
   post: PlatformPost;
   useRelativeTime: boolean;
@@ -231,7 +230,13 @@ export function PlatformPostCard({
       return formatRelativeTime(d);
     }
 
-    return formatDate(d, { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
+    return formatDate(d, {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+    });
   }, [formatDate, formatRelativeTime, post.created_at, post.crossposted_at, t, useRelativeTime]);
 
   const toggleTextPreview = (postId: number) => {
@@ -291,7 +296,7 @@ export function PlatformPostCard({
     if (!videoEl) return;
     videoEl.muted = false;
     videoEl.volume = 1.0;
-    videoEl.play().catch(() => { });
+    videoEl.play().catch(() => {});
   }, [isInlinePreviewOpen, externalMedia, post.media_url]);
 
   const getPreviewSizing = (src: string): { className: string; style?: CSSProperties } => {
@@ -379,7 +384,7 @@ export function PlatformPostCard({
               </Link>
             ) : (
               <span className="font-semibold text-[var(--color-text-primary)]">
-                h/{t('posts.unknownHub')}
+                {t('common.format.hubPath', { name: t('posts.unknownHub') })}
               </span>
             )}
             <span> · </span>
@@ -396,7 +401,9 @@ export function PlatformPostCard({
                 type="button"
                 onClick={() => toggleTextPreview(post.id)}
                 aria-pressed={!!expandedTextMap[post.id]}
-                aria-label={isInlinePreviewOpen ? t('posts.aria.hidePreview') : t('posts.aria.showPreview')}
+                aria-label={
+                  isInlinePreviewOpen ? t('posts.aria.hidePreview') : t('posts.aria.showPreview')
+                }
                 className="flex h-7 w-7 items-center justify-center rounded border border-[var(--color-border)] bg-[var(--color-surface-elevated)] text-[var(--color-text-secondary)] hover:border-[var(--color-primary)] hover:text-[var(--color-primary)]"
               >
                 <span className="sr-only">
@@ -436,8 +443,19 @@ export function PlatformPostCard({
                   state={originState}
                   className="flex items-center gap-1.5 font-medium text-[var(--color-text-primary)] hover:text-[var(--color-primary)]"
                 >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                    aria-hidden="true"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
+                    />
                   </svg>
                   {commentsLabel}
                 </Link>
@@ -449,8 +467,19 @@ export function PlatformPostCard({
                     onClick={onShare}
                     className="flex items-center gap-1 text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
                   >
-                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                    <svg
+                      className="w-3.5 h-3.5"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                      aria-hidden="true"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"
+                      />
                     </svg>
                     {t('posts.share')}
                   </button>
@@ -462,10 +491,25 @@ export function PlatformPostCard({
                     disabled={isSavePending}
                     className="flex items-center gap-1 text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] disabled:opacity-60"
                   >
-                    <svg className="w-3.5 h-3.5" fill={isSaved ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+                    <svg
+                      className="w-3.5 h-3.5"
+                      fill={isSaved ? 'currentColor' : 'none'}
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                      aria-hidden="true"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"
+                      />
                     </svg>
-                    {isSavePending ? t('posts.status.saving') : isSaved ? t('posts.actions.unsave') : t('posts.save')}
+                    {isSavePending
+                      ? t('posts.status.saving')
+                      : isSaved
+                        ? t('posts.actions.unsave')
+                        : t('posts.save')}
                   </button>
                 )}
 
@@ -500,13 +544,15 @@ export function PlatformPostCard({
                     onClick={onTogglePin}
                     disabled={isPinning}
                     title={
-                      post.is_pinned
-                        ? t('posts.actions.unpinFromTop')
-                        : t('posts.actions.pinToTop')
+                      post.is_pinned ? t('posts.actions.unpinFromTop') : t('posts.actions.pinToTop')
                     }
                     className="text-xs text-[var(--color-text-muted)] hover:text-[var(--color-primary)] disabled:opacity-60"
                   >
-                    {isPinning ? t('posts.status.updating') : post.is_pinned ? t('posts.actions.unpin') : t('posts.actions.pin')}
+                    {isPinning
+                      ? t('posts.status.updating')
+                      : post.is_pinned
+                        ? t('posts.actions.unpin')
+                        : t('posts.actions.pin')}
                   </button>
                 )}
 

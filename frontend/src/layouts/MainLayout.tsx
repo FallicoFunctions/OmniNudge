@@ -45,14 +45,13 @@ export default function MainLayout() {
   const { notifyArchivedMessages } = useSettings();
   const { state: multiColumnState } = useMultiColumnFeed();
   const [authModal, setAuthModal] = useState<'login' | 'signup' | 'forgot-password' | null>(null);
-  const [pendingRedirect, setPendingRedirect] = useState<{ to: string; state?: unknown } | null>(null);
-  const [pendingAction, setPendingAction] = useState<
-    | null
-    | {
-        type: 'subscribeSubreddit';
-        subreddit: string;
-      }
-  >(null);
+  const [pendingRedirect, setPendingRedirect] = useState<{ to: string; state?: unknown } | null>(
+    null
+  );
+  const [pendingAction, setPendingAction] = useState<null | {
+    type: 'subscribeSubreddit';
+    subreddit: string;
+  }>(null);
   const navigate = useNavigate();
   const location = useLocation();
   const queryClient = useQueryClient();
@@ -67,7 +66,8 @@ export default function MainLayout() {
   useNotificationSound();
 
   // Determine if slim mode
-  const isSlimMode = multiColumnState.viewMode === 'omniscroll' || multiColumnState.viewMode === 'standard-scroll';
+  const isSlimMode =
+    multiColumnState.viewMode === 'omniscroll' || multiColumnState.viewMode === 'standard-scroll';
   const navHeight = isSlimMode ? 'h-9' : 'h-16';
 
   // Mobile detection - 767px = Tailwind md: breakpoint (768px) - 1
@@ -135,7 +135,12 @@ export default function MainLayout() {
   useEffect(() => {
     const handler = (event: Event) => {
       const custom = event as CustomEvent<
-        | { mode: 'login' | 'signup'; redirectTo?: string; redirectState?: unknown; action?: { type: 'subscribeSubreddit'; subreddit: string } }
+        | {
+            mode: 'login' | 'signup';
+            redirectTo?: string;
+            redirectState?: unknown;
+            action?: { type: 'subscribeSubreddit'; subreddit: string };
+          }
         | 'login'
         | 'signup'
       >;
@@ -146,7 +151,11 @@ export default function MainLayout() {
         setPendingAction(null);
         return;
       }
-      if (detail && typeof detail === 'object' && (detail.mode === 'login' || detail.mode === 'signup')) {
+      if (
+        detail &&
+        typeof detail === 'object' &&
+        (detail.mode === 'login' || detail.mode === 'signup')
+      ) {
         setAuthModal(detail.mode);
         if (detail.redirectTo) {
           setPendingRedirect({ to: detail.redirectTo, state: detail.redirectState });
@@ -197,7 +206,7 @@ export default function MainLayout() {
                 to="/"
                 className={`font-bold text-[var(--color-primary)] transition-all duration-200 ${isSlimMode ? 'text-base' : 'text-xl'}`}
               >
-                {isSlimMode ? 'Omni' : 'OmniNudge'}
+                {isSlimMode ? t('common.brandNameShort') : t('common.brandName')}
               </Link>
 
               {!isSlimMode && (
@@ -279,8 +288,19 @@ export default function MainLayout() {
                         onMouseEnter={() => prefetchRoutes.profile()}
                         className="flex items-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
                       >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                        <svg
+                          className="w-4 h-4"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                          aria-hidden="true"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                          />
                         </svg>
                         {user.username}
                       </Link>
@@ -292,9 +312,25 @@ export default function MainLayout() {
                         className="flex items-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
                         aria-label={t('common.settings')}
                       >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        <svg
+                          className="w-4 h-4"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                          aria-hidden="true"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+                          />
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                          />
                         </svg>
                         {t('common.settings')}
                       </Link>
@@ -329,8 +365,18 @@ export default function MainLayout() {
                           label: user.username,
                           to: `/users/${user.username}`,
                           icon: (
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                            <svg
+                              className="w-4 h-4"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                              />
                             </svg>
                           ),
                         },
@@ -338,9 +384,24 @@ export default function MainLayout() {
                           label: t('common.settings'),
                           to: '/settings',
                           icon: (
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            <svg
+                              className="w-4 h-4"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+                              />
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                              />
                             </svg>
                           ),
                         },
@@ -438,7 +499,8 @@ export default function MainLayout() {
                         {
                           label: t('auth.registerTitle'),
                           onClick: () => setAuthModal('signup'),
-                          className: 'bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-dark)]',
+                          className:
+                            'bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-dark)]',
                         },
                       ]}
                     />
@@ -463,13 +525,13 @@ export default function MainLayout() {
         <ErrorBoundary
           fallback={
             <div className="fixed bottom-0 left-0 right-0 p-4 bg-red-50 dark:bg-red-900/20 border-t border-red-200 dark:border-red-800 text-center">
-              <p className="text-sm text-red-600 dark:text-red-400">{t('mainLayout.mobileNavigationError')}</p>
+              <p className="text-sm text-red-600 dark:text-red-400">
+                {t('mainLayout.mobileNavigationError')}
+              </p>
             </div>
           }
         >
-          <MobileTabBar
-            unreadCount={unreadTotal}
-          />
+          <MobileTabBar unreadCount={unreadTotal} />
         </ErrorBoundary>
       )}
 
@@ -534,7 +596,9 @@ export default function MainLayout() {
             if (pendingAction?.type === 'subscribeSubreddit') {
               try {
                 await subscriptionService.subscribeToSubreddit(pendingAction.subreddit);
-                queryClient.invalidateQueries({ queryKey: ['subreddit-subscription', pendingAction.subreddit] });
+                queryClient.invalidateQueries({
+                  queryKey: ['subreddit-subscription', pendingAction.subreddit],
+                });
                 queryClient.invalidateQueries({ queryKey: ['user-subscriptions'] });
                 queryClient.invalidateQueries({ queryKey: ['user-subscriptions', 'subreddits'] });
               } catch (err) {

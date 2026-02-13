@@ -27,11 +27,11 @@ export function CombinedSuggestionItem({
           className="flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-[var(--color-surface-elevated)]"
         >
           <div className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-[var(--color-primary)] text-[10px] font-semibold text-white">
-            h/
+            {t('common.prefix.hub')}
           </div>
           <div className="flex min-w-0 flex-col">
             <span className="truncate text-sm font-medium text-[var(--color-text-primary)]">
-              h/{hub.name}
+              {t('common.format.hubPath', { name: hub.name })}
             </span>
             {hub.title && (
               <span className="truncate text-[11px] text-[var(--color-text-secondary)]">
@@ -68,12 +68,12 @@ export function CombinedSuggestionItem({
           />
         ) : (
           <div className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-[var(--color-border)] text-[10px] font-semibold text-[var(--color-text-secondary)]">
-            r/
+            {t('common.prefix.subreddit')}
           </div>
         )}
         <div className="flex min-w-0 flex-col">
           <span className="truncate text-sm font-medium text-[var(--color-text-primary)]">
-            r/{subreddit.name}
+            {t('common.format.subredditPath', { name: subreddit.name })}
           </span>
           {subreddit.title && (
             <span className="truncate text-[11px] text-[var(--color-text-secondary)]">
