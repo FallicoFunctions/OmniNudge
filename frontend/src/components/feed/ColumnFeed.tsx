@@ -44,7 +44,11 @@ const unwrapPost = (post: ColumnFeedItem) => {
   return post;
 };
 
-const getPostId = (post: ColumnFeedItem, index: number, feedType: ColumnFeedProps['config']['feedType']) => {
+const getPostId = (
+  post: ColumnFeedItem,
+  index: number,
+  feedType: ColumnFeedProps['config']['feedType']
+) => {
   if (post && typeof post === 'object') {
     if ('post' in post) {
       const inner = (post as CombinedFeedItem).post as { id?: string | number };
@@ -86,12 +90,12 @@ function isVideoPost(post: ColumnFeedItem) {
   const mediaUrl = actualPost.media_url || actualPost.url;
   return Boolean(
     actualPost.is_video ||
-      redditHlsUrl ||
-      mediaUrl?.includes('.mp4') ||
-      mediaUrl?.includes('.webm') ||
-      mediaUrl?.includes('v.redd.it') ||
-      mediaUrl?.includes('redgifs.com') ||
-      mediaUrl?.includes('gfycat.com')
+    redditHlsUrl ||
+    mediaUrl?.includes('.mp4') ||
+    mediaUrl?.includes('.webm') ||
+    mediaUrl?.includes('v.redd.it') ||
+    mediaUrl?.includes('redgifs.com') ||
+    mediaUrl?.includes('gfycat.com')
   );
 }
 
@@ -120,15 +124,8 @@ export function ColumnFeed({ columnId, config, isActive, showBorder }: ColumnFee
   const [pendingOpenConversationId, setPendingOpenConversationId] = useState<number | null>(null);
   const [composerError, setComposerError] = useState<string | null>(null);
 
-  const {
-    data,
-    isLoading,
-    isError,
-    error,
-    fetchNextPage,
-    hasNextPage,
-    isFetchingNextPage,
-  } = useColumnFeed(columnId, config);
+  const { data, isLoading, isError, error, fetchNextPage, hasNextPage, isFetchingNextPage } =
+    useColumnFeed(columnId, config);
 
   // Flatten all pages into single array
   const allPosts = useMemo<ColumnFeedItem[]>(() => {
@@ -141,12 +138,16 @@ export function ColumnFeed({ columnId, config, isActive, showBorder }: ColumnFee
         return (page as { posts: ColumnFeedItem[] }).posts;
       }
       if ('data' in page) {
-        const children = (page as { data?: { children?: Array<{ data?: ColumnFeedItem }> } }).data?.children;
+        const children = (page as { data?: { children?: Array<{ data?: ColumnFeedItem }> } }).data
+          ?.children;
         if (Array.isArray(children)) {
           return children.map((child) => child.data).filter(Boolean) as ColumnFeedItem[];
         }
       }
-      if ('conversations' in page && Array.isArray((page as { conversations?: unknown }).conversations)) {
+      if (
+        'conversations' in page &&
+        Array.isArray((page as { conversations?: unknown }).conversations)
+      ) {
         return (page as { conversations: ColumnFeedItem[] }).conversations;
       }
       return [];
@@ -288,7 +289,8 @@ export function ColumnFeed({ columnId, config, isActive, showBorder }: ColumnFee
         style={{ height: '100%' }}
       >
         <div className="text-sm text-red-500">
-          {t('common.error')}: {error instanceof Error ? error.message : t('columnFeed.errors.loadFailed')}
+          {t('common.error')}:{' '}
+          {error instanceof Error ? error.message : t('columnFeed.errors.loadFailed')}
         </div>
       </div>
     );
@@ -302,13 +304,15 @@ export function ColumnFeed({ columnId, config, isActive, showBorder }: ColumnFee
         }`}
         style={{ height: '100%' }}
       >
-        <div className="text-sm text-[var(--color-text-muted)]">{t('columnFeed.noPostsToDisplay')}</div>
+        <div className="text-sm text-[var(--color-text-muted)]">
+          {t('columnFeed.noPostsToDisplay')}
+        </div>
       </div>
     );
   }
 
   const handleToggleExpand = (postId: string) => {
-    setExpandedPostIds(prev => {
+    setExpandedPostIds((prev) => {
       const next = new Set(prev);
       if (next.has(postId)) {
         next.delete(postId);
@@ -451,7 +455,7 @@ export function ColumnFeed({ columnId, config, isActive, showBorder }: ColumnFee
                       setNewUsernameError(null);
                     }
                   }}
-                  placeholder="Enter Username"
+                  placeholder={t('messages.compose.enterUsername')}
                   className="flex-1 bg-[var(--color-background)] text-xs text-[var(--color-text)] placeholder-[var(--color-text-muted)] border border-[var(--color-border)] rounded px-2 py-1 focus:outline-none focus:border-cyan-500"
                 />
                 <button
@@ -462,7 +466,7 @@ export function ColumnFeed({ columnId, config, isActive, showBorder }: ColumnFee
                     setComposerError(null);
                   }}
                   className="text-[var(--color-text-muted)] hover:text-[var(--color-text)] text-xs"
-                  aria-label="Close username entry"
+                  aria-label={t('common.close')}
                 >
                   ✕
                 </button>
@@ -482,7 +486,7 @@ export function ColumnFeed({ columnId, config, isActive, showBorder }: ColumnFee
                     onClick={() => setSelectedFile(null)}
                     className="text-red-500 hover:text-red-400"
                   >
-                    Remove
+                    {t('common.accessibility.removeFile')}
                   </button>
                 </div>
               )}
@@ -502,7 +506,7 @@ export function ColumnFeed({ columnId, config, isActive, showBorder }: ColumnFee
                   onClick={() => fileInputRef.current?.click()}
                   disabled={uploadingMedia || sendingMessage}
                   className="p-2 text-[var(--color-text-muted)] hover:text-cyan-500 transition-colors disabled:opacity-50"
-                  title="Attach file"
+                  title={t('messages.compose.attachSingle')}
                 >
                   📎
                 </button>
@@ -516,17 +520,23 @@ export function ColumnFeed({ columnId, config, isActive, showBorder }: ColumnFee
                       handleSendNewMessage();
                     }
                   }}
-                  placeholder="Type a message..."
+                  placeholder={t('messages.typeMessage')}
                   disabled={uploadingMedia || sendingMessage}
                   className="flex-1 bg-[var(--color-background)] text-[var(--color-text)] text-sm px-3 py-2 rounded border border-[var(--color-border)] focus:outline-none focus:border-cyan-500 disabled:opacity-50"
                 />
                 <button
                   type="button"
                   onClick={handleSendNewMessage}
-                  disabled={(!messageText.trim() && !selectedFile) || uploadingMedia || sendingMessage}
+                  disabled={
+                    (!messageText.trim() && !selectedFile) || uploadingMedia || sendingMessage
+                  }
                   className="px-4 py-2 bg-cyan-500 hover:bg-cyan-600 text-white text-sm font-medium rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {uploadingMedia ? 'Uploading...' : sendingMessage ? 'Sending...' : 'Send'}
+                  {uploadingMedia
+                    ? t('messages.uploading')
+                    : sendingMessage
+                      ? t('messages.deliveryStatus.sending')
+                      : t('messages.send')}
                 </button>
               </div>
             </div>
@@ -558,13 +568,13 @@ export function ColumnFeed({ columnId, config, isActive, showBorder }: ColumnFee
 
       {isFetchingNextPage && (
         <div className="p-2 text-center text-xs text-[var(--color-text-muted)]">
-          Loading more...
+          {t('standardScroll.loadingMorePosts')}
         </div>
       )}
 
       {!hasNextPage && allPosts.length > 10 && (
         <div className="p-2 text-center text-xs text-[var(--color-text-muted)]">
-          End of feed
+          {t('standardScroll.endOfFeed')}
         </div>
       )}
     </div>

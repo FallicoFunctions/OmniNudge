@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 
 export type AlertVariant = 'error' | 'success' | 'warning' | 'info';
 
@@ -10,6 +11,8 @@ interface AlertProps {
 }
 
 export const Alert: React.FC<AlertProps> = ({ variant, children, className = '', onClose }) => {
+  const { t } = useTranslation();
+
   const variantStyles: Record<AlertVariant, string> = {
     error: 'border-red-200 bg-red-50 text-red-900',
     success: 'border-green-200 bg-green-50 text-green-900',
@@ -35,7 +38,7 @@ export const Alert: React.FC<AlertProps> = ({ variant, children, className = '',
           <button
             onClick={onClose}
             className="ml-3 flex-shrink-0 text-current opacity-50 hover:opacity-100 transition-opacity"
-            aria-label="Close alert"
+            aria-label={t('common.close')}
           >
             ✕
           </button>

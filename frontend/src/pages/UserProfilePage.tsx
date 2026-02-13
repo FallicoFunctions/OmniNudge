@@ -54,7 +54,11 @@ function PostsSection({
   formatTimestampLabel: (timestamp: string | number | Date, useRelativeTime: boolean) => string;
 }) {
   if (!posts.length) {
-    return <p className="text-sm text-[var(--color-text-secondary)]">{t('userProfilePage.posts.empty')}</p>;
+    return (
+      <p className="text-sm text-[var(--color-text-secondary)]">
+        {t('userProfilePage.posts.empty')}
+      </p>
+    );
   }
 
   return (
@@ -80,7 +84,7 @@ function PostsSection({
                   state={linkState}
                   className="font-semibold text-[var(--color-text-primary)] hover:text-[var(--color-primary)]"
                 >
-                  h/{post.hub_name}
+                  {t('common.format.hubPath', { name: post.hub_name })}
                 </Link>
                 <span> · </span>
                 <span>
@@ -90,7 +94,11 @@ function PostsSection({
                   })}
                 </span>
                 <span> · </span>
-                <span>{t('posts.submittedAt', { time: formatTimestampLabel(post.created_at, useRelativeTime) })}</span>
+                <span>
+                  {t('posts.submittedAt', {
+                    time: formatTimestampLabel(post.created_at, useRelativeTime),
+                  })}
+                </span>
               </div>
               <Link to={getPostUrl(post)} state={linkState}>
                 <h3 className="mt-1 text-lg font-semibold text-[var(--color-text-primary)] hover:text-[var(--color-primary)]">
@@ -98,7 +106,10 @@ function PostsSection({
                 </h3>
               </Link>
               {post.body && (
-                <PostBodyMarkdown content={post.body} className="mt-2 text-[var(--color-text-secondary)]" />
+                <PostBodyMarkdown
+                  content={post.body}
+                  className="mt-2 text-[var(--color-text-secondary)]"
+                />
               )}
               <div className="mt-2 text-xs font-medium text-[var(--color-text-secondary)]">
                 {t('posts.comment', {
@@ -165,7 +176,10 @@ function CommentsSection({
               <span> · </span>
               <span>{formatTimestampLabel(comment.created_at, useRelativeTime)}</span>
             </div>
-            <MarkdownRenderer content={comment.content} className="text-[var(--color-text-primary)]" />
+            <MarkdownRenderer
+              content={comment.content}
+              className="text-[var(--color-text-primary)]"
+            />
 
             {/* Prominent "View thread" link */}
             <div className="mt-3 pt-3 border-t border-[var(--color-border)]">
@@ -175,8 +189,19 @@ function CommentsSection({
                 className="inline-flex items-center gap-1.5 text-sm font-medium text-[var(--color-primary)] hover:text-[var(--color-primary-dark)] hover:underline transition"
               >
                 {t('userProfilePage.actions.viewThread')}
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                  aria-hidden="true"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M13 7l5 5m0 0l-5 5m5-5H6"
+                  />
                 </svg>
               </Link>
             </div>
@@ -208,11 +233,15 @@ export default function UserProfilePage() {
     return BASE_TABS;
   }, [canViewPrivateTabs]);
   const resolvedActiveTab =
-    !canViewPrivateTabs && (activeTab === 'saved' || activeTab === 'hidden' || activeTab === 'subscribed')
+    !canViewPrivateTabs &&
+    (activeTab === 'saved' || activeTab === 'hidden' || activeTab === 'subscribed')
       ? 'overview'
       : activeTab;
 
-  const formatTimestampLabel = (timestamp: string | number | Date, useRelativeTimeEnabled: boolean) => {
+  const formatTimestampLabel = (
+    timestamp: string | number | Date,
+    useRelativeTimeEnabled: boolean
+  ) => {
     const d = new Date(timestamp);
     if (Number.isNaN(d.getTime())) return t('common.time.recently');
 
@@ -220,7 +249,13 @@ export default function UserProfilePage() {
       return formatRelativeTime(d);
     }
 
-    return formatDate(d, { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
+    return formatDate(d, {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+    });
   };
 
   const profileQuery = useQuery<UserProfile>({
@@ -304,38 +339,44 @@ export default function UserProfilePage() {
 
     if (resolvedActiveTab === 'saved') {
       if (!canViewPrivateTabs) {
-        return <p className="text-sm text-[var(--color-text-secondary)]">{t('userProfilePage.private.saved')}</p>;
+        return (
+          <p className="text-sm text-[var(--color-text-secondary)]">
+            {t('userProfilePage.private.saved')}
+          </p>
+        );
       }
-      return (
-        <SavedItemsView withContainer={false} showHeading={false} className="space-y-6" />
-      );
+      return <SavedItemsView withContainer={false} showHeading={false} className="space-y-6" />;
     }
 
     if (resolvedActiveTab === 'hidden') {
       if (!canViewPrivateTabs) {
-        return <p className="text-sm text-[var(--color-text-secondary)]">{t('userProfilePage.private.hidden')}</p>;
+        return (
+          <p className="text-sm text-[var(--color-text-secondary)]">
+            {t('userProfilePage.private.hidden')}
+          </p>
+        );
       }
-      return (
-        <HiddenItemsView withContainer={false} showHeading={false} className="space-y-6" />
-      );
+      return <HiddenItemsView withContainer={false} showHeading={false} className="space-y-6" />;
     }
 
     if (resolvedActiveTab === 'subscribed') {
       if (!canViewPrivateTabs) {
         return (
-          <p className="text-sm text-[var(--color-text-secondary)]">{t('userProfilePage.private.subscribed')}</p>
+          <p className="text-sm text-[var(--color-text-secondary)]">
+            {t('userProfilePage.private.subscribed')}
+          </p>
         );
       }
-      return (
-        <SubscribedView withContainer={false} showHeading={false} className="space-y-6" />
-      );
+      return <SubscribedView withContainer={false} showHeading={false} className="space-y-6" />;
     }
 
     return (
       <div className="grid gap-6 lg:grid-cols-2">
         <section>
           <div className="mb-2 flex items-center justify-between">
-            <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">{t('userProfilePage.headings.recentPosts')}</h3>
+            <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">
+              {t('userProfilePage.headings.recentPosts')}
+            </h3>
             {posts.length > 0 && (
               <button
                 type="button"
@@ -343,8 +384,19 @@ export default function UserProfilePage() {
                 className="flex items-center gap-1 text-sm font-medium text-[var(--color-primary)] hover:underline transition"
               >
                 {t('userProfilePage.actions.viewAll')}
-                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                <svg
+                  className="w-3.5 h-3.5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                  aria-hidden="true"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M9 5l7 7-7 7"
+                  />
                 </svg>
               </button>
             )}
@@ -370,8 +422,19 @@ export default function UserProfilePage() {
                 className="flex items-center gap-1 text-sm font-medium text-[var(--color-primary)] hover:underline transition"
               >
                 {t('userProfilePage.actions.viewAll')}
-                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                <svg
+                  className="w-3.5 h-3.5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                  aria-hidden="true"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M9 5l7 7-7 7"
+                  />
                 </svg>
               </button>
             )}
@@ -449,7 +512,9 @@ export default function UserProfilePage() {
               <h1 className="text-2xl font-bold text-[var(--color-text-primary)]">
                 {profile.username}
               </h1>
-              <p className="text-sm text-[var(--color-text-secondary)]">{t('userProfilePage.labels.joined', { time: createdLabel })}</p>
+              <p className="text-sm text-[var(--color-text-secondary)]">
+                {t('userProfilePage.labels.joined', { time: createdLabel })}
+              </p>
               <p className="text-xs text-[var(--color-text-secondary)]">
                 {t('userProfilePage.labels.lastSeen', { time: lastSeenLabel })}
               </p>
@@ -491,7 +556,9 @@ export default function UserProfilePage() {
                 to={`/h/${hub.name}`}
                 className="inline-flex items-center gap-1.5 rounded-full border border-[var(--color-border)] px-4 py-1.5 text-sm font-medium text-[var(--color-text-primary)] hover:border-[var(--color-primary)] hover:text-[var(--color-primary)] transition"
               >
-                <span className="font-semibold">h/{hub.name}</span>
+                <span className="font-semibold">
+                  {t('common.format.hubPath', { name: hub.name })}
+                </span>
                 {hub.title && (
                   <>
                     <span className="text-[var(--color-text-muted)]">·</span>
@@ -526,7 +593,6 @@ export default function UserProfilePage() {
       </div>
 
       <div className="mt-6">{renderActiveTab()}</div>
-
     </div>
   );
 }

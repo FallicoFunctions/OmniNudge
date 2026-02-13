@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { createPortal } from 'react-dom';
+import { useTranslation } from 'react-i18next';
 
 export type ToastType = 'success' | 'error' | 'info' | 'warning';
 
@@ -12,6 +13,8 @@ export interface ToastProps {
 }
 
 const Toast = ({ id, message, type = 'info', duration = 3000, onClose }: ToastProps) => {
+  const { t } = useTranslation();
+
   useEffect(() => {
     const timer = setTimeout(() => {
       onClose(id);
@@ -54,7 +57,7 @@ const Toast = ({ id, message, type = 'info', duration = 3000, onClose }: ToastPr
         type="button"
         className="flex-shrink-0 text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]"
         onClick={() => onClose(id)}
-        aria-label="Close notification"
+        aria-label={t('common.close')}
       >
         ✕
       </button>

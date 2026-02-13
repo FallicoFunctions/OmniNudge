@@ -1,7 +1,6 @@
 import { EmptyMessage, LoadingMessage } from '../common/StatusMessage';
+import { useTranslation } from 'react-i18next';
 import type { RedditSubredditModerator } from '../../types/reddit';
-
-const DEFAULT_MODERATORS_FALLBACK = 'Public Reddit API does not provide the moderator list.';
 
 interface SubredditModeratorsPanelProps {
   moderators?: RedditSubredditModerator[];
@@ -12,15 +11,20 @@ interface SubredditModeratorsPanelProps {
 export function SubredditModeratorsPanel({
   moderators = [],
   isLoading = false,
-  fallbackMessage = DEFAULT_MODERATORS_FALLBACK,
+  fallbackMessage,
 }: SubredditModeratorsPanelProps) {
+  const { t } = useTranslation();
+  const resolvedFallbackMessage = fallbackMessage ?? t('subreddit.moderatorsPanel.fallback');
+
   return (
     <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
       <h3 className="text-sm font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
-        Moderators
+        {t('subreddit.moderatorsPanel.title')}
       </h3>
       {isLoading ? (
-        <LoadingMessage className="mt-3 text-sm">Loading moderators…</LoadingMessage>
+        <LoadingMessage className="mt-3 text-sm">
+          {t('subreddit.moderatorsPanel.loading')}
+        </LoadingMessage>
       ) : moderators.length > 0 ? (
         <ul className="mt-3 space-y-2 text-sm text-[var(--color-text-primary)]">
           {moderators.map((mod) => (
@@ -35,7 +39,7 @@ export function SubredditModeratorsPanel({
           ))}
         </ul>
       ) : (
-        <EmptyMessage className="mt-3 text-sm">{fallbackMessage}</EmptyMessage>
+        <EmptyMessage className="mt-3 text-sm">{resolvedFallbackMessage}</EmptyMessage>
       )}
     </div>
   );

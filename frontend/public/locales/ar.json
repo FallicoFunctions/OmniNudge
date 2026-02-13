@@ -1,30 +1,51 @@
 {
   "common": {
+    "brandName": "OmniNudge",
+    "brandNameShort": "Omni",
     "loading": "جاري التحميل...",
     "loadingDetails": "جاري تحميل التفاصيل...",
     "error": "خطأ",
     "success": "نجاح",
     "cancel": "إلغاء",
     "save": "حفظ",
+    "subscribe": "اشترك",
+    "unsubscribe": "إلغاء الاشتراك",
     "delete": "حذف",
+    "clear": "مسح",
     "edit": "تعديل",
     "submit": "إرسال",
     "close": "إغلاق",
+    "progress": "التقدم",
     "copied": "تم النسخ!",
     "back": "عودة",
     "userNumber": "المستخدم رقم {{id}}",
+    "user": "مستخدم",
+    "unknownUser": "مستخدم غير معروف",
     "next": "التالي",
     "confirm": "تأكيد",
     "search": "بحث",
+    "searching": "جارٍ البحث...",
     "filter": "تصفية",
     "sort": "ترتيب",
     "settings": "الإعدادات",
+    "modTools": "أدوات الإشراف",
     "logout": "تسجيل الخروج",
     "login": "تسجيل الدخول",
     "register": "إنشاء حساب",
+    "go": "اذهب",
+    "write": "كتابة",
+    "preview": "معاينة",
     "username": "اسم المستخدم",
     "password": "كلمة المرور",
     "email": "البريد الإلكتروني",
+    "prefix": {
+      "hub": "h/",
+      "subreddit": "r/"
+    },
+    "format": {
+      "hubPath": "h/{{name}}",
+      "subredditPath": "r/{{name}}"
+    },
     "badges": {
       "admin": "مشرف",
       "moderator": "مراقب",
@@ -40,7 +61,15 @@
       "toggleInfiniteScroll": "تبديل التمرير اللانهائي",
       "expandCommentThread": "توسيع سلسلة التعليقات",
       "collapseCommentThread": "طي سلسلة التعليقات",
-      "removeFile": "حذف الملف"
+      "removeFile": "حذف الملف",
+      "closeModal": "إغلاق النافذة",
+      "closeEsc": "إغلاق (Esc)",
+      "closeViewer": "إغلاق العارض",
+      "loading": "جارٍ التحميل",
+      "previousImage": "الصورة السابقة",
+      "nextImage": "الصورة التالية",
+      "previousMedia": "الوسيط السابق",
+      "nextMedia": "الوسيط التالي"
     },
     "time": {
       "submitted": "تم الإرسال",
@@ -57,15 +86,34 @@
     "units": {
       "subscribersShort": "مشترك"
     },
+    "formattingHelpTable": {
+      "youType": "أنت تكتب:",
+      "youSee": "أنت ترى:"
+    },
+    "contact": {
+      "privacyEmail": "privacy@omninudge.com"
+    },
     "download": "تنزيل",
     "continue": "متابعة",
     "retry": "إعادة المحاولة",
     "noDetailsAvailable": "لا توجد تفاصيل متاحة.",
     "unableToLoadDetails": "تعذر تحميل التفاصيل.",
+    "unableToLoad": "تعذر التحميل.",
     "optional": "(اختياري)",
     "na": "غير متاح",
     "yes": "نعم",
-    "no": "لا"
+    "no": "لا",
+    "noResultsFound": "لم يتم العثور على نتائج."
+  },
+  "markdownInput": {
+    "emptyPreview": "لا توجد معاينة بعد."
+  },
+  "subreddit": {
+    "moderatorsPanel": {
+      "title": "المشرفون",
+      "loading": "جارٍ تحميل المشرفين...",
+      "fallback": "واجهة Reddit العامة لا توفر قائمة المشرفين."
+    }
   },
   "nav": {
     "home": "الرئيسية",
@@ -92,6 +140,22 @@
     "bugReporting": "الإبلاغ عن الأخطاء",
     "mobileNavigationError": "خطأ في التنقل. يرجى إعادة تحميل الصفحة.",
     "dontShowThisAgain": "لا تعرض هذا مرة أخرى"
+  },
+  "communityHeader": {
+    "labels": {
+      "hPopular": "h/popular",
+      "hAll": "h/all",
+      "rPopular": "r/popular",
+      "rFrontpage": "r/frontpage"
+    }
+  },
+  "pagination": {
+    "previous": "→ السابق",
+    "next": "التالي ←",
+    "pageOf": "الصفحة {{current}} من {{total}}"
+  },
+  "connectionStatus": {
+    "reconnecting": "جارٍ إعادة الاتصال بالخادم..."
   },
   "hubsBrowse": {
     "subtitle": "استكشف مجموعات Omni",
@@ -156,6 +220,41 @@
       "high": "عالٍ",
       "medium": "متوسط",
       "low": "منخفض"
+    }
+  },
+  "bugReportModal": {
+    "title": "الإبلاغ عن خلل",
+    "success": {
+      "message": "تم إرسال تقرير الخلل بنجاح! شكرا لمساعدتك في تحسين OmniNudge.",
+      "goToPage": "الانتقال إلى صفحة الإبلاغ عن الأخطاء",
+      "ok": "حسنا"
+    },
+    "form": {
+      "pageUrl": {
+        "label": "رابط الصفحة",
+        "placeholder": "https://omninudge.com/...",
+        "help": "رابط الصفحة التي واجهت فيها الخلل"
+      },
+      "description": {
+        "label": "الوصف",
+        "placeholder": "صف الخلل بالتفصيل. ماذا حدث؟ ماذا كنت تتوقع أن يحدث؟ خطوات إعادة الإنتاج؟"
+      },
+      "screenshot": {
+        "label": "لقطة شاشة",
+        "help": "تساعدنا لقطة الشاشة على تحديد المشكلة وإصلاحها بسرعة"
+      }
+    },
+    "actions": {
+      "submit": "إرسال تقرير الخلل",
+      "submitting": "جارٍ الإرسال..."
+    },
+    "errors": {
+      "unknownError": "خطأ غير معروف",
+      "submitFailed": "فشل إرسال تقرير الخلل: {{message}}",
+      "uploadFailed": "فشل رفع لقطة الشاشة: {{message}}",
+      "screenshotRequired": "لقطة الشاشة مطلوبة",
+      "uploadMissingUrl": "استجابة الرفع لا تحتوي على رابط الملف",
+      "screenshotMustBeImage": "يجب أن تكون لقطة الشاشة ملف صورة."
     }
   },
   "searchPage": {
@@ -563,6 +662,37 @@
       "fetchConversationFailed": "فشل في جلب المحادثة",
       "unableToLoadMessages": "تعذر تحميل الرسائل.",
       "sendFailed": "فشل في إرسال الرسالة. يرجى المحاولة مرة أخرى."
+    }
+  },
+  "modMailModal": {
+    "title": "مراسلة المشرفين",
+    "subtitle": "أرسل رسالة إلى مشرفي h/{{hubName}}",
+    "fields": {
+      "subject": {
+        "label": "الموضوع",
+        "placeholder": "ما موضوع الرسالة؟"
+      },
+      "message": {
+        "label": "الرسالة",
+        "placeholder": "اكتب رسالتك إلى المشرفين..."
+      }
+    },
+    "success": {
+      "sent": "تم إرسال الرسالة بنجاح! سيرى المشرفون رسالتك."
+    },
+    "actions": {
+      "send": "إرسال إلى المشرفين",
+      "sent": "تم الإرسال!"
+    },
+    "errors": {
+      "sendFailed": "فشل إرسال بريد الإشراف",
+      "subjectRequired": "الموضوع مطلوب",
+      "messageRequired": "الرسالة مطلوبة"
+    },
+    "encryption": {
+      "noParticipants": "لم يتم العثور على مشاركين لتشفير الرسالة؛ سيتم الإرسال كنص عادي.",
+      "senderMissingKeys": "حرج: لم تقم بإعداد مفاتيح التشفير. لا يمكن إرسال بريد الإشراف.",
+      "noRecipientsEnabled": "حرج: لا يوجد مستلمون لديهم التشفير مفعلاً. لا يمكن إرسال بريد إشراف مشفر."
     }
   },
   "hubSettingsPage": {
@@ -1101,7 +1231,11 @@
     "mobileNav": "التنقل عبر الهاتف",
     "unreadMessages": "{{count}} رسائل غير مقروءة",
     "closeMenu": "إغلاق القائمة",
-    "longPressForMoreOptions": "اضغط مطولًا لمزيد من الخيارات"
+    "longPressForMoreOptions": "اضغط مطولًا لمزيد من الخيارات",
+    "tabBarItem": {
+      "badgeSuffix": " - {{badgeLabel}}",
+      "longPressSuffix": " {{longPressHint}}"
+    }
   },
   "home": {
     "feed": {
@@ -1170,9 +1304,24 @@
     "typeMessage": "اكتب رسالة...",
     "send": "إرسال",
     "noMessages": "لا توجد رسائل بعد",
+    "status": {
+      "loadingMessages": "جارٍ تحميل الرسائل..."
+    },
+    "empty": {
+      "startConversation": "لا توجد رسائل بعد. ابدأ المحادثة!"
+    },
+    "actions": {
+      "loadOlder": "تحميل الرسائل الأقدم"
+    },
     "typing": "{{username}} يكتب الآن...",
     "online": "متصل",
     "offline": "غير متصل",
+    "deliveryStatus": {
+      "sending": "جارٍ الإرسال...",
+      "sent": "تم الإرسال",
+      "delivered": "تم التسليم",
+      "read": "تمت القراءة"
+    },
     "lastSeen": "آخر ظهور {{time}}",
     "encrypted": "مشفر من طرف إلى طرف",
     "deleteConversation": "حذف المحادثة",
@@ -1195,9 +1344,13 @@
     "media": {
       "viewAllTitle": "عرض كافة الوسائط من هذه المحادثة في عرض شرائح",
       "stillDecrypting": "الوسائط لا تزال قيد فك التشفير. يرجى الانتظار والمحاولة مرة أخرى.",
+      "loading": "جارٍ تحميل الوسائط...",
       "fileTooLarge": "الملف كبير جداً. الحجم الأقصى هو 25 ميجابايت.",
+      "fileTooLargeWithLimit": "الملف كبير جداً. الحجم الأقصى هو {{limitMb}} ميجابايت.",
       "uploadFailed": "فشل تحميل الوسائط. يرجى المحاولة مرة أخرى.",
-      "uploadFailedFile": "فشل تحميل {{filename}}"
+      "uploadFailedFile": "فشل تحميل {{filename}}",
+      "fallbackText": "وسائط",
+      "attachmentFallback": "مرفق"
     },
     "compose": {
       "enterUsername": "أدخل اسم المستخدم...",
@@ -1218,7 +1371,8 @@
       "unarchiveFailed": "فشل إلغاء أرشفة المحادثة",
       "deleteConversationFailed": "فشل حذف المحادثة",
       "recipientKeyNotFound": "لم يتم العثور على المفتاح العام للمستلم",
-      "encryptionKeysMissing": "مفاتيح التشفير الخاصة بك غير مُعدّة"
+      "encryptionKeysMissing": "مفاتيح التشفير الخاصة بك غير مُعدّة",
+      "sendFailed": "فشل في إرسال الرسالة. يرجى المحاولة مرة أخرى."
     },
     "messageOptions": {
       "ariaLabel": "خيارات الرسالة"
@@ -1291,6 +1445,19 @@
     },
     "delete": "حذف",
     "edit": "تعديل",
+    "editModal": {
+      "title": "تعديل المنشور",
+      "subtitle": "حدّث العنوان أو المحتوى ثم احفظ تغييراتك.",
+      "fields": {
+        "title": "العنوان",
+        "body": "المحتوى"
+      },
+      "placeholder": "حدّث محتوى المنشور...",
+      "actions": {
+        "saving": "جارٍ الحفظ...",
+        "saveChanges": "حفظ التغييرات"
+      }
+    },
     "postedBy": "نشر بواسطة {{username}}",
     "postedIn": "في {{hub}}",
     "timeAgo": "منذ {{time}}",
@@ -1345,14 +1512,22 @@
     "media": {
       "previewImageAlt": "صورة معاينة لـ {{title}}",
       "galleryImageAlt": "{{title}} - صورة {{index}}",
+      "carouselImageAlt": "{{title}} - {{index}}/{{total}}",
       "loadingGalleryImages": "جارٍ تحميل صور المعرض...",
       "noGalleryImages": "لم يتم العثور على صور في هذا المعرض",
       "galleryTitle": "معرض",
       "videoUnsupported": "متصفحك لا يدعم تشغيل الفيديو.",
-      "videoMayNotHaveAudio": "ملاحظة: قد لا يحتوي هذا الفيديو على صوت.",
+      "videoMayNotHaveAudio": "ملاحظة: قد لا يحتوي هذا الفيديو على صوت. يقدم Reddit الصوت بشكل منفصل.",
+      "watchOnRedditUnavailable": "المشاهدة على Reddit غير متاحة من OmniNudge.",
       "externalLinkLabel": "خارجي",
       "redgifsEmbedTitle": "{{title}} - فيديو Redgifs",
-      "embeddedMediaTitle": "{{title}} - وسائط مضمنة"
+      "embeddedMediaTitle": "{{title}} - وسائط مضمنة",
+      "viewer": {
+        "clickToShrink": "انقر للتصغير",
+        "clickToEnlarge": "انقر للتكبير",
+        "viewSmaller": "عرض أصغر",
+        "viewFullSize": "عرض بالحجم الكامل"
+      }
     },
     "errors": {
       "loadPostsFailed": "فشل تحميل المنشورات. يرجى المحاولة مرة أخرى.",
@@ -1366,6 +1541,9 @@
       "pinnedByModerators": "مثبت بواسطة المشرفين",
       "reddit": "ريديت",
       "nsfw": "NSFW"
+    },
+    "flairBadge": {
+      "title": "وسم: {{flair}}"
     },
     "postedByLabel": "نشر بواسطة",
     "submittedAt": "تم النشر {{time}}",
@@ -2016,6 +2194,29 @@
     "nextLabel": "التالي (→)",
     "counter": "{{current}} من {{total}}",
     "noMediaFound": "لم يتم العثور على وسائط",
+    "redditMedia": {
+      "title": "عرض شرائح وسائط Reddit",
+      "labels": {
+        "subreddit": "Subreddit",
+        "sort": "الترتيب",
+        "timeRange": "النطاق الزمني"
+      },
+      "subredditPlaceholder": "أدخل اسم الـ subreddit (مثل: pics, aww, funny)",
+      "timeOptions": {
+        "hour": "ساعة",
+        "day": "يوم",
+        "week": "أسبوع",
+        "month": "شهر",
+        "year": "سنة",
+        "all": "الكل"
+      },
+      "start": "بدء العرض",
+      "viewOnReddit": "عرض على Reddit →",
+      "errors": {
+        "failedToLoad": "فشل تحميل المنشورات. يرجى التحقق من اسم الـ subreddit والمحاولة مرة أخرى."
+      },
+      "noMedia": "لم يتم العثور على منشورات وسائط في r/{{subreddit}}. جرّب subreddit آخر أو خيار ترتيب مختلف."
+    },
     "aria": {
       "closeEsc": "اغلاق عرض الشرائح (Esc)",
       "previous": "السابق (←)",
@@ -2183,6 +2384,51 @@
       "activeThemeLabel": "السمة النشطة",
       "selectThemeFallback": "اختر سمة"
     },
+    "onboarding": {
+      "tipLabel": "نصيحة",
+      "actions": {
+        "skip": "تخطي الجولة",
+        "letsGo": "هيا بنا!"
+      },
+      "stepCounter": "الخطوة {{current}} من {{total}}",
+      "steps": {
+        "welcome": {
+          "title": "مرحباً بك في تخصيص السمات!",
+          "description": "اجعل OmniNudge على ذوقك عبر تخصيص الألوان والخطوط والمزيد. اختر من السمات الجاهزة أو أنشئ سمتك الخاصة.",
+          "tip": "يمكنك دائماً الوصول إلى السمات من صفحة الإعدادات."
+        },
+        "predefined": {
+          "title": "اختر سمة جاهزة",
+          "description": "ابدأ بإحدى سماتنا الجاهزة الجميلة. لكل سمة لوحة ألوان وشخصية فريدة.",
+          "tip": "مرر المؤشر فوق السمات لرؤية معاينة مباشرة."
+        },
+        "custom": {
+          "title": "أنشئ سمتك الخاصة",
+          "description": "تريد شيئاً فريداً؟ أنشئ سمة مخصصة بتعديل متغيرات CSS مثل الألوان والخطوط والمسافات والمزيد.",
+          "tip": "الوضع المتقدم يفتح تخصيص CSS الكامل."
+        },
+        "complete": {
+          "title": "أنت جاهز!",
+          "description": "ستتم مزامنة سمتك عبر جميع أجهزتك. استمتع بالتخصيص ولا تتردد في التجربة!"
+        }
+      }
+    },
+    "settingsPanel": {
+      "title": "تخصيص السمات",
+      "subtitle": "خصص تجربة OmniNudge باستخدام سمات مخصصة",
+      "actions": {
+        "showTour": "عرض الجولة"
+      },
+      "noThemeSelected": "لم يتم اختيار سمة",
+      "advancedMode": {
+        "title": "الوضع المتقدم",
+        "description": "فعّل تخصيص CSS الكامل والميزات المتقدمة"
+      },
+      "tabs": {
+        "selector": "محدد السمات",
+        "gallery": "تصفح المعرض"
+      }
+    },
     "gallery": {
       "header": {
         "kicker": "معرض السمات",
@@ -2327,6 +2573,7 @@
       }
     },
     "preview": {
+      "brandName": "OmniNudge",
       "pages": {
         "feed": "الخلاصة",
         "profile": "الملف الشخصي",
@@ -2375,7 +2622,11 @@
         "meta": "منذ ساعتين · معزز",
         "follow": "متابعة",
         "followAria": "متابعة المنشئ {{index}}",
-        "quote": "\"بناء أنظمة السمات ممتع! هذه المعاينة تتحدث مباشرة أثناء تعديل المتغيرات.\""
+        "quote": "\"بناء أنظمة السمات ممتع! هذه المعاينة تتحدث مباشرة أثناء تعديل المتغيرات.\"",
+        "sampleTags": {
+          "design": "#تصميم",
+          "themes": "#سمات"
+        }
       },
       "profile": {
         "name": "مستكشف",
@@ -2406,7 +2657,9 @@
       },
       "aria": {
         "commonSamples": "عينات المكونات الشائعة",
+        "sectionHeading": "عنوان قسم معاينة السمة",
         "avatarIndicators": "مؤشرات الصورة الشخصية",
+        "profileSummary": "ملخص الملف الشخصي",
         "profileStats": "إحصاءات الملف الشخصي"
       }
     }
@@ -2481,6 +2734,18 @@
     "actions": {
       "creating": "جارٍ الإنشاء...",
       "createPost": "إنشاء منشور"
+    },
+    "errors": {
+      "titleRequired": "العنوان مطلوب",
+      "bodyTooLong": "يجب أن يكون نص المنشور أقل من {{formattedMax}} حرف",
+      "waitForUpload": "يرجى الانتظار حتى يكتمل رفع الوسائط.",
+      "hubNameRequired": "يرجى إدخال اسم مجموعة",
+      "hubMustSelectSuggestion": "يرجى اختيار مجموعة صالحة من الاقتراحات",
+      "subredditRequired": "يرجى إدخال مجتمع",
+      "hubNoTextPosts": "هذه المجموعة لا تسمح بمنشورات النص.",
+      "hubNoLinkOrMediaPosts": "هذه المجموعة لا تسمح بمنشورات الروابط أو الوسائط.",
+      "hubNoLinkPostsUploadInstead": "هذه المجموعة لا تسمح بمنشورات الروابط. ارفع صورة أو فيديو بدلاً من ذلك.",
+      "hubNoSelectedMediaType": "هذه المجموعة لا تسمح بنوع الوسائط المحدد."
     }
   },
   "emptyStates": {
@@ -2702,9 +2967,23 @@
     "description": "الصفحة التي تبحث عنها غير موجودة او تم نقلها.",
     "goHome": "الذهاب للرئيسية"
   },
+  "errorPages": {
+    "serverError": {
+      "title": "خطأ في الخادم"
+    },
+    "networkError": {
+      "title": "انقطع الاتصال"
+    },
+    "maintenance": {
+      "title": "تحت الصيانة",
+      "message": "نجري صيانة مجدولة. سنعود قريبا!"
+    }
+  },
   "errorBoundary": {
     "title": "حدث خطا ما.",
-    "details": "تفاصيل الخطا"
+    "details": "تفاصيل الخطا",
+    "unexpectedError": "حدث خطا غير متوقع.",
+    "reloadPage": "اعادة تحميل الصفحة"
   },
   "standardScroll": {
     "loadingFeed": "جارٍ تحميل الخلاصة...",
@@ -2832,11 +3111,38 @@
       "loading": "جارٍ تحميل المستخدمين...",
       "empty": "لا يوجد مستخدمون.",
       "csv": {
-        "never": "ابدا"
+        "never": "ابدا",
+        "headers": {
+          "createdAt": "تاريخ الإنشاء"
+        }
       },
       "lastSeen": "اخر ظهور",
       "errors": {
         "reasonRequired": "السبب مطلوب"
+      },
+      "confirmations": {
+        "changeRole": "هل أنت متأكد أنك تريد تغيير دور هذا المستخدم إلى \"{{role}}\"؟"
+      },
+      "bulk": {
+        "selectedOne": "{{qty}} محدد",
+        "selectedMany": "{{qty}} محددون",
+        "noSelectionError": "يرجى تحديد مستخدم واحد على الأقل",
+        "successOne": "تم تطبيق الإجراء على {{qty}} مستخدم بنجاح",
+        "successMany": "تم تطبيق الإجراء على {{qty}} مستخدمين بنجاح",
+        "error": "فشلت بعض الإجراءات. يرجى المراجعة والمحاولة مرة أخرى.",
+        "affectsOne": "سيؤثر هذا على {{qty}} مستخدم محدد",
+        "affectsMany": "سيؤثر هذا على {{qty}} مستخدمين محددين",
+        "confirmButtonOne": "تأكيد ({{qty}} مستخدم)",
+        "confirmButtonMany": "تأكيد ({{qty}} مستخدمين)"
+      },
+      "modals": {
+        "bulkTitle": "إجراء جماعي: {{action}} للمستخدمين",
+        "singleTitle": "{{action}} مستخدم",
+        "userLabel": "المستخدم:",
+        "reasonLabel": "السبب (مطلوب)",
+        "reasonPlaceholder": "أدخل السبب...",
+        "showReasonToUser": "عرض السبب للمستخدم",
+        "showReasonToUsers": "عرض السبب للمستخدمين"
       },
       "table": {
         "id": "المعرف",
@@ -2926,7 +3232,8 @@
       "empty": "لا يوجد مشرفون لهذا المحور",
       "userId": "معرف المستخدم: {{id}}",
       "added": "تمت الاضافة: {{date}}",
-      "remove": "ازالة"
+      "remove": "ازالة",
+      "confirmRemove": "إزالة {{username}} كمشرف؟"
     },
     "banActivity": {
       "title": "نشاط الحظر على مستوى الموقع",

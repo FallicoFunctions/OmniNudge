@@ -29,12 +29,12 @@ export function SubredditSuggestionItem({ suggestion, onSelect }: SubredditSugge
           />
         ) : (
           <div className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-[var(--color-border)] text-[10px] font-semibold text-[var(--color-text-secondary)]">
-            r/
+            {t('common.prefix.subreddit')}
           </div>
         )}
         <div className="flex min-w-0 flex-col">
           <span className="truncate text-sm font-medium text-[var(--color-text-primary)]">
-            r/{suggestion.name}
+            {t('common.format.subredditPath', { name: suggestion.name })}
           </span>
           {suggestion.title && (
             <span className="truncate text-[11px] text-[var(--color-text-secondary)]">

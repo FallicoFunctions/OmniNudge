@@ -30,9 +30,7 @@ export default function AdminPage() {
     <div className="max-w-7xl mx-auto p-6">
       <div className="mb-6">
         <h1 className="text-3xl font-bold">{t('adminPage.title')}</h1>
-        <p className="text-[var(--color-text-secondary)] mt-1">
-          {t('adminPage.subtitle')}
-        </p>
+        <p className="text-[var(--color-text-secondary)] mt-1">{t('adminPage.subtitle')}</p>
       </div>
 
       {/* Tabs */}
@@ -129,13 +127,25 @@ function StatsTab() {
   const statCards = [
     { label: t('adminPage.stats.cards.totalUsers'), value: stats.total_users, color: 'blue' },
     { label: t('adminPage.stats.cards.totalPosts'), value: stats.total_posts, color: 'green' },
-    { label: t('adminPage.stats.cards.totalComments'), value: stats.total_comments, color: 'purple' },
+    {
+      label: t('adminPage.stats.cards.totalComments'),
+      value: stats.total_comments,
+      color: 'purple',
+    },
     { label: t('adminPage.stats.cards.totalHubs'), value: stats.total_hubs, color: 'orange' },
-    { label: t('adminPage.stats.cards.totalConversations'), value: stats.total_conversations, color: 'pink' },
+    {
+      label: t('adminPage.stats.cards.totalConversations'),
+      value: stats.total_conversations,
+      color: 'pink',
+    },
     { label: t('adminPage.stats.cards.totalMessages'), value: stats.total_messages, color: 'cyan' },
     { label: t('adminPage.stats.cards.totalReports'), value: stats.total_reports, color: 'red' },
     { label: t('adminPage.stats.cards.admins'), value: stats.admin_count, color: 'yellow' },
-    { label: t('adminPage.stats.cards.hubModerators'), value: stats.moderator_count, color: 'indigo' },
+    {
+      label: t('adminPage.stats.cards.hubModerators'),
+      value: stats.moderator_count,
+      color: 'indigo',
+    },
   ];
 
   return (
@@ -178,7 +188,10 @@ function UsersTab() {
   const [viewMode, setViewMode] = useState<'card' | 'table'>('card');
   const [selectedUsers, setSelectedUsers] = useState<Set<number>>(new Set());
   const [expandedUser, setExpandedUser] = useState<number | null>(null);
-  const [bulkActionModal, setBulkActionModal] = useState<{ open: boolean; action: BanModalType }>({ open: false, action: null });
+  const [bulkActionModal, setBulkActionModal] = useState<{ open: boolean; action: BanModalType }>({
+    open: false,
+    action: null,
+  });
   const [bulkReason, setBulkReason] = useState('');
   const [bulkShowReason, setBulkShowReason] = useState(false);
   const [banModal, setBanModal] = useState<BanModalState>({
@@ -195,7 +208,8 @@ function UsersTab() {
   const currentCursor = cursorStack[cursorStack.length - 1] ?? '';
   const { data, isLoading } = useQuery({
     queryKey: ['adminUsers', search, roleFilter, statusFilter, pageSize, currentCursor],
-    queryFn: () => adminService.listUsers(search, roleFilter, statusFilter, pageSize, 0, currentCursor),
+    queryFn: () =>
+      adminService.listUsers(search, roleFilter, statusFilter, pageSize, 0, currentCursor),
   });
 
   const updateRoleMutation = useMutation({
@@ -208,8 +222,15 @@ function UsersTab() {
   });
 
   const banUserMutation = useMutation({
-    mutationFn: ({ userId, reason, showReason }: { userId: number; reason: string; showReason: boolean }) =>
-      adminService.banUser(userId, reason, showReason),
+    mutationFn: ({
+      userId,
+      reason,
+      showReason,
+    }: {
+      userId: number;
+      reason: string;
+      showReason: boolean;
+    }) => adminService.banUser(userId, reason, showReason),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['adminUsers'] });
       setBanModal({ type: null, user: null, reason: '', showReason: false });
@@ -217,8 +238,15 @@ function UsersTab() {
   });
 
   const shadowBanUserMutation = useMutation({
-    mutationFn: ({ userId, reason, showReason }: { userId: number; reason: string; showReason: boolean }) =>
-      adminService.shadowBanUser(userId, reason, showReason),
+    mutationFn: ({
+      userId,
+      reason,
+      showReason,
+    }: {
+      userId: number;
+      reason: string;
+      showReason: boolean;
+    }) => adminService.shadowBanUser(userId, reason, showReason),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['adminUsers'] });
       setBanModal({ type: null, user: null, reason: '', showReason: false });
@@ -244,7 +272,7 @@ function UsersTab() {
   });
 
   const handleRoleChange = (user: AdminUser, newRole: 'user' | 'admin') => {
-    if (window.confirm(`Are you sure you want to change this user's role to "${newRole}"?`)) {
+    if (window.confirm(t('adminPage.users.confirmations.changeRole', { role: newRole }))) {
       updateRoleMutation.mutate({ userId: user.id, role: newRole });
     }
   };
@@ -270,10 +298,10 @@ function UsersTab() {
     setActionMenuOpen(null);
   };
 
- const submitBanAction = () => {
+  const submitBanAction = () => {
     if (!banModal.user || !banModal.type) return;
     if (!banModal.reason.trim()) {
-      alert('Reason is required');
+      alert(t('adminPage.users.errors.reasonRequired'));
       return;
     }
 
@@ -306,13 +334,25 @@ function UsersTab() {
 
   const getUserStatusBadge = (user: AdminUser) => {
     if (user.deleted) {
-      return <span className="px-2 py-0.5 text-xs rounded bg-gray-500 text-white">{t('adminPage.status.deleted')}</span>;
+      return (
+        <span className="px-2 py-0.5 text-xs rounded bg-gray-500 text-white">
+          {t('adminPage.status.deleted')}
+        </span>
+      );
     }
     if (user.banned) {
-      return <span className="px-2 py-0.5 text-xs rounded bg-red-600 text-white">{t('adminPage.status.banned')}</span>;
+      return (
+        <span className="px-2 py-0.5 text-xs rounded bg-red-600 text-white">
+          {t('adminPage.status.banned')}
+        </span>
+      );
     }
     if (user.shadow_banned) {
-      return <span className="px-2 py-0.5 text-xs rounded bg-orange-600 text-white">{t('adminPage.status.shadowBanned')}</span>;
+      return (
+        <span className="px-2 py-0.5 text-xs rounded bg-orange-600 text-white">
+          {t('adminPage.status.shadowBanned')}
+        </span>
+      );
     }
     return null;
   };
@@ -332,13 +372,13 @@ function UsersTab() {
     if (selectedUsers.size === data.users.length) {
       setSelectedUsers(new Set());
     } else {
-      setSelectedUsers(new Set(data.users.map(u => u.id)));
+      setSelectedUsers(new Set(data.users.map((u) => u.id)));
     }
   };
 
   const handleBulkAction = (action: BanModalType) => {
     if (selectedUsers.size === 0) {
-      alert('Please select at least one user');
+      alert(t('adminPage.users.bulk.noSelectionError'));
       return;
     }
     setBulkActionModal({ open: true, action });
@@ -348,12 +388,14 @@ function UsersTab() {
 
   const submitBulkAction = async () => {
     if (!bulkReason.trim()) {
-      alert('Reason is required');
+      alert(t('adminPage.users.errors.reasonRequired'));
       return;
     }
 
     const userIds = Array.from(selectedUsers);
-    const promises = userIds.map(userId => {
+    const bulkUserCount = userIds.length;
+    const bulkUserQty = formatNumber(bulkUserCount);
+    const promises = userIds.map((userId) => {
       switch (bulkActionModal.action) {
         case 'shadow-ban':
           return adminService.shadowBanUser(userId, bulkReason, bulkShowReason);
@@ -373,10 +415,14 @@ function UsersTab() {
       queryClient.invalidateQueries({ queryKey: ['adminUsers'] });
       setBulkActionModal({ open: false, action: null });
       setSelectedUsers(new Set());
-      alert(`Successfully applied action to ${userIds.length} users`);
+      alert(
+        bulkUserCount === 1
+          ? t('adminPage.users.bulk.successOne', { qty: bulkUserQty })
+          : t('adminPage.users.bulk.successMany', { qty: bulkUserQty })
+      );
     } catch (error) {
       console.error('Bulk admin action failed', error);
-      alert('Some actions failed. Please check and try again.');
+      alert(t('adminPage.users.bulk.error'));
     }
   };
 
@@ -395,8 +441,16 @@ function UsersTab() {
     } else {
       const formatCsvDate = (value: string | number | Date) =>
         formatDate(value, { year: 'numeric', month: '2-digit', day: '2-digit' });
-      const headers = ['ID', 'Username', 'Email', 'Role', 'Status', 'Created At', 'Last Seen'];
-      const rows = data.users.map(u => [
+      const headers = [
+        t('adminPage.users.table.id'),
+        t('adminPage.users.table.username'),
+        t('adminPage.users.table.email'),
+        t('adminPage.users.table.role'),
+        t('adminPage.users.table.status'),
+        t('adminPage.users.csv.headers.createdAt'),
+        t('adminPage.users.lastSeen'),
+      ];
+      const rows = data.users.map((u) => [
         u.id,
         u.username,
         u.email || '',
@@ -409,9 +463,9 @@ function UsersTab() {
               ? t('adminPage.status.shadowBanned')
               : t('adminPage.status.active'),
         formatCsvDate(u.created_at),
-        u.last_seen_at ? formatCsvDate(u.last_seen_at) : t('adminPage.users.csv.never')
+        u.last_seen_at ? formatCsvDate(u.last_seen_at) : t('adminPage.users.csv.never'),
       ]);
-      const csvContent = [headers, ...rows].map(row => row.join(',')).join('\n');
+      const csvContent = [headers, ...rows].map((row) => row.join(',')).join('\n');
       const blob = new Blob([csvContent], { type: 'text/csv' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -421,6 +475,24 @@ function UsersTab() {
       URL.revokeObjectURL(url);
     }
   };
+
+  const getUserActionLabel = (action: BanModalType | null | undefined) => {
+    switch (action) {
+      case 'shadow-ban':
+        return t('adminPage.users.actions.shadowBan');
+      case 'ban':
+        return t('adminPage.users.actions.ban');
+      case 'unban':
+        return t('adminPage.users.actions.unban');
+      case 'delete':
+        return t('adminPage.users.actions.softDelete');
+      default:
+        return '';
+    }
+  };
+
+  const selectedUserCount = selectedUsers.size;
+  const selectedUserQty = formatNumber(selectedUserCount);
 
   return (
     <div>
@@ -487,31 +559,33 @@ function UsersTab() {
           {selectedUsers.size > 0 && (
             <div className="flex items-center gap-2 ml-4">
               <span className="text-sm text-[var(--color-text-secondary)]">
-                {selectedUsers.size} selected
+                {selectedUserCount === 1
+                  ? t('adminPage.users.bulk.selectedOne', { qty: selectedUserQty })
+                  : t('adminPage.users.bulk.selectedMany', { qty: selectedUserQty })}
               </span>
               <button
                 onClick={() => handleBulkAction('shadow-ban')}
                 className="px-3 py-1 text-sm border border-[var(--color-border)] rounded hover:bg-[var(--color-surface-hover)]"
               >
-                Shadow Ban
+                {t('adminPage.users.actions.shadowBan')}
               </button>
               <button
                 onClick={() => handleBulkAction('ban')}
                 className="px-3 py-1 text-sm border border-[var(--color-border)] rounded hover:bg-[var(--color-surface-hover)]"
               >
-                Ban
+                {t('adminPage.users.actions.ban')}
               </button>
               <button
                 onClick={() => handleBulkAction('unban')}
                 className="px-3 py-1 text-sm border border-[var(--color-border)] rounded hover:bg-[var(--color-surface-hover)]"
               >
-                Unban
+                {t('adminPage.users.actions.unban')}
               </button>
               <button
                 onClick={() => setSelectedUsers(new Set())}
                 className="px-3 py-1 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded"
               >
-                Clear
+                {t('common.clear')}
               </button>
             </div>
           )}
@@ -598,7 +672,9 @@ function UsersTab() {
                       <div className="flex-1">
                         <div className="flex items-center gap-2 flex-wrap">
                           <button
-                            onClick={() => setExpandedUser(expandedUser === user.id ? null : user.id)}
+                            onClick={() =>
+                              setExpandedUser(expandedUser === user.id ? null : user.id)
+                            }
                             className="font-medium hover:text-[var(--color-primary)]"
                           >
                             {user.username} {expandedUser === user.id ? '▲' : '▼'}
@@ -614,12 +690,26 @@ function UsersTab() {
                           </span>
                           {getUserStatusBadge(user)}
                         </div>
-                        <div className="text-sm text-[var(--color-text-secondary)] mt-1">{user.email}</div>
+                        <div className="text-sm text-[var(--color-text-secondary)] mt-1">
+                          {user.email}
+                        </div>
                         <div className="text-sm text-[var(--color-text-secondary)] mt-1">
                           ID: {user.id} | Joined:{' '}
-                          {formatDate(user.created_at, { month: 'short', day: 'numeric', year: 'numeric' })}
+                          {formatDate(user.created_at, {
+                            month: 'short',
+                            day: 'numeric',
+                            year: 'numeric',
+                          })}
                           {user.last_seen_at && (
-                            <> | {t('adminPage.users.lastSeen')}: {formatDate(user.last_seen_at, { month: 'short', day: 'numeric', year: 'numeric' })}</>
+                            <>
+                              {' '}
+                              | {t('adminPage.users.lastSeen')}:{' '}
+                              {formatDate(user.last_seen_at, {
+                                month: 'short',
+                                day: 'numeric',
+                                year: 'numeric',
+                              })}
+                            </>
                           )}
                         </div>
                       </div>
@@ -635,18 +725,45 @@ function UsersTab() {
                       </select>
                       <div className="relative">
                         <button
-                          onClick={() => setActionMenuOpen(actionMenuOpen === user.id ? null : user.id)}
+                          onClick={() =>
+                            setActionMenuOpen(actionMenuOpen === user.id ? null : user.id)
+                          }
                           className="w-full px-3 py-1 text-sm border border-[var(--color-border)] rounded bg-[var(--color-surface)] hover:bg-[var(--color-surface-hover)]"
                         >
                           {t('adminPage.users.actions.menu')} ▼
                         </button>
                         {actionMenuOpen === user.id && (
                           <div className="absolute right-0 mt-1 w-48 bg-[var(--color-surface)] border border-[var(--color-border)] rounded-lg shadow-lg z-10">
-                            <button onClick={() => handleBanAction('shadow-ban', user)} className="w-full text-left px-4 py-2 text-sm hover:bg-[var(--color-surface-hover)] rounded-t-lg">{t('adminPage.users.actions.shadowBan')}</button>
-                            <button onClick={() => handleBanAction('ban', user)} className="w-full text-left px-4 py-2 text-sm hover:bg-[var(--color-surface-hover)]">{t('adminPage.users.actions.ban')}</button>
-                            <button onClick={() => handleBanAction('unban', user)} className="w-full text-left px-4 py-2 text-sm hover:bg-[var(--color-surface-hover)]">{t('adminPage.users.actions.unban')}</button>
-                            <button onClick={() => handleBanAction('delete', user)} className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-[var(--color-surface-hover)]">{t('adminPage.users.actions.softDelete')}</button>
-                            <button onClick={() => openBanHistory(user)} className="w-full text-left px-4 py-2 text-sm hover:bg-[var(--color-surface-hover)] rounded-b-lg border-t border-[var(--color-border)]">{t('adminPage.users.actions.viewBanHistory')}</button>
+                            <button
+                              onClick={() => handleBanAction('shadow-ban', user)}
+                              className="w-full text-left px-4 py-2 text-sm hover:bg-[var(--color-surface-hover)] rounded-t-lg"
+                            >
+                              {t('adminPage.users.actions.shadowBan')}
+                            </button>
+                            <button
+                              onClick={() => handleBanAction('ban', user)}
+                              className="w-full text-left px-4 py-2 text-sm hover:bg-[var(--color-surface-hover)]"
+                            >
+                              {t('adminPage.users.actions.ban')}
+                            </button>
+                            <button
+                              onClick={() => handleBanAction('unban', user)}
+                              className="w-full text-left px-4 py-2 text-sm hover:bg-[var(--color-surface-hover)]"
+                            >
+                              {t('adminPage.users.actions.unban')}
+                            </button>
+                            <button
+                              onClick={() => handleBanAction('delete', user)}
+                              className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-[var(--color-surface-hover)]"
+                            >
+                              {t('adminPage.users.actions.softDelete')}
+                            </button>
+                            <button
+                              onClick={() => openBanHistory(user)}
+                              className="w-full text-left px-4 py-2 text-sm hover:bg-[var(--color-surface-hover)] rounded-b-lg border-t border-[var(--color-border)]"
+                            >
+                              {t('adminPage.users.actions.viewBanHistory')}
+                            </button>
                           </div>
                         )}
                       </div>
@@ -654,24 +771,62 @@ function UsersTab() {
                   </div>
 
                   {/* Expanded details */}
-                      {expandedUser === user.id && (
+                  {expandedUser === user.id && (
                     <div className="px-4 pb-4 pt-2 border-t border-[var(--color-border)] bg-[var(--color-surface)] text-sm">
                       <div className="grid grid-cols-2 gap-4">
-                        <div><span className="font-medium">{t('adminPage.users.details.redditId')}:</span> {user.reddit_id || t('common.na')}</div>
-                        <div><span className="font-medium">{t('adminPage.users.details.karma')}:</span> {t('common.na')}</div>
-                        <div><span className="font-medium">{t('adminPage.users.details.bio')}:</span> {user.bio || t('common.na')}</div>
-                        <div><span className="font-medium">{t('adminPage.users.details.avatar')}:</span> {user.avatar_url ? t('common.yes') : t('common.no')}</div>
+                        <div>
+                          <span className="font-medium">
+                            {t('adminPage.users.details.redditId')}:
+                          </span>{' '}
+                          {user.reddit_id || t('common.na')}
+                        </div>
+                        <div>
+                          <span className="font-medium">{t('adminPage.users.details.karma')}:</span>{' '}
+                          {t('common.na')}
+                        </div>
+                        <div>
+                          <span className="font-medium">{t('adminPage.users.details.bio')}:</span>{' '}
+                          {user.bio || t('common.na')}
+                        </div>
+                        <div>
+                          <span className="font-medium">
+                            {t('adminPage.users.details.avatar')}:
+                          </span>{' '}
+                          {user.avatar_url ? t('common.yes') : t('common.no')}
+                        </div>
                         {user.banned_at && (
                           <div>
-                            <span className="font-medium">{t('adminPage.users.details.bannedAt')}:</span>{' '}
-                            {formatDate(user.banned_at, { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                            <span className="font-medium">
+                              {t('adminPage.users.details.bannedAt')}:
+                            </span>{' '}
+                            {formatDate(user.banned_at, {
+                              month: 'short',
+                              day: 'numeric',
+                              year: 'numeric',
+                              hour: 'numeric',
+                              minute: '2-digit',
+                            })}
                           </div>
                         )}
-                        {user.banned_by && <div><span className="font-medium">{t('adminPage.users.details.bannedById')}:</span> {user.banned_by}</div>}
+                        {user.banned_by && (
+                          <div>
+                            <span className="font-medium">
+                              {t('adminPage.users.details.bannedById')}:
+                            </span>{' '}
+                            {user.banned_by}
+                          </div>
+                        )}
                         {user.ban_reason && (
                           <div className="col-span-2">
-                            <span className="font-medium">{t('adminPage.users.details.banReason')}:</span> {user.ban_reason}
-                            {user.show_ban_reason && <span className="ml-2 text-xs text-[var(--color-primary)]">{t('adminPage.users.details.shownToUser')}</span>}
+                            <span className="font-medium">
+                              {t('adminPage.users.details.banReason')}:
+                            </span>{' '}
+                            {user.ban_reason}
+                            {user.show_ban_reason && (
+                              <span className="ml-2 text-xs text-[var(--color-primary)]">
+                                {t('adminPage.users.details.shownToUser')}
+                              </span>
+                            )}
                           </div>
                         )}
                       </div>
@@ -706,7 +861,10 @@ function UsersTab() {
                 </thead>
                 <tbody>
                   {data.users.map((user: AdminUser) => (
-                    <tr key={user.id} className="border-b border-[var(--color-border)] hover:bg-[var(--color-surface-hover)]">
+                    <tr
+                      key={user.id}
+                      className="border-b border-[var(--color-border)] hover:bg-[var(--color-surface-hover)]"
+                    >
                       <td className="p-3">
                         <input
                           type="checkbox"
@@ -720,38 +878,73 @@ function UsersTab() {
                       <td className="p-3">
                         <select
                           value={user.role}
-                          onChange={(e) => handleRoleChange(user, e.target.value as 'user' | 'admin')}
+                          onChange={(e) =>
+                            handleRoleChange(user, e.target.value as 'user' | 'admin')
+                          }
                           className="px-2 py-1 text-xs border border-[var(--color-border)] rounded bg-[var(--color-surface)]"
-	                        >
-	                          <option value="user">{t('adminPage.roles.user')}</option>
-	                          <option value="admin">{t('adminPage.roles.admin')}</option>
-	                        </select>
-	                      </td>
-	                      <td className="p-3">
-                          {getUserStatusBadge(user) || (
-                            <span className="text-[var(--color-text-secondary)]">{t('adminPage.status.active')}</span>
-                          )}
-                        </td>
+                        >
+                          <option value="user">{t('adminPage.roles.user')}</option>
+                          <option value="admin">{t('adminPage.roles.admin')}</option>
+                        </select>
+                      </td>
+                      <td className="p-3">
+                        {getUserStatusBadge(user) || (
+                          <span className="text-[var(--color-text-secondary)]">
+                            {t('adminPage.status.active')}
+                          </span>
+                        )}
+                      </td>
                       <td className="p-3 text-[var(--color-text-secondary)]">
-                        {formatDate(user.created_at, { month: 'short', day: 'numeric', year: 'numeric' })}
+                        {formatDate(user.created_at, {
+                          month: 'short',
+                          day: 'numeric',
+                          year: 'numeric',
+                        })}
                       </td>
                       <td className="p-3">
                         <div className="relative">
                           <button
-                            onClick={() => setActionMenuOpen(actionMenuOpen === user.id ? null : user.id)}
+                            onClick={() =>
+                              setActionMenuOpen(actionMenuOpen === user.id ? null : user.id)
+                            }
                             className="px-2 py-1 text-xs border border-[var(--color-border)] rounded hover:bg-[var(--color-surface-hover)]"
                           >
                             •••
                           </button>
-	                          {actionMenuOpen === user.id && (
-	                            <div className="absolute right-0 mt-1 w-40 bg-[var(--color-surface)] border border-[var(--color-border)] rounded-lg shadow-lg z-10">
-	                              <button onClick={() => handleBanAction('shadow-ban', user)} className="w-full text-left px-3 py-2 text-xs hover:bg-[var(--color-surface-hover)] rounded-t-lg">{t('adminPage.users.actions.shadowBan')}</button>
-	                              <button onClick={() => handleBanAction('ban', user)} className="w-full text-left px-3 py-2 text-xs hover:bg-[var(--color-surface-hover)]">{t('adminPage.users.actions.ban')}</button>
-	                              <button onClick={() => handleBanAction('unban', user)} className="w-full text-left px-3 py-2 text-xs hover:bg-[var(--color-surface-hover)]">{t('adminPage.users.actions.unban')}</button>
-	                              <button onClick={() => handleBanAction('delete', user)} className="w-full text-left px-3 py-2 text-xs text-red-600 hover:bg-[var(--color-surface-hover)]">{t('adminPage.users.actions.delete')}</button>
-	                              <button onClick={() => openBanHistory(user)} className="w-full text-left px-3 py-2 text-xs hover:bg-[var(--color-surface-hover)] rounded-b-lg border-t border-[var(--color-border)]">{t('adminPage.users.actions.history')}</button>
-	                            </div>
-	                          )}
+                          {actionMenuOpen === user.id && (
+                            <div className="absolute right-0 mt-1 w-40 bg-[var(--color-surface)] border border-[var(--color-border)] rounded-lg shadow-lg z-10">
+                              <button
+                                onClick={() => handleBanAction('shadow-ban', user)}
+                                className="w-full text-left px-3 py-2 text-xs hover:bg-[var(--color-surface-hover)] rounded-t-lg"
+                              >
+                                {t('adminPage.users.actions.shadowBan')}
+                              </button>
+                              <button
+                                onClick={() => handleBanAction('ban', user)}
+                                className="w-full text-left px-3 py-2 text-xs hover:bg-[var(--color-surface-hover)]"
+                              >
+                                {t('adminPage.users.actions.ban')}
+                              </button>
+                              <button
+                                onClick={() => handleBanAction('unban', user)}
+                                className="w-full text-left px-3 py-2 text-xs hover:bg-[var(--color-surface-hover)]"
+                              >
+                                {t('adminPage.users.actions.unban')}
+                              </button>
+                              <button
+                                onClick={() => handleBanAction('delete', user)}
+                                className="w-full text-left px-3 py-2 text-xs text-red-600 hover:bg-[var(--color-surface-hover)]"
+                              >
+                                {t('adminPage.users.actions.delete')}
+                              </button>
+                              <button
+                                onClick={() => openBanHistory(user)}
+                                className="w-full text-left px-3 py-2 text-xs hover:bg-[var(--color-surface-hover)] rounded-b-lg border-t border-[var(--color-border)]"
+                              >
+                                {t('adminPage.users.actions.history')}
+                              </button>
+                            </div>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -775,7 +968,7 @@ function UsersTab() {
             }}
             centerContent={
               <span className="text-sm text-[var(--color-text-secondary)]">
-                Page {cursorStack.length}
+                {t('adminPage.pagination.page', { page: cursorStack.length })}
               </span>
             }
           />
@@ -789,18 +982,20 @@ function UsersTab() {
             <div className="flex justify-between items-start mb-4">
               <div>
                 <h3 className="text-xl font-semibold">
-                  Bulk {bulkActionModal.action === 'shadow-ban' ? 'Shadow Ban' :
-                        bulkActionModal.action === 'ban' ? 'Ban' :
-                        bulkActionModal.action === 'unban' ? 'Unban' : 'Delete'} Users
+                  {t('adminPage.users.modals.bulkTitle', {
+                    action: getUserActionLabel(bulkActionModal.action),
+                  })}
                 </h3>
                 <p className="text-[var(--color-text-secondary)] mt-1">
-                  This will affect {selectedUsers.size} selected user{selectedUsers.size > 1 ? 's' : ''}
+                  {selectedUserCount === 1
+                    ? t('adminPage.users.bulk.affectsOne', { qty: selectedUserQty })
+                    : t('adminPage.users.bulk.affectsMany', { qty: selectedUserQty })}
                 </p>
               </div>
               <button
                 onClick={() => setBulkActionModal({ open: false, action: null })}
                 className="text-[var(--color-text-secondary)] hover:text-[var(--color-text)]"
-                aria-label="Close"
+                aria-label={t('common.close')}
               >
                 X
               </button>
@@ -809,7 +1004,7 @@ function UsersTab() {
             <div className="space-y-4">
               <div>
                 <label htmlFor="bulkReason" className="block text-sm font-medium mb-2">
-                  Reason (required)
+                  {t('adminPage.users.modals.reasonLabel')}
                 </label>
                 <textarea
                   id="bulkReason"
@@ -817,7 +1012,7 @@ function UsersTab() {
                   onChange={(e) => setBulkReason(e.target.value)}
                   rows={3}
                   className="w-full px-4 py-2 border border-[var(--color-border)] rounded-lg bg-[var(--color-surface)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
-                  placeholder="Enter reason..."
+                  placeholder={t('adminPage.users.modals.reasonPlaceholder')}
                 />
               </div>
 
@@ -831,7 +1026,7 @@ function UsersTab() {
                     className="w-4 h-4"
                   />
                   <label htmlFor="bulkShowReason" className="text-sm">
-                    Show reason to users
+                    {t('adminPage.users.modals.showReasonToUsers')}
                   </label>
                 </div>
               )}
@@ -842,16 +1037,20 @@ function UsersTab() {
                 onClick={() => setBulkActionModal({ open: false, action: null })}
                 className="px-4 py-2 rounded border border-[var(--color-border)] bg-[var(--color-surface-elevated)] hover:bg-[var(--color-surface-hover)]"
               >
-                Cancel
+                {t('common.cancel')}
               </button>
               <button
                 onClick={submitBulkAction}
                 disabled={!bulkReason.trim()}
                 className={`px-4 py-2 rounded text-white disabled:opacity-50 ${
-                  bulkActionModal.action === 'delete' ? 'bg-red-600 hover:bg-red-700' : 'bg-[var(--color-primary)] hover:bg-[var(--color-primary-strong)]'
+                  bulkActionModal.action === 'delete'
+                    ? 'bg-red-600 hover:bg-red-700'
+                    : 'bg-[var(--color-primary)] hover:bg-[var(--color-primary-strong)]'
                 }`}
               >
-                Confirm ({selectedUsers.size} users)
+                {selectedUserCount === 1
+                  ? t('adminPage.users.bulk.confirmButtonOne', { qty: selectedUserQty })
+                  : t('adminPage.users.bulk.confirmButtonMany', { qty: selectedUserQty })}
               </button>
             </div>
           </div>
@@ -865,19 +1064,21 @@ function UsersTab() {
             <div className="flex justify-between items-start mb-4">
               <div>
                 <h3 className="text-xl font-semibold">
-                  {banModal.type === 'shadow-ban' && 'Shadow Ban User'}
-                  {banModal.type === 'ban' && 'Ban User'}
-                  {banModal.type === 'unban' && 'Unban User'}
-                  {banModal.type === 'delete' && 'Soft Delete User'}
+                  {t('adminPage.users.modals.singleTitle', {
+                    action: getUserActionLabel(banModal.type),
+                  })}
                 </h3>
                 <p className="text-[var(--color-text-secondary)] mt-1">
-                  User: <span className="font-medium">{banModal.user.username}</span>
+                  {t('adminPage.users.modals.userLabel')}{' '}
+                  <span className="font-medium">{banModal.user.username}</span>
                 </p>
               </div>
               <button
-                onClick={() => setBanModal({ type: null, user: null, reason: '', showReason: false })}
+                onClick={() =>
+                  setBanModal({ type: null, user: null, reason: '', showReason: false })
+                }
                 className="text-[var(--color-text-secondary)] hover:text-[var(--color-text)]"
-                aria-label="Close"
+                aria-label={t('common.close')}
               >
                 X
               </button>
@@ -886,7 +1087,7 @@ function UsersTab() {
             <div className="space-y-4">
               <div>
                 <label htmlFor="banReason" className="block text-sm font-medium mb-2">
-                  Reason (required)
+                  {t('adminPage.users.modals.reasonLabel')}
                 </label>
                 <textarea
                   id="banReason"
@@ -894,7 +1095,7 @@ function UsersTab() {
                   onChange={(e) => setBanModal({ ...banModal, reason: e.target.value })}
                   rows={3}
                   className="w-full px-4 py-2 border border-[var(--color-border)] rounded-lg bg-[var(--color-surface)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
-                  placeholder="Enter reason..."
+                  placeholder={t('adminPage.users.modals.reasonPlaceholder')}
                 />
               </div>
 
@@ -908,7 +1109,7 @@ function UsersTab() {
                     className="w-4 h-4"
                   />
                   <label htmlFor="showReason" className="text-sm">
-                    Show reason to user
+                    {t('adminPage.users.modals.showReasonToUser')}
                   </label>
                 </div>
               )}
@@ -916,19 +1117,32 @@ function UsersTab() {
 
             <div className="mt-6 flex justify-end gap-3">
               <button
-                onClick={() => setBanModal({ type: null, user: null, reason: '', showReason: false })}
+                onClick={() =>
+                  setBanModal({ type: null, user: null, reason: '', showReason: false })
+                }
                 className="px-4 py-2 rounded border border-[var(--color-border)] bg-[var(--color-surface-elevated)] hover:bg-[var(--color-surface-hover)]"
               >
                 {t('common.cancel')}
               </button>
               <button
                 onClick={submitBanAction}
-                disabled={!banModal.reason.trim() || shadowBanUserMutation.isPending || banUserMutation.isPending || unbanUserMutation.isPending || softDeleteUserMutation.isPending}
+                disabled={
+                  !banModal.reason.trim() ||
+                  shadowBanUserMutation.isPending ||
+                  banUserMutation.isPending ||
+                  unbanUserMutation.isPending ||
+                  softDeleteUserMutation.isPending
+                }
                 className={`px-4 py-2 rounded text-white disabled:opacity-50 ${
-                  banModal.type === 'delete' ? 'bg-red-600 hover:bg-red-700' : 'bg-[var(--color-primary)] hover:bg-[var(--color-primary-strong)]'
+                  banModal.type === 'delete'
+                    ? 'bg-red-600 hover:bg-red-700'
+                    : 'bg-[var(--color-primary)] hover:bg-[var(--color-primary-strong)]'
                 }`}
               >
-                {(shadowBanUserMutation.isPending || banUserMutation.isPending || unbanUserMutation.isPending || softDeleteUserMutation.isPending)
+                {shadowBanUserMutation.isPending ||
+                banUserMutation.isPending ||
+                unbanUserMutation.isPending ||
+                softDeleteUserMutation.isPending
                   ? t('adminPage.common.processing')
                   : t('common.confirm')}
               </button>
@@ -943,8 +1157,12 @@ function UsersTab() {
           <div className="bg-white dark:bg-[var(--color-surface-elevated)] rounded-lg shadow-xl max-w-2xl w-full mx-4 p-6">
             <div className="flex justify-between items-start mb-4">
               <div>
-                <h3 className="text-xl font-semibold">{t('adminPage.users.banHistory.title', { username: historyModalUser.username })}</h3>
-                <p className="text-[var(--color-text-secondary)] text-sm">{t('adminPage.users.banHistory.subtitle')}</p>
+                <h3 className="text-xl font-semibold">
+                  {t('adminPage.users.banHistory.title', { username: historyModalUser.username })}
+                </h3>
+                <p className="text-[var(--color-text-secondary)] text-sm">
+                  {t('adminPage.users.banHistory.subtitle')}
+                </p>
               </div>
               <button
                 onClick={() => {
@@ -960,34 +1178,52 @@ function UsersTab() {
 
             {loadingHistory && (
               <div className="py-6 text-center">
-                <LoadingMessage className="text-sm">{t('adminPage.users.banHistory.loading')}</LoadingMessage>
+                <LoadingMessage className="text-sm">
+                  {t('adminPage.users.banHistory.loading')}
+                </LoadingMessage>
               </div>
             )}
             {!loadingHistory && banHistory && banHistory.length === 0 && (
               <div className="py-6 text-center">
-                <EmptyMessage className="text-sm">{t('adminPage.users.banHistory.empty')}</EmptyMessage>
+                <EmptyMessage className="text-sm">
+                  {t('adminPage.users.banHistory.empty')}
+                </EmptyMessage>
               </div>
             )}
             {!loadingHistory && banHistory && banHistory.length > 0 && (
               <div className="space-y-3 max-h-96 overflow-y-auto pr-2">
                 {banHistory.map((entry) => (
-                  <div key={entry.id} className="border border-[var(--color-border)] rounded-md p-3 bg-[var(--color-surface)]">
+                  <div
+                    key={entry.id}
+                    className="border border-[var(--color-border)] rounded-md p-3 bg-[var(--color-surface)]"
+                  >
                     <div className="flex justify-between text-sm">
                       <span className="font-semibold">{entry.action}</span>
-	                      <span className="text-[var(--color-text-secondary)]">
-	                        {t('adminPage.users.banHistory.byLine', {
-                            date: formatDate(entry.created_at, { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }),
-                            admin: entry.admin_name,
-                          })}
-	                      </span>
-	                    </div>
-	                    <div className="mt-1 text-sm">
-	                      <span className="font-medium">{t('adminPage.labels.reason')}:</span> {entry.reason}
-	                      {entry.show_reason && <span className="ml-2 text-xs text-[var(--color-primary)]">{t('adminPage.users.details.shownToUser')}</span>}
-	                    </div>
-	                  </div>
-	                ))}
-	              </div>
+                      <span className="text-[var(--color-text-secondary)]">
+                        {t('adminPage.users.banHistory.byLine', {
+                          date: formatDate(entry.created_at, {
+                            month: 'short',
+                            day: 'numeric',
+                            year: 'numeric',
+                            hour: 'numeric',
+                            minute: '2-digit',
+                          }),
+                          admin: entry.admin_name,
+                        })}
+                      </span>
+                    </div>
+                    <div className="mt-1 text-sm">
+                      <span className="font-medium">{t('adminPage.labels.reason')}:</span>{' '}
+                      {entry.reason}
+                      {entry.show_reason && (
+                        <span className="ml-2 text-xs text-[var(--color-primary)]">
+                          {t('adminPage.users.details.shownToUser')}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
             )}
           </div>
         </div>
@@ -1009,7 +1245,8 @@ function BugReportsTab() {
   const currentCursor = cursorStack[cursorStack.length - 1] ?? '';
   const { data, isLoading } = useQuery({
     queryKey: ['adminBugReports', statusFilter, pageSize, currentCursor],
-    queryFn: () => bugReportService.getBugReports(statusFilter || undefined, pageSize, 0, currentCursor),
+    queryFn: () =>
+      bugReportService.getBugReports(statusFilter || undefined, pageSize, 0, currentCursor),
   });
 
   const reports = data?.reports ?? [];
@@ -1069,12 +1306,24 @@ function BugReportsTab() {
           <table className="w-full text-sm">
             <thead className="bg-[var(--color-surface-elevated)] border-b border-[var(--color-border)]">
               <tr>
-                <th className="p-3 text-left text-[var(--color-text-secondary)] font-medium">{t('adminPage.bugReports.table.id')}</th>
-                <th className="p-3 text-left text-[var(--color-text-secondary)] font-medium">{t('adminPage.bugReports.table.status')}</th>
-                <th className="p-3 text-left text-[var(--color-text-secondary)] font-medium">{t('adminPage.bugReports.table.user')}</th>
-                <th className="p-3 text-left text-[var(--color-text-secondary)] font-medium">{t('adminPage.bugReports.table.page')}</th>
-                <th className="p-3 text-left text-[var(--color-text-secondary)] font-medium">{t('adminPage.bugReports.table.description')}</th>
-                <th className="p-3 text-left text-[var(--color-text-secondary)] font-medium">{t('adminPage.bugReports.table.submitted')}</th>
+                <th className="p-3 text-left text-[var(--color-text-secondary)] font-medium">
+                  {t('adminPage.bugReports.table.id')}
+                </th>
+                <th className="p-3 text-left text-[var(--color-text-secondary)] font-medium">
+                  {t('adminPage.bugReports.table.status')}
+                </th>
+                <th className="p-3 text-left text-[var(--color-text-secondary)] font-medium">
+                  {t('adminPage.bugReports.table.user')}
+                </th>
+                <th className="p-3 text-left text-[var(--color-text-secondary)] font-medium">
+                  {t('adminPage.bugReports.table.page')}
+                </th>
+                <th className="p-3 text-left text-[var(--color-text-secondary)] font-medium">
+                  {t('adminPage.bugReports.table.description')}
+                </th>
+                <th className="p-3 text-left text-[var(--color-text-secondary)] font-medium">
+                  {t('adminPage.bugReports.table.submitted')}
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -1094,7 +1343,10 @@ function BugReportsTab() {
                         {report.status.replace('_', ' ')}
                       </td>
                       <td className="p-3 text-[var(--color-text-secondary)]">
-                        {report.username || (report.user_id ? t('common.userNumber', { id: report.user_id }) : t('adminPage.bugReports.anonymous'))}
+                        {report.username ||
+                          (report.user_id
+                            ? t('common.userNumber', { id: report.user_id })
+                            : t('adminPage.bugReports.anonymous'))}
                       </td>
                       <td className="p-3 text-[var(--color-text-secondary)]">
                         <span className="block max-w-xs truncate">{report.page_url}</span>
@@ -1103,28 +1355,50 @@ function BugReportsTab() {
                         <span className="block max-w-md truncate">{report.description}</span>
                       </td>
                       <td className="p-3 text-[var(--color-text-secondary)]">
-                        {formatDate(report.created_at, { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                        {formatDate(report.created_at, {
+                          month: 'short',
+                          day: 'numeric',
+                          year: 'numeric',
+                          hour: 'numeric',
+                          minute: '2-digit',
+                        })}
                       </td>
                     </tr>
                     {isExpanded && (
-                      <tr key={`${report.id}-details`} className="border-b border-[var(--color-border)]">
+                      <tr
+                        key={`${report.id}-details`}
+                        className="border-b border-[var(--color-border)]"
+                      >
                         <td colSpan={6} className="p-4 bg-[var(--color-surface-elevated)]">
                           <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,360px)]">
                             <div className="space-y-3 text-sm text-[var(--color-text-secondary)]">
                               <div>
-                                <span className="font-medium text-[var(--color-text-primary)]">{t('adminPage.bugReports.details.status')}:</span>{' '}
-                                <span className="capitalize">{report.status.replace('_', ' ')}</span>
+                                <span className="font-medium text-[var(--color-text-primary)]">
+                                  {t('adminPage.bugReports.details.status')}:
+                                </span>{' '}
+                                <span className="capitalize">
+                                  {report.status.replace('_', ' ')}
+                                </span>
                               </div>
                               <div>
-                                <span className="font-medium text-[var(--color-text-primary)]">{t('adminPage.bugReports.details.reporter')}:</span>{' '}
-                                {report.username || (report.user_id ? t('common.userNumber', { id: report.user_id }) : t('adminPage.bugReports.anonymous'))}
+                                <span className="font-medium text-[var(--color-text-primary)]">
+                                  {t('adminPage.bugReports.details.reporter')}:
+                                </span>{' '}
+                                {report.username ||
+                                  (report.user_id
+                                    ? t('common.userNumber', { id: report.user_id })
+                                    : t('adminPage.bugReports.anonymous'))}
                               </div>
                               <div>
-                                <span className="font-medium text-[var(--color-text-primary)]">{t('adminPage.bugReports.details.page')}:</span>{' '}
+                                <span className="font-medium text-[var(--color-text-primary)]">
+                                  {t('adminPage.bugReports.details.page')}:
+                                </span>{' '}
                                 <span className="break-words">{report.page_url}</span>
                               </div>
                               <div>
-                                <span className="font-medium text-[var(--color-text-primary)]">{t('adminPage.bugReports.details.description')}:</span>
+                                <span className="font-medium text-[var(--color-text-primary)]">
+                                  {t('adminPage.bugReports.details.description')}:
+                                </span>
                                 <div className="mt-1 whitespace-pre-wrap text-[var(--color-text-primary)]">
                                   {report.description}
                                 </div>
@@ -1181,7 +1455,6 @@ function BugReportsTab() {
           }}
         />
       )}
-
     </div>
   );
 }
@@ -1221,7 +1494,7 @@ function ModeratorsTab() {
   });
 
   const handleRemove = (userId: number, username: string) => {
-    if (window.confirm(`Remove ${username} as moderator?`)) {
+    if (window.confirm(t('adminPage.moderators.confirmRemove', { username }))) {
       removeMutation.mutate({ hubId: selectedHubId!, userId });
     }
   };
@@ -1229,7 +1502,9 @@ function ModeratorsTab() {
   return (
     <div>
       <div className="mb-6">
-        <label className="block text-sm font-medium mb-2">{t('adminPage.moderators.selectHub')}</label>
+        <label className="block text-sm font-medium mb-2">
+          {t('adminPage.moderators.selectHub')}
+        </label>
         <select
           value={selectedHubId || ''}
           onChange={(e) => setSelectedHubId(e.target.value ? Number(e.target.value) : null)}
@@ -1238,7 +1513,7 @@ function ModeratorsTab() {
           <option value="">{t('adminPage.moderators.selectHubPlaceholder')}</option>
           {hubsData?.map((hub: Hub) => (
             <option key={hub.id} value={hub.id}>
-              h/{hub.name}
+              {t('common.format.hubPath', { name: hub.name })}
             </option>
           ))}
         </select>
@@ -1274,17 +1549,24 @@ function ModeratorsTab() {
                   <div className="flex justify-between items-center">
                     <div>
                       <div className="font-medium">{mod.username}</div>
-	                      <div className="text-sm text-[var(--color-text-secondary)]">
-	                        {t('adminPage.moderators.userId', { id: mod.user_id })} | {t('adminPage.moderators.added', { date: formatDate(mod.added_at, { month: 'short', day: 'numeric', year: 'numeric' }) })}
-	                      </div>
+                      <div className="text-sm text-[var(--color-text-secondary)]">
+                        {t('adminPage.moderators.userId', { id: mod.user_id })} |{' '}
+                        {t('adminPage.moderators.added', {
+                          date: formatDate(mod.added_at, {
+                            month: 'short',
+                            day: 'numeric',
+                            year: 'numeric',
+                          }),
+                        })}
+                      </div>
                     </div>
                     <button
                       onClick={() => handleRemove(mod.user_id, mod.username)}
                       className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
-	                      disabled={removeMutation.isPending}
-	                    >
-	                      {t('adminPage.moderators.remove')}
-	                    </button>
+                      disabled={removeMutation.isPending}
+                    >
+                      {t('adminPage.moderators.remove')}
+                    </button>
                   </div>
                 </div>
               ))}
@@ -1381,27 +1663,38 @@ function BanActivityTab() {
                           entry.action.includes('ban') && !entry.action.includes('unban')
                             ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
                             : entry.action === 'unban'
-                            ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                            : 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200'
+                              ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                              : 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200'
                         }`}
-	                      >
-	                        {t('adminPage.banActivity.userId', { id: formatNumber(entry.user_id) })}
-	                      </span>
-	                    </div>
-	                    <div className="text-sm text-[var(--color-text-secondary)] mt-1">
-	                      <span className="font-medium">{t('adminPage.labels.reason')}:</span> {entry.reason}
-	                      {entry.show_reason && <span className="ml-2 text-xs text-[var(--color-primary)]">{t('adminPage.users.details.shownToUser')}</span>}
-	                    </div>
-	                    <div className="text-sm text-[var(--color-text-secondary)] mt-1">
-	                      {t('adminPage.banActivity.byLine', {
-                          date: formatDate(entry.created_at, { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }),
-                          admin: entry.admin_name,
-                          id: formatNumber(entry.admin_id),
-                        })}
-	                    </div>
-	                  </div>
-	                </div>
-	              </div>
+                      >
+                        {t('adminPage.banActivity.userId', { id: formatNumber(entry.user_id) })}
+                      </span>
+                    </div>
+                    <div className="text-sm text-[var(--color-text-secondary)] mt-1">
+                      <span className="font-medium">{t('adminPage.labels.reason')}:</span>{' '}
+                      {entry.reason}
+                      {entry.show_reason && (
+                        <span className="ml-2 text-xs text-[var(--color-primary)]">
+                          {t('adminPage.users.details.shownToUser')}
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-sm text-[var(--color-text-secondary)] mt-1">
+                      {t('adminPage.banActivity.byLine', {
+                        date: formatDate(entry.created_at, {
+                          month: 'short',
+                          day: 'numeric',
+                          year: 'numeric',
+                          hour: 'numeric',
+                          minute: '2-digit',
+                        }),
+                        admin: entry.admin_name,
+                        id: formatNumber(entry.admin_id),
+                      })}
+                    </div>
+                  </div>
+                </div>
+              </div>
             ))}
           </div>
 
@@ -1417,12 +1710,12 @@ function BanActivityTab() {
                 setCursorStack((prev) => [...prev, data.next_cursor as string]);
               }
             }}
-	            centerContent={
-	              <span className="text-sm text-[var(--color-text-secondary)]">
-	                {t('adminPage.pagination.page', { page: formatNumber(cursorStack.length) })}
-	              </span>
-	            }
-	          />
+            centerContent={
+              <span className="text-sm text-[var(--color-text-secondary)]">
+                {t('adminPage.pagination.page', { page: formatNumber(cursorStack.length) })}
+              </span>
+            }
+          />
         </>
       )}
     </div>

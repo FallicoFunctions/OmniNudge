@@ -1,9 +1,19 @@
 import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import type { HTMLAttributes, PointerEvent as ReactPointerEvent } from 'react';
-import { keepPreviousData, useMutation, useQuery, useQueryClient, useInfiniteQuery } from '@tanstack/react-query';
+import {
+  keepPreviousData,
+  useMutation,
+  useQuery,
+  useQueryClient,
+  useInfiniteQuery,
+} from '@tanstack/react-query';
 import { useNavigate, useParams, useLocation, Link, Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { hubsService, type HubPostsResponse, type LocalSubredditPost } from '../services/hubsService';
+import {
+  hubsService,
+  type HubPostsResponse,
+  type LocalSubredditPost,
+} from '../services/hubsService';
 import { useAuth } from '../contexts/AuthContext';
 import { CommunityHeader } from '../components/common/CommunityHeader';
 import { CommunityHeaderControlsRow } from '../components/common/CommunityHeaderControlsRow';
@@ -54,7 +64,8 @@ export default function HubsPage() {
   const queryClient = useQueryClient();
   const { hubname: routeHubname } = useParams<{ hubname?: string }>();
   const { user } = useAuth();
-  const { useRelativeTime, useInfiniteScrollHubs, searchIncludeNsfwByDefault, blockAllNsfw } = useSettings();
+  const { useRelativeTime, useInfiniteScrollHubs, searchIncludeNsfwByDefault, blockAllNsfw } =
+    useSettings();
   const [hubname, setHubname] = useState(routeHubname ?? 'popular');
   const [inputValue, setInputValue] = useState('');
   const [isAutocompleteOpen, setIsAutocompleteOpen] = useState(false);
@@ -65,7 +76,10 @@ export default function HubsPage() {
   const pageSize = 50;
   const currentCursor = cursorStack[cursorStack.length - 1] ?? '';
   const [crosspostTarget, setCrosspostTarget] = useState<LocalSubredditPost | null>(null);
-  const [deletePostTarget, setDeletePostTarget] = useState<{ postId: number; authorId: number } | null>(null);
+  const [deletePostTarget, setDeletePostTarget] = useState<{
+    postId: number;
+    authorId: number;
+  } | null>(null);
   const [deleteReason, setDeleteReason] = useState('');
   const [editPostTarget, setEditPostTarget] = useState<PlatformPost | null>(null);
   const [crosspostTitle, setCrosspostTitle] = useState('');
@@ -213,91 +227,112 @@ export default function HubsPage() {
     setLimitSearchToContext,
   ]);
 
-  const navigateToHubOrSubreddit = useCallback(async (value: string) => {
-    const normalized = value.trim();
-    if (!normalized) {
-      navigate('/h/popular');
-      setIsAutocompleteOpen(false);
-      return;
-    }
-
-    try {
-      await hubsService.getHub(normalized);
-      navigate(`/h/${normalized}`);
-    } catch {
-      navigate(`/r/${normalized}`);
-    }
-    setIsAutocompleteOpen(false);
-  }, [navigate]);
-
-  const handleTopSubmit = useCallback((event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (trimmedInput) {
-      navigateToHubOrSubreddit(trimmedInput);
-      setInputValue('');
-    }
-  }, [navigateToHubOrSubreddit, trimmedInput]);
-
-  const handleTopChange = useCallback((value: string) => {
-    setInputValue(value);
-    if (!isAutocompleteOpen) {
-      setIsAutocompleteOpen(true);
-    }
-  }, [isAutocompleteOpen]);
-
-  const handleSelectHubSuggestion = useCallback((name: string) => {
-    navigate(`/h/${name}`);
-    setInputValue('');
-    setIsAutocompleteOpen(false);
-  }, [navigate]);
-
-  const handleSelectSubredditSuggestion = useCallback((name: string) => {
-    navigate(`/r/${name}`);
-    setInputValue('');
-    setIsAutocompleteOpen(false);
-  }, [navigate]);
-
-  const runHubPostSearch = useCallback(async (query: string, forceScoped: boolean = false) => {
-    if (!query) {
-      setHubSearchResults(null);
-      setHubSearchQuery('');
-      return;
-    }
-
-    const shouldScope = forceScoped || limitSearchToContext;
-    if (shouldScope && hubname) {
-      setHubSearchQuery(query);
-      try {
-        const results = await searchPlatformPosts(query, includeNsfwSearch && !blockAllNsfw, {
-          limit: 50,
-          offset: 0,
-        });
-        const filtered = results.filter((post) => {
-          const name = post.hub?.name ?? post.hub_name;
-          return name?.toLowerCase() === hubname.toLowerCase();
-        });
-        const sorted = [...filtered].sort((a, b) => {
-          const aTime = new Date(a.crossposted_at ?? a.created_at ?? '').getTime();
-          const bTime = new Date(b.crossposted_at ?? b.created_at ?? '').getTime();
-          return bTime - aTime;
-        });
-        setHubSearchResults(sorted);
-      } catch (error) {
-        console.error('Hub search failed', error);
-        setHubSearchResults([]);
+  const navigateToHubOrSubreddit = useCallback(
+    async (value: string) => {
+      const normalized = value.trim();
+      if (!normalized) {
+        navigate('/h/popular');
+        setIsAutocompleteOpen(false);
+        return;
       }
-      return;
-    }
 
-    const includeNsfwParam = includeNsfwSearch && !blockAllNsfw;
-    const nsfwQuery = includeNsfwParam ? '&include_nsfw=true' : '';
-    navigate(`/search?q=${encodeURIComponent(query)}&sort=relevance${nsfwQuery}`);
-  }, [blockAllNsfw, hubname, includeNsfwSearch, limitSearchToContext, navigate]);
+      try {
+        await hubsService.getHub(normalized);
+        navigate(`/h/${normalized}`);
+      } catch {
+        navigate(`/r/${normalized}`);
+      }
+      setIsAutocompleteOpen(false);
+    },
+    [navigate]
+  );
 
-  const handlePostSearchSubmit = useCallback((event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    runHubPostSearch(postSearchInput.trim());
-  }, [postSearchInput, runHubPostSearch]);
+  const handleTopSubmit = useCallback(
+    (event: React.FormEvent<HTMLFormElement>) => {
+      event.preventDefault();
+      if (trimmedInput) {
+        navigateToHubOrSubreddit(trimmedInput);
+        setInputValue('');
+      }
+    },
+    [navigateToHubOrSubreddit, trimmedInput]
+  );
+
+  const handleTopChange = useCallback(
+    (value: string) => {
+      setInputValue(value);
+      if (!isAutocompleteOpen) {
+        setIsAutocompleteOpen(true);
+      }
+    },
+    [isAutocompleteOpen]
+  );
+
+  const handleSelectHubSuggestion = useCallback(
+    (name: string) => {
+      navigate(`/h/${name}`);
+      setInputValue('');
+      setIsAutocompleteOpen(false);
+    },
+    [navigate]
+  );
+
+  const handleSelectSubredditSuggestion = useCallback(
+    (name: string) => {
+      navigate(`/r/${name}`);
+      setInputValue('');
+      setIsAutocompleteOpen(false);
+    },
+    [navigate]
+  );
+
+  const runHubPostSearch = useCallback(
+    async (query: string, forceScoped: boolean = false) => {
+      if (!query) {
+        setHubSearchResults(null);
+        setHubSearchQuery('');
+        return;
+      }
+
+      const shouldScope = forceScoped || limitSearchToContext;
+      if (shouldScope && hubname) {
+        setHubSearchQuery(query);
+        try {
+          const results = await searchPlatformPosts(query, includeNsfwSearch && !blockAllNsfw, {
+            limit: 50,
+            offset: 0,
+          });
+          const filtered = results.filter((post) => {
+            const name = post.hub?.name ?? post.hub_name;
+            return name?.toLowerCase() === hubname.toLowerCase();
+          });
+          const sorted = [...filtered].sort((a, b) => {
+            const aTime = new Date(a.crossposted_at ?? a.created_at ?? '').getTime();
+            const bTime = new Date(b.crossposted_at ?? b.created_at ?? '').getTime();
+            return bTime - aTime;
+          });
+          setHubSearchResults(sorted);
+        } catch (error) {
+          console.error('Hub search failed', error);
+          setHubSearchResults([]);
+        }
+        return;
+      }
+
+      const includeNsfwParam = includeNsfwSearch && !blockAllNsfw;
+      const nsfwQuery = includeNsfwParam ? '&include_nsfw=true' : '';
+      navigate(`/search?q=${encodeURIComponent(query)}&sort=relevance${nsfwQuery}`);
+    },
+    [blockAllNsfw, hubname, includeNsfwSearch, limitSearchToContext, navigate]
+  );
+
+  const handlePostSearchSubmit = useCallback(
+    (event: React.FormEvent<HTMLFormElement>) => {
+      event.preventDefault();
+      runHubPostSearch(postSearchInput.trim());
+    },
+    [postSearchInput, runHubPostSearch]
+  );
 
   const lastAppliedScopedSearch = useRef<string | null>(null);
   const scopedSearchFromState = (location.state as { scopedSearchQuery?: string } | null)
@@ -323,7 +358,12 @@ export default function HubsPage() {
 
   // Fetch posts based on current hub
   const postsQueryKey = ['hub-posts', hubname, sort, timeRangeKey, currentCursor] as const;
-  const { data: paginatedData, isLoading: paginatedLoading, error: paginatedError, isFetching: paginatedFetching } = useQuery({
+  const {
+    data: paginatedData,
+    isLoading: paginatedLoading,
+    error: paginatedError,
+    isFetching: paginatedFetching,
+  } = useQuery({
     queryKey: postsQueryKey,
     queryFn: async (): Promise<HubPostsResponse> => {
       const feedOptions = timeOptions;
@@ -335,15 +375,25 @@ export default function HubsPage() {
       }
       return hubsService.getHubPosts(hubname, sort, pageSize, 0, feedOptions, currentCursor);
     },
-    enabled: !!hubname && hubname !== '' && (!isCustomTopRange || isCustomRangeValid) && !useInfiniteScrollHubs,
+    enabled:
+      !!hubname &&
+      hubname !== '' &&
+      (!isCustomTopRange || isCustomRangeValid) &&
+      !useInfiniteScrollHubs,
     staleTime: 1000 * 60 * 5,
     placeholderData: keepPreviousData,
     retry: (failureCount, error) => {
-      const response = (error as { response?: { status?: number; data?: { access_required?: boolean } } })?.response;
+      const response = (
+        error as { response?: { status?: number; data?: { access_required?: boolean } } }
+      )?.response;
       if (response?.status === 403 && response?.data?.access_required) {
         return false;
       }
-      if (error instanceof Error && error.message.includes('private') && error.message.includes('do not have access')) {
+      if (
+        error instanceof Error &&
+        error.message.includes('private') &&
+        error.message.includes('do not have access')
+      ) {
         return false;
       }
       return failureCount < 3;
@@ -555,21 +605,24 @@ export default function HubsPage() {
     },
   });
 
-  const handleDeletePost = useCallback((post: LocalSubredditPost) => {
-    // Check if this is a moderator action (deleting someone else's post)
-    const isModeratorAction = user && post.author_id !== user.id;
+  const handleDeletePost = useCallback(
+    (post: LocalSubredditPost) => {
+      // Check if this is a moderator action (deleting someone else's post)
+      const isModeratorAction = user && post.author_id !== user.id;
 
-    if (isModeratorAction) {
-      // Show reason modal for moderator actions
-      setDeletePostTarget({ postId: post.id, authorId: post.author_id });
-    } else {
-      // For own posts, just confirm
-      if (!window.confirm(t('modals.delete.confirmOwn'))) {
-        return;
+      if (isModeratorAction) {
+        // Show reason modal for moderator actions
+        setDeletePostTarget({ postId: post.id, authorId: post.author_id });
+      } else {
+        // For own posts, just confirm
+        if (!window.confirm(t('modals.delete.confirmOwn'))) {
+          return;
+        }
+        deletePostMutation.mutate({ postId: post.id });
       }
-      deletePostMutation.mutate({ postId: post.id });
-    }
-  }, [deletePostMutation, t, user]);
+    },
+    [deletePostMutation, t, user]
+  );
 
   const handleConfirmDeletePost = () => {
     if (!deletePostTarget) return;
@@ -580,13 +633,16 @@ export default function HubsPage() {
     deletePostMutation.mutate({ postId: deletePostTarget.postId, reason: deleteReason });
   };
 
-  const handleSharePost = useCallback((postId: number) => {
-    const shareUrl = `${window.location.origin}/posts/${postId}`;
-    navigator.clipboard
-      .writeText(shareUrl)
-      .then(() => alert(t('alerts.linkCopied')))
-      .catch(() => alert(t('alerts.linkCopyFailed')));
-  }, [t]);
+  const handleSharePost = useCallback(
+    (postId: number) => {
+      const shareUrl = `${window.location.origin}/posts/${postId}`;
+      navigator.clipboard
+        .writeText(shareUrl)
+        .then(() => alert(t('alerts.linkCopied')))
+        .catch(() => alert(t('alerts.linkCopyFailed')));
+    },
+    [t]
+  );
 
   const getPinnedBaseOrder = useCallback(
     () => (pinnedOrderIds.length > 0 ? pinnedOrderIds : sortedPinnedPosts.map((post) => post.id)),
@@ -710,24 +766,30 @@ export default function HubsPage() {
     },
   });
 
-  const handleToggleSavePost = useCallback((postId: number, isCurrentlySaved: boolean) => {
-    if (!user) {
-      alert(t('alerts.signInToSave'));
-      return;
-    }
-    savedToggleMutation.mutate({ postId, shouldSave: !isCurrentlySaved });
-  }, [savedToggleMutation, t, user]);
+  const handleToggleSavePost = useCallback(
+    (postId: number, isCurrentlySaved: boolean) => {
+      if (!user) {
+        alert(t('alerts.signInToSave'));
+        return;
+      }
+      savedToggleMutation.mutate({ postId, shouldSave: !isCurrentlySaved });
+    },
+    [savedToggleMutation, t, user]
+  );
 
-  const handleHidePost = useCallback((postId: number) => {
-    if (!user) {
-      alert(t('alerts.signInToHide'));
-      return;
-    }
-    if (!window.confirm(t('modals.hide.confirmSimple'))) {
-      return;
-    }
-    hidePostMutation.mutate(postId);
-  }, [hidePostMutation, t, user]);
+  const handleHidePost = useCallback(
+    (postId: number) => {
+      if (!user) {
+        alert(t('alerts.signInToHide'));
+        return;
+      }
+      if (!window.confirm(t('modals.hide.confirmSimple'))) {
+        return;
+      }
+      hidePostMutation.mutate(postId);
+    },
+    [hidePostMutation, t, user]
+  );
 
   const resetCrosspostState = () => {
     setCrosspostTarget(null);
@@ -737,25 +799,28 @@ export default function HubsPage() {
     setSendRepliesToInbox(true);
   };
 
-  const handleCrosspostSelection = useCallback((post: LocalSubredditPost) => {
-    if (!user) {
-      alert(t('alerts.signInToCrosspost'));
-      return;
-    }
-    setCrosspostTarget(post);
-    setCrosspostTitle(post.title);
-    setSelectedHub('');
-    setSelectedSubreddit('');
-    setSendRepliesToInbox(true);
-  }, [
-    user,
-    t,
-    setCrosspostTarget,
-    setCrosspostTitle,
-    setSelectedHub,
-    setSelectedSubreddit,
-    setSendRepliesToInbox,
-  ]);
+  const handleCrosspostSelection = useCallback(
+    (post: LocalSubredditPost) => {
+      if (!user) {
+        alert(t('alerts.signInToCrosspost'));
+        return;
+      }
+      setCrosspostTarget(post);
+      setCrosspostTitle(post.title);
+      setSelectedHub('');
+      setSelectedSubreddit('');
+      setSendRepliesToInbox(true);
+    },
+    [
+      user,
+      t,
+      setCrosspostTarget,
+      setCrosspostTitle,
+      setSelectedHub,
+      setSelectedSubreddit,
+      setSendRepliesToInbox,
+    ]
+  );
 
   const renderPostCard = useCallback(
     (
@@ -782,7 +847,9 @@ export default function HubsPage() {
         author_username:
           post.author_username ??
           post.author?.username ??
-          (post.author_id === user?.id ? user?.username ?? 'You' : 'Unknown'),
+          (post.author_id === user?.id
+            ? (user?.username ?? t('posts.you'))
+            : t('posts.unknownAuthor')),
         hub_name:
           post.hub_name ??
           post.hub?.name ??
@@ -791,10 +858,7 @@ export default function HubsPage() {
       };
 
       return (
-        <div
-          {...restWrapperProps}
-          className={['pb-3', className].filter(Boolean).join(' ')}
-        >
+        <div {...restWrapperProps} className={['pb-3', className].filter(Boolean).join(' ')}>
           <HubPostCard
             post={normalizedPost}
             useRelativeTime={useRelativeTime}
@@ -909,7 +973,11 @@ export default function HubsPage() {
     },
   });
   const handleCrosspostSubmit = () => {
-    if ((!selectedHub && !selectedSubreddit) || !crosspostTitle.trim() || crosspostMutation.isPending) {
+    if (
+      (!selectedHub && !selectedSubreddit) ||
+      !crosspostTitle.trim() ||
+      crosspostMutation.isPending
+    ) {
       return;
     }
     crosspostMutation.mutate();
@@ -947,13 +1015,14 @@ export default function HubsPage() {
     const isForbidden = errorStatus === 403 || errorMessage.includes('status code 403');
     const is403Error = errorStatus === 403;
     const accessRequired = tanstackError.response?.data?.access_required === true;
-    const hasPrivateMessage = errorMessage.includes('private') && errorMessage.includes('do not have access');
-    const isPrivateHubSetting = hubSettings?.privacy_type === 'private' || tanstackError.response?.data?.privacy_type === 'private';
+    const hasPrivateMessage =
+      errorMessage.includes('private') && errorMessage.includes('do not have access');
+    const isPrivateHubSetting =
+      hubSettings?.privacy_type === 'private' ||
+      tanstackError.response?.data?.privacy_type === 'private';
     const isPrivateHubError =
-      hasPrivateMessage ||
-      accessRequired ||
-      ((is403Error || isForbidden) && isPrivateHubSetting);
-    
+      hasPrivateMessage || accessRequired || ((is403Error || isForbidden) && isPrivateHubSetting);
+
     console.log('HubPage error detected:', {
       errorMessage,
       errorStatus,
@@ -962,15 +1031,17 @@ export default function HubsPage() {
       hasPrivateMessage,
       isPrivateHubError,
       hubname,
-      showHubSidebar
+      showHubSidebar,
     });
-    
+
     if (isPrivateHubError && hubname && hubname !== 'popular' && hubname !== 'all') {
       return <Navigate to={`/h/${hubname}/private`} replace state={{ from: location.pathname }} />;
     }
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <ErrorMessage className="text-lg text-red-600">{t('hubPage.errors.loadPosts')}</ErrorMessage>
+        <ErrorMessage className="text-lg text-red-600">
+          {t('hubPage.errors.loadPosts')}
+        </ErrorMessage>
       </div>
     );
   }
@@ -1105,7 +1176,12 @@ export default function HubsPage() {
                     className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
                   >
                     <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                      />
                     </svg>
                     {t('home.sort.scroll')}
                   </button>
@@ -1114,33 +1190,33 @@ export default function HubsPage() {
             }
             right={
               <MobileOnly>
-                  <FeedSearchBars
-                    containerClassName="w-full px-4 flex flex-col gap-4 mt-4"
-                    showTopForm={true}
-                    topValue={inputValue}
-                    topPlaceholder={t('home.search.enterHubOrSubreddit')}
-                    onTopChange={handleTopChange}
-                    onTopFocus={() => setIsAutocompleteOpen(true)}
-                    onTopBlur={() => setIsAutocompleteOpen(false)}
-                    onTopSubmit={handleTopSubmit}
-                    topSuggestions={suggestions}
-                    topShouldShowSuggestions={shouldShowSuggestions}
-                    topIsLoading={isAutocompleteLoading}
-                    topEmptyMessage={t('home.search.noResults')}
-                    renderTopSuggestion={(suggestion) => (
-                      <CombinedSuggestionItem
-                        key={`${suggestion.type}-${suggestion.data.name}`}
-                        suggestion={suggestion}
+                <FeedSearchBars
+                  containerClassName="w-full px-4 flex flex-col gap-4 mt-4"
+                  showTopForm={true}
+                  topValue={inputValue}
+                  topPlaceholder={t('home.search.enterHubOrSubreddit')}
+                  onTopChange={handleTopChange}
+                  onTopFocus={() => setIsAutocompleteOpen(true)}
+                  onTopBlur={() => setIsAutocompleteOpen(false)}
+                  onTopSubmit={handleTopSubmit}
+                  topSuggestions={suggestions}
+                  topShouldShowSuggestions={shouldShowSuggestions}
+                  topIsLoading={isAutocompleteLoading}
+                  topEmptyMessage={t('home.search.noResults')}
+                  renderTopSuggestion={(suggestion) => (
+                    <CombinedSuggestionItem
+                      key={`${suggestion.type}-${suggestion.data.name}`}
+                      suggestion={suggestion}
                       onSelectHub={handleSelectHubSuggestion}
                       onSelectSubreddit={handleSelectSubredditSuggestion}
                     />
-                    )}
-                    postValue={postSearchInput}
-                    postPlaceholder={t('home.search.searchPosts')}
-                    onPostChange={(value) => {
-                      setPostSearchInput(value);
-                      if (!isSearchDropdownOpen) {
-                        setIsSearchDropdownOpen(true);
+                  )}
+                  postValue={postSearchInput}
+                  postPlaceholder={t('home.search.searchPosts')}
+                  onPostChange={(value) => {
+                    setPostSearchInput(value);
+                    if (!isSearchDropdownOpen) {
+                      setIsSearchDropdownOpen(true);
                     }
                   }}
                   onPostFocus={() => setIsSearchDropdownOpen(true)}
@@ -1152,29 +1228,29 @@ export default function HubsPage() {
                       <label className="flex items-center gap-2">
                         <input
                           type="checkbox"
-                        checked={limitSearchToContext}
-                        onChange={(e) => setLimitSearchToContext(e.target.checked)}
-                      />
-                      <span>{t('home.search.limitToHub', { hub: hubname })}</span>
-                    </label>
-                    {!blockAllNsfw && (
-                      <label className="flex items-center gap-2">
-                        <input
-                            type="checkbox"
-                          checked={includeNsfwSearch}
-                          onChange={(e) => setIncludeNsfwSearch(e.target.checked)}
+                          checked={limitSearchToContext}
+                          onChange={(e) => setLimitSearchToContext(e.target.checked)}
                         />
-                        <span>{t('home.search.includeNsfw')}</span>
+                        <span>{t('home.search.limitToHub', { hub: hubname })}</span>
                       </label>
-                    )}
-                    {blockAllNsfw && (
-                      <div className="text-xs text-[var(--color-text-secondary)]">
-                        {t('home.search.nsfwBlocked')}
-                      </div>
-                    )}
-                  </div>
-                }
-              />
+                      {!blockAllNsfw && (
+                        <label className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={includeNsfwSearch}
+                            onChange={(e) => setIncludeNsfwSearch(e.target.checked)}
+                          />
+                          <span>{t('home.search.includeNsfw')}</span>
+                        </label>
+                      )}
+                      {blockAllNsfw && (
+                        <div className="text-xs text-[var(--color-text-secondary)]">
+                          {t('home.search.nsfwBlocked')}
+                        </div>
+                      )}
+                    </div>
+                  }
+                />
               </MobileOnly>
             }
           />
@@ -1207,7 +1283,9 @@ export default function HubsPage() {
                 onChange={(event) => setCustomTopStart(event.target.value)}
                 className="rounded border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-2 py-1 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
               />
-              <span className="text-xs text-[var(--color-text-secondary)]">{t('home.timeRange.to')}</span>
+              <span className="text-xs text-[var(--color-text-secondary)]">
+                {t('home.timeRange.to')}
+              </span>
               <input
                 type="datetime-local"
                 value={customTopEnd}
@@ -1252,14 +1330,16 @@ export default function HubsPage() {
                       })}
                     </div>
                   ))}
-                  {canReorderPinned && draggingPinnedId !== null && orderedPinnedPosts.length > 0 && (
-                    <div
-                      className="flex h-10 items-center justify-center rounded border border-dashed border-[var(--color-border)] text-xs text-[var(--color-text-secondary)]"
-                      ref={pinnedDropZoneRef}
-                    >
-                      {t('hubPage.pins.dropHereToMoveToBottom')}
-                    </div>
-                  )}
+                  {canReorderPinned &&
+                    draggingPinnedId !== null &&
+                    orderedPinnedPosts.length > 0 && (
+                      <div
+                        className="flex h-10 items-center justify-center rounded border border-dashed border-[var(--color-border)] text-xs text-[var(--color-text-secondary)]"
+                        ref={pinnedDropZoneRef}
+                      >
+                        {t('hubPage.pins.dropHereToMoveToBottom')}
+                      </div>
+                    )}
                 </div>
               )}
               <div className="space-y-4">
@@ -1372,7 +1452,9 @@ export default function HubsPage() {
                 disabled={deletePostMutation.isPending || !deleteReason.trim()}
                 className="rounded bg-red-600 px-3 py-1 text-sm font-semibold text-white hover:bg-red-500 disabled:opacity-50"
               >
-                {deletePostMutation.isPending ? t('modals.delete.deleting') : t('modals.delete.deleteButton')}
+                {deletePostMutation.isPending
+                  ? t('modals.delete.deleting')
+                  : t('modals.delete.deleteButton')}
               </button>
             </div>
           </div>

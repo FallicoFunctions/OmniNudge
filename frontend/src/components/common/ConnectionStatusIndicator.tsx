@@ -1,5 +1,6 @@
 import { useWebSocket } from '../../contexts/WebSocketContext';
 import { useAuth } from '../../contexts/AuthContext';
+import { useTranslation } from 'react-i18next';
 
 /**
  * Shows WebSocket connection status indicator
@@ -8,6 +9,7 @@ import { useAuth } from '../../contexts/AuthContext';
 export function ConnectionStatusIndicator() {
   const { isConnected } = useWebSocket();
   const { user } = useAuth();
+  const { t } = useTranslation();
 
   // Don't show indicator if not authenticated
   if (!user) return null;
@@ -24,7 +26,7 @@ export function ConnectionStatusIndicator() {
       <div className="flex items-center gap-2">
         <div className="h-2 w-2 animate-pulse rounded-full bg-orange-500" />
         <span className="text-sm font-medium text-orange-700 dark:text-orange-300">
-          Reconnecting to server...
+          {t('connectionStatus.reconnecting')}
         </span>
       </div>
     </div>

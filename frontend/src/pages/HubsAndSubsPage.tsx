@@ -31,7 +31,11 @@ export default function HubsAndSubsPage() {
   type SortBy = 'alphabetical' | 'popular' | 'newest';
   const [sortBy, setSortBy] = useState<SortBy>('alphabetical');
 
-  const { data: hubsResponse, isLoading: isHubsLoading, error: hubsError } = useQuery({
+  const {
+    data: hubsResponse,
+    isLoading: isHubsLoading,
+    error: hubsError,
+  } = useQuery({
     queryKey: ['all-hubs', selectedLetter, pageIndex, showNsfw],
     queryFn: () =>
       hubsService.getAllHubs(ITEMS_PER_PAGE, pageIndex * ITEMS_PER_PAGE, selectedLetter, showNsfw),
@@ -41,20 +45,16 @@ export default function HubsAndSubsPage() {
   // Autocomplete search
   const trimmedInputValue = inputValue.trim();
 
-  const {
-    data: subredditSuggestions,
-    isFetching: isSubredditAutocompleteLoading,
-  } = useQuery<SubredditSuggestion[]>({
+  const { data: subredditSuggestions, isFetching: isSubredditAutocompleteLoading } = useQuery<
+    SubredditSuggestion[]
+  >({
     queryKey: ['subreddit-autocomplete', trimmedInputValue],
     queryFn: () => redditService.autocompleteSubreddits(trimmedInputValue),
     enabled: isAutocompleteOpen && trimmedInputValue.length >= SUBREDDIT_AUTOCOMPLETE_MIN_LENGTH,
     staleTime: 1000 * 60 * 10,
   });
 
-  const {
-    data: hubSuggestions,
-    isFetching: isHubAutocompleteLoading,
-  } = useQuery<Hub[]>({
+  const { data: hubSuggestions, isFetching: isHubAutocompleteLoading } = useQuery<Hub[]>({
     queryKey: ['hub-autocomplete', trimmedInputValue],
     queryFn: () => hubsService.searchHubs(trimmedInputValue),
     enabled: isAutocompleteOpen && trimmedInputValue.length >= SUBREDDIT_AUTOCOMPLETE_MIN_LENGTH,
@@ -64,8 +64,14 @@ export default function HubsAndSubsPage() {
   const isAutocompleteLoading = isSubredditAutocompleteLoading || isHubAutocompleteLoading;
 
   const suggestionItems: CombinedSuggestion[] = useMemo(() => {
-    const hubs: CombinedSuggestion[] = (hubSuggestions ?? []).map(hub => ({ type: 'hub' as const, data: hub }));
-    const subreddits: CombinedSuggestion[] = (subredditSuggestions ?? []).map(subreddit => ({ type: 'subreddit' as const, data: subreddit }));
+    const hubs: CombinedSuggestion[] = (hubSuggestions ?? []).map((hub) => ({
+      type: 'hub' as const,
+      data: hub,
+    }));
+    const subreddits: CombinedSuggestion[] = (subredditSuggestions ?? []).map((subreddit) => ({
+      type: 'subreddit' as const,
+      data: subreddit,
+    }));
     return [...hubs, ...subreddits];
   }, [hubSuggestions, subredditSuggestions]);
 
@@ -78,16 +84,16 @@ export default function HubsAndSubsPage() {
       return [];
     }
 
-    let hubs = hubsResponse.hubs
-      .filter((hub) => showNsfw || !hub.nsfw);
+    let hubs = hubsResponse.hubs.filter((hub) => showNsfw || !hub.nsfw);
 
     // Apply search filter
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
-      hubs = hubs.filter((hub) =>
-        hub.name.toLowerCase().includes(query) ||
-        hub.title?.toLowerCase().includes(query) ||
-        hub.description?.toLowerCase().includes(query)
+      hubs = hubs.filter(
+        (hub) =>
+          hub.name.toLowerCase().includes(query) ||
+          hub.title?.toLowerCase().includes(query) ||
+          hub.description?.toLowerCase().includes(query)
       );
     }
 
@@ -149,7 +155,9 @@ export default function HubsAndSubsPage() {
       <div className="mb-6">
         <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-[var(--color-text-primary)]">{t('menu.hubs')}</h1>
+            <h1 className="text-3xl font-bold text-[var(--color-text-primary)]">
+              {t('menu.hubs')}
+            </h1>
             <p className="text-sm text-[var(--color-text-secondary)] mt-1">
               {t('hubsBrowse.subtitle')}
             </p>
@@ -172,11 +180,15 @@ export default function HubsAndSubsPage() {
                   <div className="absolute left-0 right-0 top-full z-30 mt-1 overflow-hidden rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] shadow-lg">
                     {isAutocompleteLoading ? (
                       <div className="px-3 py-2">
-                        <LoadingMessage className="mt-0 text-sm">{t('hubsBrowse.search.searching')}</LoadingMessage>
+                        <LoadingMessage className="mt-0 text-sm">
+                          {t('hubsBrowse.search.searching')}
+                        </LoadingMessage>
                       </div>
                     ) : suggestionItems.length === 0 ? (
                       <div className="px-3 py-2">
-                        <EmptyMessage className="mt-0 text-sm">{t('hubsBrowse.search.noResults')}</EmptyMessage>
+                        <EmptyMessage className="mt-0 text-sm">
+                          {t('hubsBrowse.search.noResults')}
+                        </EmptyMessage>
                       </div>
                     ) : (
                       <ul>
@@ -196,11 +208,11 @@ export default function HubsAndSubsPage() {
                                   className="flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-[var(--color-surface-elevated)]"
                                 >
                                   <div className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-[var(--color-primary)] text-[10px] font-semibold text-white">
-                                    h/
+                                    {t('common.prefix.hub')}
                                   </div>
                                   <div className="flex min-w-0 flex-col">
                                     <span className="truncate text-sm font-medium text-[var(--color-text-primary)]">
-                                      h/{hub.name}
+                                      {t('common.format.hubPath', { name: hub.name })}
                                     </span>
                                     {hub.title && (
                                       <span className="truncate text-[11px] text-[var(--color-text-secondary)]">
@@ -208,14 +220,15 @@ export default function HubsAndSubsPage() {
                                       </span>
                                     )}
                                   </div>
-                                  {typeof hub.subscriber_count === 'number' && hub.subscriber_count > 0 && (
-                                    <span className="ml-auto text-[11px] text-[var(--color-text-secondary)]">
-                                      {t('hubsBrowse.memberCount', {
-                                        count: hub.subscriber_count,
-                                        formattedCount: formatNumber(hub.subscriber_count),
-                                      })}
-                                    </span>
-                                  )}
+                                  {typeof hub.subscriber_count === 'number' &&
+                                    hub.subscriber_count > 0 && (
+                                      <span className="ml-auto text-[11px] text-[var(--color-text-secondary)]">
+                                        {t('hubsBrowse.memberCount', {
+                                          count: hub.subscriber_count,
+                                          formattedCount: formatNumber(hub.subscriber_count),
+                                        })}
+                                      </span>
+                                    )}
                                 </button>
                               </li>
                             );
@@ -239,22 +252,23 @@ export default function HubsAndSubsPage() {
                                     />
                                   ) : (
                                     <div className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-[var(--color-border)] text-[10px] font-semibold text-[var(--color-text-secondary)]">
-                                      r/
+                                      {t('common.prefix.subreddit')}
                                     </div>
                                   )}
                                   <div className="flex min-w-0 flex-col">
                                     <span className="truncate text-sm font-medium text-[var(--color-text-primary)]">
-                                      r/{subreddit.name}
+                                      {t('common.format.subredditPath', { name: subreddit.name })}
                                     </span>
                                   </div>
-                                  {typeof subreddit.subscribers === 'number' && subreddit.subscribers > 0 && (
-                                    <span className="ml-auto text-[11px] text-[var(--color-text-secondary)]">
-                                      {t('hubsBrowse.memberCount', {
-                                        count: subreddit.subscribers,
-                                        formattedCount: formatNumber(subreddit.subscribers),
-                                      })}
-                                    </span>
-                                  )}
+                                  {typeof subreddit.subscribers === 'number' &&
+                                    subreddit.subscribers > 0 && (
+                                      <span className="ml-auto text-[11px] text-[var(--color-text-secondary)]">
+                                        {t('hubsBrowse.memberCount', {
+                                          count: subreddit.subscribers,
+                                          formattedCount: formatNumber(subreddit.subscribers),
+                                        })}
+                                      </span>
+                                    )}
                                 </button>
                               </li>
                             );
@@ -397,7 +411,7 @@ export default function HubsAndSubsPage() {
                   {/* Hub name and badges */}
                   <div className="flex items-start justify-between gap-2 mb-2">
                     <h3 className="text-base font-semibold text-[var(--color-primary)] group-hover:underline">
-                      h/{hub.name}
+                      {t('common.format.hubPath', { name: hub.name })}
                     </h3>
                     <div className="flex gap-1 flex-shrink-0">
                       {hub.nsfw && (
@@ -424,8 +438,18 @@ export default function HubsAndSubsPage() {
                   {/* Stats */}
                   <div className="flex items-center gap-4 text-xs text-[var(--color-text-muted)]">
                     <span className="flex items-center gap-1">
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                      <svg
+                        className="w-4 h-4"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
+                        />
                       </svg>
                       {t('hubsBrowse.memberCount', {
                         count: hub.subscriber_count ?? 0,

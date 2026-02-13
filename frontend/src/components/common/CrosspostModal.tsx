@@ -57,7 +57,9 @@ export function CrosspostModal({
       <ModalCloseButton onClose={onClose} />
 
       <div className="pr-12 mb-4">
-        <h3 className="text-xl font-semibold text-[var(--color-text-primary)]">{t('modals.crosspost.title')}</h3>
+        <h3 className="text-xl font-semibold text-[var(--color-text-primary)]">
+          {t('modals.crosspost.title')}
+        </h3>
       </div>
       <div className="mt-3 rounded border border-yellow-200 bg-yellow-50 p-3 text-sm text-yellow-800">
         <p>{t('modals.crosspost.info')}</p>
@@ -75,7 +77,7 @@ export function CrosspostModal({
             <option value="">{t('modals.crosspost.selectHub')}</option>
             {hubOptions.map((hub) => (
               <option key={hub.id} value={hub.name}>
-                h/{hub.name}
+                {t('common.format.hubPath', { name: hub.name })}
               </option>
             ))}
           </select>
@@ -101,7 +103,7 @@ export function CrosspostModal({
               <option value="">{t('modals.crosspost.selectSubreddit')}</option>
               {subredditOptions.map((subreddit) => (
                 <option key={subreddit.id} value={subreddit.name}>
-                  r/{subreddit.name}
+                  {t('common.format.subredditPath', { name: subreddit.name })}
                 </option>
               ))}
             </select>
@@ -109,7 +111,8 @@ export function CrosspostModal({
         </div>
         <div>
           <label className="mb-1 block text-xs font-medium text-[var(--color-text-secondary)]">
-            {t('modals.crosspost.titleLabel')} <span className="text-red-500">{t('modals.crosspost.titleRequired')}</span>
+            {t('modals.crosspost.titleLabel')}{' '}
+            <span className="text-red-500">{t('modals.crosspost.titleRequired')}</span>
           </label>
           <input
             type="text"

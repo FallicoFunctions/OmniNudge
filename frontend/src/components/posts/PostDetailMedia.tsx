@@ -1,4 +1,5 @@
 import { useState, type CSSProperties } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { GalleryImage } from '../../types/posts';
 import { HlsVideo } from '../common/HlsVideo';
 import { resolveMediaUrl } from '../../utils/mediaUrl';
@@ -155,13 +156,12 @@ export function PostDetailMedia({
   imageExpanded,
   onToggleExpanded,
 }: PostDetailMediaProps) {
+  const { t } = useTranslation();
   const [galleryIndex, setGalleryIndex] = useState(0);
 
   const hasGallery = galleryImages && galleryImages.length > 0;
   const galleryItem = hasGallery ? galleryImages[galleryIndex] : undefined;
-  const displayImage = hasGallery
-    ? resolveMediaUrl(galleryItem?.url)
-    : resolveMediaUrl(mediaUrl);
+  const displayImage = hasGallery ? resolveMediaUrl(galleryItem?.url) : resolveMediaUrl(mediaUrl);
   const externalMedia = !hasGallery ? getExternalVideoMedia(mediaUrl ?? null) : null;
   const embedUrl = externalMedia?.kind === 'iframe' ? externalMedia.src : null;
   const externalVideoUrl = externalMedia?.kind === 'video' ? externalMedia.src : null;
@@ -174,7 +174,7 @@ export function PostDetailMedia({
   const isPlayableVideo = isEmbeddableVideo || isVideoMedia || (hasGallery && isGalleryVideo);
   const isHlsVideo = Boolean(
     (displayImage ?? resolvedThumbnailUrl)?.toLowerCase().includes('.m3u8') ||
-      (mediaUrl ?? '').toLowerCase().includes('.m3u8')
+    (mediaUrl ?? '').toLowerCase().includes('.m3u8')
   );
   const containerClasses = isEmbeddableVideo
     ? embedSizing.className
@@ -202,7 +202,13 @@ export function PostDetailMedia({
             isPlayableVideo ? '' : 'cursor-pointer'
           }`}
           onClick={isPlayableVideo ? undefined : onToggleExpanded}
-          title={isPlayableVideo ? undefined : imageExpanded ? 'Click to shrink' : 'Click to enlarge'}
+          title={
+            isPlayableVideo
+              ? undefined
+              : imageExpanded
+                ? t('posts.media.viewer.clickToShrink')
+                : t('posts.media.viewer.clickToEnlarge')
+          }
         >
           {embedUrl ? (
             <iframe
@@ -275,20 +281,30 @@ export function PostDetailMedia({
               type="button"
               onClick={handlePrevGallery}
               className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-black/50 p-2 text-white hover:bg-black/70"
-              aria-label="Previous image"
+              aria-label={t('common.accessibility.previousImage')}
             >
               <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M15 19l-7-7 7-7"
+                />
               </svg>
             </button>
             <button
               type="button"
               onClick={handleNextGallery}
               className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-black/50 p-2 text-white hover:bg-black/70"
-              aria-label="Next image"
+              aria-label={t('common.accessibility.nextImage')}
             >
               <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M9 5l7 7-7 7"
+                />
               </svg>
             </button>
             <div className="absolute bottom-2 left-1/2 -translate-x-1/2 rounded-full bg-black/50 px-3 py-1 text-sm text-white">
@@ -303,7 +319,9 @@ export function PostDetailMedia({
           onClick={onToggleExpanded}
           className="text-xs text-[var(--color-primary)] hover:underline"
         >
-          {imageExpanded ? 'View smaller' : 'View full size'}
+          {imageExpanded
+            ? t('posts.media.viewer.viewSmaller')
+            : t('posts.media.viewer.viewFullSize')}
         </button>
       )}
     </div>

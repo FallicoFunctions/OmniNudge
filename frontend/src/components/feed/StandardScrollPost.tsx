@@ -1,8 +1,9 @@
 import { Link } from 'react-router-dom';
-import { formatDistanceToNow } from 'date-fns';
+import { useTranslation } from 'react-i18next';
 import { getPostUrl } from '../../utils/postUrl';
 import { resolveMediaUrl } from '../../utils/mediaUrl';
 import { sanitizeHttpUrl } from '../../utils/crosspostHelpers';
+import { useFormat } from '../../hooks/useFormat';
 import type { PlatformPost } from '../../types/posts';
 import type { CombinedFeedItem } from '../../services/feedService';
 import type { LocalSubredditPost } from '../../services/hubsService';
@@ -72,6 +73,8 @@ interface StandardScrollPostProps {
 }
 
 export function StandardScrollPost({ post, feedType, isActive }: StandardScrollPostProps) {
+  const { t } = useTranslation();
+  const { formatRelativeTime } = useFormat();
   // Determine post type and extract data
   const isRedditPost = 'subreddit' in post || 'permalink' in post;
   const isHubPost = 'hub_name' in post && !('subreddit' in post);
@@ -87,11 +90,11 @@ export function StandardScrollPost({ post, feedType, isActive }: StandardScrollP
     source = combinedItem.source === 'reddit' ? 'reddit' : 'hub';
   }
 
-  const title = actualPost.title || 'Untitled';
+  const title = actualPost.title || t('posts.compact.untitled');
   const author =
     actualPost.author_username ||
     (typeof actualPost.author === 'string' ? actualPost.author : actualPost.author?.username) ||
-    'Unknown';
+    t('posts.compact.unknownUser');
   const score = actualPost.score ?? 0;
   const commentCount = actualPost.comment_count ?? actualPost.num_comments ?? 0;
   const nsfw = actualPost.nsfw || actualPost.over_18 || actualPost.over18 || false;
@@ -121,12 +124,21 @@ export function StandardScrollPost({ post, feedType, isActive }: StandardScrollP
     }
   }
 
-  if (thumbnailUrl === 'self' || thumbnailUrl === 'default' || thumbnailUrl === 'nsfw' || thumbnailUrl === 'spoiler') {
+  if (
+    thumbnailUrl === 'self' ||
+    thumbnailUrl === 'default' ||
+    thumbnailUrl === 'nsfw' ||
+    thumbnailUrl === 'spoiler'
+  ) {
     thumbnailUrl = null;
   }
 
   // Determine if media is video
-  const isVideo = actualPost.is_video || mediaUrl?.includes('.mp4') || mediaUrl?.includes('.webm') || mediaUrl?.includes('v.redd.it');
+  const isVideo =
+    actualPost.is_video ||
+    mediaUrl?.includes('.mp4') ||
+    mediaUrl?.includes('.webm') ||
+    mediaUrl?.includes('v.redd.it');
 
   // URL generation
   let postUrl = '#';
@@ -139,19 +151,21 @@ export function StandardScrollPost({ post, feedType, isActive }: StandardScrollP
   // Time formatting
   let timeAgo = '';
   if (actualPost.created_at) {
-    timeAgo = formatDistanceToNow(new Date(actualPost.created_at), { addSuffix: true });
+    timeAgo = formatRelativeTime(actualPost.created_at);
   } else if (actualPost.created_utc) {
-    timeAgo = formatDistanceToNow(new Date(actualPost.created_utc * 1000), { addSuffix: true });
+    timeAgo = formatRelativeTime(actualPost.created_utc * 1000);
   } else if (actualPost.crossposted_at) {
-    timeAgo = formatDistanceToNow(new Date(actualPost.crossposted_at), { addSuffix: true });
+    timeAgo = formatRelativeTime(actualPost.crossposted_at);
   }
 
   // Source badge
   let sourceBadge = '';
   if (isHubPost || source === 'hub') {
-    sourceBadge = `h/${actualPost.hub_name || actualPost.hub?.name || 'unknown'}`;
+    const hubName = actualPost.hub_name || actualPost.hub?.name;
+    sourceBadge = hubName ? t('common.format.hubPath', { name: hubName }) : '';
   } else if (isRedditPost || source === 'reddit') {
-    sourceBadge = `r/${actualPost.subreddit || 'unknown'}`;
+    const subredditName = actualPost.subreddit;
+    sourceBadge = subredditName ? t('common.format.subredditPath', { name: subredditName }) : '';
   }
 
   return (
@@ -174,8 +188,8 @@ export function StandardScrollPost({ post, feedType, isActive }: StandardScrollP
                 mediaUrl?.startsWith('http')
                   ? mediaUrl
                   : thumbnailUrl?.startsWith('http')
-                  ? thumbnailUrl
-                  : resolveMediaUrl(mediaUrl || thumbnailUrl || '')
+                    ? thumbnailUrl
+                    : resolveMediaUrl(mediaUrl || thumbnailUrl || '')
               }
               alt=""
               className="w-full h-full object-cover blur-xl"
@@ -196,7 +210,7 @@ export function StandardScrollPost({ post, feedType, isActive }: StandardScrollP
             )}
             {nsfw && (
               <span className="px-3 py-1 bg-red-500/20 border border-red-500/50 rounded-full text-red-400 text-sm font-medium">
-                NSFW
+                {t('posts.badges.nsfw')}
               </span>
             )}
           </div>
@@ -220,8 +234,8 @@ export function StandardScrollPost({ post, feedType, isActive }: StandardScrollP
                 mediaUrl?.startsWith('http')
                   ? mediaUrl
                   : thumbnailUrl?.startsWith('http')
-                  ? thumbnailUrl
-                  : resolveMediaUrl(mediaUrl || thumbnailUrl || '')
+                    ? thumbnailUrl
+                    : resolveMediaUrl(mediaUrl || thumbnailUrl || '')
               }
               alt={title}
               className="max-w-full max-h-full object-contain rounded-lg shadow-2xl"

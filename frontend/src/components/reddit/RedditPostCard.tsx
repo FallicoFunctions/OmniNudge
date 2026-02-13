@@ -893,8 +893,8 @@ export function RedditPostCard({
           </div>
         )}
         <div className="flex-1 text-left">
-          <div className="flex items-start gap-2">
-            <div className="min-w-0 flex-1">
+          <div className="grid grid-cols-[1fr_auto] items-start gap-2">
+            <div className="min-w-0">
               {/* Title */}
               {isExternalLink ? (
                 <a
@@ -1008,7 +1008,7 @@ export function RedditPostCard({
             <div className="flex-1">
               <div className="text-xs text-[var(--color-text-secondary)]">
                 <Link to={`/r/${post.subreddit}`} className="hover:text-[var(--color-primary)]">
-                  r/{post.subreddit}
+                  {t('common.format.subredditPath', { name: post.subreddit })}
                 </Link>
                 <span> · </span>
                 <Link to={`/user/${post.author}`} className="hover:text-[var(--color-primary)]">

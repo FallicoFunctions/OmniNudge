@@ -22,7 +22,12 @@ import type { Hub } from '../services/hubsService';
 import type { UserProfile } from '../types/users';
 import { createRedditCrosspostPayload } from '../utils/crosspostHelpers';
 import { getPostUrl } from '../utils/postUrl';
-import { getHiddenPostIdSet, getHiddenRedditPostIdSet, getSavedPostIdSet, getSavedRedditPostIdSet } from '../utils/savedItems';
+import {
+  getHiddenPostIdSet,
+  getHiddenRedditPostIdSet,
+  getSavedPostIdSet,
+  getSavedRedditPostIdSet,
+} from '../utils/savedItems';
 
 type Tab = 'posts' | 'communities' | 'users';
 type PostSource = 'all' | 'omni';
@@ -328,21 +333,18 @@ export default function SearchResultsPage() {
     try {
       const tabTarget = opts?.tab ?? activeTab;
       const targetPage =
-        opts?.page ??
-        (tabTarget === 'communities' ? communities.page : posts.page);
+        opts?.page ?? (tabTarget === 'communities' ? communities.page : posts.page);
       const isUsersAppend = Boolean(opts?.append && tabTarget === 'users');
 
       const postsPage = tabTarget === 'posts' ? targetPage : posts.page;
       const communitiesPage = tabTarget === 'communities' ? targetPage : communities.page;
-      const redditAfter =
-        postsPage > 1 ? posts.redditAfterStack[postsPage - 2] ?? null : null;
-      const platformCursor =
-        postsPage > 1 ? posts.platformCursorStack[postsPage - 1] ?? '' : '';
+      const redditAfter = postsPage > 1 ? (posts.redditAfterStack[postsPage - 2] ?? null) : null;
+      const platformCursor = postsPage > 1 ? (posts.platformCursorStack[postsPage - 1] ?? '') : '';
       const hubsCursor =
-        communitiesPage > 1 ? communities.hubsCursorStack[communitiesPage - 1] ?? '' : '';
+        communitiesPage > 1 ? (communities.hubsCursorStack[communitiesPage - 1] ?? '') : '';
       const subredditsAfter =
         communitiesPage > 1
-          ? communities.subredditsAfterStack[communitiesPage - 2] ?? null
+          ? (communities.subredditsAfterStack[communitiesPage - 2] ?? null)
           : null;
       const omniCursor = isUsersAppend ? users.omniCursor : null;
 
@@ -357,8 +359,7 @@ export default function SearchResultsPage() {
 
       const nextAfterStack = postsPage === 1 ? [null] : [...posts.redditAfterStack];
       nextAfterStack[postsPage - 1] = res.posts.redditAfter ?? null;
-      const nextPlatformCursorStack =
-        postsPage === 1 ? [''] : [...posts.platformCursorStack];
+      const nextPlatformCursorStack = postsPage === 1 ? [''] : [...posts.platformCursorStack];
       nextPlatformCursorStack[postsPage] = res.posts.platformNextCursor ?? '';
       setPosts({
         reddit: res.posts.reddit ?? [],
@@ -374,16 +375,17 @@ export default function SearchResultsPage() {
       const nextSubredditAfterStack =
         communitiesPage === 1 ? [null] : [...communities.subredditsAfterStack];
       nextSubredditAfterStack[communitiesPage - 1] = res.subredditsAfter ?? null;
-      const nextHubsCursorStack =
-        communitiesPage === 1 ? [''] : [...communities.hubsCursorStack];
+      const nextHubsCursorStack = communitiesPage === 1 ? [''] : [...communities.hubsCursorStack];
       nextHubsCursorStack[communitiesPage] = res.hubsNextCursor ?? '';
       setCommunities({
-        subreddits: opts?.append || tabTarget === 'communities'
-          ? [...(opts?.append ? communities.subreddits : []), ...(res.subreddits ?? [])]
-          : res.subreddits ?? [],
-        hubs: opts?.append || tabTarget === 'communities'
-          ? [...(opts?.append ? communities.hubs : []), ...(res.hubs ?? [])]
-          : res.hubs ?? [],
+        subreddits:
+          opts?.append || tabTarget === 'communities'
+            ? [...(opts?.append ? communities.subreddits : []), ...(res.subreddits ?? [])]
+            : (res.subreddits ?? []),
+        hubs:
+          opts?.append || tabTarget === 'communities'
+            ? [...(opts?.append ? communities.hubs : []), ...(res.hubs ?? [])]
+            : (res.hubs ?? []),
         hubsCursorStack: nextHubsCursorStack,
         hubsNextCursor: res.hubsNextCursor ?? null,
         hasMoreHubs: Boolean(res.hubsNextCursor),
@@ -394,7 +396,7 @@ export default function SearchResultsPage() {
       });
       const nextOmniUsers = isUsersAppend
         ? [...(users.omni ?? []), ...(res.users.omni ?? [])]
-        : res.users.omni ?? [];
+        : (res.users.omni ?? []);
       setUsers({
         reddit: res.users.reddit ?? [],
         omni: nextOmniUsers,
@@ -483,9 +485,7 @@ export default function SearchResultsPage() {
       <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="text-left">
           <h1 className="text-2xl font-bold text-[var(--color-text-primary)]">{t('nav.search')}</h1>
-          <p className="text-sm text-[var(--color-text-secondary)]">
-            {t('searchPage.subtitle')}
-          </p>
+          <p className="text-sm text-[var(--color-text-secondary)]">{t('searchPage.subtitle')}</p>
         </div>
         <div className="flex flex-col gap-2 sm:flex-row">
           <input
@@ -559,7 +559,9 @@ export default function SearchResultsPage() {
         </div>
 
         <div className="flex items-center gap-2">
-          <label className="text-sm font-medium text-[var(--color-text-primary)]">{t('common.sort')}</label>
+          <label className="text-sm font-medium text-[var(--color-text-primary)]">
+            {t('common.sort')}
+          </label>
           {(['relevance', 'new', 'old'] as const).map((opt) => (
             <button
               key={opt}
@@ -576,8 +578,8 @@ export default function SearchResultsPage() {
               {opt === 'relevance'
                 ? t('searchPage.sort.relevance')
                 : opt === 'new'
-                ? t('searchPage.sort.newest')
-                : t('searchPage.sort.oldest')}
+                  ? t('searchPage.sort.newest')
+                  : t('searchPage.sort.oldest')}
             </button>
           ))}
         </div>
@@ -704,10 +706,7 @@ export default function SearchResultsPage() {
                       toggleSaveMutation.isPending &&
                       toggleSaveMutation.variables?.postId === post.id
                     }
-                    isHiding={
-                      hidePostMutation.isPending &&
-                      hidePostMutation.variables === post.id
-                    }
+                    isHiding={hidePostMutation.isPending && hidePostMutation.variables === post.id}
                     onShare={() => {
                       const shareUrl = `${window.location.origin}${getPostUrl(post)}`;
                       navigator.clipboard
@@ -755,32 +754,32 @@ export default function SearchResultsPage() {
 
       {!isLoading && activeTab === 'communities' && (
         <div className="grid gap-4 md:grid-cols-2">
-            <OffsetPaginationControls
-              showDivider={false}
-              className="md:col-span-2 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-2"
-              hasPrev={communities.page > 1}
-              hasMore={communities.hasMoreHubs || communities.hasMoreSubreddits}
-              isFetching={isLoading}
-              onPrev={() =>
-                handleSearch(query, {
-                  tab: 'communities',
-                  sort,
-                  page: Math.max(1, communities.page - 1),
-                })
-              }
-              onNext={() =>
-                handleSearch(query, {
-                  tab: 'communities',
-                  sort,
-                  page: communities.page + 1,
-                })
-              }
-              centerContent={
-                <div className="text-sm text-[var(--color-text-secondary)]">
-                  {t('searchPage.pagination.page', { page: communities.page })}
-                </div>
-              }
-            />
+          <OffsetPaginationControls
+            showDivider={false}
+            className="md:col-span-2 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-2"
+            hasPrev={communities.page > 1}
+            hasMore={communities.hasMoreHubs || communities.hasMoreSubreddits}
+            isFetching={isLoading}
+            onPrev={() =>
+              handleSearch(query, {
+                tab: 'communities',
+                sort,
+                page: Math.max(1, communities.page - 1),
+              })
+            }
+            onNext={() =>
+              handleSearch(query, {
+                tab: 'communities',
+                sort,
+                page: communities.page + 1,
+              })
+            }
+            centerContent={
+              <div className="text-sm text-[var(--color-text-secondary)]">
+                {t('searchPage.pagination.page', { page: communities.page })}
+              </div>
+            }
+          />
 
           <div>
             <h3 className="text-sm font-semibold text-[var(--color-text-primary)]">
@@ -797,7 +796,7 @@ export default function SearchResultsPage() {
                   >
                     <Link to={`/r/${sr.name}`} className="block">
                       <div className="text-sm font-semibold text-[var(--color-text-primary)] underline-offset-2 hover:underline">
-                        r/{sr.name}
+                        {t('common.format.subredditPath', { name: sr.name })}
                       </div>
                       {sr.title && (
                         <div className="text-xs text-[var(--color-text-secondary)]">{sr.title}</div>
@@ -823,10 +822,12 @@ export default function SearchResultsPage() {
                   >
                     <Link to={`/h/${hub.name}`} className="block">
                       <div className="text-sm font-semibold text-[var(--color-text-primary)] underline-offset-2 hover:underline">
-                        h/{hub.name}
+                        {t('common.format.hubPath', { name: hub.name })}
                       </div>
                       {hub.title && (
-                        <div className="text-xs text-[var(--color-text-secondary)]">{hub.title}</div>
+                        <div className="text-xs text-[var(--color-text-secondary)]">
+                          {hub.title}
+                        </div>
                       )}
                       {hub.description && (
                         <div className="mt-1 text-xs text-[var(--color-text-secondary)]">
@@ -896,8 +897,8 @@ export default function SearchResultsPage() {
                     ? t('modals.hide.hiding')
                     : t('modals.hide.hideButton')
                   : hideRedditPostMutation.isPending
-                  ? t('modals.hide.hiding')
-                  : t('modals.hide.hideButton')}
+                    ? t('modals.hide.hiding')
+                    : t('modals.hide.hideButton')}
               </button>
             </div>
           </div>
@@ -915,7 +916,10 @@ export default function SearchResultsPage() {
             ) : (
               <ul className="mt-2 space-y-2">
                 {filteredRedditUsers.map((user, idx) => (
-                  <li key={`${user.name}-${idx}`} className="rounded border border-[var(--color-border)] p-3">
+                  <li
+                    key={`${user.name}-${idx}`}
+                    className="rounded border border-[var(--color-border)] p-3"
+                  >
                     <div className="text-sm font-semibold text-[var(--color-text-primary)]">
                       u/{user.name}
                     </div>
@@ -927,9 +931,7 @@ export default function SearchResultsPage() {
               <div className="pt-2">
                 <button
                   type="button"
-                  onClick={() =>
-                    handleSearch(query, { append: true, tab: 'users', sort })
-                  }
+                  onClick={() => handleSearch(query, { append: true, tab: 'users', sort })}
                   className="rounded bg-[var(--color-primary)] px-3 py-2 text-sm font-medium text-white hover:opacity-90"
                 >
                   {t('searchPage.users.loadMoreReddit')}
@@ -946,7 +948,10 @@ export default function SearchResultsPage() {
             ) : (
               <ul className="mt-2 space-y-2">
                 {filteredOmniUsers.map((user) => (
-                  <li key={user.username} className="rounded border border-[var(--color-border)] p-3">
+                  <li
+                    key={user.username}
+                    className="rounded border border-[var(--color-border)] p-3"
+                  >
                     <div className="text-sm font-semibold text-[var(--color-text-primary)]">
                       {user.username}
                     </div>
@@ -958,9 +963,7 @@ export default function SearchResultsPage() {
               <div className="pt-2">
                 <button
                   type="button"
-                  onClick={() =>
-                    handleSearch(query, { append: true, tab: 'users', sort })
-                  }
+                  onClick={() => handleSearch(query, { append: true, tab: 'users', sort })}
                   className="rounded bg-[var(--color-primary)] px-3 py-2 text-sm font-medium text-white hover:opacity-90"
                 >
                   {t('searchPage.users.loadMoreOmni')}

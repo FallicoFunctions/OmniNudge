@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { MarkdownRenderer } from './MarkdownRenderer';
 
 type MarkdownInputProps = {
@@ -20,13 +21,16 @@ export function MarkdownInput({
   maxLength,
   helperText,
 }: MarkdownInputProps) {
+  const { t } = useTranslation();
   const [mode, setMode] = useState<'write' | 'preview'>('write');
 
   return (
     <div>
       {/* FORM-8: Improved preview toggle placement and styling */}
       <div className="flex items-center justify-between mb-2">
-        <label className="block text-sm font-semibold text-[var(--color-text-primary)]">{label}</label>
+        <label className="block text-sm font-semibold text-[var(--color-text-primary)]">
+          {label}
+        </label>
         <div className="flex gap-1">
           <button
             type="button"
@@ -37,7 +41,7 @@ export function MarkdownInput({
                 : 'bg-[var(--color-surface-elevated)] text-[var(--color-text-primary)] hover:bg-[var(--color-border)]'
             }`}
           >
-            Write
+            {t('common.write')}
           </button>
           <button
             type="button"
@@ -48,7 +52,7 @@ export function MarkdownInput({
                 : 'bg-[var(--color-surface-elevated)] text-[var(--color-text-primary)] hover:bg-[var(--color-border)]'
             }`}
           >
-            Preview
+            {t('common.preview')}
           </button>
         </div>
       </div>
@@ -67,14 +71,14 @@ export function MarkdownInput({
           {value.trim() ? (
             <MarkdownRenderer content={value} className="text-[var(--color-text-primary)]" />
           ) : (
-            <div className="text-sm text-[var(--color-text-secondary)] italic">Nothing to preview yet.</div>
+            <div className="text-sm text-[var(--color-text-secondary)] italic">
+              {t('markdownInput.emptyPreview')}
+            </div>
           )}
         </div>
       )}
 
-      {helperText ? (
-        <p className="mt-1 text-sm text-gray-500">{helperText}</p>
-      ) : null}
+      {helperText ? <p className="mt-1 text-sm text-gray-500">{helperText}</p> : null}
     </div>
   );
 }

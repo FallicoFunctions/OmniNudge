@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { subscriptionService } from '../../services/subscriptionService';
 
 interface SubscribeButtonProps {
@@ -15,6 +16,7 @@ export function SubscribeButton({
   initialSubscribed = false,
   onSubscriptionChange,
 }: SubscribeButtonProps) {
+  const { t } = useTranslation();
   const [isSubscribed, setIsSubscribed] = useState(initialSubscribed);
   const queryClient = useQueryClient();
 
@@ -40,7 +42,9 @@ export function SubscribeButton({
 
       // Invalidate relevant queries
       queryClient.invalidateQueries({ queryKey: ['user-subscriptions'] });
-      queryClient.invalidateQueries({ queryKey: ['user-subscriptions', type === 'hub' ? 'hubs' : 'subreddits'] });
+      queryClient.invalidateQueries({
+        queryKey: ['user-subscriptions', type === 'hub' ? 'hubs' : 'subreddits'],
+      });
       if (type === 'hub') {
         queryClient.invalidateQueries({ queryKey: ['hub-subscription', name] });
       } else {
@@ -65,10 +69,10 @@ export function SubscribeButton({
       } ${subscribeMutation.isPending ? 'opacity-50 cursor-wait' : ''}`}
     >
       {subscribeMutation.isPending
-        ? 'Loading...'
+        ? t('common.loading')
         : isSubscribed
-        ? 'Unsubscribe'
-        : 'Subscribe'}
+          ? t('common.unsubscribe')
+          : t('common.subscribe')}
     </button>
   );
 }

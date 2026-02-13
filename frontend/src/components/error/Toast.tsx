@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { X, CheckCircle, AlertCircle, Info, AlertTriangle } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 export type ToastType = 'success' | 'error' | 'warning' | 'info';
 
@@ -43,6 +44,7 @@ const toastConfig = {
 };
 
 export function Toast({ type, message, description, duration = 5000, onDismiss }: ToastProps) {
+  const { t } = useTranslation();
   const [isVisible, setIsVisible] = useState(true);
   const config = toastConfig[type];
   const Icon = config.icon;
@@ -79,15 +81,13 @@ export function Toast({ type, message, description, duration = 5000, onDismiss }
 
         <div className="flex-1 min-w-0">
           <p className="font-semibold text-sm">{message}</p>
-          {description && (
-            <p className="text-sm mt-1 opacity-90">{description}</p>
-          )}
+          {description && <p className="text-sm mt-1 opacity-90">{description}</p>}
         </div>
 
         <button
           onClick={handleDismiss}
           className="flex-shrink-0 opacity-70 hover:opacity-100 transition-opacity"
-          aria-label="Dismiss"
+          aria-label={t('common.close')}
         >
           <X size={18} />
         </button>

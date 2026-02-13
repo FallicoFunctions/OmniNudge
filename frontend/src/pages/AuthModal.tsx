@@ -84,7 +84,7 @@ export default function AuthModal({ mode, onClose, onSwitch, onSuccess }: AuthMo
           email: email || undefined,
           turnstile_token: turnstileToken,
           accept_privacy_policy: acceptPrivacyPolicy,
-          accept_terms: acceptTerms
+          accept_terms: acceptTerms,
         });
       }
       if (onSuccess) {
@@ -117,7 +117,7 @@ export default function AuthModal({ mode, onClose, onSwitch, onSuccess }: AuthMo
 
     try {
       await api.post('/auth/forgot-password', {
-        username: forgotUsername.trim()
+        username: forgotUsername.trim(),
       });
       setForgotSuccess(true);
     } catch (err) {
@@ -141,8 +141,7 @@ export default function AuthModal({ mode, onClose, onSwitch, onSuccess }: AuthMo
               ? t('auth.resetPasswordTitle')
               : isLogin
                 ? t('auth.loginTitle')
-                : t('auth.registerTitle')
-            }
+                : t('auth.registerTitle')}
           </h2>
         </div>
 
@@ -153,10 +152,10 @@ export default function AuthModal({ mode, onClose, onSwitch, onSuccess }: AuthMo
               {forgotSuccess ? (
                 <div className="space-y-4">
                   <div className="rounded-md bg-green-50 p-4 text-sm text-green-800">
-                    <p className="font-semibold mb-2">{t('auth.forgotPasswordFlow.checkEmailTitle')}</p>
-                    <p>
-                      {t('auth.forgotPasswordFlow.checkEmailDescription')}
+                    <p className="font-semibold mb-2">
+                      {t('auth.forgotPasswordFlow.checkEmailTitle')}
                     </p>
+                    <p>{t('auth.forgotPasswordFlow.checkEmailDescription')}</p>
                   </div>
                   <button
                     type="button"
@@ -173,9 +172,7 @@ export default function AuthModal({ mode, onClose, onSwitch, onSuccess }: AuthMo
                   </p>
 
                   {error && (
-                    <div className="rounded-md bg-red-50 p-3 text-sm text-red-800">
-                      {error}
-                    </div>
+                    <div className="rounded-md bg-red-50 p-3 text-sm text-red-800">{error}</div>
                   )}
 
                   <div>
@@ -183,7 +180,7 @@ export default function AuthModal({ mode, onClose, onSwitch, onSuccess }: AuthMo
                       htmlFor="forgot-username"
                       className="block text-sm font-semibold text-[var(--color-text-primary)]"
                     >
-                      Username <span className="text-red-500">*</span>
+                      {t('common.username')} <span className="text-red-500">*</span>
                     </label>
                     <input
                       id="forgot-username"
@@ -202,7 +199,9 @@ export default function AuthModal({ mode, onClose, onSwitch, onSuccess }: AuthMo
                     disabled={forgotLoading}
                     className="w-full rounded-md bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 disabled:opacity-50"
                   >
-                    {forgotLoading ? t('auth.forgotPasswordFlow.sending') : t('auth.forgotPasswordFlow.sendResetLink')}
+                    {forgotLoading
+                      ? t('auth.forgotPasswordFlow.sending')
+                      : t('auth.forgotPasswordFlow.sendResetLink')}
                   </button>
 
                   <p className="text-center text-sm text-[var(--color-text-secondary)]">
@@ -224,7 +223,9 @@ export default function AuthModal({ mode, onClose, onSwitch, onSuccess }: AuthMo
           {!isForgotPassword && (
             <>
               <div className="text-center">
-                <h1 className="text-2xl font-bold text-[var(--color-text-primary)]">{t('auth.title')}</h1>
+                <h1 className="text-2xl font-bold text-[var(--color-text-primary)]">
+                  {t('auth.title')}
+                </h1>
                 <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
                   {isLogin ? t('auth.loginSubtitle') : t('auth.signupSubtitle')}
                 </p>
@@ -232,18 +233,14 @@ export default function AuthModal({ mode, onClose, onSwitch, onSuccess }: AuthMo
 
               <form onSubmit={handleSubmit} className="mt-4 space-y-4">
                 {error && (
-                  <div className="rounded-md bg-red-50 p-3 text-sm text-red-800">
-                    {error}
-                  </div>
+                  <div className="rounded-md bg-red-50 p-3 text-sm text-red-800">{error}</div>
                 )}
 
                 {/* Email warning for signup without email */}
                 {isSignup && !email && (
                   <div className="rounded-md bg-amber-50 border border-amber-200 p-3 text-sm text-amber-800">
                     <p className="font-semibold mb-1">{t('auth.signupNoEmailWarning.title')}</p>
-                    <p>
-                      {t('auth.signupNoEmailWarning.description')}
-                    </p>
+                    <p>{t('auth.signupNoEmailWarning.description')}</p>
                   </div>
                 )}
 
@@ -272,11 +269,14 @@ export default function AuthModal({ mode, onClose, onSwitch, onSuccess }: AuthMo
                 {isSignup && (
                   <div>
                     <label
-	                    htmlFor="auth-email"
-	                    className="block text-sm font-semibold text-[var(--color-text-primary)]"
-	                  >
-	                      {t('auth.fields.email')} <span className="text-[var(--color-text-secondary)] text-xs">{t('common.optional')}</span>
-	                    </label>
+                      htmlFor="auth-email"
+                      className="block text-sm font-semibold text-[var(--color-text-primary)]"
+                    >
+                      {t('auth.fields.email')}{' '}
+                      <span className="text-[var(--color-text-secondary)] text-xs">
+                        {t('common.optional')}
+                      </span>
+                    </label>
                     <input
                       id="auth-email"
                       type="email"
@@ -285,12 +285,12 @@ export default function AuthModal({ mode, onClose, onSwitch, onSuccess }: AuthMo
                       className="mt-1 block w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-2 text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
                       placeholder={t('auth.fields.emailPlaceholder')}
                       autoComplete="email"
-	                    />
-	                    <p className="mt-1 text-xs text-[var(--color-text-secondary)]">
-	                      {t('auth.emailVerificationNote')}
-	                    </p>
-	                  </div>
-	                )}
+                    />
+                    <p className="mt-1 text-xs text-[var(--color-text-secondary)]">
+                      {t('auth.emailVerificationNote')}
+                    </p>
+                  </div>
+                )}
 
                 <div>
                   <label
@@ -320,14 +320,18 @@ export default function AuthModal({ mode, onClose, onSwitch, onSuccess }: AuthMo
                             key={i}
                             className="h-1 flex-1 rounded transition-colors"
                             style={{
-                              backgroundColor: i <= passwordStrength.score ? passwordStrength.color : '#e5e7eb'
+                              backgroundColor:
+                                i <= passwordStrength.score ? passwordStrength.color : '#e5e7eb',
                             }}
                           />
                         ))}
                       </div>
 
                       {/* Strength label */}
-                      <div className="text-sm font-medium" style={{ color: passwordStrength.color }}>
+                      <div
+                        className="text-sm font-medium"
+                        style={{ color: passwordStrength.color }}
+                      >
                         {passwordStrength.label}
                       </div>
 
@@ -391,8 +395,8 @@ export default function AuthModal({ mode, onClose, onSwitch, onSuccess }: AuthMo
                       htmlFor="acknowledge-no-email"
                       className="ml-2 block text-sm text-[var(--color-text-primary)]"
                     >
-                      I understand that without an email, I won't be able to reset my password if I forget it.{' '}
-                      <span className="text-red-500">*</span>
+                      I understand that without an email, I won't be able to reset my password if I
+                      forget it. <span className="text-red-500">*</span>
                     </label>
                   </div>
                 )}
@@ -473,11 +477,21 @@ export default function AuthModal({ mode, onClose, onSwitch, onSuccess }: AuthMo
                   type="submit"
                   disabled={
                     isLoading ||
-                    (isSignup && (!turnstileToken || !acceptPrivacyPolicy || !acceptTerms || (!email && !acknowledgedNoEmail)))
+                    (isSignup &&
+                      (!turnstileToken ||
+                        !acceptPrivacyPolicy ||
+                        !acceptTerms ||
+                        (!email && !acknowledgedNoEmail)))
                   }
                   className="w-full rounded-md bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 disabled:opacity-50"
                 >
-                  {isLoading ? (isLogin ? t('auth.buttons.signingIn') : t('auth.buttons.creatingAccount')) : isLogin ? t('auth.buttons.signIn') : t('auth.buttons.signUp')}
+                  {isLoading
+                    ? isLogin
+                      ? t('auth.buttons.signingIn')
+                      : t('auth.buttons.creatingAccount')
+                    : isLogin
+                      ? t('auth.buttons.signIn')
+                      : t('auth.buttons.signUp')}
                 </button>
               </form>
 

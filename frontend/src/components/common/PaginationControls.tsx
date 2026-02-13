@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 
 type PaginationControlsProps = {
   pageIndex: number;
@@ -23,13 +24,13 @@ export function PaginationControls({
   showDivider = true,
   centerContent,
 }: PaginationControlsProps) {
+  const { t } = useTranslation();
+
   if (totalPages <= 1) {
     return null;
   }
 
-  const dividerClasses = showDivider
-    ? 'mt-4 border-t border-[var(--color-border)] pt-4'
-    : '';
+  const dividerClasses = showDivider ? 'mt-4 border-t border-[var(--color-border)] pt-4' : '';
 
   return (
     <div
@@ -41,11 +42,11 @@ export function PaginationControls({
         disabled={!canGoPrev}
         className="rounded bg-[var(--color-primary)] px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
       >
-        ← Previous
+        {t('pagination.previous')}
       </button>
       {centerContent ?? (
         <span className="text-sm text-[var(--color-text-secondary)]">
-          Page {pageIndex + 1} of {totalPages}
+          {t('pagination.pageOf', { current: pageIndex + 1, total: totalPages })}
         </span>
       )}
       <button
@@ -54,7 +55,7 @@ export function PaginationControls({
         disabled={!canGoNext}
         className="rounded bg-[var(--color-primary)] px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
       >
-        Next →
+        {t('pagination.next')}
       </button>
     </div>
   );

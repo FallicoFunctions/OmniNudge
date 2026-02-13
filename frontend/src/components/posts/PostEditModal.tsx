@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Modal } from '../common/Modal';
 import { MarkdownInput } from '../common/MarkdownInput';
 import { ModalCloseButton } from '../ui/ModalCloseButton';
@@ -22,6 +23,7 @@ export function PostEditModal({
   onClose,
   onSave,
 }: PostEditModalProps) {
+  const { t } = useTranslation();
   const [draftTitle, setDraftTitle] = useState(title);
   const [draftBody, setDraftBody] = useState(body);
 
@@ -45,15 +47,17 @@ export function PostEditModal({
 
       <div className="space-y-4">
         <div className="pr-12">
-          <h3 className="text-xl font-semibold text-[var(--color-text-primary)]">Edit post</h3>
+          <h3 className="text-xl font-semibold text-[var(--color-text-primary)]">
+            {t('posts.editModal.title')}
+          </h3>
           <p className="text-sm text-[var(--color-text-secondary)]">
-            Update the title or body, then save your changes.
+            {t('posts.editModal.subtitle')}
           </p>
         </div>
 
         <div>
           <label className="mb-2 block text-sm font-medium text-[var(--color-text-primary)]">
-            Title
+            {t('posts.editModal.fields.title')}
           </label>
           <input
             type="text"
@@ -64,10 +68,10 @@ export function PostEditModal({
         </div>
 
         <MarkdownInput
-          label="Body"
+          label={t('posts.editModal.fields.body')}
           value={draftBody}
           onChange={setDraftBody}
-          placeholder="Update the post body..."
+          placeholder={t('posts.editModal.placeholder')}
           rows={6}
           maxLength={maxLength}
         />
@@ -79,7 +83,7 @@ export function PostEditModal({
             disabled={isSaving}
             className="rounded-lg border border-[var(--color-border)] px-4 py-2 text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] disabled:opacity-50"
           >
-            Cancel
+            {t('common.cancel')}
           </button>
           <button
             type="button"
@@ -87,7 +91,9 @@ export function PostEditModal({
             disabled={!trimmedTitle || isSaving}
             className="rounded-lg bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--color-primary-strong)] disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {isSaving ? 'Saving...' : 'Save changes'}
+            {isSaving
+              ? t('posts.editModal.actions.saving')
+              : t('posts.editModal.actions.saveChanges')}
           </button>
         </div>
       </div>

@@ -77,7 +77,9 @@ export default function SubscribedView({
         return nameA.localeCompare(nameB);
       });
     } else if (sortBy === 'recent') {
-      filtered.sort((a, b) => new Date(b.subscribed_at).getTime() - new Date(a.subscribed_at).getTime());
+      filtered.sort(
+        (a, b) => new Date(b.subscribed_at).getTime() - new Date(a.subscribed_at).getTime()
+      );
     }
 
     return filtered;
@@ -90,16 +92,18 @@ export default function SubscribedView({
     // Apply search
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
-      filtered = filtered.filter((sub) =>
-        sub.subreddit_name.toLowerCase().includes(query)
-      );
+      filtered = filtered.filter((sub) => sub.subreddit_name.toLowerCase().includes(query));
     }
 
     // Apply sort
     if (sortBy === 'alphabetical') {
-      filtered.sort((a, b) => a.subreddit_name.toLowerCase().localeCompare(b.subreddit_name.toLowerCase()));
+      filtered.sort((a, b) =>
+        a.subreddit_name.toLowerCase().localeCompare(b.subreddit_name.toLowerCase())
+      );
     } else if (sortBy === 'recent') {
-      filtered.sort((a, b) => new Date(b.subscribed_at).getTime() - new Date(a.subscribed_at).getTime());
+      filtered.sort(
+        (a, b) => new Date(b.subscribed_at).getTime() - new Date(a.subscribed_at).getTime()
+      );
     }
 
     return filtered;
@@ -116,11 +120,11 @@ export default function SubscribedView({
       {isLoading ? (
         <LoadingMessage className="text-sm">{t('subscriptions.loading')}</LoadingMessage>
       ) : hasError ? (
-        <ErrorMessage className="text-sm text-[var(--color-error)]">{t('subscriptions.loadFailed')}</ErrorMessage>
+        <ErrorMessage className="text-sm text-[var(--color-error)]">
+          {t('subscriptions.loadFailed')}
+        </ErrorMessage>
       ) : allHubs.length === 0 && allSubreddits.length === 0 ? (
-        <EmptyMessage className="text-sm">
-          {t('subscriptions.emptyAll')}
-        </EmptyMessage>
+        <EmptyMessage className="text-sm">{t('subscriptions.emptyAll')}</EmptyMessage>
       ) : (
         <>
           {/* PROFILE-5: Search and sort controls */}
@@ -155,78 +159,83 @@ export default function SubscribedView({
           )}
 
           <div className="grid gap-6 lg:grid-cols-2">
-          {/* Hubs Column */}
-          <section>
-            <h3 className="mb-3 text-lg font-semibold text-[var(--color-text-primary)]">
-              {t('subscriptions.hubsTitle', { count: hubs.length })}
-            </h3>
-            {hubs.length === 0 ? (
-              <EmptyMessage className="text-sm">{t('subscriptions.emptyHubs')}</EmptyMessage>
-            ) : (
-              <div className="space-y-2">
-                {hubs.map((subscription) => {
-                  const hubName = subscription.hub?.name || subscription.hub_name || t('subscriptions.unknownHub');
-                  const hubTitle = subscription.hub?.title;
+            {/* Hubs Column */}
+            <section>
+              <h3 className="mb-3 text-lg font-semibold text-[var(--color-text-primary)]">
+                {t('subscriptions.hubsTitle', { count: hubs.length })}
+              </h3>
+              {hubs.length === 0 ? (
+                <EmptyMessage className="text-sm">{t('subscriptions.emptyHubs')}</EmptyMessage>
+              ) : (
+                <div className="space-y-2">
+                  {hubs.map((subscription) => {
+                    const hubName =
+                      subscription.hub?.name ||
+                      subscription.hub_name ||
+                      t('subscriptions.unknownHub');
+                    const hubTitle = subscription.hub?.title;
 
-                  return (
+                    return (
+                      <article
+                        key={subscription.id}
+                        className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] p-4"
+                      >
+                        <Link
+                          to={`/h/${hubName}`}
+                          className="text-lg font-semibold text-[var(--color-primary)] hover:underline"
+                        >
+                          {t('common.format.hubPath', { name: hubName })}
+                        </Link>
+                        {hubTitle && (
+                          <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+                            {hubTitle}
+                          </p>
+                        )}
+                        <p className="mt-2 text-xs text-[var(--color-text-secondary)]">
+                          {t('subscriptions.subscribedAt', {
+                            time: formatSubscribedAt(subscription.subscribed_at),
+                          })}
+                        </p>
+                      </article>
+                    );
+                  })}
+                </div>
+              )}
+            </section>
+
+            {/* Subreddits Column */}
+            <section>
+              <h3 className="mb-3 text-lg font-semibold text-[var(--color-text-primary)]">
+                {t('subscriptions.subredditsTitle', { count: subreddits.length })}
+              </h3>
+              {subreddits.length === 0 ? (
+                <EmptyMessage className="text-sm">
+                  {t('subscriptions.emptySubreddits')}
+                </EmptyMessage>
+              ) : (
+                <div className="space-y-2">
+                  {subreddits.map((subscription) => (
                     <article
                       key={subscription.id}
                       className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] p-4"
                     >
                       <Link
-                        to={`/h/${hubName}`}
+                        to={`/r/${subscription.subreddit_name}`}
                         className="text-lg font-semibold text-[var(--color-primary)] hover:underline"
                       >
-                        h/{hubName}
+                        {t('common.format.subredditPath', { name: subscription.subreddit_name })}
                       </Link>
-                      {hubTitle && (
-                        <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
-                          {hubTitle}
-                        </p>
-                      )}
                       <p className="mt-2 text-xs text-[var(--color-text-secondary)]">
                         {t('subscriptions.subscribedAt', {
                           time: formatSubscribedAt(subscription.subscribed_at),
                         })}
                       </p>
                     </article>
-                  );
-                })}
-              </div>
-            )}
-          </section>
-
-          {/* Subreddits Column */}
-          <section>
-            <h3 className="mb-3 text-lg font-semibold text-[var(--color-text-primary)]">
-              {t('subscriptions.subredditsTitle', { count: subreddits.length })}
-            </h3>
-            {subreddits.length === 0 ? (
-              <EmptyMessage className="text-sm">{t('subscriptions.emptySubreddits')}</EmptyMessage>
-            ) : (
-              <div className="space-y-2">
-                {subreddits.map((subscription) => (
-                  <article
-                    key={subscription.id}
-                    className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] p-4"
-                  >
-                    <Link
-                      to={`/r/${subscription.subreddit_name}`}
-                      className="text-lg font-semibold text-[var(--color-primary)] hover:underline"
-                    >
-                      r/{subscription.subreddit_name}
-                    </Link>
-                    <p className="mt-2 text-xs text-[var(--color-text-secondary)]">
-                      {t('subscriptions.subscribedAt', {
-                        time: formatSubscribedAt(subscription.subscribed_at),
-                      })}
-                    </p>
-                  </article>
-                ))}
-              </div>
-            )}
-          </section>
-        </div>
+                  ))}
+                </div>
+              )}
+            </section>
+          </div>
         </>
       )}
     </div>

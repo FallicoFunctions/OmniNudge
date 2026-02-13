@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next';
+
 interface ProgressBarProps {
   value?: number; // 0-100 for determinate, undefined for indeterminate
   size?: 'small' | 'medium' | 'large';
@@ -15,8 +17,9 @@ export function ProgressBar({
   value,
   size = 'medium',
   showLabel = false,
-  className = ''
+  className = '',
 }: ProgressBarProps) {
+  const { t } = useTranslation();
   const isDeterminate = value !== undefined;
   const percentage = isDeterminate ? Math.min(100, Math.max(0, value)) : 0;
 
@@ -24,12 +27,14 @@ export function ProgressBar({
     <div className={className}>
       {showLabel && isDeterminate && (
         <div className="flex justify-between items-center mb-2">
-          <span className="text-sm text-secondary">Progress</span>
+          <span className="text-sm text-secondary">{t('common.progress')}</span>
           <span className="text-sm font-semibold">{percentage}%</span>
         </div>
       )}
 
-      <div className={`w-full bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden ${sizeClasses[size]}`}>
+      <div
+        className={`w-full bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden ${sizeClasses[size]}`}
+      >
         {isDeterminate ? (
           // Determinate progress bar
           <div
@@ -45,7 +50,7 @@ export function ProgressBar({
           <div
             className="h-full bg-primary animate-progress rounded-full"
             role="progressbar"
-            aria-label="Loading"
+            aria-label={t('common.accessibility.loading')}
           />
         )}
       </div>
@@ -59,7 +64,7 @@ export function CircularProgress({
   size = 48,
   strokeWidth = 4,
   showLabel = false,
-  className = ''
+  className = '',
 }: {
   value?: number;
   size?: number;
@@ -71,7 +76,9 @@ export function CircularProgress({
   const percentage = isDeterminate ? Math.min(100, Math.max(0, value)) : 0;
   const radius = (size - strokeWidth) / 2;
   const circumference = radius * 2 * Math.PI;
-  const offset = isDeterminate ? circumference - (percentage / 100) * circumference : circumference * 0.25;
+  const offset = isDeterminate
+    ? circumference - (percentage / 100) * circumference
+    : circumference * 0.25;
 
   return (
     <div className={`relative inline-flex items-center justify-center ${className}`}>

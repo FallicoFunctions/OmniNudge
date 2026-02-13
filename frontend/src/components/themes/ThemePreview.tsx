@@ -52,10 +52,7 @@ const ThemePreview = ({
     return style;
   }, [mergedVariables]);
 
-  const frameClasses =
-    deviceMode === 'mobile'
-      ? 'w-[320px]'
-      : 'w-full max-w-3xl';
+  const frameClasses = deviceMode === 'mobile' ? 'w-[320px]' : 'w-full max-w-3xl';
 
   const renderButtonSamples = () => (
     <div
@@ -65,10 +62,7 @@ const ThemePreview = ({
       <p className="text-xs uppercase tracking-wide text-[var(--color-text-secondary)]">
         {t('themes.preview.sections.buttons')}
       </p>
-      <div
-        className="mt-3 grid gap-2 md:grid-cols-2"
-        style={{ gap: 'var(--spacing-sm)' }}
-      >
+      <div className="mt-3 grid gap-2 md:grid-cols-2" style={{ gap: 'var(--spacing-sm)' }}>
         <button
           type="button"
           className="rounded-lg bg-[var(--color-primary)] font-semibold text-white"
@@ -151,14 +145,19 @@ const ThemePreview = ({
       <p className="text-xs uppercase tracking-wide text-[var(--color-text-secondary)]">
         {t('themes.preview.sections.statusIndicators')}
       </p>
-      <div
-        className="mt-3 grid gap-3 sm:grid-cols-2"
-        style={{ gap: 'var(--spacing-sm)' }}
-      >
+      <div className="mt-3 grid gap-3 sm:grid-cols-2" style={{ gap: 'var(--spacing-sm)' }}>
         {[
           { id: 'live', label: t('themes.preview.status.live'), color: 'var(--color-success)' },
-          { id: 'scheduled', label: t('themes.preview.status.scheduled'), color: 'var(--color-info)' },
-          { id: 'needsReview', label: t('themes.preview.status.needsReview'), color: 'var(--color-warning)' },
+          {
+            id: 'scheduled',
+            label: t('themes.preview.status.scheduled'),
+            color: 'var(--color-info)',
+          },
+          {
+            id: 'needsReview',
+            label: t('themes.preview.status.needsReview'),
+            color: 'var(--color-warning)',
+          },
           { id: 'blocked', label: t('themes.preview.status.blocked'), color: 'var(--color-error)' },
         ].map((status) => (
           <div
@@ -223,8 +222,11 @@ const ThemePreview = ({
         }}
       >
         <div>
-          <p className="text-xs uppercase tracking-wide text-[var(--color-text-secondary)]" aria-label="Theme preview section heading">
-            OmniNudge
+          <p
+            className="text-xs uppercase tracking-wide text-[var(--color-text-secondary)]"
+            aria-label={t('themes.preview.aria.sectionHeading')}
+          >
+            {t('themes.preview.brandName')}
           </p>
           <p
             className="font-semibold text-[var(--color-text-primary)]"
@@ -278,17 +280,17 @@ const ThemePreview = ({
                     {t('themes.preview.feed.meta')}
                   </p>
                 </div>
-            <button
-              type="button"
-              className="rounded-full bg-[var(--color-primary)] text-xs font-semibold text-white"
-              style={{
-                padding: 'var(--spacing-xs) var(--spacing-sm)',
-                borderRadius: 'var(--border-radius-2xl)',
-              }}
-              aria-label={t('themes.preview.feed.followAria', { index: item })}
-            >
-              {t('themes.preview.feed.follow')}
-            </button>
+                <button
+                  type="button"
+                  className="rounded-full bg-[var(--color-primary)] text-xs font-semibold text-white"
+                  style={{
+                    padding: 'var(--spacing-xs) var(--spacing-sm)',
+                    borderRadius: 'var(--border-radius-2xl)',
+                  }}
+                  aria-label={t('themes.preview.feed.followAria', { index: item })}
+                >
+                  {t('themes.preview.feed.follow')}
+                </button>
               </div>
               <p
                 className="text-[var(--color-text-primary)]"
@@ -307,7 +309,7 @@ const ThemePreview = ({
                     borderRadius: 'var(--border-radius-2xl)',
                   }}
                 >
-                  #design
+                  {t('themes.preview.feed.sampleTags.design')}
                 </span>
                 <span
                   className="rounded-full bg-[var(--color-surface-elevated)] text-xs text-[var(--color-text-secondary)]"
@@ -316,7 +318,7 @@ const ThemePreview = ({
                     borderRadius: 'var(--border-radius-2xl)',
                   }}
                 >
-                  #themes
+                  {t('themes.preview.feed.sampleTags.themes')}
                 </span>
               </div>
             </article>
@@ -333,7 +335,7 @@ const ThemePreview = ({
               borderRadius: 'var(--border-radius-2xl)',
               boxShadow: 'var(--shadow-md)',
             }}
-                aria-label="Profile summary"
+            aria-label={t('themes.preview.aria.profileSummary')}
           >
             <div className="flex items-center" style={{ gap: 'var(--spacing-sm)' }}>
               <span
@@ -344,13 +346,13 @@ const ThemePreview = ({
                 <p
                   className="font-semibold text-[var(--color-text-primary)]"
                   style={{ fontSize: 'var(--font-size-xl)' }}
-                  >
+                >
                   {t('themes.preview.profile.name')}
                 </p>
                 <p
                   className="text-[var(--color-text-secondary)]"
                   style={{ fontSize: 'var(--font-size-sm)' }}
-                  >
+                >
                   {t('themes.preview.profile.subtitle', {
                     formattedCount: formatNumber(12000, { notation: 'compact' }),
                   })}
@@ -474,7 +476,11 @@ const ThemePreview = ({
             </div>
             <div
               className="flex flex-col py-4"
-              style={{ gap: 'var(--spacing-sm)', paddingTop: 'var(--spacing-md)', paddingBottom: 'var(--spacing-md)' }}
+              style={{
+                gap: 'var(--spacing-sm)',
+                paddingTop: 'var(--spacing-md)',
+                paddingBottom: 'var(--spacing-md)',
+              }}
             >
               <p
                 className="w-3/4 rounded-2xl rounded-bl-none border border-[var(--color-border)] bg-[var(--color-background)] text-[var(--color-text-primary)]"
@@ -568,9 +574,7 @@ const ThemePreview = ({
       )}
 
       <div className={`relative ${isFullscreen ? 'z-50' : ''}`}>
-        <div className={`${frameClasses} transition-all`}>
-          {frameContent}
-        </div>
+        <div className={`${frameClasses} transition-all`}>{frameContent}</div>
       </div>
     </div>
   );
@@ -581,9 +585,7 @@ const ThemePreview = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-6">
-      <div className="w-full max-w-5xl">
-        {previewWrapper}
-      </div>
+      <div className="w-full max-w-5xl">{previewWrapper}</div>
     </div>
   );
 };

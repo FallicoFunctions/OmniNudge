@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import ThemeSelector from '../themes/ThemeSelector';
 import ThemeEditor from '../themes/ThemeEditor';
 import ThemeGallery from '../themes/ThemeGallery';
@@ -9,6 +10,7 @@ import type { UserTheme } from '../../types/theme';
 type ViewMode = 'selector' | 'gallery' | 'editor';
 
 const ThemeSettingsPanel = () => {
+  const { t } = useTranslation();
   const { activeTheme, userSettings, setAdvancedMode } = useTheme();
   const [viewMode, setViewMode] = useState<ViewMode>('selector');
   const [editingTheme, setEditingTheme] = useState<UserTheme | null>(null);
@@ -48,10 +50,10 @@ const ThemeSettingsPanel = () => {
         <div className="flex items-start justify-between">
           <div className="flex-1">
             <h2 className="text-xl font-bold text-[var(--color-text-primary)]">
-              Theme Customization
+              {t('themes.settingsPanel.title')}
             </h2>
             <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
-              Personalize your OmniNudge experience with custom themes
+              {t('themes.settingsPanel.subtitle')}
             </p>
           </div>
 
@@ -60,7 +62,7 @@ const ThemeSettingsPanel = () => {
             className="rounded-lg border border-[var(--color-border)] px-3 py-1 text-xs font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)] transition"
             onClick={handleShowOnboarding}
           >
-            Show Tour
+            {t('themes.settingsPanel.actions.showTour')}
           </button>
         </div>
 
@@ -68,10 +70,10 @@ const ThemeSettingsPanel = () => {
           {/* Current Theme Display */}
           <div>
             <label className="block text-sm font-medium text-[var(--color-text-primary)]">
-              Active Theme
+              {t('themes.selector.activeThemeLabel')}
             </label>
             <p className="mt-1 text-base font-semibold text-[var(--color-primary)]">
-              {activeTheme?.theme_name ?? 'No theme selected'}
+              {activeTheme?.theme_name ?? t('themes.settingsPanel.noThemeSelected')}
             </p>
             {activeTheme?.theme_description && (
               <p className="mt-1 text-xs text-[var(--color-text-secondary)]">
@@ -84,10 +86,10 @@ const ThemeSettingsPanel = () => {
           <div className="flex items-center justify-between rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-4 py-3">
             <div>
               <p className="text-sm font-medium text-[var(--color-text-primary)]">
-                Advanced Mode
+                {t('themes.settingsPanel.advancedMode.title')}
               </p>
               <p className="text-xs text-[var(--color-text-secondary)]">
-                Enable full CSS customization and advanced features
+                {t('themes.settingsPanel.advancedMode.description')}
               </p>
             </div>
             <button
@@ -120,7 +122,7 @@ const ThemeSettingsPanel = () => {
               }`}
               onClick={() => setViewMode('selector')}
             >
-              Theme Selector
+              {t('themes.settingsPanel.tabs.selector')}
             </button>
             <button
               type="button"
@@ -131,43 +133,32 @@ const ThemeSettingsPanel = () => {
               }`}
               onClick={() => setViewMode('gallery')}
             >
-              Browse Gallery
+              {t('themes.settingsPanel.tabs.gallery')}
             </button>
             <button
               type="button"
               className="rounded-lg bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:opacity-90 transition"
               onClick={handleCreateNewTheme}
             >
-              + Create Theme
+              {t('themes.gallery.actions.createTheme')}
             </button>
           </div>
         </div>
       </div>
 
       {/* View Mode Content */}
-      {viewMode === 'selector' && (
-        <ThemeSelector onCreateNewTheme={handleCreateNewTheme} />
-      )}
+      {viewMode === 'selector' && <ThemeSelector onCreateNewTheme={handleCreateNewTheme} />}
 
       {viewMode === 'gallery' && (
-        <ThemeGallery
-          onCreateNewTheme={handleCreateNewTheme}
-          onEditTheme={handleEditTheme}
-        />
+        <ThemeGallery onCreateNewTheme={handleCreateNewTheme} onEditTheme={handleEditTheme} />
       )}
 
       {viewMode === 'editor' && (
-        <ThemeEditor
-          isOpen={true}
-          initialTheme={editingTheme}
-          onClose={handleEditorClose}
-        />
+        <ThemeEditor isOpen={true} initialTheme={editingTheme} onClose={handleEditorClose} />
       )}
 
       {/* Onboarding */}
-      {showOnboarding && (
-        <ThemeOnboarding onComplete={() => setShowOnboarding(false)} />
-      )}
+      {showOnboarding && <ThemeOnboarding onComplete={() => setShowOnboarding(false)} />}
     </section>
   );
 };

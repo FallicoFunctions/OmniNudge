@@ -16,7 +16,9 @@ export default function PrivateHubPage() {
   const { accessRequestCooldownDisplay } = useSettings();
   const queryClient = useQueryClient();
   const [message, setMessage] = useState('');
-  const [requestStatus, setRequestStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+  const [requestStatus, setRequestStatus] = useState<'idle' | 'loading' | 'success' | 'error'>(
+    'idle'
+  );
   const [errorMessage, setErrorMessage] = useState('');
   const [nowTimestamp, setNowTimestamp] = useState(0);
   const normalizedHubName = hubname?.trim().toLowerCase() ?? '';
@@ -41,7 +43,9 @@ export default function PrivateHubPage() {
 
   const currentRequest = useMemo(() => {
     const requests = userRequests?.requests ?? [];
-    return requests.find((request) => request.hub_name?.toLowerCase() === normalizedHubName) ?? null;
+    return (
+      requests.find((request) => request.hub_name?.toLowerCase() === normalizedHubName) ?? null
+    );
   }, [normalizedHubName, userRequests]);
   const deniedRequests = useMemo(() => {
     const requests = userRequests?.requests ?? [];
@@ -107,21 +111,33 @@ export default function PrivateHubPage() {
       <div className="min-h-screen flex items-center justify-center bg-[var(--color-background)]">
         <div className="max-w-md w-full mx-4 text-center">
           <div className="bg-[var(--color-surface)] rounded-lg shadow-lg p-8 border border-[var(--color-border)]">
-            <svg className="mx-auto h-16 w-16 text-[var(--color-text-muted)] mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+            <svg
+              className="mx-auto h-16 w-16 text-[var(--color-text-muted)] mb-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={1.5}
+                d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+              />
             </svg>
             <h1 className="text-2xl font-bold text-[var(--color-text-primary)] mb-2">
               {t('privateHubPage.title')}
             </h1>
             <h2 className="text-xl font-semibold text-[var(--color-primary)] mb-4">
-              h/{hubname}
+              {t('common.format.hubPath', { name: hubname })}
             </h2>
             <p className="text-[var(--color-text-secondary)] mb-6">
               {t('privateHubPage.loggedOut.description')}
             </p>
             <button
               type="button"
-              onClick={() => window.dispatchEvent(new CustomEvent('open-auth-modal', { detail: 'login' }))}
+              onClick={() =>
+                window.dispatchEvent(new CustomEvent('open-auth-modal', { detail: 'login' }))
+              }
               className="w-full rounded-lg bg-[var(--color-primary)] px-4 py-3 font-semibold text-white transition-colors hover:bg-[var(--color-primary-dark)]"
             >
               {t('privateHubPage.actions.requestAccess')}
@@ -138,30 +154,48 @@ export default function PrivateHubPage() {
         <div className="min-h-screen flex items-center justify-center bg-[var(--color-background)]">
           <div className="max-w-md w-full mx-4 text-center">
             <div className="bg-[var(--color-surface)] rounded-lg shadow-lg p-8 border border-[var(--color-border)]">
-              <svg className="mx-auto h-16 w-16 text-green-500 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              <svg
+                className="mx-auto h-16 w-16 text-green-500 mb-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
               </svg>
               <h1 className="text-2xl font-bold text-[var(--color-text-primary)] mb-2">
                 {t('privateHubPage.submitted.title')}
               </h1>
               <h2 className="text-xl font-semibold text-[var(--color-primary)] mb-4">
-                h/{hubname}
+                {t('common.format.hubPath', { name: hubname })}
               </h2>
               <p className="text-[var(--color-text-secondary)] mb-4">
                 {t('privateHubPage.submitted.pendingDescription')}
               </p>
               <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4 text-left">
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-[var(--color-text-secondary)]">{t('privateHubPage.meta.status')}</span>
+                  <span className="text-[var(--color-text-secondary)]">
+                    {t('privateHubPage.meta.status')}
+                  </span>
                   <span className="font-semibold capitalize text-[var(--color-text-primary)]">
                     {requestStatusText}
                   </span>
                 </div>
                 {requestCreatedAt && (
                   <div className="mt-2 flex items-center justify-between text-sm">
-                    <span className="text-[var(--color-text-secondary)]">{t('privateHubPage.meta.requested')}</span>
+                    <span className="text-[var(--color-text-secondary)]">
+                      {t('privateHubPage.meta.requested')}
+                    </span>
                     <span className="text-[var(--color-text-primary)]">
-                      {formatDate(requestCreatedAt, { month: 'short', day: 'numeric', year: 'numeric' })}
+                      {formatDate(requestCreatedAt, {
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric',
+                      })}
                     </span>
                   </div>
                 )}
@@ -179,14 +213,24 @@ export default function PrivateHubPage() {
       <div className="min-h-screen flex items-center justify-center bg-[var(--color-background)]">
         <div className="max-w-md w-full mx-4 text-center">
           <div className="bg-[var(--color-surface)] rounded-lg shadow-lg p-8 border border-[var(--color-border)]">
-            <svg className="mx-auto h-16 w-16 text-green-500 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            <svg
+              className="mx-auto h-16 w-16 text-green-500 mb-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+              />
             </svg>
             <h1 className="text-2xl font-bold text-[var(--color-text-primary)] mb-2">
               {t('privateHubPage.submitted.title')}
             </h1>
             <h2 className="text-xl font-semibold text-[var(--color-primary)] mb-4">
-              h/{hubname}
+              {t('common.format.hubPath', { name: hubname })}
             </h2>
             <p className="text-[var(--color-text-secondary)] mb-6">
               {t('privateHubPage.submitted.description')}
@@ -211,59 +255,75 @@ export default function PrivateHubPage() {
       <div className="max-w-md w-full mx-4">
         <div className="bg-[var(--color-surface)] rounded-lg shadow-lg p-8 border border-[var(--color-border)]">
           <div className="text-center mb-6">
-            <svg className="mx-auto h-16 w-16 text-[var(--color-text-muted)] mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+            <svg
+              className="mx-auto h-16 w-16 text-[var(--color-text-muted)] mb-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={1.5}
+                d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+              />
             </svg>
             <h1 className="text-2xl font-bold text-[var(--color-text-primary)] mb-2">
               {t('privateHubPage.title')}
             </h1>
             <h2 className="text-xl font-semibold text-[var(--color-primary)] mb-4">
-              h/{hubname}
+              {t('common.format.hubPath', { name: hubname })}
             </h2>
-            <p className="text-[var(--color-text-secondary)]">
-              {t('privateHubPage.description')}
-            </p>
-          {requestStatusLabel && (
-            <div className="mt-4 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4 text-left">
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-[var(--color-text-secondary)]">{t('privateHubPage.meta.status')}</span>
-                <span className="font-semibold capitalize text-[var(--color-text-primary)]">
-                  {requestStatusText}
-                </span>
-              </div>
-              {requestCreatedAt && (
-                <div className="mt-2 flex items-center justify-between text-sm">
-                  <span className="text-[var(--color-text-secondary)]">{t('privateHubPage.meta.requested')}</span>
-                  <span className="text-[var(--color-text-primary)]">
-                    {formatDate(requestCreatedAt, { month: 'short', day: 'numeric', year: 'numeric' })}
+            <p className="text-[var(--color-text-secondary)]">{t('privateHubPage.description')}</p>
+            {requestStatusLabel && (
+              <div className="mt-4 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4 text-left">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-[var(--color-text-secondary)]">
+                    {t('privateHubPage.meta.status')}
+                  </span>
+                  <span className="font-semibold capitalize text-[var(--color-text-primary)]">
+                    {requestStatusText}
                   </span>
                 </div>
-              )}
-            </div>
-          )}
-          {cooldownActive && (
-            <div className="mt-4 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4 text-left text-sm text-[var(--color-text-secondary)]">
-              {accessRequestCooldownDisplay === 'days' && (
-                <span className="font-semibold text-[var(--color-text-primary)]">
-                  {t('privateHubPage.cooldown.days', { count: cooldownDaysRemaining })}
-                </span>
-              )}
-              {accessRequestCooldownDisplay === 'date' && (
-                <span className="font-semibold text-[var(--color-text-primary)]">
-                  {t('privateHubPage.cooldown.onDate', { date: cooldownDateLabel })}
-                </span>
-              )}
-              {accessRequestCooldownDisplay === 'both' && (
-                <span className="font-semibold text-[var(--color-text-primary)]">
-                  {t('privateHubPage.cooldown.both', {
-                    count: cooldownDaysRemaining,
-                    date: cooldownDateLabel,
-                  })}
-                </span>
-              )}
-            </div>
-          )}
-        </div>
+                {requestCreatedAt && (
+                  <div className="mt-2 flex items-center justify-between text-sm">
+                    <span className="text-[var(--color-text-secondary)]">
+                      {t('privateHubPage.meta.requested')}
+                    </span>
+                    <span className="text-[var(--color-text-primary)]">
+                      {formatDate(requestCreatedAt, {
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric',
+                      })}
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
+            {cooldownActive && (
+              <div className="mt-4 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4 text-left text-sm text-[var(--color-text-secondary)]">
+                {accessRequestCooldownDisplay === 'days' && (
+                  <span className="font-semibold text-[var(--color-text-primary)]">
+                    {t('privateHubPage.cooldown.days', { count: cooldownDaysRemaining })}
+                  </span>
+                )}
+                {accessRequestCooldownDisplay === 'date' && (
+                  <span className="font-semibold text-[var(--color-text-primary)]">
+                    {t('privateHubPage.cooldown.onDate', { date: cooldownDateLabel })}
+                  </span>
+                )}
+                {accessRequestCooldownDisplay === 'both' && (
+                  <span className="font-semibold text-[var(--color-text-primary)]">
+                    {t('privateHubPage.cooldown.both', {
+                      count: cooldownDaysRemaining,
+                      date: cooldownDateLabel,
+                    })}
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
 
           {requestStatus === 'error' && (
             <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">
@@ -280,7 +340,11 @@ export default function PrivateHubPage() {
                 {deniedRequests.map((request) => (
                   <li key={request.id}>
                     {t('privateHubPage.denials.item', {
-                      date: formatDate(request.updated_at ?? request.created_at, { month: 'short', day: 'numeric', year: 'numeric' }),
+                      date: formatDate(request.updated_at ?? request.created_at, {
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric',
+                      }),
                     })}
                   </li>
                 ))}
@@ -316,15 +380,27 @@ export default function PrivateHubPage() {
                   {requestMutation.isPending ? (
                     <span className="flex items-center justify-center gap-2">
                       <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                        <circle
+                          className="opacity-25"
+                          cx="12"
+                          cy="12"
+                          r="10"
+                          stroke="currentColor"
+                          strokeWidth="4"
+                          fill="none"
+                        />
+                        <path
+                          className="opacity-75"
+                          fill="currentColor"
+                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                        />
                       </svg>
                       {t('privateHubPage.actions.submitting')}
                     </span>
+                  ) : isPendingRequest ? (
+                    t('privateHubPage.actions.requestPending')
                   ) : (
-                    isPendingRequest
-                      ? t('privateHubPage.actions.requestPending')
-                      : t('privateHubPage.actions.requestAccess')
+                    t('privateHubPage.actions.requestAccess')
                   )}
                 </button>
               </form>

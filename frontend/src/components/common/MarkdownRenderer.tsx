@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 
 interface MarkdownRendererProps {
   content?: string | null;
@@ -71,7 +72,7 @@ function sanitizeImageSource(value: string): string | null {
   if (giphyMatch) {
     const id = giphyMatch[1];
     const imageUrl = `https://i.giphy.com/media/${id}/giphy.gif`;
-    giphyIdMap.set(imageUrl, id);  // Store the ID for later lookup
+    giphyIdMap.set(imageUrl, id); // Store the ID for later lookup
     return imageUrl;
   }
   const normalized = trimmed.replace(/&amp;/g, '&');
@@ -105,7 +106,7 @@ function isExternalImage(url: string): boolean {
     // Reddit/OmniNudge hosted images (don't open in new tab)
     const internalHosts = ['i.redd.it', 'preview.redd.it', 'www.reddit.com'];
 
-    return !internalHosts.some(host => hostname === host || hostname.endsWith(`.${host}`));
+    return !internalHosts.some((host) => hostname === host || hostname.endsWith(`.${host}`));
   } catch {
     return false;
   }
@@ -153,16 +154,13 @@ function formatInline(text: string): string {
 
     return imgTag;
   });
-  result = result.replace(
-    linkRegex,
-    (_, label, url) => {
-      // Add https:// if the URL doesn't have a protocol
-      const fullUrl = /^https?:\/\//i.test(url) ? url : `https://${url}`;
-      return `<a href="${escapeAttribute(fullUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(
-        decodeHtmlEntities(label)
-      )}</a>`;
-    }
-  );
+  result = result.replace(linkRegex, (_, label, url) => {
+    // Add https:// if the URL doesn't have a protocol
+    const fullUrl = /^https?:\/\//i.test(url) ? url : `https://${url}`;
+    return `<a href="${escapeAttribute(fullUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(
+      decodeHtmlEntities(label)
+    )}</a>`;
+  });
   // Replace r/subreddit with links
   result = result.replace(subredditRegex, (match, subreddit) => {
     const prefix = match.startsWith(' ') ? ' ' : '';
@@ -180,8 +178,14 @@ function formatInline(text: string): string {
   return result;
 }
 
-function convertMarkdown(markdown?: string | null): string {
+function convertMarkdown(
+  markdown: string | null | undefined,
+  opts?: {
+    fallbackImageAlt?: string;
+  }
+): string {
   if (!markdown) return '';
+  const fallbackImageAlt = opts?.fallbackImageAlt ?? '';
   // Decode HTML entities first (Reddit comments often come with encoded entities)
   const decoded = decodeHtmlEntities(markdown);
   const lines = decoded.replaceAll('\r\n', '\n').split('\n');
@@ -356,7 +360,7 @@ function convertMarkdown(markdown?: string | null): string {
     if (/^https?:\/\/\S+$/.test(trimmed) && isLikelyImageUrl(trimmed)) {
       closeCode();
 
-      const imgTag = `<img src="${escapeAttribute(trimmed)}" alt="Image" />`;
+      const imgTag = `<img src="${escapeAttribute(trimmed)}" alt="${escapeAttribute(fallbackImageAlt)}" />`;
 
       // Check if external and wrap in link
       if (isExternalImage(trimmed)) {
@@ -383,7 +387,13 @@ function convertMarkdown(markdown?: string | null): string {
 }
 
 export function MarkdownRenderer({ content, className = '' }: MarkdownRendererProps) {
-  const renderedHtml = useMemo(() => convertMarkdown(content), [content]);
+  const { t } = useTranslation();
+  const fallbackImageAlt = t('common.media.image');
+
+  const renderedHtml = useMemo(
+    () => convertMarkdown(content, { fallbackImageAlt }),
+    [content, fallbackImageAlt]
+  );
 
   if (!renderedHtml) {
     return null;

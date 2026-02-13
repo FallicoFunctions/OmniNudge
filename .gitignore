@@ -54,6 +54,7 @@ Firebase_Cloud_Messaging_API.txt
 # All other docs are internal/dev notes
 /*.md
 !README.md
+!PHASE2_TICKETS.MD
 /*.txt
 
 # Claude instructions

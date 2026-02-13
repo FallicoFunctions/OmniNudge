@@ -1,30 +1,51 @@
 {
   "common": {
+    "brandName": "OmniNudge",
+    "brandNameShort": "Omni",
     "loading": "Cargando...",
     "loadingDetails": "Cargando detalles...",
     "error": "Error",
     "success": "Éxito",
     "cancel": "Cancelar",
     "save": "Guardar",
+    "subscribe": "Suscribirse",
+    "unsubscribe": "Darse de baja",
     "delete": "Eliminar",
+    "clear": "Limpiar",
     "edit": "Editar",
     "submit": "Enviar",
     "close": "Cerrar",
+    "progress": "Progreso",
     "copied": "¡Copiado!",
     "back": "Atrás",
     "userNumber": "Usuario #{{id}}",
+    "user": "Usuario",
+    "unknownUser": "Usuario desconocido",
     "next": "Siguiente",
     "confirm": "Confirmar",
     "search": "Buscar",
+    "searching": "Buscando...",
     "filter": "Filtrar",
     "sort": "Ordenar",
     "settings": "Ajustes",
+    "modTools": "Herramientas de moderación",
     "logout": "Cerrar sesión",
     "login": "Iniciar sesión",
     "register": "Registrarse",
+    "go": "Ir",
+    "write": "Escribir",
+    "preview": "Vista previa",
     "username": "Nombre de usuario",
     "password": "Contraseña",
     "email": "Correo electrónico",
+    "prefix": {
+      "hub": "h/",
+      "subreddit": "r/"
+    },
+    "format": {
+      "hubPath": "h/{{name}}",
+      "subredditPath": "r/{{name}}"
+    },
     "badges": {
       "admin": "Admin",
       "moderator": "Mod",
@@ -40,7 +61,15 @@
       "toggleInfiniteScroll": "Alternar desplazamiento infinito",
       "expandCommentThread": "Expandir hilo de comentarios",
       "collapseCommentThread": "Contraer hilo de comentarios",
-      "removeFile": "Eliminar archivo"
+      "removeFile": "Eliminar archivo",
+      "closeModal": "Cerrar modal",
+      "closeEsc": "Cerrar (Esc)",
+      "closeViewer": "Cerrar visor",
+      "loading": "Cargando",
+      "previousImage": "Imagen anterior",
+      "nextImage": "Imagen siguiente",
+      "previousMedia": "Medio anterior",
+      "nextMedia": "Medio siguiente"
     },
     "time": {
       "submitted": "enviado",
@@ -57,15 +86,34 @@
     "units": {
       "subscribersShort": "suscr."
     },
+    "formattingHelpTable": {
+      "youType": "Tú escribes:",
+      "youSee": "Tú ves:"
+    },
+    "contact": {
+      "privacyEmail": "privacy@omninudge.com"
+    },
     "download": "Descargar",
     "continue": "Continuar",
     "retry": "Reintentar",
     "noDetailsAvailable": "No hay detalles disponibles.",
     "unableToLoadDetails": "No se pudieron cargar los detalles.",
+    "unableToLoad": "No se pudo cargar.",
     "optional": "(opcional)",
     "na": "N/A",
     "yes": "Si",
-    "no": "No"
+    "no": "No",
+    "noResultsFound": "No se encontraron resultados."
+  },
+  "markdownInput": {
+    "emptyPreview": "Nada para previsualizar todavia."
+  },
+  "subreddit": {
+    "moderatorsPanel": {
+      "title": "Moderadores",
+      "loading": "Cargando moderadores...",
+      "fallback": "La API pública de Reddit no proporciona la lista de moderadores."
+    }
   },
   "nav": {
     "home": "Inicio",
@@ -92,6 +140,22 @@
     "bugReporting": "Reporte de errores",
     "mobileNavigationError": "Error de navegación. Por favor, recarga la página.",
     "dontShowThisAgain": "No volver a mostrar esto"
+  },
+  "communityHeader": {
+    "labels": {
+      "hPopular": "h/popular",
+      "hAll": "h/all",
+      "rPopular": "r/popular",
+      "rFrontpage": "r/frontpage"
+    }
+  },
+  "pagination": {
+    "previous": "← Anterior",
+    "next": "Siguiente →",
+    "pageOf": "Página {{current}} de {{total}}"
+  },
+  "connectionStatus": {
+    "reconnecting": "Reconectando al servidor..."
   },
   "hubsBrowse": {
     "subtitle": "Explora hubs de Omni",
@@ -156,6 +220,41 @@
       "high": "Alto",
       "medium": "Medio",
       "low": "Bajo"
+    }
+  },
+  "bugReportModal": {
+    "title": "Reportar un bug",
+    "success": {
+      "message": "¡Reporte de bug enviado con éxito! Gracias por ayudar a mejorar OmniNudge.",
+      "goToPage": "Ir a la página de reporte de bugs",
+      "ok": "OK"
+    },
+    "form": {
+      "pageUrl": {
+        "label": "URL de la página",
+        "placeholder": "https://omninudge.com/...",
+        "help": "La URL de la página donde encontraste el bug"
+      },
+      "description": {
+        "label": "Descripción",
+        "placeholder": "Describe el bug en detalle. ¿Qué pasó? ¿Qué esperabas que pasara? Pasos para reproducirlo."
+      },
+      "screenshot": {
+        "label": "Captura de pantalla",
+        "help": "Una captura de pantalla nos ayuda a identificar y corregir el problema más rápido"
+      }
+    },
+    "actions": {
+      "submit": "Enviar reporte de bug",
+      "submitting": "Enviando..."
+    },
+    "errors": {
+      "unknownError": "Error desconocido",
+      "submitFailed": "No se pudo enviar el reporte de bug: {{message}}",
+      "uploadFailed": "No se pudo subir la captura de pantalla: {{message}}",
+      "screenshotRequired": "La captura de pantalla es obligatoria",
+      "uploadMissingUrl": "La respuesta de carga no incluye la URL del archivo",
+      "screenshotMustBeImage": "La captura de pantalla debe ser un archivo de imagen."
     }
   },
   "searchPage": {
@@ -563,6 +662,37 @@
       "fetchConversationFailed": "No se pudo obtener la conversación",
       "unableToLoadMessages": "No se pudieron cargar los mensajes.",
       "sendFailed": "No se pudo enviar el mensaje. Inténtalo de nuevo."
+    }
+  },
+  "modMailModal": {
+    "title": "Mensaje a los moderadores",
+    "subtitle": "Envía un mensaje a los moderadores de h/{{hubName}}",
+    "fields": {
+      "subject": {
+        "label": "Asunto",
+        "placeholder": "¿De qué se trata?"
+      },
+      "message": {
+        "label": "Mensaje",
+        "placeholder": "Escribe tu mensaje a los moderadores..."
+      }
+    },
+    "success": {
+      "sent": "¡Mensaje enviado con éxito! Los moderadores verán tu mensaje."
+    },
+    "actions": {
+      "send": "Enviar a moderadores",
+      "sent": "¡Enviado!"
+    },
+    "errors": {
+      "sendFailed": "No se pudo enviar el mod mail",
+      "subjectRequired": "El asunto es obligatorio",
+      "messageRequired": "El mensaje es obligatorio"
+    },
+    "encryption": {
+      "noParticipants": "No se encontraron participantes para cifrar el mensaje; se enviará en texto plano.",
+      "senderMissingKeys": "CRÍTICO: No has configurado claves de cifrado. No se puede enviar el mod mail.",
+      "noRecipientsEnabled": "CRÍTICO: Ningún destinatario tiene cifrado habilitado. No se puede enviar mod mail cifrado."
     }
   },
   "hubSettingsPage": {
@@ -1101,7 +1231,11 @@
     "mobileNav": "Navegación móvil",
     "unreadMessages": "{{count}} mensajes sin leer",
     "closeMenu": "Cerrar menú",
-    "longPressForMoreOptions": "Mantén pulsado para más opciones"
+    "longPressForMoreOptions": "Mantén pulsado para más opciones",
+    "tabBarItem": {
+      "badgeSuffix": " - {{badgeLabel}}",
+      "longPressSuffix": " {{longPressHint}}"
+    }
   },
   "home": {
     "feed": {
@@ -1170,9 +1304,24 @@
     "typeMessage": "Escribe un mensaje...",
     "send": "Enviar",
     "noMessages": "Aún no hay mensajes",
+    "status": {
+      "loadingMessages": "Cargando mensajes..."
+    },
+    "empty": {
+      "startConversation": "Aún no hay mensajes. ¡Comienza la conversación!"
+    },
+    "actions": {
+      "loadOlder": "Cargar mensajes anteriores"
+    },
     "typing": "{{username}} está escribiendo...",
     "online": "En línea",
     "offline": "Desconectado",
+    "deliveryStatus": {
+      "sending": "Enviando...",
+      "sent": "Enviado",
+      "delivered": "Entregado",
+      "read": "Leído"
+    },
     "lastSeen": "Visto por última vez {{time}}",
     "encrypted": "Cifrado de extremo a extremo",
     "deleteConversation": "Eliminar Conversación",
@@ -1195,9 +1344,13 @@
     "media": {
       "viewAllTitle": "Ver toda la media de esta conversación en un carrusel",
       "stillDecrypting": "La media aún se está descifrando. Por favor, espera e inténtalo de nuevo.",
+      "loading": "Cargando media...",
       "fileTooLarge": "Archivo demasiado grande. El tamaño máximo es 25MB.",
+      "fileTooLargeWithLimit": "Archivo demasiado grande. El tamaño máximo es {{limitMb}}MB.",
       "uploadFailed": "Error al subir la media. Por favor, inténtelo de nuevo.",
-      "uploadFailedFile": "Error al subir {{filename}}"
+      "uploadFailedFile": "Error al subir {{filename}}",
+      "fallbackText": "Multimedia",
+      "attachmentFallback": "adjunto"
     },
     "compose": {
       "enterUsername": "Introduce nombre de usuario...",
@@ -1218,7 +1371,8 @@
       "unarchiveFailed": "No se pudo desarchivar la conversación",
       "deleteConversationFailed": "No se pudo eliminar la conversación",
       "recipientKeyNotFound": "No se encontró la clave pública del destinatario",
-      "encryptionKeysMissing": "Tus claves de cifrado no están configuradas"
+      "encryptionKeysMissing": "Tus claves de cifrado no están configuradas",
+      "sendFailed": "No se pudo enviar el mensaje. Inténtalo de nuevo."
     },
     "messageOptions": {
       "ariaLabel": "Opciones de mensaje"
@@ -1291,6 +1445,19 @@
     },
     "delete": "Eliminar",
     "edit": "Editar",
+    "editModal": {
+      "title": "Editar post",
+      "subtitle": "Actualiza el título o el cuerpo y luego guarda los cambios.",
+      "fields": {
+        "title": "Título",
+        "body": "Cuerpo"
+      },
+      "placeholder": "Actualiza el cuerpo del post...",
+      "actions": {
+        "saving": "Guardando...",
+        "saveChanges": "Guardar cambios"
+      }
+    },
     "postedBy": "Posteado por {{username}}",
     "postedIn": "en {{hub}}",
     "timeAgo": "hace {{time}}",
@@ -1345,14 +1512,22 @@
     "media": {
       "previewImageAlt": "Vista previa de la imagen de {{title}}",
       "galleryImageAlt": "{{title}} - Imagen {{index}}",
+      "carouselImageAlt": "{{title}} - {{index}}/{{total}}",
       "loadingGalleryImages": "Cargando imágenes de la galería...",
       "noGalleryImages": "No se encontraron imágenes en esta galería",
       "galleryTitle": "Galería",
       "videoUnsupported": "Tu navegador no soporta la etiqueta de video.",
-      "videoMayNotHaveAudio": "Nota: Este video puede no tener audio.",
+      "videoMayNotHaveAudio": "Nota: Este video puede no tener audio. Reddit sirve el audio por separado.",
+      "watchOnRedditUnavailable": "Ver en Reddit no esta disponible desde OmniNudge.",
       "externalLinkLabel": "externo",
       "redgifsEmbedTitle": "{{title}} - video de Redgifs",
-      "embeddedMediaTitle": "{{title}} - medio incrustado"
+      "embeddedMediaTitle": "{{title}} - medio incrustado",
+      "viewer": {
+        "clickToShrink": "Haz clic para reducir",
+        "clickToEnlarge": "Haz clic para ampliar",
+        "viewSmaller": "Ver más pequeño",
+        "viewFullSize": "Ver tamaño completo"
+      }
     },
     "errors": {
       "loadPostsFailed": "Error al cargar los posts. Por favor, inténtelo de nuevo.",
@@ -1366,6 +1541,9 @@
       "pinnedByModerators": "Fijado por moderadores",
       "reddit": "Reddit",
       "nsfw": "NSFW"
+    },
+    "flairBadge": {
+      "title": "Etiqueta: {{flair}}"
     },
     "postedByLabel": "Publicado por",
     "submittedAt": "enviado {{time}}",
@@ -2016,6 +2194,29 @@
     "nextLabel": "Siguiente (→)",
     "counter": "{{current}} de {{total}}",
     "noMediaFound": "No se encontro contenido multimedia",
+    "redditMedia": {
+      "title": "Pase de diapositivas de medios de Reddit",
+      "labels": {
+        "subreddit": "Subreddit",
+        "sort": "Orden",
+        "timeRange": "Rango de tiempo"
+      },
+      "subredditPlaceholder": "Introduce el nombre del subreddit (p. ej., pics, aww, funny)",
+      "timeOptions": {
+        "hour": "Hora",
+        "day": "Día",
+        "week": "Semana",
+        "month": "Mes",
+        "year": "Año",
+        "all": "Todo"
+      },
+      "start": "Iniciar presentación",
+      "viewOnReddit": "Ver en Reddit →",
+      "errors": {
+        "failedToLoad": "No se pudieron cargar los posts. Revisa el nombre del subreddit e inténtalo de nuevo."
+      },
+      "noMedia": "No se encontraron posts con medios en r/{{subreddit}}. Prueba con otro subreddit u opción de orden."
+    },
     "aria": {
       "closeEsc": "Cerrar presentacion (Esc)",
       "previous": "Anterior (←)",
@@ -2183,6 +2384,51 @@
       "activeThemeLabel": "Tema activo",
       "selectThemeFallback": "Selecciona un tema"
     },
+    "onboarding": {
+      "tipLabel": "Consejo",
+      "actions": {
+        "skip": "Saltar recorrido",
+        "letsGo": "¡Vamos!"
+      },
+      "stepCounter": "Paso {{current}} de {{total}}",
+      "steps": {
+        "welcome": {
+          "title": "¡Bienvenido a la personalización de temas!",
+          "description": "Haz OmniNudge verdaderamente tuyo personalizando colores, fuentes y más. Elige entre temas predefinidos o crea el tuyo.",
+          "tip": "Siempre puedes acceder a los temas desde la página de ajustes."
+        },
+        "predefined": {
+          "title": "Elige un tema predefinido",
+          "description": "Empieza con uno de nuestros 8 bonitos temas predefinidos. Cada tema tiene una paleta de colores y personalidad únicas.",
+          "tip": "Pasa el cursor sobre los temas para ver una vista previa en vivo."
+        },
+        "custom": {
+          "title": "Crea tu propio tema",
+          "description": "¿Quieres algo único? Crea un tema personalizado modificando variables CSS como colores, fuentes, espaciado y más.",
+          "tip": "El modo avanzado desbloquea la personalización completa de CSS."
+        },
+        "complete": {
+          "title": "¡Listo!",
+          "description": "Tu tema se sincronizará en todos tus dispositivos. ¡Diviértete personalizando y no dudes en experimentar!"
+        }
+      }
+    },
+    "settingsPanel": {
+      "title": "Personalizacion de temas",
+      "subtitle": "Personaliza tu experiencia en OmniNudge con temas personalizados",
+      "actions": {
+        "showTour": "Mostrar recorrido"
+      },
+      "noThemeSelected": "No hay tema seleccionado",
+      "advancedMode": {
+        "title": "Modo avanzado",
+        "description": "Activa la personalizacion completa de CSS y funciones avanzadas"
+      },
+      "tabs": {
+        "selector": "Selector de temas",
+        "gallery": "Explorar galeria"
+      }
+    },
     "gallery": {
       "header": {
         "kicker": "Galeria de temas",
@@ -2327,6 +2573,7 @@
       }
     },
     "preview": {
+      "brandName": "OmniNudge",
       "pages": {
         "feed": "Feed",
         "profile": "Perfil",
@@ -2375,7 +2622,11 @@
         "meta": "hace 2 h · Impulsado",
         "follow": "Seguir",
         "followAria": "Seguir al creador {{index}}",
-        "quote": "\"Crear sistemas de temas es divertido. Esta vista previa se actualiza en vivo mientras ajustas variables.\""
+        "quote": "\"Crear sistemas de temas es divertido. Esta vista previa se actualiza en vivo mientras ajustas variables.\"",
+        "sampleTags": {
+          "design": "#diseno",
+          "themes": "#temas"
+        }
       },
       "profile": {
         "name": "Explorador",
@@ -2406,7 +2657,9 @@
       },
       "aria": {
         "commonSamples": "Ejemplos de componentes comunes",
+        "sectionHeading": "Encabezado de sección de vista previa del tema",
         "avatarIndicators": "Indicadores de avatar",
+        "profileSummary": "Resumen del perfil",
         "profileStats": "Estadisticas del perfil"
       }
     }
@@ -2481,6 +2734,18 @@
     "actions": {
       "creating": "Creando...",
       "createPost": "Crear publicacion"
+    },
+    "errors": {
+      "titleRequired": "El titulo es obligatorio",
+      "bodyTooLong": "El cuerpo de la publicacion debe tener menos de {{formattedMax}} caracteres",
+      "waitForUpload": "Por favor espera a que termine la carga del medio.",
+      "hubNameRequired": "Por favor ingresa un nombre de hub",
+      "hubMustSelectSuggestion": "Por favor selecciona un hub valido de las sugerencias",
+      "subredditRequired": "Por favor ingresa un subreddit",
+      "hubNoTextPosts": "Este hub no permite publicaciones de texto.",
+      "hubNoLinkOrMediaPosts": "Este hub no permite publicaciones de enlaces o medios.",
+      "hubNoLinkPostsUploadInstead": "Este hub no permite publicaciones de enlaces. Sube una imagen o video en su lugar.",
+      "hubNoSelectedMediaType": "Este hub no permite el tipo de medio seleccionado."
     }
   },
   "emptyStates": {
@@ -2702,9 +2967,23 @@
     "description": "La pagina que buscas no existe o ha sido movida.",
     "goHome": "Ir al inicio"
   },
+  "errorPages": {
+    "serverError": {
+      "title": "Error del servidor"
+    },
+    "networkError": {
+      "title": "Conexión perdida"
+    },
+    "maintenance": {
+      "title": "En mantenimiento",
+      "message": "Estamos realizando mantenimiento programado. ¡Volveremos pronto!"
+    }
+  },
   "errorBoundary": {
     "title": "Algo salio mal.",
-    "details": "Detalles del error"
+    "details": "Detalles del error",
+    "unexpectedError": "Ocurrio un error inesperado.",
+    "reloadPage": "Recargar pagina"
   },
   "standardScroll": {
     "loadingFeed": "Cargando feed...",
@@ -2832,11 +3111,38 @@
       "loading": "Cargando usuarios...",
       "empty": "No se encontraron usuarios.",
       "csv": {
-        "never": "Nunca"
+        "never": "Nunca",
+        "headers": {
+          "createdAt": "Creado el"
+        }
       },
       "lastSeen": "Visto por ultima vez",
       "errors": {
         "reasonRequired": "El motivo es obligatorio"
+      },
+      "confirmations": {
+        "changeRole": "¿Seguro que quieres cambiar el rol de este usuario a \"{{role}}\"?"
+      },
+      "bulk": {
+        "selectedOne": "{{qty}} seleccionado",
+        "selectedMany": "{{qty}} seleccionados",
+        "noSelectionError": "Selecciona al menos un usuario",
+        "successOne": "Accion aplicada correctamente a {{qty}} usuario",
+        "successMany": "Accion aplicada correctamente a {{qty}} usuarios",
+        "error": "Algunas acciones fallaron. Por favor, revisa e intentalo de nuevo.",
+        "affectsOne": "Esto afectara a {{qty}} usuario seleccionado",
+        "affectsMany": "Esto afectara a {{qty}} usuarios seleccionados",
+        "confirmButtonOne": "Confirmar ({{qty}} usuario)",
+        "confirmButtonMany": "Confirmar ({{qty}} usuarios)"
+      },
+      "modals": {
+        "bulkTitle": "Accion masiva: {{action}} usuarios",
+        "singleTitle": "{{action}} usuario",
+        "userLabel": "Usuario:",
+        "reasonLabel": "Motivo (obligatorio)",
+        "reasonPlaceholder": "Introduce el motivo...",
+        "showReasonToUser": "Mostrar motivo al usuario",
+        "showReasonToUsers": "Mostrar motivo a los usuarios"
       },
       "table": {
         "id": "ID",
@@ -2926,7 +3232,8 @@
       "empty": "No hay moderadores para este hub",
       "userId": "ID de usuario: {{id}}",
       "added": "Agregado: {{date}}",
-      "remove": "Quitar"
+      "remove": "Quitar",
+      "confirmRemove": "¿Quitar a {{username}} como moderador?"
     },
     "banActivity": {
       "title": "Actividad de baneos del sitio",
