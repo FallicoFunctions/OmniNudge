@@ -84,7 +84,10 @@ function useDecryptedContent(
 
       const shouldAttemptDecrypt = Boolean(
         (isOwnMessage && message.sender_encrypted_content) ||
-        (!isOwnMessage && message.encryption_version === 'v1')
+        (!isOwnMessage &&
+          (message.encryption_version === 'v1' ||
+            message.encryption_version === 'v2' ||
+            cipherText.startsWith('v2:')))
       );
 
       if (!shouldAttemptDecrypt) {
@@ -423,7 +426,7 @@ export function ExpandedMessage({ conversation, onCollapse }: ExpandedMessagePro
         conversation_id: conversation.id,
         encrypted_content: encryptedForRecipient,
         sender_encrypted_content: encryptedForSelf,
-        encryption_version: 'v1',
+        encryption_version: 'v2',
         media_file_id: mediaFileId,
         media_url: mediaUrl,
         media_type: mediaType,

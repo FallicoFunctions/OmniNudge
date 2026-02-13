@@ -1,6 +1,44 @@
 import '@testing-library/jest-dom';
 import { vi } from 'vitest';
 import { webcrypto } from 'node:crypto';
+import i18n from 'i18next';
+import { initReactI18next } from 'react-i18next';
+import en from '../../public/locales/en.json';
+import es from '../../public/locales/es.json';
+import ar from '../../public/locales/ar.json';
+
+vi.mock('../../src/services/userSettingsService', () => ({
+  userSettingsService: {
+    get: vi.fn(async () => ({
+      show_read_receipts: true,
+      show_typing_indicators: true,
+      show_last_seen: true,
+      notification_sound: true,
+    })),
+    update: vi.fn(async (updates: Record<string, unknown>) => ({
+      show_read_receipts: true,
+      show_typing_indicators: true,
+      show_last_seen: true,
+      notification_sound: true,
+      ...updates,
+    })),
+  },
+}));
+
+if (!i18n.isInitialized) {
+  i18n.use(initReactI18next).init({
+    lng: 'en',
+    fallbackLng: 'en',
+    resources: {
+      en: { translation: en },
+      es: { translation: es },
+      ar: { translation: ar },
+    },
+    interpolation: {
+      escapeValue: false,
+    },
+  });
+}
 
 // Polyfill Web Crypto API
 if (!globalThis.crypto) {
@@ -31,3 +69,8 @@ if (!window.matchMedia) {
     dispatchEvent: vi.fn(),
   }));
 }
+
+// jsdom provides these APIs but may throw "Not implemented" when called.
+// Tests should stub per-test when asserting behavior; this just prevents noisy stderr.
+window.alert = vi.fn();
+window.confirm = vi.fn(() => true);

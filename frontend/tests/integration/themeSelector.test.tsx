@@ -3,7 +3,9 @@ import { render, fireEvent, screen, waitFor } from '@testing-library/react';
 import React from 'react';
 import ThemeSelector from '../../src/components/themes/ThemeSelector';
 import { ThemeContext } from '../../src/contexts/ThemeContext';
+import { SettingsProvider } from '../../src/contexts/SettingsContext';
 import type { UserTheme } from '../../src/types/theme';
+import { SETTINGS_STORAGE_KEY } from '../../src/constants/storageKeys';
 
 const createTheme = (overrides: Partial<UserTheme> = {}): UserTheme => ({
   id: overrides.id ?? 1,
@@ -41,14 +43,21 @@ const renderSelector = (valueOverrides: Partial<React.ContextType<typeof ThemeCo
   const value = { ...defaultValue, ...valueOverrides };
 
   return render(
-    <ThemeContext.Provider value={value}>
-      <ThemeSelector />
-    </ThemeContext.Provider>
+    <SettingsProvider>
+      <ThemeContext.Provider value={value}>
+        <ThemeSelector />
+      </ThemeContext.Provider>
+    </SettingsProvider>
   );
 };
 
 describe('ThemeSelector integration', () => {
   it('selects a theme and closes menu', async () => {
+    localStorage.setItem(
+      SETTINGS_STORAGE_KEY,
+      JSON.stringify({ autoCloseThemeSelector: true, settingsVersion: 6 })
+    );
+
     const selectTheme = vi.fn().mockResolvedValue(undefined);
     renderSelector({ selectTheme });
 

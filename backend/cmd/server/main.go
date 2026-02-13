@@ -290,7 +290,7 @@ func main() {
 	cssSanitizer := services.NewCSSSanitizer()
 
 	messagesHandler := handlers.NewMessagesHandler(db.Pool, messageRepo, conversationRepo, userSettingsRepo, hub, notificationService)
-	usersHandler := handlers.NewUsersHandler(userRepo, postRepo, commentRepo, authService, hubModRepo)
+	usersHandler := handlers.NewUsersHandler(userRepo, userSettingsRepo, postRepo, commentRepo, authService, hubModRepo)
 	mediaHandler := handlers.NewMediaHandler(mediaRepo, thumbnailService)
 	hubsHandler := handlers.NewHubsHandlerWithAccessRequest(hubRepo, postRepo, hubModRepo, hubSubRepo, hubSettingsRepo, hubAccessRequestRepo)
 	subscriptionsHandler := handlers.NewSubscriptionsHandler(hubSubRepo, subredditSubRepo, hubRepo)
@@ -306,7 +306,7 @@ func main() {
 	adminHandler := handlers.NewAdminHandler(userRepo, hubModRepo, db.Pool)
 	// Create authorizer for WebSocket message authorization (P0-008b)
 	wsAuthorizer := websocket.NewAuthorizer(db.Pool)
-	wsHandler := handlers.NewWebSocketHandler(hub, wsAuthorizer)
+	wsHandler := handlers.NewWebSocketHandler(hub, wsAuthorizer, userSettingsRepo)
 	notificationsHandler := handlers.NewNotificationsHandler(notificationRepo)
 	searchHandler := handlers.NewSearchHandler(db.Pool)
 	blockingHandler := handlers.NewBlockingHandler(db.Pool, userRepo)
@@ -564,6 +564,7 @@ func main() {
 
 		// Public user profile routes
 		users := api.Group("/users")
+		users.Use(middleware.AuthOptional(authService))
 		{
 			users.GET("/status", userStatusHandler.GetUsersStatus)
 			users.GET("/:username", usersHandler.GetUserProfile)

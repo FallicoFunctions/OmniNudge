@@ -49,10 +49,13 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
   const [userSettings, setUserSettings] = useState<UserSettings | null>(null);
   const selectionRequestId = useRef(0);
   const hasInitializedTheme = useRef(false);
+  const transitionTimeoutId = useRef<number | null>(null);
   const queryClient = useQueryClient();
 
   // Only fetch themes if user is authenticated
-  const isAuthenticated = !!localStorage.getItem('auth_token');
+  const isAuthenticated =
+    typeof window !== 'undefined' &&
+    Boolean(localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token'));
 
   const {
     data: themeLists,
@@ -99,6 +102,15 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
     }
   }, []);
 
+  useEffect(() => {
+    return () => {
+      if (transitionTimeoutId.current) {
+        window.clearTimeout(transitionTimeoutId.current);
+        transitionTimeoutId.current = null;
+      }
+    };
+  }, []);
+
   const selectTheme = useCallback(
     async (theme: UserTheme, options: ThemeSelectionOptions = {}) => {
       const { notifyServer = true, persist = true } = options;
@@ -108,15 +120,22 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
       setActiveTheme(theme);
 
       // Add smooth transition animation (Section 13.1)
-      document.body.classList.add('theme-transitioning');
+      if (typeof document !== 'undefined' && document.body) {
+        document.body.classList.add('theme-transitioning');
+      }
 
       const variables = theme.css_variables ?? {};
       applyCSSVariables(variables);
       setCssVariables(variables);
 
       // Remove transition class after animation completes
-      setTimeout(() => {
-        document.body.classList.remove('theme-transitioning');
+      if (transitionTimeoutId.current) {
+        window.clearTimeout(transitionTimeoutId.current);
+      }
+      transitionTimeoutId.current = window.setTimeout(() => {
+        if (typeof document !== 'undefined' && document.body) {
+          document.body.classList.remove('theme-transitioning');
+        }
       }, 300);
 
       if (persist) {

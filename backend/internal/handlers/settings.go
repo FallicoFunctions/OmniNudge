@@ -4,8 +4,8 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/omninudge/backend/internal/models"
 	"github.com/gin-gonic/gin"
+	"github.com/omninudge/backend/internal/models"
 )
 
 // SettingsHandler handles user settings endpoints.
@@ -40,6 +40,7 @@ type updateSettingsRequest struct {
 	NotificationSound     *bool   `json:"notification_sound"`
 	ShowReadReceipts      *bool   `json:"show_read_receipts"`
 	ShowTypingIndicators  *bool   `json:"show_typing_indicators"`
+	ShowLastSeen          *bool   `json:"show_last_seen"`
 	ShowPushNotifications *bool   `json:"show_push_notifications"` // P0-042
 	AutoAppendInvitation  *bool   `json:"auto_append_invitation"`
 	Theme                 *string `json:"theme"`
@@ -80,6 +81,9 @@ func (h *SettingsHandler) UpdateSettings(c *gin.Context) {
 	}
 	if req.ShowTypingIndicators != nil {
 		settings.ShowTypingIndicators = *req.ShowTypingIndicators
+	}
+	if req.ShowLastSeen != nil {
+		settings.ShowLastSeen = *req.ShowLastSeen
 	}
 	if req.ShowPushNotifications != nil {
 		settings.ShowPushNotifications = *req.ShowPushNotifications

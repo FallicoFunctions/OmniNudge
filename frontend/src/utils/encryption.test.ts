@@ -21,6 +21,22 @@ import {
   type KeyPair,
 } from './encryption';
 
+const blobToText = (blob: Blob) =>
+  new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsText(blob);
+  });
+
+const blobToArrayBuffer = (blob: Blob) =>
+  new Promise<ArrayBuffer>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as ArrayBuffer);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsArrayBuffer(blob);
+  });
+
 describe('Encryption Utilities', () => {
   describe('Key Generation and Import/Export', () => {
     it('should generate a valid RSA key pair', async () => {
@@ -168,7 +184,7 @@ describe('Encryption Utilities', () => {
       );
 
       expect(decrypted.type).toBe('text/plain');
-      const decryptedText = await decrypted.text();
+      const decryptedText = await blobToText(decrypted);
       expect(decryptedText).toBe(fileContent);
     });
 
@@ -193,7 +209,7 @@ describe('Encryption Utilities', () => {
       );
 
       expect(decrypted.type).toBe('image/jpeg');
-      const decryptedBuffer = await decrypted.arrayBuffer();
+      const decryptedBuffer = await blobToArrayBuffer(decrypted);
       const decryptedArray = new Uint8Array(decryptedBuffer);
       expect(decryptedArray).toEqual(binaryData);
     });
@@ -221,7 +237,7 @@ describe('Encryption Utilities', () => {
         keyPair.privateKey
       );
 
-      const decryptedBuffer = await decrypted.arrayBuffer();
+      const decryptedBuffer = await blobToArrayBuffer(decrypted);
       expect(decryptedBuffer.byteLength).toBe(largeData.length);
     });
 

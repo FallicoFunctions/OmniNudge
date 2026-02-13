@@ -309,7 +309,10 @@ function useDecryptedContent(
 
       const shouldAttemptDecrypt = Boolean(
         (isOwnMessage && message.sender_encrypted_content) ||
-        (!isOwnMessage && message.encryption_version === 'v1')
+        (!isOwnMessage &&
+          (message.encryption_version === 'v1' ||
+            message.encryption_version === 'v2' ||
+            cipherText.startsWith('v2:')))
       );
 
       if (!shouldAttemptDecrypt) {
@@ -1102,7 +1105,7 @@ export default function MessagesPage() {
             media_encryption_key: recipientEncryptedKey,
             media_encryption_iv: arrayBufferToBase64(encryptedFile.iv.slice().buffer),
             sender_media_encryption_key: senderEncryptedKey,
-            encryption_version: 'v1',
+            encryption_version: 'v2',
           });
         } catch (error) {
           console.error('Failed to upload file:', file.name, error);
@@ -1396,7 +1399,11 @@ export default function MessagesPage() {
 
             // Handle standard encrypted messages
             const shouldAttemptDecrypt = Boolean(
-              (isOwn && msg.sender_encrypted_content) || (!isOwn && msg.encryption_version === 'v1')
+              (isOwn && msg.sender_encrypted_content) ||
+              (!isOwn &&
+                (msg.encryption_version === 'v1' ||
+                  msg.encryption_version === 'v2' ||
+                  cipherText.startsWith('v2:')))
             );
 
             if (!shouldAttemptDecrypt) {

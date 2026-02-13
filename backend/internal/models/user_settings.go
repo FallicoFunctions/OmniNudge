@@ -12,13 +12,14 @@ import (
 
 // UserSettings represents per-user preferences for the platform.
 type UserSettings struct {
-	UserID               int       `json:"user_id"`
-	NotificationSound    bool      `json:"notification_sound"`
-	ShowReadReceipts     bool      `json:"show_read_receipts"`
-	ShowTypingIndicators bool      `json:"show_typing_indicators"`
-	ShowPushNotifications bool     `json:"show_push_notifications"` // P0-042: Push notification preference
-	AutoAppendInvitation bool      `json:"auto_append_invitation"`
-	Theme                string    `json:"theme"`
+	UserID                int    `json:"user_id"`
+	NotificationSound     bool   `json:"notification_sound"`
+	ShowReadReceipts      bool   `json:"show_read_receipts"`
+	ShowTypingIndicators  bool   `json:"show_typing_indicators"`
+	ShowLastSeen          bool   `json:"show_last_seen"`
+	ShowPushNotifications bool   `json:"show_push_notifications"` // P0-042: Push notification preference
+	AutoAppendInvitation  bool   `json:"auto_append_invitation"`
+	Theme                 string `json:"theme"`
 
 	// Notification preferences
 	NotifyCommentReplies   bool `json:"notify_comment_replies"`
@@ -51,7 +52,7 @@ func NewUserSettingsRepository(pool *pgxpool.Pool) *UserSettingsRepository {
 // GetByUserID fetches settings for a user. Returns (nil, nil) if not found.
 func (r *UserSettingsRepository) GetByUserID(ctx context.Context, userID int) (*UserSettings, error) {
 	query := `
-		SELECT user_id, notification_sound, show_read_receipts, show_typing_indicators,
+		SELECT user_id, notification_sound, show_read_receipts, show_typing_indicators, show_last_seen,
 		       show_push_notifications, auto_append_invitation, theme,
 		       notify_comment_replies, notify_post_milestone, notify_post_velocity,
 		       notify_comment_milestone, notify_comment_velocity, daily_digest,
@@ -66,6 +67,7 @@ func (r *UserSettingsRepository) GetByUserID(ctx context.Context, userID int) (*
 		&settings.NotificationSound,
 		&settings.ShowReadReceipts,
 		&settings.ShowTypingIndicators,
+		&settings.ShowLastSeen,
 		&settings.ShowPushNotifications,
 		&settings.AutoAppendInvitation,
 		&settings.Theme,
@@ -96,7 +98,7 @@ func (r *UserSettingsRepository) CreateDefault(ctx context.Context, userID int) 
 		INSERT INTO user_settings (user_id)
 		VALUES ($1)
 		ON CONFLICT (user_id) DO NOTHING
-		RETURNING user_id, notification_sound, show_read_receipts, show_typing_indicators,
+		RETURNING user_id, notification_sound, show_read_receipts, show_typing_indicators, show_last_seen,
 		          show_push_notifications, auto_append_invitation, theme,
 		          notify_comment_replies, notify_post_milestone, notify_post_velocity,
 		          notify_comment_milestone, notify_comment_velocity, daily_digest,
@@ -109,6 +111,7 @@ func (r *UserSettingsRepository) CreateDefault(ctx context.Context, userID int) 
 		&settings.NotificationSound,
 		&settings.ShowReadReceipts,
 		&settings.ShowTypingIndicators,
+		&settings.ShowLastSeen,
 		&settings.ShowPushNotifications,
 		&settings.AutoAppendInvitation,
 		&settings.Theme,
@@ -142,21 +145,22 @@ func (r *UserSettingsRepository) Update(ctx context.Context, settings *UserSetti
 		SET notification_sound = $2,
 		    show_read_receipts = $3,
 		    show_typing_indicators = $4,
-		    show_push_notifications = $5,
-		    auto_append_invitation = $6,
-		    theme = $7,
-		    notify_comment_replies = $8,
-		    notify_post_milestone = $9,
-		    notify_post_velocity = $10,
-		    notify_comment_milestone = $11,
-		    notify_comment_velocity = $12,
-		    daily_digest = $13,
-		    media_gallery_filter = $14,
-		    active_theme_id = $15,
-		    advanced_mode_enabled = $16,
+		    show_last_seen = $5,
+		    show_push_notifications = $6,
+		    auto_append_invitation = $7,
+		    theme = $8,
+		    notify_comment_replies = $9,
+		    notify_post_milestone = $10,
+		    notify_post_velocity = $11,
+		    notify_comment_milestone = $12,
+		    notify_comment_velocity = $13,
+		    daily_digest = $14,
+		    media_gallery_filter = $15,
+		    active_theme_id = $16,
+		    advanced_mode_enabled = $17,
 		    updated_at = CURRENT_TIMESTAMP
 		WHERE user_id = $1
-		RETURNING user_id, notification_sound, show_read_receipts, show_typing_indicators,
+		RETURNING user_id, notification_sound, show_read_receipts, show_typing_indicators, show_last_seen,
 		          show_push_notifications, auto_append_invitation, theme,
 		          notify_comment_replies, notify_post_milestone, notify_post_velocity,
 		          notify_comment_milestone, notify_comment_velocity, daily_digest,
@@ -169,6 +173,7 @@ func (r *UserSettingsRepository) Update(ctx context.Context, settings *UserSetti
 		settings.NotificationSound,
 		settings.ShowReadReceipts,
 		settings.ShowTypingIndicators,
+		settings.ShowLastSeen,
 		settings.ShowPushNotifications,
 		settings.AutoAppendInvitation,
 		settings.Theme,
@@ -186,6 +191,7 @@ func (r *UserSettingsRepository) Update(ctx context.Context, settings *UserSetti
 		&updated.NotificationSound,
 		&updated.ShowReadReceipts,
 		&updated.ShowTypingIndicators,
+		&updated.ShowLastSeen,
 		&updated.ShowPushNotifications,
 		&updated.AutoAppendInvitation,
 		&updated.Theme,

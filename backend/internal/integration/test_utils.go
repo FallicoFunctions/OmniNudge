@@ -121,7 +121,7 @@ func newTestDeps(t *testing.T) *TestDeps {
 	)
 	conversationsHandler := handlers.NewConversationsHandler(db.Pool, conversationRepo, messageRepo, userRepo)
 	messagesHandler := handlers.NewMessagesHandler(db.Pool, messageRepo, conversationRepo, userSettingsRepo, hub, nil)
-	usersHandler := handlers.NewUsersHandler(userRepo, postRepo, commentRepo, nil, modRepo)
+	usersHandler := handlers.NewUsersHandler(userRepo, userSettingsRepo, postRepo, commentRepo, nil, modRepo)
 	thumbnailService := services.NewThumbnailService()
 	mediaHandler := handlers.NewMediaHandler(models.NewMediaFileRepository(db.Pool), thumbnailService)
 	hubSubRepo := models.NewHubSubscriptionRepository(db.Pool)
@@ -129,7 +129,7 @@ func newTestDeps(t *testing.T) *TestDeps {
 	moderationHandler := handlers.NewModerationHandler(reportRepo, modRepo)
 	adminHandler := handlers.NewAdminHandler(userRepo, modRepo, db.Pool)
 	authorizer := websocket.NewAuthorizer(db.Pool)
-	wsHandler := handlers.NewWebSocketHandler(hub, authorizer)
+	wsHandler := handlers.NewWebSocketHandler(hub, authorizer, userSettingsRepo)
 
 	router := gin.New()
 	router.Use(gin.Recovery())
@@ -159,7 +159,11 @@ func newTestDeps(t *testing.T) *TestDeps {
 			hubs.GET("/:name/posts", hubsHandler.GetPosts)
 		}
 
-		api.GET("/users/:username", usersHandler.GetUserProfile)
+		users := api.Group("/users")
+		users.Use(middleware.AuthOptional(authService))
+		{
+			users.GET("/:username", usersHandler.GetUserProfile)
+		}
 
 		protected := api.Group("")
 		protected.Use(middleware.AuthRequired(authService))

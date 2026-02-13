@@ -65,8 +65,7 @@ exports[`ThemePreview snapshots > matches snapshot for default desktop feed view
                   class="font-semibold text-[var(--color-text-primary)]"
                   style="font-size: var(--font-size-base);"
                 >
-                  Creator 
-                  1
+                  Creator 1
                 </p>
                 <p
                   class="text-[var(--color-text-secondary)]"
@@ -120,8 +119,7 @@ exports[`ThemePreview snapshots > matches snapshot for default desktop feed view
                   class="font-semibold text-[var(--color-text-primary)]"
                   style="font-size: var(--font-size-base);"
                 >
-                  Creator 
-                  2
+                  Creator 2
                 </p>
                 <p
                   class="text-[var(--color-text-secondary)]"
@@ -175,8 +173,7 @@ exports[`ThemePreview snapshots > matches snapshot for default desktop feed view
                   class="font-semibold text-[var(--color-text-primary)]"
                   style="font-size: var(--font-size-base);"
                 >
-                  Creator 
-                  3
+                  Creator 3
                 </p>
                 <p
                   class="text-[var(--color-text-secondary)]"

@@ -39,6 +39,33 @@ func (a *Authorizer) CanAccessConversation(ctx context.Context, userID, conversa
 	return exists, nil
 }
 
+// ListConversationParticipantIDs returns user IDs for all participants in a conversation.
+func (a *Authorizer) ListConversationParticipantIDs(ctx context.Context, conversationID int) ([]int, error) {
+	rows, err := a.db.Query(ctx, `
+		SELECT user_id
+		FROM conversation_participants
+		WHERE conversation_id = $1
+	`, conversationID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list conversation participants: %w", err)
+	}
+	defer rows.Close()
+
+	var ids []int
+	for rows.Next() {
+		var id int
+		if err := rows.Scan(&id); err != nil {
+			return nil, fmt.Errorf("failed to scan conversation participant id: %w", err)
+		}
+		ids = append(ids, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed while iterating conversation participants: %w", err)
+	}
+
+	return ids, nil
+}
+
 // CanSendMessage checks if user can send a message to a conversation
 func (a *Authorizer) CanSendMessage(ctx context.Context, userID, conversationID int) (bool, error) {
 	// Check if user is in conversation

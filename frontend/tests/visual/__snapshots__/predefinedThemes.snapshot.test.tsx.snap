@@ -66,8 +66,7 @@ exports[`Predefined theme snapshots > matches snapshot for Aurora Glow 1`] = `
               class="text-sm font-medium"
               style="color: rgb(224, 231, 255);"
             >
-              Content block 
-              1
+              Content block 1
             </div>
             <div
               class="mt-1 text-xs"
@@ -84,8 +83,7 @@ exports[`Predefined theme snapshots > matches snapshot for Aurora Glow 1`] = `
               class="text-sm font-medium"
               style="color: rgb(224, 231, 255);"
             >
-              Content block 
-              2
+              Content block 2
             </div>
             <div
               class="mt-1 text-xs"
@@ -102,8 +100,7 @@ exports[`Predefined theme snapshots > matches snapshot for Aurora Glow 1`] = `
               class="text-sm font-medium"
               style="color: rgb(224, 231, 255);"
             >
-              Content block 
-              3
+              Content block 3
             </div>
             <div
               class="mt-1 text-xs"
@@ -176,12 +173,12 @@ exports[`Predefined theme snapshots > matches snapshot for Aurora Glow 1`] = `
     class="mt-4 flex items-center justify-between text-sm text-[var(--color-text-secondary)]"
   >
     <span>
-      ⭐ 
+      ⭐
+       
       4.5
     </span>
     <span>
-      0
-       installs
+      0 installs
     </span>
   </div>
   <div
@@ -263,8 +260,7 @@ exports[`Predefined theme snapshots > matches snapshot for Desert Bloom 1`] = `
               class="text-sm font-medium"
               style="color: rgb(124, 45, 18);"
             >
-              Content block 
-              1
+              Content block 1
             </div>
             <div
               class="mt-1 text-xs"
@@ -281,8 +277,7 @@ exports[`Predefined theme snapshots > matches snapshot for Desert Bloom 1`] = `
               class="text-sm font-medium"
               style="color: rgb(124, 45, 18);"
             >
-              Content block 
-              2
+              Content block 2
             </div>
             <div
               class="mt-1 text-xs"
@@ -299,8 +294,7 @@ exports[`Predefined theme snapshots > matches snapshot for Desert Bloom 1`] = `
               class="text-sm font-medium"
               style="color: rgb(124, 45, 18);"
             >
-              Content block 
-              3
+              Content block 3
             </div>
             <div
               class="mt-1 text-xs"
@@ -373,12 +367,12 @@ exports[`Predefined theme snapshots > matches snapshot for Desert Bloom 1`] = `
     class="mt-4 flex items-center justify-between text-sm text-[var(--color-text-secondary)]"
   >
     <span>
-      ⭐ 
+      ⭐
+       
       4.5
     </span>
     <span>
-      0
-       installs
+      0 installs
     </span>
   </div>
   <div
@@ -460,8 +454,7 @@ exports[`Predefined theme snapshots > matches snapshot for Forest Whisper 1`] = 
               class="text-sm font-medium"
               style="color: rgb(6, 78, 59);"
             >
-              Content block 
-              1
+              Content block 1
             </div>
             <div
               class="mt-1 text-xs"
@@ -478,8 +471,7 @@ exports[`Predefined theme snapshots > matches snapshot for Forest Whisper 1`] = 
               class="text-sm font-medium"
               style="color: rgb(6, 78, 59);"
             >
-              Content block 
-              2
+              Content block 2
             </div>
             <div
               class="mt-1 text-xs"
@@ -496,8 +488,7 @@ exports[`Predefined theme snapshots > matches snapshot for Forest Whisper 1`] = 
               class="text-sm font-medium"
               style="color: rgb(6, 78, 59);"
             >
-              Content block 
-              3
+              Content block 3
             </div>
             <div
               class="mt-1 text-xs"
@@ -570,12 +561,12 @@ exports[`Predefined theme snapshots > matches snapshot for Forest Whisper 1`] = 
     class="mt-4 flex items-center justify-between text-sm text-[var(--color-text-secondary)]"
   >
     <span>
-      ⭐ 
+      ⭐
+       
       4.5
     </span>
     <span>
-      0
-       installs
+      0 installs
     </span>
   </div>
   <div
@@ -657,8 +648,7 @@ exports[`Predefined theme snapshots > matches snapshot for Midnight Pulse 1`] = 
               class="text-sm font-medium"
               style="color: rgb(248, 250, 252);"
             >
-              Content block 
-              1
+              Content block 1
             </div>
             <div
               class="mt-1 text-xs"
@@ -675,8 +665,7 @@ exports[`Predefined theme snapshots > matches snapshot for Midnight Pulse 1`] = 
               class="text-sm font-medium"
               style="color: rgb(248, 250, 252);"
             >
-              Content block 
-              2
+              Content block 2
             </div>
             <div
               class="mt-1 text-xs"
@@ -693,8 +682,7 @@ exports[`Predefined theme snapshots > matches snapshot for Midnight Pulse 1`] = 
               class="text-sm font-medium"
               style="color: rgb(248, 250, 252);"
             >
-              Content block 
-              3
+              Content block 3
             </div>
             <div
               class="mt-1 text-xs"
@@ -767,12 +755,12 @@ exports[`Predefined theme snapshots > matches snapshot for Midnight Pulse 1`] = 
     class="mt-4 flex items-center justify-between text-sm text-[var(--color-text-secondary)]"
   >
     <span>
-      ⭐ 
+      ⭐
+       
       4.5
     </span>
     <span>
-      0
-       installs
+      0 installs
     </span>
   </div>
   <div
@@ -854,8 +842,7 @@ exports[`Predefined theme snapshots > matches snapshot for Neon Circuit 1`] = `
               class="text-sm font-medium"
               style="color: rgb(224, 242, 254);"
             >
-              Content block 
-              1
+              Content block 1
             </div>
             <div
               class="mt-1 text-xs"
@@ -872,8 +859,7 @@ exports[`Predefined theme snapshots > matches snapshot for Neon Circuit 1`] = `
               class="text-sm font-medium"
               style="color: rgb(224, 242, 254);"
             >
-              Content block 
-              2
+              Content block 2
             </div>
             <div
               class="mt-1 text-xs"
@@ -890,8 +876,7 @@ exports[`Predefined theme snapshots > matches snapshot for Neon Circuit 1`] = `
               class="text-sm font-medium"
               style="color: rgb(224, 242, 254);"
             >
-              Content block 
-              3
+              Content block 3
             </div>
             <div
               class="mt-1 text-xs"
@@ -964,12 +949,12 @@ exports[`Predefined theme snapshots > matches snapshot for Neon Circuit 1`] = `
     class="mt-4 flex items-center justify-between text-sm text-[var(--color-text-secondary)]"
   >
     <span>
-      ⭐ 
+      ⭐
+       
       4.5
     </span>
     <span>
-      0
-       installs
+      0 installs
     </span>
   </div>
   <div
@@ -1051,8 +1036,7 @@ exports[`Predefined theme snapshots > matches snapshot for Ocean Mist 1`] = `
               class="text-sm font-medium"
               style="color: rgb(12, 74, 110);"
             >
-              Content block 
-              1
+              Content block 1
             </div>
             <div
               class="mt-1 text-xs"
@@ -1069,8 +1053,7 @@ exports[`Predefined theme snapshots > matches snapshot for Ocean Mist 1`] = `
               class="text-sm font-medium"
               style="color: rgb(12, 74, 110);"
             >
-              Content block 
-              2
+              Content block 2
             </div>
             <div
               class="mt-1 text-xs"
@@ -1087,8 +1070,7 @@ exports[`Predefined theme snapshots > matches snapshot for Ocean Mist 1`] = `
               class="text-sm font-medium"
               style="color: rgb(12, 74, 110);"
             >
-              Content block 
-              3
+              Content block 3
             </div>
             <div
               class="mt-1 text-xs"
@@ -1161,12 +1143,12 @@ exports[`Predefined theme snapshots > matches snapshot for Ocean Mist 1`] = `
     class="mt-4 flex items-center justify-between text-sm text-[var(--color-text-secondary)]"
   >
     <span>
-      ⭐ 
+      ⭐
+       
       4.5
     </span>
     <span>
-      0
-       installs
+      0 installs
     </span>
   </div>
   <div
@@ -1248,8 +1230,7 @@ exports[`Predefined theme snapshots > matches snapshot for Solar Flare 1`] = `
               class="text-sm font-medium"
               style="color: rgb(254, 243, 199);"
             >
-              Content block 
-              1
+              Content block 1
             </div>
             <div
               class="mt-1 text-xs"
@@ -1266,8 +1247,7 @@ exports[`Predefined theme snapshots > matches snapshot for Solar Flare 1`] = `
               class="text-sm font-medium"
               style="color: rgb(254, 243, 199);"
             >
-              Content block 
-              2
+              Content block 2
             </div>
             <div
               class="mt-1 text-xs"
@@ -1284,8 +1264,7 @@ exports[`Predefined theme snapshots > matches snapshot for Solar Flare 1`] = `
               class="text-sm font-medium"
               style="color: rgb(254, 243, 199);"
             >
-              Content block 
-              3
+              Content block 3
             </div>
             <div
               class="mt-1 text-xs"
@@ -1358,12 +1337,12 @@ exports[`Predefined theme snapshots > matches snapshot for Solar Flare 1`] = `
     class="mt-4 flex items-center justify-between text-sm text-[var(--color-text-secondary)]"
   >
     <span>
-      ⭐ 
+      ⭐
+       
       4.5
     </span>
     <span>
-      0
-       installs
+      0 installs
     </span>
   </div>
   <div
@@ -1445,8 +1424,7 @@ exports[`Predefined theme snapshots > matches snapshot for Velvet Noir 1`] = `
               class="text-sm font-medium"
               style="color: rgb(245, 243, 255);"
             >
-              Content block 
-              1
+              Content block 1
             </div>
             <div
               class="mt-1 text-xs"
@@ -1463,8 +1441,7 @@ exports[`Predefined theme snapshots > matches snapshot for Velvet Noir 1`] = `
               class="text-sm font-medium"
               style="color: rgb(245, 243, 255);"
             >
-              Content block 
-              2
+              Content block 2
             </div>
             <div
               class="mt-1 text-xs"
@@ -1481,8 +1458,7 @@ exports[`Predefined theme snapshots > matches snapshot for Velvet Noir 1`] = `
               class="text-sm font-medium"
               style="color: rgb(245, 243, 255);"
             >
-              Content block 
-              3
+              Content block 3
             </div>
             <div
               class="mt-1 text-xs"
@@ -1555,12 +1531,12 @@ exports[`Predefined theme snapshots > matches snapshot for Velvet Noir 1`] = `
     class="mt-4 flex items-center justify-between text-sm text-[var(--color-text-secondary)]"
   >
     <span>
-      ⭐ 
+      ⭐
+       
       4.5
     </span>
     <span>
-      0
-       installs
+      0 installs
     </span>
   </div>
   <div

@@ -104,18 +104,42 @@ export async function encryptMessage(
   message: string,
   recipientPublicKey: CryptoKey
 ): Promise<string> {
+  // RSA-OAEP can only encrypt very small payloads. For real messaging, we use a
+  // hybrid scheme:
+  // - AES-GCM encrypts the message content
+  // - RSA-OAEP encrypts the random AES key
+  // We keep backward compatibility by prefixing the payload, while decryptMessage
+  // still supports legacy v1 RSA-only ciphertext (base64).
   const encoder = new TextEncoder();
-  const data = encoder.encode(message);
+  const plaintextBytes = encoder.encode(message);
 
-  const encryptedBuffer = await window.crypto.subtle.encrypt(
-    {
-      name: 'RSA-OAEP',
-    },
-    recipientPublicKey,
-    data
+  const aesKey = await window.crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, [
+    'encrypt',
+    'decrypt',
+  ]);
+  const iv = window.crypto.getRandomValues(new Uint8Array(12));
+
+  const ciphertext = await window.crypto.subtle.encrypt(
+    { name: 'AES-GCM', iv },
+    aesKey,
+    plaintextBytes
   );
 
-  return arrayBufferToBase64(encryptedBuffer);
+  const rawKey = await window.crypto.subtle.exportKey('raw', aesKey);
+  const encryptedKey = await window.crypto.subtle.encrypt(
+    { name: 'RSA-OAEP' },
+    recipientPublicKey,
+    rawKey
+  );
+
+  const payload = {
+    v: 2,
+    iv: arrayBufferToBase64(iv.buffer),
+    key: arrayBufferToBase64(encryptedKey),
+    ct: arrayBufferToBase64(ciphertext),
+  };
+
+  return `v2:${stringToBase64(JSON.stringify(payload))}`;
 }
 
 /**
@@ -125,24 +149,88 @@ export async function decryptMessage(
   encryptedMessage: string,
   privateKey: CryptoKey
 ): Promise<string> {
-  const encryptedBuffer = base64ToArrayBuffer(encryptedMessage);
+  // v2 hybrid ciphertext: "v2:<base64(JSON)>"
+  if (encryptedMessage.startsWith('v2:')) {
+    const json = base64ToString(encryptedMessage.slice(3));
+    const parsed: unknown = JSON.parse(json);
+    if (
+      !parsed ||
+      typeof parsed !== 'object' ||
+      !('iv' in parsed) ||
+      !('key' in parsed) ||
+      !('ct' in parsed)
+    ) {
+      throw new Error('Invalid encrypted payload');
+    }
 
+    const { iv, key, ct } = parsed as { iv: string; key: string; ct: string };
+    const encryptedKeyBuffer = base64ToArrayBuffer(key);
+    const rawKeyBuffer = await window.crypto.subtle.decrypt(
+      { name: 'RSA-OAEP' },
+      privateKey,
+      encryptedKeyBuffer
+    );
+
+    const aesKey = await window.crypto.subtle.importKey(
+      'raw',
+      rawKeyBuffer,
+      { name: 'AES-GCM', length: 256 },
+      false,
+      ['decrypt']
+    );
+
+    const plaintextBuffer = await window.crypto.subtle.decrypt(
+      {
+        name: 'AES-GCM',
+        iv: new Uint8Array(base64ToArrayBuffer(iv)),
+      },
+      aesKey,
+      base64ToArrayBuffer(ct)
+    );
+
+    return new TextDecoder().decode(plaintextBuffer);
+  }
+
+  // Legacy v1 RSA-only ciphertext (base64)
+  const encryptedBuffer = base64ToArrayBuffer(encryptedMessage);
   const decryptedBuffer = await window.crypto.subtle.decrypt(
-    {
-      name: 'RSA-OAEP',
-    },
+    { name: 'RSA-OAEP' },
     privateKey,
     encryptedBuffer
   );
 
-  const decoder = new TextDecoder();
-  return decoder.decode(decryptedBuffer);
+  return new TextDecoder().decode(decryptedBuffer);
+}
+
+function stringToBase64(value: string): string {
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+  if (typeof Buffer !== 'undefined') {
+    return Buffer.from(value, 'utf8').toString('base64');
+  }
+  const bytes = new TextEncoder().encode(value);
+  return arrayBufferToBase64(bytes.buffer);
+}
+
+function base64ToString(base64: string): string {
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+  if (typeof Buffer !== 'undefined') {
+    return Buffer.from(base64, 'base64').toString('utf8');
+  }
+  const buffer = base64ToArrayBuffer(base64);
+  return new TextDecoder().decode(buffer);
 }
 
 /**
  * Helper: Convert ArrayBuffer to Base64
  */
 export function arrayBufferToBase64(buffer: ArrayBuffer): string {
+  // Node/test environments: avoid cross-realm ArrayBuffer issues by using Buffer.
+  // In the browser, Buffer is typically undefined, so we fall back to btoa.
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+  if (typeof Buffer !== 'undefined') {
+    return Buffer.from(buffer).toString('base64');
+  }
+
   const bytes = new Uint8Array(buffer);
   let binary = '';
   for (let i = 0; i < bytes.byteLength; i++) {
@@ -155,6 +243,13 @@ export function arrayBufferToBase64(buffer: ArrayBuffer): string {
  * Helper: Convert Base64 to ArrayBuffer
  */
 export function base64ToArrayBuffer(base64: string): ArrayBuffer {
+  // Node/test environments: avoid cross-realm ArrayBuffer issues by using Buffer.
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+  if (typeof Buffer !== 'undefined') {
+    const buf = Buffer.from(base64, 'base64');
+    return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
+  }
+
   const binary = window.atob(base64);
   const bytes = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i++) {
@@ -182,7 +277,9 @@ export interface EncryptedFilePayload {
  */
 export async function encryptFile(file: File): Promise<EncryptedFilePayload> {
   // Read file as ArrayBuffer
-  const fileData = await file.arrayBuffer();
+  // Always pass a same-realm typed array into WebCrypto to avoid cross-realm
+  // ArrayBuffer checks in node/jsdom test environments.
+  const fileData = new Uint8Array(await file.arrayBuffer());
 
   // Generate random AES-256 key for this file
   const aesKey = await window.crypto.subtle.generateKey(
@@ -272,11 +369,11 @@ export async function decryptFile(
   );
 
   // Decrypt file data with AES
-  const iv = base64ToArrayBuffer(encryptedFile.iv);
+  const iv = new Uint8Array(base64ToArrayBuffer(encryptedFile.iv));
   const decryptedData = await window.crypto.subtle.decrypt(
     {
       name: 'AES-GCM',
-      iv: iv,
+      iv,
     },
     aesKey,
     encryptedFile.encryptedData
@@ -303,11 +400,10 @@ export async function encryptForMultipleRecipients(
   senderPublicKey?: CryptoKey
 ): Promise<MultiRecipientEncryptionResult> {
   const encoder = new TextEncoder();
-  const aesKey = await window.crypto.subtle.generateKey(
-    { name: 'AES-GCM', length: 256 },
-    true,
-    ['encrypt', 'decrypt']
-  );
+  const aesKey = await window.crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, [
+    'encrypt',
+    'decrypt',
+  ]);
   const iv = window.crypto.getRandomValues(new Uint8Array(12));
 
   const encryptedBuffer = await window.crypto.subtle.encrypt(

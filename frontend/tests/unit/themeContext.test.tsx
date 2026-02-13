@@ -41,6 +41,7 @@ const createSettings = (overrides: Partial<UserSettings> = {}): UserSettings => 
   notification_sound: false,
   show_read_receipts: true,
   show_typing_indicators: true,
+  show_last_seen: true,
   auto_append_invitation: false,
   theme: 'default',
   notify_comment_replies: true,
@@ -70,6 +71,7 @@ const createWrapper = () => {
 describe('ThemeProvider', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    localStorage.setItem('auth_token', 'test-token');
     mockThemeService.getPredefinedThemes.mockResolvedValue([createTheme({ id: 1 })]);
     mockThemeService.getMyThemes.mockResolvedValue({
       themes: [createTheme({ id: 2, theme_type: 'variable_customization' })],

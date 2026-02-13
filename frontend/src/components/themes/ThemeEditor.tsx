@@ -79,6 +79,7 @@ const ThemeEditor = ({ isOpen, onClose, initialTheme = null }: ThemeEditorProps)
   const [infoErrors, setInfoErrors] = useState<{ name?: string; description?: string }>({});
   const [variableErrors, setVariableErrors] = useState<Record<string, string>>({});
   const cssVariableHistory = useRef<Record<string, string>[]>([]);
+  const autoCloseTimeoutId = useRef<number | null>(null);
   const colorPickerLabelId = useMemo(
     () => `color-picker-label-${selectedVariableName.replace(/[^a-z0-9]/gi, '')}`,
     [selectedVariableName]
@@ -137,6 +138,15 @@ const ThemeEditor = ({ isOpen, onClose, initialTheme = null }: ThemeEditorProps)
     setVariableErrors({});
     setStatusMessage(null);
   }, [initialTheme, isOpen, predefinedThemes, availableThemes]);
+
+  useEffect(() => {
+    return () => {
+      if (autoCloseTimeoutId.current) {
+        window.clearTimeout(autoCloseTimeoutId.current);
+        autoCloseTimeoutId.current = null;
+      }
+    };
+  }, []);
 
   const activeVariableDefinition = useMemo(() => {
     for (const group of THEME_VARIABLE_GROUPS) {
@@ -404,7 +414,10 @@ const ThemeEditor = ({ isOpen, onClose, initialTheme = null }: ThemeEditorProps)
           ? t('themes.editor.status.updated')
           : t('themes.editor.status.created'),
       });
-      setTimeout(() => {
+      if (autoCloseTimeoutId.current) {
+        window.clearTimeout(autoCloseTimeoutId.current);
+      }
+      autoCloseTimeoutId.current = window.setTimeout(() => {
         setStatusMessage(null);
         onClose();
       }, 2000);

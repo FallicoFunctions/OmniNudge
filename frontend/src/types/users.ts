@@ -14,7 +14,7 @@ export interface UserProfile {
   karma: number;
   public_key?: string | null;
   created_at: string;
-  last_seen: string;
+  last_seen?: string | null;
   moderated_hubs?: ModeratedHubSummary[];
 }
 

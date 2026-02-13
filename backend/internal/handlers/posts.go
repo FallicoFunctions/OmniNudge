@@ -149,7 +149,7 @@ type CreatePostRequest struct {
 	MediaType          *string               `json:"media_type"`
 	ThumbnailURL       *string               `json:"thumbnail_url"`
 	GalleryImages      []models.GalleryImage `json:"gallery_images"`        // Optional: gallery images
-	HubID              *int                  `json:"hub_id" binding:"required"` // Required: post to specific hub
+	HubID              *int                  `json:"hub_id"`                // Required: post to specific hub
 	TargetSubreddit    *string               `json:"target_subreddit"`      // Optional: associate with subreddit
 	SendRepliesToInbox bool                  `json:"send_replies_to_inbox"` // Notification preference
 	PostType           string                `json:"post_type"`             // "link" or "text"

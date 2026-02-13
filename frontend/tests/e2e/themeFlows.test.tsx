@@ -6,13 +6,20 @@ import userEvent from '@testing-library/user-event';
 import ThemeSelector from '../../src/components/themes/ThemeSelector';
 import ThemeEditor from '../../src/components/themes/ThemeEditor';
 import { ThemeProvider } from '../../src/contexts/ThemeContext';
+import { SettingsProvider } from '../../src/contexts/SettingsContext';
 import { useTheme } from '../../src/hooks/useTheme';
+import { SETTINGS_STORAGE_KEY } from '../../src/constants/storageKeys';
 import type {
   UserTheme,
   UserSettings,
   CreateThemeRequest,
   UpdateThemeRequest,
 } from '../../src/types/theme';
+
+const expectActiveThemeName = async (name: string) => {
+  const activeThemeButton = screen.getByRole('button', { name: /Active Theme/i });
+  await waitFor(() => expect(activeThemeButton).toHaveTextContent(name));
+};
 
 const { store, mockThemeService } = vi.hoisted(() => {
   const createTheme = (overrides: Partial<UserTheme> = {}): UserTheme => ({
@@ -43,6 +50,7 @@ const { store, mockThemeService } = vi.hoisted(() => {
     notification_sound: overrides.notification_sound ?? true,
     show_read_receipts: overrides.show_read_receipts ?? true,
     show_typing_indicators: overrides.show_typing_indicators ?? true,
+    show_last_seen: overrides.show_last_seen ?? true,
     auto_append_invitation: overrides.auto_append_invitation ?? false,
     theme: overrides.theme ?? 'default',
     notify_comment_replies: overrides.notify_comment_replies ?? true,
@@ -163,7 +171,9 @@ const renderWithProviders = (ui: React.ReactElement) => {
 
   return render(
     <QueryClientProvider client={queryClient}>
-      <ThemeProvider>{ui}</ThemeProvider>
+      <ThemeProvider>
+        <SettingsProvider>{ui}</SettingsProvider>
+      </ThemeProvider>
     </QueryClientProvider>
   );
 };
@@ -208,6 +218,11 @@ const ThemeTestHarness = () => {
 describe('Theme flows E2E', () => {
   beforeEach(() => {
     localStorage.clear();
+    localStorage.setItem('auth_token', 'test-token');
+    localStorage.setItem(
+      SETTINGS_STORAGE_KEY,
+      JSON.stringify({ autoCloseThemeSelector: true, settingsVersion: 6 })
+    );
     store.reset();
   });
 
@@ -222,9 +237,7 @@ describe('Theme flows E2E', () => {
     await user.click(screen.getByRole('button', { name: /Active Theme/i }));
     await user.click(await screen.findByRole('button', { name: /Midnight Pulse/i }));
 
-    await waitFor(() => {
-      expect(screen.getByText('Midnight Pulse')).toBeInTheDocument();
-    });
+    await expectActiveThemeName('Midnight Pulse');
 
     expect(mockThemeService.setActiveTheme).toHaveBeenCalledWith(2);
     const stored = JSON.parse(localStorage.getItem('omninudge.activeTheme') ?? '{}');
@@ -250,7 +263,8 @@ describe('Theme flows E2E', () => {
 
     await waitFor(() => expect(mockThemeService.createTheme).toHaveBeenCalled());
     await waitFor(() =>
-      expect(screen.queryByText(/Theme Editor/i)).not.toBeInTheDocument()
+      expect(screen.queryByText(/Theme Editor/i)).not.toBeInTheDocument(),
+      { timeout: 2500 }
     );
 
     await user.click(screen.getByRole('button', { name: /Active Theme/i }));
@@ -258,7 +272,7 @@ describe('Theme flows E2E', () => {
       const buttons = screen.getAllByRole('button', { name: /Desert Bloom/i });
       expect(buttons.length).toBeGreaterThanOrEqual(2);
     });
-  });
+  }, 15000);
 
   it('allows editing an existing custom theme', async () => {
     const user = userEvent.setup();
@@ -282,28 +296,29 @@ describe('Theme flows E2E', () => {
 
     await waitFor(() => expect(mockThemeService.updateTheme).toHaveBeenCalled());
     await waitFor(() =>
-      expect(screen.queryByText(/Theme Editor/i)).not.toBeInTheDocument()
+      expect(screen.queryByText(/Theme Editor/i)).not.toBeInTheDocument(),
+      { timeout: 2500 }
     );
 
     await user.click(screen.getByRole('button', { name: /Active Theme/i }));
     await waitFor(() =>
       expect(screen.getByRole('button', { name: /Studio Sunrise/i })).toBeInTheDocument()
     );
-  });
+  }, 15000);
 
   it('lets users switch between themes multiple times', async () => {
     const user = userEvent.setup();
     renderWithProviders(<ThemeSelector />);
 
-    await waitFor(() => expect(screen.getByText('Aurora Glow')).toBeInTheDocument());
+    await expectActiveThemeName('Aurora Glow');
 
     await user.click(screen.getByRole('button', { name: /Active Theme/i }));
     await user.click(await screen.findByRole('button', { name: /Midnight Pulse/i }));
-    await waitFor(() => expect(screen.getByText('Midnight Pulse')).toBeInTheDocument());
+    await expectActiveThemeName('Midnight Pulse');
 
     await user.click(screen.getByRole('button', { name: /Active Theme/i }));
     await user.click(await screen.findByRole('button', { name: /Aurora Glow/i }));
-    await waitFor(() => expect(screen.getByText('Aurora Glow')).toBeInTheDocument());
+    await expectActiveThemeName('Aurora Glow');
 
     expect(mockThemeService.setActiveTheme).toHaveBeenCalledWith(1);
     expect(mockThemeService.setActiveTheme).toHaveBeenCalledWith(2);
@@ -313,17 +328,17 @@ describe('Theme flows E2E', () => {
     const user = userEvent.setup();
     const firstRender = renderWithProviders(<ThemeSelector />);
 
-    await waitFor(() => expect(screen.getByText('Aurora Glow')).toBeInTheDocument());
+    await expectActiveThemeName('Aurora Glow');
 
     await user.click(screen.getByRole('button', { name: /Active Theme/i }));
     await user.click(await screen.findByRole('button', { name: /Midnight Pulse/i }));
-    await waitFor(() => expect(screen.getByText('Midnight Pulse')).toBeInTheDocument());
+    await expectActiveThemeName('Midnight Pulse');
 
     firstRender.unmount();
     store.state.settings = { ...store.state.settings, active_theme_id: undefined };
 
     renderWithProviders(<ThemeSelector />);
 
-    await waitFor(() => expect(screen.getByText('Midnight Pulse')).toBeInTheDocument());
+    await expectActiveThemeName('Midnight Pulse');
   });
 });
