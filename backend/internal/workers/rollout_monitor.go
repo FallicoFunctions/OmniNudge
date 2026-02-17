@@ -5,13 +5,24 @@ import (
 	"log"
 	"time"
 
+	"github.com/omninudge/backend/internal/models"
 	"github.com/omninudge/backend/internal/services"
 )
 
+type rolloutAnalytics interface {
+	GetSystemErrorRate(ctx context.Context, window time.Duration) (float64, error)
+	GetFeatureErrorRate(ctx context.Context, key string, window time.Duration) (float64, int, error)
+}
+
+type rolloutFeatureFlags interface {
+	ListFlags(ctx context.Context) ([]*models.FeatureFlag, error)
+	UpdateFlag(ctx context.Context, key string, updates map[string]interface{}, changedBy int64) error
+}
+
 // RolloutMonitor monitors feature flag rollouts and triggers automated rollbacks
 type RolloutMonitor struct {
-	analytics   *services.AnalyticsService
-	featureFlag *services.FeatureFlagService
+	analytics   rolloutAnalytics
+	featureFlag rolloutFeatureFlags
 }
 
 // NewRolloutMonitor creates a new rollout monitor

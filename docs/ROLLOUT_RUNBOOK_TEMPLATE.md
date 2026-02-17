@@ -7,11 +7,13 @@
 ## Success Metrics
 - [ ] Metric 1: (e.g., Message send events increase by 5%)
 - [ ] Metric 2: (e.g., Page load time remains < 200ms)
+- [ ] Metric 3 (A/B delta): Treatment cohort statistically better or neutral vs control
 
 ## Health Thresholds (Manual Intervention)
-- **Error Rate**: > 2%
+- **Error Rate Increase**: > 1% above baseline
+- **Crash Rate**: > 0.1%
+- **User Complaints**: > 10 in window
 - **Latency**: > 300ms p95
-- **Support Tickets**: > 5/day relating to this feature
 
 ## Rollout Schedule
 
@@ -23,6 +25,14 @@
 | 25% | | | |
 | 50% | | | |
 | 100% | | | |
+
+## A/B Comparison Checklist
+- [ ] Control cohort defined (flag disabled users)
+- [ ] Treatment cohort defined (flag enabled users)
+- [ ] Activation metric reviewed
+- [ ] Reliability metrics reviewed (error/crash)
+- [ ] Retention/sentiment reviewed
+- [ ] Decision logged with owner approval
 
 ## Rollback Procedure
 1. Navigate to Feature Flag Admin.
