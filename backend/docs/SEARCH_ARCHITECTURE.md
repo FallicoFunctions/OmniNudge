@@ -108,6 +108,10 @@ Performance assertion script:
 - `backend/scripts/search_messages_perf_assert.sql`
 - Executes representative metadata and text queries with `EXPLAIN (ANALYZE, FORMAT JSON)` and fails if either exceeds `500ms`.
 
+Wrapper command:
+- `backend/scripts/run_search_benchmark.sh [--cleanup]`
+- Runs benchmark seed/query script, executes latency assertions, and optionally cleans benchmark data.
+
 Runtime telemetry:
 - `omninudge_message_search_requests_total{status,has_query}`
 - `omninudge_message_search_duration_seconds{status,has_query}`
