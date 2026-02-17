@@ -38,6 +38,13 @@ export function FeatureFlagProvider({ children }: { children: ReactNode }) {
     };
 
     useEffect(() => {
+        // Avoid noisy 401s for anonymous visitors; flags are user-scoped.
+        if (!user) {
+            setFlags({});
+            setIsLoading(false);
+            return;
+        }
+        setIsLoading(true);
         refreshFlags();
     }, [user]); // Re-fetch when user changes
 

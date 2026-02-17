@@ -893,33 +893,11 @@ export function RedditPostCard({
           </div>
         )}
         <div className="flex-1 text-left">
-          <div className="grid grid-cols-[1fr_auto] items-start gap-2">
-            <div className="min-w-0">
-              {/* Title */}
-              {isExternalLink ? (
-                <a
-                  href={sanitizedExternalUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="block text-base font-semibold text-[var(--color-text-primary)] hover:text-[var(--color-primary)]"
-                >
-                  {decodeHtmlEntities(post.title)}
-                </a>
-              ) : (
-                <Link
-                  to={postUrl}
-                  state={linkState}
-                  className="block text-base font-semibold text-[var(--color-text-primary)] hover:text-[var(--color-primary)]"
-                >
-                  {decodeHtmlEntities(post.title)}
-                </Link>
-              )}
-            </div>
-
-            {/* Flairs/Badges (top-right) */}
-            <div className="flex max-w-[50%] flex-wrap items-center justify-end gap-2 pt-0.5 text-right">
+          <div className="relative pr-32 sm:pr-44">
+            {/* Flairs/Badges (top-right, anchored) */}
+            <div className="absolute right-0 top-0 flex max-w-[min(52%,240px)] flex-wrap content-start items-start justify-end gap-1.5 text-right">
               {/* FEED-7: Reddit source badge for visual distinction */}
-              <span className="inline-flex items-center rounded bg-orange-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-orange-800 dark:bg-orange-900/30 dark:text-orange-400">
+              <span className="inline-flex items-center whitespace-nowrap rounded bg-orange-100 px-2 py-0.5 text-[10px] font-semibold uppercase leading-none tracking-wide text-orange-800 dark:bg-orange-900/30 dark:text-orange-400">
                 {t('posts.badges.reddit')}
               </span>
               {post.over18 && (
@@ -964,6 +942,26 @@ export function RedditPostCard({
                 </a>
               )}
             </div>
+
+            {/* Title */}
+            {isExternalLink ? (
+              <a
+                href={sanitizedExternalUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block text-base font-semibold text-[var(--color-text-primary)] hover:text-[var(--color-primary)]"
+              >
+                {decodeHtmlEntities(post.title)}
+              </a>
+            ) : (
+              <Link
+                to={postUrl}
+                state={linkState}
+                className="block text-base font-semibold text-[var(--color-text-primary)] hover:text-[var(--color-primary)]"
+              >
+                {decodeHtmlEntities(post.title)}
+              </Link>
+            )}
           </div>
           <div className="mt-1 flex items-start gap-3 text-[11px] text-[var(--color-text-secondary)]">
             {hasInlineMedia && (

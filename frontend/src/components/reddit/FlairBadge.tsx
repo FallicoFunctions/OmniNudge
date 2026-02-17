@@ -41,7 +41,7 @@ export function FlairBadge({ text, backgroundColor, textColor, className = '' }:
 
   return (
     <span
-      className={`inline-flex items-center rounded px-1 py-0.5 text-xs font-medium ${className}`}
+      className={`inline-flex items-center whitespace-nowrap rounded px-1 py-0.5 text-xs font-medium leading-none ${className}`}
       style={{
         backgroundColor: bg,
         color: fg,
