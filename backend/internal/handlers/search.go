@@ -8,6 +8,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/omninudge/backend/internal/monitoring"
 	"github.com/omninudge/backend/internal/models"
 )
 
@@ -513,6 +514,19 @@ func (h *SearchHandler) SearchHubs(c *gin.Context) {
 // SearchMessages searches messages visible to the authenticated user.
 // GET /api/v1/search/messages?q=query&conversation_id=1&sender_id=2&has_files=true&start_date=...&end_date=...&limit=50&offset=0
 func (h *SearchHandler) SearchMessages(c *gin.Context) {
+	startedAt := time.Now()
+	searchSuccess := false
+	searchResultCount := 0
+	hasQuery := strings.TrimSpace(c.Query("q")) != ""
+	defer func() {
+		monitoring.RecordMessageSearch(
+			time.Since(startedAt),
+			searchResultCount,
+			searchSuccess,
+			hasQuery,
+		)
+	}()
+
 	userID, exists := c.Get("user_id")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Authentication required"})
@@ -706,6 +720,7 @@ func (h *SearchHandler) SearchMessages(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Search failed", "details": err.Error()})
 		return
 	}
+	searchResultCount = total
 
 	limitArg := nextArg
 	offsetArg := nextArg + 1
@@ -781,4 +796,5 @@ func (h *SearchHandler) SearchMessages(c *gin.Context) {
 		"query":    query,
 		"total":    total,
 	})
+	searchSuccess = true
 }
