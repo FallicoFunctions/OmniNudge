@@ -19,12 +19,35 @@ To ensure platform stability, all major features should follow these progressive
 OmniNudge uses a `RolloutMonitor` that automatically disables feature flags if technical health metrics degrade.
 
 ### Triggers
-1. **Error Rate**: If the percentage of errors associated with a feature exceeds the threshold (Internal baseline + 1%).
-2. **Performance**: If API p95 latency for feature-specific endpoints exceeds 500ms.
-3. **Min Sample Size**: Rollbacks will not trigger until at least **100 events** have been recorded for the feature in the current window.
+1. **Error Rate**: If the percentage of errors associated with a feature exceeds the threshold (internal baseline + configured threshold).
+2. **Crash Rate**: If crash events exceed 0.1% for monitored clients.
+3. **User Complaints**: If user complaints exceed 10 within the monitoring window.
+4. **Min Sample Size**: Rollbacks will not trigger until at least **100 events** have been recorded for the feature in the current window.
+
+Default thresholds:
+- Error rate increase: `> 1%`
+- Crash rate: `> 0.1%`
+- Complaints: `> 10`
+
+## A/B Testing Baseline
+
+For each staged rollout, compare:
+- Treatment cohort: users with flag enabled.
+- Control cohort: users with flag disabled.
+
+Track at minimum:
+- Activation metric (did users use the feature?)
+- Reliability metric (error/crash rate)
+- Retention proxy (7-day return rate)
+- Sentiment proxy (feedback/complaint counts)
+
+Decision rule:
+- Promote to next stage only if reliability guardrails hold and treatment cohort does not regress retention/sentiment.
 
 ## Developer Process
 1. Create a Feature Flag in the Admin UI.
 2. Initialize at 0% or 1%.
 3. Fill out a [Rollout Runbook](./ROLLOUT_RUNBOOK_TEMPLATE.md).
 4. Monitor logs and analytics after each stage increment.
+5. Run treatment vs control comparison before each stage increase.
+6. Validate against [Feature Success Metrics](./FEATURE_SUCCESS_METRICS.md) targets.

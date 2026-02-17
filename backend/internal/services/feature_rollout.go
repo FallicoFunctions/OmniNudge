@@ -37,12 +37,22 @@ func (s *RolloutService) IsFeatureEnabledForUser(ctx context.Context, featureKey
 		return false, nil
 	}
 
-	// Check if there's a rollout percentage in metadata
-	if rolloutPct, ok := flag.Metadata["rollout_percentage"].(float64); ok {
+	// Prefer first-class percentage rollout field.
+	if flag.Percentage != nil {
 		// Use consistent hashing to determine if user is in rollout group
 		userHash := hashUserID(userID, featureKey)
 		userPercentile := userHash % 100
 
+		if userPercentile < uint32(*flag.Percentage) {
+			return true, nil
+		}
+		return false, nil
+	}
+
+	// Backward compatibility for legacy metadata-based rollout.
+	if rolloutPct, ok := flag.Metadata["rollout_percentage"].(float64); ok {
+		userHash := hashUserID(userID, featureKey)
+		userPercentile := userHash % 100
 		if float64(userPercentile) < rolloutPct {
 			return true, nil
 		}
@@ -111,4 +121,24 @@ type FeatureMetrics struct {
 	RetentionTarget     float64  `json:"retention_target"`      // Target retention rate
 	NPSTarget           float64  `json:"nps_target"`            // Target NPS score
 	PerformanceBudgetMS int      `json:"performance_budget_ms"` // Max latency in ms
+}
+
+// GetPhase0FeatureSuccessMetrics returns the rollout success metrics template for F1-F14.
+func GetPhase0FeatureSuccessMetrics() []FeatureMetrics {
+	return []FeatureMetrics{
+		{FeatureKey: "F1", EngagementMetrics: []string{"messages_sent", "reply_rate"}, RetentionTarget: 0.35, NPSTarget: 35, PerformanceBudgetMS: 200},
+		{FeatureKey: "F2", EngagementMetrics: []string{"group_messages_sent", "group_creation_rate"}, RetentionTarget: 0.32, NPSTarget: 34, PerformanceBudgetMS: 250},
+		{FeatureKey: "F3", EngagementMetrics: []string{"media_upload_success", "media_messages_sent"}, RetentionTarget: 0.33, NPSTarget: 33, PerformanceBudgetMS: 300},
+		{FeatureKey: "F4", EngagementMetrics: []string{"read_receipt_delivery", "presence_updates"}, RetentionTarget: 0.30, NPSTarget: 32, PerformanceBudgetMS: 150},
+		{FeatureKey: "F5", EngagementMetrics: []string{"moderation_actions", "report_resolution_rate"}, RetentionTarget: 0.29, NPSTarget: 30, PerformanceBudgetMS: 250},
+		{FeatureKey: "F6", EngagementMetrics: []string{"upload_completion_rate", "scan_pass_rate"}, RetentionTarget: 0.31, NPSTarget: 31, PerformanceBudgetMS: 350},
+		{FeatureKey: "F7", EngagementMetrics: []string{"custom_theme_installs", "theme_engagement_time"}, RetentionTarget: 0.28, NPSTarget: 29, PerformanceBudgetMS: 250},
+		{FeatureKey: "F8", EngagementMetrics: []string{"search_ctr", "search_zero_result_rate"}, RetentionTarget: 0.27, NPSTarget: 30, PerformanceBudgetMS: 180},
+		{FeatureKey: "F9", EngagementMetrics: []string{"encryption_setup_success", "secure_message_rate"}, RetentionTarget: 0.30, NPSTarget: 34, PerformanceBudgetMS: 220},
+		{FeatureKey: "F10", EngagementMetrics: []string{"notification_open_rate", "notification_opt_in_rate"}, RetentionTarget: 0.29, NPSTarget: 31, PerformanceBudgetMS: 120},
+		{FeatureKey: "F11", EngagementMetrics: []string{"voice_note_send_rate", "voice_play_completion_rate"}, RetentionTarget: 0.28, NPSTarget: 33, PerformanceBudgetMS: 300},
+		{FeatureKey: "F12", EngagementMetrics: []string{"call_connect_success", "avg_call_duration_seconds"}, RetentionTarget: 0.27, NPSTarget: 34, PerformanceBudgetMS: 400},
+		{FeatureKey: "F13", EngagementMetrics: []string{"video_call_connect_success", "video_call_quality_score"}, RetentionTarget: 0.26, NPSTarget: 33, PerformanceBudgetMS: 450},
+		{FeatureKey: "F14", EngagementMetrics: []string{"screen_share_start_rate", "screen_share_session_length"}, RetentionTarget: 0.25, NPSTarget: 32, PerformanceBudgetMS: 500},
+	}
 }
