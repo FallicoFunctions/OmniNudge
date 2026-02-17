@@ -693,22 +693,22 @@
 ---
 
 ### P0-021: RTL Support Infrastructure
-**Status:** ⬜ TODO
+**Status:** ✅ COMPLETE (February 17, 2026)
 **Priority:** P2
 **Estimated Time:** 1 week
 
 **Problem:** Arabic, Hebrew users need right-to-left layouts.
 
 **Tasks:**
-- [ ] Add dir="rtl" detection based on language
-- [ ] Update CSS for RTL (use logical properties: inline-start vs left)
-- [ ] Test all layouts in RTL mode
-- [ ] Fix: margins, padding, flexbox, grid
-- [ ] Fix: icons, arrows (mirror horizontally)
-- [ ] Fix: text alignment
-- [ ] Add RTL toggle to dev tools
-- [ ] Test with Arabic translator
-- [ ] Document RTL best practices
+- [x] Add dir="rtl" detection based on language
+- [x] Update CSS for RTL (use logical properties: inline-start vs left)
+- [x] Test all layouts in RTL mode
+- [x] Fix: margins, padding, flexbox, grid
+- [x] Fix: icons, arrows (mirror horizontally)
+- [x] Fix: text alignment
+- [x] Add RTL toggle to dev tools
+- [x] Test with Arabic translator
+- [x] Document RTL best practices
 
 **Acceptance Criteria:**
 - All layouts work in RTL mode
