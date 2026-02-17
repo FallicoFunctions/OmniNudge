@@ -68,7 +68,7 @@ describe('SearchResultsPage message search URL behavior', () => {
   beforeEach(() => {
     vi.clearAllMocks();
 
-    useAuthMock.mockReturnValue({ user: null });
+    useAuthMock.mockReturnValue({ user: { id: 1, username: 'tester', role: 'user' } });
     useSettingsMock.mockReturnValue({
       searchIncludeNsfwByDefault: false,
       blockAllNsfw: false,
@@ -162,5 +162,16 @@ describe('SearchResultsPage message search URL behavior', () => {
         includeArchived: true,
       });
     });
+  });
+
+  it('does not call message search API when unauthenticated', async () => {
+    useAuthMock.mockReturnValue({ user: null });
+    renderPage('/search?tab=messages&q=thread');
+
+    await waitFor(() => {
+      expect(searchMessagesMock).not.toHaveBeenCalled();
+    });
+
+    expect(screen.getByText('Sign in to search messages.')).toBeInTheDocument();
   });
 });

@@ -380,6 +380,17 @@ export default function SearchResultsPage() {
       const isUsersAppend = Boolean(opts?.append && tabTarget === 'users');
 
       if (tabTarget === 'messages') {
+        if (!user) {
+          setMessageResults((prev) => ({
+            ...prev,
+            messages: [],
+            total: 0,
+            page: targetPage,
+          }));
+          setSearchError(t('searchPage.messages.authRequired'));
+          return;
+        }
+
         const hasFiles = opts?.messageFilters?.hasFiles ?? messageResults.hasFiles;
         const hasLinks = opts?.messageFilters?.hasLinks ?? messageResults.hasLinks;
         const includeArchived =

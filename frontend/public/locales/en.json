@@ -319,6 +319,7 @@
       "loadMoreOmni": "Load more users"
     },
     "messages": {
+      "authRequired": "Sign in to search messages.",
       "hasFiles": "Has files",
       "hasLinks": "Has links",
       "includeArchived": "Include archived",
