@@ -91,6 +91,14 @@ Scale test script:
 - `backend/scripts/search_messages_1m_benchmark.sql`
 - Generates a synthetic 1M-message DM dataset and runs `EXPLAIN (ANALYZE, BUFFERS)` queries.
 
+Runtime telemetry:
+- `omninudge_message_search_requests_total{status,has_query}`
+- `omninudge_message_search_duration_seconds{status,has_query}`
+- `omninudge_message_search_result_count{status,has_query}`
+
+Operational target:
+- P95 `omninudge_message_search_duration_seconds` under `0.5s` for common filters/query paths.
+
 ## Follow-ups
 
 Potential future improvements:

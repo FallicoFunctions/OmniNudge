@@ -1,6 +1,7 @@
 package monitoring
 
 import (
+	"strconv"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -295,11 +296,77 @@ var (
 		},
 		[]string{"type", "severity"}, // panic, error, warning
 	)
+
+	ModerationReportsCreatedTotal = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "omninudge_moderation_reports_created_total",
+			Help: "Total number of moderation reports created",
+		},
+		[]string{"reason", "target_type"},
+	)
+
+	ModerationReportsResolvedTotal = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "omninudge_moderation_reports_resolved_total",
+			Help: "Total number of moderation reports resolved by final status",
+		},
+		[]string{"status"},
+	)
+
+	ModerationReportResolutionDuration = promauto.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name:    "omninudge_moderation_report_resolution_duration_seconds",
+			Help:    "Time from report creation to moderation resolution",
+			Buckets: []float64{60, 300, 900, 1800, 3600, 7200, 14400, 28800, 86400, 172800},
+		},
+		[]string{"status"},
+	)
+
+	ModerationAutoSuspensionsTotal = promauto.NewCounter(
+		prometheus.CounterOpts{
+			Name: "omninudge_moderation_auto_suspensions_total",
+			Help: "Total number of users auto-suspended from report thresholds",
+		},
+	)
+
+	ModerationHighPriorityAlertsTotal = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "omninudge_moderation_high_priority_alerts_total",
+			Help: "Total number of high-priority moderation alerts created",
+		},
+		[]string{"reason", "recipient_role"},
+	)
+
+	MessageSearchRequestsTotal = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "omninudge_message_search_requests_total",
+			Help: "Total number of message search requests",
+		},
+		[]string{"status", "has_query"}, // status: success|error
+	)
+
+	MessageSearchDuration = promauto.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name:    "omninudge_message_search_duration_seconds",
+			Help:    "Duration of message search requests",
+			Buckets: []float64{0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5},
+		},
+		[]string{"status", "has_query"},
+	)
+
+	MessageSearchResultCount = promauto.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name:    "omninudge_message_search_result_count",
+			Help:    "Result count returned by message search",
+			Buckets: []float64{0, 1, 5, 10, 25, 50, 100, 250, 500, 1000},
+		},
+		[]string{"status", "has_query"},
+	)
 )
 
 // RecordHTTPRequest records an HTTP request metric
 func RecordHTTPRequest(method, path string, status int, duration time.Duration) {
-	HTTPRequestsTotal.WithLabelValues(method, path, string(rune(status))).Inc()
+	HTTPRequestsTotal.WithLabelValues(method, path, strconv.Itoa(status)).Inc()
 	HTTPRequestDuration.WithLabelValues(method, path).Observe(duration.Seconds())
 }
 
@@ -373,4 +440,36 @@ func IncrementWebSocketConnections() {
 // DecrementWebSocketConnections decrements active WebSocket connections
 func DecrementWebSocketConnections() {
 	WebSocketConnectionsActive.Dec()
+}
+
+func RecordModerationReportCreated(reason, targetType string) {
+	ModerationReportsCreatedTotal.WithLabelValues(reason, targetType).Inc()
+}
+
+func RecordModerationReportResolved(status string, resolutionDuration time.Duration) {
+	ModerationReportsResolvedTotal.WithLabelValues(status).Inc()
+	ModerationReportResolutionDuration.WithLabelValues(status).Observe(resolutionDuration.Seconds())
+}
+
+func RecordModerationAutoSuspension() {
+	ModerationAutoSuspensionsTotal.Inc()
+}
+
+func RecordModerationHighPriorityAlert(reason, recipientRole string) {
+	ModerationHighPriorityAlertsTotal.WithLabelValues(reason, recipientRole).Inc()
+}
+
+func RecordMessageSearch(duration time.Duration, resultCount int, success bool, hasQuery bool) {
+	status := "success"
+	if !success {
+		status = "error"
+	}
+	queryLabel := "false"
+	if hasQuery {
+		queryLabel = "true"
+	}
+
+	MessageSearchRequestsTotal.WithLabelValues(status, queryLabel).Inc()
+	MessageSearchDuration.WithLabelValues(status, queryLabel).Observe(duration.Seconds())
+	MessageSearchResultCount.WithLabelValues(status, queryLabel).Observe(float64(resultCount))
 }
