@@ -323,6 +323,14 @@
       "hasFiles": "Con archivos",
       "hasLinks": "Con enlaces",
       "includeArchived": "Incluir archivados",
+      "filters": {
+        "conversationId": "Conversación",
+        "senderId": "Remitente",
+        "startDate": "Desde",
+        "endDate": "Hasta",
+        "apply": "Aplicar",
+        "clear": "Limpiar"
+      },
       "meta": {
         "conversation": "Conversación n.º {{id}}",
         "sender": "Remitente n.º {{id}}"

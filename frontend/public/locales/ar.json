@@ -323,6 +323,14 @@
       "hasFiles": "يحتوي ملفات",
       "hasLinks": "يحتوي روابط",
       "includeArchived": "تضمين المؤرشف",
+      "filters": {
+        "conversationId": "المحادثة",
+        "senderId": "المرسل",
+        "startDate": "من",
+        "endDate": "إلى",
+        "apply": "تطبيق",
+        "clear": "مسح"
+      },
       "meta": {
         "conversation": "المحادثة #{{id}}",
         "sender": "المرسل #{{id}}"

@@ -323,6 +323,14 @@
       "hasFiles": "Has files",
       "hasLinks": "Has links",
       "includeArchived": "Include archived",
+      "filters": {
+        "conversationId": "Conversation",
+        "senderId": "Sender",
+        "startDate": "From",
+        "endDate": "To",
+        "apply": "Apply",
+        "clear": "Clear"
+      },
       "meta": {
         "conversation": "Conversation #{{id}}",
         "sender": "Sender #{{id}}"
