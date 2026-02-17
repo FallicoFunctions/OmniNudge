@@ -1,11 +1,17 @@
 package handlers
 
 import (
+	"bytes"
+	"encoding/json"
 	"errors"
+	"fmt"
+	"net"
 	"net/http"
 	"net/url"
+	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5"
@@ -34,9 +40,14 @@ func NewBugReportsHandler(
 
 // CreateBugReportRequest represents the request body for creating a bug report
 type CreateBugReportRequest struct {
-	PageURL       string  `json:"page_url" binding:"required"`
-	Description   string  `json:"description" binding:"required"`
-	ScreenshotURL *string `json:"screenshot_url" binding:"required"`
+	PageURL          string                 `json:"page_url" binding:"required"`
+	Description      string                 `json:"description" binding:"required"`
+	ScreenshotURL    *string                `json:"screenshot_url"`
+	FeedbackType     string                 `json:"feedback_type"`
+	FeedbackCategory string                 `json:"feedback_category"`
+	LegacyCategory   string                 `json:"category"`
+	Rating           *int                   `json:"rating"`
+	Context          map[string]interface{} `json:"context"`
 }
 
 // CreateBugReport handles POST /api/v1/bug-reports
@@ -46,34 +57,59 @@ func (h *BugReportsHandler) CreateBugReport(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body", "details": err.Error()})
 		return
 	}
-	if req.ScreenshotURL == nil || strings.TrimSpace(*req.ScreenshotURL) == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Screenshot URL is required"})
+	feedbackType := strings.TrimSpace(req.FeedbackType)
+	if feedbackType == "" {
+		feedbackType = "report"
+	}
+	if !isValidFeedbackType(feedbackType) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid feedback type"})
 		return
 	}
 
-	normalizedURL := strings.TrimSpace(*req.ScreenshotURL)
-	if strings.HasPrefix(normalizedURL, "http://") || strings.HasPrefix(normalizedURL, "https://") {
-		parsedURL, err := url.Parse(normalizedURL)
-		if err != nil || parsedURL.Path == "" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Screenshot URL is invalid"})
+	category := strings.TrimSpace(req.FeedbackCategory)
+	if category == "" {
+		category = strings.TrimSpace(req.LegacyCategory)
+	}
+	if category == "" {
+		category = "bug"
+	}
+	if !isValidFeedbackCategory(category) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid feedback category"})
+		return
+	}
+
+	if req.Rating != nil && (*req.Rating < 1 || *req.Rating > 5) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Rating must be between 1 and 5"})
+		return
+	}
+
+	var normalizedScreenshotURL *string
+	if req.ScreenshotURL != nil && strings.TrimSpace(*req.ScreenshotURL) != "" {
+		normalizedURL := strings.TrimSpace(*req.ScreenshotURL)
+		if strings.HasPrefix(normalizedURL, "http://") || strings.HasPrefix(normalizedURL, "https://") {
+			parsedURL, err := url.Parse(normalizedURL)
+			if err != nil || parsedURL.Path == "" {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "Screenshot URL is invalid"})
+				return
+			}
+			normalizedURL = parsedURL.Path
+		}
+
+		media, err := h.mediaRepo.GetByStorageURL(c.Request.Context(), normalizedURL)
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "Screenshot file not found"})
+				return
+			}
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to validate screenshot", "details": err.Error()})
 			return
 		}
-		normalizedURL = parsedURL.Path
-	}
 
-	media, err := h.mediaRepo.GetByStorageURL(c.Request.Context(), normalizedURL)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Screenshot file not found"})
+		if !strings.HasPrefix(media.FileType, "image/") {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Screenshot must be an image file"})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to validate screenshot", "details": err.Error()})
-		return
-	}
-
-	if !strings.HasPrefix(media.FileType, "image/") {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Screenshot must be an image file"})
-		return
+		normalizedScreenshotURL = &normalizedURL
 	}
 
 	// Get user ID (optional - users can report bugs while logged out)
@@ -87,7 +123,11 @@ func (h *BugReportsHandler) CreateBugReport(c *gin.Context) {
 		UserID:        userID,
 		PageURL:       req.PageURL,
 		Description:   req.Description,
-		ScreenshotURL: &normalizedURL,
+		ScreenshotURL: normalizedScreenshotURL,
+		FeedbackType:  feedbackType,
+		Category:      category,
+		Rating:        req.Rating,
+		Context:       models.JSONB(sanitizeFeedbackContext(req.Context)),
 		Status:        "new",
 	}
 
@@ -96,12 +136,25 @@ func (h *BugReportsHandler) CreateBugReport(c *gin.Context) {
 		return
 	}
 
+	go notifyFeedbackWebhook(notifyFeedbackPayload{
+		ID:           report.ID,
+		PageURL:      report.PageURL,
+		Description:  report.Description,
+		FeedbackType: report.FeedbackType,
+		Category:     report.Category,
+		Rating:       report.Rating,
+		UserID:       report.UserID,
+		CreatedAt:    report.CreatedAt,
+	})
+
 	c.JSON(http.StatusCreated, report)
 }
 
 // GetBugReports handles GET /api/v1/bug-reports (admin only)
 func (h *BugReportsHandler) GetBugReports(c *gin.Context) {
 	status := c.Query("status")
+	category := c.Query("feedback_category")
+	feedbackType := c.Query("feedback_type")
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "50"))
 	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
 	cursorParam := c.Query("cursor")
@@ -113,6 +166,22 @@ func (h *BugReportsHandler) GetBugReports(c *gin.Context) {
 	var statusPtr *string
 	if status != "" {
 		statusPtr = &status
+	}
+	var categoryPtr *string
+	if category != "" {
+		if !isValidFeedbackCategory(category) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid feedback category"})
+			return
+		}
+		categoryPtr = &category
+	}
+	var feedbackTypePtr *string
+	if feedbackType != "" {
+		if !isValidFeedbackType(feedbackType) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid feedback type"})
+			return
+		}
+		feedbackTypePtr = &feedbackType
 	}
 
 	var cursor *timeCursor
@@ -138,9 +207,23 @@ func (h *BugReportsHandler) GetBugReports(c *gin.Context) {
 		if cursor != nil {
 			payload = &models.TimeCursor{ID: cursor.ID, Timestamp: cursor.Timestamp}
 		}
-		reports, err = h.bugReportRepo.GetAllWithCursor(c.Request.Context(), statusPtr, limitArg, payload)
+		reports, err = h.bugReportRepo.GetAllWithCursor(
+			c.Request.Context(),
+			statusPtr,
+			categoryPtr,
+			feedbackTypePtr,
+			limitArg,
+			payload,
+		)
 	} else {
-		reports, err = h.bugReportRepo.GetAll(c.Request.Context(), statusPtr, limitArg, offset)
+		reports, err = h.bugReportRepo.GetAll(
+			c.Request.Context(),
+			statusPtr,
+			categoryPtr,
+			feedbackTypePtr,
+			limitArg,
+			offset,
+		)
 	}
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch bug reports", "details": err.Error()})
@@ -320,4 +403,121 @@ func (h *BugReportsHandler) DeleteKnownBug(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Known bug deleted successfully"})
+}
+
+func isValidFeedbackType(value string) bool {
+	switch value {
+	case "report", "feedback", "survey", "nps":
+		return true
+	default:
+		return false
+	}
+}
+
+func isValidFeedbackCategory(value string) bool {
+	switch value {
+	case "bug", "feature_request", "other", "nps", "survey":
+		return true
+	default:
+		return false
+	}
+}
+
+func sanitizeFeedbackContext(ctx map[string]interface{}) map[string]interface{} {
+	if len(ctx) == 0 {
+		return map[string]interface{}{}
+	}
+
+	// Keep payload bounded and predictable for storage/logging.
+	sanitized := make(map[string]interface{}, len(ctx))
+	count := 0
+	for key, value := range ctx {
+		trimmedKey := strings.TrimSpace(key)
+		if trimmedKey == "" {
+			continue
+		}
+		if count >= 50 {
+			break
+		}
+		switch typed := value.(type) {
+		case string:
+			if len(typed) > 1024 {
+				sanitized[trimmedKey] = typed[:1024]
+			} else {
+				sanitized[trimmedKey] = typed
+			}
+		case bool, float64, float32, int, int32, int64, uint, uint32, uint64, nil:
+			sanitized[trimmedKey] = value
+		default:
+			sanitized[trimmedKey] = fmt.Sprintf("%v", value)
+		}
+		count++
+	}
+	return sanitized
+}
+
+type notifyFeedbackPayload struct {
+	ID           int
+	PageURL      string
+	Description  string
+	FeedbackType string
+	Category     string
+	Rating       *int
+	UserID       *int
+	CreatedAt    time.Time
+}
+
+func notifyFeedbackWebhook(payload notifyFeedbackPayload) {
+	webhookURL := strings.TrimSpace(os.Getenv("FEEDBACK_SLACK_WEBHOOK_URL"))
+	if webhookURL == "" {
+		return
+	}
+
+	userText := "anonymous"
+	if payload.UserID != nil {
+		userText = fmt.Sprintf("user_id=%d", *payload.UserID)
+	}
+
+	ratingText := "n/a"
+	if payload.Rating != nil {
+		ratingText = fmt.Sprintf("%d/5", *payload.Rating)
+	}
+
+	body := map[string]interface{}{
+		"text": fmt.Sprintf(
+			"[Feedback] #%d type=%s category=%s rating=%s by=%s at=%s\nPage: %s\n%s",
+			payload.ID,
+			payload.FeedbackType,
+			payload.Category,
+			ratingText,
+			userText,
+			payload.CreatedAt.Format(time.RFC3339),
+			payload.PageURL,
+			payload.Description,
+		),
+	}
+
+	encoded, err := json.Marshal(body)
+	if err != nil {
+		return
+	}
+
+	client := &http.Client{
+		Timeout: 10 * time.Second,
+		Transport: &http.Transport{
+			DialContext: (&net.Dialer{
+				Timeout: 5 * time.Second,
+			}).DialContext,
+		},
+	}
+	req, err := http.NewRequest(http.MethodPost, webhookURL, bytes.NewReader(encoded))
+	if err != nil {
+		return
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := client.Do(req)
+	if err != nil {
+		return
+	}
+	defer resp.Body.Close()
 }

@@ -96,6 +96,7 @@
     },
     "download": "تنزيل",
     "continue": "متابعة",
+    "later": "لاحقًا",
     "retry": "إعادة المحاولة",
     "noDetailsAvailable": "لا توجد تفاصيل متاحة.",
     "unableToLoadDetails": "تعذر تحميل التفاصيل.",
@@ -139,6 +140,12 @@
   "mainLayout": {
     "skipToMainContent": "تخطي إلى المحتوى الرئيسي",
     "bugReporting": "الإبلاغ عن الأخطاء",
+    "feedbackButton": "Feedback",
+    "feedbackPrompt": {
+      "title": "كيف تجربتك مع OmniNudge؟",
+      "body": "شاركنا ملاحظات سريعة لتحسين الرسائل والخلاصة.",
+      "action": "إرسال الاستبيان"
+    },
     "mobileNavigationError": "خطأ في التنقل. يرجى إعادة تحميل الصفحة.",
     "dontShowThisAgain": "لا تعرض هذا مرة أخرى"
   },
@@ -240,9 +247,33 @@
         "label": "الوصف",
         "placeholder": "صف الخلل بالتفصيل. ماذا حدث؟ ماذا كنت تتوقع أن يحدث؟ خطوات إعادة الإنتاج؟"
       },
+      "feedbackType": {
+        "label": "نوع الملاحظة",
+        "options": {
+          "report": "تقرير خلل",
+          "feedback": "ملاحظة عامة",
+          "survey": "استبيان",
+          "nps": "NPS"
+        }
+      },
+      "category": {
+        "label": "الفئة",
+        "options": {
+          "bug": "خلل",
+          "featureRequest": "طلب ميزة",
+          "other": "أخرى",
+          "survey": "استبيان",
+          "nps": "NPS"
+        }
+      },
+      "rating": {
+        "label": "التقييم (اختياري)",
+        "help": "قيّم تجربتك من 1 إلى 5.",
+        "clear": "مسح"
+      },
       "screenshot": {
         "label": "لقطة شاشة",
-        "help": "تساعدنا لقطة الشاشة على تحديد المشكلة وإصلاحها بسرعة"
+        "help": "اختيارية، لكنها تساعد في إصلاح المشاكل المرئية أسرع."
       }
     },
     "actions": {
@@ -253,9 +284,9 @@
       "unknownError": "خطأ غير معروف",
       "submitFailed": "فشل إرسال تقرير الخلل: {{message}}",
       "uploadFailed": "فشل رفع لقطة الشاشة: {{message}}",
-      "screenshotRequired": "لقطة الشاشة مطلوبة",
       "uploadMissingUrl": "استجابة الرفع لا تحتوي على رابط الملف",
-      "screenshotMustBeImage": "يجب أن تكون لقطة الشاشة ملف صورة."
+      "screenshotMustBeImage": "يجب أن تكون لقطة الشاشة ملف صورة.",
+      "ratingInvalid": "يجب أن يكون التقييم بين 1 و5."
     }
   },
   "searchPage": {
@@ -3246,7 +3277,26 @@
       "subtitle": "انقر على تقرير لعرض لقطة الشاشة والتفاصيل.",
       "filters": {
         "allStatuses": "كل الحالات",
+        "allCategories": "كل الفئات",
+        "allTypes": "كل الأنواع",
+        "sortNewest": "الأحدث أولًا",
+        "sortOldest": "الأقدم أولًا",
+        "sortRatingHigh": "أعلى تقييم",
+        "sortRatingLow": "أقل تقييم",
         "perPage": "{{count}} لكل صفحة"
+      },
+      "categories": {
+        "bug": "خلل",
+        "featureRequest": "طلب ميزة",
+        "other": "أخرى",
+        "survey": "استبيان",
+        "nps": "NPS"
+      },
+      "types": {
+        "report": "تقرير",
+        "feedback": "ملاحظة",
+        "survey": "استبيان",
+        "nps": "NPS"
       },
       "status": {
         "new": "جديد",
@@ -3261,6 +3311,9 @@
       "table": {
         "id": "المعرف",
         "status": "الحالة",
+        "type": "النوع",
+        "category": "الفئة",
+        "rating": "التقييم",
         "user": "المستخدم",
         "page": "الصفحة",
         "description": "الوصف",
@@ -3268,6 +3321,9 @@
       },
       "details": {
         "status": "الحالة",
+        "type": "النوع",
+        "category": "الفئة",
+        "rating": "التقييم",
         "reporter": "المبلّغ",
         "page": "الصفحة",
         "description": "الوصف",

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -1239,16 +1239,38 @@ function BugReportsTab() {
   const [cursorStack, setCursorStack] = useState(['']);
   const [pageSize, setPageSize] = useState(50);
   const [statusFilter, setStatusFilter] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('');
+  const [typeFilter, setTypeFilter] = useState('');
+  const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'rating_desc' | 'rating_asc'>(
+    'newest'
+  );
   const [expandedReportId, setExpandedReportId] = useState<number | null>(null);
 
   const currentCursor = cursorStack[cursorStack.length - 1] ?? '';
   const { data, isLoading } = useQuery({
-    queryKey: ['adminBugReports', statusFilter, pageSize, currentCursor],
+    queryKey: ['adminBugReports', statusFilter, categoryFilter, typeFilter, pageSize, currentCursor],
     queryFn: () =>
-      bugReportService.getBugReports(statusFilter || undefined, pageSize, 0, currentCursor),
+      bugReportService.getBugReports({
+        status: statusFilter || undefined,
+        feedbackCategory: categoryFilter || undefined,
+        feedbackType: typeFilter || undefined,
+        limit: pageSize,
+        offset: 0,
+        cursor: currentCursor,
+      }),
   });
 
-  const reports = data?.reports ?? [];
+  const reports =
+    sortBy === 'newest'
+      ? data?.reports ?? []
+      : [...(data?.reports ?? [])].sort((a, b) => {
+          if (sortBy === 'oldest') {
+            return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+          }
+          const ratingA = a.rating ?? 0;
+          const ratingB = b.rating ?? 0;
+          return sortBy === 'rating_desc' ? ratingB - ratingA : ratingA - ratingB;
+        });
 
   return (
     <div className="space-y-6">
@@ -1274,6 +1296,47 @@ function BugReportsTab() {
             <option value="fixed">{t('adminPage.bugReports.status.fixed')}</option>
             <option value="wont_fix">{t('adminPage.bugReports.status.wontFix')}</option>
             <option value="duplicate">{t('adminPage.bugReports.status.duplicate')}</option>
+          </select>
+          <select
+            value={categoryFilter}
+            onChange={(e) => {
+              setCategoryFilter(e.target.value);
+              setCursorStack(['']);
+            }}
+            className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-[var(--color-text-primary)]"
+          >
+            <option value="">{t('adminPage.bugReports.filters.allCategories')}</option>
+            <option value="bug">{t('adminPage.bugReports.categories.bug')}</option>
+            <option value="feature_request">{t('adminPage.bugReports.categories.featureRequest')}</option>
+            <option value="other">{t('adminPage.bugReports.categories.other')}</option>
+            <option value="survey">{t('adminPage.bugReports.categories.survey')}</option>
+            <option value="nps">{t('adminPage.bugReports.categories.nps')}</option>
+          </select>
+          <select
+            value={typeFilter}
+            onChange={(e) => {
+              setTypeFilter(e.target.value);
+              setCursorStack(['']);
+            }}
+            className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-[var(--color-text-primary)]"
+          >
+            <option value="">{t('adminPage.bugReports.filters.allTypes')}</option>
+            <option value="report">{t('adminPage.bugReports.types.report')}</option>
+            <option value="feedback">{t('adminPage.bugReports.types.feedback')}</option>
+            <option value="survey">{t('adminPage.bugReports.types.survey')}</option>
+            <option value="nps">{t('adminPage.bugReports.types.nps')}</option>
+          </select>
+          <select
+            value={sortBy}
+            onChange={(e) =>
+              setSortBy(e.target.value as 'newest' | 'oldest' | 'rating_desc' | 'rating_asc')
+            }
+            className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-[var(--color-text-primary)]"
+          >
+            <option value="newest">{t('adminPage.bugReports.filters.sortNewest')}</option>
+            <option value="oldest">{t('adminPage.bugReports.filters.sortOldest')}</option>
+            <option value="rating_desc">{t('adminPage.bugReports.filters.sortRatingHigh')}</option>
+            <option value="rating_asc">{t('adminPage.bugReports.filters.sortRatingLow')}</option>
           </select>
           <select
             value={pageSize}
@@ -1312,6 +1375,15 @@ function BugReportsTab() {
                   {t('adminPage.bugReports.table.status')}
                 </th>
                 <th className="p-3 text-left text-[var(--color-text-secondary)] font-medium">
+                  {t('adminPage.bugReports.table.type')}
+                </th>
+                <th className="p-3 text-left text-[var(--color-text-secondary)] font-medium">
+                  {t('adminPage.bugReports.table.category')}
+                </th>
+                <th className="p-3 text-left text-[var(--color-text-secondary)] font-medium">
+                  {t('adminPage.bugReports.table.rating')}
+                </th>
+                <th className="p-3 text-left text-[var(--color-text-secondary)] font-medium">
                   {t('adminPage.bugReports.table.user')}
                 </th>
                 <th className="p-3 text-left text-[var(--color-text-secondary)] font-medium">
@@ -1329,9 +1401,8 @@ function BugReportsTab() {
               {reports.map((report) => {
                 const isExpanded = expandedReportId === report.id;
                 return (
-                  <>
+                  <Fragment key={report.id}>
                     <tr
-                      key={report.id}
                       onClick={() => setExpandedReportId(isExpanded ? null : report.id)}
                       className="border-b border-[var(--color-border)] hover:bg-[var(--color-surface-hover)] cursor-pointer"
                     >
@@ -1340,6 +1411,15 @@ function BugReportsTab() {
                       </td>
                       <td className="p-3 capitalize text-[var(--color-text-secondary)]">
                         {report.status.replace('_', ' ')}
+                      </td>
+                      <td className="p-3 capitalize text-[var(--color-text-secondary)]">
+                        {report.feedback_type.replace('_', ' ')}
+                      </td>
+                      <td className="p-3 capitalize text-[var(--color-text-secondary)]">
+                        {report.feedback_category.replace('_', ' ')}
+                      </td>
+                      <td className="p-3 text-[var(--color-text-secondary)]">
+                        {report.rating ? `${report.rating}/5` : '—'}
                       </td>
                       <td className="p-3 text-[var(--color-text-secondary)]">
                         {report.username ||
@@ -1364,11 +1444,8 @@ function BugReportsTab() {
                       </td>
                     </tr>
                     {isExpanded && (
-                      <tr
-                        key={`${report.id}-details`}
-                        className="border-b border-[var(--color-border)]"
-                      >
-                        <td colSpan={6} className="p-4 bg-[var(--color-surface-elevated)]">
+                      <tr className="border-b border-[var(--color-border)]">
+                        <td colSpan={9} className="p-4 bg-[var(--color-surface-elevated)]">
                           <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,360px)]">
                             <div className="space-y-3 text-sm text-[var(--color-text-secondary)]">
                               <div>
@@ -1378,6 +1455,28 @@ function BugReportsTab() {
                                 <span className="capitalize">
                                   {report.status.replace('_', ' ')}
                                 </span>
+                              </div>
+                              <div>
+                                <span className="font-medium text-[var(--color-text-primary)]">
+                                  {t('adminPage.bugReports.details.type')}:
+                                </span>{' '}
+                                <span className="capitalize">
+                                  {report.feedback_type.replace('_', ' ')}
+                                </span>
+                              </div>
+                              <div>
+                                <span className="font-medium text-[var(--color-text-primary)]">
+                                  {t('adminPage.bugReports.details.category')}:
+                                </span>{' '}
+                                <span className="capitalize">
+                                  {report.feedback_category.replace('_', ' ')}
+                                </span>
+                              </div>
+                              <div>
+                                <span className="font-medium text-[var(--color-text-primary)]">
+                                  {t('adminPage.bugReports.details.rating')}:
+                                </span>{' '}
+                                {report.rating ? `${report.rating}/5` : '—'}
                               </div>
                               <div>
                                 <span className="font-medium text-[var(--color-text-primary)]">
@@ -1430,7 +1529,7 @@ function BugReportsTab() {
                         </td>
                       </tr>
                     )}
-                  </>
+                  </Fragment>
                 );
               })}
             </tbody>

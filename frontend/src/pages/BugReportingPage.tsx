@@ -1,38 +1,14 @@
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { bugReportService, type KnownBug } from '../services/bugReportService';
-import { useAuth } from '../contexts/AuthContext';
 import BugReportModal from '../components/bugReports/BugReportModal';
 import { Panel } from '../components/common/Panel';
 import { LoadingMessage } from '../components/common/StatusMessage';
 
 export default function BugReportingPage() {
   const { t } = useTranslation();
-  const { user } = useAuth();
-  const navigate = useNavigate();
   const [showModal, setShowModal] = useState(false);
-
-  // If user is not logged in, trigger the auth modal and redirect to home
-  useEffect(() => {
-    if (!user) {
-      // Small delay to ensure the event listener in MainLayout is ready
-      const modalTimer = setTimeout(() => {
-        window.dispatchEvent(new CustomEvent('open-auth-modal', { detail: 'login' }));
-      }, 100);
-
-      // Redirect to home page after a longer delay (gives user time to see modal)
-      const redirectTimer = setTimeout(() => {
-        navigate('/');
-      }, 500);
-
-      return () => {
-        clearTimeout(modalTimer);
-        clearTimeout(redirectTimer);
-      };
-    }
-  }, [user, navigate]);
 
   // Fetch known bugs
   const { data: knownBugsData, isLoading } = useQuery({
@@ -90,15 +66,6 @@ export default function BugReportingPage() {
       defaultValue: severity.toUpperCase(),
     });
   };
-
-  // Don't render content if not logged in (modal will show)
-  if (!user) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <div className="text-[var(--color-text-secondary)]">{t('bugReportingPage.loginRequired')}</div>
-      </div>
-    );
-  }
 
   return (
     <div className="mx-auto w-full max-w-4xl px-4 py-8">

@@ -1061,23 +1061,23 @@
 ---
 
 ### P0-035: User Feedback Infrastructure
-**Status:** ⬜ TODO
+**Status:** ✅ COMPLETE (February 17, 2026)
 **Priority:** P1
 **Estimated Time:** 1 week
 
 **Problem:** No way to collect user feedback systematically.
 
 **Tasks:**
-- [ ] Choose feedback service (Intercom, Typeform, or custom)
-- [ ] Add in-app feedback button (bottom-right corner)
-- [ ] Create feedback form: rating (1-5), category (bug, feature request, other), text
-- [ ] Add screenshot capture (optional)
-- [ ] Send feedback to Slack channel
-- [ ] Store feedback in database
-- [ ] Create feedback dashboard (admin)
-- [ ] Set up post-feature surveys (e.g., "How was your first call?")
-- [ ] Implement NPS survey (quarterly)
-- [ ] Document feedback review process
+- [x] Choose feedback service (custom in-app feedback pipeline)
+- [x] Add in-app feedback button (bottom-right corner)
+- [x] Create feedback form: rating (1-5), category (bug, feature request, other), text
+- [x] Add screenshot capture (optional)
+- [x] Send feedback to Slack channel (webhook, best-effort)
+- [x] Store feedback in database
+- [x] Create feedback dashboard (admin)
+- [x] Set up post-feature surveys (in-app survey prompt cadence)
+- [x] Implement NPS survey (quarterly cadence prompt)
+- [x] Document feedback review process
 
 **Acceptance Criteria:**
 - Feedback button visible on all pages

@@ -10,31 +10,35 @@ import (
 
 // BugReport represents a user-submitted bug report
 type BugReport struct {
-	ID            int        `json:"id"`
-	UserID        *int       `json:"user_id"`
-	PageURL       string     `json:"page_url"`
-	Description   string     `json:"description"`
-	ScreenshotURL *string    `json:"screenshot_url"`
-	Status        string     `json:"status"`
-	AdminNotes    *string    `json:"admin_notes,omitempty"`
-	CreatedAt     time.Time  `json:"created_at"`
-	UpdatedAt     time.Time  `json:"updated_at"`
-	Username      *string    `json:"username,omitempty"` // Joined from users table
+	ID            int       `json:"id"`
+	UserID        *int      `json:"user_id"`
+	PageURL       string    `json:"page_url"`
+	Description   string    `json:"description"`
+	ScreenshotURL *string   `json:"screenshot_url"`
+	FeedbackType  string    `json:"feedback_type"`
+	Category      string    `json:"feedback_category"`
+	Rating        *int      `json:"rating,omitempty"`
+	Context       JSONB     `json:"context"`
+	Status        string    `json:"status"`
+	AdminNotes    *string   `json:"admin_notes,omitempty"`
+	CreatedAt     time.Time `json:"created_at"`
+	UpdatedAt     time.Time `json:"updated_at"`
+	Username      *string   `json:"username,omitempty"` // Joined from users table
 }
 
 // KnownBug represents a known bug in the system
 type KnownBug struct {
-	ID               int        `json:"id"`
-	Title            string     `json:"title"`
-	Description      string     `json:"description"`
-	Status           string     `json:"status"`
-	Severity         string     `json:"severity"`
-	AffectedPages    []string   `json:"affected_pages"`
-	FixedInVersion   *string    `json:"fixed_in_version"`
-	Workaround       *string    `json:"workaround"`
-	CreatedAt        time.Time  `json:"created_at"`
-	UpdatedAt        time.Time  `json:"updated_at"`
-	FixedAt          *time.Time `json:"fixed_at"`
+	ID             int        `json:"id"`
+	Title          string     `json:"title"`
+	Description    string     `json:"description"`
+	Status         string     `json:"status"`
+	Severity       string     `json:"severity"`
+	AffectedPages  []string   `json:"affected_pages"`
+	FixedInVersion *string    `json:"fixed_in_version"`
+	Workaround     *string    `json:"workaround"`
+	CreatedAt      time.Time  `json:"created_at"`
+	UpdatedAt      time.Time  `json:"updated_at"`
+	FixedAt        *time.Time `json:"fixed_at"`
 }
 
 // BugReportRepository handles database operations for bug reports
@@ -50,8 +54,8 @@ func NewBugReportRepository(pool *pgxpool.Pool) *BugReportRepository {
 // Create inserts a new bug report
 func (r *BugReportRepository) Create(ctx context.Context, report *BugReport) error {
 	query := `
-		INSERT INTO bug_reports (user_id, page_url, description, screenshot_url, status)
-		VALUES ($1, $2, $3, $4, $5)
+		INSERT INTO bug_reports (user_id, page_url, description, screenshot_url, feedback_type, feedback_category, rating, context, status)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 		RETURNING id, created_at, updated_at
 	`
 	return r.pool.QueryRow(
@@ -61,37 +65,57 @@ func (r *BugReportRepository) Create(ctx context.Context, report *BugReport) err
 		report.PageURL,
 		report.Description,
 		report.ScreenshotURL,
+		report.FeedbackType,
+		report.Category,
+		report.Rating,
+		report.Context,
 		report.Status,
 	).Scan(&report.ID, &report.CreatedAt, &report.UpdatedAt)
 }
 
 // GetAll retrieves all bug reports with optional status filter
-func (r *BugReportRepository) GetAll(ctx context.Context, status *string, limit, offset int) ([]*BugReport, error) {
+func (r *BugReportRepository) GetAll(
+	ctx context.Context,
+	status *string,
+	category *string,
+	feedbackType *string,
+	limit,
+	offset int,
+) ([]*BugReport, error) {
 	var query string
 	var args []interface{}
+	var filters []string
+	paramIdx := 1
+
+	query = `
+		SELECT br.id, br.user_id, br.page_url, br.description, br.screenshot_url, br.feedback_type, br.feedback_category, br.rating, br.context,
+		       br.status, br.admin_notes, br.created_at, br.updated_at, u.username
+		FROM bug_reports br
+		LEFT JOIN users u ON br.user_id = u.id
+		WHERE 1=1
+	`
 
 	if status != nil && *status != "" {
-		query = `
-			SELECT br.id, br.user_id, br.page_url, br.description, br.screenshot_url,
-			       br.status, br.admin_notes, br.created_at, br.updated_at, u.username
-			FROM bug_reports br
-			LEFT JOIN users u ON br.user_id = u.id
-			WHERE br.status = $1
-			ORDER BY br.created_at DESC
-			LIMIT $2 OFFSET $3
-		`
-		args = []interface{}{*status, limit, offset}
-	} else {
-		query = `
-			SELECT br.id, br.user_id, br.page_url, br.description, br.screenshot_url,
-			       br.status, br.admin_notes, br.created_at, br.updated_at, u.username
-			FROM bug_reports br
-			LEFT JOIN users u ON br.user_id = u.id
-			ORDER BY br.created_at DESC
-			LIMIT $1 OFFSET $2
-		`
-		args = []interface{}{limit, offset}
+		filters = append(filters, fmt.Sprintf("br.status = $%d", paramIdx))
+		args = append(args, *status)
+		paramIdx++
 	}
+	if category != nil && *category != "" {
+		filters = append(filters, fmt.Sprintf("br.feedback_category = $%d", paramIdx))
+		args = append(args, *category)
+		paramIdx++
+	}
+	if feedbackType != nil && *feedbackType != "" {
+		filters = append(filters, fmt.Sprintf("br.feedback_type = $%d", paramIdx))
+		args = append(args, *feedbackType)
+		paramIdx++
+	}
+
+	for _, filter := range filters {
+		query += " AND " + filter
+	}
+	query += fmt.Sprintf(" ORDER BY br.created_at DESC, br.id DESC LIMIT $%d OFFSET $%d", paramIdx, paramIdx+1)
+	args = append(args, limit, offset)
 
 	rows, err := r.pool.Query(ctx, query, args...)
 	if err != nil {
@@ -108,6 +132,10 @@ func (r *BugReportRepository) GetAll(ctx context.Context, status *string, limit,
 			&report.PageURL,
 			&report.Description,
 			&report.ScreenshotURL,
+			&report.FeedbackType,
+			&report.Category,
+			&report.Rating,
+			&report.Context,
 			&report.Status,
 			&report.AdminNotes,
 			&report.CreatedAt,
@@ -127,6 +155,8 @@ func (r *BugReportRepository) GetAll(ctx context.Context, status *string, limit,
 func (r *BugReportRepository) GetAllWithCursor(
 	ctx context.Context,
 	status *string,
+	category *string,
+	feedbackType *string,
 	limit int,
 	cursor *TimeCursor,
 ) ([]*BugReport, error) {
@@ -135,7 +165,7 @@ func (r *BugReportRepository) GetAllWithCursor(
 	paramIdx := 1
 
 	query = `
-		SELECT br.id, br.user_id, br.page_url, br.description, br.screenshot_url,
+		SELECT br.id, br.user_id, br.page_url, br.description, br.screenshot_url, br.feedback_type, br.feedback_category, br.rating, br.context,
 		       br.status, br.admin_notes, br.created_at, br.updated_at, u.username
 		FROM bug_reports br
 		LEFT JOIN users u ON br.user_id = u.id
@@ -144,6 +174,16 @@ func (r *BugReportRepository) GetAllWithCursor(
 	if status != nil && *status != "" {
 		query += fmt.Sprintf(" AND br.status = $%d", paramIdx)
 		args = append(args, *status)
+		paramIdx++
+	}
+	if category != nil && *category != "" {
+		query += fmt.Sprintf(" AND br.feedback_category = $%d", paramIdx)
+		args = append(args, *category)
+		paramIdx++
+	}
+	if feedbackType != nil && *feedbackType != "" {
+		query += fmt.Sprintf(" AND br.feedback_type = $%d", paramIdx)
+		args = append(args, *feedbackType)
 		paramIdx++
 	}
 	if cursor != nil {
@@ -169,6 +209,10 @@ func (r *BugReportRepository) GetAllWithCursor(
 			&report.PageURL,
 			&report.Description,
 			&report.ScreenshotURL,
+			&report.FeedbackType,
+			&report.Category,
+			&report.Rating,
+			&report.Context,
 			&report.Status,
 			&report.AdminNotes,
 			&report.CreatedAt,
@@ -187,7 +231,7 @@ func (r *BugReportRepository) GetAllWithCursor(
 // GetByID retrieves a single bug report by ID
 func (r *BugReportRepository) GetByID(ctx context.Context, id int) (*BugReport, error) {
 	query := `
-		SELECT br.id, br.user_id, br.page_url, br.description, br.screenshot_url,
+		SELECT br.id, br.user_id, br.page_url, br.description, br.screenshot_url, br.feedback_type, br.feedback_category, br.rating, br.context,
 		       br.status, br.admin_notes, br.created_at, br.updated_at, u.username
 		FROM bug_reports br
 		LEFT JOIN users u ON br.user_id = u.id
@@ -200,6 +244,10 @@ func (r *BugReportRepository) GetByID(ctx context.Context, id int) (*BugReport, 
 		&report.PageURL,
 		&report.Description,
 		&report.ScreenshotURL,
+		&report.FeedbackType,
+		&report.Category,
+		&report.Rating,
+		&report.Context,
 		&report.Status,
 		&report.AdminNotes,
 		&report.CreatedAt,
