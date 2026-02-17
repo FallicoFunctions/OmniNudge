@@ -168,7 +168,8 @@ func (h *AudioEncoderHandler) EncodeAudio(c *gin.Context) {
 		return
 	}
 
-	// Enqueue transcription job (P0-002), gated by transcription opt-in.
+	// Enqueue transcription job only when explicitly enabled and user opted in.
+	// This avoids creating dead-letter jobs until the transcription backend is implemented.
 	if h.queueClient != nil && duration > 0 {
 		shouldTranscribe := false
 		if h.settingsRepo != nil {
@@ -180,13 +181,15 @@ func (h *AudioEncoderHandler) EncodeAudio(c *gin.Context) {
 			}
 		}
 
-		if shouldTranscribe {
+		if shouldTranscribe && os.Getenv("ENABLE_TRANSCRIPTION_QUEUE") == "true" {
 			mediaURL := fmt.Sprintf("/uploads/voice/%s", filename)
 			err = h.queueClient.EnqueueTranscription(c.Request.Context(), mediaFile.ID, mediaURL, userID)
 			if err != nil {
 				log.Printf("Failed to enqueue transcription job: %v", err)
 				// Don't fail the request - transcription is optional
 			}
+		} else if shouldTranscribe {
+			log.Printf("Transcription opt-in enabled for user %d, but transcription queue is disabled (set ENABLE_TRANSCRIPTION_QUEUE=true to enable)", userID)
 		}
 	}
 

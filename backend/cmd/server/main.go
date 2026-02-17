@@ -232,17 +232,17 @@ func main() {
 	// Start job queue worker (P0-002: background job processing)
 	if queueClient != nil && cfg.Redis.Addr != "" {
 		jobWorker := queue.NewWorker(cfg.Redis.Addr, cfg.Redis.Password, 10) // 10 concurrent workers
+		queueThumbnailService := services.NewThumbnailService()
 
 		// Register job handlers
 		jobWorker.RegisterAllHandlers(queue.JobHandlers{
-			EmailSend:  queue.NewEmailHandler(emailService),
-			DataExport: queue.NewDataExportHandler(db.Pool, storageService, cfg.Encryption.Key, emailService),
-			// Other handlers still use placeholders for now
-			VirusScan:           queue.HandleVirusScan,
-			Transcription:       queue.HandleTranscription,
-			Notification:        queue.HandleNotification,
-			ThumbnailGeneration: queue.HandleThumbnailGeneration,
-			ContentModeration:   queue.HandleContentModeration,
+			EmailSend:           queue.NewEmailHandler(emailService),
+			DataExport:          queue.NewDataExportHandler(db.Pool, storageService, cfg.Encryption.Key, emailService),
+			VirusScan:           queue.NewVirusScanHandler(),
+			Transcription:       queue.NewUnsupportedHandler(queue.JobTypeTranscription, "transcription backend pipeline is not yet implemented"),
+			Notification:        queue.NewNotificationHandler(tokenRepo, firebaseService),
+			ThumbnailGeneration: queue.NewThumbnailGenerationHandler(mediaRepo, queueThumbnailService),
+			ContentModeration:   queue.NewUnsupportedHandler(queue.JobTypeContentModeration, "content moderation backend is not yet implemented"),
 		})
 
 		// Start worker in background

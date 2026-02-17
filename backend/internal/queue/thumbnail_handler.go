@@ -1,0 +1,55 @@
+package queue
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"log"
+	"path/filepath"
+
+	"github.com/hibiken/asynq"
+	"github.com/omninudge/backend/internal/models"
+	"github.com/omninudge/backend/internal/services"
+)
+
+// NewThumbnailGenerationHandler creates a real thumbnail generation handler.
+func NewThumbnailGenerationHandler(
+	mediaRepo *models.MediaFileRepository,
+	thumbnailService *services.ThumbnailService,
+) JobHandler {
+	return func(ctx context.Context, task *asynq.Task) error {
+		var payload ThumbnailGenerationPayload
+		if err := json.Unmarshal(task.Payload(), &payload); err != nil {
+			return fmt.Errorf("json.Unmarshal failed: %v: %w", err, asynq.SkipRetry)
+		}
+		if payload.FileID <= 0 {
+			return fmt.Errorf("invalid file_id=%d: %w", payload.FileID, asynq.SkipRetry)
+		}
+		if mediaRepo == nil || thumbnailService == nil {
+			return fmt.Errorf("thumbnail handler dependencies not configured: %w", asynq.SkipRetry)
+		}
+
+		media, err := mediaRepo.GetByID(ctx, payload.FileID)
+		if err != nil {
+			return fmt.Errorf("failed to load media %d: %w", payload.FileID, err)
+		}
+		if !services.IsImageType(media.FileType) {
+			log.Printf("Skipping thumbnail generation for non-image media %d (%s)", media.ID, media.FileType)
+			return nil
+		}
+
+		thumbnailPath, err := thumbnailService.GenerateThumbnail(media.StoragePath)
+		if err != nil {
+			return fmt.Errorf("failed to generate thumbnail for media %d: %w", media.ID, err)
+		}
+		thumbnailName := filepath.Base(thumbnailPath)
+		thumbnailURL := "/uploads/" + thumbnailName
+
+		if err := mediaRepo.UpdateThumbnailURL(ctx, media.ID, thumbnailURL); err != nil {
+			return fmt.Errorf("failed to persist thumbnail URL for media %d: %w", media.ID, err)
+		}
+
+		log.Printf("Thumbnail generated for media %d: %s", media.ID, thumbnailURL)
+		return nil
+	}
+}
