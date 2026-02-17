@@ -508,6 +508,27 @@ func TestSearchMessagesDateRangeFilterIntegration(t *testing.T) {
 	require.Equal(t, float64(newMessage.ID), response.Messages[0]["id"])
 }
 
+func TestSearchMessagesInvalidDateRangeIntegration(t *testing.T) {
+	deps := newTestDeps(t)
+	defer deps.DB.Close()
+
+	user := createUser(t, deps.UserRepo, "searchmsg_invalid_range", "user")
+	token, _ := deps.AuthService.GenerateJWT(user.ID, "", user.Username, user.Role)
+
+	startDate := time.Now().UTC().Format(time.RFC3339)
+	endDate := time.Now().Add(-24 * time.Hour).UTC().Format(time.RFC3339)
+
+	req, _ := http.NewRequest(
+		"GET",
+		"/api/v1/search/messages?start_date="+startDate+"&end_date="+endDate,
+		nil,
+	)
+	req.Header.Set("Authorization", "Bearer "+token)
+	w := doRequest(t, deps.Router, req)
+
+	require.Equal(t, http.StatusBadRequest, w.Code)
+}
+
 func TestBatchMediaUpload_RejectsTooManyFiles(t *testing.T) {
 	defer os.RemoveAll("uploads")
 	deps := newTestDeps(t)
