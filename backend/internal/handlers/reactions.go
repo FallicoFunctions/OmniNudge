@@ -31,7 +31,8 @@ type AddReactionRequest struct {
 // @Description  Adds an emoji reaction to a message. Each user may add at most one
 //
 //	reaction per emoji per message. A message may have at most 10 distinct
-//	emoji types across all users. Rate-limited to 10 reactions/10 seconds.
+//	emoji types across all users. Rate-limited to 10 reactions per 10 seconds
+//	(1 req/s steady-state, burst of 10).
 //
 // @Tags         Messages, Reactions
 // @Accept       json
@@ -45,6 +46,7 @@ type AddReactionRequest struct {
 // @Failure      404     {object} map[string]string "Message not found"
 // @Failure      409     {object} map[string]string "Already reacted / too many emoji"
 // @Failure      429     {object} map[string]string "Rate limit exceeded"
+// @Failure      500     {object} map[string]string "Internal server error"
 // @Router       /messages/{id}/reactions [post]
 // @Security     BearerAuth
 func (h *ReactionsHandler) AddReaction(c *gin.Context) {
@@ -94,7 +96,7 @@ func (h *ReactionsHandler) AddReaction(c *gin.Context) {
 // @Summary      Remove a reaction from a message
 // @Description  Removes a reaction by its ID. Only the user who added the reaction
 //
-//	may remove it.
+//	may remove it. The reaction must belong to the specified message.
 //
 // @Tags         Messages, Reactions
 // @Produce      json
@@ -105,6 +107,8 @@ func (h *ReactionsHandler) AddReaction(c *gin.Context) {
 // @Failure      401         {object} map[string]string "Unauthenticated"
 // @Failure      403         {object} map[string]string "Not the reaction owner"
 // @Failure      404         {object} map[string]string "Reaction not found"
+// @Failure      429         {object} map[string]string "Rate limit exceeded"
+// @Failure      500         {object} map[string]string "Internal server error"
 // @Router       /messages/{id}/reactions/{reaction_id} [delete]
 // @Security     BearerAuth
 func (h *ReactionsHandler) RemoveReaction(c *gin.Context) {
@@ -114,20 +118,26 @@ func (h *ReactionsHandler) RemoveReaction(c *gin.Context) {
 		return
 	}
 
+	messageID, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid message ID"})
+		return
+	}
+
 	reactionID, err := strconv.Atoi(c.Param("reaction_id"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid reaction ID"})
 		return
 	}
 
-	if err := h.reactionService.RemoveReaction(c.Request.Context(), reactionID, userID.(int)); err != nil {
+	if err := h.reactionService.RemoveReaction(c.Request.Context(), messageID, reactionID, userID.(int)); err != nil {
 		switch {
 		case errors.Is(err, services.ErrReactionNotFound):
 			c.JSON(http.StatusNotFound, gin.H{"error": "Reaction not found"})
 		case errors.Is(err, services.ErrNotReactionOwner):
 			c.JSON(http.StatusForbidden, gin.H{"error": "You can only remove your own reactions"})
 		default:
-			log.Printf("[ReactionsHandler] RemoveReaction error: reaction=%d user=%d: %v", reactionID, userID.(int), err)
+			log.Printf("[ReactionsHandler] RemoveReaction error: message=%d reaction=%d user=%d: %v", messageID, reactionID, userID.(int), err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to remove reaction"})
 		}
 		return
@@ -136,22 +146,36 @@ func (h *ReactionsHandler) RemoveReaction(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Reaction removed"})
 }
 
+// GetReactionsResponse is the response body for GET /api/v1/messages/:id/reactions.
+type GetReactionsResponse struct {
+	// Reactions contains aggregated per-emoji reaction data, ordered by count
+	// descending (most popular emoji first).
+	Reactions []interface{} `json:"reactions"`
+	// TotalUniqueEmoji is the number of distinct emoji types on this message (max 10).
+	TotalUniqueEmoji int `json:"total_unique_emoji"`
+	// UsersTruncated is true when the combined per-emoji user lists exceed 500
+	// entries and were capped. Individual reaction counts remain accurate.
+	UsersTruncated bool `json:"users_truncated"`
+}
+
 // GetReactions handles GET /api/v1/messages/:id/reactions
 //
 // @Summary      Get reactions for a message
 // @Description  Returns aggregated emoji reactions for a message, ordered by count
 //
 //	descending (most popular first). Includes per-emoji user lists and a
-//	user_reacted flag for the calling user.
+//	user_reacted flag for the calling user. When users_truncated is true,
+//	user lists are capped at 500 entries; reaction counts are always accurate.
 //
 // @Tags         Messages, Reactions
 // @Produce      json
 // @Param        id  path     int true "Message ID"
-// @Success      200 {object} map[string]interface{} "reactions array + total_unique_emoji"
-// @Failure      400 {object} map[string]string       "Invalid message ID"
-// @Failure      401 {object} map[string]string       "Unauthenticated"
-// @Failure      403 {object} map[string]string       "Not a participant"
-// @Failure      404 {object} map[string]string       "Message not found"
+// @Success      200 {object} GetReactionsResponse
+// @Failure      400 {object} map[string]string "Invalid message ID"
+// @Failure      401 {object} map[string]string "Unauthenticated"
+// @Failure      403 {object} map[string]string "Not a participant"
+// @Failure      404 {object} map[string]string "Message not found"
+// @Failure      500 {object} map[string]string "Internal server error"
 // @Router       /messages/{id}/reactions [get]
 // @Security     BearerAuth
 func (h *ReactionsHandler) GetReactions(c *gin.Context) {
@@ -184,8 +208,6 @@ func (h *ReactionsHandler) GetReactions(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"reactions":          reactions,
 		"total_unique_emoji": len(reactions),
-		// users_truncated is true when the combined per-emoji user lists were
-		// capped at 500 entries. Individual reaction counts remain accurate.
-		"users_truncated": truncated,
+		"users_truncated":    truncated,
 	})
 }

@@ -17,11 +17,11 @@ import (
 
 // Sentinel errors returned by ReactionService.
 var (
-	ErrInvalidEmoji    = errors.New("invalid emoji: must be a single non-ASCII unicode character sequence, max 100 bytes")
-	ErrMessageNotFound = errors.New("message not found")
-	ErrNotParticipant  = errors.New("you are not a participant in this conversation")
-	ErrTooManyEmoji    = errors.New("this message already has 10 unique emoji reactions")
-	ErrAlreadyReacted  = errors.New("you have already reacted with this emoji")
+	ErrInvalidEmoji     = errors.New("invalid emoji: must be a single non-ASCII unicode character sequence, max 100 bytes")
+	ErrMessageNotFound  = errors.New("message not found")
+	ErrNotParticipant   = errors.New("you are not a participant in this conversation")
+	ErrTooManyEmoji     = errors.New("this message already has 10 unique emoji reactions")
+	ErrAlreadyReacted   = errors.New("you have already reacted with this emoji")
 	ErrReactionNotFound = errors.New("reaction not found")
 	ErrNotReactionOwner = errors.New("you can only remove your own reactions")
 )
@@ -65,7 +65,7 @@ func NewReactionService(
 //
 // Rules enforced:
 //   - Emoji must be valid (non-empty, non-ASCII, ≤100 bytes, no control chars,
-//     no bidirectional override characters)
+//     no bidirectional override characters, no Unicode tag characters)
 //   - The requesting user must be a participant in the conversation
 //   - A message may have at most 10 distinct emoji types across all users
 //   - The same user cannot add the same emoji to the same message twice (UNIQUE constraint)
@@ -92,13 +92,19 @@ func (s *ReactionService) AddReaction(ctx context.Context, messageID, userID int
 		}
 	}
 
-	// 3. Enforce 10 unique-emoji-per-message cap inside a transaction to
-	//    minimise (but not fully eliminate) the race window.
+	// 3. Enforce 10 unique-emoji-per-message cap inside a transaction.
+	//    pg_advisory_xact_lock serializes concurrent AddReaction calls for the
+	//    same message, preventing two requests from both passing the cap check
+	//    simultaneously. The lock is automatically released on commit/rollback.
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("begin transaction: %w", err)
 	}
 	defer tx.Rollback(ctx)
+
+	if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock($1::bigint)`, messageID); err != nil {
+		return nil, fmt.Errorf("acquire emoji cap lock: %w", err)
+	}
 
 	// If this emoji type is brand-new for this message, check the cap.
 	var emojiExists bool
@@ -148,7 +154,7 @@ func (s *ReactionService) AddReaction(ctx context.Context, messageID, userID int
 		return nil, fmt.Errorf("commit transaction: %w", err)
 	}
 
-	// Enrich with username after commit
+	// Enrich with username after commit (non-fatal if user was just deleted)
 	_ = s.pool.QueryRow(ctx, `SELECT username FROM users WHERE id = $1`, userID).Scan(&reaction.Username)
 
 	// 5. Broadcast reaction_added to all other participants (non-blocking).
@@ -172,11 +178,22 @@ func (s *ReactionService) AddReaction(ctx context.Context, messageID, userID int
 }
 
 // RemoveReaction deletes a reaction. Only the reaction owner may remove it.
+// messageID is the message the reaction should belong to — it is validated
+// against the loaded reaction to prevent information leakage across messages.
 // Broadcasts a "reaction_removed" event to all other participants on success.
-func (s *ReactionService) RemoveReaction(ctx context.Context, reactionID, userID int) error {
+func (s *ReactionService) RemoveReaction(ctx context.Context, messageID, reactionID, userID int) error {
 	// 1. Load reaction for ownership check
 	reaction, err := s.reactionRepo.GetByID(ctx, reactionID)
 	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return ErrReactionNotFound
+		}
+		return fmt.Errorf("get reaction by id: %w", err)
+	}
+
+	// Verify the reaction belongs to the claimed message. Without this check a
+	// caller could probe whether a reaction_id exists on a different message.
+	if reaction.MessageID != messageID {
 		return ErrReactionNotFound
 	}
 
@@ -192,6 +209,10 @@ func (s *ReactionService) RemoveReaction(ctx context.Context, reactionID, userID
 
 	// 2. Delete
 	if err := s.reactionRepo.RemoveReaction(ctx, reactionID); err != nil {
+		if errors.Is(err, models.ErrNoRowsAffected) {
+			// Concurrent deletion — reaction is already gone; treat as not found.
+			return ErrReactionNotFound
+		}
 		return fmt.Errorf("remove reaction: %w", err)
 	}
 
@@ -229,13 +250,18 @@ func (s *ReactionService) GetReactions(ctx context.Context, messageID, userID in
 // ---------------------------------------------------------------------------
 
 // isValidEmoji returns true if s is a non-empty UTF-8 string that contains at
-// least one non-ASCII rune and no null bytes, low control characters, or
-// bidirectional override/control characters (which could be used for visual
-// spoofing attacks such as reversing the display order of surrounding text).
+// least one non-ASCII rune and no null bytes, low control characters,
+// bidirectional override/control characters, or Unicode tag characters.
 //
 // Accepts ZWJ sequences (U+200D), variation selectors, and skin-tone modifiers.
-// Rejects: empty, >100 bytes, invalid UTF-8, ASCII-only, control chars < U+0020,
-// and Unicode bidi controls U+202A–U+202E and U+2066–U+2069.
+//
+// Rejects:
+//   - Empty or >100 bytes
+//   - Invalid UTF-8
+//   - ASCII-only strings
+//   - Control characters (< U+0020)
+//   - Bidi controls U+202A–U+202E and U+2066–U+2069 (visual spoofing)
+//   - Tag characters U+E0000–U+E007F (could encode hidden payload)
 func isValidEmoji(s string) bool {
 	if len(s) == 0 || len(s) > 100 {
 		return false
@@ -264,6 +290,13 @@ func isValidEmoji(s string) bool {
 		//   U+2068 FIRST STRONG ISOLATE
 		//   U+2069 POP DIRECTIONAL ISOLATE
 		if (r >= 0x202A && r <= 0x202E) || (r >= 0x2066 && r <= 0x2069) {
+			return false
+		}
+
+		// Reject Unicode tag characters (U+E0000–U+E007F). These are used for
+		// language tagging in emoji sequences but can also encode hidden
+		// arbitrary text that would be invisible in normal rendering.
+		if r >= 0xE0000 && r <= 0xE007F {
 			return false
 		}
 

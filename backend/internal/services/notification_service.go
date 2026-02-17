@@ -257,13 +257,20 @@ func (s *NotificationService) NotifyMessageReaction(
 	contentID := message.ID
 	actorID := reaction.UserID
 
+	// Use a safe fallback if the reactor's username is empty (e.g., the user
+	// was deleted in the narrow window between reaction insert and notification).
+	username := reaction.Username
+	if username == "" {
+		username = "Someone"
+	}
+
 	notif := &models.Notification{
 		UserID:           message.SenderID,
 		NotificationType: "message_reaction",
 		ContentType:      &contentType,
 		ContentID:        &contentID,
 		ActorID:          &actorID,
-		Message:          fmt.Sprintf("%s reacted with %s to your message", reaction.Username, reaction.Emoji),
+		Message:          fmt.Sprintf("%s reacted with %s to your message", username, reaction.Emoji),
 	}
 
 	if err := s.sendNotification(ctx, notif); err != nil {

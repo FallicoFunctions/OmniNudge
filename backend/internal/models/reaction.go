@@ -2,11 +2,17 @@ package models
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
+
+// ErrNoRowsAffected is returned by write operations when the target row no
+// longer exists at the time of deletion. This typically indicates a concurrent
+// operation removed the row between the caller's existence check and the delete.
+var ErrNoRowsAffected = errors.New("no rows affected")
 
 // MessageReaction represents a single emoji reaction on a message.
 type MessageReaction struct {
@@ -86,10 +92,14 @@ func (r *MessageReactionRepository) AddReaction(ctx context.Context, messageID, 
 }
 
 // RemoveReaction permanently deletes a reaction row.
+// Returns ErrNoRowsAffected if the row was already deleted (concurrent deletion).
 func (r *MessageReactionRepository) RemoveReaction(ctx context.Context, reactionID int) error {
-	_, err := r.pool.Exec(ctx, `DELETE FROM message_reactions WHERE id = $1`, reactionID)
+	ct, err := r.pool.Exec(ctx, `DELETE FROM message_reactions WHERE id = $1`, reactionID)
 	if err != nil {
 		return fmt.Errorf("delete reaction: %w", err)
+	}
+	if ct.RowsAffected() == 0 {
+		return ErrNoRowsAffected
 	}
 	return nil
 }
