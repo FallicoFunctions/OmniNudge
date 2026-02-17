@@ -508,6 +508,110 @@ func TestSearchMessagesDateRangeFilterIntegration(t *testing.T) {
 	require.Equal(t, float64(newMessage.ID), response.Messages[0]["id"])
 }
 
+func TestSearchMessagesConversationFilterIntegration(t *testing.T) {
+	deps := newTestDeps(t)
+	defer deps.DB.Close()
+
+	user1 := createUser(t, deps.UserRepo, "searchmsg_conv_user1", "user")
+	user2 := createUser(t, deps.UserRepo, "searchmsg_conv_user2", "user")
+	user3 := createUser(t, deps.UserRepo, "searchmsg_conv_user3", "user")
+	token, _ := deps.AuthService.GenerateJWT(user1.ID, "", user1.Username, user1.Role)
+
+	convA, err := deps.ConversationRepo.Create(context.Background(), user1.ID, user2.ID)
+	require.NoError(t, err)
+	convB, err := deps.ConversationRepo.Create(context.Background(), user1.ID, user3.ID)
+	require.NoError(t, err)
+
+	msgA := &models.Message{
+		ConversationID:    convA.ID,
+		SenderID:          user2.ID,
+		RecipientID:       user1.ID,
+		EncryptedContent:  "conversation-filter-token",
+		MessageType:       "text",
+		EncryptionVersion: "v1",
+	}
+	msgB := &models.Message{
+		ConversationID:    convB.ID,
+		SenderID:          user3.ID,
+		RecipientID:       user1.ID,
+		EncryptedContent:  "conversation-filter-token",
+		MessageType:       "text",
+		EncryptionVersion: "v1",
+	}
+	require.NoError(t, deps.MessageRepo.Create(context.Background(), msgA))
+	require.NoError(t, deps.MessageRepo.Create(context.Background(), msgB))
+
+	req, _ := http.NewRequest(
+		"GET",
+		fmt.Sprintf("/api/v1/search/messages?q=conversation-filter-token&conversation_id=%d", convA.ID),
+		nil,
+	)
+	req.Header.Set("Authorization", "Bearer "+token)
+	w := doRequest(t, deps.Router, req)
+	require.Equal(t, http.StatusOK, w.Code, "body=%s", w.Body.String())
+
+	var response struct {
+		Total    int                      `json:"total"`
+		Messages []map[string]interface{} `json:"messages"`
+	}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &response))
+	require.Equal(t, 1, response.Total)
+	require.Len(t, response.Messages, 1)
+	require.Equal(t, float64(msgA.ID), response.Messages[0]["id"])
+}
+
+func TestSearchMessagesSenderFilterIntegration(t *testing.T) {
+	deps := newTestDeps(t)
+	defer deps.DB.Close()
+
+	user1 := createUser(t, deps.UserRepo, "searchmsg_sender_user1", "user")
+	user2 := createUser(t, deps.UserRepo, "searchmsg_sender_user2", "user")
+	user3 := createUser(t, deps.UserRepo, "searchmsg_sender_user3", "user")
+	token, _ := deps.AuthService.GenerateJWT(user1.ID, "", user1.Username, user1.Role)
+
+	convA, err := deps.ConversationRepo.Create(context.Background(), user1.ID, user2.ID)
+	require.NoError(t, err)
+	convB, err := deps.ConversationRepo.Create(context.Background(), user1.ID, user3.ID)
+	require.NoError(t, err)
+
+	msgFromUser2 := &models.Message{
+		ConversationID:    convA.ID,
+		SenderID:          user2.ID,
+		RecipientID:       user1.ID,
+		EncryptedContent:  "sender-filter-token",
+		MessageType:       "text",
+		EncryptionVersion: "v1",
+	}
+	msgFromUser3 := &models.Message{
+		ConversationID:    convB.ID,
+		SenderID:          user3.ID,
+		RecipientID:       user1.ID,
+		EncryptedContent:  "sender-filter-token",
+		MessageType:       "text",
+		EncryptionVersion: "v1",
+	}
+	require.NoError(t, deps.MessageRepo.Create(context.Background(), msgFromUser2))
+	require.NoError(t, deps.MessageRepo.Create(context.Background(), msgFromUser3))
+
+	req, _ := http.NewRequest(
+		"GET",
+		fmt.Sprintf("/api/v1/search/messages?q=sender-filter-token&sender_id=%d", user2.ID),
+		nil,
+	)
+	req.Header.Set("Authorization", "Bearer "+token)
+	w := doRequest(t, deps.Router, req)
+	require.Equal(t, http.StatusOK, w.Code, "body=%s", w.Body.String())
+
+	var response struct {
+		Total    int                      `json:"total"`
+		Messages []map[string]interface{} `json:"messages"`
+	}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &response))
+	require.Equal(t, 1, response.Total)
+	require.Len(t, response.Messages, 1)
+	require.Equal(t, float64(msgFromUser2.ID), response.Messages[0]["id"])
+}
+
 func TestSearchMessagesInvalidDateRangeIntegration(t *testing.T) {
 	deps := newTestDeps(t)
 	defer deps.DB.Close()
