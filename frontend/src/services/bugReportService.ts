@@ -6,6 +6,10 @@ export interface BugReport {
   page_url: string;
   description: string;
   screenshot_url?: string;
+  feedback_type: 'report' | 'feedback' | 'survey' | 'nps';
+  feedback_category: 'bug' | 'feature_request' | 'other' | 'nps' | 'survey';
+  rating?: number;
+  context?: Record<string, unknown>;
   status: 'new' | 'investigating' | 'fixed' | 'wont_fix' | 'duplicate';
   admin_notes?: string;
   created_at: string;
@@ -30,7 +34,11 @@ export interface KnownBug {
 export interface CreateBugReportRequest {
   page_url: string;
   description: string;
-  screenshot_url: string; // Required
+  screenshot_url?: string;
+  feedback_type?: 'report' | 'feedback' | 'survey' | 'nps';
+  feedback_category?: 'bug' | 'feature_request' | 'other' | 'nps' | 'survey';
+  rating?: number;
+  context?: Record<string, unknown>;
 }
 
 export interface BugReportsResponse {
@@ -59,13 +67,24 @@ export const bugReportService = {
   },
 
   // Admin only: Get all bug reports
-  async getBugReports(status?: string, limit = 50, offset = 0, cursor?: string): Promise<BugReportsResponse> {
+  async getBugReports(options?: {
+    status?: string;
+    feedbackCategory?: string;
+    feedbackType?: string;
+    limit?: number;
+    offset?: number;
+    cursor?: string;
+  }): Promise<BugReportsResponse> {
+    const limit = options?.limit ?? 50;
+    const offset = options?.offset ?? 0;
     const params = new URLSearchParams({
       limit: String(limit),
       offset: String(offset),
     });
-    if (status) params.append('status', status);
-    if (cursor) params.append('cursor', cursor);
+    if (options?.status) params.append('status', options.status);
+    if (options?.feedbackCategory) params.append('feedback_category', options.feedbackCategory);
+    if (options?.feedbackType) params.append('feedback_type', options.feedbackType);
+    if (options?.cursor) params.append('cursor', options.cursor);
     return api.get<BugReportsResponse>(`/admin/bug-reports?${params.toString()}`);
   },
 

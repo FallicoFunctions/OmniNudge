@@ -96,6 +96,7 @@
     },
     "download": "Download",
     "continue": "Continue",
+    "later": "Later",
     "retry": "Retry",
     "noDetailsAvailable": "No details available.",
     "unableToLoadDetails": "Unable to load details.",
@@ -139,6 +140,12 @@
   "mainLayout": {
     "skipToMainContent": "Skip to main content",
     "bugReporting": "Bug Reporting",
+    "feedbackButton": "Feedback",
+    "feedbackPrompt": {
+      "title": "How is OmniNudge so far?",
+      "body": "Share quick feedback to help us improve the messaging and feed experience.",
+      "action": "Take Survey"
+    },
     "mobileNavigationError": "Navigation error. Please reload the page.",
     "dontShowThisAgain": "Don't Show This Again"
   },
@@ -240,9 +247,33 @@
         "label": "Description",
         "placeholder": "Describe the bug in detail. What happened? What did you expect to happen? Steps to reproduce?"
       },
+      "feedbackType": {
+        "label": "Feedback Type",
+        "options": {
+          "report": "Bug Report",
+          "feedback": "General Feedback",
+          "survey": "Survey",
+          "nps": "NPS"
+        }
+      },
+      "category": {
+        "label": "Category",
+        "options": {
+          "bug": "Bug",
+          "featureRequest": "Feature Request",
+          "other": "Other",
+          "survey": "Survey",
+          "nps": "NPS"
+        }
+      },
+      "rating": {
+        "label": "Rating (Optional)",
+        "help": "Rate your experience from 1 to 5.",
+        "clear": "Clear"
+      },
       "screenshot": {
         "label": "Screenshot",
-        "help": "A screenshot helps us identify and fix the issue faster"
+        "help": "Optional, but helpful for debugging visual issues faster."
       }
     },
     "actions": {
@@ -253,9 +284,9 @@
       "unknownError": "Unknown error",
       "submitFailed": "Failed to submit bug report: {{message}}",
       "uploadFailed": "Failed to upload screenshot: {{message}}",
-      "screenshotRequired": "Screenshot is required",
       "uploadMissingUrl": "Upload response missing file URL",
-      "screenshotMustBeImage": "Screenshot must be an image file."
+      "screenshotMustBeImage": "Screenshot must be an image file.",
+      "ratingInvalid": "Rating must be between 1 and 5."
     }
   },
   "searchPage": {
@@ -3246,7 +3277,26 @@
       "subtitle": "Click a report to view the screenshot and full details.",
       "filters": {
         "allStatuses": "All statuses",
+        "allCategories": "All categories",
+        "allTypes": "All types",
+        "sortNewest": "Newest first",
+        "sortOldest": "Oldest first",
+        "sortRatingHigh": "Highest rating",
+        "sortRatingLow": "Lowest rating",
         "perPage": "{{count}} per page"
+      },
+      "categories": {
+        "bug": "Bug",
+        "featureRequest": "Feature request",
+        "other": "Other",
+        "survey": "Survey",
+        "nps": "NPS"
+      },
+      "types": {
+        "report": "Report",
+        "feedback": "Feedback",
+        "survey": "Survey",
+        "nps": "NPS"
       },
       "status": {
         "new": "New",
@@ -3261,6 +3311,9 @@
       "table": {
         "id": "ID",
         "status": "Status",
+        "type": "Type",
+        "category": "Category",
+        "rating": "Rating",
         "user": "User",
         "page": "Page",
         "description": "Description",
@@ -3268,6 +3321,9 @@
       },
       "details": {
         "status": "Status",
+        "type": "Type",
+        "category": "Category",
+        "rating": "Rating",
         "reporter": "Reporter",
         "page": "Page",
         "description": "Description",

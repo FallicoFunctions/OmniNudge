@@ -96,6 +96,7 @@
     },
     "download": "Descargar",
     "continue": "Continuar",
+    "later": "Más tarde",
     "retry": "Reintentar",
     "noDetailsAvailable": "No hay detalles disponibles.",
     "unableToLoadDetails": "No se pudieron cargar los detalles.",
@@ -139,6 +140,12 @@
   "mainLayout": {
     "skipToMainContent": "Saltar al contenido principal",
     "bugReporting": "Reporte de errores",
+    "feedbackButton": "Feedback",
+    "feedbackPrompt": {
+      "title": "¿Cómo va OmniNudge?",
+      "body": "Comparte feedback rápido para mejorar mensajería y feed.",
+      "action": "Responder encuesta"
+    },
     "mobileNavigationError": "Error de navegación. Por favor, recarga la página.",
     "dontShowThisAgain": "No volver a mostrar esto"
   },
@@ -240,9 +247,33 @@
         "label": "Descripción",
         "placeholder": "Describe el bug en detalle. ¿Qué pasó? ¿Qué esperabas que pasara? Pasos para reproducirlo."
       },
+      "feedbackType": {
+        "label": "Tipo de feedback",
+        "options": {
+          "report": "Reporte de bug",
+          "feedback": "Feedback general",
+          "survey": "Encuesta",
+          "nps": "NPS"
+        }
+      },
+      "category": {
+        "label": "Categoría",
+        "options": {
+          "bug": "Bug",
+          "featureRequest": "Solicitud de función",
+          "other": "Otro",
+          "survey": "Encuesta",
+          "nps": "NPS"
+        }
+      },
+      "rating": {
+        "label": "Calificación (opcional)",
+        "help": "Califica tu experiencia del 1 al 5.",
+        "clear": "Limpiar"
+      },
       "screenshot": {
         "label": "Captura de pantalla",
-        "help": "Una captura de pantalla nos ayuda a identificar y corregir el problema más rápido"
+        "help": "Opcional, pero ayuda a depurar problemas visuales más rápido."
       }
     },
     "actions": {
@@ -253,9 +284,9 @@
       "unknownError": "Error desconocido",
       "submitFailed": "No se pudo enviar el reporte de bug: {{message}}",
       "uploadFailed": "No se pudo subir la captura de pantalla: {{message}}",
-      "screenshotRequired": "La captura de pantalla es obligatoria",
       "uploadMissingUrl": "La respuesta de carga no incluye la URL del archivo",
-      "screenshotMustBeImage": "La captura de pantalla debe ser un archivo de imagen."
+      "screenshotMustBeImage": "La captura de pantalla debe ser un archivo de imagen.",
+      "ratingInvalid": "La calificación debe estar entre 1 y 5."
     }
   },
   "searchPage": {
@@ -3246,7 +3277,26 @@
       "subtitle": "Haz clic en un reporte para ver la captura y los detalles completos.",
       "filters": {
         "allStatuses": "Todos los estados",
+        "allCategories": "Todas las categorías",
+        "allTypes": "Todos los tipos",
+        "sortNewest": "Más recientes",
+        "sortOldest": "Más antiguos",
+        "sortRatingHigh": "Mayor calificación",
+        "sortRatingLow": "Menor calificación",
         "perPage": "{{count}} por pagina"
+      },
+      "categories": {
+        "bug": "Bug",
+        "featureRequest": "Solicitud de función",
+        "other": "Otro",
+        "survey": "Encuesta",
+        "nps": "NPS"
+      },
+      "types": {
+        "report": "Reporte",
+        "feedback": "Feedback",
+        "survey": "Encuesta",
+        "nps": "NPS"
       },
       "status": {
         "new": "Nuevo",
@@ -3261,6 +3311,9 @@
       "table": {
         "id": "ID",
         "status": "Estado",
+        "type": "Tipo",
+        "category": "Categoría",
+        "rating": "Calificación",
         "user": "Usuario",
         "page": "Pagina",
         "description": "Descripcion",
@@ -3268,6 +3321,9 @@
       },
       "details": {
         "status": "Estado",
+        "type": "Tipo",
+        "category": "Categoría",
+        "rating": "Calificación",
         "reporter": "Reportante",
         "page": "Pagina",
         "description": "Descripcion",

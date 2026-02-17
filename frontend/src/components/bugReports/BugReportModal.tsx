@@ -10,6 +10,9 @@ type BugReportModalProps = {
   onClose: () => void;
   initialUrl?: string;
   onNavigateToPage?: () => void;
+  defaultFeedbackType?: 'report' | 'feedback' | 'survey' | 'nps';
+  defaultFeedbackCategory?: 'bug' | 'feature_request' | 'other' | 'nps' | 'survey';
+  hidePageLinkAction?: boolean;
 };
 
 export default function BugReportModal({
@@ -17,10 +20,20 @@ export default function BugReportModal({
   onClose,
   initialUrl,
   onNavigateToPage,
+  defaultFeedbackType = 'report',
+  defaultFeedbackCategory = 'bug',
+  hidePageLinkAction = false,
 }: BugReportModalProps) {
   const { t } = useTranslation();
   const [pageUrl, setPageUrl] = useState('');
   const [description, setDescription] = useState('');
+  const [feedbackType, setFeedbackType] = useState<'report' | 'feedback' | 'survey' | 'nps'>(
+    defaultFeedbackType
+  );
+  const [feedbackCategory, setFeedbackCategory] = useState<
+    'bug' | 'feature_request' | 'other' | 'nps' | 'survey'
+  >(defaultFeedbackCategory);
+  const [rating, setRating] = useState<number | ''>('');
   const [screenshot, setScreenshot] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
@@ -29,21 +42,41 @@ export default function BugReportModal({
   useEffect(() => {
     if (!isOpen) return;
     setPageUrl(initialUrl ?? '');
+    setFeedbackType(defaultFeedbackType);
+    setFeedbackCategory(defaultFeedbackCategory);
+    setRating('');
+    setDescription('');
+    setScreenshot(null);
     setShowSuccess(false);
     setErrorMessage('');
-  }, [initialUrl, isOpen]);
+  }, [defaultFeedbackCategory, defaultFeedbackType, initialUrl, isOpen]);
 
   const submitBugMutation = useMutation({
-    mutationFn: async (screenshotUrl: string) => {
+    mutationFn: async (screenshotUrl?: string) => {
       return bugReportService.createBugReport({
         page_url: pageUrl,
         description,
         screenshot_url: screenshotUrl,
+        feedback_type: feedbackType,
+        feedback_category: feedbackCategory,
+        rating: rating === '' ? undefined : rating,
+        context: {
+          page_title: typeof document !== 'undefined' ? document.title : '',
+          user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : '',
+          language: typeof navigator !== 'undefined' ? navigator.language : '',
+          viewport:
+            typeof window !== 'undefined'
+              ? `${window.innerWidth}x${window.innerHeight}`
+              : undefined,
+        },
       });
     },
     onSuccess: () => {
       setPageUrl(initialUrl ?? '');
       setDescription('');
+      setFeedbackType(defaultFeedbackType);
+      setFeedbackCategory(defaultFeedbackCategory);
+      setRating('');
       setScreenshot(null);
       setShowSuccess(true);
       setErrorMessage('');
@@ -62,22 +95,25 @@ export default function BugReportModal({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!screenshot) {
-      setErrorMessage(t('bugReportModal.errors.screenshotRequired'));
+    if (rating !== '' && (rating < 1 || rating > 5)) {
+      setErrorMessage(t('bugReportModal.errors.ratingInvalid'));
       return;
     }
 
+    let screenshotUrl: string | undefined;
+
     try {
       setErrorMessage('');
-      setUploading(true);
-
-      const response = await api.uploadFile<{ storage_url?: string; url?: string }>(
-        '/media/upload',
-        screenshot
-      );
-      const screenshotUrl = response.storage_url ?? response.url ?? '';
-      if (!screenshotUrl) {
-        throw new Error(t('bugReportModal.errors.uploadMissingUrl'));
+      if (screenshot) {
+        setUploading(true);
+        const response = await api.uploadFile<{ storage_url?: string; url?: string }>(
+          '/media/upload',
+          screenshot
+        );
+        screenshotUrl = response.storage_url ?? response.url ?? '';
+        if (!screenshotUrl) {
+          throw new Error(t('bugReportModal.errors.uploadMissingUrl'));
+        }
       }
 
       submitBugMutation.mutate(screenshotUrl);
@@ -177,13 +213,89 @@ export default function BugReportModal({
             />
           </div>
 
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div>
+              <label className="block text-sm font-medium text-[var(--color-text-primary)] mb-2">
+                {t('bugReportModal.form.feedbackType.label')}
+              </label>
+              <select
+                value={feedbackType}
+                onChange={(e) =>
+                  setFeedbackType(e.target.value as 'report' | 'feedback' | 'survey' | 'nps')
+                }
+                className="w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-2 text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
+              >
+                <option value="report">{t('bugReportModal.form.feedbackType.options.report')}</option>
+                <option value="feedback">
+                  {t('bugReportModal.form.feedbackType.options.feedback')}
+                </option>
+                <option value="survey">{t('bugReportModal.form.feedbackType.options.survey')}</option>
+                <option value="nps">{t('bugReportModal.form.feedbackType.options.nps')}</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-[var(--color-text-primary)] mb-2">
+                {t('bugReportModal.form.category.label')}
+              </label>
+              <select
+                value={feedbackCategory}
+                onChange={(e) =>
+                  setFeedbackCategory(
+                    e.target.value as 'bug' | 'feature_request' | 'other' | 'nps' | 'survey'
+                  )
+                }
+                className="w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-2 text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
+              >
+                <option value="bug">{t('bugReportModal.form.category.options.bug')}</option>
+                <option value="feature_request">
+                  {t('bugReportModal.form.category.options.featureRequest')}
+                </option>
+                <option value="other">{t('bugReportModal.form.category.options.other')}</option>
+                <option value="survey">{t('bugReportModal.form.category.options.survey')}</option>
+                <option value="nps">{t('bugReportModal.form.category.options.nps')}</option>
+              </select>
+            </div>
+          </div>
+
           <div>
             <label className="block text-sm font-medium text-[var(--color-text-primary)] mb-2">
-              {t('bugReportModal.form.screenshot.label')} <span className="text-red-500">*</span>
+              {t('bugReportModal.form.rating.label')}
+            </label>
+            <div className="flex items-center gap-2">
+              {[1, 2, 3, 4, 5].map((value) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setRating(value)}
+                  className={`h-9 w-9 rounded-md border text-sm font-semibold ${
+                    rating === value
+                      ? 'border-[var(--color-primary)] bg-[var(--color-primary)] text-white'
+                      : 'border-[var(--color-border)] bg-[var(--color-surface-elevated)] text-[var(--color-text-primary)] hover:bg-[var(--color-surface)]'
+                  }`}
+                >
+                  {value}
+                </button>
+              ))}
+              <button
+                type="button"
+                onClick={() => setRating('')}
+                className="ml-2 rounded-md border border-[var(--color-border)] px-3 py-1 text-xs text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-elevated)]"
+              >
+                {t('bugReportModal.form.rating.clear')}
+              </button>
+            </div>
+            <p className="mt-1 text-xs text-[var(--color-text-secondary)]">
+              {t('bugReportModal.form.rating.help')}
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-[var(--color-text-primary)] mb-2">
+              {t('bugReportModal.form.screenshot.label')}
             </label>
             <input
               type="file"
-              required
               accept="image/*"
               onChange={(e) => {
                 const file = e.target.files?.[0] || null;
@@ -204,7 +316,7 @@ export default function BugReportModal({
           </div>
 
           <div className="flex flex-col gap-3 pt-4 sm:flex-row sm:items-center sm:justify-between">
-            {onNavigateToPage && (
+            {!hidePageLinkAction && onNavigateToPage && (
               <button
                 type="button"
                 onClick={onNavigateToPage}
