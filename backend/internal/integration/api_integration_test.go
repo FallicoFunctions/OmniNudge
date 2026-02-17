@@ -529,6 +529,67 @@ func TestSearchMessagesInvalidDateRangeIntegration(t *testing.T) {
 	require.Equal(t, http.StatusBadRequest, w.Code)
 }
 
+func TestSearchMessagesRespectsPerUserDeleteVisibilityIntegration(t *testing.T) {
+	deps := newTestDeps(t)
+	defer deps.DB.Close()
+
+	user1 := createUser(t, deps.UserRepo, "searchmsg_delete_user1", "user")
+	user2 := createUser(t, deps.UserRepo, "searchmsg_delete_user2", "user")
+	tokenUser1, _ := deps.AuthService.GenerateJWT(user1.ID, "", user1.Username, user1.Role)
+	tokenUser2, _ := deps.AuthService.GenerateJWT(user2.ID, "", user2.Username, user2.Role)
+
+	conv, err := deps.ConversationRepo.Create(context.Background(), user1.ID, user2.ID)
+	require.NoError(t, err)
+
+	msg := &models.Message{
+		ConversationID:    conv.ID,
+		SenderID:          user1.ID,
+		RecipientID:       user2.ID,
+		EncryptedContent:  "delete-visibility-token",
+		MessageType:       "text",
+		EncryptionVersion: "v1",
+	}
+	require.NoError(t, deps.MessageRepo.Create(context.Background(), msg))
+
+	searchAsUser1, _ := http.NewRequest("GET", "/api/v1/search/messages?q=delete-visibility-token", nil)
+	searchAsUser1.Header.Set("Authorization", "Bearer "+tokenUser1)
+	w := doRequest(t, deps.Router, searchAsUser1)
+	require.Equal(t, http.StatusOK, w.Code, "body=%s", w.Body.String())
+
+	var beforeDelete struct {
+		Total int `json:"total"`
+	}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &beforeDelete))
+	require.Equal(t, 1, beforeDelete.Total)
+
+	deleteReq, _ := http.NewRequest("DELETE", fmt.Sprintf("/api/v1/messages/%d?delete_for=self", msg.ID), nil)
+	deleteReq.Header.Set("Authorization", "Bearer "+tokenUser1)
+	w = doRequest(t, deps.Router, deleteReq)
+	require.Equal(t, http.StatusOK, w.Code, "body=%s", w.Body.String())
+
+	searchAsUser1After, _ := http.NewRequest("GET", "/api/v1/search/messages?q=delete-visibility-token", nil)
+	searchAsUser1After.Header.Set("Authorization", "Bearer "+tokenUser1)
+	w = doRequest(t, deps.Router, searchAsUser1After)
+	require.Equal(t, http.StatusOK, w.Code, "body=%s", w.Body.String())
+
+	var afterDeleteUser1 struct {
+		Total int `json:"total"`
+	}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &afterDeleteUser1))
+	require.Equal(t, 0, afterDeleteUser1.Total)
+
+	searchAsUser2After, _ := http.NewRequest("GET", "/api/v1/search/messages?q=delete-visibility-token", nil)
+	searchAsUser2After.Header.Set("Authorization", "Bearer "+tokenUser2)
+	w = doRequest(t, deps.Router, searchAsUser2After)
+	require.Equal(t, http.StatusOK, w.Code, "body=%s", w.Body.String())
+
+	var afterDeleteUser2 struct {
+		Total int `json:"total"`
+	}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &afterDeleteUser2))
+	require.Equal(t, 1, afterDeleteUser2.Total)
+}
+
 func TestBatchMediaUpload_RejectsTooManyFiles(t *testing.T) {
 	defer os.RemoveAll("uploads")
 	deps := newTestDeps(t)
