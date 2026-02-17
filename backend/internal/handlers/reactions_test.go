@@ -23,7 +23,7 @@ var reactionsTestCounter int64
 
 func uniqueReactionsUsername(base string) string {
 	id := atomic.AddInt64(&reactionsTestCounter, 1)
-	return fmt.Sprintf("%s_reactions_%d_%d", base, time.Now().UnixNano(), id)
+	return fmt.Sprintf("%s_rxn_%d", base, id)
 }
 
 // reactionsTestBed holds all the state needed for a single reactions handler test.
@@ -112,6 +112,89 @@ func TestAddReaction_Success(t *testing.T) {
 	assert.Equal(t, float64(bed.msgID), resp["message_id"])
 }
 
+// TestAddReaction_SelfReaction verifies that a user can react to their own
+// message (valid use case). Notifications are suppressed for self-reactions
+// at the service layer, but the reaction itself must succeed.
+func TestAddReaction_SelfReaction(t *testing.T) {
+	bed, cleanup := setupReactionsHandlerTest(t)
+	defer cleanup()
+
+	// bed.msgID was sent by user1; user1 now reacts to their own message.
+	router := gin.New()
+	router.POST("/messages/:id/reactions", func(c *gin.Context) {
+		c.Set("user_id", bed.user1ID)
+		bed.handler.AddReaction(c)
+	})
+
+	body, _ := json.Marshal(map[string]string{"emoji": "😂"})
+	req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("/messages/%d/reactions", bed.msgID), bytes.NewBuffer(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusCreated, w.Code, "self-reaction should succeed: %s", w.Body.String())
+
+	var resp map[string]interface{}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+	assert.Equal(t, "😂", resp["emoji"])
+}
+
+// TestAddReaction_SameEmojiDifferentUsers verifies that two different users can
+// add the same emoji to the same message (the UNIQUE constraint is per user).
+func TestAddReaction_SameEmojiDifferentUsers(t *testing.T) {
+	bed, cleanup := setupReactionsHandlerTest(t)
+	defer cleanup()
+
+	target := fmt.Sprintf("/messages/%d/reactions", bed.msgID)
+	body, _ := json.Marshal(map[string]string{"emoji": "👍"})
+
+	// user1 reacts with 👍
+	r1 := gin.New()
+	r1.POST("/messages/:id/reactions", func(c *gin.Context) {
+		c.Set("user_id", bed.user1ID)
+		bed.handler.AddReaction(c)
+	})
+	req1 := httptest.NewRequest(http.MethodPost, target, bytes.NewBuffer(body))
+	req1.Header.Set("Content-Type", "application/json")
+	w1 := httptest.NewRecorder()
+	r1.ServeHTTP(w1, req1)
+	require.Equal(t, http.StatusCreated, w1.Code, w1.Body.String())
+
+	// user2 reacts with the same 👍 — must succeed (different user)
+	r2 := gin.New()
+	r2.POST("/messages/:id/reactions", func(c *gin.Context) {
+		c.Set("user_id", bed.user2ID)
+		bed.handler.AddReaction(c)
+	})
+	req2 := httptest.NewRequest(http.MethodPost, target, bytes.NewBuffer(body))
+	req2.Header.Set("Content-Type", "application/json")
+	w2 := httptest.NewRecorder()
+	r2.ServeHTTP(w2, req2)
+	require.Equal(t, http.StatusCreated, w2.Code, w2.Body.String())
+
+	// GetReactions should show 1 emoji type with count=2
+	rGet := gin.New()
+	rGet.GET("/messages/:id/reactions", func(c *gin.Context) {
+		c.Set("user_id", bed.user1ID)
+		bed.handler.GetReactions(c)
+	})
+	reqGet := httptest.NewRequest(http.MethodGet, target, nil)
+	wGet := httptest.NewRecorder()
+	rGet.ServeHTTP(wGet, reqGet)
+	require.Equal(t, http.StatusOK, wGet.Code)
+
+	var resp map[string]interface{}
+	require.NoError(t, json.Unmarshal(wGet.Body.Bytes(), &resp))
+	assert.Equal(t, float64(1), resp["total_unique_emoji"], "only 1 unique emoji")
+
+	reactions := resp["reactions"].([]interface{})
+	require.Len(t, reactions, 1)
+	first := reactions[0].(map[string]interface{})
+	assert.Equal(t, "👍", first["emoji"])
+	assert.Equal(t, float64(2), first["count"])
+	assert.Equal(t, true, first["user_reacted"]) // user1 queried
+}
+
 func TestAddReaction_InvalidEmoji(t *testing.T) {
 	tests := []struct {
 		name  string
@@ -120,6 +203,7 @@ func TestAddReaction_InvalidEmoji(t *testing.T) {
 		{"empty", ""},
 		{"ascii only", "hello"},
 		{"rlo override", "\u202e"},
+		{"tag character", "\U000e0041"}, // U+E0041 (tag Latin A)
 	}
 
 	for _, tt := range tests {
@@ -248,7 +332,7 @@ func TestAddReaction_TooManyEmoji(t *testing.T) {
 
 	target := fmt.Sprintf("/messages/%d/reactions", bed.msgID)
 
-	// Distinct emoji list (11 total; first 10 should succeed, 11th should 409)
+	// 11 distinct emoji — first 10 succeed, 11th must return 409
 	emojis := []string{"👍", "❤️", "😂", "😮", "😢", "😡", "🎉", "🔥", "💯", "✅", "🚀"}
 	require.Len(t, emojis, 11)
 
@@ -306,7 +390,8 @@ func TestAddReaction_InvalidMessageID(t *testing.T) {
 // RemoveReaction tests
 // ---------------------------------------------------------------------------
 
-// addTestReaction is a helper that inserts a reaction and returns its ID.
+// addTestReaction bypasses the service layer to insert a reaction directly,
+// avoiding any rate-limit or business-logic interference in test setup.
 func addTestReaction(t *testing.T, bed *reactionsTestBed, userID int, emoji string) int {
 	t.Helper()
 	ctx := context.Background()
@@ -384,6 +469,32 @@ func TestRemoveReaction_NotFound(t *testing.T) {
 	assert.Equal(t, http.StatusNotFound, w.Code)
 }
 
+// TestRemoveReaction_WrongMessage verifies that a reaction cannot be deleted by
+// providing the correct reaction_id but the wrong message_id in the URL path.
+// This prevents information leakage: an attacker cannot probe whether a
+// reaction_id exists on a different message.
+func TestRemoveReaction_WrongMessage(t *testing.T) {
+	bed, cleanup := setupReactionsHandlerTest(t)
+	defer cleanup()
+
+	reactionID := addTestReaction(t, bed, bed.user1ID, "👍")
+
+	router := gin.New()
+	router.DELETE("/messages/:id/reactions/:reaction_id", func(c *gin.Context) {
+		c.Set("user_id", bed.user1ID)
+		bed.handler.RemoveReaction(c)
+	})
+
+	// Use a non-existent message ID (999999) with a real reaction ID
+	req := httptest.NewRequest(http.MethodDelete,
+		fmt.Sprintf("/messages/999999/reactions/%d", reactionID), nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusNotFound, w.Code,
+		"reaction belongs to a different message, should be 404")
+}
+
 func TestRemoveReaction_Unauthenticated(t *testing.T) {
 	bed, cleanup := setupReactionsHandlerTest(t)
 	defer cleanup()
@@ -433,7 +544,10 @@ func TestGetReactions_WithReactions(t *testing.T) {
 
 	// user1 and user2 both add thumbs-up; user2 also adds heart
 	addTestReaction(t, bed, bed.user1ID, "👍")
+	// Small sleep to ensure created_at ordering is deterministic
+	time.Sleep(2 * time.Millisecond)
 	addTestReaction(t, bed, bed.user2ID, "👍")
+	time.Sleep(2 * time.Millisecond)
 	addTestReaction(t, bed, bed.user2ID, "❤️")
 
 	router := gin.New()

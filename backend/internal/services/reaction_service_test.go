@@ -59,6 +59,13 @@ func TestIsValidEmoji(t *testing.T) {
 		// Bidi control smuggled inside an otherwise valid emoji
 		{name: "emoji with embedded RLO", input: "👍\u202E", want: false},
 
+		// ── invalid: Unicode tag characters (U+E0000–U+E007F) ───────────────
+		// These can encode hidden payloads in emoji sequences.
+		{name: "U+E0001 LANGUAGE TAG", input: "\U000E0001", want: false},
+		{name: "U+E0041 tag Latin A", input: "\U000E0041", want: false},
+		{name: "U+E007F CANCEL TAG", input: "\U000E007F", want: false},
+		{name: "emoji with embedded tag char", input: "🏳\U000E0067\U000E0062", want: false}, // flag + tag chars
+
 		// ── valid: adjacent to bidi range (must NOT be rejected) ────────────
 		// U+2029 = paragraph separator (below range), U+206A is above range
 		{name: "U+2029 paragraph separator (valid high char)", input: "\u2029", want: true},  // non-ASCII, not in bidi range
