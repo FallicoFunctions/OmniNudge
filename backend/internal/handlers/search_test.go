@@ -559,6 +559,67 @@ func TestSearchMessagesExcludesDeletedConversationsForUser(t *testing.T) {
 	assert.Equal(t, float64(0), response["total"])
 }
 
+func TestSearchMessagesSortOld(t *testing.T) {
+	handler, db, cleanup := setupSearchHandlerTest(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	userRepo := models.NewUserRepository(db.Pool)
+	conversationRepo := models.NewConversationRepository(db.Pool)
+	messageRepo := models.NewMessageRepository(db.Pool)
+
+	user1 := &models.User{Username: uniqueSearchName("msg_sort_old_user1"), PasswordHash: "hash"}
+	user2 := &models.User{Username: uniqueSearchName("msg_sort_old_user2"), PasswordHash: "hash"}
+	require.NoError(t, userRepo.Create(ctx, user1))
+	require.NoError(t, userRepo.Create(ctx, user2))
+
+	conversation, err := conversationRepo.Create(ctx, user1.ID, user2.ID)
+	require.NoError(t, err)
+
+	older := &models.Message{
+		ConversationID:    conversation.ID,
+		SenderID:          user2.ID,
+		RecipientID:       user1.ID,
+		EncryptedContent:  "sort-token-older",
+		MessageType:       "text",
+		EncryptionVersion: "v1",
+	}
+	newer := &models.Message{
+		ConversationID:    conversation.ID,
+		SenderID:          user2.ID,
+		RecipientID:       user1.ID,
+		EncryptedContent:  "sort-token-newer",
+		MessageType:       "text",
+		EncryptionVersion: "v1",
+	}
+	require.NoError(t, messageRepo.Create(ctx, older))
+	require.NoError(t, messageRepo.Create(ctx, newer))
+
+	_, err = db.Pool.Exec(ctx, `UPDATE messages SET sent_at = NOW() - INTERVAL '2 hours' WHERE id = $1`, older.ID)
+	require.NoError(t, err)
+	_, err = db.Pool.Exec(ctx, `UPDATE messages SET sent_at = NOW() - INTERVAL '1 hour' WHERE id = $1`, newer.ID)
+	require.NoError(t, err)
+
+	router := gin.Default()
+	router.GET("/search/messages", func(c *gin.Context) {
+		c.Set("user_id", user1.ID)
+		handler.SearchMessages(c)
+	})
+
+	req := httptest.NewRequest("GET", "/search/messages?q=sort-token&sort=old", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusOK, w.Code, "body=%s", w.Body.String())
+	var response map[string]interface{}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &response))
+	require.Equal(t, "old", response["sort"])
+	messages := response["messages"].([]interface{})
+	require.Len(t, messages, 2)
+	first := messages[0].(map[string]interface{})
+	require.Equal(t, float64(older.ID), first["id"])
+}
+
 func strPtrSearch(value string) *string {
 	return &value
 }
