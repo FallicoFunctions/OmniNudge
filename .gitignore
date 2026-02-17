@@ -82,3 +82,8 @@ backend/*.txt
 # Temporary build/migration tools
 backend/cmd/migrate/
 backend/cmd/worker/
+
+# Local runtime/build artifacts (do not commit)
+.claude/
+backend/dump.rdb
+frontend/storybook-static/
