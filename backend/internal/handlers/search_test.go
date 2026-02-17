@@ -10,9 +10,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gin-gonic/gin"
 	"github.com/omninudge/backend/internal/database"
 	"github.com/omninudge/backend/internal/models"
-	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -311,4 +311,123 @@ func TestSearchPagination(t *testing.T) {
 	offset := int(response["offset"].(float64))
 	assert.Equal(t, 2, limit)
 	assert.Equal(t, 0, offset)
+}
+
+func TestSearchMessagesRequiresAuth(t *testing.T) {
+	handler, _, cleanup := setupSearchHandlerTest(t)
+	defer cleanup()
+
+	router := gin.Default()
+	router.GET("/search/messages", handler.SearchMessages)
+
+	req := httptest.NewRequest("GET", "/search/messages?q=test", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusUnauthorized, w.Code)
+}
+
+func TestSearchMessagesFindsVisibleMessages(t *testing.T) {
+	handler, db, cleanup := setupSearchHandlerTest(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	userRepo := models.NewUserRepository(db.Pool)
+	conversationRepo := models.NewConversationRepository(db.Pool)
+	messageRepo := models.NewMessageRepository(db.Pool)
+
+	user1 := &models.User{Username: uniqueSearchName("msg_search_user1"), PasswordHash: "hash"}
+	user2 := &models.User{Username: uniqueSearchName("msg_search_user2"), PasswordHash: "hash"}
+	require.NoError(t, userRepo.Create(ctx, user1))
+	require.NoError(t, userRepo.Create(ctx, user2))
+
+	conversation, err := conversationRepo.Create(ctx, user1.ID, user2.ID)
+	require.NoError(t, err)
+
+	msg := &models.Message{
+		ConversationID:    conversation.ID,
+		SenderID:          user2.ID,
+		RecipientID:       user1.ID,
+		EncryptedContent:  "hello-search-token",
+		MessageType:       "text",
+		EncryptionVersion: "v1",
+	}
+	require.NoError(t, messageRepo.Create(ctx, msg))
+
+	router := gin.Default()
+	router.GET("/search/messages", func(c *gin.Context) {
+		c.Set("user_id", user1.ID)
+		handler.SearchMessages(c)
+	})
+
+	req := httptest.NewRequest("GET", "/search/messages?q=hello-search-token", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusOK, w.Code, "body=%s", w.Body.String())
+
+	var response map[string]interface{}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &response))
+	assert.Equal(t, float64(1), response["total"])
+	messages := response["messages"].([]interface{})
+	assert.Len(t, messages, 1)
+}
+
+func TestSearchMessagesArchivedFilter(t *testing.T) {
+	handler, db, cleanup := setupSearchHandlerTest(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	userRepo := models.NewUserRepository(db.Pool)
+	conversationRepo := models.NewConversationRepository(db.Pool)
+	messageRepo := models.NewMessageRepository(db.Pool)
+
+	user1 := &models.User{Username: uniqueSearchName("msg_archived_user1"), PasswordHash: "hash"}
+	user2 := &models.User{Username: uniqueSearchName("msg_archived_user2"), PasswordHash: "hash"}
+	require.NoError(t, userRepo.Create(ctx, user1))
+	require.NoError(t, userRepo.Create(ctx, user2))
+
+	conversation, err := conversationRepo.Create(ctx, user1.ID, user2.ID)
+	require.NoError(t, err)
+
+	msg := &models.Message{
+		ConversationID:    conversation.ID,
+		SenderID:          user2.ID,
+		RecipientID:       user1.ID,
+		EncryptedContent:  "archived-message-token",
+		MessageType:       "text",
+		EncryptionVersion: "v1",
+	}
+	require.NoError(t, messageRepo.Create(ctx, msg))
+
+	_, err = db.Pool.Exec(ctx, `
+		UPDATE conversations
+		SET archived_for_user1 = TRUE
+		WHERE id = $1
+	`, conversation.ID)
+	require.NoError(t, err)
+
+	router := gin.Default()
+	router.GET("/search/messages", func(c *gin.Context) {
+		c.Set("user_id", user1.ID)
+		handler.SearchMessages(c)
+	})
+
+	reqWithoutArchived := httptest.NewRequest("GET", "/search/messages?q=archived-message-token", nil)
+	wWithoutArchived := httptest.NewRecorder()
+	router.ServeHTTP(wWithoutArchived, reqWithoutArchived)
+	require.Equal(t, http.StatusOK, wWithoutArchived.Code, "body=%s", wWithoutArchived.Body.String())
+
+	var withoutArchived map[string]interface{}
+	require.NoError(t, json.Unmarshal(wWithoutArchived.Body.Bytes(), &withoutArchived))
+	assert.Equal(t, float64(0), withoutArchived["total"])
+
+	reqWithArchived := httptest.NewRequest("GET", "/search/messages?q=archived-message-token&include_archived=true", nil)
+	wWithArchived := httptest.NewRecorder()
+	router.ServeHTTP(wWithArchived, reqWithArchived)
+	require.Equal(t, http.StatusOK, wWithArchived.Code, "body=%s", wWithArchived.Body.String())
+
+	var withArchived map[string]interface{}
+	require.NoError(t, json.Unmarshal(wWithArchived.Body.Bytes(), &withArchived))
+	assert.Equal(t, float64(1), withArchived["total"])
 }

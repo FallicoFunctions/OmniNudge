@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -507,4 +508,248 @@ func (h *SearchHandler) SearchHubs(c *gin.Context) {
 		response["next_cursor"] = nextCursor
 	}
 	c.JSON(http.StatusOK, response)
+}
+
+// SearchMessages searches messages visible to the authenticated user.
+// GET /api/v1/search/messages?q=query&conversation_id=1&sender_id=2&has_files=true&start_date=...&end_date=...&limit=50&offset=0
+func (h *SearchHandler) SearchMessages(c *gin.Context) {
+	userID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Authentication required"})
+		return
+	}
+
+	authUserID, ok := userID.(int)
+	if !ok || authUserID == 0 {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid user context"})
+		return
+	}
+
+	query := strings.TrimSpace(c.Query("q"))
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "50"))
+	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
+	if limit < 1 || limit > 100 {
+		limit = 50
+	}
+	if offset < 0 {
+		offset = 0
+	}
+
+	includeArchived, _ := strconv.ParseBool(c.DefaultQuery("include_archived", "false"))
+	hasFiles, _ := strconv.ParseBool(c.DefaultQuery("has_files", "false"))
+	hasLinks, _ := strconv.ParseBool(c.DefaultQuery("has_links", "false"))
+
+	var conversationID *int
+	if rawConversationID := strings.TrimSpace(c.Query("conversation_id")); rawConversationID != "" {
+		id, err := strconv.Atoi(rawConversationID)
+		if err != nil || id <= 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid conversation_id"})
+			return
+		}
+		conversationID = &id
+	}
+
+	var senderID *int
+	if rawSenderID := strings.TrimSpace(c.Query("sender_id")); rawSenderID != "" {
+		id, err := strconv.Atoi(rawSenderID)
+		if err != nil || id <= 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid sender_id"})
+			return
+		}
+		senderID = &id
+	}
+
+	var startDate *time.Time
+	if rawStartDate := strings.TrimSpace(c.Query("start_date")); rawStartDate != "" {
+		parsed, err := time.Parse(time.RFC3339, rawStartDate)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid start_date (expected RFC3339)"})
+			return
+		}
+		startDate = &parsed
+	}
+
+	var endDate *time.Time
+	if rawEndDate := strings.TrimSpace(c.Query("end_date")); rawEndDate != "" {
+		parsed, err := time.Parse(time.RFC3339, rawEndDate)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid end_date (expected RFC3339)"})
+			return
+		}
+		endDate = &parsed
+	}
+
+	if startDate != nil && endDate != nil && endDate.Before(*startDate) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "end_date must be after start_date"})
+		return
+	}
+
+	baseWhere := `
+		FROM messages m
+		LEFT JOIN media_files mf ON m.media_file_id = mf.id
+		INNER JOIN conversations c ON c.id = m.conversation_id
+		WHERE
+		(
+			((c.conversation_type = 'dm' OR c.conversation_type IS NULL) AND (c.user1_id = $1 OR c.user2_id = $1))
+			OR
+			(c.conversation_type = 'mod_mail' AND EXISTS (
+				SELECT 1
+				FROM conversation_participants cp
+				WHERE cp.conversation_id = c.id AND cp.user_id = $1
+			))
+		)
+		AND (
+			(m.sender_id = $1 AND m.deleted_for_sender = FALSE)
+			OR
+			(m.recipient_id = $1 AND m.deleted_for_recipient = FALSE)
+			OR
+			(m.is_multi_recipient = TRUE AND EXISTS (
+				SELECT 1
+				FROM message_recipient_keys mrk
+				WHERE mrk.message_id = m.id AND mrk.user_id = $1
+			))
+		)
+	`
+
+	args := []interface{}{authUserID}
+	nextArg := 2
+
+	if !includeArchived {
+		baseWhere += `
+			AND (
+				(c.conversation_type = 'mod_mail' AND c.archived_at IS NULL)
+				OR
+				((c.conversation_type = 'dm' OR c.conversation_type IS NULL) AND NOT (
+					(c.user1_id = $1 AND c.archived_for_user1 = TRUE)
+					OR
+					(c.user2_id = $1 AND c.archived_for_user2 = TRUE)
+					OR
+					c.archived_at IS NOT NULL
+				))
+			)
+		`
+	}
+
+	if conversationID != nil {
+		baseWhere += " AND m.conversation_id = $" + strconv.Itoa(nextArg)
+		args = append(args, *conversationID)
+		nextArg++
+	}
+	if senderID != nil {
+		baseWhere += " AND m.sender_id = $" + strconv.Itoa(nextArg)
+		args = append(args, *senderID)
+		nextArg++
+	}
+	if startDate != nil {
+		baseWhere += " AND m.sent_at >= $" + strconv.Itoa(nextArg)
+		args = append(args, *startDate)
+		nextArg++
+	}
+	if endDate != nil {
+		baseWhere += " AND m.sent_at <= $" + strconv.Itoa(nextArg)
+		args = append(args, *endDate)
+		nextArg++
+	}
+	if hasFiles {
+		baseWhere += " AND (m.media_file_id IS NOT NULL OR m.media_url IS NOT NULL)"
+	}
+	if hasLinks {
+		baseWhere += " AND (LOWER(COALESCE(m.sender_encrypted_content, m.encrypted_content, '')) LIKE '%http%' OR LOWER(COALESCE(mf.storage_url, m.media_url, '')) LIKE '%http%')"
+	}
+
+	// NOTE: message contents are encrypted for most rows. Query matching still helps legacy/plaintext rows
+	// and username-based lookups.
+	rankExpr := "0::double precision"
+	if query != "" {
+		likeArg := nextArg
+		args = append(args, "%"+strings.ToLower(query)+"%")
+		nextArg++
+		baseWhere += `
+			AND (
+				LOWER(COALESCE(m.sender_encrypted_content, m.encrypted_content, '')) LIKE $` + strconv.Itoa(likeArg) + `
+				OR EXISTS (
+					SELECT 1 FROM users us
+					WHERE us.id = m.sender_id AND LOWER(us.username) LIKE $` + strconv.Itoa(likeArg) + `
+				)
+			)
+		`
+		rankExpr = `
+			CASE
+				WHEN LOWER(COALESCE(m.sender_encrypted_content, m.encrypted_content, '')) LIKE $` + strconv.Itoa(likeArg) + ` THEN 2.0
+				ELSE 1.0
+			END
+		`
+	}
+
+	countSQL := "SELECT COUNT(*) " + baseWhere
+	var total int
+	if err := h.pool.QueryRow(c.Request.Context(), countSQL, args...).Scan(&total); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Search failed", "details": err.Error()})
+		return
+	}
+
+	limitArg := nextArg
+	offsetArg := nextArg + 1
+	querySQL := `
+		SELECT m.id, m.conversation_id, m.sender_id, m.recipient_id, m.encrypted_content,
+		       m.sender_encrypted_content, m.message_type, m.sent_at, m.delivered_at, m.read_at,
+		       m.deleted_for_sender, m.deleted_for_recipient, m.media_file_id,
+		       COALESCE(mf.storage_url, m.media_url) as media_url,
+		       COALESCE(m.media_type, mf.file_type) as media_type,
+		       COALESCE(m.media_size, mf.file_size) as media_size,
+		       m.encryption_version, m.media_encryption_key, m.media_encryption_iv,
+		       m.sender_media_encryption_key, COALESCE(m.is_multi_recipient, FALSE) as is_multi_recipient,
+		       m.shared_encryption_iv
+	` + baseWhere + `
+		ORDER BY (` + rankExpr + `) DESC, m.sent_at DESC, m.id DESC
+		LIMIT $` + strconv.Itoa(limitArg) + ` OFFSET $` + strconv.Itoa(offsetArg)
+
+	dataArgs := append(append([]interface{}{}, args...), limit, offset)
+	rows, err := h.pool.Query(c.Request.Context(), querySQL, dataArgs...)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Search failed", "details": err.Error()})
+		return
+	}
+	defer rows.Close()
+
+	messages := make([]*models.Message, 0, limit)
+	for rows.Next() {
+		message := &models.Message{}
+		if err := rows.Scan(
+			&message.ID,
+			&message.ConversationID,
+			&message.SenderID,
+			&message.RecipientID,
+			&message.EncryptedContent,
+			&message.SenderEncryptedContent,
+			&message.MessageType,
+			&message.SentAt,
+			&message.DeliveredAt,
+			&message.ReadAt,
+			&message.DeletedForSender,
+			&message.DeletedForRecipient,
+			&message.MediaFileID,
+			&message.MediaURL,
+			&message.MediaType,
+			&message.MediaSize,
+			&message.EncryptionVersion,
+			&message.MediaEncryptionKey,
+			&message.MediaEncryptionIV,
+			&message.SenderMediaEncryptionKey,
+			&message.IsMultiRecipient,
+			&message.SharedEncryptionIV,
+		); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to parse results"})
+			return
+		}
+		messages = append(messages, message)
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"messages": messages,
+		"limit":    limit,
+		"offset":   offset,
+		"query":    query,
+		"total":    total,
+	})
 }
