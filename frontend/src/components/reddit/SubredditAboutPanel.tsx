@@ -1,7 +1,8 @@
 import type { RefObject } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useFormat } from '../../hooks/useFormat';
-import { LoadingMessage, ErrorMessage, EmptyMessage } from '../common/StatusMessage';
+import { LoadingMessage, ErrorMessage } from '../common/StatusMessage';
+import { EmptyState } from '../empty';
 import type { RedditSubredditAbout } from '../../types/reddit';
 
 type SubredditAboutPanelProps = {
@@ -63,7 +64,11 @@ export default function SubredditAboutPanel({
               {about.public_description}
             </p>
           ) : (
-            <EmptyMessage>{t('subredditAboutPanel.emptyDescription')}</EmptyMessage>
+            <EmptyState
+              illustration="noData"
+              title={t('subredditAboutPanel.emptyDescription')}
+              className="py-6"
+            />
           )}
           <div className="mt-4 space-y-2 text-xs text-[var(--color-text-secondary)]">
             <div className="flex items-center justify-between">
@@ -93,7 +98,7 @@ export default function SubredditAboutPanel({
           </div>
         </>
       ) : (
-        <EmptyMessage>{t('subredditAboutPanel.empty')}</EmptyMessage>
+        <EmptyState illustration="noData" title={t('subredditAboutPanel.empty')} className="py-6" />
       )}
     </div>
   );

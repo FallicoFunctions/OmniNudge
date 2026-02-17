@@ -12,6 +12,7 @@ import type { CombinedFeedItem } from '../../services/feedService';
 import type { RedditApiPost } from '../../types/reddit';
 import type { LocalSubredditPost } from '../../services/hubsService';
 import type { Conversation } from '../../types/messages';
+import { EmptyState } from '../empty';
 
 interface ColumnFeedProps {
   columnId: string;
@@ -304,8 +305,8 @@ export function ColumnFeed({ columnId, config, isActive, showBorder }: ColumnFee
         }`}
         style={{ height: '100%' }}
       >
-        <div className="text-sm text-[var(--color-text-muted)]">
-          {t('columnFeed.noPostsToDisplay')}
+        <div className="w-full max-w-md">
+          <EmptyState illustration="noData" title={t('columnFeed.noPostsToDisplay')} />
         </div>
       </div>
     );

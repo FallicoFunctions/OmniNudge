@@ -12,7 +12,8 @@ import { hubsService } from '../services/hubsService';
 import { RedditPostCard } from '../components/reddit/RedditPostCard';
 import { HubPostCard } from '../components/hubs/HubPostCard';
 import { CrosspostModal } from '../components/common/CrosspostModal';
-import { EmptyMessage, LoadingMessage } from '../components/common/StatusMessage';
+import { LoadingMessage } from '../components/common/StatusMessage';
+import { EmptySearchResults, EmptyState } from '../components/empty';
 import { OffsetPaginationControls } from '../components/common/OffsetPaginationControls';
 import { useHiddenItems } from '../hooks/useHiddenItems';
 import { useSavedItems } from '../hooks/useSavedItems';
@@ -644,7 +645,7 @@ export default function SearchResultsPage() {
       {!isLoading && activeTab === 'posts' && (
         <div className="space-y-3">
           {visiblePosts.length === 0 && (
-            <EmptyMessage className="text-sm">{t('searchPage.empty.posts')}</EmptyMessage>
+            <EmptySearchResults query={query} />
           )}
           <div className="space-y-3">
             {visiblePosts.map((item, idx) => {
@@ -786,7 +787,7 @@ export default function SearchResultsPage() {
               {t('searchPage.communities.subreddits')}
             </h3>
             {filteredSubreddits.length === 0 ? (
-              <EmptyMessage className="text-sm">{t('searchPage.empty.subreddits')}</EmptyMessage>
+              <EmptyState illustration="noResults" title={t('searchPage.empty.subreddits')} />
             ) : (
               <ul className="mt-2 space-y-2">
                 {filteredSubreddits.map((sr) => (
@@ -812,7 +813,7 @@ export default function SearchResultsPage() {
               {t('searchPage.communities.hubs')}
             </h3>
             {filteredHubs.length === 0 ? (
-              <EmptyMessage className="text-sm">{t('searchPage.empty.hubs')}</EmptyMessage>
+              <EmptyState illustration="noResults" title={t('searchPage.empty.hubs')} />
             ) : (
               <ul className="mt-2 space-y-2">
                 {filteredHubs.map((hub) => (
@@ -912,7 +913,7 @@ export default function SearchResultsPage() {
               {t('searchPage.users.reddit')}
             </h3>
             {filteredRedditUsers.length === 0 ? (
-              <EmptyMessage className="text-sm">{t('searchPage.empty.redditUsers')}</EmptyMessage>
+              <EmptyState illustration="noResults" title={t('searchPage.empty.redditUsers')} />
             ) : (
               <ul className="mt-2 space-y-2">
                 {filteredRedditUsers.map((user, idx) => (
@@ -944,7 +945,7 @@ export default function SearchResultsPage() {
               {t('searchPage.users.omni')}
             </h3>
             {filteredOmniUsers.length === 0 ? (
-              <EmptyMessage className="text-sm">{t('searchPage.empty.omniUsers')}</EmptyMessage>
+              <EmptyState illustration="noResults" title={t('searchPage.empty.omniUsers')} />
             ) : (
               <ul className="mt-2 space-y-2">
                 {filteredOmniUsers.map((user) => (

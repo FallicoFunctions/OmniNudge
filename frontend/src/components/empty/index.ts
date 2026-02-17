@@ -1,5 +1,6 @@
 export {
   EmptyState,
+  EmptyStateIllustration,
   EmptyInbox,
   EmptySearchResults,
   EmptyNotifications,
@@ -10,3 +11,4 @@ export {
   ErrorState,
   PermissionDenied,
 } from './EmptyState';
+export type { EmptyStateIllustrationVariant } from './EmptyState';

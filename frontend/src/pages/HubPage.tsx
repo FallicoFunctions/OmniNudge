@@ -44,7 +44,8 @@ import { useHiddenItems } from '../hooks/useHiddenItems';
 import { CrosspostModal } from '../components/common/CrosspostModal';
 import { RedditPostSlideshow } from '../components/slideshow/RedditPostSlideshow';
 import { getHiddenPostIdSet, getSavedPostIdSet } from '../utils/savedItems';
-import { EmptyMessage, ErrorMessage, LoadingMessage } from '../components/common/StatusMessage';
+import { ErrorMessage, LoadingMessage } from '../components/common/StatusMessage';
+import { EmptyState } from '../components/empty';
 import { PostCardSkeleton } from '../components/common/LoadingStates';
 import { FeedSearchBars } from '../components/common/FeedSearchBars';
 import { CombinedSuggestionItem } from '../components/common/CombinedSuggestionItem';
@@ -1350,11 +1351,14 @@ export default function HubsPage() {
             </>
           ) : (
             <div className="py-12 text-center">
-              <EmptyMessage>
-                {isSearchActive && hubSearchQuery
-                  ? t('hubPage.empty.searchNoResults', { query: hubSearchQuery, hub: hubname })
-                  : t('hubPage.empty.noPosts')}
-              </EmptyMessage>
+              <EmptyState
+                illustration={isSearchActive && hubSearchQuery ? 'noResults' : 'noData'}
+                title={
+                  isSearchActive && hubSearchQuery
+                    ? t('hubPage.empty.searchNoResults', { query: hubSearchQuery, hub: hubname })
+                    : t('hubPage.empty.noPosts')
+                }
+              />
             </div>
           )}
 

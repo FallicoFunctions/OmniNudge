@@ -30,6 +30,7 @@ import { PostCardSkeleton } from '../components/common/LoadingStates';
 import { FeedSearchBars } from '../components/common/FeedSearchBars';
 import { CreateActionButtons } from '../components/common/CreateActionButtons';
 import { CombinedSuggestionItem } from '../components/common/CombinedSuggestionItem';
+import { EmptyState } from '../components/empty';
 import { useHubSubredditAutocomplete } from '../hooks/useHubSubredditAutocomplete';
 import { createRedditCrosspostPayload } from '../utils/crosspostHelpers';
 import { OMNI_FEED_STORAGE_KEY } from '../constants/storageKeys';
@@ -1014,32 +1015,31 @@ export default function HomePage() {
           <PostCardSkeleton />
         </div>
       ) : displayedPosts.length === 0 ? (
-        <div className="text-center text-[var(--color-text-secondary)]">
+        <div className="mx-auto max-w-2xl">
           {user ? (
             !hasAnySubscriptions ? (
-              <div>
-                <p className="mb-4">{t('home.empty.noSubscriptions')}</p>
-                <button
-                  type="button"
-                  onClick={() => setShowPopularFallback(true)}
-                  disabled={requiresValidCustomRange}
-                  className={`rounded-md bg-[var(--color-primary)] px-4 py-2 text-white transition hover:opacity-90 ${
-                    requiresValidCustomRange ? 'cursor-not-allowed opacity-60' : ''
-                  }`}
-                >
-                  {t('home.empty.viewPopularButton')}
-                </button>
-              </div>
+              <EmptyState
+                illustration="noData"
+                title={t('home.empty.noSubscriptions')}
+                description={t('home.empty.subscribeMessage')}
+                action={{
+                  label: t('home.empty.viewPopularButton'),
+                  onClick: () => setShowPopularFallback(true),
+                  disabled: requiresValidCustomRange,
+                }}
+              />
             ) : (
-              <div>
-                <p className="mb-4">
-                  {omniOnly ? t('home.empty.noOmniPosts') : t('home.empty.noPosts')}
-                </p>
-                <p className="text-sm">{t('home.empty.subscribeMessage')}</p>
-              </div>
+              <EmptyState
+                illustration="noResults"
+                title={omniOnly ? t('home.empty.noOmniPosts') : t('home.empty.noPosts')}
+                description={t('home.empty.subscribeMessage')}
+              />
             )
           ) : (
-            <p>{omniOnly ? t('home.empty.noOmniAvailable') : t('home.empty.noPostsAvailable')}</p>
+            <EmptyState
+              illustration="noResults"
+              title={omniOnly ? t('home.empty.noOmniAvailable') : t('home.empty.noPostsAvailable')}
+            />
           )}
         </div>
       ) : (

@@ -39,7 +39,8 @@ import { useHiddenItems } from '../hooks/useHiddenItems';
 import { useSubredditAutocomplete } from '../hooks/useSubredditAutocomplete';
 import { useSubredditActiveUsers } from '../hooks/useSubredditActiveUsers';
 import { getHiddenPostIdSet, getSavedPostIdSet, getSavedRedditPostIdSet } from '../utils/savedItems';
-import { EmptyMessage, LoadingMessage } from '../components/common/StatusMessage';
+import { LoadingMessage } from '../components/common/StatusMessage';
+import { EmptySearchResults, EmptyState } from '../components/empty';
 import { PostCardSkeleton } from '../components/common/LoadingStates';
 import { FeedSearchBars } from '../components/common/FeedSearchBars';
 import { OffsetPaginationControls } from '../components/common/OffsetPaginationControls';
@@ -1396,9 +1397,7 @@ export default function RedditPage() {
                 />
               </>
             ) : (
-              <div className="text-center text-[var(--color-text-secondary)]">
-                {t('subredditPage.empty.searchNoResults')}
-              </div>
+              <EmptySearchResults query={postSearchQuery || undefined} />
             )
           ) : filteredCombinedPosts.length > 0 ? (
             <div className="space-y-3">
@@ -1410,15 +1409,16 @@ export default function RedditPage() {
             </div>
           ) : (
             !isLoading && (
-              <div className="text-center">
-                <EmptyMessage>
-                  {postSearchQuery
+              <EmptyState
+                illustration={postSearchQuery ? 'noResults' : 'noData'}
+                title={
+                  postSearchQuery
                     ? t('subredditPage.empty.noMatches', { query: postSearchQuery })
                     : showOmniOnly
                     ? t('subredditPage.empty.noOmniPosts', { subreddit })
-                    : t('subredditPage.empty.noPosts', { subreddit })}
-                </EmptyMessage>
-              </div>
+                    : t('subredditPage.empty.noPosts', { subreddit })
+                }
+              />
             )
           )}
 

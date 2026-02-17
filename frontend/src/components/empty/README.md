@@ -12,6 +12,7 @@ Empty states appear when:
 **Don't use empty states when:**
 - Data is loading (use skeleton loader instead)
 - Temporary network issue (use error toast + retry)
+- Space is very constrained (dropdowns/typeahead rows, tiny inline helper copy)
 
 ## Empty State vs Loading State
 
@@ -29,6 +30,11 @@ Empty states appear when:
 {posts.length === 0 ? <EmptyPosts /> : posts.map(...)}
 ```
 
+## EmptyState vs EmptyMessage
+
+- Use `EmptyState` for page-level, section-level, or card-level "no content" moments where the user needs context and an action.
+- Use `EmptyMessage` only for compact inline contexts where a full visual state would be too heavy (autocomplete menus, short helper rows).
+
 ## Component Usage
 
 ### Basic Empty State
@@ -38,6 +44,7 @@ import { EmptyState } from '@/components/empty';
 import { Inbox } from 'lucide-react';
 
 <EmptyState
+  illustration="messages"
   icon={Inbox}
   title="No messages yet"
   description="Start a conversation to see messages here."
@@ -51,6 +58,20 @@ import { Inbox } from 'lucide-react';
   }}
 />
 ```
+
+## Illustration Variants
+
+The design system includes optimized inline SVG illustrations:
+
+- `noData`
+- `noResults`
+- `error`
+- `permission`
+- `messages`
+- `posts`
+- `media`
+- `members`
+- `notifications`
 
 ### Pre-configured Variants
 
@@ -254,3 +275,9 @@ All empty states include:
 4. **Simulate errors** - Verify error state shows
 5. **Screen reader** - Ensure text is descriptive
 6. **Keyboard nav** - Tab to all actions
+
+## Storybook
+
+Browse all variants in Storybook:
+
+- `Design System/Empty States`

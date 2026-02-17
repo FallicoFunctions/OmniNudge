@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Search } from 'lucide-react';
 import ThemePreviewCard from './ThemePreviewCard';
 import { useTheme } from '../../hooks/useTheme';
 import type { UserTheme } from '../../types/theme';
-import EmptyState from '../ui/EmptyState';
+import { EmptyState } from '../empty';
 import LoadingSpinner from '../ui/LoadingSpinner';
 
 const filterOptions = [
@@ -179,7 +180,8 @@ const ThemeGallery = ({ onCreateNewTheme, onEditTheme }: ThemeGalleryProps) => {
       ) : filteredThemes.length === 0 ? (
         <div className="mt-8">
           <EmptyState
-            icon="🎨"
+            icon={Search}
+            illustration={customThemes.length === 0 && filter === 'custom' ? 'noData' : 'noResults'}
             title={
               customThemes.length === 0 && filter === 'custom'
                 ? t('themes.gallery.empty.noCustomTitle')

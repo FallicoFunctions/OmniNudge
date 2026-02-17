@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { LoadingMessage, ErrorMessage, EmptyMessage } from '../common/StatusMessage';
+import { LoadingMessage, ErrorMessage } from '../common/StatusMessage';
+import { EmptyState } from '../empty';
 import type { HubModerator } from '../../types/hubSettings';
 import { getHubModeratorRoleLabel } from '../../utils/moderation';
 
@@ -38,7 +39,7 @@ export default function HubModeratorsPanel({
       ) : isError ? (
         <ErrorMessage>{t('hubModeratorsPanel.errors.unableToLoad')}</ErrorMessage>
       ) : moderators.length === 0 ? (
-        <EmptyMessage>{t('hubModeratorsPanel.empty')}</EmptyMessage>
+        <EmptyState illustration="members" title={t('hubModeratorsPanel.empty')} className="py-6" />
       ) : (
         <ul className="mt-3 space-y-2">
           {moderators.map((moderator) => {

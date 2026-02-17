@@ -1,7 +1,8 @@
 import type { RefObject } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useFormat } from '../../hooks/useFormat';
-import { LoadingMessage, ErrorMessage, EmptyMessage } from '../common/StatusMessage';
+import { LoadingMessage, ErrorMessage } from '../common/StatusMessage';
+import { EmptyState } from '../empty';
 
 export interface AboutPanelStat {
   label: string;
@@ -96,7 +97,7 @@ export const AboutPanel: React.FC<AboutPanelProps> = ({
           )}
         </>
       ) : (
-        <EmptyMessage>{resolvedEmptyMessage}</EmptyMessage>
+        <EmptyState illustration="noData" title={resolvedEmptyMessage} className="py-6" />
       )}
     </div>
   );

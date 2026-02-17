@@ -4,7 +4,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { moderationService } from '../services/moderationService';
 import { accessRequestService, type AccessRequest } from '../services/accessRequestService';
-import { EmptyMessage, LoadingMessage } from '../components/common/StatusMessage';
+import { LoadingMessage } from '../components/common/StatusMessage';
+import { EmptyState } from '../components/empty';
 import { OffsetPaginationControls } from '../components/common/OffsetPaginationControls';
 import { modMailService } from '../services/modMailService';
 import { useFormat } from '../hooks/useFormat';
@@ -418,7 +419,7 @@ function RemovalReasonsTab({ hubName }: { hubName: string }) {
 
       {reasons && reasons.length === 0 && (
         <div className="text-center py-12">
-          <EmptyMessage>{t('modToolsPage.removalReasons.empty')}</EmptyMessage>
+          <EmptyState illustration="noData" title={t('modToolsPage.removalReasons.empty')} />
         </div>
       )}
 
@@ -732,9 +733,10 @@ function ModMailTab({ hubName }: { hubName: string }) {
 
       {conversations.length === 0 && (
         <div className="text-center py-12">
-          <EmptyMessage>
-            {t('modToolsPage.modMail.empty', { status: statusLabelWithSpace })}
-          </EmptyMessage>
+          <EmptyState
+            illustration="noData"
+            title={t('modToolsPage.modMail.empty', { status: statusLabelWithSpace })}
+          />
         </div>
       )}
 
@@ -933,7 +935,7 @@ function AccessRequestsTab({ hubName }: { hubName: string }) {
 
       {pendingRequests.length === 0 && (
         <div className="text-center py-12">
-          <EmptyMessage>{t('modToolsPage.requests.empty')}</EmptyMessage>
+          <EmptyState illustration="noData" title={t('modToolsPage.requests.empty')} />
         </div>
       )}
 

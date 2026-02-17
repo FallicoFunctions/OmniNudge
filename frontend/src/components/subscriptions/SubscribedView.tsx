@@ -4,7 +4,8 @@ import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { subscriptionService } from '../../services/subscriptionService';
 import { useSettings } from '../../contexts/SettingsContext';
-import { EmptyMessage, ErrorMessage, LoadingMessage } from '../common/StatusMessage';
+import { ErrorMessage, LoadingMessage } from '../common/StatusMessage';
+import { EmptyState } from '../empty';
 import { useFormat } from '../../hooks/useFormat';
 
 interface SubscribedViewProps {
@@ -124,7 +125,7 @@ export default function SubscribedView({
           {t('subscriptions.loadFailed')}
         </ErrorMessage>
       ) : allHubs.length === 0 && allSubreddits.length === 0 ? (
-        <EmptyMessage className="text-sm">{t('subscriptions.emptyAll')}</EmptyMessage>
+        <EmptyState illustration="noData" title={t('subscriptions.emptyAll')} />
       ) : (
         <>
           {/* PROFILE-5: Search and sort controls */}
@@ -165,7 +166,7 @@ export default function SubscribedView({
                 {t('subscriptions.hubsTitle', { count: hubs.length })}
               </h3>
               {hubs.length === 0 ? (
-                <EmptyMessage className="text-sm">{t('subscriptions.emptyHubs')}</EmptyMessage>
+                <EmptyState illustration="noData" title={t('subscriptions.emptyHubs')} />
               ) : (
                 <div className="space-y-2">
                   {hubs.map((subscription) => {
@@ -209,9 +210,7 @@ export default function SubscribedView({
                 {t('subscriptions.subredditsTitle', { count: subreddits.length })}
               </h3>
               {subreddits.length === 0 ? (
-                <EmptyMessage className="text-sm">
-                  {t('subscriptions.emptySubreddits')}
-                </EmptyMessage>
+                <EmptyState illustration="noData" title={t('subscriptions.emptySubreddits')} />
               ) : (
                 <div className="space-y-2">
                   {subreddits.map((subscription) => (
