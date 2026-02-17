@@ -156,9 +156,9 @@ func GlobalAPIRateLimiter(cache services.Cache) *RedisRateLimiter {
 }
 
 // UploadRateLimiterRedis creates a distributed rate limiter for uploads
-// 5 uploads per minute per user
+// 10 uploads per minute per user
 func UploadRateLimiterRedis(cache services.Cache) *RedisRateLimiter {
-	return NewRedisRateLimiter(cache, 5, time.Minute, "rate:upload")
+	return NewRedisRateLimiter(cache, 10, time.Minute, "rate:upload")
 }
 
 // PostCreationRateLimiter creates a distributed rate limiter for post creation

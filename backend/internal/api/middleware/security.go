@@ -1,6 +1,8 @@
 package middleware
 
 import (
+	"bytes"
+	"path/filepath"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -13,18 +15,18 @@ func SecurityHeaders() gin.HandlerFunc {
 		// Content Security Policy (CSP)
 		// Prevents XSS attacks by controlling resource loading
 		csp := []string{
-			"default-src 'self'",                                    // Only load from same origin by default
-			"script-src 'self' 'unsafe-inline' 'unsafe-eval'",       // Allow scripts (unsafe-inline needed for React, unsafe-eval for development)
-			"style-src 'self' 'unsafe-inline'",                      // Allow styles (unsafe-inline needed for styled-components)
-			"img-src 'self' data: blob: https:",                     // Allow images from self, data URLs, blobs, HTTPS
-			"font-src 'self' data:",                                 // Allow fonts from self and data URLs
-			"connect-src 'self' ws: wss:",                           // Allow WebSocket connections
-			"media-src 'self' blob:",                                // Allow media from self and blobs
-			"object-src 'none'",                                     // Block plugins (Flash, etc.)
-			"frame-ancestors 'none'",                                // Prevent clickjacking
-			"base-uri 'self'",                                       // Restrict <base> tag
-			"form-action 'self'",                                    // Only submit forms to same origin
-			"upgrade-insecure-requests",                             // Upgrade HTTP to HTTPS
+			"default-src 'self'",                              // Only load from same origin by default
+			"script-src 'self' 'unsafe-inline' 'unsafe-eval'", // Allow scripts (unsafe-inline needed for React, unsafe-eval for development)
+			"style-src 'self' 'unsafe-inline'",                // Allow styles (unsafe-inline needed for styled-components)
+			"img-src 'self' data: blob: https:",               // Allow images from self, data URLs, blobs, HTTPS
+			"font-src 'self' data:",                           // Allow fonts from self and data URLs
+			"connect-src 'self' ws: wss:",                     // Allow WebSocket connections
+			"media-src 'self' blob:",                          // Allow media from self and blobs
+			"object-src 'none'",                               // Block plugins (Flash, etc.)
+			"frame-ancestors 'none'",                          // Prevent clickjacking
+			"base-uri 'self'",                                 // Restrict <base> tag
+			"form-action 'self'",                              // Only submit forms to same origin
+			"upgrade-insecure-requests",                       // Upgrade HTTP to HTTPS
 		}
 		c.Header("Content-Security-Policy", strings.Join(csp, "; "))
 
@@ -53,14 +55,14 @@ func SecurityHeaders() gin.HandlerFunc {
 		// Permissions-Policy: Control browser features
 		// Disable unnecessary features to reduce attack surface
 		permissions := []string{
-			"camera=(self)",           // Camera only for same origin
-			"microphone=(self)",       // Microphone only for same origin (voice messages)
-			"geolocation=()",          // Disable geolocation
-			"payment=()",              // Disable payment API
-			"usb=()",                  // Disable USB access
-			"magnetometer=()",         // Disable magnetometer
-			"gyroscope=()",            // Disable gyroscope
-			"accelerometer=()",        // Disable accelerometer
+			"camera=(self)",     // Camera only for same origin
+			"microphone=(self)", // Microphone only for same origin (voice messages)
+			"geolocation=()",    // Disable geolocation
+			"payment=()",        // Disable payment API
+			"usb=()",            // Disable USB access
+			"magnetometer=()",   // Disable magnetometer
+			"gyroscope=()",      // Disable gyroscope
+			"accelerometer=()",  // Disable accelerometer
 		}
 		c.Header("Permissions-Policy", strings.Join(permissions, ", "))
 
@@ -119,14 +121,14 @@ func CSRFProtection() gin.HandlerFunc {
 func SanitizeInput(input string) string {
 	// Remove common XSS patterns
 	replacements := map[string]string{
-		"<script":   "&lt;script",
-		"</script>": "&lt;/script&gt;",
+		"<script":     "&lt;script",
+		"</script>":   "&lt;/script&gt;",
 		"javascript:": "",
-		"onerror=":  "",
-		"onload=":   "",
-		"onclick=":  "",
-		"<iframe":   "&lt;iframe",
-		"</iframe>": "&lt;/iframe&gt;",
+		"onerror=":    "",
+		"onload=":     "",
+		"onclick=":    "",
+		"<iframe":     "&lt;iframe",
+		"</iframe>":   "&lt;/iframe&gt;",
 	}
 
 	sanitized := input
@@ -163,13 +165,15 @@ var AllowedMediaTypes = []string{
 	"image/png",
 	"image/gif",
 	"image/webp",
+	// Documents
+	"application/pdf",
 	// Audio
-	"audio/mpeg",       // MP3
-	"audio/mp4",        // M4A
-	"audio/ogg",        // OGG
-	"audio/wav",        // WAV
-	"audio/webm",       // WebM audio
-	"audio/opus",       // Opus
+	"audio/mpeg", // MP3
+	"audio/mp4",  // M4A
+	"audio/ogg",  // OGG
+	"audio/wav",  // WAV
+	"audio/webm", // WebM audio
+	"audio/opus", // Opus
 	// Video
 	"video/mp4",
 	"video/webm",
@@ -177,11 +181,84 @@ var AllowedMediaTypes = []string{
 	"video/x-matroska", // MKV
 }
 
+// AllowedFileExtensions defines allowed file extensions for uploads.
+var AllowedFileExtensions = map[string]bool{
+	".jpg":  true,
+	".jpeg": true,
+	".png":  true,
+	".gif":  true,
+	".webp": true,
+	".mp3":  true,
+	".m4a":  true,
+	".ogg":  true,
+	".wav":  true,
+	".webm": true,
+	".opus": true,
+	".mp4":  true,
+	".mov":  true,
+	".mkv":  true,
+	".pdf":  true,
+}
+
+var extensionToAllowedMIMEs = map[string][]string{
+	".jpg":  {"image/jpeg"},
+	".jpeg": {"image/jpeg"},
+	".png":  {"image/png"},
+	".gif":  {"image/gif"},
+	".webp": {"image/webp"},
+	".mp3":  {"audio/mpeg"},
+	".m4a":  {"audio/mp4"},
+	".ogg":  {"audio/ogg"},
+	".wav":  {"audio/wav"},
+	".webm": {"audio/webm", "video/webm"},
+	".opus": {"audio/opus"},
+	".mp4":  {"video/mp4"},
+	".mov":  {"video/quicktime"},
+	".mkv":  {"video/x-matroska"},
+	".pdf":  {"application/pdf"},
+}
+
+// ValidateFileExtension checks whether the filename extension is allowed.
+func ValidateFileExtension(filename string) bool {
+	ext := strings.ToLower(filepath.Ext(filename))
+	return AllowedFileExtensions[ext]
+}
+
+// ValidateExtensionMatchesMIME ensures extension and detected MIME are consistent.
+func ValidateExtensionMatchesMIME(filename, mimeType string) bool {
+	ext := strings.ToLower(filepath.Ext(filename))
+	allowedMIMEs, ok := extensionToAllowedMIMEs[ext]
+	if !ok {
+		return false
+	}
+	for _, allowed := range allowedMIMEs {
+		if mimeType == allowed {
+			return true
+		}
+	}
+	return false
+}
+
+// ValidateNoSuspiciousSignatures performs lightweight polyglot detection.
+// It rejects files that contain embedded ZIP signatures while claiming a non-archive MIME.
+func ValidateNoSuspiciousSignatures(head []byte, mimeType string) bool {
+	if strings.HasPrefix(mimeType, "image/") ||
+		strings.HasPrefix(mimeType, "audio/") ||
+		strings.HasPrefix(mimeType, "video/") ||
+		mimeType == "application/pdf" {
+		if bytes.Contains(head, []byte("PK\x03\x04")) {
+			return false
+		}
+	}
+	return true
+}
+
 // MaxUploadSizes defines max file sizes by type (in bytes)
 var MaxUploadSizes = map[string]int64{
-	"image/*": 10 * 1024 * 1024,  // 10 MB for images
-	"audio/*": 100 * 1024 * 1024, // 100 MB for audio
-	"video/*": 500 * 1024 * 1024, // 500 MB for video
+	"image/*":         10 * 1024 * 1024,  // 10 MB for images
+	"video/*":         100 * 1024 * 1024, // 100 MB for videos
+	"audio/*":         10 * 1024 * 1024,  // 10 MB for voice/audio uploads
+	"application/pdf": 25 * 1024 * 1024,  // 25 MB for documents
 }
 
 // GetMaxSizeForMIME returns the max allowed size for a MIME type

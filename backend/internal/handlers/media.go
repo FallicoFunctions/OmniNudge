@@ -11,14 +11,19 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/gin-gonic/gin"
+	"github.com/omninudge/backend/internal/api/middleware"
 	"github.com/omninudge/backend/internal/models"
 	"github.com/omninudge/backend/internal/services"
-	"github.com/omninudge/backend/internal/api/middleware"
-	"github.com/gin-gonic/gin"
 )
 
 const (
-	maxUploadSize = 25 * 1024 * 1024 // 25MB hard cap
+	maxUploadSize      = 100 * 1024 * 1024 // 100MB hard cap (largest allowed class: video)
+	maxBatchUploadSize = 250 * 1024 * 1024 // 250MB total multipart body limit for batch uploads
+	maxBatchFiles      = 10
+	maxImageDimension  = 8000
+	freeTierStorageCap = 5 * 1024 * 1024 * 1024  // 5GB
+	proTierStorageCap  = 50 * 1024 * 1024 * 1024 // 50GB (admin/moderator elevated cap)
 )
 
 // MediaHandler handles media uploads
@@ -53,6 +58,27 @@ func (h *MediaHandler) UploadMedia(c *gin.Context) {
 		return
 	}
 	defer file.Close()
+	if header.Size <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Empty file is not allowed"})
+		return
+	}
+
+	usedBytes, err := h.mediaRepo.GetTotalStorageByUserID(c.Request.Context(), userID.(int))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to evaluate storage quota", "details": err.Error()})
+		return
+	}
+	capBytes := resolveStorageCapForRole(c.GetString("role"))
+	if usedBytes+header.Size > capBytes {
+		c.JSON(http.StatusRequestEntityTooLarge, gin.H{
+			"error":            "Storage quota exceeded",
+			"storage_used":     usedBytes,
+			"incoming_size":    header.Size,
+			"storage_quota":    capBytes,
+			"storage_quota_gb": capBytes / (1024 * 1024 * 1024),
+		})
+		return
+	}
 
 	uploadDir := "uploads"
 	if err := os.MkdirAll(uploadDir, 0o755); err != nil {
@@ -61,6 +87,13 @@ func (h *MediaHandler) UploadMedia(c *gin.Context) {
 	}
 
 	safeName := filepath.Base(header.Filename)
+	if !middleware.ValidateFileExtension(safeName) {
+		c.JSON(http.StatusUnsupportedMediaType, gin.H{
+			"error": "Unsupported file extension",
+			"name":  safeName,
+		})
+		return
+	}
 	newName := fmt.Sprintf("%d_%s", time.Now().UnixNano(), safeName)
 	storagePath := filepath.Join(uploadDir, newName)
 
@@ -85,14 +118,32 @@ func (h *MediaHandler) UploadMedia(c *gin.Context) {
 	// Validate MIME type (P0-008 Security Audit)
 	if !middleware.ValidateMIMEType(contentType, middleware.AllowedMediaTypes) {
 		_ = os.Remove(storagePath)
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "File type not allowed",
+		c.JSON(http.StatusUnsupportedMediaType, gin.H{
+			"error": "Unsupported file type",
 			"type":  contentType,
 			"allowed": []string{
-				"Images: JPEG, PNG, GIF, WebP",
-				"Audio: MP3, M4A, OGG, WAV, WebM, Opus",
-				"Video: MP4, WebM, MOV, MKV",
+				"Images: JPEG, PNG, GIF, WebP (max 10MB)",
+				"Audio/Voice: MP3, M4A, OGG, WAV, WebM, Opus (max 10MB)",
+				"Video: MP4, WebM, MOV, MKV (max 100MB)",
+				"Documents: PDF (max 25MB)",
 			},
+		})
+		return
+	}
+	if !middleware.ValidateNoSuspiciousSignatures(sniff[:n], contentType) {
+		_ = os.Remove(storagePath)
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "File contains suspicious embedded signatures",
+			"type":  contentType,
+		})
+		return
+	}
+	if !middleware.ValidateExtensionMatchesMIME(safeName, contentType) {
+		_ = os.Remove(storagePath)
+		c.JSON(http.StatusUnsupportedMediaType, gin.H{
+			"error": "File extension does not match detected content type",
+			"name":  safeName,
+			"type":  contentType,
 		})
 		return
 	}
@@ -101,11 +152,12 @@ func (h *MediaHandler) UploadMedia(c *gin.Context) {
 	maxSizeForType := middleware.GetMaxSizeForMIME(contentType)
 	if total > maxSizeForType {
 		_ = os.Remove(storagePath)
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error":    "File too large for this type",
-			"type":     contentType,
-			"size":     total,
-			"max_size": maxSizeForType,
+		c.JSON(http.StatusRequestEntityTooLarge, gin.H{
+			"error":       "File size exceeds limit for this file type",
+			"type":        contentType,
+			"file_size":   total,
+			"max_size":    maxSizeForType,
+			"max_size_mb": maxSizeForType / (1024 * 1024),
 		})
 		return
 	}
@@ -128,7 +180,12 @@ func (h *MediaHandler) UploadMedia(c *gin.Context) {
 
 	if total > maxUploadSize {
 		_ = os.Remove(storagePath)
-		c.JSON(http.StatusBadRequest, gin.H{"error": "File too large", "max_bytes": maxUploadSize})
+		c.JSON(http.StatusRequestEntityTooLarge, gin.H{
+			"error":       "File size exceeds service upload limit",
+			"file_size":   total,
+			"max_size":    maxUploadSize,
+			"max_size_mb": maxUploadSize / (1024 * 1024),
+		})
 		return
 	}
 
@@ -155,6 +212,16 @@ func (h *MediaHandler) UploadMedia(c *gin.Context) {
 		// Get image dimensions
 		width, height, err := h.thumbnailService.GetImageDimensions(storagePath)
 		if err == nil {
+			if width > maxImageDimension || height > maxImageDimension {
+				_ = os.Remove(storagePath)
+				c.JSON(http.StatusBadRequest, gin.H{
+					"error":         "Image dimensions exceed limit",
+					"max_dimension": maxImageDimension,
+					"width":         width,
+					"height":        height,
+				})
+				return
+			}
 			media.Width = &width
 			media.Height = &height
 		}
@@ -187,7 +254,7 @@ func (h *MediaHandler) BatchUploadMedia(c *gin.Context) {
 	}
 
 	// Parse multipart form
-	if err := c.Request.ParseMultipartForm(maxUploadSize * 20); err != nil {
+	if err := c.Request.ParseMultipartForm(maxBatchUploadSize); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to parse form", "details": err.Error()})
 		return
 	}
@@ -195,6 +262,36 @@ func (h *MediaHandler) BatchUploadMedia(c *gin.Context) {
 	files := c.Request.MultipartForm.File["files"]
 	if len(files) == 0 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "No files provided"})
+		return
+	}
+	if len(files) > maxBatchFiles {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":     "Too many files in one request",
+			"max_files": maxBatchFiles,
+		})
+		return
+	}
+
+	usedBytes, err := h.mediaRepo.GetTotalStorageByUserID(c.Request.Context(), userID.(int))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to evaluate storage quota", "details": err.Error()})
+		return
+	}
+	capBytes := resolveStorageCapForRole(c.GetString("role"))
+	var incomingTotal int64
+	for _, f := range files {
+		if f.Size > 0 {
+			incomingTotal += f.Size
+		}
+	}
+	if usedBytes+incomingTotal > capBytes {
+		c.JSON(http.StatusRequestEntityTooLarge, gin.H{
+			"error":            "Storage quota exceeded",
+			"storage_used":     usedBytes,
+			"incoming_size":    incomingTotal,
+			"storage_quota":    capBytes,
+			"storage_quota_gb": capBytes / (1024 * 1024 * 1024),
+		})
 		return
 	}
 
@@ -249,6 +346,9 @@ func (h *MediaHandler) processSingleUpload(ctx context.Context, userID int, head
 	if header.Size > maxUploadSize {
 		return nil, fmt.Errorf("file too large: %d bytes (max: %d)", header.Size, maxUploadSize)
 	}
+	if header.Size <= 0 {
+		return nil, fmt.Errorf("empty file is not allowed")
+	}
 
 	file, err := header.Open()
 	if err != nil {
@@ -262,6 +362,9 @@ func (h *MediaHandler) processSingleUpload(ctx context.Context, userID int, head
 	}
 
 	safeName := filepath.Base(header.Filename)
+	if !middleware.ValidateFileExtension(safeName) {
+		return nil, fmt.Errorf("unsupported file extension")
+	}
 	newName := fmt.Sprintf("%d_%s", time.Now().UnixNano(), safeName)
 	storagePath := filepath.Join(uploadDir, newName)
 
@@ -283,6 +386,14 @@ func (h *MediaHandler) processSingleUpload(ctx context.Context, userID int, head
 	if !middleware.ValidateMIMEType(contentType, middleware.AllowedMediaTypes) {
 		_ = os.Remove(storagePath)
 		return nil, fmt.Errorf("file type not allowed: %s", contentType)
+	}
+	if !middleware.ValidateNoSuspiciousSignatures(sniff[:n], contentType) {
+		_ = os.Remove(storagePath)
+		return nil, fmt.Errorf("file contains suspicious embedded signatures")
+	}
+	if !middleware.ValidateExtensionMatchesMIME(safeName, contentType) {
+		_ = os.Remove(storagePath)
+		return nil, fmt.Errorf("file extension does not match detected content type")
 	}
 
 	// Validate file size for MIME type
@@ -320,6 +431,10 @@ func (h *MediaHandler) processSingleUpload(ctx context.Context, userID int, head
 		// Get image dimensions
 		width, height, err := h.thumbnailService.GetImageDimensions(storagePath)
 		if err == nil {
+			if width > maxImageDimension || height > maxImageDimension {
+				_ = os.Remove(storagePath)
+				return nil, fmt.Errorf("image dimensions exceed limit: %dx%d (max %dx%d)", width, height, maxImageDimension, maxImageDimension)
+			}
 			media.Width = &width
 			media.Height = &height
 		}
@@ -339,4 +454,13 @@ func (h *MediaHandler) processSingleUpload(ctx context.Context, userID int, head
 	}
 
 	return media, nil
+}
+
+func resolveStorageCapForRole(role string) int64 {
+	switch role {
+	case "admin", "moderator":
+		return proTierStorageCap
+	default:
+		return freeTierStorageCap
+	}
 }

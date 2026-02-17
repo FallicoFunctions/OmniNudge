@@ -202,6 +202,7 @@ func newTestDeps(t *testing.T) *TestDeps {
 
 		api.GET("/ws", middleware.AuthRequired(authService), wsHandler.HandleWebSocket)
 		api.POST("/media/upload", middleware.AuthRequired(authService), mediaHandler.UploadMedia)
+		api.POST("/media/batch-upload", middleware.AuthRequired(authService), mediaHandler.BatchUploadMedia)
 	}
 
 	return &TestDeps{
