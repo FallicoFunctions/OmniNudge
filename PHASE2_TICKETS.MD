@@ -1481,7 +1481,7 @@
 ---
 
 ### F0-003: Message Search Infrastructure
-**Status:** 🟨 IN PROGRESS
+**Status:** ✅ COMPLETE
 **Priority:** P0 (CRITICAL - F4-010 references "search index" but no primary implementation)
 **Estimated Time:** 2 weeks
 
@@ -1500,7 +1500,7 @@
 - [x] Highlight search terms in results
 - [x] Implement search result preview (snippet with highlighted terms)
 - [x] Optimize search performance (<500ms for queries)
-- [ ] Test search with 1M+ messages (ensure performance)
+- [x] Test search with 1M+ messages (ensure performance)
 - [x] Document search architecture and query syntax
 
 **Acceptance Criteria:**
