@@ -84,6 +84,10 @@ Message search performance indexes were added in migration `044_message_search_i
 And extension:
 - `pg_trgm` (if available)
 
+Scale test script:
+- `backend/scripts/search_messages_1m_benchmark.sql`
+- Generates a synthetic 1M-message DM dataset and runs `EXPLAIN (ANALYZE, BUFFERS)` queries.
+
 ## Follow-ups
 
 Potential future improvements:
