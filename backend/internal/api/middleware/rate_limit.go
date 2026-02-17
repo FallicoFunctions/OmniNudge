@@ -78,10 +78,10 @@ func (rl *RateLimiter) Middleware() gin.HandlerFunc {
 }
 
 // UploadRateLimiter creates a rate limiter specifically for media uploads
-// Allows 30 uploads per minute (30 requests / 60 seconds = 0.5 requests/second)
+// Allows 10 uploads per minute (10 requests / 60 seconds = ~0.1667 requests/second)
 func UploadRateLimiter() *RateLimiter {
-	// 30 uploads per minute with burst of 10 (allows multi-file uploads)
-	return NewRateLimiter(rate.Limit(30.0/60.0), 10)
+	// 10 uploads per minute with burst of 3.
+	return NewRateLimiter(rate.Limit(10.0/60.0), 3)
 }
 
 // ThemeCreationRateLimiter creates a rate limiter for theme creation/updates

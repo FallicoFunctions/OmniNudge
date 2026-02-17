@@ -2,6 +2,7 @@ package models
 
 import (
 	"context"
+	"database/sql"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -91,4 +92,21 @@ func (r *MediaFileRepository) GetByStorageURL(ctx context.Context, storageURL st
 		return nil, err
 	}
 	return media, nil
+}
+
+// GetTotalStorageByUserID returns total bytes currently stored by a user.
+func (r *MediaFileRepository) GetTotalStorageByUserID(ctx context.Context, userID int) (int64, error) {
+	var total sql.NullInt64
+	err := r.pool.QueryRow(ctx, `
+		SELECT COALESCE(SUM(file_size), 0)
+		FROM media_files
+		WHERE user_id = $1
+	`, userID).Scan(&total)
+	if err != nil {
+		return 0, err
+	}
+	if !total.Valid {
+		return 0, nil
+	}
+	return total.Int64, nil
 }

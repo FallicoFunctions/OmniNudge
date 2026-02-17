@@ -790,11 +790,11 @@ func main() {
 			protected.GET("/conversations/:id/media", mediaGalleryHandler.GetConversationMedia)
 			protected.GET("/conversations/:id/media/:messageId/index", mediaGalleryHandler.FindMediaIndex)
 
-			// Media upload (with rate limiting: 30 uploads per minute)
+			// Media upload (with rate limiting: 10 uploads per minute)
 			uploadRateLimiter := middleware.UploadRateLimiter()
 			protected.POST("/media/upload", uploadRateLimiter.Middleware(), mediaHandler.UploadMedia)
-			// Batch media upload (no individual rate limiting, processes multiple files concurrently)
-			protected.POST("/media/batch-upload", mediaHandler.BatchUploadMedia)
+			// Batch media upload (same request rate limiter as single upload; per-request file count capped in handler)
+			protected.POST("/media/batch-upload", uploadRateLimiter.Middleware(), mediaHandler.BatchUploadMedia)
 			// Audio encoding for iOS Safari (P0-003)
 			protected.POST("/media/encode-audio", audioEncoderHandler.EncodeAudio)
 

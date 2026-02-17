@@ -209,7 +209,7 @@ func TestMediaUploadValidation(t *testing.T) {
 	req.Header.Set("Content-Type", writer.FormDataContentType())
 
 	w := doRequest(t, deps.Router, req)
-	require.Equal(t, http.StatusBadRequest, w.Code)
+	require.Equal(t, http.StatusUnsupportedMediaType, w.Code)
 	require.True(t, strings.Contains(w.Body.String(), "Unsupported file type"))
 }
 
@@ -247,8 +247,175 @@ func TestMediaUploadHappyPathAndSizeLimit(t *testing.T) {
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Content-Type", bw.FormDataContentType())
 	w = doRequest(t, deps.Router, req)
-	require.Equal(t, http.StatusBadRequest, w.Code)
+	require.Equal(t, http.StatusRequestEntityTooLarge, w.Code)
 	require.True(t, strings.Contains(strings.ToLower(w.Body.String()), "too large"))
+}
+
+func TestMediaUpload_AllowsPDFDocument(t *testing.T) {
+	defer os.RemoveAll("uploads")
+	deps := newTestDeps(t)
+	defer deps.DB.Close()
+
+	user := createUser(t, deps.UserRepo, "media_pdf", "user")
+	token, _ := deps.AuthService.GenerateJWT(user.ID, "", user.Username, user.Role)
+
+	var b bytes.Buffer
+	writer := multipart.NewWriter(&b)
+	part, _ := writer.CreateFormFile("file", "doc.pdf")
+	part.Write([]byte("%PDF-1.4\n1 0 obj\n<< /Type /Catalog >>\nendobj\n"))
+	writer.Close()
+
+	req, _ := http.NewRequest("POST", "/api/v1/media/upload", &b)
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	w := doRequest(t, deps.Router, req)
+	require.Equal(t, http.StatusCreated, w.Code, w.Body.String())
+}
+
+func TestBatchMediaUpload_RejectsTooManyFiles(t *testing.T) {
+	defer os.RemoveAll("uploads")
+	deps := newTestDeps(t)
+	defer deps.DB.Close()
+
+	user := createUser(t, deps.UserRepo, "media_batch_limit", "user")
+	token, _ := deps.AuthService.GenerateJWT(user.ID, "", user.Username, user.Role)
+
+	var b bytes.Buffer
+	writer := multipart.NewWriter(&b)
+	for i := 0; i < 11; i++ {
+		part, err := writer.CreateFormFile("files", fmt.Sprintf("img%d.png", i))
+		require.NoError(t, err)
+		_, err = part.Write([]byte{0x89, 0x50, 0x4E, 0x47, 'D', 'A', 'T', 'A'})
+		require.NoError(t, err)
+	}
+	require.NoError(t, writer.Close())
+
+	req, _ := http.NewRequest("POST", "/api/v1/media/batch-upload", &b)
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	w := doRequest(t, deps.Router, req)
+	require.Equal(t, http.StatusBadRequest, w.Code, w.Body.String())
+	require.Contains(t, w.Body.String(), "Too many files")
+}
+
+func TestMediaUpload_RejectsUnsupportedExtension(t *testing.T) {
+	defer os.RemoveAll("uploads")
+	deps := newTestDeps(t)
+	defer deps.DB.Close()
+
+	user := createUser(t, deps.UserRepo, "media_ext", "user")
+	token, _ := deps.AuthService.GenerateJWT(user.ID, "", user.Username, user.Role)
+
+	var b bytes.Buffer
+	writer := multipart.NewWriter(&b)
+	part, _ := writer.CreateFormFile("file", "photo.exe")
+	// PNG magic bytes with forbidden extension should still be rejected.
+	part.Write([]byte{0x89, 0x50, 0x4E, 0x47, 'D', 'A', 'T', 'A'})
+	writer.Close()
+
+	req, _ := http.NewRequest("POST", "/api/v1/media/upload", &b)
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	w := doRequest(t, deps.Router, req)
+	require.Equal(t, http.StatusUnsupportedMediaType, w.Code)
+	require.Contains(t, w.Body.String(), "Unsupported file extension")
+}
+
+func TestMediaUpload_RejectsEmptyFile(t *testing.T) {
+	defer os.RemoveAll("uploads")
+	deps := newTestDeps(t)
+	defer deps.DB.Close()
+
+	user := createUser(t, deps.UserRepo, "media_empty", "user")
+	token, _ := deps.AuthService.GenerateJWT(user.ID, "", user.Username, user.Role)
+
+	var b bytes.Buffer
+	writer := multipart.NewWriter(&b)
+	_, _ = writer.CreateFormFile("file", "empty.png")
+	writer.Close()
+
+	req, _ := http.NewRequest("POST", "/api/v1/media/upload", &b)
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	w := doRequest(t, deps.Router, req)
+	require.Equal(t, http.StatusBadRequest, w.Code)
+	require.Contains(t, strings.ToLower(w.Body.String()), "empty file")
+}
+
+func TestMediaUpload_RejectsExtensionMimeMismatch(t *testing.T) {
+	defer os.RemoveAll("uploads")
+	deps := newTestDeps(t)
+	defer deps.DB.Close()
+
+	user := createUser(t, deps.UserRepo, "media_mismatch", "user")
+	token, _ := deps.AuthService.GenerateJWT(user.ID, "", user.Username, user.Role)
+
+	var b bytes.Buffer
+	writer := multipart.NewWriter(&b)
+	part, _ := writer.CreateFormFile("file", "image.jpg")
+	// PDF magic bytes with jpg extension.
+	part.Write([]byte("%PDF-1.4\n1 0 obj\n"))
+	writer.Close()
+
+	req, _ := http.NewRequest("POST", "/api/v1/media/upload", &b)
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	w := doRequest(t, deps.Router, req)
+	require.Equal(t, http.StatusUnsupportedMediaType, w.Code)
+	require.Contains(t, w.Body.String(), "extension does not match")
+}
+
+func TestMediaUpload_RejectsStorageQuotaExceeded(t *testing.T) {
+	defer os.RemoveAll("uploads")
+	deps := newTestDeps(t)
+	defer deps.DB.Close()
+
+	user := createUser(t, deps.UserRepo, "media_quota", "user")
+	token, _ := deps.AuthService.GenerateJWT(user.ID, "", user.Username, user.Role)
+
+	// Pre-fill near 5GB free-tier quota.
+	_, err := deps.DB.Pool.Exec(context.Background(), `
+		INSERT INTO media_files (user_id, filename, original_filename, file_type, file_size, storage_url, storage_path)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
+	`, user.ID, "existing.bin", "existing.bin", "video/mp4", int64(5*1024*1024*1024-1024), "/uploads/existing.bin", "uploads/existing.bin")
+	require.NoError(t, err)
+
+	var b bytes.Buffer
+	writer := multipart.NewWriter(&b)
+	part, _ := writer.CreateFormFile("file", "clip.mp4")
+	part.Write([]byte{0x00, 0x00, 0x00, 0x18, 0x66, 0x74, 0x79, 0x70, 'D', 'A', 'T', 'A'})
+	writer.Close()
+
+	req, _ := http.NewRequest("POST", "/api/v1/media/upload", &b)
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	w := doRequest(t, deps.Router, req)
+	require.Equal(t, http.StatusRequestEntityTooLarge, w.Code)
+	require.Contains(t, w.Body.String(), "Storage quota exceeded")
+}
+
+func TestMediaUpload_RejectsSuspiciousEmbeddedZipSignature(t *testing.T) {
+	defer os.RemoveAll("uploads")
+	deps := newTestDeps(t)
+	defer deps.DB.Close()
+
+	user := createUser(t, deps.UserRepo, "media_polyglot", "user")
+	token, _ := deps.AuthService.GenerateJWT(user.ID, "", user.Username, user.Role)
+
+	var b bytes.Buffer
+	writer := multipart.NewWriter(&b)
+	part, _ := writer.CreateFormFile("file", "photo.png")
+	// PNG header + embedded ZIP local file header marker.
+	payload := []byte{0x89, 0x50, 0x4E, 0x47, 'D', 'A', 'T', 'A', 'P', 'K', 0x03, 0x04}
+	part.Write(payload)
+	writer.Close()
+
+	req, _ := http.NewRequest("POST", "/api/v1/media/upload", &b)
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	w := doRequest(t, deps.Router, req)
+	require.Equal(t, http.StatusBadRequest, w.Code)
+	require.Contains(t, strings.ToLower(w.Body.String()), "suspicious")
 }
 
 func TestReportsRoleEnforcement(t *testing.T) {
