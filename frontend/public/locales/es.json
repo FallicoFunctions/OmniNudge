@@ -3298,5 +3298,37 @@
       "userId": "ID de usuario: {{id}}",
       "byLine": "{{date}} por {{admin}} (ID: {{id}})"
     }
+  },
+  "loadingShowcase": {
+    "title": "Muestrario de Estados de Carga",
+    "subtitle": "Patrones de referencia para spinner, skeleton, barra de progreso y shimmer.",
+    "threshold": {
+      "title": "Simulador de Umbrales por Duración",
+      "description": "Reglas: <500ms sin indicador, 500ms-3s spinner/skeleton, >3s progreso cuando sea medible.",
+      "start": "Iniciar Simulación",
+      "reset": "Reiniciar",
+      "elapsed": "Transcurrido: {{elapsed}}ms",
+      "pattern": "Patrón Recomendado: {{pattern}}"
+    },
+    "spinner": {
+      "title": "Tamaños de Spinner"
+    },
+    "shimmer": {
+      "title": "Efecto Shimmer"
+    },
+    "skeleton": {
+      "post": "Skeleton de Post",
+      "list": "Skeleton de Lista",
+      "card": "Skeleton de Tarjeta"
+    },
+    "progress": {
+      "title": "Variantes de Progreso"
+    },
+    "slow3g": {
+      "title": "Verificación en 3G Lento",
+      "step1": "Abre DevTools del navegador y activa el throttling de red: Slow 3G.",
+      "step2": "Navega por feed, post y perfil y verifica que los skeletons aparezcan de inmediato.",
+      "step3": "Confirma que no haya regresiones de layout shift y que las barras de progreso sigan visibles en operaciones largas."
+    }
   }
 }

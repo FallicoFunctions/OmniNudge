@@ -45,6 +45,7 @@ const BugReportingPage = lazy(() => import('./pages/BugReportingPage'));
 const PrivateHubPage = lazy(() => import('./pages/PrivateHubPage'));
 const ResetPasswordPage = lazy(() => import('./pages/ResetPasswordPage'));
 const VerifyEmailPage = lazy(() => import('./pages/VerifyEmailPage'));
+const LoadingStatesShowcasePage = lazy(() => import('./pages/LoadingStatesShowcasePage'));
 
 // Initialize analytics on app load
 function AnalyticsWrapper({ children }: { children: React.ReactNode }) {
@@ -123,6 +124,9 @@ function App() {
                             <Route path="/bug-reporting" element={<BugReportingPage />} />
                             <Route path="/reset-password" element={<ResetPasswordPage />} />
                             <Route path="/verify-email" element={<VerifyEmailPage />} />
+                            {import.meta.env.DEV && (
+                              <Route path="/dev/loading-states" element={<LoadingStatesShowcasePage />} />
+                            )}
 
                             {/* PROTECTED routes - require auth */}
                             <Route
