@@ -88,7 +88,7 @@ describe('SearchResultsPage message search URL behavior', () => {
 
     searchMessagesMock.mockResolvedValue({
       messages: [],
-      limit: 25,
+      limit: 50,
       offset: 0,
       query: '',
       sort: 'relevance',
@@ -106,8 +106,8 @@ describe('SearchResultsPage message search URL behavior', () => {
     expect(searchMessagesMock).toHaveBeenCalledWith({
       query: '',
       sort: 'old',
-      limit: 25,
-      offset: 25,
+      limit: 50,
+      offset: 50,
       hasFiles: true,
       hasLinks: true,
       includeArchived: true,
@@ -130,7 +130,7 @@ describe('SearchResultsPage message search URL behavior', () => {
       expect(searchMessagesMock).toHaveBeenCalledWith({
         query: 'hello',
         sort: 'relevance',
-        limit: 25,
+        limit: 50,
         offset: 0,
         hasFiles: true,
         hasLinks: false,
@@ -155,7 +155,7 @@ describe('SearchResultsPage message search URL behavior', () => {
       expect(searchMessagesMock).toHaveBeenCalledWith({
         query: 'thread',
         sort: 'new',
-        limit: 25,
+        limit: 50,
         offset: 0,
         hasFiles: false,
         hasLinks: false,

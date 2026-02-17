@@ -41,7 +41,7 @@ import {
 type Tab = 'posts' | 'communities' | 'users' | 'messages';
 type PostSource = 'all' | 'omni';
 type SortOrder = 'relevance' | 'new' | 'old';
-const MESSAGE_PAGE_SIZE = 25;
+const MESSAGE_PAGE_SIZE = 50;
 type MessageSearchItem = MessageSearchResponse['messages'][number];
 type CrosspostTarget = { post: RedditApiPost };
 type HideTarget =
