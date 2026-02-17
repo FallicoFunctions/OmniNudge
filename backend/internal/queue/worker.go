@@ -106,13 +106,13 @@ func (w *Worker) RegisterAllHandlers(handlers JobHandlers) {
 
 // JobHandlers groups all job handler functions
 type JobHandlers struct {
-	VirusScan          JobHandler
-	Transcription      JobHandler
-	Notification       JobHandler
+	VirusScan           JobHandler
+	Transcription       JobHandler
+	Notification        JobHandler
 	ThumbnailGeneration JobHandler
-	EmailSend          JobHandler
-	DataExport         JobHandler
-	ContentModeration  JobHandler
+	EmailSend           JobHandler
+	DataExport          JobHandler
+	ContentModeration   JobHandler
 }
 
 // Start starts the worker server
@@ -127,162 +127,86 @@ func (w *Worker) Shutdown() {
 	w.server.Shutdown()
 }
 
-// Example job handlers (to be implemented with actual logic)
-
-// HandleVirusScan processes virus scan jobs
+// HandleVirusScan processes virus scan jobs.
+// Default behavior uses deterministic signature checks; service wiring may provide richer handlers.
 func HandleVirusScan(ctx context.Context, task *asynq.Task) error {
-	var payload VirusScanPayload
-	if err := json.Unmarshal(task.Payload(), &payload); err != nil {
-		return fmt.Errorf("json.Unmarshal failed: %v: %w", err, asynq.SkipRetry)
-	}
-
-	log.Printf("Processing virus scan: file_id=%d s3_key=%s", payload.FileID, payload.S3Key)
-
-	// TODO: Implement actual virus scanning with ClamAV
-	// 1. Download file from S3
-	// 2. Run ClamAV scan
-	// 3. Update file status in database
-	// 4. If infected: quarantine and notify user
-	// 5. If clean: mark as safe
-
-	// Placeholder: simulate work
-	time.Sleep(2 * time.Second)
-
-	log.Printf("Virus scan complete: file_id=%d status=clean", payload.FileID)
-	return nil
+	return NewVirusScanHandler()(ctx, task)
 }
 
-// HandleTranscription processes audio transcription jobs
+// HandleTranscription processes audio transcription jobs.
 func HandleTranscription(ctx context.Context, task *asynq.Task) error {
 	var payload TranscriptionPayload
 	if err := json.Unmarshal(task.Payload(), &payload); err != nil {
 		return fmt.Errorf("json.Unmarshal failed: %v: %w", err, asynq.SkipRetry)
 	}
-
-	log.Printf("Processing transcription: voice_message_id=%d audio_url=%s", payload.VoiceMessageID, payload.AudioURL)
-
-	// TODO: Implement actual transcription
-	// 1. Download audio file
-	// 2. Send to transcription service (Whisper, Google Speech-to-Text, etc.)
-	// 3. Save transcription to database
-	// 4. Notify user if enabled
-
-	// Placeholder: simulate work
-	time.Sleep(5 * time.Second)
-
-	log.Printf("Transcription complete: voice_message_id=%d", payload.VoiceMessageID)
-	return nil
+	if payload.VoiceMessageID <= 0 || payload.AudioURL == "" {
+		return fmt.Errorf("invalid transcription payload: voice_message_id=%d audio_url=%q: %w",
+			payload.VoiceMessageID, payload.AudioURL, asynq.SkipRetry)
+	}
+	return NewUnsupportedHandler(JobTypeTranscription, "transcription backend pipeline is not yet implemented")(ctx, task)
 }
 
-// HandleNotification processes push notification jobs
+// HandleNotification processes push notification jobs.
 func HandleNotification(ctx context.Context, task *asynq.Task) error {
 	var payload NotificationPayload
 	if err := json.Unmarshal(task.Payload(), &payload); err != nil {
 		return fmt.Errorf("json.Unmarshal failed: %v: %w", err, asynq.SkipRetry)
 	}
-
-	log.Printf("Processing notification: users=%d title=%s", len(payload.UserIDs), payload.Title)
-
-	// TODO: Implement actual push notification
-	// 1. Fetch device tokens for users
-	// 2. Send to FCM/APNs
-	// 3. Handle failures and token updates
-	// 4. Log delivery status
-
-	// Placeholder: simulate work
-	time.Sleep(1 * time.Second)
-
-	log.Printf("Notification sent: users=%d", len(payload.UserIDs))
+	if len(payload.UserIDs) == 0 {
+		return fmt.Errorf("notification payload has no user_ids: %w", asynq.SkipRetry)
+	}
+	log.Printf("Notification task accepted for %d user(s)", len(payload.UserIDs))
 	return nil
 }
 
-// HandleThumbnailGeneration processes thumbnail generation jobs
+// HandleThumbnailGeneration processes thumbnail generation jobs.
 func HandleThumbnailGeneration(ctx context.Context, task *asynq.Task) error {
 	var payload ThumbnailGenerationPayload
 	if err := json.Unmarshal(task.Payload(), &payload); err != nil {
 		return fmt.Errorf("json.Unmarshal failed: %v: %w", err, asynq.SkipRetry)
 	}
-
-	log.Printf("Processing thumbnail generation: file_id=%d type=%s sizes=%d", payload.FileID, payload.FileType, len(payload.Sizes))
-
-	// TODO: Implement actual thumbnail generation
-	// 1. Download source file
-	// 2. Generate thumbnails for each size
-	// 3. Upload thumbnails to S3
-	// 4. Save thumbnail URLs to database
-
-	// Placeholder: simulate work
-	time.Sleep(3 * time.Second)
-
-	log.Printf("Thumbnail generation complete: file_id=%d", payload.FileID)
-	return nil
+	if payload.FileID <= 0 {
+		return fmt.Errorf("invalid thumbnail payload: file_id=%d: %w", payload.FileID, asynq.SkipRetry)
+	}
+	return NewUnsupportedHandler(JobTypeThumbnailGeneration, "thumbnail handler requires repository/service wiring")(ctx, task)
 }
 
-// HandleEmailSend processes email sending jobs
+// HandleEmailSend processes email sending jobs.
 func HandleEmailSend(ctx context.Context, task *asynq.Task) error {
 	var payload EmailSendPayload
 	if err := json.Unmarshal(task.Payload(), &payload); err != nil {
 		return fmt.Errorf("json.Unmarshal failed: %v: %w", err, asynq.SkipRetry)
 	}
-
-	log.Printf("Processing email send: to=%v subject=%s", payload.To, payload.Subject)
-
-	// TODO: Implement actual email sending
-	// 1. Render email template if needed
-	// 2. Send via SMTP/SendGrid/SES
-	// 3. Handle bounces
-	// 4. Log delivery status
-
-	// Placeholder: simulate work
-	time.Sleep(1 * time.Second)
-
-	log.Printf("Email sent: to=%v", payload.To)
-	return nil
+	if len(payload.To) == 0 {
+		return fmt.Errorf("email payload has no recipients: %w", asynq.SkipRetry)
+	}
+	return NewUnsupportedHandler(JobTypeEmailSend, "email handler requires email service wiring")(ctx, task)
 }
 
-// HandleDataExport processes GDPR data export jobs
+// HandleDataExport processes GDPR data export jobs.
 func HandleDataExport(ctx context.Context, task *asynq.Task) error {
 	var payload DataExportPayload
 	if err := json.Unmarshal(task.Payload(), &payload); err != nil {
 		return fmt.Errorf("json.Unmarshal failed: %v: %w", err, asynq.SkipRetry)
 	}
-
-	log.Printf("Processing data export: user_id=%d export_id=%s types=%v", payload.UserID, payload.ExportID, payload.DataTypes)
-
-	// TODO: Implement actual data export
-	// 1. Query all user data from database
-	// 2. Decrypt encrypted data
-	// 3. Export to JSON/ZIP
-	// 4. Upload to S3
-	// 5. Send download link via email
-
-	// Placeholder: simulate work
-	time.Sleep(10 * time.Second)
-
-	log.Printf("Data export complete: user_id=%d export_id=%s", payload.UserID, payload.ExportID)
-	return nil
+	if payload.UserID <= 0 || payload.ExportID == "" {
+		return fmt.Errorf("invalid data export payload: user_id=%d export_id=%q: %w",
+			payload.UserID, payload.ExportID, asynq.SkipRetry)
+	}
+	return NewUnsupportedHandler(JobTypeDataExport, "data export handler requires db/storage wiring")(ctx, task)
 }
 
-// HandleContentModeration processes content moderation jobs
+// HandleContentModeration processes content moderation jobs.
 func HandleContentModeration(ctx context.Context, task *asynq.Task) error {
 	var payload ContentModerationPayload
 	if err := json.Unmarshal(task.Payload(), &payload); err != nil {
 		return fmt.Errorf("json.Unmarshal failed: %v: %w", err, asynq.SkipRetry)
 	}
-
-	log.Printf("Processing content moderation: type=%s id=%d", payload.ContentType, payload.ContentID)
-
-	// TODO: Implement actual content moderation
-	// 1. Send to moderation API (PhotoDNA, etc.)
-	// 2. Flag if inappropriate
-	// 3. Alert moderators if flagged
-	// 4. Auto-remove if CSAM detected
-
-	// Placeholder: simulate work
-	time.Sleep(2 * time.Second)
-
-	log.Printf("Content moderation complete: type=%s id=%d status=clean", payload.ContentType, payload.ContentID)
-	return nil
+	if payload.ContentType == "" || payload.ContentID <= 0 {
+		return fmt.Errorf("invalid content moderation payload: type=%q content_id=%d: %w",
+			payload.ContentType, payload.ContentID, asynq.SkipRetry)
+	}
+	return NewUnsupportedHandler(JobTypeContentModeration, "content moderation backend is not yet implemented")(ctx, task)
 }
 
 // Dead Letter Queue handling
