@@ -57,6 +57,10 @@ export default function SearchResultsPage() {
   const initialSort = (params.get('sort') as SortOrder) ?? 'relevance';
   const initialTab = (params.get('tab') as Tab) ?? 'posts';
   const initialIncludeNsfwParam = params.get('include_nsfw') === 'true';
+  const initialMessageHasFiles = params.get('has_files') === 'true';
+  const initialMessageHasLinks = params.get('has_links') === 'true';
+  const initialMessageIncludeArchived = params.get('include_archived') === 'true';
+  const initialMessagePage = Math.max(1, Number.parseInt(params.get('mpage') ?? '1', 10) || 1);
   const { searchIncludeNsfwByDefault, blockAllNsfw, useRelativeTime } = useSettings();
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -137,10 +141,10 @@ export default function SearchResultsPage() {
   }>({
     messages: [],
     total: 0,
-    page: 1,
-    hasFiles: false,
-    hasLinks: false,
-    includeArchived: false,
+    page: initialMessagePage,
+    hasFiles: initialMessageHasFiles,
+    hasLinks: initialMessageHasLinks,
+    includeArchived: initialMessageIncludeArchived,
   });
   const [messagePreviewById, setMessagePreviewById] = useState<Record<number, string>>({});
   const [isDecryptingMessagePreviews, setIsDecryptingMessagePreviews] = useState(false);
@@ -398,10 +402,21 @@ export default function SearchResultsPage() {
         }));
 
         const nextParams = new URLSearchParams(location.search);
-        nextParams.set('q', q);
+        if (q.trim()) {
+          nextParams.set('q', q);
+        } else {
+          nextParams.delete('q');
+        }
         nextParams.set('tab', tabTarget);
         nextParams.set('sort', opts?.sort ?? sort);
         nextParams.set('include_nsfw', includeNsfw ? 'true' : 'false');
+        nextParams.set('mpage', String(targetPage));
+        if (hasFiles) nextParams.set('has_files', 'true');
+        else nextParams.delete('has_files');
+        if (hasLinks) nextParams.set('has_links', 'true');
+        else nextParams.delete('has_links');
+        if (includeArchived) nextParams.set('include_archived', 'true');
+        else nextParams.delete('include_archived');
         navigate(`/search?${nextParams.toString()}`, { replace: true });
         return;
       }
@@ -480,6 +495,10 @@ export default function SearchResultsPage() {
       nextParams.set('tab', opts?.tab ?? activeTab);
       nextParams.set('sort', opts?.sort ?? sort);
       nextParams.set('include_nsfw', includeNsfw ? 'true' : 'false');
+      nextParams.delete('mpage');
+      nextParams.delete('has_files');
+      nextParams.delete('has_links');
+      nextParams.delete('include_archived');
       navigate(`/search?${nextParams.toString()}`, { replace: true });
     } catch (err) {
       console.error('Search failed:', err);
@@ -490,8 +509,12 @@ export default function SearchResultsPage() {
   };
 
   useEffect(() => {
-    if (initialQuery) {
-      handleSearch(initialQuery, { tab: initialTab, sort: initialSort });
+    if (initialQuery || initialTab === 'messages') {
+      handleSearch(initialQuery, {
+        tab: initialTab,
+        sort: initialSort,
+        page: initialTab === 'messages' ? initialMessagePage : undefined,
+      });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
