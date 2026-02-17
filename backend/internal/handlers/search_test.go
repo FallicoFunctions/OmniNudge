@@ -507,6 +507,56 @@ func TestSearchMessagesHasFilesFilter(t *testing.T) {
 	assert.Equal(t, float64(1), response["total"])
 }
 
+func TestSearchMessagesExcludesDeletedConversationsForUser(t *testing.T) {
+	handler, db, cleanup := setupSearchHandlerTest(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	userRepo := models.NewUserRepository(db.Pool)
+	conversationRepo := models.NewConversationRepository(db.Pool)
+	messageRepo := models.NewMessageRepository(db.Pool)
+
+	user1 := &models.User{Username: uniqueSearchName("msg_deleted_conv_user1"), PasswordHash: "hash"}
+	user2 := &models.User{Username: uniqueSearchName("msg_deleted_conv_user2"), PasswordHash: "hash"}
+	require.NoError(t, userRepo.Create(ctx, user1))
+	require.NoError(t, userRepo.Create(ctx, user2))
+
+	conversation, err := conversationRepo.Create(ctx, user1.ID, user2.ID)
+	require.NoError(t, err)
+
+	msg := &models.Message{
+		ConversationID:    conversation.ID,
+		SenderID:          user2.ID,
+		RecipientID:       user1.ID,
+		EncryptedContent:  "deleted-conversation-token",
+		MessageType:       "text",
+		EncryptionVersion: "v1",
+	}
+	require.NoError(t, messageRepo.Create(ctx, msg))
+
+	_, err = db.Pool.Exec(ctx, `
+		UPDATE conversations
+		SET deleted_for_user1 = TRUE
+		WHERE id = $1
+	`, conversation.ID)
+	require.NoError(t, err)
+
+	router := gin.Default()
+	router.GET("/search/messages", func(c *gin.Context) {
+		c.Set("user_id", user1.ID)
+		handler.SearchMessages(c)
+	})
+
+	req := httptest.NewRequest("GET", "/search/messages?q=deleted-conversation-token", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusOK, w.Code, "body=%s", w.Body.String())
+	var response map[string]interface{}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &response))
+	assert.Equal(t, float64(0), response["total"])
+}
+
 func strPtrSearch(value string) *string {
 	return &value
 }
