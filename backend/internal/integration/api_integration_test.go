@@ -272,6 +272,48 @@ func TestMediaUpload_AllowsPDFDocument(t *testing.T) {
 	require.Equal(t, http.StatusCreated, w.Code, w.Body.String())
 }
 
+func TestSearchMessagesAuthAndResults(t *testing.T) {
+	deps := newTestDeps(t)
+	defer deps.DB.Close()
+
+	user1 := createUser(t, deps.UserRepo, "searchmsg_user1", "user")
+	user2 := createUser(t, deps.UserRepo, "searchmsg_user2", "user")
+	token, _ := deps.AuthService.GenerateJWT(user1.ID, "", user1.Username, user1.Role)
+
+	conv, err := deps.ConversationRepo.Create(context.Background(), user1.ID, user2.ID)
+	require.NoError(t, err)
+
+	msg := &models.Message{
+		ConversationID:    conv.ID,
+		SenderID:          user2.ID,
+		RecipientID:       user1.ID,
+		EncryptedContent:  "integration-search-token",
+		MessageType:       "text",
+		EncryptionVersion: "v1",
+	}
+	require.NoError(t, deps.MessageRepo.Create(context.Background(), msg))
+
+	// Unauthenticated request should fail
+	req, _ := http.NewRequest("GET", "/api/v1/search/messages?q=integration-search-token", nil)
+	w := doRequest(t, deps.Router, req)
+	require.Equal(t, http.StatusUnauthorized, w.Code)
+
+	// Authenticated request should return result
+	req, _ = http.NewRequest("GET", "/api/v1/search/messages?q=integration-search-token", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	w = doRequest(t, deps.Router, req)
+	require.Equal(t, http.StatusOK, w.Code, "body=%s", w.Body.String())
+
+	var response struct {
+		Total    int                      `json:"total"`
+		Messages []map[string]interface{} `json:"messages"`
+	}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &response))
+	require.Equal(t, 1, response.Total)
+	require.Len(t, response.Messages, 1)
+	require.Equal(t, user2.Username, response.Messages[0]["sender_username"])
+}
+
 func TestBatchMediaUpload_RejectsTooManyFiles(t *testing.T) {
 	defer os.RemoveAll("uploads")
 	deps := newTestDeps(t)
@@ -446,6 +488,69 @@ func TestReportsRoleEnforcement(t *testing.T) {
 	req.Header.Set("Authorization", "Bearer "+adminToken)
 	w = doRequest(t, deps.Router, req)
 	require.Equal(t, http.StatusOK, w.Code)
+}
+
+func TestReports_AutoSuspendAfterThreeDistinctUserReports(t *testing.T) {
+	deps := newTestDeps(t)
+	defer deps.DB.Close()
+
+	target := createUser(t, deps.UserRepo, "report_target_http", "user")
+	reporterOne := createUser(t, deps.UserRepo, "reporter_one_http", "user")
+	reporterTwo := createUser(t, deps.UserRepo, "reporter_two_http", "user")
+	reporterThree := createUser(t, deps.UserRepo, "reporter_three_http", "user")
+
+	reporterOneToken, _ := deps.AuthService.GenerateJWT(reporterOne.ID, "", reporterOne.Username, reporterOne.Role)
+	reporterTwoToken, _ := deps.AuthService.GenerateJWT(reporterTwo.ID, "", reporterTwo.Username, reporterTwo.Role)
+	reporterThreeToken, _ := deps.AuthService.GenerateJWT(reporterThree.ID, "", reporterThree.Username, reporterThree.Role)
+
+	for _, token := range []string{reporterOneToken, reporterTwoToken, reporterThreeToken} {
+		body := []byte(`{"target_type":"user","target_id":` + fmt.Sprint(target.ID) + `,"reason":"harassment"}`)
+		req, _ := http.NewRequest("POST", "/api/v1/reports", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer "+token)
+		w := doRequest(t, deps.Router, req)
+		require.Equal(t, http.StatusCreated, w.Code, w.Body.String())
+	}
+
+	status, err := deps.UserRepo.GetBanStatus(context.Background(), target.ID)
+	require.NoError(t, err)
+	require.NotNil(t, status)
+	require.True(t, status.Banned)
+	require.NotNil(t, status.BanReason)
+	require.Equal(t, "Auto-suspended pending moderation review", *status.BanReason)
+}
+
+func TestReports_HighPriorityCreatesModeratorNotifications(t *testing.T) {
+	deps := newTestDeps(t)
+	defer deps.DB.Close()
+
+	reporter := createUser(t, deps.UserRepo, "reporter_hp_http", "user")
+	target := createUser(t, deps.UserRepo, "target_hp_http", "user")
+	admin := createUser(t, deps.UserRepo, "admin_hp_http", "admin")
+	moderator := createUser(t, deps.UserRepo, "moderator_hp_http", "moderator")
+
+	reporterToken, _ := deps.AuthService.GenerateJWT(reporter.ID, "", reporter.Username, reporter.Role)
+	adminToken, _ := deps.AuthService.GenerateJWT(admin.ID, "", admin.Username, admin.Role)
+	moderatorToken, _ := deps.AuthService.GenerateJWT(moderator.ID, "", moderator.Username, moderator.Role)
+
+	body := []byte(`{"target_type":"user","target_id":` + fmt.Sprint(target.ID) + `,"reason":"csam"}`)
+	req, _ := http.NewRequest("POST", "/api/v1/reports", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+reporterToken)
+	w := doRequest(t, deps.Router, req)
+	require.Equal(t, http.StatusCreated, w.Code, w.Body.String())
+
+	req, _ = http.NewRequest("GET", "/api/v1/notifications?limit=20&offset=0", nil)
+	req.Header.Set("Authorization", "Bearer "+adminToken)
+	w = doRequest(t, deps.Router, req)
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	require.Contains(t, w.Body.String(), `"notification_type":"moderation_report_high_priority"`)
+
+	req, _ = http.NewRequest("GET", "/api/v1/notifications?limit=20&offset=0", nil)
+	req.Header.Set("Authorization", "Bearer "+moderatorToken)
+	w = doRequest(t, deps.Router, req)
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	require.Contains(t, w.Body.String(), `"notification_type":"moderation_report_high_priority"`)
 }
 
 func TestMessagingFlow(t *testing.T) {

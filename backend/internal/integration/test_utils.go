@@ -95,6 +95,7 @@ func newTestDeps(t *testing.T) *TestDeps {
 	hubRepo := models.NewHubRepository(db.Pool)
 	reportRepo := models.NewReportRepository(db.Pool)
 	modRepo := models.NewHubModeratorRepository(db.Pool)
+	notifRepo := models.NewNotificationRepository(db.Pool)
 	redditPostRepo := models.NewRedditPostRepository(db.Pool)
 	feedRepo := models.NewFeedRepository(db.Pool)
 	hubSettingsRepo := repository.NewHubSettingsRepository(db.Pool)
@@ -126,10 +127,11 @@ func newTestDeps(t *testing.T) *TestDeps {
 	mediaHandler := handlers.NewMediaHandler(models.NewMediaFileRepository(db.Pool), thumbnailService, nil)
 	hubSubRepo := models.NewHubSubscriptionRepository(db.Pool)
 	hubsHandler := handlers.NewHubsHandler(hubRepo, postRepo, modRepo, hubSubRepo, hubSettingsRepo)
-	moderationHandler := handlers.NewModerationHandler(reportRepo, modRepo)
+	moderationHandler := handlers.NewModerationHandler(reportRepo, modRepo, userRepo, notifRepo, hub, nil)
 	adminHandler := handlers.NewAdminHandler(userRepo, modRepo, db.Pool)
 	authorizer := websocket.NewAuthorizer(db.Pool)
 	wsHandler := handlers.NewWebSocketHandler(hub, authorizer, userSettingsRepo)
+	searchHandler := handlers.NewSearchHandler(db.Pool)
 
 	router := gin.New()
 	router.Use(gin.Recovery())
@@ -165,6 +167,14 @@ func newTestDeps(t *testing.T) *TestDeps {
 			users.GET("/:username", usersHandler.GetUserProfile)
 		}
 
+		search := api.Group("/search")
+		{
+			search.GET("/posts", searchHandler.SearchPosts)
+			search.GET("/comments", searchHandler.SearchComments)
+			search.GET("/users", searchHandler.SearchUsers)
+			search.GET("/hubs", searchHandler.SearchHubs)
+		}
+
 		protected := api.Group("")
 		protected.Use(middleware.AuthRequired(authService))
 		{
@@ -198,6 +208,7 @@ func newTestDeps(t *testing.T) *TestDeps {
 			protected.GET("/conversations/:id/messages", messagesHandler.GetMessages)
 			protected.POST("/conversations/:id/read", messagesHandler.MarkAsRead)
 			protected.POST("/conversations", conversationsHandler.CreateConversation)
+			protected.GET("/search/messages", searchHandler.SearchMessages)
 		}
 
 		api.GET("/ws", middleware.AuthRequired(authService), wsHandler.HandleWebSocket)
