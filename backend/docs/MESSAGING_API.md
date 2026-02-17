@@ -219,6 +219,57 @@ Send a new message in a conversation.
 
 ---
 
+### Search Messages
+Search messages visible to the authenticated user with metadata filters.
+
+**Endpoint:** `GET /search/messages`
+**Auth Required:** Yes
+
+**Query Parameters:**
+- `q` (optional) - Text query. Works for legacy/plaintext rows and sender username matching.
+- `conversation_id` (optional) - Restrict to one conversation.
+- `sender_id` (optional) - Restrict to one sender.
+- `has_files` (optional, default: `false`) - Only messages with attached media.
+- `has_links` (optional, default: `false`) - Filter to rows containing URL-like text (`http`) in searchable fields.
+- `start_date` (optional, RFC3339) - Sent at or after this timestamp.
+- `end_date` (optional, RFC3339) - Sent at or before this timestamp.
+- `include_archived` (optional, default: `false`) - Include archived conversations.
+- `limit` (optional, default: `50`, max: `100`) - Page size.
+- `offset` (optional, default: `0`) - Offset pagination.
+
+**Response:** `200 OK`
+```json
+{
+  "messages": [
+    {
+      "id": 123,
+      "conversation_id": 42,
+      "sender_id": 1,
+      "recipient_id": 5,
+      "encrypted_content": "base64-encoded-encrypted-blob",
+      "message_type": "text",
+      "sent_at": "2026-02-17T15:00:00Z",
+      "encryption_version": "v1"
+    }
+  ],
+  "limit": 50,
+  "offset": 0,
+  "query": "hello",
+  "total": 1
+}
+```
+
+**Error Codes:**
+- `400` - Invalid query parameters (IDs, date format, or date range)
+- `401` - Authentication required
+- `500` - Search query failed
+
+**Notes:**
+- Message bodies are encrypted in the normal flow. Server-side text matching is best-effort and primarily supports metadata filtering plus fallback text matching for legacy/plaintext rows.
+- For full encrypted message text search, continue using client-side decrypted in-conversation search.
+
+---
+
 ### Get Messages
 Retrieve messages from a conversation.
 
@@ -407,6 +458,16 @@ Check if specific users are currently online.
 ---
 
 ## User Blocking
+
+### Blocking Behavior Rules
+
+When a block relationship exists, messaging behavior is enforced consistently:
+
+- New DM creation is denied when either user has blocked the other (`403 Forbidden`).
+- Sending a message is denied when the recipient has blocked the sender (`403 Forbidden`).
+- Message history APIs hide messages authored by users you have blocked (DMs and mod mail).
+- Unread/delivery/read calculations ignore messages from users you have blocked.
+- Existing conversations are kept; only visibility and send permissions are restricted.
 
 ### Block User
 Block a user from sending you messages.

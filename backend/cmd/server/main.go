@@ -294,7 +294,7 @@ func main() {
 	mediaHandler := handlers.NewMediaHandler(mediaRepo, thumbnailService, queueClient)
 	hubsHandler := handlers.NewHubsHandlerWithAccessRequest(hubRepo, postRepo, hubModRepo, hubSubRepo, hubSettingsRepo, hubAccessRequestRepo)
 	subscriptionsHandler := handlers.NewSubscriptionsHandler(hubSubRepo, subredditSubRepo, hubRepo)
-	moderationHandler := handlers.NewModerationHandler(reportRepo, hubModRepo)
+	moderationHandler := handlers.NewModerationHandler(reportRepo, hubModRepo, userRepo, notificationRepo, hub, emailService)
 	moderationHandlerV2 := handlers.NewModerationHandlerV2(
 		hubBanRepo,
 		removalReasonRepo,
@@ -753,6 +753,7 @@ func main() {
 			protected.POST("/conversations/:id/read", messagesHandler.MarkAsRead)
 			protected.POST("/messages/:id/read", messagesHandler.MarkSingleMessageAsRead)
 			protected.DELETE("/messages/:id", messagesHandler.DeleteMessage)
+			protected.GET("/search/messages", searchHandler.SearchMessages)
 
 			// Mod mail routes
 			protected.POST("/mod-mail", modMailHandler.CreateModMail)
