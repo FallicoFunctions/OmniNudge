@@ -620,6 +620,49 @@ func TestSearchMessagesSortOld(t *testing.T) {
 	require.Equal(t, float64(older.ID), first["id"])
 }
 
+func TestSearchMessagesInvalidSortFallsBackToRelevance(t *testing.T) {
+	handler, db, cleanup := setupSearchHandlerTest(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	userRepo := models.NewUserRepository(db.Pool)
+	conversationRepo := models.NewConversationRepository(db.Pool)
+	messageRepo := models.NewMessageRepository(db.Pool)
+
+	user1 := &models.User{Username: uniqueSearchName("msg_sort_fallback_user1"), PasswordHash: "hash"}
+	user2 := &models.User{Username: uniqueSearchName("msg_sort_fallback_user2"), PasswordHash: "hash"}
+	require.NoError(t, userRepo.Create(ctx, user1))
+	require.NoError(t, userRepo.Create(ctx, user2))
+
+	conversation, err := conversationRepo.Create(ctx, user1.ID, user2.ID)
+	require.NoError(t, err)
+
+	msg := &models.Message{
+		ConversationID:    conversation.ID,
+		SenderID:          user2.ID,
+		RecipientID:       user1.ID,
+		EncryptedContent:  "fallback-sort-token",
+		MessageType:       "text",
+		EncryptionVersion: "v1",
+	}
+	require.NoError(t, messageRepo.Create(ctx, msg))
+
+	router := gin.Default()
+	router.GET("/search/messages", func(c *gin.Context) {
+		c.Set("user_id", user1.ID)
+		handler.SearchMessages(c)
+	})
+
+	req := httptest.NewRequest("GET", "/search/messages?q=fallback-sort-token&sort=not-real", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusOK, w.Code, "body=%s", w.Body.String())
+	var response map[string]interface{}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &response))
+	require.Equal(t, "relevance", response["sort"])
+}
+
 func strPtrSearch(value string) *string {
 	return &value
 }
