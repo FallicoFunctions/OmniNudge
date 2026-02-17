@@ -279,6 +279,29 @@ func TestBatchedNotifications(t *testing.T) {
 	}
 }
 
+func TestConversationMuteDetection(t *testing.T) {
+	service, db, cleanup := setupNotificationTest(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	recipientID := createTestUser(t, db, uniqueNotificationName("muted_recipient"))
+	senderID := createTestUser(t, db, uniqueNotificationName("muted_sender"))
+
+	convRepo := models.NewConversationRepository(db.Pool)
+	conv, err := convRepo.Create(ctx, senderID, recipientID)
+	require.NoError(t, err)
+
+	assert.False(t, service.isConversationMutedForUser(ctx, conv.ID, recipientID))
+
+	_, err = db.Pool.Exec(ctx, `
+		INSERT INTO conversation_notification_settings (conversation_id, user_id, muted)
+		VALUES ($1, $2, TRUE)
+	`, conv.ID, recipientID)
+	require.NoError(t, err)
+
+	assert.True(t, service.isConversationMutedForUser(ctx, conv.ID, recipientID))
+}
+
 func TestSelfReplyNoNotification(t *testing.T) {
 	service, db, cleanup := setupNotificationTest(t)
 	defer cleanup()

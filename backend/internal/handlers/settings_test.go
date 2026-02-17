@@ -1,0 +1,145 @@
+package handlers
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"testing"
+
+	"github.com/gin-gonic/gin"
+	"github.com/omninudge/backend/internal/database"
+	"github.com/omninudge/backend/internal/models"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+func setupSettingsHandlerTest(t *testing.T) (*SettingsHandler, *models.UserSettingsRepository, int, func()) {
+	db, err := database.NewTest()
+	require.NoError(t, err)
+	t.Cleanup(db.Close)
+
+	ctx := context.Background()
+	require.NoError(t, db.Migrate(ctx))
+	require.NoError(t, database.ResetTestData(ctx, db))
+
+	userRepo := models.NewUserRepository(db.Pool)
+	user := &models.User{
+		Username:     uniqueConversationsUsername("settings_user"),
+		PasswordHash: "test_hash",
+	}
+	require.NoError(t, userRepo.Create(ctx, user))
+
+	settingsRepo := models.NewUserSettingsRepository(db.Pool)
+	handler := NewSettingsHandler(settingsRepo)
+
+	cleanup := func() {
+		db.Close()
+	}
+	return handler, settingsRepo, user.ID, cleanup
+}
+
+func TestUpdateSettings_RejectsInvalidFontSize(t *testing.T) {
+	handler, _, userID, cleanup := setupSettingsHandlerTest(t)
+	defer cleanup()
+
+	router := gin.Default()
+	router.PUT("/settings", func(c *gin.Context) {
+		c.Set("user_id", userID)
+		handler.UpdateSettings(c)
+	})
+
+	body := map[string]any{
+		"font_size": "xlarge",
+	}
+	payload, _ := json.Marshal(body)
+
+	req := httptest.NewRequest(http.MethodPut, "/settings", bytes.NewReader(payload))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+	assert.Contains(t, w.Body.String(), "Invalid font_size")
+}
+
+func TestUpdateSettings_RejectsTooLongDeviceID(t *testing.T) {
+	handler, _, userID, cleanup := setupSettingsHandlerTest(t)
+	defer cleanup()
+
+	router := gin.Default()
+	router.PUT("/settings", func(c *gin.Context) {
+		c.Set("user_id", userID)
+		handler.UpdateSettings(c)
+	})
+
+	body := map[string]any{
+		"mic_device_id": strings.Repeat("a", 256),
+	}
+	payload, _ := json.Marshal(body)
+
+	req := httptest.NewRequest(http.MethodPut, "/settings", bytes.NewReader(payload))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+	assert.Contains(t, w.Body.String(), "Invalid mic_device_id")
+}
+
+func TestUpdateSettings_PersistsDeviceIDs(t *testing.T) {
+	handler, settingsRepo, userID, cleanup := setupSettingsHandlerTest(t)
+	defer cleanup()
+
+	router := gin.Default()
+	router.PUT("/settings", func(c *gin.Context) {
+		c.Set("user_id", userID)
+		handler.UpdateSettings(c)
+	})
+
+	body := map[string]any{
+		"mic_device_id":     "mic-1",
+		"camera_device_id":  "cam-1",
+		"speaker_device_id": "spk-1",
+	}
+	payload, _ := json.Marshal(body)
+
+	req := httptest.NewRequest(http.MethodPut, "/settings", bytes.NewReader(payload))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	require.Equal(t, http.StatusOK, w.Code, "response: %s", w.Body.String())
+
+	settings, err := settingsRepo.GetByUserID(context.Background(), userID)
+	require.NoError(t, err)
+	require.NotNil(t, settings)
+	assert.Equal(t, "mic-1", settings.MicDeviceID)
+	assert.Equal(t, "cam-1", settings.CameraDeviceID)
+	assert.Equal(t, "spk-1", settings.SpeakerDeviceID)
+}
+
+func TestUpdateSettings_RejectsInvalidQuietHoursTimezone(t *testing.T) {
+	handler, _, userID, cleanup := setupSettingsHandlerTest(t)
+	defer cleanup()
+
+	router := gin.Default()
+	router.PUT("/settings", func(c *gin.Context) {
+		c.Set("user_id", userID)
+		handler.UpdateSettings(c)
+	})
+
+	body := map[string]any{
+		"quiet_hours_timezone": "Not/A_Real_Timezone",
+	}
+	payload, _ := json.Marshal(body)
+
+	req := httptest.NewRequest(http.MethodPut, "/settings", bytes.NewReader(payload))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+	assert.Contains(t, w.Body.String(), "Invalid quiet_hours_timezone")
+}

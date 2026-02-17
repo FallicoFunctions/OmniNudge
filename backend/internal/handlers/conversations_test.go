@@ -243,6 +243,51 @@ func TestGetConversations(t *testing.T) {
 	}
 }
 
+func TestMuteAndUnmuteConversation(t *testing.T) {
+	handler, db, user1ID, user2ID, cleanup := setupConversationsHandlerTest(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	convRepo := models.NewConversationRepository(db.Pool)
+	conv, err := convRepo.Create(ctx, user1ID, user2ID)
+	require.NoError(t, err)
+
+	router := gin.Default()
+	router.PUT("/conversations/:id/mute", func(c *gin.Context) {
+		c.Set("user_id", user1ID)
+		handler.MuteConversation(c)
+	})
+	router.PUT("/conversations/:id/unmute", func(c *gin.Context) {
+		c.Set("user_id", user1ID)
+		handler.UnmuteConversation(c)
+	})
+
+	muteReq := httptest.NewRequest(http.MethodPut, fmt.Sprintf("/conversations/%d/mute", conv.ID), nil)
+	muteRes := httptest.NewRecorder()
+	router.ServeHTTP(muteRes, muteReq)
+	require.Equal(t, http.StatusOK, muteRes.Code, "mute response: %s", muteRes.Body.String())
+
+	var muted bool
+	err = db.Pool.QueryRow(ctx, `
+		SELECT muted FROM conversation_notification_settings
+		WHERE conversation_id = $1 AND user_id = $2
+	`, conv.ID, user1ID).Scan(&muted)
+	require.NoError(t, err)
+	assert.True(t, muted)
+
+	unmuteReq := httptest.NewRequest(http.MethodPut, fmt.Sprintf("/conversations/%d/unmute", conv.ID), nil)
+	unmuteRes := httptest.NewRecorder()
+	router.ServeHTTP(unmuteRes, unmuteReq)
+	require.Equal(t, http.StatusOK, unmuteRes.Code, "unmute response: %s", unmuteRes.Body.String())
+
+	err = db.Pool.QueryRow(ctx, `
+		SELECT muted FROM conversation_notification_settings
+		WHERE conversation_id = $1 AND user_id = $2
+	`, conv.ID, user1ID).Scan(&muted)
+	require.NoError(t, err)
+	assert.False(t, muted)
+}
+
 func TestGetConversations_WithMessages(t *testing.T) {
 	handler, db, user1ID, user2ID, cleanup := setupConversationsHandlerTest(t)
 	defer cleanup()

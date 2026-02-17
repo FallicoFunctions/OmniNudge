@@ -335,6 +335,12 @@ func (s *NotificationService) SendMessagePush(ctx context.Context, senderID int,
 		if !settings.ShowPushNotifications {
 			return
 		}
+		if settings.QuietHoursEnabled && isWithinQuietHours(time.Now(), settings.QuietHoursTimezone, settings.QuietHoursStartMinutes, settings.QuietHoursEndMinutes) {
+			return
+		}
+		if s.isConversationMutedForUser(bgCtx, message.ConversationID, recipientID) {
+			return
+		}
 
 		// 2. Fetch sender name for title
 		var senderUsername string
@@ -360,6 +366,39 @@ func (s *NotificationService) SendMessagePush(ctx context.Context, senderID int,
 		// Title should be the sender name
 		s.performPush(bgCtx, n, data, fmt.Sprintf("New message from %s", senderUsername))
 	}()
+}
+
+func (s *NotificationService) isConversationMutedForUser(ctx context.Context, conversationID int, userID int) bool {
+	var muted bool
+	err := s.pool.QueryRow(ctx, `
+		SELECT COALESCE(muted, false)
+		FROM conversation_notification_settings
+		WHERE conversation_id = $1 AND user_id = $2
+	`, conversationID, userID).Scan(&muted)
+	if err != nil {
+		return false
+	}
+	return muted
+}
+
+func isWithinQuietHours(now time.Time, tz string, startMinutes, endMinutes int) bool {
+	loc, err := time.LoadLocation(tz)
+	if err != nil {
+		loc = time.UTC
+	}
+	local := now.In(loc)
+	minutes := local.Hour()*60 + local.Minute()
+
+	// Normal window: start < end (e.g., 09:00-17:00)
+	if startMinutes < endMinutes {
+		return minutes >= startMinutes && minutes < endMinutes
+	}
+	// Overnight window: start > end (e.g., 22:00-07:00)
+	if startMinutes > endMinutes {
+		return minutes >= startMinutes || minutes < endMinutes
+	}
+	// start == end means "no quiet hours window"
+	return false
 }
 
 func (s *NotificationService) sendPushToUser(ctx context.Context, n *models.Notification) {

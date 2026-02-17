@@ -59,6 +59,42 @@ type ConversationUser struct {
 	Karma     int     `json:"karma"`
 }
 
+func (h *ConversationsHandler) ensureConversationParticipant(c *gin.Context, conversationID int, userID int) (*models.Conversation, bool) {
+	conversation, err := h.conversationRepo.GetByID(c.Request.Context(), conversationID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get conversation", "details": err.Error()})
+		return nil, false
+	}
+	if conversation == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Conversation not found"})
+		return nil, false
+	}
+
+	switch conversation.ConversationType {
+	case "dm", "":
+		if !conversation.IsParticipant(userID) {
+			c.JSON(http.StatusForbidden, gin.H{"error": "You are not a participant in this conversation"})
+			return nil, false
+		}
+	case "mod_mail":
+		var count int
+		err := h.pool.QueryRow(c.Request.Context(), `
+			SELECT COUNT(*) FROM conversation_participants
+			WHERE conversation_id = $1 AND user_id = $2
+		`, conversationID, userID).Scan(&count)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to verify conversation participant", "details": err.Error()})
+			return nil, false
+		}
+		if count == 0 {
+			c.JSON(http.StatusForbidden, gin.H{"error": "You are not a participant in this mod mail conversation"})
+			return nil, false
+		}
+	}
+
+	return conversation, true
+}
+
 // CreateConversation handles POST /api/v1/conversations
 func (h *ConversationsHandler) CreateConversation(c *gin.Context) {
 	// Get user ID from context (set by AuthRequired middleware)
@@ -537,4 +573,58 @@ func (h *ConversationsHandler) UnarchiveConversation(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Conversation unarchived successfully"})
+}
+
+// MuteConversation handles PUT /api/v1/conversations/:id/mute
+func (h *ConversationsHandler) MuteConversation(c *gin.Context) {
+	userIDValue, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
+	userID := userIDValue.(int)
+
+	conversationID, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid conversation ID"})
+		return
+	}
+
+	if _, ok := h.ensureConversationParticipant(c, conversationID, userID); !ok {
+		return
+	}
+
+	if err := h.conversationRepo.SetMuted(c.Request.Context(), conversationID, userID, true); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to mute conversation", "details": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Conversation muted successfully"})
+}
+
+// UnmuteConversation handles PUT /api/v1/conversations/:id/unmute
+func (h *ConversationsHandler) UnmuteConversation(c *gin.Context) {
+	userIDValue, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
+	userID := userIDValue.(int)
+
+	conversationID, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid conversation ID"})
+		return
+	}
+
+	if _, ok := h.ensureConversationParticipant(c, conversationID, userID); !ok {
+		return
+	}
+
+	if err := h.conversationRepo.SetMuted(c.Request.Context(), conversationID, userID, false); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to unmute conversation", "details": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Conversation unmuted successfully"})
 }

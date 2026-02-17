@@ -1370,6 +1370,8 @@
       "deleteMessageFailed": "فشل حذف الرسالة",
       "archiveFailed": "فشل أرشفة المحادثة",
       "unarchiveFailed": "فشل إلغاء أرشفة المحادثة",
+      "muteFailed": "فشل كتم إشعارات المحادثة",
+      "unmuteFailed": "فشل إعادة تفعيل إشعارات المحادثة",
       "deleteConversationFailed": "فشل حذف المحادثة",
       "recipientKeyNotFound": "لم يتم العثور على المفتاح العام للمستلم",
       "encryptionKeysMissing": "مفاتيح التشفير الخاصة بك غير مُعدّة",
@@ -1391,6 +1393,9 @@
     },
     "archive": "أرشفة",
     "unarchive": "إلغاء الأرشفة",
+    "mute": "كتم الإشعارات",
+    "unmute": "إلغاء كتم الإشعارات",
+    "muted": "مكتومة",
     "noConversations": "لا توجد محادثات بعد. ابدأ دردشة جديدة!",
     "loadMore": "تحميل المزيد من المحادثات",
     "modMail": "بريد الإشراف",
@@ -1718,6 +1723,41 @@
       "notifications": "الإشعارات",
       "preferences": "التفضيلات",
       "accountPrivacy": "الحساب والخصوصية"
+    },
+    "tabs": {
+      "general": "عام",
+      "notifications": "الإشعارات",
+      "privacy": "الخصوصية",
+      "appearance": "المظهر",
+      "audioVideo": "الصوت والفيديو"
+    },
+    "appearancePreferences": {
+      "fontSizeTitle": "حجم الخط",
+      "fontSizeHelp": "اضبط حجم النص العام المستخدم في واجهة التطبيق.",
+      "fontSizeLabel": "حجم الخط الأساسي",
+      "fontSizeSmall": "صغير",
+      "fontSizeMedium": "متوسط",
+      "fontSizeLarge": "كبير"
+    },
+    "quietHours": {
+      "title": "ساعات الهدوء",
+      "description": "إيقاف إشعارات الرسائل الفورية خلال الساعات المحددة.",
+      "toggle": "تفعيل ساعات الهدوء",
+      "timezone": "المنطقة الزمنية: {{tz}}",
+      "start": "وقت البدء",
+      "end": "وقت الانتهاء"
+    },
+    "audioVideo": {
+      "devicesTitle": "الأجهزة",
+      "devicesDescription": "اختر أجهزة الإدخال والإخراج المفضلة للرسائل والمكالمات.",
+      "microphone": "الميكروفون",
+      "camera": "الكاميرا",
+      "speaker": "مكبر الصوت",
+      "defaultDevice": "افتراضي النظام",
+      "transcriptionTitle": "خصوصية الصوت والفيديو",
+      "transcriptionDescription": "تحكم في كيفية معالجة الرسائل الصوتية في حسابك.",
+      "transcriptionToggle": "السماح بتفريغ الصوت",
+      "transcriptionHelp": "عند التفعيل، يمكن تفريغ المقاطع الصوتية لتحسين ميزات البحث وإمكانية الوصول."
     },
     "themeSection": {
       "title": "السمة",
