@@ -122,7 +122,7 @@ func (s *FeatureFlagService) CreateFlag(ctx context.Context, flag *models.Featur
 		ChangedBy:  createdBy,
 		NewValue:   map[string]interface{}{"enabled": flag.Enabled, "percentage": flag.Percentage},
 	}
-	s.repo.CreateAuditLog(ctx, audit)
+	s.createAuditLogIfPossible(ctx, audit)
 
 	// Invalidate cache
 	s.invalidateCache(ctx, flag.Key)
@@ -164,7 +164,7 @@ func (s *FeatureFlagService) UpdateFlag(ctx context.Context, key string, updates
 			OldValue:   map[string]interface{}{"enabled": oldFlag.Enabled},
 			NewValue:   map[string]interface{}{"enabled": newFlag.Enabled},
 		}
-		s.repo.CreateAuditLog(ctx, audit)
+		s.createAuditLogIfPossible(ctx, audit)
 	}
 
 	if oldFlag.Percentage != newFlag.Percentage {
@@ -175,7 +175,7 @@ func (s *FeatureFlagService) UpdateFlag(ctx context.Context, key string, updates
 			OldValue:   map[string]interface{}{"percentage": oldFlag.Percentage},
 			NewValue:   map[string]interface{}{"percentage": newFlag.Percentage},
 		}
-		s.repo.CreateAuditLog(ctx, audit)
+		s.createAuditLogIfPossible(ctx, audit)
 	}
 
 	// Invalidate cache (best-effort, ignore Redis errors)
@@ -201,7 +201,7 @@ func (s *FeatureFlagService) DeleteFlag(ctx context.Context, key string, deleted
 		ChangeType: "deleted",
 		ChangedBy:  deletedBy,
 	}
-	s.repo.CreateAuditLog(ctx, audit)
+	s.createAuditLogIfPossible(ctx, audit)
 
 	// Invalidate cache
 	s.invalidateCache(ctx, key)
@@ -222,7 +222,7 @@ func (s *FeatureFlagService) SetUserOverride(ctx context.Context, key string, us
 		ChangedBy:  changedBy,
 		NewValue:   map[string]interface{}{"user_id": userID, "enabled": enabled},
 	}
-	s.repo.CreateAuditLog(ctx, audit)
+	s.createAuditLogIfPossible(ctx, audit)
 
 	// Invalidate cache for this user
 	if s.redis != nil {
@@ -246,7 +246,7 @@ func (s *FeatureFlagService) RemoveUserOverride(ctx context.Context, key string,
 		ChangedBy:  changedBy,
 		OldValue:   map[string]interface{}{"user_id": userID},
 	}
-	s.repo.CreateAuditLog(ctx, audit)
+	s.createAuditLogIfPossible(ctx, audit)
 
 	// Invalidate cache for this user
 	if s.redis != nil {
@@ -307,6 +307,18 @@ func (s *FeatureFlagService) GetUserFlags(ctx context.Context, userID int64) (ma
 // GetAuditLog retrieves audit log for a flag
 func (s *FeatureFlagService) GetAuditLog(ctx context.Context, key string, limit int) ([]*models.FeatureFlagAudit, error) {
 	return s.repo.GetAuditLog(ctx, key, limit)
+}
+
+func (s *FeatureFlagService) createAuditLogIfPossible(ctx context.Context, audit *models.FeatureFlagAudit) {
+	if audit.ChangedBy <= 0 {
+		actorID, err := s.repo.GetAnyUserID(ctx)
+		if err != nil {
+			// Preserve primary feature-flag mutation path when no actor can be resolved.
+			return
+		}
+		audit.ChangedBy = actorID
+	}
+	_ = s.repo.CreateAuditLog(ctx, audit)
 }
 
 // Helper methods

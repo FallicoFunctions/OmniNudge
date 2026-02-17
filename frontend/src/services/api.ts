@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { trackError } from './errorTrackingService';
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8080/api/v1',
@@ -24,6 +25,39 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error) => {
+    const method = error.config?.method?.toUpperCase() ?? 'UNKNOWN';
+    const url = error.config?.url ?? 'unknown-url';
+    const status = error.response?.status;
+
+    if (!status) {
+      trackError({
+        error,
+        severity: 'error',
+        area: 'api_interceptor',
+        pattern: 'toast',
+        context: { method, url, kind: 'network_or_timeout' },
+      });
+      return Promise.reject(error);
+    }
+
+    if (status >= 500) {
+      trackError({
+        error,
+        severity: 'critical',
+        area: 'api_interceptor',
+        pattern: 'modal',
+        context: { method, url, status },
+      });
+    } else if (status >= 400) {
+      trackError({
+        error,
+        severity: status === 401 ? 'warning' : 'error',
+        area: 'api_interceptor',
+        pattern: 'toast',
+        context: { method, url, status },
+      });
+    }
+
     if (error.response?.status === 401) {
       const hadToken =
         Boolean(localStorage.getItem('auth_token')) ||

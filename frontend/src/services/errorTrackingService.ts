@@ -21,14 +21,6 @@ declare global {
           extra?: Record<string, unknown>;
         }
       ) => void;
-      captureMessage: (
-        message: string,
-        context?: {
-          level?: 'info' | 'warning' | 'error' | 'fatal';
-          tags?: Record<string, string>;
-          extra?: Record<string, unknown>;
-        }
-      ) => void;
     };
   }
 }

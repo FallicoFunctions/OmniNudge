@@ -178,6 +178,8 @@ All boundary-level and global errors are tracked through `errorTrackingService` 
 - area (feature/component scope)
 - runtime context (component stack, request metadata, etc.)
 
+Axios/API failures are also tracked centrally in the API interceptor so HTTP/network failures are captured even when React boundaries are not involved.
+
 When Sentry is available on `window.Sentry`, errors are sent there with tags and extra context.  
 All tracked errors are also shipped through frontend log aggregation for fallback visibility.
 

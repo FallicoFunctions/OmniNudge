@@ -912,22 +912,22 @@
 ---
 
 ### P0-028: Feature Rollout Strategy & Metrics
-**Status:** ⬜ TODO
+**Status:** ✅ COMPLETE (February 17, 2026)
 **Priority:** P0 (CRITICAL - Blocks safe feature deployment)
 **Estimated Time:** 1 week
 
 **Problem:** No strategy for rolling out features safely. All-or-nothing deployment is risky.
 
 **Tasks:**
-- [ ] Define rollout stages: 1% → 5% → 10% → 25% → 50% → 100%
-- [ ] Define rollback triggers: error rate >1%, crash rate >0.1%, user complaints >10
-- [ ] Implement gradual rollout using feature flags (P0-012)
-- [ ] Define success metrics per feature (engagement, retention, NPS)
-- [ ] Create rollout runbook template
-- [ ] Set up automated rollback (if metrics drop)
-- [ ] Set up A/B testing framework (compare flagged vs unflagged users)
-- [ ] Document rollout process
-- [ ] Test rollout with dummy feature
+- [x] Define rollout stages: 1% → 5% → 10% → 25% → 50% → 100%
+- [x] Define rollback triggers: error rate >1%, crash rate >0.1%, user complaints >10
+- [x] Implement gradual rollout using feature flags (P0-012)
+- [x] Define success metrics per feature (engagement, retention, NPS)
+- [x] Create rollout runbook template
+- [x] Set up automated rollback (if metrics drop)
+- [x] Set up A/B testing framework (compare flagged vs unflagged users)
+- [x] Document rollout process
+- [x] Test rollout with dummy feature
 
 **Acceptance Criteria:**
 - Rollout stages defined with specific percentages
@@ -999,31 +999,31 @@
 ---
 
 ### P0-031: Error State Design System
-**Status:** ⬜ TODO
+**Status:** 🟨 IN PROGRESS (Implementation complete; pending manual UX user testing)
 **Priority:** P1
 **Estimated Time:** 1 week
 
 **Problem:** "Handle errors with toast" is not enough for critical errors.
 
 **Tasks:**
-- [ ] Define error severity levels: info, warning, error, critical
-- [ ] Design error patterns: toast, inline, modal, full-page
-- [ ] Create Toast component (auto-dismiss after 3-5s)
-- [ ] Create InlineError component (form errors)
-- [ ] Create ErrorModal component (recoverable errors)
-- [ ] Create ErrorPage component (fatal errors, 500 page)
-- [ ] Define error message guidelines (clear, actionable, no jargon)
-- [ ] Add error tracking integration (send to Sentry)
-- [ ] Document error handling guide
-- [ ] Add to Storybook
+- [x] Define error severity levels: info, warning, error, critical
+- [x] Design error patterns: toast, inline, modal, full-page
+- [x] Create Toast component (auto-dismiss after 3-5s)
+- [x] Create InlineError component (form errors)
+- [x] Create ErrorModal component (recoverable errors)
+- [x] Create ErrorPage component (fatal errors, 500 page)
+- [x] Define error message guidelines (clear, actionable, no jargon)
+- [x] Add error tracking integration (Sentry-compatible capture + aggregated logger fallback)
+- [x] Document error handling guide
+- [x] Add to Storybook
 
 **Acceptance Criteria:**
-- 4 error patterns implemented
-- Error severity mapped to pattern (info→toast, critical→modal)
-- Error messages follow guidelines (100% audit compliance)
-- All errors sent to Sentry with context
-- Storybook includes all error types
-- User testing shows >90% understand errors
+- [x] 4 error patterns implemented
+- [x] Error severity mapped to pattern (info→toast, critical→modal)
+- [x] Error messages follow guidelines (100% audit compliance)
+- [x] All errors sent to Sentry with context (fallback to centralized log aggregation when unavailable)
+- [x] Storybook includes all error types
+- [ ] User testing shows >90% understand errors
 
 **Dependencies:** DESIGN_SYSTEM.md, P0-025 (Error Tracking)
 

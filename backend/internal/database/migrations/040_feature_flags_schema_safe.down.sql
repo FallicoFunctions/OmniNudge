@@ -1,0 +1,2 @@
+-- No-op rollback: this migration safely backfills schema compatibility for existing installs.
+-- Intentionally does not drop backfilled columns/tables to avoid destructive rollback behavior.

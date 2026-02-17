@@ -49,7 +49,6 @@ describe('errorTrackingService', () => {
     const captureException = vi.fn();
     window.Sentry = {
       captureException,
-      captureMessage: vi.fn(),
     };
 
     trackError({

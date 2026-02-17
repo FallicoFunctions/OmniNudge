@@ -307,7 +307,7 @@ func (s *AnalyticsService) GetFeatureErrorRate(ctx context.Context, featureKey s
 			COUNT(*) FILTER (WHERE event_name = 'error_occurred') as errors,
 			COUNT(*) as total
 		FROM analytics_events
-		WHERE created_at >= NOW() - ($1 || ' seconds')::interval
+		WHERE created_at >= NOW() - make_interval(secs => $1)
 		  AND properties->'active_flags' ? $2
 	`
 
@@ -323,6 +323,70 @@ func (s *AnalyticsService) GetFeatureErrorRate(ctx context.Context, featureKey s
 	return float64(errorCount) / float64(totalCount), totalCount, nil
 }
 
+// GetFeatureCrashRate returns critical error/crash rate for a specific feature flag key.
+// Crash signals are derived from error_occurred events where severity=critical.
+func (s *AnalyticsService) GetFeatureCrashRate(ctx context.Context, featureKey string, window time.Duration) (float64, int, error) {
+	var crashCount, totalCount int
+
+	query := `
+		SELECT 
+			COUNT(*) FILTER (
+				WHERE event_name = 'error_occurred'
+				  AND COALESCE(properties->>'severity', '') = 'critical'
+			) as crashes,
+			COUNT(*) as total
+		FROM analytics_events
+		WHERE created_at >= NOW() - make_interval(secs => $1)
+		  AND properties->'active_flags' ? $2
+	`
+
+	err := s.db.QueryRow(ctx, query, int(window.Seconds()), featureKey).Scan(&crashCount, &totalCount)
+	if err != nil {
+		return 0, 0, err
+	}
+	if totalCount == 0 {
+		return 0, 0, nil
+	}
+
+	return float64(crashCount) / float64(totalCount), totalCount, nil
+}
+
+// GetFeatureComplaintCount returns user complaint count for a feature within a time window.
+// Complaints are inferred from feedback_submitted analytics events and bug reports mentioning the feature key.
+func (s *AnalyticsService) GetFeatureComplaintCount(ctx context.Context, featureKey string, window time.Duration) (int, error) {
+	var complaintCount int
+
+	query := `
+		WITH analytics_complaints AS (
+			SELECT COUNT(*)::int AS cnt
+			FROM analytics_events
+			WHERE created_at >= NOW() - make_interval(secs => $1)
+			  AND event_name = 'feedback_submitted'
+			  AND properties->'active_flags' ? $2
+		),
+		bug_report_complaints AS (
+			SELECT COUNT(*)::int AS cnt
+			FROM bug_reports
+			WHERE created_at >= NOW() - make_interval(secs => $1)
+			  AND (
+				LOWER(COALESCE(page_url, '')) LIKE '%' || LOWER($2) || '%'
+				OR LOWER(COALESCE(description, '')) LIKE '%' || LOWER($2) || '%'
+			  )
+		)
+		SELECT
+			COALESCE((SELECT cnt FROM analytics_complaints), 0)
+			+
+			COALESCE((SELECT cnt FROM bug_report_complaints), 0)
+	`
+
+	err := s.db.QueryRow(ctx, query, int(window.Seconds()), featureKey).Scan(&complaintCount)
+	if err != nil {
+		return 0, err
+	}
+
+	return complaintCount, nil
+}
+
 // GetSystemErrorRate returns the baseline error rate for the entire system
 func (s *AnalyticsService) GetSystemErrorRate(ctx context.Context, window time.Duration) (float64, error) {
 	var errorCount, totalCount int
@@ -332,7 +396,7 @@ func (s *AnalyticsService) GetSystemErrorRate(ctx context.Context, window time.D
 			COUNT(*) FILTER (WHERE event_name = 'error_occurred') as errors,
 			COUNT(*) as total
 		FROM analytics_events
-		WHERE created_at >= NOW() - ($1 || ' seconds')::interval
+		WHERE created_at >= NOW() - make_interval(secs => $1)
 	`
 
 	err := s.db.QueryRow(ctx, query, int(window.Seconds())).Scan(&errorCount, &totalCount)

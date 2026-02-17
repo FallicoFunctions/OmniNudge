@@ -256,3 +256,13 @@ func (r *FeatureFlagRepository) GetAuditLog(ctx context.Context, key string, lim
 
 	return logs, nil
 }
+
+// GetAnyUserID returns a valid user ID for system/audit fallback paths.
+func (r *FeatureFlagRepository) GetAnyUserID(ctx context.Context) (int64, error) {
+	var userID int64
+	err := r.pool.QueryRow(ctx, `SELECT id FROM users ORDER BY id ASC LIMIT 1`).Scan(&userID)
+	if err != nil {
+		return 0, err
+	}
+	return userID, nil
+}
