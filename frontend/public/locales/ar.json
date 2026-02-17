@@ -319,6 +319,7 @@
       "loadMoreOmni": "تحميل المزيد من المستخدمين"
     },
     "messages": {
+      "authRequired": "سجّل الدخول للبحث في الرسائل.",
       "hasFiles": "يحتوي ملفات",
       "hasLinks": "يحتوي روابط",
       "includeArchived": "تضمين المؤرشف",

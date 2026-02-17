@@ -319,6 +319,7 @@
       "loadMoreOmni": "Cargar más usuarios"
     },
     "messages": {
+      "authRequired": "Inicia sesión para buscar mensajes.",
       "hasFiles": "Con archivos",
       "hasLinks": "Con enlaces",
       "includeArchived": "Incluir archivados",
