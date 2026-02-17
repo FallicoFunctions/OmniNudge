@@ -102,6 +102,10 @@ Scale test script:
 - `backend/scripts/search_messages_1m_benchmark.sql`
 - Generates a synthetic 1M-message DM dataset and runs `EXPLAIN (ANALYZE, BUFFERS)` queries.
 
+Performance assertion script:
+- `backend/scripts/search_messages_perf_assert.sql`
+- Executes representative metadata and text queries with `EXPLAIN (ANALYZE, FORMAT JSON)` and fails if either exceeds `500ms`.
+
 Runtime telemetry:
 - `omninudge_message_search_requests_total{status,has_query}`
 - `omninudge_message_search_duration_seconds{status,has_query}`
