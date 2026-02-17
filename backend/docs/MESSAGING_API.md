@@ -227,6 +227,7 @@ Search messages visible to the authenticated user with metadata filters.
 
 **Query Parameters:**
 - `q` (optional) - Text query. Works for legacy/plaintext rows and sender username matching.
+- `sort` (optional, default: `relevance`) - `relevance`, `new`, or `old`.
 - `conversation_id` (optional) - Restrict to one conversation.
 - `sender_id` (optional) - Restrict to one sender.
 - `has_files` (optional, default: `false`) - Only messages with attached media.
@@ -257,6 +258,7 @@ Search messages visible to the authenticated user with metadata filters.
   "limit": 50,
   "offset": 0,
   "query": "hello",
+  "sort": "relevance",
   "total": 1
 }
 ```

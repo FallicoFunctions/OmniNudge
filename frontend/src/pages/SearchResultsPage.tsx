@@ -382,6 +382,7 @@ export default function SearchResultsPage() {
           opts?.messageFilters?.includeArchived ?? messageResults.includeArchived;
         const response = await searchMessagesApi({
           query: q,
+          sort: opts?.sort ?? sort,
           limit: MESSAGE_PAGE_SIZE,
           offset: (targetPage - 1) * MESSAGE_PAGE_SIZE,
           hasFiles,

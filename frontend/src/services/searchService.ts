@@ -32,6 +32,7 @@ export interface SiteWideSearchResults {
 
 export interface MessageSearchParams {
   query?: string;
+  sort?: 'relevance' | 'new' | 'old';
   limit?: number;
   offset?: number;
   conversationId?: number;
@@ -53,12 +54,14 @@ export interface MessageSearchResponse {
   limit: number;
   offset: number;
   query: string;
+  sort?: 'relevance' | 'new' | 'old';
   total: number;
 }
 
 export async function searchMessages(params: MessageSearchParams): Promise<MessageSearchResponse> {
   const searchParams = new URLSearchParams();
   if (params.query?.trim()) searchParams.set('q', params.query.trim());
+  if (params.sort) searchParams.set('sort', params.sort);
   if (params.limit !== undefined) searchParams.set('limit', String(params.limit));
   if (params.offset !== undefined) searchParams.set('offset', String(params.offset));
   if (params.conversationId !== undefined) {

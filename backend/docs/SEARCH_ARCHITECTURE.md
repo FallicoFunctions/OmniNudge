@@ -48,6 +48,10 @@ Implementation details:
   - `limit` (1-100)
   - `offset` (>=0)
   - includes `total` in response
+- Supports sort modes:
+  - `relevance` (default)
+  - `new`
+  - `old`
 - Response includes rendering helpers:
   - `sender_username`
   - `search_snippet` (best-effort snippet for matched rows)

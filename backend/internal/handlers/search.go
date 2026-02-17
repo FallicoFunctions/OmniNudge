@@ -8,8 +8,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/omninudge/backend/internal/monitoring"
 	"github.com/omninudge/backend/internal/models"
+	"github.com/omninudge/backend/internal/monitoring"
 )
 
 // SearchHandler handles full-text search requests
@@ -540,6 +540,10 @@ func (h *SearchHandler) SearchMessages(c *gin.Context) {
 	}
 
 	query := strings.TrimSpace(c.Query("q"))
+	sort := strings.ToLower(c.DefaultQuery("sort", "relevance")) // relevance | new | old
+	if sort != "relevance" && sort != "new" && sort != "old" {
+		sort = "relevance"
+	}
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "50"))
 	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
 	if limit < 1 || limit > 100 {
@@ -724,6 +728,12 @@ func (h *SearchHandler) SearchMessages(c *gin.Context) {
 
 	limitArg := nextArg
 	offsetArg := nextArg + 1
+	orderClause := "ORDER BY (" + rankExpr + ") DESC, m.sent_at DESC, m.id DESC"
+	if sort == "new" {
+		orderClause = "ORDER BY m.sent_at DESC, m.id DESC"
+	} else if sort == "old" {
+		orderClause = "ORDER BY m.sent_at ASC, m.id ASC"
+	}
 	querySQL := `
 		SELECT m.id, m.conversation_id, m.sender_id, m.recipient_id, m.encrypted_content,
 		       m.sender_encrypted_content, m.message_type, m.sent_at, m.delivered_at, m.read_at,
@@ -737,7 +747,7 @@ func (h *SearchHandler) SearchMessages(c *gin.Context) {
 		       COALESCE(su.username, '') as sender_username,
 		       ` + snippetExpr + ` as search_snippet
 	` + baseWhere + `
-		ORDER BY (` + rankExpr + `) DESC, m.sent_at DESC, m.id DESC
+		` + orderClause + `
 		LIMIT $` + strconv.Itoa(limitArg) + ` OFFSET $` + strconv.Itoa(offsetArg)
 
 	dataArgs := append(append([]interface{}{}, args...), limit, offset)
@@ -795,6 +805,7 @@ func (h *SearchHandler) SearchMessages(c *gin.Context) {
 		"offset":   offset,
 		"query":    query,
 		"total":    total,
+		"sort":     sort,
 	})
 	searchSuccess = true
 }
