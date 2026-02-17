@@ -314,6 +314,53 @@ func TestSearchMessagesAuthAndResults(t *testing.T) {
 	require.Equal(t, user2.Username, response.Messages[0]["sender_username"])
 }
 
+func TestSearchMessagesFilterOnlyHasFiles(t *testing.T) {
+	deps := newTestDeps(t)
+	defer deps.DB.Close()
+
+	user1 := createUser(t, deps.UserRepo, "searchmsg_filter_user1", "user")
+	user2 := createUser(t, deps.UserRepo, "searchmsg_filter_user2", "user")
+	token, _ := deps.AuthService.GenerateJWT(user1.ID, "", user1.Username, user1.Role)
+
+	conv, err := deps.ConversationRepo.Create(context.Background(), user1.ID, user2.ID)
+	require.NoError(t, err)
+
+	withFileURL := "/uploads/integration-test.png"
+	withFile := &models.Message{
+		ConversationID:    conv.ID,
+		SenderID:          user2.ID,
+		RecipientID:       user1.ID,
+		EncryptedContent:  "message-with-file",
+		MessageType:       "image",
+		EncryptionVersion: "v1",
+		MediaURL:          &withFileURL,
+	}
+	withoutFile := &models.Message{
+		ConversationID:    conv.ID,
+		SenderID:          user2.ID,
+		RecipientID:       user1.ID,
+		EncryptedContent:  "message-without-file",
+		MessageType:       "text",
+		EncryptionVersion: "v1",
+	}
+	require.NoError(t, deps.MessageRepo.Create(context.Background(), withFile))
+	require.NoError(t, deps.MessageRepo.Create(context.Background(), withoutFile))
+
+	req, _ := http.NewRequest("GET", "/api/v1/search/messages?has_files=true", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	w := doRequest(t, deps.Router, req)
+	require.Equal(t, http.StatusOK, w.Code, "body=%s", w.Body.String())
+
+	var response struct {
+		Total    int                      `json:"total"`
+		Messages []map[string]interface{} `json:"messages"`
+	}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &response))
+	require.Equal(t, 1, response.Total)
+	require.Len(t, response.Messages, 1)
+	require.Equal(t, float64(withFile.ID), response.Messages[0]["id"])
+}
+
 func TestBatchMediaUpload_RejectsTooManyFiles(t *testing.T) {
 	defer os.RemoveAll("uploads")
 	deps := newTestDeps(t)
