@@ -60,6 +60,15 @@ export default function SearchResultsPage() {
   const initialMessageHasFiles = params.get('has_files') === 'true';
   const initialMessageHasLinks = params.get('has_links') === 'true';
   const initialMessageIncludeArchived = params.get('include_archived') === 'true';
+  const parsePositiveInt = (value: string | null): number | undefined => {
+    if (!value) return undefined;
+    const parsed = Number.parseInt(value, 10);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
+  };
+  const initialMessageConversationId = parsePositiveInt(params.get('conversation_id'));
+  const initialMessageSenderId = parsePositiveInt(params.get('sender_id'));
+  const initialMessageStartDate = params.get('start_date') ?? undefined;
+  const initialMessageEndDate = params.get('end_date') ?? undefined;
   const initialMessagePage = Math.max(1, Number.parseInt(params.get('mpage') ?? '1', 10) || 1);
   const { searchIncludeNsfwByDefault, blockAllNsfw, useRelativeTime } = useSettings();
   const { user } = useAuth();
@@ -138,6 +147,10 @@ export default function SearchResultsPage() {
     hasFiles: boolean;
     hasLinks: boolean;
     includeArchived: boolean;
+    conversationId?: number;
+    senderId?: number;
+    startDate?: string;
+    endDate?: string;
   }>({
     messages: [],
     total: 0,
@@ -145,6 +158,10 @@ export default function SearchResultsPage() {
     hasFiles: initialMessageHasFiles,
     hasLinks: initialMessageHasLinks,
     includeArchived: initialMessageIncludeArchived,
+    conversationId: initialMessageConversationId,
+    senderId: initialMessageSenderId,
+    startDate: initialMessageStartDate,
+    endDate: initialMessageEndDate,
   });
   const [messagePreviewById, setMessagePreviewById] = useState<Record<number, string>>({});
   const [isDecryptingMessagePreviews, setIsDecryptingMessagePreviews] = useState(false);
@@ -395,14 +412,22 @@ export default function SearchResultsPage() {
         const hasLinks = opts?.messageFilters?.hasLinks ?? messageResults.hasLinks;
         const includeArchived =
           opts?.messageFilters?.includeArchived ?? messageResults.includeArchived;
+        const conversationId = messageResults.conversationId;
+        const senderId = messageResults.senderId;
+        const startDate = messageResults.startDate;
+        const endDate = messageResults.endDate;
         const response = await searchMessagesApi({
           query: q,
           sort: opts?.sort ?? sort,
           limit: MESSAGE_PAGE_SIZE,
           offset: (targetPage - 1) * MESSAGE_PAGE_SIZE,
+          conversationId,
+          senderId,
           hasFiles,
           hasLinks,
           includeArchived,
+          startDate,
+          endDate,
         });
 
         setMessageResults((prev) => ({
@@ -428,6 +453,14 @@ export default function SearchResultsPage() {
         else nextParams.delete('has_links');
         if (includeArchived) nextParams.set('include_archived', 'true');
         else nextParams.delete('include_archived');
+        if (conversationId) nextParams.set('conversation_id', String(conversationId));
+        else nextParams.delete('conversation_id');
+        if (senderId) nextParams.set('sender_id', String(senderId));
+        else nextParams.delete('sender_id');
+        if (startDate) nextParams.set('start_date', startDate);
+        else nextParams.delete('start_date');
+        if (endDate) nextParams.set('end_date', endDate);
+        else nextParams.delete('end_date');
         navigate(`/search?${nextParams.toString()}`, { replace: true });
         return;
       }
