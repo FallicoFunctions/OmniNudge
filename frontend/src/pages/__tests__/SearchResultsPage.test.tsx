@@ -97,7 +97,7 @@ describe('SearchResultsPage message search URL behavior', () => {
   });
 
   it('loads message-tab deep links with filter/page params even when q is empty', async () => {
-    renderPage('/search?tab=messages&sort=old&has_files=true&has_links=true&include_archived=true&mpage=2');
+    renderPage('/search?tab=messages&sort=old&has_files=true&has_links=true&include_archived=true&conversation_id=42&sender_id=7&start_date=2026-02-01T00:00:00Z&end_date=2026-02-15T00:00:00Z&mpage=2');
 
     await waitFor(() => {
       expect(searchMessagesMock).toHaveBeenCalled();
@@ -108,9 +108,13 @@ describe('SearchResultsPage message search URL behavior', () => {
       sort: 'old',
       limit: 50,
       offset: 50,
+      conversationId: 42,
+      senderId: 7,
       hasFiles: true,
       hasLinks: true,
       includeArchived: true,
+      startDate: '2026-02-01T00:00:00Z',
+      endDate: '2026-02-15T00:00:00Z',
     });
   });
 
