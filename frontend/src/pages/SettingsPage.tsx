@@ -13,9 +13,15 @@ import { usePushNotifications } from '../hooks/usePushNotifications';
 import { accountService } from '../services/accountService';
 import { useFeatureFlag } from '../hooks/useFeatureFlag';
 import { FEATURE_FLAGS } from '../config/featureFlags';
+import {
+  getForcedDocumentDirection,
+  setForcedDocumentDirection,
+  syncDocumentLanguageAttributes,
+  type DocumentDirection,
+} from '../i18n/languageUtils';
 
 export default function SettingsPage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const location = useLocation();
   const {
     useRelativeTime,
@@ -114,6 +120,10 @@ export default function SettingsPage() {
   const [microphones, setMicrophones] = useState<MediaDeviceInfo[]>([]);
   const [cameras, setCameras] = useState<MediaDeviceInfo[]>([]);
   const [speakers, setSpeakers] = useState<MediaDeviceInfo[]>([]);
+  const [devDirectionOverride, setDevDirectionOverride] = useState<'auto' | DocumentDirection>(() => {
+    const forcedDirection = getForcedDocumentDirection();
+    return forcedDirection ?? 'auto';
+  });
 
   // Data Export (P0-016)
   const [isRequestingExport, setIsRequestingExport] = useState(false);
@@ -151,6 +161,15 @@ export default function SettingsPage() {
   useEffect(() => {
     setPublicKey(getOwnPublicKeyBase64());
   }, []);
+
+  useEffect(() => {
+    if (!import.meta.env.DEV) {
+      return;
+    }
+
+    setForcedDocumentDirection(devDirectionOverride === 'auto' ? null : devDirectionOverride);
+    syncDocumentLanguageAttributes(i18n.resolvedLanguage || i18n.language || 'en');
+  }, [devDirectionOverride, i18n.language, i18n.resolvedLanguage]);
 
   useEffect(() => {
     if (typeof navigator === 'undefined' || !navigator.mediaDevices?.enumerateDevices) {
@@ -263,6 +282,32 @@ export default function SettingsPage() {
           <Panel as="section">
             <LanguageSelector />
           </Panel>
+          {import.meta.env.DEV && (
+            <Panel as="section">
+              <h3 className="mb-2 text-base font-semibold text-[var(--color-text-primary)]">
+                {t('settings.devRtl.title')}
+              </h3>
+              <p className="mb-3 text-xs text-[var(--color-text-secondary)]">
+                {t('settings.devRtl.description')}
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {(['auto', 'ltr', 'rtl'] as const).map((value) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => setDevDirectionOverride(value)}
+                    className={`rounded border px-3 py-1 text-xs font-semibold ${
+                      devDirectionOverride === value
+                        ? 'border-[var(--color-primary)] bg-[var(--color-primary)] text-white'
+                        : 'border-[var(--color-border)] bg-[var(--color-surface-elevated)] text-[var(--color-text-primary)]'
+                    }`}
+                  >
+                    {t(`settings.devRtl.options.${value}`)}
+                  </button>
+                ))}
+              </div>
+            </Panel>
+          )}
         </div>
 
         <div hidden={activeTab !== 'notifications'}>

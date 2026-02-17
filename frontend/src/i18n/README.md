@@ -62,3 +62,14 @@ export function ExampleStats({ count }: { count: number }) {
 - `npm run i18n:check`: validates locale key parity + interpolation parity.
 - `npm run i18n:guard`: prevents regressions for hardcoded alert/confirm/toast patterns.
 - Missing keys emit warnings in development mode from `/src/i18n/config.ts`.
+
+## RTL Best Practices
+
+- Prefer logical CSS properties over physical ones:
+  - `padding-inline-start` instead of `padding-left`
+  - `margin-inline-start` instead of `margin-left`
+  - `border-inline-start` instead of `border-left`
+  - `text-align: start` instead of `text-align: left`
+- Avoid hardcoded `left`/`right` positioning when possible; use logical inset properties.
+- Direction is applied globally via `syncDocumentLanguageAttributes()` in `/src/i18n/config.ts`.
+- In development, use Settings -> General -> "Dev RTL Direction Override" to force `LTR`/`RTL` without changing language.

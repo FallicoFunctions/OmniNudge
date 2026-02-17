@@ -1704,6 +1704,15 @@
     "language_label": "Seleccionar Idioma",
     "language_help": "Elija su idioma preferido. Inglés, español y العربية (árabe) son compatibles actualmente con soporte completo para diseño RTL.",
     "language_footer": "OmniNudge es un proyecto impulsado por la comunidad. Las traducciones son proporcionadas por la comunidad y pueden estar incompletas.",
+    "devRtl": {
+      "title": "Forzar Dirección RTL (Dev)",
+      "description": "Control solo para desarrollo para validar rápidamente layouts RTL/LTR sin cambiar el idioma.",
+      "options": {
+        "auto": "Auto (Idioma)",
+        "ltr": "Forzar LTR",
+        "rtl": "Forzar RTL"
+      }
+    },
     "account": "Cuenta",
     "theme": "Tema",
     "darkMode": "Modo Oscuro",

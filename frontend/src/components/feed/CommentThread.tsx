@@ -162,10 +162,17 @@ export function CommentThread({
         const isSaved = typeof comment.id === 'string' ? savedRedditAPICommentIds.has(comment.id) : false;
 
         return (
-          <div key={comment.id} className="relative" style={{ marginLeft: depth > 0 ? `${depth * 8}px` : 0 }}>
+          <div
+            key={comment.id}
+            className="relative"
+            style={{ marginInlineStart: depth > 0 ? `${depth * 8}px` : 0 }}
+          >
             {/* Vertical thread line */}
             {depth > 0 && (
-              <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-cyan-500" style={{ left: '-4px' }} />
+              <div
+                className="absolute top-0 bottom-0 w-0.5 bg-cyan-500"
+                style={{ insetInlineStart: '-4px' }}
+              />
             )}
 
             {/* Comment content */}
