@@ -42,6 +42,8 @@ export function useVoiceRecorder(options: VoiceRecorderOptions = {}) {
   const audioContextRef = useRef<AudioContext | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
+  const isRecordingRef = useRef(false);
+  const isPausedRef = useRef(false);
   const startTimeRef = useRef<number>(0);
   const durationIntervalRef = useRef<number | null>(null);
 
@@ -126,6 +128,8 @@ export function useVoiceRecorder(options: VoiceRecorderOptions = {}) {
           isPaused: false,
           duration: 0,
         }));
+        isRecordingRef.current = false;
+        isPausedRef.current = false;
       };
 
       mediaRecorder.start(100); // Collect data every 100ms
@@ -137,6 +141,10 @@ export function useVoiceRecorder(options: VoiceRecorderOptions = {}) {
         isPaused: false,
         error: null,
       }));
+      isRecordingRef.current = true;
+      isPausedRef.current = false;
+      isRecordingRef.current = true;
+      isPausedRef.current = false;
     } catch (err) {
       const error = err instanceof Error ? err : new Error('Failed to start recording');
       setState(prev => ({ ...prev, error: error.message }));
@@ -162,7 +170,7 @@ export function useVoiceRecorder(options: VoiceRecorderOptions = {}) {
       audioBuffersRef.current = [];
 
       scriptProcessor.onaudioprocess = (event) => {
-        if (state.isRecording && !state.isPaused) {
+        if (isRecordingRef.current && !isPausedRef.current) {
           const inputData = event.inputBuffer.getChannelData(0);
           // Clone the data to prevent it from being overwritten
           const buffer = new Float32Array(inputData.length);
@@ -189,7 +197,7 @@ export function useVoiceRecorder(options: VoiceRecorderOptions = {}) {
         onError(error);
       }
     }
-  }, [getAudioConstraints, state.isRecording, state.isPaused, onError, startDurationTimer]);
+  }, [getAudioConstraints, onError, startDurationTimer]);
 
   // Start recording (auto-detects best method)
   const startRecording = useCallback(async () => {
@@ -292,6 +300,8 @@ export function useVoiceRecorder(options: VoiceRecorderOptions = {}) {
         isPaused: false,
         duration: 0,
       }));
+      isRecordingRef.current = false;
+      isPausedRef.current = false;
     }
   }, [stopDurationTimer, onRecordingComplete, onError]);
 
@@ -301,10 +311,12 @@ export function useVoiceRecorder(options: VoiceRecorderOptions = {}) {
       mediaRecorderRef.current.pause();
       stopDurationTimer();
       setState(prev => ({ ...prev, isPaused: true }));
+      isPausedRef.current = true;
     } else if (audioContextRef.current) {
       // For Web Audio API, we just stop collecting buffers (handled in onaudioprocess)
       stopDurationTimer();
       setState(prev => ({ ...prev, isPaused: true }));
+      isPausedRef.current = true;
     }
   }, [stopDurationTimer]);
 
@@ -314,9 +326,11 @@ export function useVoiceRecorder(options: VoiceRecorderOptions = {}) {
       mediaRecorderRef.current.resume();
       startDurationTimer();
       setState(prev => ({ ...prev, isPaused: false }));
+      isPausedRef.current = false;
     } else if (audioContextRef.current) {
       startDurationTimer();
       setState(prev => ({ ...prev, isPaused: false }));
+      isPausedRef.current = false;
     }
   }, [startDurationTimer]);
 
@@ -354,6 +368,8 @@ export function useVoiceRecorder(options: VoiceRecorderOptions = {}) {
       isProcessing: false,
       error: null,
     });
+    isRecordingRef.current = false;
+    isPausedRef.current = false;
   }, [stopDurationTimer]);
 
   return {
