@@ -13,26 +13,32 @@ html[dir="rtl"] {
 /* Use logical properties instead of physical properties */
 /* These automatically flip for RTL */
 
-/* Margins - use logical properties */
+/* Margins - logical mappings for common utility classes used across the app */
 .ml-1 { margin-inline-start: 0.25rem; }
 .ml-2 { margin-inline-start: 0.5rem; }
 .ml-3 { margin-inline-start: 0.75rem; }
 .ml-4 { margin-inline-start: 1rem; }
+.ml-6 { margin-inline-start: 1.5rem; }
+.ml-7 { margin-inline-start: 1.75rem; }
+.ml-auto { margin-inline-start: auto; }
 .mr-1 { margin-inline-end: 0.25rem; }
 .mr-2 { margin-inline-end: 0.5rem; }
 .mr-3 { margin-inline-end: 0.75rem; }
 .mr-4 { margin-inline-end: 1rem; }
 
-/* Padding - use logical properties */
+/* Padding - logical mappings for common utility classes used across the app */
 .pl-1 { padding-inline-start: 0.25rem; }
 .pl-2 { padding-inline-start: 0.5rem; }
 .pl-3 { padding-inline-start: 0.75rem; }
 .pl-4 { padding-inline-start: 1rem; }
 .pl-6 { padding-inline-start: 1.5rem; }
+.pl-9 { padding-inline-start: 2.25rem; }
 .pr-1 { padding-inline-end: 0.25rem; }
 .pr-2 { padding-inline-end: 0.5rem; }
 .pr-3 { padding-inline-end: 0.75rem; }
 .pr-4 { padding-inline-end: 1rem; }
+.pr-12 { padding-inline-end: 3rem; }
+.pr-20 { padding-inline-end: 5rem; }
 
 /* Text alignment */
 .text-left { text-align: start; }
@@ -41,6 +47,34 @@ html[dir="rtl"] {
 /* Border radius - use logical properties */
 .rounded-l { border-start-start-radius: 0.25rem; border-end-start-radius: 0.25rem; }
 .rounded-r { border-start-end-radius: 0.25rem; border-end-end-radius: 0.25rem; }
+.rounded-bl-none { border-end-start-radius: 0; }
+.rounded-br-none { border-end-end-radius: 0; }
+
+/* Border side mappings for common utility classes */
+html[dir="rtl"] .border-l {
+  border-left-width: 0;
+  border-right-width: 1px;
+}
+
+html[dir="rtl"] .border-l-2 {
+  border-left-width: 0;
+  border-right-width: 2px;
+}
+
+html[dir="rtl"] .border-l-4 {
+  border-left-width: 0;
+  border-right-width: 4px;
+}
+
+html[dir="rtl"] .border-r {
+  border-right-width: 0;
+  border-left-width: 1px;
+}
+
+html[dir="rtl"] .border-r-2 {
+  border-right-width: 0;
+  border-left-width: 2px;
+}
 
 /* Transforms for arrows and icons that should flip in RTL */
 html[dir="rtl"] .rtl-flip {
@@ -75,6 +109,51 @@ html[dir="rtl"] .left-0 {
 html[dir="rtl"] .right-0 {
   right: auto;
   left: 0;
+}
+
+html[dir="rtl"] .left-2 {
+  left: auto;
+  right: 0.5rem;
+}
+
+html[dir="rtl"] .left-3 {
+  left: auto;
+  right: 0.75rem;
+}
+
+html[dir="rtl"] .left-4 {
+  left: auto;
+  right: 1rem;
+}
+
+html[dir="rtl"] .left-1\/2 {
+  left: auto;
+  right: 50%;
+}
+
+html[dir="rtl"] .right-1 {
+  right: auto;
+  left: 0.25rem;
+}
+
+html[dir="rtl"] .right-2 {
+  right: auto;
+  left: 0.5rem;
+}
+
+html[dir="rtl"] .right-3 {
+  right: auto;
+  left: 0.75rem;
+}
+
+html[dir="rtl"] .right-4 {
+  right: auto;
+  left: 1rem;
+}
+
+html[dir="rtl"] .right-16 {
+  right: auto;
+  left: 4rem;
 }
 
 /* Chevrons and arrows should flip in RTL */
