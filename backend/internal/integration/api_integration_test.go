@@ -694,6 +694,68 @@ func TestSearchMessagesRespectsPerUserDeleteVisibilityIntegration(t *testing.T) 
 	require.Equal(t, 1, afterDeleteUser2.Total)
 }
 
+func TestSearchMessagesReflectsContentUpdatesIntegration(t *testing.T) {
+	deps := newTestDeps(t)
+	defer deps.DB.Close()
+
+	user1 := createUser(t, deps.UserRepo, "searchmsg_update_user1", "user")
+	user2 := createUser(t, deps.UserRepo, "searchmsg_update_user2", "user")
+	token, _ := deps.AuthService.GenerateJWT(user1.ID, "", user1.Username, user1.Role)
+
+	conv, err := deps.ConversationRepo.Create(context.Background(), user1.ID, user2.ID)
+	require.NoError(t, err)
+
+	msg := &models.Message{
+		ConversationID:    conv.ID,
+		SenderID:          user2.ID,
+		RecipientID:       user1.ID,
+		EncryptedContent:  "old-content-token",
+		MessageType:       "text",
+		EncryptionVersion: "v1",
+	}
+	require.NoError(t, deps.MessageRepo.Create(context.Background(), msg))
+
+	searchOld, _ := http.NewRequest("GET", "/api/v1/search/messages?q=old-content-token", nil)
+	searchOld.Header.Set("Authorization", "Bearer "+token)
+	w := doRequest(t, deps.Router, searchOld)
+	require.Equal(t, http.StatusOK, w.Code, "body=%s", w.Body.String())
+
+	var beforeUpdate struct {
+		Total int `json:"total"`
+	}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &beforeUpdate))
+	require.Equal(t, 1, beforeUpdate.Total)
+
+	_, err = deps.DB.Pool.Exec(
+		context.Background(),
+		`UPDATE messages SET encrypted_content = 'new-content-token', sender_encrypted_content = 'new-content-token' WHERE id = $1`,
+		msg.ID,
+	)
+	require.NoError(t, err)
+
+	searchOldAfter, _ := http.NewRequest("GET", "/api/v1/search/messages?q=old-content-token", nil)
+	searchOldAfter.Header.Set("Authorization", "Bearer "+token)
+	w = doRequest(t, deps.Router, searchOldAfter)
+	require.Equal(t, http.StatusOK, w.Code, "body=%s", w.Body.String())
+
+	var afterOldQuery struct {
+		Total int `json:"total"`
+	}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &afterOldQuery))
+	require.Equal(t, 0, afterOldQuery.Total)
+
+	searchNew, _ := http.NewRequest("GET", "/api/v1/search/messages?q=new-content-token", nil)
+	searchNew.Header.Set("Authorization", "Bearer "+token)
+	w = doRequest(t, deps.Router, searchNew)
+	require.Equal(t, http.StatusOK, w.Code, "body=%s", w.Body.String())
+
+	var afterNewQuery struct {
+		Total int `json:"total"`
+	}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &afterNewQuery))
+	require.Equal(t, 1, afterNewQuery.Total)
+}
+
 func TestBatchMediaUpload_RejectsTooManyFiles(t *testing.T) {
 	defer os.RemoveAll("uploads")
 	deps := newTestDeps(t)
