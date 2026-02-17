@@ -105,3 +105,11 @@ func GeneralAPIRateLimiter() *RateLimiter {
 	// 100 requests per minute with burst of 20
 	return NewRateLimiter(rate.Limit(100.0/60.0), 20)
 }
+
+// ReactionRateLimiter creates a rate limiter for message reaction endpoints.
+// Allows 10 reactions per 10 seconds (1 reaction/second steady-state) with a
+// burst of 10 so a user can quickly react to multiple messages without hitting
+// the limit immediately.
+func ReactionRateLimiter() *RateLimiter {
+	return NewRateLimiter(rate.Limit(1.0), 10)
+}
