@@ -58,6 +58,7 @@ export interface UserSettings {
   show_read_receipts: boolean;
   show_typing_indicators: boolean;
   show_last_seen: boolean;
+  profile_visibility: 'public' | 'friends_only' | 'private';
   use_relative_time: boolean;
   auto_close_theme_selector: boolean;
   notify_archived_messages: boolean;

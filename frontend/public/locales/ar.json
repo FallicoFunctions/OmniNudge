@@ -1992,7 +1992,12 @@
       "notificationSound": "صوت إشعارات الرسائل",
       "notificationSoundHelp": "تشغيل صوت عند تلقي رسالة جديدة. يتم التشغيل فقط عند استخدام التطبيق بنشاط.",
       "lastSeen": "آخر ظهور",
-      "lastSeenHelp": "أظهر للآخرين متى كنت نشطاً آخر مرة. عند التعطيل، قد يتم إخفاء وقت آخر ظهور من العروض العامة للملف الشخصي."
+      "lastSeenHelp": "أظهر للآخرين متى كنت نشطاً آخر مرة. عند التعطيل، قد يتم إخفاء وقت آخر ظهور من العروض العامة للملف الشخصي.",
+      "profileVisibility": "خصوصية الملف الشخصي",
+      "profileVisibilityHelp": "تحكم في من يمكنه عرض تفاصيل ملفك الشخصي العامة.",
+      "profileVisibilityPublic": "عام",
+      "profileVisibilityFriendsOnly": "الأصدقاء فقط",
+      "profileVisibilityPrivate": "خاص"
     },
     "dateTime": {
       "title": "عروض التاريخ والوقت",

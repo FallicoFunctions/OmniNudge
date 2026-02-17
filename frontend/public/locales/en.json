@@ -1992,7 +1992,12 @@
       "notificationSound": "Message notification sound",
       "notificationSoundHelp": "Play a sound when you receive a new message. Only plays when you're actively using the app.",
       "lastSeen": "Last seen",
-      "lastSeenHelp": "Show others when you were last active. When disabled, your last seen time may be hidden from public profile views."
+      "lastSeenHelp": "Show others when you were last active. When disabled, your last seen time may be hidden from public profile views.",
+      "profileVisibility": "Profile visibility",
+      "profileVisibilityHelp": "Control who can view your public profile details.",
+      "profileVisibilityPublic": "Public",
+      "profileVisibilityFriendsOnly": "Friends only",
+      "profileVisibilityPrivate": "Private"
     },
     "dateTime": {
       "title": "Date & Time Display",

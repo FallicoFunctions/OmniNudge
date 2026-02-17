@@ -60,6 +60,8 @@ interface SettingsContextType {
   setTypingIndicators: (value: boolean) => void;
   showLastSeen: boolean;
   setShowLastSeen: (value: boolean) => void;
+  profileVisibility: 'public' | 'friends_only' | 'private';
+  setProfileVisibility: (value: 'public' | 'friends_only' | 'private') => void;
   notificationSound: boolean;
   setNotificationSound: (value: boolean) => void;
 }
@@ -93,11 +95,12 @@ interface StoredSettings {
   readReceipts?: boolean;
   typingIndicators?: boolean;
   showLastSeen?: boolean;
+  profileVisibility?: 'public' | 'friends_only' | 'private';
   notificationSound?: boolean;
   settingsVersion?: number;
 }
 
-const CURRENT_SETTINGS_VERSION = 8;
+const CURRENT_SETTINGS_VERSION = 9;
 
 const getStoredSettings = (): StoredSettings => {
   if (typeof window === 'undefined' || !window.localStorage) {
@@ -133,6 +136,7 @@ const getStoredSettings = (): StoredSettings => {
           readReceipts: parsed.readReceipts ?? true,
           typingIndicators: parsed.typingIndicators ?? true,
           showLastSeen: parsed.showLastSeen ?? true,
+          profileVisibility: parsed.profileVisibility ?? 'public',
           notificationSound: parsed.notificationSound ?? true,
           settingsVersion: CURRENT_SETTINGS_VERSION,
         };
@@ -259,6 +263,10 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     const settings = getStoredSettings();
     return settings.showLastSeen ?? true;
   });
+  const [profileVisibility, setProfileVisibilityState] = useState<'public' | 'friends_only' | 'private'>(() => {
+    const settings = getStoredSettings();
+    return settings.profileVisibility ?? 'public';
+  });
   const [notificationSound, setNotificationSoundState] = useState<boolean>(() => {
     const settings = getStoredSettings();
     return settings.notificationSound ?? true;
@@ -304,6 +312,9 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         setReadReceiptsState(settings.show_read_receipts ?? true);
         setTypingIndicatorsState(settings.show_typing_indicators ?? true);
         setShowLastSeenState(settings.show_last_seen ?? true);
+        setProfileVisibilityState(
+          (settings.profile_visibility as 'public' | 'friends_only' | 'private') ?? 'public'
+        );
         setNotificationSoundState(settings.notification_sound ?? true);
       } catch (error) {
         // Best-effort: fall back to localStorage snapshot.
@@ -346,6 +357,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         readReceipts,
         typingIndicators,
         showLastSeen,
+        profileVisibility,
         notificationSound,
         settingsVersion: CURRENT_SETTINGS_VERSION,
       };
@@ -380,6 +392,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     readReceipts,
     typingIndicators,
     showLastSeen,
+    profileVisibility,
     notificationSound,
   ]);
 
@@ -650,6 +663,16 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     });
   };
 
+  const setProfileVisibility = (value: 'public' | 'friends_only' | 'private') => {
+    const previous = profileVisibility;
+    setProfileVisibilityState(value);
+    if (!hasAuthToken()) return;
+    void userSettingsService.update({ profile_visibility: value }).catch((error) => {
+      console.error('[Settings] Failed to update profile visibility setting:', error);
+      setProfileVisibilityState(previous);
+    });
+  };
+
   const setNotificationSound = (value: boolean) => {
     const previous = notificationSound;
     setNotificationSoundState(value);
@@ -715,6 +738,8 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         setTypingIndicators,
         showLastSeen,
         setShowLastSeen,
+        profileVisibility,
+        setProfileVisibility,
         notificationSound,
         setNotificationSound,
       }}

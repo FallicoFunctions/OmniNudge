@@ -577,6 +577,7 @@ func main() {
 		users.Use(middleware.AuthOptional(authService))
 		{
 			users.GET("/status", userStatusHandler.GetUsersStatus)
+			users.GET("/id/:id/profile", usersHandler.GetUserProfileByID)
 			users.GET("/:username", usersHandler.GetUserProfile)
 			users.GET("/:username/posts", usersHandler.GetUserPosts)
 			users.GET("/:username/comments", usersHandler.GetUserComments)
