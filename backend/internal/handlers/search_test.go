@@ -456,6 +456,52 @@ func TestSearchMessagesInvalidDate(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, w.Code)
 }
 
+func TestSearchMessagesInvalidConversationID(t *testing.T) {
+	handler, db, cleanup := setupSearchHandlerTest(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	userRepo := models.NewUserRepository(db.Pool)
+	user := &models.User{Username: uniqueSearchName("msg_invalid_conv_id"), PasswordHash: "hash"}
+	require.NoError(t, userRepo.Create(ctx, user))
+
+	router := gin.Default()
+	router.GET("/search/messages", func(c *gin.Context) {
+		c.Set("user_id", user.ID)
+		handler.SearchMessages(c)
+	})
+
+	req := httptest.NewRequest("GET", "/search/messages?conversation_id=abc", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+	assert.Contains(t, w.Body.String(), "Invalid conversation_id")
+}
+
+func TestSearchMessagesInvalidSenderID(t *testing.T) {
+	handler, db, cleanup := setupSearchHandlerTest(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	userRepo := models.NewUserRepository(db.Pool)
+	user := &models.User{Username: uniqueSearchName("msg_invalid_sender_id"), PasswordHash: "hash"}
+	require.NoError(t, userRepo.Create(ctx, user))
+
+	router := gin.Default()
+	router.GET("/search/messages", func(c *gin.Context) {
+		c.Set("user_id", user.ID)
+		handler.SearchMessages(c)
+	})
+
+	req := httptest.NewRequest("GET", "/search/messages?sender_id=-5", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+	assert.Contains(t, w.Body.String(), "Invalid sender_id")
+}
+
 func TestSearchMessagesHasFilesFilter(t *testing.T) {
 	handler, db, cleanup := setupSearchHandlerTest(t)
 	defer cleanup()
