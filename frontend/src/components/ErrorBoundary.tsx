@@ -1,6 +1,7 @@
 import { Component } from 'react';
 import type { ReactNode, ErrorInfo } from 'react';
 import i18n from '../i18n/config';
+import { trackError } from '../services/errorTrackingService';
 
 interface Props {
   children: ReactNode;
@@ -44,16 +45,20 @@ export class ErrorBoundary extends Component<Props, State> {
     console.error('[ErrorBoundary] Caught error:', error);
     console.error('[ErrorBoundary] Error info:', errorInfo);
 
+    trackError({
+      error,
+      severity: 'critical',
+      area: 'component_error_boundary',
+      pattern: 'modal',
+      context: {
+        componentStack: errorInfo.componentStack,
+      },
+    });
+
     // Call optional error handler
     if (this.props.onError) {
       this.props.onError(error, errorInfo);
     }
-
-    // TODO: Send to error tracking service (Sentry, LogRocket, etc.)
-    // Example:
-    // if (typeof Sentry !== 'undefined') {
-    //   Sentry.captureException(error, { contexts: { react: errorInfo } });
-    // }
   }
 
   render(): ReactNode {

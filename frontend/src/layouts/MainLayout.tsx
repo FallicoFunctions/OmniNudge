@@ -19,6 +19,8 @@ import { useNotificationSound } from '../hooks/useNotificationSound';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import { MobileTabBar } from '../components/mobile/MobileTabBar';
 import { ErrorBoundary } from '../components/ErrorBoundary';
+import { ToastContainer } from '../components/error';
+import { dismissToast, useToasts } from '../hooks/useToast';
 
 const AboutContent = lazy(() =>
   import('../components/about/AboutContent').then((module) => ({
@@ -61,6 +63,7 @@ export default function MainLayout() {
   const [showBugReportModal, setShowBugReportModal] = useState(false);
   const [bugReportUrl, setBugReportUrl] = useState('');
   const [openBugReportAfterAuth, setOpenBugReportAfterAuth] = useState(false);
+  const toasts = useToasts();
 
   // Enable notification sounds globally
   useNotificationSound();
@@ -617,6 +620,13 @@ export default function MainLayout() {
           }}
         />
       )}
+
+      <ToastContainer
+        toasts={toasts.map((toast) => ({
+          ...toast,
+          onDismiss: () => dismissToast(toast.id),
+        }))}
+      />
 
       {/* WebSocket connection status indicator */}
       <ConnectionStatusIndicator />
