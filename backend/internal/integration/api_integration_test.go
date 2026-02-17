@@ -10,6 +10,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/omninudge/backend/internal/models"
 	"github.com/stretchr/testify/require"
@@ -409,6 +410,102 @@ func TestSearchMessagesSortOldIntegration(t *testing.T) {
 	require.Equal(t, "old", response.Sort)
 	require.Len(t, response.Messages, 2)
 	require.Equal(t, float64(older.ID), response.Messages[0]["id"])
+}
+
+func TestSearchMessagesHasLinksFilterIntegration(t *testing.T) {
+	deps := newTestDeps(t)
+	defer deps.DB.Close()
+
+	user1 := createUser(t, deps.UserRepo, "searchmsg_links_user1", "user")
+	user2 := createUser(t, deps.UserRepo, "searchmsg_links_user2", "user")
+	token, _ := deps.AuthService.GenerateJWT(user1.ID, "", user1.Username, user1.Role)
+
+	conv, err := deps.ConversationRepo.Create(context.Background(), user1.ID, user2.ID)
+	require.NoError(t, err)
+
+	withLink := &models.Message{
+		ConversationID:    conv.ID,
+		SenderID:          user2.ID,
+		RecipientID:       user1.ID,
+		EncryptedContent:  "check this link https://example.com/test",
+		MessageType:       "text",
+		EncryptionVersion: "v1",
+	}
+	withoutLink := &models.Message{
+		ConversationID:    conv.ID,
+		SenderID:          user2.ID,
+		RecipientID:       user1.ID,
+		EncryptedContent:  "plain text message",
+		MessageType:       "text",
+		EncryptionVersion: "v1",
+	}
+	require.NoError(t, deps.MessageRepo.Create(context.Background(), withLink))
+	require.NoError(t, deps.MessageRepo.Create(context.Background(), withoutLink))
+
+	req, _ := http.NewRequest("GET", "/api/v1/search/messages?has_links=true", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	w := doRequest(t, deps.Router, req)
+	require.Equal(t, http.StatusOK, w.Code, "body=%s", w.Body.String())
+
+	var response struct {
+		Total    int                      `json:"total"`
+		Messages []map[string]interface{} `json:"messages"`
+	}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &response))
+	require.Equal(t, 1, response.Total)
+	require.Len(t, response.Messages, 1)
+	require.Equal(t, float64(withLink.ID), response.Messages[0]["id"])
+}
+
+func TestSearchMessagesDateRangeFilterIntegration(t *testing.T) {
+	deps := newTestDeps(t)
+	defer deps.DB.Close()
+
+	user1 := createUser(t, deps.UserRepo, "searchmsg_date_user1", "user")
+	user2 := createUser(t, deps.UserRepo, "searchmsg_date_user2", "user")
+	token, _ := deps.AuthService.GenerateJWT(user1.ID, "", user1.Username, user1.Role)
+
+	conv, err := deps.ConversationRepo.Create(context.Background(), user1.ID, user2.ID)
+	require.NoError(t, err)
+
+	oldMessage := &models.Message{
+		ConversationID:    conv.ID,
+		SenderID:          user2.ID,
+		RecipientID:       user1.ID,
+		EncryptedContent:  "older-range-token",
+		MessageType:       "text",
+		EncryptionVersion: "v1",
+	}
+	newMessage := &models.Message{
+		ConversationID:    conv.ID,
+		SenderID:          user2.ID,
+		RecipientID:       user1.ID,
+		EncryptedContent:  "newer-range-token",
+		MessageType:       "text",
+		EncryptionVersion: "v1",
+	}
+	require.NoError(t, deps.MessageRepo.Create(context.Background(), oldMessage))
+	require.NoError(t, deps.MessageRepo.Create(context.Background(), newMessage))
+
+	_, err = deps.DB.Pool.Exec(context.Background(), `UPDATE messages SET sent_at = NOW() - INTERVAL '10 days' WHERE id = $1`, oldMessage.ID)
+	require.NoError(t, err)
+	_, err = deps.DB.Pool.Exec(context.Background(), `UPDATE messages SET sent_at = NOW() - INTERVAL '1 day' WHERE id = $1`, newMessage.ID)
+	require.NoError(t, err)
+
+	startDate := time.Now().Add(-72 * time.Hour).UTC().Format(time.RFC3339)
+	req, _ := http.NewRequest("GET", "/api/v1/search/messages?start_date="+startDate, nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	w := doRequest(t, deps.Router, req)
+	require.Equal(t, http.StatusOK, w.Code, "body=%s", w.Body.String())
+
+	var response struct {
+		Total    int                      `json:"total"`
+		Messages []map[string]interface{} `json:"messages"`
+	}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &response))
+	require.Equal(t, 1, response.Total)
+	require.Len(t, response.Messages, 1)
+	require.Equal(t, float64(newMessage.ID), response.Messages[0]["id"])
 }
 
 func TestBatchMediaUpload_RejectsTooManyFiles(t *testing.T) {
