@@ -334,7 +334,7 @@ func main() {
 	hubWikiHandler := handlers.NewHubWikiHandler(hubRepo, hubSettingsRepo, hubWikiRepo)
 	accessRequestHandler := handlers.NewAccessRequestHandler(hubAccessRequestRepo, hubRepo, hubSettingsRepo, userRepo)
 	jobsHandler := handlers.NewJobsHandler(queueClient)
-	audioEncoderHandler := handlers.NewAudioEncoderHandler(mediaRepo, queueClient)
+	audioEncoderHandler := handlers.NewAudioEncoderHandler(mediaRepo, userSettingsRepo, queueClient)
 	featureFlagsHandler := handlers.NewFeatureFlagHandler(featureFlagService)
 	accountDeletionHandler := handlers.NewAccountDeletionHandler(db.Pool, queueClient)
 	dataExportHandler := handlers.NewDataExportHandler(db.Pool, queueClient, cfg.Encryption.Key)
@@ -619,6 +619,8 @@ func main() {
 
 			protected.GET("/settings", settingsHandler.GetSettings)
 			protected.PUT("/settings", settingsHandler.UpdateSettings)
+			protected.GET("/users/me/settings", settingsHandler.GetSettings)
+			protected.PUT("/users/me/settings", settingsHandler.UpdateSettings)
 			protected.GET("/users/me/saved", savedItemsHandler.GetSavedItems)
 
 			// Feature flags (P0-012: check if feature enabled for user)
@@ -741,6 +743,8 @@ func main() {
 			protected.GET("/conversations/:id", conversationsHandler.GetConversation)
 			protected.PUT("/conversations/:id/archive", conversationsHandler.ArchiveConversation)
 			protected.PUT("/conversations/:id/unarchive", conversationsHandler.UnarchiveConversation)
+			protected.PUT("/conversations/:id/mute", conversationsHandler.MuteConversation)
+			protected.PUT("/conversations/:id/unmute", conversationsHandler.UnmuteConversation)
 			protected.DELETE("/conversations/:id", conversationsHandler.DeleteConversation)
 
 			// Protected messages routes

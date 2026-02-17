@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import { useLocation } from 'react-router-dom';
 import ThemeSelector from '../components/themes/ThemeSelector';
@@ -44,6 +44,23 @@ export default function SettingsPage() {
     setBlockNsfwThumbnails,
     accessRequestCooldownDisplay,
     setAccessRequestCooldownDisplay,
+    fontSize,
+    setFontSize,
+    transcriptionOptIn,
+    setTranscriptionOptIn,
+    micDeviceId,
+    setMicDeviceId,
+    cameraDeviceId,
+    setCameraDeviceId,
+    speakerDeviceId,
+    setSpeakerDeviceId,
+    quietHoursEnabled,
+    setQuietHoursEnabled,
+    quietHoursStartMinutes,
+    setQuietHoursStartMinutes,
+    quietHoursEndMinutes,
+    setQuietHoursEndMinutes,
+    quietHoursTimezone,
     readReceipts,
     setReadReceipts,
     typingIndicators,
@@ -53,6 +70,34 @@ export default function SettingsPage() {
     notificationSound,
     setNotificationSound,
   } = useSettings();
+
+  type SettingsTab = 'general' | 'notifications' | 'privacy' | 'appearance' | 'audio_video';
+  const [activeTab, setActiveTab] = useState<SettingsTab>('general');
+
+  const tabItems = useMemo(
+    () =>
+      [
+        { key: 'general' as const, label: t('settings.tabs.general') },
+        { key: 'notifications' as const, label: t('settings.tabs.notifications') },
+        { key: 'privacy' as const, label: t('settings.tabs.privacy') },
+        { key: 'appearance' as const, label: t('settings.tabs.appearance') },
+        { key: 'audio_video' as const, label: t('settings.tabs.audioVideo') },
+      ] satisfies Array<{ key: SettingsTab; label: string }>,
+    [t]
+  );
+
+  const minutesToTimeValue = (minutes: number): string => {
+    const m = Math.max(0, Math.min(1439, minutes));
+    const hh = String(Math.floor(m / 60)).padStart(2, '0');
+    const mm = String(m % 60).padStart(2, '0');
+    return `${hh}:${mm}`;
+  };
+
+  const timeValueToMinutes = (value: string): number => {
+    const [hh, mm] = value.split(':').map((v) => Number.parseInt(v, 10));
+    if (!Number.isFinite(hh) || !Number.isFinite(mm)) return 0;
+    return Math.max(0, Math.min(1439, hh * 60 + mm));
+  };
   const [publicKey, setPublicKey] = useState<string | null>(null);
   const [showPublicKey, setShowPublicKey] = useState(false);
   const [copyStatus, setCopyStatus] = useState<'idle' | 'copied' | 'error'>('idle');
@@ -66,6 +111,9 @@ export default function SettingsPage() {
   const [isUpdatingEmail, setIsUpdatingEmail] = useState(false);
   const [isResendingVerification, setIsResendingVerification] = useState(false);
   const [isThemeEditorOpen, setIsThemeEditorOpen] = useState(false);
+  const [microphones, setMicrophones] = useState<MediaDeviceInfo[]>([]);
+  const [cameras, setCameras] = useState<MediaDeviceInfo[]>([]);
+  const [speakers, setSpeakers] = useState<MediaDeviceInfo[]>([]);
 
   // Data Export (P0-016)
   const [isRequestingExport, setIsRequestingExport] = useState(false);
@@ -104,6 +152,36 @@ export default function SettingsPage() {
     setPublicKey(getOwnPublicKeyBase64());
   }, []);
 
+  useEffect(() => {
+    if (typeof navigator === 'undefined' || !navigator.mediaDevices?.enumerateDevices) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadDevices = async () => {
+      try {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        if (cancelled) return;
+        setMicrophones(devices.filter((d) => d.kind === 'audioinput'));
+        setCameras(devices.filter((d) => d.kind === 'videoinput'));
+        setSpeakers(devices.filter((d) => d.kind === 'audiooutput'));
+      } catch (error) {
+        if (!cancelled) {
+          console.warn('[SettingsPage] Failed to enumerate media devices:', error);
+        }
+      }
+    };
+
+    void loadDevices();
+    navigator.mediaDevices.addEventListener?.('devicechange', loadDevices);
+
+    return () => {
+      cancelled = true;
+      navigator.mediaDevices.removeEventListener?.('devicechange', loadDevices);
+    };
+  }, []);
+
   return (
     <div className="mx-auto max-w-4xl px-4 py-8">
       <div className="mb-6">
@@ -113,79 +191,130 @@ export default function SettingsPage() {
         <p className="mt-2 text-sm text-[var(--color-text-secondary)]">{t('settings.subtitle')}</p>
       </div>
 
-      <div className="space-y-8">
-        {/* SETTINGS-5: Category header for Appearance */}
-        <div className="border-b border-[var(--color-border)] pb-2">
-          <h2 className="text-2xl font-bold text-[var(--color-text-primary)]">
-            {t('settings.categories.appearance')}
-          </h2>
-        </div>
+      <div className="mb-8 flex flex-wrap gap-2" role="tablist" aria-label={t('settings.title')}>
+        {tabItems.map((tab) => (
+          <button
+            key={tab.key}
+            type="button"
+            role="tab"
+            aria-selected={activeTab === tab.key}
+            onClick={() => setActiveTab(tab.key)}
+            className={`rounded-full border px-4 py-2 text-sm font-semibold transition-colors ${
+              activeTab === tab.key
+                ? 'border-[var(--color-primary)] bg-[var(--color-primary)] text-white'
+                : 'border-[var(--color-border)] bg-[var(--color-surface-elevated)] text-[var(--color-text-primary)] hover:border-[var(--color-primary)]'
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
 
-        {/* Theme Selection */}
-        <Panel as="section">
-          <h3 className="mb-4 text-xl font-semibold text-[var(--color-text-primary)]">
-            {t('settings.themeSection.title')}
-          </h3>
-          <p className="mb-4 text-sm text-[var(--color-text-secondary)]">
-            {t('settings.themeSection.description')}
-          </p>
-          <ThemeSelector onCreateNewTheme={() => setIsThemeEditorOpen(true)} />
-        </Panel>
+      <div className="space-y-8">
+        <div hidden={activeTab !== 'appearance'}>
+          {/* SETTINGS-5: Category header for Appearance */}
+          <div className="border-b border-[var(--color-border)] pb-2">
+            <h2 className="text-2xl font-bold text-[var(--color-text-primary)]">
+              {t('settings.categories.appearance')}
+            </h2>
+          </div>
+
+          {/* Theme Selection */}
+          <Panel as="section">
+            <h3 className="mb-4 text-xl font-semibold text-[var(--color-text-primary)]">
+              {t('settings.themeSection.title')}
+            </h3>
+            <p className="mb-4 text-sm text-[var(--color-text-secondary)]">
+              {t('settings.themeSection.description')}
+            </p>
+            <ThemeSelector onCreateNewTheme={() => setIsThemeEditorOpen(true)} />
+          </Panel>
+
+          <Panel as="section">
+            <h3 className="mb-4 text-xl font-semibold text-[var(--color-text-primary)]">
+              {t('settings.appearancePreferences.fontSizeTitle')}
+            </h3>
+            <p className="text-sm text-[var(--color-text-secondary)]">
+              {t('settings.appearancePreferences.fontSizeHelp')}
+            </p>
+            <div className="mt-4 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4">
+              <label
+                htmlFor="font-size"
+                className="block text-sm font-semibold text-[var(--color-text-primary)]"
+              >
+                {t('settings.appearancePreferences.fontSizeLabel')}
+              </label>
+              <select
+                id="font-size"
+                value={fontSize}
+                onChange={(e) => setFontSize(e.target.value as 'small' | 'medium' | 'large')}
+                className="mt-3 w-full rounded border border-[var(--color-border)] bg-[var(--color-background)] px-3 py-2 text-sm text-[var(--color-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+              >
+                <option value="small">{t('settings.appearancePreferences.fontSizeSmall')}</option>
+                <option value="medium">{t('settings.appearancePreferences.fontSizeMedium')}</option>
+                <option value="large">{t('settings.appearancePreferences.fontSizeLarge')}</option>
+              </select>
+            </div>
+          </Panel>
+        </div>
 
         {/* Language Selection */}
-        <Panel as="section">
-          <LanguageSelector />
-        </Panel>
-
-        {/* SETTINGS-5: Category header for Notifications */}
-        <div className="border-b border-[var(--color-border)] pb-2 pt-4">
-          <h2 className="text-2xl font-bold text-[var(--color-text-primary)]">
-            {t('settings.categories.notifications')}
-          </h2>
+        <div hidden={activeTab !== 'general'}>
+          <Panel as="section">
+            <LanguageSelector />
+          </Panel>
         </div>
 
-        {/* Messaging Notifications */}
-        <Panel as="section">
-          <h3 className="mb-4 text-xl font-semibold text-[var(--color-text-primary)]">
-            {t('settings.archivedNotifications.title')}
-          </h3>
-          <p className="text-sm text-[var(--color-text-secondary)]">
-            {t('settings.archivedNotifications.description')}
-          </p>
-
-          <div className="mt-4 flex items-center justify-between rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4">
-            <div className="pr-4">
-              <p className="text-base font-semibold text-[var(--color-text-primary)]">
-                {t('settings.archivedNotifications.toggleLabel')}
-              </p>
-              <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
-                {t('settings.archivedNotifications.toggleHelp')}
-              </p>
-            </div>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={notifyArchivedMessages}
-              onClick={() => setNotifyArchivedMessages(!notifyArchivedMessages)}
-              className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${
-                notifyArchivedMessages ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
-              }`}
-            >
-              <span className="sr-only">
-                {t('common.accessibility.toggleArchivedNotifications')}
-              </span>
-              <span
-                aria-hidden="true"
-                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                  notifyArchivedMessages ? 'translate-x-5' : 'translate-x-0'
-                }`}
-              />
-            </button>
+        <div hidden={activeTab !== 'notifications'}>
+          {/* SETTINGS-5: Category header for Notifications */}
+          <div className="border-b border-[var(--color-border)] pb-2 pt-4">
+            <h2 className="text-2xl font-bold text-[var(--color-text-primary)]">
+              {t('settings.categories.notifications')}
+            </h2>
           </div>
-        </Panel>
 
-        {/* Push Notifications */}
-        <Panel as="section">
+          {/* Messaging Notifications */}
+          <Panel as="section">
+            <h3 className="mb-4 text-xl font-semibold text-[var(--color-text-primary)]">
+              {t('settings.archivedNotifications.title')}
+            </h3>
+            <p className="text-sm text-[var(--color-text-secondary)]">
+              {t('settings.archivedNotifications.description')}
+            </p>
+
+            <div className="mt-4 flex items-center justify-between rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4">
+              <div className="pr-4">
+                <p className="text-base font-semibold text-[var(--color-text-primary)]">
+                  {t('settings.archivedNotifications.toggleLabel')}
+                </p>
+                <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+                  {t('settings.archivedNotifications.toggleHelp')}
+                </p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={notifyArchivedMessages}
+                onClick={() => setNotifyArchivedMessages(!notifyArchivedMessages)}
+                className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${
+                  notifyArchivedMessages ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
+                }`}
+              >
+                <span className="sr-only">
+                  {t('common.accessibility.toggleArchivedNotifications')}
+                </span>
+                <span
+                  aria-hidden="true"
+                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                    notifyArchivedMessages ? 'translate-x-5' : 'translate-x-0'
+                  }`}
+                />
+              </button>
+            </div>
+          </Panel>
+
+          {/* Push Notifications */}
+          <Panel as="section">
           <h3 className="mb-4 text-xl font-semibold text-[var(--color-text-primary)]">
             {t('settings.pushNotificationsSection.title')}
           </h3>
@@ -232,10 +361,84 @@ export default function SettingsPage() {
               </button>
             </div>
           )}
-        </Panel>
+          </Panel>
+
+          <Panel as="section">
+            <h3 className="mb-4 text-xl font-semibold text-[var(--color-text-primary)]">
+              {t('settings.quietHours.title')}
+            </h3>
+            <p className="text-sm text-[var(--color-text-secondary)]">
+              {t('settings.quietHours.description')}
+            </p>
+
+            <div className="mt-4 flex items-center justify-between rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4">
+              <div className="pr-4">
+                <p className="text-base font-semibold text-[var(--color-text-primary)]">
+                  {t('settings.quietHours.toggle')}
+                </p>
+                <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+                  {t('settings.quietHours.timezone', { tz: quietHoursTimezone })}
+                </p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={quietHoursEnabled}
+                onClick={() => setQuietHoursEnabled(!quietHoursEnabled)}
+                className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${
+                  quietHoursEnabled ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
+                }`}
+              >
+                <span className="sr-only">{t('settings.quietHours.toggle')}</span>
+                <span
+                  aria-hidden="true"
+                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                    quietHoursEnabled ? 'translate-x-5' : 'translate-x-0'
+                  }`}
+                />
+              </button>
+            </div>
+
+            <div className={`mt-4 grid gap-4 sm:grid-cols-2 ${quietHoursEnabled ? '' : 'opacity-60'}`}>
+              <div className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4">
+                <label
+                  htmlFor="quiet-hours-start"
+                  className="block text-sm font-semibold text-[var(--color-text-primary)]"
+                >
+                  {t('settings.quietHours.start')}
+                </label>
+                <input
+                  id="quiet-hours-start"
+                  type="time"
+                  value={minutesToTimeValue(quietHoursStartMinutes)}
+                  disabled={!quietHoursEnabled}
+                  onChange={(e) => setQuietHoursStartMinutes(timeValueToMinutes(e.target.value))}
+                  className="mt-3 w-full rounded border border-[var(--color-border)] bg-[var(--color-background)] px-3 py-2 text-sm text-[var(--color-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+                />
+              </div>
+              <div className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4">
+                <label
+                  htmlFor="quiet-hours-end"
+                  className="block text-sm font-semibold text-[var(--color-text-primary)]"
+                >
+                  {t('settings.quietHours.end')}
+                </label>
+                <input
+                  id="quiet-hours-end"
+                  type="time"
+                  value={minutesToTimeValue(quietHoursEndMinutes)}
+                  disabled={!quietHoursEnabled}
+                  onChange={(e) => setQuietHoursEndMinutes(timeValueToMinutes(e.target.value))}
+                  className="mt-3 w-full rounded border border-[var(--color-border)] bg-[var(--color-background)] px-3 py-2 text-sm text-[var(--color-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+                />
+              </div>
+            </div>
+          </Panel>
+        </div>
 
         {/* Messaging Settings */}
-        <Panel as="section">
+        <div hidden={activeTab !== 'privacy'}>
+          <Panel as="section">
           <h3 className="mb-4 text-xl font-semibold text-[var(--color-text-primary)]">
             {t('settings.messagingPrivacy.title')}
           </h3>
@@ -360,17 +563,19 @@ export default function SettingsPage() {
               </button>
             </div>
           </div>
-        </Panel>
-
-        {/* SETTINGS-5: Category header for Preferences */}
-        <div className="border-b border-[var(--color-border)] pb-2 pt-4">
-          <h2 className="text-2xl font-bold text-[var(--color-text-primary)]">
-            {t('settings.categories.preferences')}
-          </h2>
+          </Panel>
         </div>
 
-        {/* Date & Time Settings */}
-        <Panel as="section">
+        <div hidden={activeTab !== 'general'}>
+          {/* SETTINGS-5: Category header for Preferences */}
+          <div className="border-b border-[var(--color-border)] pb-2 pt-4">
+            <h2 className="text-2xl font-bold text-[var(--color-text-primary)]">
+              {t('settings.categories.preferences')}
+            </h2>
+          </div>
+
+          {/* Date & Time Settings */}
+          <Panel as="section">
           <h3 className="mb-4 text-xl font-semibold text-[var(--color-text-primary)]">
             {t('settings.dateTime.title')}
           </h3>
@@ -442,80 +647,79 @@ export default function SettingsPage() {
                 <option value="days">{t('settings.dateTime.cooldownDays')}</option>
                 <option value="date">{t('settings.dateTime.cooldownDate')}</option>
                 <option value="both">{t('settings.dateTime.cooldownBoth')}</option>
-                <option value="both">{t('settings.dateTime.cooldownBoth')}</option>
               </select>
             </div>
           </div>
-        </Panel>
+          </Panel>
 
-        <Panel as="section">
-          <h2 className="mb-4 text-xl font-semibold text-[var(--color-text-primary)]">
-            {t('settings.themeSelector.title')}
-          </h2>
-          <p className="text-sm text-[var(--color-text-secondary)]">
-            {t('settings.themeSelector.description')}
-          </p>
+          <Panel as="section">
+            <h2 className="mb-4 text-xl font-semibold text-[var(--color-text-primary)]">
+              {t('settings.themeSelector.title')}
+            </h2>
+            <p className="text-sm text-[var(--color-text-secondary)]">
+              {t('settings.themeSelector.description')}
+            </p>
 
-          <div className="mt-4 grid gap-4 sm:grid-cols-2">
-            <label
-              htmlFor="theme-selector-stay-open"
-              className={`flex cursor-pointer flex-col rounded-lg border p-4 ${
-                !autoCloseThemeSelector
-                  ? 'border-[var(--color-primary)] bg-[var(--color-surface-elevated)] shadow-sm'
-                  : 'border-[var(--color-border)]'
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-base font-semibold text-[var(--color-text-primary)]">
-                    {t('settings.themeSelector.stayOpen')}
-                  </p>
-                  <p className="text-sm text-[var(--color-text-secondary)]">
-                    {t('settings.themeSelector.stayOpenHelp')}
-                  </p>
+            <div className="mt-4 grid gap-4 sm:grid-cols-2">
+              <label
+                htmlFor="theme-selector-stay-open"
+                className={`flex cursor-pointer flex-col rounded-lg border p-4 ${
+                  !autoCloseThemeSelector
+                    ? 'border-[var(--color-primary)] bg-[var(--color-surface-elevated)] shadow-sm'
+                    : 'border-[var(--color-border)]'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-base font-semibold text-[var(--color-text-primary)]">
+                      {t('settings.themeSelector.stayOpen')}
+                    </p>
+                    <p className="text-sm text-[var(--color-text-secondary)]">
+                      {t('settings.themeSelector.stayOpenHelp')}
+                    </p>
+                  </div>
+                  <input
+                    id="theme-selector-stay-open"
+                    type="radio"
+                    name="theme-selector-behavior"
+                    className="h-4 w-4 text-[var(--color-primary)] focus:ring-[var(--color-primary)]"
+                    checked={!autoCloseThemeSelector}
+                    onChange={() => setAutoCloseThemeSelector(false)}
+                  />
                 </div>
-                <input
-                  id="theme-selector-stay-open"
-                  type="radio"
-                  name="theme-selector-behavior"
-                  className="h-4 w-4 text-[var(--color-primary)] focus:ring-[var(--color-primary)]"
-                  checked={!autoCloseThemeSelector}
-                  onChange={() => setAutoCloseThemeSelector(false)}
-                />
-              </div>
-            </label>
+              </label>
 
-            <label
-              htmlFor="theme-selector-auto-close"
-              className={`flex cursor-pointer flex-col rounded-lg border p-4 ${
-                autoCloseThemeSelector
-                  ? 'border-[var(--color-primary)] bg-[var(--color-surface-elevated)] shadow-sm'
-                  : 'border-[var(--color-border)]'
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-base font-semibold text-[var(--color-text-primary)]">
-                    {t('settings.themeSelector.autoClose')}
-                  </p>
-                  <p className="text-sm text-[var(--color-text-secondary)]">
-                    {t('settings.themeSelector.autoCloseHelp')}
-                  </p>
+              <label
+                htmlFor="theme-selector-auto-close"
+                className={`flex cursor-pointer flex-col rounded-lg border p-4 ${
+                  autoCloseThemeSelector
+                    ? 'border-[var(--color-primary)] bg-[var(--color-surface-elevated)] shadow-sm'
+                    : 'border-[var(--color-border)]'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-base font-semibold text-[var(--color-text-primary)]">
+                      {t('settings.themeSelector.autoClose')}
+                    </p>
+                    <p className="text-sm text-[var(--color-text-secondary)]">
+                      {t('settings.themeSelector.autoCloseHelp')}
+                    </p>
+                  </div>
+                  <input
+                    id="theme-selector-auto-close"
+                    type="radio"
+                    name="theme-selector-behavior"
+                    className="h-4 w-4 text-[var(--color-primary)] focus:ring-[var(--color-primary)]"
+                    checked={autoCloseThemeSelector}
+                    onChange={() => setAutoCloseThemeSelector(true)}
+                  />
                 </div>
-                <input
-                  id="theme-selector-auto-close"
-                  type="radio"
-                  name="theme-selector-behavior"
-                  className="h-4 w-4 text-[var(--color-primary)] focus:ring-[var(--color-primary)]"
-                  checked={autoCloseThemeSelector}
-                  onChange={() => setAutoCloseThemeSelector(true)}
-                />
-              </div>
-            </label>
-          </div>
-        </Panel>
+              </label>
+            </div>
+          </Panel>
 
-        <Panel as="section">
+          <Panel as="section">
           <h2 className="mb-4 text-xl font-semibold text-[var(--color-text-primary)]">
             {t('settings.savedItems.title')}
           </h2>
@@ -550,9 +754,9 @@ export default function SettingsPage() {
               />
             </button>
           </div>
-        </Panel>
+          </Panel>
 
-        <Panel as="section">
+          <Panel as="section">
           <h2 className="mb-4 text-xl font-semibold text-[var(--color-text-primary)]">
             {t('settings.omniFeed.title')}
           </h2>
@@ -617,10 +821,10 @@ export default function SettingsPage() {
               </button>
             </div>
           </div>
-        </Panel>
+          </Panel>
 
-        {/* Infinite Scroll Settings */}
-        <Panel as="section">
+          {/* Infinite Scroll Settings */}
+          <Panel as="section">
           <h2 className="mb-4 text-xl font-semibold text-[var(--color-text-primary)]">
             {t('settings.pageNavigation.title')}
           </h2>
@@ -743,10 +947,12 @@ export default function SettingsPage() {
               </div>
             </div>
           </div>
-        </Panel>
+          </Panel>
+        </div>
 
-        {/* NSFW Search & Visibility */}
-        <Panel as="section">
+        <div hidden={activeTab !== 'privacy'}>
+          {/* NSFW Search & Visibility */}
+          <Panel as="section">
           <h2 className="mb-4 text-xl font-semibold text-[var(--color-text-primary)]">
             {t('settings.nsfw.title')}
           </h2>
@@ -861,10 +1067,10 @@ export default function SettingsPage() {
               </div>
             </div>
           </div>
-        </Panel>
+          </Panel>
 
-        {/* Security & Keys */}
-        <Panel as="section">
+          {/* Security & Keys */}
+          <Panel as="section">
           <h2 className="mb-2 text-xl font-semibold text-[var(--color-text-primary)]">
             {t('settings.security.title')}
           </h2>
@@ -917,10 +1123,10 @@ export default function SettingsPage() {
               </div>
             )}
           </div>
-        </Panel>
+          </Panel>
 
-        {/* Email Settings */}
-        <Panel as="section">
+          {/* Email Settings */}
+          <Panel as="section">
           <h2 className="mb-2 text-xl font-semibold text-[var(--color-text-primary)]">
             {t('settings.email.title')}
           </h2>
@@ -1115,96 +1321,213 @@ export default function SettingsPage() {
               </div>
             )}
           </div>
-        </Panel>
-
-        {/* Beta Features (P0-012: Feature Flag Integration Demo) */}
-        {(voiceCallsEnabled || videoCallsEnabled || lazyLoadImagesEnabled) && (
-          <>
-            <div className="border-b border-[var(--color-border)] pb-2 pt-4">
-              <h2 className="text-2xl font-bold text-[var(--color-text-primary)]">
-                {t('settings.betaFeatures.title')}
-              </h2>
-            </div>
-
-            <Panel as="section">
-              <h2 className="mb-2 text-xl font-semibold text-[var(--color-text-primary)]">
-                {t('settings.betaFeatures.experimentalTitle')}
-              </h2>
-              <p className="text-sm text-[var(--color-text-secondary)]">
-                {t('settings.betaFeatures.experimentalDescription')}
-              </p>
-
-              <div className="mt-4 space-y-4">
-                {voiceCallsEnabled && (
-                  <div className="rounded-md border border-[var(--color-primary)] bg-blue-50 p-4">
-                    <div className="flex items-center gap-2">
-                      <span className="text-lg">🎙️</span>
-                      <div>
-                        <h4 className="font-semibold text-[var(--color-text-primary)]">
-                          {t('settings.betaFeatures.voiceCalls')}
-                        </h4>
-                        <p className="text-sm text-[var(--color-text-secondary)]">
-                          {t('settings.betaFeatures.voiceCallsDescription')}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {videoCallsEnabled && (
-                  <div className="rounded-md border border-[var(--color-primary)] bg-blue-50 p-4">
-                    <div className="flex items-center gap-2">
-                      <span className="text-lg">📹</span>
-                      <div>
-                        <h4 className="font-semibold text-[var(--color-text-primary)]">
-                          {t('settings.betaFeatures.videoCalls')}
-                        </h4>
-                        <p className="text-sm text-[var(--color-text-secondary)]">
-                          {t('settings.betaFeatures.videoCallsDescription')}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {lazyLoadImagesEnabled && (
-                  <div className="rounded-md border border-green-600 bg-green-50 p-4">
-                    <div className="flex items-center gap-2">
-                      <span className="text-lg">⚡</span>
-                      <div>
-                        <h4 className="font-semibold text-[var(--color-text-primary)]">
-                          {t('settings.betaFeatures.performanceMode')}
-                        </h4>
-                        <p className="text-sm text-[var(--color-text-secondary)]">
-                          {t('settings.betaFeatures.performanceModeDescription')}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                <div className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-3">
-                  <p className="text-xs text-[var(--color-text-secondary)]">
-                    <Trans
-                      i18nKey="settings.betaFeatures.noteWithLabel"
-                      components={{ strong: <strong /> }}
-                    />
-                  </p>
-                </div>
-              </div>
-            </Panel>
-          </>
-        )}
-
-        {/* Account & Privacy */}
-        <div className="border-b border-[var(--color-border)] pb-2 pt-4">
-          <h2 className="text-2xl font-bold text-[var(--color-text-primary)]">
-            {t('settings.categories.accountPrivacy')}
-          </h2>
+          </Panel>
         </div>
 
-        {/* Data Export (P0-016: GDPR Right to Data Portability) */}
-        <Panel as="section">
+        <div hidden={activeTab !== 'audio_video'}>
+          <Panel as="section">
+            <h3 className="mb-4 text-xl font-semibold text-[var(--color-text-primary)]">
+              {t('settings.audioVideo.devicesTitle')}
+            </h3>
+            <p className="text-sm text-[var(--color-text-secondary)]">
+              {t('settings.audioVideo.devicesDescription')}
+            </p>
+
+            <div className="mt-4 grid gap-4 sm:grid-cols-1">
+              <div className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4">
+                <label
+                  htmlFor="preferred-microphone"
+                  className="block text-sm font-semibold text-[var(--color-text-primary)]"
+                >
+                  {t('settings.audioVideo.microphone')}
+                </label>
+                <select
+                  id="preferred-microphone"
+                  value={micDeviceId}
+                  onChange={(e) => setMicDeviceId(e.target.value)}
+                  className="mt-3 w-full rounded border border-[var(--color-border)] bg-[var(--color-background)] px-3 py-2 text-sm text-[var(--color-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+                >
+                  <option value="">{t('settings.audioVideo.defaultDevice')}</option>
+                  {microphones.map((device, index) => (
+                    <option key={device.deviceId} value={device.deviceId}>
+                      {device.label || `${t('settings.audioVideo.microphone')} ${index + 1}`}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4">
+                <label
+                  htmlFor="preferred-camera"
+                  className="block text-sm font-semibold text-[var(--color-text-primary)]"
+                >
+                  {t('settings.audioVideo.camera')}
+                </label>
+                <select
+                  id="preferred-camera"
+                  value={cameraDeviceId}
+                  onChange={(e) => setCameraDeviceId(e.target.value)}
+                  className="mt-3 w-full rounded border border-[var(--color-border)] bg-[var(--color-background)] px-3 py-2 text-sm text-[var(--color-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+                >
+                  <option value="">{t('settings.audioVideo.defaultDevice')}</option>
+                  {cameras.map((device, index) => (
+                    <option key={device.deviceId} value={device.deviceId}>
+                      {device.label || `${t('settings.audioVideo.camera')} ${index + 1}`}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4">
+                <label
+                  htmlFor="preferred-speaker"
+                  className="block text-sm font-semibold text-[var(--color-text-primary)]"
+                >
+                  {t('settings.audioVideo.speaker')}
+                </label>
+                <select
+                  id="preferred-speaker"
+                  value={speakerDeviceId}
+                  onChange={(e) => setSpeakerDeviceId(e.target.value)}
+                  className="mt-3 w-full rounded border border-[var(--color-border)] bg-[var(--color-background)] px-3 py-2 text-sm text-[var(--color-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+                >
+                  <option value="">{t('settings.audioVideo.defaultDevice')}</option>
+                  {speakers.map((device, index) => (
+                    <option key={device.deviceId} value={device.deviceId}>
+                      {device.label || `${t('settings.audioVideo.speaker')} ${index + 1}`}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </Panel>
+
+          <Panel as="section">
+            <h3 className="mb-4 text-xl font-semibold text-[var(--color-text-primary)]">
+              {t('settings.audioVideo.transcriptionTitle')}
+            </h3>
+            <p className="text-sm text-[var(--color-text-secondary)]">
+              {t('settings.audioVideo.transcriptionDescription')}
+            </p>
+
+            <div className="mt-4 flex items-center justify-between rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4">
+              <div className="pr-4">
+                <p className="text-base font-semibold text-[var(--color-text-primary)]">
+                  {t('settings.audioVideo.transcriptionToggle')}
+                </p>
+                <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+                  {t('settings.audioVideo.transcriptionHelp')}
+                </p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={transcriptionOptIn}
+                onClick={() => setTranscriptionOptIn(!transcriptionOptIn)}
+                className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${
+                  transcriptionOptIn ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
+                }`}
+              >
+                <span className="sr-only">{t('settings.audioVideo.transcriptionToggle')}</span>
+                <span
+                  aria-hidden="true"
+                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                    transcriptionOptIn ? 'translate-x-5' : 'translate-x-0'
+                  }`}
+                />
+              </button>
+            </div>
+          </Panel>
+
+          {(voiceCallsEnabled || videoCallsEnabled || lazyLoadImagesEnabled) && (
+            <>
+              <div className="border-b border-[var(--color-border)] pb-2 pt-4">
+                <h2 className="text-2xl font-bold text-[var(--color-text-primary)]">
+                  {t('settings.betaFeatures.title')}
+                </h2>
+              </div>
+
+              <Panel as="section">
+                <h2 className="mb-2 text-xl font-semibold text-[var(--color-text-primary)]">
+                  {t('settings.betaFeatures.experimentalTitle')}
+                </h2>
+                <p className="text-sm text-[var(--color-text-secondary)]">
+                  {t('settings.betaFeatures.experimentalDescription')}
+                </p>
+
+                <div className="mt-4 space-y-4">
+                  {voiceCallsEnabled && (
+                    <div className="rounded-md border border-[var(--color-primary)] bg-blue-50 p-4">
+                      <div className="flex items-center gap-2">
+                        <span className="text-lg">🎙️</span>
+                        <div>
+                          <h4 className="font-semibold text-[var(--color-text-primary)]">
+                            {t('settings.betaFeatures.voiceCalls')}
+                          </h4>
+                          <p className="text-sm text-[var(--color-text-secondary)]">
+                            {t('settings.betaFeatures.voiceCallsDescription')}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {videoCallsEnabled && (
+                    <div className="rounded-md border border-[var(--color-primary)] bg-blue-50 p-4">
+                      <div className="flex items-center gap-2">
+                        <span className="text-lg">📹</span>
+                        <div>
+                          <h4 className="font-semibold text-[var(--color-text-primary)]">
+                            {t('settings.betaFeatures.videoCalls')}
+                          </h4>
+                          <p className="text-sm text-[var(--color-text-secondary)]">
+                            {t('settings.betaFeatures.videoCallsDescription')}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {lazyLoadImagesEnabled && (
+                    <div className="rounded-md border border-green-600 bg-green-50 p-4">
+                      <div className="flex items-center gap-2">
+                        <span className="text-lg">⚡</span>
+                        <div>
+                          <h4 className="font-semibold text-[var(--color-text-primary)]">
+                            {t('settings.betaFeatures.performanceMode')}
+                          </h4>
+                          <p className="text-sm text-[var(--color-text-secondary)]">
+                            {t('settings.betaFeatures.performanceModeDescription')}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-3">
+                    <p className="text-xs text-[var(--color-text-secondary)]">
+                      <Trans
+                        i18nKey="settings.betaFeatures.noteWithLabel"
+                        components={{ strong: <strong /> }}
+                      />
+                    </p>
+                  </div>
+                </div>
+              </Panel>
+            </>
+          )}
+        </div>
+
+        <div hidden={activeTab !== 'privacy'}>
+          {/* Account & Privacy */}
+          <div className="border-b border-[var(--color-border)] pb-2 pt-4">
+            <h2 className="text-2xl font-bold text-[var(--color-text-primary)]">
+              {t('settings.categories.accountPrivacy')}
+            </h2>
+          </div>
+
+          {/* Data Export (P0-016: GDPR Right to Data Portability) */}
+          <Panel as="section">
           <h2 className="mb-2 text-xl font-semibold text-[var(--color-text-primary)]">
             {t('settings.dataExport.title')}
           </h2>
@@ -1283,10 +1606,10 @@ export default function SettingsPage() {
               </p>
             </div>
           </div>
-        </Panel>
+          </Panel>
 
-        {/* Account Deletion */}
-        <Panel as="section">
+          {/* Account Deletion */}
+          <Panel as="section">
           <h2 className="mb-2 text-xl font-semibold text-[var(--color-text-primary)]">
             {t('settings.accountDeletion.title')}
           </h2>
@@ -1302,7 +1625,8 @@ export default function SettingsPage() {
               {t('settings.accountDeletion.manageButton')}
             </a>
           </div>
-        </Panel>
+          </Panel>
+        </div>
       </div>
 
       {/* Theme Editor Modal */}

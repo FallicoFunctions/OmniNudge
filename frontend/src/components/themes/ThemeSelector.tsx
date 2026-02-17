@@ -40,11 +40,12 @@ const ThemeSelector = ({ onCreateNewTheme, variant = 'card' }: ThemeSelectorProp
 
   const handleSelect = async (theme: UserTheme) => {
     setSwitchingThemeId(theme.id);
-    await selectTheme(theme);
-    setSwitchingThemeId(null);
     if (autoCloseThemeSelector) {
+      // Close immediately to avoid reopen/close race conditions while async state sync completes.
       setIsOpen(false);
     }
+    await selectTheme(theme);
+    setSwitchingThemeId(null);
     setAnnouncement(t('themes.selector.announcements.selected', { theme: theme.theme_name }));
   };
 

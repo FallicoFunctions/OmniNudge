@@ -19,15 +19,21 @@ import (
 
 // AudioEncoderHandler handles server-side audio encoding for iOS devices
 type AudioEncoderHandler struct {
-	mediaRepo   *models.MediaFileRepository
-	queueClient *queue.QueueClient
+	mediaRepo    *models.MediaFileRepository
+	settingsRepo *models.UserSettingsRepository
+	queueClient  *queue.QueueClient
 }
 
 // NewAudioEncoderHandler creates a new audio encoder handler
-func NewAudioEncoderHandler(mediaRepo *models.MediaFileRepository, queueClient *queue.QueueClient) *AudioEncoderHandler {
+func NewAudioEncoderHandler(
+	mediaRepo *models.MediaFileRepository,
+	settingsRepo *models.UserSettingsRepository,
+	queueClient *queue.QueueClient,
+) *AudioEncoderHandler {
 	return &AudioEncoderHandler{
-		mediaRepo:   mediaRepo,
-		queueClient: queueClient,
+		mediaRepo:    mediaRepo,
+		settingsRepo: settingsRepo,
+		queueClient:  queueClient,
 	}
 }
 
@@ -104,7 +110,7 @@ func (h *AudioEncoderHandler) EncodeAudio(c *gin.Context) {
 	if err != nil {
 		log.Printf("FFmpeg encoding failed: %v\nOutput: %s", err, string(output))
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "Failed to encode audio",
+			"error":   "Failed to encode audio",
 			"details": "Audio encoding failed. Please try again.",
 		})
 		return
@@ -162,13 +168,25 @@ func (h *AudioEncoderHandler) EncodeAudio(c *gin.Context) {
 		return
 	}
 
-	// Enqueue transcription job (P0-002)
+	// Enqueue transcription job (P0-002), gated by transcription opt-in.
 	if h.queueClient != nil && duration > 0 {
-		mediaURL := fmt.Sprintf("/uploads/voice/%s", filename)
-		err = h.queueClient.EnqueueTranscription(c.Request.Context(), mediaFile.ID, mediaURL, userID)
-		if err != nil {
-			log.Printf("Failed to enqueue transcription job: %v", err)
-			// Don't fail the request - transcription is optional
+		shouldTranscribe := false
+		if h.settingsRepo != nil {
+			settings, settingsErr := h.settingsRepo.GetByUserID(c.Request.Context(), userID)
+			if settingsErr != nil {
+				log.Printf("Failed to load user settings for transcription opt-in: %v", settingsErr)
+			} else if settings != nil {
+				shouldTranscribe = settings.TranscriptionOptIn
+			}
+		}
+
+		if shouldTranscribe {
+			mediaURL := fmt.Sprintf("/uploads/voice/%s", filename)
+			err = h.queueClient.EnqueueTranscription(c.Request.Context(), mediaFile.ID, mediaURL, userID)
+			if err != nil {
+				log.Printf("Failed to enqueue transcription job: %v", err)
+				// Don't fail the request - transcription is optional
+			}
 		}
 	}
 

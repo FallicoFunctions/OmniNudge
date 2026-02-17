@@ -65,7 +65,22 @@ interface DecryptedMediaViewerWrapperProps {
   initialIndex: number;
   onClose: () => void;
   currentUserId?: number;
+  speakerDeviceId?: string;
 }
+
+const applyAudioOutputDevice = async (
+  element: HTMLMediaElement,
+  speakerDeviceId?: string
+): Promise<void> => {
+  if (!speakerDeviceId) return;
+  const maybeSink = element as HTMLMediaElement & { setSinkId?: (id: string) => Promise<void> };
+  if (typeof maybeSink.setSinkId !== 'function') return;
+  try {
+    await maybeSink.setSinkId(speakerDeviceId);
+  } catch (error) {
+    console.warn('[MessagesPage] Failed to set audio output device:', error);
+  }
+};
 
 /**
  * Wrapper component that handles decryption for full-screen media viewing
@@ -76,6 +91,7 @@ function DecryptedMediaViewerWrapper({
   initialIndex,
   onClose,
   currentUserId,
+  speakerDeviceId,
 }: DecryptedMediaViewerWrapperProps) {
   const { t } = useTranslation();
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
@@ -203,6 +219,7 @@ function DecryptedMediaViewerWrapper({
             style={{ maxWidth: '90vw', maxHeight: '90vh' }}
             onCanPlay={(e) => {
               const video = e.currentTarget;
+              void applyAudioOutputDevice(video, speakerDeviceId);
               video.muted = false;
               video.volume = 1.0;
               console.log('Video can play, attempting to play with sound...');
@@ -513,6 +530,7 @@ function useDecryptedMedia(message: Message, isOwnMessage: boolean): string | nu
 
 const MessageMediaPreview = ({ message, isOwnMessage, onMediaClick }: MessageMediaPreviewProps) => {
   const { t } = useTranslation();
+  const { speakerDeviceId } = useSettings();
   const mediaSrc = useDecryptedMedia(message, isOwnMessage);
   const filename = message.media_url?.split('/').pop() ?? 'attachment';
 
@@ -548,6 +566,9 @@ const MessageMediaPreview = ({ message, isOwnMessage, onMediaClick }: MessageMed
           controls
           className="max-w-full rounded cursor-pointer"
           style={{ maxHeight: '50vh' }}
+          onLoadedMetadata={(e) => {
+            void applyAudioOutputDevice(e.currentTarget, speakerDeviceId);
+          }}
           onClick={() => onMediaClick?.()}
         />
       </div>
@@ -557,7 +578,13 @@ const MessageMediaPreview = ({ message, isOwnMessage, onMediaClick }: MessageMed
   if (resolvedType === 'audio') {
     return (
       <div className="mb-2">
-        <audio controls className="w-full">
+        <audio
+          controls
+          className="w-full"
+          onLoadedMetadata={(e) => {
+            void applyAudioOutputDevice(e.currentTarget, speakerDeviceId);
+          }}
+        >
           <source src={mediaSrc} type={message.media_type ?? 'audio/mpeg'} />
           Your browser does not support the audio element.
         </audio>
@@ -657,7 +684,7 @@ export default function MessagesPage() {
   const toUsernameParam = searchParams.get('to');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { sendTypingIndicator } = useWebSocket();
-  const { typingIndicators, readReceipts } = useSettings();
+  const { typingIndicators, readReceipts, speakerDeviceId } = useSettings();
   const [searchQuery, setSearchQuery] = useState('');
   const [messageSearchQuery, setMessageSearchQuery] = useState('');
   const debouncedMessageSearch = useDebounce(messageSearchQuery, 300);
@@ -945,6 +972,34 @@ export default function MessagesPage() {
     },
     onError: (error) => {
       alert(error instanceof Error ? error.message : t('messages.errors.unarchiveFailed'));
+    },
+  });
+
+  const muteConversationMutation = useMutation({
+    mutationFn: (conversationId: number) => messagesService.muteConversation(conversationId),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.refetchQueries({ queryKey: ['conversations', 'all'] }),
+        queryClient.refetchQueries({ queryKey: ['conversations'] }),
+      ]);
+      setConversationMenuOpen(null);
+    },
+    onError: (error) => {
+      alert(error instanceof Error ? error.message : t('messages.errors.muteFailed'));
+    },
+  });
+
+  const unmuteConversationMutation = useMutation({
+    mutationFn: (conversationId: number) => messagesService.unmuteConversation(conversationId),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.refetchQueries({ queryKey: ['conversations', 'all'] }),
+        queryClient.refetchQueries({ queryKey: ['conversations'] }),
+      ]);
+      setConversationMenuOpen(null);
+    },
+    onError: (error) => {
+      alert(error instanceof Error ? error.message : t('messages.errors.unmuteFailed'));
     },
   });
 
@@ -1704,6 +1759,11 @@ export default function MessagesPage() {
                             {formatRelativeTime(conversation.latest_message.sent_at)}
                           </span>
                         )}
+                        {conversation.muted && (
+                          <span className="rounded-full border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
+                            {t('messages.muted')}
+                          </span>
+                        )}
                       </div>
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0">
@@ -1762,6 +1822,19 @@ export default function MessagesPage() {
                         {t('messages.unarchive')}
                       </button>
                     )}
+                    <button
+                      type="button"
+                      className="w-full rounded-md px-3 py-2 text-left text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
+                      onClick={() => {
+                        if (conversation.muted) {
+                          unmuteConversationMutation.mutate(conversation.id);
+                        } else {
+                          muteConversationMutation.mutate(conversation.id);
+                        }
+                      }}
+                    >
+                      {conversation.muted ? t('messages.unmute') : t('messages.mute')}
+                    </button>
                     <button
                       type="button"
                       className="w-full rounded-md px-3 py-2 text-left text-sm font-medium text-[var(--color-error)] hover:bg-[var(--color-surface-elevated)]"
@@ -2573,6 +2646,7 @@ export default function MessagesPage() {
           initialIndex={viewerState.initialIndex}
           onClose={() => setViewerState(null)}
           currentUserId={user?.id}
+          speakerDeviceId={speakerDeviceId}
         />
       )}
 
@@ -2583,7 +2657,13 @@ export default function MessagesPage() {
             const isOwnMessage = message.sender_id === user?.id;
             return {
               id: message.id,
-              element: <DecryptedSlideshowItem message={message} isOwnMessage={isOwnMessage} />,
+              element: (
+                <DecryptedSlideshowItem
+                  message={message}
+                  isOwnMessage={isOwnMessage}
+                  speakerDeviceId={speakerDeviceId}
+                />
+              ),
             };
           })}
           initialIndex={0}
@@ -2711,9 +2791,11 @@ export default function MessagesPage() {
 function DecryptedSlideshowItem({
   message,
   isOwnMessage,
+  speakerDeviceId,
 }: {
   message: Message;
   isOwnMessage: boolean;
+  speakerDeviceId?: string;
 }) {
   const { t } = useTranslation();
   const mediaSrc = useDecryptedMedia(message, isOwnMessage);
@@ -2750,6 +2832,7 @@ function DecryptedSlideshowItem({
         style={{ maxWidth: '90vw', maxHeight: '90vh' }}
         onCanPlay={(e) => {
           const video = e.currentTarget;
+          void applyAudioOutputDevice(video, speakerDeviceId);
           video.muted = false;
           video.volume = 1.0;
           console.log('Video can play, attempting to play with sound...');

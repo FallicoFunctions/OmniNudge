@@ -36,6 +36,24 @@ interface SettingsContextType {
   setBlockNsfwThumbnails: (value: boolean) => void;
   accessRequestCooldownDisplay: 'days' | 'date' | 'both';
   setAccessRequestCooldownDisplay: (value: 'days' | 'date' | 'both') => void;
+  fontSize: 'small' | 'medium' | 'large';
+  setFontSize: (value: 'small' | 'medium' | 'large') => void;
+  transcriptionOptIn: boolean;
+  setTranscriptionOptIn: (value: boolean) => void;
+  micDeviceId: string;
+  setMicDeviceId: (value: string) => void;
+  cameraDeviceId: string;
+  setCameraDeviceId: (value: string) => void;
+  speakerDeviceId: string;
+  setSpeakerDeviceId: (value: string) => void;
+  quietHoursEnabled: boolean;
+  setQuietHoursEnabled: (value: boolean) => void;
+  quietHoursStartMinutes: number;
+  setQuietHoursStartMinutes: (value: number) => void;
+  quietHoursEndMinutes: number;
+  setQuietHoursEndMinutes: (value: number) => void;
+  quietHoursTimezone: string;
+  setQuietHoursTimezone: (value: string) => void;
   readReceipts: boolean;
   setReadReceipts: (value: boolean) => void;
   typingIndicators: boolean;
@@ -63,6 +81,15 @@ interface StoredSettings {
   blockAllNsfw?: boolean;
   blockNsfwThumbnails?: boolean;
   accessRequestCooldownDisplay?: 'days' | 'date' | 'both';
+  fontSize?: 'small' | 'medium' | 'large';
+  transcriptionOptIn?: boolean;
+  micDeviceId?: string;
+  cameraDeviceId?: string;
+  speakerDeviceId?: string;
+  quietHoursEnabled?: boolean;
+  quietHoursStartMinutes?: number;
+  quietHoursEndMinutes?: number;
+  quietHoursTimezone?: string;
   readReceipts?: boolean;
   typingIndicators?: boolean;
   showLastSeen?: boolean;
@@ -70,7 +97,7 @@ interface StoredSettings {
   settingsVersion?: number;
 }
 
-const CURRENT_SETTINGS_VERSION = 6;
+const CURRENT_SETTINGS_VERSION = 8;
 
 const getStoredSettings = (): StoredSettings => {
   if (typeof window === 'undefined' || !window.localStorage) {
@@ -90,6 +117,19 @@ const getStoredSettings = (): StoredSettings => {
           useInfiniteScroll: false,
           accessRequestCooldownDisplay: parsed.accessRequestCooldownDisplay ?? 'days',
           blockNsfwThumbnails: parsed.blockNsfwThumbnails ?? true,
+          fontSize: parsed.fontSize ?? 'medium',
+          transcriptionOptIn: parsed.transcriptionOptIn ?? false,
+          micDeviceId: parsed.micDeviceId ?? '',
+          cameraDeviceId: parsed.cameraDeviceId ?? '',
+          speakerDeviceId: parsed.speakerDeviceId ?? '',
+          quietHoursEnabled: parsed.quietHoursEnabled ?? false,
+          quietHoursStartMinutes: parsed.quietHoursStartMinutes ?? 1320,
+          quietHoursEndMinutes: parsed.quietHoursEndMinutes ?? 420,
+          quietHoursTimezone:
+            parsed.quietHoursTimezone ??
+            (typeof Intl !== 'undefined'
+              ? (Intl.DateTimeFormat().resolvedOptions().timeZone ?? 'UTC')
+              : 'UTC'),
           readReceipts: parsed.readReceipts ?? true,
           typingIndicators: parsed.typingIndicators ?? true,
           showLastSeen: parsed.showLastSeen ?? true,
@@ -166,6 +206,47 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     const settings = getStoredSettings();
     return settings.accessRequestCooldownDisplay ?? 'days';
   });
+  const [fontSize, setFontSizeState] = useState<'small' | 'medium' | 'large'>(() => {
+    const settings = getStoredSettings();
+    return settings.fontSize ?? 'medium';
+  });
+  const [transcriptionOptIn, setTranscriptionOptInState] = useState<boolean>(() => {
+    const settings = getStoredSettings();
+    return settings.transcriptionOptIn ?? false;
+  });
+  const [micDeviceId, setMicDeviceIdState] = useState<string>(() => {
+    const settings = getStoredSettings();
+    return settings.micDeviceId ?? '';
+  });
+  const [cameraDeviceId, setCameraDeviceIdState] = useState<string>(() => {
+    const settings = getStoredSettings();
+    return settings.cameraDeviceId ?? '';
+  });
+  const [speakerDeviceId, setSpeakerDeviceIdState] = useState<string>(() => {
+    const settings = getStoredSettings();
+    return settings.speakerDeviceId ?? '';
+  });
+  const [quietHoursEnabled, setQuietHoursEnabledState] = useState<boolean>(() => {
+    const settings = getStoredSettings();
+    return settings.quietHoursEnabled ?? false;
+  });
+  const [quietHoursStartMinutes, setQuietHoursStartMinutesState] = useState<number>(() => {
+    const settings = getStoredSettings();
+    return settings.quietHoursStartMinutes ?? 1320;
+  });
+  const [quietHoursEndMinutes, setQuietHoursEndMinutesState] = useState<number>(() => {
+    const settings = getStoredSettings();
+    return settings.quietHoursEndMinutes ?? 420;
+  });
+  const [quietHoursTimezone, setQuietHoursTimezoneState] = useState<string>(() => {
+    const settings = getStoredSettings();
+    return (
+      settings.quietHoursTimezone ??
+      (typeof Intl !== 'undefined'
+        ? (Intl.DateTimeFormat().resolvedOptions().timeZone ?? 'UTC')
+        : 'UTC')
+    );
+  });
   const [readReceipts, setReadReceiptsState] = useState<boolean>(() => {
     const settings = getStoredSettings();
     return settings.readReceipts ?? true;
@@ -195,6 +276,31 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         const settings = await userSettingsService.get();
         if (cancelled) return;
 
+        setUseRelativeTimeState(settings.use_relative_time ?? true);
+        setAutoCloseThemeSelectorState(settings.auto_close_theme_selector ?? false);
+        setNotifyArchivedMessagesState(settings.notify_archived_messages ?? false);
+        setNotifyRemovedSavedPostsState(settings.notify_removed_saved_posts ?? true);
+        setDefaultOmniPostsOnlyState(settings.default_omni_posts_only ?? false);
+        setStayOnPostAfterHideState(settings.stay_on_post_after_hide ?? false);
+        setUseInfiniteScrollHomeState(settings.use_infinite_scroll_home ?? false);
+        setUseInfiniteScrollHubsState(settings.use_infinite_scroll_hubs ?? false);
+        setUseInfiniteScrollSubsState(settings.use_infinite_scroll_subs ?? false);
+        setUseInfiniteScrollState(settings.use_infinite_scroll ?? false);
+        setSearchIncludeNsfwByDefaultState(settings.search_include_nsfw_by_default ?? false);
+        setBlockAllNsfwState(settings.block_all_nsfw ?? false);
+        setBlockNsfwThumbnailsState(settings.block_nsfw_thumbnails ?? true);
+        setAccessRequestCooldownDisplayState(
+          (settings.access_request_cooldown_display as 'days' | 'date' | 'both') ?? 'days'
+        );
+        setFontSizeState((settings.font_size as 'small' | 'medium' | 'large') ?? 'medium');
+        setTranscriptionOptInState(settings.transcription_opt_in ?? false);
+        setMicDeviceIdState(settings.mic_device_id ?? '');
+        setCameraDeviceIdState(settings.camera_device_id ?? '');
+        setSpeakerDeviceIdState(settings.speaker_device_id ?? '');
+        setQuietHoursEnabledState(settings.quiet_hours_enabled ?? false);
+        setQuietHoursStartMinutesState(settings.quiet_hours_start_minutes ?? 1320);
+        setQuietHoursEndMinutesState(settings.quiet_hours_end_minutes ?? 420);
+        setQuietHoursTimezoneState(settings.quiet_hours_timezone ?? quietHoursTimezone);
         setReadReceiptsState(settings.show_read_receipts ?? true);
         setTypingIndicatorsState(settings.show_typing_indicators ?? true);
         setShowLastSeenState(settings.show_last_seen ?? true);
@@ -228,6 +334,15 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         blockAllNsfw,
         blockNsfwThumbnails,
         accessRequestCooldownDisplay,
+        fontSize,
+        transcriptionOptIn,
+        micDeviceId,
+        cameraDeviceId,
+        speakerDeviceId,
+        quietHoursEnabled,
+        quietHoursStartMinutes,
+        quietHoursEndMinutes,
+        quietHoursTimezone,
         readReceipts,
         typingIndicators,
         showLastSeen,
@@ -253,108 +368,296 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     blockAllNsfw,
     blockNsfwThumbnails,
     accessRequestCooldownDisplay,
+    fontSize,
+    transcriptionOptIn,
+    micDeviceId,
+    cameraDeviceId,
+    speakerDeviceId,
+    quietHoursEnabled,
+    quietHoursStartMinutes,
+    quietHoursEndMinutes,
+    quietHoursTimezone,
     readReceipts,
     typingIndicators,
     showLastSeen,
     notificationSound,
   ]);
 
+  // Apply font size immediately by adjusting the document root font-size.
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    const px = fontSize === 'small' ? 14 : fontSize === 'large' ? 18 : 16;
+    document.documentElement.style.fontSize = `${px}px`;
+  }, [fontSize]);
+
   const setUseRelativeTime = (value: boolean) => {
+    const previous = useRelativeTime;
     setUseRelativeTimeState(value);
+    if (!hasAuthToken()) return;
+    void userSettingsService.update({ use_relative_time: value }).catch((error) => {
+      console.error('[Settings] Failed to update relative time setting:', error);
+      setUseRelativeTimeState(previous);
+    });
   };
 
   const setAutoCloseThemeSelector = (value: boolean) => {
+    const previous = autoCloseThemeSelector;
     setAutoCloseThemeSelectorState(value);
+    if (!hasAuthToken()) return;
+    void userSettingsService.update({ auto_close_theme_selector: value }).catch((error) => {
+      console.error('[Settings] Failed to update theme selector behavior:', error);
+      setAutoCloseThemeSelectorState(previous);
+    });
   };
 
   const setUseInfiniteScrollHome = (value: boolean) => {
+    const previous = useInfiniteScrollHome;
     setUseInfiniteScrollHomeState(value);
+    if (!hasAuthToken()) return;
+    void userSettingsService.update({ use_infinite_scroll_home: value }).catch((error) => {
+      console.error('[Settings] Failed to update infinite scroll home setting:', error);
+      setUseInfiniteScrollHomeState(previous);
+    });
   };
   const setUseInfiniteScrollHubs = (value: boolean) => {
+    const previous = useInfiniteScrollHubs;
     setUseInfiniteScrollHubsState(value);
+    if (!hasAuthToken()) return;
+    void userSettingsService.update({ use_infinite_scroll_hubs: value }).catch((error) => {
+      console.error('[Settings] Failed to update infinite scroll hubs setting:', error);
+      setUseInfiniteScrollHubsState(previous);
+    });
   };
   const setUseInfiniteScrollSubs = (value: boolean) => {
+    const previous = useInfiniteScrollSubs;
     setUseInfiniteScrollSubsState(value);
+    if (!hasAuthToken()) return;
+    void userSettingsService.update({ use_infinite_scroll_subs: value }).catch((error) => {
+      console.error('[Settings] Failed to update infinite scroll subs setting:', error);
+      setUseInfiniteScrollSubsState(previous);
+    });
   };
 
   const setNotifyRemovedSavedPosts = (value: boolean) => {
+    const previous = notifyRemovedSavedPosts;
     setNotifyRemovedSavedPostsState(value);
+    if (!hasAuthToken()) return;
+    void userSettingsService.update({ notify_removed_saved_posts: value }).catch((error) => {
+      console.error('[Settings] Failed to update removed saved posts notification setting:', error);
+      setNotifyRemovedSavedPostsState(previous);
+    });
   };
 
   const setNotifyArchivedMessages = (value: boolean) => {
+    const previous = notifyArchivedMessages;
     setNotifyArchivedMessagesState(value);
+    if (!hasAuthToken()) return;
+    void userSettingsService.update({ notify_archived_messages: value }).catch((error) => {
+      console.error('[Settings] Failed to update archived messages notification setting:', error);
+      setNotifyArchivedMessagesState(previous);
+    });
   };
 
   const setDefaultOmniPostsOnly = (value: boolean) => {
+    const previous = defaultOmniPostsOnly;
     setDefaultOmniPostsOnlyState(value);
+    if (!hasAuthToken()) return;
+    void userSettingsService.update({ default_omni_posts_only: value }).catch((error) => {
+      console.error('[Settings] Failed to update omni-only default setting:', error);
+      setDefaultOmniPostsOnlyState(previous);
+    });
   };
 
   const setStayOnPostAfterHide = (value: boolean) => {
+    const previous = stayOnPostAfterHide;
     setStayOnPostAfterHideState(value);
+    if (!hasAuthToken()) return;
+    void userSettingsService.update({ stay_on_post_after_hide: value }).catch((error) => {
+      console.error('[Settings] Failed to update stay-on-post-after-hide setting:', error);
+      setStayOnPostAfterHideState(previous);
+    });
   };
 
   const setUseInfiniteScroll = (value: boolean) => {
+    const previous = useInfiniteScroll;
     setUseInfiniteScrollState(value);
+    if (!hasAuthToken()) return;
+    void userSettingsService.update({ use_infinite_scroll: value }).catch((error) => {
+      console.error('[Settings] Failed to update infinite scroll setting:', error);
+      setUseInfiniteScrollState(previous);
+    });
   };
   const setSearchIncludeNsfwByDefault = (value: boolean) => {
+    const previous = searchIncludeNsfwByDefault;
     setSearchIncludeNsfwByDefaultState(value);
+    if (!hasAuthToken()) return;
+    void userSettingsService.update({ search_include_nsfw_by_default: value }).catch((error) => {
+      console.error('[Settings] Failed to update search NSFW setting:', error);
+      setSearchIncludeNsfwByDefaultState(previous);
+    });
   };
   const setBlockAllNsfw = (value: boolean) => {
+    const previous = blockAllNsfw;
     setBlockAllNsfwState(value);
+    if (!hasAuthToken()) return;
+    void userSettingsService.update({ block_all_nsfw: value }).catch((error) => {
+      console.error('[Settings] Failed to update block-all-NSFW setting:', error);
+      setBlockAllNsfwState(previous);
+    });
   };
   const setBlockNsfwThumbnails = (value: boolean) => {
+    const previous = blockNsfwThumbnails;
     setBlockNsfwThumbnailsState(value);
+    if (!hasAuthToken()) return;
+    void userSettingsService.update({ block_nsfw_thumbnails: value }).catch((error) => {
+      console.error('[Settings] Failed to update block-NSFW-thumbnails setting:', error);
+      setBlockNsfwThumbnailsState(previous);
+    });
   };
   const setAccessRequestCooldownDisplay = (value: 'days' | 'date' | 'both') => {
+    const previous = accessRequestCooldownDisplay;
     setAccessRequestCooldownDisplayState(value);
+    if (!hasAuthToken()) return;
+    void userSettingsService.update({ access_request_cooldown_display: value }).catch((error) => {
+      console.error('[Settings] Failed to update cooldown display setting:', error);
+      setAccessRequestCooldownDisplayState(previous);
+    });
+  };
+
+  const setFontSize = (value: 'small' | 'medium' | 'large') => {
+    const previous = fontSize;
+    setFontSizeState(value);
+    if (!hasAuthToken()) return;
+    void userSettingsService.update({ font_size: value }).catch((error) => {
+      console.error('[Settings] Failed to update font size setting:', error);
+      setFontSizeState(previous);
+    });
+  };
+
+  const setTranscriptionOptIn = (value: boolean) => {
+    const previous = transcriptionOptIn;
+    setTranscriptionOptInState(value);
+    if (!hasAuthToken()) return;
+    void userSettingsService.update({ transcription_opt_in: value }).catch((error) => {
+      console.error('[Settings] Failed to update transcription opt-in:', error);
+      setTranscriptionOptInState(previous);
+    });
+  };
+
+  const setMicDeviceId = (value: string) => {
+    const trimmed = value.trim();
+    const previous = micDeviceId;
+    setMicDeviceIdState(trimmed);
+    if (!hasAuthToken()) return;
+    void userSettingsService.update({ mic_device_id: trimmed }).catch((error) => {
+      console.error('[Settings] Failed to update mic device setting:', error);
+      setMicDeviceIdState(previous);
+    });
+  };
+
+  const setCameraDeviceId = (value: string) => {
+    const trimmed = value.trim();
+    const previous = cameraDeviceId;
+    setCameraDeviceIdState(trimmed);
+    if (!hasAuthToken()) return;
+    void userSettingsService.update({ camera_device_id: trimmed }).catch((error) => {
+      console.error('[Settings] Failed to update camera device setting:', error);
+      setCameraDeviceIdState(previous);
+    });
+  };
+
+  const setSpeakerDeviceId = (value: string) => {
+    const trimmed = value.trim();
+    const previous = speakerDeviceId;
+    setSpeakerDeviceIdState(trimmed);
+    if (!hasAuthToken()) return;
+    void userSettingsService.update({ speaker_device_id: trimmed }).catch((error) => {
+      console.error('[Settings] Failed to update speaker device setting:', error);
+      setSpeakerDeviceIdState(previous);
+    });
+  };
+
+  const setQuietHoursEnabled = (value: boolean) => {
+    const previous = quietHoursEnabled;
+    setQuietHoursEnabledState(value);
+    if (!hasAuthToken()) return;
+    void userSettingsService.update({ quiet_hours_enabled: value }).catch((error) => {
+      console.error('[Settings] Failed to update quiet hours enabled:', error);
+      setQuietHoursEnabledState(previous);
+    });
+  };
+
+  const setQuietHoursStartMinutes = (value: number) => {
+    const clamped = Math.max(0, Math.min(1439, value));
+    const previous = quietHoursStartMinutes;
+    setQuietHoursStartMinutesState(clamped);
+    if (!hasAuthToken()) return;
+    void userSettingsService.update({ quiet_hours_start_minutes: clamped }).catch((error) => {
+      console.error('[Settings] Failed to update quiet hours start:', error);
+      setQuietHoursStartMinutesState(previous);
+    });
+  };
+
+  const setQuietHoursEndMinutes = (value: number) => {
+    const clamped = Math.max(0, Math.min(1439, value));
+    const previous = quietHoursEndMinutes;
+    setQuietHoursEndMinutesState(clamped);
+    if (!hasAuthToken()) return;
+    void userSettingsService.update({ quiet_hours_end_minutes: clamped }).catch((error) => {
+      console.error('[Settings] Failed to update quiet hours end:', error);
+      setQuietHoursEndMinutesState(previous);
+    });
+  };
+
+  const setQuietHoursTimezone = (value: string) => {
+    const trimmed = value.trim();
+    const previous = quietHoursTimezone;
+    setQuietHoursTimezoneState(trimmed);
+    if (!hasAuthToken()) return;
+    void userSettingsService.update({ quiet_hours_timezone: trimmed }).catch((error) => {
+      console.error('[Settings] Failed to update quiet hours timezone:', error);
+      setQuietHoursTimezoneState(previous);
+    });
   };
 
   const setReadReceipts = (value: boolean) => {
     const previous = readReceipts;
     setReadReceiptsState(value);
     if (!hasAuthToken()) return;
-    void userSettingsService
-      .update({ show_read_receipts: value })
-      .catch((error) => {
-        console.error('[Settings] Failed to update read receipts setting:', error);
-        setReadReceiptsState(previous);
-      });
+    void userSettingsService.update({ show_read_receipts: value }).catch((error) => {
+      console.error('[Settings] Failed to update read receipts setting:', error);
+      setReadReceiptsState(previous);
+    });
   };
 
   const setTypingIndicators = (value: boolean) => {
     const previous = typingIndicators;
     setTypingIndicatorsState(value);
     if (!hasAuthToken()) return;
-    void userSettingsService
-      .update({ show_typing_indicators: value })
-      .catch((error) => {
-        console.error('[Settings] Failed to update typing indicators setting:', error);
-        setTypingIndicatorsState(previous);
-      });
+    void userSettingsService.update({ show_typing_indicators: value }).catch((error) => {
+      console.error('[Settings] Failed to update typing indicators setting:', error);
+      setTypingIndicatorsState(previous);
+    });
   };
 
   const setShowLastSeen = (value: boolean) => {
     const previous = showLastSeen;
     setShowLastSeenState(value);
     if (!hasAuthToken()) return;
-    void userSettingsService
-      .update({ show_last_seen: value })
-      .catch((error) => {
-        console.error('[Settings] Failed to update last seen setting:', error);
-        setShowLastSeenState(previous);
-      });
+    void userSettingsService.update({ show_last_seen: value }).catch((error) => {
+      console.error('[Settings] Failed to update last seen setting:', error);
+      setShowLastSeenState(previous);
+    });
   };
 
   const setNotificationSound = (value: boolean) => {
     const previous = notificationSound;
     setNotificationSoundState(value);
     if (!hasAuthToken()) return;
-    void userSettingsService
-      .update({ notification_sound: value })
-      .catch((error) => {
-        console.error('[Settings] Failed to update notification sound setting:', error);
-        setNotificationSoundState(previous);
-      });
+    void userSettingsService.update({ notification_sound: value }).catch((error) => {
+      console.error('[Settings] Failed to update notification sound setting:', error);
+      setNotificationSoundState(previous);
+    });
   };
 
   return (
@@ -388,6 +691,24 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         setBlockNsfwThumbnails,
         accessRequestCooldownDisplay,
         setAccessRequestCooldownDisplay,
+        fontSize,
+        setFontSize,
+        transcriptionOptIn,
+        setTranscriptionOptIn,
+        micDeviceId,
+        setMicDeviceId,
+        cameraDeviceId,
+        setCameraDeviceId,
+        speakerDeviceId,
+        setSpeakerDeviceId,
+        quietHoursEnabled,
+        setQuietHoursEnabled,
+        quietHoursStartMinutes,
+        setQuietHoursStartMinutes,
+        quietHoursEndMinutes,
+        setQuietHoursEndMinutes,
+        quietHoursTimezone,
+        setQuietHoursTimezone,
         readReceipts,
         setReadReceipts,
         typingIndicators,

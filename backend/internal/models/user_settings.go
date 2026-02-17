@@ -12,14 +12,37 @@ import (
 
 // UserSettings represents per-user preferences for the platform.
 type UserSettings struct {
-	UserID                int    `json:"user_id"`
-	NotificationSound     bool   `json:"notification_sound"`
-	ShowReadReceipts      bool   `json:"show_read_receipts"`
-	ShowTypingIndicators  bool   `json:"show_typing_indicators"`
-	ShowLastSeen          bool   `json:"show_last_seen"`
-	ShowPushNotifications bool   `json:"show_push_notifications"` // P0-042: Push notification preference
-	AutoAppendInvitation  bool   `json:"auto_append_invitation"`
-	Theme                 string `json:"theme"`
+	UserID                       int    `json:"user_id"`
+	NotificationSound            bool   `json:"notification_sound"`
+	ShowReadReceipts             bool   `json:"show_read_receipts"`
+	ShowTypingIndicators         bool   `json:"show_typing_indicators"`
+	ShowLastSeen                 bool   `json:"show_last_seen"`
+	ShowPushNotifications        bool   `json:"show_push_notifications"` // P0-042: Push notification preference
+	AutoAppendInvitation         bool   `json:"auto_append_invitation"`
+	Theme                        string `json:"theme"`
+	UseRelativeTime              bool   `json:"use_relative_time"`
+	AutoCloseThemeSelector       bool   `json:"auto_close_theme_selector"`
+	NotifyArchivedMessages       bool   `json:"notify_archived_messages"`
+	NotifyRemovedSavedPosts      bool   `json:"notify_removed_saved_posts"`
+	DefaultOmniPostsOnly         bool   `json:"default_omni_posts_only"`
+	StayOnPostAfterHide          bool   `json:"stay_on_post_after_hide"`
+	UseInfiniteScrollHome        bool   `json:"use_infinite_scroll_home"`
+	UseInfiniteScrollHubs        bool   `json:"use_infinite_scroll_hubs"`
+	UseInfiniteScrollSubs        bool   `json:"use_infinite_scroll_subs"`
+	UseInfiniteScroll            bool   `json:"use_infinite_scroll"`
+	SearchIncludeNsfwByDefault   bool   `json:"search_include_nsfw_by_default"`
+	BlockAllNsfw                 bool   `json:"block_all_nsfw"`
+	BlockNsfwThumbnails          bool   `json:"block_nsfw_thumbnails"`
+	AccessRequestCooldownDisplay string `json:"access_request_cooldown_display"`
+	FontSize                     string `json:"font_size"`
+	TranscriptionOptIn           bool   `json:"transcription_opt_in"`
+	MicDeviceID                  string `json:"mic_device_id"`
+	CameraDeviceID               string `json:"camera_device_id"`
+	SpeakerDeviceID              string `json:"speaker_device_id"`
+	QuietHoursEnabled            bool   `json:"quiet_hours_enabled"`
+	QuietHoursStartMinutes       int    `json:"quiet_hours_start_minutes"`
+	QuietHoursEndMinutes         int    `json:"quiet_hours_end_minutes"`
+	QuietHoursTimezone           string `json:"quiet_hours_timezone"`
 
 	// Notification preferences
 	NotifyCommentReplies   bool `json:"notify_comment_replies"`
@@ -54,6 +77,14 @@ func (r *UserSettingsRepository) GetByUserID(ctx context.Context, userID int) (*
 	query := `
 		SELECT user_id, notification_sound, show_read_receipts, show_typing_indicators, show_last_seen,
 		       show_push_notifications, auto_append_invitation, theme,
+		       use_relative_time, auto_close_theme_selector,
+		       notify_archived_messages, notify_removed_saved_posts,
+		       default_omni_posts_only, stay_on_post_after_hide,
+		       use_infinite_scroll_home, use_infinite_scroll_hubs, use_infinite_scroll_subs, use_infinite_scroll,
+		       search_include_nsfw_by_default, block_all_nsfw, block_nsfw_thumbnails,
+		       access_request_cooldown_display, font_size, transcription_opt_in,
+		       mic_device_id, camera_device_id, speaker_device_id,
+		       quiet_hours_enabled, quiet_hours_start_minutes, quiet_hours_end_minutes, quiet_hours_timezone,
 		       notify_comment_replies, notify_post_milestone, notify_post_velocity,
 		       notify_comment_milestone, notify_comment_velocity, daily_digest,
 		       media_gallery_filter, active_theme_id, advanced_mode_enabled, updated_at
@@ -71,6 +102,29 @@ func (r *UserSettingsRepository) GetByUserID(ctx context.Context, userID int) (*
 		&settings.ShowPushNotifications,
 		&settings.AutoAppendInvitation,
 		&settings.Theme,
+		&settings.UseRelativeTime,
+		&settings.AutoCloseThemeSelector,
+		&settings.NotifyArchivedMessages,
+		&settings.NotifyRemovedSavedPosts,
+		&settings.DefaultOmniPostsOnly,
+		&settings.StayOnPostAfterHide,
+		&settings.UseInfiniteScrollHome,
+		&settings.UseInfiniteScrollHubs,
+		&settings.UseInfiniteScrollSubs,
+		&settings.UseInfiniteScroll,
+		&settings.SearchIncludeNsfwByDefault,
+		&settings.BlockAllNsfw,
+		&settings.BlockNsfwThumbnails,
+		&settings.AccessRequestCooldownDisplay,
+		&settings.FontSize,
+		&settings.TranscriptionOptIn,
+		&settings.MicDeviceID,
+		&settings.CameraDeviceID,
+		&settings.SpeakerDeviceID,
+		&settings.QuietHoursEnabled,
+		&settings.QuietHoursStartMinutes,
+		&settings.QuietHoursEndMinutes,
+		&settings.QuietHoursTimezone,
 		&settings.NotifyCommentReplies,
 		&settings.NotifyPostMilestone,
 		&settings.NotifyPostVelocity,
@@ -100,6 +154,14 @@ func (r *UserSettingsRepository) CreateDefault(ctx context.Context, userID int) 
 		ON CONFLICT (user_id) DO NOTHING
 		RETURNING user_id, notification_sound, show_read_receipts, show_typing_indicators, show_last_seen,
 		          show_push_notifications, auto_append_invitation, theme,
+		          use_relative_time, auto_close_theme_selector,
+		          notify_archived_messages, notify_removed_saved_posts,
+		          default_omni_posts_only, stay_on_post_after_hide,
+		          use_infinite_scroll_home, use_infinite_scroll_hubs, use_infinite_scroll_subs, use_infinite_scroll,
+		          search_include_nsfw_by_default, block_all_nsfw, block_nsfw_thumbnails,
+		          access_request_cooldown_display, font_size, transcription_opt_in,
+		          mic_device_id, camera_device_id, speaker_device_id,
+		          quiet_hours_enabled, quiet_hours_start_minutes, quiet_hours_end_minutes, quiet_hours_timezone,
 		          notify_comment_replies, notify_post_milestone, notify_post_velocity,
 		          notify_comment_milestone, notify_comment_velocity, daily_digest,
 		          media_gallery_filter, active_theme_id, advanced_mode_enabled, updated_at
@@ -115,6 +177,29 @@ func (r *UserSettingsRepository) CreateDefault(ctx context.Context, userID int) 
 		&settings.ShowPushNotifications,
 		&settings.AutoAppendInvitation,
 		&settings.Theme,
+		&settings.UseRelativeTime,
+		&settings.AutoCloseThemeSelector,
+		&settings.NotifyArchivedMessages,
+		&settings.NotifyRemovedSavedPosts,
+		&settings.DefaultOmniPostsOnly,
+		&settings.StayOnPostAfterHide,
+		&settings.UseInfiniteScrollHome,
+		&settings.UseInfiniteScrollHubs,
+		&settings.UseInfiniteScrollSubs,
+		&settings.UseInfiniteScroll,
+		&settings.SearchIncludeNsfwByDefault,
+		&settings.BlockAllNsfw,
+		&settings.BlockNsfwThumbnails,
+		&settings.AccessRequestCooldownDisplay,
+		&settings.FontSize,
+		&settings.TranscriptionOptIn,
+		&settings.MicDeviceID,
+		&settings.CameraDeviceID,
+		&settings.SpeakerDeviceID,
+		&settings.QuietHoursEnabled,
+		&settings.QuietHoursStartMinutes,
+		&settings.QuietHoursEndMinutes,
+		&settings.QuietHoursTimezone,
 		&settings.NotifyCommentReplies,
 		&settings.NotifyPostMilestone,
 		&settings.NotifyPostVelocity,
@@ -149,19 +234,50 @@ func (r *UserSettingsRepository) Update(ctx context.Context, settings *UserSetti
 		    show_push_notifications = $6,
 		    auto_append_invitation = $7,
 		    theme = $8,
-		    notify_comment_replies = $9,
-		    notify_post_milestone = $10,
-		    notify_post_velocity = $11,
-		    notify_comment_milestone = $12,
-		    notify_comment_velocity = $13,
-		    daily_digest = $14,
-		    media_gallery_filter = $15,
-		    active_theme_id = $16,
-		    advanced_mode_enabled = $17,
+		    use_relative_time = $9,
+		    auto_close_theme_selector = $10,
+		    notify_archived_messages = $11,
+		    notify_removed_saved_posts = $12,
+		    default_omni_posts_only = $13,
+		    stay_on_post_after_hide = $14,
+		    use_infinite_scroll_home = $15,
+		    use_infinite_scroll_hubs = $16,
+		    use_infinite_scroll_subs = $17,
+		    use_infinite_scroll = $18,
+		    search_include_nsfw_by_default = $19,
+		    block_all_nsfw = $20,
+		    block_nsfw_thumbnails = $21,
+		    access_request_cooldown_display = $22,
+		    font_size = $23,
+		    transcription_opt_in = $24,
+		    mic_device_id = $25,
+		    camera_device_id = $26,
+		    speaker_device_id = $27,
+		    quiet_hours_enabled = $28,
+		    quiet_hours_start_minutes = $29,
+		    quiet_hours_end_minutes = $30,
+		    quiet_hours_timezone = $31,
+		    notify_comment_replies = $32,
+		    notify_post_milestone = $33,
+		    notify_post_velocity = $34,
+		    notify_comment_milestone = $35,
+		    notify_comment_velocity = $36,
+		    daily_digest = $37,
+		    media_gallery_filter = $38,
+		    active_theme_id = $39,
+		    advanced_mode_enabled = $40,
 		    updated_at = CURRENT_TIMESTAMP
 		WHERE user_id = $1
 		RETURNING user_id, notification_sound, show_read_receipts, show_typing_indicators, show_last_seen,
 		          show_push_notifications, auto_append_invitation, theme,
+		          use_relative_time, auto_close_theme_selector,
+		          notify_archived_messages, notify_removed_saved_posts,
+		          default_omni_posts_only, stay_on_post_after_hide,
+		          use_infinite_scroll_home, use_infinite_scroll_hubs, use_infinite_scroll_subs, use_infinite_scroll,
+		          search_include_nsfw_by_default, block_all_nsfw, block_nsfw_thumbnails,
+		          access_request_cooldown_display, font_size, transcription_opt_in,
+		          mic_device_id, camera_device_id, speaker_device_id,
+		          quiet_hours_enabled, quiet_hours_start_minutes, quiet_hours_end_minutes, quiet_hours_timezone,
 		          notify_comment_replies, notify_post_milestone, notify_post_velocity,
 		          notify_comment_milestone, notify_comment_velocity, daily_digest,
 		          media_gallery_filter, active_theme_id, advanced_mode_enabled, updated_at
@@ -177,6 +293,29 @@ func (r *UserSettingsRepository) Update(ctx context.Context, settings *UserSetti
 		settings.ShowPushNotifications,
 		settings.AutoAppendInvitation,
 		settings.Theme,
+		settings.UseRelativeTime,
+		settings.AutoCloseThemeSelector,
+		settings.NotifyArchivedMessages,
+		settings.NotifyRemovedSavedPosts,
+		settings.DefaultOmniPostsOnly,
+		settings.StayOnPostAfterHide,
+		settings.UseInfiniteScrollHome,
+		settings.UseInfiniteScrollHubs,
+		settings.UseInfiniteScrollSubs,
+		settings.UseInfiniteScroll,
+		settings.SearchIncludeNsfwByDefault,
+		settings.BlockAllNsfw,
+		settings.BlockNsfwThumbnails,
+		settings.AccessRequestCooldownDisplay,
+		settings.FontSize,
+		settings.TranscriptionOptIn,
+		settings.MicDeviceID,
+		settings.CameraDeviceID,
+		settings.SpeakerDeviceID,
+		settings.QuietHoursEnabled,
+		settings.QuietHoursStartMinutes,
+		settings.QuietHoursEndMinutes,
+		settings.QuietHoursTimezone,
 		settings.NotifyCommentReplies,
 		settings.NotifyPostMilestone,
 		settings.NotifyPostVelocity,
@@ -195,6 +334,29 @@ func (r *UserSettingsRepository) Update(ctx context.Context, settings *UserSetti
 		&updated.ShowPushNotifications,
 		&updated.AutoAppendInvitation,
 		&updated.Theme,
+		&updated.UseRelativeTime,
+		&updated.AutoCloseThemeSelector,
+		&updated.NotifyArchivedMessages,
+		&updated.NotifyRemovedSavedPosts,
+		&updated.DefaultOmniPostsOnly,
+		&updated.StayOnPostAfterHide,
+		&updated.UseInfiniteScrollHome,
+		&updated.UseInfiniteScrollHubs,
+		&updated.UseInfiniteScrollSubs,
+		&updated.UseInfiniteScroll,
+		&updated.SearchIncludeNsfwByDefault,
+		&updated.BlockAllNsfw,
+		&updated.BlockNsfwThumbnails,
+		&updated.AccessRequestCooldownDisplay,
+		&updated.FontSize,
+		&updated.TranscriptionOptIn,
+		&updated.MicDeviceID,
+		&updated.CameraDeviceID,
+		&updated.SpeakerDeviceID,
+		&updated.QuietHoursEnabled,
+		&updated.QuietHoursStartMinutes,
+		&updated.QuietHoursEndMinutes,
+		&updated.QuietHoursTimezone,
 		&updated.NotifyCommentReplies,
 		&updated.NotifyPostMilestone,
 		&updated.NotifyPostVelocity,

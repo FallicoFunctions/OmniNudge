@@ -316,8 +316,12 @@ describe('Theme flows E2E', () => {
     await user.click(await screen.findByRole('button', { name: /Midnight Pulse/i }));
     await expectActiveThemeName('Midnight Pulse');
 
-    await user.click(screen.getByRole('button', { name: /Active Theme/i }));
-    await user.click(await screen.findByRole('button', { name: /Aurora Glow/i }));
+    let auroraOption = screen.queryByRole('button', { name: /Aurora Glow/i });
+    if (!auroraOption) {
+      await user.click(screen.getByRole('button', { name: /Active Theme/i }));
+      auroraOption = await screen.findByRole('button', { name: /Aurora Glow/i });
+    }
+    await user.click(auroraOption);
     await expectActiveThemeName('Aurora Glow');
 
     expect(mockThemeService.setActiveTheme).toHaveBeenCalledWith(1);

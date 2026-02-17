@@ -1370,6 +1370,8 @@
       "deleteMessageFailed": "No se pudo eliminar el mensaje",
       "archiveFailed": "No se pudo archivar la conversación",
       "unarchiveFailed": "No se pudo desarchivar la conversación",
+      "muteFailed": "No se pudo silenciar la conversación",
+      "unmuteFailed": "No se pudo reactivar las notificaciones de la conversación",
       "deleteConversationFailed": "No se pudo eliminar la conversación",
       "recipientKeyNotFound": "No se encontró la clave pública del destinatario",
       "encryptionKeysMissing": "Tus claves de cifrado no están configuradas",
@@ -1391,6 +1393,9 @@
     },
     "archive": "Archivar",
     "unarchive": "Desarchivar",
+    "mute": "Silenciar notificaciones",
+    "unmute": "Activar notificaciones",
+    "muted": "Silenciada",
     "noConversations": "Aún no hay conversaciones. ¡Inicia un chat nuevo!",
     "loadMore": "Cargar más conversaciones",
     "modMail": "Correo de moderación",
@@ -1718,6 +1723,41 @@
       "notifications": "Notificaciones",
       "preferences": "Preferencias",
       "accountPrivacy": "Cuenta y Privacidad"
+    },
+    "tabs": {
+      "general": "General",
+      "notifications": "Notificaciones",
+      "privacy": "Privacidad",
+      "appearance": "Apariencia",
+      "audioVideo": "Audio y Video"
+    },
+    "appearancePreferences": {
+      "fontSizeTitle": "Tamaño de Fuente",
+      "fontSizeHelp": "Ajusta el tamaño general del texto en toda la interfaz.",
+      "fontSizeLabel": "Tamaño base de fuente",
+      "fontSizeSmall": "Pequeño",
+      "fontSizeMedium": "Mediano",
+      "fontSizeLarge": "Grande"
+    },
+    "quietHours": {
+      "title": "Horas de Silencio",
+      "description": "Pausa las notificaciones push de mensajes durante las horas seleccionadas.",
+      "toggle": "Activar horas de silencio",
+      "timezone": "Zona horaria: {{tz}}",
+      "start": "Hora de inicio",
+      "end": "Hora de fin"
+    },
+    "audioVideo": {
+      "devicesTitle": "Dispositivos",
+      "devicesDescription": "Elige los dispositivos de entrada y salida preferidos para mensajes y llamadas.",
+      "microphone": "Micrófono",
+      "camera": "Cámara",
+      "speaker": "Altavoz",
+      "defaultDevice": "Predeterminado del sistema",
+      "transcriptionTitle": "Privacidad de Audio y Video",
+      "transcriptionDescription": "Controla cómo funciona el procesamiento de mensajes de voz en tu cuenta.",
+      "transcriptionToggle": "Permitir transcripción de audio",
+      "transcriptionHelp": "Cuando está activado, los clips de voz pueden transcribirse para mejorar la búsqueda y la accesibilidad."
     },
     "themeSection": {
       "title": "Tema",

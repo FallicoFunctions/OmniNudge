@@ -84,7 +84,9 @@ export const messagesService = {
 
     // For multi-recipient messages (mod mail), the caller provides encryption payloads.
     // Only fetch the conversation for traditional 1:1 messages to find the recipient.
-    const conversation = data.is_multi_recipient ? undefined : await this.getConversation(conversationId);
+    const conversation = data.is_multi_recipient
+      ? undefined
+      : await this.getConversation(conversationId);
     const recipientId = conversation?.other_user?.id;
 
     const skipClientEncryption = Boolean(data.encrypted_content);
@@ -106,12 +108,15 @@ export const messagesService = {
 
           if (recipientPublicKeyBase64) {
             // Import recipient's public key
-            const recipientPublicKey = await getUserPublicKey(recipientId, recipientPublicKeyBase64);
+            const recipientPublicKey = await getUserPublicKey(
+              recipientId,
+              recipientPublicKeyBase64
+            );
 
             if (recipientPublicKey) {
               // Encrypt the message
               encryptedContent = await encryptMessage(data.content, recipientPublicKey);
-              encryptionVersion = 'v1';
+              encryptionVersion = 'v2';
             } else {
               // Fallback to plaintext if key import fails
               console.warn('Failed to import recipient public key, sending plaintext');
@@ -170,11 +175,9 @@ export const messagesService = {
     await api.post(`/conversations/${conversationId}/read`, {});
   },
 
-  async deleteMessage(
-    messageId: number,
-    options?: { deleteFor?: 'self' | 'both' }
-  ): Promise<void> {
-    const scope = options?.deleteFor && options.deleteFor !== 'self' ? options.deleteFor : undefined;
+  async deleteMessage(messageId: number, options?: { deleteFor?: 'self' | 'both' }): Promise<void> {
+    const scope =
+      options?.deleteFor && options.deleteFor !== 'self' ? options.deleteFor : undefined;
     const query = scope ? `?delete_for=${scope}` : '';
     await api.delete(`/messages/${messageId}${query}`);
   },
@@ -185,6 +188,14 @@ export const messagesService = {
 
   async unarchiveConversation(conversationId: number): Promise<void> {
     await api.put(`/conversations/${conversationId}/unarchive`, {});
+  },
+
+  async muteConversation(conversationId: number): Promise<void> {
+    await api.put(`/conversations/${conversationId}/mute`, {});
+  },
+
+  async unmuteConversation(conversationId: number): Promise<void> {
+    await api.put(`/conversations/${conversationId}/unmute`, {});
   },
 
   async deleteConversation(

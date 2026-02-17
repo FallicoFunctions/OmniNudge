@@ -24,6 +24,7 @@ type Conversation struct {
 	Status           *string    `json:"status,omitempty"`  // For mod_mail: 'open', 'archived', 'resolved'
 	ArchivedAt       *time.Time `json:"archived_at"`       // When conversation was archived (explicit null when active)
 	ArchivedBy       *int       `json:"archived_by"`       // User who archived it (explicit null when active)
+	Muted            bool       `json:"muted"`             // Whether this conversation is muted for current user
 
 	// Phase 2 features (not implemented yet)
 	User1AutoDeleteAfter *string `json:"user1_auto_delete_after,omitempty"`
@@ -153,11 +154,14 @@ func (r *ConversationRepository) GetByUsers(ctx context.Context, user1ID, user2I
 // includeArchived: if true, includes archived conversations
 func (r *ConversationRepository) GetByUserID(ctx context.Context, userID int, limit, offset int, includeArchived bool) ([]*Conversation, error) {
 	query := `
-		SELECT id, user1_id, user2_id, created_at, last_message_at,
+		SELECT conversations.id, conversations.user1_id, conversations.user2_id, conversations.created_at, conversations.last_message_at,
 		       user1_auto_delete_after, user2_auto_delete_after,
 		       user1_pseudonym, user2_pseudonym,
-		       conversation_type, hub_id, subject, status, archived_at, archived_by
+		       conversation_type, hub_id, subject, status, archived_at, archived_by,
+		       COALESCE(cns.muted, false) AS muted
 		FROM conversations
+		LEFT JOIN conversation_notification_settings cns
+		       ON cns.conversation_id = conversations.id AND cns.user_id = $1
 		WHERE (
 			-- DM conversations (including legacy conversations with NULL conversation_type)
 			(
@@ -217,6 +221,7 @@ func (r *ConversationRepository) GetByUserID(ctx context.Context, userID int, li
 			&conversation.Status,
 			&conversation.ArchivedAt,
 			&conversation.ArchivedBy,
+			&conversation.Muted,
 		)
 		if err != nil {
 			return nil, err
@@ -236,11 +241,14 @@ func (r *ConversationRepository) GetByUserIDWithCursor(
 	cursor *TimeCursor,
 ) ([]*Conversation, error) {
 	query := `
-		SELECT id, user1_id, user2_id, created_at, last_message_at,
+		SELECT conversations.id, conversations.user1_id, conversations.user2_id, conversations.created_at, conversations.last_message_at,
 		       user1_auto_delete_after, user2_auto_delete_after,
 		       user1_pseudonym, user2_pseudonym,
-		       conversation_type, hub_id, subject, status, archived_at, archived_by
+		       conversation_type, hub_id, subject, status, archived_at, archived_by,
+		       COALESCE(cns.muted, false) AS muted
 		FROM conversations
+		LEFT JOIN conversation_notification_settings cns
+		       ON cns.conversation_id = conversations.id AND cns.user_id = $1
 		WHERE (
 			(
 				(conversation_type = 'dm' OR conversation_type IS NULL) AND
@@ -305,6 +313,7 @@ func (r *ConversationRepository) GetByUserIDWithCursor(
 			&conversation.Status,
 			&conversation.ArchivedAt,
 			&conversation.ArchivedBy,
+			&conversation.Muted,
 		)
 		if err != nil {
 			return nil, err
@@ -504,5 +513,17 @@ func (r *ConversationRepository) HardDeleteIfBothDeleted(ctx context.Context, co
 		  AND deleted_for_user2 = TRUE
 	`
 	_, err := r.pool.Exec(ctx, query, conversationID)
+	return err
+}
+
+// SetMuted toggles per-conversation mute for a specific user.
+func (r *ConversationRepository) SetMuted(ctx context.Context, conversationID int, userID int, muted bool) error {
+	query := `
+		INSERT INTO conversation_notification_settings (conversation_id, user_id, muted, updated_at)
+		VALUES ($1, $2, $3, CURRENT_TIMESTAMP)
+		ON CONFLICT (conversation_id, user_id)
+		DO UPDATE SET muted = EXCLUDED.muted, updated_at = CURRENT_TIMESTAMP
+	`
+	_, err := r.pool.Exec(ctx, query, conversationID, userID, muted)
 	return err
 }

@@ -1370,6 +1370,8 @@
       "deleteMessageFailed": "Failed to delete message",
       "archiveFailed": "Failed to archive conversation",
       "unarchiveFailed": "Failed to unarchive conversation",
+      "muteFailed": "Failed to mute conversation",
+      "unmuteFailed": "Failed to unmute conversation",
       "deleteConversationFailed": "Failed to delete conversation",
       "recipientKeyNotFound": "Recipient public key not found",
       "encryptionKeysMissing": "Your encryption keys are not set up",
@@ -1391,6 +1393,9 @@
     },
     "archive": "Archive",
     "unarchive": "Unarchive",
+    "mute": "Mute notifications",
+    "unmute": "Unmute notifications",
+    "muted": "Muted",
     "noConversations": "No conversations yet. Start a new chat!",
     "loadMore": "Load more conversations",
     "modMail": "Mod Mail",
@@ -1718,6 +1723,41 @@
       "notifications": "Notifications",
       "preferences": "Preferences",
       "accountPrivacy": "Account & Privacy"
+    },
+    "tabs": {
+      "general": "General",
+      "notifications": "Notifications",
+      "privacy": "Privacy",
+      "appearance": "Appearance",
+      "audioVideo": "Audio & Video"
+    },
+    "appearancePreferences": {
+      "fontSizeTitle": "Font Size",
+      "fontSizeHelp": "Adjust the overall text size used across the app interface.",
+      "fontSizeLabel": "Base font size",
+      "fontSizeSmall": "Small",
+      "fontSizeMedium": "Medium",
+      "fontSizeLarge": "Large"
+    },
+    "quietHours": {
+      "title": "Quiet Hours",
+      "description": "Pause message push notifications during selected hours.",
+      "toggle": "Enable quiet hours",
+      "timezone": "Timezone: {{tz}}",
+      "start": "Start time",
+      "end": "End time"
+    },
+    "audioVideo": {
+      "devicesTitle": "Devices",
+      "devicesDescription": "Choose preferred input and output devices for messaging and calls.",
+      "microphone": "Microphone",
+      "camera": "Camera",
+      "speaker": "Speaker",
+      "defaultDevice": "System Default",
+      "transcriptionTitle": "Audio & Video Privacy",
+      "transcriptionDescription": "Control how voice message processing works for your account.",
+      "transcriptionToggle": "Allow audio transcription",
+      "transcriptionHelp": "When enabled, voice clips can be transcribed to improve search and accessibility features."
     },
     "themeSection": {
       "title": "Theme",

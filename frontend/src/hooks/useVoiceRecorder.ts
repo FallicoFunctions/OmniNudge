@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback } from 'react';
+import { useSettings } from '../contexts/SettingsContext';
 
 /**
  * Voice recorder hook with iOS Safari fallback support
@@ -48,6 +49,16 @@ export function useVoiceRecorder(options: VoiceRecorderOptions = {}) {
   const scriptProcessorRef = useRef<ScriptProcessorNode | null>(null);
   const audioBuffersRef = useRef<Float32Array[]>([]);
   const sampleRateRef = useRef<number>(44100);
+  const { micDeviceId } = useSettings();
+
+  const getAudioConstraints = useCallback((): MediaTrackConstraints | boolean => {
+    if (!micDeviceId) {
+      return true;
+    }
+    return {
+      deviceId: { exact: micDeviceId },
+    };
+  }, [micDeviceId]);
 
   // Feature detection
   const isMediaRecorderSupported = useCallback(() => {
@@ -79,7 +90,7 @@ export function useVoiceRecorder(options: VoiceRecorderOptions = {}) {
   // Start recording with MediaRecorder (modern browsers)
   const startMediaRecorder = useCallback(async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: getAudioConstraints() });
       streamRef.current = stream;
 
       const mediaRecorder = new MediaRecorder(stream, {
@@ -133,12 +144,12 @@ export function useVoiceRecorder(options: VoiceRecorderOptions = {}) {
         onError(error);
       }
     }
-  }, [onRecordingComplete, onError, startDurationTimer]);
+  }, [getAudioConstraints, onRecordingComplete, onError, startDurationTimer]);
 
   // Start recording with Web Audio API (iOS Safari fallback)
   const startWebAudioRecorder = useCallback(async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: getAudioConstraints() });
       streamRef.current = stream;
 
       const audioContext = new AudioContext();
@@ -178,7 +189,7 @@ export function useVoiceRecorder(options: VoiceRecorderOptions = {}) {
         onError(error);
       }
     }
-  }, [state.isRecording, state.isPaused, onError, startDurationTimer]);
+  }, [getAudioConstraints, state.isRecording, state.isPaused, onError, startDurationTimer]);
 
   // Start recording (auto-detects best method)
   const startRecording = useCallback(async () => {
