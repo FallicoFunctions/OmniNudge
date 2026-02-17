@@ -321,12 +321,14 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!user?.id) return;
 
-    const token = localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token');
-    if (!token) return;
-
     isCleanupRef.current = false;
 
     const connect = () => {
+      const token = localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token');
+      if (!token) {
+        console.warn('[WebSocket] No auth token available for connection attempt');
+        return;
+      }
       console.log('[WebSocket] Connecting...');
       const url = new URL(API_BASE_URL);
       url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -355,14 +357,14 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
         console.log('[WebSocket] Disconnected');
 
         if (isCleanupRef.current) return;
-
-        if (hasOpened) {
-          // Exponential backoff: 1s, 2s, 4s, 8s, 16s, max 30s
-          reconnectAttemptsRef.current += 1;
-          const delay = Math.min(1000 * Math.pow(2, reconnectAttemptsRef.current - 1), 30000);
-          console.log(`[WebSocket] Reconnecting in ${delay / 1000} seconds... (attempt ${reconnectAttemptsRef.current})`);
-          reconnectTimerRef.current = setTimeout(connect, delay);
-        }
+        // Exponential backoff: 1s, 2s, 4s, 8s, 16s, max 30s.
+        // Reconnect even if the socket never opened, so refreshed tokens can recover long-lived sessions.
+        reconnectAttemptsRef.current += 1;
+        const delay = Math.min(1000 * Math.pow(2, reconnectAttemptsRef.current - 1), 30000);
+        console.log(
+          `[WebSocket] Reconnecting in ${delay / 1000} seconds... (attempt ${reconnectAttemptsRef.current}, opened=${hasOpened})`
+        );
+        reconnectTimerRef.current = setTimeout(connect, delay);
       };
 
       socket.onerror = (error) => {

@@ -46,6 +46,12 @@ func (h *Hub) Run() {
 		select {
 		case client := <-h.register:
 			h.mu.Lock()
+			if existing, ok := h.clients[client.UserID]; ok {
+				// "Last connection wins": close previous connection for this user.
+				close(existing.Send)
+				delete(h.clients, client.UserID)
+				log.Printf("Client replaced: user_id=%d", client.UserID)
+			}
 			h.clients[client.UserID] = client
 			h.mu.Unlock()
 			log.Printf("Client registered: user_id=%d", client.UserID)
