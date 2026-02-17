@@ -590,7 +590,15 @@ func (h *SearchHandler) SearchMessages(c *gin.Context) {
 		INNER JOIN conversations c ON c.id = m.conversation_id
 		WHERE
 		(
-			((c.conversation_type = 'dm' OR c.conversation_type IS NULL) AND (c.user1_id = $1 OR c.user2_id = $1))
+			(
+				(c.conversation_type = 'dm' OR c.conversation_type IS NULL)
+				AND (c.user1_id = $1 OR c.user2_id = $1)
+				AND NOT (
+					(c.user1_id = $1 AND c.deleted_for_user1 = TRUE)
+					OR
+					(c.user2_id = $1 AND c.deleted_for_user2 = TRUE)
+				)
+			)
 			OR
 			(c.conversation_type = 'mod_mail' AND EXISTS (
 				SELECT 1
