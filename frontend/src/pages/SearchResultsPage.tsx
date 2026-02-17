@@ -7,6 +7,7 @@ import { useAuth } from '../contexts/AuthContext';
 import {
   siteWideSearch,
   searchMessages as searchMessagesApi,
+  type MessageSearchResponse,
   type RedditUserSearchResult,
 } from '../services/searchService';
 import { useRedditBlocklist } from '../contexts/RedditBlockContext';
@@ -23,7 +24,6 @@ import { OffsetPaginationControls } from '../components/common/OffsetPaginationC
 import { useHiddenItems } from '../hooks/useHiddenItems';
 import { useSavedItems } from '../hooks/useSavedItems';
 import type { PlatformPost } from '../types/posts';
-import type { Message } from '../types/messages';
 import type { RedditApiPost, SubredditSuggestion } from '../types/reddit';
 import type { Hub } from '../services/hubsService';
 import type { UserProfile } from '../types/users';
@@ -42,6 +42,7 @@ type Tab = 'posts' | 'communities' | 'users' | 'messages';
 type PostSource = 'all' | 'omni';
 type SortOrder = 'relevance' | 'new' | 'old';
 const MESSAGE_PAGE_SIZE = 25;
+type MessageSearchItem = MessageSearchResponse['messages'][number];
 type CrosspostTarget = { post: RedditApiPost };
 type HideTarget =
   | { type: 'reddit'; post: RedditApiPost }
@@ -127,7 +128,7 @@ export default function SearchResultsPage() {
     hasMoreOmni: false,
   });
   const [messageResults, setMessageResults] = useState<{
-    messages: Message[];
+    messages: MessageSearchItem[];
     total: number;
     page: number;
     hasFiles: boolean;
@@ -516,6 +517,11 @@ export default function SearchResultsPage() {
       const previews: Record<number, string> = {};
 
       for (const message of messageResults.messages) {
+        if (message.search_snippet && message.search_snippet.trim()) {
+          previews[message.id] = message.search_snippet;
+          continue;
+        }
+
         const cipherText =
           message.sender_id === user?.id
             ? (message.sender_encrypted_content ?? message.encrypted_content)
@@ -1180,7 +1186,11 @@ export default function SearchResultsPage() {
                     <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--color-text-secondary)]">
                       <span>{t('searchPage.messages.meta.conversation', { id: message.conversation_id })}</span>
                       <span>•</span>
-                      <span>{t('searchPage.messages.meta.sender', { id: message.sender_id })}</span>
+                      <span>
+                        {message.sender_username
+                          ? `@${message.sender_username}`
+                          : t('searchPage.messages.meta.sender', { id: message.sender_id })}
+                      </span>
                       <span>•</span>
                       <span>{new Date(message.sent_at).toLocaleString()}</span>
                     </div>

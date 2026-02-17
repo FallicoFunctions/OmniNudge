@@ -48,6 +48,9 @@ Implementation details:
   - `limit` (1-100)
   - `offset` (>=0)
   - includes `total` in response
+- Response includes rendering helpers:
+  - `sender_username`
+  - `search_snippet` (best-effort snippet for matched rows)
 
 Ranking:
 - Query text match score + recency ordering (`sent_at DESC`, `id DESC`)

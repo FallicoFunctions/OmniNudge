@@ -44,7 +44,12 @@ export interface MessageSearchParams {
 }
 
 export interface MessageSearchResponse {
-  messages: Message[];
+  messages: Array<
+    Message & {
+      sender_username?: string;
+      search_snippet?: string | null;
+    }
+  >;
   limit: number;
   offset: number;
   query: string;
