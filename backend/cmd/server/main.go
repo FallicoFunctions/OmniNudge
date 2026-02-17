@@ -86,6 +86,9 @@ func main() {
 	subredditSubRepo := models.NewSubredditSubscriptionRepository(db.Pool)
 	tokenRepo := models.NewDeviceTokenRepository(db.Pool)
 
+	// Feature 1: Message Reactions repository
+	messageReactionRepo := models.NewMessageReactionRepository(db.Pool)
+
 	// Moderation Phase 1 repositories
 	hubBanRepo := models.NewHubBanRepository(db.Pool)
 	removalReasonRepo := models.NewRemovalReasonRepository(db.Pool)
@@ -192,6 +195,9 @@ func main() {
 		hub,
 	)
 	baselineCalculatorService := services.NewBaselineCalculatorService(db.Pool, baselineRepo)
+
+	// Feature 1: Message Reactions service
+	reactionService := services.NewReactionService(db.Pool, messageReactionRepo, messageRepo, notificationService, hub)
 
 	// Initialize feature flag repository
 	featureFlagRepo := repository.NewFeatureFlagRepository(db.Pool)
@@ -342,6 +348,10 @@ func main() {
 	logHandler := handlers.NewLogHandler(analyticsService)
 	dataRetentionHandler := handlers.NewDataRetentionHandler(db.Pool)
 	pushNotificationHandler := handlers.NewPushNotificationHandler(db.Pool, tokenRepo, firebaseService)
+
+	// Feature 1: Message Reactions handler + rate limiter
+	reactionsHandler := handlers.NewReactionsHandler(reactionService)
+	reactionRateLimiter := middleware.ReactionRateLimiter()
 
 	// Check ffmpeg availability for iOS audio encoding (P0-003)
 	if err := handlers.CheckFFmpegAvailability(); err != nil {
@@ -754,6 +764,11 @@ func main() {
 			protected.POST("/messages/:id/read", messagesHandler.MarkSingleMessageAsRead)
 			protected.DELETE("/messages/:id", messagesHandler.DeleteMessage)
 			protected.GET("/search/messages", searchHandler.SearchMessages)
+
+			// Feature 1: Message Reactions (rate-limited)
+			protected.GET("/messages/:id/reactions", reactionsHandler.GetReactions)
+			protected.POST("/messages/:id/reactions", reactionRateLimiter.Middleware(), reactionsHandler.AddReaction)
+			protected.DELETE("/messages/:id/reactions/:reaction_id", reactionsHandler.RemoveReaction)
 
 			// Mod mail routes
 			protected.POST("/mod-mail", modMailHandler.CreateModMail)

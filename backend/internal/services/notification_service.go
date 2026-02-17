@@ -239,6 +239,39 @@ func (s *NotificationService) NotifyCommentReply(
 	return s.sendNotification(ctx, notification)
 }
 
+// NotifyMessageReaction sends an in-app notification to the message author when
+// someone reacts to their message. The notification is always delivered in-app;
+// push delivery follows the user's ShowPushNotifications preference.
+// Safe to call from a goroutine — all errors are logged and swallowed.
+func (s *NotificationService) NotifyMessageReaction(
+	ctx context.Context,
+	message *models.Message,
+	reaction *models.MessageReaction,
+) {
+	// Never notify the author about their own reaction
+	if message.SenderID == reaction.UserID {
+		return
+	}
+
+	contentType := "message"
+	contentID := message.ID
+	actorID := reaction.UserID
+
+	notif := &models.Notification{
+		UserID:           message.SenderID,
+		NotificationType: "message_reaction",
+		ContentType:      &contentType,
+		ContentID:        &contentID,
+		ActorID:          &actorID,
+		Message:          fmt.Sprintf("%s reacted with %s to your message", reaction.Username, reaction.Emoji),
+	}
+
+	if err := s.sendNotification(ctx, notif); err != nil {
+		log.Printf("[NotificationService] NotifyMessageReaction: failed for message %d actor %d: %v",
+			message.ID, reaction.UserID, err)
+	}
+}
+
 // ProcessBatchedNotifications processes all pending notification batches
 // Called by the worker every 15 minutes
 func (s *NotificationService) ProcessBatchedNotifications(ctx context.Context) error {
