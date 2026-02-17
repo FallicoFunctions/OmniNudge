@@ -702,10 +702,20 @@ func (h *SearchHandler) SearchMessages(c *gin.Context) {
 			)
 		`
 		rankExpr = `
-			CASE
-				WHEN LOWER(COALESCE(m.sender_encrypted_content, m.encrypted_content, '')) LIKE $` + strconv.Itoa(likeArg) + ` THEN 2.0
-				ELSE 1.0
-			END
+			(
+				CASE
+					WHEN LOWER(COALESCE(m.sender_encrypted_content, m.encrypted_content, '')) LIKE $` + strconv.Itoa(likeArg) + ` THEN 3.0
+					ELSE 1.0
+				END
+			)
+			+
+			(
+				CASE
+					WHEN m.sent_at >= NOW() - INTERVAL '1 day' THEN 1.5
+					WHEN m.sent_at >= NOW() - INTERVAL '7 days' THEN 0.75
+					ELSE 0.0
+				END
+			)
 		`
 		snippetExpr = `
 			CASE
