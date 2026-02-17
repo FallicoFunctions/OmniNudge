@@ -1,7 +1,8 @@
 import type { Hub } from '../../services/hubsService';
 import { useTranslation } from 'react-i18next';
 import { useFormat } from '../../hooks/useFormat';
-import { LoadingMessage, ErrorMessage, EmptyMessage } from '../common/StatusMessage';
+import { LoadingMessage, ErrorMessage } from '../common/StatusMessage';
+import { EmptyState } from '../empty';
 import { PostBodyMarkdown } from '../posts/PostBodyMarkdown';
 
 type HubAboutPanelProps = {
@@ -94,7 +95,7 @@ export default function HubAboutPanel({
           )}
         </>
       ) : (
-        <EmptyMessage>{t('hubAboutPanel.empty')}</EmptyMessage>
+        <EmptyState illustration="noData" title={t('hubAboutPanel.empty')} className="py-6" />
       )}
     </div>
   );

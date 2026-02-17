@@ -1,4 +1,5 @@
-import { EmptyMessage, LoadingMessage } from '../common/StatusMessage';
+import { LoadingMessage } from '../common/StatusMessage';
+import { EmptyState } from '../empty';
 import { useTranslation } from 'react-i18next';
 import type { RedditSubredditModerator } from '../../types/reddit';
 
@@ -39,7 +40,7 @@ export function SubredditModeratorsPanel({
           ))}
         </ul>
       ) : (
-        <EmptyMessage className="mt-3 text-sm">{resolvedFallbackMessage}</EmptyMessage>
+        <EmptyState illustration="members" title={resolvedFallbackMessage} className="mt-3 py-6" />
       )}
     </div>
   );

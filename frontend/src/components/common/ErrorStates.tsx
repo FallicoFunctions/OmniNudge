@@ -5,6 +5,7 @@
 
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import { EmptyState as DesignEmptyState } from '../empty';
 
 // Field Error - For individual form field validation
 interface FieldErrorProps {
@@ -235,43 +236,14 @@ interface EmptyStateProps {
 
 export function EmptyState({ title, message, icon, action }: EmptyStateProps) {
   return (
-    <div className="text-center py-12 px-4">
-      {icon ? (
-        <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-[var(--color-surface-elevated)] mb-4">
-          {icon}
-        </div>
-      ) : (
-        <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-[var(--color-surface-elevated)] mb-4">
-          <svg
-            className="w-8 h-8 text-[var(--color-text-secondary)]"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-            aria-hidden="true"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"
-            />
-          </svg>
-        </div>
-      )}
-
-      <h3 className="text-lg font-semibold text-[var(--color-text-primary)] mb-2">{title}</h3>
-      <p className="text-sm text-[var(--color-text-secondary)] max-w-md mx-auto mb-4">{message}</p>
-
-      {action && (
-        <button
-          type="button"
-          onClick={action.onClick}
-          className="rounded-lg bg-[var(--color-primary)] px-6 py-2 text-white font-medium hover:bg-[var(--color-primary-dark)] transition"
-        >
-          {action.label}
-        </button>
-      )}
-    </div>
+    <DesignEmptyState
+      iconNode={icon}
+      illustration={icon ? undefined : 'noData'}
+      title={title}
+      description={message}
+      action={action}
+      className="py-6"
+    />
   );
 }
 

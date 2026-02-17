@@ -9,7 +9,8 @@ import ContentSettingsTab from '../components/hubSettings/ContentSettingsTab';
 import ModerationSettingsTab from '../components/hubSettings/ModerationSettingsTab';
 import ModeratorsTab from '../components/hubSettings/ModeratorsTab';
 import ThemeTab from '../components/hubSettings/ThemeTab';
-import { LoadingMessage, EmptyMessage } from '../components/common/StatusMessage';
+import { LoadingMessage } from '../components/common/StatusMessage';
+import { EmptyState, PermissionDenied } from '../components/empty';
 import { isAdmin } from '../utils/permissions';
 
 type TabType = 'general' | 'content' | 'moderation' | 'moderators' | 'theme';
@@ -77,7 +78,7 @@ export default function HubSettingsPage() {
   if (!settings) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <EmptyMessage>{t('hubSettingsPage.notFound')}</EmptyMessage>
+        <EmptyState illustration="noData" title={t('hubSettingsPage.notFound')} />
       </div>
     );
   }
@@ -85,14 +86,7 @@ export default function HubSettingsPage() {
   if (!canEditSettings) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center max-w-md mx-auto p-6">
-          <h2 className="text-2xl font-bold text-[var(--color-text-primary)] mb-4">
-            {t('hubSettingsPage.accessDenied.title')}
-          </h2>
-          <p className="text-[var(--color-text-secondary)]">
-            {t('hubSettingsPage.accessDenied.description')}
-          </p>
-        </div>
+        <PermissionDenied resource={t('common.format.hubPath', { name: hubName })} />
       </div>
     );
   }

@@ -970,29 +970,29 @@
 ---
 
 ### P0-030: Empty State Design System
-**Status:** ⬜ TODO
+**Status:** 🟨 IN PROGRESS (Implementation complete; pending manual UX user testing)
 **Priority:** P1
 **Estimated Time:** 1 week
 
 **Problem:** Every feature says "empty states" but no consistent design or guidance.
 
 **Tasks:**
-- [ ] Design empty state patterns: no data, no results, error, permission denied
-- [ ] Create EmptyState component (icon, title, description, action button)
-- [ ] Define copy guidelines (helpful, actionable, not negative)
-- [ ] Create illustrations for common empty states (8-10 illustrations)
-- [ ] Document when to show empty state vs skeleton
-- [ ] Add to Storybook
-- [ ] Apply to all features
+- [x] Design empty state patterns: no data, no results, error, permission denied
+- [x] Create EmptyState component (icon, title, description, action button)
+- [x] Define copy guidelines (helpful, actionable, not negative)
+- [x] Create illustrations for common empty states (8-10 illustrations)
+- [x] Document when to show empty state vs skeleton
+- [x] Add to Storybook
+- [x] Apply to all features (major page/surface sweep completed; compact inline exceptions documented)
 - [ ] User test empty states
 
 **Acceptance Criteria:**
-- EmptyState component covers all patterns
-- 8+ illustrations created (SVG, optimized)
-- Copy guidelines documented with examples
-- Storybook includes all variants
-- Consistent across all features (audit shows 100% adoption)
-- User testing shows >80% understand what to do next
+- [x] EmptyState component covers all patterns
+- [x] 8+ illustrations created (SVG, optimized)
+- [x] Copy guidelines documented with examples
+- [x] Storybook includes all variants
+- [x] Consistent across all features (audit + migration sweep; compact inline exceptions documented)
+- [ ] User testing shows >80% understand what to do next
 
 **Dependencies:** DESIGN_SYSTEM.md
 

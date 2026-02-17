@@ -6,7 +6,8 @@ import { redditService } from '../services/redditService';
 import { sanitizeHttpUrl } from '../utils/crosspostHelpers';
 import { useFormat } from '../hooks/useFormat';
 import { Panel } from '../components/common/Panel';
-import { EmptyMessage, ErrorMessage, LoadingMessage } from '../components/common/StatusMessage';
+import { ErrorMessage, LoadingMessage } from '../components/common/StatusMessage';
+import { EmptyState } from '../components/empty';
 import type {
   RedditSubredditAbout,
   RedditWikiRevisionsResponse,
@@ -585,7 +586,7 @@ export default function RedditWikiPage({ mode = 'view' }: RedditWikiPageProps = 
                 dangerouslySetInnerHTML={{ __html: processedHtml }}
               />
             ) : (
-              <EmptyMessage>{t('redditWikiPage.view.empty')}</EmptyMessage>
+              <EmptyState illustration="noData" title={t('redditWikiPage.view.empty')} />
             )}
             <div className="hidden lg:block clear-both" aria-hidden="true" />
           </div>
@@ -683,9 +684,10 @@ export default function RedditWikiPage({ mode = 'view' }: RedditWikiPageProps = 
                       </div>
                     ) : (
                       <div className="rounded border border-[var(--color-border)] bg-[var(--color-surface-secondary,#f7f9fc)] p-6 text-center">
-                        <EmptyMessage className="text-sm">
-                          {t('redditWikiPage.history.noDifferences')}
-                        </EmptyMessage>
+                        <EmptyState
+                          illustration="noResults"
+                          title={t('redditWikiPage.history.noDifferences')}
+                        />
                       </div>
                     )}
                   </div>

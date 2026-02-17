@@ -6,7 +6,8 @@ import { adminService } from '../services/adminService';
 import { bugReportService } from '../services/bugReportService';
 import type { Hub } from '../services/hubsService';
 import type { AdminUser, BanHistoryItem } from '../types/admin';
-import { EmptyMessage, LoadingMessage } from '../components/common/StatusMessage';
+import { LoadingMessage } from '../components/common/StatusMessage';
+import { EmptyState } from '../components/empty';
 import { OffsetPaginationControls } from '../components/common/OffsetPaginationControls';
 import { resolveMediaUrl } from '../utils/mediaUrl';
 import { useFormat } from '../hooks/useFormat';
@@ -119,7 +120,7 @@ function StatsTab() {
   if (!stats) {
     return (
       <div className="text-center py-12">
-        <EmptyMessage>{t('adminPage.stats.empty')}</EmptyMessage>
+        <EmptyState illustration="noData" title={t('adminPage.stats.empty')} />
       </div>
     );
   }
@@ -645,7 +646,7 @@ function UsersTab() {
 
       {data && data.users.length === 0 && (
         <div className="text-center py-12">
-          <EmptyMessage>{t('adminPage.users.empty')}</EmptyMessage>
+          <EmptyState illustration="noData" title={t('adminPage.users.empty')} />
         </div>
       )}
 
@@ -1185,9 +1186,7 @@ function UsersTab() {
             )}
             {!loadingHistory && banHistory && banHistory.length === 0 && (
               <div className="py-6 text-center">
-                <EmptyMessage className="text-sm">
-                  {t('adminPage.users.banHistory.empty')}
-                </EmptyMessage>
+                <EmptyState illustration="noData" title={t('adminPage.users.banHistory.empty')} />
               </div>
             )}
             {!loadingHistory && banHistory && banHistory.length > 0 && (
@@ -1299,7 +1298,7 @@ function BugReportsTab() {
         </div>
       ) : reports.length === 0 ? (
         <div className="text-center py-12">
-          <EmptyMessage>{t('adminPage.bugReports.empty')}</EmptyMessage>
+          <EmptyState illustration="noData" title={t('adminPage.bugReports.empty')} />
         </div>
       ) : (
         <div className="overflow-x-auto rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)]">
@@ -1642,7 +1641,7 @@ function BanActivityTab() {
 
       {data && history.length === 0 && (
         <div className="text-center py-12">
-          <EmptyMessage>{t('adminPage.banActivity.empty')}</EmptyMessage>
+          <EmptyState illustration="noData" title={t('adminPage.banActivity.empty')} />
         </div>
       )}
 

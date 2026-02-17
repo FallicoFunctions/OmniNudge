@@ -14,6 +14,7 @@ import { PaginationControls } from '../common/PaginationControls';
 import { sanitizeHttpUrl } from '../../utils/crosspostHelpers';
 import { getPostUrl, getPostCommentUrl } from '../../utils/postUrl';
 import { ErrorMessage, LoadingMessage } from '../common/StatusMessage';
+import { EmptyState } from '../empty';
 import type { PlatformPost } from '../../types/posts';
 import { postsService } from '../../services/postsService';
 import { useAuth } from '../../contexts/AuthContext';
@@ -677,9 +678,10 @@ export function SavedItemsView({
             ? t('saved.empty.sources.omni')
             : t('saved.empty.sources.reddit');
       return (
-        <p className="text-sm text-[var(--color-text-secondary)]">
-          {t('saved.empty.message', { source: sourceText, type: typeText })}
-        </p>
+        <EmptyState
+          illustration="noData"
+          title={t('saved.empty.message', { source: sourceText, type: typeText })}
+        />
       );
     }
 

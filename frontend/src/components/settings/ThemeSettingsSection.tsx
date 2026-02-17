@@ -3,7 +3,8 @@ import { useTranslation } from 'react-i18next';
 import ThemeSelector from '../themes/ThemeSelector';
 import { useTheme } from '../../hooks/useTheme';
 import { useFormat } from '../../hooks/useFormat';
-import { EmptyMessage, LoadingMessage } from '../common/StatusMessage';
+import { LoadingMessage } from '../common/StatusMessage';
+import { EmptyState } from '../empty';
 
 interface ThemeSettingsSectionProps {
   onCreateTheme: () => void;
@@ -123,9 +124,11 @@ const ThemeSettingsSection = ({ onCreateTheme, onManageThemes }: ThemeSettingsSe
               </dl>
             </>
           ) : (
-            <EmptyMessage className="mt-2 text-sm">
-              {t('settings.themeSettingsSection.activeTheme.noActive')}
-            </EmptyMessage>
+            <EmptyState
+              illustration="noData"
+              title={t('settings.themeSettingsSection.activeTheme.noActive')}
+              className="mt-2 py-6"
+            />
           )}
         </div>
 

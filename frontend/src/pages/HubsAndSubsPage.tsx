@@ -6,6 +6,7 @@ import { hubsService, type Hub } from '../services/hubsService';
 import { redditService } from '../services/redditService';
 import type { SubredditSuggestion } from '../types/reddit';
 import { EmptyMessage, ErrorMessage, LoadingMessage } from '../components/common/StatusMessage';
+import { EmptyState } from '../components/empty';
 import { OffsetPaginationControls } from '../components/common/OffsetPaginationControls';
 import { useFormat } from '../hooks/useFormat';
 
@@ -398,7 +399,7 @@ export default function HubsAndSubsPage() {
         <>
           {filteredHubs.length === 0 ? (
             <div className="text-center py-12">
-              <EmptyMessage>{t('hubsBrowse.empty')}</EmptyMessage>
+              <EmptyState illustration="noResults" title={t('hubsBrowse.empty')} />
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">

@@ -35,7 +35,8 @@ import {
 import { getOwnKeys, getUserPublicKey } from '../services/keyManagementService';
 import { encryptionService } from '../services/encryptionService';
 import { useFormat } from '../hooks/useFormat';
-import { EmptyMessage, LoadingMessage } from '../components/common/StatusMessage';
+import { LoadingMessage } from '../components/common/StatusMessage';
+import { EmptyConversations, EmptyInbox, EmptySearchResults } from '../components/empty';
 import { MediaSlideshow } from '../components/slideshow/MediaSlideshow';
 import { MediaUploadZone } from '../components/slideshow/MediaUploadZone';
 import { RedditPostSlideshow } from '../components/slideshow/RedditPostSlideshow';
@@ -1851,8 +1852,8 @@ export default function MessagesPage() {
             ))}
 
             {conversations?.length === 0 && (
-              <div className="p-4 text-center">
-                <EmptyMessage className="text-sm">{t('messages.noConversations')}</EmptyMessage>
+              <div className="p-4">
+                <EmptyConversations />
               </div>
             )}
 
@@ -2251,28 +2252,12 @@ export default function MessagesPage() {
                     {filteredMessages.length === 0 &&
                       orderedMessages.length > 0 &&
                       debouncedMessageSearch && (
-                        <div className="text-center py-8">
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            className="h-12 w-12 mx-auto text-[var(--color-text-muted)] mb-3"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                            />
-                          </svg>
-                          <p className="text-sm text-[var(--color-text-secondary)]">
-                            {t('messages.noMatches', { query: debouncedMessageSearch })}
-                          </p>
+                        <div className="py-6">
+                          <EmptySearchResults query={debouncedMessageSearch} />
                           <button
                             type="button"
                             onClick={() => setMessageSearchQuery('')}
-                            className="mt-2 text-sm text-[var(--color-primary)] hover:underline"
+                            className="mx-auto mt-3 block text-sm text-[var(--color-primary)] hover:underline"
                           >
                             {t('messages.search.clearLabel')}
                           </button>
@@ -2280,8 +2265,8 @@ export default function MessagesPage() {
                       )}
 
                     {orderedMessages.length === 0 && (
-                      <div className="text-center text-sm text-[var(--color-text-secondary)]">
-                        {t('messages.noMessages')}
+                      <div className="py-6">
+                        <EmptyInbox />
                       </div>
                     )}
                   </div>

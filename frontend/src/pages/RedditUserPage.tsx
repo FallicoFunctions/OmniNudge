@@ -17,7 +17,8 @@ import { useSettings } from '../contexts/SettingsContext';
 import { useRedditBlocklist } from '../contexts/RedditBlockContext';
 import { MarkdownRenderer } from '../components/common/MarkdownRenderer';
 import { RedditPostCard } from '../components/reddit/RedditPostCard';
-import { EmptyMessage, ErrorMessage, LoadingMessage } from '../components/common/StatusMessage';
+import { ErrorMessage, LoadingMessage } from '../components/common/StatusMessage';
+import { EmptyState } from '../components/empty';
 import { OffsetPaginationControls } from '../components/common/OffsetPaginationControls';
 import type {
   RedditApiPost,
@@ -475,9 +476,7 @@ export default function RedditUserPage() {
                 </div>
               )}
               {!listingQuery.isLoading && !listingQuery.isError && listingItems.length === 0 && (
-                <EmptyMessage className="text-sm">
-                  {t('redditUserPage.activity.empty')}
-                </EmptyMessage>
+                <EmptyState illustration="noData" title={t('redditUserPage.activity.empty')} />
               )}
               {!listingQuery.isLoading && !listingQuery.isError && listingItems.length > 0 && (
                 <>
