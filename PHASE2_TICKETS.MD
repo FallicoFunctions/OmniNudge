@@ -907,7 +907,7 @@
 - GDPR compliant (user can opt out)
 - Dashboard accessible to team
 
-**Dependencies:** P0-018 (Privacy Policy must mention analytics)
+**Dependencies:** LEG-003 (Privacy Policy must mention analytics)
 
 ---
 
@@ -1123,10 +1123,10 @@
 
 ### P0-036: Email/SMTP Infrastructure Setup
 **Status:** ✅ COMPLETE (February 6, 2026)
-**Priority:** P0 (CRITICAL - Blocks P0-016, P0-017, notifications)
+**Priority:** P0 (CRITICAL - Blocks LEG-001, LEG-002, notifications)
 **Estimated Time:** 1 week
 
-**Problem:** P0-016 needs to email export links, P0-017 needs deletion confirmation emails, but no email service exists.
+**Problem:** LEG-001 needs to email export links, LEG-002 needs deletion confirmation emails, but no email service exists.
 
 **Tasks:**
 - [ ] Choose email service provider (SendGrid, AWS SES, Postmark, or Mailgun)
@@ -1481,27 +1481,27 @@
 ---
 
 ### F0-003: Message Search Infrastructure
-**Status:** ⬜ TODO
+**Status:** 🟨 IN PROGRESS
 **Priority:** P0 (CRITICAL - F4-010 references "search index" but no primary implementation)
 **Estimated Time:** 2 weeks
 
 **Problem:** F4-010 is "Fix - Search Index Update" but there's no primary search implementation.
 
 **Tasks:**
-- [ ] Choose search solution (PostgreSQL Full-Text Search, Elasticsearch, or Typesense)
-- [ ] Set up search infrastructure (Elasticsearch cluster or PostgreSQL FTS indexes)
-- [ ] Create search indexing pipeline (index new messages, updates, deletes)
-- [ ] Implement incremental indexing (don't reindex everything)
-- [ ] Handle E2E encrypted messages (decrypt client-side, index locally, or server-side with user key)
-- [ ] Create GET /api/search endpoint (query, filters, pagination)
-- [ ] Implement search ranking (relevance score, recency boost)
-- [ ] Support filters: conversation_id, sender_id, date_range, has_files, has_links
-- [ ] Create SearchPage component (search input, results list, filters)
-- [ ] Highlight search terms in results
-- [ ] Implement search result preview (snippet with highlighted terms)
-- [ ] Optimize search performance (<500ms for queries)
+- [x] Choose search solution (PostgreSQL Full-Text Search, Elasticsearch, or Typesense)
+- [x] Set up search infrastructure (Elasticsearch cluster or PostgreSQL FTS indexes)
+- [x] Create search indexing pipeline (index new messages, updates, deletes)
+- [x] Implement incremental indexing (don't reindex everything)
+- [x] Handle E2E encrypted messages (decrypt client-side, index locally, or server-side with user key)
+- [x] Create GET /api/search endpoint (query, filters, pagination)
+- [x] Implement search ranking (relevance score, recency boost)
+- [x] Support filters: conversation_id, sender_id, date_range, has_files, has_links
+- [x] Create SearchPage component (search input, results list, filters)
+- [x] Highlight search terms in results
+- [x] Implement search result preview (snippet with highlighted terms)
+- [x] Optimize search performance (<500ms for queries)
 - [ ] Test search with 1M+ messages (ensure performance)
-- [ ] Document search architecture and query syntax
+- [x] Document search architecture and query syntax
 
 **Acceptance Criteria:**
 - Search returns relevant results <500ms (tested with 1M messages)
@@ -1521,7 +1521,7 @@
 **Priority:** P1 (High - referenced in GDPR export)
 **Estimated Time:** 1 week
 
-**Problem:** User profiles mentioned in P0-016 (GDPR export) but no dedicated implementation.
+**Problem:** User profiles mentioned in LEG-001 (GDPR export) but no dedicated implementation.
 
 **Tasks:**
 - [ ] Create database schema: user_profiles table (user_id, avatar_url, bio, status_text, updated_at)
@@ -4557,7 +4557,7 @@
 - Requires strong confirmation (cannot be accidental)
 - Tests verify message unrecoverable after 7 days
 
-**Dependencies:** F10-006, P0-017 (Account Deletion pattern)
+**Dependencies:** F10-006, LEG-002 (Account Deletion pattern)
 
 ---
 
@@ -8437,7 +8437,7 @@
 - Terms of service reviewed by lawyer (legal sign-off obtained)
 - All compliance gaps addressed (0 high-severity violations)
 
-**Dependencies:** COMP-001 through COMP-006, QA-024 (Penetration Test), P0-016 (GDPR Export), P0-017 (GDPR Deletion)
+**Dependencies:** COMP-001 through COMP-006, QA-024 (Penetration Test), LEG-001 (GDPR Export), LEG-002 (GDPR Deletion)
 
 **Note:** Budget $30,000-$100,000 for compliance audits depending on scope (SOC 2 is expensive).
 
@@ -9350,7 +9350,7 @@
 - P3 (Low): ~12 tickets
 
 **By Category:**
-- Phase 0 (Infrastructure): 44 tickets ✅ (P0-001 to P0-043, P0-008b)
+- Phase 0 (Infrastructure, non-legal): 39 tickets ✅ (P0-001 to P0-043 excluding LEG-001 to LEG-005, plus P0-008b)
 - Feature 0 (Foundational): 5 tickets ✅ (F0-001 to F0-005 - NEW)
 - Feature 1 (Reactions): 11 tickets ✅ (F1-001 to F1-011)
 - Feature 2 (Pinning): 10 tickets ✅ (F2-001 to F2-010)
@@ -9375,10 +9375,10 @@
 **Status:** ALL 375 tickets fully detailed and enumerated. No critical gaps remaining. Production-ready.
 
 **Recommended Order:**
-1. **Complete Phase 0 (P0-001 to P0-043) - MUST DO FIRST (6-8 weeks)**
+1. **Complete Phase 0 Core Infrastructure (non-legal P0 tickets) - MUST DO FIRST (6-8 weeks)**
    - Critical infrastructure: Email, Secrets, S3/CDN, DB, Caching, Middleware
    - Security: Rate limiting, audit, WebSocket auth, content moderation
-   - Compliance: GDPR, CCPA, i18n, WebRTC servers
+   - Compliance/intl infra: i18n, WebRTC servers
    - Performance: Budgets, monitoring, logging
 
 2. **Feature 0 (Foundational - 2 weeks)**
@@ -9464,7 +9464,7 @@
 **Goal:** Infrastructure ready for feature development
 
 **Deliverables:**
-- ✅ Phase 0 tickets: P0-001 through P0-035 (all 35+ tickets)
+- ✅ Phase 0 core tickets: non-legal P0 infrastructure set completed
 - ✅ CI/CD pipeline operational
 - ✅ Monitoring and logging set up
 - ✅ Design system finalized
@@ -9734,9 +9734,9 @@
 **Estimated Time:** 1 week
 
 **Checklist:**
-- [ ] Privacy policy published and accessible (P0-018)
-- [ ] Data export functional (P0-016)
-- [ ] Account deletion functional (P0-017)
+- [ ] Privacy policy published and accessible (LEG-003)
+- [ ] Data export functional (LEG-001)
+- [ ] Account deletion functional (LEG-002)
 - [ ] Data retention policy implemented (P0-034)
 - [ ] Consent obtained during signup (checkbox + timestamp)
 - [ ] Cookie banner compliant (opt-in for non-essential)
@@ -9747,7 +9747,7 @@
 
 **Pass Criteria:** Lawyer certifies GDPR compliance (written approval)
 
-**Dependencies:** P0-016, P0-017, P0-018, P0-034
+**Dependencies:** LEG-001, LEG-002, LEG-003, P0-034
 
 ---
 
@@ -9757,7 +9757,7 @@
 **Estimated Time:** 1 week
 
 **Checklist:**
-- [ ] "Do Not Sell" link in footer (P0-033)
+- [ ] "Do Not Sell" link in footer (LEG-005)
 - [ ] Privacy policy includes CCPA disclosures
 - [ ] Data access requests functional
 - [ ] Data deletion requests functional (45-day response)
@@ -9768,7 +9768,7 @@
 
 **Pass Criteria:** Lawyer certifies CCPA compliance (written approval)
 
-**Dependencies:** P0-033
+**Dependencies:** LEG-005
 
 ---
 
@@ -9844,8 +9844,8 @@
 **Estimated Time:** 1 week
 
 **Checklist:**
-- [ ] Terms of Service reviewed (P0-019)
-- [ ] Privacy Policy reviewed (P0-018)
+- [ ] Terms of Service reviewed (LEG-004)
+- [ ] Privacy Policy reviewed (LEG-003)
 - [ ] Data Processing Agreement reviewed
 - [ ] Intellectual Property audit (no GPL code, no copyright violations)
 - [ ] Trademark search (app name cleared)
@@ -9857,7 +9857,7 @@
 
 **Pass Criteria:** Lawyer certifies all legal requirements met (written approval)
 
-**Dependencies:** P0-018, P0-019
+**Dependencies:** LEG-003, LEG-004
 
 ---
 
@@ -9865,10 +9865,11 @@
 ## LEGAL, COMPLIANCE & PRIVACY TASKS
 
 > These tickets are deferred until launch is imminent. As a personal project, legal and compliance work is addressed last.
+> These are intentionally tracked outside the Phase 0 execution scope.
 
 ---
 
-### P0-016: GDPR Compliance - Data Export
+### LEG-001: GDPR Compliance - Data Export
 **Status:** ⬜ TODO
 **Priority:** P0
 **Estimated Time:** 2 weeks (Decryption of encrypted data is complex)
@@ -9908,7 +9909,7 @@
 
 ---
 
-### P0-017: GDPR Compliance - Account Deletion
+### LEG-002: GDPR Compliance - Account Deletion
 **Status:** ⬜ TODO
 **Priority:** P0
 **Estimated Time:** 1 week
@@ -9939,7 +9940,7 @@
 
 ---
 
-### P0-018: Privacy Policy Page
+### LEG-003: Privacy Policy Page
 **Status:** ⬜ TODO
 **Priority:** P0
 **Estimated Time:** 2 days
@@ -9968,7 +9969,7 @@
 
 ---
 
-### P0-019: Terms of Service Page
+### LEG-004: Terms of Service Page
 **Status:** ⬜ TODO
 **Priority:** P0
 **Estimated Time:** 2 days
@@ -9996,7 +9997,7 @@
 
 ---
 
-### P0-033: CCPA Compliance
+### LEG-005: CCPA Compliance
 **Status:** ⬜ TODO
 **Priority:** P0 (CRITICAL - Legal requirement for California users)
 **Estimated Time:** 2 weeks
@@ -10022,7 +10023,7 @@
 - Audit trail logs all requests
 - Lawyer approves compliance (signed off)
 
-**Dependencies:** P0-016 (GDPR Data Export), P0-017 (Account Deletion), P0-018 (Privacy Policy)
+**Dependencies:** LEG-001 (GDPR Data Export), LEG-002 (Account Deletion), LEG-003 (Privacy Policy)
 
 ---
 
@@ -10053,7 +10054,7 @@
 - Admin can view what will be deleted (UI dashboard)
 - Tested in staging with dummy data (100% success rate)
 
-**Dependencies:** P0-018 (Privacy Policy)
+**Dependencies:** LEG-003 (Privacy Policy)
 
 ---
 
