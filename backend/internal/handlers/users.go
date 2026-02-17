@@ -360,7 +360,6 @@ func (h *UsersHandler) UpdateProfile(c *gin.Context) {
 			user.AvatarURL = &avatarURL
 		}
 	}
-
 	// Update profile
 	if err := h.userRepo.UpdateProfile(c.Request.Context(), user.ID, user.Bio, user.AvatarURL); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update profile"})
@@ -379,6 +378,14 @@ func (h *UsersHandler) UpdateProfile(c *gin.Context) {
 			formatted := user.LastSeen.Format(time.RFC3339)
 			return &formatted
 		}(),
+	})
+}
+
+// GetMyProfile handles GET /api/v1/users/me/profile
+func (h *UsersHandler) GetMyProfile(c *gin.Context) {
+	userID := c.GetInt("user_id")
+	h.getUserProfileResponse(c, func() (*models.User, error) {
+		return h.userRepo.GetByID(c.Request.Context(), userID)
 	})
 }
 
