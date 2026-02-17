@@ -3,6 +3,7 @@ package websocket
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"log"
 	"time"
 
@@ -118,6 +119,8 @@ type typingPayload struct {
 	IsTyping       bool `json:"is_typing"`
 }
 
+var errUnauthorizedConversationAccess = errors.New("unauthorized conversation access")
+
 func (c *Client) buildTypingBroadcasts(ctx context.Context, typingData typingPayload) ([]*Message, error) {
 	if typingData.ConversationID == 0 || c.Authorizer == nil || c.Hub == nil {
 		return nil, nil
@@ -129,23 +132,21 @@ func (c *Client) buildTypingBroadcasts(ctx context.Context, typingData typingPay
 	}
 	c.lastTyping = now
 
+	canAccess, err := c.Authorizer.CanAccessConversation(ctx, c.UserID, typingData.ConversationID)
+	if err != nil {
+		return nil, err
+	}
+	if !canAccess {
+		log.Printf("[SECURITY] Unauthorized typing event: user_id=%d, conversation_id=%d, remote_addr=%s",
+			c.UserID, typingData.ConversationID, c.RemoteAddr)
+		return nil, errUnauthorizedConversationAccess
+	}
+
 	participantIDs, err := c.getConversationParticipantIDsCached(ctx, typingData.ConversationID, now)
 	if err != nil {
 		return nil, err
 	}
 	if len(participantIDs) == 0 {
-		return nil, nil
-	}
-
-	// Verify sender is in the conversation.
-	isMember := false
-	for _, id := range participantIDs {
-		if id == c.UserID {
-			isMember = true
-			break
-		}
-	}
-	if !isMember {
 		return nil, nil
 	}
 
@@ -330,6 +331,17 @@ func (c *Client) readPump() {
 			msgs, err := c.buildTypingBroadcasts(ctx, typingData)
 			cancel()
 			if err != nil {
+				if errors.Is(err, errUnauthorizedConversationAccess) {
+					c.Send <- &Message{
+						RecipientID: c.UserID,
+						Type:        "error",
+						Payload: map[string]interface{}{
+							"code":    "UNAUTHORIZED_CONVERSATION_ACCESS",
+							"message": "You are not authorized to send events for this conversation.",
+						},
+					}
+					continue
+				}
 				log.Printf("Authorization/settings error for typing event: %v", err)
 				continue
 			}

@@ -2,6 +2,7 @@ package websocket
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/omninudge/backend/internal/models"
@@ -70,6 +71,7 @@ func TestBuildTypingBroadcasts_SenderMustBeConversationMember(t *testing.T) {
 		RecipientID:    2,
 		IsTyping:       true,
 	})
-	require.NoError(t, err)
+	require.Error(t, err)
+	require.True(t, errors.Is(err, errUnauthorizedConversationAccess))
 	require.Empty(t, msgs)
 }

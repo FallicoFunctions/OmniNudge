@@ -97,3 +97,37 @@ func TestAuthRequired_RejectsMissingHeader(t *testing.T) {
 
 	require.Equal(t, http.StatusUnauthorized, w.Code)
 }
+
+func TestAuthRequired_RejectsInvalidToken(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	authService := services.NewAuthService("", "", "", "test-secret", "ua", "")
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	req, _ := http.NewRequest("GET", "/", nil)
+	req.Header.Set("Authorization", "Bearer not-a-valid-token")
+	c.Request = req
+
+	handler := AuthRequired(authService)
+	handler(c)
+
+	require.Equal(t, http.StatusUnauthorized, w.Code)
+}
+
+func TestAuthRequired_RejectsExpiredToken(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	authService := services.NewAuthService("", "", "", "test-secret", "ua", "")
+	token, err := authService.GenerateJWTWithExpiry(42, "rid", "alice", "user", -1)
+	require.NoError(t, err)
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	req, _ := http.NewRequest("GET", "/", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	c.Request = req
+
+	handler := AuthRequired(authService)
+	handler(c)
+
+	require.Equal(t, http.StatusUnauthorized, w.Code)
+}
