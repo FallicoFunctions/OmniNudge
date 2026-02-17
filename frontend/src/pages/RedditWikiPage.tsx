@@ -568,7 +568,7 @@ export default function RedditWikiPage({ mode = 'view' }: RedditWikiPageProps = 
                       <a
                         href={`#${item.id}`}
                         className="text-[var(--color-link,#0079d3)] hover:underline"
-                        style={{ marginLeft: `${(item.level - minHeadingLevel) * 12}px` }}
+                        style={{ marginInlineStart: `${(item.level - minHeadingLevel) * 12}px` }}
                       >
                         {item.text}
                       </a>
