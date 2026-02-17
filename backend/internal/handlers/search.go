@@ -587,6 +587,7 @@ func (h *SearchHandler) SearchMessages(c *gin.Context) {
 	baseWhere := `
 		FROM messages m
 		LEFT JOIN media_files mf ON m.media_file_id = mf.id
+		LEFT JOIN users su ON su.id = m.sender_id
 		INNER JOIN conversations c ON c.id = m.conversation_id
 		WHERE
 		(
@@ -668,6 +669,7 @@ func (h *SearchHandler) SearchMessages(c *gin.Context) {
 	// NOTE: message contents are encrypted for most rows. Query matching still helps legacy/plaintext rows
 	// and username-based lookups.
 	rankExpr := "0::double precision"
+	snippetExpr := "NULL::text"
 	if query != "" {
 		likeArg := nextArg
 		args = append(args, "%"+strings.ToLower(query)+"%")
@@ -685,6 +687,15 @@ func (h *SearchHandler) SearchMessages(c *gin.Context) {
 			CASE
 				WHEN LOWER(COALESCE(m.sender_encrypted_content, m.encrypted_content, '')) LIKE $` + strconv.Itoa(likeArg) + ` THEN 2.0
 				ELSE 1.0
+			END
+		`
+		snippetExpr = `
+			CASE
+				WHEN LOWER(COALESCE(m.sender_encrypted_content, m.encrypted_content, '')) LIKE $` + strconv.Itoa(likeArg) + `
+					THEN LEFT(COALESCE(m.sender_encrypted_content, m.encrypted_content, ''), 200)
+				WHEN LOWER(COALESCE(su.username, '')) LIKE $` + strconv.Itoa(likeArg) + `
+					THEN 'from @' || su.username
+				ELSE NULL
 			END
 		`
 	}
@@ -707,7 +718,9 @@ func (h *SearchHandler) SearchMessages(c *gin.Context) {
 		       COALESCE(m.media_size, mf.file_size) as media_size,
 		       m.encryption_version, m.media_encryption_key, m.media_encryption_iv,
 		       m.sender_media_encryption_key, COALESCE(m.is_multi_recipient, FALSE) as is_multi_recipient,
-		       m.shared_encryption_iv
+		       m.shared_encryption_iv,
+		       COALESCE(su.username, '') as sender_username,
+		       ` + snippetExpr + ` as search_snippet
 	` + baseWhere + `
 		ORDER BY (` + rankExpr + `) DESC, m.sent_at DESC, m.id DESC
 		LIMIT $` + strconv.Itoa(limitArg) + ` OFFSET $` + strconv.Itoa(offsetArg)
@@ -720,9 +733,15 @@ func (h *SearchHandler) SearchMessages(c *gin.Context) {
 	}
 	defer rows.Close()
 
-	messages := make([]*models.Message, 0, limit)
+	type messageSearchResult struct {
+		models.Message
+		SenderUsername string  `json:"sender_username"`
+		SearchSnippet  *string `json:"search_snippet,omitempty"`
+	}
+
+	messages := make([]messageSearchResult, 0, limit)
 	for rows.Next() {
-		message := &models.Message{}
+		message := messageSearchResult{}
 		if err := rows.Scan(
 			&message.ID,
 			&message.ConversationID,
@@ -746,6 +765,8 @@ func (h *SearchHandler) SearchMessages(c *gin.Context) {
 			&message.SenderMediaEncryptionKey,
 			&message.IsMultiRecipient,
 			&message.SharedEncryptionIV,
+			&message.SenderUsername,
+			&message.SearchSnippet,
 		); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to parse results"})
 			return

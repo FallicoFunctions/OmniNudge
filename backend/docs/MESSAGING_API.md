@@ -249,7 +249,9 @@ Search messages visible to the authenticated user with metadata filters.
       "encrypted_content": "base64-encoded-encrypted-blob",
       "message_type": "text",
       "sent_at": "2026-02-17T15:00:00Z",
-      "encryption_version": "v1"
+      "encryption_version": "v1",
+      "sender_username": "alice",
+      "search_snippet": "hello benchmark token ..."
     }
   ],
   "limit": 50,
@@ -267,6 +269,7 @@ Search messages visible to the authenticated user with metadata filters.
 **Notes:**
 - Message bodies are encrypted in the normal flow. Server-side text matching is best-effort and primarily supports metadata filtering plus fallback text matching for legacy/plaintext rows.
 - For full encrypted message text search, continue using client-side decrypted in-conversation search.
+- `search_snippet` and `sender_username` are included to improve result rendering without requiring full client-side decrypt in all cases.
 
 ---
 

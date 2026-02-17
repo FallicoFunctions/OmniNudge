@@ -371,6 +371,8 @@ func TestSearchMessagesFindsVisibleMessages(t *testing.T) {
 	assert.Equal(t, float64(1), response["total"])
 	messages := response["messages"].([]interface{})
 	assert.Len(t, messages, 1)
+	first := messages[0].(map[string]interface{})
+	assert.Equal(t, user2.Username, first["sender_username"])
 }
 
 func TestSearchMessagesArchivedFilter(t *testing.T) {
