@@ -31,6 +31,26 @@ describe('searchService.searchMessages', () => {
     expect(api.get).toHaveBeenCalledWith('/search/messages?q=hello&limit=25&offset=0');
   });
 
+  it('serializes sort parameter when provided', async () => {
+    vi.mocked(api.get).mockResolvedValue({
+      messages: [],
+      limit: 25,
+      offset: 0,
+      query: 'hello',
+      sort: 'old',
+      total: 0,
+    });
+
+    await searchMessages({
+      query: 'hello',
+      sort: 'old',
+      limit: 25,
+      offset: 0,
+    });
+
+    expect(api.get).toHaveBeenCalledWith('/search/messages?q=hello&sort=old&limit=25&offset=0');
+  });
+
   it('serializes optional filters only when enabled', async () => {
     vi.mocked(api.get).mockResolvedValue({
       messages: [],
