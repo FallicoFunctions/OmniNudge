@@ -5,9 +5,11 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"time"
 	"unicode/utf8"
 
 	"github.com/gin-gonic/gin"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/omninudge/backend/internal/models"
 	"github.com/omninudge/backend/internal/websocket"
@@ -15,7 +17,7 @@ import (
 
 // Sentinel errors returned by ReactionService.
 var (
-	ErrInvalidEmoji   = errors.New("invalid emoji: must be a single non-ASCII unicode character sequence, max 100 bytes")
+	ErrInvalidEmoji    = errors.New("invalid emoji: must be a single non-ASCII unicode character sequence, max 100 bytes")
 	ErrMessageNotFound = errors.New("message not found")
 	ErrNotParticipant  = errors.New("you are not a participant in this conversation")
 	ErrTooManyEmoji    = errors.New("this message already has 10 unique emoji reactions")
@@ -24,6 +26,10 @@ var (
 	ErrNotReactionOwner = errors.New("you can only remove your own reactions")
 )
 
+// broadcastTimeout is the maximum time allowed for non-blocking background
+// goroutines that broadcast WebSocket events or send notifications.
+const broadcastTimeout = 30 * time.Second
+
 // ReactionHubInterface is the subset of the WebSocket hub used by ReactionService.
 type ReactionHubInterface interface {
 	Broadcast(message *websocket.Message)
@@ -31,11 +37,11 @@ type ReactionHubInterface interface {
 
 // ReactionService handles all business logic for message reactions.
 type ReactionService struct {
-	pool             *pgxpool.Pool
-	reactionRepo     *models.MessageReactionRepository
-	messageRepo      *models.MessageRepository
-	notifService     *NotificationService
-	hub              ReactionHubInterface
+	pool         *pgxpool.Pool
+	reactionRepo *models.MessageReactionRepository
+	messageRepo  *models.MessageRepository
+	notifService *NotificationService
+	hub          ReactionHubInterface
 }
 
 // NewReactionService creates a new ReactionService.
@@ -58,7 +64,8 @@ func NewReactionService(
 // AddReaction adds an emoji reaction to a message.
 //
 // Rules enforced:
-//   - Emoji must be valid (non-empty, non-ASCII, ≤100 bytes, no control chars)
+//   - Emoji must be valid (non-empty, non-ASCII, ≤100 bytes, no control chars,
+//     no bidirectional override characters)
 //   - The requesting user must be a participant in the conversation
 //   - A message may have at most 10 distinct emoji types across all users
 //   - The same user cannot add the same emoji to the same message twice (UNIQUE constraint)
@@ -131,7 +138,7 @@ func (s *ReactionService) AddReaction(ctx context.Context, messageID, userID int
 		&reaction.CreatedAt,
 	)
 	if err != nil {
-		if err.Error() == "no rows in result set" {
+		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, ErrAlreadyReacted
 		}
 		return nil, fmt.Errorf("insert reaction: %w", err)
@@ -144,12 +151,21 @@ func (s *ReactionService) AddReaction(ctx context.Context, messageID, userID int
 	// Enrich with username after commit
 	_ = s.pool.QueryRow(ctx, `SELECT username FROM users WHERE id = $1`, userID).Scan(&reaction.Username)
 
-	// 5. Broadcast reaction_added to all other participants (non-blocking)
-	go s.broadcastReactionAdded(context.Background(), message.ConversationID, reaction, userID)
+	// 5. Broadcast reaction_added to all other participants (non-blocking).
+	//    A bounded context prevents goroutine leaks on server shutdown.
+	go func() {
+		bctx, cancel := context.WithTimeout(context.Background(), broadcastTimeout)
+		defer cancel()
+		s.broadcastReactionAdded(bctx, message.ConversationID, reaction, userID)
+	}()
 
-	// 6. Notify the message author (non-blocking, skip self-reactions)
+	// 6. Notify the message author (non-blocking, skip self-reactions).
 	if message.SenderID != userID && s.notifService != nil {
-		go s.notifService.NotifyMessageReaction(context.Background(), message, reaction)
+		go func() {
+			nctx, cancel := context.WithTimeout(context.Background(), broadcastTimeout)
+			defer cancel()
+			s.notifService.NotifyMessageReaction(nctx, message, reaction)
+		}()
 	}
 
 	return reaction, nil
@@ -179,24 +195,29 @@ func (s *ReactionService) RemoveReaction(ctx context.Context, reactionID, userID
 		return fmt.Errorf("remove reaction: %w", err)
 	}
 
-	// 3. Broadcast reaction_removed (non-blocking)
-	go s.broadcastReactionRemoved(context.Background(), message.ConversationID, reaction, userID)
+	// 3. Broadcast reaction_removed (non-blocking).
+	go func() {
+		bctx, cancel := context.WithTimeout(context.Background(), broadcastTimeout)
+		defer cancel()
+		s.broadcastReactionRemoved(bctx, message.ConversationID, reaction, userID)
+	}()
 
 	return nil
 }
 
 // GetReactions returns aggregated reactions for a message, ensuring the caller
-// is a participant in the containing conversation.
-func (s *ReactionService) GetReactions(ctx context.Context, messageID, userID int) ([]models.ReactionSummary, error) {
+// is a participant in the containing conversation. The second return value
+// indicates whether the user list was truncated due to the 500-user cap.
+func (s *ReactionService) GetReactions(ctx context.Context, messageID, userID int) ([]models.ReactionSummary, bool, error) {
 	message, err := s.messageRepo.GetByID(ctx, messageID)
 	if err != nil {
-		return nil, ErrMessageNotFound
+		return nil, false, ErrMessageNotFound
 	}
 
 	if !message.IsParticipant(userID) {
 		ok, checkErr := s.isConversationParticipant(ctx, message.ConversationID, userID)
 		if checkErr != nil || !ok {
-			return nil, ErrNotParticipant
+			return nil, false, ErrNotParticipant
 		}
 	}
 
@@ -208,8 +229,13 @@ func (s *ReactionService) GetReactions(ctx context.Context, messageID, userID in
 // ---------------------------------------------------------------------------
 
 // isValidEmoji returns true if s is a non-empty UTF-8 string that contains at
-// least one non-ASCII rune and no null bytes or low control characters.
+// least one non-ASCII rune and no null bytes, low control characters, or
+// bidirectional override/control characters (which could be used for visual
+// spoofing attacks such as reversing the display order of surrounding text).
+//
 // Accepts ZWJ sequences (U+200D), variation selectors, and skin-tone modifiers.
+// Rejects: empty, >100 bytes, invalid UTF-8, ASCII-only, control chars < U+0020,
+// and Unicode bidi controls U+202A–U+202E and U+2066–U+2069.
 func isValidEmoji(s string) bool {
 	if len(s) == 0 || len(s) > 100 {
 		return false
@@ -220,11 +246,27 @@ func isValidEmoji(s string) bool {
 
 	hasNonASCII := false
 	for _, r := range s {
-		// Reject null bytes and ASCII control characters
-		// (ZWJ U+200D = 8205 is well above 32, so it passes)
+		// Reject null bytes and ASCII control characters.
+		// (ZWJ U+200D = 8205 is well above 32, so it passes.)
 		if r < 32 {
 			return false
 		}
+
+		// Reject bidirectional override/embedding/isolate controls that could
+		// be used to visually spoof the emoji or surrounding UI text:
+		//   U+202A LEFT-TO-RIGHT EMBEDDING
+		//   U+202B RIGHT-TO-LEFT EMBEDDING
+		//   U+202C POP DIRECTIONAL FORMATTING
+		//   U+202D LEFT-TO-RIGHT OVERRIDE
+		//   U+202E RIGHT-TO-LEFT OVERRIDE   ← main attack vector
+		//   U+2066 LEFT-TO-RIGHT ISOLATE
+		//   U+2067 RIGHT-TO-LEFT ISOLATE
+		//   U+2068 FIRST STRONG ISOLATE
+		//   U+2069 POP DIRECTIONAL ISOLATE
+		if (r >= 0x202A && r <= 0x202E) || (r >= 0x2066 && r <= 0x2069) {
+			return false
+		}
+
 		if r > 127 {
 			hasNonASCII = true
 		}
@@ -276,15 +318,25 @@ func (s *ReactionService) getConversationParticipants(ctx context.Context, conve
 		return participants, nil
 	}
 
-	// Fall back to DM-style conversation (user1_id / user2_id)
+	// Fall back to DM-style conversation (user1_id / user2_id).
+	// COALESCE guards against NULL in mod_mail rows that lack user1_id/user2_id.
 	var user1, user2 int
 	err = s.pool.QueryRow(ctx, `
-		SELECT user1_id, user2_id FROM conversations WHERE id = $1
+		SELECT COALESCE(user1_id, 0), COALESCE(user2_id, 0)
+		FROM conversations WHERE id = $1
 	`, conversationID).Scan(&user1, &user2)
 	if err != nil {
 		return nil, fmt.Errorf("get dm participants: %w", err)
 	}
-	return []int{user1, user2}, nil
+
+	result := make([]int, 0, 2)
+	if user1 != 0 {
+		result = append(result, user1)
+	}
+	if user2 != 0 {
+		result = append(result, user2)
+	}
+	return result, nil
 }
 
 // broadcastReactionAdded sends a "reaction_added" WebSocket event to all

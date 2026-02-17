@@ -167,7 +167,7 @@ func (h *ReactionsHandler) GetReactions(c *gin.Context) {
 		return
 	}
 
-	reactions, err := h.reactionService.GetReactions(c.Request.Context(), messageID, userID.(int))
+	reactions, truncated, err := h.reactionService.GetReactions(c.Request.Context(), messageID, userID.(int))
 	if err != nil {
 		switch {
 		case errors.Is(err, services.ErrMessageNotFound):
@@ -184,5 +184,8 @@ func (h *ReactionsHandler) GetReactions(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"reactions":          reactions,
 		"total_unique_emoji": len(reactions),
+		// users_truncated is true when the combined per-emoji user lists were
+		// capped at 500 entries. Individual reaction counts remain accurate.
+		"users_truncated": truncated,
 	})
 }

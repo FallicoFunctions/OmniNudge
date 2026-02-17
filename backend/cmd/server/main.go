@@ -765,10 +765,10 @@ func main() {
 			protected.DELETE("/messages/:id", messagesHandler.DeleteMessage)
 			protected.GET("/search/messages", searchHandler.SearchMessages)
 
-			// Feature 1: Message Reactions (rate-limited)
+			// Feature 1: Message Reactions (rate-limited on mutating endpoints)
 			protected.GET("/messages/:id/reactions", reactionsHandler.GetReactions)
 			protected.POST("/messages/:id/reactions", reactionRateLimiter.Middleware(), reactionsHandler.AddReaction)
-			protected.DELETE("/messages/:id/reactions/:reaction_id", reactionsHandler.RemoveReaction)
+			protected.DELETE("/messages/:id/reactions/:reaction_id", reactionRateLimiter.Middleware(), reactionsHandler.RemoveReaction)
 
 			// Mod mail routes
 			protected.POST("/mod-mail", modMailHandler.CreateModMail)

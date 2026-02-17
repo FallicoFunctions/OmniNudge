@@ -125,7 +125,11 @@ func (r *MessageReactionRepository) HasEmoji(ctx context.Context, messageID int,
 // GetReactionsByMessageID returns aggregated reaction summaries for a message,
 // ordered by reaction count descending (most popular first), then first-seen ascending.
 // viewerID is used to populate the user_reacted flag.
-func (r *MessageReactionRepository) GetReactionsByMessageID(ctx context.Context, messageID, viewerID int) ([]ReactionSummary, error) {
+//
+// The second return value is true when the combined user list across all emoji
+// exceeds 500 entries and was truncated. Callers should surface this to clients
+// so they know the lists are not exhaustive.
+func (r *MessageReactionRepository) GetReactionsByMessageID(ctx context.Context, messageID, viewerID int) ([]ReactionSummary, bool, error) {
 	// Step 1: Per-emoji aggregates (count + whether the viewer reacted)
 	rows, err := r.pool.Query(ctx, `
 		SELECT emoji, COUNT(*) AS count, BOOL_OR(user_id = $2) AS user_reacted
@@ -136,7 +140,7 @@ func (r *MessageReactionRepository) GetReactionsByMessageID(ctx context.Context,
 		LIMIT 10
 	`, messageID, viewerID)
 	if err != nil {
-		return nil, fmt.Errorf("get reaction summaries: %w", err)
+		return nil, false, fmt.Errorf("get reaction summaries: %w", err)
 	}
 	defer rows.Close()
 
@@ -147,39 +151,46 @@ func (r *MessageReactionRepository) GetReactionsByMessageID(ctx context.Context,
 	for rows.Next() {
 		s := &ReactionSummary{}
 		if err := rows.Scan(&s.Emoji, &s.Count, &s.UserReacted); err != nil {
-			return nil, fmt.Errorf("scan reaction summary: %w", err)
+			return nil, false, fmt.Errorf("scan reaction summary: %w", err)
 		}
 		summaryMap[s.Emoji] = s
 		emojiOrder = append(emojiOrder, s.Emoji)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterate reaction summaries: %w", err)
+		return nil, false, fmt.Errorf("iterate reaction summaries: %w", err)
 	}
 
 	if len(emojiOrder) == 0 {
-		return []ReactionSummary{}, nil
+		return []ReactionSummary{}, false, nil
 	}
 
 	// Step 2: Enrich each summary with the list of users who reacted.
-	// Single query, ordered by created_at so the list is deterministic.
+	// Query LIMIT+1 so we can detect truncation without an extra COUNT query.
+	const userListCap = 500
 	userRows, err := r.pool.Query(ctx, `
 		SELECT mr.emoji, mr.user_id, u.username
 		FROM message_reactions mr
 		JOIN users u ON mr.user_id = u.id
 		WHERE mr.message_id = $1
 		ORDER BY mr.created_at ASC
-		LIMIT 500
-	`, messageID)
+		LIMIT $2
+	`, messageID, userListCap+1)
 	if err != nil {
-		return nil, fmt.Errorf("get reaction users: %w", err)
+		return nil, false, fmt.Errorf("get reaction users: %w", err)
 	}
 	defer userRows.Close()
 
+	scanned := 0
 	for userRows.Next() {
+		scanned++
+		if scanned > userListCap {
+			// Drain the cursor so the connection returns cleanly, then stop.
+			continue
+		}
 		var emoji, username string
 		var userID int
 		if err := userRows.Scan(&emoji, &userID, &username); err != nil {
-			return nil, fmt.Errorf("scan reaction user: %w", err)
+			return nil, false, fmt.Errorf("scan reaction user: %w", err)
 		}
 		if s, ok := summaryMap[emoji]; ok {
 			s.UserIDs = append(s.UserIDs, userID)
@@ -187,13 +198,15 @@ func (r *MessageReactionRepository) GetReactionsByMessageID(ctx context.Context,
 		}
 	}
 	if err := userRows.Err(); err != nil {
-		return nil, fmt.Errorf("iterate reaction users: %w", err)
+		return nil, false, fmt.Errorf("iterate reaction users: %w", err)
 	}
+
+	truncated := scanned > userListCap
 
 	// Return summaries in the original order (most-popular first)
 	result := make([]ReactionSummary, 0, len(emojiOrder))
 	for _, emoji := range emojiOrder {
 		result = append(result, *summaryMap[emoji])
 	}
-	return result, nil
+	return result, truncated, nil
 }
