@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -27,12 +28,23 @@ func uniqueMessagesUsername(base string) string {
 }
 
 type mockHub struct {
+	mu             sync.Mutex
 	broadcastCalls []*websocket.Message
 	onlineUsers    map[int]bool
 }
 
 func (m *mockHub) Broadcast(msg *websocket.Message) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	m.broadcastCalls = append(m.broadcastCalls, msg)
+}
+
+func (m *mockHub) SnapshotBroadcastCalls() []*websocket.Message {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	calls := make([]*websocket.Message, len(m.broadcastCalls))
+	copy(calls, m.broadcastCalls)
+	return calls
 }
 
 func (m *mockHub) IsUserOnline(userID int) bool {
@@ -387,13 +399,17 @@ func TestMarkMessagesAsRead(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, w.Code)
 
-	// Verify WebSocket notifications: 3 message_read events + 1 conversation_read event
-	assert.Len(t, hub.broadcastCalls, 4)
+	// Verify WebSocket notifications: 3 message_read events + 1 conversation_read event.
+	var calls []*websocket.Message
+	require.Eventually(t, func() bool {
+		calls = hub.SnapshotBroadcastCalls()
+		return len(calls) == 4
+	}, 2*time.Second, 10*time.Millisecond)
 
 	// Count event types
 	messageReadCount := 0
 	conversationReadCount := 0
-	for _, call := range hub.broadcastCalls {
+	for _, call := range calls {
 		assert.Equal(t, user1ID, call.RecipientID)
 		switch call.Type {
 		case "message_read":
@@ -787,12 +803,16 @@ func TestMarkMessagesAsRead_SendsIndividualEvents(t *testing.T) {
 	assert.Equal(t, http.StatusOK, w.Code)
 
 	// Should send individual message_read events + 1 conversation_read event
-	require.Len(t, hub.broadcastCalls, 4)
+	var calls []*websocket.Message
+	require.Eventually(t, func() bool {
+		calls = hub.SnapshotBroadcastCalls()
+		return len(calls) == 4
+	}, 2*time.Second, 10*time.Millisecond)
 
 	// First 3 should be message_read events
 	readEvents := 0
 	conversationReadEvents := 0
-	for _, call := range hub.broadcastCalls {
+	for _, call := range calls {
 		switch call.Type {
 		case "message_read":
 			readEvents++
