@@ -709,6 +709,71 @@ func TestSearchMessagesInvalidSortFallsBackToRelevance(t *testing.T) {
 	require.Equal(t, "relevance", response["sort"])
 }
 
+func TestSearchMessagesRelevanceAppliesRecencyBoost(t *testing.T) {
+	handler, db, cleanup := setupSearchHandlerTest(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	userRepo := models.NewUserRepository(db.Pool)
+	conversationRepo := models.NewConversationRepository(db.Pool)
+	messageRepo := models.NewMessageRepository(db.Pool)
+
+	user1 := &models.User{Username: uniqueSearchName("msg_relevance_boost_user1"), PasswordHash: "hash"}
+	senderOld := &models.User{Username: uniqueSearchName("boost-token-old"), PasswordHash: "hash"}
+	senderNew := &models.User{Username: uniqueSearchName("boost-token-new"), PasswordHash: "hash"}
+	require.NoError(t, userRepo.Create(ctx, user1))
+	require.NoError(t, userRepo.Create(ctx, senderOld))
+	require.NoError(t, userRepo.Create(ctx, senderNew))
+
+	convOld, err := conversationRepo.Create(ctx, user1.ID, senderOld.ID)
+	require.NoError(t, err)
+	convNew, err := conversationRepo.Create(ctx, user1.ID, senderNew.ID)
+	require.NoError(t, err)
+
+	oldMsg := &models.Message{
+		ConversationID:    convOld.ID,
+		SenderID:          senderOld.ID,
+		RecipientID:       user1.ID,
+		EncryptedContent:  "plain message old",
+		MessageType:       "text",
+		EncryptionVersion: "v1",
+	}
+	newMsg := &models.Message{
+		ConversationID:    convNew.ID,
+		SenderID:          senderNew.ID,
+		RecipientID:       user1.ID,
+		EncryptedContent:  "plain message new",
+		MessageType:       "text",
+		EncryptionVersion: "v1",
+	}
+	require.NoError(t, messageRepo.Create(ctx, oldMsg))
+	require.NoError(t, messageRepo.Create(ctx, newMsg))
+
+	_, err = db.Pool.Exec(ctx, `UPDATE messages SET sent_at = NOW() - INTERVAL '10 days' WHERE id = $1`, oldMsg.ID)
+	require.NoError(t, err)
+	_, err = db.Pool.Exec(ctx, `UPDATE messages SET sent_at = NOW() - INTERVAL '1 hour' WHERE id = $1`, newMsg.ID)
+	require.NoError(t, err)
+
+	router := gin.Default()
+	router.GET("/search/messages", func(c *gin.Context) {
+		c.Set("user_id", user1.ID)
+		handler.SearchMessages(c)
+	})
+
+	req := httptest.NewRequest("GET", "/search/messages?q=boost-token&sort=relevance", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusOK, w.Code, "body=%s", w.Body.String())
+	var response map[string]interface{}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &response))
+	require.Equal(t, "relevance", response["sort"])
+	messages := response["messages"].([]interface{})
+	require.Len(t, messages, 2)
+	first := messages[0].(map[string]interface{})
+	require.Equal(t, float64(newMsg.ID), first["id"])
+}
+
 func strPtrSearch(value string) *string {
 	return &value
 }

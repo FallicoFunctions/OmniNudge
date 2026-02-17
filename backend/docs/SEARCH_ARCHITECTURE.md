@@ -57,7 +57,9 @@ Implementation details:
   - `search_snippet` (best-effort snippet for matched rows)
 
 Ranking:
-- Query text match score + recency ordering (`sent_at DESC`, `id DESC`)
+- Query text match score with recency boost:
+  - text hit weight: `3.0` (content hit) / `1.0` (sender-username hit)
+  - recency boost: `+1.5` (<=1 day), `+0.75` (<=7 days)
 - When `q` is empty, results are ordered by recency
 
 Encryption note:
