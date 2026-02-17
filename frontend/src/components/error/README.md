@@ -7,6 +7,13 @@
 3. **Error** - Recoverable errors, user action may fix
 4. **Critical** - Fatal errors, requires intervention
 
+### Severity to Pattern Mapping
+
+- **Info** → Toast
+- **Warning** → Inline
+- **Error** → Toast (or modal when explicit acknowledgement is required)
+- **Critical** → Modal (or full-page for fatal route-level failures)
+
 ## When to Use Each Pattern
 
 ### 1. Toast (Info, Warning, Error, Success)
@@ -162,6 +169,17 @@ import { ErrorPage, NotFoundPage, ServerErrorPage } from '@/components/error';
 - "Invalid input" ❌ (what's invalid?)
 - "Something went wrong" ❌ (too vague)
 - "ERROR_USER_NOT_FOUND" ❌ (jargon)
+
+## Error Tracking Integration
+
+All boundary-level and global errors are tracked through `errorTrackingService` with context:
+- severity (`info`, `warning`, `error`, `critical`)
+- UI pattern (`toast`, `inline`, `modal`, `page`)
+- area (feature/component scope)
+- runtime context (component stack, request metadata, etc.)
+
+When Sentry is available on `window.Sentry`, errors are sent there with tags and extra context.  
+All tracked errors are also shipped through frontend log aggregation for fallback visibility.
 
 ## Decision Tree
 

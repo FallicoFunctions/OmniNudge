@@ -1,6 +1,7 @@
 import { Component } from 'react';
 import type { ErrorInfo, ReactNode } from 'react';
 import { analyticsService } from './services/analyticsService';
+import { trackError } from './services/errorTrackingService';
 import i18n from './i18n/config';
 
 interface Props {
@@ -24,6 +25,16 @@ class ErrorBoundary extends Component<Props, State> {
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     console.error('Uncaught error:', error, errorInfo);
+
+    trackError({
+      error,
+      severity: 'critical',
+      area: 'root_error_boundary',
+      pattern: 'page',
+      context: {
+        componentStack: errorInfo.componentStack,
+      },
+    });
 
     // Track as analytics event for automated rollbacks
     analyticsService.track('error_occurred', {

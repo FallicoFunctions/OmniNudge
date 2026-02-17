@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import type { ToastType } from '../components/error/Toast';
 
 interface ToastOptions {
@@ -8,7 +8,7 @@ interface ToastOptions {
   duration?: number;
 }
 
-interface Toast extends ToastOptions {
+export interface Toast extends ToastOptions {
   id: string;
 }
 
@@ -37,6 +37,10 @@ function removeToast(id: string) {
   emitChange();
 }
 
+export function dismissToast(id: string) {
+  removeToast(id);
+}
+
 // Hook for using toasts
 export function useToast() {
   const [, setToasts] = useState<Toast[]>(toasts);
@@ -49,7 +53,7 @@ export function useToast() {
     };
   }, []);
 
-  useState(subscribe);
+  useEffect(subscribe, [subscribe]);
 
   const toast = {
     success: (message: string, description?: string, duration?: number) => {
@@ -83,7 +87,7 @@ export function useToasts() {
     };
   }, []);
 
-  useState(subscribe);
+  useEffect(subscribe, [subscribe]);
 
   return currentToasts;
 }
