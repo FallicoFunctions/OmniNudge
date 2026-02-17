@@ -28,7 +28,7 @@ func TestIsValidEmoji(t *testing.T) {
 		{name: "ZWJ family sequence", input: "👨‍👩‍👧‍👦", want: true},    // multi-rune ZWJ sequence
 		{name: "skin tone modifier", input: "👍🏽", want: true},            // thumb + medium skin tone
 		{name: "variation selector", input: "❤\uFE0F", want: true},        // heart + VS-16
-		{name: "100 bytes exactly", input: string(make([]byte, 100)), want: false}, // all zero bytes = control chars, but tests byte cap
+		{name: "null bytes (100 control chars)", input: string(make([]byte, 100)), want: false}, // \x00 × 100 — rejected by r < 32 check
 
 		// ── invalid: structural ─────────────────────────────────────────────
 		{name: "empty string", input: "", want: false},
@@ -66,9 +66,11 @@ func TestIsValidEmoji(t *testing.T) {
 		{name: "U+E007F CANCEL TAG", input: "\U000E007F", want: false},
 		{name: "emoji with embedded tag char", input: "🏳\U000E0067\U000E0062", want: false}, // flag + tag chars
 
-		// ── valid: adjacent to bidi range (must NOT be rejected) ────────────
-		// U+2029 = paragraph separator (below range), U+206A is above range
-		{name: "U+2029 paragraph separator (valid high char)", input: "\u2029", want: true},  // non-ASCII, not in bidi range
+		// ── invalid: Unicode space separators ───────────────────────────────
+		// These are non-ASCII but would render as invisible emoji.
+		{name: "U+00A0 no-break space", input: "\u00A0", want: false},
+		{name: "U+2028 line separator", input: "\u2028", want: false},
+		{name: "U+2029 paragraph separator", input: "\u2029", want: false},
 	}
 
 	for _, tt := range tests {

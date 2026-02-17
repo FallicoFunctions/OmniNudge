@@ -7,6 +7,7 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
+	"github.com/omninudge/backend/internal/models"
 	"github.com/omninudge/backend/internal/services"
 )
 
@@ -18,6 +19,25 @@ type ReactionsHandler struct {
 // NewReactionsHandler creates a new reactions handler.
 func NewReactionsHandler(reactionService *services.ReactionService) *ReactionsHandler {
 	return &ReactionsHandler{reactionService: reactionService}
+}
+
+// requireUserID extracts the authenticated user ID from the gin context.
+// On failure it writes a 401 response and returns (0, false).
+// Using a typed assertion (v.(int)) guards against a middleware bug where
+// user_id is stored as a different numeric type, which would otherwise
+// cause an unrecovered panic in production.
+func requireUserID(c *gin.Context) (int, bool) {
+	v, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return 0, false
+	}
+	id, ok := v.(int)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return 0, false
+	}
+	return id, true
 }
 
 // AddReactionRequest is the JSON body for POST /api/v1/messages/:id/reactions.
@@ -50,9 +70,8 @@ type AddReactionRequest struct {
 // @Router       /messages/{id}/reactions [post]
 // @Security     BearerAuth
 func (h *ReactionsHandler) AddReaction(c *gin.Context) {
-	userID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+	userID, ok := requireUserID(c)
+	if !ok {
 		return
 	}
 
@@ -68,7 +87,7 @@ func (h *ReactionsHandler) AddReaction(c *gin.Context) {
 		return
 	}
 
-	reaction, err := h.reactionService.AddReaction(c.Request.Context(), messageID, userID.(int), req.Emoji)
+	reaction, err := h.reactionService.AddReaction(c.Request.Context(), messageID, userID, req.Emoji)
 	if err != nil {
 		switch {
 		case errors.Is(err, services.ErrInvalidEmoji):
@@ -82,7 +101,7 @@ func (h *ReactionsHandler) AddReaction(c *gin.Context) {
 		case errors.Is(err, services.ErrAlreadyReacted):
 			c.JSON(http.StatusConflict, gin.H{"error": "You have already reacted with this emoji"})
 		default:
-			log.Printf("[ReactionsHandler] AddReaction error: message=%d user=%d: %v", messageID, userID.(int), err)
+			log.Printf("[ReactionsHandler] AddReaction error: message=%d user=%d: %v", messageID, userID, err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to add reaction"})
 		}
 		return
@@ -112,9 +131,8 @@ func (h *ReactionsHandler) AddReaction(c *gin.Context) {
 // @Router       /messages/{id}/reactions/{reaction_id} [delete]
 // @Security     BearerAuth
 func (h *ReactionsHandler) RemoveReaction(c *gin.Context) {
-	userID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+	userID, ok := requireUserID(c)
+	if !ok {
 		return
 	}
 
@@ -130,14 +148,14 @@ func (h *ReactionsHandler) RemoveReaction(c *gin.Context) {
 		return
 	}
 
-	if err := h.reactionService.RemoveReaction(c.Request.Context(), messageID, reactionID, userID.(int)); err != nil {
+	if err := h.reactionService.RemoveReaction(c.Request.Context(), messageID, reactionID, userID); err != nil {
 		switch {
 		case errors.Is(err, services.ErrReactionNotFound):
 			c.JSON(http.StatusNotFound, gin.H{"error": "Reaction not found"})
 		case errors.Is(err, services.ErrNotReactionOwner):
 			c.JSON(http.StatusForbidden, gin.H{"error": "You can only remove your own reactions"})
 		default:
-			log.Printf("[ReactionsHandler] RemoveReaction error: message=%d reaction=%d user=%d: %v", messageID, reactionID, userID.(int), err)
+			log.Printf("[ReactionsHandler] RemoveReaction error: message=%d reaction=%d user=%d: %v", messageID, reactionID, userID, err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to remove reaction"})
 		}
 		return
@@ -150,7 +168,7 @@ func (h *ReactionsHandler) RemoveReaction(c *gin.Context) {
 type GetReactionsResponse struct {
 	// Reactions contains aggregated per-emoji reaction data, ordered by count
 	// descending (most popular emoji first).
-	Reactions []interface{} `json:"reactions"`
+	Reactions []models.ReactionSummary `json:"reactions"`
 	// TotalUniqueEmoji is the number of distinct emoji types on this message (max 10).
 	TotalUniqueEmoji int `json:"total_unique_emoji"`
 	// UsersTruncated is true when the combined per-emoji user lists exceed 500
@@ -179,9 +197,8 @@ type GetReactionsResponse struct {
 // @Router       /messages/{id}/reactions [get]
 // @Security     BearerAuth
 func (h *ReactionsHandler) GetReactions(c *gin.Context) {
-	userID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+	userID, ok := requireUserID(c)
+	if !ok {
 		return
 	}
 
@@ -191,7 +208,7 @@ func (h *ReactionsHandler) GetReactions(c *gin.Context) {
 		return
 	}
 
-	reactions, truncated, err := h.reactionService.GetReactions(c.Request.Context(), messageID, userID.(int))
+	reactions, truncated, err := h.reactionService.GetReactions(c.Request.Context(), messageID, userID)
 	if err != nil {
 		switch {
 		case errors.Is(err, services.ErrMessageNotFound):
@@ -199,7 +216,7 @@ func (h *ReactionsHandler) GetReactions(c *gin.Context) {
 		case errors.Is(err, services.ErrNotParticipant):
 			c.JSON(http.StatusForbidden, gin.H{"error": "You are not a participant in this conversation"})
 		default:
-			log.Printf("[ReactionsHandler] GetReactions error: message=%d user=%d: %v", messageID, userID.(int), err)
+			log.Printf("[ReactionsHandler] GetReactions error: message=%d user=%d: %v", messageID, userID, err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get reactions"})
 		}
 		return
