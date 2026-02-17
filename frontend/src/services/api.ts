@@ -25,10 +25,29 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      // Handle unauthorized - redirect to login
+      const hadToken =
+        Boolean(localStorage.getItem('auth_token')) ||
+        Boolean(sessionStorage.getItem('auth_token'));
+
+      // Anonymous users should not be forced into login on public pages.
+      if (!hadToken) {
+        return Promise.reject(error);
+      }
+
+      // Handle unauthorized without navigating to a non-existent /login route.
       localStorage.removeItem('auth_token');
       sessionStorage.removeItem('auth_token');
-      window.location.href = '/login';
+      if (typeof window !== 'undefined') {
+        const redirectTo = window.location.pathname || '/';
+        if (window.location.pathname !== '/') {
+          window.location.href = '/';
+        }
+        window.dispatchEvent(
+          new CustomEvent('open-auth-modal', {
+            detail: { mode: 'login', redirectTo },
+          })
+        );
+      }
     }
     return Promise.reject(error);
   }
