@@ -361,6 +361,56 @@ func TestSearchMessagesFilterOnlyHasFiles(t *testing.T) {
 	require.Equal(t, float64(withFile.ID), response.Messages[0]["id"])
 }
 
+func TestSearchMessagesSortOldIntegration(t *testing.T) {
+	deps := newTestDeps(t)
+	defer deps.DB.Close()
+
+	user1 := createUser(t, deps.UserRepo, "searchmsg_sort_user1", "user")
+	user2 := createUser(t, deps.UserRepo, "searchmsg_sort_user2", "user")
+	token, _ := deps.AuthService.GenerateJWT(user1.ID, "", user1.Username, user1.Role)
+
+	conv, err := deps.ConversationRepo.Create(context.Background(), user1.ID, user2.ID)
+	require.NoError(t, err)
+
+	older := &models.Message{
+		ConversationID:    conv.ID,
+		SenderID:          user2.ID,
+		RecipientID:       user1.ID,
+		EncryptedContent:  "sort-int-token-older",
+		MessageType:       "text",
+		EncryptionVersion: "v1",
+	}
+	newer := &models.Message{
+		ConversationID:    conv.ID,
+		SenderID:          user2.ID,
+		RecipientID:       user1.ID,
+		EncryptedContent:  "sort-int-token-newer",
+		MessageType:       "text",
+		EncryptionVersion: "v1",
+	}
+	require.NoError(t, deps.MessageRepo.Create(context.Background(), older))
+	require.NoError(t, deps.MessageRepo.Create(context.Background(), newer))
+
+	_, err = deps.DB.Pool.Exec(context.Background(), `UPDATE messages SET sent_at = NOW() - INTERVAL '2 hours' WHERE id = $1`, older.ID)
+	require.NoError(t, err)
+	_, err = deps.DB.Pool.Exec(context.Background(), `UPDATE messages SET sent_at = NOW() - INTERVAL '1 hour' WHERE id = $1`, newer.ID)
+	require.NoError(t, err)
+
+	req, _ := http.NewRequest("GET", "/api/v1/search/messages?q=sort-int-token&sort=old", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	w := doRequest(t, deps.Router, req)
+	require.Equal(t, http.StatusOK, w.Code, "body=%s", w.Body.String())
+
+	var response struct {
+		Sort     string                   `json:"sort"`
+		Messages []map[string]interface{} `json:"messages"`
+	}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &response))
+	require.Equal(t, "old", response.Sort)
+	require.Len(t, response.Messages, 2)
+	require.Equal(t, float64(older.ID), response.Messages[0]["id"])
+}
+
 func TestBatchMediaUpload_RejectsTooManyFiles(t *testing.T) {
 	defer os.RemoveAll("uploads")
 	deps := newTestDeps(t)
