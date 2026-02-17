@@ -8,6 +8,7 @@ export type UpdateUserSettingsRequest = Partial<
     | 'show_typing_indicators'
     | 'notification_sound'
     | 'show_last_seen'
+    | 'profile_visibility'
     | 'use_relative_time'
     | 'auto_close_theme_selector'
     | 'notify_archived_messages'

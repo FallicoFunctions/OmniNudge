@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
-import { useLocation } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import ThemeSelector from '../components/themes/ThemeSelector';
 import ThemeEditor from '../components/themes/ThemeEditor';
 import { LanguageSelector } from '../components/settings/LanguageSelector';
@@ -73,6 +73,8 @@ export default function SettingsPage() {
     setTypingIndicators,
     showLastSeen,
     setShowLastSeen,
+    profileVisibility,
+    setProfileVisibility,
     notificationSound,
     setNotificationSound,
   } = useSettings();
@@ -606,6 +608,34 @@ export default function SettingsPage() {
                   }`}
                 />
               </button>
+            </div>
+
+            <div className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4">
+              <label
+                htmlFor="profile-visibility"
+                className="block text-base font-semibold text-[var(--color-text-primary)]"
+              >
+                {t('settings.messagingPrivacy.profileVisibility')}
+              </label>
+              <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+                {t('settings.messagingPrivacy.profileVisibilityHelp')}
+              </p>
+              <select
+                id="profile-visibility"
+                value={profileVisibility}
+                onChange={(e) =>
+                  setProfileVisibility(e.target.value as 'public' | 'friends_only' | 'private')
+                }
+                className="mt-3 w-full rounded border border-[var(--color-border)] bg-[var(--color-background)] px-3 py-2 text-sm text-[var(--color-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+              >
+                <option value="public">{t('settings.messagingPrivacy.profileVisibilityPublic')}</option>
+                <option value="friends_only">
+                  {t('settings.messagingPrivacy.profileVisibilityFriendsOnly')}
+                </option>
+                <option value="private">
+                  {t('settings.messagingPrivacy.profileVisibilityPrivate')}
+                </option>
+              </select>
             </div>
           </div>
           </Panel>
@@ -1655,21 +1685,38 @@ export default function SettingsPage() {
 
           {/* Account Deletion */}
           <Panel as="section">
-          <h2 className="mb-2 text-xl font-semibold text-[var(--color-text-primary)]">
-            {t('settings.accountDeletion.title')}
-          </h2>
-          <p className="text-sm text-[var(--color-text-secondary)]">
-            {t('settings.accountDeletion.description')}
-          </p>
+            <h2 className="mb-2 text-xl font-semibold text-[var(--color-text-primary)]">
+              {t('settings.accountDeletion.title')}
+            </h2>
+            <p className="text-sm text-[var(--color-text-secondary)]">
+              {t('settings.accountDeletion.description')}
+            </p>
 
-          <div className="mt-4">
-            <a
-              href="/profile?tab=account"
-              className="inline-block rounded-md border border-red-600 bg-red-50 px-4 py-2 text-sm font-semibold text-red-600 hover:bg-red-100"
-            >
-              {t('settings.accountDeletion.manageButton')}
-            </a>
-          </div>
+            <div className="mt-4">
+              <a
+                href="/profile?tab=account"
+                className="inline-block rounded-md border border-red-600 bg-red-50 px-4 py-2 text-sm font-semibold text-red-600 hover:bg-red-100"
+              >
+                {t('settings.accountDeletion.manageButton')}
+              </a>
+            </div>
+          </Panel>
+
+          <Panel as="section">
+            <h2 className="mb-2 text-xl font-semibold text-[var(--color-text-primary)]">
+              {t('settings.blockedUsers.title')}
+            </h2>
+            <p className="text-sm text-[var(--color-text-secondary)]">
+              {t('settings.blockedUsers.description')}
+            </p>
+            <div className="mt-4">
+              <Link
+                to="/settings/blocked-users"
+                className="inline-block rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-4 py-2 text-sm font-semibold text-[var(--color-text-primary)] hover:border-[var(--color-primary)] hover:text-[var(--color-primary)]"
+              >
+                {t('settings.blockedUsers.manageButton')}
+              </Link>
+            </div>
           </Panel>
         </div>
       </div>

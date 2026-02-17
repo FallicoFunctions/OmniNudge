@@ -78,8 +78,26 @@ type AgentStateResponse struct {
 // GetUserProfile handles GET /api/v1/users/:username
 func (h *UsersHandler) GetUserProfile(c *gin.Context) {
 	username := c.Param("username")
+	h.getUserProfileResponse(c, func() (*models.User, error) {
+		return h.userRepo.GetByUsername(c.Request.Context(), username)
+	})
+}
 
-	user, err := h.userRepo.GetByUsername(c.Request.Context(), username)
+// GetUserProfileByID handles GET /api/v1/users/id/:id/profile
+func (h *UsersHandler) GetUserProfileByID(c *gin.Context) {
+	idStr := c.Param("id")
+	userID, err := strconv.Atoi(idStr)
+	if err != nil || userID <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user id"})
+		return
+	}
+	h.getUserProfileResponse(c, func() (*models.User, error) {
+		return h.userRepo.GetByID(c.Request.Context(), userID)
+	})
+}
+
+func (h *UsersHandler) getUserProfileResponse(c *gin.Context, loadUser func() (*models.User, error)) {
+	user, err := loadUser()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch user", "details": err.Error()})
 		return
@@ -89,23 +107,32 @@ func (h *UsersHandler) GetUserProfile(c *gin.Context) {
 		return
 	}
 
-	// Determine whether to expose last_seen. Default is visible.
-	// If show_last_seen is disabled, only the user themselves can see it (when authenticated via AuthOptional).
 	var viewerID int
 	if v, exists := c.Get("user_id"); exists {
 		if id, ok := v.(int); ok {
 			viewerID = id
 		}
 	}
+
 	showLastSeen := true
+	profileVisibility := "public"
 	if h.settingsRepo != nil {
 		settings, err := h.settingsRepo.GetByUserID(c.Request.Context(), user.ID)
-		// Fail-closed: if we can't load privacy settings, do not expose last_seen to other users.
 		if err != nil {
+			// Fail closed on settings read errors.
 			showLastSeen = false
+			profileVisibility = "private"
 		} else if settings != nil {
 			showLastSeen = settings.ShowLastSeen
+			if strings.TrimSpace(settings.ProfileVisibility) != "" {
+				profileVisibility = settings.ProfileVisibility
+			}
 		}
+	}
+
+	if !canViewerSeeProfile(user.ID, viewerID, profileVisibility) {
+		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		return
 	}
 
 	var lastSeenPtr *string
@@ -146,6 +173,23 @@ func (h *UsersHandler) GetUserProfile(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, response)
+}
+
+func canViewerSeeProfile(profileUserID, viewerID int, profileVisibility string) bool {
+	if viewerID == profileUserID {
+		return true
+	}
+
+	switch strings.ToLower(strings.TrimSpace(profileVisibility)) {
+	case "", "public":
+		return true
+	case "private", "friends_only":
+		// Friendship graph is not yet implemented; treat friends_only as private for now.
+		return false
+	default:
+		// Fail closed on invalid persisted values.
+		return false
+	}
 }
 
 // GetUserPosts handles GET /api/v1/users/:username/posts

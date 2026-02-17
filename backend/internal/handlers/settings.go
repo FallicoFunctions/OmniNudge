@@ -42,6 +42,7 @@ type updateSettingsRequest struct {
 	ShowReadReceipts             *bool   `json:"show_read_receipts"`
 	ShowTypingIndicators         *bool   `json:"show_typing_indicators"`
 	ShowLastSeen                 *bool   `json:"show_last_seen"`
+	ProfileVisibility            *string `json:"profile_visibility"`
 	ShowPushNotifications        *bool   `json:"show_push_notifications"` // P0-042
 	AutoAppendInvitation         *bool   `json:"auto_append_invitation"`
 	Theme                        *string `json:"theme"`
@@ -108,6 +109,16 @@ func (h *SettingsHandler) UpdateSettings(c *gin.Context) {
 	}
 	if req.ShowLastSeen != nil {
 		settings.ShowLastSeen = *req.ShowLastSeen
+	}
+	if req.ProfileVisibility != nil {
+		v := strings.ToLower(strings.TrimSpace(*req.ProfileVisibility))
+		switch v {
+		case "public", "friends_only", "private":
+			settings.ProfileVisibility = v
+		default:
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid profile_visibility"})
+			return
+		}
 	}
 	if req.ShowPushNotifications != nil {
 		settings.ShowPushNotifications = *req.ShowPushNotifications

@@ -1992,7 +1992,12 @@
       "notificationSound": "Sonido de notificación de mensaje",
       "notificationSoundHelp": "Reproduce un sonido cuando recibas un nuevo mensaje. Solo se reproduce cuando estás usando la app activamente.",
       "lastSeen": "Visto por última vez",
-      "lastSeenHelp": "Muestra a otros cuándo estuviste activo por última vez. Cuando está desactivado, tu hora de visto por última vez puede ocultarse en las vistas públicas del perfil."
+      "lastSeenHelp": "Muestra a otros cuándo estuviste activo por última vez. Cuando está desactivado, tu hora de visto por última vez puede ocultarse en las vistas públicas del perfil.",
+      "profileVisibility": "Visibilidad del perfil",
+      "profileVisibilityHelp": "Controla quién puede ver los detalles públicos de tu perfil.",
+      "profileVisibilityPublic": "Público",
+      "profileVisibilityFriendsOnly": "Solo amigos",
+      "profileVisibilityPrivate": "Privado"
     },
     "dateTime": {
       "title": "Visualización de Fecha y Hora",
