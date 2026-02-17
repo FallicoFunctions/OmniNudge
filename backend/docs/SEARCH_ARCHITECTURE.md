@@ -101,6 +101,8 @@ And extension:
 Scale test script:
 - `backend/scripts/search_messages_1m_benchmark.sql`
 - Generates a synthetic 1M-message DM dataset and runs `EXPLAIN (ANALYZE, BUFFERS)` queries.
+- Cleanup script: `backend/scripts/search_messages_1m_cleanup.sql`
+  - Removes benchmark users/conversation/messages and vacuums affected tables.
 
 Performance assertion script:
 - `backend/scripts/search_messages_perf_assert.sql`
