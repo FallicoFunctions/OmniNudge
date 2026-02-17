@@ -291,7 +291,7 @@ func main() {
 
 	messagesHandler := handlers.NewMessagesHandler(db.Pool, messageRepo, conversationRepo, userSettingsRepo, hub, notificationService)
 	usersHandler := handlers.NewUsersHandler(userRepo, userSettingsRepo, postRepo, commentRepo, authService, hubModRepo)
-	mediaHandler := handlers.NewMediaHandler(mediaRepo, thumbnailService)
+	mediaHandler := handlers.NewMediaHandler(mediaRepo, thumbnailService, queueClient)
 	hubsHandler := handlers.NewHubsHandlerWithAccessRequest(hubRepo, postRepo, hubModRepo, hubSubRepo, hubSettingsRepo, hubAccessRequestRepo)
 	subscriptionsHandler := handlers.NewSubscriptionsHandler(hubSubRepo, subredditSubRepo, hubRepo)
 	moderationHandler := handlers.NewModerationHandler(reportRepo, hubModRepo)

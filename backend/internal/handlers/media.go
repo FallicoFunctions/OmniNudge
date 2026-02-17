@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log"
 	"mime/multipart"
 	"net/http"
 	"os"
@@ -14,6 +15,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/omninudge/backend/internal/api/middleware"
 	"github.com/omninudge/backend/internal/models"
+	"github.com/omninudge/backend/internal/queue"
 	"github.com/omninudge/backend/internal/services"
 )
 
@@ -30,13 +32,19 @@ const (
 type MediaHandler struct {
 	mediaRepo        *models.MediaFileRepository
 	thumbnailService *services.ThumbnailService
+	queueClient      *queue.QueueClient
 }
 
 // NewMediaHandler creates a new media handler
-func NewMediaHandler(mediaRepo *models.MediaFileRepository, thumbnailService *services.ThumbnailService) *MediaHandler {
+func NewMediaHandler(
+	mediaRepo *models.MediaFileRepository,
+	thumbnailService *services.ThumbnailService,
+	queueClient *queue.QueueClient,
+) *MediaHandler {
 	return &MediaHandler{
 		mediaRepo:        mediaRepo,
 		thumbnailService: thumbnailService,
+		queueClient:      queueClient,
 	}
 }
 
@@ -207,9 +215,8 @@ func (h *MediaHandler) UploadMedia(c *gin.Context) {
 		UsedInMessageID:  usedInMessageID,
 	}
 
-	// Generate thumbnail and extract dimensions for images
+	// Extract dimensions for images (thumbnail generation is async when queue is available)
 	if services.IsImageType(contentType) {
-		// Get image dimensions
 		width, height, err := h.thumbnailService.GetImageDimensions(storagePath)
 		if err == nil {
 			if width > maxImageDimension || height > maxImageDimension {
@@ -225,21 +232,14 @@ func (h *MediaHandler) UploadMedia(c *gin.Context) {
 			media.Width = &width
 			media.Height = &height
 		}
-
-		// Generate thumbnail
-		thumbnailPath, err := h.thumbnailService.GenerateThumbnail(storagePath)
-		if err == nil {
-			// Convert absolute path to URL path
-			thumbnailName := filepath.Base(thumbnailPath)
-			thumbnailURL := "/uploads/" + thumbnailName
-			media.ThumbnailURL = &thumbnailURL
-		}
 	}
 
 	if err := h.mediaRepo.Create(c.Request.Context(), media); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save media record", "details": err.Error()})
 		return
 	}
+
+	h.schedulePostUploadJobs(c.Request.Context(), media)
 
 	c.JSON(http.StatusCreated, media)
 }
@@ -426,9 +426,8 @@ func (h *MediaHandler) processSingleUpload(ctx context.Context, userID int, head
 		StoragePath:      storagePath,
 	}
 
-	// Generate thumbnail and extract dimensions for images
+	// Extract dimensions for images (thumbnail generation is async when queue is available)
 	if services.IsImageType(contentType) {
-		// Get image dimensions
 		width, height, err := h.thumbnailService.GetImageDimensions(storagePath)
 		if err == nil {
 			if width > maxImageDimension || height > maxImageDimension {
@@ -438,14 +437,6 @@ func (h *MediaHandler) processSingleUpload(ctx context.Context, userID int, head
 			media.Width = &width
 			media.Height = &height
 		}
-
-		// Generate thumbnail
-		thumbnailPath, err := h.thumbnailService.GenerateThumbnail(storagePath)
-		if err == nil {
-			thumbnailName := filepath.Base(thumbnailPath)
-			thumbnailURL := "/uploads/" + thumbnailName
-			media.ThumbnailURL = &thumbnailURL
-		}
 	}
 
 	if err := h.mediaRepo.Create(ctx, media); err != nil {
@@ -453,7 +444,49 @@ func (h *MediaHandler) processSingleUpload(ctx context.Context, userID int, head
 		return nil, fmt.Errorf("failed to save media record: %w", err)
 	}
 
+	h.schedulePostUploadJobs(ctx, media)
+
 	return media, nil
+}
+
+func (h *MediaHandler) schedulePostUploadJobs(ctx context.Context, media *models.MediaFile) {
+	if h.queueClient != nil {
+		if err := h.queueClient.EnqueueVirusScan(ctx, media.ID, media.StoragePath, "", media.UserID); err != nil {
+			log.Printf("failed to enqueue virus scan for media %d: %v", media.ID, err)
+		}
+
+		if services.IsImageType(media.FileType) {
+			if err := h.queueClient.EnqueueThumbnailGeneration(ctx, media.ID, media.StorageURL, "image"); err != nil {
+				log.Printf("failed to enqueue thumbnail generation for media %d: %v", media.ID, err)
+				h.generateAndStoreThumbnail(ctx, media)
+			}
+		}
+
+		return
+	}
+
+	if !services.IsImageType(media.FileType) {
+		return
+	}
+
+	h.generateAndStoreThumbnail(ctx, media)
+}
+
+func (h *MediaHandler) generateAndStoreThumbnail(ctx context.Context, media *models.MediaFile) {
+	thumbnailPath, err := h.thumbnailService.GenerateThumbnail(media.StoragePath)
+	if err != nil {
+		log.Printf("failed to generate thumbnail for media %d: %v", media.ID, err)
+		return
+	}
+
+	thumbnailName := filepath.Base(thumbnailPath)
+	thumbnailURL := "/uploads/" + thumbnailName
+	if err := h.mediaRepo.UpdateThumbnailURL(ctx, media.ID, thumbnailURL); err != nil {
+		log.Printf("failed to persist thumbnail URL for media %d: %v", media.ID, err)
+		return
+	}
+
+	media.ThumbnailURL = &thumbnailURL
 }
 
 func resolveStorageCapForRole(role string) int64 {
