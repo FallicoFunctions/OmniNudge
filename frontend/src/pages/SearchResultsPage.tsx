@@ -4,13 +4,18 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { useSettings } from '../contexts/SettingsContext';
 import { useAuth } from '../contexts/AuthContext';
-import { siteWideSearch, type RedditUserSearchResult } from '../services/searchService';
+import {
+  siteWideSearch,
+  searchMessages as searchMessagesApi,
+  type RedditUserSearchResult,
+} from '../services/searchService';
 import { useRedditBlocklist } from '../contexts/RedditBlockContext';
 import { savedService } from '../services/savedService';
 import { subscriptionService } from '../services/subscriptionService';
 import { hubsService } from '../services/hubsService';
 import { RedditPostCard } from '../components/reddit/RedditPostCard';
 import { HubPostCard } from '../components/hubs/HubPostCard';
+import { HighlightedText } from '../components/messages/HighlightedText';
 import { CrosspostModal } from '../components/common/CrosspostModal';
 import { LoadingMessage } from '../components/common/StatusMessage';
 import { EmptySearchResults, EmptyState } from '../components/empty';
@@ -18,11 +23,14 @@ import { OffsetPaginationControls } from '../components/common/OffsetPaginationC
 import { useHiddenItems } from '../hooks/useHiddenItems';
 import { useSavedItems } from '../hooks/useSavedItems';
 import type { PlatformPost } from '../types/posts';
+import type { Message } from '../types/messages';
 import type { RedditApiPost, SubredditSuggestion } from '../types/reddit';
 import type { Hub } from '../services/hubsService';
 import type { UserProfile } from '../types/users';
 import { createRedditCrosspostPayload } from '../utils/crosspostHelpers';
 import { getPostUrl } from '../utils/postUrl';
+import { decryptMessage } from '../utils/encryption';
+import { getOwnKeys } from '../services/keyManagementService';
 import {
   getHiddenPostIdSet,
   getHiddenRedditPostIdSet,
@@ -30,9 +38,10 @@ import {
   getSavedRedditPostIdSet,
 } from '../utils/savedItems';
 
-type Tab = 'posts' | 'communities' | 'users';
+type Tab = 'posts' | 'communities' | 'users' | 'messages';
 type PostSource = 'all' | 'omni';
 type SortOrder = 'relevance' | 'new' | 'old';
+const MESSAGE_PAGE_SIZE = 25;
 type CrosspostTarget = { post: RedditApiPost };
 type HideTarget =
   | { type: 'reddit'; post: RedditApiPost }
@@ -117,6 +126,23 @@ export default function SearchResultsPage() {
     hasMoreReddit: false,
     hasMoreOmni: false,
   });
+  const [messageResults, setMessageResults] = useState<{
+    messages: Message[];
+    total: number;
+    page: number;
+    hasFiles: boolean;
+    hasLinks: boolean;
+    includeArchived: boolean;
+  }>({
+    messages: [],
+    total: 0,
+    page: 1,
+    hasFiles: false,
+    hasLinks: false,
+    includeArchived: false,
+  });
+  const [messagePreviewById, setMessagePreviewById] = useState<Record<number, string>>({});
+  const [isDecryptingMessagePreviews, setIsDecryptingMessagePreviews] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [crosspostTarget, setCrosspostTarget] = useState<CrosspostTarget | null>(null);
   const [crosspostTitle, setCrosspostTitle] = useState('');
@@ -326,7 +352,13 @@ export default function SearchResultsPage() {
 
   const handleSearch = async (
     q: string,
-    opts?: { tab?: Tab; sort?: SortOrder; page?: number; append?: boolean }
+    opts?: {
+      tab?: Tab;
+      sort?: SortOrder;
+      page?: number;
+      append?: boolean;
+      messageFilters?: Partial<Pick<typeof messageResults, 'hasFiles' | 'hasLinks' | 'includeArchived'>>;
+    }
   ) => {
     if (!q.trim()) return;
     setIsLoading(true);
@@ -334,8 +366,43 @@ export default function SearchResultsPage() {
     try {
       const tabTarget = opts?.tab ?? activeTab;
       const targetPage =
-        opts?.page ?? (tabTarget === 'communities' ? communities.page : posts.page);
+        opts?.page
+        ?? (tabTarget === 'communities'
+          ? communities.page
+          : tabTarget === 'messages'
+            ? messageResults.page
+            : posts.page);
       const isUsersAppend = Boolean(opts?.append && tabTarget === 'users');
+
+      if (tabTarget === 'messages') {
+        const hasFiles = opts?.messageFilters?.hasFiles ?? messageResults.hasFiles;
+        const hasLinks = opts?.messageFilters?.hasLinks ?? messageResults.hasLinks;
+        const includeArchived =
+          opts?.messageFilters?.includeArchived ?? messageResults.includeArchived;
+        const response = await searchMessagesApi({
+          query: q,
+          limit: MESSAGE_PAGE_SIZE,
+          offset: (targetPage - 1) * MESSAGE_PAGE_SIZE,
+          hasFiles,
+          hasLinks,
+          includeArchived,
+        });
+
+        setMessageResults((prev) => ({
+          ...prev,
+          messages: response.messages ?? [],
+          total: response.total ?? 0,
+          page: targetPage,
+        }));
+
+        const nextParams = new URLSearchParams(location.search);
+        nextParams.set('q', q);
+        nextParams.set('tab', tabTarget);
+        nextParams.set('sort', opts?.sort ?? sort);
+        nextParams.set('include_nsfw', includeNsfw ? 'true' : 'false');
+        navigate(`/search?${nextParams.toString()}`, { replace: true });
+        return;
+      }
 
       const postsPage = tabTarget === 'posts' ? targetPage : posts.page;
       const communitiesPage = tabTarget === 'communities' ? targetPage : communities.page;
@@ -433,6 +500,58 @@ export default function SearchResultsPage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [includeNsfw]);
+
+  useEffect(() => {
+    if (activeTab !== 'messages') return;
+    if (messageResults.messages.length === 0) {
+      setMessagePreviewById({});
+      setIsDecryptingMessagePreviews(false);
+      return;
+    }
+
+    let cancelled = false;
+    const decryptPreviews = async () => {
+      setIsDecryptingMessagePreviews(true);
+      const keys = await getOwnKeys();
+      const previews: Record<number, string> = {};
+
+      for (const message of messageResults.messages) {
+        const cipherText =
+          message.sender_id === user?.id
+            ? (message.sender_encrypted_content ?? message.encrypted_content)
+            : message.encrypted_content;
+
+        if (!cipherText) continue;
+
+        if (!keys) {
+          previews[message.id] = t('messages.encrypted');
+          continue;
+        }
+
+        const shouldDecrypt = cipherText.startsWith('v2:') || message.encryption_version === 'v1';
+        if (!shouldDecrypt) {
+          previews[message.id] = cipherText;
+          continue;
+        }
+
+        try {
+          previews[message.id] = await decryptMessage(cipherText, keys.privateKey);
+        } catch {
+          previews[message.id] = t('messages.encrypted');
+        }
+      }
+
+      if (!cancelled) {
+        setMessagePreviewById(previews);
+        setIsDecryptingMessagePreviews(false);
+      }
+    };
+
+    decryptPreviews();
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTab, messageResults.messages, t, user?.id]);
 
   const filteredPosts = useMemo(() => {
     const reddit = posts.reddit ?? [];
@@ -557,6 +676,20 @@ export default function SearchResultsPage() {
           >
             {t('searchPage.tabs.users')}
           </button>
+          <button
+            className={`rounded-md px-3 py-2 text-sm font-semibold ${
+              activeTab === 'messages'
+                ? 'bg-[var(--color-primary)] text-white'
+                : 'bg-[var(--color-surface-elevated)] text-[var(--color-text-primary)]'
+            }`}
+            onClick={() => {
+              setActiveTab('messages');
+              setMessageResults((prev) => ({ ...prev, page: 1 }));
+              handleSearch(query, { tab: 'messages', sort, page: 1 });
+            }}
+          >
+            {t('searchPage.tabs.messages')}
+          </button>
         </div>
 
         <div className="flex items-center gap-2">
@@ -631,6 +764,62 @@ export default function SearchResultsPage() {
               />
             </button>
           </div>
+        )}
+
+        {activeTab === 'messages' && (
+          <>
+            <label className="flex items-center gap-2 text-sm font-medium text-[var(--color-text-primary)]">
+              <input
+                type="checkbox"
+                checked={messageResults.hasFiles}
+                onChange={(event) => {
+                  const hasFiles = event.target.checked;
+                  setMessageResults((prev) => ({ ...prev, hasFiles, page: 1 }));
+                  handleSearch(query, {
+                    tab: 'messages',
+                    sort,
+                    page: 1,
+                    messageFilters: { hasFiles },
+                  });
+                }}
+              />
+              {t('searchPage.messages.hasFiles')}
+            </label>
+            <label className="flex items-center gap-2 text-sm font-medium text-[var(--color-text-primary)]">
+              <input
+                type="checkbox"
+                checked={messageResults.hasLinks}
+                onChange={(event) => {
+                  const hasLinks = event.target.checked;
+                  setMessageResults((prev) => ({ ...prev, hasLinks, page: 1 }));
+                  handleSearch(query, {
+                    tab: 'messages',
+                    sort,
+                    page: 1,
+                    messageFilters: { hasLinks },
+                  });
+                }}
+              />
+              {t('searchPage.messages.hasLinks')}
+            </label>
+            <label className="flex items-center gap-2 text-sm font-medium text-[var(--color-text-primary)]">
+              <input
+                type="checkbox"
+                checked={messageResults.includeArchived}
+                onChange={(event) => {
+                  const includeArchived = event.target.checked;
+                  setMessageResults((prev) => ({ ...prev, includeArchived, page: 1 }));
+                  handleSearch(query, {
+                    tab: 'messages',
+                    sort,
+                    page: 1,
+                    messageFilters: { includeArchived },
+                  });
+                }}
+              />
+              {t('searchPage.messages.includeArchived')}
+            </label>
+          </>
         )}
       </div>
 
@@ -972,6 +1161,67 @@ export default function SearchResultsPage() {
               </div>
             )}
           </div>
+        </div>
+      )}
+
+      {!isLoading && activeTab === 'messages' && (
+        <div className="space-y-3">
+          {messageResults.messages.length === 0 ? (
+            <EmptyState illustration="noResults" title={t('searchPage.empty.messages')} />
+          ) : (
+            <ul className="space-y-2">
+              {messageResults.messages.map((message) => {
+                const preview = messagePreviewById[message.id] ?? t('messages.encrypted');
+                return (
+                  <li
+                    key={message.id}
+                    className="rounded border border-[var(--color-border)] bg-[var(--color-surface)] p-3"
+                  >
+                    <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--color-text-secondary)]">
+                      <span>{t('searchPage.messages.meta.conversation', { id: message.conversation_id })}</span>
+                      <span>•</span>
+                      <span>{t('searchPage.messages.meta.sender', { id: message.sender_id })}</span>
+                      <span>•</span>
+                      <span>{new Date(message.sent_at).toLocaleString()}</span>
+                    </div>
+                    <div className="mt-2 text-sm text-[var(--color-text-primary)]">
+                      {isDecryptingMessagePreviews ? (
+                        <span>{t('messages.searching')}</span>
+                      ) : (
+                        <HighlightedText text={preview} highlight={query} />
+                      )}
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+          <OffsetPaginationControls
+            showDivider={false}
+            className="mt-2"
+            hasPrev={messageResults.page > 1}
+            hasMore={messageResults.page * MESSAGE_PAGE_SIZE < messageResults.total}
+            isFetching={isLoading}
+            onPrev={() =>
+              handleSearch(query, {
+                tab: 'messages',
+                sort,
+                page: Math.max(1, messageResults.page - 1),
+              })
+            }
+            onNext={() =>
+              handleSearch(query, {
+                tab: 'messages',
+                sort,
+                page: messageResults.page + 1,
+              })
+            }
+            centerContent={
+              <span className="text-sm text-[var(--color-text-secondary)]">
+                {t('searchPage.pagination.page', { page: messageResults.page })}
+              </span>
+            }
+          />
         </div>
       )}
     </div>

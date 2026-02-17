@@ -295,7 +295,8 @@
     "tabs": {
       "posts": "المنشورات",
       "communities": "المجتمعات",
-      "users": "المستخدمون"
+      "users": "المستخدمون",
+      "messages": "الرسائل"
     },
     "sort": {
       "relevance": "الصلة",
@@ -317,12 +318,22 @@
       "loadMoreReddit": "تحميل المزيد من مستخدمي Reddit",
       "loadMoreOmni": "تحميل المزيد من المستخدمين"
     },
+    "messages": {
+      "hasFiles": "يحتوي ملفات",
+      "hasLinks": "يحتوي روابط",
+      "includeArchived": "تضمين المؤرشف",
+      "meta": {
+        "conversation": "المحادثة #{{id}}",
+        "sender": "المرسل #{{id}}"
+      }
+    },
     "empty": {
       "posts": "لم يتم العثور على منشورات.",
       "subreddits": "لم يتم العثور على مجتمعات.",
       "hubs": "لم يتم العثور على مجموعات.",
       "redditUsers": "لم يتم العثور على مستخدمي Reddit.",
-      "omniUsers": "لم يتم العثور على مستخدمي Omni."
+      "omniUsers": "لم يتم العثور على مستخدمي Omni.",
+      "messages": "لم يتم العثور على رسائل."
     },
     "errors": {
       "generic": "فشل البحث. يرجى المحاولة مرة أخرى."
@@ -506,6 +517,7 @@
       "userBans": "الحظر",
       "removalReasons": "أسباب الإزالة",
       "modLog": "سجل الإشراف",
+      "reports": "البلاغات",
       "modMail": "بريد المشرفين",
       "requests": "الطلبات"
     },
@@ -604,6 +616,44 @@
         "create_removal_reason": "أنشأ سبب إزالة",
         "update_removal_reason": "حدّث سبب إزالة",
         "delete_removal_reason": "حذف سبب إزالة"
+      }
+    },
+    "reports": {
+      "title": "قائمة البلاغات",
+      "empty": "لا توجد بلاغات في هذه القائمة.",
+      "meta": "المبلّغ #{{reporterId}} · الهدف #{{targetId}} · {{createdAt}}",
+      "sort": {
+        "priority": "الأولوية",
+        "recent": "الأحدث"
+      },
+      "status": {
+        "open": "مفتوح",
+        "approved": "مقبول",
+        "rejected": "مرفوض",
+        "no_action": "بدون إجراء",
+        "reviewed": "تمت المراجعة",
+        "dismissed": "مغلق"
+      },
+      "actions": {
+        "approve": "قبول",
+        "reject": "رفض",
+        "noAction": "بدون إجراء"
+      },
+      "targetType": {
+        "post": "منشور",
+        "comment": "تعليق",
+        "user": "مستخدم",
+        "message": "رسالة",
+        "reddit_comment": "تعليق Reddit"
+      },
+      "reason": {
+        "spam": "رسائل مزعجة",
+        "harassment": "تحرش",
+        "illegal_content": "محتوى غير قانوني",
+        "csam": "CSAM",
+        "violence": "عنف",
+        "hate_speech": "خطاب كراهية",
+        "other": "أخرى"
       }
     },
     "modMail": {
@@ -1209,12 +1259,18 @@
     "labels": {
       "joined": "انضم {{time}}",
       "lastSeen": "آخر ظهور {{time}}",
-      "karma": "كارما"
+      "karma": "كارما",
+      "blocked": "محظور"
     },
     "actions": {
       "viewAll": "عرض الكل",
       "message": "رسالة",
-      "viewThread": "عرض السلسلة"
+      "viewThread": "عرض السلسلة",
+      "block": "حظر",
+      "unblock": "إلغاء الحظر",
+      "confirmBlock": "هل تريد حظر {{username}}؟ لن ترى رسائله.",
+      "report": "الإبلاغ عن المستخدم",
+      "reportFailed": "فشل إرسال البلاغ: {{message}}"
     },
     "posts": {
       "empty": "لا توجد منشورات بعد."
@@ -1337,13 +1393,15 @@
     "send": "إرسال",
     "noMessages": "لا توجد رسائل بعد",
     "status": {
-      "loadingMessages": "جارٍ تحميل الرسائل..."
+      "loadingMessages": "جارٍ تحميل الرسائل...",
+      "reporting": "جارٍ الإبلاغ..."
     },
     "empty": {
       "startConversation": "لا توجد رسائل بعد. ابدأ المحادثة!"
     },
     "actions": {
-      "loadOlder": "تحميل الرسائل الأقدم"
+      "loadOlder": "تحميل الرسائل الأقدم",
+      "report": "إبلاغ"
     },
     "typing": "{{username}} يكتب الآن...",
     "online": "متصل",
@@ -1371,7 +1429,18 @@
       "clearLabel": "مسح البحث",
       "conversationResults_one": "تم العثور على {{count}} محادثة",
       "conversationResults_other": "تم العثور على {{count}} محادثات",
-      "ariaToggle": "بحث الرسائل"
+      "ariaToggle": "بحث الرسائل",
+      "filters": {
+        "senderAll": "كل المرسلين",
+        "senderMine": "رسائلي",
+        "senderOthers": "الآخرون",
+        "dateAll": "أي وقت",
+        "date24h": "آخر 24 ساعة",
+        "date7d": "آخر 7 أيام",
+        "date30d": "آخر 30 يوماً",
+        "hasFiles": "يحتوي ملفات",
+        "hasLinks": "يحتوي روابط"
+      }
     },
     "media": {
       "viewAllTitle": "عرض كافة الوسائط من هذه المحادثة في عرض شرائح",
@@ -1406,7 +1475,8 @@
       "deleteConversationFailed": "فشل حذف المحادثة",
       "recipientKeyNotFound": "لم يتم العثور على المفتاح العام للمستلم",
       "encryptionKeysMissing": "مفاتيح التشفير الخاصة بك غير مُعدّة",
-      "sendFailed": "فشل في إرسال الرسالة. يرجى المحاولة مرة أخرى."
+      "sendFailed": "فشل في إرسال الرسالة. يرجى المحاولة مرة أخرى.",
+      "reportFailed": "فشل إرسال البلاغ: {{message}}"
     },
     "messageOptions": {
       "ariaLabel": "خيارات الرسالة"
@@ -1477,7 +1547,7 @@
     "save": "حفظ",
     "hide": "إخفاء",
     "report": {
-      "reasonPrompt": "سبب الإبلاغ (اختياري):",
+      "reasonPrompt": "سبب الإبلاغ (اختر واحدًا): spam, harassment, illegal_content, csam, violence, hate_speech, other",
       "success": "شكرًا! تم إبلاغ فريق الإشراف."
     },
     "delete": "حذف",
@@ -1601,6 +1671,12 @@
       "user": "مستخدم",
       "unknownUser": "مستخدم غير معروف"
     }
+  },
+  "reporting": {
+    "reasonPrompt": "سبب الإبلاغ (اختر واحدًا): spam, harassment, illegal_content, csam, violence, hate_speech, other",
+    "detailsPrompt": "تفاصيل إضافية (اختياري):",
+    "invalidReason": "سبب غير صالح. استخدم أحد القيم التالية: spam, harassment, illegal_content, csam, violence, hate_speech, other.",
+    "success": "شكرًا! تم إبلاغ فريق الإشراف."
   },
   "comments": {
     "title": "التعليقات",
@@ -2028,6 +2104,24 @@
       "title": "حذف الحساب",
       "description": "احذف حسابك وكافة البيانات المرتبطة به بشكل دائم. يتضمن هذا الإجراء فترة سماح مدتها 30 يوماً يمكنك خلالها إلغاء الحذف.",
       "manageButton": "إدارة حذف الحساب"
+    },
+    "blockedUsers": {
+      "title": "المستخدمون المحظورون",
+      "description": "قم بإدارة الأشخاص الذين قمت بحظرهم. لا يمكن للمستخدمين المحظورين مراسلتك أو بدء محادثات جديدة معك.",
+      "manageButton": "إدارة المستخدمين المحظورين"
+    }
+  },
+  "blockedUsersPage": {
+    "title": "المستخدمون المحظورون",
+    "subtitle": "الأشخاص الذين قمت بحظرهم عبر الرسائل المباشرة والملفات الشخصية.",
+    "loading": "جاري تحميل المستخدمين المحظورين...",
+    "empty": "لم تقم بحظر أي شخص بعد.",
+    "blockedAt": "تم الحظر في {{time}}",
+    "actions": {
+      "unblock": "إلغاء الحظر"
+    },
+    "errors": {
+      "loadFailed": "فشل تحميل المستخدمين المحظورين."
     }
   },
   "errors": {
@@ -2269,7 +2363,12 @@
     "deleteReason": "سبب الحذف",
     "deleteReasonPlaceholder": "مثال: انتهاك القاعدة 3: لا رسائل مزعجة...",
     "modmailNote": "سيتلقى المؤلف رسالة بريدية بالسبب.",
-    "reasonRequired": "يرجى تقديم سبب للحذف"
+    "reasonRequired": "يرجى تقديم سبب للحذف",
+    "dashboard": {
+      "title": "لوحة الإشراف",
+      "subtitle": "راجع بلاغات المستخدمين وتعامل بسرعة مع الحالات عالية الأولوية.",
+      "queueTitle": "قائمة البلاغات"
+    }
   },
   "slideshow": {
     "closeLabel": "إغلاق العرض (Esc)",
@@ -3170,6 +3269,9 @@
         "totalConversations": "اجمالي المحادثات",
         "totalMessages": "اجمالي الرسائل",
         "totalReports": "اجمالي البلاغات",
+        "openReports": "البلاغات المفتوحة",
+        "falseReportRate": "نسبة البلاغات الكاذبة",
+        "avgReportResolutionHours": "متوسط زمن الحل (ساعات)",
         "admins": "المسؤولون",
         "hubModerators": "مشرفو المحور"
       }

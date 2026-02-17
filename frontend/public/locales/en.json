@@ -295,7 +295,8 @@
     "tabs": {
       "posts": "Posts",
       "communities": "Communities",
-      "users": "Users"
+      "users": "Users",
+      "messages": "Messages"
     },
     "sort": {
       "relevance": "Relevance",
@@ -317,12 +318,22 @@
       "loadMoreReddit": "Load more Reddit users",
       "loadMoreOmni": "Load more users"
     },
+    "messages": {
+      "hasFiles": "Has files",
+      "hasLinks": "Has links",
+      "includeArchived": "Include archived",
+      "meta": {
+        "conversation": "Conversation #{{id}}",
+        "sender": "Sender #{{id}}"
+      }
+    },
     "empty": {
       "posts": "No posts found.",
       "subreddits": "No subreddits found.",
       "hubs": "No hubs found.",
       "redditUsers": "No Reddit users found.",
-      "omniUsers": "No Omni users found."
+      "omniUsers": "No Omni users found.",
+      "messages": "No messages found."
     },
     "errors": {
       "generic": "Search failed. Please try again."
@@ -506,6 +517,7 @@
       "userBans": "User Bans",
       "removalReasons": "Removal Reasons",
       "modLog": "Mod Log",
+      "reports": "Reports",
       "modMail": "Mod Mail",
       "requests": "Requests"
     },
@@ -604,6 +616,44 @@
         "create_removal_reason": "created removal reason",
         "update_removal_reason": "updated removal reason",
         "delete_removal_reason": "deleted removal reason"
+      }
+    },
+    "reports": {
+      "title": "Reports Queue",
+      "empty": "No reports in this queue.",
+      "meta": "Reporter #{{reporterId}} · Target #{{targetId}} · {{createdAt}}",
+      "sort": {
+        "priority": "Priority",
+        "recent": "Most Recent"
+      },
+      "status": {
+        "open": "Open",
+        "approved": "Approved",
+        "rejected": "Rejected",
+        "no_action": "No Action",
+        "reviewed": "Reviewed",
+        "dismissed": "Dismissed"
+      },
+      "actions": {
+        "approve": "Approve",
+        "reject": "Reject",
+        "noAction": "No Action"
+      },
+      "targetType": {
+        "post": "Post",
+        "comment": "Comment",
+        "user": "User",
+        "message": "Message",
+        "reddit_comment": "Reddit Comment"
+      },
+      "reason": {
+        "spam": "Spam",
+        "harassment": "Harassment",
+        "illegal_content": "Illegal Content",
+        "csam": "CSAM",
+        "violence": "Violence",
+        "hate_speech": "Hate Speech",
+        "other": "Other"
       }
     },
     "modMail": {
@@ -1209,12 +1259,18 @@
     "labels": {
       "joined": "Joined {{time}}",
       "lastSeen": "Last seen {{time}}",
-      "karma": "karma"
+      "karma": "karma",
+      "blocked": "Blocked"
     },
     "actions": {
       "viewAll": "View all",
       "message": "Message",
-      "viewThread": "View thread"
+      "viewThread": "View thread",
+      "block": "Block",
+      "unblock": "Unblock",
+      "confirmBlock": "Block {{username}}? You won't see their messages.",
+      "report": "Report User",
+      "reportFailed": "Failed to submit report: {{message}}"
     },
     "posts": {
       "empty": "No posts yet."
@@ -1337,13 +1393,15 @@
     "send": "Send",
     "noMessages": "No messages yet",
     "status": {
-      "loadingMessages": "Loading messages..."
+      "loadingMessages": "Loading messages...",
+      "reporting": "Reporting..."
     },
     "empty": {
       "startConversation": "No messages yet. Start the conversation!"
     },
     "actions": {
-      "loadOlder": "Load older messages"
+      "loadOlder": "Load older messages",
+      "report": "Report"
     },
     "typing": "{{username}} is typing...",
     "online": "Online",
@@ -1371,7 +1429,18 @@
       "clearLabel": "Clear search",
       "conversationResults_one": "{{count}} conversation found",
       "conversationResults_other": "{{count}} conversations found",
-      "ariaToggle": "Search messages"
+      "ariaToggle": "Search messages",
+      "filters": {
+        "senderAll": "All senders",
+        "senderMine": "My messages",
+        "senderOthers": "Others",
+        "dateAll": "Any time",
+        "date24h": "Last 24h",
+        "date7d": "Last 7 days",
+        "date30d": "Last 30 days",
+        "hasFiles": "Has files",
+        "hasLinks": "Has links"
+      }
     },
     "media": {
       "viewAllTitle": "View all media from this conversation in a slideshow",
@@ -1406,7 +1475,8 @@
       "deleteConversationFailed": "Failed to delete conversation",
       "recipientKeyNotFound": "Recipient public key not found",
       "encryptionKeysMissing": "Your encryption keys are not set up",
-      "sendFailed": "Failed to send message. Please try again."
+      "sendFailed": "Failed to send message. Please try again.",
+      "reportFailed": "Failed to submit report: {{message}}"
     },
     "messageOptions": {
       "ariaLabel": "Message options"
@@ -1475,7 +1545,7 @@
     "save": "Save",
     "hide": "Hide",
     "report": {
-      "reasonPrompt": "Reason for reporting (optional):",
+      "reasonPrompt": "Report reason (type one): spam, harassment, illegal_content, csam, violence, hate_speech, other",
       "success": "Thanks! The moderation team has been notified."
     },
     "delete": "Delete",
@@ -1601,6 +1671,12 @@
       "user": "User",
       "unknownUser": "Unknown user"
     }
+  },
+  "reporting": {
+    "reasonPrompt": "Report reason (type one): spam, harassment, illegal_content, csam, violence, hate_speech, other",
+    "detailsPrompt": "Additional details (optional):",
+    "invalidReason": "Invalid reason. Use one of: spam, harassment, illegal_content, csam, violence, hate_speech, other.",
+    "success": "Thanks! The moderation team has been notified."
   },
   "comments": {
     "title": "Comments",
@@ -2028,6 +2104,24 @@
       "title": "Delete Account",
       "description": "Permanently delete your account and all associated data. This action has a 30-day grace period during which you can cancel the deletion.",
       "manageButton": "Manage Account Deletion"
+    },
+    "blockedUsers": {
+      "title": "Blocked Users",
+      "description": "Manage people you have blocked. Blocked users cannot message you or start new conversations with you.",
+      "manageButton": "Manage Blocked Users"
+    }
+  },
+  "blockedUsersPage": {
+    "title": "Blocked Users",
+    "subtitle": "People you've blocked across direct messages and profiles.",
+    "loading": "Loading blocked users...",
+    "empty": "You haven't blocked anyone yet.",
+    "blockedAt": "Blocked on {{time}}",
+    "actions": {
+      "unblock": "Unblock"
+    },
+    "errors": {
+      "loadFailed": "Failed to load blocked users."
     }
   },
   "errors": {
@@ -2269,7 +2363,12 @@
     "deleteReason": "Reason for deletion",
     "deleteReasonPlaceholder": "E.g., Violates rule 3: No spam...",
     "modmailNote": "The author will receive a modmail with your reason.",
-    "reasonRequired": "Please provide a reason for deletion"
+    "reasonRequired": "Please provide a reason for deletion",
+    "dashboard": {
+      "title": "Moderation Dashboard",
+      "subtitle": "Review user reports and resolve high-priority issues quickly.",
+      "queueTitle": "Report Queue"
+    }
   },
   "slideshow": {
     "closeLabel": "Close slideshow (Esc)",
@@ -3170,6 +3269,9 @@
         "totalConversations": "Total Conversations",
         "totalMessages": "Total Messages",
         "totalReports": "Total Reports",
+        "openReports": "Open Reports",
+        "falseReportRate": "False Report Rate",
+        "avgReportResolutionHours": "Avg Report Resolution (hrs)",
         "admins": "Admins",
         "hubModerators": "Hub Moderators"
       }
