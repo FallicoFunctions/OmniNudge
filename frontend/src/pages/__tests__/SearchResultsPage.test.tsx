@@ -168,6 +168,41 @@ describe('SearchResultsPage message search URL behavior', () => {
     });
   });
 
+  it('applies conversation and sender filters from message-tab controls', async () => {
+    const user = userEvent.setup();
+    renderPage('/search?tab=messages&q=hello&sort=relevance');
+
+    await waitFor(() => {
+      expect(searchMessagesMock).toHaveBeenCalled();
+    });
+
+    searchMessagesMock.mockClear();
+
+    const conversationInput = screen.getByLabelText('Conversation');
+    const senderInput = screen.getByLabelText('Sender');
+    await user.clear(conversationInput);
+    await user.type(conversationInput, '42');
+    await user.clear(senderInput);
+    await user.type(senderInput, '7');
+    await user.click(screen.getByRole('button', { name: 'Apply' }));
+
+    await waitFor(() => {
+      expect(searchMessagesMock).toHaveBeenCalledWith({
+        query: 'hello',
+        sort: 'relevance',
+        limit: 50,
+        offset: 0,
+        conversationId: 42,
+        senderId: 7,
+        hasFiles: false,
+        hasLinks: false,
+        includeArchived: false,
+        startDate: undefined,
+        endDate: undefined,
+      });
+    });
+  });
+
   it('does not call message search API when unauthenticated', async () => {
     useAuthMock.mockReturnValue({ user: null });
     renderPage('/search?tab=messages&q=thread');

@@ -173,6 +173,20 @@ export default function SearchResultsPage() {
   const [sendRepliesToInbox, setSendRepliesToInbox] = useState(true);
   const [hideTarget, setHideTarget] = useState<HideTarget | null>(null);
 
+  const parseLocalDateTimeToRFC3339 = (value: string): string | undefined => {
+    if (!value.trim()) return undefined;
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return undefined;
+    return parsed.toISOString();
+  };
+
+  const formatRFC3339ForLocalInput = (value?: string): string => {
+    if (!value) return '';
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return '';
+    return parsed.toISOString().slice(0, 16);
+  };
+
   const savedPostsKey = ['saved-items', 'posts'] as const;
   const hiddenPostsKey = ['hidden-items', 'posts'] as const;
   const savedRedditPostsKey = ['saved-items', 'reddit_posts'] as const;
@@ -379,7 +393,12 @@ export default function SearchResultsPage() {
       sort?: SortOrder;
       page?: number;
       append?: boolean;
-      messageFilters?: Partial<Pick<typeof messageResults, 'hasFiles' | 'hasLinks' | 'includeArchived'>>;
+      messageFilters?: Partial<
+        Pick<
+          typeof messageResults,
+          'hasFiles' | 'hasLinks' | 'includeArchived' | 'conversationId' | 'senderId' | 'startDate' | 'endDate'
+        >
+      >;
     }
   ) => {
     const tabTarget = opts?.tab ?? activeTab;
@@ -412,10 +431,11 @@ export default function SearchResultsPage() {
         const hasLinks = opts?.messageFilters?.hasLinks ?? messageResults.hasLinks;
         const includeArchived =
           opts?.messageFilters?.includeArchived ?? messageResults.includeArchived;
-        const conversationId = messageResults.conversationId;
-        const senderId = messageResults.senderId;
-        const startDate = messageResults.startDate;
-        const endDate = messageResults.endDate;
+        const conversationId =
+          opts?.messageFilters?.conversationId ?? messageResults.conversationId;
+        const senderId = opts?.messageFilters?.senderId ?? messageResults.senderId;
+        const startDate = opts?.messageFilters?.startDate ?? messageResults.startDate;
+        const endDate = opts?.messageFilters?.endDate ?? messageResults.endDate;
         const response = await searchMessagesApi({
           query: q,
           sort: opts?.sort ?? sort,
@@ -435,6 +455,10 @@ export default function SearchResultsPage() {
           messages: response.messages ?? [],
           total: response.total ?? 0,
           page: targetPage,
+          conversationId,
+          senderId,
+          startDate,
+          endDate,
         }));
 
         const nextParams = new URLSearchParams(location.search);
@@ -842,6 +866,115 @@ export default function SearchResultsPage() {
 
         {activeTab === 'messages' && (
           <>
+            <label className="flex items-center gap-2 text-sm font-medium text-[var(--color-text-primary)]">
+              <span>{t('searchPage.messages.filters.conversationId')}</span>
+              <input
+                type="number"
+                min={1}
+                value={messageResults.conversationId ?? ''}
+                onChange={(event) => {
+                  const raw = event.target.value.trim();
+                  const parsed = raw ? Number.parseInt(raw, 10) : NaN;
+                  setMessageResults((prev) => ({
+                    ...prev,
+                    conversationId: Number.isFinite(parsed) && parsed > 0 ? parsed : undefined,
+                  }));
+                }}
+                className="w-24 rounded border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-2 py-1 text-xs"
+              />
+            </label>
+            <label className="flex items-center gap-2 text-sm font-medium text-[var(--color-text-primary)]">
+              <span>{t('searchPage.messages.filters.senderId')}</span>
+              <input
+                type="number"
+                min={1}
+                value={messageResults.senderId ?? ''}
+                onChange={(event) => {
+                  const raw = event.target.value.trim();
+                  const parsed = raw ? Number.parseInt(raw, 10) : NaN;
+                  setMessageResults((prev) => ({
+                    ...prev,
+                    senderId: Number.isFinite(parsed) && parsed > 0 ? parsed : undefined,
+                  }));
+                }}
+                className="w-24 rounded border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-2 py-1 text-xs"
+              />
+            </label>
+            <label className="flex items-center gap-2 text-sm font-medium text-[var(--color-text-primary)]">
+              <span>{t('searchPage.messages.filters.startDate')}</span>
+              <input
+                type="datetime-local"
+                value={formatRFC3339ForLocalInput(messageResults.startDate)}
+                onChange={(event) => {
+                  setMessageResults((prev) => ({
+                    ...prev,
+                    startDate: parseLocalDateTimeToRFC3339(event.target.value),
+                  }));
+                }}
+                className="rounded border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-2 py-1 text-xs"
+              />
+            </label>
+            <label className="flex items-center gap-2 text-sm font-medium text-[var(--color-text-primary)]">
+              <span>{t('searchPage.messages.filters.endDate')}</span>
+              <input
+                type="datetime-local"
+                value={formatRFC3339ForLocalInput(messageResults.endDate)}
+                onChange={(event) => {
+                  setMessageResults((prev) => ({
+                    ...prev,
+                    endDate: parseLocalDateTimeToRFC3339(event.target.value),
+                  }));
+                }}
+                className="rounded border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-2 py-1 text-xs"
+              />
+            </label>
+            <button
+              type="button"
+              className="rounded-md bg-[var(--color-primary)] px-3 py-1 text-xs font-semibold text-white hover:bg-[var(--color-primary-dark)]"
+              onClick={() => {
+                setMessageResults((prev) => ({ ...prev, page: 1 }));
+                handleSearch(query, {
+                  tab: 'messages',
+                  sort,
+                  page: 1,
+                  messageFilters: {
+                    conversationId: messageResults.conversationId,
+                    senderId: messageResults.senderId,
+                    startDate: messageResults.startDate,
+                    endDate: messageResults.endDate,
+                  },
+                });
+              }}
+            >
+              {t('searchPage.messages.filters.apply')}
+            </button>
+            <button
+              type="button"
+              className="rounded-md bg-[var(--color-surface-elevated)] px-3 py-1 text-xs font-semibold text-[var(--color-text-primary)]"
+              onClick={() => {
+                setMessageResults((prev) => ({
+                  ...prev,
+                  page: 1,
+                  conversationId: undefined,
+                  senderId: undefined,
+                  startDate: undefined,
+                  endDate: undefined,
+                }));
+                handleSearch(query, {
+                  tab: 'messages',
+                  sort,
+                  page: 1,
+                  messageFilters: {
+                    conversationId: undefined,
+                    senderId: undefined,
+                    startDate: undefined,
+                    endDate: undefined,
+                  },
+                });
+              }}
+            >
+              {t('searchPage.messages.filters.clear')}
+            </button>
             <label className="flex items-center gap-2 text-sm font-medium text-[var(--color-text-primary)]">
               <input
                 type="checkbox"
