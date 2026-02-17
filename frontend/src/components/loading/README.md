@@ -136,3 +136,23 @@ All loading components include:
 - `aria-label` for screen readers
 - `sr-only` text where appropriate
 - Keyboard navigation support (no focus traps)
+
+## Showcase (Storybook-Equivalent)
+
+- Dev route: `/dev/loading-states`
+- Includes:
+  - Spinner sizes
+  - Shimmer effect
+  - Skeleton variants (post, list, card)
+  - Determinate and indeterminate progress bars
+  - Duration-threshold simulator based on:
+    - `<500ms`: none
+    - `500ms-3s`: spinner/skeleton
+    - `>3s`: progress bar when measurable
+
+## Slow 3G Test Checklist
+
+1. Open browser DevTools and enable network throttle `Slow 3G`.
+2. Visit `/`, `/posts/:id`, `/users/:username`.
+3. Confirm skeletons render quickly and no severe layout shift appears.
+4. Trigger long-running actions (upload/export where available) and verify progress indicators remain visible.

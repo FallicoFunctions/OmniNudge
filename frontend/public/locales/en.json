@@ -3298,5 +3298,37 @@
       "userId": "User ID: {{id}}",
       "byLine": "{{date}} by {{admin}} (ID: {{id}})"
     }
+  },
+  "loadingShowcase": {
+    "title": "Loading State Showcase",
+    "subtitle": "Reference patterns for spinner, skeleton, progress, and shimmer states.",
+    "threshold": {
+      "title": "Duration Threshold Simulator",
+      "description": "Rules: <500ms no indicator, 500ms-3s spinner/skeleton, >3s progress when measurable.",
+      "start": "Start Simulation",
+      "reset": "Reset",
+      "elapsed": "Elapsed: {{elapsed}}ms",
+      "pattern": "Recommended Pattern: {{pattern}}"
+    },
+    "spinner": {
+      "title": "Spinner Sizes"
+    },
+    "shimmer": {
+      "title": "Shimmer Effect"
+    },
+    "skeleton": {
+      "post": "Post Skeleton",
+      "list": "List Skeleton",
+      "card": "Card Skeleton"
+    },
+    "progress": {
+      "title": "Progress Variants"
+    },
+    "slow3g": {
+      "title": "Slow 3G Verification",
+      "step1": "Open browser DevTools and enable network throttling: Slow 3G.",
+      "step2": "Navigate through feed, post, and profile pages and verify skeletons render immediately.",
+      "step3": "Confirm no layout shift regressions and that progress bars remain visible on long operations."
+    }
   }
 }
