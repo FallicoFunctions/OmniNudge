@@ -21,6 +21,21 @@ interface LogEntry {
   user_agent: string;
 }
 
+declare global {
+  interface Window {
+    Sentry?: {
+      captureException: (
+        error: unknown,
+        context?: {
+          level?: 'info' | 'warning' | 'error' | 'fatal';
+          tags?: Record<string, string>;
+          extra?: Record<string, unknown>;
+        }
+      ) => void;
+    };
+  }
+}
+
 class Logger {
   private sessionId: string;
   private logCounts = new Map<string, number>();
@@ -158,6 +173,21 @@ window.addEventListener('error', (event) => {
     colno: event.colno,
     error: event.error?.stack,
   });
+
+  if (window.Sentry) {
+    window.Sentry.captureException(event.error ?? new Error(event.message), {
+      level: 'fatal',
+      tags: {
+        area: 'global_window_error',
+        source: 'window_error',
+      },
+      extra: {
+        filename: event.filename,
+        lineno: event.lineno,
+        colno: event.colno,
+      },
+    });
+  }
 });
 
 // Global promise rejection handler
@@ -166,4 +196,15 @@ window.addEventListener('unhandledrejection', (event) => {
     reason: event.reason?.message || String(event.reason),
     stack: event.reason?.stack,
   });
+
+  if (window.Sentry) {
+    const reason = event.reason instanceof Error ? event.reason : new Error(String(event.reason));
+    window.Sentry.captureException(reason, {
+      level: 'fatal',
+      tags: {
+        area: 'global_promise_rejection',
+        source: 'unhandledrejection',
+      },
+    });
+  }
 });

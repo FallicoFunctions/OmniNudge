@@ -18,10 +18,12 @@ type FeatureFlag struct {
 
 // RollbackTrigger defines conditions for automated feature rollback
 type RollbackTrigger struct {
-	MetricType    string  `json:"metric_type"`     // 'error_rate', 'latency'
-	Threshold     float64 `json:"threshold"`       // e.g., 0.01 for 1%
-	MinSampleSize int     `json:"min_sample_size"` // e.g., 100
-	WindowSeconds int     `json:"window_seconds"`  // e.g., 60
+	MetricType         string  `json:"metric_type"`                    // 'error_rate', 'latency'
+	Threshold          float64 `json:"threshold"`                      // e.g., 0.01 for 1%
+	CrashRateThreshold float64 `json:"crash_rate_threshold,omitempty"` // e.g., 0.001 (0.1%)
+	ComplaintThreshold int     `json:"complaint_threshold,omitempty"`  // e.g., 10 complaints
+	MinSampleSize      int     `json:"min_sample_size"`                // e.g., 100
+	WindowSeconds      int     `json:"window_seconds"`                 // e.g., 60
 }
 
 // FeatureFlagOverride represents a per-user override
