@@ -45,7 +45,7 @@ Implementation details:
   - `has_links`
   - `start_date`, `end_date` (RFC3339)
 - Supports pagination:
-  - `limit` (1-100)
+  - `limit` (1-100, frontend default 50)
   - `offset` (>=0)
   - includes `total` in response
 - Supports sort modes:
@@ -65,12 +65,17 @@ Encryption note:
 - Server-side text matching is best-effort for rows where searchable plaintext-like content is present.
 - Full content search for encrypted text should use client-side decrypted search flows.
 
+Incremental update model:
+- Message search is query-time over the canonical `messages` table; no async reindex queue is required.
+- New messages become searchable immediately after commit.
+- Update/delete visibility is applied in real time via message/conversation visibility flags.
+
 ## Query Syntax
 
 Message search example:
 
 ```http
-GET /api/v1/search/messages?q=hello&conversation_id=42&has_files=true&start_date=2026-02-01T00:00:00Z&end_date=2026-02-17T23:59:59Z&limit=25&offset=0
+GET /api/v1/search/messages?q=hello&conversation_id=42&has_files=true&start_date=2026-02-01T00:00:00Z&end_date=2026-02-17T23:59:59Z&limit=50&offset=0
 Authorization: Bearer <jwt>
 ```
 
