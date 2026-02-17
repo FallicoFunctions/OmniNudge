@@ -295,7 +295,8 @@
     "tabs": {
       "posts": "Posts",
       "communities": "Comunidades",
-      "users": "Usuarios"
+      "users": "Usuarios",
+      "messages": "Mensajes"
     },
     "sort": {
       "relevance": "Relevancia",
@@ -317,12 +318,22 @@
       "loadMoreReddit": "Cargar más usuarios de Reddit",
       "loadMoreOmni": "Cargar más usuarios"
     },
+    "messages": {
+      "hasFiles": "Con archivos",
+      "hasLinks": "Con enlaces",
+      "includeArchived": "Incluir archivados",
+      "meta": {
+        "conversation": "Conversación n.º {{id}}",
+        "sender": "Remitente n.º {{id}}"
+      }
+    },
     "empty": {
       "posts": "No se encontraron posts.",
       "subreddits": "No se encontraron subreddits.",
       "hubs": "No se encontraron hubs.",
       "redditUsers": "No se encontraron usuarios de Reddit.",
-      "omniUsers": "No se encontraron usuarios de Omni."
+      "omniUsers": "No se encontraron usuarios de Omni.",
+      "messages": "No se encontraron mensajes."
     },
     "errors": {
       "generic": "La búsqueda falló. Por favor, inténtalo de nuevo."
@@ -506,6 +517,7 @@
       "userBans": "Baneos",
       "removalReasons": "Razones de eliminación",
       "modLog": "Registro",
+      "reports": "Reportes",
       "modMail": "Correo de moderación",
       "requests": "Solicitudes"
     },
@@ -604,6 +616,44 @@
         "create_removal_reason": "creó una razón de eliminación",
         "update_removal_reason": "actualizó una razón de eliminación",
         "delete_removal_reason": "eliminó una razón de eliminación"
+      }
+    },
+    "reports": {
+      "title": "Cola de reportes",
+      "empty": "No hay reportes en esta cola.",
+      "meta": "Reportante #{{reporterId}} · Objetivo #{{targetId}} · {{createdAt}}",
+      "sort": {
+        "priority": "Prioridad",
+        "recent": "Más recientes"
+      },
+      "status": {
+        "open": "Abierto",
+        "approved": "Aprobado",
+        "rejected": "Rechazado",
+        "no_action": "Sin acción",
+        "reviewed": "Revisado",
+        "dismissed": "Descartado"
+      },
+      "actions": {
+        "approve": "Aprobar",
+        "reject": "Rechazar",
+        "noAction": "Sin acción"
+      },
+      "targetType": {
+        "post": "Post",
+        "comment": "Comentario",
+        "user": "Usuario",
+        "message": "Mensaje",
+        "reddit_comment": "Comentario de Reddit"
+      },
+      "reason": {
+        "spam": "Spam",
+        "harassment": "Acoso",
+        "illegal_content": "Contenido ilegal",
+        "csam": "CSAM",
+        "violence": "Violencia",
+        "hate_speech": "Discurso de odio",
+        "other": "Otro"
       }
     },
     "modMail": {
@@ -1209,12 +1259,18 @@
     "labels": {
       "joined": "Se unió {{time}}",
       "lastSeen": "Visto por última vez {{time}}",
-      "karma": "karma"
+      "karma": "karma",
+      "blocked": "Bloqueado"
     },
     "actions": {
       "viewAll": "Ver todo",
       "message": "Mensaje",
-      "viewThread": "Ver hilo"
+      "viewThread": "Ver hilo",
+      "block": "Bloquear",
+      "unblock": "Desbloquear",
+      "confirmBlock": "¿Bloquear a {{username}}? No verás sus mensajes.",
+      "report": "Reportar usuario",
+      "reportFailed": "No se pudo enviar el reporte: {{message}}"
     },
     "posts": {
       "empty": "Aún no hay posts."
@@ -1337,13 +1393,15 @@
     "send": "Enviar",
     "noMessages": "Aún no hay mensajes",
     "status": {
-      "loadingMessages": "Cargando mensajes..."
+      "loadingMessages": "Cargando mensajes...",
+      "reporting": "Reportando..."
     },
     "empty": {
       "startConversation": "Aún no hay mensajes. ¡Comienza la conversación!"
     },
     "actions": {
-      "loadOlder": "Cargar mensajes anteriores"
+      "loadOlder": "Cargar mensajes anteriores",
+      "report": "Reportar"
     },
     "typing": "{{username}} está escribiendo...",
     "online": "En línea",
@@ -1371,7 +1429,18 @@
       "clearLabel": "Limpiar búsqueda",
       "conversationResults_one": "{{count}} conversación encontrada",
       "conversationResults_other": "{{count}} conversaciones encontradas",
-      "ariaToggle": "Buscar mensajes"
+      "ariaToggle": "Buscar mensajes",
+      "filters": {
+        "senderAll": "Todos los remitentes",
+        "senderMine": "Mis mensajes",
+        "senderOthers": "Otros",
+        "dateAll": "Cualquier fecha",
+        "date24h": "Últimas 24 h",
+        "date7d": "Últimos 7 días",
+        "date30d": "Últimos 30 días",
+        "hasFiles": "Con archivos",
+        "hasLinks": "Con enlaces"
+      }
     },
     "media": {
       "viewAllTitle": "Ver toda la media de esta conversación en un carrusel",
@@ -1406,7 +1475,8 @@
       "deleteConversationFailed": "No se pudo eliminar la conversación",
       "recipientKeyNotFound": "No se encontró la clave pública del destinatario",
       "encryptionKeysMissing": "Tus claves de cifrado no están configuradas",
-      "sendFailed": "No se pudo enviar el mensaje. Inténtalo de nuevo."
+      "sendFailed": "No se pudo enviar el mensaje. Inténtalo de nuevo.",
+      "reportFailed": "No se pudo enviar el reporte: {{message}}"
     },
     "messageOptions": {
       "ariaLabel": "Opciones de mensaje"
@@ -1477,7 +1547,7 @@
     "save": "Guardar",
     "hide": "Ocultar",
     "report": {
-      "reasonPrompt": "Motivo del reporte (opcional):",
+      "reasonPrompt": "Motivo del reporte (elige uno): spam, harassment, illegal_content, csam, violence, hate_speech, other",
       "success": "¡Gracias! El equipo de moderación ha sido notificado."
     },
     "delete": "Eliminar",
@@ -1601,6 +1671,12 @@
       "user": "Usuario",
       "unknownUser": "Usuario desconocido"
     }
+  },
+  "reporting": {
+    "reasonPrompt": "Motivo del reporte (elige uno): spam, harassment, illegal_content, csam, violence, hate_speech, other",
+    "detailsPrompt": "Detalles adicionales (opcional):",
+    "invalidReason": "Motivo inválido. Usa uno de: spam, harassment, illegal_content, csam, violence, hate_speech, other.",
+    "success": "¡Gracias! El equipo de moderación ha sido notificado."
   },
   "comments": {
     "title": "Comentarios",
@@ -2028,6 +2104,24 @@
       "title": "Eliminar Cuenta",
       "description": "Elimina permanentemente tu cuenta y todos los datos asociados. Esta acción tiene un periodo de gracia de 30 días durante el cual puedes cancelar la eliminación.",
       "manageButton": "Gestionar Eliminación de Cuenta"
+    },
+    "blockedUsers": {
+      "title": "Usuarios Bloqueados",
+      "description": "Gestiona las personas que has bloqueado. Los usuarios bloqueados no pueden enviarte mensajes ni iniciar nuevas conversaciones contigo.",
+      "manageButton": "Gestionar Usuarios Bloqueados"
+    }
+  },
+  "blockedUsersPage": {
+    "title": "Usuarios Bloqueados",
+    "subtitle": "Personas que has bloqueado en mensajes directos y perfiles.",
+    "loading": "Cargando usuarios bloqueados...",
+    "empty": "Aún no has bloqueado a nadie.",
+    "blockedAt": "Bloqueado el {{time}}",
+    "actions": {
+      "unblock": "Desbloquear"
+    },
+    "errors": {
+      "loadFailed": "No se pudieron cargar los usuarios bloqueados."
     }
   },
   "errors": {
@@ -2269,7 +2363,12 @@
     "deleteReason": "Razón para la eliminación",
     "deleteReasonPlaceholder": "Ej., Viola la regla 3: No spam...",
     "modmailNote": "El autor recibirá un modmail con tu razón.",
-    "reasonRequired": "Por favor, proporciona una razón para la eliminación"
+    "reasonRequired": "Por favor, proporciona una razón para la eliminación",
+    "dashboard": {
+      "title": "Panel de Moderación",
+      "subtitle": "Revisa reportes de usuarios y resuelve rápido los casos de alta prioridad.",
+      "queueTitle": "Cola de reportes"
+    }
   },
   "slideshow": {
     "closeLabel": "Cerrar presentación (Esc)",
@@ -3170,6 +3269,9 @@
         "totalConversations": "Conversaciones totales",
         "totalMessages": "Mensajes totales",
         "totalReports": "Reportes totales",
+        "openReports": "Reportes abiertos",
+        "falseReportRate": "Tasa de reportes falsos",
+        "avgReportResolutionHours": "Promedio de resolución (horas)",
         "admins": "Admins",
         "hubModerators": "Moderadores del hub"
       }

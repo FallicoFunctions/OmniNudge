@@ -3,6 +3,7 @@ import type { SubredditSuggestion, RedditPostsResponse } from '../types/reddit';
 import type { PlatformPost } from '../types/posts';
 import type { Hub } from './hubsService';
 import type { UserProfile } from '../types/users';
+import type { Message } from '../types/messages';
 
 export interface RedditUserSearchResult {
   name: string;
@@ -27,6 +28,45 @@ export interface SiteWideSearchResults {
     redditAfter?: string | null;
     omniNextCursor?: string | null;
   };
+}
+
+export interface MessageSearchParams {
+  query?: string;
+  limit?: number;
+  offset?: number;
+  conversationId?: number;
+  senderId?: number;
+  hasFiles?: boolean;
+  hasLinks?: boolean;
+  includeArchived?: boolean;
+  startDate?: string;
+  endDate?: string;
+}
+
+export interface MessageSearchResponse {
+  messages: Message[];
+  limit: number;
+  offset: number;
+  query: string;
+  total: number;
+}
+
+export async function searchMessages(params: MessageSearchParams): Promise<MessageSearchResponse> {
+  const searchParams = new URLSearchParams();
+  if (params.query?.trim()) searchParams.set('q', params.query.trim());
+  if (params.limit !== undefined) searchParams.set('limit', String(params.limit));
+  if (params.offset !== undefined) searchParams.set('offset', String(params.offset));
+  if (params.conversationId !== undefined) {
+    searchParams.set('conversation_id', String(params.conversationId));
+  }
+  if (params.senderId !== undefined) searchParams.set('sender_id', String(params.senderId));
+  if (params.hasFiles) searchParams.set('has_files', 'true');
+  if (params.hasLinks) searchParams.set('has_links', 'true');
+  if (params.includeArchived) searchParams.set('include_archived', 'true');
+  if (params.startDate) searchParams.set('start_date', params.startDate);
+  if (params.endDate) searchParams.set('end_date', params.endDate);
+
+  return api.get<MessageSearchResponse>(`/search/messages?${searchParams.toString()}`);
 }
 
 export async function siteWideSearch(
