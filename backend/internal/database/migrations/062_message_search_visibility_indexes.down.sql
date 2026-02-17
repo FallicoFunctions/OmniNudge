@@ -1,0 +1,4 @@
+DROP INDEX IF EXISTS idx_messages_conversation_recipient_sent_at;
+DROP INDEX IF EXISTS idx_messages_conversation_sent_at;
+DROP INDEX IF EXISTS idx_messages_recipient_visible_sent_at;
+DROP INDEX IF EXISTS idx_messages_sender_visible_sent_at;
