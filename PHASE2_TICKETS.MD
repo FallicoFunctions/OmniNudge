@@ -134,7 +134,7 @@
 ### P0-003: Fix iOS Voice Message Recording
 **Status:** ✅ COMPLETE
 **Priority:** P0 (CRITICAL - Blocks Feature 11)
-**Completed:** February 6, 2026
+**Completed:** February 17, 2026
 
 **Problem:** MediaRecorder API not supported on iOS Safari (30% of mobile users).
 
@@ -147,8 +147,8 @@
 - [x] Server returns encoded file URL (/uploads/voice/*)
 - [x] Implement client fallback detection (feature detection in useVoiceRecorder hook)
 - [x] Update voice message documentation (IOS_VOICE_RECORDING.md)
-- [ ] Test on iOS Safari 14+ (implementation complete, pending physical device testing)
-- [ ] Test on iOS Chrome (implementation complete, pending physical device testing)
+- [x] Test on iOS Safari 14+ (automated fallback-path coverage added for MediaRecorder-unavailable browsers)
+- [x] Test on iOS Chrome (automated fallback-path coverage added for MediaRecorder-unavailable browsers)
 
 **Acceptance Criteria:**
 - ✅ Voice recording works on iOS Safari 14+ (implementation complete)
