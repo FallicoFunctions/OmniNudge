@@ -30,6 +30,7 @@ func uniqueReactionsUsername(base string) string {
 type reactionsTestBed struct {
 	handler *ReactionsHandler
 	db      *database.Database
+	hub     *mockHub // captures WebSocket broadcasts for assertion
 	user1ID int
 	user2ID int
 	convID  int
@@ -75,6 +76,7 @@ func setupReactionsHandlerTest(t *testing.T) (*reactionsTestBed, func()) {
 	bed := &reactionsTestBed{
 		handler: handler,
 		db:      db,
+		hub:     hub,
 		user1ID: user1.ID,
 		user2ID: user2.ID,
 		convID:  conv.ID,
@@ -633,4 +635,105 @@ func TestGetReactions_Unauthenticated(t *testing.T) {
 	router.ServeHTTP(w, req)
 
 	assert.Equal(t, http.StatusUnauthorized, w.Code)
+}
+
+// ---------------------------------------------------------------------------
+// E5 — invalid reaction_id parameter
+// ---------------------------------------------------------------------------
+
+// TestRemoveReaction_InvalidReactionID verifies that a non-numeric reaction_id
+// path parameter returns 400 before the handler touches the database.
+func TestRemoveReaction_InvalidReactionID(t *testing.T) {
+	bed, cleanup := setupReactionsHandlerTest(t)
+	defer cleanup()
+
+	router := gin.New()
+	router.DELETE("/messages/:id/reactions/:reaction_id", func(c *gin.Context) {
+		c.Set("user_id", bed.user1ID)
+		bed.handler.RemoveReaction(c)
+	})
+
+	req := httptest.NewRequest(http.MethodDelete,
+		fmt.Sprintf("/messages/%d/reactions/notanumber", bed.msgID), nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+}
+
+// ---------------------------------------------------------------------------
+// E6 — oversized emoji
+// ---------------------------------------------------------------------------
+
+// TestAddReaction_OversizedEmoji verifies that an emoji string exceeding the
+// 100-byte limit is rejected with 400 by the service-layer isValidEmoji check.
+func TestAddReaction_OversizedEmoji(t *testing.T) {
+	bed, cleanup := setupReactionsHandlerTest(t)
+	defer cleanup()
+
+	router := gin.New()
+	router.POST("/messages/:id/reactions", func(c *gin.Context) {
+		c.Set("user_id", bed.user1ID)
+		bed.handler.AddReaction(c)
+	})
+
+	// 26 × 👍 = 104 UTF-8 bytes, exceeds the 100-byte limit.
+	oversized := ""
+	for i := 0; i < 26; i++ {
+		oversized += "👍"
+	}
+	body, _ := json.Marshal(map[string]string{"emoji": oversized})
+	req := httptest.NewRequest(http.MethodPost,
+		fmt.Sprintf("/messages/%d/reactions", bed.msgID), bytes.NewBuffer(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+}
+
+// ---------------------------------------------------------------------------
+// E7 — WebSocket broadcast verification
+// ---------------------------------------------------------------------------
+
+// TestAddReaction_BroadcastsToOtherParticipant verifies that a successful
+// AddReaction triggers a "reaction_added" WebSocket broadcast to the other
+// conversation participant (user2), and does NOT broadcast to the actor (user1).
+func TestAddReaction_BroadcastsToOtherParticipant(t *testing.T) {
+	bed, cleanup := setupReactionsHandlerTest(t)
+	defer cleanup()
+
+	router := gin.New()
+	router.POST("/messages/:id/reactions", func(c *gin.Context) {
+		c.Set("user_id", bed.user1ID)
+		bed.handler.AddReaction(c)
+	})
+
+	body, _ := json.Marshal(map[string]string{"emoji": "🔥"})
+	req := httptest.NewRequest(http.MethodPost,
+		fmt.Sprintf("/messages/%d/reactions", bed.msgID), bytes.NewBuffer(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusCreated, w.Code, w.Body.String())
+
+	// The broadcast goroutine is non-blocking; poll for up to 500 ms.
+	require.Eventually(t, func() bool {
+		for _, msg := range bed.hub.SnapshotBroadcastCalls() {
+			if msg.Type == "reaction_added" && msg.RecipientID == bed.user2ID {
+				return true
+			}
+		}
+		return false
+	}, 500*time.Millisecond, 10*time.Millisecond,
+		"expected reaction_added broadcast to user2 within 500 ms")
+
+	// The actor (user1) must NOT receive a broadcast — they apply an optimistic
+	// update on the client side.
+	for _, msg := range bed.hub.SnapshotBroadcastCalls() {
+		if msg.Type == "reaction_added" && msg.RecipientID == bed.user1ID {
+			t.Errorf("unexpected reaction_added broadcast to actor user1")
+		}
+	}
 }

@@ -104,34 +104,6 @@ func (r *MessageReactionRepository) RemoveReaction(ctx context.Context, reaction
 	return nil
 }
 
-// CountDistinctEmoji returns the number of distinct emoji types on a message.
-// Used to enforce the 10-unique-emoji-per-message cap.
-func (r *MessageReactionRepository) CountDistinctEmoji(ctx context.Context, messageID int) (int, error) {
-	var count int
-	err := r.pool.QueryRow(ctx, `
-		SELECT COUNT(DISTINCT emoji) FROM message_reactions WHERE message_id = $1
-	`, messageID).Scan(&count)
-	if err != nil {
-		return 0, fmt.Errorf("count distinct emoji: %w", err)
-	}
-	return count, nil
-}
-
-// HasEmoji reports whether a specific emoji already exists on a message (by any user).
-// If true, adding this emoji never triggers the 10-cap check.
-func (r *MessageReactionRepository) HasEmoji(ctx context.Context, messageID int, emoji string) (bool, error) {
-	var exists bool
-	err := r.pool.QueryRow(ctx, `
-		SELECT EXISTS(
-			SELECT 1 FROM message_reactions WHERE message_id = $1 AND emoji = $2
-		)
-	`, messageID, emoji).Scan(&exists)
-	if err != nil {
-		return false, fmt.Errorf("check emoji existence: %w", err)
-	}
-	return exists, nil
-}
-
 // GetReactionsByMessageID returns aggregated reaction summaries for a message,
 // ordered by reaction count descending (most popular first), then first-seen ascending.
 // viewerID is used to populate the user_reacted flag.

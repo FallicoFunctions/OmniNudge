@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"time"
+	"unicode"
 	"unicode/utf8"
 
 	"github.com/gin-gonic/gin"
@@ -275,6 +276,15 @@ func isValidEmoji(s string) bool {
 		// Reject null bytes and ASCII control characters.
 		// (ZWJ U+200D = 8205 is well above 32, so it passes.)
 		if r < 32 {
+			return false
+		}
+
+		// Reject Unicode space separators that would render as invisible emoji:
+		// U+00A0 NO-BREAK SPACE, U+2028 LINE SEPARATOR, U+2029 PARAGRAPH
+		// SEPARATOR, and other code points classified as White_Space.
+		// Note: ZWJ (U+200D) and variation selectors are NOT classified as
+		// White_Space, so valid multi-rune emoji sequences are unaffected.
+		if unicode.IsSpace(r) {
 			return false
 		}
 
