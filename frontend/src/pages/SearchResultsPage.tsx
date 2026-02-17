@@ -427,15 +427,31 @@ export default function SearchResultsPage() {
           return;
         }
 
-        const hasFiles = opts?.messageFilters?.hasFiles ?? messageResults.hasFiles;
-        const hasLinks = opts?.messageFilters?.hasLinks ?? messageResults.hasLinks;
-        const includeArchived =
-          opts?.messageFilters?.includeArchived ?? messageResults.includeArchived;
-        const conversationId =
-          opts?.messageFilters?.conversationId ?? messageResults.conversationId;
-        const senderId = opts?.messageFilters?.senderId ?? messageResults.senderId;
-        const startDate = opts?.messageFilters?.startDate ?? messageResults.startDate;
-        const endDate = opts?.messageFilters?.endDate ?? messageResults.endDate;
+        const messageFilterOverrides = opts?.messageFilters;
+        const resolveMessageFilter = <
+          K extends keyof NonNullable<typeof messageFilterOverrides>
+        >(
+          key: K,
+          fallback: NonNullable<typeof messageFilterOverrides>[K]
+        ) =>
+          messageFilterOverrides &&
+          Object.prototype.hasOwnProperty.call(messageFilterOverrides, key)
+            ? messageFilterOverrides[key]
+            : fallback;
+
+        const hasFiles = resolveMessageFilter('hasFiles', messageResults.hasFiles);
+        const hasLinks = resolveMessageFilter('hasLinks', messageResults.hasLinks);
+        const includeArchived = resolveMessageFilter(
+          'includeArchived',
+          messageResults.includeArchived
+        );
+        const conversationId = resolveMessageFilter(
+          'conversationId',
+          messageResults.conversationId
+        );
+        const senderId = resolveMessageFilter('senderId', messageResults.senderId);
+        const startDate = resolveMessageFilter('startDate', messageResults.startDate);
+        const endDate = resolveMessageFilter('endDate', messageResults.endDate);
         const response = await searchMessagesApi({
           query: q,
           sort: opts?.sort ?? sort,

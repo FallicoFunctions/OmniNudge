@@ -203,6 +203,62 @@ describe('SearchResultsPage message search URL behavior', () => {
     });
   });
 
+  it('applies date range filters from message-tab controls', async () => {
+    const user = userEvent.setup();
+    renderPage('/search?tab=messages&q=hello&sort=relevance');
+
+    await waitFor(() => {
+      expect(searchMessagesMock).toHaveBeenCalled();
+    });
+
+    searchMessagesMock.mockClear();
+
+    await user.type(screen.getByLabelText('From'), '2026-02-10T12:00');
+    await user.type(screen.getByLabelText('To'), '2026-02-15T12:00');
+    await user.click(screen.getByRole('button', { name: 'Apply' }));
+
+    await waitFor(() => {
+      expect(searchMessagesMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          query: 'hello',
+          sort: 'relevance',
+          limit: 50,
+          offset: 0,
+          startDate: expect.any(String),
+          endDate: expect.any(String),
+        })
+      );
+    });
+  });
+
+  it('clears conversation, sender, and date filters from message-tab controls', async () => {
+    const user = userEvent.setup();
+    renderPage('/search?tab=messages&q=hello&sort=relevance&conversation_id=42&sender_id=7&start_date=2026-02-10T00:00:00Z&end_date=2026-02-15T00:00:00Z');
+
+    await waitFor(() => {
+      expect(searchMessagesMock).toHaveBeenCalled();
+    });
+
+    searchMessagesMock.mockClear();
+    await user.click(screen.getByRole('button', { name: 'Clear' }));
+
+    await waitFor(() => {
+      expect(searchMessagesMock).toHaveBeenCalledWith({
+        query: 'hello',
+        sort: 'relevance',
+        limit: 50,
+        offset: 0,
+        conversationId: undefined,
+        senderId: undefined,
+        hasFiles: false,
+        hasLinks: false,
+        includeArchived: false,
+        startDate: undefined,
+        endDate: undefined,
+      });
+    });
+  });
+
   it('does not call message search API when unauthenticated', async () => {
     useAuthMock.mockReturnValue({ user: null });
     renderPage('/search?tab=messages&q=thread');
