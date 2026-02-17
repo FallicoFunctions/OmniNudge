@@ -816,6 +816,8 @@ func main() {
 			protected.POST("/media/encode-audio", audioEncoderHandler.EncodeAudio)
 
 			// User profile management
+			protected.GET("/users/me/profile", usersHandler.GetMyProfile)
+			protected.PUT("/users/me/profile", usersHandler.UpdateProfile)
 			protected.PUT("/users/profile", usersHandler.UpdateProfile)
 			protected.PUT("/users/email", authHandler.UpdateEmail)
 			protected.POST("/users/change-password", usersHandler.ChangePassword)

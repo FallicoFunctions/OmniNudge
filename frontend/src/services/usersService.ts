@@ -14,6 +14,17 @@ export const usersService = {
     return api.get<UserProfile>(`/users/id/${id}/profile`);
   },
 
+  async getMyProfile(): Promise<UserProfile> {
+    return api.get<UserProfile>('/users/me/profile');
+  },
+
+  async updateProfile(payload: {
+    bio?: string | null;
+    avatar_url?: string | null;
+  }): Promise<UserProfile> {
+    return api.put<UserProfile>('/users/me/profile', payload);
+  },
+
   async getPosts(username: string, limit = 20, offset = 0): Promise<UserPostsResponse> {
     return api.get<UserPostsResponse>(`/users/${username}/posts?limit=${limit}&offset=${offset}`);
   },

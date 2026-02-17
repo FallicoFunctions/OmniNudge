@@ -2,10 +2,12 @@ package handlers
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/omninudge/backend/internal/database"
@@ -27,11 +29,11 @@ func setupUsersVisibilityTest(t *testing.T) (*models.UserRepository, *models.Use
 	settingsRepo := models.NewUserSettingsRepository(db.Pool)
 
 	owner := &models.User{
-		Username:     uniqueConversationsUsername("profile_owner"),
+		Username:     fmt.Sprintf("po_%d", time.Now().UnixNano()%1_000_000_000),
 		PasswordHash: "test_hash",
 	}
 	viewer := &models.User{
-		Username:     uniqueConversationsUsername("profile_viewer"),
+		Username:     fmt.Sprintf("pv_%d", time.Now().UnixNano()%1_000_000_000),
 		PasswordHash: "test_hash",
 	}
 	require.NoError(t, userRepo.Create(ctx, owner))
@@ -60,6 +62,14 @@ func newUsersVisibilityRouter(handler *UsersHandler) *gin.Engine {
 			}
 		}
 		handler.GetUserProfileByID(c)
+	})
+	router.GET("/users/me/profile", func(c *gin.Context) {
+		if header := c.GetHeader("X-Viewer-ID"); header != "" {
+			if id, err := strconv.Atoi(header); err == nil {
+				c.Set("user_id", id)
+			}
+		}
+		handler.GetMyProfile(c)
 	})
 	return router
 }
@@ -120,6 +130,22 @@ func TestGetUserProfileByID_PublicVisibility_ReturnsProfile(t *testing.T) {
 	router := newUsersVisibilityRouter(handler)
 
 	req := httptest.NewRequest(http.MethodGet, "/users/id/"+strconv.Itoa(owner.ID)+"/profile", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Contains(t, w.Body.String(), owner.Username)
+}
+
+func TestGetMyProfile_ReturnsAuthenticatedUserProfile(t *testing.T) {
+	userRepo, settingsRepo, owner, _, cleanup := setupUsersVisibilityTest(t)
+	defer cleanup()
+
+	handler := NewUsersHandler(userRepo, settingsRepo, nil, nil, nil, nil)
+	router := newUsersVisibilityRouter(handler)
+
+	req := httptest.NewRequest(http.MethodGet, "/users/me/profile", nil)
+	req.Header.Set("X-Viewer-ID", strconv.Itoa(owner.ID))
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
