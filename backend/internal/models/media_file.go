@@ -110,3 +110,13 @@ func (r *MediaFileRepository) GetTotalStorageByUserID(ctx context.Context, userI
 	}
 	return total.Int64, nil
 }
+
+// UpdateThumbnailURL updates thumbnail_url for an existing media record.
+func (r *MediaFileRepository) UpdateThumbnailURL(ctx context.Context, mediaID int, thumbnailURL string) error {
+	_, err := r.pool.Exec(ctx, `
+		UPDATE media_files
+		SET thumbnail_url = $2
+		WHERE id = $1
+	`, mediaID, thumbnailURL)
+	return err
+}

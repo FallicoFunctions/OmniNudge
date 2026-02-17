@@ -109,7 +109,7 @@
 - [x] Document job processing architecture
 - [x] Write deployment guide for workers
 - [x] Create API endpoint to query job status (GET /api/v1/jobs/:queue/:id)
-- [ ] Update API endpoints to queue jobs instead of blocking (Phase 2 - integrate with upload handlers)
+- [x] Update API endpoints to queue jobs instead of blocking (Phase 2 - integrate with upload handlers)
 
 **Acceptance Criteria:**
 - ✅ Jobs process in background without blocking API requests
