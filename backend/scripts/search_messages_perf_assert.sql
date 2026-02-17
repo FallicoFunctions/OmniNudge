@@ -28,7 +28,7 @@ BEGIN
 	END IF;
 
 	EXECUTE format(
-		$$
+		$q1$
 		EXPLAIN (ANALYZE, FORMAT JSON)
 		SELECT m.id
 		FROM messages m
@@ -57,7 +57,7 @@ BEGIN
 		AND m.sent_at >= NOW() - INTERVAL '30 days'
 		ORDER BY m.sent_at DESC, m.id DESC
 		LIMIT 50 OFFSET 0
-		$$,
+		$q1$,
 		auth_user_id
 	)
 	INTO explain_plan;
@@ -69,7 +69,7 @@ BEGIN
 	RAISE NOTICE 'PASS metadata query: % ms (budget: % ms)', exec_ms, max_ms;
 
 	EXECUTE format(
-		$$
+		$q2$
 		EXPLAIN (ANALYZE, FORMAT JSON)
 		SELECT m.id
 		FROM messages m
@@ -102,7 +102,7 @@ BEGIN
 		)
 		ORDER BY m.sent_at DESC, m.id DESC
 		LIMIT 50 OFFSET 0
-		$$,
+		$q2$,
 		auth_user_id
 	)
 	INTO explain_plan;

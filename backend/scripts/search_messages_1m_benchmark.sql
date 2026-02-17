@@ -10,14 +10,23 @@
 \timing on
 
 -- Ensure required extension/indexes are available.
-CREATE EXTENSION IF NOT EXISTS pg_trgm;
+-- Non-superuser environments may not have permission to create extensions.
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'pg_trgm') THEN
+    RAISE NOTICE 'pg_trgm extension detected.';
+  ELSE
+    RAISE NOTICE 'pg_trgm extension not installed; continuing benchmark without extension setup.';
+  END IF;
+END $$;
 
 -- Synthetic users
-INSERT INTO users (username, password_hash, created_at)
-VALUES
-  ('bench_user_1', 'bench_hash', NOW()),
-  ('bench_user_2', 'bench_hash', NOW())
-ON CONFLICT (username) DO NOTHING;
+INSERT INTO users (username, username_normalized, password_hash, created_at)
+SELECT s.username, LOWER(s.username), 'bench_hash', NOW()
+FROM (VALUES ('bench_user_1'), ('bench_user_2')) AS s(username)
+WHERE NOT EXISTS (
+  SELECT 1 FROM users u WHERE u.username = s.username
+);
 
 -- Ensure deterministic IDs for the benchmark users.
 WITH u AS (
@@ -32,7 +41,12 @@ ids AS (
 INSERT INTO conversations (user1_id, user2_id, created_at, last_message_at)
 SELECT LEAST(user1_id, user2_id), GREATEST(user1_id, user2_id), NOW(), NOW()
 FROM ids
-ON CONFLICT (user1_id, user2_id) DO NOTHING;
+WHERE NOT EXISTS (
+  SELECT 1
+  FROM conversations c
+  WHERE c.user1_id = LEAST(ids.user1_id, ids.user2_id)
+    AND c.user2_id = GREATEST(ids.user1_id, ids.user2_id)
+);
 
 -- Locate conversation id.
 \echo Resolving benchmark conversation id...
