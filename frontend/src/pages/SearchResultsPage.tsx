@@ -361,11 +361,11 @@ export default function SearchResultsPage() {
       messageFilters?: Partial<Pick<typeof messageResults, 'hasFiles' | 'hasLinks' | 'includeArchived'>>;
     }
   ) => {
-    if (!q.trim()) return;
+    const tabTarget = opts?.tab ?? activeTab;
+    if (!q.trim() && tabTarget !== 'messages') return;
     setIsLoading(true);
     setSearchError(null);
     try {
-      const tabTarget = opts?.tab ?? activeTab;
       const targetPage =
         opts?.page
         ?? (tabTarget === 'communities'
