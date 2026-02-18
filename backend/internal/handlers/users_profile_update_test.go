@@ -54,7 +54,7 @@ func TestUpdateProfileViaMeProfile_UpdatesBioAndAvatar(t *testing.T) {
 	userRepo, settingsRepo, owner, _, cleanup := setupUsersVisibilityTest(t)
 	defer cleanup()
 
-	handler := NewUsersHandler(userRepo, settingsRepo, nil, nil, nil, nil, nil)
+	handler := NewUsersHandler(userRepo, nil, settingsRepo, nil, nil, nil, nil, nil)
 	router := newUsersProfileUpdateRouter(handler)
 
 	body := map[string]any{
@@ -86,7 +86,7 @@ func TestUpdateProfileViaLegacyAlias_UpdatesBioAndAvatar(t *testing.T) {
 	userRepo, settingsRepo, owner, _, cleanup := setupUsersVisibilityTest(t)
 	defer cleanup()
 
-	handler := NewUsersHandler(userRepo, settingsRepo, nil, nil, nil, nil, nil)
+	handler := NewUsersHandler(userRepo, nil, settingsRepo, nil, nil, nil, nil, nil)
 	router := newUsersProfileUpdateRouter(handler)
 
 	body := map[string]any{
@@ -110,7 +110,7 @@ func TestUpdateProfile_RejectsInvalidAvatarURL(t *testing.T) {
 	userRepo, settingsRepo, owner, _, cleanup := setupUsersVisibilityTest(t)
 	defer cleanup()
 
-	handler := NewUsersHandler(userRepo, settingsRepo, nil, nil, nil, nil, nil)
+	handler := NewUsersHandler(userRepo, nil, settingsRepo, nil, nil, nil, nil, nil)
 	router := newUsersProfileUpdateRouter(handler)
 
 	body := map[string]any{
@@ -132,7 +132,7 @@ func TestUpdateProfile_RejectsTooLongBio(t *testing.T) {
 	userRepo, settingsRepo, owner, _, cleanup := setupUsersVisibilityTest(t)
 	defer cleanup()
 
-	handler := NewUsersHandler(userRepo, settingsRepo, nil, nil, nil, nil, nil)
+	handler := NewUsersHandler(userRepo, nil, settingsRepo, nil, nil, nil, nil, nil)
 	router := newUsersProfileUpdateRouter(handler)
 
 	body := map[string]any{
@@ -154,7 +154,7 @@ func TestUpdateProfile_EmptyStringsClearFields(t *testing.T) {
 	userRepo, settingsRepo, owner, _, cleanup := setupUsersVisibilityTest(t)
 	defer cleanup()
 
-	handler := NewUsersHandler(userRepo, settingsRepo, nil, nil, nil, nil, nil)
+	handler := NewUsersHandler(userRepo, nil, settingsRepo, nil, nil, nil, nil, nil)
 	router := newUsersProfileUpdateRouter(handler)
 
 	seedBody := map[string]any{
@@ -199,7 +199,7 @@ func TestUpdateProfile_InvalidatesCachedPublicProfile(t *testing.T) {
 	initialBio := "before cache"
 	require.NoError(t, userRepo.UpdateProfile(context.Background(), owner.ID, &initialBio, nil))
 
-	handler := NewUsersHandler(userRepo, settingsRepo, nil, nil, nil, nil, services.NewMemoryCache())
+	handler := NewUsersHandler(userRepo, nil, settingsRepo, nil, nil, nil, nil, services.NewMemoryCache())
 	router := newUsersProfileUpdateRouter(handler)
 
 	firstGetReq := httptest.NewRequest(http.MethodGet, "/users/"+owner.Username, nil)
@@ -231,7 +231,7 @@ func TestPing_InvalidatesCachedOwnerProfileLastSeen(t *testing.T) {
 	userRepo, settingsRepo, owner, _, cleanup := setupUsersVisibilityTest(t)
 	defer cleanup()
 
-	handler := NewUsersHandler(userRepo, settingsRepo, nil, nil, nil, nil, services.NewMemoryCache())
+	handler := NewUsersHandler(userRepo, nil, settingsRepo, nil, nil, nil, nil, services.NewMemoryCache())
 	router := newUsersProfileUpdateRouter(handler)
 
 	firstReq := httptest.NewRequest(http.MethodGet, "/users/me/profile", nil)

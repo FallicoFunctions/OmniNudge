@@ -2,6 +2,19 @@
 
 This document describes the current user profile implementation for OmniNudge.
 
+## Data Model
+
+Profile fields are stored in a dedicated `user_profiles` table:
+- `user_id` (PK, FK to `users.id`)
+- `avatar_url`
+- `bio`
+- `status_text`
+- `created_at`
+- `updated_at`
+
+Migration `066_user_profiles_table` backfills existing `users.avatar_url` and `users.bio` into `user_profiles`.
+For compatibility, profile updates currently mirror to both locations while reads prefer `user_profiles` when available.
+
 ## API Endpoints
 
 ### Public profile reads

@@ -18,6 +18,7 @@ import (
 // UsersHandler serves public user profile data and profile management
 type UsersHandler struct {
 	userRepo     *models.UserRepository
+	userProfRepo *models.UserProfileRepository
 	settingsRepo *models.UserSettingsRepository
 	postRepo     *models.PlatformPostRepository
 	commentRepo  *models.PostCommentRepository
@@ -29,6 +30,7 @@ type UsersHandler struct {
 // NewUsersHandler creates a new UsersHandler
 func NewUsersHandler(
 	userRepo *models.UserRepository,
+	userProfRepo *models.UserProfileRepository,
 	settingsRepo *models.UserSettingsRepository,
 	postRepo *models.PlatformPostRepository,
 	commentRepo *models.PostCommentRepository,
@@ -41,6 +43,7 @@ func NewUsersHandler(
 	}
 	return &UsersHandler{
 		userRepo:     userRepo,
+		userProfRepo: userProfRepo,
 		settingsRepo: settingsRepo,
 		postRepo:     postRepo,
 		commentRepo:  commentRepo,
@@ -144,6 +147,20 @@ func (h *UsersHandler) getUserProfileResponse(c *gin.Context, loadUser func() (*
 		return
 	}
 
+	avatarURL := user.AvatarURL
+	bio := user.Bio
+	if h.userProfRepo != nil {
+		profile, err := h.userProfRepo.GetByUserID(c.Request.Context(), user.ID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch user profile", "details": err.Error()})
+			return
+		}
+		if profile != nil {
+			avatarURL = profile.AvatarURL
+			bio = profile.Bio
+		}
+	}
+
 	exposeLastSeen := showLastSeen || viewerID == user.ID
 	if cached, ok := h.getCachedProfileResponse(c.Request.Context(), user.ID, viewerID, exposeLastSeen); ok {
 		c.JSON(http.StatusOK, cached)
@@ -176,8 +193,8 @@ func (h *UsersHandler) getUserProfileResponse(c *gin.Context, loadUser func() (*
 	response := UserProfileResponse{
 		ID:        user.ID,
 		Username:  user.Username,
-		AvatarURL: user.AvatarURL,
-		Bio:       user.Bio,
+		AvatarURL: avatarURL,
+		Bio:       bio,
 		Karma:     user.Karma,
 		PublicKey: user.PublicKey,
 		CreatedAt: user.CreatedAt.Format(time.RFC3339),
@@ -380,6 +397,12 @@ func (h *UsersHandler) UpdateProfile(c *gin.Context) {
 	if err := h.userRepo.UpdateProfile(c.Request.Context(), user.ID, user.Bio, user.AvatarURL); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update profile"})
 		return
+	}
+	if h.userProfRepo != nil {
+		if err := h.userProfRepo.Upsert(c.Request.Context(), user.ID, user.Bio, user.AvatarURL, nil); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update user profile"})
+			return
+		}
 	}
 	h.invalidateProfileResponseCache(c.Request.Context(), user.ID)
 
