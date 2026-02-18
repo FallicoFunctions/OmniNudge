@@ -1657,7 +1657,8 @@
       "title": "Embed Comment",
       "instruction": "Copy this HTML snippet to share the comment outside OmniNudge.",
       "previewLabel": "Preview",
-      "closeLabel": "Close embed modal"
+      "closeLabel": "Close embed modal",
+      "commentByUser": "Comment by {{author}}"
     },
     "viewingThread": "You are viewing a single comment's thread.",
     "status": {

@@ -1659,7 +1659,8 @@
       "title": "Incrustar Comentario",
       "instruction": "Copia este fragmento HTML para compartir el comentario fuera de OmniNudge.",
       "previewLabel": "Vista previa",
-      "closeLabel": "Cerrar modal de incrustación"
+      "closeLabel": "Cerrar modal de incrustación",
+      "commentByUser": "Comentario de {{author}}"
     },
     "viewingThread": "Estás viendo el hilo de un solo comentario.",
     "status": {
