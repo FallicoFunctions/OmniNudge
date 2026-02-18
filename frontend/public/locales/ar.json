@@ -1274,6 +1274,7 @@
     "actions": {
       "viewAll": "عرض الكل",
       "message": "رسالة",
+      "editProfile": "تعديل الملف الشخصي",
       "viewThread": "عرض السلسلة",
       "block": "حظر",
       "unblock": "إلغاء الحظر",
@@ -1297,6 +1298,20 @@
     },
     "aria": {
       "avatarAlt": "صورة {{username}}"
+    },
+    "edit": {
+      "title": "تعديل الملف الشخصي",
+      "description": "حدّث رابط الصورة الشخصية والنبذة.",
+      "avatarUrlLabel": "رابط الصورة الشخصية",
+      "avatarUrlPlaceholder": "https://example.com/avatar.jpg",
+      "bioLabel": "النبذة",
+      "bioPlaceholder": "اكتب نبذة قصيرة عنك...",
+      "bioCount": "{{count}} / 500",
+      "errors": {
+        "bioTooLong": "يجب ألا تتجاوز النبذة 500 حرف.",
+        "invalidAvatarUrl": "يجب أن يبدأ رابط الصورة بـ http:// أو https://",
+        "saveFailed": "فشل حفظ الملف الشخصي: {{message}}"
+      }
     }
   },
   "redditPostPage": {
@@ -1410,7 +1425,8 @@
     },
     "actions": {
       "loadOlder": "تحميل الرسائل الأقدم",
-      "report": "إبلاغ"
+      "report": "إبلاغ",
+      "viewProfile": "عرض الملف الشخصي"
     },
     "typing": "{{username}} يكتب الآن...",
     "online": "متصل",
