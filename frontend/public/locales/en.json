@@ -1526,6 +1526,16 @@
       "sendFailed": "Failed to send message. Please try again.",
       "reportFailed": "Failed to submit report: {{message}}"
     },
+    "editing": {
+      "ariaInput": "Edit message text",
+      "saving": "Saving...",
+      "timeLeft": "Editable for {{time}}",
+      "expired": "Edit window expired",
+      "errors": {
+        "empty": "Message cannot be empty",
+        "saveFailed": "Failed to save edits"
+      }
+    },
     "messageOptions": {
       "ariaLabel": "Message options"
     },
