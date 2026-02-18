@@ -114,3 +114,51 @@ func TestUserProfile_MeUpdate_InvalidAvatarRejected(t *testing.T) {
 	updateResp := doRequest(t, deps.Router, updateReq)
 	require.Equal(t, http.StatusBadRequest, updateResp.Code)
 }
+
+func TestUserProfile_MeEndpoints_RequireAuth(t *testing.T) {
+	deps := newTestDeps(t)
+
+	getReq, err := http.NewRequest("GET", "/api/v1/users/me/profile", nil)
+	require.NoError(t, err)
+	getResp := doRequest(t, deps.Router, getReq)
+	require.Equal(t, http.StatusUnauthorized, getResp.Code)
+
+	updateReq, err := http.NewRequest("PUT", "/api/v1/users/me/profile", bytes.NewReader([]byte(`{}`)))
+	require.NoError(t, err)
+	updateReq.Header.Set("Content-Type", "application/json")
+	updateResp := doRequest(t, deps.Router, updateReq)
+	require.Equal(t, http.StatusUnauthorized, updateResp.Code)
+}
+
+func TestUserProfile_LegacyUpdateAlias_RemainsFunctional(t *testing.T) {
+	deps := newTestDeps(t)
+	user := createUser(t, deps.UserRepo, "legacy_profile_user", "user")
+
+	token, err := deps.AuthService.GenerateJWT(user.ID, "", user.Username, user.Role)
+	require.NoError(t, err)
+
+	updateBody := map[string]any{
+		"bio":        "Legacy route bio",
+		"avatar_url": "https://example.com/legacy-route-avatar.png",
+	}
+	payload, err := json.Marshal(updateBody)
+	require.NoError(t, err)
+
+	updateReq, err := http.NewRequest("PUT", "/api/v1/users/profile", bytes.NewReader(payload))
+	require.NoError(t, err)
+	updateReq.Header.Set("Authorization", "Bearer "+token)
+	updateReq.Header.Set("Content-Type", "application/json")
+	updateResp := doRequest(t, deps.Router, updateReq)
+	require.Equal(t, http.StatusOK, updateResp.Code)
+
+	getReq, err := http.NewRequest("GET", "/api/v1/users/me/profile", nil)
+	require.NoError(t, err)
+	getReq.Header.Set("Authorization", "Bearer "+token)
+	getResp := doRequest(t, deps.Router, getReq)
+	require.Equal(t, http.StatusOK, getResp.Code)
+
+	var profile map[string]any
+	require.NoError(t, json.Unmarshal(getResp.Body.Bytes(), &profile))
+	require.Equal(t, "Legacy route bio", profile["bio"])
+	require.Equal(t, "https://example.com/legacy-route-avatar.png", profile["avatar_url"])
+}
