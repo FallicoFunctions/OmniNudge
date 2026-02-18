@@ -13,7 +13,9 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/omninudge/backend/internal/database"
 	"github.com/omninudge/backend/internal/models"
+	"github.com/omninudge/backend/internal/monitoring"
 	"github.com/omninudge/backend/internal/services"
+	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -266,4 +268,56 @@ func TestGetUserProfile_UsesDedicatedUserProfilesData(t *testing.T) {
 	require.Equal(t, http.StatusOK, w.Code)
 	assert.Contains(t, w.Body.String(), profileBio)
 	assert.Contains(t, w.Body.String(), profileAvatar)
+}
+
+func TestGetUserProfile_CachedRead_Under200ms(t *testing.T) {
+	userRepo, settingsRepo, owner, _, cleanup := setupUsersVisibilityTest(t)
+	defer cleanup()
+
+	handler := NewUsersHandler(userRepo, nil, nil, settingsRepo, nil, nil, nil, nil, services.NewMemoryCache())
+	router := newUsersVisibilityRouter(handler)
+
+	// Warm cache.
+	warmReq := httptest.NewRequest(http.MethodGet, "/users/"+owner.Username, nil)
+	warmW := httptest.NewRecorder()
+	router.ServeHTTP(warmW, warmReq)
+	require.Equal(t, http.StatusOK, warmW.Code)
+
+	start := time.Now()
+	cachedReq := httptest.NewRequest(http.MethodGet, "/users/"+owner.Username, nil)
+	cachedW := httptest.NewRecorder()
+	router.ServeHTTP(cachedW, cachedReq)
+	duration := time.Since(start)
+
+	require.Equal(t, http.StatusOK, cachedW.Code)
+	assert.Less(t, duration, 200*time.Millisecond, "cached profile read should stay under 200ms")
+}
+
+func TestGetUserProfile_CacheHitRate_Exceeds80PercentOnWarmTraffic(t *testing.T) {
+	userRepo, settingsRepo, owner, _, cleanup := setupUsersVisibilityTest(t)
+	defer cleanup()
+
+	handler := NewUsersHandler(userRepo, nil, nil, settingsRepo, nil, nil, nil, nil, services.NewMemoryCache())
+	router := newUsersVisibilityRouter(handler)
+
+	beforeHit := testutil.ToFloat64(monitoring.ProfileCacheAccessTotal.WithLabelValues("hit", "public"))
+	beforeMiss := testutil.ToFloat64(monitoring.ProfileCacheAccessTotal.WithLabelValues("miss", "public"))
+
+	for i := 0; i < 10; i++ {
+		req := httptest.NewRequest(http.MethodGet, "/users/"+owner.Username, nil)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+		require.Equal(t, http.StatusOK, w.Code)
+	}
+
+	afterHit := testutil.ToFloat64(monitoring.ProfileCacheAccessTotal.WithLabelValues("hit", "public"))
+	afterMiss := testutil.ToFloat64(monitoring.ProfileCacheAccessTotal.WithLabelValues("miss", "public"))
+
+	hitDelta := afterHit - beforeHit
+	missDelta := afterMiss - beforeMiss
+	totalDelta := hitDelta + missDelta
+
+	require.GreaterOrEqual(t, totalDelta, float64(10))
+	require.Greater(t, hitDelta, float64(0))
+	assert.GreaterOrEqual(t, hitDelta/totalDelta, 0.80)
 }
