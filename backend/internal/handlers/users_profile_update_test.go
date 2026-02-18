@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/omninudge/backend/internal/models"
 	"github.com/omninudge/backend/internal/services"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -225,6 +226,91 @@ func TestUpdateProfile_InvalidatesCachedPublicProfile(t *testing.T) {
 	require.Equal(t, http.StatusOK, secondGetW.Code)
 	assert.Contains(t, secondGetW.Body.String(), "after update")
 	assert.NotContains(t, secondGetW.Body.String(), initialBio)
+}
+
+func TestUpdateProfile_StatusText_PersistsAndReturns(t *testing.T) {
+	userRepo, settingsRepo, owner, _, cleanup := setupUsersVisibilityTest(t)
+	defer cleanup()
+
+	profileRepo := models.NewUserProfileRepository(userRepo.GetPool())
+	handler := NewUsersHandler(userRepo, profileRepo, settingsRepo, nil, nil, nil, nil, nil)
+	router := newUsersProfileUpdateRouter(handler)
+
+	body := map[string]any{
+		"bio":         "Profile with status",
+		"status_text": "Heads down building",
+	}
+	payload, err := json.Marshal(body)
+	require.NoError(t, err)
+
+	updateReq := httptest.NewRequest(http.MethodPut, "/users/me/profile", bytes.NewReader(payload))
+	updateReq.Header.Set("Content-Type", "application/json")
+	updateReq.Header.Set("X-Viewer-ID", strconv.Itoa(owner.ID))
+	updateW := httptest.NewRecorder()
+	router.ServeHTTP(updateW, updateReq)
+	require.Equal(t, http.StatusOK, updateW.Code, "response: %s", updateW.Body.String())
+	assert.Contains(t, updateW.Body.String(), "Heads down building")
+
+	getReq := httptest.NewRequest(http.MethodGet, "/users/"+owner.Username, nil)
+	getW := httptest.NewRecorder()
+	router.ServeHTTP(getW, getReq)
+	require.Equal(t, http.StatusOK, getW.Code)
+	assert.Contains(t, getW.Body.String(), "Heads down building")
+}
+
+func TestUpdateProfile_StatusText_RejectsTooLongValue(t *testing.T) {
+	userRepo, settingsRepo, owner, _, cleanup := setupUsersVisibilityTest(t)
+	defer cleanup()
+
+	profileRepo := models.NewUserProfileRepository(userRepo.GetPool())
+	handler := NewUsersHandler(userRepo, profileRepo, settingsRepo, nil, nil, nil, nil, nil)
+	router := newUsersProfileUpdateRouter(handler)
+
+	body := map[string]any{
+		"status_text": strings.Repeat("a", 501),
+	}
+	payload, err := json.Marshal(body)
+	require.NoError(t, err)
+
+	req := httptest.NewRequest(http.MethodPut, "/users/me/profile", bytes.NewReader(payload))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Viewer-ID", strconv.Itoa(owner.ID))
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+	assert.Contains(t, w.Body.String(), "Status text must be 500 characters or less")
+}
+
+func TestUpdateProfile_PreservesExistingStatusTextWhenOmitted(t *testing.T) {
+	userRepo, settingsRepo, owner, _, cleanup := setupUsersVisibilityTest(t)
+	defer cleanup()
+
+	profileRepo := models.NewUserProfileRepository(userRepo.GetPool())
+	seedStatus := "Keep this status"
+	require.NoError(t, profileRepo.Upsert(context.Background(), owner.ID, nil, nil, &seedStatus))
+
+	handler := NewUsersHandler(userRepo, profileRepo, settingsRepo, nil, nil, nil, nil, nil)
+	router := newUsersProfileUpdateRouter(handler)
+
+	body := map[string]any{
+		"bio": "Bio changed but status omitted",
+	}
+	payload, err := json.Marshal(body)
+	require.NoError(t, err)
+
+	updateReq := httptest.NewRequest(http.MethodPut, "/users/me/profile", bytes.NewReader(payload))
+	updateReq.Header.Set("Content-Type", "application/json")
+	updateReq.Header.Set("X-Viewer-ID", strconv.Itoa(owner.ID))
+	updateW := httptest.NewRecorder()
+	router.ServeHTTP(updateW, updateReq)
+	require.Equal(t, http.StatusOK, updateW.Code, "response: %s", updateW.Body.String())
+	assert.Contains(t, updateW.Body.String(), seedStatus)
+
+	profile, err := profileRepo.GetByUserID(context.Background(), owner.ID)
+	require.NoError(t, err)
+	require.NotNil(t, profile)
+	require.NotNil(t, profile.StatusText)
+	assert.Equal(t, seedStatus, *profile.StatusText)
 }
 
 func TestPing_InvalidatesCachedOwnerProfileLastSeen(t *testing.T) {

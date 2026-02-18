@@ -30,18 +30,22 @@ func TestUserProfileRepository_UpsertAndGetByUserID(t *testing.T) {
 
 	initialBio := "Profile repo bio"
 	initialAvatar := "https://example.com/profile.png"
-	require.NoError(t, profileRepo.Upsert(ctx, user.ID, &initialBio, &initialAvatar, nil))
+	initialStatus := "initial status"
+	require.NoError(t, profileRepo.Upsert(ctx, user.ID, &initialBio, &initialAvatar, &initialStatus))
 
 	profile, err := profileRepo.GetByUserID(ctx, user.ID)
 	require.NoError(t, err)
 	require.NotNil(t, profile)
 	require.NotNil(t, profile.Bio)
 	require.NotNil(t, profile.AvatarURL)
+	require.NotNil(t, profile.StatusText)
 	require.Equal(t, initialBio, *profile.Bio)
 	require.Equal(t, initialAvatar, *profile.AvatarURL)
+	require.Equal(t, initialStatus, *profile.StatusText)
 
 	updatedBio := "Updated profile repo bio"
-	require.NoError(t, profileRepo.Upsert(ctx, user.ID, &updatedBio, nil, nil))
+	updatedStatus := "updated status"
+	require.NoError(t, profileRepo.Upsert(ctx, user.ID, &updatedBio, nil, &updatedStatus))
 
 	updated, err := profileRepo.GetByUserID(ctx, user.ID)
 	require.NoError(t, err)
@@ -49,4 +53,6 @@ func TestUserProfileRepository_UpsertAndGetByUserID(t *testing.T) {
 	require.NotNil(t, updated.Bio)
 	require.Equal(t, updatedBio, *updated.Bio)
 	require.Nil(t, updated.AvatarURL)
+	require.NotNil(t, updated.StatusText)
+	require.Equal(t, updatedStatus, *updated.StatusText)
 }

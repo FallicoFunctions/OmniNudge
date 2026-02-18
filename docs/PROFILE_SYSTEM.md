@@ -42,6 +42,7 @@ Both endpoints return the same `UserProfileResponse` shape:
 Accepted payload:
 - `bio` (`null` to clear, max 500 chars)
 - `avatar_url` (`null` to clear, must be `http://` or `https://` when set)
+- `status_text` (`null` to clear, max 500 chars)
 
 ## Privacy Controls
 
