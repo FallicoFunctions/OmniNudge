@@ -49,6 +49,7 @@ type updateSettingsRequest struct {
 	UseRelativeTime              *bool   `json:"use_relative_time"`
 	AutoCloseThemeSelector       *bool   `json:"auto_close_theme_selector"`
 	NotifyArchivedMessages       *bool   `json:"notify_archived_messages"`
+	AutoUnarchiveOnMessage       *bool   `json:"auto_unarchive_on_message"`
 	NotifyRemovedSavedPosts      *bool   `json:"notify_removed_saved_posts"`
 	DefaultOmniPostsOnly         *bool   `json:"default_omni_posts_only"`
 	StayOnPostAfterHide          *bool   `json:"stay_on_post_after_hide"`
@@ -155,6 +156,9 @@ func (h *SettingsHandler) UpdateSettings(c *gin.Context) {
 	}
 	if req.NotifyArchivedMessages != nil {
 		settings.NotifyArchivedMessages = *req.NotifyArchivedMessages
+	}
+	if req.AutoUnarchiveOnMessage != nil {
+		settings.AutoUnarchiveOnMessage = *req.AutoUnarchiveOnMessage
 	}
 	if req.NotifyRemovedSavedPosts != nil {
 		settings.NotifyRemovedSavedPosts = *req.NotifyRemovedSavedPosts

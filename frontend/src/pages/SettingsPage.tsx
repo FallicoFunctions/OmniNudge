@@ -30,6 +30,8 @@ export default function SettingsPage() {
     setAutoCloseThemeSelector,
     notifyArchivedMessages,
     setNotifyArchivedMessages,
+    autoUnarchiveOnMessage,
+    setAutoUnarchiveOnMessage,
     notifyRemovedSavedPosts,
     setNotifyRemovedSavedPosts,
     defaultOmniPostsOnly,
@@ -665,6 +667,34 @@ export default function SettingsPage() {
                   aria-hidden="true"
                   className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
                     typingIndicators ? 'translate-x-5' : 'translate-x-0'
+                  }`}
+                />
+              </button>
+            </div>
+
+            <div className="flex items-center justify-between rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4">
+              <div className="pr-4">
+                <p className="text-base font-semibold text-[var(--color-text-primary)]">
+                  {t('settings.messagingPrivacy.autoUnarchiveOnMessage')}
+                </p>
+                <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+                  {t('settings.messagingPrivacy.autoUnarchiveOnMessageHelp')}
+                </p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={autoUnarchiveOnMessage}
+                onClick={() => setAutoUnarchiveOnMessage(!autoUnarchiveOnMessage)}
+                className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${
+                  autoUnarchiveOnMessage ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
+                }`}
+              >
+                <span className="sr-only">{t('settings.messagingPrivacy.autoUnarchiveOnMessage')}</span>
+                <span
+                  aria-hidden="true"
+                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                    autoUnarchiveOnMessage ? 'translate-x-5' : 'translate-x-0'
                   }`}
                 />
               </button>

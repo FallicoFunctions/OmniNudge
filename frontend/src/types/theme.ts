@@ -63,6 +63,7 @@ export interface UserSettings {
   use_relative_time: boolean;
   auto_close_theme_selector: boolean;
   notify_archived_messages: boolean;
+  auto_unarchive_on_message: boolean;
   notify_removed_saved_posts: boolean;
   default_omni_posts_only: boolean;
   stay_on_post_after_hide: boolean;

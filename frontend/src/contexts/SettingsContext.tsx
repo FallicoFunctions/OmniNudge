@@ -20,6 +20,8 @@ interface SettingsContextType {
   setUseInfiniteScrollSubs: (value: boolean) => void;
   notifyArchivedMessages: boolean;
   setNotifyArchivedMessages: (value: boolean) => void;
+  autoUnarchiveOnMessage: boolean;
+  setAutoUnarchiveOnMessage: (value: boolean) => void;
   notifyRemovedSavedPosts: boolean;
   setNotifyRemovedSavedPosts: (value: boolean) => void;
   defaultOmniPostsOnly: boolean;
@@ -89,6 +91,7 @@ interface StoredSettings {
   useInfiniteScrollHubs?: boolean;
   useInfiniteScrollSubs?: boolean;
   notifyArchivedMessages?: boolean;
+  autoUnarchiveOnMessage?: boolean;
   notifyRemovedSavedPosts?: boolean;
   defaultOmniPostsOnly?: boolean;
   stayOnPostAfterHide?: boolean;
@@ -121,7 +124,7 @@ interface StoredSettings {
   settingsVersion?: number;
 }
 
-const CURRENT_SETTINGS_VERSION = 10;
+const CURRENT_SETTINGS_VERSION = 11;
 
 const getStoredSettings = (): StoredSettings => {
   if (typeof window === 'undefined' || !window.localStorage) {
@@ -139,6 +142,7 @@ const getStoredSettings = (): StoredSettings => {
           useInfiniteScrollHubs: false,
           useInfiniteScrollSubs: false,
           useInfiniteScroll: false,
+          autoUnarchiveOnMessage: parsed.autoUnarchiveOnMessage ?? true,
           accessRequestCooldownDisplay: parsed.accessRequestCooldownDisplay ?? 'days',
           blockNsfwThumbnails: parsed.blockNsfwThumbnails ?? true,
           fontSize: parsed.fontSize ?? 'medium',
@@ -206,6 +210,10 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   const [notifyArchivedMessages, setNotifyArchivedMessagesState] = useState<boolean>(() => {
     const settings = getStoredSettings();
     return settings.notifyArchivedMessages ?? false; // Default: no notifications for archived chats
+  });
+  const [autoUnarchiveOnMessage, setAutoUnarchiveOnMessageState] = useState<boolean>(() => {
+    const settings = getStoredSettings();
+    return settings.autoUnarchiveOnMessage ?? true;
   });
   const [defaultOmniPostsOnly, setDefaultOmniPostsOnlyState] = useState<boolean>(() => {
     const settings = getStoredSettings();
@@ -342,6 +350,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         setUseRelativeTimeState(settings.use_relative_time ?? true);
         setAutoCloseThemeSelectorState(settings.auto_close_theme_selector ?? false);
         setNotifyArchivedMessagesState(settings.notify_archived_messages ?? false);
+        setAutoUnarchiveOnMessageState(settings.auto_unarchive_on_message ?? true);
         setNotifyRemovedSavedPostsState(settings.notify_removed_saved_posts ?? true);
         setDefaultOmniPostsOnlyState(settings.default_omni_posts_only ?? false);
         setStayOnPostAfterHideState(settings.stay_on_post_after_hide ?? false);
@@ -399,6 +408,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         useInfiniteScrollHubs,
         useInfiniteScrollSubs,
         notifyArchivedMessages,
+        autoUnarchiveOnMessage,
         notifyRemovedSavedPosts,
         defaultOmniPostsOnly,
         stayOnPostAfterHide,
@@ -441,6 +451,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     useInfiniteScrollHubs,
     useInfiniteScrollSubs,
     notifyArchivedMessages,
+    autoUnarchiveOnMessage,
     notifyRemovedSavedPosts,
     defaultOmniPostsOnly,
     stayOnPostAfterHide,
@@ -544,6 +555,16 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     void userSettingsService.update({ notify_archived_messages: value }).catch((error) => {
       console.error('[Settings] Failed to update archived messages notification setting:', error);
       setNotifyArchivedMessagesState(previous);
+    });
+  };
+
+  const setAutoUnarchiveOnMessage = (value: boolean) => {
+    const previous = autoUnarchiveOnMessage;
+    setAutoUnarchiveOnMessageState(value);
+    if (!hasAuthToken()) return;
+    void userSettingsService.update({ auto_unarchive_on_message: value }).catch((error) => {
+      console.error('[Settings] Failed to update auto-unarchive-on-message setting:', error);
+      setAutoUnarchiveOnMessageState(previous);
     });
   };
 
@@ -844,6 +865,8 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         setUseInfiniteScrollSubs,
         notifyArchivedMessages,
         setNotifyArchivedMessages,
+        autoUnarchiveOnMessage,
+        setAutoUnarchiveOnMessage,
         notifyRemovedSavedPosts,
         setNotifyRemovedSavedPosts,
         defaultOmniPostsOnly,
