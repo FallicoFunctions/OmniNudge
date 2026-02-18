@@ -366,6 +366,194 @@ func TestGetMessages_NotParticipant(t *testing.T) {
 	assert.Equal(t, http.StatusForbidden, w.Code)
 }
 
+func TestGetMessages_HidesBlockedSenderDM(t *testing.T) {
+	handler, db, user1ID, user2ID, convID, _, cleanup := setupMessagesHandlerTest(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	messageRepo := models.NewMessageRepository(db.Pool)
+
+	allowedMessage := &models.Message{
+		ConversationID:    convID,
+		SenderID:          user2ID,
+		RecipientID:       user1ID,
+		EncryptedContent:  "visible",
+		MessageType:       "text",
+		EncryptionVersion: "v1",
+	}
+	require.NoError(t, messageRepo.Create(ctx, allowedMessage))
+
+	hiddenMessage := &models.Message{
+		ConversationID:    convID,
+		SenderID:          user1ID,
+		RecipientID:       user2ID,
+		EncryptedContent:  "should-hide-for-user2",
+		MessageType:       "text",
+		EncryptionVersion: "v1",
+	}
+	require.NoError(t, messageRepo.Create(ctx, hiddenMessage))
+
+	_, err := db.Pool.Exec(ctx, `
+		INSERT INTO blocked_users (blocker_id, blocked_id)
+		VALUES ($1, $2)
+	`, user2ID, user1ID)
+	require.NoError(t, err)
+
+	router := gin.Default()
+	router.GET("/conversations/:id/messages", func(c *gin.Context) {
+		c.Set("user_id", user2ID)
+		handler.GetMessages(c)
+	})
+
+	req := httptest.NewRequest("GET", fmt.Sprintf("/conversations/%d/messages", convID), nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	var response map[string]interface{}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &response))
+	messages := response["messages"].([]interface{})
+	require.Len(t, messages, 1)
+	msg := messages[0].(map[string]interface{})
+	assert.Equal(t, float64(allowedMessage.ID), msg["id"])
+}
+
+func TestGetMessages_HidesBlockedSenderModMail(t *testing.T) {
+	handler, db, user1ID, user2ID, convID, _, cleanup := setupMessagesHandlerTest(t)
+	defer cleanup()
+
+	ctx := context.Background()
+
+	_, err := db.Pool.Exec(ctx, `
+		UPDATE conversations
+		SET conversation_type = 'mod_mail'
+		WHERE id = $1
+	`, convID)
+	require.NoError(t, err)
+
+	_, err = db.Pool.Exec(ctx, `
+		INSERT INTO conversation_participants (conversation_id, user_id, is_moderator)
+		VALUES ($1, $2, false), ($1, $3, true)
+		ON CONFLICT DO NOTHING
+	`, convID, user1ID, user2ID)
+	require.NoError(t, err)
+
+	messageRepo := models.NewMessageRepository(db.Pool)
+	visible := &models.Message{
+		ConversationID:    convID,
+		SenderID:          user2ID,
+		RecipientID:       user1ID,
+		EncryptedContent:  "visible-modmail",
+		MessageType:       "text",
+		EncryptionVersion: "v1",
+	}
+	require.NoError(t, messageRepo.Create(ctx, visible))
+
+	hidden := &models.Message{
+		ConversationID:    convID,
+		SenderID:          user1ID,
+		RecipientID:       user2ID,
+		EncryptedContent:  "hidden-modmail",
+		MessageType:       "text",
+		EncryptionVersion: "v1",
+	}
+	require.NoError(t, messageRepo.Create(ctx, hidden))
+
+	_, err = db.Pool.Exec(ctx, `
+		INSERT INTO blocked_users (blocker_id, blocked_id)
+		VALUES ($1, $2)
+	`, user2ID, user1ID)
+	require.NoError(t, err)
+
+	router := gin.Default()
+	router.GET("/conversations/:id/messages", func(c *gin.Context) {
+		c.Set("user_id", user2ID)
+		handler.GetMessages(c)
+	})
+
+	req := httptest.NewRequest("GET", fmt.Sprintf("/conversations/%d/messages", convID), nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	var response map[string]interface{}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &response))
+	messages := response["messages"].([]interface{})
+	require.Len(t, messages, 1)
+	msg := messages[0].(map[string]interface{})
+	assert.Equal(t, float64(visible.ID), msg["id"])
+}
+
+func TestGetMessages_UnblockRestoresVisibilityDM(t *testing.T) {
+	handler, db, user1ID, user2ID, convID, _, cleanup := setupMessagesHandlerTest(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	messageRepo := models.NewMessageRepository(db.Pool)
+
+	fromUser1 := &models.Message{
+		ConversationID:    convID,
+		SenderID:          user1ID,
+		RecipientID:       user2ID,
+		EncryptedContent:  "from-user1",
+		MessageType:       "text",
+		EncryptionVersion: "v1",
+	}
+	require.NoError(t, messageRepo.Create(ctx, fromUser1))
+
+	fromUser2 := &models.Message{
+		ConversationID:    convID,
+		SenderID:          user2ID,
+		RecipientID:       user1ID,
+		EncryptedContent:  "from-user2",
+		MessageType:       "text",
+		EncryptionVersion: "v1",
+	}
+	require.NoError(t, messageRepo.Create(ctx, fromUser2))
+
+	_, err := db.Pool.Exec(ctx, `
+		INSERT INTO blocked_users (blocker_id, blocked_id)
+		VALUES ($1, $2)
+	`, user2ID, user1ID)
+	require.NoError(t, err)
+
+	router := gin.Default()
+	router.GET("/conversations/:id/messages", func(c *gin.Context) {
+		c.Set("user_id", user2ID)
+		handler.GetMessages(c)
+	})
+
+	// While blocked: user2 should only see their own message.
+	req := httptest.NewRequest("GET", fmt.Sprintf("/conversations/%d/messages", convID), nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	require.Equal(t, http.StatusOK, w.Code)
+
+	var blockedResponse map[string]interface{}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &blockedResponse))
+	blockedMessages := blockedResponse["messages"].([]interface{})
+	require.Len(t, blockedMessages, 1)
+
+	// Unblock and fetch again.
+	_, err = db.Pool.Exec(ctx, `
+		DELETE FROM blocked_users
+		WHERE blocker_id = $1 AND blocked_id = $2
+	`, user2ID, user1ID)
+	require.NoError(t, err)
+
+	reqAfter := httptest.NewRequest("GET", fmt.Sprintf("/conversations/%d/messages", convID), nil)
+	wAfter := httptest.NewRecorder()
+	router.ServeHTTP(wAfter, reqAfter)
+	require.Equal(t, http.StatusOK, wAfter.Code)
+
+	var unblockedResponse map[string]interface{}
+	require.NoError(t, json.Unmarshal(wAfter.Body.Bytes(), &unblockedResponse))
+	unblockedMessages := unblockedResponse["messages"].([]interface{})
+	require.Len(t, unblockedMessages, 2)
+}
+
 func TestMarkMessagesAsRead(t *testing.T) {
 	handler, db, user1ID, user2ID, convID, hub, cleanup := setupMessagesHandlerTest(t)
 	defer cleanup()
@@ -827,4 +1015,161 @@ func TestMarkMessagesAsRead_SendsIndividualEvents(t *testing.T) {
 
 	assert.Equal(t, 3, readEvents)
 	assert.Equal(t, 1, conversationReadEvents)
+}
+
+func createPinTestMessage(t *testing.T, db *database.Database, convID, senderID, recipientID int, body string) int {
+	t.Helper()
+	var messageID int
+	err := db.Pool.QueryRow(context.Background(), `
+		INSERT INTO messages (conversation_id, sender_id, recipient_id, encrypted_content, message_type)
+		VALUES ($1, $2, $3, $4, 'text')
+		RETURNING id
+	`, convID, senderID, recipientID, body).Scan(&messageID)
+	require.NoError(t, err)
+	return messageID
+}
+
+func TestPinMessage_EnforcesMaxTenPinned(t *testing.T) {
+	handler, db, user1ID, user2ID, convID, _, cleanup := setupMessagesHandlerTest(t)
+	defer cleanup()
+
+	messageIDs := make([]int, 0, 11)
+	for i := 0; i < 11; i++ {
+		messageIDs = append(messageIDs, createPinTestMessage(t, db, convID, user1ID, user2ID, fmt.Sprintf("pin-%d", i)))
+	}
+
+	router := gin.Default()
+	router.POST("/messages/:id/pin", func(c *gin.Context) {
+		c.Set("user_id", user1ID)
+		handler.PinMessage(c)
+	})
+
+	for i := 0; i < 10; i++ {
+		req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("/messages/%d/pin", messageIDs[i]), nil)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+		assert.Equal(t, http.StatusOK, w.Code, "message %d should pin successfully", i)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("/messages/%d/pin", messageIDs[10]), nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusConflict, w.Code, "11th pinned message should fail")
+
+	var pinnedCount int
+	err := db.Pool.QueryRow(context.Background(), `
+		SELECT COUNT(*) FROM messages WHERE conversation_id = $1 AND pinned = TRUE
+	`, convID).Scan(&pinnedCount)
+	require.NoError(t, err)
+	assert.Equal(t, 10, pinnedCount)
+}
+
+func TestUnpinMessage_AdminCanUnpinOthers(t *testing.T) {
+	handler, db, user1ID, user2ID, convID, _, cleanup := setupMessagesHandlerTest(t)
+	defer cleanup()
+
+	messageID := createPinTestMessage(t, db, convID, user1ID, user2ID, "to-unpin")
+	_, err := db.Pool.Exec(context.Background(), `
+		UPDATE messages
+		SET pinned = TRUE, pinned_by = $2, pinned_at = NOW()
+		WHERE id = $1
+	`, messageID, user1ID)
+	require.NoError(t, err)
+
+	userRepo := models.NewUserRepository(db.Pool)
+	admin := &models.User{
+		Username:     uniqueMessagesUsername("admin"),
+		PasswordHash: "test_hash",
+	}
+	require.NoError(t, userRepo.Create(context.Background(), admin))
+	require.NoError(t, userRepo.UpdateRole(context.Background(), admin.ID, "admin"))
+
+	router := gin.Default()
+	router.DELETE("/messages/:id/pin", func(c *gin.Context) {
+		c.Set("user_id", admin.ID)
+		handler.UnpinMessage(c)
+	})
+
+	req := httptest.NewRequest(http.MethodDelete, fmt.Sprintf("/messages/%d/pin", messageID), nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	var pinned bool
+	err = db.Pool.QueryRow(context.Background(), `SELECT pinned FROM messages WHERE id = $1`, messageID).Scan(&pinned)
+	require.NoError(t, err)
+	assert.False(t, pinned)
+}
+
+func TestUnpinMessage_NonAdminCannotUnpinOthers(t *testing.T) {
+	handler, db, user1ID, user2ID, convID, _, cleanup := setupMessagesHandlerTest(t)
+	defer cleanup()
+
+	messageID := createPinTestMessage(t, db, convID, user1ID, user2ID, "cannot-unpin")
+	_, err := db.Pool.Exec(context.Background(), `
+		UPDATE messages
+		SET pinned = TRUE, pinned_by = $2, pinned_at = NOW()
+		WHERE id = $1
+	`, messageID, user1ID)
+	require.NoError(t, err)
+
+	router := gin.Default()
+	router.DELETE("/messages/:id/pin", func(c *gin.Context) {
+		c.Set("user_id", user2ID)
+		handler.UnpinMessage(c)
+	})
+
+	req := httptest.NewRequest(http.MethodDelete, fmt.Sprintf("/messages/%d/pin", messageID), nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusForbidden, w.Code)
+
+	var pinned bool
+	err = db.Pool.QueryRow(context.Background(), `SELECT pinned FROM messages WHERE id = $1`, messageID).Scan(&pinned)
+	require.NoError(t, err)
+	assert.True(t, pinned)
+}
+
+func TestGetPinnedMessages_ChronologicalOrder(t *testing.T) {
+	handler, db, user1ID, user2ID, convID, _, cleanup := setupMessagesHandlerTest(t)
+	defer cleanup()
+
+	firstPinned := createPinTestMessage(t, db, convID, user1ID, user2ID, "first")
+	secondPinned := createPinTestMessage(t, db, convID, user2ID, user1ID, "second")
+	_ = createPinTestMessage(t, db, convID, user1ID, user2ID, "un-pinned")
+
+	now := time.Now().UTC()
+	_, err := db.Pool.Exec(context.Background(), `
+		UPDATE messages
+		SET pinned = TRUE, pinned_by = $2, pinned_at = $3
+		WHERE id = $1
+	`, firstPinned, user1ID, now.Add(-10*time.Minute))
+	require.NoError(t, err)
+	_, err = db.Pool.Exec(context.Background(), `
+		UPDATE messages
+		SET pinned = TRUE, pinned_by = $2, pinned_at = $3
+		WHERE id = $1
+	`, secondPinned, user2ID, now.Add(-1*time.Minute))
+	require.NoError(t, err)
+
+	router := gin.Default()
+	router.GET("/conversations/:id/pinned-messages", func(c *gin.Context) {
+		c.Set("user_id", user1ID)
+		handler.GetPinnedMessages(c)
+	})
+
+	req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/conversations/%d/pinned-messages", convID), nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusOK, w.Code, w.Body.String())
+
+	var resp map[string]interface{}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+	pinned := resp["pinned_messages"].([]interface{})
+	require.Len(t, pinned, 2)
+
+	first := pinned[0].(map[string]interface{})
+	second := pinned[1].(map[string]interface{})
+	assert.Equal(t, float64(firstPinned), first["id"])
+	assert.Equal(t, float64(secondPinned), second["id"])
 }

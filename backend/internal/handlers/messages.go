@@ -2,12 +2,15 @@ package handlers
 
 import (
 	"context"
+	"errors"
 	"log"
 	"net/http"
 	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/omninudge/backend/internal/models"
 	"github.com/omninudge/backend/internal/services"
@@ -55,6 +58,53 @@ func (h *MessagesHandler) isAdmin(ctx context.Context, userID int) (bool, error)
 		SELECT role = 'admin' FROM users WHERE id = $1
 	`, userID).Scan(&isAdmin)
 	return isAdmin, err
+}
+
+func (h *MessagesHandler) getConversationType(ctx context.Context, conversationID int) (string, error) {
+	var conversationType string
+	err := h.pool.QueryRow(ctx, `
+		SELECT COALESCE(conversation_type, 'dm') AS conversation_type
+		FROM conversations
+		WHERE id = $1
+	`, conversationID).Scan(&conversationType)
+	return conversationType, err
+}
+
+func (h *MessagesHandler) canAccessConversation(ctx context.Context, conversationID, userID int) (bool, error) {
+	conversationType, err := h.getConversationType(ctx, conversationID)
+	if err != nil {
+		return false, err
+	}
+
+	if conversationType == "mod_mail" {
+		var isParticipant bool
+		err = h.pool.QueryRow(ctx, `
+			SELECT EXISTS(
+				SELECT 1 FROM conversation_participants
+				WHERE conversation_id = $1 AND user_id = $2
+			)
+		`, conversationID, userID).Scan(&isParticipant)
+		if err != nil {
+			return false, err
+		}
+		if isParticipant {
+			return true, nil
+		}
+		isAdmin, adminErr := h.isAdmin(ctx, userID)
+		if adminErr != nil {
+			return false, adminErr
+		}
+		return isAdmin, nil
+	}
+
+	conversation, err := h.conversationRepo.GetByID(ctx, conversationID)
+	if err != nil {
+		return false, err
+	}
+	if conversation == nil {
+		return false, nil
+	}
+	return conversation.IsParticipant(userID), nil
 }
 
 // sendPushNotification is deprecated and removed in favor of NotificationService.SendMessagePush
@@ -444,9 +494,21 @@ func (h *MessagesHandler) GetMessages(c *gin.Context) {
 			if cursor != nil {
 				payload = &models.TimeCursor{ID: cursor.ID, Timestamp: cursor.Timestamp}
 			}
-			messages, err = h.messageRepo.GetByConversationIDForAllWithCursor(c.Request.Context(), conversationID, limitArg, payload)
+			messages, err = h.messageRepo.GetByConversationIDForAllWithCursor(
+				c.Request.Context(),
+				conversationID,
+				userID.(int),
+				limitArg,
+				payload,
+			)
 		} else {
-			messages, err = h.messageRepo.GetByConversationIDForAll(c.Request.Context(), conversationID, limitArg, offset)
+			messages, err = h.messageRepo.GetByConversationIDForAll(
+				c.Request.Context(),
+				conversationID,
+				userID.(int),
+				limitArg,
+				offset,
+			)
 		}
 	} else {
 		if useCursorPagination {
@@ -590,6 +652,11 @@ func (h *MessagesHandler) MarkAsRead(c *gin.Context) {
 		  AND recipient_id = $2
 		  AND read_at IS NULL
 		  AND deleted_for_recipient = false
+		  AND NOT EXISTS (
+		    SELECT 1 FROM blocked_users bu
+		    WHERE bu.blocker_id = $2
+		      AND bu.blocked_id = messages.sender_id
+		  )
 	`
 	rows, err := h.pool.Query(c.Request.Context(), query, conversationID, userID.(int))
 	if err != nil {
@@ -872,4 +939,270 @@ func (h *MessagesHandler) DeleteMessage(c *gin.Context) {
 	} else {
 		c.JSON(http.StatusOK, gin.H{"message": "Message deleted successfully"})
 	}
+}
+
+// PinMessage handles POST /api/v1/messages/:id/pin
+func (h *MessagesHandler) PinMessage(c *gin.Context) {
+	userIDValue, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
+	userID := userIDValue.(int)
+
+	messageID, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid message ID"})
+		return
+	}
+
+	var conversationID int
+	var isPinned bool
+	err = h.pool.QueryRow(c.Request.Context(), `
+		SELECT conversation_id, pinned
+		FROM messages
+		WHERE id = $1
+	`, messageID).Scan(&conversationID, &isPinned)
+	if err != nil {
+		if err.Error() == "no rows in result set" {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Message not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load message"})
+		return
+	}
+
+	canAccess, err := h.canAccessConversation(c.Request.Context(), conversationID, userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to verify conversation access"})
+		return
+	}
+	if !canAccess {
+		c.JSON(http.StatusForbidden, gin.H{"error": "You are not a participant in this conversation"})
+		return
+	}
+
+	if isPinned {
+		c.JSON(http.StatusOK, gin.H{"message": "Message already pinned"})
+		return
+	}
+
+	_, err = h.pool.Exec(c.Request.Context(), `
+		UPDATE messages
+		SET pinned = TRUE, pinned_by = $2, pinned_at = NOW()
+		WHERE id = $1
+	`, messageID, userID)
+	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.ConstraintName == "messages_max_pinned_per_conversation" {
+			c.JSON(http.StatusConflict, gin.H{"error": "Conversation already has maximum pinned messages (10)"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to pin message"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Message pinned"})
+}
+
+// UnpinMessage handles DELETE /api/v1/messages/:id/pin
+func (h *MessagesHandler) UnpinMessage(c *gin.Context) {
+	userIDValue, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
+	userID := userIDValue.(int)
+
+	messageID, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid message ID"})
+		return
+	}
+
+	var conversationID int
+	var isPinned bool
+	var pinnedBy *int
+	err = h.pool.QueryRow(c.Request.Context(), `
+		SELECT conversation_id, pinned, pinned_by
+		FROM messages
+		WHERE id = $1
+	`, messageID).Scan(&conversationID, &isPinned, &pinnedBy)
+	if err != nil {
+		if err.Error() == "no rows in result set" {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Message not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load message"})
+		return
+	}
+
+	canAccess, err := h.canAccessConversation(c.Request.Context(), conversationID, userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to verify conversation access"})
+		return
+	}
+	if !canAccess {
+		isAdmin, adminErr := h.isAdmin(c.Request.Context(), userID)
+		if adminErr != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to verify unpin permissions"})
+			return
+		}
+		if !isAdmin {
+			c.JSON(http.StatusForbidden, gin.H{"error": "You are not a participant in this conversation"})
+			return
+		}
+	}
+
+	if !isPinned {
+		c.JSON(http.StatusOK, gin.H{"message": "Message already unpinned"})
+		return
+	}
+
+	isAdmin, err := h.isAdmin(c.Request.Context(), userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to verify unpin permissions"})
+		return
+	}
+	if pinnedBy == nil || (*pinnedBy != userID && !isAdmin) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Only the pinner or an admin can unpin this message"})
+		return
+	}
+
+	_, err = h.pool.Exec(c.Request.Context(), `
+		UPDATE messages
+		SET pinned = FALSE, pinned_by = NULL, pinned_at = NULL
+		WHERE id = $1
+	`, messageID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to unpin message"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Message unpinned"})
+}
+
+// GetPinnedMessages handles GET /api/v1/conversations/:id/pinned-messages
+func (h *MessagesHandler) GetPinnedMessages(c *gin.Context) {
+	userIDValue, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
+	userID := userIDValue.(int)
+
+	conversationID, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid conversation ID"})
+		return
+	}
+
+	conversationType, err := h.getConversationType(c.Request.Context(), conversationID)
+	if err != nil {
+		if err.Error() == "no rows in result set" {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Conversation not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load conversation"})
+		return
+	}
+
+	canAccess, err := h.canAccessConversation(c.Request.Context(), conversationID, userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to verify conversation access"})
+		return
+	}
+	if !canAccess {
+		c.JSON(http.StatusForbidden, gin.H{"error": "You are not a participant in this conversation"})
+		return
+	}
+
+	query := `
+		SELECT m.id, m.conversation_id, m.sender_id, m.recipient_id, m.encrypted_content,
+		       m.sender_encrypted_content,
+		       m.message_type, m.sent_at, m.delivered_at, m.read_at,
+		       m.deleted_for_sender, m.deleted_for_recipient,
+		       m.media_file_id,
+		       COALESCE(mf.storage_url, m.media_url) as media_url,
+		       COALESCE(m.media_type, mf.file_type) as media_type,
+		       COALESCE(m.media_size, mf.file_size) as media_size,
+		       m.encryption_version,
+		       m.media_encryption_key,
+		       m.media_encryption_iv,
+		       m.sender_media_encryption_key,
+		       COALESCE(m.is_multi_recipient, FALSE) as is_multi_recipient,
+		       m.shared_encryption_iv,
+		       EXISTS (SELECT 1 FROM message_reactions mr WHERE mr.message_id = m.id) AS has_reactions
+		FROM messages m
+		LEFT JOIN media_files mf ON m.media_file_id = mf.id
+		WHERE m.conversation_id = $1
+		  AND m.pinned = TRUE
+	`
+
+	var rows pgx.Rows
+	if conversationType == "mod_mail" {
+		query += ` ORDER BY m.pinned_at ASC, m.id ASC LIMIT 10`
+		rows, err = h.pool.Query(c.Request.Context(), query, conversationID)
+	} else {
+		query += `
+		  AND (
+		    (m.sender_id = $2 AND m.deleted_for_sender = false) OR
+		    (m.recipient_id = $2 AND m.deleted_for_recipient = false)
+		  )
+		  AND NOT EXISTS (
+		    SELECT 1 FROM blocked_users bu
+		    WHERE bu.blocker_id = $2
+		      AND bu.blocked_id = m.sender_id
+		  )
+		  ORDER BY m.pinned_at ASC, m.id ASC
+		  LIMIT 10
+		`
+		rows, err = h.pool.Query(c.Request.Context(), query, conversationID, userID)
+	}
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get pinned messages"})
+		return
+	}
+	defer rows.Close()
+
+	messages := make([]*models.Message, 0, 10)
+	for rows.Next() {
+		message := &models.Message{}
+		err = rows.Scan(
+			&message.ID,
+			&message.ConversationID,
+			&message.SenderID,
+			&message.RecipientID,
+			&message.EncryptedContent,
+			&message.SenderEncryptedContent,
+			&message.MessageType,
+			&message.SentAt,
+			&message.DeliveredAt,
+			&message.ReadAt,
+			&message.DeletedForSender,
+			&message.DeletedForRecipient,
+			&message.MediaFileID,
+			&message.MediaURL,
+			&message.MediaType,
+			&message.MediaSize,
+			&message.EncryptionVersion,
+			&message.MediaEncryptionKey,
+			&message.MediaEncryptionIV,
+			&message.SenderMediaEncryptionKey,
+			&message.IsMultiRecipient,
+			&message.SharedEncryptionIV,
+			&message.HasReactions,
+		)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to read pinned messages"})
+			return
+		}
+		messages = append(messages, message)
+	}
+	if err := rows.Err(); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to iterate pinned messages"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"pinned_messages": messages})
 }
