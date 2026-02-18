@@ -64,6 +64,8 @@ interface SettingsContextType {
   setProfileVisibility: (value: 'public' | 'friends_only' | 'private') => void;
   notificationSound: boolean;
   setNotificationSound: (value: boolean) => void;
+  showPushNotifications: boolean;
+  setShowPushNotifications: (value: boolean) => void;
 }
 
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
@@ -97,6 +99,7 @@ interface StoredSettings {
   showLastSeen?: boolean;
   profileVisibility?: 'public' | 'friends_only' | 'private';
   notificationSound?: boolean;
+  showPushNotifications?: boolean;
   settingsVersion?: number;
 }
 
@@ -271,6 +274,10 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     const settings = getStoredSettings();
     return settings.notificationSound ?? true;
   });
+  const [showPushNotifications, setShowPushNotificationsState] = useState<boolean>(() => {
+    const settings = getStoredSettings();
+    return settings.showPushNotifications ?? true;
+  });
 
   // Hydrate messaging privacy settings from server when authenticated.
   useEffect(() => {
@@ -316,6 +323,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
           (settings.profile_visibility as 'public' | 'friends_only' | 'private') ?? 'public'
         );
         setNotificationSoundState(settings.notification_sound ?? true);
+        setShowPushNotificationsState(settings.show_push_notifications ?? true);
       } catch (error) {
         // Best-effort: fall back to localStorage snapshot.
         console.warn('[Settings] Failed to load server settings, using local settings:', error);
@@ -359,6 +367,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         showLastSeen,
         profileVisibility,
         notificationSound,
+        showPushNotifications,
         settingsVersion: CURRENT_SETTINGS_VERSION,
       };
       localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings));
@@ -394,6 +403,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     showLastSeen,
     profileVisibility,
     notificationSound,
+    showPushNotifications,
   ]);
 
   // Apply font size immediately by adjusting the document root font-size.
@@ -683,6 +693,16 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     });
   };
 
+  const setShowPushNotifications = (value: boolean) => {
+    const previous = showPushNotifications;
+    setShowPushNotificationsState(value);
+    if (!hasAuthToken()) return;
+    void userSettingsService.update({ show_push_notifications: value }).catch((error) => {
+      console.error('[Settings] Failed to update push notifications setting:', error);
+      setShowPushNotificationsState(previous);
+    });
+  };
+
   return (
     <SettingsContext.Provider
       value={{
@@ -742,6 +762,8 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         setProfileVisibility,
         notificationSound,
         setNotificationSound,
+        showPushNotifications,
+        setShowPushNotifications,
       }}
     >
       {children}

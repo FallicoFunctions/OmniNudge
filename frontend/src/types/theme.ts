@@ -55,6 +55,7 @@ export interface UserSettings {
   active_theme_id?: number;
   advanced_mode_enabled: boolean;
   notification_sound: boolean;
+  show_push_notifications: boolean;
   show_read_receipts: boolean;
   show_typing_indicators: boolean;
   show_last_seen: boolean;

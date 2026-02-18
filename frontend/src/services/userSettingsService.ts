@@ -7,6 +7,7 @@ export type UpdateUserSettingsRequest = Partial<
     | 'show_read_receipts'
     | 'show_typing_indicators'
     | 'notification_sound'
+    | 'show_push_notifications'
     | 'show_last_seen'
     | 'profile_visibility'
     | 'use_relative_time'

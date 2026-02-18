@@ -8,8 +8,8 @@ interface UsePushNotificationsReturn {
   isSupported: boolean;
   isPermissionGranted: boolean;
   isRegistered: boolean;
-  requestPermission: () => Promise<void>;
-  unregister: () => Promise<void>;
+  requestPermission: () => Promise<boolean>;
+  unregister: () => Promise<boolean>;
 }
 
 /**
@@ -65,10 +65,10 @@ export function usePushNotifications(): UsePushNotificationsReturn {
     return unsubscribe;
   }, [isRegistered, t, toast]);
 
-  const requestPermission = async () => {
+  const requestPermission = async (): Promise<boolean> => {
     if (!isSupported) {
       toast.error(t('notifications.push.notSupported'));
-      return;
+      return false;
     }
 
     try {
@@ -77,7 +77,7 @@ export function usePushNotifications(): UsePushNotificationsReturn {
 
       if (!token) {
         toast.error(t('notifications.push.permissionFailed'));
-        return;
+        return false;
       }
 
       // Register device token with backend
@@ -95,14 +95,16 @@ export function usePushNotifications(): UsePushNotificationsReturn {
       setCurrentToken(token);
 
       toast.success(t('notifications.push.enabled'));
+      return true;
     } catch (error) {
       console.error('Error requesting notification permission:', error);
       toast.error(t('notifications.push.enableFailed'));
+      return false;
     }
   };
 
-  const unregister = async () => {
-    if (!currentToken) return;
+  const unregister = async (): Promise<boolean> => {
+    if (!currentToken) return true;
 
     try {
       // Unregister from backend
@@ -117,9 +119,11 @@ export function usePushNotifications(): UsePushNotificationsReturn {
       setCurrentToken(null);
 
       toast.success(t('notifications.push.disabled'));
+      return true;
     } catch (error) {
       console.error('Error unregistering device:', error);
       toast.error(t('notifications.push.disableFailed'));
+      return false;
     }
   };
 
