@@ -7,7 +7,6 @@ import (
 	"log"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/omninudge/backend/internal/models"
@@ -332,14 +331,16 @@ func (s *ReactionService) broadcastReactionAdded(ctx context.Context, conversati
 		if uid == senderUserID {
 			continue // sender gets optimistic update on the client
 		}
+		event := models.ReactionEvent{
+			Type:           "reaction_added",
+			MessageID:      reaction.MessageID,
+			ConversationID: conversationID,
+			Reaction:       reaction,
+		}
 		s.hub.Broadcast(&websocket.Message{
 			RecipientID: uid,
 			Type:        "reaction_added",
-			Payload: gin.H{
-				"message_id":      reaction.MessageID,
-				"conversation_id": conversationID,
-				"reaction":        reaction,
-			},
+			Payload:     event,
 		})
 	}
 }
@@ -359,16 +360,21 @@ func (s *ReactionService) broadcastReactionRemoved(ctx context.Context, conversa
 		if uid == senderUserID {
 			continue
 		}
+		reactionID := reaction.ID
+		userID := reaction.UserID
+		emoji := reaction.Emoji
+		event := models.ReactionEvent{
+			Type:           "reaction_removed",
+			MessageID:      reaction.MessageID,
+			ConversationID: conversationID,
+			ReactionID:     &reactionID,
+			UserID:         &userID,
+			Emoji:          &emoji,
+		}
 		s.hub.Broadcast(&websocket.Message{
 			RecipientID: uid,
 			Type:        "reaction_removed",
-			Payload: gin.H{
-				"message_id":      reaction.MessageID,
-				"conversation_id": conversationID,
-				"reaction_id":     reaction.ID,
-				"user_id":         reaction.UserID,
-				"emoji":           reaction.Emoji,
-			},
+			Payload:     event,
 		})
 	}
 }
