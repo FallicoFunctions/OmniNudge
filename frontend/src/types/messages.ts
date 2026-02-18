@@ -60,6 +60,16 @@ export interface PinnedMessagesResponse {
   pinned_messages: Message[];
 }
 
+export interface WsMessagePinEvent {
+  type: 'message_pinned' | 'message_unpinned';
+  message_id: number;
+  conversation_id: number;
+  pinned_by?: number | null;
+  pinned_at?: string | null;
+  preview?: string;
+  message_type?: Message['message_type'];
+}
+
 export interface SendMessageRequest {
   conversation_id?: number;
   recipient_username?: string;

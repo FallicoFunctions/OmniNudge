@@ -1441,7 +1441,11 @@
       "title_other": "{{count}} pinned messages",
       "showMore": "Show {{count}} more",
       "showLess": "Show less",
+      "badge": "PINNED",
+      "pin": "Pin message",
       "unpin": "Unpin",
+      "unpinNotAllowed": "Only the pinner or admin can unpin",
+      "updating": "Updating...",
       "unpinning": "Unpinning...",
       "unpinFailed": "Failed to unpin message"
     },
