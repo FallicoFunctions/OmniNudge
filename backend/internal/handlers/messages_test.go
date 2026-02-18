@@ -1418,7 +1418,7 @@ func TestGetPinnedMessages_ChronologicalOrder(t *testing.T) {
 }
 
 func TestEditMessage_Success(t *testing.T) {
-	handler, db, user1ID, user2ID, convID, _, cleanup := setupMessagesHandlerTest(t)
+	handler, db, user1ID, user2ID, convID, hub, cleanup := setupMessagesHandlerTest(t)
 	defer cleanup()
 
 	message := &models.Message{
@@ -1479,6 +1479,11 @@ func TestEditMessage_Success(t *testing.T) {
 	`, message.ID).Scan(&historyCount)
 	require.NoError(t, err)
 	assert.Equal(t, 1, historyCount)
+
+	calls := hub.SnapshotBroadcastCalls()
+	require.Len(t, calls, 2)
+	require.NotNil(t, findBroadcastByTypeAndRecipient(calls, "message_edited", user1ID))
+	require.NotNil(t, findBroadcastByTypeAndRecipient(calls, "message_edited", user2ID))
 }
 
 func TestEditMessage_RejectsNonSender(t *testing.T) {
