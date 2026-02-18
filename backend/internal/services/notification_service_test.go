@@ -339,3 +339,69 @@ func TestSelfReplyNoNotification(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, notifs, 0, "Should not create notification for self-reply")
 }
+
+func TestIsWithinQuietHours(t *testing.T) {
+	tz := "UTC"
+	makeTime := func(hour, minute int) time.Time {
+		return time.Date(2026, time.January, 1, hour, minute, 0, 0, time.UTC)
+	}
+
+	testCases := []struct {
+		name         string
+		now          time.Time
+		startMinutes int
+		endMinutes   int
+		expected     bool
+	}{
+		{
+			name:         "normal window inside",
+			now:          makeTime(10, 0),
+			startMinutes: 9 * 60,
+			endMinutes:   17 * 60,
+			expected:     true,
+		},
+		{
+			name:         "normal window outside",
+			now:          makeTime(18, 0),
+			startMinutes: 9 * 60,
+			endMinutes:   17 * 60,
+			expected:     false,
+		},
+		{
+			name:         "overnight window inside before midnight",
+			now:          makeTime(23, 30),
+			startMinutes: 22 * 60,
+			endMinutes:   7 * 60,
+			expected:     true,
+		},
+		{
+			name:         "overnight window inside after midnight",
+			now:          makeTime(6, 30),
+			startMinutes: 22 * 60,
+			endMinutes:   7 * 60,
+			expected:     true,
+		},
+		{
+			name:         "overnight window outside",
+			now:          makeTime(12, 0),
+			startMinutes: 22 * 60,
+			endMinutes:   7 * 60,
+			expected:     false,
+		},
+		{
+			name:         "equal start end means no quiet hours",
+			now:          makeTime(12, 0),
+			startMinutes: 8 * 60,
+			endMinutes:   8 * 60,
+			expected:     false,
+		},
+	}
+
+	for _, tc := range testCases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			actual := isWithinQuietHours(tc.now, tz, tc.startMinutes, tc.endMinutes)
+			assert.Equal(t, tc.expected, actual)
+		})
+	}
+}
