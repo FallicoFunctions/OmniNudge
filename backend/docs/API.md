@@ -400,7 +400,7 @@ Change user password with current password verification.
 ## Settings API
 
 ### Get Settings
-Get notification and user settings.
+Get the authenticated user's full settings object. If no settings row exists yet, defaults are created automatically.
 
 **Endpoint:** `GET /settings`
 
@@ -410,19 +410,50 @@ Get notification and user settings.
 ```json
 {
   "user_id": 123,
+  "notification_sound": true,
+  "show_push_notifications": true,
+  "show_read_receipts": true,
+  "show_typing_indicators": true,
+  "show_last_seen": true,
+  "profile_visibility": "public",
+  "theme": "system",
+  "font_size": "medium",
+  "use_relative_time": true,
+  "auto_close_theme_selector": false,
+  "transcription_opt_in": false,
+  "mic_device_id": "",
+  "camera_device_id": "",
+  "speaker_device_id": "",
+  "quiet_hours_enabled": false,
+  "quiet_hours_start_minutes": 1320,
+  "quiet_hours_end_minutes": 420,
+  "quiet_hours_timezone": "UTC",
+  "access_request_cooldown_display": "days",
+  "notify_archived_messages": false,
+  "notify_removed_saved_posts": true,
+  "default_omni_posts_only": false,
+  "stay_on_post_after_hide": false,
+  "use_infinite_scroll_home": false,
+  "use_infinite_scroll_hubs": false,
+  "use_infinite_scroll_subs": false,
+  "use_infinite_scroll": false,
+  "search_include_nsfw_by_default": false,
+  "block_all_nsfw": false,
+  "block_nsfw_thumbnails": true,
   "notify_comment_replies": true,
   "notify_post_milestone": true,
   "notify_post_velocity": true,
   "notify_comment_milestone": true,
-  "notify_comment_velocity": false,
-  "daily_digest": false
+  "notify_comment_velocity": true,
+  "daily_digest": false,
+  "updated_at": "2026-02-18T00:00:00Z"
 }
 ```
 
 ---
 
 ### Update Settings
-Update notification preferences.
+Update settings fields. Request body is partial; only provided keys are changed.
 
 **Endpoint:** `PUT /settings`
 
@@ -431,6 +462,19 @@ Update notification preferences.
 **Request Body:**
 ```json
 {
+  "show_push_notifications": false,
+  "show_read_receipts": false,
+  "show_typing_indicators": true,
+  "show_last_seen": true,
+  "profile_visibility": "friends_only",
+  "theme": "auto",
+  "font_size": "large",
+  "quiet_hours_enabled": true,
+  "quiet_hours_start_minutes": 1320,
+  "quiet_hours_end_minutes": 420,
+  "quiet_hours_timezone": "America/New_York",
+  "access_request_cooldown_display": "both",
+  "transcription_opt_in": true,
   "notify_comment_replies": true,
   "notify_post_milestone": true,
   "notify_post_velocity": false,
@@ -443,7 +487,32 @@ Update notification preferences.
 **Response:** `200 OK`
 ```json
 {
-  "message": "Settings updated successfully"
+  "user_id": 123,
+  "show_push_notifications": false,
+  "profile_visibility": "friends_only",
+  "theme": "system",
+  "font_size": "large",
+  "access_request_cooldown_display": "both",
+  "notify_comment_replies": true,
+  "daily_digest": false,
+  "...": "full settings object"
+}
+```
+
+**Validation Rules (selected):**
+- `profile_visibility`: `public | friends_only | private`
+- `theme`: `light | dark | system` (`auto` accepted and normalized to `system`)
+- `font_size`: `small | medium | large`
+- `access_request_cooldown_display`: `days | date | both`
+- `mic_device_id`, `camera_device_id`, `speaker_device_id`: max 255 chars
+- `quiet_hours_start_minutes`, `quiet_hours_end_minutes`: `0..1439`
+- `quiet_hours_timezone`: valid IANA timezone
+- When `quiet_hours_enabled=true`, start and end minutes must differ
+
+**Error Response:** `400 Bad Request`
+```json
+{
+  "error": "Invalid <field_name>"
 }
 ```
 
