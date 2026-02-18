@@ -1,0 +1,76 @@
+# Profile System
+
+This document describes the current user profile implementation for OmniNudge.
+
+## API Endpoints
+
+### Public profile reads
+- `GET /api/v1/users/:username`
+- `GET /api/v1/users/id/:id/profile`
+
+Both endpoints return the same `UserProfileResponse` shape:
+- `id`
+- `username`
+- `avatar_url`
+- `bio`
+- `karma`
+- `public_key`
+- `created_at`
+- `last_seen` (conditionally included)
+- `moderated_hubs` (when applicable)
+
+### Authenticated self profile
+- `GET /api/v1/users/me/profile`
+
+### Profile updates
+- `PUT /api/v1/users/me/profile`
+- `PUT /api/v1/users/profile` (legacy alias, still supported)
+
+Accepted payload:
+- `bio` (`null` to clear, max 500 chars)
+- `avatar_url` (`null` to clear, must be `http://` or `https://` when set)
+
+## Privacy Controls
+
+Profile visibility and last-seen behavior are backed by `user_settings`:
+- `profile_visibility`: `public | friends_only | private`
+- `show_last_seen`: `true | false`
+
+Current enforcement:
+- `public`: profile visible to everyone
+- `private`: profile hidden from non-owner
+- `friends_only`: currently treated as private until friendship graph exists
+
+`last_seen` exposure:
+- shown when `show_last_seen=true`
+- always shown to the profile owner
+- hidden for others when `show_last_seen=false`
+
+When settings lookup fails, visibility fails closed.
+
+## Frontend Behavior
+
+### Profile page
+- Route: `/users/:username`
+- Own profile shows an **Edit Profile** action.
+- Edit flow uses `usersService.updateProfile()` and refreshes profile data on success.
+
+### Messaging action menu
+- Message options include **View Profile** for non-own messages.
+- Navigates to `/users/:username`.
+
+## Test Coverage
+
+Backend:
+- Settings validation/persistence for `profile_visibility`.
+- Visibility enforcement for `public/private/friends_only`.
+- Authenticated `/users/me/profile` profile read.
+
+Frontend:
+- `EditProfileModal` validation and submit behavior.
+
+## Notes / Remaining Work
+
+- `friends_only` should be updated once friendship relationships are implemented.
+- Avatar upload pipeline (storage + thumbnails) is separate and currently out of scope here.
+- Profile data is still stored on `users` table; a dedicated `user_profiles` table is future work.
