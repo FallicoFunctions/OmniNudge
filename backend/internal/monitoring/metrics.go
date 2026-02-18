@@ -362,6 +362,23 @@ var (
 		},
 		[]string{"status", "has_query"},
 	)
+
+	ProfileCacheAccessTotal = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "omninudge_profile_cache_access_total",
+			Help: "Total profile cache accesses by result and scope",
+		},
+		[]string{"result", "scope"}, // result: hit|miss, scope: owner|public
+	)
+
+	ProfileReadDuration = promauto.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name:    "omninudge_profile_read_duration_seconds",
+			Help:    "Duration of profile read requests",
+			Buckets: []float64{0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.2, 0.5, 1, 2},
+		},
+		[]string{"cache", "status"}, // cache: hit|miss, status: success|not_found|error
+	)
 )
 
 // RecordHTTPRequest records an HTTP request metric
@@ -472,4 +489,16 @@ func RecordMessageSearch(duration time.Duration, resultCount int, success bool, 
 	MessageSearchRequestsTotal.WithLabelValues(status, queryLabel).Inc()
 	MessageSearchDuration.WithLabelValues(status, queryLabel).Observe(duration.Seconds())
 	MessageSearchResultCount.WithLabelValues(status, queryLabel).Observe(float64(resultCount))
+}
+
+func RecordProfileCacheAccess(hit bool, scope string) {
+	result := "miss"
+	if hit {
+		result = "hit"
+	}
+	ProfileCacheAccessTotal.WithLabelValues(result, scope).Inc()
+}
+
+func RecordProfileRead(duration time.Duration, cache string, status string) {
+	ProfileReadDuration.WithLabelValues(cache, status).Observe(duration.Seconds())
 }
