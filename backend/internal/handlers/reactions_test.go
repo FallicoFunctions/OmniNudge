@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -736,4 +737,182 @@ func TestAddReaction_BroadcastsToOtherParticipant(t *testing.T) {
 			t.Errorf("unexpected reaction_added broadcast to actor user1")
 		}
 	}
+}
+
+// ---------------------------------------------------------------------------
+// M3 — RemoveReaction broadcast verification
+// ---------------------------------------------------------------------------
+
+// TestRemoveReaction_BroadcastsToOtherParticipant verifies that a successful
+// RemoveReaction triggers a "reaction_removed" WebSocket broadcast to the other
+// conversation participant (user2) and NOT to the actor (user1).
+func TestRemoveReaction_BroadcastsToOtherParticipant(t *testing.T) {
+	bed, cleanup := setupReactionsHandlerTest(t)
+	defer cleanup()
+
+	reactionID := addTestReaction(t, bed, bed.user1ID, "🔥")
+
+	router := gin.New()
+	router.DELETE("/messages/:id/reactions/:reaction_id", func(c *gin.Context) {
+		c.Set("user_id", bed.user1ID)
+		bed.handler.RemoveReaction(c)
+	})
+
+	req := httptest.NewRequest(http.MethodDelete,
+		fmt.Sprintf("/messages/%d/reactions/%d", bed.msgID, reactionID), nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+
+	// The broadcast goroutine is non-blocking; poll for up to 500 ms.
+	require.Eventually(t, func() bool {
+		for _, msg := range bed.hub.SnapshotBroadcastCalls() {
+			if msg.Type == "reaction_removed" && msg.RecipientID == bed.user2ID {
+				return true
+			}
+		}
+		return false
+	}, 500*time.Millisecond, 10*time.Millisecond,
+		"expected reaction_removed broadcast to user2 within 500 ms")
+
+	// The actor (user1) must NOT receive the broadcast.
+	for _, msg := range bed.hub.SnapshotBroadcastCalls() {
+		if msg.Type == "reaction_removed" && msg.RecipientID == bed.user1ID {
+			t.Errorf("unexpected reaction_removed broadcast to actor user1")
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// M1 — Full reaction lifecycle test
+// ---------------------------------------------------------------------------
+
+// TestReactionLifecycle_AddGetRemoveGet validates the complete lifecycle of a
+// reaction: add it, verify it appears in GetReactions, remove it, verify the
+// count decrements to zero.
+func TestReactionLifecycle_AddGetRemoveGet(t *testing.T) {
+	bed, cleanup := setupReactionsHandlerTest(t)
+	defer cleanup()
+
+	target := fmt.Sprintf("/messages/%d/reactions", bed.msgID)
+
+	// 1. Add reaction
+	addRouter := gin.New()
+	addRouter.POST("/messages/:id/reactions", func(c *gin.Context) {
+		c.Set("user_id", bed.user1ID)
+		bed.handler.AddReaction(c)
+	})
+	body, _ := json.Marshal(map[string]string{"emoji": "🎉"})
+	addReq := httptest.NewRequest(http.MethodPost, target, bytes.NewBuffer(body))
+	addReq.Header.Set("Content-Type", "application/json")
+	addW := httptest.NewRecorder()
+	addRouter.ServeHTTP(addW, addReq)
+	require.Equal(t, http.StatusCreated, addW.Code, "add: %s", addW.Body.String())
+
+	var addResp map[string]interface{}
+	require.NoError(t, json.Unmarshal(addW.Body.Bytes(), &addResp))
+	reactionID := int(addResp["id"].(float64))
+
+	// 2. GetReactions — should show 1 reaction with count=1
+	getRouter := gin.New()
+	getRouter.GET("/messages/:id/reactions", func(c *gin.Context) {
+		c.Set("user_id", bed.user1ID)
+		bed.handler.GetReactions(c)
+	})
+	getReq := httptest.NewRequest(http.MethodGet, target, nil)
+	getW := httptest.NewRecorder()
+	getRouter.ServeHTTP(getW, getReq)
+	require.Equal(t, http.StatusOK, getW.Code)
+
+	var getResp map[string]interface{}
+	require.NoError(t, json.Unmarshal(getW.Body.Bytes(), &getResp))
+	assert.Equal(t, float64(1), getResp["total_unique_emoji"], "should have 1 unique emoji after add")
+	rxns := getResp["reactions"].([]interface{})
+	require.Len(t, rxns, 1)
+	assert.Equal(t, float64(1), rxns[0].(map[string]interface{})["count"])
+
+	// 3. Remove reaction
+	delRouter := gin.New()
+	delRouter.DELETE("/messages/:id/reactions/:reaction_id", func(c *gin.Context) {
+		c.Set("user_id", bed.user1ID)
+		bed.handler.RemoveReaction(c)
+	})
+	delReq := httptest.NewRequest(http.MethodDelete,
+		fmt.Sprintf("/messages/%d/reactions/%d", bed.msgID, reactionID), nil)
+	delW := httptest.NewRecorder()
+	delRouter.ServeHTTP(delW, delReq)
+	require.Equal(t, http.StatusOK, delW.Code, "remove: %s", delW.Body.String())
+
+	// 4. GetReactions — should be empty now
+	getReq2 := httptest.NewRequest(http.MethodGet, target, nil)
+	getW2 := httptest.NewRecorder()
+	getRouter.ServeHTTP(getW2, getReq2)
+	require.Equal(t, http.StatusOK, getW2.Code)
+
+	var getResp2 map[string]interface{}
+	require.NoError(t, json.Unmarshal(getW2.Body.Bytes(), &getResp2))
+	assert.Equal(t, float64(0), getResp2["total_unique_emoji"], "should have 0 unique emoji after remove")
+	rxns2 := getResp2["reactions"].([]interface{})
+	assert.Empty(t, rxns2, "reaction list should be empty after removal")
+}
+
+// ---------------------------------------------------------------------------
+// M2 — Concurrent AddReaction cap enforcement (advisory lock verification)
+// ---------------------------------------------------------------------------
+
+// TestAddReaction_ConcurrentCapEnforcement fires 11 concurrent AddReaction
+// requests for 11 distinct emoji against the same message. Exactly 10 must
+// succeed (cap) and at least 1 must fail with 409. This exercises the
+// pg_advisory_xact_lock path that serializes cap-check + insert.
+func TestAddReaction_ConcurrentCapEnforcement(t *testing.T) {
+	bed, cleanup := setupReactionsHandlerTest(t)
+	defer cleanup()
+
+	emojis := []string{"👍", "❤️", "😂", "😮", "😢", "😡", "🎉", "🔥", "💯", "✅", "🚀"}
+	require.Len(t, emojis, 11)
+
+	router := gin.New()
+	router.POST("/messages/:id/reactions", func(c *gin.Context) {
+		c.Set("user_id", bed.user1ID)
+		bed.handler.AddReaction(c)
+	})
+
+	type result struct {
+		status int
+	}
+	results := make([]result, len(emojis))
+
+	var wg sync.WaitGroup
+	wg.Add(len(emojis))
+	for i, emoji := range emojis {
+		i, emoji := i, emoji
+		go func() {
+			defer wg.Done()
+			body, _ := json.Marshal(map[string]string{"emoji": emoji})
+			req := httptest.NewRequest(http.MethodPost,
+				fmt.Sprintf("/messages/%d/reactions", bed.msgID), bytes.NewBuffer(body))
+			req.Header.Set("Content-Type", "application/json")
+			w := httptest.NewRecorder()
+			router.ServeHTTP(w, req)
+			results[i] = result{status: w.Code}
+		}()
+	}
+	wg.Wait()
+
+	successes := 0
+	conflicts := 0
+	for _, r := range results {
+		switch r.status {
+		case http.StatusCreated:
+			successes++
+		case http.StatusConflict:
+			conflicts++
+		default:
+			t.Errorf("unexpected status %d", r.status)
+		}
+	}
+
+	assert.Equal(t, 10, successes, "exactly 10 emoji should be accepted (cap)")
+	assert.Equal(t, 1, conflicts, "exactly 1 emoji should be rejected (cap exceeded)")
 }
