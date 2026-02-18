@@ -37,6 +37,8 @@ export interface Message {
   sent_at: string;
   delivered_at?: string;
   read_at?: string;
+  edited?: boolean;
+  edited_at?: string | null;
   pinned?: boolean;
   pinned_by?: number | null;
   pinned_at?: string | null;
@@ -89,4 +91,26 @@ export interface SendMessageRequest {
   is_multi_recipient?: boolean;
   shared_encryption_iv?: string;
   recipient_keys?: Record<number, string>;
+}
+
+export interface EditMessageRequest {
+  conversation_id: number;
+  content: string;
+}
+
+export interface MessageEditHistoryEntry {
+  id: number;
+  message_id: number;
+  content?: string | null;
+  encrypted_content?: string | null;
+  edited_at: string;
+  edited_by: number;
+}
+
+export interface MessageEditHistoryResponse {
+  history: MessageEditHistoryEntry[];
+  message_id: number;
+  total: number;
+  limit: number;
+  offset: number;
 }
