@@ -20,6 +20,8 @@ type Message struct {
 	SentAt                   time.Time      `json:"sent_at"`
 	DeliveredAt              *time.Time     `json:"delivered_at,omitempty"`
 	ReadAt                   *time.Time     `json:"read_at,omitempty"`
+	Edited                   bool           `json:"edited"`
+	EditedAt                 *time.Time     `json:"edited_at,omitempty"`
 	Pinned                   bool           `json:"pinned"`
 	PinnedBy                 *int           `json:"pinned_by,omitempty"`
 	PinnedAt                 *time.Time     `json:"pinned_at,omitempty"`
@@ -152,6 +154,7 @@ func (r *MessageRepository) GetByID(ctx context.Context, id int) (*Message, erro
 		SELECT m.id, m.conversation_id, m.sender_id, m.recipient_id, m.encrypted_content,
 		       m.sender_encrypted_content,
 		       m.message_type, m.sent_at, m.delivered_at, m.read_at,
+		       COALESCE(m.edited, FALSE) AS edited, m.edited_at,
 		       m.deleted_for_sender, m.deleted_for_recipient,
 		       m.media_file_id,
 		       COALESCE(mf.storage_url, m.media_url) as media_url,
@@ -179,6 +182,8 @@ func (r *MessageRepository) GetByID(ctx context.Context, id int) (*Message, erro
 		&message.SentAt,
 		&message.DeliveredAt,
 		&message.ReadAt,
+		&message.Edited,
+		&message.EditedAt,
 		&message.DeletedForSender,
 		&message.DeletedForRecipient,
 		&message.MediaFileID,
@@ -212,6 +217,7 @@ func (r *MessageRepository) GetByConversationID(ctx context.Context, conversatio
 		SELECT m.id, m.conversation_id, m.sender_id, m.recipient_id, m.encrypted_content,
 		       m.sender_encrypted_content,
 		       m.message_type, m.sent_at, m.delivered_at, m.read_at,
+		       COALESCE(m.edited, FALSE) AS edited, m.edited_at,
 		       m.deleted_for_sender, m.deleted_for_recipient,
 		       m.media_file_id,
 		       COALESCE(mf.storage_url, m.media_url) as media_url,
@@ -260,6 +266,8 @@ func (r *MessageRepository) GetByConversationID(ctx context.Context, conversatio
 			&message.SentAt,
 			&message.DeliveredAt,
 			&message.ReadAt,
+			&message.Edited,
+			&message.EditedAt,
 			&message.DeletedForSender,
 			&message.DeletedForRecipient,
 			&message.MediaFileID,

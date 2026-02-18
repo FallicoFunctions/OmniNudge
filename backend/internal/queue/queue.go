@@ -15,13 +15,14 @@ type JobType string
 
 const (
 	// Job types as per P0-002 requirements
-	JobTypeVirusScan          JobType = "virus_scan"
-	JobTypeTranscription      JobType = "transcription"
-	JobTypeNotification       JobType = "notification"
+	JobTypeVirusScan           JobType = "virus_scan"
+	JobTypeTranscription       JobType = "transcription"
+	JobTypeNotification        JobType = "notification"
 	JobTypeThumbnailGeneration JobType = "thumbnail_generation"
-	JobTypeEmailSend          JobType = "email_send"           // P0-036
-	JobTypeDataExport         JobType = "data_export"          // P0-016
-	JobTypeContentModeration  JobType = "content_moderation"   // P0-043
+	JobTypeEmailSend           JobType = "email_send"         // P0-036
+	JobTypeDataExport          JobType = "data_export"        // P0-016
+	JobTypeContentModeration   JobType = "content_moderation" // P0-043
+	JobTypeMessageReencrypt    JobType = "message_reencrypt"
 )
 
 // QueueClient wraps the Asynq client for enqueuing jobs
@@ -69,9 +70,9 @@ func (q *QueueClient) EnqueueJob(
 	// Default options if not provided
 	if len(opts) == 0 {
 		opts = []asynq.Option{
-			asynq.MaxRetry(3),                          // P0-002: retry 3 times
-			asynq.Timeout(30 * time.Minute),            // 30 min timeout
-			asynq.Retention(24 * time.Hour),            // Keep completed jobs for 24h
+			asynq.MaxRetry(3),               // P0-002: retry 3 times
+			asynq.Timeout(30 * time.Minute), // 30 min timeout
+			asynq.Retention(24 * time.Hour), // Keep completed jobs for 24h
 		}
 		task = asynq.NewTask(string(jobType), payloadBytes, opts...)
 	}
@@ -165,26 +166,26 @@ type TranscriptionPayload struct {
 
 // NotificationPayload for push notification jobs
 type NotificationPayload struct {
-	UserIDs     []int             `json:"user_ids"`
-	Title       string            `json:"title"`
-	Body        string            `json:"body"`
-	Data        map[string]string `json:"data,omitempty"`
-	Sound       string            `json:"sound,omitempty"`
-	Badge       int               `json:"badge,omitempty"`
+	UserIDs []int             `json:"user_ids"`
+	Title   string            `json:"title"`
+	Body    string            `json:"body"`
+	Data    map[string]string `json:"data,omitempty"`
+	Sound   string            `json:"sound,omitempty"`
+	Badge   int               `json:"badge,omitempty"`
 }
 
 // ThumbnailGenerationPayload for thumbnail generation jobs
 type ThumbnailGenerationPayload struct {
-	FileID      int    `json:"file_id"`
-	SourceURL   string `json:"source_url"`
-	SourceS3Key string `json:"source_s3_key"`
-	FileType    string `json:"file_type"` // "image", "video", "pdf"
+	FileID      int             `json:"file_id"`
+	SourceURL   string          `json:"source_url"`
+	SourceS3Key string          `json:"source_s3_key"`
+	FileType    string          `json:"file_type"` // "image", "video", "pdf"
 	Sizes       []ThumbnailSize `json:"sizes"`
 }
 
 // ThumbnailSize specifies a thumbnail size to generate
 type ThumbnailSize struct {
-	Name   string `json:"name"`   // e.g., "small", "medium", "large"
+	Name   string `json:"name"` // e.g., "small", "medium", "large"
 	Width  int    `json:"width"`
 	Height int    `json:"height"`
 }
@@ -222,6 +223,13 @@ type ContentModerationPayload struct {
 	ContentURL  string `json:"content_url,omitempty"`
 	ContentText string `json:"content_text,omitempty"`
 	ReportedBy  int    `json:"reported_by,omitempty"`
+}
+
+// MessageReencryptPayload for asynchronous message re-encryption jobs.
+type MessageReencryptPayload struct {
+	MessageID      int `json:"message_id"`
+	ConversationID int `json:"conversation_id"`
+	EditorID       int `json:"editor_id"`
 }
 
 // Helper functions for common job enqueueing patterns
@@ -302,5 +310,11 @@ func (q *QueueClient) EnqueueEmail(ctx context.Context, to []string, subject, bo
 func (q *QueueClient) EnqueueDataExport(ctx context.Context, payload DataExportPayload) error {
 	// Low priority, can be slow
 	_, err := q.EnqueueJobWithPriority(ctx, JobTypeDataExport, payload, 0)
+	return err
+}
+
+// EnqueueMessageReencrypt enqueues a message re-encryption job.
+func (q *QueueClient) EnqueueMessageReencrypt(ctx context.Context, payload MessageReencryptPayload) error {
+	_, err := q.EnqueueJob(ctx, JobTypeMessageReencrypt, payload)
 	return err
 }

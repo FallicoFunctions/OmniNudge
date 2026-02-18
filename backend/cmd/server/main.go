@@ -251,6 +251,7 @@ func main() {
 			Notification:        queue.NewNotificationHandler(tokenRepo, firebaseService),
 			ThumbnailGeneration: queue.NewThumbnailGenerationHandler(mediaRepo, queueThumbnailService),
 			ContentModeration:   queue.NewUnsupportedHandler(queue.JobTypeContentModeration, "content moderation backend is not yet implemented"),
+			MessageReencrypt:    queue.NewUnsupportedHandler(queue.JobTypeMessageReencrypt, "message re-encryption backend pipeline is not yet implemented"),
 		})
 
 		// Start worker in background
@@ -297,7 +298,7 @@ func main() {
 	// Initialize CSS sanitizer
 	cssSanitizer := services.NewCSSSanitizer()
 
-	messagesHandler := handlers.NewMessagesHandler(db.Pool, messageRepo, conversationRepo, userSettingsRepo, hub, notificationService)
+	messagesHandler := handlers.NewMessagesHandler(db.Pool, messageRepo, conversationRepo, userSettingsRepo, hub, notificationService, queueClient)
 	usersHandler := handlers.NewUsersHandler(userRepo, userProfileRepo, userFriendshipRepo, userSettingsRepo, postRepo, commentRepo, authService, hubModRepo, cache, thumbnailService)
 	mediaHandler := handlers.NewMediaHandler(mediaRepo, thumbnailService, queueClient)
 	hubsHandler := handlers.NewHubsHandlerWithAccessRequest(hubRepo, postRepo, hubModRepo, hubSubRepo, hubSettingsRepo, hubAccessRequestRepo)
@@ -768,6 +769,7 @@ func main() {
 			protected.GET("/conversations/:id/pinned-messages", messagesHandler.GetPinnedMessages)
 			protected.POST("/conversations/:id/read", messagesHandler.MarkAsRead)
 			protected.POST("/messages/:id/read", messagesHandler.MarkSingleMessageAsRead)
+			protected.PATCH("/messages/:id", messagesHandler.EditMessage)
 			protected.DELETE("/messages/:id", messagesHandler.DeleteMessage)
 			protected.POST("/messages/:id/pin", messagesHandler.PinMessage)
 			protected.DELETE("/messages/:id/pin", messagesHandler.UnpinMessage)

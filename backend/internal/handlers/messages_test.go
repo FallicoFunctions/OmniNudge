@@ -1416,3 +1416,136 @@ func TestGetPinnedMessages_ChronologicalOrder(t *testing.T) {
 	assert.Equal(t, float64(firstPinned), first["id"])
 	assert.Equal(t, float64(secondPinned), second["id"])
 }
+
+func TestEditMessage_Success(t *testing.T) {
+	handler, db, user1ID, user2ID, convID, _, cleanup := setupMessagesHandlerTest(t)
+	defer cleanup()
+
+	message := &models.Message{
+		ConversationID:    convID,
+		SenderID:          user1ID,
+		RecipientID:       user2ID,
+		EncryptedContent:  "original-encrypted",
+		MessageType:       "text",
+		EncryptionVersion: "v1",
+	}
+	require.NoError(t, handler.messageRepo.Create(context.Background(), message))
+
+	router := gin.Default()
+	router.PATCH("/messages/:id", func(c *gin.Context) {
+		c.Set("user_id", user1ID)
+		handler.EditMessage(c)
+	})
+
+	body := map[string]any{
+		"encrypted_content":        "updated-encrypted",
+		"sender_encrypted_content": "updated-sender-copy",
+		"content":                  "updated plaintext",
+		"encryption_version":       "v1",
+	}
+	bodyJSON, _ := json.Marshal(body)
+	req := httptest.NewRequest(http.MethodPatch, fmt.Sprintf("/messages/%d", message.ID), bytes.NewBuffer(bodyJSON))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code, w.Body.String())
+
+	var edited bool
+	var editedAt *time.Time
+	var currentEncrypted string
+	var currentSenderEncrypted *string
+	var originalContent *string
+	err := db.Pool.QueryRow(context.Background(), `
+		SELECT edited, edited_at, encrypted_content, sender_encrypted_content, original_content
+		FROM messages
+		WHERE id = $1
+	`, message.ID).Scan(&edited, &editedAt, &currentEncrypted, &currentSenderEncrypted, &originalContent)
+	require.NoError(t, err)
+
+	assert.True(t, edited)
+	require.NotNil(t, editedAt)
+	assert.Equal(t, "updated-encrypted", currentEncrypted)
+	require.NotNil(t, currentSenderEncrypted)
+	assert.Equal(t, "updated-sender-copy", *currentSenderEncrypted)
+	require.NotNil(t, originalContent)
+	assert.Equal(t, "original-encrypted", *originalContent)
+
+	var historyCount int
+	err = db.Pool.QueryRow(context.Background(), `
+		SELECT COUNT(*)
+		FROM message_edit_history
+		WHERE message_id = $1
+	`, message.ID).Scan(&historyCount)
+	require.NoError(t, err)
+	assert.Equal(t, 1, historyCount)
+}
+
+func TestEditMessage_RejectsNonSender(t *testing.T) {
+	handler, _, user1ID, user2ID, convID, _, cleanup := setupMessagesHandlerTest(t)
+	defer cleanup()
+
+	message := &models.Message{
+		ConversationID:    convID,
+		SenderID:          user1ID,
+		RecipientID:       user2ID,
+		EncryptedContent:  "original-encrypted",
+		MessageType:       "text",
+		EncryptionVersion: "v1",
+	}
+	require.NoError(t, handler.messageRepo.Create(context.Background(), message))
+
+	router := gin.Default()
+	router.PATCH("/messages/:id", func(c *gin.Context) {
+		c.Set("user_id", user2ID)
+		handler.EditMessage(c)
+	})
+
+	body := map[string]any{
+		"encrypted_content": "updated-encrypted",
+	}
+	bodyJSON, _ := json.Marshal(body)
+	req := httptest.NewRequest(http.MethodPatch, fmt.Sprintf("/messages/%d", message.ID), bytes.NewBuffer(bodyJSON))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusForbidden, w.Code, w.Body.String())
+}
+
+func TestEditMessage_RejectsAfter15Minutes(t *testing.T) {
+	handler, db, user1ID, user2ID, convID, _, cleanup := setupMessagesHandlerTest(t)
+	defer cleanup()
+
+	message := &models.Message{
+		ConversationID:    convID,
+		SenderID:          user1ID,
+		RecipientID:       user2ID,
+		EncryptedContent:  "original-encrypted",
+		MessageType:       "text",
+		EncryptionVersion: "v1",
+	}
+	require.NoError(t, handler.messageRepo.Create(context.Background(), message))
+
+	_, err := db.Pool.Exec(context.Background(), `
+		UPDATE messages SET sent_at = NOW() - INTERVAL '16 minutes' WHERE id = $1
+	`, message.ID)
+	require.NoError(t, err)
+
+	router := gin.Default()
+	router.PATCH("/messages/:id", func(c *gin.Context) {
+		c.Set("user_id", user1ID)
+		handler.EditMessage(c)
+	})
+
+	body := map[string]any{
+		"encrypted_content": "updated-encrypted",
+	}
+	bodyJSON, _ := json.Marshal(body)
+	req := httptest.NewRequest(http.MethodPatch, fmt.Sprintf("/messages/%d", message.ID), bytes.NewBuffer(bodyJSON))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusForbidden, w.Code, w.Body.String())
+}
