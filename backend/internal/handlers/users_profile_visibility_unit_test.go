@@ -8,6 +8,7 @@ func TestCanViewerSeeProfile(t *testing.T) {
 		profileUserID     int
 		viewerID          int
 		profileVisibility string
+		viewerIsFriend    bool
 		want              bool
 	}{
 		{
@@ -32,10 +33,19 @@ func TestCanViewerSeeProfile(t *testing.T) {
 			want:              true,
 		},
 		{
-			name:              "friends only currently hidden from non-owner",
+			name:              "friends only visible to accepted friend",
 			profileUserID:     10,
 			viewerID:          11,
 			profileVisibility: "friends_only",
+			viewerIsFriend:    true,
+			want:              true,
+		},
+		{
+			name:              "friends only hidden from non-friend",
+			profileUserID:     10,
+			viewerID:          11,
+			profileVisibility: "friends_only",
+			viewerIsFriend:    false,
 			want:              false,
 		},
 		{
@@ -56,7 +66,7 @@ func TestCanViewerSeeProfile(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := canViewerSeeProfile(tt.profileUserID, tt.viewerID, tt.profileVisibility)
+			got := canViewerSeeProfile(tt.profileUserID, tt.viewerID, tt.profileVisibility, tt.viewerIsFriend)
 			if got != tt.want {
 				t.Fatalf("canViewerSeeProfile() = %v, want %v", got, tt.want)
 			}
