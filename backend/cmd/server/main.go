@@ -766,6 +766,7 @@ func main() {
 			// Protected messages routes
 			protected.POST("/messages", messagesHandler.SendMessage)
 			protected.GET("/conversations/:id/messages", messagesHandler.GetMessages)
+			protected.GET("/messages/:id/history", messagesHandler.GetMessageHistory)
 			protected.GET("/conversations/:id/pinned-messages", messagesHandler.GetPinnedMessages)
 			protected.POST("/conversations/:id/read", messagesHandler.MarkAsRead)
 			protected.POST("/messages/:id/read", messagesHandler.MarkSingleMessageAsRead)

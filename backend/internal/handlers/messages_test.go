@@ -1549,3 +1549,82 @@ func TestEditMessage_RejectsAfter15Minutes(t *testing.T) {
 
 	assert.Equal(t, http.StatusForbidden, w.Code, w.Body.String())
 }
+
+func TestGetMessageHistory_SuccessWithPagination(t *testing.T) {
+	handler, db, user1ID, user2ID, convID, _, cleanup := setupMessagesHandlerTest(t)
+	defer cleanup()
+
+	message := &models.Message{
+		ConversationID:    convID,
+		SenderID:          user1ID,
+		RecipientID:       user2ID,
+		EncryptedContent:  "history-original",
+		MessageType:       "text",
+		EncryptionVersion: "v1",
+	}
+	require.NoError(t, handler.messageRepo.Create(context.Background(), message))
+
+	_, err := db.Pool.Exec(context.Background(), `
+		INSERT INTO message_edit_history (message_id, content, encrypted_content, edited_at, edited_by)
+		VALUES
+			($1, $2, $3, NOW() - INTERVAL '2 minutes', $4),
+			($1, $5, $6, NOW() - INTERVAL '1 minutes', $4)
+	`, message.ID, "v1", "enc-v1", user1ID, "v2", "enc-v2")
+	require.NoError(t, err)
+
+	router := gin.Default()
+	router.GET("/messages/:id/history", func(c *gin.Context) {
+		c.Set("user_id", user2ID)
+		handler.GetMessageHistory(c)
+	})
+
+	req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/messages/%d/history?limit=1&offset=0", message.ID), nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusOK, w.Code, w.Body.String())
+
+	var resp map[string]any
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+	assert.Equal(t, float64(2), resp["total"])
+	assert.Equal(t, float64(1), resp["limit"])
+	assert.Equal(t, float64(0), resp["offset"])
+
+	history, ok := resp["history"].([]any)
+	require.True(t, ok)
+	require.Len(t, history, 1)
+	first := history[0].(map[string]any)
+	assert.Equal(t, "v1", first["content"])
+}
+
+func TestGetMessageHistory_RejectsNonParticipant(t *testing.T) {
+	handler, db, user1ID, user2ID, convID, _, cleanup := setupMessagesHandlerTest(t)
+	defer cleanup()
+
+	message := &models.Message{
+		ConversationID:    convID,
+		SenderID:          user1ID,
+		RecipientID:       user2ID,
+		EncryptedContent:  "history-original",
+		MessageType:       "text",
+		EncryptionVersion: "v1",
+	}
+	require.NoError(t, handler.messageRepo.Create(context.Background(), message))
+
+	userRepo := models.NewUserRepository(db.Pool)
+	outsider := &models.User{
+		Username:     uniqueMessagesUsername("outsider"),
+		PasswordHash: "test_hash",
+	}
+	require.NoError(t, userRepo.Create(context.Background(), outsider))
+
+	router := gin.Default()
+	router.GET("/messages/:id/history", func(c *gin.Context) {
+		c.Set("user_id", outsider.ID)
+		handler.GetMessageHistory(c)
+	})
+
+	req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/messages/%d/history", message.ID), nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusForbidden, w.Code, w.Body.String())
+}

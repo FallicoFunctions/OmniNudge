@@ -594,6 +594,15 @@ type EditMessageRequest struct {
 	EncryptionVersion      *string `json:"encryption_version,omitempty"`
 }
 
+type MessageEditHistoryEntry struct {
+	ID               int       `json:"id"`
+	MessageID        int       `json:"message_id"`
+	Content          *string   `json:"content,omitempty"`
+	EncryptedContent *string   `json:"encrypted_content,omitempty"`
+	EditedAt         time.Time `json:"edited_at"`
+	EditedBy         int       `json:"edited_by"`
+}
+
 // EditMessage handles PATCH /api/v1/messages/:id
 func (h *MessagesHandler) EditMessage(c *gin.Context) {
 	userIDValue, exists := c.Get("user_id")
@@ -742,6 +751,111 @@ func (h *MessagesHandler) EditMessage(c *gin.Context) {
 	updatedMessage.EditedAt = &editedAt
 
 	c.JSON(http.StatusOK, updatedMessage)
+}
+
+// GetMessageHistory handles GET /api/v1/messages/:id/history
+func (h *MessagesHandler) GetMessageHistory(c *gin.Context) {
+	userIDValue, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
+	userID := userIDValue.(int)
+
+	messageID, err := strconv.Atoi(c.Param("id"))
+	if err != nil || messageID <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid message ID"})
+		return
+	}
+
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
+	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
+	if limit < 1 || limit > 100 {
+		limit = 20
+	}
+	if offset < 0 {
+		offset = 0
+	}
+
+	ctx := c.Request.Context()
+
+	var conversationID int
+	err = h.pool.QueryRow(ctx, `
+		SELECT conversation_id
+		FROM messages
+		WHERE id = $1
+	`, messageID).Scan(&conversationID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Message not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load message", "details": err.Error()})
+		return
+	}
+
+	canAccess, err := h.canAccessConversation(ctx, conversationID, userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to validate conversation access", "details": err.Error()})
+		return
+	}
+	if !canAccess {
+		c.JSON(http.StatusForbidden, gin.H{"error": "You are not a participant in this conversation"})
+		return
+	}
+
+	var total int
+	err = h.pool.QueryRow(ctx, `
+		SELECT COUNT(*)
+		FROM message_edit_history
+		WHERE message_id = $1
+	`, messageID).Scan(&total)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load message edit history", "details": err.Error()})
+		return
+	}
+
+	rows, err := h.pool.Query(ctx, `
+		SELECT id, message_id, content, encrypted_content, edited_at, edited_by
+		FROM message_edit_history
+		WHERE message_id = $1
+		ORDER BY edited_at ASC, id ASC
+		LIMIT $2 OFFSET $3
+	`, messageID, limit, offset)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load message edit history", "details": err.Error()})
+		return
+	}
+	defer rows.Close()
+
+	history := make([]MessageEditHistoryEntry, 0, limit)
+	for rows.Next() {
+		var entry MessageEditHistoryEntry
+		if err := rows.Scan(
+			&entry.ID,
+			&entry.MessageID,
+			&entry.Content,
+			&entry.EncryptedContent,
+			&entry.EditedAt,
+			&entry.EditedBy,
+		); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to parse message edit history", "details": err.Error()})
+			return
+		}
+		history = append(history, entry)
+	}
+	if err := rows.Err(); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to iterate message edit history", "details": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"history":    history,
+		"message_id": messageID,
+		"total":      total,
+		"limit":      limit,
+		"offset":     offset,
+	})
 }
 
 // GetMessages handles GET /api/v1/conversations/:id/messages

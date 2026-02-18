@@ -433,6 +433,53 @@ func TestEditMessageEndpoint_UpdatesMessageAndHistory(t *testing.T) {
 	require.Equal(t, 1, historyCount)
 }
 
+func TestGetMessageHistoryEndpoint_ReturnsChronologicalHistory(t *testing.T) {
+	deps := newTestDeps(t)
+	defer deps.DB.Close()
+
+	sender := createUser(t, deps.UserRepo, "history_sender", "user")
+	recipient := createUser(t, deps.UserRepo, "history_recipient", "user")
+	recipientToken, _ := deps.AuthService.GenerateJWT(recipient.ID, "", recipient.Username, recipient.Role)
+
+	conversation, err := deps.ConversationRepo.Create(context.Background(), sender.ID, recipient.ID)
+	require.NoError(t, err)
+
+	message := &models.Message{
+		ConversationID:    conversation.ID,
+		SenderID:          sender.ID,
+		RecipientID:       recipient.ID,
+		EncryptedContent:  "history-original",
+		MessageType:       "text",
+		EncryptionVersion: "v1",
+	}
+	require.NoError(t, deps.MessageRepo.Create(context.Background(), message))
+
+	_, err = deps.DB.Pool.Exec(context.Background(), `
+		INSERT INTO message_edit_history (message_id, content, encrypted_content, edited_at, edited_by)
+		VALUES
+		  ($1, $2, $3, NOW() - INTERVAL '3 minutes', $4),
+		  ($1, $5, $6, NOW() - INTERVAL '2 minutes', $4)
+	`, message.ID, "before", "enc-before", sender.ID, "after", "enc-after")
+	require.NoError(t, err)
+
+	req, _ := http.NewRequest("GET", fmt.Sprintf("/api/v1/messages/%d/history?limit=20&offset=0", message.ID), nil)
+	req.Header.Set("Authorization", "Bearer "+recipientToken)
+	resp := doRequest(t, deps.Router, req)
+	require.Equal(t, http.StatusOK, resp.Code, "body=%s", resp.Body.String())
+
+	var payload struct {
+		History []struct {
+			Content *string `json:"content"`
+		} `json:"history"`
+		Total float64 `json:"total"`
+	}
+	require.NoError(t, json.Unmarshal(resp.Body.Bytes(), &payload))
+	require.Equal(t, float64(2), payload.Total)
+	require.Len(t, payload.History, 2)
+	require.NotNil(t, payload.History[0].Content)
+	require.Equal(t, "before", *payload.History[0].Content)
+}
+
 func TestSearchMessagesAuthAndResults(t *testing.T) {
 	deps := newTestDeps(t)
 	defer deps.DB.Close()
