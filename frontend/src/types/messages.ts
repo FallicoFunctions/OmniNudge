@@ -49,6 +49,8 @@ export interface Message {
   is_multi_recipient?: boolean;
   shared_encryption_iv?: string | null;
   recipient_keys?: Record<number, string>;
+  /** Set by the server. True when ≥1 reaction exists. Avoids per-message reaction fetches. */
+  has_reactions?: boolean;
 }
 
 export interface SendMessageRequest {

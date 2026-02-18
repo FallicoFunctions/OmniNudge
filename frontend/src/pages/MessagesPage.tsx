@@ -19,6 +19,7 @@ import { OnlineStatusIndicator } from '../components/messages/OnlineStatusIndica
 import { TypingIndicator } from '../components/messages/TypingIndicator';
 import { HighlightedText } from '../components/messages/HighlightedText';
 import { MessageReactions } from '../components/messages/MessageReactions';
+import { QuickReactButton } from '../components/messages/QuickReactButton';
 import { useDebounce } from '../hooks/useDebounce';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import type { Conversation, Message, SendMessageRequest } from '../types/messages';
@@ -2323,7 +2324,7 @@ export default function MessagesPage() {
                       return (
                         <div
                           key={message.id}
-                          className={`flex flex-col ${isOwnMessage ? 'items-end' : 'items-start'}`}
+                          className={`group flex flex-col ${isOwnMessage ? 'items-end' : 'items-start'}`}
                           data-message-menu-container={message.id}
                         >
                           <div
@@ -2469,12 +2470,27 @@ export default function MessagesPage() {
                             </div>
                           </div>
                           {message.id > 0 && (
-                            <MessageReactions
-                              messageId={message.id}
-                              isOwnMessage={isOwnMessage}
-                              currentUserId={user?.id ?? 0}
-                              currentUsername={user?.username}
-                            />
+                            <div
+                              className={`mt-1 flex items-center gap-1 ${isOwnMessage ? 'flex-row-reverse' : 'flex-row'}`}
+                            >
+                              {!!user && (
+                                <QuickReactButton
+                                  messageId={message.id}
+                                  conversationId={selectedConversationId!}
+                                  isOwnMessage={isOwnMessage}
+                                  currentUserId={user.id}
+                                  currentUsername={user.username}
+                                />
+                              )}
+                              {message.has_reactions && (
+                                <MessageReactions
+                                  messageId={message.id}
+                                  isOwnMessage={isOwnMessage}
+                                  currentUserId={user?.id ?? 0}
+                                  currentUsername={user?.username}
+                                />
+                              )}
+                            </div>
                           )}
                         </div>
                       );

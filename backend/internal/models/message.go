@@ -10,29 +10,30 @@ import (
 
 // Message represents an encrypted message in a conversation
 type Message struct {
-	ID                       int                         `json:"id"`
-	ConversationID           int                         `json:"conversation_id"`
-	SenderID                 int                         `json:"sender_id"`
-	RecipientID              int                         `json:"recipient_id"`
-	EncryptedContent         string                      `json:"encrypted_content"` // Base64 encoded encrypted blob (recipient copy or plaintext)
-	SenderEncryptedContent   *string                     `json:"sender_encrypted_content,omitempty"`
-	MessageType              string                      `json:"message_type"` // "text", "image", "video", "audio"
-	SentAt                   time.Time                   `json:"sent_at"`
-	DeliveredAt              *time.Time                  `json:"delivered_at,omitempty"`
-	ReadAt                   *time.Time                  `json:"read_at,omitempty"`
-	DeletedForSender         bool                        `json:"deleted_for_sender"`
-	DeletedForRecipient      bool                        `json:"deleted_for_recipient"`
-	MediaFileID              *int                        `json:"media_file_id,omitempty"` // References media_files table
-	MediaURL                 *string                     `json:"media_url,omitempty"`
-	MediaType                *string                     `json:"media_type,omitempty"`
-	MediaSize                *int                        `json:"media_size,omitempty"`
-	EncryptionVersion        string                      `json:"encryption_version"`             // For future encryption updates, e.g., "v1"
-	MediaEncryptionKey       *string                     `json:"media_encryption_key,omitempty"` // RSA-encrypted AES key (Base64) for recipient
-	MediaEncryptionIV        *string                     `json:"media_encryption_iv,omitempty"`  // AES-GCM initialization vector (Base64)
-	SenderMediaEncryptionKey *string                     `json:"sender_media_encryption_key,omitempty"`
-	IsMultiRecipient         bool                        `json:"is_multi_recipient"`                // True for multi-recipient messages (mod mail)
-	SharedEncryptionIV       *string                     `json:"shared_encryption_iv,omitempty"`    // Shared IV for multi-recipient messages
-	RecipientKeys            map[int]string              `json:"recipient_keys,omitempty"`          // Map of user_id -> encrypted_key for multi-recipient
+	ID                       int            `json:"id"`
+	ConversationID           int            `json:"conversation_id"`
+	SenderID                 int            `json:"sender_id"`
+	RecipientID              int            `json:"recipient_id"`
+	EncryptedContent         string         `json:"encrypted_content"` // Base64 encoded encrypted blob (recipient copy or plaintext)
+	SenderEncryptedContent   *string        `json:"sender_encrypted_content,omitempty"`
+	MessageType              string         `json:"message_type"` // "text", "image", "video", "audio"
+	SentAt                   time.Time      `json:"sent_at"`
+	DeliveredAt              *time.Time     `json:"delivered_at,omitempty"`
+	ReadAt                   *time.Time     `json:"read_at,omitempty"`
+	DeletedForSender         bool           `json:"deleted_for_sender"`
+	DeletedForRecipient      bool           `json:"deleted_for_recipient"`
+	MediaFileID              *int           `json:"media_file_id,omitempty"` // References media_files table
+	MediaURL                 *string        `json:"media_url,omitempty"`
+	MediaType                *string        `json:"media_type,omitempty"`
+	MediaSize                *int           `json:"media_size,omitempty"`
+	EncryptionVersion        string         `json:"encryption_version"`             // For future encryption updates, e.g., "v1"
+	MediaEncryptionKey       *string        `json:"media_encryption_key,omitempty"` // RSA-encrypted AES key (Base64) for recipient
+	MediaEncryptionIV        *string        `json:"media_encryption_iv,omitempty"`  // AES-GCM initialization vector (Base64)
+	SenderMediaEncryptionKey *string        `json:"sender_media_encryption_key,omitempty"`
+	IsMultiRecipient         bool           `json:"is_multi_recipient"`             // True for multi-recipient messages (mod mail)
+	SharedEncryptionIV       *string        `json:"shared_encryption_iv,omitempty"` // Shared IV for multi-recipient messages
+	RecipientKeys            map[int]string `json:"recipient_keys,omitempty"`       // Map of user_id -> encrypted_key for multi-recipient
+	HasReactions             bool           `json:"has_reactions"`                  // True when ≥1 reaction exists — avoids N+1 fetches on the client
 }
 
 // MessageRepository handles database operations for messages
@@ -218,13 +219,19 @@ func (r *MessageRepository) GetByConversationID(ctx context.Context, conversatio
 		       m.media_encryption_iv,
 		       m.sender_media_encryption_key,
 		       COALESCE(m.is_multi_recipient, FALSE) as is_multi_recipient,
-		       m.shared_encryption_iv
+		       m.shared_encryption_iv,
+		       EXISTS (SELECT 1 FROM message_reactions mr WHERE mr.message_id = m.id) AS has_reactions
 		FROM messages m
 		LEFT JOIN media_files mf ON m.media_file_id = mf.id
 		WHERE m.conversation_id = $1
 		  AND (
 		    (m.sender_id = $2 AND m.deleted_for_sender = false) OR
 		    (m.recipient_id = $2 AND m.deleted_for_recipient = false)
+		  )
+		  AND NOT EXISTS (
+		    SELECT 1 FROM blocked_users bu
+		    WHERE bu.blocker_id = $2
+		      AND bu.blocked_id = m.sender_id
 		  )
 		ORDER BY m.sent_at DESC
 		LIMIT $3 OFFSET $4
@@ -262,6 +269,7 @@ func (r *MessageRepository) GetByConversationID(ctx context.Context, conversatio
 			&message.SenderMediaEncryptionKey,
 			&message.IsMultiRecipient,
 			&message.SharedEncryptionIV,
+			&message.HasReactions,
 		)
 		if err != nil {
 			return nil, err
@@ -300,13 +308,19 @@ func (r *MessageRepository) GetByConversationIDWithCursor(
 		       m.media_encryption_iv,
 		       m.sender_media_encryption_key,
 		       COALESCE(m.is_multi_recipient, FALSE) as is_multi_recipient,
-		       m.shared_encryption_iv
+		       m.shared_encryption_iv,
+		       EXISTS (SELECT 1 FROM message_reactions mr WHERE mr.message_id = m.id) AS has_reactions
 		FROM messages m
 		LEFT JOIN media_files mf ON m.media_file_id = mf.id
 		WHERE m.conversation_id = $1
 		  AND (
 		    (m.sender_id = $2 AND m.deleted_for_sender = false) OR
 		    (m.recipient_id = $2 AND m.deleted_for_recipient = false)
+		  )
+		  AND NOT EXISTS (
+		    SELECT 1 FROM blocked_users bu
+		    WHERE bu.blocker_id = $2
+		      AND bu.blocked_id = m.sender_id
 		  )
 	`
 	args := []interface{}{conversationID, userID}
@@ -351,6 +365,7 @@ func (r *MessageRepository) GetByConversationIDWithCursor(
 			&message.SenderMediaEncryptionKey,
 			&message.IsMultiRecipient,
 			&message.SharedEncryptionIV,
+			&message.HasReactions,
 		)
 		if err != nil {
 			return nil, err
@@ -367,7 +382,7 @@ func (r *MessageRepository) GetByConversationIDWithCursor(
 }
 
 // GetByConversationIDForAll retrieves messages for mod mail conversations (visible to all participants)
-func (r *MessageRepository) GetByConversationIDForAll(ctx context.Context, conversationID int, limit int, offset int) ([]*Message, error) {
+func (r *MessageRepository) GetByConversationIDForAll(ctx context.Context, conversationID int, viewerID int, limit int, offset int) ([]*Message, error) {
 	query := `
 		SELECT m.id, m.conversation_id, m.sender_id, m.recipient_id, m.encrypted_content,
 		       m.sender_encrypted_content,
@@ -382,16 +397,22 @@ func (r *MessageRepository) GetByConversationIDForAll(ctx context.Context, conve
 		       m.media_encryption_iv,
 		       m.sender_media_encryption_key,
 		       COALESCE(m.is_multi_recipient, FALSE) as is_multi_recipient,
-		       m.shared_encryption_iv
+		       m.shared_encryption_iv,
+		       EXISTS (SELECT 1 FROM message_reactions mr WHERE mr.message_id = m.id) AS has_reactions
 		FROM messages m
 		LEFT JOIN media_files mf ON m.media_file_id = mf.id
 		WHERE m.conversation_id = $1
 		  AND NOT (m.deleted_for_sender = TRUE AND m.deleted_for_recipient = TRUE)
+		  AND NOT EXISTS (
+		    SELECT 1 FROM blocked_users bu
+		    WHERE bu.blocker_id = $2
+		      AND bu.blocked_id = m.sender_id
+		  )
 		ORDER BY m.sent_at ASC
-		LIMIT $2 OFFSET $3
+		LIMIT $3 OFFSET $4
 	`
 
-	rows, err := r.pool.Query(ctx, query, conversationID, limit, offset)
+	rows, err := r.pool.Query(ctx, query, conversationID, viewerID, limit, offset)
 	if err != nil {
 		return nil, err
 	}
@@ -423,6 +444,7 @@ func (r *MessageRepository) GetByConversationIDForAll(ctx context.Context, conve
 			&message.SenderMediaEncryptionKey,
 			&message.IsMultiRecipient,
 			&message.SharedEncryptionIV,
+			&message.HasReactions,
 		)
 		if err != nil {
 			return nil, err
@@ -443,6 +465,7 @@ func (r *MessageRepository) GetByConversationIDForAll(ctx context.Context, conve
 func (r *MessageRepository) GetByConversationIDForAllWithCursor(
 	ctx context.Context,
 	conversationID int,
+	viewerID int,
 	limit int,
 	cursor *TimeCursor,
 ) ([]*Message, error) {
@@ -460,14 +483,20 @@ func (r *MessageRepository) GetByConversationIDForAllWithCursor(
 		       m.media_encryption_iv,
 		       m.sender_media_encryption_key,
 		       COALESCE(m.is_multi_recipient, FALSE) as is_multi_recipient,
-		       m.shared_encryption_iv
+		       m.shared_encryption_iv,
+		       EXISTS (SELECT 1 FROM message_reactions mr WHERE mr.message_id = m.id) AS has_reactions
 		FROM messages m
 		LEFT JOIN media_files mf ON m.media_file_id = mf.id
 		WHERE m.conversation_id = $1
 		  AND NOT (m.deleted_for_sender = TRUE AND m.deleted_for_recipient = TRUE)
+		  AND NOT EXISTS (
+		    SELECT 1 FROM blocked_users bu
+		    WHERE bu.blocker_id = $2
+		      AND bu.blocked_id = m.sender_id
+		  )
 	`
-	args := []interface{}{conversationID}
-	paramIdx := 2
+	args := []interface{}{conversationID, viewerID}
+	paramIdx := 3
 	if cursor != nil {
 		query += fmt.Sprintf(" AND (m.sent_at, m.id) > ($%d, $%d)", paramIdx, paramIdx+1)
 		args = append(args, cursor.Timestamp, cursor.ID)
@@ -508,6 +537,7 @@ func (r *MessageRepository) GetByConversationIDForAllWithCursor(
 			&message.SenderMediaEncryptionKey,
 			&message.IsMultiRecipient,
 			&message.SharedEncryptionIV,
+			&message.HasReactions,
 		)
 		if err != nil {
 			return nil, err
@@ -543,6 +573,11 @@ func (r *MessageRepository) MarkUndeliveredAsDelivered(ctx context.Context, conv
 		WHERE conversation_id = $1
 		  AND recipient_id = $2
 		  AND delivered_at IS NULL
+		  AND NOT EXISTS (
+		    SELECT 1 FROM blocked_users bu
+		    WHERE bu.blocker_id = $2
+		      AND bu.blocked_id = messages.sender_id
+		  )
 		RETURNING id, sender_id
 	`
 
@@ -583,6 +618,11 @@ func (r *MessageRepository) MarkAllAsRead(ctx context.Context, conversationID in
 		WHERE conversation_id = $1
 		  AND recipient_id = $2
 		  AND read_at IS NULL
+		  AND NOT EXISTS (
+		    SELECT 1 FROM blocked_users bu
+		    WHERE bu.blocker_id = $2
+		      AND bu.blocked_id = messages.sender_id
+		  )
 	`
 	_, err := r.pool.Exec(ctx, query, conversationID, recipientID)
 	return err
@@ -642,13 +682,18 @@ func (r *MessageRepository) GetUnreadCount(ctx context.Context, conversationID i
 		  AND recipient_id = $2
 		  AND read_at IS NULL
 		  AND deleted_for_recipient = false
+		  AND NOT EXISTS (
+		    SELECT 1 FROM blocked_users bu
+		    WHERE bu.blocker_id = $2
+		      AND bu.blocked_id = messages.sender_id
+		  )
 	`
 	err := r.pool.QueryRow(ctx, query, conversationID, userID).Scan(&count)
 	return count, err
 }
 
 // GetLatestMessage gets the most recent message in a conversation
-func (r *MessageRepository) GetLatestMessage(ctx context.Context, conversationID int) (*Message, error) {
+func (r *MessageRepository) GetLatestMessage(ctx context.Context, conversationID int, viewerID int) (*Message, error) {
 	message := &Message{}
 
 	query := `
@@ -669,11 +714,16 @@ func (r *MessageRepository) GetLatestMessage(ctx context.Context, conversationID
 		FROM messages m
 		LEFT JOIN media_files mf ON m.media_file_id = mf.id
 		WHERE m.conversation_id = $1
+		  AND NOT EXISTS (
+		    SELECT 1 FROM blocked_users bu
+		    WHERE bu.blocker_id = $2
+		      AND bu.blocked_id = m.sender_id
+		  )
 		ORDER BY m.sent_at DESC
 		LIMIT 1
 	`
 
-	err := r.pool.QueryRow(ctx, query, conversationID).Scan(
+	err := r.pool.QueryRow(ctx, query, conversationID, viewerID).Scan(
 		&message.ID,
 		&message.ConversationID,
 		&message.SenderID,
