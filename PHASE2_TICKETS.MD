@@ -1830,10 +1830,10 @@
 **Estimated Time:** 30 minutes
 
 **Tasks:**
-- [ ] Update API documentation
-- [ ] Update user guide
+- [x] Update API documentation
+- [x] Update user guide
 - [ ] Create GIF demo for feature
-- [ ] Add to changelog
+- [x] Add to changelog
 
 **Acceptance Criteria:**
 - Feature documented in API docs

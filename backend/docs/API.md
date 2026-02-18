@@ -611,6 +611,54 @@ Add an emoji reaction to a message.
 - `400 Bad Request` invalid emoji payload
 - `409 Conflict` duplicate reaction by same user or message at max unique-emoji cap
 
+### Remove Reaction
+Remove a reaction by reaction ID.
+
+**Endpoint:** `DELETE /messages/:id/reactions/:reaction_id`
+
+**Headers:** `Authorization: Bearer <token>` (required)
+
+**Response:** `200 OK`
+```json
+{
+  "message": "Reaction removed"
+}
+```
+
+**Error Responses:**
+- `400 Bad Request` invalid message/reaction ID
+- `403 Forbidden` reaction belongs to another user
+- `404 Not Found` message or reaction not found
+
+### Get Reactions
+Get aggregated reactions for a message.
+
+**Endpoint:** `GET /messages/:id/reactions`
+
+**Headers:** `Authorization: Bearer <token>` (required)
+
+**Response:** `200 OK`
+```json
+{
+  "reactions": [
+    {
+      "emoji": "👍",
+      "count": 5,
+      "user_ids": [1, 2, 3, 4, 5],
+      "usernames": ["alice", "bob", "carol", "dave", "eve"],
+      "user_reacted": true,
+      "my_reaction_id": 321
+    }
+  ],
+  "total_unique_emoji": 1,
+  "users_truncated": false
+}
+```
+
+**Notes:**
+- `my_reaction_id` is returned only when the authenticated user reacted with that emoji.
+- `users_truncated=true` means username lists were capped; `count` remains accurate.
+
 ---
 
 ## Slideshow API

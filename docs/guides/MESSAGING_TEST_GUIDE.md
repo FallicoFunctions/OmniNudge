@@ -567,6 +567,27 @@ Run all critical path tests in Safari
 
 ---
 
+### **Test 8.2: Mobile Message Reactions**
+**Objective**: Verify mobile reaction UX (no hover required)
+
+**Steps**:
+1. Open DevTools device toolbar (iPhone 13 or Pixel 7 profile)
+2. Open a conversation with existing reactions
+3. Tap a reaction pill on a message
+4. Verify a bottom-sheet details modal opens
+5. Verify the modal shows usernames who reacted
+6. Tap **React with this emoji** or **Remove your reaction**
+7. Verify count updates and modal closes
+8. Re-open modal and close via backdrop tap
+
+**Expected Results**:
+- ✅ Tapping a reaction opens details on mobile
+- ✅ User list is visible without hover
+- ✅ React/remove action works from modal
+- ✅ Modal closes via button/backdrop
+
+---
+
 ## **AUTOMATED TEST COVERAGE**
 
 ### **Unit Tests Needed**
