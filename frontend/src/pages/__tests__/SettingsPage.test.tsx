@@ -202,4 +202,23 @@ describe('SettingsPage push toggle', () => {
     });
     expect(setShowPushNotifications).not.toHaveBeenCalledWith(false);
   });
+
+  it('keeps push setting unchanged when enable flow fails', async () => {
+    useSettingsMock.mockReturnValue(buildSettingsMock(false));
+    enablePush.mockResolvedValue(false);
+
+    render(
+      <MemoryRouter>
+        <SettingsPage />
+      </MemoryRouter>
+    );
+
+    fireEvent.click(screen.getByRole('tab', { name: 'settings.tabs.notifications' }));
+    fireEvent.click(screen.getByRole('switch', { name: 'common.accessibility.togglePushNotifications' }));
+
+    await waitFor(() => {
+      expect(enablePush).toHaveBeenCalledTimes(1);
+    });
+    expect(setShowPushNotifications).not.toHaveBeenCalledWith(true);
+  });
 });
