@@ -712,6 +712,40 @@ func TestGetReactions_WithReactions(t *testing.T) {
 	assert.Equal(t, false, second["user_reacted"]) // user1 did NOT react with ❤️
 }
 
+func TestGetReactions_TieBreaksByFirstSeen(t *testing.T) {
+	bed, cleanup := setupReactionsHandlerTest(t)
+	defer cleanup()
+
+	// Both emoji end up with count=1. The one seen first should sort first.
+	addTestReaction(t, bed, bed.user1ID, "🔥")
+	time.Sleep(2 * time.Millisecond)
+	addTestReaction(t, bed, bed.user2ID, "❤️")
+
+	router := gin.New()
+	router.GET("/messages/:id/reactions", func(c *gin.Context) {
+		c.Set("user_id", bed.user1ID)
+		bed.handler.GetReactions(c)
+	})
+
+	req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/messages/%d/reactions", bed.msgID), nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code, w.Body.String())
+
+	var resp map[string]interface{}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+	reactions := resp["reactions"].([]interface{})
+	require.Len(t, reactions, 2)
+
+	first := reactions[0].(map[string]interface{})
+	second := reactions[1].(map[string]interface{})
+	assert.Equal(t, "🔥", first["emoji"])
+	assert.Equal(t, "❤️", second["emoji"])
+	assert.Equal(t, float64(1), first["count"])
+	assert.Equal(t, float64(1), second["count"])
+}
+
 func TestGetReactions_NotParticipant(t *testing.T) {
 	bed, cleanup := setupReactionsHandlerTest(t)
 	defer cleanup()

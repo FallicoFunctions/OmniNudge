@@ -1784,17 +1784,17 @@
 ---
 
 ### F1-009: Fix - Reaction Ordering
-**Status:** ⬜ TODO
+**Status:** ✅ COMPLETE
 **Priority:** P2
 **Estimated Time:** 1 hour
 
 **Problem:** Reaction display order not specified.
 
 **Tasks:**
-- [ ] Choose ordering: most popular first, or chronological
-- [ ] Implement in backend aggregation query
-- [ ] Update frontend display
-- [ ] Document decision
+- [x] Choose ordering: most popular first, or chronological
+- [x] Implement in backend aggregation query
+- [x] Update frontend display
+- [x] Document decision
 
 **Acceptance Criteria:**
 - Reactions display in consistent order

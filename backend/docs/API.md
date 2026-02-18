@@ -568,6 +568,11 @@ All error responses follow this format:
 
 ## Reactions API
 
+**Display Ordering Decision:**
+- Reactions are ordered by `count DESC` (most popular first).
+- Ties are ordered by first-seen time ascending.
+- Final tie-breaker is emoji lexicographic order for deterministic output.
+
 ### Add Reaction
 Add an emoji reaction to a message.
 

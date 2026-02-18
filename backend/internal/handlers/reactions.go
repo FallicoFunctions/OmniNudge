@@ -166,8 +166,10 @@ func (h *ReactionsHandler) RemoveReaction(c *gin.Context) {
 
 // GetReactionsResponse is the response body for GET /api/v1/messages/:id/reactions.
 type GetReactionsResponse struct {
-	// Reactions contains aggregated per-emoji reaction data, ordered by count
-	// descending (most popular emoji first).
+	// Reactions contains aggregated per-emoji reaction data, ordered by:
+	// 1) count descending (most popular first),
+	// 2) first-seen ascending,
+	// 3) emoji lexicographically.
 	Reactions []models.ReactionSummary `json:"reactions"`
 	// TotalUniqueEmoji is the number of distinct emoji types on this message (max 10).
 	TotalUniqueEmoji int `json:"total_unique_emoji"`
@@ -179,11 +181,12 @@ type GetReactionsResponse struct {
 // GetReactions handles GET /api/v1/messages/:id/reactions
 //
 // @Summary      Get reactions for a message
-// @Description  Returns aggregated emoji reactions for a message, ordered by count
+// @Description  Returns aggregated emoji reactions for a message, ordered by
 //
-//	descending (most popular first). Includes per-emoji user lists and a
-//	user_reacted flag for the calling user. When users_truncated is true,
-//	user lists are capped at 500 entries; reaction counts are always accurate.
+//	count DESC, first-seen ASC, emoji ASC. Includes per-emoji user lists
+//	and a user_reacted flag for the calling user. When users_truncated is
+//	true, user lists are capped at 500 entries; reaction counts are always
+//	accurate.
 //
 // @Tags         Messages, Reactions
 // @Produce      json
