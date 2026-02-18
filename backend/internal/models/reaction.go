@@ -9,6 +9,12 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+// MaxEmojiPerMessage is the maximum number of distinct emoji types allowed on a
+// single message. Enforced at the service layer (advisory-locked cap check) and
+// used as a LIMIT in the aggregation query so the DB never returns more rows
+// than the application can act on.
+const MaxEmojiPerMessage = 10
+
 // ErrNoRowsAffected is returned by write operations when the target row no
 // longer exists at the time of deletion. This typically indicates a concurrent
 // operation removed the row between the caller's existence check and the delete.
@@ -119,8 +125,8 @@ func (r *MessageReactionRepository) GetReactionsByMessageID(ctx context.Context,
 		WHERE message_id = $1
 		GROUP BY emoji
 		ORDER BY count DESC, MIN(created_at) ASC
-		LIMIT 10
-	`, messageID, viewerID)
+		LIMIT $3
+	`, messageID, viewerID, MaxEmojiPerMessage)
 	if err != nil {
 		return nil, false, fmt.Errorf("get reaction summaries: %w", err)
 	}
@@ -128,7 +134,7 @@ func (r *MessageReactionRepository) GetReactionsByMessageID(ctx context.Context,
 
 	// Build an ordered map of emoji → summary
 	summaryMap := make(map[string]*ReactionSummary)
-	emojiOrder := make([]string, 0, 10)
+	emojiOrder := make([]string, 0, MaxEmojiPerMessage)
 
 	for rows.Next() {
 		s := &ReactionSummary{}

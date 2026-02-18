@@ -17,11 +17,14 @@ import (
 )
 
 // Sentinel errors returned by ReactionService.
+// fmt.Errorf (without %w) is used where the message embeds a constant so
+// the number stays in sync automatically. errors.Is matches on pointer
+// equality, which is guaranteed for package-level vars.
 var (
-	ErrInvalidEmoji     = errors.New("invalid emoji: must be a single non-ASCII unicode character sequence, max 100 bytes")
+	ErrInvalidEmoji     = fmt.Errorf("invalid emoji: must be a single non-ASCII unicode character sequence, max %d bytes", maxEmojiBytesLen)
 	ErrMessageNotFound  = errors.New("message not found")
 	ErrNotParticipant   = errors.New("you are not a participant in this conversation")
-	ErrTooManyEmoji     = errors.New("this message already has 10 unique emoji reactions")
+	ErrTooManyEmoji     = fmt.Errorf("this message already has %d unique emoji reactions", models.MaxEmojiPerMessage)
 	ErrAlreadyReacted   = errors.New("you have already reacted with this emoji")
 	ErrReactionNotFound = errors.New("reaction not found")
 	ErrNotReactionOwner = errors.New("you can only remove your own reactions")
@@ -30,6 +33,10 @@ var (
 // broadcastTimeout is the maximum time allowed for non-blocking background
 // goroutines that broadcast WebSocket events or send notifications.
 const broadcastTimeout = 30 * time.Second
+
+// maxEmojiBytesLen is the maximum UTF-8 byte length (len(s)) accepted for a
+// single emoji string. Mirrors the DB-level CHECK (octet_length(emoji) <= 100).
+const maxEmojiBytesLen = 100
 
 // ReactionHubInterface is the subset of the WebSocket hub used by ReactionService.
 type ReactionHubInterface interface {
@@ -124,7 +131,7 @@ func (s *ReactionService) AddReaction(ctx context.Context, messageID, userID int
 		`, messageID).Scan(&distinctCount); err != nil {
 			return nil, fmt.Errorf("count distinct emoji: %w", err)
 		}
-		if distinctCount >= 10 {
+		if distinctCount >= models.MaxEmojiPerMessage {
 			return nil, ErrTooManyEmoji
 		}
 	}
@@ -264,7 +271,7 @@ func (s *ReactionService) GetReactions(ctx context.Context, messageID, userID in
 //   - Bidi controls U+202A–U+202E and U+2066–U+2069 (visual spoofing)
 //   - Tag characters U+E0000–U+E007F (could encode hidden payload)
 func isValidEmoji(s string) bool {
-	if len(s) == 0 || len(s) > 100 {
+	if len(s) == 0 || len(s) > maxEmojiBytesLen {
 		return false
 	}
 	if !utf8.ValidString(s) {
