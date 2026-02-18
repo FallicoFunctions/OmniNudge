@@ -218,6 +218,10 @@ export const messagesService = {
     await api.put(`/conversations/${conversationId}/archive`, {});
   },
 
+  async archiveConversationsBatch(conversationIds: number[]): Promise<void> {
+    await api.post('/conversations/archive-batch', { conversation_ids: conversationIds });
+  },
+
   async unarchiveConversation(conversationId: number): Promise<void> {
     await api.put(`/conversations/${conversationId}/unarchive`, {});
   },

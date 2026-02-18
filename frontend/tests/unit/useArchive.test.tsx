@@ -11,6 +11,7 @@ const toastError = vi.fn();
 vi.mock('../../src/services/messagesService', () => ({
   messagesService: {
     archiveConversation: vi.fn(),
+    archiveConversationsBatch: vi.fn(),
     unarchiveConversation: vi.fn(),
   },
 }));
@@ -148,5 +149,33 @@ describe('useArchive', () => {
     await waitFor(() => {
       expect(toastSuccess).toHaveBeenCalled();
     });
+  });
+
+  it('archives multiple conversations with batch endpoint', async () => {
+    vi.mocked(messagesService.archiveConversationsBatch).mockResolvedValue();
+    const { queryClient, wrapper } = createWrapper();
+
+    queryClient.setQueryData<InfiniteData<{ conversations: Conversation[]; next_cursor?: string }>>(
+      ['conversations', 'all'],
+      {
+        pages: [{ conversations: [makeConversation(31), makeConversation(32), makeConversation(33)] }],
+        pageParams: [''],
+      }
+    );
+
+    const { result } = renderHook(() => useArchive(), { wrapper });
+    await act(async () => {
+      await result.current.archiveConversationsBatch([31, 33]);
+    });
+
+    await waitFor(() => {
+      const optimistic = queryClient.getQueryData<InfiniteData<{ conversations: Conversation[] }>>(
+        ['conversations', 'all']
+      );
+      expect(optimistic?.pages[0].conversations.map((c) => c.id)).toEqual([32]);
+    });
+
+    expect(messagesService.archiveConversationsBatch).toHaveBeenCalledWith([31, 33]);
+    expect(toastSuccess).toHaveBeenCalled();
   });
 });

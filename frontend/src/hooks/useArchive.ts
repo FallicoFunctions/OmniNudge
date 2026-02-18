@@ -25,6 +25,25 @@ const removeConversationFromList = (
   conversationID: number
 ) => data?.filter((conversation) => conversation.id !== conversationID);
 
+const removeConversationsFromPages = (
+  data: InfiniteData<ConversationsPage> | undefined,
+  conversationIDs: Set<number>
+) => {
+  if (!data) return data;
+  return {
+    ...data,
+    pages: data.pages.map((page) => ({
+      ...page,
+      conversations: page.conversations.filter((conversation) => !conversationIDs.has(conversation.id)),
+    })),
+  };
+};
+
+const removeConversationsFromList = (
+  data: Conversation[] | undefined,
+  conversationIDs: Set<number>
+) => data?.filter((conversation) => !conversationIDs.has(conversation.id));
+
 export function useArchive() {
   const queryClient = useQueryClient();
   const { t } = useTranslation();
@@ -56,6 +75,49 @@ export function useArchive() {
       return { previousAll, previousActive };
     },
     onError: (error, _conversationID, context) => {
+      if (context?.previousAll) {
+        queryClient.setQueryData(['conversations', 'all'], context.previousAll);
+      }
+      if (context?.previousActive) {
+        queryClient.setQueryData(['conversations', 'active'], context.previousActive);
+      }
+      toast.error(error instanceof Error ? error.message : t('messages.errors.archiveFailed'));
+    },
+    onSuccess: () => {
+      toast.success(t('messages.toasts.archived'));
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['conversations'] });
+    },
+  });
+
+  const archiveBatchMutation = useMutation({
+    mutationFn: (conversationIDs: number[]) => messagesService.archiveConversationsBatch(conversationIDs),
+    onMutate: async (conversationIDs: number[]) => {
+      const ids = new Set(conversationIDs);
+      await Promise.all([
+        queryClient.cancelQueries({ queryKey: ['conversations', 'all'] }),
+        queryClient.cancelQueries({ queryKey: ['conversations', 'active'] }),
+      ]);
+
+      const previousAll = queryClient.getQueryData<InfiniteData<ConversationsPage>>([
+        'conversations',
+        'all',
+      ]);
+      const previousActive = queryClient.getQueryData<Conversation[]>(['conversations', 'active']);
+
+      queryClient.setQueryData<InfiniteData<ConversationsPage>>(
+        ['conversations', 'all'],
+        (old) => removeConversationsFromPages(old, ids)
+      );
+      queryClient.setQueryData<Conversation[]>(
+        ['conversations', 'active'],
+        (old) => removeConversationsFromList(old, ids)
+      );
+
+      return { previousAll, previousActive };
+    },
+    onError: (error, _conversationIDs, context) => {
       if (context?.previousAll) {
         queryClient.setQueryData(['conversations', 'all'], context.previousAll);
       }
@@ -119,8 +181,10 @@ export function useArchive() {
 
   return {
     archiveConversation: archiveMutation.mutate,
+    archiveConversationsBatch: archiveBatchMutation.mutateAsync,
     unarchiveConversation: unarchiveMutation.mutate,
     isArchiving: archiveMutation.isPending,
+    isBatchArchiving: archiveBatchMutation.isPending,
     isUnarchiving: unarchiveMutation.isPending,
   };
 }

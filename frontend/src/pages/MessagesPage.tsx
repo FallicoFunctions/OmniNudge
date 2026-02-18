@@ -712,6 +712,7 @@ export default function MessagesPage() {
   const [messageSearchHasLinks, setMessageSearchHasLinks] = useState(false);
   const [messageSearchPage, setMessageSearchPage] = useState(0);
   const [expandedPinnedMessages, setExpandedPinnedMessages] = useState(false);
+  const [selectedConversationIDs, setSelectedConversationIDs] = useState<Set<number>>(new Set());
   const touchStartRef = useRef<{ conversationID: number; x: number; y: number } | null>(null);
   const swipeHandledRef = useRef<number | null>(null);
   const debouncedMessageSearch = useDebounce(messageSearchQuery, 300);
@@ -946,8 +947,10 @@ export default function MessagesPage() {
   });
   const {
     archiveConversation,
+    archiveConversationsBatch,
     unarchiveConversation,
     isArchiving,
+    isBatchArchiving,
     isUnarchiving,
   } = useArchive();
 
@@ -1863,6 +1866,29 @@ export default function MessagesPage() {
     setSelectedFile(null);
   }, []);
 
+  const toggleConversationSelection = useCallback((conversationID: number) => {
+    setSelectedConversationIDs((prev) => {
+      const next = new Set(prev);
+      if (next.has(conversationID)) {
+        next.delete(conversationID);
+      } else {
+        next.add(conversationID);
+      }
+      return next;
+    });
+  }, []);
+
+  const handleArchiveSelected = useCallback(async () => {
+    if (selectedConversationIDs.size === 0) return;
+    const ids = Array.from(selectedConversationIDs);
+    try {
+      await archiveConversationsBatch(ids);
+      setSelectedConversationIDs(new Set());
+    } catch {
+      // Errors are surfaced by useArchive toast handling.
+    }
+  }, [archiveConversationsBatch, selectedConversationIDs]);
+
   // Cleanup typing timeout on unmount
   useEffect(() => {
     return () => {
@@ -1871,6 +1897,20 @@ export default function MessagesPage() {
       }
     };
   }, []);
+
+  useEffect(() => {
+    setSelectedConversationIDs(new Set());
+  }, [activeTab]);
+
+  useEffect(() => {
+    if (!conversations) return;
+    const visibleIDs = new Set(conversations.map((conversation) => conversation.id));
+    setSelectedConversationIDs((prev) => {
+      const next = new Set(Array.from(prev).filter((id) => visibleIDs.has(id)));
+      if (next.size === prev.size) return prev;
+      return next;
+    });
+  }, [conversations]);
 
   return (
     <>
@@ -1895,18 +1935,30 @@ export default function MessagesPage() {
               <h2 className="text-lg font-semibold text-[var(--color-text-primary)]">
                 {t('messages.title')}
               </h2>
-              <button
-                onClick={() => {
-                  setIsCreatingChat(true);
-                  setSelectedConversationId(null);
-                  setNewChatUsername('');
-                  setMessageText('');
-                  setSelectedFile(null);
-                }}
-                className="rounded-md bg-[var(--color-primary)] px-3 py-2 md:py-1 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)] active:bg-[var(--color-primary-dark)]"
-              >
-                {t('messages.newConversation')}
-              </button>
+              <div className="flex items-center gap-2">
+                {activeTab === 'active' && selectedConversationIDs.size > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => void handleArchiveSelected()}
+                    disabled={isBatchArchiving}
+                    className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 md:py-1 text-sm font-semibold text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)] disabled:opacity-60"
+                  >
+                    {`${t('messages.archive')} (${selectedConversationIDs.size})`}
+                  </button>
+                )}
+                <button
+                  onClick={() => {
+                    setIsCreatingChat(true);
+                    setSelectedConversationId(null);
+                    setNewChatUsername('');
+                    setMessageText('');
+                    setSelectedFile(null);
+                  }}
+                  className="rounded-md bg-[var(--color-primary)] px-3 py-2 md:py-1 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)] active:bg-[var(--color-primary-dark)]"
+                >
+                  {t('messages.newConversation')}
+                </button>
+              </div>
             </div>
             {/* Tabs */}
             <div className="flex gap-1 border-b border-[var(--color-border)]">
@@ -1981,6 +2033,19 @@ export default function MessagesPage() {
                   onTouchEnd={(event) => handleConversationTouchEnd(conversation.id, event)}
                   className="w-full p-4 text-left"
                 >
+                  {activeTab === 'active' && (
+                    <label className="mb-2 inline-flex items-center gap-2 text-xs text-[var(--color-text-secondary)]">
+                      <input
+                        type="checkbox"
+                        checked={selectedConversationIDs.has(conversation.id)}
+                        onChange={() => toggleConversationSelection(conversation.id)}
+                        onClick={(event) => event.stopPropagation()}
+                        onTouchStart={(event) => event.stopPropagation()}
+                        onTouchEnd={(event) => event.stopPropagation()}
+                      />
+                      {t('messages.archive')}
+                    </label>
+                  )}
                   {/* MSG-2: Enhanced conversation preview with timestamp and better spacing */}
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex-1 min-w-0">

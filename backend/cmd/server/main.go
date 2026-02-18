@@ -755,6 +755,7 @@ func main() {
 			protected.GET("/conversations", conversationsHandler.GetConversations)
 			protected.GET("/conversations/archived", conversationsHandler.GetArchivedConversations)
 			protected.GET("/conversations/:id", conversationsHandler.GetConversation)
+			protected.POST("/conversations/archive-batch", conversationsHandler.ArchiveConversationBatch)
 			protected.PUT("/conversations/:id/archive", conversationsHandler.ArchiveConversation)
 			protected.PUT("/conversations/:id/unarchive", conversationsHandler.UnarchiveConversation)
 			protected.PUT("/conversations/:id/mute", conversationsHandler.MuteConversation)
