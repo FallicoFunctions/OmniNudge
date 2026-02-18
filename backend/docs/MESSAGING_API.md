@@ -87,6 +87,9 @@ List all conversations for the authenticated user.
 **Query Parameters:**
 - `limit` (optional, default: 20, max: 100) - Number of conversations to return
 - `offset` (optional, default: 0) - Offset for pagination
+- `include_archived` (optional, default: `false`) - Include archived conversations in mixed results
+- `archived_only` (optional, default: `false`) - Return only archived conversations
+- `cursor` (optional) - Cursor token for cursor-based pagination
 
 **Response:** `200 OK`
 ```json
@@ -103,6 +106,7 @@ List all conversations for the authenticated user.
         "username": "jane_doe"
       },
       "unread_count": 3,
+      "is_archived": false,
       "last_message": {
         "id": 123,
         "message_type": "text",
@@ -112,6 +116,84 @@ List all conversations for the authenticated user.
   ],
   "limit": 20,
   "offset": 0
+}
+```
+
+---
+
+### Get Archived Conversations
+List archived conversations for the authenticated user.
+
+**Endpoint:** `GET /conversations/archived`
+**Auth Required:** Yes
+
+**Query Parameters:**
+- `limit` (optional, default: 20, max: 100)
+- `cursor` (optional)
+
+**Response:** `200 OK`
+```json
+{
+  "conversations": [
+    {
+      "id": 42,
+      "is_archived": true
+    }
+  ],
+  "next_cursor": "base64-cursor-token"
+}
+```
+
+---
+
+### Archive Conversation
+Archive a conversation for the current user only (per-user archive semantics).
+
+**Endpoint:** `PUT /conversations/:id/archive`
+**Auth Required:** Yes
+
+**Response:** `200 OK`
+```json
+{
+  "message": "Conversation archived successfully"
+}
+```
+
+---
+
+### Unarchive Conversation
+Unarchive a conversation for the current user only.
+
+**Endpoint:** `PUT /conversations/:id/unarchive`
+**Auth Required:** Yes
+
+**Response:** `200 OK`
+```json
+{
+  "message": "Conversation unarchived successfully"
+}
+```
+
+---
+
+### Batch Archive Conversations
+Archive multiple conversations in one request.
+
+**Endpoint:** `POST /conversations/archive-batch`
+**Auth Required:** Yes
+
+**Request Body:**
+```json
+{
+  "conversation_ids": [12, 19, 42]
+}
+```
+
+**Response:** `200 OK`
+```json
+{
+  "message": "Conversations archived successfully",
+  "count": 3
 }
 ```
 
@@ -216,6 +298,7 @@ Send a new message in a conversation.
 **WebSocket Events Triggered:**
 - `new_message` - Sent to recipient (if online)
 - `message_delivered` - Sent to sender (if recipient online)
+- `conversation_unarchived` - Sent to recipient when their archived DM is auto-unarchived by an incoming message
 
 ---
 
@@ -770,6 +853,22 @@ Sent when a message is unpinned in a conversation.
     "pinned_at": "2026-02-18T11:45:00Z",
     "preview": "encrypted-preview-or-placeholder",
     "message_type": "text"
+  }
+}
+```
+
+---
+
+#### 9. Conversation Unarchived
+Sent when an incoming DM auto-unarchives a conversation for the recipient.
+
+```json
+{
+  "type": "conversation_unarchived",
+  "payload": {
+    "conversation_id": 42,
+    "user_id": 5,
+    "trigger": "new_message"
   }
 }
 ```

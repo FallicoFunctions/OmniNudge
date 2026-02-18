@@ -318,6 +318,43 @@ This guide provides step-by-step instructions for testing all Phase 1 messaging 
 
 ---
 
+### **Test 3.3a: Batch Archive (DM)**
+**Objective**: Verify multi-select archive action
+
+**Steps**:
+1. **Browser 1 (User A)**: Ensure at least 3 active DM conversations exist
+2. **Browser 1**: Enable multi-select mode in conversation list
+3. **Browser 1**: Select 2+ conversations
+4. **Browser 1**: Click "Archive selected"
+5. **Browser 1**: Verify selected conversations disappear from Active tab
+6. **Browser 1**: Open Archived tab and verify all selected conversations are present
+
+**Expected Results**:
+- ✅ Selected conversations are archived in one action
+- ✅ Active list updates immediately (optimistic UI)
+- ✅ Archived list contains all selected items
+
+---
+
+### **Test 3.3b: Auto-Unarchive Preference**
+**Objective**: Verify incoming DM behavior respects `auto_unarchive_on_message`
+
+**Steps**:
+1. **Browser 1 (User A)**: Archive DM with User B
+2. **Browser 1**: Go to Settings → Privacy → disable "Auto-unarchive on new message"
+3. **Browser 2 (User B)**: Send a new DM to User A
+4. **Browser 1**: Verify conversation remains in Archived tab
+5. **Browser 1**: Re-enable "Auto-unarchive on new message"
+6. **Browser 2**: Send another DM to User A
+7. **Browser 1**: Verify conversation moves back to Active tab
+
+**Expected Results**:
+- ✅ Disabled setting keeps archived conversation archived on incoming message
+- ✅ Enabled setting auto-unarchives on incoming message
+- ✅ Behavior is per-recipient preference
+
+---
+
 ### **Test 3.4: Delete Conversation**
 **Objective**: Verify conversation deletion
 

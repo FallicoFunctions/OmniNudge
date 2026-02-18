@@ -51,6 +51,7 @@ Per-conversation mute is stored separately in `conversation_notification_setting
 - `show_typing_indicators` (`boolean`)
 - `show_last_seen` (`boolean`)
 - `profile_visibility` (`public | friends_only | private`)
+- `auto_unarchive_on_message` (`boolean`, default `true`)
 
 ### Appearance
 - `theme` (`light | dark | system`)
@@ -112,6 +113,10 @@ Implemented tabs in `SettingsPage`:
 - Audio/Video
 
 Updates apply immediately through `SettingsContext` setters and are persisted to the server.
+
+Auto-unarchive behavior:
+- When `auto_unarchive_on_message=true`, incoming DM messages can move archived conversations back to active.
+- When `auto_unarchive_on_message=false`, archived DM conversations stay archived on incoming messages.
 
 ## Testing Coverage
 
