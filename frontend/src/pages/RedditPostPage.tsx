@@ -1461,8 +1461,10 @@ export default function RedditPostPage() {
     const escapeHtml = (value: string) =>
       value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     const body = escapeHtml(data.body);
+    const authorPath = t('common.format.userPath', { name: data.author });
+    const commentByText = escapeHtml(t('posts.embed.commentByUser', { author: authorPath }));
     const timestamp = Math.floor(new Date(data.createdAt).getTime() / 1000);
-    return `<blockquote class="reddit-card" data-card-created="${timestamp}"><p>${body}</p><a href="${data.permalink}">Comment by u/${data.author}</a></blockquote><script async src="https://embed.redditmedia.com/widgets/platform.js" charset="UTF-8"></script>`;
+    return `<blockquote class="reddit-card" data-card-created="${timestamp}"><p>${body}</p><a href="${data.permalink}">${commentByText}</a></blockquote><script async src="https://embed.redditmedia.com/widgets/platform.js" charset="UTF-8"></script>`;
   };
 
   const editCommentMutation = useMutation({
