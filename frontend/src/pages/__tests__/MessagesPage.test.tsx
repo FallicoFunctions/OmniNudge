@@ -183,4 +183,15 @@ describe('MessagesPage swipe archive gestures', () => {
 
     alertSpy.mockRestore();
   });
+
+  it('does not open conversation when checkbox receives keyboard events', async () => {
+    renderPage();
+
+    await screen.findByText('alice');
+    setActiveConversationId.mockClear();
+    const checkbox = await screen.findByRole('checkbox');
+    fireEvent.keyDown(checkbox, { key: ' ', code: 'Space' });
+
+    expect(setActiveConversationId).not.toHaveBeenCalled();
+  });
 });
