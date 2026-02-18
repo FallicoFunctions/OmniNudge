@@ -43,6 +43,19 @@ type ReactionSummary struct {
 	MyReactionID *int     `json:"my_reaction_id,omitempty"`
 }
 
+// ReactionEvent is the typed WebSocket payload used for reaction events.
+// For reaction_added, Reaction is populated.
+// For reaction_removed, ReactionID/UserID/Emoji are populated.
+type ReactionEvent struct {
+	Type           string           `json:"type"`
+	MessageID      int              `json:"message_id"`
+	ConversationID int              `json:"conversation_id"`
+	Reaction       *MessageReaction `json:"reaction,omitempty"`
+	ReactionID     *int             `json:"reaction_id,omitempty"`
+	UserID         *int             `json:"user_id,omitempty"`
+	Emoji          *string          `json:"emoji,omitempty"`
+}
+
 // MessageReactionRepository handles all database operations for message reactions.
 type MessageReactionRepository struct {
 	pool *pgxpool.Pool

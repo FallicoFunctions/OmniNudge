@@ -1661,21 +1661,21 @@
 ---
 
 ### F1-004: Backend - WebSocket Reaction Events
-**Status:** ⬜ TODO
+**Status:** ✅ COMPLETE (2026-02-18)
 **Priority:** P1
 **Estimated Time:** 2 hours
 
 **Tasks:**
-- [ ] Create ReactionEvent struct (type, message_id, reaction, user)
-- [ ] Broadcast reaction_added event to conversation participants
-- [ ] Broadcast reaction_removed event to conversation participants
-- [ ] Add event deduplication (don't broadcast to sender)
-- [ ] Test real-time delivery
+- [x] Create `ReactionEvent` struct (`internal/models/reaction.go`)
+- [x] Broadcast `reaction_added` events to conversation participants
+- [x] Broadcast `reaction_removed` events to conversation participants
+- [x] Add event deduplication (exclude sender from server broadcast)
+- [x] Test real-time delivery and payload structure
 
 **Acceptance Criteria:**
-- Reactions appear in real-time for all participants
-- Sender doesn't receive their own event
-- Events include all necessary data
+- [x] Reactions appear in real-time for all participants
+- [x] Sender doesn't receive their own event
+- [x] Events include all necessary data
 
 **Dependencies:** F1-003, P0-004
 

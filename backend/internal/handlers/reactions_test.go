@@ -857,6 +857,26 @@ func TestAddReaction_BroadcastsToOtherParticipant(t *testing.T) {
 	}, 500*time.Millisecond, 10*time.Millisecond,
 		"expected reaction_added broadcast to user2 within 500 ms")
 
+	var addedPayload models.ReactionEvent
+	foundAddedPayload := false
+	for _, msg := range bed.hub.SnapshotBroadcastCalls() {
+		if msg.Type == "reaction_added" && msg.RecipientID == bed.user2ID {
+			event, ok := msg.Payload.(models.ReactionEvent)
+			require.True(t, ok, "reaction_added payload should be models.ReactionEvent")
+			addedPayload = event
+			foundAddedPayload = true
+			break
+		}
+	}
+	require.True(t, foundAddedPayload, "expected a reaction_added payload for recipient")
+	assert.Equal(t, "reaction_added", addedPayload.Type)
+	assert.Equal(t, bed.msgID, addedPayload.MessageID)
+	assert.Equal(t, bed.convID, addedPayload.ConversationID)
+	require.NotNil(t, addedPayload.Reaction)
+	assert.Equal(t, "🔥", addedPayload.Reaction.Emoji)
+	assert.Equal(t, bed.msgID, addedPayload.Reaction.MessageID)
+	assert.Equal(t, bed.user1ID, addedPayload.Reaction.UserID)
+
 	// The actor (user1) must NOT receive a broadcast — they apply an optimistic
 	// update on the client side.
 	for _, msg := range bed.hub.SnapshotBroadcastCalls() {
@@ -902,6 +922,28 @@ func TestRemoveReaction_BroadcastsToOtherParticipant(t *testing.T) {
 		return false
 	}, 500*time.Millisecond, 10*time.Millisecond,
 		"expected reaction_removed broadcast to user2 within 500 ms")
+
+	var removedPayload models.ReactionEvent
+	foundRemovedPayload := false
+	for _, msg := range bed.hub.SnapshotBroadcastCalls() {
+		if msg.Type == "reaction_removed" && msg.RecipientID == bed.user2ID {
+			event, ok := msg.Payload.(models.ReactionEvent)
+			require.True(t, ok, "reaction_removed payload should be models.ReactionEvent")
+			removedPayload = event
+			foundRemovedPayload = true
+			break
+		}
+	}
+	require.True(t, foundRemovedPayload, "expected a reaction_removed payload for recipient")
+	assert.Equal(t, "reaction_removed", removedPayload.Type)
+	assert.Equal(t, bed.msgID, removedPayload.MessageID)
+	assert.Equal(t, bed.convID, removedPayload.ConversationID)
+	require.NotNil(t, removedPayload.ReactionID)
+	assert.Equal(t, reactionID, *removedPayload.ReactionID)
+	require.NotNil(t, removedPayload.UserID)
+	assert.Equal(t, bed.user1ID, *removedPayload.UserID)
+	require.NotNil(t, removedPayload.Emoji)
+	assert.Equal(t, "🔥", *removedPayload.Emoji)
 
 	// The actor (user1) must NOT receive the broadcast.
 	for _, msg := range bed.hub.SnapshotBroadcastCalls() {
