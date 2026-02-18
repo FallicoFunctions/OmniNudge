@@ -128,7 +128,8 @@ func (r *MessageReactionRepository) RemoveReaction(ctx context.Context, reaction
 }
 
 // GetReactionsByMessageID returns aggregated reaction summaries for a message,
-// ordered by reaction count descending (most popular first), then first-seen ascending.
+// ordered by reaction count descending (most popular first), then first-seen
+// ascending, then emoji lexicographically (deterministic final tie-breaker).
 // viewerID is used to populate the user_reacted flag.
 //
 // The second return value is true when the combined user list across all emoji
@@ -148,7 +149,7 @@ func (r *MessageReactionRepository) GetReactionsByMessageID(ctx context.Context,
 		FROM message_reactions
 		WHERE message_id = $1
 		GROUP BY emoji
-		ORDER BY count DESC, MIN(created_at) ASC
+		ORDER BY count DESC, MIN(created_at) ASC, emoji ASC
 		LIMIT $3
 	`, messageID, viewerID, MaxEmojiPerMessage)
 	if err != nil {
