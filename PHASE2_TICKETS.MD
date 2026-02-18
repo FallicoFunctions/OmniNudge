@@ -1612,22 +1612,22 @@
 ---
 
 ### F1-002: Backend - Emoji Validation
-**Status:** ⬜ TODO
+**Status:** ✅ COMPLETE (2026-02-18)
 **Priority:** P1
 **Estimated Time:** 2 hours
 
 **Tasks:**
-- [ ] Create emoji validation library
-- [ ] Whitelist common emoji (or use emoji regex)
-- [ ] Reject invalid unicode sequences
-- [ ] Limit emoji string length (10 characters max)
-- [ ] Write unit tests for edge cases
-- [ ] Document allowed emoji
+- [x] Create emoji validation library (`internal/validation/emoji.go`)
+- [x] Implement Unicode-sequence validation strategy (non-ASCII emoji payloads with safety filters)
+- [x] Reject invalid unicode sequences and unsafe Unicode controls/tags
+- [x] Limit emoji payload length (10 Unicode code points max, plus 100-byte safety cap)
+- [x] Write unit tests for edge cases (ZWJ, skin tones, bidi controls, tag chars, boundaries)
+- [x] Document allowed emoji and validation rules (`backend/docs/API.md`)
 
 **Acceptance Criteria:**
-- Valid emoji accepted
-- Invalid emoji rejected with clear error
-- Tests cover edge cases (ZWJ sequences, skin tones)
+- [x] Valid emoji accepted
+- [x] Invalid emoji rejected with clear error
+- [x] Tests cover edge cases (ZWJ sequences, skin tones)
 
 **Dependencies:** None
 
