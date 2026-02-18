@@ -53,7 +53,7 @@ Profile visibility and last-seen behavior are backed by `user_settings`:
 Current enforcement:
 - `public`: profile visible to everyone
 - `private`: profile hidden from non-owner
-- `friends_only`: currently treated as private until friendship graph exists
+- `friends_only`: profile visible only to accepted friends
 
 `last_seen` exposure:
 - shown when `show_last_seen=true`
@@ -97,6 +97,5 @@ Frontend:
 
 ## Notes / Remaining Work
 
-- `friends_only` should be updated once friendship relationships are implemented.
 - Avatar upload pipeline (storage + thumbnails) is separate and currently out of scope here.
-- Profile data is still stored on `users` table; a dedicated `user_profiles` table is future work.
+- During transition, profile writes are mirrored to legacy `users.avatar_url` / `users.bio` for compatibility.

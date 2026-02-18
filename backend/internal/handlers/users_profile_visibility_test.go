@@ -87,7 +87,7 @@ func TestGetUserProfile_PrivateVisibility_HidesFromOthers(t *testing.T) {
 	_, err = settingsRepo.Update(ctx, settings)
 	require.NoError(t, err)
 
-	handler := NewUsersHandler(userRepo, nil, settingsRepo, nil, nil, nil, nil, nil)
+	handler := NewUsersHandler(userRepo, nil, nil, settingsRepo, nil, nil, nil, nil, nil)
 	router := newUsersVisibilityRouter(handler)
 
 	req := httptest.NewRequest(http.MethodGet, "/users/"+owner.Username, nil)
@@ -114,7 +114,7 @@ func TestGetUserProfile_FriendsOnlyVisibility_HidesFromOthers(t *testing.T) {
 	_, err = settingsRepo.Update(ctx, settings)
 	require.NoError(t, err)
 
-	handler := NewUsersHandler(userRepo, nil, settingsRepo, nil, nil, nil, nil, nil)
+	handler := NewUsersHandler(userRepo, nil, nil, settingsRepo, nil, nil, nil, nil, nil)
 	router := newUsersVisibilityRouter(handler)
 
 	req := httptest.NewRequest(http.MethodGet, "/users/"+owner.Username, nil)
@@ -124,11 +124,35 @@ func TestGetUserProfile_FriendsOnlyVisibility_HidesFromOthers(t *testing.T) {
 	assert.Equal(t, http.StatusNotFound, w.Code)
 }
 
+func TestGetUserProfile_FriendsOnlyVisibility_ShowsToAcceptedFriend(t *testing.T) {
+	userRepo, settingsRepo, owner, viewer, cleanup := setupUsersVisibilityTest(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	settings, err := settingsRepo.CreateDefault(ctx, owner.ID)
+	require.NoError(t, err)
+	settings.ProfileVisibility = "friends_only"
+	_, err = settingsRepo.Update(ctx, settings)
+	require.NoError(t, err)
+
+	friendRepo := models.NewUserFriendshipRepository(userRepo.GetPool())
+	require.NoError(t, friendRepo.UpsertAccepted(ctx, owner.ID, viewer.ID))
+
+	handler := NewUsersHandler(userRepo, nil, friendRepo, settingsRepo, nil, nil, nil, nil, nil)
+	router := newUsersVisibilityRouter(handler)
+
+	req := httptest.NewRequest(http.MethodGet, "/users/"+owner.Username, nil)
+	req.Header.Set("X-Viewer-ID", strconv.Itoa(viewer.ID))
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusOK, w.Code)
+}
+
 func TestGetUserProfileByID_PublicVisibility_ReturnsProfile(t *testing.T) {
 	userRepo, settingsRepo, owner, _, cleanup := setupUsersVisibilityTest(t)
 	defer cleanup()
 
-	handler := NewUsersHandler(userRepo, nil, settingsRepo, nil, nil, nil, nil, nil)
+	handler := NewUsersHandler(userRepo, nil, nil, settingsRepo, nil, nil, nil, nil, nil)
 	router := newUsersVisibilityRouter(handler)
 
 	req := httptest.NewRequest(http.MethodGet, "/users/id/"+strconv.Itoa(owner.ID)+"/profile", nil)
@@ -143,7 +167,7 @@ func TestGetMyProfile_ReturnsAuthenticatedUserProfile(t *testing.T) {
 	userRepo, settingsRepo, owner, _, cleanup := setupUsersVisibilityTest(t)
 	defer cleanup()
 
-	handler := NewUsersHandler(userRepo, nil, settingsRepo, nil, nil, nil, nil, nil)
+	handler := NewUsersHandler(userRepo, nil, nil, settingsRepo, nil, nil, nil, nil, nil)
 	router := newUsersVisibilityRouter(handler)
 
 	req := httptest.NewRequest(http.MethodGet, "/users/me/profile", nil)
@@ -162,7 +186,7 @@ func TestGetUserProfile_UsesCachedResponseUntilTTLExpiry(t *testing.T) {
 	initialBio := "cached bio"
 	require.NoError(t, userRepo.UpdateProfile(context.Background(), owner.ID, &initialBio, nil))
 
-	handler := NewUsersHandler(userRepo, nil, settingsRepo, nil, nil, nil, nil, services.NewMemoryCache())
+	handler := NewUsersHandler(userRepo, nil, nil, settingsRepo, nil, nil, nil, nil, services.NewMemoryCache())
 	router := newUsersVisibilityRouter(handler)
 
 	firstReq := httptest.NewRequest(http.MethodGet, "/users/"+owner.Username, nil)
@@ -193,7 +217,7 @@ func TestGetUserProfile_CacheScope_DoesNotLeakOwnerLastSeen(t *testing.T) {
 	_, err = settingsRepo.Update(ctx, settings)
 	require.NoError(t, err)
 
-	handler := NewUsersHandler(userRepo, nil, settingsRepo, nil, nil, nil, nil, services.NewMemoryCache())
+	handler := NewUsersHandler(userRepo, nil, nil, settingsRepo, nil, nil, nil, nil, services.NewMemoryCache())
 	router := newUsersVisibilityRouter(handler)
 
 	// Owner request should include last_seen and populate owner-scoped cache.
@@ -232,7 +256,7 @@ func TestGetUserProfile_UsesDedicatedUserProfilesData(t *testing.T) {
 	profileAvatar := "https://example.com/user-profiles-avatar.png"
 	require.NoError(t, profileRepo.Upsert(ctx, owner.ID, &profileBio, &profileAvatar, nil))
 
-	handler := NewUsersHandler(userRepo, profileRepo, settingsRepo, nil, nil, nil, nil, nil)
+	handler := NewUsersHandler(userRepo, profileRepo, nil, settingsRepo, nil, nil, nil, nil, nil)
 	router := newUsersVisibilityRouter(handler)
 
 	req := httptest.NewRequest(http.MethodGet, "/users/"+owner.Username, nil)

@@ -50,6 +50,40 @@ func TestUserProfile_PrivateVisibility_HiddenFromOthersAndVisibleToOwner(t *test
 	require.Equal(t, owner.Username, payload["username"])
 }
 
+func TestUserProfile_FriendsOnly_VisibleToAcceptedFriendAndHiddenOtherwise(t *testing.T) {
+	deps := newTestDeps(t)
+
+	owner := createUser(t, deps.UserRepo, "friends_profile_owner", "user")
+	friendViewer := createUser(t, deps.UserRepo, "friends_profile_friend", "user")
+	otherViewer := createUser(t, deps.UserRepo, "friends_profile_other", "user")
+
+	settingsRepo := models.NewUserSettingsRepository(deps.DB.Pool)
+	settings, err := settingsRepo.CreateDefault(context.Background(), owner.ID)
+	require.NoError(t, err)
+	settings.ProfileVisibility = "friends_only"
+	_, err = settingsRepo.Update(context.Background(), settings)
+	require.NoError(t, err)
+
+	friendRepo := models.NewUserFriendshipRepository(deps.DB.Pool)
+	require.NoError(t, friendRepo.UpsertAccepted(context.Background(), owner.ID, friendViewer.ID))
+
+	friendToken, err := deps.AuthService.GenerateJWT(friendViewer.ID, "", friendViewer.Username, friendViewer.Role)
+	require.NoError(t, err)
+	friendReq, err := http.NewRequest("GET", "/api/v1/users/"+owner.Username, nil)
+	require.NoError(t, err)
+	friendReq.Header.Set("Authorization", "Bearer "+friendToken)
+	friendResp := doRequest(t, deps.Router, friendReq)
+	require.Equal(t, http.StatusOK, friendResp.Code)
+
+	otherToken, err := deps.AuthService.GenerateJWT(otherViewer.ID, "", otherViewer.Username, otherViewer.Role)
+	require.NoError(t, err)
+	otherReq, err := http.NewRequest("GET", "/api/v1/users/"+owner.Username, nil)
+	require.NoError(t, err)
+	otherReq.Header.Set("Authorization", "Bearer "+otherToken)
+	otherResp := doRequest(t, deps.Router, otherReq)
+	require.Equal(t, http.StatusNotFound, otherResp.Code)
+}
+
 func TestUserProfileByID_PublicVisibility_ReturnsProfile(t *testing.T) {
 	deps := newTestDeps(t)
 	user := createUser(t, deps.UserRepo, "id_profile_user", "user")

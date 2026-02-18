@@ -19,6 +19,7 @@ import (
 type UsersHandler struct {
 	userRepo     *models.UserRepository
 	userProfRepo *models.UserProfileRepository
+	friendRepo   *models.UserFriendshipRepository
 	settingsRepo *models.UserSettingsRepository
 	postRepo     *models.PlatformPostRepository
 	commentRepo  *models.PostCommentRepository
@@ -31,6 +32,7 @@ type UsersHandler struct {
 func NewUsersHandler(
 	userRepo *models.UserRepository,
 	userProfRepo *models.UserProfileRepository,
+	friendRepo *models.UserFriendshipRepository,
 	settingsRepo *models.UserSettingsRepository,
 	postRepo *models.PlatformPostRepository,
 	commentRepo *models.PostCommentRepository,
@@ -44,6 +46,7 @@ func NewUsersHandler(
 	return &UsersHandler{
 		userRepo:     userRepo,
 		userProfRepo: userProfRepo,
+		friendRepo:   friendRepo,
 		settingsRepo: settingsRepo,
 		postRepo:     postRepo,
 		commentRepo:  commentRepo,
@@ -143,7 +146,17 @@ func (h *UsersHandler) getUserProfileResponse(c *gin.Context, loadUser func() (*
 		}
 	}
 
-	if !canViewerSeeProfile(user.ID, viewerID, profileVisibility) {
+	viewerIsFriend := false
+	if viewerID > 0 && viewerID != user.ID && strings.EqualFold(strings.TrimSpace(profileVisibility), "friends_only") && h.friendRepo != nil {
+		isFriend, err := h.friendRepo.AreUsersFriends(c.Request.Context(), user.ID, viewerID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to validate profile access", "details": err.Error()})
+			return
+		}
+		viewerIsFriend = isFriend
+	}
+
+	if !canViewerSeeProfile(user.ID, viewerID, profileVisibility, viewerIsFriend) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
 		return
 	}
@@ -212,7 +225,7 @@ func (h *UsersHandler) getUserProfileResponse(c *gin.Context, loadUser func() (*
 	c.JSON(http.StatusOK, response)
 }
 
-func canViewerSeeProfile(profileUserID, viewerID int, profileVisibility string) bool {
+func canViewerSeeProfile(profileUserID, viewerID int, profileVisibility string, viewerIsFriend bool) bool {
 	if viewerID == profileUserID {
 		return true
 	}
@@ -220,8 +233,9 @@ func canViewerSeeProfile(profileUserID, viewerID int, profileVisibility string) 
 	switch strings.ToLower(strings.TrimSpace(profileVisibility)) {
 	case "", "public":
 		return true
-	case "private", "friends_only":
-		// Friendship graph is not yet implemented; treat friends_only as private for now.
+	case "friends_only":
+		return viewerIsFriend
+	case "private":
 		return false
 	default:
 		// Fail closed on invalid persisted values.
