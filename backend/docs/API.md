@@ -566,6 +566,48 @@ All error responses follow this format:
 
 ---
 
+## Reactions API
+
+### Add Reaction
+Add an emoji reaction to a message.
+
+**Endpoint:** `POST /messages/:id/reactions`
+
+**Headers:** `Authorization: Bearer <token>` (required)
+
+**Request Body:**
+```json
+{
+  "emoji": "👍"
+}
+```
+
+**Emoji Validation Rules:**
+- Must be valid UTF-8 and contain at least one non-ASCII code point
+- Maximum length: `10` Unicode code points
+- Maximum size: `100` UTF-8 bytes
+- Rejects control characters and Unicode whitespace separators
+- Rejects bidi override/isolate controls (`U+202A..U+202E`, `U+2066..U+2069`)
+- Rejects Unicode tag characters (`U+E0000..U+E007F`)
+- Supports common multi-code-point emoji sequences (ZWJ families, skin tone modifiers, variation selectors)
+
+**Response:** `201 Created`
+```json
+{
+  "id": 321,
+  "message_id": 456,
+  "user_id": 123,
+  "emoji": "👍",
+  "created_at": "2026-02-18T01:00:00Z"
+}
+```
+
+**Error Responses:**
+- `400 Bad Request` invalid emoji payload
+- `409 Conflict` duplicate reaction by same user or message at max unique-emoji cap
+
+---
+
 ## Slideshow API
 
 ### Start Slideshow

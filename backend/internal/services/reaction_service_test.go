@@ -1,18 +1,18 @@
 package services
 
 import (
+	"strings"
 	"testing"
 
+	"github.com/omninudge/backend/internal/validation"
 	"github.com/stretchr/testify/assert"
 )
 
 // ---------------------------------------------------------------------------
-// isValidEmoji — unit tests
-// These live in the services package (not services_test) to access the
-// unexported isValidEmoji function directly.
+// Emoji validation library integration tests
 // ---------------------------------------------------------------------------
 
-func TestIsValidEmoji(t *testing.T) {
+func TestIsValidReactionEmoji(t *testing.T) {
 	tests := []struct {
 		name  string
 		input string
@@ -32,7 +32,8 @@ func TestIsValidEmoji(t *testing.T) {
 
 		// ── invalid: structural ─────────────────────────────────────────────
 		{name: "empty string", input: "", want: false},
-		{name: "too long (101 bytes)", input: "👍" + string(make([]byte, 97)), want: false}, // > 100 bytes
+		{name: "too many characters (11 code points)", input: strings.Repeat("👍", 11), want: false},
+		{name: "too long (101 bytes)", input: strings.Repeat("👍", 26) + "a", want: false}, // > 100 bytes
 		{name: "ASCII only — letter", input: "a", want: false},
 		{name: "ASCII only — word", input: "hello", want: false},
 		{name: "ASCII only — number", input: "1", want: false},
@@ -75,31 +76,17 @@ func TestIsValidEmoji(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := isValidEmoji(tt.input)
+			got := validation.IsValidReactionEmoji(tt.input)
 			assert.Equal(t, tt.want, got,
-				"isValidEmoji(%q) = %v, want %v", tt.input, got, tt.want)
+				"IsValidReactionEmoji(%q) = %v, want %v", tt.input, got, tt.want)
 		})
 	}
 }
 
-// TestIsValidEmoji_ByteLengthBoundary verifies that the 100-byte cap uses byte
-// count (len(s)) — not rune count — so a 26-rune emoji sequence that happens
-// to be >100 bytes is correctly rejected.
-func TestIsValidEmoji_ByteLengthBoundary(t *testing.T) {
-	// Each of these emoji is 4 bytes in UTF-8. 26 × 4 = 104 bytes > 100.
-	// Building it this way avoids hard-coding non-printable bytes.
-	long := ""
-	for i := 0; i < 26; i++ {
-		long += "👍"
-	}
-	assert.Greater(t, len(long), 100, "test precondition: string must exceed 100 bytes")
-	assert.False(t, isValidEmoji(long), "26-emoji string (104 bytes) should be rejected")
+func TestIsValidReactionEmoji_CharacterBoundary(t *testing.T) {
+	exact := strings.Repeat("👍", 10)
+	assert.True(t, validation.IsValidReactionEmoji(exact), "10-emoji string should be accepted")
 
-	// 25 × 4 = 100 bytes — right on the limit, should pass.
-	exact := ""
-	for i := 0; i < 25; i++ {
-		exact += "👍"
-	}
-	assert.Equal(t, 100, len(exact), "test precondition: string must be exactly 100 bytes")
-	assert.True(t, isValidEmoji(exact), "25-emoji string (100 bytes) should be accepted")
+	tooMany := strings.Repeat("👍", 11)
+	assert.False(t, validation.IsValidReactionEmoji(tooMany), "11-emoji string should be rejected")
 }

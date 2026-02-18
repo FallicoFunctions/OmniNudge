@@ -6,13 +6,12 @@ import (
 	"fmt"
 	"log"
 	"time"
-	"unicode"
-	"unicode/utf8"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/omninudge/backend/internal/models"
+	"github.com/omninudge/backend/internal/validation"
 	"github.com/omninudge/backend/internal/websocket"
 )
 
@@ -21,7 +20,7 @@ import (
 // the number stays in sync automatically. errors.Is matches on pointer
 // equality, which is guaranteed for package-level vars.
 var (
-	ErrInvalidEmoji     = fmt.Errorf("invalid emoji: must be a single non-ASCII unicode character sequence, max %d bytes", maxEmojiBytesLen)
+	ErrInvalidEmoji     = fmt.Errorf("invalid emoji: must be a valid unicode emoji sequence, max %d characters and %d bytes", validation.MaxReactionEmojiChars, validation.MaxReactionEmojiBytes)
 	ErrMessageNotFound  = errors.New("message not found")
 	ErrNotParticipant   = errors.New("you are not a participant in this conversation")
 	ErrTooManyEmoji     = fmt.Errorf("this message already has %d unique emoji reactions", models.MaxEmojiPerMessage)
@@ -33,10 +32,6 @@ var (
 // broadcastTimeout is the maximum time allowed for non-blocking background
 // goroutines that broadcast WebSocket events or send notifications.
 const broadcastTimeout = 30 * time.Second
-
-// maxEmojiBytesLen is the maximum UTF-8 byte length (len(s)) accepted for a
-// single emoji string. Mirrors the DB-level CHECK (octet_length(emoji) <= 100).
-const maxEmojiBytesLen = 100
 
 // ReactionHubInterface is the subset of the WebSocket hub used by ReactionService.
 type ReactionHubInterface interface {
@@ -72,8 +67,8 @@ func NewReactionService(
 // AddReaction adds an emoji reaction to a message.
 //
 // Rules enforced:
-//   - Emoji must be valid (non-empty, non-ASCII, ≤100 bytes, no control chars,
-//     no bidirectional override characters, no Unicode tag characters)
+//   - Emoji must be valid (non-empty, non-ASCII, <=10 code points, <=100 bytes,
+//     no control chars, no bidirectional override characters, no Unicode tag characters)
 //   - The requesting user must be a participant in the conversation
 //   - A message may have at most 10 distinct emoji types across all users
 //   - The same user cannot add the same emoji to the same message twice (UNIQUE constraint)
@@ -82,7 +77,7 @@ func NewReactionService(
 // participants and sends an in-app notification to the message author.
 func (s *ReactionService) AddReaction(ctx context.Context, messageID, userID int, emoji string) (*models.MessageReaction, error) {
 	// 1. Validate emoji
-	if !isValidEmoji(emoji) {
+	if !validation.IsValidReactionEmoji(emoji) {
 		return nil, ErrInvalidEmoji
 	}
 
@@ -256,73 +251,6 @@ func (s *ReactionService) GetReactions(ctx context.Context, messageID, userID in
 // ---------------------------------------------------------------------------
 // Internal helpers
 // ---------------------------------------------------------------------------
-
-// isValidEmoji returns true if s is a non-empty UTF-8 string that contains at
-// least one non-ASCII rune and no null bytes, low control characters,
-// bidirectional override/control characters, or Unicode tag characters.
-//
-// Accepts ZWJ sequences (U+200D), variation selectors, and skin-tone modifiers.
-//
-// Rejects:
-//   - Empty or >100 bytes
-//   - Invalid UTF-8
-//   - ASCII-only strings
-//   - Control characters (< U+0020)
-//   - Bidi controls U+202A–U+202E and U+2066–U+2069 (visual spoofing)
-//   - Tag characters U+E0000–U+E007F (could encode hidden payload)
-func isValidEmoji(s string) bool {
-	if len(s) == 0 || len(s) > maxEmojiBytesLen {
-		return false
-	}
-	if !utf8.ValidString(s) {
-		return false
-	}
-
-	hasNonASCII := false
-	for _, r := range s {
-		// Reject null bytes and ASCII control characters.
-		// (ZWJ U+200D = 8205 is well above 32, so it passes.)
-		if r < 32 {
-			return false
-		}
-
-		// Reject Unicode space separators that would render as invisible emoji:
-		// U+00A0 NO-BREAK SPACE, U+2028 LINE SEPARATOR, U+2029 PARAGRAPH
-		// SEPARATOR, and other code points classified as White_Space.
-		// Note: ZWJ (U+200D) and variation selectors are NOT classified as
-		// White_Space, so valid multi-rune emoji sequences are unaffected.
-		if unicode.IsSpace(r) {
-			return false
-		}
-
-		// Reject bidirectional override/embedding/isolate controls that could
-		// be used to visually spoof the emoji or surrounding UI text:
-		//   U+202A LEFT-TO-RIGHT EMBEDDING
-		//   U+202B RIGHT-TO-LEFT EMBEDDING
-		//   U+202C POP DIRECTIONAL FORMATTING
-		//   U+202D LEFT-TO-RIGHT OVERRIDE
-		//   U+202E RIGHT-TO-LEFT OVERRIDE   ← main attack vector
-		//   U+2066 LEFT-TO-RIGHT ISOLATE
-		//   U+2067 RIGHT-TO-LEFT ISOLATE
-		//   U+2068 FIRST STRONG ISOLATE
-		//   U+2069 POP DIRECTIONAL ISOLATE
-		if (r >= 0x202A && r <= 0x202E) || (r >= 0x2066 && r <= 0x2069) {
-			return false
-		}
-
-		// Reject Unicode tag characters (U+E0000–U+E007F). These are used for
-		// language tagging in emoji sequences but can also encode hidden
-		// arbitrary text that would be invisible in normal rendering.
-		if r >= 0xE0000 && r <= 0xE007F {
-			return false
-		}
-
-		if r > 127 {
-			hasNonASCII = true
-		}
-	}
-	return hasNonASCII
-}
 
 // isConversationParticipant checks the conversation_participants table
 // (used for mod_mail conversations where messages have a single recipient_id).
