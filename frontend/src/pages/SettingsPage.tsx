@@ -79,6 +79,18 @@ export default function SettingsPage() {
     setNotificationSound,
     showPushNotifications,
     setShowPushNotifications,
+    notifyCommentReplies,
+    setNotifyCommentReplies,
+    notifyPostMilestone,
+    setNotifyPostMilestone,
+    notifyPostVelocity,
+    setNotifyPostVelocity,
+    notifyCommentMilestone,
+    setNotifyCommentMilestone,
+    notifyCommentVelocity,
+    setNotifyCommentVelocity,
+    dailyDigest,
+    setDailyDigest,
   } = useSettings();
 
   type SettingsTab = 'general' | 'notifications' | 'privacy' | 'appearance' | 'audio_video';
@@ -500,6 +512,91 @@ export default function SettingsPage() {
                   className="mt-3 w-full rounded border border-[var(--color-border)] bg-[var(--color-background)] px-3 py-2 text-sm text-[var(--color-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
                 />
               </div>
+            </div>
+          </Panel>
+
+          <Panel as="section">
+            <h3 className="mb-4 text-xl font-semibold text-[var(--color-text-primary)]">
+              {t('settings.notificationPreferences.title')}
+            </h3>
+            <p className="text-sm text-[var(--color-text-secondary)]">
+              {t('settings.notificationPreferences.description')}
+            </p>
+
+            <div className="mt-4 space-y-4">
+              {[
+                {
+                  key: 'notify-comment-replies',
+                  label: t('settings.notificationPreferences.commentReplies'),
+                  help: t('settings.notificationPreferences.commentRepliesHelp'),
+                  value: notifyCommentReplies,
+                  onToggle: () => setNotifyCommentReplies(!notifyCommentReplies),
+                },
+                {
+                  key: 'notify-post-milestone',
+                  label: t('settings.notificationPreferences.postMilestones'),
+                  help: t('settings.notificationPreferences.postMilestonesHelp'),
+                  value: notifyPostMilestone,
+                  onToggle: () => setNotifyPostMilestone(!notifyPostMilestone),
+                },
+                {
+                  key: 'notify-post-velocity',
+                  label: t('settings.notificationPreferences.postVelocity'),
+                  help: t('settings.notificationPreferences.postVelocityHelp'),
+                  value: notifyPostVelocity,
+                  onToggle: () => setNotifyPostVelocity(!notifyPostVelocity),
+                },
+                {
+                  key: 'notify-comment-milestone',
+                  label: t('settings.notificationPreferences.commentMilestones'),
+                  help: t('settings.notificationPreferences.commentMilestonesHelp'),
+                  value: notifyCommentMilestone,
+                  onToggle: () => setNotifyCommentMilestone(!notifyCommentMilestone),
+                },
+                {
+                  key: 'notify-comment-velocity',
+                  label: t('settings.notificationPreferences.commentVelocity'),
+                  help: t('settings.notificationPreferences.commentVelocityHelp'),
+                  value: notifyCommentVelocity,
+                  onToggle: () => setNotifyCommentVelocity(!notifyCommentVelocity),
+                },
+                {
+                  key: 'daily-digest',
+                  label: t('settings.notificationPreferences.dailyDigest'),
+                  help: t('settings.notificationPreferences.dailyDigestHelp'),
+                  value: dailyDigest,
+                  onToggle: () => setDailyDigest(!dailyDigest),
+                },
+              ].map((item) => (
+                <div
+                  key={item.key}
+                  className="flex items-center justify-between rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4"
+                >
+                  <div className="pr-4">
+                    <p className="text-base font-semibold text-[var(--color-text-primary)]">
+                      {item.label}
+                    </p>
+                    <p className="mt-1 text-sm text-[var(--color-text-secondary)]">{item.help}</p>
+                  </div>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={item.value}
+                    onClick={item.onToggle}
+                    className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${
+                      item.value ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
+                    }`}
+                  >
+                    <span className="sr-only">{item.label}</span>
+                    <span
+                      aria-hidden="true"
+                      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                        item.value ? 'translate-x-5' : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
+                </div>
+              ))}
             </div>
           </Panel>
         </div>
