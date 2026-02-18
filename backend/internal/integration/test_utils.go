@@ -124,6 +124,7 @@ func newTestDeps(t *testing.T) *TestDeps {
 	)
 	conversationsHandler := handlers.NewConversationsHandler(db.Pool, conversationRepo, messageRepo, userRepo)
 	messagesHandler := handlers.NewMessagesHandler(db.Pool, messageRepo, conversationRepo, userSettingsRepo, hub, nil)
+	settingsHandler := handlers.NewSettingsHandler(userSettingsRepo)
 	thumbnailService := services.NewThumbnailService()
 	usersHandler := handlers.NewUsersHandler(userRepo, userProfileRepo, userFriendshipRepo, userSettingsRepo, postRepo, commentRepo, nil, modRepo, services.NoopCache{}, thumbnailService)
 	mediaHandler := handlers.NewMediaHandler(models.NewMediaFileRepository(db.Pool), thumbnailService, nil)
@@ -215,6 +216,8 @@ func newTestDeps(t *testing.T) *TestDeps {
 			protected.GET("/users/me/profile", usersHandler.GetMyProfile)
 			protected.PUT("/users/me/profile", usersHandler.UpdateProfile)
 			protected.POST("/users/me/avatar", usersHandler.UploadMyAvatar)
+			protected.GET("/settings", settingsHandler.GetSettings)
+			protected.PUT("/settings", settingsHandler.UpdateSettings)
 		}
 
 		api.GET("/ws", middleware.AuthRequired(authService), wsHandler.HandleWebSocket)
