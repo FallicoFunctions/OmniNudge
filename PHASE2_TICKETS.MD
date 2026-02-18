@@ -1551,36 +1551,36 @@
 ---
 
 ### F0-005: Settings Page/System
-**Status:** ⬜ TODO
+**Status:** ✅ COMPLETE (2026-02-18)
 **Priority:** P1 (High - referenced throughout features)
 **Estimated Time:** 1 week
 
 **Problem:** Settings mentioned in many features but no comprehensive implementation.
 
 **Tasks:**
-- [ ] Create database schema: user_settings table (user_id, setting_key, setting_value, updated_at)
-- [ ] Create GET /api/users/me/settings endpoint
-- [ ] Create PUT /api/users/me/settings endpoint (update multiple settings)
-- [ ] Define settings structure: notifications, privacy, appearance, audio_video, transcription
-- [ ] Implement notification preferences (per-conversation muting, quiet hours, sound enabled)
-- [ ] Implement privacy settings (profile visibility, read receipts, typing indicators, last seen)
-- [ ] Implement appearance settings (theme: light/dark/auto, font_size: small/medium/large)
-- [ ] Implement audio/video settings (mic device, camera device, speaker device)
-- [ ] Implement transcription opt-in (per F11-005b requirement)
-- [ ] Create SettingsPage component (tabbed interface)
-- [ ] Create settings tabs: General, Notifications, Privacy, Appearance, Audio/Video
-- [ ] Implement settings sync (save to server, apply immediately)
-- [ ] Add settings validation (valid enum values, ranges)
-- [ ] Write unit tests (get settings, update settings, validation)
-- [ ] Document all available settings
+- [x] Expand `user_settings` schema for typed, server-backed settings (`037_settings_expansion`, plus related settings migrations)
+- [x] Create `GET /api/v1/settings`
+- [x] Create `PUT /api/v1/settings` (partial update)
+- [x] Define settings structure: notifications, privacy, appearance, audio_video, transcription
+- [x] Implement notification preferences (push toggle, quiet hours, sound, event/digest toggles, per-conversation muting support)
+- [x] Implement privacy settings (profile visibility, read receipts, typing indicators, last seen)
+- [x] Implement appearance settings (theme: light/dark/system + `auto` alias normalization, font_size)
+- [x] Implement audio/video settings (mic device, camera device, speaker device)
+- [x] Implement transcription opt-in (per F11-005b requirement)
+- [x] Create `SettingsPage` component (tabbed interface)
+- [x] Create settings tabs: General, Notifications, Privacy, Appearance, Audio/Video
+- [x] Implement settings sync (save to server, optimistic update + rollback on failure)
+- [x] Add settings validation (enum normalization/validation, ranges, timezone, quiet-hours invariants)
+- [x] Write unit/integration tests (get settings, update settings, validation, rollback behavior)
+- [x] Document available settings (`docs/USER_SETTINGS.md`, `backend/docs/API.md`)
 
 **Acceptance Criteria:**
-- Settings page functional (all tabs work)
-- Settings persist across devices (saved to server)
-- Settings apply immediately (<100ms)
-- Quiet hours work (notifications silenced during configured hours)
-- Device selection works (mic, camera, speaker)
-- Transcription opt-in respected (F11-005b requirement met)
+- [x] Settings page functional (all tabs work)
+- [x] Settings persist across devices (saved to server)
+- [x] Settings apply immediately (<100ms target; optimistic local apply with automated timing assertion)
+- [x] Quiet hours work (notifications silenced during configured hours)
+- [x] Device selection works (mic, camera, speaker)
+- [x] Transcription opt-in respected (F11-005b requirement met)
 
 **Dependencies:** None
 
