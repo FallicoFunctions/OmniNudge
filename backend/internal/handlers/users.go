@@ -1,6 +1,9 @@
 package handlers
 
 import (
+	"context"
+	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -20,6 +23,7 @@ type UsersHandler struct {
 	commentRepo  *models.PostCommentRepository
 	authService  *services.AuthService
 	hubModRepo   *models.HubModeratorRepository
+	cache        services.Cache
 }
 
 // NewUsersHandler creates a new UsersHandler
@@ -30,7 +34,11 @@ func NewUsersHandler(
 	commentRepo *models.PostCommentRepository,
 	authService *services.AuthService,
 	hubModRepo *models.HubModeratorRepository,
+	cache services.Cache,
 ) *UsersHandler {
+	if cache == nil {
+		cache = services.NoopCache{}
+	}
 	return &UsersHandler{
 		userRepo:     userRepo,
 		settingsRepo: settingsRepo,
@@ -38,6 +46,7 @@ func NewUsersHandler(
 		commentRepo:  commentRepo,
 		authService:  authService,
 		hubModRepo:   hubModRepo,
+		cache:        cache,
 	}
 }
 
@@ -135,8 +144,14 @@ func (h *UsersHandler) getUserProfileResponse(c *gin.Context, loadUser func() (*
 		return
 	}
 
+	exposeLastSeen := showLastSeen || viewerID == user.ID
+	if cached, ok := h.getCachedProfileResponse(c.Request.Context(), user.ID, viewerID, exposeLastSeen); ok {
+		c.JSON(http.StatusOK, cached)
+		return
+	}
+
 	var lastSeenPtr *string
-	if showLastSeen || viewerID == user.ID {
+	if exposeLastSeen {
 		formatted := user.LastSeen.Format(time.RFC3339)
 		lastSeenPtr = &formatted
 	}
@@ -171,6 +186,7 @@ func (h *UsersHandler) getUserProfileResponse(c *gin.Context, loadUser func() (*
 	if len(moderatedHubs) > 0 {
 		response.Moderated = moderatedHubs
 	}
+	h.setCachedProfileResponse(c.Request.Context(), user.ID, viewerID, exposeLastSeen, response)
 
 	c.JSON(http.StatusOK, response)
 }
@@ -365,6 +381,7 @@ func (h *UsersHandler) UpdateProfile(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update profile"})
 		return
 	}
+	h.invalidateProfileResponseCache(c.Request.Context(), user.ID)
 
 	c.JSON(http.StatusOK, UserProfileResponse{
 		ID:        user.ID,
@@ -491,10 +508,56 @@ func (h *UsersHandler) Ping(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update last seen"})
 		return
 	}
+	h.invalidateProfileResponseCache(c.Request.Context(), userID.(int))
 
 	c.JSON(http.StatusOK, gin.H{
 		"last_seen": lastSeen.Format(time.RFC3339),
 	})
+}
+
+func profileResponseCacheScope(profileUserID, viewerID int) string {
+	if viewerID == profileUserID {
+		return "owner"
+	}
+	return "public"
+}
+
+func profileResponseCacheKey(profileUserID, viewerID int, exposeLastSeen bool) string {
+	return fmt.Sprintf("profile:response:%d:%s:%t", profileUserID, profileResponseCacheScope(profileUserID, viewerID), exposeLastSeen)
+}
+
+func (h *UsersHandler) getCachedProfileResponse(ctx context.Context, profileUserID, viewerID int, exposeLastSeen bool) (UserProfileResponse, bool) {
+	cacheKey := profileResponseCacheKey(profileUserID, viewerID, exposeLastSeen)
+	raw, hit, err := h.cache.Get(ctx, cacheKey)
+	if err != nil || !hit || strings.TrimSpace(raw) == "" {
+		return UserProfileResponse{}, false
+	}
+
+	var response UserProfileResponse
+	if err := json.Unmarshal([]byte(raw), &response); err != nil {
+		return UserProfileResponse{}, false
+	}
+	return response, true
+}
+
+func (h *UsersHandler) setCachedProfileResponse(ctx context.Context, profileUserID, viewerID int, exposeLastSeen bool, response UserProfileResponse) {
+	data, err := json.Marshal(response)
+	if err != nil {
+		return
+	}
+	cacheKey := profileResponseCacheKey(profileUserID, viewerID, exposeLastSeen)
+	_ = h.cache.Set(ctx, cacheKey, string(data), services.TTLUserProfile)
+}
+
+func (h *UsersHandler) invalidateProfileResponseCache(ctx context.Context, profileUserID int) {
+	keys := []string{
+		profileResponseCacheKey(profileUserID, profileUserID, true),
+		profileResponseCacheKey(profileUserID, 0, false),
+		profileResponseCacheKey(profileUserID, 0, true),
+	}
+	for _, key := range keys {
+		_ = h.cache.Set(ctx, key, "", time.Second)
+	}
 }
 
 // UpdateLastAgentPostAt updates the last_agent_post_at timestamp for the authenticated user

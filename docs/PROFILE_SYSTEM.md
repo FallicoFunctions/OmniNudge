@@ -59,6 +59,18 @@ When settings lookup fails, visibility fails closed.
 - Message options include **View Profile** for non-own messages.
 - Navigates to `/users/:username`.
 
+## Caching
+
+- Profile responses are cached for 5 minutes (`TTLUserProfile`).
+- Cache scope is privacy-safe:
+  - owner-scoped response cache for self views
+  - public-scoped response cache for non-owner views
+- Visibility and `show_last_seen` are evaluated before serving cached data, so a private profile is never returned from cache to non-owners.
+- Profile cache is invalidated on:
+  - `PUT /api/v1/users/me/profile`
+  - `PUT /api/v1/users/profile` (legacy alias)
+  - `POST /api/v1/users/me/ping` (refreshes last-seen views)
+
 ## Test Coverage
 
 Backend:

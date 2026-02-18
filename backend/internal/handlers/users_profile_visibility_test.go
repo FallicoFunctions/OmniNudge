@@ -12,6 +12,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/omninudge/backend/internal/database"
 	"github.com/omninudge/backend/internal/models"
+	"github.com/omninudge/backend/internal/services"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -85,7 +86,7 @@ func TestGetUserProfile_PrivateVisibility_HidesFromOthers(t *testing.T) {
 	_, err = settingsRepo.Update(ctx, settings)
 	require.NoError(t, err)
 
-	handler := NewUsersHandler(userRepo, settingsRepo, nil, nil, nil, nil)
+	handler := NewUsersHandler(userRepo, settingsRepo, nil, nil, nil, nil, nil)
 	router := newUsersVisibilityRouter(handler)
 
 	req := httptest.NewRequest(http.MethodGet, "/users/"+owner.Username, nil)
@@ -112,7 +113,7 @@ func TestGetUserProfile_FriendsOnlyVisibility_HidesFromOthers(t *testing.T) {
 	_, err = settingsRepo.Update(ctx, settings)
 	require.NoError(t, err)
 
-	handler := NewUsersHandler(userRepo, settingsRepo, nil, nil, nil, nil)
+	handler := NewUsersHandler(userRepo, settingsRepo, nil, nil, nil, nil, nil)
 	router := newUsersVisibilityRouter(handler)
 
 	req := httptest.NewRequest(http.MethodGet, "/users/"+owner.Username, nil)
@@ -126,7 +127,7 @@ func TestGetUserProfileByID_PublicVisibility_ReturnsProfile(t *testing.T) {
 	userRepo, settingsRepo, owner, _, cleanup := setupUsersVisibilityTest(t)
 	defer cleanup()
 
-	handler := NewUsersHandler(userRepo, settingsRepo, nil, nil, nil, nil)
+	handler := NewUsersHandler(userRepo, settingsRepo, nil, nil, nil, nil, nil)
 	router := newUsersVisibilityRouter(handler)
 
 	req := httptest.NewRequest(http.MethodGet, "/users/id/"+strconv.Itoa(owner.ID)+"/profile", nil)
@@ -141,7 +142,7 @@ func TestGetMyProfile_ReturnsAuthenticatedUserProfile(t *testing.T) {
 	userRepo, settingsRepo, owner, _, cleanup := setupUsersVisibilityTest(t)
 	defer cleanup()
 
-	handler := NewUsersHandler(userRepo, settingsRepo, nil, nil, nil, nil)
+	handler := NewUsersHandler(userRepo, settingsRepo, nil, nil, nil, nil, nil)
 	router := newUsersVisibilityRouter(handler)
 
 	req := httptest.NewRequest(http.MethodGet, "/users/me/profile", nil)
@@ -151,4 +152,31 @@ func TestGetMyProfile_ReturnsAuthenticatedUserProfile(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, w.Code)
 	assert.Contains(t, w.Body.String(), owner.Username)
+}
+
+func TestGetUserProfile_UsesCachedResponseUntilTTLExpiry(t *testing.T) {
+	userRepo, settingsRepo, owner, _, cleanup := setupUsersVisibilityTest(t)
+	defer cleanup()
+
+	initialBio := "cached bio"
+	require.NoError(t, userRepo.UpdateProfile(context.Background(), owner.ID, &initialBio, nil))
+
+	handler := NewUsersHandler(userRepo, settingsRepo, nil, nil, nil, nil, services.NewMemoryCache())
+	router := newUsersVisibilityRouter(handler)
+
+	firstReq := httptest.NewRequest(http.MethodGet, "/users/"+owner.Username, nil)
+	firstW := httptest.NewRecorder()
+	router.ServeHTTP(firstW, firstReq)
+	require.Equal(t, http.StatusOK, firstW.Code)
+	assert.Contains(t, firstW.Body.String(), initialBio)
+
+	updatedBio := "fresh bio"
+	require.NoError(t, userRepo.UpdateProfile(context.Background(), owner.ID, &updatedBio, nil))
+
+	secondReq := httptest.NewRequest(http.MethodGet, "/users/"+owner.Username, nil)
+	secondW := httptest.NewRecorder()
+	router.ServeHTTP(secondW, secondReq)
+	require.Equal(t, http.StatusOK, secondW.Code)
+	assert.Contains(t, secondW.Body.String(), initialBio)
+	assert.NotContains(t, secondW.Body.String(), updatedBio)
 }
