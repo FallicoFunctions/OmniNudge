@@ -97,4 +97,34 @@ describe('SettingsContext showPushNotifications', () => {
 
     expect(userSettingsService.update).toHaveBeenCalledWith({ show_push_notifications: false });
   });
+
+  it('persists showPushNotifications to localStorage on successful update', async () => {
+    vi.mocked(userSettingsService.get).mockResolvedValue({
+      ...defaultServerSettings,
+      show_push_notifications: true,
+    } as never);
+    vi.mocked(userSettingsService.update).mockResolvedValue({
+      ...defaultServerSettings,
+      show_push_notifications: false,
+    } as never);
+
+    const { result } = renderHook(() => useSettings(), { wrapper });
+
+    await waitFor(() => {
+      expect(result.current.showPushNotifications).toBe(true);
+    });
+
+    await act(async () => {
+      result.current.setShowPushNotifications(false);
+    });
+
+    await waitFor(() => {
+      expect(result.current.showPushNotifications).toBe(false);
+    });
+
+    const raw = localStorage.getItem('omninudge-settings');
+    expect(raw).toBeTruthy();
+    const parsed = JSON.parse(raw ?? '{}') as { showPushNotifications?: boolean };
+    expect(parsed.showPushNotifications).toBe(false);
+  });
 });
