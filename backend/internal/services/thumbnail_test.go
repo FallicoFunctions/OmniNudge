@@ -171,6 +171,22 @@ func TestGetImageDimensions_NonExistentFile(t *testing.T) {
 	assert.Error(t, err)
 }
 
+func TestGenerateSquareThumbnail(t *testing.T) {
+	service := NewThumbnailService()
+	imagePath := createTestImage(t, 900, 450)
+
+	thumbnailPath, err := service.GenerateSquareThumbnail(imagePath, 200)
+	require.NoError(t, err)
+
+	width, height, err := service.GetImageDimensions(thumbnailPath)
+	require.NoError(t, err)
+	assert.Equal(t, 200, width)
+	assert.Equal(t, 200, height)
+
+	os.Remove(imagePath)
+	os.Remove(thumbnailPath)
+}
+
 func TestIsImageType(t *testing.T) {
 	testCases := []struct {
 		contentType string
@@ -196,11 +212,11 @@ func TestIsImageType(t *testing.T) {
 
 func TestCalculateThumbnailDimensions(t *testing.T) {
 	testCases := []struct {
-		name         string
-		origWidth    int
-		origHeight   int
-		expectedW    int
-		expectedH    int
+		name       string
+		origWidth  int
+		origHeight int
+		expectedW  int
+		expectedH  int
 	}{
 		{"Landscape 16:9", 1920, 1080, 300, 168},
 		{"Portrait 9:16", 1080, 1920, 168, 300},

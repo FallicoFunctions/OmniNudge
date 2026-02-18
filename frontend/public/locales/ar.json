@@ -1304,6 +1304,9 @@
       "description": "حدّث رابط الصورة الشخصية ونص الحالة والنبذة.",
       "avatarUrlLabel": "رابط الصورة الشخصية",
       "avatarUrlPlaceholder": "https://example.com/avatar.jpg",
+      "avatarUploadButton": "رفع صورة الملف الشخصي",
+      "avatarUploading": "جارٍ الرفع...",
+      "avatarUploadHint": "PNG أو JPG أو GIF أو WebP حتى 5MB. قص تلقائي إلى 200x200.",
       "statusLabel": "نص الحالة",
       "statusPlaceholder": "بماذا تنشغل الآن؟",
       "statusCount": "{{count}} / 500",
@@ -1314,6 +1317,7 @@
         "bioTooLong": "يجب ألا تتجاوز النبذة 500 حرف.",
         "statusTooLong": "يجب ألا يتجاوز نص الحالة 500 حرف.",
         "invalidAvatarUrl": "يجب أن يبدأ رابط الصورة بـ http:// أو https://",
+        "uploadFailed": "فشل رفع الصورة الشخصية: {{message}}",
         "saveFailed": "فشل حفظ الملف الشخصي: {{message}}"
       }
     }

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ChangeEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
 interface EditProfileModalProps {
@@ -12,6 +12,7 @@ interface EditProfileModalProps {
   initialBio?: string | null;
   initialAvatarUrl?: string | null;
   initialStatusText?: string | null;
+  onUploadAvatar?: (file: File) => Promise<string>;
   isSaving?: boolean;
 }
 
@@ -22,12 +23,14 @@ export default function EditProfileModal({
   initialBio,
   initialAvatarUrl,
   initialStatusText,
+  onUploadAvatar,
   isSaving = false,
 }: EditProfileModalProps) {
   const { t } = useTranslation();
   const [bio, setBio] = useState(initialBio ?? '');
   const [avatarUrl, setAvatarUrl] = useState(initialAvatarUrl ?? '');
   const [statusText, setStatusText] = useState(initialStatusText ?? '');
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -39,6 +42,28 @@ export default function EditProfileModal({
   }, [initialAvatarUrl, initialBio, initialStatusText, isOpen]);
 
   if (!isOpen) return null;
+
+  const handleAvatarFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !onUploadAvatar) {
+      return;
+    }
+    setError(null);
+    setIsUploadingAvatar(true);
+    try {
+      const uploadedUrl = await onUploadAvatar(file);
+      setAvatarUrl(uploadedUrl);
+    } catch (err) {
+      setError(
+        t('userProfilePage.edit.errors.uploadFailed', {
+          message: err instanceof Error ? err.message : t('common.error'),
+        })
+      );
+    } finally {
+      setIsUploadingAvatar(false);
+      event.target.value = '';
+    }
+  };
 
   const handleSave = async () => {
     const trimmedBio = bio.trim();
@@ -96,6 +121,31 @@ export default function EditProfileModal({
               placeholder={t('userProfilePage.edit.avatarUrlPlaceholder')}
               className="mt-1 w-full rounded-md border border-[var(--color-border)] bg-[var(--color-background)] px-3 py-2 text-sm text-[var(--color-text-primary)]"
             />
+            {onUploadAvatar && (
+              <div className="mt-2 flex items-center gap-2">
+                <label
+                  htmlFor="edit-profile-avatar-file"
+                  className="inline-flex cursor-pointer items-center rounded-md border border-[var(--color-border)] px-3 py-1.5 text-xs font-semibold text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
+                >
+                  {isUploadingAvatar
+                    ? t('userProfilePage.edit.avatarUploading')
+                    : t('userProfilePage.edit.avatarUploadButton')}
+                </label>
+                <input
+                  id="edit-profile-avatar-file"
+                  type="file"
+                  accept="image/png,image/jpeg,image/gif,image/webp"
+                  className="hidden"
+                  disabled={isUploadingAvatar}
+                  onChange={(event) => {
+                    void handleAvatarFileChange(event);
+                  }}
+                />
+                <span className="text-xs text-[var(--color-text-secondary)]">
+                  {t('userProfilePage.edit.avatarUploadHint')}
+                </span>
+              </div>
+            )}
           </div>
 
           <div>

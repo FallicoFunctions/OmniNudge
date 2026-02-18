@@ -4,8 +4,13 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"image"
+	"image/color"
+	"image/png"
+	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strconv"
 	"strings"
 	"testing"
@@ -48,14 +53,38 @@ func newUsersProfileUpdateRouter(handler *UsersHandler) *gin.Engine {
 		withUser(c)
 		handler.Ping(c)
 	})
+	router.POST("/users/me/avatar", func(c *gin.Context) {
+		withUser(c)
+		handler.UploadMyAvatar(c)
+	})
 	return router
+}
+
+func createPNGImagePayload(t *testing.T, width, height int) []byte {
+	t.Helper()
+
+	img := image.NewRGBA(image.Rect(0, 0, width, height))
+	for y := 0; y < height; y++ {
+		for x := 0; x < width; x++ {
+			img.Set(x, y, color.RGBA{
+				R: uint8((x * 255) / width),
+				G: uint8((y * 255) / height),
+				B: 120,
+				A: 255,
+			})
+		}
+	}
+
+	var buf bytes.Buffer
+	require.NoError(t, png.Encode(&buf, img))
+	return buf.Bytes()
 }
 
 func TestUpdateProfileViaMeProfile_UpdatesBioAndAvatar(t *testing.T) {
 	userRepo, settingsRepo, owner, _, cleanup := setupUsersVisibilityTest(t)
 	defer cleanup()
 
-	handler := NewUsersHandler(userRepo, nil, nil, settingsRepo, nil, nil, nil, nil, nil)
+	handler := NewUsersHandler(userRepo, nil, nil, settingsRepo, nil, nil, nil, nil, nil, nil)
 	router := newUsersProfileUpdateRouter(handler)
 
 	body := map[string]any{
@@ -87,7 +116,7 @@ func TestUpdateProfileViaLegacyAlias_UpdatesBioAndAvatar(t *testing.T) {
 	userRepo, settingsRepo, owner, _, cleanup := setupUsersVisibilityTest(t)
 	defer cleanup()
 
-	handler := NewUsersHandler(userRepo, nil, nil, settingsRepo, nil, nil, nil, nil, nil)
+	handler := NewUsersHandler(userRepo, nil, nil, settingsRepo, nil, nil, nil, nil, nil, nil)
 	router := newUsersProfileUpdateRouter(handler)
 
 	body := map[string]any{
@@ -111,7 +140,7 @@ func TestUpdateProfile_RejectsInvalidAvatarURL(t *testing.T) {
 	userRepo, settingsRepo, owner, _, cleanup := setupUsersVisibilityTest(t)
 	defer cleanup()
 
-	handler := NewUsersHandler(userRepo, nil, nil, settingsRepo, nil, nil, nil, nil, nil)
+	handler := NewUsersHandler(userRepo, nil, nil, settingsRepo, nil, nil, nil, nil, nil, nil)
 	router := newUsersProfileUpdateRouter(handler)
 
 	body := map[string]any{
@@ -133,7 +162,7 @@ func TestUpdateProfile_RejectsTooLongBio(t *testing.T) {
 	userRepo, settingsRepo, owner, _, cleanup := setupUsersVisibilityTest(t)
 	defer cleanup()
 
-	handler := NewUsersHandler(userRepo, nil, nil, settingsRepo, nil, nil, nil, nil, nil)
+	handler := NewUsersHandler(userRepo, nil, nil, settingsRepo, nil, nil, nil, nil, nil, nil)
 	router := newUsersProfileUpdateRouter(handler)
 
 	body := map[string]any{
@@ -155,7 +184,7 @@ func TestUpdateProfile_EmptyStringsClearFields(t *testing.T) {
 	userRepo, settingsRepo, owner, _, cleanup := setupUsersVisibilityTest(t)
 	defer cleanup()
 
-	handler := NewUsersHandler(userRepo, nil, nil, settingsRepo, nil, nil, nil, nil, nil)
+	handler := NewUsersHandler(userRepo, nil, nil, settingsRepo, nil, nil, nil, nil, nil, nil)
 	router := newUsersProfileUpdateRouter(handler)
 
 	seedBody := map[string]any{
@@ -200,7 +229,7 @@ func TestUpdateProfile_InvalidatesCachedPublicProfile(t *testing.T) {
 	initialBio := "before cache"
 	require.NoError(t, userRepo.UpdateProfile(context.Background(), owner.ID, &initialBio, nil))
 
-	handler := NewUsersHandler(userRepo, nil, nil, settingsRepo, nil, nil, nil, nil, services.NewMemoryCache())
+	handler := NewUsersHandler(userRepo, nil, nil, settingsRepo, nil, nil, nil, nil, services.NewMemoryCache(), nil)
 	router := newUsersProfileUpdateRouter(handler)
 
 	firstGetReq := httptest.NewRequest(http.MethodGet, "/users/"+owner.Username, nil)
@@ -233,7 +262,7 @@ func TestUpdateProfile_StatusText_PersistsAndReturns(t *testing.T) {
 	defer cleanup()
 
 	profileRepo := models.NewUserProfileRepository(userRepo.GetPool())
-	handler := NewUsersHandler(userRepo, profileRepo, nil, settingsRepo, nil, nil, nil, nil, nil)
+	handler := NewUsersHandler(userRepo, profileRepo, nil, settingsRepo, nil, nil, nil, nil, nil, nil)
 	router := newUsersProfileUpdateRouter(handler)
 
 	body := map[string]any{
@@ -263,7 +292,7 @@ func TestUpdateProfile_StatusText_RejectsTooLongValue(t *testing.T) {
 	defer cleanup()
 
 	profileRepo := models.NewUserProfileRepository(userRepo.GetPool())
-	handler := NewUsersHandler(userRepo, profileRepo, nil, settingsRepo, nil, nil, nil, nil, nil)
+	handler := NewUsersHandler(userRepo, profileRepo, nil, settingsRepo, nil, nil, nil, nil, nil, nil)
 	router := newUsersProfileUpdateRouter(handler)
 
 	body := map[string]any{
@@ -289,7 +318,7 @@ func TestUpdateProfile_PreservesExistingStatusTextWhenOmitted(t *testing.T) {
 	seedStatus := "Keep this status"
 	require.NoError(t, profileRepo.Upsert(context.Background(), owner.ID, nil, nil, &seedStatus))
 
-	handler := NewUsersHandler(userRepo, profileRepo, nil, settingsRepo, nil, nil, nil, nil, nil)
+	handler := NewUsersHandler(userRepo, profileRepo, nil, settingsRepo, nil, nil, nil, nil, nil, nil)
 	router := newUsersProfileUpdateRouter(handler)
 
 	body := map[string]any{
@@ -317,7 +346,7 @@ func TestPing_InvalidatesCachedOwnerProfileLastSeen(t *testing.T) {
 	userRepo, settingsRepo, owner, _, cleanup := setupUsersVisibilityTest(t)
 	defer cleanup()
 
-	handler := NewUsersHandler(userRepo, nil, nil, settingsRepo, nil, nil, nil, nil, services.NewMemoryCache())
+	handler := NewUsersHandler(userRepo, nil, nil, settingsRepo, nil, nil, nil, nil, services.NewMemoryCache(), nil)
 	router := newUsersProfileUpdateRouter(handler)
 
 	firstReq := httptest.NewRequest(http.MethodGet, "/users/me/profile", nil)
@@ -352,4 +381,219 @@ func TestPing_InvalidatesCachedOwnerProfileLastSeen(t *testing.T) {
 	require.True(t, ok)
 	require.NotEmpty(t, secondLastSeen)
 	assert.NotEqual(t, firstLastSeen, secondLastSeen)
+}
+
+func TestUploadMyAvatar_SavesSquareThumbnailAndUpdatesProfile(t *testing.T) {
+	userRepo, settingsRepo, owner, _, cleanup := setupUsersVisibilityTest(t)
+	defer cleanup()
+	t.Cleanup(func() { _ = os.RemoveAll("uploads") })
+
+	profileRepo := models.NewUserProfileRepository(userRepo.GetPool())
+	handler := NewUsersHandler(
+		userRepo,
+		profileRepo,
+		nil,
+		settingsRepo,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		services.NewThumbnailService(),
+	)
+	router := newUsersProfileUpdateRouter(handler)
+
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+	part, err := writer.CreateFormFile("avatar", "avatar.png")
+	require.NoError(t, err)
+	_, err = part.Write(createPNGImagePayload(t, 640, 480))
+	require.NoError(t, err)
+	require.NoError(t, writer.Close())
+
+	req := httptest.NewRequest(http.MethodPost, "/users/me/avatar", &body)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	req.Header.Set("X-Viewer-ID", strconv.Itoa(owner.ID))
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	require.Equal(t, http.StatusOK, w.Code, "response: %s", w.Body.String())
+
+	var payload map[string]any
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &payload))
+	avatarURL, ok := payload["avatar_url"].(string)
+	require.True(t, ok)
+	require.True(t, strings.HasPrefix(avatarURL, "/uploads/avatars/"))
+
+	filePath := strings.TrimPrefix(avatarURL, "/")
+	_, err = os.Stat(filePath)
+	require.NoError(t, err)
+
+	ts := services.NewThumbnailService()
+	width, height, err := ts.GetImageDimensions(filePath)
+	require.NoError(t, err)
+	require.Equal(t, 200, width)
+	require.Equal(t, 200, height)
+
+	updated, err := userRepo.GetByID(context.Background(), owner.ID)
+	require.NoError(t, err)
+	require.NotNil(t, updated)
+	require.NotNil(t, updated.AvatarURL)
+	require.Equal(t, avatarURL, *updated.AvatarURL)
+
+	profile, err := profileRepo.GetByUserID(context.Background(), owner.ID)
+	require.NoError(t, err)
+	require.NotNil(t, profile)
+	require.NotNil(t, profile.AvatarURL)
+	require.Equal(t, avatarURL, *profile.AvatarURL)
+}
+
+func TestUploadMyAvatar_RejectsNonImageFile(t *testing.T) {
+	userRepo, settingsRepo, owner, _, cleanup := setupUsersVisibilityTest(t)
+	defer cleanup()
+	t.Cleanup(func() { _ = os.RemoveAll("uploads") })
+
+	handler := NewUsersHandler(
+		userRepo,
+		nil,
+		nil,
+		settingsRepo,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		services.NewThumbnailService(),
+	)
+	router := newUsersProfileUpdateRouter(handler)
+
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+	part, err := writer.CreateFormFile("avatar", "avatar.txt")
+	require.NoError(t, err)
+	_, err = part.Write([]byte("not an image"))
+	require.NoError(t, err)
+	require.NoError(t, writer.Close())
+
+	req := httptest.NewRequest(http.MethodPost, "/users/me/avatar", &body)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	req.Header.Set("X-Viewer-ID", strconv.Itoa(owner.ID))
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusUnsupportedMediaType, w.Code)
+}
+
+func TestUploadMyAvatar_AcceptsGenericFileField(t *testing.T) {
+	userRepo, settingsRepo, owner, _, cleanup := setupUsersVisibilityTest(t)
+	defer cleanup()
+	t.Cleanup(func() { _ = os.RemoveAll("uploads") })
+
+	handler := NewUsersHandler(
+		userRepo,
+		nil,
+		nil,
+		settingsRepo,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		services.NewThumbnailService(),
+	)
+	router := newUsersProfileUpdateRouter(handler)
+
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+	part, err := writer.CreateFormFile("file", "avatar.png")
+	require.NoError(t, err)
+	_, err = part.Write(createPNGImagePayload(t, 640, 480))
+	require.NoError(t, err)
+	require.NoError(t, writer.Close())
+
+	req := httptest.NewRequest(http.MethodPost, "/users/me/avatar", &body)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	req.Header.Set("X-Viewer-ID", strconv.Itoa(owner.ID))
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	require.Equal(t, http.StatusOK, w.Code, "response: %s", w.Body.String())
+}
+
+func TestUploadMyAvatar_RejectsOversizedUpload(t *testing.T) {
+	userRepo, settingsRepo, owner, _, cleanup := setupUsersVisibilityTest(t)
+	defer cleanup()
+	t.Cleanup(func() { _ = os.RemoveAll("uploads") })
+
+	handler := NewUsersHandler(
+		userRepo,
+		nil,
+		nil,
+		settingsRepo,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		services.NewThumbnailService(),
+	)
+	router := newUsersProfileUpdateRouter(handler)
+
+	oversized := bytes.Repeat([]byte("a"), (5*1024*1024)+2048)
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+	part, err := writer.CreateFormFile("avatar", "avatar.png")
+	require.NoError(t, err)
+	_, err = part.Write(oversized)
+	require.NoError(t, err)
+	require.NoError(t, writer.Close())
+
+	req := httptest.NewRequest(http.MethodPost, "/users/me/avatar", &body)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	req.Header.Set("X-Viewer-ID", strconv.Itoa(owner.ID))
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	require.Equal(t, http.StatusRequestEntityTooLarge, w.Code, "response: %s", w.Body.String())
+}
+
+func TestUploadMyAvatar_RemovesPreviousLocalAvatarFile(t *testing.T) {
+	userRepo, settingsRepo, owner, _, cleanup := setupUsersVisibilityTest(t)
+	defer cleanup()
+	t.Cleanup(func() { _ = os.RemoveAll("uploads") })
+
+	require.NoError(t, os.MkdirAll("uploads/avatars", 0o755))
+	oldPath := "uploads/avatars/old_avatar.png"
+	require.NoError(t, os.WriteFile(oldPath, createPNGImagePayload(t, 300, 300), 0o644))
+	oldURL := "/uploads/avatars/old_avatar.png"
+	require.NoError(t, userRepo.UpdateProfile(context.Background(), owner.ID, nil, &oldURL))
+
+	handler := NewUsersHandler(
+		userRepo,
+		nil,
+		nil,
+		settingsRepo,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		services.NewThumbnailService(),
+	)
+	router := newUsersProfileUpdateRouter(handler)
+
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+	part, err := writer.CreateFormFile("avatar", "avatar.png")
+	require.NoError(t, err)
+	_, err = part.Write(createPNGImagePayload(t, 640, 480))
+	require.NoError(t, err)
+	require.NoError(t, writer.Close())
+
+	req := httptest.NewRequest(http.MethodPost, "/users/me/avatar", &body)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	req.Header.Set("X-Viewer-ID", strconv.Itoa(owner.ID))
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	require.Equal(t, http.StatusOK, w.Code, "response: %s", w.Body.String())
+
+	_, err = os.Stat(oldPath)
+	require.True(t, os.IsNotExist(err), "expected previous avatar file to be removed")
 }

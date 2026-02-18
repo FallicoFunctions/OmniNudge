@@ -4,6 +4,10 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"image"
+	"image/color"
+	"image/png"
+	"mime/multipart"
 	"net/http"
 	"strconv"
 	"testing"
@@ -11,6 +15,24 @@ import (
 	"github.com/omninudge/backend/internal/models"
 	"github.com/stretchr/testify/require"
 )
+
+func createAvatarPNGPayload(t *testing.T, width, height int) []byte {
+	t.Helper()
+	img := image.NewRGBA(image.Rect(0, 0, width, height))
+	for y := 0; y < height; y++ {
+		for x := 0; x < width; x++ {
+			img.Set(x, y, color.RGBA{
+				R: uint8((x * 255) / width),
+				G: uint8((y * 255) / height),
+				B: 80,
+				A: 255,
+			})
+		}
+	}
+	var buf bytes.Buffer
+	require.NoError(t, png.Encode(&buf, img))
+	return buf.Bytes()
+}
 
 func TestUserProfile_PrivateVisibility_HiddenFromOthersAndVisibleToOwner(t *testing.T) {
 	deps := newTestDeps(t)
@@ -179,6 +201,45 @@ func TestUserProfile_MeUpdate_InvalidAvatarRejected(t *testing.T) {
 	require.Equal(t, http.StatusBadRequest, updateResp.Code)
 }
 
+func TestUserProfile_UploadAvatar_UpdatesProfileWithThumbnailURL(t *testing.T) {
+	deps := newTestDeps(t)
+	user := createUser(t, deps.UserRepo, "me_profile_avatar_upload", "user")
+
+	token, err := deps.AuthService.GenerateJWT(user.ID, "", user.Username, user.Role)
+	require.NoError(t, err)
+
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+	part, err := writer.CreateFormFile("avatar", "avatar.png")
+	require.NoError(t, err)
+	_, err = part.Write(createAvatarPNGPayload(t, 700, 430))
+	require.NoError(t, err)
+	require.NoError(t, writer.Close())
+
+	uploadReq, err := http.NewRequest("POST", "/api/v1/users/me/avatar", &body)
+	require.NoError(t, err)
+	uploadReq.Header.Set("Authorization", "Bearer "+token)
+	uploadReq.Header.Set("Content-Type", writer.FormDataContentType())
+	uploadResp := doRequest(t, deps.Router, uploadReq)
+	require.Equal(t, http.StatusOK, uploadResp.Code, "response: %s", uploadResp.Body.String())
+
+	var uploadPayload map[string]any
+	require.NoError(t, json.Unmarshal(uploadResp.Body.Bytes(), &uploadPayload))
+	avatarURL, ok := uploadPayload["avatar_url"].(string)
+	require.True(t, ok)
+	require.Contains(t, avatarURL, "/uploads/avatars/")
+
+	getReq, err := http.NewRequest("GET", "/api/v1/users/me/profile", nil)
+	require.NoError(t, err)
+	getReq.Header.Set("Authorization", "Bearer "+token)
+	getResp := doRequest(t, deps.Router, getReq)
+	require.Equal(t, http.StatusOK, getResp.Code)
+
+	var profile map[string]any
+	require.NoError(t, json.Unmarshal(getResp.Body.Bytes(), &profile))
+	require.Equal(t, avatarURL, profile["avatar_url"])
+}
+
 func TestUserProfile_MeEndpoints_RequireAuth(t *testing.T) {
 	deps := newTestDeps(t)
 
@@ -192,6 +253,20 @@ func TestUserProfile_MeEndpoints_RequireAuth(t *testing.T) {
 	updateReq.Header.Set("Content-Type", "application/json")
 	updateResp := doRequest(t, deps.Router, updateReq)
 	require.Equal(t, http.StatusUnauthorized, updateResp.Code)
+
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+	part, err := writer.CreateFormFile("avatar", "avatar.png")
+	require.NoError(t, err)
+	_, err = part.Write(createAvatarPNGPayload(t, 100, 100))
+	require.NoError(t, err)
+	require.NoError(t, writer.Close())
+
+	uploadReq, err := http.NewRequest("POST", "/api/v1/users/me/avatar", &body)
+	require.NoError(t, err)
+	uploadReq.Header.Set("Content-Type", writer.FormDataContentType())
+	uploadResp := doRequest(t, deps.Router, uploadReq)
+	require.Equal(t, http.StatusUnauthorized, uploadResp.Code)
 }
 
 func TestUserProfile_LegacyUpdateAlias_RemainsFunctional(t *testing.T) {

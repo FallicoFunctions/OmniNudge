@@ -1304,6 +1304,9 @@
       "description": "Actualiza la URL de tu avatar, tu estado y tu biografía.",
       "avatarUrlLabel": "URL del avatar",
       "avatarUrlPlaceholder": "https://example.com/avatar.jpg",
+      "avatarUploadButton": "Subir imagen de avatar",
+      "avatarUploading": "Subiendo...",
+      "avatarUploadHint": "PNG, JPG, GIF o WebP hasta 5MB. Recorte automático a 200x200.",
       "statusLabel": "Estado",
       "statusPlaceholder": "¿Qué estás haciendo?",
       "statusCount": "{{count}} / 500",
@@ -1314,6 +1317,7 @@
         "bioTooLong": "La biografía debe tener 500 caracteres o menos.",
         "statusTooLong": "El estado debe tener 500 caracteres o menos.",
         "invalidAvatarUrl": "La URL del avatar debe comenzar con http:// o https://",
+        "uploadFailed": "No se pudo subir el avatar: {{message}}",
         "saveFailed": "No se pudo guardar el perfil: {{message}}"
       }
     }
