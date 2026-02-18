@@ -1,6 +1,7 @@
 package integration
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"net/http"
@@ -58,4 +59,58 @@ func TestUserProfileByID_PublicVisibility_ReturnsProfile(t *testing.T) {
 
 	resp := doRequest(t, deps.Router, req)
 	require.Equal(t, http.StatusOK, resp.Code)
+}
+
+func TestUserProfile_MeUpdate_ValidatesAndPersists(t *testing.T) {
+	deps := newTestDeps(t)
+	user := createUser(t, deps.UserRepo, "me_profile_user", "user")
+
+	token, err := deps.AuthService.GenerateJWT(user.ID, "", user.Username, user.Role)
+	require.NoError(t, err)
+
+	updateBody := map[string]any{
+		"bio":        "Integration profile bio",
+		"avatar_url": "https://example.com/integration-avatar.png",
+	}
+	payload, err := json.Marshal(updateBody)
+	require.NoError(t, err)
+
+	updateReq, err := http.NewRequest("PUT", "/api/v1/users/me/profile", bytes.NewReader(payload))
+	require.NoError(t, err)
+	updateReq.Header.Set("Authorization", "Bearer "+token)
+	updateReq.Header.Set("Content-Type", "application/json")
+	updateResp := doRequest(t, deps.Router, updateReq)
+	require.Equal(t, http.StatusOK, updateResp.Code)
+
+	getReq, err := http.NewRequest("GET", "/api/v1/users/me/profile", nil)
+	require.NoError(t, err)
+	getReq.Header.Set("Authorization", "Bearer "+token)
+	getResp := doRequest(t, deps.Router, getReq)
+	require.Equal(t, http.StatusOK, getResp.Code)
+
+	var profile map[string]any
+	require.NoError(t, json.Unmarshal(getResp.Body.Bytes(), &profile))
+	require.Equal(t, "Integration profile bio", profile["bio"])
+	require.Equal(t, "https://example.com/integration-avatar.png", profile["avatar_url"])
+}
+
+func TestUserProfile_MeUpdate_InvalidAvatarRejected(t *testing.T) {
+	deps := newTestDeps(t)
+	user := createUser(t, deps.UserRepo, "me_profile_invalid_avatar", "user")
+
+	token, err := deps.AuthService.GenerateJWT(user.ID, "", user.Username, user.Role)
+	require.NoError(t, err)
+
+	updateBody := map[string]any{
+		"avatar_url": "ftp://not-allowed.example/avatar.png",
+	}
+	payload, err := json.Marshal(updateBody)
+	require.NoError(t, err)
+
+	updateReq, err := http.NewRequest("PUT", "/api/v1/users/me/profile", bytes.NewReader(payload))
+	require.NoError(t, err)
+	updateReq.Header.Set("Authorization", "Bearer "+token)
+	updateReq.Header.Set("Content-Type", "application/json")
+	updateResp := doRequest(t, deps.Router, updateReq)
+	require.Equal(t, http.StatusBadRequest, updateResp.Code)
 }
