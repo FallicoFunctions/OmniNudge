@@ -1760,19 +1760,19 @@
 ---
 
 ### F1-008: Frontend - Integration & Testing
-**Status:** ⬜ TODO
+**Status:** ✅ COMPLETE
 **Priority:** P1
 **Estimated Time:** 2 hours
 
 **Tasks:**
-- [ ] Integrate reactions into MessagesPage
-- [ ] Add "+" button on message hover
-- [ ] Test adding reaction
-- [ ] Test removing reaction
-- [ ] Test real-time updates (two users)
-- [ ] Test mobile interactions
-- [ ] Test accessibility (keyboard, screen reader)
-- [ ] Fix any bugs found
+- [x] Integrate reactions into MessagesPage
+- [x] Add "+" button on message hover
+- [x] Test adding reaction
+- [x] Test removing reaction
+- [x] Test real-time updates (two users)
+- [x] Test mobile interactions
+- [x] Test accessibility (keyboard, screen reader)
+- [x] Fix any bugs found
 
 **Acceptance Criteria:**
 - Reactions fully functional end-to-end

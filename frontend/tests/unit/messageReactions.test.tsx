@@ -28,6 +28,21 @@ const createWrapper = () => {
   );
 };
 
+const createWrapperWithClient = () => {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false },
+      mutations: { retry: false },
+    },
+  });
+  return {
+    queryClient,
+    Wrapper: ({ children }: { children: React.ReactNode }) => (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    ),
+  };
+};
+
 function makeReaction(overrides: Partial<MessageReaction> = {}): MessageReaction {
   return {
     id: 99,
@@ -447,5 +462,40 @@ describe('MessageReactions — tooltip', () => {
     await waitFor(() => expect(screen.getByRole('tooltip')).toBeInTheDocument());
     fireEvent.keyDown(btn, { key: 'Escape' });
     expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
+  });
+});
+
+describe('MessageReactions — realtime cache updates', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('updates when cache changes (simulating another user websocket reaction)', async () => {
+    vi.mocked(reactionsService.getReactions).mockResolvedValue(twoReactionsResponse);
+    const { queryClient, Wrapper } = createWrapperWithClient();
+    render(
+      <Wrapper>
+        <MessageReactions messageId={1} isOwnMessage={false} currentUserId={1} />
+      </Wrapper>
+    );
+
+    await waitFor(() => screen.getByRole('group'));
+    expect(screen.getByRole('button', { name: /👍 3 reactions/i })).toBeInTheDocument();
+
+    queryClient.setQueryData<GetReactionsResponse>(['message-reactions', 1], {
+      ...twoReactionsResponse,
+      reactions: twoReactionsResponse.reactions.map((r) =>
+        r.emoji === '👍'
+          ? {
+              ...r,
+              count: 4,
+              user_ids: [...r.user_ids, 99],
+              usernames: [...r.usernames, 'zoe'],
+            }
+          : r,
+      ),
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /👍 4 reactions/i })).toBeInTheDocument();
+    });
   });
 });
