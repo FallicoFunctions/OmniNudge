@@ -1436,6 +1436,15 @@
       "report": "Report",
       "viewProfile": "View Profile"
     },
+    "pinned": {
+      "title_one": "{{count}} pinned message",
+      "title_other": "{{count}} pinned messages",
+      "showMore": "Show {{count}} more",
+      "showLess": "Show less",
+      "unpin": "Unpin",
+      "unpinning": "Unpinning...",
+      "unpinFailed": "Failed to unpin message"
+    },
     "typing": "{{username}} is typing...",
     "online": "Online",
     "offline": "Offline",

@@ -1436,6 +1436,15 @@
       "report": "إبلاغ",
       "viewProfile": "عرض الملف الشخصي"
     },
+    "pinned": {
+      "title_one": "رسالة مثبتة واحدة",
+      "title_other": "{{count}} رسائل مثبتة",
+      "showMore": "عرض {{count}} إضافية",
+      "showLess": "عرض أقل",
+      "unpin": "إلغاء التثبيت",
+      "unpinning": "جارٍ إلغاء التثبيت...",
+      "unpinFailed": "تعذر إلغاء تثبيت الرسالة"
+    },
     "typing": "{{username}} يكتب الآن...",
     "online": "متصل",
     "offline": "غير متصل",

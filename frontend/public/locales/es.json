@@ -1436,6 +1436,15 @@
       "report": "Reportar",
       "viewProfile": "Ver perfil"
     },
+    "pinned": {
+      "title_one": "{{count}} mensaje fijado",
+      "title_other": "{{count}} mensajes fijados",
+      "showMore": "Mostrar {{count}} más",
+      "showLess": "Mostrar menos",
+      "unpin": "Desfijar",
+      "unpinning": "Desfijando...",
+      "unpinFailed": "No se pudo desfijar el mensaje"
+    },
     "typing": "{{username}} está escribiendo...",
     "online": "En línea",
     "offline": "Desconectado",

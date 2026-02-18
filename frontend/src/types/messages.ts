@@ -36,6 +36,9 @@ export interface Message {
   sent_at: string;
   delivered_at?: string;
   read_at?: string;
+  pinned?: boolean;
+  pinned_by?: number | null;
+  pinned_at?: string | null;
   deleted_for_sender?: boolean;
   deleted_for_recipient?: boolean;
   media_file_id?: number | null;
@@ -51,6 +54,10 @@ export interface Message {
   recipient_keys?: Record<number, string>;
   /** Set by the server. True when ≥1 reaction exists. Avoids per-message reaction fetches. */
   has_reactions?: boolean;
+}
+
+export interface PinnedMessagesResponse {
+  pinned_messages: Message[];
 }
 
 export interface SendMessageRequest {

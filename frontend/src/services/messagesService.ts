@@ -1,5 +1,10 @@
 import { api } from '../lib/api';
-import type { Conversation, Message, SendMessageRequest } from '../types/messages';
+import type {
+  Conversation,
+  Message,
+  PinnedMessagesResponse,
+  SendMessageRequest,
+} from '../types/messages';
 import type { UserProfile } from '../types/users';
 import { encryptMessage } from '../utils/encryption';
 import { getUserPublicKey, getOwnKeys } from '../services/keyManagementService';
@@ -75,6 +80,18 @@ export const messagesService = {
     return api.get<{ messages: Message[]; next_cursor?: string }>(
       `/conversations/${conversationId}/messages?${params.toString()}`
     );
+  },
+
+  async getPinnedMessages(conversationId: number): Promise<PinnedMessagesResponse> {
+    return api.get<PinnedMessagesResponse>(`/conversations/${conversationId}/pinned-messages`);
+  },
+
+  async pinMessage(messageId: number): Promise<void> {
+    await api.post(`/messages/${messageId}/pin`, {});
+  },
+
+  async unpinMessage(messageId: number): Promise<void> {
+    await api.delete(`/messages/${messageId}/pin`);
   },
 
   async sendMessage(data: SendMessageRequest): Promise<Message> {
