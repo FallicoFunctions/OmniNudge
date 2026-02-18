@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -41,7 +42,7 @@ func (r *UserProfileRepository) GetByUserID(ctx context.Context, userID int) (*U
 		&profile.StatusText,
 	)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if err == sql.ErrNoRows || err == pgx.ErrNoRows {
 			return nil, nil
 		}
 		return nil, err

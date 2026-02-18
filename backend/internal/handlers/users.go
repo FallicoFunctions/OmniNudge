@@ -59,6 +59,7 @@ type UserProfileResponse struct {
 	Username  string                 `json:"username"`
 	AvatarURL *string                `json:"avatar_url,omitempty"`
 	Bio       *string                `json:"bio,omitempty"`
+	Status    *string                `json:"status_text,omitempty"`
 	Karma     int                    `json:"karma"`
 	PublicKey *string                `json:"public_key,omitempty"`
 	CreatedAt string                 `json:"created_at"`
@@ -149,6 +150,7 @@ func (h *UsersHandler) getUserProfileResponse(c *gin.Context, loadUser func() (*
 
 	avatarURL := user.AvatarURL
 	bio := user.Bio
+	var statusText *string
 	if h.userProfRepo != nil {
 		profile, err := h.userProfRepo.GetByUserID(c.Request.Context(), user.ID)
 		if err != nil {
@@ -158,6 +160,7 @@ func (h *UsersHandler) getUserProfileResponse(c *gin.Context, loadUser func() (*
 		if profile != nil {
 			avatarURL = profile.AvatarURL
 			bio = profile.Bio
+			statusText = profile.StatusText
 		}
 	}
 
@@ -195,6 +198,7 @@ func (h *UsersHandler) getUserProfileResponse(c *gin.Context, loadUser func() (*
 		Username:  user.Username,
 		AvatarURL: avatarURL,
 		Bio:       bio,
+		Status:    statusText,
 		Karma:     user.Karma,
 		PublicKey: user.PublicKey,
 		CreatedAt: user.CreatedAt.Format(time.RFC3339),
@@ -342,6 +346,7 @@ func (h *UsersHandler) GetUserComments(c *gin.Context) {
 type updateProfileRequest struct {
 	Bio       *string `json:"bio"`
 	AvatarURL *string `json:"avatar_url"`
+	Status    *string `json:"status_text"`
 }
 
 // UpdateProfile handles PUT /api/v1/users/profile
@@ -379,6 +384,30 @@ func (h *UsersHandler) UpdateProfile(c *gin.Context) {
 		}
 	}
 
+	var statusText *string
+	if h.userProfRepo != nil {
+		existingProfile, err := h.userProfRepo.GetByUserID(c.Request.Context(), user.ID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch user profile"})
+			return
+		}
+		if existingProfile != nil {
+			statusText = existingProfile.StatusText
+		}
+	}
+	if req.Status != nil {
+		status := strings.TrimSpace(*req.Status)
+		if len(status) > 500 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Status text must be 500 characters or less"})
+			return
+		}
+		if status == "" {
+			statusText = nil
+		} else {
+			statusText = &status
+		}
+	}
+
 	// Validate avatar URL if provided
 	if req.AvatarURL != nil {
 		avatarURL := strings.TrimSpace(*req.AvatarURL)
@@ -399,7 +428,7 @@ func (h *UsersHandler) UpdateProfile(c *gin.Context) {
 		return
 	}
 	if h.userProfRepo != nil {
-		if err := h.userProfRepo.Upsert(c.Request.Context(), user.ID, user.Bio, user.AvatarURL, nil); err != nil {
+		if err := h.userProfRepo.Upsert(c.Request.Context(), user.ID, user.Bio, user.AvatarURL, statusText); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update user profile"})
 			return
 		}
@@ -411,6 +440,7 @@ func (h *UsersHandler) UpdateProfile(c *gin.Context) {
 		Username:  user.Username,
 		AvatarURL: user.AvatarURL,
 		Bio:       user.Bio,
+		Status:    statusText,
 		Karma:     user.Karma,
 		PublicKey: user.PublicKey,
 		CreatedAt: user.CreatedAt.Format(time.RFC3339),
