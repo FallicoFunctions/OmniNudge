@@ -215,6 +215,7 @@ func newTestDeps(t *testing.T) *TestDeps {
 			protected.GET("/conversations/:id/messages", messagesHandler.GetMessages)
 			protected.GET("/conversations/:id/pinned-messages", messagesHandler.GetPinnedMessages)
 			protected.POST("/conversations/:id/read", messagesHandler.MarkAsRead)
+			protected.PATCH("/messages/:id", messagesHandler.EditMessage)
 			protected.PUT("/conversations/:id/archive", conversationsHandler.ArchiveConversation)
 			protected.PUT("/conversations/:id/unarchive", conversationsHandler.UnarchiveConversation)
 			protected.POST("/messages/:id/pin", messagesHandler.PinMessage)

@@ -102,6 +102,9 @@ func (w *Worker) RegisterAllHandlers(handlers JobHandlers) {
 	if handlers.ContentModeration != nil {
 		w.RegisterHandler(JobTypeContentModeration, handlers.ContentModeration)
 	}
+	if handlers.MessageReencrypt != nil {
+		w.RegisterHandler(JobTypeMessageReencrypt, handlers.MessageReencrypt)
+	}
 }
 
 // JobHandlers groups all job handler functions
@@ -113,6 +116,7 @@ type JobHandlers struct {
 	EmailSend           JobHandler
 	DataExport          JobHandler
 	ContentModeration   JobHandler
+	MessageReencrypt    JobHandler
 }
 
 // Start starts the worker server
@@ -207,6 +211,19 @@ func HandleContentModeration(ctx context.Context, task *asynq.Task) error {
 			payload.ContentType, payload.ContentID, asynq.SkipRetry)
 	}
 	return NewUnsupportedHandler(JobTypeContentModeration, "content moderation backend is not yet implemented")(ctx, task)
+}
+
+// HandleMessageReencrypt processes message re-encryption jobs.
+func HandleMessageReencrypt(ctx context.Context, task *asynq.Task) error {
+	var payload MessageReencryptPayload
+	if err := json.Unmarshal(task.Payload(), &payload); err != nil {
+		return fmt.Errorf("json.Unmarshal failed: %v: %w", err, asynq.SkipRetry)
+	}
+	if payload.MessageID <= 0 || payload.ConversationID <= 0 || payload.EditorID <= 0 {
+		return fmt.Errorf("invalid message reencrypt payload: message_id=%d conversation_id=%d editor_id=%d: %w",
+			payload.MessageID, payload.ConversationID, payload.EditorID, asynq.SkipRetry)
+	}
+	return NewUnsupportedHandler(JobTypeMessageReencrypt, "message re-encryption backend pipeline is not yet implemented")(ctx, task)
 }
 
 // Dead Letter Queue handling

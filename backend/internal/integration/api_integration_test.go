@@ -385,6 +385,54 @@ func TestSendMessage_AutoUnarchivesRecipientWhenEnabled_Integration(t *testing.T
 	require.False(t, recipientArchived, "recipient archive flag should be cleared when auto-unarchive is enabled")
 }
 
+func TestEditMessageEndpoint_UpdatesMessageAndHistory(t *testing.T) {
+	deps := newTestDeps(t)
+	defer deps.DB.Close()
+
+	sender := createUser(t, deps.UserRepo, "edit_sender", "user")
+	recipient := createUser(t, deps.UserRepo, "edit_recipient", "user")
+	senderToken, _ := deps.AuthService.GenerateJWT(sender.ID, "", sender.Username, sender.Role)
+
+	conversation, err := deps.ConversationRepo.Create(context.Background(), sender.ID, recipient.ID)
+	require.NoError(t, err)
+
+	message := &models.Message{
+		ConversationID:    conversation.ID,
+		SenderID:          sender.ID,
+		RecipientID:       recipient.ID,
+		EncryptedContent:  "original-ciphertext",
+		MessageType:       "text",
+		EncryptionVersion: "v1",
+	}
+	require.NoError(t, deps.MessageRepo.Create(context.Background(), message))
+
+	editBody := []byte(`{
+		"encrypted_content": "updated-ciphertext",
+		"sender_encrypted_content": "updated-sender-copy",
+		"content": "updated plaintext",
+		"encryption_version": "v1"
+	}`)
+	req, _ := http.NewRequest("PATCH", fmt.Sprintf("/api/v1/messages/%d", message.ID), bytes.NewReader(editBody))
+	req.Header.Set("Authorization", "Bearer "+senderToken)
+	req.Header.Set("Content-Type", "application/json")
+	resp := doRequest(t, deps.Router, req)
+	require.Equal(t, http.StatusOK, resp.Code, "body=%s", resp.Body.String())
+
+	var edited bool
+	var historyCount int
+	err = deps.DB.Pool.QueryRow(context.Background(), `
+		SELECT edited FROM messages WHERE id = $1
+	`, message.ID).Scan(&edited)
+	require.NoError(t, err)
+	require.True(t, edited)
+
+	err = deps.DB.Pool.QueryRow(context.Background(), `
+		SELECT COUNT(*) FROM message_edit_history WHERE message_id = $1
+	`, message.ID).Scan(&historyCount)
+	require.NoError(t, err)
+	require.Equal(t, 1, historyCount)
+}
+
 func TestSearchMessagesAuthAndResults(t *testing.T) {
 	deps := newTestDeps(t)
 	defer deps.DB.Close()

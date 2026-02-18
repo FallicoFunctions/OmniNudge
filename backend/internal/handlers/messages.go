@@ -14,6 +14,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/omninudge/backend/internal/models"
+	"github.com/omninudge/backend/internal/queue"
 	"github.com/omninudge/backend/internal/services"
 	"github.com/omninudge/backend/internal/websocket"
 )
@@ -26,6 +27,7 @@ type MessagesHandler struct {
 	userSettingsRepo *models.UserSettingsRepository
 	hub              HubInterface
 	notifService     *services.NotificationService
+	queueClient      *queue.QueueClient
 }
 
 // HubInterface defines the methods we need from the WebSocket hub
@@ -42,7 +44,12 @@ func NewMessagesHandler(
 	userSettingsRepo *models.UserSettingsRepository,
 	hub HubInterface,
 	notifService *services.NotificationService,
+	queueClient ...*queue.QueueClient,
 ) *MessagesHandler {
+	var qc *queue.QueueClient
+	if len(queueClient) > 0 {
+		qc = queueClient[0]
+	}
 	return &MessagesHandler{
 		pool:             pool,
 		messageRepo:      messageRepo,
@@ -50,6 +57,7 @@ func NewMessagesHandler(
 		userSettingsRepo: userSettingsRepo,
 		hub:              hub,
 		notifService:     notifService,
+		queueClient:      qc,
 	}
 }
 
@@ -577,6 +585,163 @@ func (h *MessagesHandler) SendMessage(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusCreated, message)
+}
+
+type EditMessageRequest struct {
+	EncryptedContent       string  `json:"encrypted_content" binding:"required"`
+	SenderEncryptedContent *string `json:"sender_encrypted_content,omitempty"`
+	Content                *string `json:"content,omitempty"`
+	EncryptionVersion      *string `json:"encryption_version,omitempty"`
+}
+
+// EditMessage handles PATCH /api/v1/messages/:id
+func (h *MessagesHandler) EditMessage(c *gin.Context) {
+	userIDValue, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
+	userID := userIDValue.(int)
+
+	messageID, err := strconv.Atoi(c.Param("id"))
+	if err != nil || messageID <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid message ID"})
+		return
+	}
+
+	var req EditMessageRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body", "details": err.Error()})
+		return
+	}
+	if strings.TrimSpace(req.EncryptedContent) == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "encrypted_content is required"})
+		return
+	}
+
+	ctx := c.Request.Context()
+	tx, err := h.pool.Begin(ctx)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to start edit transaction"})
+		return
+	}
+	defer tx.Rollback(ctx)
+
+	var conversationID int
+	var senderID int
+	var sentAt time.Time
+	var deletedForSender bool
+	var currentEncryptedContent string
+	var currentSenderEncryptedContent *string
+	var currentEncryptionVersion string
+	var originalContent *string
+	err = tx.QueryRow(ctx, `
+		SELECT conversation_id, sender_id, sent_at,
+		       COALESCE(deleted_for_sender, FALSE),
+		       encrypted_content,
+		       sender_encrypted_content,
+		       COALESCE(encryption_version, 'v1'),
+		       original_content
+		FROM messages
+		WHERE id = $1
+		FOR UPDATE
+	`, messageID).Scan(
+		&conversationID,
+		&senderID,
+		&sentAt,
+		&deletedForSender,
+		&currentEncryptedContent,
+		&currentSenderEncryptedContent,
+		&currentEncryptionVersion,
+		&originalContent,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Message not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load message", "details": err.Error()})
+		return
+	}
+
+	if senderID != userID {
+		c.JSON(http.StatusForbidden, gin.H{"error": "You can only edit your own messages"})
+		return
+	}
+	if deletedForSender {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Cannot edit deleted message"})
+		return
+	}
+	if time.Since(sentAt) > 15*time.Minute {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Message can only be edited within 15 minutes"})
+		return
+	}
+
+	if _, err := tx.Exec(ctx, `
+		INSERT INTO message_edit_history (message_id, content, encrypted_content, edited_by)
+		VALUES ($1, $2, $3, $4)
+	`, messageID, nil, currentEncryptedContent, userID); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to store edit history", "details": err.Error()})
+		return
+	}
+
+	originalContentToPersist := originalContent
+	if originalContentToPersist == nil {
+		originalContentToPersist = &currentEncryptedContent
+	}
+
+	nextSenderEncryptedContent := currentSenderEncryptedContent
+	if req.SenderEncryptedContent != nil {
+		nextSenderEncryptedContent = req.SenderEncryptedContent
+	}
+
+	nextEncryptionVersion := currentEncryptionVersion
+	if req.EncryptionVersion != nil && strings.TrimSpace(*req.EncryptionVersion) != "" {
+		nextEncryptionVersion = strings.TrimSpace(*req.EncryptionVersion)
+	}
+
+	var editedAt time.Time
+	if err := tx.QueryRow(ctx, `
+		UPDATE messages
+		SET encrypted_content = $2,
+		    sender_encrypted_content = $3,
+		    encryption_version = $4,
+		    edited = TRUE,
+		    edited_at = NOW(),
+		    original_content = $5
+		WHERE id = $1
+		RETURNING edited_at
+	`, messageID, req.EncryptedContent, nextSenderEncryptedContent, nextEncryptionVersion, originalContentToPersist).Scan(&editedAt); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update message", "details": err.Error()})
+		return
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to commit message edit"})
+		return
+	}
+
+	if h.queueClient != nil {
+		payload := queue.MessageReencryptPayload{
+			MessageID:      messageID,
+			ConversationID: conversationID,
+			EditorID:       userID,
+		}
+		if err := h.queueClient.EnqueueMessageReencrypt(ctx, payload); err != nil {
+			log.Printf("[EditMessage] failed to enqueue re-encryption job for message_id=%d: %v", messageID, err)
+		}
+	}
+
+	updatedMessage, err := h.messageRepo.GetByID(ctx, messageID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Message updated but failed to load response", "details": err.Error()})
+		return
+	}
+
+	updatedMessage.Edited = true
+	updatedMessage.EditedAt = &editedAt
+
+	c.JSON(http.StatusOK, updatedMessage)
 }
 
 // GetMessages handles GET /api/v1/conversations/:id/messages
