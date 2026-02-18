@@ -103,7 +103,7 @@ func (s *ReactionService) AddReaction(ctx context.Context, messageID, userID int
 	}
 	defer tx.Rollback(ctx)
 
-	if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock($1::bigint)`, messageID); err != nil {
+	if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock($1::bigint)`, int64(messageID)); err != nil {
 		return nil, fmt.Errorf("acquire emoji cap lock: %w", err)
 	}
 
