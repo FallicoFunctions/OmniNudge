@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5"
@@ -105,6 +106,107 @@ func (h *MessagesHandler) canAccessConversation(ctx context.Context, conversatio
 		return false, nil
 	}
 	return conversation.IsParticipant(userID), nil
+}
+
+func (h *MessagesHandler) getConversationParticipantIDs(ctx context.Context, conversationID int) ([]int, error) {
+	conversationType, err := h.getConversationType(ctx, conversationID)
+	if err != nil {
+		return nil, err
+	}
+
+	if conversationType == "mod_mail" {
+		rows, err := h.pool.Query(ctx, `
+			SELECT user_id
+			FROM conversation_participants
+			WHERE conversation_id = $1
+		`, conversationID)
+		if err != nil {
+			return nil, err
+		}
+		defer rows.Close()
+
+		participants := make([]int, 0, 8)
+		for rows.Next() {
+			var uid int
+			if scanErr := rows.Scan(&uid); scanErr != nil {
+				return nil, scanErr
+			}
+			participants = append(participants, uid)
+		}
+		return participants, rows.Err()
+	}
+
+	conversation, err := h.conversationRepo.GetByID(ctx, conversationID)
+	if err != nil {
+		return nil, err
+	}
+	if conversation == nil {
+		return nil, pgx.ErrNoRows
+	}
+
+	participants := make([]int, 0, 2)
+	if conversation.User1ID != nil && *conversation.User1ID != 0 {
+		participants = append(participants, *conversation.User1ID)
+	}
+	if conversation.User2ID != nil && *conversation.User2ID != 0 {
+		participants = append(participants, *conversation.User2ID)
+	}
+	return participants, nil
+}
+
+func buildPinnedMessagePreview(messageType, encryptedContent string) string {
+	if messageType != "text" {
+		return "[" + messageType + "]"
+	}
+
+	const maxPreviewChars = 120
+	runes := []rune(encryptedContent)
+	if len(runes) <= maxPreviewChars {
+		return encryptedContent
+	}
+	return string(runes[:maxPreviewChars]) + "..."
+}
+
+func (h *MessagesHandler) broadcastPinEvent(
+	ctx context.Context,
+	conversationID int,
+	eventType string,
+	messageID int,
+	pinnedBy *int,
+	pinnedAt *time.Time,
+	messageType string,
+	encryptedContent string,
+) {
+	if h.hub == nil {
+		return
+	}
+
+	participants, err := h.getConversationParticipantIDs(ctx, conversationID)
+	if err != nil {
+		log.Printf("[MessagesHandler] failed to get participants for pin event: conversation_id=%d err=%v", conversationID, err)
+		return
+	}
+
+	event := models.PinEvent{
+		Type:           eventType,
+		MessageID:      messageID,
+		ConversationID: conversationID,
+		PinnedBy:       pinnedBy,
+		PinnedAt:       pinnedAt,
+		Preview:        buildPinnedMessagePreview(messageType, encryptedContent),
+		MessageType:    messageType,
+	}
+
+	for _, participantID := range participants {
+		if participantID == 0 {
+			continue
+		}
+		h.hub.Broadcast(&websocket.Message{
+			RecipientID: participantID,
+			Type:        eventType,
+			Payload:     event,
+		})
+	}
 }
 
 // sendPushNotification is deprecated and removed in favor of NotificationService.SendMessagePush
@@ -958,11 +1060,13 @@ func (h *MessagesHandler) PinMessage(c *gin.Context) {
 
 	var conversationID int
 	var isPinned bool
+	var encryptedContent string
+	var messageType string
 	err = h.pool.QueryRow(c.Request.Context(), `
-		SELECT conversation_id, pinned
+		SELECT conversation_id, pinned, encrypted_content, message_type
 		FROM messages
 		WHERE id = $1
-	`, messageID).Scan(&conversationID, &isPinned)
+	`, messageID).Scan(&conversationID, &isPinned, &encryptedContent, &messageType)
 	if err != nil {
 		if err.Error() == "no rows in result set" {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Message not found"})
@@ -987,11 +1091,13 @@ func (h *MessagesHandler) PinMessage(c *gin.Context) {
 		return
 	}
 
-	_, err = h.pool.Exec(c.Request.Context(), `
+	var pinnedAt time.Time
+	err = h.pool.QueryRow(c.Request.Context(), `
 		UPDATE messages
 		SET pinned = TRUE, pinned_by = $2, pinned_at = NOW()
 		WHERE id = $1
-	`, messageID, userID)
+		RETURNING pinned_at
+	`, messageID, userID).Scan(&pinnedAt)
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.ConstraintName == "messages_max_pinned_per_conversation" {
@@ -1001,6 +1107,17 @@ func (h *MessagesHandler) PinMessage(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to pin message"})
 		return
 	}
+
+	h.broadcastPinEvent(
+		c.Request.Context(),
+		conversationID,
+		"message_pinned",
+		messageID,
+		&userID,
+		&pinnedAt,
+		messageType,
+		encryptedContent,
+	)
 
 	c.JSON(http.StatusOK, gin.H{"message": "Message pinned"})
 }
@@ -1023,11 +1140,14 @@ func (h *MessagesHandler) UnpinMessage(c *gin.Context) {
 	var conversationID int
 	var isPinned bool
 	var pinnedBy *int
+	var pinnedAt *time.Time
+	var encryptedContent string
+	var messageType string
 	err = h.pool.QueryRow(c.Request.Context(), `
-		SELECT conversation_id, pinned, pinned_by
+		SELECT conversation_id, pinned, pinned_by, pinned_at, encrypted_content, message_type
 		FROM messages
 		WHERE id = $1
-	`, messageID).Scan(&conversationID, &isPinned, &pinnedBy)
+	`, messageID).Scan(&conversationID, &isPinned, &pinnedBy, &pinnedAt, &encryptedContent, &messageType)
 	if err != nil {
 		if err.Error() == "no rows in result set" {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Message not found"})
@@ -1078,6 +1198,17 @@ func (h *MessagesHandler) UnpinMessage(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to unpin message"})
 		return
 	}
+
+	h.broadcastPinEvent(
+		c.Request.Context(),
+		conversationID,
+		"message_unpinned",
+		messageID,
+		pinnedBy,
+		pinnedAt,
+		messageType,
+		encryptedContent,
+	)
 
 	c.JSON(http.StatusOK, gin.H{"message": "Message unpinned"})
 }
