@@ -1301,14 +1301,18 @@
     },
     "edit": {
       "title": "تعديل الملف الشخصي",
-      "description": "حدّث رابط الصورة الشخصية والنبذة.",
+      "description": "حدّث رابط الصورة الشخصية ونص الحالة والنبذة.",
       "avatarUrlLabel": "رابط الصورة الشخصية",
       "avatarUrlPlaceholder": "https://example.com/avatar.jpg",
+      "statusLabel": "نص الحالة",
+      "statusPlaceholder": "بماذا تنشغل الآن؟",
+      "statusCount": "{{count}} / 500",
       "bioLabel": "النبذة",
       "bioPlaceholder": "اكتب نبذة قصيرة عنك...",
       "bioCount": "{{count}} / 500",
       "errors": {
         "bioTooLong": "يجب ألا تتجاوز النبذة 500 حرف.",
+        "statusTooLong": "يجب ألا يتجاوز نص الحالة 500 حرف.",
         "invalidAvatarUrl": "يجب أن يبدأ رابط الصورة بـ http:// أو https://",
         "saveFailed": "فشل حفظ الملف الشخصي: {{message}}"
       }
