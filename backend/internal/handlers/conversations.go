@@ -127,6 +127,25 @@ func (h *ConversationsHandler) CreateConversation(c *gin.Context) {
 		return
 	}
 
+	// Prevent creating DMs when either side has blocked the other.
+	var blockedByEither bool
+	err = h.pool.QueryRow(c.Request.Context(), `
+		SELECT EXISTS (
+			SELECT 1
+			FROM blocked_users
+			WHERE (blocker_id = $1 AND blocked_id = $2)
+			   OR (blocker_id = $2 AND blocked_id = $1)
+		)
+	`, userID.(int), req.OtherUserID).Scan(&blockedByEither)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check blocking status", "details": err.Error()})
+		return
+	}
+	if blockedByEither {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Cannot create conversation due to blocking settings"})
+		return
+	}
+
 	// Create or get existing conversation
 	conversation, err := h.conversationRepo.Create(c.Request.Context(), userID.(int), req.OtherUserID)
 	if err != nil {
@@ -150,7 +169,11 @@ func (h *ConversationsHandler) GetConversations(c *gin.Context) {
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
 	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
 	includeArchived := c.DefaultQuery("include_archived", "false") == "true"
+	archivedOnly := c.DefaultQuery("archived_only", "false") == "true"
 	cursorParam := c.Query("cursor")
+	if archivedOnly {
+		includeArchived = true
+	}
 
 	// Validate limit
 	if limit < 1 || limit > 100 {
@@ -232,7 +255,7 @@ func (h *ConversationsHandler) GetConversations(c *gin.Context) {
 			}
 
 			// Get latest message
-			latestMsg, err := h.messageRepo.GetLatestMessage(ctx, conversation.ID)
+			latestMsg, err := h.messageRepo.GetLatestMessage(ctx, conversation.ID, userID.(int))
 			if err == nil && latestMsg != nil {
 				details.LatestMessage = latestMsg
 			}
@@ -282,6 +305,16 @@ func (h *ConversationsHandler) GetConversations(c *gin.Context) {
 		<-resultsChan
 	}
 
+	if archivedOnly {
+		filtered := make([]*ConversationWithDetails, 0, len(enriched))
+		for _, conversation := range enriched {
+			if conversation != nil && conversation.ArchivedAt != nil {
+				filtered = append(filtered, conversation)
+			}
+		}
+		enriched = filtered
+	}
+
 	nextCursor := ""
 	if useCursorPagination && len(enriched) > limit {
 		enriched = enriched[:limit]
@@ -300,6 +333,15 @@ func (h *ConversationsHandler) GetConversations(c *gin.Context) {
 		response["next_cursor"] = nextCursor
 	}
 	c.JSON(http.StatusOK, response)
+}
+
+// GetArchivedConversations handles GET /api/v1/conversations/archived
+func (h *ConversationsHandler) GetArchivedConversations(c *gin.Context) {
+	query := c.Request.URL.Query()
+	query.Set("include_archived", "true")
+	query.Set("archived_only", "true")
+	c.Request.URL.RawQuery = query.Encode()
+	h.GetConversations(c)
 }
 
 // GetConversation handles GET /api/v1/conversations/:id
@@ -366,7 +408,7 @@ func (h *ConversationsHandler) GetConversation(c *gin.Context) {
 		details := &ConversationWithDetails{Conversation: conv}
 
 		// Latest message
-		latestMsg, _ := h.messageRepo.GetLatestMessage(c.Request.Context(), conversationID)
+		latestMsg, _ := h.messageRepo.GetLatestMessage(c.Request.Context(), conversationID, userID.(int))
 		if latestMsg != nil {
 			details.LatestMessage = latestMsg
 		}
@@ -414,7 +456,7 @@ func (h *ConversationsHandler) GetConversation(c *gin.Context) {
 	}
 
 	// Get latest message
-	latestMsg, err := h.messageRepo.GetLatestMessage(c.Request.Context(), conversation.ID)
+	latestMsg, err := h.messageRepo.GetLatestMessage(c.Request.Context(), conversation.ID, userID.(int))
 	if err == nil && latestMsg != nil {
 		details.LatestMessage = latestMsg
 	}

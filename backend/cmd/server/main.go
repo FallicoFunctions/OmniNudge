@@ -753,6 +753,7 @@ func main() {
 			// Protected conversations routes
 			protected.POST("/conversations", conversationsHandler.CreateConversation)
 			protected.GET("/conversations", conversationsHandler.GetConversations)
+			protected.GET("/conversations/archived", conversationsHandler.GetArchivedConversations)
 			protected.GET("/conversations/:id", conversationsHandler.GetConversation)
 			protected.PUT("/conversations/:id/archive", conversationsHandler.ArchiveConversation)
 			protected.PUT("/conversations/:id/unarchive", conversationsHandler.UnarchiveConversation)
