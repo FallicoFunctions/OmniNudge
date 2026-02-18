@@ -259,6 +259,12 @@ func (h *SettingsHandler) UpdateSettings(c *gin.Context) {
 		}
 		settings.QuietHoursTimezone = v
 	}
+	if settings.QuietHoursEnabled && settings.QuietHoursStartMinutes == settings.QuietHoursEndMinutes {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "quiet_hours_start_minutes and quiet_hours_end_minutes must differ when quiet hours are enabled",
+		})
+		return
+	}
 
 	// Update notification preferences
 	if req.NotifyCommentReplies != nil {

@@ -194,3 +194,64 @@ func TestUpdateSettings_PersistsProfileVisibility(t *testing.T) {
 	require.NotNil(t, settings)
 	assert.Equal(t, "friends_only", settings.ProfileVisibility)
 }
+
+func TestUpdateSettings_RejectsQuietHoursWithSameStartAndEndWhenEnabled(t *testing.T) {
+	handler, _, userID, cleanup := setupSettingsHandlerTest(t)
+	defer cleanup()
+
+	router := gin.Default()
+	router.PUT("/settings", func(c *gin.Context) {
+		c.Set("user_id", userID)
+		handler.UpdateSettings(c)
+	})
+
+	body := map[string]any{
+		"quiet_hours_enabled":       true,
+		"quiet_hours_start_minutes": 480,
+		"quiet_hours_end_minutes":   480,
+	}
+	payload, _ := json.Marshal(body)
+
+	req := httptest.NewRequest(http.MethodPut, "/settings", bytes.NewReader(payload))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+	assert.Contains(
+		t,
+		w.Body.String(),
+		"quiet_hours_start_minutes and quiet_hours_end_minutes must differ",
+	)
+}
+
+func TestUpdateSettings_AllowsQuietHoursWithSameStartAndEndWhenDisabled(t *testing.T) {
+	handler, settingsRepo, userID, cleanup := setupSettingsHandlerTest(t)
+	defer cleanup()
+
+	router := gin.Default()
+	router.PUT("/settings", func(c *gin.Context) {
+		c.Set("user_id", userID)
+		handler.UpdateSettings(c)
+	})
+
+	body := map[string]any{
+		"quiet_hours_enabled":       false,
+		"quiet_hours_start_minutes": 480,
+		"quiet_hours_end_minutes":   480,
+	}
+	payload, _ := json.Marshal(body)
+
+	req := httptest.NewRequest(http.MethodPut, "/settings", bytes.NewReader(payload))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	require.Equal(t, http.StatusOK, w.Code, "response: %s", w.Body.String())
+
+	settings, err := settingsRepo.GetByUserID(context.Background(), userID)
+	require.NoError(t, err)
+	require.NotNil(t, settings)
+	assert.False(t, settings.QuietHoursEnabled)
+	assert.Equal(t, 480, settings.QuietHoursStartMinutes)
+	assert.Equal(t, 480, settings.QuietHoursEndMinutes)
+}
