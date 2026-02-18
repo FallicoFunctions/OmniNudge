@@ -1984,21 +1984,23 @@
 ---
 
 ### F2-007: Fix - Pin Ordering
-**Status:** ⬜ TODO
+**Status:** ✅ COMPLETE
 **Priority:** P2
 **Estimated Time:** 1 hour
 
 **Problem:** Pin display order not specified.
 
 **Tasks:**
-- [ ] Choose ordering: chronological (oldest first) or reverse
-- [ ] Implement in backend query
-- [ ] Update frontend display
-- [ ] Document decision
+- [x] Choose ordering: chronological (oldest first) or reverse
+- [x] Implement in backend query
+- [x] Update frontend display
+- [x] Document decision
 
 **Acceptance Criteria:**
-- Consistent pin ordering
-- Makes sense to users
+- Consistent pin ordering ✅
+- Makes sense to users ✅
+
+**Decision:** Pinned messages are ordered chronologically by pin time (`pinned_at ASC`, tie-break `id ASC`), so the oldest pin appears first and newer pins append below it.
 
 **Dependencies:** F2-002
 
