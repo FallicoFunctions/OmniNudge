@@ -195,18 +195,18 @@ const ThemeEditor = ({ isOpen, onClose, initialTheme = null }: ThemeEditorProps)
     const type = definition?.type ?? 'string';
 
     if (!trimmed) {
-      setVariableError(variableName, 'Value is required.');
+      setVariableError(variableName, t('themes.editor.validation.valueRequired'));
       return false;
     }
 
     if (type === 'color') {
       const normalized = normalizeHexColor(trimmed);
       if (!looksLikeHexColor(trimmed)) {
-        setVariableError(variableName, 'Use a hex color like #1a1a1a.');
+        setVariableError(variableName, t('themes.editor.validation.hexExample'));
         return false;
       }
       if (!isValidHexColor(normalized)) {
-        setVariableError(variableName, 'Hex colors must be 3 or 6 characters.');
+        setVariableError(variableName, t('themes.editor.validation.hexLength'));
         return false;
       }
       setVariableError(variableName, undefined);
@@ -215,7 +215,7 @@ const ThemeEditor = ({ isOpen, onClose, initialTheme = null }: ThemeEditorProps)
 
     if (type === 'size') {
       if (!SIZE_VALUE_REGEX.test(trimmed)) {
-        setVariableError(variableName, 'Use units like px, rem, em, or %.');
+        setVariableError(variableName, t('themes.editor.validation.sizeUnits'));
         return false;
       }
       setVariableError(variableName, undefined);
@@ -225,7 +225,7 @@ const ThemeEditor = ({ isOpen, onClose, initialTheme = null }: ThemeEditorProps)
     if (type === 'number') {
       const numeric = Number(trimmed);
       if (Number.isNaN(numeric)) {
-        setVariableError(variableName, 'Value must be a valid number.');
+        setVariableError(variableName, t('themes.editor.validation.numberRequired'));
         return false;
       }
       setVariableError(variableName, undefined);
@@ -233,13 +233,16 @@ const ThemeEditor = ({ isOpen, onClose, initialTheme = null }: ThemeEditorProps)
     }
 
     if (trimmed.length > MAX_STRING_LENGTH) {
-      setVariableError(variableName, `Keep this value under ${MAX_STRING_LENGTH} characters.`);
+      setVariableError(
+        variableName,
+        t('themes.editor.validation.maxLength', { max: MAX_STRING_LENGTH })
+      );
       return false;
     }
 
     setVariableError(variableName, undefined);
     return true;
-  }, [setVariableError]);
+  }, [setVariableError, t]);
 
   const updateVariable = (variableName: string, value: string) => {
     cssVariableHistory.current = [
@@ -293,7 +296,7 @@ const ThemeEditor = ({ isOpen, onClose, initialTheme = null }: ThemeEditorProps)
         }
       });
       setInfoErrors(issues);
-      setError('Fix the highlighted fields to continue.');
+      setError(t('themes.editor.validation.fixHighlighted'));
       return false;
     }
 
@@ -316,7 +319,7 @@ const ThemeEditor = ({ isOpen, onClose, initialTheme = null }: ThemeEditorProps)
         }
       });
       setVariableErrors(nextErrors);
-      setError(generalMessage ?? 'Fix invalid values before continuing.');
+      setError(generalMessage ?? t('themes.editor.validation.fixInvalidValues'));
       return null;
     }
 
@@ -344,7 +347,7 @@ const ThemeEditor = ({ isOpen, onClose, initialTheme = null }: ThemeEditorProps)
   const validateStep = () => {
     const stepId = steps[currentStep].id;
     if (stepId === 'base' && !startFromScratch && !selectedBaseThemeId) {
-      setError('Please choose a base theme or start from scratch to continue.');
+      setError(t('themes.editor.validation.chooseBaseTheme'));
       return false;
     }
 

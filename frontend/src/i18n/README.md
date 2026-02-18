@@ -60,7 +60,11 @@ export function ExampleStats({ count }: { count: number }) {
 ## Guardrails
 
 - `npm run i18n:check`: validates locale key parity + interpolation parity.
+- `npm run i18n:check` also fails on duplicate keys inside the same JSON object (source-level detection before JSON parse overwrite behavior).
 - `npm run i18n:guard`: prevents regressions for hardcoded alert/confirm/toast patterns.
+- `npm run i18n:verify`: runs both checks together (`i18n:check` + `i18n:guard`).
+- Pre-commit (`frontend/.husky/pre-commit`) runs `npm run i18n:verify`.
+- CI workflow (`.github/workflows/i18n-verify.yml`) runs `npm run i18n:verify` for locale/i18n changes.
 - Missing keys emit warnings in development mode from `/src/i18n/config.ts`.
 
 ## RTL Best Practices

@@ -127,4 +127,16 @@ describe('ThemeEditor integration', () => {
     expect(mockContextValue.refreshThemes).toHaveBeenCalled();
     expect(mockContextValue.selectTheme).not.toHaveBeenCalled();
   });
+
+  it('shows translated validation error when info step is incomplete', async () => {
+    const onClose = vi.fn();
+
+    render(<ThemeEditor isOpen onClose={onClose} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /Next/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Next/i }));
+
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('Fix the highlighted fields to continue.');
+  });
 });

@@ -742,7 +742,8 @@
       "visibleToAllMods": "All moderators of {{hub}} can see and reply to this conversation"
     },
     "badges": {
-      "mod": "MOD"
+      "mod": "MOD",
+      "archived": "Archived"
     },
     "encryption": {
       "noParticipants": "No participants found. Cannot send mod mail.",
@@ -1543,10 +1544,12 @@
     },
     "hubFallback": "Hub",
     "aria": {
-      "backToConversations": "Back to conversations"
+      "backToConversations": "Back to conversations",
+      "openConversation": "Open conversation"
     },
     "badges": {
-      "mod": "MOD"
+      "mod": "MOD",
+      "archived": "Archived"
     },
     "tabs": {
       "active": "Active",
@@ -1554,6 +1557,10 @@
     },
     "archive": "Archive",
     "unarchive": "Unarchive",
+    "toasts": {
+      "archived": "Conversation archived",
+      "unarchived": "Conversation unarchived"
+    },
     "mute": "Mute notifications",
     "unmute": "Unmute notifications",
     "muted": "Muted",
@@ -2794,6 +2801,17 @@
       "errors": {
         "saveFailed": "Unable to save theme."
       },
+      "validation": {
+        "fixHighlighted": "Fix the highlighted fields to continue.",
+        "fixInvalidValues": "Fix invalid values before continuing.",
+        "chooseBaseTheme": "Please choose a base theme or start from scratch to continue.",
+        "valueRequired": "Value is required.",
+        "hexExample": "Use a hex color like #1a1a1a.",
+        "hexLength": "Hex colors must be 3 or 6 characters.",
+        "sizeUnits": "Use units like px, rem, em, or %.",
+        "numberRequired": "Value must be a valid number.",
+        "maxLength": "Keep this value under {{max}} characters."
+      },
       "base": {
         "intro": "Choose a predefined theme as your starting point or begin from a clean slate. You can tweak every value later.",
         "startFromScratch": {
@@ -3004,6 +3022,10 @@
       "titleRequired": "Title is required",
       "bodyTooLong": "Post body must be less than {{formattedMax}} characters",
       "waitForUpload": "Please wait for the media upload to finish.",
+      "mediaUploadsDisabled": "Media uploads are disabled for this hub.",
+      "chooseAllowedFiles": "Please choose {{allowed}}.",
+      "uploadFailedCount": "{{count}} file(s) failed to upload",
+      "uploadFailed": "Failed to upload media. Please try again.",
       "hubNameRequired": "Please enter a hub name",
       "hubMustSelectSuggestion": "Please select a valid hub from the suggestions",
       "subredditRequired": "Please enter a subreddit",

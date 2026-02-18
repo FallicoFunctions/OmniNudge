@@ -8,8 +8,8 @@ import { useSettings } from '../contexts/SettingsContext';
 import { postsService } from '../services/postsService';
 import { hubsService } from '../services/hubsService';
 import { savedService } from '../services/savedService';
+import { buildUserReport, reportService } from '../services/reportService';
 import { moderationService } from '../services/moderationService';
-import { api } from '../lib/api';
 import { subscriptionService } from '../services/subscriptionService';
 import type { PlatformPost, PostComment } from '../types/posts';
 import { CommentItem } from '../components/comments/CommentItem';
@@ -411,13 +411,17 @@ export default function PostDetailPage() {
       await queryClient.invalidateQueries({ queryKey: savedSiteCommentsKey });
     },
     report: async (comment) => {
-      const reason = window.prompt(t('posts.report.reasonPrompt')) ?? '';
-      await api.post('/reports', {
-        target_type: 'comment',
-        target_id: comment.id,
+      const reasonInput = window.prompt(t('reporting.reasonPrompt'));
+      if (reasonInput === null) return;
+      const detailsInput = window.prompt(t('reporting.detailsPrompt'));
+      const { reason, description } = buildUserReport(reasonInput, detailsInput);
+      await reportService.createReport({
+        targetType: 'comment',
+        targetId: comment.id,
         reason,
+        description,
       });
-      alert(t('posts.report.success'));
+      alert(t('reporting.success'));
     },
     permalink: (comment) => {
       const url = hubName
@@ -1033,7 +1037,7 @@ export default function PostDetailPage() {
                           to={`/h/${hubName}`}
                           className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
                         >
-                          {hubDisplayTitle ?? `h/${hubName}`}
+                          {hubDisplayTitle ?? t('common.format.hubPath', { name: hubName })}
                         </Link>,
                       ]
                     : []),
