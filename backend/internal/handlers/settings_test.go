@@ -185,6 +185,54 @@ func TestUpdateSettings_RejectsInvalidQuietHoursTimezone(t *testing.T) {
 	assert.Contains(t, w.Body.String(), "Invalid quiet_hours_timezone")
 }
 
+func TestUpdateSettings_RejectsInvalidQuietHoursStartMinutesRange(t *testing.T) {
+	handler, _, userID, cleanup := setupSettingsHandlerTest(t)
+	defer cleanup()
+
+	router := gin.Default()
+	router.PUT("/settings", func(c *gin.Context) {
+		c.Set("user_id", userID)
+		handler.UpdateSettings(c)
+	})
+
+	body := map[string]any{
+		"quiet_hours_start_minutes": 1440,
+	}
+	payload, _ := json.Marshal(body)
+
+	req := httptest.NewRequest(http.MethodPut, "/settings", bytes.NewReader(payload))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+	assert.Contains(t, w.Body.String(), "Invalid quiet_hours_start_minutes")
+}
+
+func TestUpdateSettings_RejectsInvalidQuietHoursEndMinutesRange(t *testing.T) {
+	handler, _, userID, cleanup := setupSettingsHandlerTest(t)
+	defer cleanup()
+
+	router := gin.Default()
+	router.PUT("/settings", func(c *gin.Context) {
+		c.Set("user_id", userID)
+		handler.UpdateSettings(c)
+	})
+
+	body := map[string]any{
+		"quiet_hours_end_minutes": -1,
+	}
+	payload, _ := json.Marshal(body)
+
+	req := httptest.NewRequest(http.MethodPut, "/settings", bytes.NewReader(payload))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+	assert.Contains(t, w.Body.String(), "Invalid quiet_hours_end_minutes")
+}
+
 func TestUpdateSettings_RejectsInvalidProfileVisibility(t *testing.T) {
 	handler, _, userID, cleanup := setupSettingsHandlerTest(t)
 	defer cleanup()
