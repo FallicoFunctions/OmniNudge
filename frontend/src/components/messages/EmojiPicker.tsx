@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 const EMOJI_OPTIONS = [
   '👍', '❤️', '😂', '😮', '😢', '🔥',
@@ -17,6 +18,7 @@ interface EmojiPickerProps {
 }
 
 export function EmojiPicker({ isOpen, isOwnMessage, onSelect, onClose }: EmojiPickerProps) {
+  const { t } = useTranslation();
   const [focusedIndex, setFocusedIndex] = useState(0);
   const buttonsRef = useRef<Array<HTMLButtonElement | null>>([]);
 
@@ -59,7 +61,7 @@ export function EmojiPicker({ isOpen, isOwnMessage, onSelect, onClose }: EmojiPi
       <div
         role="dialog"
         aria-modal="true"
-        aria-label="Emoji picker"
+        aria-label={t('messages.reactions.emojiPickerLabel')}
         className={[
           'fixed inset-0 z-30 flex flex-col bg-[var(--color-surface)] p-4 sm:inset-auto sm:bottom-full sm:mb-1 sm:w-[320px] sm:rounded-xl sm:border sm:border-[var(--color-border)] sm:bg-[var(--color-surface)] sm:p-2 sm:shadow-lg',
           isOwnMessage ? 'sm:right-0' : 'sm:left-0',
@@ -67,15 +69,15 @@ export function EmojiPicker({ isOpen, isOwnMessage, onSelect, onClose }: EmojiPi
       >
         <div className="mb-3 flex items-center justify-between sm:mb-2">
           <span className="text-sm font-semibold text-[var(--color-text-primary)]">
-            Choose reaction
+            {t('messages.reactions.chooseReaction')}
           </span>
           <button
             type="button"
-            aria-label="Close emoji picker"
+            aria-label={t('messages.reactions.closeEmojiPickerLabel')}
             className="rounded-md px-2 py-1 text-sm text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-elevated)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]"
             onClick={onClose}
           >
-            Close
+            {t('common.close')}
           </button>
         </div>
 
@@ -91,7 +93,7 @@ export function EmojiPicker({ isOpen, isOwnMessage, onSelect, onClose }: EmojiPi
                 buttonsRef.current[index] = el;
               }}
               type="button"
-              aria-label={`React with ${emoji}`}
+              aria-label={t('messages.reactions.reactWithEmoji', { emoji })}
               className="rounded-lg p-2 text-2xl transition-transform hover:scale-110 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]"
               onClick={() => selectEmoji(emoji)}
               onFocus={() => setFocusedIndex(index)}
