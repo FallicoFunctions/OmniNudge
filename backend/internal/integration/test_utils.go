@@ -88,6 +88,7 @@ func newTestDeps(t *testing.T) *TestDeps {
 	cfg, _ := config.Load()
 
 	userRepo := models.NewUserRepository(db.Pool)
+	userProfileRepo := models.NewUserProfileRepository(db.Pool)
 	postRepo := models.NewPlatformPostRepository(db.Pool)
 	commentRepo := models.NewPostCommentRepository(db.Pool)
 	conversationRepo := models.NewConversationRepository(db.Pool)
@@ -122,7 +123,7 @@ func newTestDeps(t *testing.T) *TestDeps {
 	)
 	conversationsHandler := handlers.NewConversationsHandler(db.Pool, conversationRepo, messageRepo, userRepo)
 	messagesHandler := handlers.NewMessagesHandler(db.Pool, messageRepo, conversationRepo, userSettingsRepo, hub, nil)
-	usersHandler := handlers.NewUsersHandler(userRepo, userSettingsRepo, postRepo, commentRepo, nil, modRepo, services.NoopCache{})
+	usersHandler := handlers.NewUsersHandler(userRepo, userProfileRepo, userSettingsRepo, postRepo, commentRepo, nil, modRepo, services.NoopCache{})
 	thumbnailService := services.NewThumbnailService()
 	mediaHandler := handlers.NewMediaHandler(models.NewMediaFileRepository(db.Pool), thumbnailService, nil)
 	hubSubRepo := models.NewHubSubscriptionRepository(db.Pool)

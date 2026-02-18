@@ -87,7 +87,7 @@ func TestGetUserProfile_PrivateVisibility_HidesFromOthers(t *testing.T) {
 	_, err = settingsRepo.Update(ctx, settings)
 	require.NoError(t, err)
 
-	handler := NewUsersHandler(userRepo, settingsRepo, nil, nil, nil, nil, nil)
+	handler := NewUsersHandler(userRepo, nil, settingsRepo, nil, nil, nil, nil, nil)
 	router := newUsersVisibilityRouter(handler)
 
 	req := httptest.NewRequest(http.MethodGet, "/users/"+owner.Username, nil)
@@ -114,7 +114,7 @@ func TestGetUserProfile_FriendsOnlyVisibility_HidesFromOthers(t *testing.T) {
 	_, err = settingsRepo.Update(ctx, settings)
 	require.NoError(t, err)
 
-	handler := NewUsersHandler(userRepo, settingsRepo, nil, nil, nil, nil, nil)
+	handler := NewUsersHandler(userRepo, nil, settingsRepo, nil, nil, nil, nil, nil)
 	router := newUsersVisibilityRouter(handler)
 
 	req := httptest.NewRequest(http.MethodGet, "/users/"+owner.Username, nil)
@@ -128,7 +128,7 @@ func TestGetUserProfileByID_PublicVisibility_ReturnsProfile(t *testing.T) {
 	userRepo, settingsRepo, owner, _, cleanup := setupUsersVisibilityTest(t)
 	defer cleanup()
 
-	handler := NewUsersHandler(userRepo, settingsRepo, nil, nil, nil, nil, nil)
+	handler := NewUsersHandler(userRepo, nil, settingsRepo, nil, nil, nil, nil, nil)
 	router := newUsersVisibilityRouter(handler)
 
 	req := httptest.NewRequest(http.MethodGet, "/users/id/"+strconv.Itoa(owner.ID)+"/profile", nil)
@@ -143,7 +143,7 @@ func TestGetMyProfile_ReturnsAuthenticatedUserProfile(t *testing.T) {
 	userRepo, settingsRepo, owner, _, cleanup := setupUsersVisibilityTest(t)
 	defer cleanup()
 
-	handler := NewUsersHandler(userRepo, settingsRepo, nil, nil, nil, nil, nil)
+	handler := NewUsersHandler(userRepo, nil, settingsRepo, nil, nil, nil, nil, nil)
 	router := newUsersVisibilityRouter(handler)
 
 	req := httptest.NewRequest(http.MethodGet, "/users/me/profile", nil)
@@ -162,7 +162,7 @@ func TestGetUserProfile_UsesCachedResponseUntilTTLExpiry(t *testing.T) {
 	initialBio := "cached bio"
 	require.NoError(t, userRepo.UpdateProfile(context.Background(), owner.ID, &initialBio, nil))
 
-	handler := NewUsersHandler(userRepo, settingsRepo, nil, nil, nil, nil, services.NewMemoryCache())
+	handler := NewUsersHandler(userRepo, nil, settingsRepo, nil, nil, nil, nil, services.NewMemoryCache())
 	router := newUsersVisibilityRouter(handler)
 
 	firstReq := httptest.NewRequest(http.MethodGet, "/users/"+owner.Username, nil)
@@ -193,7 +193,7 @@ func TestGetUserProfile_CacheScope_DoesNotLeakOwnerLastSeen(t *testing.T) {
 	_, err = settingsRepo.Update(ctx, settings)
 	require.NoError(t, err)
 
-	handler := NewUsersHandler(userRepo, settingsRepo, nil, nil, nil, nil, services.NewMemoryCache())
+	handler := NewUsersHandler(userRepo, nil, settingsRepo, nil, nil, nil, nil, services.NewMemoryCache())
 	router := newUsersVisibilityRouter(handler)
 
 	// Owner request should include last_seen and populate owner-scoped cache.
@@ -220,4 +220,26 @@ func TestGetUserProfile_CacheScope_DoesNotLeakOwnerLastSeen(t *testing.T) {
 	require.NoError(t, json.Unmarshal(publicW.Body.Bytes(), &publicPayload))
 	_, publicHasLastSeen := publicPayload["last_seen"]
 	assert.False(t, publicHasLastSeen, "public response should not include owner-only last_seen")
+}
+
+func TestGetUserProfile_UsesDedicatedUserProfilesData(t *testing.T) {
+	userRepo, settingsRepo, owner, _, cleanup := setupUsersVisibilityTest(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	profileRepo := models.NewUserProfileRepository(userRepo.GetPool())
+	profileBio := "bio from user_profiles"
+	profileAvatar := "https://example.com/user-profiles-avatar.png"
+	require.NoError(t, profileRepo.Upsert(ctx, owner.ID, &profileBio, &profileAvatar, nil))
+
+	handler := NewUsersHandler(userRepo, profileRepo, settingsRepo, nil, nil, nil, nil, nil)
+	router := newUsersVisibilityRouter(handler)
+
+	req := httptest.NewRequest(http.MethodGet, "/users/"+owner.Username, nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusOK, w.Code)
+	assert.Contains(t, w.Body.String(), profileBio)
+	assert.Contains(t, w.Body.String(), profileAvatar)
 }

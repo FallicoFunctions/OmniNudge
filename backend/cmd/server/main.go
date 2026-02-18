@@ -88,6 +88,7 @@ func main() {
 
 	// Feature 1: Message Reactions repository
 	messageReactionRepo := models.NewMessageReactionRepository(db.Pool)
+	userProfileRepo := models.NewUserProfileRepository(db.Pool)
 
 	// Moderation Phase 1 repositories
 	hubBanRepo := models.NewHubBanRepository(db.Pool)
@@ -296,7 +297,7 @@ func main() {
 	cssSanitizer := services.NewCSSSanitizer()
 
 	messagesHandler := handlers.NewMessagesHandler(db.Pool, messageRepo, conversationRepo, userSettingsRepo, hub, notificationService)
-	usersHandler := handlers.NewUsersHandler(userRepo, userSettingsRepo, postRepo, commentRepo, authService, hubModRepo, cache)
+	usersHandler := handlers.NewUsersHandler(userRepo, userProfileRepo, userSettingsRepo, postRepo, commentRepo, authService, hubModRepo, cache)
 	mediaHandler := handlers.NewMediaHandler(mediaRepo, thumbnailService, queueClient)
 	hubsHandler := handlers.NewHubsHandlerWithAccessRequest(hubRepo, postRepo, hubModRepo, hubSubRepo, hubSettingsRepo, hubAccessRequestRepo)
 	subscriptionsHandler := handlers.NewSubscriptionsHandler(hubSubRepo, subredditSubRepo, hubRepo)
