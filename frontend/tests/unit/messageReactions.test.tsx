@@ -377,33 +377,14 @@ describe('MessageReactions — unauthenticated (currentUserId=0)', () => {
   });
 });
 
-// ── Add-reaction button ───────────────────────────────────────────────────────
+// ── No internal add-reaction button ──────────────────────────────────────────
+// The add-reaction affordance lives in QuickReactButton (a sibling component).
+// MessageReactions only renders existing reaction pills.
 
-describe('MessageReactions — add-reaction button', () => {
+describe('MessageReactions — no internal add-reaction button', () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it('shows and fires the button when onAddNewEmoji is provided', async () => {
-    vi.mocked(reactionsService.getReactions).mockResolvedValue(twoReactionsResponse);
-    const onAdd = vi.fn();
-    const Wrapper = createWrapper();
-    render(
-      <Wrapper>
-        <MessageReactions
-          messageId={1}
-          isOwnMessage={false}
-          currentUserId={1}
-          onAddNewEmoji={onAdd}
-        />
-      </Wrapper>
-    );
-    await waitFor(() => screen.getByRole('group'));
-    const addBtn = screen.getByRole('button', { name: /Add reaction/i });
-    expect(addBtn).toBeInTheDocument();
-    fireEvent.click(addBtn);
-    expect(onAdd).toHaveBeenCalledTimes(1);
-  });
-
-  it('does not show the button when onAddNewEmoji is omitted', async () => {
+  it('never renders an "Add reaction" button regardless of props', async () => {
     vi.mocked(reactionsService.getReactions).mockResolvedValue(twoReactionsResponse);
     const Wrapper = createWrapper();
     render(

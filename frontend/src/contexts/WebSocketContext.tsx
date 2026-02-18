@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useRef, useState, useCallback, ty
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from './AuthContext';
 import { API_BASE_URL } from '../lib/api';
+import type { InfiniteData } from '@tanstack/react-query';
 import type { Message, Conversation } from '../types/messages';
 import type { GetReactionsResponse, WsReactionAddedPayload, WsReactionRemovedPayload } from '../types/reactions';
 
@@ -319,7 +320,7 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
         }
 
         case 'reaction_added': {
-          const { message_id, reaction } = data.payload as WsReactionAddedPayload;
+          const { message_id, conversation_id, reaction } = data.payload as WsReactionAddedPayload;
           console.log('[WebSocket] Reaction added:', message_id, reaction.emoji);
           queryClient.setQueryData<GetReactionsResponse>(
             ['message-reactions', message_id],
@@ -374,6 +375,23 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
                 my_reaction_id: isMe ? reaction.id : updated[idx].my_reaction_id,
               };
               return { ...old, reactions: updated };
+            },
+          );
+          // Flip has_reactions on the message so <MessageReactions> mounts for
+          // conversations where this message previously had zero reactions.
+          queryClient.setQueryData<InfiniteData<{ messages: Message[]; next_cursor?: string }>>(
+            ['messages', conversation_id],
+            (old) => {
+              if (!old) return old;
+              return {
+                ...old,
+                pages: old.pages.map((page) => ({
+                  ...page,
+                  messages: page.messages.map((msg) =>
+                    msg.id === message_id ? { ...msg, has_reactions: true } : msg,
+                  ),
+                })),
+              };
             },
           );
           break;

@@ -33,11 +33,6 @@ interface MessageReactionsProps {
   currentUserId: number;
   /** The authenticated user's username — enriches optimistic update tooltips. */
   currentUsername?: string;
-  /**
-   * Called when the user wants to add a *new* emoji reaction.
-   * Implemented by the EmojiPicker (F1-006). Until F1-006 ships this is a no-op.
-   */
-  onAddNewEmoji?: () => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -49,7 +44,6 @@ export function MessageReactions({
   isOwnMessage,
   currentUserId,
   currentUsername,
-  onAddNewEmoji,
 }: MessageReactionsProps) {
   const queryClient = useQueryClient();
   const [tooltip, setTooltip] = useState<{ emoji: string; text: string } | null>(null);
@@ -222,7 +216,7 @@ export function MessageReactions({
   if (isLoading) {
     return (
       <div
-        className={`mt-1 flex gap-1 ${isOwnMessage ? 'justify-end' : 'justify-start'}`}
+        className={`flex gap-1 ${isOwnMessage ? 'justify-end' : 'justify-start'}`}
         aria-busy="true"
       >
         {[1, 2].map((i) => (
@@ -243,7 +237,7 @@ export function MessageReactions({
 
   return (
     <div
-      className={`mt-1 flex flex-wrap items-center gap-1 ${isOwnMessage ? 'justify-end' : 'justify-start'}`}
+      className={`flex flex-wrap items-center gap-1 ${isOwnMessage ? 'justify-end' : 'justify-start'}`}
       role="group"
       aria-label="Message reactions"
     >
@@ -255,6 +249,10 @@ export function MessageReactions({
           currentUserId > 0 &&
           (isActive ? summary.my_reaction_id !== undefined : true);
 
+        // Stable ID for aria-describedby — emoji codepoint makes it unique per message
+        const tooltipId = `rt-${messageId}-${summary.emoji.codePointAt(0)}`;
+        const isTooltipVisible = tooltip?.emoji === summary.emoji && !!tooltip.text;
+
         return (
           <div key={summary.emoji} className="relative">
             <button
@@ -262,6 +260,7 @@ export function MessageReactions({
               disabled={isBusy || !canToggle}
               aria-pressed={isActive}
               aria-label={`${summary.emoji} ${summary.count} reaction${summary.count === 1 ? '' : 's'}${isActive ? ', you reacted' : ''}`}
+              aria-describedby={isTooltipVisible ? tooltipId : undefined}
               className={[
                 'flex items-center gap-1 rounded-full border px-2 py-0.5',
                 'text-xs font-medium transition-colors select-none',
@@ -289,8 +288,9 @@ export function MessageReactions({
             </button>
 
             {/* Hover / focus tooltip — capped width so it never overflows on mobile */}
-            {tooltip?.emoji === summary.emoji && tooltip.text && (
+            {isTooltipVisible && (
               <div
+                id={tooltipId}
                 role="tooltip"
                 className={[
                   'pointer-events-none absolute z-30 max-w-[200px] rounded-md px-2 py-1',
@@ -307,18 +307,6 @@ export function MessageReactions({
           </div>
         );
       })}
-
-      {/* "Add reaction" button — placeholder until EmojiPicker (F1-006) ships */}
-      {onAddNewEmoji && (
-        <button
-          type="button"
-          aria-label="Add reaction"
-          className="flex items-center justify-center rounded-full border border-dashed border-[var(--color-border)] px-2 py-0.5 text-xs text-[var(--color-text-muted)] transition-colors hover:border-[var(--color-primary)]/50 hover:text-[var(--color-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]"
-          onClick={onAddNewEmoji}
-        >
-          +
-        </button>
-      )}
 
       {/* Mutation error — shown briefly when add/remove fails (auto-cleared on retry) */}
       {hasError && (
