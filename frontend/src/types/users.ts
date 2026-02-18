@@ -11,6 +11,7 @@ export interface UserProfile {
   username: string;
   avatar_url?: string | null;
   bio?: string | null;
+  status_text?: string | null;
   karma: number;
   public_key?: string | null;
   created_at: string;

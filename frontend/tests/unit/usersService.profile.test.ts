@@ -40,11 +40,13 @@ describe('usersService profile methods', () => {
       username: 'me',
       bio: 'Updated bio',
       avatar_url: 'https://example.com/avatar.png',
+      status_text: 'Building cool things',
     });
 
     const payload = {
       bio: 'Updated bio',
       avatar_url: 'https://example.com/avatar.png',
+      status_text: 'Building cool things',
     };
 
     await usersService.updateProfile(payload);

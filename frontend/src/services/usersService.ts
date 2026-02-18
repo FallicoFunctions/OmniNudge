@@ -21,6 +21,7 @@ export const usersService = {
   async updateProfile(payload: {
     bio?: string | null;
     avatar_url?: string | null;
+    status_text?: string | null;
   }): Promise<UserProfile> {
     return api.put<UserProfile>('/users/me/profile', payload);
   },
