@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
+  type InfiniteData,
   useInfiniteQuery,
   useMutation,
   useQuery,
@@ -20,9 +21,15 @@ import { TypingIndicator } from '../components/messages/TypingIndicator';
 import { HighlightedText } from '../components/messages/HighlightedText';
 import { MessageReactions } from '../components/messages/MessageReactions';
 import { QuickReactButton } from '../components/messages/QuickReactButton';
+import { PinnedMessagesBar } from '../components/messages/PinnedMessagesBar';
 import { useDebounce } from '../hooks/useDebounce';
 import { useMediaQuery } from '../hooks/useMediaQuery';
-import type { Conversation, Message, SendMessageRequest } from '../types/messages';
+import type {
+  Conversation,
+  Message,
+  PinnedMessagesResponse,
+  SendMessageRequest,
+} from '../types/messages';
 import type { ModMailConversation } from '../types/modmail';
 import { API_BASE_URL } from '../lib/api';
 import {
@@ -701,6 +708,7 @@ export default function MessagesPage() {
   const [messageSearchHasFiles, setMessageSearchHasFiles] = useState(false);
   const [messageSearchHasLinks, setMessageSearchHasLinks] = useState(false);
   const [messageSearchPage, setMessageSearchPage] = useState(0);
+  const [expandedPinnedMessages, setExpandedPinnedMessages] = useState(false);
   const debouncedMessageSearch = useDebounce(messageSearchQuery, 300);
   const [decryptedContentMap, setDecryptedContentMap] = useState<Map<number, string>>(new Map());
   const [isDecryptingForSearch, setIsDecryptingForSearch] = useState(false);
@@ -860,9 +868,19 @@ export default function MessagesPage() {
     refetchOnWindowFocus: false,
     retry: false, // Avoid retry loops on 404 when a conversation was deleted
   });
+  const { data: pinnedMessagesData } = useQuery<PinnedMessagesResponse>({
+    queryKey: ['pinnedMessages', selectedConversationId],
+    queryFn: () => messagesService.getPinnedMessages(selectedConversationId!),
+    enabled: !!selectedConversationId && selectedConversationExists && !isCreatingChat,
+    refetchOnWindowFocus: false,
+  });
   const messages = useMemo(
     () => messagesData?.pages.flatMap((page) => page.messages) ?? [],
     [messagesData]
+  );
+  const pinnedMessages = useMemo(
+    () => pinnedMessagesData?.pinned_messages ?? [],
+    [pinnedMessagesData]
   );
 
   // Create media messages list for full-screen viewer (images and videos only)
@@ -966,6 +984,44 @@ export default function MessagesPage() {
     },
     onSettled: () => {
       setDeleteScopeInFlight(null);
+    },
+  });
+
+  const unpinMessageMutation = useMutation({
+    mutationFn: (messageId: number) => messagesService.unpinMessage(messageId),
+    onSuccess: (_, messageId) => {
+      if (!selectedConversationId) return;
+
+      queryClient.setQueryData<PinnedMessagesResponse | undefined>(
+        ['pinnedMessages', selectedConversationId],
+        (prev) =>
+          prev
+            ? {
+                ...prev,
+                pinned_messages: prev.pinned_messages.filter((msg) => msg.id !== messageId),
+              }
+            : prev
+      );
+
+      queryClient.setQueryData<
+        InfiniteData<{ messages: Message[]; next_cursor?: string }> | undefined
+      >(['messages', selectedConversationId], (prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          pages: prev.pages.map((page) => ({
+            ...page,
+            messages: page.messages.map((msg) =>
+              msg.id === messageId
+                ? { ...msg, pinned: false, pinned_by: null, pinned_at: null }
+                : msg
+            ),
+          })),
+        };
+      });
+    },
+    onError: (error) => {
+      alert(error instanceof Error ? error.message : t('messages.pinned.unpinFailed'));
     },
   });
 
@@ -1714,7 +1770,15 @@ export default function MessagesPage() {
     setMessageMenuOpen(null);
     setDeleteDialogMessage(null);
     setShowMessageSearch(false);
+    setExpandedPinnedMessages(false);
   }, [selectedConversationId]);
+
+  const handleJumpToPinnedMessage = useCallback((messageId: number) => {
+    const target = document.getElementById(`message-${messageId}`);
+    if (target) {
+      target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, []);
 
   // Keyboard shortcut: Escape to clear message search
   useEffect(() => {
@@ -2278,6 +2342,19 @@ export default function MessagesPage() {
                 </div>
               )}
 
+              {!isCreatingChat && selectedConversationId && (
+                <PinnedMessagesBar
+                  pinnedMessages={pinnedMessages}
+                  currentUserId={user?.id}
+                  currentUserRole={user?.role}
+                  expanded={expandedPinnedMessages}
+                  onToggleExpanded={() => setExpandedPinnedMessages((prev) => !prev)}
+                  onJumpToMessage={handleJumpToPinnedMessage}
+                  onUnpinMessage={(messageId) => unpinMessageMutation.mutate(messageId)}
+                  unpinningMessageId={unpinMessageMutation.variables}
+                />
+              )}
+
               {/* Messages */}
               <div ref={messagesContainerRef} className="flex-1 overflow-y-auto p-4">
                 {isCreatingChat ? (
@@ -2324,6 +2401,7 @@ export default function MessagesPage() {
                       return (
                         <div
                           key={message.id}
+                          id={`message-${message.id}`}
                           className={`group flex flex-col ${isOwnMessage ? 'items-end' : 'items-start'}`}
                           data-message-menu-container={message.id}
                         >

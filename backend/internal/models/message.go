@@ -20,6 +20,9 @@ type Message struct {
 	SentAt                   time.Time      `json:"sent_at"`
 	DeliveredAt              *time.Time     `json:"delivered_at,omitempty"`
 	ReadAt                   *time.Time     `json:"read_at,omitempty"`
+	Pinned                   bool           `json:"pinned"`
+	PinnedBy                 *int           `json:"pinned_by,omitempty"`
+	PinnedAt                 *time.Time     `json:"pinned_at,omitempty"`
 	DeletedForSender         bool           `json:"deleted_for_sender"`
 	DeletedForRecipient      bool           `json:"deleted_for_recipient"`
 	MediaFileID              *int           `json:"media_file_id,omitempty"` // References media_files table

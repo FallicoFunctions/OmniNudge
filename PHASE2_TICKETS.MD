@@ -1914,19 +1914,19 @@
 ---
 
 ### F2-004: Frontend - PinnedMessagesBar Component
-**Status:** ⬜ TODO
+**Status:** ✅ COMPLETE
 **Priority:** P1
 **Estimated Time:** 4 hours
 
 **Tasks:**
-- [ ] Create PinnedMessagesBar.tsx component
-- [ ] Display at top of conversation
-- [ ] Show compact list of pinned messages
-- [ ] Click to scroll to message in conversation
-- [ ] Show unpin button (if permitted)
-- [ ] Collapsible if >3 pins
-- [ ] Empty state: hide bar if no pins
-- [ ] Write component tests
+- [x] Create PinnedMessagesBar.tsx component
+- [x] Display at top of conversation
+- [x] Show compact list of pinned messages
+- [x] Click to scroll to message in conversation
+- [x] Show unpin button (if permitted)
+- [x] Collapsible if >3 pins
+- [x] Empty state: hide bar if no pins
+- [x] Write component tests
 
 **Acceptance Criteria:**
 - Pinned bar displays at top
