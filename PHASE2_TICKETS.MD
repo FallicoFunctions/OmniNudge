@@ -1895,15 +1895,15 @@
 ---
 
 ### F2-003: Backend - WebSocket Pin Events
-**Status:** ⬜ TODO
+**Status:** ✅ COMPLETE
 **Priority:** P1
 **Estimated Time:** 1 hour
 
 **Tasks:**
-- [ ] Create PinEvent struct
-- [ ] Broadcast message_pinned event
-- [ ] Broadcast message_unpinned event
-- [ ] Include message preview in event
+- [x] Create PinEvent struct
+- [x] Broadcast message_pinned event
+- [x] Broadcast message_unpinned event
+- [x] Include message preview in event
 
 **Acceptance Criteria:**
 - Pins update in real-time

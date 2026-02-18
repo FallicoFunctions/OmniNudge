@@ -1029,6 +1029,15 @@ func createPinTestMessage(t *testing.T, db *database.Database, convID, senderID,
 	return messageID
 }
 
+func findBroadcastByTypeAndRecipient(calls []*websocket.Message, eventType string, recipientID int) *websocket.Message {
+	for _, call := range calls {
+		if call.Type == eventType && call.RecipientID == recipientID {
+			return call
+		}
+	}
+	return nil
+}
+
 func TestPinMessage_EnforcesMaxTenPinned(t *testing.T) {
 	handler, db, user1ID, user2ID, convID, _, cleanup := setupMessagesHandlerTest(t)
 	defer cleanup()
@@ -1062,6 +1071,45 @@ func TestPinMessage_EnforcesMaxTenPinned(t *testing.T) {
 	`, convID).Scan(&pinnedCount)
 	require.NoError(t, err)
 	assert.Equal(t, 10, pinnedCount)
+}
+
+func TestPinMessage_BroadcastsPinEvent(t *testing.T) {
+	handler, db, user1ID, user2ID, convID, hub, cleanup := setupMessagesHandlerTest(t)
+	defer cleanup()
+
+	messageID := createPinTestMessage(t, db, convID, user1ID, user2ID, "pin preview content")
+
+	router := gin.Default()
+	router.POST("/messages/:id/pin", func(c *gin.Context) {
+		c.Set("user_id", user1ID)
+		handler.PinMessage(c)
+	})
+
+	req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("/messages/%d/pin", messageID), nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	calls := hub.SnapshotBroadcastCalls()
+	require.Len(t, calls, 2)
+
+	for _, recipientID := range []int{user1ID, user2ID} {
+		call := findBroadcastByTypeAndRecipient(calls, "message_pinned", recipientID)
+		require.NotNil(t, call)
+
+		payload, ok := call.Payload.(models.PinEvent)
+		require.True(t, ok)
+		assert.Equal(t, "message_pinned", payload.Type)
+		assert.Equal(t, messageID, payload.MessageID)
+		assert.Equal(t, convID, payload.ConversationID)
+		assert.NotNil(t, payload.PinnedBy)
+		if payload.PinnedBy != nil {
+			assert.Equal(t, user1ID, *payload.PinnedBy)
+		}
+		assert.NotNil(t, payload.PinnedAt)
+		assert.Equal(t, "pin preview content", payload.Preview)
+		assert.Equal(t, "text", payload.MessageType)
+	}
 }
 
 func TestUnpinMessage_AdminCanUnpinOthers(t *testing.T) {
@@ -1128,6 +1176,51 @@ func TestUnpinMessage_NonAdminCannotUnpinOthers(t *testing.T) {
 	err = db.Pool.QueryRow(context.Background(), `SELECT pinned FROM messages WHERE id = $1`, messageID).Scan(&pinned)
 	require.NoError(t, err)
 	assert.True(t, pinned)
+}
+
+func TestUnpinMessage_BroadcastsUnpinEvent(t *testing.T) {
+	handler, db, user1ID, user2ID, convID, hub, cleanup := setupMessagesHandlerTest(t)
+	defer cleanup()
+
+	messageID := createPinTestMessage(t, db, convID, user1ID, user2ID, "unpinned preview content")
+	_, err := db.Pool.Exec(context.Background(), `
+		UPDATE messages
+		SET pinned = TRUE, pinned_by = $2, pinned_at = NOW()
+		WHERE id = $1
+	`, messageID, user1ID)
+	require.NoError(t, err)
+
+	router := gin.Default()
+	router.DELETE("/messages/:id/pin", func(c *gin.Context) {
+		c.Set("user_id", user1ID)
+		handler.UnpinMessage(c)
+	})
+
+	req := httptest.NewRequest(http.MethodDelete, fmt.Sprintf("/messages/%d/pin", messageID), nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	calls := hub.SnapshotBroadcastCalls()
+	require.Len(t, calls, 2)
+
+	for _, recipientID := range []int{user1ID, user2ID} {
+		call := findBroadcastByTypeAndRecipient(calls, "message_unpinned", recipientID)
+		require.NotNil(t, call)
+
+		payload, ok := call.Payload.(models.PinEvent)
+		require.True(t, ok)
+		assert.Equal(t, "message_unpinned", payload.Type)
+		assert.Equal(t, messageID, payload.MessageID)
+		assert.Equal(t, convID, payload.ConversationID)
+		assert.NotNil(t, payload.PinnedBy)
+		if payload.PinnedBy != nil {
+			assert.Equal(t, user1ID, *payload.PinnedBy)
+		}
+		assert.NotNil(t, payload.PinnedAt)
+		assert.Equal(t, "unpinned preview content", payload.Preview)
+		assert.Equal(t, "text", payload.MessageType)
+	}
 }
 
 func TestGetPinnedMessages_ChronologicalOrder(t *testing.T) {
