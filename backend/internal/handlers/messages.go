@@ -122,7 +122,7 @@ func (h *MessagesHandler) unarchiveDMForRecipient(
 		       COALESCE(archived_for_user1, FALSE),
 		       COALESCE(archived_for_user2, FALSE)
 		FROM conversations
-		WHERE id = $1 AND conversation_type = 'dm'
+		WHERE id = $1 AND (conversation_type = 'dm' OR conversation_type IS NULL)
 	`, conversationID).Scan(&user1ID, &user2ID, &archivedForUser1, &archivedForUser2)
 	if err != nil {
 		return false, err
@@ -137,8 +137,8 @@ func (h *MessagesHandler) unarchiveDMForRecipient(
 	// Clear recipient archive flag only. If both sides are now unarchived, clear legacy archived_at/by as well.
 	_, err = h.pool.Exec(ctx, `
 		UPDATE conversations
-		SET archived_for_user1 = CASE WHEN user1_id = $2 THEN FALSE ELSE archived_for_user1 END,
-		    archived_for_user2 = CASE WHEN user2_id = $2 THEN FALSE ELSE archived_for_user2 END,
+			SET archived_for_user1 = CASE WHEN user1_id = $2 THEN FALSE ELSE archived_for_user1 END,
+			    archived_for_user2 = CASE WHEN user2_id = $2 THEN FALSE ELSE archived_for_user2 END,
 		    archived_at = CASE
 		      WHEN (
 		        CASE WHEN user1_id = $2 THEN FALSE ELSE COALESCE(archived_for_user1, FALSE) END
@@ -159,7 +159,7 @@ func (h *MessagesHandler) unarchiveDMForRecipient(
 		      THEN NULL
 		      ELSE archived_by
 		    END
-		WHERE id = $1 AND conversation_type = 'dm'
+			WHERE id = $1 AND (conversation_type = 'dm' OR conversation_type IS NULL)
 	`, conversationID, recipientID)
 	if err != nil {
 		return false, err

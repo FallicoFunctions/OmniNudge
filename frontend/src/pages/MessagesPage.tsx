@@ -23,6 +23,7 @@ import { MessageReactions } from '../components/messages/MessageReactions';
 import { QuickReactButton } from '../components/messages/QuickReactButton';
 import { PinnedMessagesBar } from '../components/messages/PinnedMessagesBar';
 import { usePinnedMessages } from '../hooks/usePinnedMessages';
+import { useArchive } from '../hooks/useArchive';
 import { useDebounce } from '../hooks/useDebounce';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import type {
@@ -55,8 +56,9 @@ import { hubsService } from '../services/hubsService';
 import { useHubSubredditAutocomplete } from '../hooks/useHubSubredditAutocomplete';
 import type { LocalSubredditPost } from '../services/hubsService';
 import type { RedditApiPost } from '../types/reddit';
-import { normalizeReportReason, reportService, type ReportReason } from '../services/reportService';
+import { buildUserReport, reportService, type ReportReason } from '../services/reportService';
 import { searchMessages, type MessageSearchFilters, type MessageSearchResult } from '../utils/messageSearch';
+import { formatRedditSlideshowInput, parseRedditSlideshowInput } from '../utils/redditSlideshowInput';
 
 const MAX_UPLOAD_SIZE = 25 * 1024 * 1024; // 25MB
 const SEARCH_PAGE_SIZE = 50;
@@ -710,6 +712,8 @@ export default function MessagesPage() {
   const [messageSearchHasLinks, setMessageSearchHasLinks] = useState(false);
   const [messageSearchPage, setMessageSearchPage] = useState(0);
   const [expandedPinnedMessages, setExpandedPinnedMessages] = useState(false);
+  const touchStartRef = useRef<{ conversationID: number; x: number; y: number } | null>(null);
+  const swipeHandledRef = useRef<number | null>(null);
   const debouncedMessageSearch = useDebounce(messageSearchQuery, 300);
   const [decryptedContentMap, setDecryptedContentMap] = useState<Map<number, string>>(new Map());
   const [isDecryptingForSearch, setIsDecryptingForSearch] = useState(false);
@@ -735,9 +739,14 @@ export default function MessagesPage() {
     fetchNextPage: fetchMoreConversations,
     isFetchingNextPage: isFetchingMoreConversations,
   } = useInfiniteQuery({
-    queryKey: ['conversations', 'all'],
-    queryFn: ({ pageParam }) =>
-      messagesService.getConversationsPage(true, 20, pageParam ? String(pageParam) : undefined),
+    queryKey: ['conversations', activeTab === 'archived' ? 'archived' : 'all'],
+    queryFn: ({ pageParam }) => {
+      const cursor = pageParam ? String(pageParam) : undefined;
+      if (activeTab === 'archived') {
+        return messagesService.getArchivedConversationsPage(20, cursor);
+      }
+      return messagesService.getConversationsPage(false, 20, cursor);
+    },
     initialPageParam: '',
     getNextPageParam: (lastPage) => lastPage.next_cursor ?? undefined,
   });
@@ -784,10 +793,12 @@ export default function MessagesPage() {
   // Filter conversations based on active tab
   const unfilteredConversations = useMemo(() => {
     if (!allConversations.length) return undefined;
+    const isArchived = (conversation: Conversation) =>
+      conversation.is_archived ?? conversation.archived_at !== null;
     if (activeTab === 'archived') {
-      return allConversations.filter((c) => c.archived_at !== null);
+      return allConversations.filter((c) => isArchived(c));
     }
-    return allConversations.filter((c) => c.archived_at === null);
+    return allConversations.filter((c) => !isArchived(c));
   }, [allConversations, activeTab]);
 
   // Apply search filter
@@ -933,6 +944,12 @@ export default function MessagesPage() {
   const uploadMediaMutation = useMutation({
     mutationFn: (file: File) => mediaService.uploadMedia(file),
   });
+  const {
+    archiveConversation,
+    unarchiveConversation,
+    isArchiving,
+    isUnarchiving,
+  } = useArchive();
 
   const sendMessageMutation = useMutation({
     mutationFn: (data: SendMessageRequest) => messagesService.sendMessage(data),
@@ -1042,34 +1059,6 @@ export default function MessagesPage() {
     },
   });
 
-  const archiveConversationMutation = useMutation({
-    mutationFn: (conversationId: number) => messagesService.archiveConversation(conversationId),
-    onSuccess: async () => {
-      await Promise.all([
-        queryClient.refetchQueries({ queryKey: ['conversations', 'all'] }),
-        queryClient.refetchQueries({ queryKey: ['conversations'] }), // Also refetch MainLayout's query
-      ]);
-      setConversationMenuOpen(null);
-    },
-    onError: (error) => {
-      alert(error instanceof Error ? error.message : t('messages.errors.archiveFailed'));
-    },
-  });
-
-  const unarchiveConversationMutation = useMutation({
-    mutationFn: (conversationId: number) => messagesService.unarchiveConversation(conversationId),
-    onSuccess: async () => {
-      await Promise.all([
-        queryClient.refetchQueries({ queryKey: ['conversations', 'all'] }),
-        queryClient.refetchQueries({ queryKey: ['conversations'] }), // Also refetch MainLayout's query
-      ]);
-      setConversationMenuOpen(null);
-    },
-    onError: (error) => {
-      alert(error instanceof Error ? error.message : t('messages.errors.unarchiveFailed'));
-    },
-  });
-
   const muteConversationMutation = useMutation({
     mutationFn: (conversationId: number) => messagesService.muteConversation(conversationId),
     onSuccess: async () => {
@@ -1143,15 +1132,18 @@ export default function MessagesPage() {
   const handleLoadRedditSlideshow = async () => {
     const trimmed = redditSlideshowInput.trim();
     if (!trimmed) return;
+    const hubPrefix = t('common.prefix.hub', 'h/');
+    const subredditPrefix = t('common.prefix.subreddit', 'r/');
+    const { isHub, name } = parseRedditSlideshowInput(trimmed, hubPrefix, subredditPrefix);
+    if (!name) {
+      alert(t('messages.errors.loadPostsFailed'));
+      return;
+    }
 
     setIsLoadingRedditPosts(true);
     setRedditSlideshowModalOpen(false);
 
     try {
-      // Check if it's a hub (starts with h/) or subreddit (starts with r/ or just the name)
-      const isHub = trimmed.startsWith('h/');
-      const name = trimmed.replace(/^[hr]\//, '');
-
       let posts: Array<RedditApiPost | LocalSubredditPost> = [];
 
       if (isHub) {
@@ -1175,7 +1167,14 @@ export default function MessagesPage() {
   };
 
   const handleSelectRedditSlideshowSuggestion = (type: 'hub' | 'subreddit', name: string) => {
-    setRedditSlideshowInput(type === 'hub' ? `h/${name}` : `r/${name}`);
+    setRedditSlideshowInput(
+      formatRedditSlideshowInput(
+        type,
+        name,
+        t('common.prefix.hub', 'h/'),
+        t('common.prefix.subreddit', 'r/')
+      )
+    );
     setRedditSlideshowAutocompleteOpen(false);
   };
 
@@ -1501,17 +1500,13 @@ export default function MessagesPage() {
   const handleReportMessage = (message: Message) => {
     const reasonInput = window.prompt(t('reporting.reasonPrompt'));
     if (reasonInput === null) return;
-    const reason = normalizeReportReason(reasonInput);
-    if (!reason) {
-      alert(t('reporting.invalidReason'));
-      return;
-    }
     const detailsInput = window.prompt(t('reporting.detailsPrompt'));
+    const { reason, description } = buildUserReport(reasonInput, detailsInput);
 
     reportMessageMutation.mutate({
       messageId: message.id,
       reason,
-      description: detailsInput ?? undefined,
+      description,
     });
   };
 
@@ -1823,6 +1818,51 @@ export default function MessagesPage() {
     return () => document.removeEventListener('click', handleClick);
   }, [conversationMenuOpen]);
 
+  const handleConversationTouchStart = useCallback(
+    (conversationID: number, event: React.TouchEvent<HTMLDivElement>) => {
+      if (!isMobile) return;
+      const touch = event.touches[0];
+      if (!touch) return;
+      touchStartRef.current = { conversationID, x: touch.clientX, y: touch.clientY };
+    },
+    [isMobile]
+  );
+
+  const handleConversationTouchEnd = useCallback(
+    (conversationID: number, event: React.TouchEvent<HTMLDivElement>) => {
+      if (!isMobile || !touchStartRef.current) return;
+      if (touchStartRef.current.conversationID != conversationID) return;
+      const touch = event.changedTouches[0];
+      const start = touchStartRef.current;
+      touchStartRef.current = null;
+      if (!touch) return;
+
+      const deltaX = touch.clientX - start.x;
+      const deltaY = touch.clientY - start.y;
+      if (Math.abs(deltaX) < 72 || Math.abs(deltaY) > 42) return;
+
+      if (activeTab === 'active' && deltaX < 0) {
+        swipeHandledRef.current = conversationID;
+        archiveConversation(conversationID);
+      } else if (activeTab === 'archived' && deltaX > 0) {
+        swipeHandledRef.current = conversationID;
+        unarchiveConversation(conversationID);
+      }
+    },
+    [activeTab, archiveConversation, isMobile, unarchiveConversation]
+  );
+
+  const handleSelectConversation = useCallback((conversationID: number) => {
+    if (swipeHandledRef.current === conversationID) {
+      swipeHandledRef.current = null;
+      return;
+    }
+    setSelectedConversationId(conversationID);
+    setIsCreatingChat(false);
+    setNewChatUsername('');
+    setSelectedFile(null);
+  }, []);
+
   // Cleanup typing timeout on unmount
   useEffect(() => {
     return () => {
@@ -1926,13 +1966,19 @@ export default function MessagesPage() {
                 }`}
                 data-conversation-menu-container={conversation.id}
               >
-                <button
-                  onClick={() => {
-                    setSelectedConversationId(conversation.id);
-                    setIsCreatingChat(false);
-                    setNewChatUsername('');
-                    setSelectedFile(null);
+                <div
+                  role="button"
+                  tabIndex={0}
+                  aria-label={t('messages.aria.openConversation')}
+                  onClick={() => handleSelectConversation(conversation.id)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      handleSelectConversation(conversation.id);
+                    }
                   }}
+                  onTouchStart={(event) => handleConversationTouchStart(conversation.id, event)}
+                  onTouchEnd={(event) => handleConversationTouchEnd(conversation.id, event)}
                   className="w-full p-4 text-left"
                 >
                   {/* MSG-2: Enhanced conversation preview with timestamp and better spacing */}
@@ -1950,6 +1996,11 @@ export default function MessagesPage() {
                           {conversation.other_user?.id && (
                             <OnlineStatusIndicator userId={conversation.other_user.id} />
                           )}
+                          {(conversation.is_archived ?? conversation.archived_at !== null) && (
+                            <span className="rounded-full border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
+                              {t('messages.badges.archived')}
+                            </span>
+                          )}
                         </div>
                         {conversation.latest_message?.sent_at && (
                           <span className="text-xs text-[var(--color-text-muted)] flex-shrink-0">
@@ -1964,6 +2015,21 @@ export default function MessagesPage() {
                       </div>
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0">
+                      {activeTab === 'archived' && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            unarchiveConversation(conversation.id);
+                          }}
+                          onTouchStart={(e) => e.stopPropagation()}
+                          onTouchEnd={(e) => e.stopPropagation()}
+                          className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-1 text-xs font-semibold text-[var(--color-text-secondary)] transition hover:bg-[var(--color-surface-elevated)] hover:text-[var(--color-text-primary)]"
+                          disabled={isUnarchiving}
+                        >
+                          {t('messages.unarchive')}
+                        </button>
+                      )}
                       {conversation.unread_count > 0 &&
                         conversation.id !== selectedConversationId && (
                           <span className="rounded-full bg-[var(--color-primary)] px-2.5 py-1 text-xs font-semibold text-white">
@@ -1978,6 +2044,8 @@ export default function MessagesPage() {
                             conversationMenuOpen === conversation.id ? null : conversation.id
                           );
                         }}
+                        onTouchStart={(e) => e.stopPropagation()}
+                        onTouchEnd={(e) => e.stopPropagation()}
                         className="rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-0.5 text-xs font-semibold text-[var(--color-text-secondary)] transition hover:bg-[var(--color-surface-elevated)] hover:text-[var(--color-text-primary)]"
                       >
                         ...
@@ -1994,7 +2062,7 @@ export default function MessagesPage() {
                         className="mt-1 text-sm text-[var(--color-text-secondary)] line-clamp-2"
                       />
                     )}
-                </button>
+                </div>
                 {/* Context Menu */}
                 {conversationMenuOpen === conversation.id && (
                   <div className="absolute right-2 top-12 z-20 w-44 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] p-2 shadow-lg">
@@ -2003,8 +2071,10 @@ export default function MessagesPage() {
                         type="button"
                         className="w-full rounded-md px-3 py-2 text-left text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
                         onClick={() => {
-                          archiveConversationMutation.mutate(conversation.id);
+                          archiveConversation(conversation.id);
+                          setConversationMenuOpen(null);
                         }}
+                        disabled={isArchiving}
                       >
                         {t('messages.archive')}
                       </button>
@@ -2013,8 +2083,10 @@ export default function MessagesPage() {
                         type="button"
                         className="w-full rounded-md px-3 py-2 text-left text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
                         onClick={() => {
-                          unarchiveConversationMutation.mutate(conversation.id);
+                          unarchiveConversation(conversation.id);
+                          setConversationMenuOpen(null);
                         }}
+                        disabled={isUnarchiving}
                       >
                         {t('messages.unarchive')}
                       </button>
@@ -3098,7 +3170,9 @@ export default function MessagesPage() {
                           <span
                             className={`font-medium ${suggestion.type === 'hub' ? 'text-blue-600' : 'text-orange-600'}`}
                           >
-                            {suggestion.type === 'hub' ? 'h/' : 'r/'}
+                            {suggestion.type === 'hub'
+                              ? t('common.prefix.hub', 'h/')
+                              : t('common.prefix.subreddit', 'r/')}
                           </span>
                           <span className="text-[var(--color-text-primary)]">
                             {suggestion.data.name}

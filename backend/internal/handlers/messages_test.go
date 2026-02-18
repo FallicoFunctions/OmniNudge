@@ -852,7 +852,8 @@ func TestSendMessage_AutoUnarchivesRecipientDM(t *testing.T) {
 	ctx := context.Background()
 	_, err := db.Pool.Exec(ctx, `
 		UPDATE conversations
-		SET archived_for_user2 = TRUE
+		SET archived_for_user2 = TRUE,
+		    conversation_type = NULL
 		WHERE id = $1
 	`, convID)
 	require.NoError(t, err)

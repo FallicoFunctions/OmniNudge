@@ -47,6 +47,7 @@ type ConversationWithDetails struct {
 	HubName       *string           `json:"hub_name,omitempty"`
 	LatestMessage *models.Message   `json:"latest_message,omitempty"`
 	UnreadCount   int               `json:"unread_count"`
+	IsArchived    bool              `json:"is_archived"`
 }
 
 // ConversationUser exposes a safe subset of user fields for conversation listings.
@@ -203,9 +204,17 @@ func (h *ConversationsHandler) GetConversations(c *gin.Context) {
 		if cursor != nil {
 			payload = &models.TimeCursor{ID: cursor.ID, Timestamp: cursor.Timestamp}
 		}
-		conversations, err = h.conversationRepo.GetByUserIDWithCursor(c.Request.Context(), userID.(int), limitArg, includeArchived, payload)
+		if archivedOnly {
+			conversations, err = h.conversationRepo.GetArchivedByUserIDWithCursor(c.Request.Context(), userID.(int), limitArg, payload)
+		} else {
+			conversations, err = h.conversationRepo.GetByUserIDWithCursor(c.Request.Context(), userID.(int), limitArg, includeArchived, payload)
+		}
 	} else {
-		conversations, err = h.conversationRepo.GetByUserID(c.Request.Context(), userID.(int), limitArg, offset, includeArchived)
+		if archivedOnly {
+			conversations, err = h.conversationRepo.GetArchivedByUserID(c.Request.Context(), userID.(int), limitArg, offset)
+		} else {
+			conversations, err = h.conversationRepo.GetByUserID(c.Request.Context(), userID.(int), limitArg, offset, includeArchived)
+		}
 	}
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get conversations", "details": err.Error()})
@@ -228,6 +237,7 @@ func (h *ConversationsHandler) GetConversations(c *gin.Context) {
 		go func(idx int, conversation *models.Conversation) {
 			details := &ConversationWithDetails{
 				Conversation: conversation,
+				IsArchived:   conversation.ArchivedAt != nil,
 			}
 
 			// Get other user info (only for DM conversations)
@@ -266,32 +276,18 @@ func (h *ConversationsHandler) GetConversations(c *gin.Context) {
 				details.UnreadCount = unreadCount
 			}
 
-			// For DMs: compute per-user archived_at based on archived_for_user1/user2
-			// This ensures the frontend can filter correctly based on archived_at
-			if conversation.ConversationType == "dm" {
+			// For DMs (including legacy rows with empty conversation_type): compute per-user archive state.
+			if conversation.ConversationType == "dm" || conversation.ConversationType == "" {
 				var archivedForUser1, archivedForUser2 bool
 				err := h.pool.QueryRow(ctx, `
 					SELECT COALESCE(archived_for_user1, false), COALESCE(archived_for_user2, false)
 					FROM conversations WHERE id = $1
 				`, conversation.ID).Scan(&archivedForUser1, &archivedForUser2)
 				if err == nil {
-					// Legacy fallback: if conversation-level archived_at is set, treat as archived for both users
 					legacyArchived := conversation.ArchivedAt != nil
-
-					// If this conversation is archived for the current user, set archived_at
-					// Otherwise, clear it
-					if (conversation.User1ID != nil && *conversation.User1ID == userID.(int) && archivedForUser1) ||
+					details.IsArchived = (conversation.User1ID != nil && *conversation.User1ID == userID.(int) && archivedForUser1) ||
 						(conversation.User2ID != nil && *conversation.User2ID == userID.(int) && archivedForUser2) ||
-						legacyArchived {
-						// Keep the existing archived_at if set, otherwise use current time as a placeholder
-						if details.ArchivedAt == nil {
-							now := time.Now()
-							details.ArchivedAt = &now
-						}
-					} else {
-						// Not archived for this user
-						details.ArchivedAt = nil
-					}
+						legacyArchived
 				}
 			}
 
@@ -303,16 +299,6 @@ func (h *ConversationsHandler) GetConversations(c *gin.Context) {
 	// Wait for all enrichment to complete
 	for i := 0; i < len(conversations); i++ {
 		<-resultsChan
-	}
-
-	if archivedOnly {
-		filtered := make([]*ConversationWithDetails, 0, len(enriched))
-		for _, conversation := range enriched {
-			if conversation != nil && conversation.ArchivedAt != nil {
-				filtered = append(filtered, conversation)
-			}
-		}
-		enriched = filtered
 	}
 
 	nextCursor := ""

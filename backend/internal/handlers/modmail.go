@@ -114,7 +114,7 @@ func (h *ModMailHandler) enrichConversationDetails(ctx context.Context, conv *Mo
 	conv.Participants = participants
 
 	// Get latest message
-	latestMsg, err := h.messageRepo.GetLatestMessage(ctx, conv.ID)
+	latestMsg, err := h.messageRepo.GetLatestMessage(ctx, conv.ID, userID)
 	if err == nil && latestMsg != nil {
 		conv.LatestMessage = latestMsg
 	}
@@ -131,7 +131,8 @@ func (h *ModMailHandler) enrichConversationDetails(ctx context.Context, conv *Mo
 // GetModMailRecipients handles GET /api/v1/mod-mail/hubs/:hub_name/recipients
 // Returns user IDs for hub moderators and admins for encryption recipients.
 func (h *ModMailHandler) GetModMailRecipients(c *gin.Context) {
-	if _, exists := c.Get("user_id"); !exists {
+	userID, exists := c.Get("user_id")
+	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
 		return
 	}
@@ -150,8 +151,17 @@ func (h *ModMailHandler) GetModMailRecipients(c *gin.Context) {
 	recipientIDs := map[int]struct{}{}
 
 	rows, err := h.pool.Query(c.Request.Context(), `
-		SELECT user_id FROM hub_moderators WHERE hub_id = $1
-	`, hub.ID)
+		SELECT hm.user_id
+		FROM hub_moderators hm
+		WHERE hm.hub_id = $1
+		  AND hm.user_id <> $2
+		  AND NOT EXISTS (
+		    SELECT 1
+		    FROM blocked_users bu
+		    WHERE (bu.blocker_id = $2 AND bu.blocked_id = hm.user_id)
+		       OR (bu.blocked_id = $2 AND bu.blocker_id = hm.user_id)
+		  )
+	`, hub.ID, userID.(int))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get moderators"})
 		return
@@ -165,11 +175,26 @@ func (h *ModMailHandler) GetModMailRecipients(c *gin.Context) {
 		}
 		recipientIDs[modID] = struct{}{}
 	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to read moderators"})
+		return
+	}
 	rows.Close()
 
 	adminRows, err := h.pool.Query(c.Request.Context(), `
-		SELECT id FROM users WHERE role = 'admin' AND deleted = false
-	`)
+		SELECT u.id
+		FROM users u
+		WHERE u.role = 'admin'
+		  AND u.deleted = false
+		  AND u.id <> $1
+		  AND NOT EXISTS (
+		    SELECT 1
+		    FROM blocked_users bu
+		    WHERE (bu.blocker_id = $1 AND bu.blocked_id = u.id)
+		       OR (bu.blocked_id = $1 AND bu.blocker_id = u.id)
+		  )
+	`, userID.(int))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get admins"})
 		return
@@ -182,6 +207,11 @@ func (h *ModMailHandler) GetModMailRecipients(c *gin.Context) {
 			return
 		}
 		recipientIDs[adminID] = struct{}{}
+	}
+	if err := adminRows.Err(); err != nil {
+		adminRows.Close()
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to read admins"})
+		return
 	}
 	adminRows.Close()
 
@@ -285,13 +315,40 @@ func (h *ModMailHandler) CreateModMail(c *gin.Context) {
 		}
 		moderatorIDs = append(moderatorIDs, modID)
 	}
+	if err := rows.Err(); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to read moderators"})
+		return
+	}
+
+	// Prevent creating new mod mail conversations that include users with a block relationship.
+	if len(moderatorIDs) > 0 {
+		var hasBlockingConflict bool
+		err = tx.QueryRow(c.Request.Context(), `
+			SELECT EXISTS (
+				SELECT 1
+				FROM blocked_users bu
+				WHERE (bu.blocker_id = $1 AND bu.blocked_id = ANY($2::int[]))
+				   OR (bu.blocked_id = $1 AND bu.blocker_id = ANY($2::int[]))
+			)
+		`, userID.(int), moderatorIDs).Scan(&hasBlockingConflict)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check blocking relationships"})
+			return
+		}
+		if hasBlockingConflict {
+			c.JSON(http.StatusForbidden, gin.H{
+				"error": "Cannot create mod mail due to blocking settings with one or more moderators",
+			})
+			return
+		}
+	}
 
 	// Add all moderators as participants (batch insert for better performance)
 	if len(moderatorIDs) > 0 {
 		_, err = tx.Exec(c.Request.Context(), `
 			INSERT INTO conversation_participants (conversation_id, user_id, is_moderator, joined_at)
 			SELECT $1, UNNEST($2::int[]), TRUE, NOW()
-			ON CONFLICT (conversation_id, user_id) DO NOTHING
+			ON CONFLICT (conversation_id, user_id) DO UPDATE SET is_moderator = TRUE
 		`, conversationID, moderatorIDs)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to add moderators"})

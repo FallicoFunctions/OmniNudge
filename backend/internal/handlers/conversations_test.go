@@ -751,3 +751,83 @@ func TestGetArchivedConversations_OnlyArchived(t *testing.T) {
 	assert.Equal(t, float64(archivedConv.ID), convMap["id"])
 	assert.NotEqual(t, float64(activeConv.ID), convMap["id"])
 }
+
+func TestGetArchivedConversations_StrictCursorPagination(t *testing.T) {
+	handler, db, user1ID, user2ID, cleanup := setupConversationsHandlerTest(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	convRepo := models.NewConversationRepository(db.Pool)
+
+	archivedNewer, err := convRepo.Create(ctx, user1ID, user2ID)
+	require.NoError(t, err)
+
+	userRepo := models.NewUserRepository(db.Pool)
+	user3 := &models.User{
+		Username:     uniqueConversationsUsername("u3archp"),
+		PasswordHash: "test_hash",
+	}
+	require.NoError(t, userRepo.Create(ctx, user3))
+	archivedOlder, err := convRepo.Create(ctx, user1ID, user3.ID)
+	require.NoError(t, err)
+
+	user4 := &models.User{
+		Username:     uniqueConversationsUsername("u4actp"),
+		PasswordHash: "test_hash",
+	}
+	require.NoError(t, userRepo.Create(ctx, user4))
+	activeNewest, err := convRepo.Create(ctx, user1ID, user4.ID)
+	require.NoError(t, err)
+
+	_, err = db.Pool.Exec(ctx, `
+		UPDATE conversations
+		SET archived_for_user1 = TRUE
+		WHERE id IN ($1, $2)
+	`, archivedNewer.ID, archivedOlder.ID)
+	require.NoError(t, err)
+
+	now := time.Now().UTC()
+	_, err = db.Pool.Exec(ctx, `
+		UPDATE conversations
+		SET last_message_at = CASE
+			WHEN id = $1 THEN $4
+			WHEN id = $2 THEN $5
+			WHEN id = $3 THEN $6
+			ELSE last_message_at
+		END
+		WHERE id IN ($1, $2, $3)
+	`, archivedNewer.ID, archivedOlder.ID, activeNewest.ID, now.Add(-1*time.Minute), now.Add(-3*time.Minute), now)
+	require.NoError(t, err)
+
+	router := gin.Default()
+	router.GET("/conversations/archived", func(c *gin.Context) {
+		c.Set("user_id", user1ID)
+		handler.GetArchivedConversations(c)
+	})
+
+	firstReq := httptest.NewRequest(http.MethodGet, "/conversations/archived?limit=1", nil)
+	firstRes := httptest.NewRecorder()
+	router.ServeHTTP(firstRes, firstReq)
+	require.Equal(t, http.StatusOK, firstRes.Code, "response: %s", firstRes.Body.String())
+
+	var firstBody map[string]interface{}
+	require.NoError(t, json.Unmarshal(firstRes.Body.Bytes(), &firstBody))
+	firstConversations := firstBody["conversations"].([]interface{})
+	require.Len(t, firstConversations, 1)
+	firstConv := firstConversations[0].(map[string]interface{})
+	assert.Equal(t, float64(archivedNewer.ID), firstConv["id"], "active conversation must not appear in archived pagination")
+	require.NotEmpty(t, firstBody["next_cursor"])
+
+	nextCursor := firstBody["next_cursor"].(string)
+	secondReq := httptest.NewRequest(http.MethodGet, "/conversations/archived?limit=1&cursor="+nextCursor, nil)
+	secondRes := httptest.NewRecorder()
+	router.ServeHTTP(secondRes, secondReq)
+	require.Equal(t, http.StatusOK, secondRes.Code, "response: %s", secondRes.Body.String())
+
+	var secondBody map[string]interface{}
+	require.NoError(t, json.Unmarshal(secondRes.Body.Bytes(), &secondBody))
+	secondConversations := secondBody["conversations"].([]interface{})
+	require.Len(t, secondConversations, 1)
+	secondConv := secondConversations[0].(map[string]interface{})
+	assert.Equal(t, float64(archivedOlder.ID), secondConv["id"])
+}
