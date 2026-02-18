@@ -1,7 +1,6 @@
-import { useState, useCallback } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { reactionsService } from '../../services/reactionsService';
-import type { GetReactionsResponse, ReactionSummary } from '../../types/reactions';
+import { useState } from 'react';
+import type { ReactionSummary } from '../../types/reactions';
+import { useMessageReactions } from '../../hooks/useMessageReactions';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -45,168 +44,12 @@ export function MessageReactions({
   currentUserId,
   currentUsername,
 }: MessageReactionsProps) {
-  const queryClient = useQueryClient();
   const [tooltip, setTooltip] = useState<{ emoji: string; text: string } | null>(null);
-
-  // ── Data fetching ──────────────────────────────────────────────────────────
-
-  const { data, isLoading } = useQuery<GetReactionsResponse>({
-    queryKey: ['message-reactions', messageId],
-    queryFn: () => reactionsService.getReactions(messageId),
-    staleTime: 10 * 60 * 1000, // 10 min — WS events keep the cache fresh
-    refetchOnWindowFocus: false,
-    retry: 1, // retry once on transient failure; do not loop on persistent errors
+  const { isLoading, reactions, isBusy, hasError, toggleReaction } = useMessageReactions({
+    messageId,
+    currentUserId,
+    currentUsername,
   });
-
-  // ── Mutations ──────────────────────────────────────────────────────────────
-
-  const addMutation = useMutation({
-    mutationFn: ({ emoji }: { emoji: string }) =>
-      reactionsService.addReaction(messageId, emoji),
-
-    onMutate: async ({ emoji }) => {
-      await queryClient.cancelQueries({ queryKey: ['message-reactions', messageId] });
-      const prev = queryClient.getQueryData<GetReactionsResponse>([
-        'message-reactions',
-        messageId,
-      ]);
-
-      // Optimistic: increment count, mark user_reacted, include username in tooltip list
-      queryClient.setQueryData<GetReactionsResponse>(
-        ['message-reactions', messageId],
-        (old) => {
-          if (!old) return old;
-          const idx = old.reactions.findIndex((r) => r.emoji === emoji);
-          if (idx === -1) {
-            // New emoji type — append with current user's info
-            return {
-              ...old,
-              reactions: [
-                ...old.reactions,
-                {
-                  emoji,
-                  count: 1,
-                  user_ids: [currentUserId],
-                  usernames: currentUsername ? [currentUsername] : [],
-                  user_reacted: true,
-                  my_reaction_id: undefined,
-                },
-              ],
-              total_unique_emoji: old.total_unique_emoji + 1,
-            };
-          }
-          // Existing emoji — append user to both parallel arrays
-          const updated = [...old.reactions];
-          updated[idx] = {
-            ...updated[idx],
-            count: updated[idx].count + 1,
-            user_ids: [...updated[idx].user_ids, currentUserId],
-            usernames: currentUsername
-              ? [...updated[idx].usernames, currentUsername]
-              : updated[idx].usernames,
-            user_reacted: true,
-          };
-          return { ...old, reactions: updated };
-        },
-      );
-
-      return { prev };
-    },
-
-    onSuccess: (reaction, { emoji }) => {
-      // Patch the optimistic entry with the real reaction ID
-      queryClient.setQueryData<GetReactionsResponse>(
-        ['message-reactions', messageId],
-        (old) => {
-          if (!old) return old;
-          return {
-            ...old,
-            reactions: old.reactions.map((r) =>
-              r.emoji === emoji
-                ? { ...r, my_reaction_id: reaction.id }
-                : r,
-            ),
-          };
-        },
-      );
-    },
-
-    onError: (_err, _vars, ctx) => {
-      if (ctx?.prev) {
-        queryClient.setQueryData(['message-reactions', messageId], ctx.prev);
-      }
-    },
-  });
-
-  const removeMutation = useMutation({
-    mutationFn: ({ reactionId }: { reactionId: number }) =>
-      reactionsService.removeReaction(messageId, reactionId),
-
-    onMutate: async ({ reactionId }) => {
-      await queryClient.cancelQueries({ queryKey: ['message-reactions', messageId] });
-      const prev = queryClient.getQueryData<GetReactionsResponse>([
-        'message-reactions',
-        messageId,
-      ]);
-
-      // Optimistic: decrement count, clear user_reacted/my_reaction_id, remove from
-      // both user_ids and usernames (which are parallel arrays keyed by position).
-      queryClient.setQueryData<GetReactionsResponse>(
-        ['message-reactions', messageId],
-        (old) => {
-          if (!old) return old;
-          const reactions = old.reactions
-            .map((r) => {
-              if (r.my_reaction_id !== reactionId) return r;
-              const newCount = r.count - 1;
-              if (newCount === 0) return null;
-              const userIdx = r.user_ids.indexOf(currentUserId);
-              return {
-                ...r,
-                count: newCount,
-                user_ids: r.user_ids.filter((id) => id !== currentUserId),
-                usernames:
-                  userIdx >= 0
-                    ? r.usernames.filter((_, i) => i !== userIdx)
-                    : r.usernames,
-                user_reacted: false,
-                my_reaction_id: undefined,
-              };
-            })
-            .filter(Boolean) as typeof old.reactions;
-
-          return {
-            ...old,
-            reactions,
-            total_unique_emoji: reactions.length,
-          };
-        },
-      );
-
-      return { prev };
-    },
-
-    onError: (_err, _vars, ctx) => {
-      if (ctx?.prev) {
-        queryClient.setQueryData(['message-reactions', messageId], ctx.prev);
-      }
-    },
-  });
-
-  // ── Interaction ────────────────────────────────────────────────────────────
-
-  const handleToggle = useCallback(
-    (summary: ReactionSummary) => {
-      if (addMutation.isPending || removeMutation.isPending) return;
-
-      if (summary.user_reacted && summary.my_reaction_id !== undefined) {
-        removeMutation.mutate({ reactionId: summary.my_reaction_id });
-      } else if (!summary.user_reacted) {
-        addMutation.mutate({ emoji: summary.emoji });
-      }
-    },
-    [addMutation, removeMutation],
-  );
 
   // handleKeyDown is inlined on each button (no memoization needed — not a prop)
 
@@ -229,11 +72,7 @@ export function MessageReactions({
     );
   }
 
-  const reactions = data?.reactions ?? [];
   if (reactions.length === 0) return null;
-
-  const isBusy = addMutation.isPending || removeMutation.isPending;
-  const hasError = addMutation.isError || removeMutation.isError;
 
   return (
     <div
@@ -272,7 +111,7 @@ export function MessageReactions({
                   ? 'cursor-not-allowed opacity-60'
                   : 'cursor-pointer hover:border-[var(--color-primary)]/50 hover:bg-[var(--color-primary)]/5 active:scale-95',
               ].join(' ')}
-              onClick={() => handleToggle(summary)}
+              onClick={() => toggleReaction(summary)}
               onMouseEnter={() =>
                 setTooltip({ emoji: summary.emoji, text: buildTooltip(summary) })
               }
