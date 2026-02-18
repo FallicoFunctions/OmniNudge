@@ -15,11 +15,21 @@ CREATE TABLE IF NOT EXISTS message_edit_history (
 CREATE INDEX IF NOT EXISTS idx_message_edit_history_message_id
     ON message_edit_history (message_id);
 
+CREATE INDEX IF NOT EXISTS idx_message_edit_history_edited_at
+    ON message_edit_history (edited_at);
+
 CREATE OR REPLACE FUNCTION cleanup_message_edit_history_retention()
 RETURNS trigger AS $$
 BEGIN
+    -- Keep trigger cleanup bounded so inserts do not trigger full-table scans/deletes.
     DELETE FROM message_edit_history
-    WHERE edited_at < now() - interval '30 days';
+    WHERE id IN (
+        SELECT id
+        FROM message_edit_history
+        WHERE edited_at < now() - interval '30 days'
+        ORDER BY edited_at ASC
+        LIMIT 500
+    );
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;

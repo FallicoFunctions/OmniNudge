@@ -639,25 +639,29 @@ func (h *MessagesHandler) EditMessage(c *gin.Context) {
 	var conversationID int
 	var senderID int
 	var sentAt time.Time
+	var conversationType string
 	var deletedForSender bool
 	var currentEncryptedContent string
 	var currentSenderEncryptedContent *string
 	var currentEncryptionVersion string
 	var originalContent *string
 	err = tx.QueryRow(ctx, `
-		SELECT conversation_id, sender_id, sent_at,
+		SELECT m.conversation_id, m.sender_id, m.sent_at,
+		       COALESCE(c.conversation_type, 'dm') AS conversation_type,
 		       COALESCE(deleted_for_sender, FALSE),
 		       encrypted_content,
 		       sender_encrypted_content,
 		       COALESCE(encryption_version, 'v1'),
 		       original_content
-		FROM messages
-		WHERE id = $1
+		FROM messages m
+		JOIN conversations c ON c.id = m.conversation_id
+		WHERE m.id = $1
 		FOR UPDATE
 	`, messageID).Scan(
 		&conversationID,
 		&senderID,
 		&sentAt,
+		&conversationType,
 		&deletedForSender,
 		&currentEncryptedContent,
 		&currentSenderEncryptedContent,
@@ -685,11 +689,15 @@ func (h *MessagesHandler) EditMessage(c *gin.Context) {
 		c.JSON(http.StatusForbidden, gin.H{"error": "Message can only be edited within 15 minutes"})
 		return
 	}
+	if conversationType == "mod_mail" {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Editing mod mail messages is not supported"})
+		return
+	}
 
 	if _, err := tx.Exec(ctx, `
 		INSERT INTO message_edit_history (message_id, content, encrypted_content, edited_by)
 		VALUES ($1, $2, $3, $4)
-	`, messageID, nil, currentEncryptedContent, userID); err != nil {
+	`, messageID, currentEncryptedContent, currentEncryptedContent, userID); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to store edit history", "details": err.Error()})
 		return
 	}
