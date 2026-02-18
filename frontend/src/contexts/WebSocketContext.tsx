@@ -328,7 +328,7 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
 
               if (!old) {
                 // Query not yet populated — seed the cache so the event isn't lost.
-                // The component's own fetch will merge/overwrite once it resolves.
+                // The component's own fetch will overwrite this entry once it resolves.
                 return {
                   reactions: [
                     {

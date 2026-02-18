@@ -345,6 +345,38 @@ describe('MessageReactions — optimistic updates', () => {
   });
 });
 
+// ── Unauthenticated guard ─────────────────────────────────────────────────────
+
+describe('MessageReactions — unauthenticated (currentUserId=0)', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('disables all reaction buttons when currentUserId is 0', async () => {
+    vi.mocked(reactionsService.getReactions).mockResolvedValue(twoReactionsResponse);
+    const Wrapper = createWrapper();
+    render(
+      <Wrapper>
+        <MessageReactions messageId={1} isOwnMessage={false} currentUserId={0} />
+      </Wrapper>
+    );
+    await waitFor(() => screen.getByRole('group'));
+    const buttons = screen.getAllByRole('button');
+    buttons.forEach((btn) => expect(btn).toBeDisabled());
+  });
+
+  it('never calls addReaction when currentUserId is 0', async () => {
+    vi.mocked(reactionsService.getReactions).mockResolvedValue(twoReactionsResponse);
+    const Wrapper = createWrapper();
+    render(
+      <Wrapper>
+        <MessageReactions messageId={1} isOwnMessage={false} currentUserId={0} />
+      </Wrapper>
+    );
+    await waitFor(() => screen.getByRole('group'));
+    fireEvent.click(screen.getByRole('button', { name: /👍/ }));
+    expect(reactionsService.addReaction).not.toHaveBeenCalled();
+  });
+});
+
 // ── Add-reaction button ───────────────────────────────────────────────────────
 
 describe('MessageReactions — add-reaction button', () => {
