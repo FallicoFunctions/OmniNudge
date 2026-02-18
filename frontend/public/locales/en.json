@@ -1304,6 +1304,9 @@
       "description": "Update your avatar URL, status text, and bio.",
       "avatarUrlLabel": "Avatar URL",
       "avatarUrlPlaceholder": "https://example.com/avatar.jpg",
+      "avatarUploadButton": "Upload avatar image",
+      "avatarUploading": "Uploading...",
+      "avatarUploadHint": "PNG, JPG, GIF, or WebP up to 5MB. Auto-cropped to 200x200.",
       "statusLabel": "Status text",
       "statusPlaceholder": "What are you up to?",
       "statusCount": "{{count}} / 500",
@@ -1314,6 +1317,7 @@
         "bioTooLong": "Bio must be 500 characters or less.",
         "statusTooLong": "Status text must be 500 characters or less.",
         "invalidAvatarUrl": "Avatar URL must start with http:// or https://",
+        "uploadFailed": "Failed to upload avatar: {{message}}",
         "saveFailed": "Failed to save profile: {{message}}"
       }
     }

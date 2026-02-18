@@ -38,11 +38,19 @@ Both endpoints return the same `UserProfileResponse` shape:
 ### Profile updates
 - `PUT /api/v1/users/me/profile`
 - `PUT /api/v1/users/profile` (legacy alias, still supported)
+- `POST /api/v1/users/me/avatar` (multipart upload)
 
 Accepted payload:
 - `bio` (`null` to clear, max 500 chars)
 - `avatar_url` (`null` to clear, must be `http://` or `https://` when set)
 - `status_text` (`null` to clear, max 500 chars)
+
+Avatar upload behavior:
+- multipart field name: `avatar`
+- max size: 5MB
+- accepted image types: jpeg, png, gif, webp
+- generates square center-cropped thumbnail: `200x200`
+- updates profile `avatar_url` to the generated thumbnail URL
 
 ## Privacy Controls
 

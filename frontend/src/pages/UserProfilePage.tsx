@@ -751,6 +751,10 @@ export default function UserProfilePage() {
         initialBio={profile.bio}
         initialAvatarUrl={profile.avatar_url}
         initialStatusText={profile.status_text}
+        onUploadAvatar={async (file) => {
+          const uploadResult = await usersService.uploadAvatar(file);
+          return uploadResult.avatar_url;
+        }}
         isSaving={updateProfileMutation.isPending}
         onSave={async (payload) => {
           await updateProfileMutation.mutateAsync(payload);

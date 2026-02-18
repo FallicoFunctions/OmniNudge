@@ -86,4 +86,55 @@ describe('EditProfileModal', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
     expect(onSave).not.toHaveBeenCalled();
   });
+
+  it('uploads avatar file and updates avatar URL field', async () => {
+    const onUploadAvatar = vi.fn(async () => '/uploads/avatars/new-avatar_sq200.png');
+
+    render(
+      <EditProfileModal
+        isOpen
+        onClose={() => {}}
+        onSave={async () => {}}
+        onUploadAvatar={onUploadAvatar}
+        initialBio=""
+        initialAvatarUrl=""
+        initialStatusText=""
+      />
+    );
+
+    const fileInput = document.getElementById('edit-profile-avatar-file') as HTMLInputElement;
+    const file = new File(['avatar'], 'avatar.png', { type: 'image/png' });
+    await userEvent.upload(fileInput, file);
+
+    await waitFor(() => {
+      expect(onUploadAvatar).toHaveBeenCalledWith(file);
+    });
+    await waitFor(() => {
+      expect(screen.getByLabelText('Avatar URL')).toHaveValue('/uploads/avatars/new-avatar_sq200.png');
+    });
+  });
+
+  it('shows upload error when avatar upload fails', async () => {
+    const onUploadAvatar = vi.fn(async () => {
+      throw new Error('network down');
+    });
+
+    render(
+      <EditProfileModal
+        isOpen
+        onClose={() => {}}
+        onSave={async () => {}}
+        onUploadAvatar={onUploadAvatar}
+        initialBio=""
+        initialAvatarUrl=""
+        initialStatusText=""
+      />
+    );
+
+    const fileInput = document.getElementById('edit-profile-avatar-file') as HTMLInputElement;
+    const file = new File(['avatar'], 'avatar.png', { type: 'image/png' });
+    await userEvent.upload(fileInput, file);
+
+    expect(await screen.findByText('Failed to upload avatar: network down')).toBeInTheDocument();
+  });
 });

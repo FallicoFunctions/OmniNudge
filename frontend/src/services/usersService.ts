@@ -26,6 +26,10 @@ export const usersService = {
     return api.put<UserProfile>('/users/me/profile', payload);
   },
 
+  async uploadAvatar(file: File): Promise<{ avatar_url: string; thumbnail_size: number }> {
+    return api.uploadFile<{ avatar_url: string; thumbnail_size: number }>('/users/me/avatar', file);
+  },
+
   async getPosts(username: string, limit = 20, offset = 0): Promise<UserPostsResponse> {
     return api.get<UserPostsResponse>(`/users/${username}/posts?limit=${limit}&offset=${offset}`);
   },

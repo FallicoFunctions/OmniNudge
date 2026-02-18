@@ -8,6 +8,7 @@ vi.mock('../../src/lib/api', () => ({
     post: vi.fn(),
     put: vi.fn(),
     delete: vi.fn(),
+    uploadFile: vi.fn(),
   },
 }));
 
@@ -52,5 +53,17 @@ describe('usersService profile methods', () => {
     await usersService.updateProfile(payload);
 
     expect(api.put).toHaveBeenCalledWith('/users/me/profile', payload);
+  });
+
+  it('calls avatar upload endpoint with file payload', async () => {
+    const file = new File(['avatar'], 'avatar.png', { type: 'image/png' });
+    vi.mocked(api.uploadFile).mockResolvedValue({
+      avatar_url: '/uploads/avatars/avatar_11_sq200.png',
+      thumbnail_size: 200,
+    });
+
+    await usersService.uploadAvatar(file);
+
+    expect(api.uploadFile).toHaveBeenCalledWith('/users/me/avatar', file);
   });
 });

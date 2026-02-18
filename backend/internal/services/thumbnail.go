@@ -65,6 +65,33 @@ func (s *ThumbnailService) GenerateThumbnail(sourcePath string) (string, error) 
 	return thumbnailPath, nil
 }
 
+// GenerateSquareThumbnail creates a square center-cropped thumbnail of the requested size.
+func (s *ThumbnailService) GenerateSquareThumbnail(sourcePath string, size int) (string, error) {
+	if size <= 0 {
+		return "", fmt.Errorf("invalid thumbnail size: %d", size)
+	}
+	if _, err := os.Stat(sourcePath); os.IsNotExist(err) {
+		return "", fmt.Errorf("source file does not exist: %w", err)
+	}
+
+	src, err := imaging.Open(sourcePath)
+	if err != nil {
+		return "", fmt.Errorf("failed to open image: %w", err)
+	}
+
+	thumb := imaging.Fill(src, size, size, imaging.Center, imaging.Lanczos)
+
+	ext := filepath.Ext(sourcePath)
+	nameWithoutExt := strings.TrimSuffix(filepath.Base(sourcePath), ext)
+	thumbnailName := fmt.Sprintf("%s_sq%d%s", nameWithoutExt, size, ext)
+	thumbnailPath := filepath.Join(filepath.Dir(sourcePath), thumbnailName)
+
+	if err := imaging.Save(thumb, thumbnailPath); err != nil {
+		return "", fmt.Errorf("failed to save square thumbnail: %w", err)
+	}
+	return thumbnailPath, nil
+}
+
 // GetImageDimensions returns the width and height of an image
 func (s *ThumbnailService) GetImageDimensions(imagePath string) (width int, height int, err error) {
 	file, err := os.Open(imagePath)

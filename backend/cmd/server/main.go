@@ -298,7 +298,7 @@ func main() {
 	cssSanitizer := services.NewCSSSanitizer()
 
 	messagesHandler := handlers.NewMessagesHandler(db.Pool, messageRepo, conversationRepo, userSettingsRepo, hub, notificationService)
-	usersHandler := handlers.NewUsersHandler(userRepo, userProfileRepo, userFriendshipRepo, userSettingsRepo, postRepo, commentRepo, authService, hubModRepo, cache)
+	usersHandler := handlers.NewUsersHandler(userRepo, userProfileRepo, userFriendshipRepo, userSettingsRepo, postRepo, commentRepo, authService, hubModRepo, cache, thumbnailService)
 	mediaHandler := handlers.NewMediaHandler(mediaRepo, thumbnailService, queueClient)
 	hubsHandler := handlers.NewHubsHandlerWithAccessRequest(hubRepo, postRepo, hubModRepo, hubSubRepo, hubSettingsRepo, hubAccessRequestRepo)
 	subscriptionsHandler := handlers.NewSubscriptionsHandler(hubSubRepo, subredditSubRepo, hubRepo)
@@ -820,6 +820,7 @@ func main() {
 			// User profile management
 			protected.GET("/users/me/profile", usersHandler.GetMyProfile)
 			protected.PUT("/users/me/profile", usersHandler.UpdateProfile)
+			protected.POST("/users/me/avatar", usersHandler.UploadMyAvatar)
 			protected.PUT("/users/profile", usersHandler.UpdateProfile)
 			protected.PUT("/users/email", authHandler.UpdateEmail)
 			protected.POST("/users/change-password", usersHandler.ChangePassword)

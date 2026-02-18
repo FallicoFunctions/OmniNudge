@@ -3,13 +3,18 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/omninudge/backend/internal/api/middleware"
 	"github.com/omninudge/backend/internal/models"
 	"github.com/omninudge/backend/internal/monitoring"
 	"github.com/omninudge/backend/internal/services"
@@ -27,6 +32,7 @@ type UsersHandler struct {
 	authService  *services.AuthService
 	hubModRepo   *models.HubModeratorRepository
 	cache        services.Cache
+	thumbService *services.ThumbnailService
 }
 
 // NewUsersHandler creates a new UsersHandler
@@ -40,9 +46,13 @@ func NewUsersHandler(
 	authService *services.AuthService,
 	hubModRepo *models.HubModeratorRepository,
 	cache services.Cache,
+	thumbService *services.ThumbnailService,
 ) *UsersHandler {
 	if cache == nil {
 		cache = services.NoopCache{}
+	}
+	if thumbService == nil {
+		thumbService = services.NewThumbnailService()
 	}
 	return &UsersHandler{
 		userRepo:     userRepo,
@@ -54,6 +64,7 @@ func NewUsersHandler(
 		authService:  authService,
 		hubModRepo:   hubModRepo,
 		cache:        cache,
+		thumbService: thumbService,
 	}
 }
 
@@ -381,6 +392,38 @@ type updateProfileRequest struct {
 	Status    *string `json:"status_text"`
 }
 
+const (
+	maxAvatarUploadSize = 5 * 1024 * 1024
+	avatarThumbSize     = 200
+)
+
+func localAvatarDiskPath(avatarURL string) (string, bool) {
+	if !strings.HasPrefix(avatarURL, "/uploads/avatars/") {
+		return "", false
+	}
+	trimmed := strings.TrimPrefix(avatarURL, "/")
+	cleaned := filepath.Clean(trimmed)
+	if cleaned != trimmed || filepath.IsAbs(cleaned) {
+		return "", false
+	}
+	avatarsRoot := filepath.Clean(filepath.Join("uploads", "avatars"))
+	if cleaned != avatarsRoot && !strings.HasPrefix(cleaned, avatarsRoot+string(os.PathSeparator)) {
+		return "", false
+	}
+	return cleaned, true
+}
+
+func isRequestBodyTooLarge(err error) bool {
+	if err == nil {
+		return false
+	}
+	var maxBytesErr *http.MaxBytesError
+	if errors.As(err, &maxBytesErr) {
+		return true
+	}
+	return strings.Contains(strings.ToLower(err.Error()), "request body too large")
+}
+
 // UpdateProfile handles PUT /api/v1/users/profile
 func (h *UsersHandler) UpdateProfile(c *gin.Context) {
 	userID := c.GetInt("user_id")
@@ -480,6 +523,171 @@ func (h *UsersHandler) UpdateProfile(c *gin.Context) {
 			formatted := user.LastSeen.Format(time.RFC3339)
 			return &formatted
 		}(),
+	})
+}
+
+// UploadMyAvatar handles POST /api/v1/users/me/avatar
+func (h *UsersHandler) UploadMyAvatar(c *gin.Context) {
+	userID := c.GetInt("user_id")
+
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, maxAvatarUploadSize+1024)
+	file, header, err := c.Request.FormFile("avatar")
+	if err != nil {
+		if isRequestBodyTooLarge(err) {
+			c.JSON(http.StatusRequestEntityTooLarge, gin.H{"error": "Avatar exceeds 5MB limit"})
+			return
+		}
+		// Support generic uploader clients that use "file".
+		file, header, err = c.Request.FormFile("file")
+		if err != nil {
+			if isRequestBodyTooLarge(err) {
+				c.JSON(http.StatusRequestEntityTooLarge, gin.H{"error": "Avatar exceeds 5MB limit"})
+				return
+			}
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Avatar file is required", "details": err.Error()})
+			return
+		}
+	}
+	defer file.Close()
+
+	if header.Size <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Empty avatar file is not allowed"})
+		return
+	}
+
+	safeName := filepath.Base(header.Filename)
+	ext := strings.ToLower(filepath.Ext(safeName))
+	switch ext {
+	case ".jpg", ".jpeg", ".png", ".gif", ".webp":
+	default:
+		c.JSON(http.StatusUnsupportedMediaType, gin.H{"error": "Unsupported avatar file extension"})
+		return
+	}
+
+	uploadDir := filepath.Join("uploads", "avatars")
+	if err := os.MkdirAll(uploadDir, 0o755); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to prepare avatar storage", "details": err.Error()})
+		return
+	}
+
+	filename := fmt.Sprintf("avatar_%d_%d%s", userID, time.Now().UnixNano(), ext)
+	originalPath := filepath.Join(uploadDir, filename)
+	dst, err := os.Create(originalPath)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create avatar file", "details": err.Error()})
+		return
+	}
+	defer dst.Close()
+	defer func() { _ = os.Remove(originalPath) }()
+
+	var thumbPath string
+	persistThumb := false
+	defer func() {
+		if !persistThumb && thumbPath != "" {
+			_ = os.Remove(thumbPath)
+		}
+	}()
+
+	limited := io.LimitReader(file, maxAvatarUploadSize+1)
+	var sniff [512]byte
+	n, _ := io.ReadFull(limited, sniff[:])
+	total := int64(n)
+
+	detected := http.DetectContentType(sniff[:n])
+	if !services.IsImageType(detected) {
+		c.JSON(http.StatusUnsupportedMediaType, gin.H{"error": "Avatar must be an image"})
+		return
+	}
+	if !middleware.ValidateExtensionMatchesMIME(safeName, detected) {
+		c.JSON(http.StatusUnsupportedMediaType, gin.H{"error": "Avatar extension does not match file type"})
+		return
+	}
+	if !middleware.ValidateNoSuspiciousSignatures(sniff[:n], detected) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Avatar file contains suspicious data"})
+		return
+	}
+	if n > 0 {
+		if _, err := dst.Write(sniff[:n]); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to write avatar file", "details": err.Error()})
+			return
+		}
+	}
+
+	written, err := io.Copy(dst, limited)
+	total += written
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save avatar file", "details": err.Error()})
+		return
+	}
+	if total > maxAvatarUploadSize {
+		c.JSON(http.StatusRequestEntityTooLarge, gin.H{"error": "Avatar exceeds 5MB limit"})
+		return
+	}
+
+	thumbPath, err = h.thumbService.GenerateSquareThumbnail(originalPath, avatarThumbSize)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate avatar thumbnail", "details": err.Error()})
+		return
+	}
+
+	width, height, err := h.thumbService.GetImageDimensions(thumbPath)
+	if err != nil || width != avatarThumbSize || height != avatarThumbSize {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to verify avatar thumbnail dimensions"})
+		return
+	}
+
+	avatarURL := "/" + filepath.ToSlash(thumbPath)
+
+	user, err := h.userRepo.GetByID(c.Request.Context(), userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch user"})
+		return
+	}
+	if user == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		return
+	}
+	var oldAvatarLocalPath string
+	if user.AvatarURL != nil {
+		if path, ok := localAvatarDiskPath(*user.AvatarURL); ok {
+			oldAvatarLocalPath = path
+		}
+	}
+	user.AvatarURL = &avatarURL
+
+	if err := h.userRepo.UpdateProfile(c.Request.Context(), user.ID, user.Bio, user.AvatarURL); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update user avatar"})
+		return
+	}
+
+	if h.userProfRepo != nil {
+		var statusText *string
+		profile, err := h.userProfRepo.GetByUserID(c.Request.Context(), user.ID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch user profile"})
+			return
+		}
+		if profile != nil {
+			statusText = profile.StatusText
+			if profile.Bio != nil {
+				user.Bio = profile.Bio
+			}
+		}
+		if err := h.userProfRepo.Upsert(c.Request.Context(), user.ID, user.Bio, user.AvatarURL, statusText); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to persist user avatar"})
+			return
+		}
+	}
+
+	h.invalidateProfileResponseCache(c.Request.Context(), user.ID)
+	persistThumb = true
+	if oldAvatarLocalPath != "" && oldAvatarLocalPath != thumbPath {
+		_ = os.Remove(oldAvatarLocalPath)
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"avatar_url":     avatarURL,
+		"thumbnail_size": avatarThumbSize,
 	})
 }
 
