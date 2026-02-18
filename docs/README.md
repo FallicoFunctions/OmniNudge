@@ -30,6 +30,7 @@
 - `EMAIL_SMTP_SETUP.md` - Comprehensive SMTP setup (SendGrid, Gmail, etc.)
 - `SMTP_QUICK_START.md` - Quick SMTP reference
 - `MESSAGING_TEST_GUIDE.md` - Testing WebSocket messaging
+- `REACTIONS_GIF_CAPTURE.md` - Exact capture steps for reactions feature demo GIF
 
 ---
 

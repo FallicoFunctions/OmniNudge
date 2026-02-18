@@ -1514,6 +1514,19 @@
     "messageOptions": {
       "ariaLabel": "خيارات الرسالة"
     },
+    "reactions": {
+      "addReaction": "إضافة تفاعل",
+      "updateFailed": "فشل تحديث التفاعل",
+      "detailsDialogLabel": "تفاصيل التفاعل",
+      "closeDetailsAria": "إغلاق تفاصيل التفاعل",
+      "removeYourReaction": "إزالة تفاعلك",
+      "reactWithThisEmoji": "تفاعل بهذا الإيموجي",
+      "noUserNamesAvailable": "لا توجد أسماء مستخدمين متاحة.",
+      "emojiPickerLabel": "منتقي الإيموجي",
+      "chooseReaction": "اختر تفاعلًا",
+      "closeEmojiPickerLabel": "إغلاق منتقي الإيموجي",
+      "reactWithEmoji": "تفاعل بـ {{emoji}}"
+    },
     "hubFallback": "هَب",
     "aria": {
       "backToConversations": "العودة إلى المحادثات"

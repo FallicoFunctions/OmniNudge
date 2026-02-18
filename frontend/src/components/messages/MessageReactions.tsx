@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { ReactionSummary } from '../../types/reactions';
 import { useMessageReactions } from '../../hooks/useMessageReactions';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
@@ -45,6 +46,7 @@ export function MessageReactions({
   currentUserId,
   currentUsername,
 }: MessageReactionsProps) {
+  const { t } = useTranslation();
   const [tooltip, setTooltip] = useState<{ emoji: string; text: string } | null>(null);
   const [mobileDetails, setMobileDetails] = useState<ReactionSummary | null>(null);
   const isMobile = useMediaQuery('(max-width: 640px)');
@@ -163,7 +165,7 @@ export function MessageReactions({
           role="alert"
           aria-live="assertive"
         >
-          Failed to update reaction
+          {t('messages.reactions.updateFailed')}
         </span>
       )}
 
@@ -172,17 +174,17 @@ export function MessageReactions({
           className="fixed inset-0 z-40 flex items-end sm:hidden"
           role="dialog"
           aria-modal="true"
-          aria-label="Reaction details"
+          aria-label={t('messages.reactions.detailsDialogLabel')}
           onKeyDown={(e) => {
             if (e.key === 'Escape') setMobileDetails(null);
           }}
         >
-          <button
-            type="button"
-            aria-label="Close reaction details"
-            className="absolute inset-0 bg-black/40"
-            onClick={() => setMobileDetails(null)}
-          />
+            <button
+              type="button"
+              aria-label={t('messages.reactions.closeDetailsAria')}
+              className="absolute inset-0 bg-black/40"
+              onClick={() => setMobileDetails(null)}
+            />
           <div className="relative z-10 w-full rounded-t-2xl bg-[var(--color-surface)] p-4 shadow-xl">
             <div className="mb-3 flex items-center justify-between">
               <h3 className="text-sm font-semibold text-[var(--color-text-primary)]">
@@ -193,7 +195,7 @@ export function MessageReactions({
                 className="rounded-md px-2 py-1 text-xs font-medium text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-elevated)]"
                 onClick={() => setMobileDetails(null)}
               >
-                Close
+                {t('common.close')}
               </button>
             </div>
 
@@ -206,7 +208,9 @@ export function MessageReactions({
                 setMobileDetails(null);
               }}
             >
-              {mobileDetails.user_reacted ? 'Remove your reaction' : 'React with this emoji'}
+              {mobileDetails.user_reacted
+                ? t('messages.reactions.removeYourReaction')
+                : t('messages.reactions.reactWithThisEmoji')}
             </button>
 
             <div className="max-h-48 overflow-y-auto rounded-md border border-[var(--color-border)]">
@@ -220,7 +224,7 @@ export function MessageReactions({
                 </ul>
               ) : (
                 <p className="px-3 py-2 text-sm text-[var(--color-text-secondary)]">
-                  No user names available.
+                  {t('messages.reactions.noUserNamesAvailable')}
                 </p>
               )}
             </div>

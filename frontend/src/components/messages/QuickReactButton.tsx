@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import type { InfiniteData } from '@tanstack/react-query';
 import { reactionsService } from '../../services/reactionsService';
@@ -29,6 +30,7 @@ export function QuickReactButton({
   currentUserId,
   currentUsername,
 }: QuickReactButtonProps) {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
 
@@ -99,7 +101,7 @@ export function QuickReactButton({
           always subtly visible on mobile where hover doesn't exist. */}
       <button
         type="button"
-        aria-label="Add reaction"
+        aria-label={t('messages.reactions.addReaction')}
         aria-expanded={open}
         aria-haspopup="dialog"
         className={[

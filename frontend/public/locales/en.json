@@ -1514,6 +1514,19 @@
     "messageOptions": {
       "ariaLabel": "Message options"
     },
+    "reactions": {
+      "addReaction": "Add reaction",
+      "updateFailed": "Failed to update reaction",
+      "detailsDialogLabel": "Reaction details",
+      "closeDetailsAria": "Close reaction details",
+      "removeYourReaction": "Remove your reaction",
+      "reactWithThisEmoji": "React with this emoji",
+      "noUserNamesAvailable": "No user names available.",
+      "emojiPickerLabel": "Emoji picker",
+      "chooseReaction": "Choose reaction",
+      "closeEmojiPickerLabel": "Close emoji picker",
+      "reactWithEmoji": "React with {{emoji}}"
+    },
     "hubFallback": "Hub",
     "aria": {
       "backToConversations": "Back to conversations"
