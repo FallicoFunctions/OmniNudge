@@ -168,6 +168,25 @@ func (h *MessagesHandler) unarchiveDMForRecipient(
 	return true, nil
 }
 
+func (h *MessagesHandler) shouldAutoUnarchiveRecipient(
+	ctx context.Context,
+	recipientID int,
+) bool {
+	if h.userSettingsRepo == nil {
+		return true
+	}
+
+	settings, err := h.userSettingsRepo.GetByUserID(ctx, recipientID)
+	if err != nil {
+		log.Printf("[SendMessage] Failed to load recipient settings for auto-unarchive: recipient_id=%d err=%v", recipientID, err)
+		return true
+	}
+	if settings == nil {
+		return true
+	}
+	return settings.AutoUnarchiveOnMessage
+}
+
 func (h *MessagesHandler) getConversationParticipantIDs(ctx context.Context, conversationID int) ([]int, error) {
 	conversationType, err := h.getConversationType(ctx, conversationID)
 	if err != nil {
@@ -502,19 +521,21 @@ func (h *MessagesHandler) SendMessage(c *gin.Context) {
 			WHERE id = $1 AND conversation_type = 'dm'
 		`, req.ConversationID)
 
-		unarchivedForRecipient, unarchiveErr := h.unarchiveDMForRecipient(c.Request.Context(), req.ConversationID, recipientID)
-		if unarchiveErr != nil {
-			log.Printf("[SendMessage] Failed to auto-unarchive recipient conversation: conversation_id=%d recipient_id=%d err=%v", req.ConversationID, recipientID, unarchiveErr)
-		} else if unarchivedForRecipient && h.hub != nil {
-			h.hub.Broadcast(&websocket.Message{
-				RecipientID: recipientID,
-				Type:        "conversation_unarchived",
-				Payload: gin.H{
-					"conversation_id": req.ConversationID,
-					"user_id":         recipientID,
-					"trigger":         "new_message",
-				},
-			})
+		if h.shouldAutoUnarchiveRecipient(c.Request.Context(), recipientID) {
+			unarchivedForRecipient, unarchiveErr := h.unarchiveDMForRecipient(c.Request.Context(), req.ConversationID, recipientID)
+			if unarchiveErr != nil {
+				log.Printf("[SendMessage] Failed to auto-unarchive recipient conversation: conversation_id=%d recipient_id=%d err=%v", req.ConversationID, recipientID, unarchiveErr)
+			} else if unarchivedForRecipient && h.hub != nil {
+				h.hub.Broadcast(&websocket.Message{
+					RecipientID: recipientID,
+					Type:        "conversation_unarchived",
+					Payload: gin.H{
+						"conversation_id": req.ConversationID,
+						"user_id":         recipientID,
+						"trigger":         "new_message",
+					},
+				})
+			}
 		}
 	}
 

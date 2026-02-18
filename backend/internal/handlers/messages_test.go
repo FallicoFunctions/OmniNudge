@@ -940,6 +940,61 @@ func TestSendMessage_AutoUnarchiveDoesNotAffectSenderArchiveFlag(t *testing.T) {
 	assert.False(t, archivedForUser2, "recipient archive flag should be cleared")
 }
 
+func TestSendMessage_RespectsRecipientAutoUnarchiveSetting(t *testing.T) {
+	handler, db, user1ID, user2ID, convID, hub, cleanup := setupMessagesHandlerTest(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	_, err := db.Pool.Exec(ctx, `
+		UPDATE conversations
+		SET archived_for_user2 = TRUE
+		WHERE id = $1
+	`, convID)
+	require.NoError(t, err)
+
+	settingsRepo := models.NewUserSettingsRepository(db.Pool)
+	settings, err := settingsRepo.CreateDefault(ctx, user2ID)
+	require.NoError(t, err)
+	settings.AutoUnarchiveOnMessage = false
+	_, err = settingsRepo.Update(ctx, settings)
+	require.NoError(t, err)
+
+	hub.onlineUsers[user2ID] = true
+
+	router := gin.Default()
+	router.POST("/messages", func(c *gin.Context) {
+		c.Set("user_id", user1ID)
+		handler.SendMessage(c)
+	})
+
+	body := map[string]interface{}{
+		"conversation_id":    convID,
+		"encrypted_content":  "respect auto-unarchive setting",
+		"message_type":       "text",
+		"encryption_version": "v1",
+	}
+	bodyJSON, _ := json.Marshal(body)
+
+	req := httptest.NewRequest("POST", "/messages", bytes.NewBuffer(bodyJSON))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusCreated, w.Code, "Response body: %s", w.Body.String())
+
+	var archivedForUser2 bool
+	err = db.Pool.QueryRow(ctx, `
+		SELECT COALESCE(archived_for_user2, FALSE)
+		FROM conversations
+		WHERE id = $1
+	`, convID).Scan(&archivedForUser2)
+	require.NoError(t, err)
+	assert.True(t, archivedForUser2, "recipient archive flag should remain set when setting is disabled")
+
+	unarchiveEvent := findBroadcastByTypeAndRecipient(hub.SnapshotBroadcastCalls(), "conversation_unarchived", user2ID)
+	assert.Nil(t, unarchiveEvent, "recipient should not receive conversation_unarchived event when disabled")
+}
+
 func TestMarkSingleMessageAsRead(t *testing.T) {
 	handler, db, user1ID, user2ID, convID, hub, cleanup := setupMessagesHandlerTest(t)
 	defer cleanup()

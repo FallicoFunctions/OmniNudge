@@ -2065,6 +2065,8 @@
       "readReceiptsHelp": "Permite que otros sepan cuándo has leído sus mensajes. Cuando está desactivado, otros no verán el estado de lectura de tus mensajes.",
       "typingIndicators": "Indicadores de escritura",
       "typingIndicatorsHelp": "Muestra a otros cuando estás escribiendo. Cuando está desactivado, no enviarás ni verás indicadores de escritura.",
+      "autoUnarchiveOnMessage": "Desarchivar automáticamente con nuevos mensajes",
+      "autoUnarchiveOnMessageHelp": "Cuando está activado, los mensajes entrantes mueven conversaciones archivadas a activas. Desactívalo para mantenerlas archivadas.",
       "notificationSound": "Sonido de notificación de mensaje",
       "notificationSoundHelp": "Reproduce un sonido cuando recibas un nuevo mensaje. Solo se reproduce cuando estás usando la app activamente.",
       "lastSeen": "Visto por última vez",

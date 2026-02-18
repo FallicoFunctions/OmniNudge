@@ -2065,6 +2065,8 @@
       "readReceiptsHelp": "Let others know when you've read their messages. When disabled, others won't see read status for your messages.",
       "typingIndicators": "Typing indicators",
       "typingIndicatorsHelp": "Show others when you're typing. When disabled, you won't send or see typing indicators.",
+      "autoUnarchiveOnMessage": "Auto-unarchive on new message",
+      "autoUnarchiveOnMessageHelp": "When enabled, incoming messages automatically move archived conversations back to active. Turn this off to keep archived conversations archived.",
       "notificationSound": "Message notification sound",
       "notificationSoundHelp": "Play a sound when you receive a new message. Only plays when you're actively using the app.",
       "lastSeen": "Last seen",

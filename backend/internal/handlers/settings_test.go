@@ -89,6 +89,7 @@ func TestGetSettings_CreatesDefaultSettingsWhenMissing(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, settings)
 	assert.Equal(t, userID, settings.UserID)
+	assert.True(t, settings.AutoUnarchiveOnMessage)
 }
 
 func TestGetSettings_RequiresAuth(t *testing.T) {
@@ -159,6 +160,33 @@ func TestUpdateSettings_PersistsDeviceIDs(t *testing.T) {
 	assert.Equal(t, "mic-1", settings.MicDeviceID)
 	assert.Equal(t, "cam-1", settings.CameraDeviceID)
 	assert.Equal(t, "spk-1", settings.SpeakerDeviceID)
+}
+
+func TestUpdateSettings_PersistsAutoUnarchiveOnMessage(t *testing.T) {
+	handler, settingsRepo, userID, cleanup := setupSettingsHandlerTest(t)
+	defer cleanup()
+
+	router := gin.Default()
+	router.PUT("/settings", func(c *gin.Context) {
+		c.Set("user_id", userID)
+		handler.UpdateSettings(c)
+	})
+
+	body := map[string]any{
+		"auto_unarchive_on_message": false,
+	}
+	payload, _ := json.Marshal(body)
+
+	req := httptest.NewRequest(http.MethodPut, "/settings", bytes.NewReader(payload))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	require.Equal(t, http.StatusOK, w.Code, "response: %s", w.Body.String())
+
+	settings, err := settingsRepo.GetByUserID(context.Background(), userID)
+	require.NoError(t, err)
+	require.NotNil(t, settings)
+	assert.False(t, settings.AutoUnarchiveOnMessage)
 }
 
 func TestUpdateSettings_RejectsInvalidQuietHoursTimezone(t *testing.T) {

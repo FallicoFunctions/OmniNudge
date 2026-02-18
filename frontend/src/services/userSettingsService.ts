@@ -13,6 +13,7 @@ export type UpdateUserSettingsRequest = Partial<
     | 'use_relative_time'
     | 'auto_close_theme_selector'
     | 'notify_archived_messages'
+    | 'auto_unarchive_on_message'
     | 'notify_removed_saved_posts'
     | 'default_omni_posts_only'
     | 'stay_on_post_after_hide'
