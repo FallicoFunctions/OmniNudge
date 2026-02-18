@@ -45,6 +45,28 @@ func TestSettings_GetAndUpdate_AuthenticatedFlow(t *testing.T) {
 	require.Equal(t, false, updated["show_push_notifications"])
 }
 
+func TestSettings_Get_CreatesAndReturnsExpectedDefaults(t *testing.T) {
+	deps := newTestDeps(t)
+	user := createUser(t, deps.UserRepo, "settings_default_values_user", "user")
+
+	token, err := deps.AuthService.GenerateJWT(user.ID, "", user.Username, user.Role)
+	require.NoError(t, err)
+
+	getReq, err := http.NewRequest("GET", "/api/v1/settings", nil)
+	require.NoError(t, err)
+	getReq.Header.Set("Authorization", "Bearer "+token)
+	getResp := doRequest(t, deps.Router, getReq)
+	require.Equal(t, http.StatusOK, getResp.Code, "response: %s", getResp.Body.String())
+
+	var settings map[string]any
+	require.NoError(t, json.Unmarshal(getResp.Body.Bytes(), &settings))
+	require.Equal(t, true, settings["show_push_notifications"])
+	require.Equal(t, "public", settings["profile_visibility"])
+	require.Equal(t, "system", settings["theme"])
+	require.Equal(t, "medium", settings["font_size"])
+	require.Equal(t, false, settings["quiet_hours_enabled"])
+}
+
 func TestSettings_Update_RejectsInvalidValues(t *testing.T) {
 	deps := newTestDeps(t)
 	user := createUser(t, deps.UserRepo, "settings_invalid_user", "user")
