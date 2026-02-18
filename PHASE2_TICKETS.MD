@@ -1846,18 +1846,18 @@
 ## FEATURE 2: MESSAGE PINNING (3 days)
 
 ### F2-001: Backend - Database Schema
-**Status:** ⬜ TODO
+**Status:** ✅ COMPLETE
 **Priority:** P1
 **Estimated Time:** 1 hour
 
 **Tasks:**
-- [ ] Create migration: add columns to messages table
-- [ ] Add pinned BOOLEAN DEFAULT FALSE
-- [ ] Add pinned_by INTEGER REFERENCES users(id)
-- [ ] Add pinned_at TIMESTAMP
-- [ ] Add CHECK constraint: max 10 pinned per conversation
-- [ ] Add index: (conversation_id, pinned) WHERE pinned = TRUE
-- [ ] Test migration
+- [x] Create migration: add columns to messages table
+- [x] Add pinned BOOLEAN DEFAULT FALSE
+- [x] Add pinned_by INTEGER REFERENCES users(id)
+- [x] Add pinned_at TIMESTAMP
+- [x] Add CHECK constraint: max 10 pinned per conversation
+- [x] Add index: (conversation_id, pinned) WHERE pinned = TRUE
+- [x] Test migration
 
 **Acceptance Criteria:**
 - Migration runs successfully
