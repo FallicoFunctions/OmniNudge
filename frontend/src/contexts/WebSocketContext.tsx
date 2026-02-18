@@ -221,6 +221,17 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
           break;
         }
 
+        case 'conversation_unarchived': {
+          const { conversation_id } = data.payload as { conversation_id: number };
+          console.log('[WebSocket] Conversation unarchived:', conversation_id);
+          queryClient.invalidateQueries({ queryKey: ['conversations'] });
+          queryClient.invalidateQueries({ queryKey: ['conversations', 'all'] });
+          window.dispatchEvent(new CustomEvent('conversation-unarchived', {
+            detail: data.payload,
+          }));
+          break;
+        }
+
         case 'user_online': {
           const { user_id } = data.payload;
           console.log('[WebSocket] User online:', user_id);

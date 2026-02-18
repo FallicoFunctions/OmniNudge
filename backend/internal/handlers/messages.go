@@ -108,6 +108,66 @@ func (h *MessagesHandler) canAccessConversation(ctx context.Context, conversatio
 	return conversation.IsParticipant(userID), nil
 }
 
+func (h *MessagesHandler) unarchiveDMForRecipient(
+	ctx context.Context,
+	conversationID int,
+	recipientID int,
+) (bool, error) {
+	var user1ID *int
+	var user2ID *int
+	var archivedForUser1 bool
+	var archivedForUser2 bool
+	err := h.pool.QueryRow(ctx, `
+		SELECT user1_id, user2_id,
+		       COALESCE(archived_for_user1, FALSE),
+		       COALESCE(archived_for_user2, FALSE)
+		FROM conversations
+		WHERE id = $1 AND conversation_type = 'dm'
+	`, conversationID).Scan(&user1ID, &user2ID, &archivedForUser1, &archivedForUser2)
+	if err != nil {
+		return false, err
+	}
+
+	targetUser1 := user1ID != nil && *user1ID == recipientID
+	targetUser2 := user2ID != nil && *user2ID == recipientID
+	if (!targetUser1 && !targetUser2) || (targetUser1 && !archivedForUser1) || (targetUser2 && !archivedForUser2) {
+		return false, nil
+	}
+
+	// Clear recipient archive flag only. If both sides are now unarchived, clear legacy archived_at/by as well.
+	_, err = h.pool.Exec(ctx, `
+		UPDATE conversations
+		SET archived_for_user1 = CASE WHEN user1_id = $2 THEN FALSE ELSE archived_for_user1 END,
+		    archived_for_user2 = CASE WHEN user2_id = $2 THEN FALSE ELSE archived_for_user2 END,
+		    archived_at = CASE
+		      WHEN (
+		        CASE WHEN user1_id = $2 THEN FALSE ELSE COALESCE(archived_for_user1, FALSE) END
+		      ) = FALSE
+		      AND (
+		        CASE WHEN user2_id = $2 THEN FALSE ELSE COALESCE(archived_for_user2, FALSE) END
+		      ) = FALSE
+		      THEN NULL
+		      ELSE archived_at
+		    END,
+		    archived_by = CASE
+		      WHEN (
+		        CASE WHEN user1_id = $2 THEN FALSE ELSE COALESCE(archived_for_user1, FALSE) END
+		      ) = FALSE
+		      AND (
+		        CASE WHEN user2_id = $2 THEN FALSE ELSE COALESCE(archived_for_user2, FALSE) END
+		      ) = FALSE
+		      THEN NULL
+		      ELSE archived_by
+		    END
+		WHERE id = $1 AND conversation_type = 'dm'
+	`, conversationID, recipientID)
+	if err != nil {
+		return false, err
+	}
+
+	return true, nil
+}
+
 func (h *MessagesHandler) getConversationParticipantIDs(ctx context.Context, conversationID int) ([]int, error) {
 	conversationType, err := h.getConversationType(ctx, conversationID)
 	if err != nil {
@@ -433,7 +493,7 @@ func (h *MessagesHandler) SendMessage(c *gin.Context) {
 	}
 
 	// Re-add users to conversation if they had deleted it (for DM conversations only).
-	// Do NOT clear archived flags so archived conversations stay archived when new messages arrive.
+	// If the recipient archived the DM, auto-unarchive it on new incoming message.
 	if conversationType == "dm" {
 		_, _ = h.pool.Exec(c.Request.Context(), `
 			UPDATE conversations
@@ -441,6 +501,21 @@ func (h *MessagesHandler) SendMessage(c *gin.Context) {
 			    deleted_for_user2 = FALSE
 			WHERE id = $1 AND conversation_type = 'dm'
 		`, req.ConversationID)
+
+		unarchivedForRecipient, unarchiveErr := h.unarchiveDMForRecipient(c.Request.Context(), req.ConversationID, recipientID)
+		if unarchiveErr != nil {
+			log.Printf("[SendMessage] Failed to auto-unarchive recipient conversation: conversation_id=%d recipient_id=%d err=%v", req.ConversationID, recipientID, unarchiveErr)
+		} else if unarchivedForRecipient && h.hub != nil {
+			h.hub.Broadcast(&websocket.Message{
+				RecipientID: recipientID,
+				Type:        "conversation_unarchived",
+				Payload: gin.H{
+					"conversation_id": req.ConversationID,
+					"user_id":         recipientID,
+					"trigger":         "new_message",
+				},
+			})
+		}
 	}
 
 	// Broadcast message to recipient via WebSocket if they're online OR send push notification if offline

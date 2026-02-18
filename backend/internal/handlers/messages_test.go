@@ -845,6 +845,100 @@ func TestSendMessage_NotBlocked(t *testing.T) {
 	assert.Equal(t, http.StatusCreated, w.Code, "Response body: %s", w.Body.String())
 }
 
+func TestSendMessage_AutoUnarchivesRecipientDM(t *testing.T) {
+	handler, db, user1ID, user2ID, convID, hub, cleanup := setupMessagesHandlerTest(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	_, err := db.Pool.Exec(ctx, `
+		UPDATE conversations
+		SET archived_for_user2 = TRUE
+		WHERE id = $1
+	`, convID)
+	require.NoError(t, err)
+
+	hub.onlineUsers[user2ID] = true
+
+	router := gin.Default()
+	router.POST("/messages", func(c *gin.Context) {
+		c.Set("user_id", user1ID)
+		handler.SendMessage(c)
+	})
+
+	body := map[string]interface{}{
+		"conversation_id":    convID,
+		"encrypted_content":  "auto unarchive recipient",
+		"message_type":       "text",
+		"encryption_version": "v1",
+	}
+	bodyJSON, _ := json.Marshal(body)
+
+	req := httptest.NewRequest("POST", "/messages", bytes.NewBuffer(bodyJSON))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusCreated, w.Code, "Response body: %s", w.Body.String())
+
+	var archivedForUser2 bool
+	err = db.Pool.QueryRow(ctx, `
+		SELECT COALESCE(archived_for_user2, FALSE)
+		FROM conversations
+		WHERE id = $1
+	`, convID).Scan(&archivedForUser2)
+	require.NoError(t, err)
+	assert.False(t, archivedForUser2, "recipient archive flag should be cleared on new message")
+
+	unarchiveEvent := findBroadcastByTypeAndRecipient(hub.SnapshotBroadcastCalls(), "conversation_unarchived", user2ID)
+	require.NotNil(t, unarchiveEvent, "recipient should receive conversation_unarchived event")
+}
+
+func TestSendMessage_AutoUnarchiveDoesNotAffectSenderArchiveFlag(t *testing.T) {
+	handler, db, user1ID, _, convID, _, cleanup := setupMessagesHandlerTest(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	_, err := db.Pool.Exec(ctx, `
+		UPDATE conversations
+		SET archived_for_user1 = TRUE,
+		    archived_for_user2 = TRUE
+		WHERE id = $1
+	`, convID)
+	require.NoError(t, err)
+
+	router := gin.Default()
+	router.POST("/messages", func(c *gin.Context) {
+		c.Set("user_id", user1ID)
+		handler.SendMessage(c)
+	})
+
+	body := map[string]interface{}{
+		"conversation_id":    convID,
+		"encrypted_content":  "sender archive unaffected",
+		"message_type":       "text",
+		"encryption_version": "v1",
+	}
+	bodyJSON, _ := json.Marshal(body)
+
+	req := httptest.NewRequest("POST", "/messages", bytes.NewBuffer(bodyJSON))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusCreated, w.Code, "Response body: %s", w.Body.String())
+
+	var archivedForUser1 bool
+	var archivedForUser2 bool
+	err = db.Pool.QueryRow(ctx, `
+		SELECT COALESCE(archived_for_user1, FALSE), COALESCE(archived_for_user2, FALSE)
+		FROM conversations
+		WHERE id = $1
+	`, convID).Scan(&archivedForUser1, &archivedForUser2)
+	require.NoError(t, err)
+	assert.True(t, archivedForUser1, "sender archive flag should remain unchanged")
+	assert.False(t, archivedForUser2, "recipient archive flag should be cleared")
+}
+
 func TestMarkSingleMessageAsRead(t *testing.T) {
 	handler, db, user1ID, user2ID, convID, hub, cleanup := setupMessagesHandlerTest(t)
 	defer cleanup()
