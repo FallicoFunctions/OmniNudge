@@ -2114,19 +2114,19 @@
 ---
 
 ### F3-003: Backend - Auto-Unarchive on New Message
-**Status:** ⬜ TODO
+**Status:** ✅ COMPLETE
 **Priority:** P1
 **Estimated Time:** 1 hour
 
 **Tasks:**
-- [ ] In message send handler, check if conversation archived
-- [ ] If archived for recipient, unarchive
-- [ ] Broadcast conversation_unarchived event
-- [ ] Write tests
+- [x] In message send handler, check if conversation archived
+- [x] If archived for recipient, unarchive
+- [x] Broadcast conversation_unarchived event
+- [x] Write tests
 
 **Acceptance Criteria:**
-- New message unarchives conversation for recipient
-- Sender not affected
+- New message unarchives conversation for recipient ✅
+- Sender not affected ✅
 
 **Dependencies:** F3-002
 
