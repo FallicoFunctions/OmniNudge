@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -179,4 +180,44 @@ func TestGetUserProfile_UsesCachedResponseUntilTTLExpiry(t *testing.T) {
 	require.Equal(t, http.StatusOK, secondW.Code)
 	assert.Contains(t, secondW.Body.String(), initialBio)
 	assert.NotContains(t, secondW.Body.String(), updatedBio)
+}
+
+func TestGetUserProfile_CacheScope_DoesNotLeakOwnerLastSeen(t *testing.T) {
+	userRepo, settingsRepo, owner, viewer, cleanup := setupUsersVisibilityTest(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	settings, err := settingsRepo.CreateDefault(ctx, owner.ID)
+	require.NoError(t, err)
+	settings.ShowLastSeen = false
+	_, err = settingsRepo.Update(ctx, settings)
+	require.NoError(t, err)
+
+	handler := NewUsersHandler(userRepo, settingsRepo, nil, nil, nil, nil, services.NewMemoryCache())
+	router := newUsersVisibilityRouter(handler)
+
+	// Owner request should include last_seen and populate owner-scoped cache.
+	ownerReq := httptest.NewRequest(http.MethodGet, "/users/"+owner.Username, nil)
+	ownerReq.Header.Set("X-Viewer-ID", strconv.Itoa(owner.ID))
+	ownerW := httptest.NewRecorder()
+	router.ServeHTTP(ownerW, ownerReq)
+	require.Equal(t, http.StatusOK, ownerW.Code)
+
+	var ownerPayload map[string]any
+	require.NoError(t, json.Unmarshal(ownerW.Body.Bytes(), &ownerPayload))
+	ownerLastSeen, ownerHasLastSeen := ownerPayload["last_seen"]
+	require.True(t, ownerHasLastSeen)
+	require.NotEmpty(t, ownerLastSeen)
+
+	// Public request should not include last_seen and must not reuse owner cache.
+	publicReq := httptest.NewRequest(http.MethodGet, "/users/"+owner.Username, nil)
+	publicReq.Header.Set("X-Viewer-ID", strconv.Itoa(viewer.ID))
+	publicW := httptest.NewRecorder()
+	router.ServeHTTP(publicW, publicReq)
+	require.Equal(t, http.StatusOK, publicW.Code)
+
+	var publicPayload map[string]any
+	require.NoError(t, json.Unmarshal(publicW.Body.Bytes(), &publicPayload))
+	_, publicHasLastSeen := publicPayload["last_seen"]
+	assert.False(t, publicHasLastSeen, "public response should not include owner-only last_seen")
 }

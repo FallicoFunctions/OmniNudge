@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/omninudge/backend/internal/services"
@@ -37,6 +38,14 @@ func newUsersProfileUpdateRouter(handler *UsersHandler) *gin.Engine {
 	router.GET("/users/:username", func(c *gin.Context) {
 		withUser(c)
 		handler.GetUserProfile(c)
+	})
+	router.GET("/users/me/profile", func(c *gin.Context) {
+		withUser(c)
+		handler.GetMyProfile(c)
+	})
+	router.POST("/users/me/ping", func(c *gin.Context) {
+		withUser(c)
+		handler.Ping(c)
 	})
 	return router
 }
@@ -216,4 +225,45 @@ func TestUpdateProfile_InvalidatesCachedPublicProfile(t *testing.T) {
 	require.Equal(t, http.StatusOK, secondGetW.Code)
 	assert.Contains(t, secondGetW.Body.String(), "after update")
 	assert.NotContains(t, secondGetW.Body.String(), initialBio)
+}
+
+func TestPing_InvalidatesCachedOwnerProfileLastSeen(t *testing.T) {
+	userRepo, settingsRepo, owner, _, cleanup := setupUsersVisibilityTest(t)
+	defer cleanup()
+
+	handler := NewUsersHandler(userRepo, settingsRepo, nil, nil, nil, nil, services.NewMemoryCache())
+	router := newUsersProfileUpdateRouter(handler)
+
+	firstReq := httptest.NewRequest(http.MethodGet, "/users/me/profile", nil)
+	firstReq.Header.Set("X-Viewer-ID", strconv.Itoa(owner.ID))
+	firstW := httptest.NewRecorder()
+	router.ServeHTTP(firstW, firstReq)
+	require.Equal(t, http.StatusOK, firstW.Code)
+
+	var firstPayload map[string]any
+	require.NoError(t, json.Unmarshal(firstW.Body.Bytes(), &firstPayload))
+	firstLastSeen, ok := firstPayload["last_seen"].(string)
+	require.True(t, ok)
+	require.NotEmpty(t, firstLastSeen)
+
+	time.Sleep(1100 * time.Millisecond)
+
+	pingReq := httptest.NewRequest(http.MethodPost, "/users/me/ping", nil)
+	pingReq.Header.Set("X-Viewer-ID", strconv.Itoa(owner.ID))
+	pingW := httptest.NewRecorder()
+	router.ServeHTTP(pingW, pingReq)
+	require.Equal(t, http.StatusOK, pingW.Code)
+
+	secondReq := httptest.NewRequest(http.MethodGet, "/users/me/profile", nil)
+	secondReq.Header.Set("X-Viewer-ID", strconv.Itoa(owner.ID))
+	secondW := httptest.NewRecorder()
+	router.ServeHTTP(secondW, secondReq)
+	require.Equal(t, http.StatusOK, secondW.Code)
+
+	var secondPayload map[string]any
+	require.NoError(t, json.Unmarshal(secondW.Body.Bytes(), &secondPayload))
+	secondLastSeen, ok := secondPayload["last_seen"].(string)
+	require.True(t, ok)
+	require.NotEmpty(t, secondLastSeen)
+	assert.NotEqual(t, firstLastSeen, secondLastSeen)
 }
