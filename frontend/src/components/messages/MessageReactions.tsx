@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { ReactionSummary } from '../../types/reactions';
 import { useMessageReactions } from '../../hooks/useMessageReactions';
+import { useMediaQuery } from '../../hooks/useMediaQuery';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -45,6 +46,8 @@ export function MessageReactions({
   currentUsername,
 }: MessageReactionsProps) {
   const [tooltip, setTooltip] = useState<{ emoji: string; text: string } | null>(null);
+  const [mobileDetails, setMobileDetails] = useState<ReactionSummary | null>(null);
+  const isMobile = useMediaQuery('(max-width: 640px)');
   const { isLoading, reactions, isBusy, hasError, toggleReaction } = useMessageReactions({
     messageId,
     currentUserId,
@@ -111,7 +114,13 @@ export function MessageReactions({
                   ? 'cursor-not-allowed opacity-60'
                   : 'cursor-pointer hover:border-[var(--color-primary)]/50 hover:bg-[var(--color-primary)]/5 active:scale-95',
               ].join(' ')}
-              onClick={() => toggleReaction(summary)}
+              onClick={() => {
+                if (isMobile) {
+                  setMobileDetails(summary);
+                  return;
+                }
+                toggleReaction(summary);
+              }}
               onMouseEnter={() =>
                 setTooltip({ emoji: summary.emoji, text: buildTooltip(summary) })
               }
@@ -156,6 +165,67 @@ export function MessageReactions({
         >
           Failed to update reaction
         </span>
+      )}
+
+      {mobileDetails && (
+        <div
+          className="fixed inset-0 z-40 flex items-end sm:hidden"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Reaction details"
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') setMobileDetails(null);
+          }}
+        >
+          <button
+            type="button"
+            aria-label="Close reaction details"
+            className="absolute inset-0 bg-black/40"
+            onClick={() => setMobileDetails(null)}
+          />
+          <div className="relative z-10 w-full rounded-t-2xl bg-[var(--color-surface)] p-4 shadow-xl">
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-[var(--color-text-primary)]">
+                {mobileDetails.emoji} {mobileDetails.count}
+              </h3>
+              <button
+                type="button"
+                className="rounded-md px-2 py-1 text-xs font-medium text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-elevated)]"
+                onClick={() => setMobileDetails(null)}
+              >
+                Close
+              </button>
+            </div>
+
+            <button
+              type="button"
+              disabled={isBusy}
+              className="mb-3 w-full rounded-md border border-[var(--color-border)] px-3 py-2 text-sm font-medium text-[var(--color-text-primary)] disabled:opacity-60"
+              onClick={() => {
+                toggleReaction(mobileDetails);
+                setMobileDetails(null);
+              }}
+            >
+              {mobileDetails.user_reacted ? 'Remove your reaction' : 'React with this emoji'}
+            </button>
+
+            <div className="max-h-48 overflow-y-auto rounded-md border border-[var(--color-border)]">
+              {mobileDetails.usernames.length > 0 ? (
+                <ul className="divide-y divide-[var(--color-border)]">
+                  {mobileDetails.usernames.map((username, index) => (
+                    <li key={`${username}-${index}`} className="px-3 py-2 text-sm text-[var(--color-text-primary)]">
+                      {username}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="px-3 py-2 text-sm text-[var(--color-text-secondary)]">
+                  No user names available.
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

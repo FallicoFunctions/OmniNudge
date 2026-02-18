@@ -499,3 +499,40 @@ describe('MessageReactions — realtime cache updates', () => {
     });
   });
 });
+
+describe('MessageReactions — mobile details modal', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('opens details modal with full user list on mobile tap', async () => {
+    const matchMediaSpy = vi.spyOn(window, 'matchMedia').mockImplementation((query) => ({
+      matches: query === '(max-width: 640px)',
+      media: query,
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    }) as MediaQueryList);
+
+    vi.mocked(reactionsService.getReactions).mockResolvedValue(twoReactionsResponse);
+    const Wrapper = createWrapper();
+    render(
+      <Wrapper>
+        <MessageReactions messageId={1} isOwnMessage={false} currentUserId={1} />
+      </Wrapper>
+    );
+
+    await waitFor(() => screen.getByRole('group'));
+    fireEvent.click(screen.getByRole('button', { name: /👍 3 reactions/i }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('dialog', { name: 'Reaction details' })).toBeInTheDocument();
+    });
+    expect(screen.getByText('alice')).toBeInTheDocument();
+    expect(screen.getByText('bob')).toBeInTheDocument();
+    expect(screen.getByText('charlie')).toBeInTheDocument();
+
+    matchMediaSpy.mockRestore();
+  });
+});
