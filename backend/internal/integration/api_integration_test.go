@@ -273,6 +273,118 @@ func TestMediaUpload_AllowsPDFDocument(t *testing.T) {
 	require.Equal(t, http.StatusCreated, w.Code, w.Body.String())
 }
 
+func TestSendMessage_RespectsRecipientAutoUnarchiveSetting_Integration(t *testing.T) {
+	deps := newTestDeps(t)
+	defer deps.DB.Close()
+
+	sender := createUser(t, deps.UserRepo, "msg_sender", "user")
+	recipient := createUser(t, deps.UserRepo, "msg_recipient", "user")
+	senderToken, _ := deps.AuthService.GenerateJWT(sender.ID, "", sender.Username, sender.Role)
+	recipientToken, _ := deps.AuthService.GenerateJWT(recipient.ID, "", recipient.Username, recipient.Role)
+
+	conversation, err := deps.ConversationRepo.Create(context.Background(), sender.ID, recipient.ID)
+	require.NoError(t, err)
+
+	archiveReq, _ := http.NewRequest("PUT", fmt.Sprintf("/api/v1/conversations/%d/archive", conversation.ID), nil)
+	archiveReq.Header.Set("Authorization", "Bearer "+recipientToken)
+	archiveResp := doRequest(t, deps.Router, archiveReq)
+	require.Equal(t, http.StatusOK, archiveResp.Code, "archive body=%s", archiveResp.Body.String())
+
+	settingsBody := []byte(`{"auto_unarchive_on_message": false}`)
+	settingsReq, _ := http.NewRequest("PUT", "/api/v1/settings", bytes.NewReader(settingsBody))
+	settingsReq.Header.Set("Authorization", "Bearer "+recipientToken)
+	settingsReq.Header.Set("Content-Type", "application/json")
+	settingsResp := doRequest(t, deps.Router, settingsReq)
+	require.Equal(t, http.StatusOK, settingsResp.Code, "settings body=%s", settingsResp.Body.String())
+
+	sendBody := []byte(fmt.Sprintf(
+		`{"conversation_id":%d,"encrypted_content":"integration auto-unarchive check","message_type":"text","encryption_version":"v1"}`,
+		conversation.ID,
+	))
+	sendReq, _ := http.NewRequest("POST", "/api/v1/messages", bytes.NewReader(sendBody))
+	sendReq.Header.Set("Authorization", "Bearer "+senderToken)
+	sendReq.Header.Set("Content-Type", "application/json")
+	sendResp := doRequest(t, deps.Router, sendReq)
+	require.Equal(t, http.StatusCreated, sendResp.Code, "send body=%s", sendResp.Body.String())
+
+	var user1ID int
+	var user2ID int
+	var archivedForUser1 bool
+	var archivedForUser2 bool
+	err = deps.DB.Pool.QueryRow(context.Background(), `
+		SELECT user1_id, user2_id,
+		       COALESCE(archived_for_user1, FALSE),
+		       COALESCE(archived_for_user2, FALSE)
+		FROM conversations
+		WHERE id = $1
+	`, conversation.ID).Scan(&user1ID, &user2ID, &archivedForUser1, &archivedForUser2)
+	require.NoError(t, err)
+
+	recipientArchived := archivedForUser2
+	if recipient.ID == user1ID {
+		recipientArchived = archivedForUser1
+	} else {
+		require.Equal(t, recipient.ID, user2ID)
+	}
+	require.True(t, recipientArchived, "recipient archive flag should stay true when auto-unarchive is disabled")
+}
+
+func TestSendMessage_AutoUnarchivesRecipientWhenEnabled_Integration(t *testing.T) {
+	deps := newTestDeps(t)
+	defer deps.DB.Close()
+
+	sender := createUser(t, deps.UserRepo, "msg_sender_enabled", "user")
+	recipient := createUser(t, deps.UserRepo, "msg_recipient_enabled", "user")
+	senderToken, _ := deps.AuthService.GenerateJWT(sender.ID, "", sender.Username, sender.Role)
+	recipientToken, _ := deps.AuthService.GenerateJWT(recipient.ID, "", recipient.Username, recipient.Role)
+
+	conversation, err := deps.ConversationRepo.Create(context.Background(), sender.ID, recipient.ID)
+	require.NoError(t, err)
+
+	archiveReq, _ := http.NewRequest("PUT", fmt.Sprintf("/api/v1/conversations/%d/archive", conversation.ID), nil)
+	archiveReq.Header.Set("Authorization", "Bearer "+recipientToken)
+	archiveResp := doRequest(t, deps.Router, archiveReq)
+	require.Equal(t, http.StatusOK, archiveResp.Code, "archive body=%s", archiveResp.Body.String())
+
+	settingsBody := []byte(`{"auto_unarchive_on_message": true}`)
+	settingsReq, _ := http.NewRequest("PUT", "/api/v1/settings", bytes.NewReader(settingsBody))
+	settingsReq.Header.Set("Authorization", "Bearer "+recipientToken)
+	settingsReq.Header.Set("Content-Type", "application/json")
+	settingsResp := doRequest(t, deps.Router, settingsReq)
+	require.Equal(t, http.StatusOK, settingsResp.Code, "settings body=%s", settingsResp.Body.String())
+
+	sendBody := []byte(fmt.Sprintf(
+		`{"conversation_id":%d,"encrypted_content":"integration auto-unarchive enabled","message_type":"text","encryption_version":"v1"}`,
+		conversation.ID,
+	))
+	sendReq, _ := http.NewRequest("POST", "/api/v1/messages", bytes.NewReader(sendBody))
+	sendReq.Header.Set("Authorization", "Bearer "+senderToken)
+	sendReq.Header.Set("Content-Type", "application/json")
+	sendResp := doRequest(t, deps.Router, sendReq)
+	require.Equal(t, http.StatusCreated, sendResp.Code, "send body=%s", sendResp.Body.String())
+
+	var user1ID int
+	var user2ID int
+	var archivedForUser1 bool
+	var archivedForUser2 bool
+	err = deps.DB.Pool.QueryRow(context.Background(), `
+		SELECT user1_id, user2_id,
+		       COALESCE(archived_for_user1, FALSE),
+		       COALESCE(archived_for_user2, FALSE)
+		FROM conversations
+		WHERE id = $1
+	`, conversation.ID).Scan(&user1ID, &user2ID, &archivedForUser1, &archivedForUser2)
+	require.NoError(t, err)
+
+	recipientArchived := archivedForUser2
+	if recipient.ID == user1ID {
+		recipientArchived = archivedForUser1
+	} else {
+		require.Equal(t, recipient.ID, user2ID)
+	}
+	require.False(t, recipientArchived, "recipient archive flag should be cleared when auto-unarchive is enabled")
+}
+
 func TestSearchMessagesAuthAndResults(t *testing.T) {
 	deps := newTestDeps(t)
 	defer deps.DB.Close()

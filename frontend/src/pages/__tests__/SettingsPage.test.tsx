@@ -5,6 +5,7 @@ import { MemoryRouter } from 'react-router-dom';
 import SettingsPage from '../SettingsPage';
 
 const setShowPushNotifications = vi.fn();
+const setAutoUnarchiveOnMessage = vi.fn();
 const enablePush = vi.fn();
 const disablePush = vi.fn();
 
@@ -15,6 +16,8 @@ const buildSettingsMock = (showPushNotifications: boolean) => ({
   setAutoCloseThemeSelector: vi.fn(),
   notifyArchivedMessages: false,
   setNotifyArchivedMessages: vi.fn(),
+  autoUnarchiveOnMessage: true,
+  setAutoUnarchiveOnMessage,
   notifyRemovedSavedPosts: true,
   setNotifyRemovedSavedPosts: vi.fn(),
   defaultOmniPostsOnly: false,
@@ -249,4 +252,27 @@ describe('SettingsPage push toggle', () => {
     },
     10000
   );
+});
+
+describe('SettingsPage messaging privacy toggles', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('updates auto-unarchive preference from privacy tab', async () => {
+    useSettingsMock.mockReturnValue(buildSettingsMock(true));
+
+    render(
+      <MemoryRouter>
+        <SettingsPage />
+      </MemoryRouter>
+    );
+
+    fireEvent.click(screen.getByRole('tab', { name: 'settings.tabs.privacy' }));
+    fireEvent.click(screen.getByRole('switch', { name: 'settings.messagingPrivacy.autoUnarchiveOnMessage' }));
+
+    await waitFor(() => {
+      expect(setAutoUnarchiveOnMessage).toHaveBeenCalledWith(false);
+    });
+  });
 });
