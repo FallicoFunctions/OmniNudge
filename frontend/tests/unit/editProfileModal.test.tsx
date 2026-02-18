@@ -15,6 +15,7 @@ describe('EditProfileModal', () => {
         onSave={onSave}
         initialBio="Old bio"
         initialAvatarUrl="https://example.com/old.png"
+        initialStatusText="Old status"
       />
     );
 
@@ -26,12 +27,17 @@ describe('EditProfileModal', () => {
     await userEvent.clear(avatarUrl);
     await userEvent.type(avatarUrl, '  https://example.com/new.png  ');
 
+    const status = screen.getByLabelText('Status text');
+    await userEvent.clear(status);
+    await userEvent.type(status, '  Building things  ');
+
     await userEvent.click(screen.getByRole('button', { name: 'Save' }));
 
     await waitFor(() => {
       expect(onSave).toHaveBeenCalledWith({
         bio: 'Updated bio',
         avatar_url: 'https://example.com/new.png',
+        status_text: 'Building things',
       });
     });
   });
@@ -46,6 +52,7 @@ describe('EditProfileModal', () => {
         onSave={onSave}
         initialBio=""
         initialAvatarUrl=""
+        initialStatusText=""
       />
     );
 
@@ -70,6 +77,7 @@ describe('EditProfileModal', () => {
         onSave={onSave}
         initialBio=""
         initialAvatarUrl=""
+        initialStatusText=""
       />
     );
 

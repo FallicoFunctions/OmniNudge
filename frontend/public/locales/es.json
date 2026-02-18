@@ -1301,14 +1301,18 @@
     },
     "edit": {
       "title": "Editar perfil",
-      "description": "Actualiza la URL de tu avatar y tu biografía.",
+      "description": "Actualiza la URL de tu avatar, tu estado y tu biografía.",
       "avatarUrlLabel": "URL del avatar",
       "avatarUrlPlaceholder": "https://example.com/avatar.jpg",
+      "statusLabel": "Estado",
+      "statusPlaceholder": "¿Qué estás haciendo?",
+      "statusCount": "{{count}} / 500",
       "bioLabel": "Biografía",
       "bioPlaceholder": "Cuéntale a la gente un poco sobre ti...",
       "bioCount": "{{count}} / 500",
       "errors": {
         "bioTooLong": "La biografía debe tener 500 caracteres o menos.",
+        "statusTooLong": "El estado debe tener 500 caracteres o menos.",
         "invalidAvatarUrl": "La URL del avatar debe comenzar con http:// o https://",
         "saveFailed": "No se pudo guardar el perfil: {{message}}"
       }

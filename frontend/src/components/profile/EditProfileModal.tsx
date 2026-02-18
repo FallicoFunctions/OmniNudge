@@ -4,9 +4,14 @@ import { useTranslation } from 'react-i18next';
 interface EditProfileModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (payload: { bio?: string | null; avatar_url?: string | null }) => Promise<void>;
+  onSave: (payload: {
+    bio?: string | null;
+    avatar_url?: string | null;
+    status_text?: string | null;
+  }) => Promise<void>;
   initialBio?: string | null;
   initialAvatarUrl?: string | null;
+  initialStatusText?: string | null;
   isSaving?: boolean;
 }
 
@@ -16,28 +21,36 @@ export default function EditProfileModal({
   onSave,
   initialBio,
   initialAvatarUrl,
+  initialStatusText,
   isSaving = false,
 }: EditProfileModalProps) {
   const { t } = useTranslation();
   const [bio, setBio] = useState(initialBio ?? '');
   const [avatarUrl, setAvatarUrl] = useState(initialAvatarUrl ?? '');
+  const [statusText, setStatusText] = useState(initialStatusText ?? '');
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isOpen) return;
     setBio(initialBio ?? '');
     setAvatarUrl(initialAvatarUrl ?? '');
+    setStatusText(initialStatusText ?? '');
     setError(null);
-  }, [initialAvatarUrl, initialBio, isOpen]);
+  }, [initialAvatarUrl, initialBio, initialStatusText, isOpen]);
 
   if (!isOpen) return null;
 
   const handleSave = async () => {
     const trimmedBio = bio.trim();
     const trimmedAvatarUrl = avatarUrl.trim();
+    const trimmedStatusText = statusText.trim();
 
     if (trimmedBio.length > 500) {
       setError(t('userProfilePage.edit.errors.bioTooLong'));
+      return;
+    }
+    if (trimmedStatusText.length > 500) {
+      setError(t('userProfilePage.edit.errors.statusTooLong'));
       return;
     }
     if (
@@ -53,6 +66,7 @@ export default function EditProfileModal({
     await onSave({
       bio: trimmedBio ? trimmedBio : null,
       avatar_url: trimmedAvatarUrl ? trimmedAvatarUrl : null,
+      status_text: trimmedStatusText ? trimmedStatusText : null,
     });
   };
 
@@ -82,6 +96,27 @@ export default function EditProfileModal({
               placeholder={t('userProfilePage.edit.avatarUrlPlaceholder')}
               className="mt-1 w-full rounded-md border border-[var(--color-border)] bg-[var(--color-background)] px-3 py-2 text-sm text-[var(--color-text-primary)]"
             />
+          </div>
+
+          <div>
+            <label
+              htmlFor="edit-profile-status-text"
+              className="block text-sm font-medium text-[var(--color-text-primary)]"
+            >
+              {t('userProfilePage.edit.statusLabel')}
+            </label>
+            <input
+              id="edit-profile-status-text"
+              type="text"
+              value={statusText}
+              onChange={(e) => setStatusText(e.target.value)}
+              maxLength={500}
+              placeholder={t('userProfilePage.edit.statusPlaceholder')}
+              className="mt-1 w-full rounded-md border border-[var(--color-border)] bg-[var(--color-background)] px-3 py-2 text-sm text-[var(--color-text-primary)]"
+            />
+            <p className="mt-1 text-xs text-[var(--color-text-secondary)]">
+              {t('userProfilePage.edit.statusCount', { count: statusText.length })}
+            </p>
           </div>
 
           <div>

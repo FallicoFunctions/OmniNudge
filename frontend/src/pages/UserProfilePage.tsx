@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useParams } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Trans, useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import { usersService } from '../services/usersService';
@@ -19,6 +19,8 @@ import { Panel } from '../components/common/Panel';
 import { ErrorMessage } from '../components/common/StatusMessage';
 import { Skeleton } from '../components/common/LoadingStates';
 import { useFormat } from '../hooks/useFormat';
+import { normalizeReportReason, reportService, type ReportReason } from '../services/reportService';
+import EditProfileModal from '../components/profile/EditProfileModal';
 
 const BASE_TABS = [
   { key: 'overview', labelKey: 'userProfilePage.tabs.overview' },
@@ -218,9 +220,11 @@ export default function UserProfilePage() {
   const location = useLocation();
   const { username } = useParams<{ username: string }>();
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const { useRelativeTime } = useSettings();
   const [activeTab, setActiveTab] = useState<TabKey>('overview');
   const canViewPrivateTabs = user?.username === username;
+  const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
   const originState = useMemo(
     () => ({ originPath: `${location.pathname}${location.search}` }),
     [location.pathname, location.search]
@@ -286,6 +290,69 @@ export default function UserProfilePage() {
     [commentsQuery.data?.comments]
   );
   const canMessageUser = user && profile && user.username !== profile.username;
+  const blockedUsersQuery = useQuery({
+    queryKey: ['blocked-users'],
+    queryFn: () => usersService.getBlockedUsers(),
+    enabled: Boolean(user && profile && user.username !== profile.username),
+    staleTime: 1000 * 30,
+  });
+  const isBlocked = Boolean(
+    profile &&
+      blockedUsersQuery.data?.blocked_users?.some(
+        (blockedUser) => blockedUser.username.toLowerCase() === profile.username.toLowerCase()
+      )
+  );
+
+  const blockMutation = useMutation({
+    mutationFn: async () => {
+      if (!profile) return;
+      await usersService.blockUser(profile.username);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['blocked-users'] });
+    },
+  });
+
+  const unblockMutation = useMutation({
+    mutationFn: async () => {
+      if (!profile) return;
+      await usersService.unblockUser(profile.username);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['blocked-users'] });
+    },
+  });
+
+  const reportUserMutation = useMutation({
+    mutationFn: async (payload: { userId: number; reason: ReportReason; description?: string }) => {
+      await reportService.createReport({
+        targetType: 'user',
+        targetId: payload.userId,
+        reason: payload.reason,
+        description: payload.description,
+      });
+    },
+  });
+
+  const updateProfileMutation = useMutation({
+    mutationFn: async (payload: {
+      bio?: string | null;
+      avatar_url?: string | null;
+      status_text?: string | null;
+    }) =>
+      usersService.updateProfile(payload),
+    onSuccess: async () => {
+      await refetchProfile();
+      setIsEditProfileOpen(false);
+    },
+    onError: (error) => {
+      alert(
+        t('userProfilePage.edit.errors.saveFailed', {
+          message: error instanceof Error ? error.message : t('common.error'),
+        })
+      );
+    },
+  });
 
   useEffect(() => {
     if (!user || !username || user.username !== username) {
@@ -521,6 +588,11 @@ export default function UserProfilePage() {
                   {t('userProfilePage.labels.lastSeen', { time: lastSeenLabel })}
                 </p>
               )}
+              {profile.status_text && (
+                <p className="text-sm font-medium text-[var(--color-text-primary)]">
+                  {profile.status_text}
+                </p>
+              )}
             </div>
           </div>
           <div className="flex flex-col gap-2 text-sm text-[var(--color-text-secondary)] md:items-end md:text-right">
@@ -530,13 +602,89 @@ export default function UserProfilePage() {
               </span>{' '}
               {t('userProfilePage.labels.karma')}
             </div>
-            {canMessageUser && (
-              <Link
-                to={`/messages?to=${encodeURIComponent(profile.username)}`}
+            {canViewPrivateTabs && (
+              <button
+                type="button"
+                onClick={() => setIsEditProfileOpen(true)}
                 className="inline-flex items-center justify-center rounded-md border border-[var(--color-border)] px-4 py-2 text-sm font-semibold text-[var(--color-text-primary)] hover:border-[var(--color-primary)] hover:text-[var(--color-primary)]"
               >
-                {t('userProfilePage.actions.message')}
-              </Link>
+                {t('userProfilePage.actions.editProfile')}
+              </button>
+            )}
+            {canMessageUser && (
+              <div className="flex flex-wrap items-center gap-2 md:justify-end">
+                {!isBlocked && (
+                  <Link
+                    to={`/messages?to=${encodeURIComponent(profile.username)}`}
+                    className="inline-flex items-center justify-center rounded-md border border-[var(--color-border)] px-4 py-2 text-sm font-semibold text-[var(--color-text-primary)] hover:border-[var(--color-primary)] hover:text-[var(--color-primary)]"
+                  >
+                    {t('userProfilePage.actions.message')}
+                  </Link>
+                )}
+                <button
+                  type="button"
+                  disabled={blockMutation.isPending || unblockMutation.isPending || reportUserMutation.isPending}
+                  onClick={() => {
+                    if (!profile) return;
+                    if (isBlocked) {
+                      unblockMutation.mutate();
+                    } else if (
+                      window.confirm(
+                        t('userProfilePage.actions.confirmBlock', { username: profile.username })
+                      )
+                    ) {
+                      blockMutation.mutate();
+                    }
+                  }}
+                  className={`inline-flex items-center justify-center rounded-md border px-4 py-2 text-sm font-semibold transition ${
+                    isBlocked
+                      ? 'border-[var(--color-success)] text-[var(--color-success)] hover:opacity-80'
+                      : 'border-[var(--color-error)] text-[var(--color-error)] hover:opacity-80'
+                  } disabled:opacity-50`}
+                >
+                  {isBlocked
+                    ? t('userProfilePage.actions.unblock')
+                    : t('userProfilePage.actions.block')}
+                </button>
+                {isBlocked && (
+                  <span className="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700">
+                    {t('userProfilePage.labels.blocked')}
+                  </span>
+                )}
+                <button
+                  type="button"
+                  disabled={reportUserMutation.isPending}
+                  onClick={() => {
+                    if (!profile) return;
+                    const reasonInput = window.prompt(t('reporting.reasonPrompt'));
+                    if (reasonInput === null) return;
+                    const reason = normalizeReportReason(reasonInput);
+                    if (!reason) {
+                      alert(t('reporting.invalidReason'));
+                      return;
+                    }
+                    const detailsInput = window.prompt(t('reporting.detailsPrompt'));
+                    reportUserMutation.mutate(
+                      { userId: profile.id, reason, description: detailsInput ?? undefined },
+                      {
+                        onSuccess: () => {
+                          alert(t('reporting.success'));
+                        },
+                        onError: (error) => {
+                          alert(
+                            t('userProfilePage.actions.reportFailed', {
+                              message: error instanceof Error ? error.message : t('common.error'),
+                            })
+                          );
+                        },
+                      }
+                    );
+                  }}
+                  className="inline-flex items-center justify-center rounded-md border border-[var(--color-error)] px-4 py-2 text-sm font-semibold text-[var(--color-error)] hover:opacity-80 disabled:opacity-50"
+                >
+                  {t('userProfilePage.actions.report')}
+                </button>
+              </div>
             )}
           </div>
         </div>
@@ -596,6 +744,18 @@ export default function UserProfilePage() {
       </div>
 
       <div className="mt-6">{renderActiveTab()}</div>
+
+      <EditProfileModal
+        isOpen={isEditProfileOpen}
+        onClose={() => setIsEditProfileOpen(false)}
+        initialBio={profile.bio}
+        initialAvatarUrl={profile.avatar_url}
+        initialStatusText={profile.status_text}
+        isSaving={updateProfileMutation.isPending}
+        onSave={async (payload) => {
+          await updateProfileMutation.mutateAsync(payload);
+        }}
+      />
     </div>
   );
 }
