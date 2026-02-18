@@ -77,6 +77,8 @@ export default function SettingsPage() {
     setProfileVisibility,
     notificationSound,
     setNotificationSound,
+    showPushNotifications,
+    setShowPushNotifications,
   } = useSettings();
 
   type SettingsTab = 'general' | 'notifications' | 'privacy' | 'appearance' | 'audio_video';
@@ -144,6 +146,23 @@ export default function SettingsPage() {
     requestPermission: enablePush,
     unregister: disablePush,
   } = usePushNotifications();
+
+  const handleTogglePushNotifications = async () => {
+    if (!pushSupported) {
+      return;
+    }
+
+    if (showPushNotifications) {
+      const unregistered = await disablePush();
+      if (unregistered) {
+        setShowPushNotifications(false);
+      }
+      return;
+    }
+
+    const enabled = pushEnabled ? true : await enablePush();
+    setShowPushNotifications(enabled);
+  };
 
   // Track if we've already processed email verification to prevent infinite loop
   const hasProcessedVerification = useRef(false);
@@ -384,7 +403,7 @@ export default function SettingsPage() {
                   {t('settings.pushNotificationsSection.toggleLabel')}
                 </p>
                 <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
-                  {pushEnabled
+                  {showPushNotifications
                     ? t('settings.pushNotificationsSection.toggleHelpOn')
                     : t('settings.pushNotificationsSection.toggleHelpOff')}
                 </p>
@@ -392,17 +411,19 @@ export default function SettingsPage() {
               <button
                 type="button"
                 role="switch"
-                aria-checked={pushEnabled}
-                onClick={() => (pushEnabled ? disablePush() : enablePush())}
+                aria-checked={showPushNotifications}
+                onClick={() => {
+                  void handleTogglePushNotifications();
+                }}
                 className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${
-                  pushEnabled ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
+                  showPushNotifications ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
                 }`}
               >
                 <span className="sr-only">{t('common.accessibility.togglePushNotifications')}</span>
                 <span
                   aria-hidden="true"
                   className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                    pushEnabled ? 'translate-x-5' : 'translate-x-0'
+                    showPushNotifications ? 'translate-x-5' : 'translate-x-0'
                   }`}
                 />
               </button>
