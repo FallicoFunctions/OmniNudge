@@ -1,7 +1,9 @@
 import { api } from '../lib/api';
 import type {
   Conversation,
+  EditMessageRequest,
   Message,
+  MessageEditHistoryResponse,
   PinnedMessagesResponse,
   SendMessageRequest,
 } from '../types/messages';
@@ -95,6 +97,18 @@ export const messagesService = {
     return api.get<{ messages: Message[]; next_cursor?: string }>(
       `/conversations/${conversationId}/messages?${params.toString()}`
     );
+  },
+
+  async getMessageHistory(
+    messageId: number,
+    limit = 20,
+    offset = 0
+  ): Promise<MessageEditHistoryResponse> {
+    const params = new URLSearchParams({
+      limit: String(limit),
+      offset: String(offset),
+    });
+    return api.get<MessageEditHistoryResponse>(`/messages/${messageId}/history?${params.toString()}`);
   },
 
   async getPinnedMessages(conversationId: number): Promise<PinnedMessagesResponse> {
@@ -200,6 +214,47 @@ export const messagesService = {
       is_multi_recipient: data.is_multi_recipient,
       shared_encryption_iv: data.shared_encryption_iv,
       recipient_keys: data.recipient_keys,
+    });
+  },
+
+  async editMessage(messageId: number, data: EditMessageRequest): Promise<Message> {
+    const conversation = await this.getConversation(data.conversation_id);
+    const recipientId = conversation.other_user?.id;
+
+    let encryptedContent = data.content;
+    let senderEncryptedContent = data.content;
+    let encryptionVersion = 'plaintext';
+
+    const ownKeys = await getOwnKeys();
+    if (recipientId) {
+      try {
+        const publicKeys = await encryptionService.getPublicKeys([recipientId]);
+        const recipientPublicKeyBase64 = publicKeys[recipientId];
+        if (recipientPublicKeyBase64) {
+          const recipientPublicKey = await getUserPublicKey(recipientId, recipientPublicKeyBase64);
+          if (recipientPublicKey) {
+            encryptedContent = await encryptMessage(data.content, recipientPublicKey);
+            encryptionVersion = 'v2';
+          }
+        }
+      } catch (error) {
+        console.error('Message edit encryption failed, falling back to plaintext:', error);
+      }
+    }
+
+    if (ownKeys?.publicKey) {
+      try {
+        senderEncryptedContent = await encryptMessage(data.content, ownKeys.publicKey);
+      } catch (error) {
+        console.error('Failed to encrypt sender copy for edited message:', error);
+      }
+    }
+
+    return api.patch<Message>(`/messages/${messageId}`, {
+      encrypted_content: encryptedContent,
+      sender_encrypted_content: senderEncryptedContent,
+      content: data.content,
+      encryption_version: encryptionVersion,
     });
   },
 

@@ -232,6 +232,59 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
           break;
         }
 
+        case 'message_edited': {
+          const {
+            message_id,
+            conversation_id,
+            edited_at,
+            encrypted_content,
+            sender_encrypted_content,
+            encryption_version,
+          } = data.payload as {
+            message_id: number;
+            conversation_id: number;
+            edited_at: string;
+            encrypted_content?: string;
+            sender_encrypted_content?: string | null;
+            encryption_version?: string;
+          };
+
+          console.log('[WebSocket] Message edited:', message_id);
+
+          queryClient.setQueryData<InfiniteData<{ messages: Message[]; next_cursor?: string }> | undefined>(
+            ['messages', conversation_id],
+            (prev) => {
+              if (!prev) return prev;
+              return {
+                ...prev,
+                pages: prev.pages.map((page) => ({
+                  ...page,
+                  messages: page.messages.map((msg) =>
+                    msg.id === message_id
+                      ? {
+                          ...msg,
+                          edited: true,
+                          edited_at: edited_at || new Date().toISOString(),
+                          encrypted_content: encrypted_content ?? msg.encrypted_content,
+                          sender_encrypted_content:
+                            sender_encrypted_content ?? msg.sender_encrypted_content,
+                          encryption_version: encryption_version ?? msg.encryption_version,
+                        }
+                      : msg
+                  ),
+                })),
+              };
+            }
+          );
+
+          window.dispatchEvent(
+            new CustomEvent('message-edited', {
+              detail: data.payload,
+            })
+          );
+          break;
+        }
+
         case 'user_online': {
           const { user_id } = data.payload;
           console.log('[WebSocket] User online:', user_id);
