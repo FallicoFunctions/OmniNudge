@@ -4,12 +4,7 @@ import type { InfiniteData } from '@tanstack/react-query';
 import { reactionsService } from '../../services/reactionsService';
 import type { GetReactionsResponse } from '../../types/reactions';
 import type { Message } from '../../types/messages';
-
-// ---------------------------------------------------------------------------
-// Constants
-// ---------------------------------------------------------------------------
-
-const QUICK_EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '🔥'] as const;
+import { EmojiPicker } from './EmojiPicker';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -106,7 +101,7 @@ export function QuickReactButton({
         type="button"
         aria-label="Add reaction"
         aria-expanded={open}
-        aria-haspopup="true"
+        aria-haspopup="dialog"
         className={[
           'flex h-6 w-6 items-center justify-center rounded-full text-sm',
           'text-[var(--color-text-muted)] transition-all',
@@ -121,39 +116,12 @@ export function QuickReactButton({
         🙂
       </button>
 
-      {open && (
-        <>
-          {/* Transparent backdrop closes the picker on outside click */}
-          <div
-            className="fixed inset-0 z-20"
-            aria-hidden="true"
-            onClick={() => setOpen(false)}
-          />
-
-          {/* Emoji picker row */}
-          <div
-            role="toolbar"
-            aria-label="Quick reactions"
-            className={[
-              'absolute z-30 bottom-full mb-1 flex gap-0.5 rounded-xl',
-              'border border-[var(--color-border)] bg-[var(--color-surface)] p-1.5 shadow-lg',
-              isOwnMessage ? 'right-0' : 'left-0',
-            ].join(' ')}
-          >
-            {QUICK_EMOJIS.map((emoji) => (
-              <button
-                key={emoji}
-                type="button"
-                aria-label={`React with ${emoji}`}
-                className="rounded-lg p-1 text-xl transition-transform hover:scale-125 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]"
-                onClick={() => handlePick(emoji)}
-              >
-                {emoji}
-              </button>
-            ))}
-          </div>
-        </>
-      )}
+      <EmojiPicker
+        isOpen={open}
+        isOwnMessage={isOwnMessage}
+        onClose={() => setOpen(false)}
+        onSelect={handlePick}
+      />
     </div>
   );
 }

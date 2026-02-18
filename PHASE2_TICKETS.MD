@@ -1682,21 +1682,21 @@
 ---
 
 ### F1-005: Frontend - MessageReactions Component
-**Status:** ⬜ TODO
+**Status:** ✅ COMPLETE
 **Priority:** P1
 **Estimated Time:** 4 hours
 
 **Tasks:**
-- [ ] Create MessageReactions.tsx component
-- [ ] Display reactions below message bubble
-- [ ] Format: `👍 5  ❤️ 3  😂 1`
-- [ ] Highlight user's reactions (border/background)
-- [ ] Show hover tooltip: "John, Jane, and 3 others"
-- [ ] Click to toggle reaction on/off
-- [ ] Responsive layout (wrap on small screens)
-- [ ] Add loading state during API call
-- [ ] Add error handling
-- [ ] Write component tests
+- [x] Create MessageReactions.tsx component
+- [x] Display reactions below message bubble
+- [x] Format: `👍 5  ❤️ 3  😂 1`
+- [x] Highlight user's reactions (border/background)
+- [x] Show hover tooltip: "John, Jane, and 3 others"
+- [x] Click to toggle reaction on/off
+- [x] Responsive layout (wrap on small screens)
+- [x] Add loading state during API call
+- [x] Add error handling
+- [x] Write component tests
 
 **Acceptance Criteria:**
 - Reactions display correctly
@@ -1709,20 +1709,20 @@
 ---
 
 ### F1-006: Frontend - EmojiPicker Component
-**Status:** ⬜ TODO
+**Status:** ✅ COMPLETE
 **Priority:** P1
 **Estimated Time:** 4 hours
 
 **Tasks:**
-- [ ] Create EmojiPicker.tsx component
-- [ ] Show 20+ common emoji in grid
-- [ ] Position floating above message on hover
-- [ ] Click emoji adds reaction immediately
-- [ ] Close picker after selection
-- [ ] Keyboard navigation (arrow keys, enter)
-- [ ] Accessibility (ARIA labels)
-- [ ] Mobile: full-screen picker
-- [ ] Write component tests
+- [x] Create EmojiPicker.tsx component
+- [x] Show 20+ common emoji in grid
+- [x] Position floating above message on hover
+- [x] Click emoji adds reaction immediately
+- [x] Close picker after selection
+- [x] Keyboard navigation (arrow keys, enter)
+- [x] Accessibility (ARIA labels)
+- [x] Mobile: full-screen picker
+- [x] Write component tests
 
 **Acceptance Criteria:**
 - Picker opens on "+" button click
