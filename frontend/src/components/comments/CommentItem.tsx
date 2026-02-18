@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { MarkdownInput } from '../common/MarkdownInput';
 import { MarkdownRenderer } from '../common/MarkdownRenderer';
 import { useFormat } from '../../hooks/useFormat';
+import { useNavigate } from 'react-router-dom';
 
 export interface CommentActionHandlers<T extends LocalCommentBase> {
   vote: (comment: T, value: 1 | -1) => Promise<void>;
@@ -44,6 +45,7 @@ export function CommentItem<T extends LocalCommentBase>({
   isModerator = false,
 }: CommentItemProps<T>) {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const { formatNumber, formatDate, formatRelativeTime } = useFormat();
   const [replyText, setReplyText] = useState('');
   const [editText, setEditText] = useState(comment.content);
@@ -305,6 +307,12 @@ export function CommentItem<T extends LocalCommentBase>({
             </button>
 
             {/* Secondary actions: Save, Edit, Inbox toggle */}
+            <button
+              onClick={() => navigate(`/users/${encodeURIComponent(comment.username)}`)}
+              className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+            >
+              {t('comments.actions.viewProfile')}
+            </button>
             <button
               onClick={handleToggleSave}
               disabled={savePending}
