@@ -61,7 +61,7 @@ export function MessageReactions({
     queryFn: () => reactionsService.getReactions(messageId),
     staleTime: 10 * 60 * 1000, // 10 min — WS events keep the cache fresh
     refetchOnWindowFocus: false,
-    retry: false,
+    retry: 1, // retry once on transient failure; do not loop on persistent errors
   });
 
   // ── Mutations ──────────────────────────────────────────────────────────────
@@ -214,10 +214,7 @@ export function MessageReactions({
     [addMutation, removeMutation],
   );
 
-  // Dismiss tooltip on Escape (keyboard accessibility)
-  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if (e.key === 'Escape') setTooltip(null);
-  }, []);
+  // handleKeyDown is inlined on each button (no memoization needed — not a prop)
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
@@ -252,9 +249,11 @@ export function MessageReactions({
     >
       {reactions.map((summary) => {
         const isActive = summary.user_reacted;
-        const canToggle = isActive
-          ? summary.my_reaction_id !== undefined
-          : true; // add is always allowed (server enforces cap)
+        // Disable toggling when: unauthenticated (id≤0), mutation in flight, or
+        // user reacted but we don't have the reaction ID needed for DELETE.
+        const canToggle =
+          currentUserId > 0 &&
+          (isActive ? summary.my_reaction_id !== undefined : true);
 
         return (
           <div key={summary.emoji} className="relative">
@@ -283,7 +282,7 @@ export function MessageReactions({
                 setTooltip({ emoji: summary.emoji, text: buildTooltip(summary) })
               }
               onBlur={() => setTooltip(null)}
-              onKeyDown={handleKeyDown}
+              onKeyDown={(e) => { if (e.key === 'Escape') setTooltip(null); }}
             >
               <span className="text-base leading-none">{summary.emoji}</span>
               <span className="tabular-nums">{summary.count}</span>
