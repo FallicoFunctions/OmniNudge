@@ -38,6 +38,14 @@ export interface SiteStats {
   total_conversations: number;
   total_messages: number;
   total_reports: number;
+  open_reports: number;
+  approved_reports: number;
+  rejected_reports: number;
+  no_action_reports: number;
+  reviewed_reports: number;
+  dismissed_reports: number;
+  false_report_rate_pct: number;
+  avg_report_resolution_hours: number;
   admin_count: number;
   moderator_count: number;
 }

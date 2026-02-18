@@ -141,6 +141,17 @@ function StatsTab() {
     },
     { label: t('adminPage.stats.cards.totalMessages'), value: stats.total_messages, color: 'cyan' },
     { label: t('adminPage.stats.cards.totalReports'), value: stats.total_reports, color: 'red' },
+    { label: t('adminPage.stats.cards.openReports'), value: stats.open_reports, color: 'red' },
+    {
+      label: t('adminPage.stats.cards.falseReportRate'),
+      value: `${formatNumber(stats.false_report_rate_pct)}%`,
+      color: 'amber',
+    },
+    {
+      label: t('adminPage.stats.cards.avgReportResolutionHours'),
+      value: `${formatNumber(stats.avg_report_resolution_hours)}h`,
+      color: 'lime',
+    },
     { label: t('adminPage.stats.cards.admins'), value: stats.admin_count, color: 'yellow' },
     {
       label: t('adminPage.stats.cards.hubModerators'),
@@ -158,7 +169,7 @@ function StatsTab() {
         >
           <div className="text-sm text-[var(--color-text-secondary)] mb-1">{stat.label}</div>
           <div className="text-3xl font-bold">
-            {typeof stat.value === 'number' ? formatNumber(stat.value) : '—'}
+            {typeof stat.value === 'number' ? formatNumber(stat.value) : stat.value}
           </div>
         </div>
       ))}
