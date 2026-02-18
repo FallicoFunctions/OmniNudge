@@ -1472,13 +1472,16 @@ func TestEditMessage_Success(t *testing.T) {
 	assert.Equal(t, "original-encrypted", *originalContent)
 
 	var historyCount int
+	var historyContent *string
 	err = db.Pool.QueryRow(context.Background(), `
-		SELECT COUNT(*)
+		SELECT COUNT(*), MIN(content)
 		FROM message_edit_history
 		WHERE message_id = $1
-	`, message.ID).Scan(&historyCount)
+	`, message.ID).Scan(&historyCount, &historyContent)
 	require.NoError(t, err)
 	assert.Equal(t, 1, historyCount)
+	require.NotNil(t, historyContent)
+	assert.Equal(t, "original-encrypted", *historyContent)
 
 	calls := hub.SnapshotBroadcastCalls()
 	require.Len(t, calls, 2)
@@ -1553,6 +1556,44 @@ func TestEditMessage_RejectsAfter15Minutes(t *testing.T) {
 	router.ServeHTTP(w, req)
 
 	assert.Equal(t, http.StatusForbidden, w.Code, w.Body.String())
+}
+
+func TestEditMessage_RejectsModMailConversation(t *testing.T) {
+	handler, db, user1ID, user2ID, convID, _, cleanup := setupMessagesHandlerTest(t)
+	defer cleanup()
+
+	_, err := db.Pool.Exec(context.Background(), `
+		UPDATE conversations SET conversation_type = 'mod_mail' WHERE id = $1
+	`, convID)
+	require.NoError(t, err)
+
+	message := &models.Message{
+		ConversationID:    convID,
+		SenderID:          user1ID,
+		RecipientID:       user2ID,
+		EncryptedContent:  "original-encrypted",
+		MessageType:       "text",
+		EncryptionVersion: "v1",
+	}
+	require.NoError(t, handler.messageRepo.Create(context.Background(), message))
+
+	router := gin.Default()
+	router.PATCH("/messages/:id", func(c *gin.Context) {
+		c.Set("user_id", user1ID)
+		handler.EditMessage(c)
+	})
+
+	body := map[string]any{
+		"encrypted_content": "updated-encrypted",
+	}
+	bodyJSON, _ := json.Marshal(body)
+	req := httptest.NewRequest(http.MethodPatch, fmt.Sprintf("/messages/%d", message.ID), bytes.NewBuffer(bodyJSON))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusForbidden, w.Code, w.Body.String())
+	assert.Contains(t, w.Body.String(), "Editing mod mail messages is not supported")
 }
 
 func TestGetMessageHistory_SuccessWithPagination(t *testing.T) {
