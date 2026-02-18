@@ -1939,18 +1939,18 @@
 ---
 
 ### F2-005: Frontend - Pin Button & Hook
-**Status:** ⬜ TODO
+**Status:** ✅ COMPLETE
 **Priority:** P1
 **Estimated Time:** 3 hours
 
 **Tasks:**
-- [ ] Add pin button to message hover menu
-- [ ] Create usePinnedMessages.ts hook
-- [ ] Implement pin/unpin mutations
-- [ ] Subscribe to WebSocket pin events
-- [ ] Update cache on pin changes
-- [ ] Show visual indicator on pinned messages
-- [ ] Write tests
+- [x] Add pin button to message hover menu
+- [x] Create usePinnedMessages.ts hook
+- [x] Implement pin/unpin mutations
+- [x] Subscribe to WebSocket pin events
+- [x] Update cache on pin changes
+- [x] Show visual indicator on pinned messages
+- [x] Write tests
 
 **Acceptance Criteria:**
 - Pin button visible on hover

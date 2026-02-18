@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
-  type InfiniteData,
   useInfiniteQuery,
   useMutation,
   useQuery,
@@ -22,12 +21,12 @@ import { HighlightedText } from '../components/messages/HighlightedText';
 import { MessageReactions } from '../components/messages/MessageReactions';
 import { QuickReactButton } from '../components/messages/QuickReactButton';
 import { PinnedMessagesBar } from '../components/messages/PinnedMessagesBar';
+import { usePinnedMessages } from '../hooks/usePinnedMessages';
 import { useDebounce } from '../hooks/useDebounce';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import type {
   Conversation,
   Message,
-  PinnedMessagesResponse,
   SendMessageRequest,
 } from '../types/messages';
 import type { ModMailConversation } from '../types/modmail';
@@ -868,20 +867,24 @@ export default function MessagesPage() {
     refetchOnWindowFocus: false,
     retry: false, // Avoid retry loops on 404 when a conversation was deleted
   });
-  const { data: pinnedMessagesData } = useQuery<PinnedMessagesResponse>({
-    queryKey: ['pinnedMessages', selectedConversationId],
-    queryFn: () => messagesService.getPinnedMessages(selectedConversationId!),
-    enabled: !!selectedConversationId && selectedConversationExists && !isCreatingChat,
-    refetchOnWindowFocus: false,
-  });
   const messages = useMemo(
     () => messagesData?.pages.flatMap((page) => page.messages) ?? [],
     [messagesData]
   );
-  const pinnedMessages = useMemo(
-    () => pinnedMessagesData?.pinned_messages ?? [],
-    [pinnedMessagesData]
-  );
+  const {
+    pinnedMessages,
+    pinnedMessageIds,
+    canUnpinMessage,
+    pinMessage,
+    unpinMessage,
+    pinningMessageId,
+    unpinningMessageId,
+  } = usePinnedMessages({
+    conversationId: selectedConversationId,
+    currentUserId: user?.id,
+    currentUserRole: user?.role,
+    enabled: selectedConversationExists && !isCreatingChat,
+  });
 
   // Create media messages list for full-screen viewer (images and videos only)
   const conversationMediaMessages = useMemo(() => {
@@ -984,44 +987,6 @@ export default function MessagesPage() {
     },
     onSettled: () => {
       setDeleteScopeInFlight(null);
-    },
-  });
-
-  const unpinMessageMutation = useMutation({
-    mutationFn: (messageId: number) => messagesService.unpinMessage(messageId),
-    onSuccess: (_, messageId) => {
-      if (!selectedConversationId) return;
-
-      queryClient.setQueryData<PinnedMessagesResponse | undefined>(
-        ['pinnedMessages', selectedConversationId],
-        (prev) =>
-          prev
-            ? {
-                ...prev,
-                pinned_messages: prev.pinned_messages.filter((msg) => msg.id !== messageId),
-              }
-            : prev
-      );
-
-      queryClient.setQueryData<
-        InfiniteData<{ messages: Message[]; next_cursor?: string }> | undefined
-      >(['messages', selectedConversationId], (prev) => {
-        if (!prev) return prev;
-        return {
-          ...prev,
-          pages: prev.pages.map((page) => ({
-            ...page,
-            messages: page.messages.map((msg) =>
-              msg.id === messageId
-                ? { ...msg, pinned: false, pinned_by: null, pinned_at: null }
-                : msg
-            ),
-          })),
-        };
-      });
-    },
-    onError: (error) => {
-      alert(error instanceof Error ? error.message : t('messages.pinned.unpinFailed'));
     },
   });
 
@@ -2350,8 +2315,8 @@ export default function MessagesPage() {
                   expanded={expandedPinnedMessages}
                   onToggleExpanded={() => setExpandedPinnedMessages((prev) => !prev)}
                   onJumpToMessage={handleJumpToPinnedMessage}
-                  onUnpinMessage={(messageId) => unpinMessageMutation.mutate(messageId)}
-                  unpinningMessageId={unpinMessageMutation.variables}
+                  onUnpinMessage={(messageId) => unpinMessage(messageId)}
+                  unpinningMessageId={unpinningMessageId}
                 />
               )}
 
@@ -2385,6 +2350,11 @@ export default function MessagesPage() {
                     )}
                     {filteredMessages.map((message) => {
                       const isOwnMessage = message.sender_id === user?.id;
+                      const messagePinned = pinnedMessageIds.has(message.id);
+                      const isPinningMessage = pinningMessageId === message.id;
+                      const isUnpinningMessage = unpinningMessageId === message.id;
+                      const canUnpinThisMessage = canUnpinMessage(message.id);
+                      const pinMutationPending = isPinningMessage || isUnpinningMessage;
 
                       // For mod_mail, get sender info from participants
                       const isModMail = selectedConversation?.conversation_type === 'mod_mail';
@@ -2466,6 +2436,17 @@ export default function MessagesPage() {
                                     )}
                                   </>
                                 )}
+                                {messagePinned && (
+                                  <span
+                                    className={`px-1.5 py-0.5 text-[10px] font-semibold rounded ${
+                                      isOwnMessage
+                                        ? 'bg-white/20 text-white'
+                                        : 'bg-[var(--color-primary)] text-white'
+                                    }`}
+                                  >
+                                    {t('messages.pinned.badge')}
+                                  </span>
+                                )}
                                 <span>
                                   {formatDate(message.sent_at, {
                                     month: 'short',
@@ -2533,6 +2514,30 @@ export default function MessagesPage() {
                                         : t('messages.actions.report')}
                                     </button>
                                   )}
+                                  <button
+                                    type="button"
+                                    className="w-full rounded-md px-3 py-2 text-left text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
+                                    disabled={
+                                      pinMutationPending || (messagePinned && !canUnpinThisMessage)
+                                    }
+                                    onClick={() => {
+                                      if (messagePinned) {
+                                        if (!canUnpinThisMessage) return;
+                                        unpinMessage(message.id);
+                                      } else {
+                                        pinMessage(message.id);
+                                      }
+                                      setMessageMenuOpen(null);
+                                    }}
+                                  >
+                                    {pinMutationPending
+                                      ? t('messages.pinned.updating')
+                                      : messagePinned
+                                        ? canUnpinThisMessage
+                                          ? t('messages.pinned.unpin')
+                                          : t('messages.pinned.unpinNotAllowed')
+                                        : t('messages.pinned.pin')}
+                                  </button>
                                   <button
                                     type="button"
                                     className="w-full rounded-md px-3 py-2 text-left text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"

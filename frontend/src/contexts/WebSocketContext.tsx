@@ -3,7 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from './AuthContext';
 import { API_BASE_URL } from '../lib/api';
 import type { InfiniteData } from '@tanstack/react-query';
-import type { Message, Conversation } from '../types/messages';
+import type { Message, Conversation, WsMessagePinEvent } from '../types/messages';
 import type { GetReactionsResponse, WsReactionAddedPayload, WsReactionRemovedPayload } from '../types/reactions';
 
 interface WebSocketMessage {
@@ -432,6 +432,22 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
           );
           window.dispatchEvent(new CustomEvent<WsReactionRemovedPayload>('reaction-removed', {
             detail: data.payload as WsReactionRemovedPayload,
+          }));
+          break;
+        }
+
+        case 'message_pinned': {
+          const payload = data.payload as WsMessagePinEvent;
+          window.dispatchEvent(new CustomEvent<WsMessagePinEvent>('message-pinned', {
+            detail: payload,
+          }));
+          break;
+        }
+
+        case 'message_unpinned': {
+          const payload = data.payload as WsMessagePinEvent;
+          window.dispatchEvent(new CustomEvent<WsMessagePinEvent>('message-unpinned', {
+            detail: payload,
           }));
           break;
         }

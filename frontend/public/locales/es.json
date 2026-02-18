@@ -1441,7 +1441,11 @@
       "title_other": "{{count}} mensajes fijados",
       "showMore": "Mostrar {{count}} más",
       "showLess": "Mostrar menos",
+      "badge": "FIJADO",
+      "pin": "Fijar mensaje",
       "unpin": "Desfijar",
+      "unpinNotAllowed": "Solo quien fijó o un admin puede desfijar",
+      "updating": "Actualizando...",
       "unpinning": "Desfijando...",
       "unpinFailed": "No se pudo desfijar el mensaje"
     },
