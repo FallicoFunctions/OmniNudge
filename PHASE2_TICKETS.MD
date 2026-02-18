@@ -2029,25 +2029,25 @@
 ---
 
 ### F2-009: Fix - Group Pin Permissions
-**Status:** ⬜ TODO
+**Status:** ⏸️ DEFERRED (Moved to Feature 9 sequence)
 **Priority:** P2
 **Estimated Time:** 1 hour
 
-**Problem:** Group pin permissions not fully specified.
+**Problem:** Group pin permissions require group roles/settings that are introduced in Feature 9, not Feature 2.
 
-**Tasks:**
-- [ ] Read group settings: anyone_can_pin
-- [ ] If true: all members can pin
-- [ ] If false: only admin/owner can pin
-- [ ] Enforce in API endpoint
-- [ ] Update frontend to show/hide pin button
-- [ ] Document permission logic
+**Disposition:**
+- Moved out of Feature 2 delivery scope to keep sequencing consistent.
+- Implement under Feature 9 once group schema and permission services exist.
+- Canonical implementation points:
+  - `F9-001` (group schema + `anyone_can_pin` + roles)
+  - `F9-009` (group permission checks including `CanPinMessage`)
+  - `F9` frontend group settings/admin flows for UI gating
 
 **Acceptance Criteria:**
-- Permissions enforced correctly
-- UI matches permissions
+- Permissions enforced correctly (when groups implemented)
+- UI matches permissions (when groups implemented)
 
-**Dependencies:** F2-002 (after groups implemented)
+**Dependencies:** F9-001, F9-009
 
 ---
 
@@ -3844,6 +3844,8 @@
 **Status:** ⬜ TODO
 **Priority:** P1
 **Estimated Time:** 3 hours
+
+**Note:** This ticket absorbs former `F2-009` (group pin permissions).
 
 **Tasks:**
 - [ ] Create group_permissions.go service
