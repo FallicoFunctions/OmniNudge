@@ -1812,8 +1812,8 @@
 **Problem:** Hover tooltip doesn't work on mobile.
 
 **Tasks:**
-- [ ] Implement tap-to-see-details modal on mobile
-- [ ] Show full list of users who reacted
+- [x] Implement tap-to-see-details modal on mobile
+- [x] Show full list of users who reacted
 - [ ] Test on iOS and Android
 
 **Acceptance Criteria:**
