@@ -385,6 +385,92 @@ Delete a message (soft delete for the current user).
 
 ---
 
+### Pin Message
+Pin a message in a conversation.
+
+**Endpoint:** `POST /messages/:id/pin`
+**Auth Required:** Yes
+
+**Response:** `200 OK`
+```json
+{
+  "message": "Message pinned"
+}
+```
+
+**Error Codes:**
+- `403` - Not a participant in this conversation
+- `404` - Message not found
+- `409` - Conversation already has maximum pinned messages (10)
+
+**Notes:**
+- Maximum pinned messages per conversation: `10`
+- Pins are tracked on the message row (`pinned`, `pinned_by`, `pinned_at`).
+
+**WebSocket Events Triggered:**
+- `message_pinned` - Sent to conversation participants
+
+---
+
+### Unpin Message
+Unpin a previously pinned message.
+
+**Endpoint:** `DELETE /messages/:id/pin`
+**Auth Required:** Yes
+
+**Response:** `200 OK`
+```json
+{
+  "message": "Message unpinned"
+}
+```
+
+**Error Codes:**
+- `403` - Only the pinner or admin can unpin
+- `404` - Message not found
+
+**WebSocket Events Triggered:**
+- `message_unpinned` - Sent to conversation participants
+
+---
+
+### Get Pinned Messages
+Retrieve pinned messages for a conversation in chronological pin order.
+
+**Endpoint:** `GET /conversations/:id/pinned-messages`
+**Auth Required:** Yes
+
+**Response:** `200 OK`
+```json
+{
+  "pinned_messages": [
+    {
+      "id": 123,
+      "conversation_id": 42,
+      "sender_id": 1,
+      "recipient_id": 5,
+      "encrypted_content": "base64-encoded-encrypted-blob",
+      "message_type": "text",
+      "pinned": true,
+      "pinned_by": 1,
+      "pinned_at": "2026-02-18T11:45:00Z",
+      "sent_at": "2026-02-18T10:45:00Z",
+      "encryption_version": "v2"
+    }
+  ]
+}
+```
+
+**Error Codes:**
+- `403` - Not a participant in this conversation
+- `404` - Conversation not found
+
+**Notes:**
+- Order is `pinned_at ASC`, then `id ASC` for deterministic ties.
+- Maximum returned pinned messages: `10`.
+
+---
+
 ## Media Upload
 
 ### Upload Media File
@@ -644,6 +730,46 @@ Sent when a user disconnects from WebSocket.
   "type": "user_offline",
   "payload": {
     "user_id": 5
+  }
+}
+```
+
+---
+
+#### 7. Message Pinned
+Sent when a message is pinned in a conversation.
+
+```json
+{
+  "type": "message_pinned",
+  "payload": {
+    "type": "message_pinned",
+    "message_id": 123,
+    "conversation_id": 42,
+    "pinned_by": 1,
+    "pinned_at": "2026-02-18T11:45:00Z",
+    "preview": "encrypted-preview-or-placeholder",
+    "message_type": "text"
+  }
+}
+```
+
+---
+
+#### 8. Message Unpinned
+Sent when a message is unpinned in a conversation.
+
+```json
+{
+  "type": "message_unpinned",
+  "payload": {
+    "type": "message_unpinned",
+    "message_id": 123,
+    "conversation_id": 42,
+    "pinned_by": 1,
+    "pinned_at": "2026-02-18T11:45:00Z",
+    "preview": "encrypted-preview-or-placeholder",
+    "message_type": "text"
   }
 }
 ```

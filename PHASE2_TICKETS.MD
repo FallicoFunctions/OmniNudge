@@ -2052,14 +2052,14 @@
 ---
 
 ### F2-010: Documentation - Pinning Feature
-**Status:** ⬜ TODO
+**Status:** ✅ COMPLETE
 **Priority:** P2
 **Estimated Time:** 30 minutes
 
 **Tasks:**
-- [ ] Update API documentation
-- [ ] Update user guide
-- [ ] Add to changelog
+- [x] Update API documentation
+- [x] Update user guide
+- [x] Add to changelog
 
 **Dependencies:** F2-006
 
