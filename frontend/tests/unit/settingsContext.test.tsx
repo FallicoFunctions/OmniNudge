@@ -19,6 +19,7 @@ const defaultServerSettings = {
   use_relative_time: true,
   auto_close_theme_selector: false,
   notify_archived_messages: false,
+  auto_unarchive_on_message: true,
   notify_removed_saved_posts: true,
   default_omni_posts_only: false,
   stay_on_post_after_hide: false,
@@ -156,6 +157,60 @@ describe('SettingsContext showPushNotifications', () => {
     });
 
     expect(userSettingsService.update).toHaveBeenCalledWith({ daily_digest: true });
+  });
+
+  it('rolls back autoUnarchiveOnMessage when update fails', async () => {
+    vi.mocked(userSettingsService.get).mockResolvedValue({
+      ...defaultServerSettings,
+      auto_unarchive_on_message: true,
+    } as never);
+    vi.mocked(userSettingsService.update).mockRejectedValue(new Error('update failed'));
+
+    const { result } = renderHook(() => useSettings(), { wrapper });
+
+    await waitFor(() => {
+      expect(result.current.autoUnarchiveOnMessage).toBe(true);
+    });
+
+    await act(async () => {
+      result.current.setAutoUnarchiveOnMessage(false);
+    });
+
+    await waitFor(() => {
+      expect(result.current.autoUnarchiveOnMessage).toBe(true);
+    });
+
+    expect(userSettingsService.update).toHaveBeenCalledWith({ auto_unarchive_on_message: false });
+  });
+
+  it('persists autoUnarchiveOnMessage to localStorage on successful update', async () => {
+    vi.mocked(userSettingsService.get).mockResolvedValue({
+      ...defaultServerSettings,
+      auto_unarchive_on_message: true,
+    } as never);
+    vi.mocked(userSettingsService.update).mockResolvedValue({
+      ...defaultServerSettings,
+      auto_unarchive_on_message: false,
+    } as never);
+
+    const { result } = renderHook(() => useSettings(), { wrapper });
+
+    await waitFor(() => {
+      expect(result.current.autoUnarchiveOnMessage).toBe(true);
+    });
+
+    await act(async () => {
+      result.current.setAutoUnarchiveOnMessage(false);
+    });
+
+    await waitFor(() => {
+      expect(result.current.autoUnarchiveOnMessage).toBe(false);
+    });
+
+    const raw = localStorage.getItem('omninudge-settings');
+    expect(raw).toBeTruthy();
+    const parsed = JSON.parse(raw ?? '{}') as { autoUnarchiveOnMessage?: boolean };
+    expect(parsed.autoUnarchiveOnMessage).toBe(false);
   });
 
   it('applies settings locally in under 100ms before server response', async () => {
