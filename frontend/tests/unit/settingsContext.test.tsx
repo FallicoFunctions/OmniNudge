@@ -157,4 +157,32 @@ describe('SettingsContext showPushNotifications', () => {
 
     expect(userSettingsService.update).toHaveBeenCalledWith({ daily_digest: true });
   });
+
+  it('applies settings locally in under 100ms before server response', async () => {
+    vi.mocked(userSettingsService.get).mockResolvedValue({
+      ...defaultServerSettings,
+      daily_digest: false,
+    } as never);
+    vi.mocked(userSettingsService.update).mockImplementation(
+      () =>
+        new Promise(() => {
+          // Intentionally never resolve to verify local optimistic update.
+        }) as never
+    );
+
+    const { result } = renderHook(() => useSettings(), { wrapper });
+
+    await waitFor(() => {
+      expect(result.current.dailyDigest).toBe(false);
+    });
+
+    const start = performance.now();
+    act(() => {
+      result.current.setDailyDigest(true);
+    });
+    const elapsedMs = performance.now() - start;
+
+    expect(result.current.dailyDigest).toBe(true);
+    expect(elapsedMs).toBeLessThan(100);
+  });
 });
