@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -390,6 +391,64 @@ func TestMessageReactions_DBConstraint_MaxUniqueEmoji(t *testing.T) {
 	`, bed.msgID).Scan(&distinctCount)
 	require.NoError(t, err)
 	assert.Equal(t, 10, distinctCount)
+}
+
+// TestMessageReactions_DBConstraint_MaxUniqueEmoji_ConcurrentBypass ensures the
+// DB-level cap remains enforced under concurrent direct inserts.
+func TestMessageReactions_DBConstraint_MaxUniqueEmoji_ConcurrentBypass(t *testing.T) {
+	bed, cleanup := setupReactionsHandlerTest(t)
+	defer cleanup()
+
+	emojis := []string{"👍", "❤️", "😂", "😮", "😢", "😡", "🎉", "🔥", "💯", "✅", "🚀", "🧠", "🌟", "🐳", "🍕"}
+	const workers = 5
+
+	var successCount int64
+	var wg sync.WaitGroup
+
+	for w := 0; w < workers; w++ {
+		wg.Add(1)
+		go func(worker int) {
+			defer wg.Done()
+			actorID := bed.user1ID
+			if worker%2 == 1 {
+				actorID = bed.user2ID
+			}
+			for i, emoji := range emojis {
+				_, err := bed.db.Pool.Exec(context.Background(), `
+					INSERT INTO message_reactions (message_id, user_id, emoji)
+					VALUES ($1, $2, $3)
+					ON CONFLICT (message_id, user_id, emoji) DO NOTHING
+				`, bed.msgID, actorID, fmt.Sprintf("%s_%d_%d", emoji, worker, i))
+
+				if err == nil {
+					atomic.AddInt64(&successCount, 1)
+					continue
+				}
+
+				var pgErr *pgconn.PgError
+				if errors.As(err, &pgErr) && pgErr.ConstraintName == "message_reactions_max_unique_emoji_per_message" {
+					continue
+				}
+
+				// Duplicate-key conflicts from concurrent inserts are acceptable;
+				// this path is mostly for cap-enforcement validation.
+				t.Errorf("unexpected insert error: %v", err)
+			}
+		}(w)
+	}
+	wg.Wait()
+
+	var distinctCount int
+	err := bed.db.Pool.QueryRow(context.Background(), `
+		SELECT COUNT(DISTINCT emoji)
+		FROM message_reactions
+		WHERE message_id = $1
+	`, bed.msgID).Scan(&distinctCount)
+	require.NoError(t, err)
+
+	assert.LessOrEqual(t, distinctCount, 10, "DB cap should hold under concurrency")
+	assert.Equal(t, 10, distinctCount, "table should end at the configured max")
+	assert.GreaterOrEqual(t, successCount, int64(10), "at least 10 inserts should succeed")
 }
 
 func TestAddReaction_Unauthenticated(t *testing.T) {
