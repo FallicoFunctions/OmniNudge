@@ -32,11 +32,15 @@ type MessageReaction struct {
 
 // ReactionSummary aggregates all reactions of the same emoji on a message.
 type ReactionSummary struct {
-	Emoji       string   `json:"emoji"`
-	Count       int      `json:"count"`
-	UserIDs     []int    `json:"user_ids"`
-	Usernames   []string `json:"usernames"`
-	UserReacted bool     `json:"user_reacted"`
+	Emoji        string   `json:"emoji"`
+	Count        int      `json:"count"`
+	UserIDs      []int    `json:"user_ids"`
+	Usernames    []string `json:"usernames"`
+	UserReacted  bool     `json:"user_reacted"`
+	// MyReactionID is the ID of the requesting user's reaction for this emoji,
+	// or nil if the viewer has not reacted. Required by clients to call the
+	// DELETE /messages/{id}/reactions/{reaction_id} endpoint.
+	MyReactionID *int     `json:"my_reaction_id,omitempty"`
 }
 
 // MessageReactionRepository handles all database operations for message reactions.
@@ -119,8 +123,15 @@ func (r *MessageReactionRepository) RemoveReaction(ctx context.Context, reaction
 // so they know the lists are not exhaustive.
 func (r *MessageReactionRepository) GetReactionsByMessageID(ctx context.Context, messageID, viewerID int) ([]ReactionSummary, bool, error) {
 	// Step 1: Per-emoji aggregates (count + whether the viewer reacted)
+	// Step 1 selects per-emoji aggregates and the viewer's own reaction ID
+	// (NULL when the viewer has not reacted with that emoji).
+	// MAX(CASE ...) is safe because (message_id, user_id, emoji) is UNIQUE,
+	// so there is at most one matching row and MAX returns that single id.
 	rows, err := r.pool.Query(ctx, `
-		SELECT emoji, COUNT(*) AS count, BOOL_OR(user_id = $2) AS user_reacted
+		SELECT emoji,
+		       COUNT(*) AS count,
+		       BOOL_OR(user_id = $2) AS user_reacted,
+		       MAX(CASE WHEN user_id = $2 THEN id END) AS my_reaction_id
 		FROM message_reactions
 		WHERE message_id = $1
 		GROUP BY emoji
@@ -138,7 +149,7 @@ func (r *MessageReactionRepository) GetReactionsByMessageID(ctx context.Context,
 
 	for rows.Next() {
 		s := &ReactionSummary{}
-		if err := rows.Scan(&s.Emoji, &s.Count, &s.UserReacted); err != nil {
+		if err := rows.Scan(&s.Emoji, &s.Count, &s.UserReacted, &s.MyReactionID); err != nil {
 			return nil, false, fmt.Errorf("scan reaction summary: %w", err)
 		}
 		summaryMap[s.Emoji] = s

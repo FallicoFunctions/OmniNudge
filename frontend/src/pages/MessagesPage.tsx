@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   useInfiniteQuery,
   useMutation,
@@ -18,6 +18,7 @@ import { MessageStatusIndicator } from '../components/messages/MessageStatusIndi
 import { OnlineStatusIndicator } from '../components/messages/OnlineStatusIndicator';
 import { TypingIndicator } from '../components/messages/TypingIndicator';
 import { HighlightedText } from '../components/messages/HighlightedText';
+import { MessageReactions } from '../components/messages/MessageReactions';
 import { useDebounce } from '../hooks/useDebounce';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import type { Conversation, Message, SendMessageRequest } from '../types/messages';
@@ -45,8 +46,13 @@ import { hubsService } from '../services/hubsService';
 import { useHubSubredditAutocomplete } from '../hooks/useHubSubredditAutocomplete';
 import type { LocalSubredditPost } from '../services/hubsService';
 import type { RedditApiPost } from '../types/reddit';
+import { normalizeReportReason, reportService, type ReportReason } from '../services/reportService';
+import { searchMessages, type MessageSearchFilters, type MessageSearchResult } from '../utils/messageSearch';
 
 const MAX_UPLOAD_SIZE = 25 * 1024 * 1024; // 25MB
+const SEARCH_PAGE_SIZE = 50;
+
+type MessageSearchDateRange = 'all' | '24h' | '7d' | '30d';
 
 function inferMessageTypeFromFile(file: File): Message['message_type'] {
   if (file.type.startsWith('video/')) {
@@ -649,6 +655,7 @@ const DownloadButton = ({ message, isOwnMessage, onClose }: DownloadButtonProps)
 
 export default function MessagesPage() {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const { formatRelativeTime, formatDate } = useFormat();
   const { user } = useAuth();
   const { setActiveConversationId } = useMessagingContext();
@@ -688,6 +695,11 @@ export default function MessagesPage() {
   const { typingIndicators, readReceipts, speakerDeviceId } = useSettings();
   const [searchQuery, setSearchQuery] = useState('');
   const [messageSearchQuery, setMessageSearchQuery] = useState('');
+  const [messageSearchSenderFilter, setMessageSearchSenderFilter] = useState<'all' | 'mine' | 'others'>('all');
+  const [messageSearchDateRange, setMessageSearchDateRange] = useState<MessageSearchDateRange>('all');
+  const [messageSearchHasFiles, setMessageSearchHasFiles] = useState(false);
+  const [messageSearchHasLinks, setMessageSearchHasLinks] = useState(false);
+  const [messageSearchPage, setMessageSearchPage] = useState(0);
   const debouncedMessageSearch = useDebounce(messageSearchQuery, 300);
   const [decryptedContentMap, setDecryptedContentMap] = useState<Map<number, string>>(new Map());
   const [isDecryptingForSearch, setIsDecryptingForSearch] = useState(false);
@@ -697,6 +709,14 @@ export default function MessagesPage() {
   const isMobile = useMediaQuery('(max-width: 767px)');
   const isInChat = Boolean(selectedConversationId || isCreatingChat);
   const [showMessageSearch, setShowMessageSearch] = useState(false);
+  const resetMessageSearch = useCallback(() => {
+    setMessageSearchQuery('');
+    setMessageSearchSenderFilter('all');
+    setMessageSearchDateRange('all');
+    setMessageSearchHasFiles(false);
+    setMessageSearchHasLinks(false);
+    setMessageSearchPage(0);
+  }, []);
 
   const {
     data: conversationsData,
@@ -945,6 +965,35 @@ export default function MessagesPage() {
     },
     onSettled: () => {
       setDeleteScopeInFlight(null);
+    },
+  });
+
+  const reportMessageMutation = useMutation({
+    mutationFn: ({
+      messageId,
+      reason,
+      description,
+    }: {
+      messageId: number;
+      reason: ReportReason;
+      description?: string;
+    }) =>
+      reportService.createReport({
+        targetType: 'message',
+        targetId: messageId,
+        reason,
+        description,
+      }),
+    onSuccess: () => {
+      alert(t('reporting.success'));
+      setMessageMenuOpen(null);
+    },
+    onError: (error) => {
+      alert(
+        t('messages.errors.reportFailed', {
+          message: error instanceof Error ? error.message : t('common.error'),
+        })
+      );
     },
   });
 
@@ -1404,6 +1453,23 @@ export default function MessagesPage() {
     });
   };
 
+  const handleReportMessage = (message: Message) => {
+    const reasonInput = window.prompt(t('reporting.reasonPrompt'));
+    if (reasonInput === null) return;
+    const reason = normalizeReportReason(reasonInput);
+    if (!reason) {
+      alert(t('reporting.invalidReason'));
+      return;
+    }
+    const detailsInput = window.prompt(t('reporting.detailsPrompt'));
+
+    reportMessageMutation.mutate({
+      messageId: message.id,
+      reason,
+      description: detailsInput ?? undefined,
+    });
+  };
+
   // For mod_mail conversations, backend returns messages in ASC order (oldest first)
   // For DM conversations, backend returns messages in DESC order (newest first)
   // We want to display oldest-to-newest (newest at bottom), so only reverse for DMs
@@ -1413,9 +1479,21 @@ export default function MessagesPage() {
     return isModMail ? [...messages] : [...messages].reverse();
   }, [messages, selectedConversation?.conversation_type]);
 
+  useEffect(() => {
+    setMessageSearchPage(0);
+  }, [
+    debouncedMessageSearch,
+    messageSearchSenderFilter,
+    messageSearchDateRange,
+    messageSearchHasFiles,
+    messageSearchHasLinks,
+    selectedConversationId,
+  ]);
+
   // Decrypt all messages for search functionality
   useEffect(() => {
-    if (!debouncedMessageSearch.trim() || orderedMessages.length === 0) {
+    const requiresDecryptedContent = Boolean(debouncedMessageSearch.trim()) || messageSearchHasLinks;
+    if (!requiresDecryptedContent || orderedMessages.length === 0) {
       setDecryptedContentMap(new Map());
       setIsDecryptingForSearch(false);
       return;
@@ -1487,18 +1565,83 @@ export default function MessagesPage() {
     };
 
     decryptAllMessages();
-  }, [orderedMessages, debouncedMessageSearch, user?.id]);
+  }, [orderedMessages, debouncedMessageSearch, messageSearchHasLinks, user?.id]);
 
-  // Filter messages based on search query
-  const filteredMessages = useMemo(() => {
-    if (!debouncedMessageSearch.trim()) return orderedMessages;
+  const messageSearchFilters = useMemo<MessageSearchFilters>(() => {
+    const now = Date.now();
+    let startDate: Date | undefined;
+    if (messageSearchDateRange === '24h') {
+      startDate = new Date(now - 24 * 60 * 60 * 1000);
+    } else if (messageSearchDateRange === '7d') {
+      startDate = new Date(now - 7 * 24 * 60 * 60 * 1000);
+    } else if (messageSearchDateRange === '30d') {
+      startDate = new Date(now - 30 * 24 * 60 * 60 * 1000);
+    }
 
-    const query = debouncedMessageSearch.toLowerCase();
-    return orderedMessages.filter((msg) => {
-      const content = decryptedContentMap.get(msg.id);
-      return content?.toLowerCase().includes(query);
+    const senderId =
+      messageSearchSenderFilter === 'mine'
+        ? user?.id
+        : messageSearchSenderFilter === 'others'
+          ? selectedConversation?.other_user?.id
+          : undefined;
+
+    return {
+      conversationId: selectedConversationId ?? undefined,
+      senderId,
+      startDate,
+      hasFiles: messageSearchHasFiles,
+      hasLinks: messageSearchHasLinks,
+    };
+  }, [
+    messageSearchDateRange,
+    messageSearchSenderFilter,
+    messageSearchHasFiles,
+    messageSearchHasLinks,
+    selectedConversationId,
+    selectedConversation?.other_user?.id,
+    user?.id,
+  ]);
+
+  const hasActiveMessageSearch = Boolean(debouncedMessageSearch.trim()) ||
+    messageSearchSenderFilter !== 'all' ||
+    messageSearchDateRange !== 'all' ||
+    messageSearchHasFiles ||
+    messageSearchHasLinks;
+
+  const messageSearchOutput = useMemo(() => {
+    if (!hasActiveMessageSearch) {
+      return { total: 0, results: [] };
+    }
+
+    return searchMessages(orderedMessages, decryptedContentMap, debouncedMessageSearch, messageSearchFilters, {
+      limit: SEARCH_PAGE_SIZE,
+      offset: messageSearchPage * SEARCH_PAGE_SIZE,
     });
-  }, [orderedMessages, debouncedMessageSearch, decryptedContentMap]);
+  }, [
+    hasActiveMessageSearch,
+    orderedMessages,
+    decryptedContentMap,
+    debouncedMessageSearch,
+    messageSearchFilters,
+    messageSearchPage,
+  ]);
+
+  const filteredMessages = useMemo(
+    () =>
+      hasActiveMessageSearch
+        ? messageSearchOutput.results.map((result) => result.message)
+        : orderedMessages,
+    [hasActiveMessageSearch, messageSearchOutput, orderedMessages]
+  );
+  const filteredMessageCount = hasActiveMessageSearch ? messageSearchOutput.total : orderedMessages.length;
+  const searchResultMetaByMessageId = useMemo(() => {
+    if (!hasActiveMessageSearch) return new Map<number, MessageSearchResult>();
+    const map = new Map<number, MessageSearchResult>();
+    messageSearchOutput.results.forEach((result) => {
+      map.set(result.message.id, result);
+    });
+    return map;
+  }, [hasActiveMessageSearch, messageSearchOutput]);
 
   const messagesContainerRef = useRef<HTMLDivElement | null>(null);
   const scrollToLatestMessage = useCallback(() => {
@@ -2051,7 +2194,7 @@ export default function MessagesPage() {
                     {messageSearchQuery && (
                       <button
                         type="button"
-                        onClick={() => setMessageSearchQuery('')}
+                        onClick={resetMessageSearch}
                         className="absolute right-16 p-1 rounded-full hover:bg-[var(--color-surface-hover)] active:bg-[var(--color-surface-hover)] text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] transition-colors"
                         aria-label={t('messages.search.clearLabel')}
                       >
@@ -2073,20 +2216,63 @@ export default function MessagesPage() {
                     )}
 
                     {/* Result Count */}
-                    {debouncedMessageSearch && (
+                    {hasActiveMessageSearch && (
                       <div className="absolute right-3 flex items-center gap-1 text-xs text-[var(--color-text-muted)] bg-[var(--color-surface-elevated)] px-2 py-1 rounded">
                         {isDecryptingForSearch ? (
                           <span>{t('messages.searching')}</span>
                         ) : (
                           <span>
-                            {filteredMessages.length}{' '}
-                            {filteredMessages.length === 1
+                            {filteredMessageCount}{' '}
+                            {filteredMessageCount === 1
                               ? t('messages.match')
                               : t('messages.matches')}
                           </span>
                         )}
                       </div>
                     )}
+                  </div>
+                  <div className="mt-2 grid grid-cols-2 gap-2 md:flex md:flex-wrap md:items-center">
+                    <select
+                      value={messageSearchSenderFilter}
+                      onChange={(e) =>
+                        setMessageSearchSenderFilter(e.target.value as 'all' | 'mine' | 'others')
+                      }
+                      className="rounded border border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-1 text-xs text-[var(--color-text-primary)]"
+                    >
+                      <option value="all">{t('messages.search.filters.senderAll')}</option>
+                      <option value="mine">{t('messages.search.filters.senderMine')}</option>
+                      <option value="others">{t('messages.search.filters.senderOthers')}</option>
+                    </select>
+                    <select
+                      value={messageSearchDateRange}
+                      onChange={(e) =>
+                        setMessageSearchDateRange(
+                          e.target.value as 'all' | '24h' | '7d' | '30d'
+                        )
+                      }
+                      className="rounded border border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-1 text-xs text-[var(--color-text-primary)]"
+                    >
+                      <option value="all">{t('messages.search.filters.dateAll')}</option>
+                      <option value="24h">{t('messages.search.filters.date24h')}</option>
+                      <option value="7d">{t('messages.search.filters.date7d')}</option>
+                      <option value="30d">{t('messages.search.filters.date30d')}</option>
+                    </select>
+                    <label className="inline-flex items-center gap-1 text-xs text-[var(--color-text-secondary)]">
+                      <input
+                        type="checkbox"
+                        checked={messageSearchHasFiles}
+                        onChange={(e) => setMessageSearchHasFiles(e.target.checked)}
+                      />
+                      {t('messages.search.filters.hasFiles')}
+                    </label>
+                    <label className="inline-flex items-center gap-1 text-xs text-[var(--color-text-secondary)]">
+                      <input
+                        type="checkbox"
+                        checked={messageSearchHasLinks}
+                        onChange={(e) => setMessageSearchHasLinks(e.target.checked)}
+                      />
+                      {t('messages.search.filters.hasLinks')}
+                    </label>
                   </div>
                 </div>
               )}
@@ -2105,7 +2291,7 @@ export default function MessagesPage() {
                   </div>
                 ) : (
                   <div className="space-y-3">
-                    {hasMoreMessages && !debouncedMessageSearch && (
+                    {hasMoreMessages && !hasActiveMessageSearch && (
                       <div className="flex justify-center">
                         <button
                           type="button"
@@ -2137,7 +2323,7 @@ export default function MessagesPage() {
                       return (
                         <div
                           key={message.id}
-                          className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'}`}
+                          className={`flex flex-col ${isOwnMessage ? 'items-end' : 'items-start'}`}
                           data-message-menu-container={message.id}
                         >
                           <div
@@ -2168,6 +2354,18 @@ export default function MessagesPage() {
                                     highlightText={debouncedMessageSearch}
                                   />
                                 )}
+                              {hasActiveMessageSearch && searchResultMetaByMessageId.get(message.id)?.snippet && (
+                                <p
+                                  className={`text-xs mb-1 ${
+                                    isOwnMessage ? 'text-white/80' : 'text-[var(--color-text-muted)]'
+                                  }`}
+                                >
+                                  <HighlightedText
+                                    text={searchResultMetaByMessageId.get(message.id)!.snippet}
+                                    highlight={debouncedMessageSearch}
+                                  />
+                                </p>
+                              )}
                               <div
                                 className={`text-xs flex items-center gap-1 ${
                                   isOwnMessage ? 'text-white/70' : 'text-[var(--color-text-muted)]'
@@ -2231,6 +2429,31 @@ export default function MessagesPage() {
                                       onClose={() => setMessageMenuOpen(null)}
                                     />
                                   )}
+                                  {!isOwnMessage && (
+                                    <button
+                                      type="button"
+                                      className="w-full rounded-md px-3 py-2 text-left text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
+                                      onClick={() => {
+                                        if (!senderUsername) return;
+                                        setMessageMenuOpen(null);
+                                        navigate(`/users/${encodeURIComponent(senderUsername)}`);
+                                      }}
+                                    >
+                                      {t('messages.actions.viewProfile')}
+                                    </button>
+                                  )}
+                                  {!isOwnMessage && (
+                                    <button
+                                      type="button"
+                                      className="w-full rounded-md px-3 py-2 text-left text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
+                                      disabled={reportMessageMutation.isPending}
+                                      onClick={() => handleReportMessage(message)}
+                                    >
+                                      {reportMessageMutation.isPending
+                                        ? t('messages.status.reporting')
+                                        : t('messages.actions.report')}
+                                    </button>
+                                  )}
                                   <button
                                     type="button"
                                     className="w-full rounded-md px-3 py-2 text-left text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
@@ -2245,24 +2468,55 @@ export default function MessagesPage() {
                               )}
                             </div>
                           </div>
+                          {message.id > 0 && (
+                            <MessageReactions
+                              messageId={message.id}
+                              isOwnMessage={isOwnMessage}
+                              currentUserId={user?.id ?? 0}
+                            />
+                          )}
                         </div>
                       );
                     })}
 
                     {filteredMessages.length === 0 &&
                       orderedMessages.length > 0 &&
-                      debouncedMessageSearch && (
+                      hasActiveMessageSearch && (
                         <div className="py-6">
                           <EmptySearchResults query={debouncedMessageSearch} />
                           <button
                             type="button"
-                            onClick={() => setMessageSearchQuery('')}
+                            onClick={resetMessageSearch}
                             className="mx-auto mt-3 block text-sm text-[var(--color-primary)] hover:underline"
                           >
                             {t('messages.search.clearLabel')}
                           </button>
                         </div>
                       )}
+
+                    {hasActiveMessageSearch && filteredMessageCount > SEARCH_PAGE_SIZE && (
+                      <div className="mt-3 flex items-center justify-center gap-3">
+                        <button
+                          type="button"
+                          onClick={() => setMessageSearchPage((prev) => Math.max(0, prev - 1))}
+                          disabled={messageSearchPage === 0}
+                          className="rounded-md border border-[var(--color-border)] px-3 py-1 text-xs font-semibold text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-elevated)] disabled:opacity-50"
+                        >
+                          {t('common.back')}
+                        </button>
+                        <span className="text-xs text-[var(--color-text-secondary)]">
+                          {t('searchPage.pagination.page', { page: messageSearchPage + 1 })}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setMessageSearchPage((prev) => prev + 1)}
+                          disabled={(messageSearchPage + 1) * SEARCH_PAGE_SIZE >= filteredMessageCount}
+                          className="rounded-md border border-[var(--color-border)] px-3 py-1 text-xs font-semibold text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-elevated)] disabled:opacity-50"
+                        >
+                          {t('common.next')}
+                        </button>
+                      </div>
+                    )}
 
                     {orderedMessages.length === 0 && (
                       <div className="py-6">
