@@ -509,6 +509,13 @@ Update settings fields. Request body is partial; only provided keys are changed.
 - `quiet_hours_timezone`: valid IANA timezone
 - When `quiet_hours_enabled=true`, start and end minutes must differ
 
+**Normalization Notes:**
+- Enum string inputs are case-insensitive and trimmed before validation.
+- Examples:
+  - `"  FRIENDS_ONLY  "` -> `"friends_only"`
+  - `"  DATE  "` -> `"date"`
+  - `"  AUTO  "` -> `"system"`
+
 **Error Response:** `400 Bad Request`
 ```json
 {
