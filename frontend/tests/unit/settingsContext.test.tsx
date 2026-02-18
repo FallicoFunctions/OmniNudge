@@ -45,6 +45,12 @@ const defaultServerSettings = {
   profile_visibility: 'public',
   notification_sound: true,
   show_push_notifications: true,
+  notify_comment_replies: true,
+  notify_post_milestone: true,
+  notify_post_velocity: true,
+  notify_comment_milestone: true,
+  notify_comment_velocity: true,
+  daily_digest: false,
 };
 
 describe('SettingsContext showPushNotifications', () => {
@@ -126,5 +132,29 @@ describe('SettingsContext showPushNotifications', () => {
     expect(raw).toBeTruthy();
     const parsed = JSON.parse(raw ?? '{}') as { showPushNotifications?: boolean };
     expect(parsed.showPushNotifications).toBe(false);
+  });
+
+  it('rolls back dailyDigest when update fails', async () => {
+    vi.mocked(userSettingsService.get).mockResolvedValue({
+      ...defaultServerSettings,
+      daily_digest: false,
+    } as never);
+    vi.mocked(userSettingsService.update).mockRejectedValue(new Error('update failed'));
+
+    const { result } = renderHook(() => useSettings(), { wrapper });
+
+    await waitFor(() => {
+      expect(result.current.dailyDigest).toBe(false);
+    });
+
+    await act(async () => {
+      result.current.setDailyDigest(true);
+    });
+
+    await waitFor(() => {
+      expect(result.current.dailyDigest).toBe(false);
+    });
+
+    expect(userSettingsService.update).toHaveBeenCalledWith({ daily_digest: true });
   });
 });

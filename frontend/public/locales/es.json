@@ -2007,6 +2007,22 @@
       "toggleHelpOn": "Recibirás notificaciones cuando la app esté cerrada",
       "toggleHelpOff": "Haz clic para permitir notificaciones del navegador"
     },
+    "notificationPreferences": {
+      "title": "Preferencias de notificación",
+      "description": "Elige qué eventos de mensajes y actividad deben generar notificaciones.",
+      "commentReplies": "Respuestas a comentarios",
+      "commentRepliesHelp": "Notificar cuando alguien responda a tus comentarios.",
+      "postMilestones": "Hitos de publicaciones",
+      "postMilestonesHelp": "Notificar cuando tus publicaciones alcancen hitos.",
+      "postVelocity": "Alertas de velocidad de publicaciones",
+      "postVelocityHelp": "Notificar cuando una de tus publicaciones empiece a crecer rápido.",
+      "commentMilestones": "Hitos de comentarios",
+      "commentMilestonesHelp": "Notificar cuando tus comentarios alcancen hitos.",
+      "commentVelocity": "Alertas de velocidad de comentarios",
+      "commentVelocityHelp": "Notificar cuando uno de tus comentarios reciba actividad rápida.",
+      "dailyDigest": "Resumen diario",
+      "dailyDigestHelp": "Recibe una notificación de resumen con la actividad de tu cuenta una vez al día."
+    },
     "messagingPrivacy": {
       "title": "Privacidad de Mensajería",
       "description": "Controla qué información compartes con otros usuarios durante las conversaciones.",

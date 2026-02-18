@@ -2007,6 +2007,22 @@
       "toggleHelpOn": "You will receive notifications when the app is closed",
       "toggleHelpOff": "Click to allow browser notifications"
     },
+    "notificationPreferences": {
+      "title": "Notification Preferences",
+      "description": "Choose which message and engagement events trigger notifications.",
+      "commentReplies": "Comment replies",
+      "commentRepliesHelp": "Notify when someone replies to your comments.",
+      "postMilestones": "Post milestones",
+      "postMilestonesHelp": "Notify when your posts hit milestone thresholds.",
+      "postVelocity": "Post velocity alerts",
+      "postVelocityHelp": "Notify when one of your posts starts gaining traction quickly.",
+      "commentMilestones": "Comment milestones",
+      "commentMilestonesHelp": "Notify when your comments hit milestone thresholds.",
+      "commentVelocity": "Comment velocity alerts",
+      "commentVelocityHelp": "Notify when one of your comments gets rapid activity.",
+      "dailyDigest": "Daily digest",
+      "dailyDigestHelp": "Receive a summary notification of your account activity once per day."
+    },
     "messagingPrivacy": {
       "title": "Messaging Privacy",
       "description": "Control what information you share with other users during conversations.",

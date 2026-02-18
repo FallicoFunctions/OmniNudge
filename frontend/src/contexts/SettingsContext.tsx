@@ -66,6 +66,18 @@ interface SettingsContextType {
   setNotificationSound: (value: boolean) => void;
   showPushNotifications: boolean;
   setShowPushNotifications: (value: boolean) => void;
+  notifyCommentReplies: boolean;
+  setNotifyCommentReplies: (value: boolean) => void;
+  notifyPostMilestone: boolean;
+  setNotifyPostMilestone: (value: boolean) => void;
+  notifyPostVelocity: boolean;
+  setNotifyPostVelocity: (value: boolean) => void;
+  notifyCommentMilestone: boolean;
+  setNotifyCommentMilestone: (value: boolean) => void;
+  notifyCommentVelocity: boolean;
+  setNotifyCommentVelocity: (value: boolean) => void;
+  dailyDigest: boolean;
+  setDailyDigest: (value: boolean) => void;
 }
 
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
@@ -100,10 +112,16 @@ interface StoredSettings {
   profileVisibility?: 'public' | 'friends_only' | 'private';
   notificationSound?: boolean;
   showPushNotifications?: boolean;
+  notifyCommentReplies?: boolean;
+  notifyPostMilestone?: boolean;
+  notifyPostVelocity?: boolean;
+  notifyCommentMilestone?: boolean;
+  notifyCommentVelocity?: boolean;
+  dailyDigest?: boolean;
   settingsVersion?: number;
 }
 
-const CURRENT_SETTINGS_VERSION = 9;
+const CURRENT_SETTINGS_VERSION = 10;
 
 const getStoredSettings = (): StoredSettings => {
   if (typeof window === 'undefined' || !window.localStorage) {
@@ -141,6 +159,12 @@ const getStoredSettings = (): StoredSettings => {
           showLastSeen: parsed.showLastSeen ?? true,
           profileVisibility: parsed.profileVisibility ?? 'public',
           notificationSound: parsed.notificationSound ?? true,
+          notifyCommentReplies: parsed.notifyCommentReplies ?? true,
+          notifyPostMilestone: parsed.notifyPostMilestone ?? true,
+          notifyPostVelocity: parsed.notifyPostVelocity ?? true,
+          notifyCommentMilestone: parsed.notifyCommentMilestone ?? true,
+          notifyCommentVelocity: parsed.notifyCommentVelocity ?? true,
+          dailyDigest: parsed.dailyDigest ?? false,
           settingsVersion: CURRENT_SETTINGS_VERSION,
         };
         localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(migrated));
@@ -278,6 +302,30 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     const settings = getStoredSettings();
     return settings.showPushNotifications ?? true;
   });
+  const [notifyCommentReplies, setNotifyCommentRepliesState] = useState<boolean>(() => {
+    const settings = getStoredSettings();
+    return settings.notifyCommentReplies ?? true;
+  });
+  const [notifyPostMilestone, setNotifyPostMilestoneState] = useState<boolean>(() => {
+    const settings = getStoredSettings();
+    return settings.notifyPostMilestone ?? true;
+  });
+  const [notifyPostVelocity, setNotifyPostVelocityState] = useState<boolean>(() => {
+    const settings = getStoredSettings();
+    return settings.notifyPostVelocity ?? true;
+  });
+  const [notifyCommentMilestone, setNotifyCommentMilestoneState] = useState<boolean>(() => {
+    const settings = getStoredSettings();
+    return settings.notifyCommentMilestone ?? true;
+  });
+  const [notifyCommentVelocity, setNotifyCommentVelocityState] = useState<boolean>(() => {
+    const settings = getStoredSettings();
+    return settings.notifyCommentVelocity ?? true;
+  });
+  const [dailyDigest, setDailyDigestState] = useState<boolean>(() => {
+    const settings = getStoredSettings();
+    return settings.dailyDigest ?? false;
+  });
 
   // Hydrate messaging privacy settings from server when authenticated.
   useEffect(() => {
@@ -324,6 +372,12 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         );
         setNotificationSoundState(settings.notification_sound ?? true);
         setShowPushNotificationsState(settings.show_push_notifications ?? true);
+        setNotifyCommentRepliesState(settings.notify_comment_replies ?? true);
+        setNotifyPostMilestoneState(settings.notify_post_milestone ?? true);
+        setNotifyPostVelocityState(settings.notify_post_velocity ?? true);
+        setNotifyCommentMilestoneState(settings.notify_comment_milestone ?? true);
+        setNotifyCommentVelocityState(settings.notify_comment_velocity ?? true);
+        setDailyDigestState(settings.daily_digest ?? false);
       } catch (error) {
         // Best-effort: fall back to localStorage snapshot.
         console.warn('[Settings] Failed to load server settings, using local settings:', error);
@@ -368,6 +422,12 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         profileVisibility,
         notificationSound,
         showPushNotifications,
+        notifyCommentReplies,
+        notifyPostMilestone,
+        notifyPostVelocity,
+        notifyCommentMilestone,
+        notifyCommentVelocity,
+        dailyDigest,
         settingsVersion: CURRENT_SETTINGS_VERSION,
       };
       localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings));
@@ -404,6 +464,12 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     profileVisibility,
     notificationSound,
     showPushNotifications,
+    notifyCommentReplies,
+    notifyPostMilestone,
+    notifyPostVelocity,
+    notifyCommentMilestone,
+    notifyCommentVelocity,
+    dailyDigest,
   ]);
 
   // Apply font size immediately by adjusting the document root font-size.
@@ -703,6 +769,66 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     });
   };
 
+  const setNotifyCommentReplies = (value: boolean) => {
+    const previous = notifyCommentReplies;
+    setNotifyCommentRepliesState(value);
+    if (!hasAuthToken()) return;
+    void userSettingsService.update({ notify_comment_replies: value }).catch((error) => {
+      console.error('[Settings] Failed to update comment reply notifications:', error);
+      setNotifyCommentRepliesState(previous);
+    });
+  };
+
+  const setNotifyPostMilestone = (value: boolean) => {
+    const previous = notifyPostMilestone;
+    setNotifyPostMilestoneState(value);
+    if (!hasAuthToken()) return;
+    void userSettingsService.update({ notify_post_milestone: value }).catch((error) => {
+      console.error('[Settings] Failed to update post milestone notifications:', error);
+      setNotifyPostMilestoneState(previous);
+    });
+  };
+
+  const setNotifyPostVelocity = (value: boolean) => {
+    const previous = notifyPostVelocity;
+    setNotifyPostVelocityState(value);
+    if (!hasAuthToken()) return;
+    void userSettingsService.update({ notify_post_velocity: value }).catch((error) => {
+      console.error('[Settings] Failed to update post velocity notifications:', error);
+      setNotifyPostVelocityState(previous);
+    });
+  };
+
+  const setNotifyCommentMilestone = (value: boolean) => {
+    const previous = notifyCommentMilestone;
+    setNotifyCommentMilestoneState(value);
+    if (!hasAuthToken()) return;
+    void userSettingsService.update({ notify_comment_milestone: value }).catch((error) => {
+      console.error('[Settings] Failed to update comment milestone notifications:', error);
+      setNotifyCommentMilestoneState(previous);
+    });
+  };
+
+  const setNotifyCommentVelocity = (value: boolean) => {
+    const previous = notifyCommentVelocity;
+    setNotifyCommentVelocityState(value);
+    if (!hasAuthToken()) return;
+    void userSettingsService.update({ notify_comment_velocity: value }).catch((error) => {
+      console.error('[Settings] Failed to update comment velocity notifications:', error);
+      setNotifyCommentVelocityState(previous);
+    });
+  };
+
+  const setDailyDigest = (value: boolean) => {
+    const previous = dailyDigest;
+    setDailyDigestState(value);
+    if (!hasAuthToken()) return;
+    void userSettingsService.update({ daily_digest: value }).catch((error) => {
+      console.error('[Settings] Failed to update daily digest setting:', error);
+      setDailyDigestState(previous);
+    });
+  };
+
   return (
     <SettingsContext.Provider
       value={{
@@ -764,6 +890,18 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         setNotificationSound,
         showPushNotifications,
         setShowPushNotifications,
+        notifyCommentReplies,
+        setNotifyCommentReplies,
+        notifyPostMilestone,
+        setNotifyPostMilestone,
+        notifyPostVelocity,
+        setNotifyPostVelocity,
+        notifyCommentMilestone,
+        setNotifyCommentMilestone,
+        notifyCommentVelocity,
+        setNotifyCommentVelocity,
+        dailyDigest,
+        setDailyDigest,
       }}
     >
       {children}

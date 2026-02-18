@@ -64,6 +64,18 @@ const buildSettingsMock = (showPushNotifications: boolean) => ({
   setNotificationSound: vi.fn(),
   showPushNotifications,
   setShowPushNotifications,
+  notifyCommentReplies: true,
+  setNotifyCommentReplies: vi.fn(),
+  notifyPostMilestone: true,
+  setNotifyPostMilestone: vi.fn(),
+  notifyPostVelocity: true,
+  setNotifyPostVelocity: vi.fn(),
+  notifyCommentMilestone: true,
+  setNotifyCommentMilestone: vi.fn(),
+  notifyCommentVelocity: true,
+  setNotifyCommentVelocity: vi.fn(),
+  dailyDigest: false,
+  setDailyDigest: vi.fn(),
 });
 
 const useSettingsMock = vi.fn(() => buildSettingsMock(false));
