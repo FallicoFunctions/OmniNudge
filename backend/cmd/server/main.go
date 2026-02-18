@@ -763,9 +763,12 @@ func main() {
 			// Protected messages routes
 			protected.POST("/messages", messagesHandler.SendMessage)
 			protected.GET("/conversations/:id/messages", messagesHandler.GetMessages)
+			protected.GET("/conversations/:id/pinned-messages", messagesHandler.GetPinnedMessages)
 			protected.POST("/conversations/:id/read", messagesHandler.MarkAsRead)
 			protected.POST("/messages/:id/read", messagesHandler.MarkSingleMessageAsRead)
 			protected.DELETE("/messages/:id", messagesHandler.DeleteMessage)
+			protected.POST("/messages/:id/pin", messagesHandler.PinMessage)
+			protected.DELETE("/messages/:id/pin", messagesHandler.UnpinMessage)
 			protected.GET("/search/messages", searchHandler.SearchMessages)
 
 			// Feature 1: Message Reactions (rate-limited on mutating endpoints)

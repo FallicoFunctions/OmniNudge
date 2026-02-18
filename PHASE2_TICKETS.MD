@@ -1869,20 +1869,20 @@
 ---
 
 ### F2-002: Backend - Pin API Endpoints
-**Status:** ⬜ TODO
+**Status:** ✅ COMPLETE
 **Priority:** P1
 **Estimated Time:** 2 hours
 
 **Tasks:**
-- [ ] Create POST /api/messages/{id}/pin endpoint
-- [ ] Check permission (user is participant)
-- [ ] Check pin limit (10 per conversation)
-- [ ] Update message: pinned=true, pinned_by, pinned_at
-- [ ] Create DELETE /api/messages/{id}/pin endpoint
-- [ ] Check permission (pinner or admin)
-- [ ] Create GET /api/conversations/{id}/pinned-messages endpoint
-- [ ] Return chronologically ordered pinned messages
-- [ ] Write API tests
+- [x] Create POST /api/messages/{id}/pin endpoint
+- [x] Check permission (user is participant)
+- [x] Check pin limit (10 per conversation)
+- [x] Update message: pinned=true, pinned_by, pinned_at
+- [x] Create DELETE /api/messages/{id}/pin endpoint
+- [x] Check permission (pinner or admin)
+- [x] Create GET /api/conversations/{id}/pinned-messages endpoint
+- [x] Return chronologically ordered pinned messages
+- [x] Write API tests
 
 **Acceptance Criteria:**
 - Can pin up to 10 messages
