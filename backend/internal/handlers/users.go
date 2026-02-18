@@ -11,6 +11,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/omninudge/backend/internal/models"
+	"github.com/omninudge/backend/internal/monitoring"
 	"github.com/omninudge/backend/internal/services"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -113,12 +114,21 @@ func (h *UsersHandler) GetUserProfileByID(c *gin.Context) {
 }
 
 func (h *UsersHandler) getUserProfileResponse(c *gin.Context, loadUser func() (*models.User, error)) {
+	start := time.Now()
+	cacheState := "miss"
+	resultState := "success"
+	defer func() {
+		monitoring.RecordProfileRead(time.Since(start), cacheState, resultState)
+	}()
+
 	user, err := loadUser()
 	if err != nil {
+		resultState = "error"
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch user", "details": err.Error()})
 		return
 	}
 	if user == nil {
+		resultState = "not_found"
 		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
 		return
 	}
@@ -150,6 +160,7 @@ func (h *UsersHandler) getUserProfileResponse(c *gin.Context, loadUser func() (*
 	if viewerID > 0 && viewerID != user.ID && strings.EqualFold(strings.TrimSpace(profileVisibility), "friends_only") && h.friendRepo != nil {
 		isFriend, err := h.friendRepo.AreUsersFriends(c.Request.Context(), user.ID, viewerID)
 		if err != nil {
+			resultState = "error"
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to validate profile access", "details": err.Error()})
 			return
 		}
@@ -157,6 +168,7 @@ func (h *UsersHandler) getUserProfileResponse(c *gin.Context, loadUser func() (*
 	}
 
 	if !canViewerSeeProfile(user.ID, viewerID, profileVisibility, viewerIsFriend) {
+		resultState = "not_found"
 		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
 		return
 	}
@@ -167,6 +179,7 @@ func (h *UsersHandler) getUserProfileResponse(c *gin.Context, loadUser func() (*
 	if h.userProfRepo != nil {
 		profile, err := h.userProfRepo.GetByUserID(c.Request.Context(), user.ID)
 		if err != nil {
+			resultState = "error"
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch user profile", "details": err.Error()})
 			return
 		}
@@ -178,10 +191,14 @@ func (h *UsersHandler) getUserProfileResponse(c *gin.Context, loadUser func() (*
 	}
 
 	exposeLastSeen := showLastSeen || viewerID == user.ID
+	cacheScope := profileResponseCacheScope(user.ID, viewerID)
 	if cached, ok := h.getCachedProfileResponse(c.Request.Context(), user.ID, viewerID, exposeLastSeen); ok {
+		cacheState = "hit"
+		monitoring.RecordProfileCacheAccess(true, cacheScope)
 		c.JSON(http.StatusOK, cached)
 		return
 	}
+	monitoring.RecordProfileCacheAccess(false, cacheScope)
 
 	var lastSeenPtr *string
 	if exposeLastSeen {
@@ -193,6 +210,7 @@ func (h *UsersHandler) getUserProfileResponse(c *gin.Context, loadUser func() (*
 	if h.hubModRepo != nil {
 		hubs, err := h.hubModRepo.GetHubsForModerator(c.Request.Context(), user.ID)
 		if err != nil {
+			resultState = "error"
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch moderated hubs", "details": err.Error()})
 			return
 		}

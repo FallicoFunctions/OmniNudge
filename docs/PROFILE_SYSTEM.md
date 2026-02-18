@@ -85,6 +85,18 @@ When settings lookup fails, visibility fails closed.
   - `PUT /api/v1/users/profile` (legacy alias)
   - `POST /api/v1/users/me/ping` (refreshes last-seen views)
 
+### Cache Performance Verification
+
+Prometheus metrics are emitted for profile reads:
+- `omninudge_profile_cache_access_total{result,scope}`
+- `omninudge_profile_read_duration_seconds{cache,status}`
+
+Use these to verify acceptance criteria:
+- Cache hit rate (target >80% on warm traffic):
+  - `sum(rate(omninudge_profile_cache_access_total{result="hit"}[5m])) / sum(rate(omninudge_profile_cache_access_total[5m]))`
+- Cached profile p95 latency (target <200ms):
+  - `histogram_quantile(0.95, sum(rate(omninudge_profile_read_duration_seconds_bucket{cache="hit",status="success"}[5m])) by (le))`
+
 ## Test Coverage
 
 Backend:
