@@ -164,6 +164,7 @@ func newTestDeps(t *testing.T) *TestDeps {
 		users := api.Group("/users")
 		users.Use(middleware.AuthOptional(authService))
 		{
+			users.GET("/id/:id/profile", usersHandler.GetUserProfileByID)
 			users.GET("/:username", usersHandler.GetUserProfile)
 		}
 
@@ -209,6 +210,8 @@ func newTestDeps(t *testing.T) *TestDeps {
 			protected.POST("/conversations/:id/read", messagesHandler.MarkAsRead)
 			protected.POST("/conversations", conversationsHandler.CreateConversation)
 			protected.GET("/search/messages", searchHandler.SearchMessages)
+			protected.GET("/users/me/profile", usersHandler.GetMyProfile)
+			protected.PUT("/users/me/profile", usersHandler.UpdateProfile)
 		}
 
 		api.GET("/ws", middleware.AuthRequired(authService), wsHandler.HandleWebSocket)
