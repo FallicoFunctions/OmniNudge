@@ -70,6 +70,14 @@ type UserRepository struct {
 	pool *pgxpool.Pool
 }
 
+// UserRoleContact stores minimal recipient info for role-based notifications.
+type UserRoleContact struct {
+	ID       int
+	Username string
+	Role     string
+	Email    *string
+}
+
 // NewUserRepository creates a new user repository
 func NewUserRepository(pool *pgxpool.Pool) *UserRepository {
 	return &UserRepository{pool: pool}
@@ -244,6 +252,76 @@ func (r *UserRepository) GetPublicKeysByIDs(ctx context.Context, userIDs []int) 
 	return publicKeys, nil
 }
 
+// ListUserIDsByRoles returns user IDs whose role is in the provided set.
+func (r *UserRepository) ListUserIDsByRoles(ctx context.Context, roles []string) ([]int, error) {
+	if len(roles) == 0 {
+		return []int{}, nil
+	}
+
+	rows, err := r.pool.Query(ctx, `
+		SELECT id
+		FROM users
+		WHERE role = ANY($1)
+		  AND deleted = false
+	`, roles)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	ids := make([]int, 0)
+	for rows.Next() {
+		var id int
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
+}
+
+// ListUserContactsByRoles returns minimal user contact data for users in the provided roles.
+func (r *UserRepository) ListUserContactsByRoles(ctx context.Context, roles []string) ([]UserRoleContact, error) {
+	if len(roles) == 0 {
+		return []UserRoleContact{}, nil
+	}
+
+	rows, err := r.pool.Query(ctx, `
+		SELECT id, username, role, email, email_encrypted
+		FROM users
+		WHERE role = ANY($1)
+		  AND deleted = false
+	`, roles)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	contacts := make([]UserRoleContact, 0)
+	for rows.Next() {
+		var contact UserRoleContact
+		var encryptedEmail *string
+		var emailEncrypted bool
+		if err := rows.Scan(&contact.ID, &contact.Username, &contact.Role, &encryptedEmail, &emailEncrypted); err != nil {
+			return nil, err
+		}
+		if encryptedEmail != nil {
+			if emailEncrypted {
+				decrypted, decryptErr := utils.DecryptEmail(*encryptedEmail)
+				if decryptErr != nil {
+					log.Printf("Warning: failed to decrypt email for user_id=%d: %v", contact.ID, decryptErr)
+				} else {
+					contact.Email = &decrypted
+				}
+			} else {
+				contact.Email = encryptedEmail
+			}
+		}
+		contacts = append(contacts, contact)
+	}
+	return contacts, rows.Err()
+}
+
 // GetByUsername retrieves a user by their username (case-insensitive)
 func (r *UserRepository) GetByUsername(ctx context.Context, username string) (*User, error) {
 	if username == "" {
@@ -407,31 +485,31 @@ func (r *UserRepository) GetByEmail(ctx context.Context, email string) (*User, e
 	for rows.Next() {
 		user := &User{}
 		err = rows.Scan(
-		&user.ID,
-		&user.Username,
-		&user.EncryptedEmail,
-		&user.EmailEncrypted,
-		&user.EmailVerified,
-		&user.RedditID,
-		&user.RedditUsername,
-		&user.PublicKey,
-		&user.EncryptedPrivateKey,
-		&user.AvatarURL,
-		&user.Bio,
-		&user.Karma,
-		&user.Role,
-		&user.ShadowBanned,
-		&user.Banned,
-		&user.Deleted,
-		&user.BanReason,
-		&user.ShowBanReason,
-		&user.BannedAt,
-		&user.BannedBy,
-		&user.CreatedAt,
-		&user.LastSeen,
-		&user.LastAgentPostAt,
-		&user.LastAgentBrowseAt,
-		&user.PasswordHash,
+			&user.ID,
+			&user.Username,
+			&user.EncryptedEmail,
+			&user.EmailEncrypted,
+			&user.EmailVerified,
+			&user.RedditID,
+			&user.RedditUsername,
+			&user.PublicKey,
+			&user.EncryptedPrivateKey,
+			&user.AvatarURL,
+			&user.Bio,
+			&user.Karma,
+			&user.Role,
+			&user.ShadowBanned,
+			&user.Banned,
+			&user.Deleted,
+			&user.BanReason,
+			&user.ShowBanReason,
+			&user.BannedAt,
+			&user.BannedBy,
+			&user.CreatedAt,
+			&user.LastSeen,
+			&user.LastAgentPostAt,
+			&user.LastAgentBrowseAt,
+			&user.PasswordHash,
 		)
 		if err != nil {
 			continue // Skip this user if scan fails
@@ -600,6 +678,23 @@ func (r *UserRepository) BanUser(ctx context.Context, userID int, reason string,
 	}
 
 	return tx.Commit(ctx)
+}
+
+// AutoSuspendForReports marks a user as banned when repeated reports exceed threshold.
+// This path is system-initiated, so banned_by remains NULL.
+func (r *UserRepository) AutoSuspendForReports(ctx context.Context, userID int, reason string) error {
+	_, err := r.pool.Exec(ctx, `
+		UPDATE users
+		SET banned = true,
+		    ban_reason = $2,
+		    show_ban_reason = false,
+		    banned_at = NOW(),
+		    banned_by = NULL
+		WHERE id = $1
+		  AND deleted = false
+		  AND banned = false
+	`, userID, reason)
+	return err
 }
 
 // UnbanUser unbans a user (clears both shadow ban and regular ban)

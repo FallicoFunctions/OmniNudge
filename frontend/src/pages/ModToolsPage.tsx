@@ -9,6 +9,7 @@ import { EmptyState } from '../components/empty';
 import { OffsetPaginationControls } from '../components/common/OffsetPaginationControls';
 import { modMailService } from '../services/modMailService';
 import { useFormat } from '../hooks/useFormat';
+import { ModerationDashboard } from '../components/moderation/ModerationDashboard';
 import type {
   HubBan,
   CreateBanRequest,
@@ -18,7 +19,7 @@ import type {
 } from '../types/moderation';
 import type { ModMailConversation } from '../types/modmail';
 
-type TabType = 'bans' | 'removal_reasons' | 'mod_log' | 'mod_mail' | 'requests';
+type TabType = 'bans' | 'removal_reasons' | 'mod_log' | 'reports' | 'mod_mail' | 'requests';
 
 export default function ModToolsPage() {
   const { t } = useTranslation();
@@ -90,6 +91,16 @@ export default function ModToolsPage() {
             {t('modToolsPage.tabs.modLog')}
           </button>
           <button
+            onClick={() => setActiveTab('reports')}
+            className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+              activeTab === 'reports'
+                ? 'border-[var(--color-primary)] text-[var(--color-primary)]'
+                : 'border-transparent text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:border-gray-300'
+            }`}
+          >
+            {t('modToolsPage.tabs.reports')}
+          </button>
+          <button
             onClick={() => setActiveTab('mod_mail')}
             className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
               activeTab === 'mod_mail'
@@ -116,6 +127,7 @@ export default function ModToolsPage() {
       {activeTab === 'bans' && <BansTab hubName={hubName} />}
       {activeTab === 'removal_reasons' && <RemovalReasonsTab hubName={hubName} />}
       {activeTab === 'mod_log' && <ModLogTab hubName={hubName} />}
+      {activeTab === 'reports' && <ReportsTab />}
       {activeTab === 'mod_mail' && <ModMailTab hubName={hubName} />}
       {activeTab === 'requests' && <AccessRequestsTab hubName={hubName} />}
     </div>
@@ -679,6 +691,12 @@ function getActionDescription(t: Translate, log: ModLog): string {
   }
 
   return action;
+}
+
+// ===== REPORTS TAB =====
+
+function ReportsTab() {
+  return <ModerationDashboard />;
 }
 
 // ===== MOD MAIL TAB =====

@@ -35,7 +35,9 @@ const PrivacyPage = lazy(() => import('./pages/PrivacyPage'));
 const CCPAPage = lazy(() => import('./pages/CCPAPage'));
 const MessagesPage = lazy(() => import('./pages/MessagesPage'));
 const SettingsPage = lazy(() => import('./pages/SettingsPage'));
+const BlockedUsersPage = lazy(() => import('./pages/BlockedUsersPage'));
 const ModToolsPage = lazy(() => import('./pages/ModToolsPage'));
+const ModerationReportsPage = lazy(() => import('./pages/ModerationReportsPage'));
 const HubSettingsPage = lazy(() => import('./pages/HubSettingsPage'));
 const ModMailConversationPage = lazy(() => import('./pages/ModMailConversationPage'));
 const AdminPage = lazy(() => import('./pages/AdminPage'));
@@ -130,6 +132,14 @@ function App() {
 
                             {/* PROTECTED routes - require auth */}
                             <Route
+                              path="/mod/reports"
+                              element={
+                                <ProtectedRoute>
+                                  <ModerationReportsPage />
+                                </ProtectedRoute>
+                              }
+                            />
+                            <Route
                               path="/h/:hubName/mod"
                               element={
                                 <ProtectedRoute>
@@ -182,6 +192,14 @@ function App() {
                               element={
                                 <ProtectedRoute>
                                   <SettingsPage />
+                                </ProtectedRoute>
+                              }
+                            />
+                            <Route
+                              path="/settings/blocked-users"
+                              element={
+                                <ProtectedRoute>
+                                  <BlockedUsersPage />
                                 </ProtectedRoute>
                               }
                             />

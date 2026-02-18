@@ -38,6 +38,7 @@ const prefetchRoutes = {
   settings: () => import('../pages/SettingsPage'),
   themes: () => import('../pages/ThemesPage'),
   admin: () => import('../pages/AdminPage'),
+  moderationReports: () => import('../pages/ModerationReportsPage'),
   profile: () => import('../pages/UserProfilePage'),
 };
 
@@ -498,6 +499,14 @@ export default function MainLayout() {
                               },
                             ]
                           : []),
+                        ...(user.role === 'admin' || user.role === 'moderator'
+                          ? [
+                              {
+                                label: t('common.modTools'),
+                                to: '/mod/reports',
+                              },
+                            ]
+                          : []),
                         {
                           label: t('common.logout'),
                           onClick: handleLogout,
@@ -514,6 +523,16 @@ export default function MainLayout() {
                       className="rounded-md bg-red-600 px-3 py-2 text-sm font-medium text-white hover:bg-red-700"
                     >
                       {t('nav.admin')}
+                    </Link>
+                  )}
+
+                  {!isSlimMode && (user.role === 'admin' || user.role === 'moderator') && (
+                    <Link
+                      to="/mod/reports"
+                      onMouseEnter={() => prefetchRoutes.moderationReports()}
+                      className="rounded-md bg-[var(--color-surface-elevated)] px-3 py-2 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-border)]"
+                    >
+                      {t('common.modTools')}
                     </Link>
                   )}
 
