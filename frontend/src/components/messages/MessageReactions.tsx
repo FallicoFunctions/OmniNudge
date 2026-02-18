@@ -7,12 +7,9 @@ import type { GetReactionsResponse, ReactionSummary } from '../../types/reaction
 // Helpers
 // ---------------------------------------------------------------------------
 
-/** Build the hover tooltip text: "Alice, Bob, and 3 others" */
+/** Build the hover tooltip text: "Alice, Bob and 3 others" */
 function buildTooltip(summary: ReactionSummary): string {
-  const { usernames, count, users_truncated_global } = {
-    ...summary,
-    users_truncated_global: false,
-  };
+  const { usernames, count } = summary;
 
   if (usernames.length === 0) return '';
   if (usernames.length === 1) return usernames[0];
@@ -34,6 +31,8 @@ interface MessageReactionsProps {
   isOwnMessage: boolean;
   /** The authenticated user's ID — used to apply the "reacted" highlight. */
   currentUserId: number;
+  /** The authenticated user's username — enriches optimistic update tooltips. */
+  currentUsername?: string;
   /**
    * Called when the user wants to add a *new* emoji reaction.
    * Implemented by the EmojiPicker (F1-006). Until F1-006 ships this is a no-op.
@@ -49,6 +48,7 @@ export function MessageReactions({
   messageId,
   isOwnMessage,
   currentUserId,
+  currentUsername,
   onAddNewEmoji,
 }: MessageReactionsProps) {
   const queryClient = useQueryClient();
@@ -77,14 +77,14 @@ export function MessageReactions({
         messageId,
       ]);
 
-      // Optimistic: increment count and mark user_reacted = true
+      // Optimistic: increment count, mark user_reacted, include username in tooltip list
       queryClient.setQueryData<GetReactionsResponse>(
         ['message-reactions', messageId],
         (old) => {
           if (!old) return old;
           const idx = old.reactions.findIndex((r) => r.emoji === emoji);
           if (idx === -1) {
-            // New emoji type — append
+            // New emoji type — append with current user's info
             return {
               ...old,
               reactions: [
@@ -93,7 +93,7 @@ export function MessageReactions({
                   emoji,
                   count: 1,
                   user_ids: [currentUserId],
-                  usernames: [],
+                  usernames: currentUsername ? [currentUsername] : [],
                   user_reacted: true,
                   my_reaction_id: undefined,
                 },
@@ -101,11 +101,15 @@ export function MessageReactions({
               total_unique_emoji: old.total_unique_emoji + 1,
             };
           }
+          // Existing emoji — append user to both parallel arrays
           const updated = [...old.reactions];
           updated[idx] = {
             ...updated[idx],
             count: updated[idx].count + 1,
             user_ids: [...updated[idx].user_ids, currentUserId],
+            usernames: currentUsername
+              ? [...updated[idx].usernames, currentUsername]
+              : updated[idx].usernames,
             user_reacted: true,
           };
           return { ...old, reactions: updated };
@@ -151,7 +155,8 @@ export function MessageReactions({
         messageId,
       ]);
 
-      // Optimistic: decrement count and clear user_reacted / my_reaction_id
+      // Optimistic: decrement count, clear user_reacted/my_reaction_id, remove from
+      // both user_ids and usernames (which are parallel arrays keyed by position).
       queryClient.setQueryData<GetReactionsResponse>(
         ['message-reactions', messageId],
         (old) => {
@@ -160,15 +165,19 @@ export function MessageReactions({
             .map((r) => {
               if (r.my_reaction_id !== reactionId) return r;
               const newCount = r.count - 1;
-              return newCount === 0
-                ? null
-                : {
-                    ...r,
-                    count: newCount,
-                    user_ids: r.user_ids.filter((id) => id !== currentUserId),
-                    user_reacted: false,
-                    my_reaction_id: undefined,
-                  };
+              if (newCount === 0) return null;
+              const userIdx = r.user_ids.indexOf(currentUserId);
+              return {
+                ...r,
+                count: newCount,
+                user_ids: r.user_ids.filter((id) => id !== currentUserId),
+                usernames:
+                  userIdx >= 0
+                    ? r.usernames.filter((_, i) => i !== userIdx)
+                    : r.usernames,
+                user_reacted: false,
+                my_reaction_id: undefined,
+              };
             })
             .filter(Boolean) as typeof old.reactions;
 
@@ -205,6 +214,11 @@ export function MessageReactions({
     [addMutation, removeMutation],
   );
 
+  // Dismiss tooltip on Escape (keyboard accessibility)
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === 'Escape') setTooltip(null);
+  }, []);
+
   // ── Render ─────────────────────────────────────────────────────────────────
 
   // Skeleton while fetching (only on first load — no flicker on WS updates)
@@ -228,19 +242,19 @@ export function MessageReactions({
   if (reactions.length === 0) return null;
 
   const isBusy = addMutation.isPending || removeMutation.isPending;
+  const hasError = addMutation.isError || removeMutation.isError;
 
   return (
     <div
-      className={`mt-1 flex flex-wrap gap-1 ${isOwnMessage ? 'justify-end' : 'justify-start'}`}
+      className={`mt-1 flex flex-wrap items-center gap-1 ${isOwnMessage ? 'justify-end' : 'justify-start'}`}
       role="group"
       aria-label="Message reactions"
     >
       {reactions.map((summary) => {
         const isActive = summary.user_reacted;
-        const canToggle =
-          isActive
-            ? summary.my_reaction_id !== undefined
-            : true; // add is always allowed (server enforces cap)
+        const canToggle = isActive
+          ? summary.my_reaction_id !== undefined
+          : true; // add is always allowed (server enforces cap)
 
         return (
           <div key={summary.emoji} className="relative">
@@ -269,17 +283,18 @@ export function MessageReactions({
                 setTooltip({ emoji: summary.emoji, text: buildTooltip(summary) })
               }
               onBlur={() => setTooltip(null)}
+              onKeyDown={handleKeyDown}
             >
               <span className="text-base leading-none">{summary.emoji}</span>
               <span className="tabular-nums">{summary.count}</span>
             </button>
 
-            {/* Hover tooltip */}
+            {/* Hover / focus tooltip — capped width so it never overflows on mobile */}
             {tooltip?.emoji === summary.emoji && tooltip.text && (
               <div
                 role="tooltip"
                 className={[
-                  'pointer-events-none absolute z-30 whitespace-nowrap rounded-md px-2 py-1',
+                  'pointer-events-none absolute z-30 max-w-[200px] rounded-md px-2 py-1',
                   'text-xs font-medium text-white bg-gray-900/90',
                   'shadow-lg',
                   // Position above the button, aligned to message direction
@@ -304,6 +319,17 @@ export function MessageReactions({
         >
           +
         </button>
+      )}
+
+      {/* Mutation error — shown briefly when add/remove fails (auto-cleared on retry) */}
+      {hasError && (
+        <span
+          className="self-center text-[10px] text-[var(--color-error)]"
+          role="alert"
+          aria-live="assertive"
+        >
+          Failed to update reaction
+        </span>
       )}
     </div>
   );

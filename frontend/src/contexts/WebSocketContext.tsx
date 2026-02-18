@@ -324,8 +324,26 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
           queryClient.setQueryData<GetReactionsResponse>(
             ['message-reactions', message_id],
             (old) => {
-              if (!old) return old;
               const isMe = reaction.user_id === user?.id;
+
+              if (!old) {
+                // Query not yet populated — seed the cache so the event isn't lost.
+                // The component's own fetch will merge/overwrite once it resolves.
+                return {
+                  reactions: [
+                    {
+                      emoji: reaction.emoji,
+                      count: 1,
+                      user_ids: [reaction.user_id],
+                      usernames: reaction.username ? [reaction.username] : [],
+                      user_reacted: isMe,
+                      my_reaction_id: isMe ? reaction.id : undefined,
+                    },
+                  ],
+                  total_unique_emoji: 1,
+                  users_truncated: false,
+                };
+              }
               const idx = old.reactions.findIndex((r) => r.emoji === reaction.emoji);
               if (idx === -1) {
                 return {

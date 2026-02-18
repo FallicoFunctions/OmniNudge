@@ -2473,6 +2473,7 @@ export default function MessagesPage() {
                               messageId={message.id}
                               isOwnMessage={isOwnMessage}
                               currentUserId={user?.id ?? 0}
+                              currentUsername={user?.username}
                             />
                           )}
                         </div>
