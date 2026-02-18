@@ -192,6 +192,35 @@ func TestCreateConversation_UserNotFound(t *testing.T) {
 	assert.NotEmpty(t, response["error"])
 }
 
+func TestCreateConversation_BlockedForbidden(t *testing.T) {
+	handler, db, user1ID, user2ID, cleanup := setupConversationsHandlerTest(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	_, err := db.Pool.Exec(ctx, `
+		INSERT INTO blocked_users (blocker_id, blocked_id)
+		VALUES ($1, $2)
+	`, user2ID, user1ID)
+	require.NoError(t, err)
+
+	router := gin.Default()
+	router.POST("/conversations", func(c *gin.Context) {
+		c.Set("user_id", user1ID)
+		handler.CreateConversation(c)
+	})
+
+	body := map[string]interface{}{
+		"other_user_id": user2ID,
+	}
+	bodyJSON, _ := json.Marshal(body)
+	req := httptest.NewRequest("POST", "/conversations", bytes.NewBuffer(bodyJSON))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusForbidden, w.Code)
+}
+
 func TestGetConversations(t *testing.T) {
 	handler, db, user1ID, user2ID, cleanup := setupConversationsHandlerTest(t)
 	defer cleanup()
@@ -551,4 +580,174 @@ func TestDeleteConversation_NotParticipant(t *testing.T) {
 	router.ServeHTTP(w, req)
 
 	assert.Equal(t, http.StatusForbidden, w.Code)
+}
+
+func TestArchiveConversation_DM_PerUserArchive(t *testing.T) {
+	handler, db, user1ID, user2ID, cleanup := setupConversationsHandlerTest(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	convRepo := models.NewConversationRepository(db.Pool)
+	conv, err := convRepo.Create(ctx, user1ID, user2ID)
+	require.NoError(t, err)
+
+	router := gin.Default()
+	router.PUT("/conversations/:id/archive", func(c *gin.Context) {
+		c.Set("user_id", user1ID)
+		handler.ArchiveConversation(c)
+	})
+
+	req := httptest.NewRequest(http.MethodPut, fmt.Sprintf("/conversations/%d/archive", conv.ID), nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	require.Equal(t, http.StatusOK, w.Code, "response: %s", w.Body.String())
+
+	var archivedForUser1, archivedForUser2 bool
+	err = db.Pool.QueryRow(ctx, `
+		SELECT COALESCE(archived_for_user1, FALSE), COALESCE(archived_for_user2, FALSE)
+		FROM conversations
+		WHERE id = $1
+	`, conv.ID).Scan(&archivedForUser1, &archivedForUser2)
+	require.NoError(t, err)
+	assert.True(t, archivedForUser1)
+	assert.False(t, archivedForUser2)
+
+	user1Convs, err := convRepo.GetByUserID(ctx, user1ID, 20, 0, false)
+	require.NoError(t, err)
+	assert.Len(t, user1Convs, 0, "archived conversation should be hidden for archiving user")
+
+	user2Convs, err := convRepo.GetByUserID(ctx, user2ID, 20, 0, false)
+	require.NoError(t, err)
+	assert.Len(t, user2Convs, 1, "conversation should remain visible for other participant")
+}
+
+func TestUnarchiveConversation_DM_ClearsPerUserArchive(t *testing.T) {
+	handler, db, user1ID, user2ID, cleanup := setupConversationsHandlerTest(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	convRepo := models.NewConversationRepository(db.Pool)
+	conv, err := convRepo.Create(ctx, user1ID, user2ID)
+	require.NoError(t, err)
+
+	_, err = db.Pool.Exec(ctx, `
+		UPDATE conversations SET archived_for_user1 = TRUE WHERE id = $1
+	`, conv.ID)
+	require.NoError(t, err)
+
+	router := gin.Default()
+	router.PUT("/conversations/:id/unarchive", func(c *gin.Context) {
+		c.Set("user_id", user1ID)
+		handler.UnarchiveConversation(c)
+	})
+
+	req := httptest.NewRequest(http.MethodPut, fmt.Sprintf("/conversations/%d/unarchive", conv.ID), nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	require.Equal(t, http.StatusOK, w.Code, "response: %s", w.Body.String())
+
+	var archivedForUser1 bool
+	err = db.Pool.QueryRow(ctx, `
+		SELECT COALESCE(archived_for_user1, FALSE)
+		FROM conversations
+		WHERE id = $1
+	`, conv.ID).Scan(&archivedForUser1)
+	require.NoError(t, err)
+	assert.False(t, archivedForUser1)
+}
+
+func TestGetConversations_IncludeArchived(t *testing.T) {
+	handler, db, user1ID, user2ID, cleanup := setupConversationsHandlerTest(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	convRepo := models.NewConversationRepository(db.Pool)
+	convA, err := convRepo.Create(ctx, user1ID, user2ID)
+	require.NoError(t, err)
+
+	userRepo := models.NewUserRepository(db.Pool)
+	user3 := &models.User{
+		Username:     uniqueConversationsUsername("user3_archive"),
+		PasswordHash: "test_hash",
+	}
+	require.NoError(t, userRepo.Create(ctx, user3))
+	convB, err := convRepo.Create(ctx, user1ID, user3.ID)
+	require.NoError(t, err)
+
+	_, err = db.Pool.Exec(ctx, `
+		UPDATE conversations SET archived_for_user1 = TRUE WHERE id = $1
+	`, convA.ID)
+	require.NoError(t, err)
+
+	router := gin.Default()
+	router.GET("/conversations", func(c *gin.Context) {
+		c.Set("user_id", user1ID)
+		handler.GetConversations(c)
+	})
+
+	activeReq := httptest.NewRequest(http.MethodGet, "/conversations", nil)
+	activeRes := httptest.NewRecorder()
+	router.ServeHTTP(activeRes, activeReq)
+	require.Equal(t, http.StatusOK, activeRes.Code, "active response: %s", activeRes.Body.String())
+
+	var activeBody map[string]interface{}
+	require.NoError(t, json.Unmarshal(activeRes.Body.Bytes(), &activeBody))
+	activeConversations := activeBody["conversations"].([]interface{})
+	assert.Len(t, activeConversations, 1, "default listing should exclude archived conversations")
+
+	archivedReq := httptest.NewRequest(http.MethodGet, "/conversations?include_archived=true", nil)
+	archivedRes := httptest.NewRecorder()
+	router.ServeHTTP(archivedRes, archivedReq)
+	require.Equal(t, http.StatusOK, archivedRes.Code, "archived response: %s", archivedRes.Body.String())
+
+	var archivedBody map[string]interface{}
+	require.NoError(t, json.Unmarshal(archivedRes.Body.Bytes(), &archivedBody))
+	allConversations := archivedBody["conversations"].([]interface{})
+	assert.Len(t, allConversations, 2, "include_archived listing should include archived conversations")
+
+	_ = convB // keep explicit reference to ensure second conversation creation remains intentional
+}
+
+func TestGetArchivedConversations_OnlyArchived(t *testing.T) {
+	handler, db, user1ID, user2ID, cleanup := setupConversationsHandlerTest(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	convRepo := models.NewConversationRepository(db.Pool)
+	archivedConv, err := convRepo.Create(ctx, user1ID, user2ID)
+	require.NoError(t, err)
+
+	userRepo := models.NewUserRepository(db.Pool)
+	user3 := &models.User{
+		Username:     uniqueConversationsUsername("u3_arch"),
+		PasswordHash: "test_hash",
+	}
+	require.NoError(t, userRepo.Create(ctx, user3))
+	activeConv, err := convRepo.Create(ctx, user1ID, user3.ID)
+	require.NoError(t, err)
+
+	_, err = db.Pool.Exec(ctx, `
+		UPDATE conversations SET archived_for_user1 = TRUE WHERE id = $1
+	`, archivedConv.ID)
+	require.NoError(t, err)
+
+	router := gin.Default()
+	router.GET("/conversations/archived", func(c *gin.Context) {
+		c.Set("user_id", user1ID)
+		handler.GetArchivedConversations(c)
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/conversations/archived", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	require.Equal(t, http.StatusOK, w.Code, "response: %s", w.Body.String())
+
+	var response map[string]interface{}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &response))
+	conversations := response["conversations"].([]interface{})
+	require.Len(t, conversations, 1)
+
+	convMap := conversations[0].(map[string]interface{})
+	assert.Equal(t, float64(archivedConv.ID), convMap["id"])
+	assert.NotEqual(t, float64(activeConv.ID), convMap["id"])
 }

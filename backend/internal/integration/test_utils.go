@@ -209,9 +209,13 @@ func newTestDeps(t *testing.T) *TestDeps {
 			}
 
 			protected.POST("/messages", messagesHandler.SendMessage)
+			protected.GET("/conversations", conversationsHandler.GetConversations)
+			protected.GET("/conversations/archived", conversationsHandler.GetArchivedConversations)
 			protected.GET("/conversations/:id/messages", messagesHandler.GetMessages)
 			protected.GET("/conversations/:id/pinned-messages", messagesHandler.GetPinnedMessages)
 			protected.POST("/conversations/:id/read", messagesHandler.MarkAsRead)
+			protected.PUT("/conversations/:id/archive", conversationsHandler.ArchiveConversation)
+			protected.PUT("/conversations/:id/unarchive", conversationsHandler.UnarchiveConversation)
 			protected.POST("/messages/:id/pin", messagesHandler.PinMessage)
 			protected.DELETE("/messages/:id/pin", messagesHandler.UnpinMessage)
 			protected.POST("/conversations", conversationsHandler.CreateConversation)
