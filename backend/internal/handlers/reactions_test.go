@@ -15,6 +15,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/omninudge/backend/internal/api/middleware"
 	"github.com/omninudge/backend/internal/database"
 	"github.com/omninudge/backend/internal/models"
 	"github.com/omninudge/backend/internal/services"
@@ -354,6 +355,35 @@ func TestAddReaction_TooManyEmoji(t *testing.T) {
 			assert.Equal(t, http.StatusConflict, w.Code, "11th emoji should be rejected: %s", w.Body.String())
 		}
 	}
+}
+
+func TestAddReaction_RateLimited(t *testing.T) {
+	bed, cleanup := setupReactionsHandlerTest(t)
+	defer cleanup()
+
+	router := gin.New()
+	router.POST(
+		"/messages/:id/reactions",
+		func(c *gin.Context) {
+			c.Set("user_id", bed.user1ID)
+			c.Next()
+		},
+		middleware.ReactionRateLimiter().Middleware(),
+		bed.handler.AddReaction,
+	)
+
+	target := fmt.Sprintf("/messages/%d/reactions", bed.msgID)
+	var statusCodes []int
+	for i := 0; i < 11; i++ {
+		body, _ := json.Marshal(map[string]string{"emoji": "👍"})
+		req := httptest.NewRequest(http.MethodPost, target, bytes.NewBuffer(body))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+		statusCodes = append(statusCodes, w.Code)
+	}
+
+	assert.Equal(t, http.StatusTooManyRequests, statusCodes[len(statusCodes)-1], "11th request should be rate limited")
 }
 
 // TestMessageReactions_DBConstraint_MaxUniqueEmoji ensures the database-level

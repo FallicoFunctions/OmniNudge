@@ -1634,27 +1634,27 @@
 ---
 
 ### F1-003: Backend - Reaction API Endpoints
-**Status:** ⬜ TODO
+**Status:** ✅ COMPLETE (2026-02-18)
 **Priority:** P1
 **Estimated Time:** 3 hours
 
 **Tasks:**
-- [ ] Create POST /api/messages/{id}/reactions endpoint
-- [ ] Validate emoji (use F1-002)
-- [ ] Check user permission (can access message)
-- [ ] Enforce 10 emoji limit per message
-- [ ] Return reaction with ID
-- [ ] Create DELETE /api/messages/{id}/reactions/{reaction_id} endpoint
-- [ ] Create GET /api/messages/{id}/reactions endpoint
-- [ ] Return aggregated counts: [{ emoji, count, users, user_reacted }]
-- [ ] Add rate limiting (10 reactions per 10 seconds)
-- [ ] Write API tests
+- [x] Create POST `/api/v1/messages/{id}/reactions` endpoint
+- [x] Validate emoji via F1-002 validation library
+- [x] Check user permission (conversation participant)
+- [x] Enforce 10 unique emoji limit per message
+- [x] Return reaction with ID
+- [x] Create DELETE `/api/v1/messages/{id}/reactions/{reaction_id}` endpoint
+- [x] Create GET `/api/v1/messages/{id}/reactions` endpoint
+- [x] Return aggregated counts and user state (`emoji`, `count`, users, `user_reacted`, `my_reaction_id`)
+- [x] Add rate limiting (10 reactions per 10 seconds) on mutating endpoints
+- [x] Write API tests (success/error/concurrency/rate-limit paths)
 
 **Acceptance Criteria:**
-- Can add reaction to message
-- Cannot add >10 unique emoji
-- Can remove own reaction
-- Rate limiting prevents spam
+- [x] Can add reaction to message
+- [x] Cannot add >10 unique emoji
+- [x] Can remove own reaction
+- [x] Rate limiting prevents spam
 
 **Dependencies:** F1-001, F1-002, P0-007
 
