@@ -132,6 +132,9 @@ func (h *SettingsHandler) UpdateSettings(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Theme cannot be empty"})
 			return
 		}
+		if theme == "auto" {
+			theme = "system"
+		}
 
 		allowedThemes := map[string]bool{
 			"dark":   true,

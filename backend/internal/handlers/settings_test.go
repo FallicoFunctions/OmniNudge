@@ -255,3 +255,30 @@ func TestUpdateSettings_AllowsQuietHoursWithSameStartAndEndWhenDisabled(t *testi
 	assert.Equal(t, 480, settings.QuietHoursStartMinutes)
 	assert.Equal(t, 480, settings.QuietHoursEndMinutes)
 }
+
+func TestUpdateSettings_AcceptsThemeAutoAlias(t *testing.T) {
+	handler, settingsRepo, userID, cleanup := setupSettingsHandlerTest(t)
+	defer cleanup()
+
+	router := gin.Default()
+	router.PUT("/settings", func(c *gin.Context) {
+		c.Set("user_id", userID)
+		handler.UpdateSettings(c)
+	})
+
+	body := map[string]any{
+		"theme": "auto",
+	}
+	payload, _ := json.Marshal(body)
+
+	req := httptest.NewRequest(http.MethodPut, "/settings", bytes.NewReader(payload))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	require.Equal(t, http.StatusOK, w.Code, "response: %s", w.Body.String())
+
+	settings, err := settingsRepo.GetByUserID(context.Background(), userID)
+	require.NoError(t, err)
+	require.NotNil(t, settings)
+	assert.Equal(t, "system", settings.Theme)
+}
