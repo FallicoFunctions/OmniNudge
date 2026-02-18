@@ -716,7 +716,7 @@ export default function RedditWikiPage({ mode = 'view' }: RedditWikiPageProps = 
                     const authorName = displayAuthor
                       ? displayAuthor
                       : normalizedAuthorName
-                        ? `u/${normalizedAuthorName}`
+                        ? t('common.format.userPath', { name: normalizedAuthorName })
                         : t('redditWikiPage.history.unknownAuthor');
                     const changeSummary =
                       revision.reason || t('redditWikiPage.history.noDescriptionProvided');
@@ -996,7 +996,11 @@ function RevisionSummaryCard({ title, meta, alignRight = false }: RevisionSummar
             </div>
           )}
           {meta.author && (
-            <div className="text-sm text-[var(--color-text-secondary)]">{meta.author}</div>
+            <div className="text-sm text-[var(--color-text-secondary)]">
+              {t('common.format.userPath', {
+                name: meta.author.replace(/^u\//i, '').replace(/^\/+/, '').trim() || meta.author,
+              })}
+            </div>
           )}
           {meta.reason && (
             <div className="mt-2 text-xs text-[var(--color-text-secondary)]">{meta.reason}</div>
@@ -1227,7 +1231,7 @@ function extractRevisionMeta(
     ?.trim();
   const author =
     (revisionByData?.display_name_prefixed as string | undefined)?.trim() ??
-    (rawAuthorName ? `u/${rawAuthorName}` : undefined);
+    rawAuthorName;
 
   let timestamp: number | undefined;
   if (typeof apiData.revision_date === 'number') {

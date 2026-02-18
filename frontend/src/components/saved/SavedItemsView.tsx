@@ -495,7 +495,7 @@ export function SavedItemsView({
         // Transform SavedRedditPost to match RedditPostCard's expected shape
         const redditPost = {
           id: post.reddit_post_id,
-          title: mergedPost.title || `r/${post.subreddit}`,
+          title: mergedPost.title || t('common.format.subredditPath', { name: post.subreddit }),
           author: mergedPost.author || t('posts.unknownAuthor'),
           subreddit: post.subreddit,
           score: mergedPost.score ?? 0,

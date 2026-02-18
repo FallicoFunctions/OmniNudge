@@ -80,9 +80,13 @@ export function ColumnConfigPanel({ columnId, config }: ColumnConfigPanelProps) 
       case 'home':
         return config.omniOnly ? t('columnConfigPanel.feedLabel.homeOmniOnly') : t('columnConfigPanel.feedLabel.home');
       case 'subreddit':
-        return config.feedSource ? `r/${config.feedSource}` : t('columnConfigPanel.feedLabel.subredditNotSet');
+        return config.feedSource
+          ? t('common.format.subredditPath', { name: config.feedSource })
+          : t('columnConfigPanel.feedLabel.subredditNotSet');
       case 'hub':
-        return config.feedSource ? `h/${config.feedSource}` : t('columnConfigPanel.feedLabel.hubNotSet');
+        return config.feedSource
+          ? t('common.format.hubPath', { name: config.feedSource })
+          : t('columnConfigPanel.feedLabel.hubNotSet');
       case 'messages':
         return t('columnConfigPanel.feedLabel.messages');
       default:

@@ -59,11 +59,11 @@ export function CommunityHeader({
       if (communityName === 'popular') return t('communityHeader.labels.hPopular');
       if (communityName === 'all') return t('communityHeader.labels.hAll');
       if (displayTitle) return displayTitle;
-      return `h/${communityName}`;
+      return t('common.format.hubPath', { name: communityName });
     }
     if (communityName === 'popular') return t('communityHeader.labels.rPopular');
     if (communityName === 'frontpage') return t('communityHeader.labels.rFrontpage');
-    return `r/${communityName}`;
+    return t('common.format.subredditPath', { name: communityName });
   }, [isHub, communityName, displayTitle, t]);
 
   const defaultReturnTo = isHub ? `/h/${communityName}` : `/r/${communityName}`;

@@ -40,6 +40,8 @@ import { EmptyMessage, LoadingMessage } from '../components/common/StatusMessage
 import { loadHls } from '../utils/hlsLoader';
 import { RedditPostMedia } from '../components/reddit/RedditPostMedia';
 import { useFormat } from '../hooks/useFormat';
+import { buildRedditCommentEmbedHtml } from '../utils/redditEmbed';
+import { normalizeReportReason, reportService, type ReportReason } from '../services/reportService';
 
 interface RedditComment {
   kind: string;
@@ -1458,13 +1460,7 @@ export default function RedditPostPage() {
   );
 
   const buildEmbedHtml = (data: EmbedPayload) => {
-    const escapeHtml = (value: string) =>
-      value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    const body = escapeHtml(data.body);
-    const authorPath = t('common.format.userPath', { name: data.author });
-    const commentByText = escapeHtml(t('posts.embed.commentByUser', { author: authorPath }));
-    const timestamp = Math.floor(new Date(data.createdAt).getTime() / 1000);
-    return `<blockquote class="reddit-card" data-card-created="${timestamp}"><p>${body}</p><a href="${data.permalink}">${commentByText}</a></blockquote><script async src="https://embed.redditmedia.com/widgets/platform.js" charset="UTF-8"></script>`;
+    return buildRedditCommentEmbedHtml(data, t);
   };
 
   const editCommentMutation = useMutation({
@@ -1555,14 +1551,17 @@ export default function RedditPostPage() {
     mutationFn: async ({
       commentId: redditCommentId,
       reason,
+      description,
     }: {
       commentId: number;
-      reason?: string;
+      reason: ReportReason;
+      description?: string;
     }) => {
-      await api.post('/reports', {
-        target_type: 'reddit_comment',
-        target_id: redditCommentId,
+      await reportService.createReport({
+        targetType: 'reddit_comment',
+        targetId: redditCommentId,
         reason,
+        description,
       });
     },
   });
@@ -1717,9 +1716,20 @@ export default function RedditPostPage() {
     inboxPreferenceMutation.mutateAsync({ commentId: commentIdValue, nextValue });
 
   const handleReportComment = async (commentIdValue: number) => {
-    const reason = window.prompt(t('posts.report.reasonPrompt')) ?? '';
-    await reportCommentMutation.mutateAsync({ commentId: commentIdValue, reason });
-    alert(t('posts.report.success'));
+    const reasonInput = window.prompt(t('reporting.reasonPrompt'));
+    if (reasonInput === null) return;
+    const reason = normalizeReportReason(reasonInput);
+    if (!reason) {
+      alert(t('reporting.invalidReason'));
+      return;
+    }
+    const detailsInput = window.prompt(t('reporting.detailsPrompt'));
+    await reportCommentMutation.mutateAsync({
+      commentId: commentIdValue,
+      reason,
+      description: detailsInput ?? undefined,
+    });
+    alert(t('reporting.success'));
   };
 
   const topLevelComments = useMemo(() => {
@@ -2107,7 +2117,7 @@ export default function RedditPostPage() {
                           to={`/user/${post.author}`}
                           className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
                         >
-                          u/{post.author}
+                          {t('common.format.userPath', { name: post.author })}
                         </Link>
                       </span>,
                       <span key="submitted">
@@ -2465,7 +2475,9 @@ export default function RedditPostPage() {
               <div className="mb-1 text-xs text-[var(--color-text-secondary)]">
                 {t('posts.embed.previewLabel')}
               </div>
-              <div className="font-semibold">u/{embedTarget.author}</div>
+              <div className="font-semibold">
+                {t('common.format.userPath', { name: embedTarget.author })}
+              </div>
               <div className="text-[var(--color-text-primary)]">{embedTarget.body}</div>
               <a
                 href={embedTarget.permalink}

@@ -216,17 +216,17 @@ export default function CreatePostPage() {
     const allowImageUploads = allowImagePosts;
     const allowVideoUploads = allowVideoPosts;
     if (!allowImageUploads && !allowVideoUploads) {
-      setMediaUploadError('Media uploads are disabled for this hub.');
+      setMediaUploadError(t('createPostPage.errors.mediaUploadsDisabled'));
       return;
     }
     const allowedLabel =
       allowImageUploads && allowVideoUploads
-        ? 'image or video files'
+        ? t('createPostPage.media.labels.imagesVideos')
         : allowImageUploads
-          ? 'image files'
+          ? t('createPostPage.media.labels.images')
           : allowVideoUploads
-            ? 'video files'
-            : 'media files';
+            ? t('createPostPage.media.labels.videos')
+            : t('createPostPage.media.labels.media');
 
     const validFiles = files.filter(
       (file) =>
@@ -234,7 +234,11 @@ export default function CreatePostPage() {
         (allowVideoUploads && file.type.startsWith('video/'))
     );
     if (validFiles.length === 0) {
-      setMediaUploadError(`Please choose ${allowedLabel}.`);
+      setMediaUploadError(
+        t('createPostPage.errors.chooseAllowedFiles', {
+          allowed: allowedLabel,
+        })
+      );
       return;
     }
 
@@ -286,11 +290,15 @@ export default function CreatePostPage() {
 
       // Show error if some uploads failed
       if (result.errors && result.errors.length > 0) {
-        setMediaUploadError(`${result.errors.length} file(s) failed to upload`);
+        setMediaUploadError(
+          t('createPostPage.errors.uploadFailedCount', {
+            count: result.errors.length,
+          })
+        );
       }
     } catch (error) {
       console.error('[CreatePostPage] Failed to upload media:', error);
-      setMediaUploadError('Failed to upload media. Please try again.');
+      setMediaUploadError(t('createPostPage.errors.uploadFailed'));
     } finally {
       setIsUploadingMedia(false);
     }

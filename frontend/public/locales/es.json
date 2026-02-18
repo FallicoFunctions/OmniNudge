@@ -742,7 +742,8 @@
       "visibleToAllMods": "Todos los moderadores de {{hub}} pueden ver y responder a esta conversación"
     },
     "badges": {
-      "mod": "MOD"
+      "mod": "MOD",
+      "archived": "Archivada"
     },
     "encryption": {
       "noParticipants": "No se encontraron participantes. No se puede enviar correo de moderación.",
@@ -1543,10 +1544,12 @@
     },
     "hubFallback": "Hub",
     "aria": {
-      "backToConversations": "Volver a conversaciones"
+      "backToConversations": "Volver a conversaciones",
+      "openConversation": "Abrir conversación"
     },
     "badges": {
-      "mod": "MOD"
+      "mod": "MOD",
+      "archived": "Archivadas"
     },
     "tabs": {
       "active": "Activas",
@@ -1554,6 +1557,10 @@
     },
     "archive": "Archivar",
     "unarchive": "Desarchivar",
+    "toasts": {
+      "archived": "Conversación archivada",
+      "unarchived": "Conversación desarchivada"
+    },
     "mute": "Silenciar notificaciones",
     "unmute": "Activar notificaciones",
     "muted": "Silenciada",
@@ -2794,6 +2801,17 @@
       "errors": {
         "saveFailed": "No se pudo guardar el tema."
       },
+      "validation": {
+        "fixHighlighted": "Corrige los campos resaltados para continuar.",
+        "fixInvalidValues": "Corrige los valores invalidos antes de continuar.",
+        "chooseBaseTheme": "Elige un tema base o empieza desde cero para continuar.",
+        "valueRequired": "El valor es obligatorio.",
+        "hexExample": "Usa un color hexadecimal como #1a1a1a.",
+        "hexLength": "Los colores hexadecimales deben tener 3 o 6 caracteres.",
+        "sizeUnits": "Usa unidades como px, rem, em o %.",
+        "numberRequired": "El valor debe ser un numero valido.",
+        "maxLength": "Mantén este valor por debajo de {{max}} caracteres."
+      },
       "base": {
         "intro": "Elige un tema predefinido como punto de partida o empieza desde cero. Podras ajustar cada valor mas tarde.",
         "startFromScratch": {
@@ -3004,6 +3022,10 @@
       "titleRequired": "El titulo es obligatorio",
       "bodyTooLong": "El cuerpo de la publicacion debe tener menos de {{formattedMax}} caracteres",
       "waitForUpload": "Por favor espera a que termine la carga del medio.",
+      "mediaUploadsDisabled": "Las subidas de medios estan deshabilitadas para este hub.",
+      "chooseAllowedFiles": "Por favor elige {{allowed}}.",
+      "uploadFailedCount": "{{count}} archivo(s) no se pudieron subir",
+      "uploadFailed": "No se pudo subir el medio. Intentalo de nuevo.",
       "hubNameRequired": "Por favor ingresa un nombre de hub",
       "hubMustSelectSuggestion": "Por favor selecciona un hub valido de las sugerencias",
       "subredditRequired": "Por favor ingresa un subreddit",

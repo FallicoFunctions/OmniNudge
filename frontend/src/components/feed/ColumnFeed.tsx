@@ -398,7 +398,7 @@ export function ColumnFeed({ columnId, config, isActive, showBorder }: ColumnFee
       setPendingOpenConversationId(message.conversation_id);
       queryClient.invalidateQueries({ queryKey: ['column-feed', columnId] });
     } catch {
-      setComposerError('Failed to send message. Please try again.');
+      setComposerError(t('messages.errors.sendFailed'));
     } finally {
       setUploadingMedia(false);
       setSendingMessage(false);
@@ -430,7 +430,7 @@ export function ColumnFeed({ columnId, config, isActive, showBorder }: ColumnFee
             }}
             className="w-full px-3 py-2 text-xs font-semibold text-left text-[var(--color-primary)] hover:bg-[var(--color-hover)] transition-colors"
           >
-            Send Message
+            {t('emptyStates.inbox.actions.newMessage')}
           </button>
           {showNewMessageInput && !pendingRecipient && (
             <div className="px-3 pb-2">

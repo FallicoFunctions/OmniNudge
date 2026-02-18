@@ -742,7 +742,8 @@
       "visibleToAllMods": "يمكن لجميع مشرفي {{hub}} رؤية هذه المحادثة والرد عليها"
     },
     "badges": {
-      "mod": "مراقب"
+      "mod": "مراقب",
+      "archived": "مؤرشفة"
     },
     "encryption": {
       "noParticipants": "لم يتم العثور على مشاركين. لا يمكن إرسال بريد الإشراف.",
@@ -1438,7 +1439,7 @@
       "viewProfile": "عرض الملف الشخصي"
     },
     "pinned": {
-      "title_one": "رسالة مثبتة واحدة",
+      "title_one": "{{count}} رسالة مثبتة",
       "title_other": "{{count}} رسائل مثبتة",
       "showMore": "عرض {{count}} إضافية",
       "showLess": "عرض أقل",
@@ -1543,10 +1544,12 @@
     },
     "hubFallback": "هَب",
     "aria": {
-      "backToConversations": "العودة إلى المحادثات"
+      "backToConversations": "العودة إلى المحادثات",
+      "openConversation": "فتح المحادثة"
     },
     "badges": {
-      "mod": "مشرف"
+      "mod": "مشرف",
+      "archived": "مؤرشفة"
     },
     "tabs": {
       "active": "النشطة",
@@ -1554,6 +1557,10 @@
     },
     "archive": "أرشفة",
     "unarchive": "إلغاء الأرشفة",
+    "toasts": {
+      "archived": "تمت أرشفة المحادثة",
+      "unarchived": "تم إلغاء أرشفة المحادثة"
+    },
     "mute": "كتم الإشعارات",
     "unmute": "إلغاء كتم الإشعارات",
     "muted": "مكتومة",
@@ -2794,6 +2801,17 @@
       "errors": {
         "saveFailed": "تعذر حفظ السمة."
       },
+      "validation": {
+        "fixHighlighted": "أصلح الحقول المميزة للمتابعة.",
+        "fixInvalidValues": "أصلح القيم غير الصالحة قبل المتابعة.",
+        "chooseBaseTheme": "يرجى اختيار سمة أساسية أو البدء من الصفر للمتابعة.",
+        "valueRequired": "القيمة مطلوبة.",
+        "hexExample": "استخدم لون hex مثل #1a1a1a.",
+        "hexLength": "يجب أن تكون ألوان hex من 3 أو 6 أحرف.",
+        "sizeUnits": "استخدم وحدات مثل px أو rem أو em أو %.",
+        "numberRequired": "يجب أن تكون القيمة رقماً صالحاً.",
+        "maxLength": "اجعل هذه القيمة أقل من {{max}} حرفاً."
+      },
       "base": {
         "intro": "اختر سمة جاهزة كنقطة انطلاق أو ابدأ من الصفر. يمكنك تعديل كل قيمة لاحقاً.",
         "startFromScratch": {
@@ -3004,6 +3022,10 @@
       "titleRequired": "العنوان مطلوب",
       "bodyTooLong": "يجب أن يكون نص المنشور أقل من {{formattedMax}} حرف",
       "waitForUpload": "يرجى الانتظار حتى يكتمل رفع الوسائط.",
+      "mediaUploadsDisabled": "رفع الوسائط معطل لهذه المجموعة.",
+      "chooseAllowedFiles": "يرجى اختيار {{allowed}}.",
+      "uploadFailedCount": "فشل رفع {{count}} ملف(ات)",
+      "uploadFailed": "فشل رفع الوسائط. يرجى المحاولة مرة أخرى.",
       "hubNameRequired": "يرجى إدخال اسم مجموعة",
       "hubMustSelectSuggestion": "يرجى اختيار مجموعة صالحة من الاقتراحات",
       "subredditRequired": "يرجى إدخال مجتمع",

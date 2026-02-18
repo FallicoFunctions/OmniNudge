@@ -38,9 +38,254 @@ function extractInterpolationTokens(value) {
   return [...new Set(tokens)].sort();
 }
 
-function readLocaleFile(filepath) {
-  const file = fs.readFileSync(filepath, 'utf8');
-  return JSON.parse(file);
+function createParser(text) {
+  let index = 0;
+  let line = 1;
+  let column = 1;
+
+  function currentChar() {
+    return text[index];
+  }
+
+  function advance() {
+    const char = text[index];
+    index += 1;
+    if (char === '\n') {
+      line += 1;
+      column = 1;
+    } else {
+      column += 1;
+    }
+    return char;
+  }
+
+  function skipWhitespace() {
+    while (index < text.length) {
+      const char = currentChar();
+      if (char === ' ' || char === '\n' || char === '\r' || char === '\t') {
+        advance();
+      } else {
+        break;
+      }
+    }
+  }
+
+  function parseString() {
+    if (currentChar() !== '"') {
+      throw new Error(`Expected string at ${line}:${column}`);
+    }
+    advance(); // opening quote
+
+    let raw = '';
+    while (index < text.length) {
+      const char = advance();
+      if (char === '"') {
+        try {
+          return JSON.parse(`"${raw}"`);
+        } catch (error) {
+          throw new Error(
+            `Invalid string escape at ${line}:${column}: ${error instanceof Error ? error.message : String(error)}`
+          );
+        }
+      }
+      if (char === '\\') {
+        const escaped = advance();
+        if (escaped === undefined) {
+          throw new Error(`Unterminated escape sequence at ${line}:${column}`);
+        }
+        raw += `\\${escaped}`;
+        if (escaped === 'u') {
+          for (let i = 0; i < 4; i += 1) {
+            const hex = advance();
+            if (!/[0-9a-fA-F]/.test(hex ?? '')) {
+              throw new Error(`Invalid unicode escape at ${line}:${column}`);
+            }
+            raw += hex;
+          }
+        }
+        continue;
+      }
+      raw += char;
+    }
+
+    throw new Error(`Unterminated string at ${line}:${column}`);
+  }
+
+  function parseLiteral(literal) {
+    for (const char of literal) {
+      if (currentChar() !== char) {
+        throw new Error(`Expected "${literal}" at ${line}:${column}`);
+      }
+      advance();
+    }
+  }
+
+  function parseNumber() {
+    if (currentChar() === '-') advance();
+
+    if (currentChar() === '0') {
+      advance();
+    } else {
+      while (/[0-9]/.test(currentChar() ?? '')) {
+        advance();
+      }
+    }
+
+    if (currentChar() === '.') {
+      advance();
+      while (/[0-9]/.test(currentChar() ?? '')) {
+        advance();
+      }
+    }
+
+    const exponent = currentChar();
+    if (exponent === 'e' || exponent === 'E') {
+      advance();
+      const sign = currentChar();
+      if (sign === '+' || sign === '-') advance();
+      while (/[0-9]/.test(currentChar() ?? '')) {
+        advance();
+      }
+    }
+  }
+
+  function parseArray(path, duplicates) {
+    if (currentChar() !== '[') {
+      throw new Error(`Expected "[" at ${line}:${column}`);
+    }
+    advance();
+    skipWhitespace();
+
+    if (currentChar() === ']') {
+      advance();
+      return;
+    }
+
+    let itemIndex = 0;
+    while (index < text.length) {
+      parseValue(`${path}[${itemIndex}]`, duplicates);
+      itemIndex += 1;
+      skipWhitespace();
+      if (currentChar() === ',') {
+        advance();
+        skipWhitespace();
+        continue;
+      }
+      if (currentChar() === ']') {
+        advance();
+        return;
+      }
+      throw new Error(`Expected "," or "]" at ${line}:${column}`);
+    }
+
+    throw new Error(`Unterminated array at ${line}:${column}`);
+  }
+
+  function parseObject(path, duplicates) {
+    if (currentChar() !== '{') {
+      throw new Error(`Expected "{" at ${line}:${column}`);
+    }
+    advance();
+    skipWhitespace();
+
+    const keySet = new Set();
+    if (currentChar() === '}') {
+      advance();
+      return;
+    }
+
+    while (index < text.length) {
+      skipWhitespace();
+      const keyLine = line;
+      const keyColumn = column;
+      const key = parseString();
+      if (keySet.has(key)) {
+        duplicates.push({
+          path: path || '<root>',
+          key,
+          line: keyLine,
+          column: keyColumn,
+        });
+      } else {
+        keySet.add(key);
+      }
+
+      skipWhitespace();
+      if (currentChar() !== ':') {
+        throw new Error(`Expected ":" at ${line}:${column}`);
+      }
+      advance();
+      skipWhitespace();
+      const nextPath = path ? `${path}.${key}` : key;
+      parseValue(nextPath, duplicates);
+
+      skipWhitespace();
+      if (currentChar() === ',') {
+        advance();
+        skipWhitespace();
+        continue;
+      }
+      if (currentChar() === '}') {
+        advance();
+        return;
+      }
+      throw new Error(`Expected "," or "}" at ${line}:${column}`);
+    }
+
+    throw new Error(`Unterminated object at ${line}:${column}`);
+  }
+
+  function parseValue(path, duplicates) {
+    skipWhitespace();
+    const char = currentChar();
+
+    if (char === '"') {
+      parseString();
+      return;
+    }
+    if (char === '{') {
+      parseObject(path, duplicates);
+      return;
+    }
+    if (char === '[') {
+      parseArray(path, duplicates);
+      return;
+    }
+    if (char === '-' || /[0-9]/.test(char ?? '')) {
+      parseNumber();
+      return;
+    }
+    if (char === 't') {
+      parseLiteral('true');
+      return;
+    }
+    if (char === 'f') {
+      parseLiteral('false');
+      return;
+    }
+    if (char === 'n') {
+      parseLiteral('null');
+      return;
+    }
+
+    throw new Error(`Unexpected token "${char ?? '<eof>'}" at ${line}:${column}`);
+  }
+
+  return {
+    parseRoot() {
+      const duplicates = [];
+      skipWhitespace();
+      if (currentChar() !== '{') {
+        throw new Error(`Locale root must be an object at ${line}:${column}`);
+      }
+      parseValue('', duplicates);
+      skipWhitespace();
+      if (index !== text.length) {
+        throw new Error(`Unexpected trailing token at ${line}:${column}`);
+      }
+      return duplicates;
+    },
+  };
 }
 
 if (!fs.existsSync(localesDir)) {
@@ -72,7 +317,16 @@ for (const filename of localeFiles) {
   const fullPath = path.join(localesDir, filename);
 
   try {
-    const parsed = readLocaleFile(fullPath);
+    const source = fs.readFileSync(fullPath, 'utf8');
+    const parser = createParser(source);
+    const duplicateKeys = parser.parseRoot();
+    for (const duplicate of duplicateKeys) {
+      errors.push(
+        `[${lang}] duplicate key "${duplicate.key}" at ${duplicate.path} (${duplicate.line}:${duplicate.column})`
+      );
+    }
+
+    const parsed = JSON.parse(source);
     const flat = flattenObject(parsed);
     localeKeyMap.set(lang, new Set(Object.keys(flat)));
     flatValueMap.set(lang, flat);
