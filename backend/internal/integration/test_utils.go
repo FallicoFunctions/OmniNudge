@@ -122,7 +122,7 @@ func newTestDeps(t *testing.T) *TestDeps {
 	)
 	conversationsHandler := handlers.NewConversationsHandler(db.Pool, conversationRepo, messageRepo, userRepo)
 	messagesHandler := handlers.NewMessagesHandler(db.Pool, messageRepo, conversationRepo, userSettingsRepo, hub, nil)
-	usersHandler := handlers.NewUsersHandler(userRepo, userSettingsRepo, postRepo, commentRepo, nil, modRepo)
+	usersHandler := handlers.NewUsersHandler(userRepo, userSettingsRepo, postRepo, commentRepo, nil, modRepo, services.NoopCache{})
 	thumbnailService := services.NewThumbnailService()
 	mediaHandler := handlers.NewMediaHandler(models.NewMediaFileRepository(db.Pool), thumbnailService, nil)
 	hubSubRepo := models.NewHubSubscriptionRepository(db.Pool)

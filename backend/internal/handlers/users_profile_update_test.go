@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
+	"github.com/omninudge/backend/internal/services"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -33,6 +34,10 @@ func newUsersProfileUpdateRouter(handler *UsersHandler) *gin.Engine {
 		withUser(c)
 		handler.UpdateProfile(c)
 	})
+	router.GET("/users/:username", func(c *gin.Context) {
+		withUser(c)
+		handler.GetUserProfile(c)
+	})
 	return router
 }
 
@@ -40,7 +45,7 @@ func TestUpdateProfileViaMeProfile_UpdatesBioAndAvatar(t *testing.T) {
 	userRepo, settingsRepo, owner, _, cleanup := setupUsersVisibilityTest(t)
 	defer cleanup()
 
-	handler := NewUsersHandler(userRepo, settingsRepo, nil, nil, nil, nil)
+	handler := NewUsersHandler(userRepo, settingsRepo, nil, nil, nil, nil, nil)
 	router := newUsersProfileUpdateRouter(handler)
 
 	body := map[string]any{
@@ -72,7 +77,7 @@ func TestUpdateProfileViaLegacyAlias_UpdatesBioAndAvatar(t *testing.T) {
 	userRepo, settingsRepo, owner, _, cleanup := setupUsersVisibilityTest(t)
 	defer cleanup()
 
-	handler := NewUsersHandler(userRepo, settingsRepo, nil, nil, nil, nil)
+	handler := NewUsersHandler(userRepo, settingsRepo, nil, nil, nil, nil, nil)
 	router := newUsersProfileUpdateRouter(handler)
 
 	body := map[string]any{
@@ -96,7 +101,7 @@ func TestUpdateProfile_RejectsInvalidAvatarURL(t *testing.T) {
 	userRepo, settingsRepo, owner, _, cleanup := setupUsersVisibilityTest(t)
 	defer cleanup()
 
-	handler := NewUsersHandler(userRepo, settingsRepo, nil, nil, nil, nil)
+	handler := NewUsersHandler(userRepo, settingsRepo, nil, nil, nil, nil, nil)
 	router := newUsersProfileUpdateRouter(handler)
 
 	body := map[string]any{
@@ -118,7 +123,7 @@ func TestUpdateProfile_RejectsTooLongBio(t *testing.T) {
 	userRepo, settingsRepo, owner, _, cleanup := setupUsersVisibilityTest(t)
 	defer cleanup()
 
-	handler := NewUsersHandler(userRepo, settingsRepo, nil, nil, nil, nil)
+	handler := NewUsersHandler(userRepo, settingsRepo, nil, nil, nil, nil, nil)
 	router := newUsersProfileUpdateRouter(handler)
 
 	body := map[string]any{
@@ -140,7 +145,7 @@ func TestUpdateProfile_EmptyStringsClearFields(t *testing.T) {
 	userRepo, settingsRepo, owner, _, cleanup := setupUsersVisibilityTest(t)
 	defer cleanup()
 
-	handler := NewUsersHandler(userRepo, settingsRepo, nil, nil, nil, nil)
+	handler := NewUsersHandler(userRepo, settingsRepo, nil, nil, nil, nil, nil)
 	router := newUsersProfileUpdateRouter(handler)
 
 	seedBody := map[string]any{
@@ -176,4 +181,39 @@ func TestUpdateProfile_EmptyStringsClearFields(t *testing.T) {
 	require.NotNil(t, updated)
 	assert.Nil(t, updated.Bio)
 	assert.Nil(t, updated.AvatarURL)
+}
+
+func TestUpdateProfile_InvalidatesCachedPublicProfile(t *testing.T) {
+	userRepo, settingsRepo, owner, _, cleanup := setupUsersVisibilityTest(t)
+	defer cleanup()
+
+	initialBio := "before cache"
+	require.NoError(t, userRepo.UpdateProfile(context.Background(), owner.ID, &initialBio, nil))
+
+	handler := NewUsersHandler(userRepo, settingsRepo, nil, nil, nil, nil, services.NewMemoryCache())
+	router := newUsersProfileUpdateRouter(handler)
+
+	firstGetReq := httptest.NewRequest(http.MethodGet, "/users/"+owner.Username, nil)
+	firstGetW := httptest.NewRecorder()
+	router.ServeHTTP(firstGetW, firstGetReq)
+	require.Equal(t, http.StatusOK, firstGetW.Code)
+	assert.Contains(t, firstGetW.Body.String(), initialBio)
+
+	updateBody := map[string]any{"bio": "after update"}
+	updatePayload, err := json.Marshal(updateBody)
+	require.NoError(t, err)
+
+	updateReq := httptest.NewRequest(http.MethodPut, "/users/me/profile", bytes.NewReader(updatePayload))
+	updateReq.Header.Set("Content-Type", "application/json")
+	updateReq.Header.Set("X-Viewer-ID", strconv.Itoa(owner.ID))
+	updateW := httptest.NewRecorder()
+	router.ServeHTTP(updateW, updateReq)
+	require.Equal(t, http.StatusOK, updateW.Code, "response: %s", updateW.Body.String())
+
+	secondGetReq := httptest.NewRequest(http.MethodGet, "/users/"+owner.Username, nil)
+	secondGetW := httptest.NewRecorder()
+	router.ServeHTTP(secondGetW, secondGetReq)
+	require.Equal(t, http.StatusOK, secondGetW.Code)
+	assert.Contains(t, secondGetW.Body.String(), "after update")
+	assert.NotContains(t, secondGetW.Body.String(), initialBio)
 }
