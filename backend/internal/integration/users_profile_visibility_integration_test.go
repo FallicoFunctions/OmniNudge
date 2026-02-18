@@ -94,6 +94,36 @@ func TestUserProfile_MeUpdate_ValidatesAndPersists(t *testing.T) {
 	require.Equal(t, "https://example.com/integration-avatar.png", profile["avatar_url"])
 }
 
+func TestUserProfile_MeUpdate_StatusTextPersistsToPublicReads(t *testing.T) {
+	deps := newTestDeps(t)
+	user := createUser(t, deps.UserRepo, "status_profile_user", "user")
+
+	token, err := deps.AuthService.GenerateJWT(user.ID, "", user.Username, user.Role)
+	require.NoError(t, err)
+
+	updateBody := map[string]any{
+		"status_text": "Integration status text",
+	}
+	payload, err := json.Marshal(updateBody)
+	require.NoError(t, err)
+
+	updateReq, err := http.NewRequest("PUT", "/api/v1/users/me/profile", bytes.NewReader(payload))
+	require.NoError(t, err)
+	updateReq.Header.Set("Authorization", "Bearer "+token)
+	updateReq.Header.Set("Content-Type", "application/json")
+	updateResp := doRequest(t, deps.Router, updateReq)
+	require.Equal(t, http.StatusOK, updateResp.Code)
+
+	getReq, err := http.NewRequest("GET", "/api/v1/users/id/"+strconv.Itoa(user.ID)+"/profile", nil)
+	require.NoError(t, err)
+	getResp := doRequest(t, deps.Router, getReq)
+	require.Equal(t, http.StatusOK, getResp.Code)
+
+	var profile map[string]any
+	require.NoError(t, json.Unmarshal(getResp.Body.Bytes(), &profile))
+	require.Equal(t, "Integration status text", profile["status_text"])
+}
+
 func TestUserProfile_MeUpdate_InvalidAvatarRejected(t *testing.T) {
 	deps := newTestDeps(t)
 	user := createUser(t, deps.UserRepo, "me_profile_invalid_avatar", "user")
@@ -161,4 +191,34 @@ func TestUserProfile_LegacyUpdateAlias_RemainsFunctional(t *testing.T) {
 	require.NoError(t, json.Unmarshal(getResp.Body.Bytes(), &profile))
 	require.Equal(t, "Legacy route bio", profile["bio"])
 	require.Equal(t, "https://example.com/legacy-route-avatar.png", profile["avatar_url"])
+}
+
+func TestUserProfile_MeUpdate_WithoutProfileRow_CreatesProfileEntry(t *testing.T) {
+	deps := newTestDeps(t)
+	user := createUser(t, deps.UserRepo, "create_profile_row_user", "user")
+
+	_, err := deps.DB.Pool.Exec(context.Background(), "DELETE FROM user_profiles WHERE user_id = $1", user.ID)
+	require.NoError(t, err)
+
+	token, err := deps.AuthService.GenerateJWT(user.ID, "", user.Username, user.Role)
+	require.NoError(t, err)
+
+	updateBody := map[string]any{
+		"bio":         "Created profile row bio",
+		"status_text": "Created profile row status",
+	}
+	payload, err := json.Marshal(updateBody)
+	require.NoError(t, err)
+
+	updateReq, err := http.NewRequest("PUT", "/api/v1/users/me/profile", bytes.NewReader(payload))
+	require.NoError(t, err)
+	updateReq.Header.Set("Authorization", "Bearer "+token)
+	updateReq.Header.Set("Content-Type", "application/json")
+	updateResp := doRequest(t, deps.Router, updateReq)
+	require.Equal(t, http.StatusOK, updateResp.Code)
+
+	var statusText string
+	err = deps.DB.Pool.QueryRow(context.Background(), "SELECT status_text FROM user_profiles WHERE user_id = $1", user.ID).Scan(&statusText)
+	require.NoError(t, err)
+	require.Equal(t, "Created profile row status", statusText)
 }
