@@ -104,3 +104,44 @@ func TestSettings_Endpoints_RequireAuth(t *testing.T) {
 	updateResp := doRequest(t, deps.Router, updateReq)
 	require.Equal(t, http.StatusUnauthorized, updateResp.Code)
 }
+
+func TestSettings_UpdateAndGet_PersistsNotificationPreferenceFields(t *testing.T) {
+	deps := newTestDeps(t)
+	user := createUser(t, deps.UserRepo, "settings_notif_prefs_user", "user")
+
+	token, err := deps.AuthService.GenerateJWT(user.ID, "", user.Username, user.Role)
+	require.NoError(t, err)
+
+	updateBody := map[string]any{
+		"notify_comment_replies":   false,
+		"notify_post_milestone":    false,
+		"notify_post_velocity":     false,
+		"notify_comment_milestone": false,
+		"notify_comment_velocity":  false,
+		"daily_digest":             true,
+	}
+	payload, err := json.Marshal(updateBody)
+	require.NoError(t, err)
+
+	updateReq, err := http.NewRequest("PUT", "/api/v1/settings", bytes.NewReader(payload))
+	require.NoError(t, err)
+	updateReq.Header.Set("Authorization", "Bearer "+token)
+	updateReq.Header.Set("Content-Type", "application/json")
+	updateResp := doRequest(t, deps.Router, updateReq)
+	require.Equal(t, http.StatusOK, updateResp.Code, "response: %s", updateResp.Body.String())
+
+	getReq, err := http.NewRequest("GET", "/api/v1/settings", nil)
+	require.NoError(t, err)
+	getReq.Header.Set("Authorization", "Bearer "+token)
+	getResp := doRequest(t, deps.Router, getReq)
+	require.Equal(t, http.StatusOK, getResp.Code, "response: %s", getResp.Body.String())
+
+	var settings map[string]any
+	require.NoError(t, json.Unmarshal(getResp.Body.Bytes(), &settings))
+	require.Equal(t, false, settings["notify_comment_replies"])
+	require.Equal(t, false, settings["notify_post_milestone"])
+	require.Equal(t, false, settings["notify_post_velocity"])
+	require.Equal(t, false, settings["notify_comment_milestone"])
+	require.Equal(t, false, settings["notify_comment_velocity"])
+	require.Equal(t, true, settings["daily_digest"])
+}
