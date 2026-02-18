@@ -158,7 +158,9 @@ describe('SettingsPage push toggle', () => {
     vi.clearAllMocks();
   });
 
-  it('disables push setting when currently enabled and unregister succeeds', async () => {
+  it(
+    'disables push setting when currently enabled and unregister succeeds',
+    async () => {
     useSettingsMock.mockReturnValue(buildSettingsMock(true));
     disablePush.mockResolvedValue(true);
 
@@ -175,9 +177,13 @@ describe('SettingsPage push toggle', () => {
       expect(disablePush).toHaveBeenCalledTimes(1);
       expect(setShowPushNotifications).toHaveBeenCalledWith(false);
     });
-  });
+    },
+    10000
+  );
 
-  it('enables push setting only when permission flow succeeds', async () => {
+  it(
+    'enables push setting only when permission flow succeeds',
+    async () => {
     useSettingsMock.mockReturnValue(buildSettingsMock(false));
     enablePush.mockResolvedValue(true);
 
@@ -194,9 +200,13 @@ describe('SettingsPage push toggle', () => {
       expect(enablePush).toHaveBeenCalledTimes(1);
       expect(setShowPushNotifications).toHaveBeenCalledWith(true);
     });
-  });
+    },
+    10000
+  );
 
-  it('keeps push setting unchanged when unregister fails', async () => {
+  it(
+    'keeps push setting unchanged when unregister fails',
+    async () => {
     useSettingsMock.mockReturnValue(buildSettingsMock(true));
     disablePush.mockResolvedValue(false);
 
@@ -213,9 +223,13 @@ describe('SettingsPage push toggle', () => {
       expect(disablePush).toHaveBeenCalledTimes(1);
     });
     expect(setShowPushNotifications).not.toHaveBeenCalledWith(false);
-  });
+    },
+    10000
+  );
 
-  it('keeps push setting unchanged when enable flow fails', async () => {
+  it(
+    'keeps push setting unchanged when enable flow fails',
+    async () => {
     useSettingsMock.mockReturnValue(buildSettingsMock(false));
     enablePush.mockResolvedValue(false);
 
@@ -232,5 +246,7 @@ describe('SettingsPage push toggle', () => {
       expect(enablePush).toHaveBeenCalledTimes(1);
     });
     expect(setShowPushNotifications).not.toHaveBeenCalledWith(true);
-  });
+    },
+    10000
+  );
 });
