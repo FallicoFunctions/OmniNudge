@@ -394,6 +394,9 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
               };
             },
           );
+          window.dispatchEvent(new CustomEvent<WsReactionAddedPayload>('reaction-added', {
+            detail: data.payload as WsReactionAddedPayload,
+          }));
           break;
         }
 
@@ -427,6 +430,9 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
               return { ...old, reactions, total_unique_emoji: reactions.length };
             },
           );
+          window.dispatchEvent(new CustomEvent<WsReactionRemovedPayload>('reaction-removed', {
+            detail: data.payload as WsReactionRemovedPayload,
+          }));
           break;
         }
 

@@ -1735,19 +1735,19 @@
 ---
 
 ### F1-007: Frontend - useMessageReactions Hook
-**Status:** ⬜ TODO
+**Status:** ✅ COMPLETE
 **Priority:** P1
 **Estimated Time:** 3 hours
 
 **Tasks:**
-- [ ] Create useMessageReactions.ts hook
-- [ ] Use React Query for reactions data
-- [ ] Implement add reaction mutation
-- [ ] Implement remove reaction mutation
-- [ ] Subscribe to WebSocket reaction events
-- [ ] Update cache optimistically
-- [ ] Handle errors gracefully
-- [ ] Write hook tests
+- [x] Create useMessageReactions.ts hook
+- [x] Use React Query for reactions data
+- [x] Implement add reaction mutation
+- [x] Implement remove reaction mutation
+- [x] Subscribe to WebSocket reaction events
+- [x] Update cache optimistically
+- [x] Handle errors gracefully
+- [x] Write hook tests
 
 **Acceptance Criteria:**
 - Reactions load from API
