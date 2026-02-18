@@ -2007,20 +2007,22 @@
 ---
 
 ### F2-008: Fix - Deleted Message Handling
-**Status:** ⬜ TODO
+**Status:** ✅ COMPLETE
 **Priority:** P2
 **Estimated Time:** 30 minutes
 
 **Problem:** What happens to pin when message deleted?
 
 **Tasks:**
-- [ ] Set foreign key to CASCADE (pin deleted when message deleted)
-- [ ] Test deletion
-- [ ] Update pinned bar in real-time
+- [x] Set foreign key to CASCADE (pin deleted when message deleted)
+- [x] Test deletion
+- [x] Update pinned bar in real-time
 
 **Acceptance Criteria:**
-- Deleting message removes from pinned bar
-- No broken references
+- Deleting message removes from pinned bar ✅
+- No broken references ✅
+
+**Implementation Note:** Pins are stored on the `messages` row (`pinned/pinned_by/pinned_at`) rather than a separate pin table. Deleting a message inherently removes its pin state; frontend cache updates now also remove deleted pinned messages immediately from the pinned bar.
 
 **Dependencies:** F2-001
 

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
+  type InfiniteData,
   useInfiniteQuery,
   useMutation,
   useQuery,
@@ -27,6 +28,7 @@ import { useMediaQuery } from '../hooks/useMediaQuery';
 import type {
   Conversation,
   Message,
+  PinnedMessagesResponse,
   SendMessageRequest,
 } from '../types/messages';
 import type { ModMailConversation } from '../types/modmail';
@@ -973,10 +975,31 @@ export default function MessagesPage() {
       return variables;
     },
     onSuccess: (_, variables) => {
-      queryClient.setQueryData<Message[] | undefined>(
-        ['messages', variables.conversationId],
-        (prev) => (prev ? prev.filter((msg) => msg.id !== variables.messageId) : prev)
+      queryClient.setQueryData<
+        InfiniteData<{ messages: Message[]; next_cursor?: string }> | undefined
+      >(['messages', variables.conversationId], (prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          pages: prev.pages.map((page) => ({
+            ...page,
+            messages: page.messages.filter((msg) => msg.id !== variables.messageId),
+          })),
+        };
+      });
+      queryClient.setQueryData<PinnedMessagesResponse | undefined>(
+        ['pinnedMessages', variables.conversationId],
+        (prev) =>
+          prev
+            ? {
+                ...prev,
+                pinned_messages: prev.pinned_messages.filter(
+                  (msg) => msg.id !== variables.messageId
+                ),
+              }
+            : prev
       );
+      queryClient.invalidateQueries({ queryKey: ['pinnedMessages', variables.conversationId] });
       queryClient.invalidateQueries({ queryKey: ['conversations'] });
       queryClient.invalidateQueries({ queryKey: ['conversations', 'all'] });
       setDeleteDialogMessage(null);
