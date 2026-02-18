@@ -130,4 +130,118 @@ describe('usePinnedMessages', () => {
       expect(messagesService.pinMessage).toHaveBeenCalledWith(123);
     });
   });
+
+  it('calls unpin mutation service method and updates pinned set', async () => {
+    vi.mocked(messagesService.getPinnedMessages).mockResolvedValue({
+      pinned_messages: [makePinnedMessage(44)],
+    });
+    vi.mocked(messagesService.unpinMessage).mockResolvedValue();
+
+    const { wrapper } = createWrapper();
+    const { result } = renderHook(
+      () =>
+        usePinnedMessages({
+          conversationId: 55,
+          currentUserId: 1,
+          currentUserRole: 'user',
+        }),
+      { wrapper }
+    );
+
+    await waitFor(() => expect(result.current.isLoadingPinned).toBe(false));
+    expect(result.current.pinnedMessages.some((message) => message.id === 44)).toBe(true);
+
+    act(() => {
+      result.current.unpinMessage(44);
+    });
+
+    await waitFor(() => {
+      expect(messagesService.unpinMessage).toHaveBeenCalledWith(44);
+    });
+  });
+
+  it('rolls back optimistic pin when pin API fails (e.g., 10-pin limit)', async () => {
+    vi.mocked(messagesService.getPinnedMessages).mockResolvedValue({
+      pinned_messages: [makePinnedMessage(1)],
+    });
+    vi.mocked(messagesService.pinMessage).mockRejectedValue(new Error('max pinned limit reached'));
+
+    const { wrapper, queryClient } = createWrapper();
+    queryClient.setQueryData(['messages', 55], {
+      pages: [
+        {
+          messages: [
+            {
+              ...makePinnedMessage(2),
+              pinned: false,
+              pinned_by: null,
+              pinned_at: null,
+            },
+          ],
+        },
+      ],
+      pageParams: [''],
+    });
+
+    const { result } = renderHook(
+      () =>
+        usePinnedMessages({
+          conversationId: 55,
+          currentUserId: 1,
+          currentUserRole: 'user',
+        }),
+      { wrapper }
+    );
+
+    await waitFor(() => expect(result.current.isLoadingPinned).toBe(false));
+    expect(result.current.pinnedMessages.map((m) => m.id)).toEqual([1]);
+
+    act(() => {
+      result.current.pinMessage(2);
+    });
+
+    await waitFor(() => {
+      expect(messagesService.pinMessage).toHaveBeenCalledWith(2);
+    });
+
+    await waitFor(() => {
+      expect(result.current.pinnedMessages.map((m) => m.id)).toEqual([1]);
+    });
+  });
+
+  it('applies websocket message-unpinned events to pinned cache', async () => {
+    vi.mocked(messagesService.getPinnedMessages).mockResolvedValue({
+      pinned_messages: [makePinnedMessage(88)],
+    });
+
+    const { wrapper } = createWrapper();
+    const { result } = renderHook(
+      () =>
+        usePinnedMessages({
+          conversationId: 55,
+          currentUserId: 1,
+          currentUserRole: 'user',
+        }),
+      { wrapper }
+    );
+
+    await waitFor(() => expect(result.current.isLoadingPinned).toBe(false));
+    expect(result.current.pinnedMessages.some((message) => message.id === 88)).toBe(true);
+
+    act(() => {
+      window.dispatchEvent(
+        new CustomEvent('message-unpinned', {
+          detail: {
+            type: 'message_unpinned',
+            message_id: 88,
+            conversation_id: 55,
+          },
+        })
+      );
+    });
+
+    await waitFor(() => {
+      expect(result.current.pinnedMessages.some((message) => message.id === 88)).toBe(false);
+    });
+  });
 });
