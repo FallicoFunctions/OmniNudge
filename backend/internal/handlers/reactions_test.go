@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/omninudge/backend/internal/database"
 	"github.com/omninudge/backend/internal/models"
 	"github.com/omninudge/backend/internal/services"
@@ -352,6 +353,43 @@ func TestAddReaction_TooManyEmoji(t *testing.T) {
 			assert.Equal(t, http.StatusConflict, w.Code, "11th emoji should be rejected: %s", w.Body.String())
 		}
 	}
+}
+
+// TestMessageReactions_DBConstraint_MaxUniqueEmoji ensures the database-level
+// trigger enforces the 10-unique-emoji cap even when inserts bypass service logic.
+func TestMessageReactions_DBConstraint_MaxUniqueEmoji(t *testing.T) {
+	bed, cleanup := setupReactionsHandlerTest(t)
+	defer cleanup()
+
+	emojis := []string{"👍", "❤️", "😂", "😮", "😢", "😡", "🎉", "🔥", "💯", "✅", "🚀"}
+	require.Len(t, emojis, 11)
+
+	for i, emoji := range emojis {
+		_, err := bed.db.Pool.Exec(context.Background(), `
+			INSERT INTO message_reactions (message_id, user_id, emoji)
+			VALUES ($1, $2, $3)
+		`, bed.msgID, bed.user1ID, emoji)
+
+		if i < 10 {
+			require.NoError(t, err, "emoji %d (%s) should insert", i, emoji)
+			continue
+		}
+
+		require.Error(t, err, "11th unique emoji insert should fail")
+		var pgErr *pgconn.PgError
+		require.ErrorAs(t, err, &pgErr)
+		assert.Equal(t, "23514", pgErr.Code)
+		assert.Equal(t, "message_reactions_max_unique_emoji_per_message", pgErr.ConstraintName)
+	}
+
+	var distinctCount int
+	err := bed.db.Pool.QueryRow(context.Background(), `
+		SELECT COUNT(DISTINCT emoji)
+		FROM message_reactions
+		WHERE message_id = $1
+	`, bed.msgID).Scan(&distinctCount)
+	require.NoError(t, err)
+	assert.Equal(t, 10, distinctCount)
 }
 
 func TestAddReaction_Unauthenticated(t *testing.T) {

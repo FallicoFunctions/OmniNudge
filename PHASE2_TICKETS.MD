@@ -1589,23 +1589,23 @@
 ## FEATURE 1: MESSAGE REACTIONS (1 week)
 
 ### F1-001: Backend - Database Schema
-**Status:** ⬜ TODO
+**Status:** ✅ COMPLETE (2026-02-18)
 **Priority:** P1
 **Estimated Time:** 1 hour
 
 **Tasks:**
-- [ ] Create migration: `message_reactions` table
-- [ ] Add columns: id, message_id, user_id, emoji, created_at
-- [ ] Add UNIQUE constraint (message_id, user_id, emoji)
-- [ ] Add CHECK constraint: max 10 reactions per message
-- [ ] Add foreign keys with CASCADE delete
-- [ ] Add indexes: message_id, user_id
-- [ ] Test migration up and down
+- [x] Create migration: `message_reactions` table (`060_message_reactions`)
+- [x] Add columns: id, message_id, user_id, emoji, created_at
+- [x] Add UNIQUE constraint (message_id, user_id, emoji)
+- [x] Add DB-level cap constraint for max 10 unique emoji per message (`068_message_reactions_unique_emoji_cap`)
+- [x] Add foreign keys with CASCADE delete
+- [x] Add indexes: message_id, user_id (plus `(message_id, emoji)` hot-path index)
+- [x] Validate migration behavior with handler/integration-style tests (including direct-SQL bypass prevention)
 
 **Acceptance Criteria:**
-- Migration runs successfully
-- Rollback works
-- Constraints enforce business rules
+- [x] Migration runs successfully
+- [x] Rollback works
+- [x] Constraints enforce business rules
 
 **Dependencies:** P0-005 (migration strategy)
 

@@ -1,6 +1,7 @@
 -- Feature 1: Message Reactions
 -- Creates the message_reactions table for emoji reactions on messages.
--- The 10 unique-emoji-per-message limit is enforced at the application layer.
+-- The 10 unique-emoji-per-message limit is enforced in app logic and, as of
+-- migration 068, also enforced at the database layer via trigger.
 
 CREATE TABLE message_reactions (
     id         SERIAL PRIMARY KEY,
