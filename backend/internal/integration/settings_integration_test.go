@@ -170,3 +170,32 @@ func TestSettings_UpdateAndGet_PersistsNotificationPreferenceFields(t *testing.T
 	require.Equal(t, false, settings["notify_comment_velocity"])
 	require.Equal(t, true, settings["daily_digest"])
 }
+
+func TestSettings_Update_NormalizesEnumValuesCaseAndWhitespace(t *testing.T) {
+	deps := newTestDeps(t)
+	user := createUser(t, deps.UserRepo, "settings_normalize_user", "user")
+
+	token, err := deps.AuthService.GenerateJWT(user.ID, "", user.Username, user.Role)
+	require.NoError(t, err)
+
+	updateBody := map[string]any{
+		"theme":                           "  AUTO  ",
+		"profile_visibility":              "  FRIENDS_ONLY  ",
+		"access_request_cooldown_display": "  DATE  ",
+	}
+	payload, err := json.Marshal(updateBody)
+	require.NoError(t, err)
+
+	updateReq, err := http.NewRequest("PUT", "/api/v1/settings", bytes.NewReader(payload))
+	require.NoError(t, err)
+	updateReq.Header.Set("Authorization", "Bearer "+token)
+	updateReq.Header.Set("Content-Type", "application/json")
+	updateResp := doRequest(t, deps.Router, updateReq)
+	require.Equal(t, http.StatusOK, updateResp.Code, "response: %s", updateResp.Body.String())
+
+	var updated map[string]any
+	require.NoError(t, json.Unmarshal(updateResp.Body.Bytes(), &updated))
+	require.Equal(t, "system", updated["theme"])
+	require.Equal(t, "friends_only", updated["profile_visibility"])
+	require.Equal(t, "date", updated["access_request_cooldown_display"])
+}
