@@ -473,3 +473,40 @@ func TestUpdateSettings_PersistsShowPushNotifications(t *testing.T) {
 	require.NotNil(t, settings)
 	assert.False(t, settings.ShowPushNotifications)
 }
+
+func TestUpdateSettings_PersistsNotificationPreferenceFields(t *testing.T) {
+	handler, settingsRepo, userID, cleanup := setupSettingsHandlerTest(t)
+	defer cleanup()
+
+	router := gin.Default()
+	router.PUT("/settings", func(c *gin.Context) {
+		c.Set("user_id", userID)
+		handler.UpdateSettings(c)
+	})
+
+	body := map[string]any{
+		"notify_comment_replies":   false,
+		"notify_post_milestone":    false,
+		"notify_post_velocity":     false,
+		"notify_comment_milestone": false,
+		"notify_comment_velocity":  false,
+		"daily_digest":             true,
+	}
+	payload, _ := json.Marshal(body)
+
+	req := httptest.NewRequest(http.MethodPut, "/settings", bytes.NewReader(payload))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	require.Equal(t, http.StatusOK, w.Code, "response: %s", w.Body.String())
+
+	settings, err := settingsRepo.GetByUserID(context.Background(), userID)
+	require.NoError(t, err)
+	require.NotNil(t, settings)
+	assert.False(t, settings.NotifyCommentReplies)
+	assert.False(t, settings.NotifyPostMilestone)
+	assert.False(t, settings.NotifyPostVelocity)
+	assert.False(t, settings.NotifyCommentMilestone)
+	assert.False(t, settings.NotifyCommentVelocity)
+	assert.True(t, settings.DailyDigest)
+}
