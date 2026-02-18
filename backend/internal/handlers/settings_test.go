@@ -65,6 +65,47 @@ func TestUpdateSettings_RejectsInvalidFontSize(t *testing.T) {
 	assert.Contains(t, w.Body.String(), "Invalid font_size")
 }
 
+func TestGetSettings_CreatesDefaultSettingsWhenMissing(t *testing.T) {
+	handler, settingsRepo, userID, cleanup := setupSettingsHandlerTest(t)
+	defer cleanup()
+
+	// New test users start without a user_settings row.
+	existing, err := settingsRepo.GetByUserID(context.Background(), userID)
+	require.NoError(t, err)
+	require.Nil(t, existing)
+
+	router := gin.Default()
+	router.GET("/settings", func(c *gin.Context) {
+		c.Set("user_id", userID)
+		handler.GetSettings(c)
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/settings", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	require.Equal(t, http.StatusOK, w.Code, "response: %s", w.Body.String())
+
+	settings, err := settingsRepo.GetByUserID(context.Background(), userID)
+	require.NoError(t, err)
+	require.NotNil(t, settings)
+	assert.Equal(t, userID, settings.UserID)
+}
+
+func TestGetSettings_RequiresAuth(t *testing.T) {
+	handler, _, _, cleanup := setupSettingsHandlerTest(t)
+	defer cleanup()
+
+	router := gin.Default()
+	router.GET("/settings", handler.GetSettings)
+
+	req := httptest.NewRequest(http.MethodGet, "/settings", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusUnauthorized, w.Code)
+	assert.Contains(t, w.Body.String(), "Not authenticated")
+}
+
 func TestUpdateSettings_RejectsTooLongDeviceID(t *testing.T) {
 	handler, _, userID, cleanup := setupSettingsHandlerTest(t)
 	defer cleanup()
