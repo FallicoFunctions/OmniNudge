@@ -56,6 +56,21 @@ export const messagesService = {
     );
   },
 
+  async getArchivedConversationsPage(
+    limit = 20,
+    cursor?: string
+  ): Promise<{ conversations: Conversation[]; next_cursor?: string }> {
+    const params = new URLSearchParams();
+    params.set('limit', String(limit));
+    params.set('offset', '0');
+    if (cursor) {
+      params.set('cursor', cursor);
+    }
+    return api.get<{ conversations: Conversation[]; next_cursor?: string }>(
+      `/conversations/archived?${params.toString()}`
+    );
+  },
+
   async getConversation(id: number): Promise<Conversation> {
     return api.get<Conversation>(`/conversations/${id}`);
   },

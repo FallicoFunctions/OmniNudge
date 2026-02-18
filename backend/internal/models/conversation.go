@@ -324,6 +324,164 @@ func (r *ConversationRepository) GetByUserIDWithCursor(
 	return conversations, rows.Err()
 }
 
+// GetArchivedByUserID retrieves only archived conversations for a specific user.
+func (r *ConversationRepository) GetArchivedByUserID(ctx context.Context, userID int, limit, offset int) ([]*Conversation, error) {
+	query := `
+		SELECT conversations.id, conversations.user1_id, conversations.user2_id, conversations.created_at, conversations.last_message_at,
+		       user1_auto_delete_after, user2_auto_delete_after,
+		       user1_pseudonym, user2_pseudonym,
+		       conversation_type, hub_id, subject, status, archived_at, archived_by,
+		       COALESCE(cns.muted, false) AS muted
+		FROM conversations
+		LEFT JOIN conversation_notification_settings cns
+		       ON cns.conversation_id = conversations.id AND cns.user_id = $1
+		WHERE (
+			(
+				(conversation_type = 'dm' OR conversation_type IS NULL) AND
+				(user1_id = $1 OR user2_id = $1) AND
+				NOT ((user1_id = $1 AND deleted_for_user1 = TRUE) OR (user2_id = $1 AND deleted_for_user2 = TRUE)) AND
+				(
+					(user1_id = $1 AND archived_for_user1 = TRUE) OR
+					(user2_id = $1 AND archived_for_user2 = TRUE) OR
+					archived_at IS NOT NULL
+				)
+			)
+			OR
+			(
+				conversation_type = 'mod_mail' AND
+				id IN (
+					SELECT conversation_id
+					FROM conversation_participants
+					WHERE user_id = $1 AND is_moderator = FALSE
+				) AND
+				archived_at IS NOT NULL
+			)
+		)
+		ORDER BY last_message_at DESC, id DESC
+		LIMIT $2 OFFSET $3
+	`
+
+	rows, err := r.pool.Query(ctx, query, userID, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var conversations []*Conversation
+	for rows.Next() {
+		conversation := &Conversation{}
+		err := rows.Scan(
+			&conversation.ID,
+			&conversation.User1ID,
+			&conversation.User2ID,
+			&conversation.CreatedAt,
+			&conversation.LastMessageAt,
+			&conversation.User1AutoDeleteAfter,
+			&conversation.User2AutoDeleteAfter,
+			&conversation.User1Pseudonym,
+			&conversation.User2Pseudonym,
+			&conversation.ConversationType,
+			&conversation.HubID,
+			&conversation.Subject,
+			&conversation.Status,
+			&conversation.ArchivedAt,
+			&conversation.ArchivedBy,
+			&conversation.Muted,
+		)
+		if err != nil {
+			return nil, err
+		}
+		conversations = append(conversations, conversation)
+	}
+	return conversations, rows.Err()
+}
+
+// GetArchivedByUserIDWithCursor retrieves only archived conversations using cursor pagination.
+func (r *ConversationRepository) GetArchivedByUserIDWithCursor(
+	ctx context.Context,
+	userID int,
+	limit int,
+	cursor *TimeCursor,
+) ([]*Conversation, error) {
+	query := `
+		SELECT conversations.id, conversations.user1_id, conversations.user2_id, conversations.created_at, conversations.last_message_at,
+		       user1_auto_delete_after, user2_auto_delete_after,
+		       user1_pseudonym, user2_pseudonym,
+		       conversation_type, hub_id, subject, status, archived_at, archived_by,
+		       COALESCE(cns.muted, false) AS muted
+		FROM conversations
+		LEFT JOIN conversation_notification_settings cns
+		       ON cns.conversation_id = conversations.id AND cns.user_id = $1
+		WHERE (
+			(
+				(conversation_type = 'dm' OR conversation_type IS NULL) AND
+				(user1_id = $1 OR user2_id = $1) AND
+				NOT ((user1_id = $1 AND deleted_for_user1 = TRUE) OR (user2_id = $1 AND deleted_for_user2 = TRUE)) AND
+				(
+					(user1_id = $1 AND archived_for_user1 = TRUE) OR
+					(user2_id = $1 AND archived_for_user2 = TRUE) OR
+					archived_at IS NOT NULL
+				)
+			)
+			OR
+			(
+				conversation_type = 'mod_mail' AND
+				id IN (
+					SELECT conversation_id
+					FROM conversation_participants
+					WHERE user_id = $1 AND is_moderator = FALSE
+				) AND
+				archived_at IS NOT NULL
+			)
+		)
+	`
+
+	args := []interface{}{userID}
+	paramIdx := 2
+	if cursor != nil {
+		query += fmt.Sprintf(" AND (last_message_at, id) < ($%d, $%d)", paramIdx, paramIdx+1)
+		args = append(args, cursor.Timestamp, cursor.ID)
+		paramIdx += 2
+	}
+
+	query += fmt.Sprintf(" ORDER BY last_message_at DESC, id DESC LIMIT $%d", paramIdx)
+	args = append(args, limit)
+
+	rows, err := r.pool.Query(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var conversations []*Conversation
+	for rows.Next() {
+		conversation := &Conversation{}
+		err := rows.Scan(
+			&conversation.ID,
+			&conversation.User1ID,
+			&conversation.User2ID,
+			&conversation.CreatedAt,
+			&conversation.LastMessageAt,
+			&conversation.User1AutoDeleteAfter,
+			&conversation.User2AutoDeleteAfter,
+			&conversation.User1Pseudonym,
+			&conversation.User2Pseudonym,
+			&conversation.ConversationType,
+			&conversation.HubID,
+			&conversation.Subject,
+			&conversation.Status,
+			&conversation.ArchivedAt,
+			&conversation.ArchivedBy,
+			&conversation.Muted,
+		)
+		if err != nil {
+			return nil, err
+		}
+		conversations = append(conversations, conversation)
+	}
+	return conversations, rows.Err()
+}
+
 // UpdateLastMessageAt updates the last_message_at timestamp
 func (r *ConversationRepository) UpdateLastMessageAt(ctx context.Context, conversationID int) error {
 	query := `UPDATE conversations SET last_message_at = CURRENT_TIMESTAMP WHERE id = $1`

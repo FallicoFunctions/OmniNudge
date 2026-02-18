@@ -18,6 +18,7 @@ import {
 } from '../../utils/encryption';
 import { getOwnKeys, getUserPublicKey } from '../../services/keyManagementService';
 import { resolveMediaUrl } from '../../utils/mediaUrl';
+import { normalizeReportReason, reportService, type ReportReason } from '../../services/reportService';
 
 const MAX_UPLOAD_SIZE = 25 * 1024 * 1024; // 25MB
 
@@ -227,9 +228,17 @@ interface MessageBubbleProps {
   message: Message;
   isOwnMessage: boolean;
   currentUserId?: number;
+  reporting: boolean;
+  onReport: (message: Message) => void;
 }
 
-function MessageBubble({ message, isOwnMessage, currentUserId }: MessageBubbleProps) {
+function MessageBubble({
+  message,
+  isOwnMessage,
+  currentUserId,
+  reporting,
+  onReport,
+}: MessageBubbleProps) {
   const { t } = useTranslation();
   const { formatRelativeTime } = useFormat();
   const decryptedText = useDecryptedContent(message, isOwnMessage, currentUserId);
@@ -294,6 +303,16 @@ function MessageBubble({ message, isOwnMessage, currentUserId }: MessageBubblePr
         >
           {formatRelativeTime(message.sent_at)}
         </div>
+        {!isOwnMessage && (
+          <button
+            type="button"
+            onClick={() => onReport(message)}
+            disabled={reporting}
+            className="mt-1 text-xs underline opacity-80 hover:opacity-100 disabled:opacity-50"
+          >
+            {reporting ? t('messages.status.reporting') : t('messages.actions.report')}
+          </button>
+        )}
       </div>
     </div>
   );
@@ -306,6 +325,7 @@ export function ExpandedMessage({ conversation, onCollapse }: ExpandedMessagePro
   const [messageText, setMessageText] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploadingMedia, setUploadingMedia] = useState(false);
+  const [reportingMessageID, setReportingMessageID] = useState<number | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -348,6 +368,54 @@ export function ExpandedMessage({ conversation, onCollapse }: ExpandedMessagePro
       setSelectedFile(null);
     },
   });
+
+  const reportMessageMutation = useMutation({
+    mutationFn: async ({
+      messageID,
+      reason,
+      description,
+    }: {
+      messageID: number;
+      reason: ReportReason;
+      description?: string;
+    }) => {
+      await reportService.createReport({
+        targetType: 'message',
+        targetId: messageID,
+        reason,
+        description,
+      });
+    },
+  });
+
+  const handleReportMessage = async (message: Message) => {
+    const reasonInput = window.prompt(t('reporting.reasonPrompt'));
+    if (reasonInput === null) return;
+    const reason = normalizeReportReason(reasonInput);
+    if (!reason) {
+      alert(t('reporting.invalidReason'));
+      return;
+    }
+    const detailsInput = window.prompt(t('reporting.detailsPrompt'));
+
+    setReportingMessageID(message.id);
+    try {
+      await reportMessageMutation.mutateAsync({
+        messageID: message.id,
+        reason,
+        description: detailsInput ?? undefined,
+      });
+      alert(t('reporting.success'));
+    } catch (error) {
+      alert(
+        t('comments.errors.reportFailed', {
+          message: error instanceof Error ? error.message : t('common.error'),
+        })
+      );
+    } finally {
+      setReportingMessageID(null);
+    }
+  };
 
   const handleSendMessage = async () => {
     if ((!messageText.trim() && !selectedFile) || sendMessageMutation.isPending) return;
@@ -532,6 +600,8 @@ export function ExpandedMessage({ conversation, onCollapse }: ExpandedMessagePro
                 message={message}
                 isOwnMessage={message.sender_id === user?.id}
                 currentUserId={user?.id}
+                reporting={reportingMessageID === message.id}
+                onReport={handleReportMessage}
               />
             ))}
             <div ref={messagesEndRef} />
