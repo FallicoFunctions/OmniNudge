@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -69,6 +70,30 @@ func TestSettings_Update_RejectsInvalidValues(t *testing.T) {
 				"quiet_hours_enabled":       true,
 				"quiet_hours_start_minutes": 300,
 				"quiet_hours_end_minutes":   300,
+			},
+		},
+		{
+			name: "invalid quiet hours start range",
+			body: map[string]any{
+				"quiet_hours_start_minutes": 1440,
+			},
+		},
+		{
+			name: "invalid quiet hours end range",
+			body: map[string]any{
+				"quiet_hours_end_minutes": -1,
+			},
+		},
+		{
+			name: "invalid quiet hours timezone",
+			body: map[string]any{
+				"quiet_hours_timezone": "Not/A_Real_Timezone",
+			},
+		},
+		{
+			name: "invalid mic device id too long",
+			body: map[string]any{
+				"mic_device_id": strings.Repeat("a", 256),
 			},
 		},
 	}
