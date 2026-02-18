@@ -2040,6 +2040,7 @@ export default function MessagesPage() {
                         checked={selectedConversationIDs.has(conversation.id)}
                         onChange={() => toggleConversationSelection(conversation.id)}
                         onClick={(event) => event.stopPropagation()}
+                        onKeyDown={(event) => event.stopPropagation()}
                         onTouchStart={(event) => event.stopPropagation()}
                         onTouchEnd={(event) => event.stopPropagation()}
                       />

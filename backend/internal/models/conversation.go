@@ -522,7 +522,7 @@ func (r *ConversationRepository) Archive(ctx context.Context, conversationID int
 	var conversationType string
 	var user1ID, user2ID *int
 	err := r.pool.QueryRow(ctx, `
-		SELECT conversation_type, user1_id, user2_id
+		SELECT COALESCE(conversation_type, 'dm') AS conversation_type, user1_id, user2_id
 		FROM conversations
 		WHERE id = $1
 	`, conversationID).Scan(&conversationType, &user1ID, &user2ID)
@@ -581,7 +581,7 @@ func (r *ConversationRepository) ArchiveBatch(ctx context.Context, conversationI
 		var conversationType string
 		var user1ID, user2ID *int
 		err := tx.QueryRow(ctx, `
-			SELECT conversation_type, user1_id, user2_id
+			SELECT COALESCE(conversation_type, 'dm') AS conversation_type, user1_id, user2_id
 			FROM conversations
 			WHERE id = $1
 		`, conversationID).Scan(&conversationType, &user1ID, &user2ID)
@@ -651,7 +651,7 @@ func (r *ConversationRepository) Unarchive(ctx context.Context, conversationID i
 	var conversationType string
 	var user1ID, user2ID *int
 	err := r.pool.QueryRow(ctx, `
-		SELECT conversation_type, user1_id, user2_id
+		SELECT COALESCE(conversation_type, 'dm') AS conversation_type, user1_id, user2_id
 		FROM conversations
 		WHERE id = $1
 	`, conversationID).Scan(&conversationType, &user1ID, &user2ID)

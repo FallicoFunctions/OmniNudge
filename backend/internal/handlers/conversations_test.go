@@ -926,3 +926,69 @@ func TestArchiveConversationBatch_AllOrNothingRollback(t *testing.T) {
 	require.NoError(t, err)
 	assert.False(t, archivedForUser1, "authorized conversation should not be archived when batch fails")
 }
+
+func TestArchiveConversation_LegacyNullConversationType(t *testing.T) {
+	handler, db, user1ID, user2ID, cleanup := setupConversationsHandlerTest(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	convRepo := models.NewConversationRepository(db.Pool)
+	conv, err := convRepo.Create(ctx, user1ID, user2ID)
+	require.NoError(t, err)
+
+	_, err = db.Pool.Exec(ctx, `UPDATE conversations SET conversation_type = NULL WHERE id = $1`, conv.ID)
+	require.NoError(t, err)
+
+	router := gin.Default()
+	router.PUT("/conversations/:id/archive", func(c *gin.Context) {
+		c.Set("user_id", user1ID)
+		handler.ArchiveConversation(c)
+	})
+
+	req := httptest.NewRequest(http.MethodPut, fmt.Sprintf("/conversations/%d/archive", conv.ID), nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusOK, w.Code, "response: %s", w.Body.String())
+
+	var archivedForUser1 bool
+	err = db.Pool.QueryRow(ctx, `SELECT COALESCE(archived_for_user1, false) FROM conversations WHERE id = $1`, conv.ID).Scan(&archivedForUser1)
+	require.NoError(t, err)
+	assert.True(t, archivedForUser1)
+}
+
+func TestArchiveConversationBatch_LegacyNullConversationType(t *testing.T) {
+	handler, db, user1ID, user2ID, cleanup := setupConversationsHandlerTest(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	convRepo := models.NewConversationRepository(db.Pool)
+	conv, err := convRepo.Create(ctx, user1ID, user2ID)
+	require.NoError(t, err)
+
+	_, err = db.Pool.Exec(ctx, `UPDATE conversations SET conversation_type = NULL WHERE id = $1`, conv.ID)
+	require.NoError(t, err)
+
+	router := gin.Default()
+	router.POST("/conversations/archive-batch", func(c *gin.Context) {
+		c.Set("user_id", user1ID)
+		handler.ArchiveConversationBatch(c)
+	})
+
+	body := map[string]interface{}{
+		"conversation_ids": []int{conv.ID},
+	}
+	bodyJSON, _ := json.Marshal(body)
+
+	req := httptest.NewRequest(http.MethodPost, "/conversations/archive-batch", bytes.NewBuffer(bodyJSON))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusOK, w.Code, "response: %s", w.Body.String())
+
+	var archivedForUser1 bool
+	err = db.Pool.QueryRow(ctx, `SELECT COALESCE(archived_for_user1, false) FROM conversations WHERE id = $1`, conv.ID).Scan(&archivedForUser1)
+	require.NoError(t, err)
+	assert.True(t, archivedForUser1)
+}
