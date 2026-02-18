@@ -1010,7 +1010,7 @@ export function RedditPostCard({
                 </Link>
                 <span> · </span>
                 <Link to={`/user/${post.author}`} className="hover:text-[var(--color-primary)]">
-                  u/{post.author}
+                  {t('common.format.userPath', { name: post.author })}
                 </Link>
                 <span> · </span>
                 <span>{pointsLabel}</span>

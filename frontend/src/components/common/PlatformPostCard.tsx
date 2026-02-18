@@ -380,7 +380,7 @@ export function PlatformPostCard({
                 to={`/h/${resolvedHubName}`}
                 className="font-semibold text-[var(--color-text-primary)] hover:text-[var(--color-primary)]"
               >
-                {resolvedHubTitle ?? `h/${resolvedHubName}`}
+                {resolvedHubTitle ?? t('common.format.hubPath', { name: resolvedHubName })}
               </Link>
             ) : (
               <span className="font-semibold text-[var(--color-text-primary)]">

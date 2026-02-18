@@ -381,9 +381,15 @@ export function CompactPostCard({
   let sourceBadge = '';
   if (actualPost) {
     if (isHubPost || source === 'hub') {
-      sourceBadge = `h/${actualPost.hub_name || actualPost.hub?.name || t('posts.compact.unknownSource')}`;
+      const hubName = actualPost.hub_name || actualPost.hub?.name;
+      sourceBadge = hubName
+        ? t('common.format.hubPath', { name: hubName })
+        : t('posts.compact.unknownSource');
     } else if (isRedditPost || source === 'reddit') {
-      sourceBadge = `r/${actualPost.subreddit || t('posts.compact.unknownSource')}`;
+      const subredditName = actualPost.subreddit;
+      sourceBadge = subredditName
+        ? t('common.format.subredditPath', { name: subredditName })
+        : t('posts.compact.unknownSource');
     }
   }
 

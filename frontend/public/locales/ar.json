@@ -44,7 +44,8 @@
     },
     "format": {
       "hubPath": "h/{{name}}",
-      "subredditPath": "r/{{name}}"
+      "subredditPath": "r/{{name}}",
+      "userPath": "u/{{name}}"
     },
     "badges": {
       "admin": "مشرف",
