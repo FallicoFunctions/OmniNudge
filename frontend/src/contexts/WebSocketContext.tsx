@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from './AuthContext';
 import { API_BASE_URL } from '../lib/api';
 import type { Message, Conversation } from '../types/messages';
+import type { GetReactionsResponse, WsReactionAddedPayload, WsReactionRemovedPayload } from '../types/reactions';
 
 interface WebSocketMessage {
   type: string;
@@ -306,6 +307,90 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
           window.dispatchEvent(new CustomEvent('feature-flag-updated', {
             detail: { key, enabled, percentage }
           }));
+          break;
+        }
+
+        case 'moderation_report_created':
+        case 'moderation_report_updated': {
+          console.log('[WebSocket] Moderation report event:', data.type, data.payload);
+          queryClient.invalidateQueries({ queryKey: ['modReports'] });
+          queryClient.invalidateQueries({ queryKey: ['adminStats'] });
+          break;
+        }
+
+        case 'reaction_added': {
+          const { message_id, reaction } = data.payload as WsReactionAddedPayload;
+          console.log('[WebSocket] Reaction added:', message_id, reaction.emoji);
+          queryClient.setQueryData<GetReactionsResponse>(
+            ['message-reactions', message_id],
+            (old) => {
+              if (!old) return old;
+              const isMe = reaction.user_id === user?.id;
+              const idx = old.reactions.findIndex((r) => r.emoji === reaction.emoji);
+              if (idx === -1) {
+                return {
+                  ...old,
+                  reactions: [
+                    ...old.reactions,
+                    {
+                      emoji: reaction.emoji,
+                      count: 1,
+                      user_ids: [reaction.user_id],
+                      usernames: reaction.username ? [reaction.username] : [],
+                      user_reacted: isMe,
+                      my_reaction_id: isMe ? reaction.id : undefined,
+                    },
+                  ],
+                  total_unique_emoji: old.total_unique_emoji + 1,
+                };
+              }
+              const updated = [...old.reactions];
+              updated[idx] = {
+                ...updated[idx],
+                count: updated[idx].count + 1,
+                user_ids: [...updated[idx].user_ids, reaction.user_id],
+                usernames: reaction.username
+                  ? [...updated[idx].usernames, reaction.username]
+                  : updated[idx].usernames,
+                user_reacted: isMe ? true : updated[idx].user_reacted,
+                my_reaction_id: isMe ? reaction.id : updated[idx].my_reaction_id,
+              };
+              return { ...old, reactions: updated };
+            },
+          );
+          break;
+        }
+
+        case 'reaction_removed': {
+          const { message_id, user_id, emoji } = data.payload as WsReactionRemovedPayload;
+          console.log('[WebSocket] Reaction removed:', message_id, emoji);
+          queryClient.setQueryData<GetReactionsResponse>(
+            ['message-reactions', message_id],
+            (old) => {
+              if (!old) return old;
+              const isMe = user_id === user?.id;
+              const reactions = old.reactions
+                .map((r) => {
+                  if (r.emoji !== emoji) return r;
+                  const newCount = r.count - 1;
+                  if (newCount === 0) return null;
+                  const userIdx = r.user_ids.indexOf(user_id);
+                  return {
+                    ...r,
+                    count: newCount,
+                    user_ids: r.user_ids.filter((id) => id !== user_id),
+                    usernames:
+                      userIdx >= 0
+                        ? r.usernames.filter((_, i) => i !== userIdx)
+                        : r.usernames,
+                    user_reacted: isMe ? false : r.user_reacted,
+                    my_reaction_id: isMe ? undefined : r.my_reaction_id,
+                  };
+                })
+                .filter(Boolean) as GetReactionsResponse['reactions'];
+              return { ...old, reactions, total_unique_emoji: reactions.length };
+            },
+          );
           break;
         }
 
