@@ -1526,6 +1526,16 @@
       "sendFailed": "No se pudo enviar el mensaje. Inténtalo de nuevo.",
       "reportFailed": "No se pudo enviar el reporte: {{message}}"
     },
+    "editing": {
+      "ariaInput": "Editar texto del mensaje",
+      "saving": "Guardando...",
+      "timeLeft": "Editable durante {{time}}",
+      "expired": "La ventana de edición expiró",
+      "errors": {
+        "empty": "El mensaje no puede estar vacío",
+        "saveFailed": "No se pudieron guardar los cambios"
+      }
+    },
     "messageOptions": {
       "ariaLabel": "Opciones de mensaje"
     },
