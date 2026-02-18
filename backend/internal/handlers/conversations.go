@@ -40,6 +40,10 @@ type CreateConversationRequest struct {
 	OtherUserID int `json:"other_user_id" binding:"required"`
 }
 
+type ArchiveBatchRequest struct {
+	ConversationIDs []int `json:"conversation_ids" binding:"required"`
+}
+
 // ConversationWithDetails includes conversation info plus latest message and unread count
 type ConversationWithDetails struct {
 	*models.Conversation
@@ -548,7 +552,7 @@ func (h *ConversationsHandler) ArchiveConversation(c *gin.Context) {
 
 	// Check permissions based on conversation type
 	switch conversation.ConversationType {
-	case "dm":
+	case "dm", "":
 		if !conversation.IsParticipant(userID.(int)) {
 			c.JSON(http.StatusForbidden, gin.H{"error": "You are not a participant in this conversation"})
 			return
@@ -573,6 +577,59 @@ func (h *ConversationsHandler) ArchiveConversation(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Conversation archived successfully"})
+}
+
+// ArchiveConversationBatch handles POST /api/v1/conversations/archive-batch
+func (h *ConversationsHandler) ArchiveConversationBatch(c *gin.Context) {
+	userID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
+
+	var req ArchiveBatchRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body", "details": err.Error()})
+		return
+	}
+	if len(req.ConversationIDs) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "conversation_ids must contain at least one ID"})
+		return
+	}
+	if len(req.ConversationIDs) > 100 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "conversation_ids cannot exceed 100 IDs"})
+		return
+	}
+
+	seen := make(map[int]struct{}, len(req.ConversationIDs))
+	uniqueIDs := make([]int, 0, len(req.ConversationIDs))
+	for _, id := range req.ConversationIDs {
+		if id <= 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "conversation_ids must contain only positive IDs"})
+			return
+		}
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+		uniqueIDs = append(uniqueIDs, id)
+	}
+
+	if err := h.conversationRepo.ArchiveBatch(c.Request.Context(), uniqueIDs, userID.(int)); err != nil {
+		if err == pgx.ErrNoRows {
+			c.JSON(http.StatusForbidden, gin.H{
+				"error": "One or more conversations are invalid or you are not a participant",
+			})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to archive conversations", "details": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Conversations archived successfully",
+		"count":   len(uniqueIDs),
+	})
 }
 
 // UnarchiveConversation handles PUT /api/v1/conversations/:id/unarchive

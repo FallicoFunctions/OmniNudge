@@ -831,3 +831,98 @@ func TestGetArchivedConversations_StrictCursorPagination(t *testing.T) {
 	secondConv := secondConversations[0].(map[string]interface{})
 	assert.Equal(t, float64(archivedOlder.ID), secondConv["id"])
 }
+
+func TestArchiveConversationBatch_Success(t *testing.T) {
+	handler, db, user1ID, user2ID, cleanup := setupConversationsHandlerTest(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	convRepo := models.NewConversationRepository(db.Pool)
+	conv1, err := convRepo.Create(ctx, user1ID, user2ID)
+	require.NoError(t, err)
+
+	userRepo := models.NewUserRepository(db.Pool)
+	user3 := &models.User{
+		Username:     uniqueConversationsUsername("batchu3"),
+		PasswordHash: "test_hash",
+	}
+	require.NoError(t, userRepo.Create(ctx, user3))
+	conv2, err := convRepo.Create(ctx, user1ID, user3.ID)
+	require.NoError(t, err)
+
+	router := gin.Default()
+	router.POST("/conversations/archive-batch", func(c *gin.Context) {
+		c.Set("user_id", user1ID)
+		handler.ArchiveConversationBatch(c)
+	})
+
+	body := map[string]interface{}{
+		"conversation_ids": []int{conv1.ID, conv2.ID, conv2.ID}, // duplicate should be de-duped
+	}
+	bodyJSON, _ := json.Marshal(body)
+
+	req := httptest.NewRequest(http.MethodPost, "/conversations/archive-batch", bytes.NewBuffer(bodyJSON))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusOK, w.Code, "response: %s", w.Body.String())
+
+	var archivedForUser1Conv1 bool
+	err = db.Pool.QueryRow(ctx, `SELECT COALESCE(archived_for_user1, false) FROM conversations WHERE id = $1`, conv1.ID).Scan(&archivedForUser1Conv1)
+	require.NoError(t, err)
+	assert.True(t, archivedForUser1Conv1)
+
+	var archivedForUser1Conv2 bool
+	err = db.Pool.QueryRow(ctx, `SELECT COALESCE(archived_for_user1, false) FROM conversations WHERE id = $1`, conv2.ID).Scan(&archivedForUser1Conv2)
+	require.NoError(t, err)
+	assert.True(t, archivedForUser1Conv2)
+}
+
+func TestArchiveConversationBatch_AllOrNothingRollback(t *testing.T) {
+	handler, db, user1ID, user2ID, cleanup := setupConversationsHandlerTest(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	convRepo := models.NewConversationRepository(db.Pool)
+	authorizedConv, err := convRepo.Create(ctx, user1ID, user2ID)
+	require.NoError(t, err)
+
+	userRepo := models.NewUserRepository(db.Pool)
+	user3 := &models.User{
+		Username:     uniqueConversationsUsername("batchunauth3"),
+		PasswordHash: "test_hash",
+	}
+	require.NoError(t, userRepo.Create(ctx, user3))
+	user4 := &models.User{
+		Username:     uniqueConversationsUsername("batchunauth4"),
+		PasswordHash: "test_hash",
+	}
+	require.NoError(t, userRepo.Create(ctx, user4))
+
+	unauthorizedConv, err := convRepo.Create(ctx, user3.ID, user4.ID) // user1 is not participant
+	require.NoError(t, err)
+
+	router := gin.Default()
+	router.POST("/conversations/archive-batch", func(c *gin.Context) {
+		c.Set("user_id", user1ID)
+		handler.ArchiveConversationBatch(c)
+	})
+
+	body := map[string]interface{}{
+		"conversation_ids": []int{authorizedConv.ID, unauthorizedConv.ID},
+	}
+	bodyJSON, _ := json.Marshal(body)
+
+	req := httptest.NewRequest(http.MethodPost, "/conversations/archive-batch", bytes.NewBuffer(bodyJSON))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusForbidden, w.Code, "response: %s", w.Body.String())
+
+	var archivedForUser1 bool
+	err = db.Pool.QueryRow(ctx, `SELECT COALESCE(archived_for_user1, false) FROM conversations WHERE id = $1`, authorizedConv.ID).Scan(&archivedForUser1)
+	require.NoError(t, err)
+	assert.False(t, archivedForUser1, "authorized conversation should not be archived when batch fails")
+}

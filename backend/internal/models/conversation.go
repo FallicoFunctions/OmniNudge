@@ -530,7 +530,7 @@ func (r *ConversationRepository) Archive(ctx context.Context, conversationID int
 		return err
 	}
 
-	if conversationType == "dm" {
+	if conversationType == "dm" || conversationType == "" {
 		// For DMs: per-user archive
 		var query string
 		if user1ID != nil && *user1ID == userID {
@@ -562,6 +562,85 @@ func (r *ConversationRepository) Archive(ctx context.Context, conversationID int
 	}
 
 	return nil
+}
+
+// ArchiveBatch archives multiple conversations for a user in a single transaction.
+// If any conversation is invalid or unauthorized, no updates are committed.
+func (r *ConversationRepository) ArchiveBatch(ctx context.Context, conversationIDs []int, userID int) error {
+	if len(conversationIDs) == 0 {
+		return nil
+	}
+
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	for _, conversationID := range conversationIDs {
+		var conversationType string
+		var user1ID, user2ID *int
+		err := tx.QueryRow(ctx, `
+			SELECT conversation_type, user1_id, user2_id
+			FROM conversations
+			WHERE id = $1
+		`, conversationID).Scan(&conversationType, &user1ID, &user2ID)
+		if err != nil {
+			return err
+		}
+
+		if conversationType == "dm" || conversationType == "" {
+			var query string
+			if user1ID != nil && *user1ID == userID {
+				query = `UPDATE conversations SET archived_for_user1 = TRUE WHERE id = $1`
+			} else if user2ID != nil && *user2ID == userID {
+				query = `UPDATE conversations SET archived_for_user2 = TRUE WHERE id = $1`
+			} else {
+				return pgx.ErrNoRows
+			}
+
+			result, execErr := tx.Exec(ctx, query, conversationID)
+			if execErr != nil {
+				return execErr
+			}
+			if result.RowsAffected() == 0 {
+				return pgx.ErrNoRows
+			}
+			continue
+		}
+
+		if conversationType == "mod_mail" {
+			var isParticipant bool
+			checkErr := tx.QueryRow(ctx, `
+				SELECT EXISTS(
+					SELECT 1 FROM conversation_participants
+					WHERE conversation_id = $1 AND user_id = $2
+				)
+			`, conversationID, userID).Scan(&isParticipant)
+			if checkErr != nil {
+				return checkErr
+			}
+			if !isParticipant {
+				return pgx.ErrNoRows
+			}
+
+			_, execErr := tx.Exec(ctx, `
+				UPDATE conversations
+				SET archived_at = CURRENT_TIMESTAMP,
+				    archived_by = $2,
+				    status = 'archived'::varchar
+				WHERE id = $1
+			`, conversationID, userID)
+			if execErr != nil {
+				return execErr
+			}
+			continue
+		}
+
+		return pgx.ErrNoRows
+	}
+
+	return tx.Commit(ctx)
 }
 
 // Unarchive unarchives a conversation

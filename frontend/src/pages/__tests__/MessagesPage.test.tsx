@@ -9,6 +9,7 @@ import { hubsService } from '../../services/hubsService';
 import { redditService } from '../../services/redditService';
 
 const archiveConversation = vi.fn();
+const archiveConversationsBatch = vi.fn();
 const unarchiveConversation = vi.fn();
 const setActiveConversationId = vi.fn();
 
@@ -67,8 +68,10 @@ vi.mock('../../contexts/SettingsContext', () => ({
 vi.mock('../../hooks/useArchive', () => ({
   useArchive: () => ({
     archiveConversation,
+    archiveConversationsBatch,
     unarchiveConversation,
     isArchiving: false,
+    isBatchArchiving: false,
     isUnarchiving: false,
   }),
 }));
