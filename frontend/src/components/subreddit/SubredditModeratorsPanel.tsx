@@ -30,7 +30,7 @@ export function SubredditModeratorsPanel({
         <ul className="mt-3 space-y-2 text-sm text-[var(--color-text-primary)]">
           {moderators.map((mod) => (
             <li key={mod.id} className="flex items-center justify-between">
-              <span>u/{mod.name ?? mod.id}</span>
+              <span>{t('common.format.userPath', { name: mod.name ?? mod.id })}</span>
               {mod.mod_permissions && mod.mod_permissions.length > 0 && (
                 <span className="text-xs uppercase tracking-wide text-[var(--color-text-secondary)]">
                   {mod.mod_permissions.join(', ')}

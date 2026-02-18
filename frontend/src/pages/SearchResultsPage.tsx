@@ -1334,7 +1334,7 @@ export default function SearchResultsPage() {
                     className="rounded border border-[var(--color-border)] p-3"
                   >
                     <div className="text-sm font-semibold text-[var(--color-text-primary)]">
-                      u/{user.name}
+                      {t('common.format.userPath', { name: user.name })}
                     </div>
                   </li>
                 ))}

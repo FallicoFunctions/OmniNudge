@@ -413,7 +413,7 @@ export default function RedditUserPage() {
             <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[var(--color-border)] p-4">
               <div className="flex items-center gap-4">
                 <h1 className="text-2xl font-bold text-[var(--color-text-primary)]">
-                  u/{username}
+                  {t('common.format.userPath', { name: username })}
                 </h1>
                 <div className="flex gap-2 text-sm font-semibold uppercase">
                   {TAB_OPTIONS.map((tab) => (

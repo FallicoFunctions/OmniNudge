@@ -447,7 +447,9 @@ export function SavedItemsView({
           </div>
           <div className="text-xs text-[var(--color-text-secondary)]">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="font-semibold">u/{comment.username}</span>
+              <span className="font-semibold">
+                {t('common.format.userPath', { name: comment.username })}
+              </span>
               <span>•</span>
               <span>{formatSavedTimestamp(comment.created_at)}</span>
             </div>
@@ -545,7 +547,9 @@ export function SavedItemsView({
             </div>
             <div className="text-xs text-[var(--color-text-secondary)]">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="font-semibold">u/{comment.username}</span>
+                <span className="font-semibold">
+                  {t('common.format.userPath', { name: comment.username })}
+                </span>
                 <span>•</span>
                 <span>{formatSavedTimestamp(comment.created_at)}</span>
               </div>
@@ -591,7 +595,9 @@ export function SavedItemsView({
                 {` ${t('saved.labels.inSubreddit', { subreddit: comment.subreddit })}`}
               </div>
               <div className="flex flex-wrap items-center gap-2">
-                <span className="font-semibold">u/{comment.comment_author}</span>
+                <span className="font-semibold">
+                  {t('common.format.userPath', { name: comment.comment_author })}
+                </span>
                 <span>•</span>
                 <span>
                   {t('posts.point', {
