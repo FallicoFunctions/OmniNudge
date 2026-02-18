@@ -621,6 +621,65 @@ Using Playwright or Cypress:
 
 ---
 
+## **PINNING TESTS (FEATURE 2)**
+
+### **Test P1: Pin Message from Menu**
+**Objective**: Verify users can pin a message and it appears in pinned bar immediately.
+
+**Steps**:
+1. Open `/messages` and select a conversation.
+2. Open the message options menu (`...`) on a non-pinned message.
+3. Click **Pin message**.
+4. Verify pinned badge appears on the message.
+5. Verify message appears in the pinned bar above the timeline.
+
+**Expected Results**:
+- ✅ Pin action succeeds without page refresh
+- ✅ Pinned badge appears in-thread
+- ✅ Pinned bar updates immediately
+
+### **Test P2: Unpin Permissions**
+**Objective**: Verify only the pinner or admin can unpin.
+
+**Steps**:
+1. User A pins a message.
+2. User B (non-admin) opens same message menu.
+3. Verify unpin action is disabled/unavailable for User B.
+4. User A (or admin) unpins the message.
+
+**Expected Results**:
+- ✅ Unauthorized user cannot unpin
+- ✅ Pinner/admin can unpin
+- ✅ Pinned bar removes message immediately
+
+### **Test P3: Real-Time Pin Sync**
+**Objective**: Verify pin/unpin websocket updates in other clients.
+
+**Steps**:
+1. Open same conversation in Browser 1 and Browser 2.
+2. In Browser 1, pin a message.
+3. Verify Browser 2 pinned bar updates without refresh.
+4. In Browser 1, unpin the same message.
+5. Verify Browser 2 pinned bar removes it without refresh.
+
+**Expected Results**:
+- ✅ `message_pinned` and `message_unpinned` events reflected in UI
+- ✅ Pinned order remains stable (oldest pin first)
+
+### **Test P4: Pin Limit (10)**
+**Objective**: Verify pin cap enforcement and cache rollback.
+
+**Steps**:
+1. Pin 10 messages in one conversation.
+2. Attempt to pin an 11th message.
+
+**Expected Results**:
+- ✅ API returns conflict for 11th pin
+- ✅ UI does not retain failed optimistic 11th pin
+- ✅ Pinned bar remains at 10 items
+
+---
+
 ## **ACCEPTANCE CRITERIA**
 
 Phase 1 messaging is **PRODUCTION READY** when:
