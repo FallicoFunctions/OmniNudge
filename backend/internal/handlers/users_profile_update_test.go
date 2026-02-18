@@ -55,7 +55,7 @@ func TestUpdateProfileViaMeProfile_UpdatesBioAndAvatar(t *testing.T) {
 	userRepo, settingsRepo, owner, _, cleanup := setupUsersVisibilityTest(t)
 	defer cleanup()
 
-	handler := NewUsersHandler(userRepo, nil, settingsRepo, nil, nil, nil, nil, nil)
+	handler := NewUsersHandler(userRepo, nil, nil, settingsRepo, nil, nil, nil, nil, nil)
 	router := newUsersProfileUpdateRouter(handler)
 
 	body := map[string]any{
@@ -87,7 +87,7 @@ func TestUpdateProfileViaLegacyAlias_UpdatesBioAndAvatar(t *testing.T) {
 	userRepo, settingsRepo, owner, _, cleanup := setupUsersVisibilityTest(t)
 	defer cleanup()
 
-	handler := NewUsersHandler(userRepo, nil, settingsRepo, nil, nil, nil, nil, nil)
+	handler := NewUsersHandler(userRepo, nil, nil, settingsRepo, nil, nil, nil, nil, nil)
 	router := newUsersProfileUpdateRouter(handler)
 
 	body := map[string]any{
@@ -111,7 +111,7 @@ func TestUpdateProfile_RejectsInvalidAvatarURL(t *testing.T) {
 	userRepo, settingsRepo, owner, _, cleanup := setupUsersVisibilityTest(t)
 	defer cleanup()
 
-	handler := NewUsersHandler(userRepo, nil, settingsRepo, nil, nil, nil, nil, nil)
+	handler := NewUsersHandler(userRepo, nil, nil, settingsRepo, nil, nil, nil, nil, nil)
 	router := newUsersProfileUpdateRouter(handler)
 
 	body := map[string]any{
@@ -133,7 +133,7 @@ func TestUpdateProfile_RejectsTooLongBio(t *testing.T) {
 	userRepo, settingsRepo, owner, _, cleanup := setupUsersVisibilityTest(t)
 	defer cleanup()
 
-	handler := NewUsersHandler(userRepo, nil, settingsRepo, nil, nil, nil, nil, nil)
+	handler := NewUsersHandler(userRepo, nil, nil, settingsRepo, nil, nil, nil, nil, nil)
 	router := newUsersProfileUpdateRouter(handler)
 
 	body := map[string]any{
@@ -155,7 +155,7 @@ func TestUpdateProfile_EmptyStringsClearFields(t *testing.T) {
 	userRepo, settingsRepo, owner, _, cleanup := setupUsersVisibilityTest(t)
 	defer cleanup()
 
-	handler := NewUsersHandler(userRepo, nil, settingsRepo, nil, nil, nil, nil, nil)
+	handler := NewUsersHandler(userRepo, nil, nil, settingsRepo, nil, nil, nil, nil, nil)
 	router := newUsersProfileUpdateRouter(handler)
 
 	seedBody := map[string]any{
@@ -200,7 +200,7 @@ func TestUpdateProfile_InvalidatesCachedPublicProfile(t *testing.T) {
 	initialBio := "before cache"
 	require.NoError(t, userRepo.UpdateProfile(context.Background(), owner.ID, &initialBio, nil))
 
-	handler := NewUsersHandler(userRepo, nil, settingsRepo, nil, nil, nil, nil, services.NewMemoryCache())
+	handler := NewUsersHandler(userRepo, nil, nil, settingsRepo, nil, nil, nil, nil, services.NewMemoryCache())
 	router := newUsersProfileUpdateRouter(handler)
 
 	firstGetReq := httptest.NewRequest(http.MethodGet, "/users/"+owner.Username, nil)
@@ -233,7 +233,7 @@ func TestUpdateProfile_StatusText_PersistsAndReturns(t *testing.T) {
 	defer cleanup()
 
 	profileRepo := models.NewUserProfileRepository(userRepo.GetPool())
-	handler := NewUsersHandler(userRepo, profileRepo, settingsRepo, nil, nil, nil, nil, nil)
+	handler := NewUsersHandler(userRepo, profileRepo, nil, settingsRepo, nil, nil, nil, nil, nil)
 	router := newUsersProfileUpdateRouter(handler)
 
 	body := map[string]any{
@@ -263,7 +263,7 @@ func TestUpdateProfile_StatusText_RejectsTooLongValue(t *testing.T) {
 	defer cleanup()
 
 	profileRepo := models.NewUserProfileRepository(userRepo.GetPool())
-	handler := NewUsersHandler(userRepo, profileRepo, settingsRepo, nil, nil, nil, nil, nil)
+	handler := NewUsersHandler(userRepo, profileRepo, nil, settingsRepo, nil, nil, nil, nil, nil)
 	router := newUsersProfileUpdateRouter(handler)
 
 	body := map[string]any{
@@ -289,7 +289,7 @@ func TestUpdateProfile_PreservesExistingStatusTextWhenOmitted(t *testing.T) {
 	seedStatus := "Keep this status"
 	require.NoError(t, profileRepo.Upsert(context.Background(), owner.ID, nil, nil, &seedStatus))
 
-	handler := NewUsersHandler(userRepo, profileRepo, settingsRepo, nil, nil, nil, nil, nil)
+	handler := NewUsersHandler(userRepo, profileRepo, nil, settingsRepo, nil, nil, nil, nil, nil)
 	router := newUsersProfileUpdateRouter(handler)
 
 	body := map[string]any{
@@ -317,7 +317,7 @@ func TestPing_InvalidatesCachedOwnerProfileLastSeen(t *testing.T) {
 	userRepo, settingsRepo, owner, _, cleanup := setupUsersVisibilityTest(t)
 	defer cleanup()
 
-	handler := NewUsersHandler(userRepo, nil, settingsRepo, nil, nil, nil, nil, services.NewMemoryCache())
+	handler := NewUsersHandler(userRepo, nil, nil, settingsRepo, nil, nil, nil, nil, services.NewMemoryCache())
 	router := newUsersProfileUpdateRouter(handler)
 
 	firstReq := httptest.NewRequest(http.MethodGet, "/users/me/profile", nil)
