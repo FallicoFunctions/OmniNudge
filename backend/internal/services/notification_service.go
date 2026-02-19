@@ -615,6 +615,7 @@ func (s *NotificationService) ProcessBatchedNotifications(ctx context.Context) e
 	log.Printf("Processing %d notification batches", len(batches))
 
 	for _, batch := range batches {
+		message := s.buildBatchNotificationMessage(batch)
 		// Create notification from batch
 		notification := &models.Notification{
 			UserID:           batch.UserID,
@@ -623,7 +624,7 @@ func (s *NotificationService) ProcessBatchedNotifications(ctx context.Context) e
 			ContentID:        &batch.ContentID,
 			VotesPerHour:     batch.VotesPerHour,
 			MilestoneCount:   batch.MilestoneCount,
-			Message:          s.buildVelocityMessage(batch.ContentType, *batch.VotesPerHour),
+			Message:          message,
 		}
 
 		if err := s.sendNotification(ctx, notification); err != nil {
@@ -638,6 +639,29 @@ func (s *NotificationService) ProcessBatchedNotifications(ctx context.Context) e
 	}
 
 	return nil
+}
+
+func (s *NotificationService) buildBatchNotificationMessage(batch *models.NotificationBatch) string {
+	switch batch.NotificationType {
+	case "post_velocity", "comment_velocity":
+		if batch.VotesPerHour != nil {
+			return s.buildVelocityMessage(batch.ContentType, *batch.VotesPerHour)
+		}
+		if batch.ContentType == "post" {
+			return "Your post is trending!"
+		}
+		return "Your comment is trending!"
+	case "post_milestone", "comment_milestone":
+		if batch.MilestoneCount != nil {
+			return s.buildMilestoneMessage(batch.ContentType, *batch.MilestoneCount)
+		}
+		if batch.ContentType == "post" {
+			return "Your post reached a new milestone!"
+		}
+		return "Your comment reached a new milestone!"
+	default:
+		return "You have a new notification"
+	}
 }
 
 // SendMessagePush sends a push notification for a new message (to be called by MessagesHandler)

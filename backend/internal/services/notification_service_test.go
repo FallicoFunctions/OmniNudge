@@ -280,6 +280,42 @@ func TestBatchedNotifications(t *testing.T) {
 	}
 }
 
+func TestProcessBatchedNotifications_HandlesNilVotesPerHour(t *testing.T) {
+	service, db, cleanup := setupNotificationTest(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	userID := createTestUser(t, db, uniqueNotificationName("batched_user"))
+
+	batchRepo := models.NewNotificationBatchRepository(db.Pool)
+	batch := &models.NotificationBatch{
+		UserID:           userID,
+		ContentType:      "post",
+		ContentID:        12345,
+		NotificationType: "post_milestone",
+		VotesPerHour:     nil,
+		MilestoneCount:   nil,
+		ScheduledFor:     time.Now().Add(-1 * time.Minute),
+		Status:           "pending",
+	}
+	err := batchRepo.Create(ctx, batch)
+	require.NoError(t, err)
+
+	err = service.ProcessBatchedNotifications(ctx)
+	require.NoError(t, err)
+
+	notifs, err := models.NewNotificationRepository(db.Pool).GetByUserID(ctx, userID, 10, 0, false)
+	require.NoError(t, err)
+	require.Len(t, notifs, 1)
+	assert.Equal(t, "post_milestone", notifs[0].NotificationType)
+	assert.Equal(t, "Your post reached a new milestone!", notifs[0].Message)
+
+	var status string
+	err = db.Pool.QueryRow(ctx, `SELECT status FROM notification_batches WHERE id = $1`, batch.ID).Scan(&status)
+	require.NoError(t, err)
+	assert.Equal(t, "processed", status)
+}
+
 func TestConversationMuteDetection(t *testing.T) {
 	service, db, cleanup := setupNotificationTest(t)
 	defer cleanup()
