@@ -209,6 +209,8 @@ func newTestDeps(t *testing.T) *TestDeps {
 			}
 
 			protected.POST("/messages", messagesHandler.SendMessage)
+			protected.POST("/messages/forward", messagesHandler.ForwardMessage)
+			protected.GET("/messages/:id/forward-info", messagesHandler.GetForwardInfo)
 			protected.GET("/conversations", conversationsHandler.GetConversations)
 			protected.GET("/conversations/archived", conversationsHandler.GetArchivedConversations)
 			protected.POST("/conversations/archive-batch", conversationsHandler.ArchiveConversationBatch)

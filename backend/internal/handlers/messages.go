@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"strconv"
@@ -317,6 +318,38 @@ type SendMessageRequest struct {
 	RecipientKeys            map[int]string `json:"recipient_keys,omitempty"`       // Map of user_id -> encrypted_key for multi-recipient
 }
 
+type ForwardMessageRequest struct {
+	MessageID                int            `json:"message_id" binding:"required"`
+	ConversationIDs          []int          `json:"conversation_ids" binding:"required"`
+	IncludeMedia             bool           `json:"include_media"`
+	EncryptedContent         *string        `json:"encrypted_content,omitempty"`
+	SenderEncryptedContent   *string        `json:"sender_encrypted_content,omitempty"`
+	EncryptionVersion        *string        `json:"encryption_version,omitempty"`
+	MediaEncryptionKey       *string        `json:"media_encryption_key,omitempty"`
+	MediaEncryptionIV        *string        `json:"media_encryption_iv,omitempty"`
+	SenderMediaEncryptionKey *string        `json:"sender_media_encryption_key,omitempty"`
+	IsMultiRecipient         *bool          `json:"is_multi_recipient,omitempty"`
+	SharedEncryptionIV       *string        `json:"shared_encryption_iv,omitempty"`
+	RecipientKeys            map[int]string `json:"recipient_keys,omitempty"`
+}
+
+type forwardTargetContext struct {
+	conversationID         int
+	conversationType       string
+	participantIDs         []int
+	recipientID            int
+	encryptedContent       string
+	senderEncryptedContent *string
+}
+
+func copyStringPtr(value *string) *string {
+	if value == nil {
+		return nil
+	}
+	copied := *value
+	return &copied
+}
+
 // SendMessage handles POST /api/v1/messages
 func (h *MessagesHandler) SendMessage(c *gin.Context) {
 	// Get user ID from context (set by AuthRequired middleware)
@@ -587,6 +620,436 @@ func (h *MessagesHandler) SendMessage(c *gin.Context) {
 	c.JSON(http.StatusCreated, message)
 }
 
+// ForwardMessage handles POST /api/v1/messages/forward
+func (h *MessagesHandler) ForwardMessage(c *gin.Context) {
+	userIDValue, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
+	userID := userIDValue.(int)
+
+	var req ForwardMessageRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body", "details": err.Error()})
+		return
+	}
+	if req.MessageID <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid message_id"})
+		return
+	}
+	if len(req.ConversationIDs) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "conversation_ids is required"})
+		return
+	}
+
+	seen := make(map[int]struct{}, len(req.ConversationIDs))
+	dedupedConversationIDs := make([]int, 0, len(req.ConversationIDs))
+	for _, conversationID := range req.ConversationIDs {
+		if conversationID <= 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "conversation_ids must contain valid IDs"})
+			return
+		}
+		if _, ok := seen[conversationID]; ok {
+			continue
+		}
+		seen[conversationID] = struct{}{}
+		dedupedConversationIDs = append(dedupedConversationIDs, conversationID)
+	}
+	if len(dedupedConversationIDs) > 10 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Cannot forward to more than 10 conversations"})
+		return
+	}
+
+	ctx := c.Request.Context()
+	original, err := h.messageRepo.GetByID(ctx, req.MessageID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Message not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load message", "details": err.Error()})
+		return
+	}
+
+	canAccessOriginalConversation, err := h.canAccessConversation(ctx, original.ConversationID, userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to validate source conversation access", "details": err.Error()})
+		return
+	}
+	if !canAccessOriginalConversation {
+		c.JSON(http.StatusForbidden, gin.H{"error": "You are not authorized to forward this message"})
+		return
+	}
+
+	sourceConversationType, err := h.getConversationType(ctx, original.ConversationID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load source conversation type", "details": err.Error()})
+		return
+	}
+	if sourceConversationType == "dm" {
+		if (original.SenderID == userID && original.DeletedForSender) || (original.RecipientID == userID && original.DeletedForRecipient) {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Cannot forward a message that is deleted for you"})
+			return
+		}
+	}
+
+	sourceParticipantIDs, err := h.getConversationParticipantIDs(ctx, original.ConversationID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load source participants", "details": err.Error()})
+		return
+	}
+	sourceParticipants := make(map[int]struct{}, len(sourceParticipantIDs))
+	for _, participantID := range sourceParticipantIDs {
+		if participantID == 0 {
+			continue
+		}
+		sourceParticipants[participantID] = struct{}{}
+	}
+
+	isEncryptedForward := original.EncryptionVersion != "plaintext" && original.EncryptionVersion != "none"
+	forwardEncryptionVersion := original.EncryptionVersion
+	if req.EncryptionVersion != nil && strings.TrimSpace(*req.EncryptionVersion) != "" {
+		forwardEncryptionVersion = strings.TrimSpace(*req.EncryptionVersion)
+	}
+	if isEncryptedForward {
+		if forwardEncryptionVersion == "plaintext" || forwardEncryptionVersion == "none" {
+			c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "Encrypted forwards cannot downgrade encryption_version"})
+			return
+		}
+		if req.EncryptedContent == nil || strings.TrimSpace(*req.EncryptedContent) == "" {
+			c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "Encrypted forwards require new encrypted_content"})
+			return
+		}
+	}
+	targetContexts := make([]forwardTargetContext, 0, len(dedupedConversationIDs))
+	for _, targetConversationID := range dedupedConversationIDs {
+		canAccessTargetConversation, err := h.canAccessConversation(ctx, targetConversationID, userID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to validate target conversation access", "details": err.Error()})
+			return
+		}
+		if !canAccessTargetConversation {
+			c.JSON(http.StatusForbidden, gin.H{"error": fmt.Sprintf("You are not a participant in conversation %d", targetConversationID)})
+			return
+		}
+		targetParticipantIDs, err := h.getConversationParticipantIDs(ctx, targetConversationID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load target participants", "details": err.Error()})
+			return
+		}
+		targetParticipants := make(map[int]struct{}, len(targetParticipantIDs))
+		for _, participantID := range targetParticipantIDs {
+			if participantID == 0 {
+				continue
+			}
+			targetParticipants[participantID] = struct{}{}
+		}
+
+		targetConversationType, err := h.getConversationType(ctx, targetConversationID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load target conversation type", "details": err.Error()})
+			return
+		}
+		if isEncryptedForward {
+			if len(sourceParticipants) != len(targetParticipants) {
+				c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "Encrypted forward requires identical participants"})
+				return
+			}
+			for participantID := range sourceParticipants {
+				if _, ok := targetParticipants[participantID]; !ok {
+					c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "Encrypted forward requires identical participants"})
+					return
+				}
+			}
+		}
+
+		targetRecipientID := original.RecipientID
+		if targetConversationType == "dm" {
+			targetConversation, err := h.conversationRepo.GetByID(ctx, targetConversationID)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load target conversation", "details": err.Error()})
+				return
+			}
+			if targetConversation == nil {
+				c.JSON(http.StatusNotFound, gin.H{"error": "Target conversation not found"})
+				return
+			}
+			targetRecipientID = targetConversation.GetOtherUserID(userID)
+
+			var isBlocked bool
+			if err := h.pool.QueryRow(ctx, `
+				SELECT EXISTS(
+					SELECT 1
+					FROM blocked_users
+					WHERE blocker_id = $1 AND blocked_id = $2
+				)
+			`, targetRecipientID, userID).Scan(&isBlocked); err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check blocking status", "details": err.Error()})
+				return
+			}
+			if isBlocked {
+				c.JSON(http.StatusForbidden, gin.H{"error": "You cannot send messages to this user"})
+				return
+			}
+		} else {
+			// For mod mail, keep recipient as sender to satisfy schema.
+			targetRecipientID = userID
+		}
+
+		resolvedEncryptedContent := original.EncryptedContent
+		resolvedSenderEncryptedContent := copyStringPtr(original.SenderEncryptedContent)
+		if isEncryptedForward {
+			resolvedEncryptedContent = strings.TrimSpace(*req.EncryptedContent)
+			if targetConversationType == "dm" {
+				if req.SenderEncryptedContent == nil || strings.TrimSpace(*req.SenderEncryptedContent) == "" {
+					c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "Encrypted DM forwards require new sender_encrypted_content"})
+					return
+				}
+				resolvedSenderEncryptedContent = copyStringPtr(req.SenderEncryptedContent)
+			} else {
+				resolvedSenderEncryptedContent = copyStringPtr(req.SenderEncryptedContent)
+			}
+		}
+
+		targetContexts = append(targetContexts, forwardTargetContext{
+			conversationID:         targetConversationID,
+			conversationType:       targetConversationType,
+			participantIDs:         targetParticipantIDs,
+			recipientID:            targetRecipientID,
+			encryptedContent:       resolvedEncryptedContent,
+			senderEncryptedContent: resolvedSenderEncryptedContent,
+		})
+	}
+
+	tx, err := h.pool.Begin(ctx)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to start forward transaction", "details": err.Error()})
+		return
+	}
+	defer tx.Rollback(ctx)
+
+	forwardedMessages := make([]*models.Message, 0, len(targetContexts))
+	forwardedMessageIDs := make([]int, 0, len(targetContexts))
+	for _, target := range targetContexts {
+
+		forwardedMessageType := original.MessageType
+		forwardedMediaFileID := original.MediaFileID
+		forwardedMediaURL := original.MediaURL
+		forwardedMediaType := original.MediaType
+		forwardedMediaSize := original.MediaSize
+		forwardedMediaEncryptionKey := original.MediaEncryptionKey
+		forwardedMediaEncryptionIV := original.MediaEncryptionIV
+		forwardedSenderMediaEncryptionKey := original.SenderMediaEncryptionKey
+		if !req.IncludeMedia {
+			forwardedMediaFileID = nil
+			forwardedMediaURL = nil
+			forwardedMediaType = nil
+			forwardedMediaSize = nil
+			forwardedMediaEncryptionKey = nil
+			forwardedMediaEncryptionIV = nil
+			forwardedSenderMediaEncryptionKey = nil
+			if forwardedMessageType != "text" {
+				forwardedMessageType = "text"
+			}
+		}
+
+		newMessage := &models.Message{
+			ConversationID:           target.conversationID,
+			SenderID:                 userID,
+			RecipientID:              target.recipientID,
+			EncryptedContent:         target.encryptedContent,
+			SenderEncryptedContent:   target.senderEncryptedContent,
+			MessageType:              forwardedMessageType,
+			MediaFileID:              forwardedMediaFileID,
+			MediaURL:                 forwardedMediaURL,
+			MediaType:                forwardedMediaType,
+			MediaSize:                forwardedMediaSize,
+			EncryptionVersion:        forwardEncryptionVersion,
+			MediaEncryptionKey:       forwardedMediaEncryptionKey,
+			MediaEncryptionIV:        forwardedMediaEncryptionIV,
+			SenderMediaEncryptionKey: forwardedSenderMediaEncryptionKey,
+			IsMultiRecipient:         original.IsMultiRecipient,
+			SharedEncryptionIV:       original.SharedEncryptionIV,
+			RecipientKeys:            original.RecipientKeys,
+		}
+		if isEncryptedForward {
+			if req.MediaEncryptionKey != nil {
+				newMessage.MediaEncryptionKey = req.MediaEncryptionKey
+			}
+			if req.MediaEncryptionIV != nil {
+				newMessage.MediaEncryptionIV = req.MediaEncryptionIV
+			}
+			if req.SenderMediaEncryptionKey != nil {
+				newMessage.SenderMediaEncryptionKey = req.SenderMediaEncryptionKey
+			}
+			if req.IsMultiRecipient != nil {
+				newMessage.IsMultiRecipient = *req.IsMultiRecipient
+			}
+			if target.conversationType == "dm" && newMessage.IsMultiRecipient {
+				c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "DM forwards cannot be multi-recipient"})
+				return
+			}
+			if req.SharedEncryptionIV != nil {
+				newMessage.SharedEncryptionIV = req.SharedEncryptionIV
+			}
+			if req.RecipientKeys != nil {
+				newMessage.RecipientKeys = req.RecipientKeys
+			} else if newMessage.IsMultiRecipient {
+				c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "Encrypted multi-recipient forwards require recipient_keys"})
+				return
+			}
+			if newMessage.IsMultiRecipient {
+				if len(newMessage.RecipientKeys) != len(target.participantIDs) {
+					c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "recipient_keys must match target participants"})
+					return
+				}
+				for _, participantID := range target.participantIDs {
+					if participantID == 0 {
+						continue
+					}
+					if _, ok := newMessage.RecipientKeys[participantID]; !ok {
+						c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "recipient_keys must match target participants"})
+						return
+					}
+				}
+			}
+		}
+		if target.conversationType == "mod_mail" {
+			if newMessage.EncryptionVersion == "plaintext" || newMessage.EncryptionVersion == "none" || newMessage.EncryptionVersion == "" {
+				c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "Mod mail forwards must remain encrypted"})
+				return
+			}
+			if !newMessage.IsMultiRecipient || newMessage.SharedEncryptionIV == nil || len(newMessage.RecipientKeys) == 0 {
+				c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "Mod mail forwards require multi-recipient encryption payloads"})
+				return
+			}
+		}
+		createErr := tx.QueryRow(ctx, `
+			INSERT INTO messages (
+				conversation_id, sender_id, recipient_id, encrypted_content, sender_encrypted_content,
+				message_type, media_file_id, media_url, media_type, media_size, encryption_version,
+				media_encryption_key, media_encryption_iv, sender_media_encryption_key,
+				is_multi_recipient, shared_encryption_iv
+			)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+			RETURNING id, sent_at
+		`,
+			newMessage.ConversationID,
+			newMessage.SenderID,
+			newMessage.RecipientID,
+			newMessage.EncryptedContent,
+			newMessage.SenderEncryptedContent,
+			newMessage.MessageType,
+			newMessage.MediaFileID,
+			newMessage.MediaURL,
+			newMessage.MediaType,
+			newMessage.MediaSize,
+			newMessage.EncryptionVersion,
+			newMessage.MediaEncryptionKey,
+			newMessage.MediaEncryptionIV,
+			newMessage.SenderMediaEncryptionKey,
+			newMessage.IsMultiRecipient,
+			newMessage.SharedEncryptionIV,
+		).Scan(&newMessage.ID, &newMessage.SentAt)
+		if createErr != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create forwarded message", "details": createErr.Error()})
+			return
+		}
+		if newMessage.IsMultiRecipient && len(newMessage.RecipientKeys) > 0 {
+			for participantID, encryptedKey := range newMessage.RecipientKeys {
+				if _, err := tx.Exec(ctx, `
+					INSERT INTO message_recipient_keys (message_id, user_id, encrypted_key)
+					VALUES ($1, $2, $3)
+				`, newMessage.ID, participantID, encryptedKey); err != nil {
+					c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to persist recipient keys", "details": err.Error()})
+					return
+				}
+			}
+		}
+
+		if _, err := tx.Exec(ctx, `
+			UPDATE messages
+			SET forwarded_from = $2
+			WHERE id = $1
+		`, newMessage.ID, original.ID); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to annotate forwarded message", "details": err.Error()})
+			return
+		}
+
+		if _, err := tx.Exec(ctx, `
+			UPDATE conversations
+			SET last_message_at = CURRENT_TIMESTAMP
+			WHERE id = $1
+		`, target.conversationID); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update conversation timestamp", "details": err.Error()})
+			return
+		}
+
+		forwardedMessages = append(forwardedMessages, newMessage)
+		forwardedMessageIDs = append(forwardedMessageIDs, newMessage.ID)
+	}
+
+	if _, err := tx.Exec(ctx, `
+		UPDATE messages
+		SET forward_count = forward_count + $2
+		WHERE id = $1
+	`, original.ID, len(forwardedMessageIDs)); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to increment forward count", "details": err.Error()})
+		return
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to commit forwarded messages", "details": err.Error()})
+		return
+	}
+
+	queueEnqueueErrors := 0
+	for idx, newMessage := range forwardedMessages {
+		target := targetContexts[idx]
+		if h.queueClient != nil {
+			payload := queue.MessageReencryptPayload{
+				MessageID:      newMessage.ID,
+				ConversationID: target.conversationID,
+				EditorID:       userID,
+			}
+			if err := h.queueClient.EnqueueMessageReencrypt(ctx, payload); err != nil {
+				queueEnqueueErrors++
+				log.Printf("[ForwardMessage] failed to enqueue re-encryption job for message_id=%d: %v", newMessage.ID, err)
+			}
+		}
+
+		if h.hub != nil {
+			forwardedMessage, loadErr := h.messageRepo.GetByID(ctx, newMessage.ID)
+			if loadErr != nil {
+				log.Printf("[ForwardMessage] failed to load forwarded message for websocket broadcast: message_id=%d err=%v", newMessage.ID, loadErr)
+			} else {
+				for _, participantID := range target.participantIDs {
+					if participantID == 0 {
+						continue
+					}
+					h.hub.Broadcast(&websocket.Message{
+						RecipientID: participantID,
+						Type:        "new_message",
+						Payload:     forwardedMessage,
+					})
+				}
+			}
+		}
+	}
+
+	response := gin.H{
+		"original_message_id":   original.ID,
+		"forwarded_message_ids": forwardedMessageIDs,
+		"forwarded_count":       len(forwardedMessageIDs),
+	}
+	if queueEnqueueErrors > 0 {
+		response["queue_warning"] = fmt.Sprintf("%d forwarding jobs could not be queued", queueEnqueueErrors)
+	}
+
+	c.JSON(http.StatusOK, response)
+}
+
 type EditMessageRequest struct {
 	EncryptedContent       string  `json:"encrypted_content" binding:"required"`
 	SenderEncryptedContent *string `json:"sender_encrypted_content,omitempty"`
@@ -601,6 +1064,110 @@ type MessageEditHistoryEntry struct {
 	EncryptedContent *string   `json:"encrypted_content,omitempty"`
 	EditedAt         time.Time `json:"edited_at"`
 	EditedBy         int       `json:"edited_by"`
+}
+
+// GetForwardInfo handles GET /api/v1/messages/:id/forward-info
+func (h *MessagesHandler) GetForwardInfo(c *gin.Context) {
+	userIDValue, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
+	userID := userIDValue.(int)
+
+	messageID, err := strconv.Atoi(c.Param("id"))
+	if err != nil || messageID <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid message ID"})
+		return
+	}
+
+	ctx := c.Request.Context()
+
+	var conversationID int
+	var senderID int
+	var forwardedFrom *int
+	var forwardCount int
+	err = h.pool.QueryRow(ctx, `
+		SELECT conversation_id, sender_id, forwarded_from, COALESCE(forward_count, 0)
+		FROM messages
+		WHERE id = $1
+	`, messageID).Scan(&conversationID, &senderID, &forwardedFrom, &forwardCount)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Message not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load message", "details": err.Error()})
+		return
+	}
+
+	canAccessConversation, err := h.canAccessConversation(ctx, conversationID, userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to validate conversation access", "details": err.Error()})
+		return
+	}
+	if !canAccessConversation {
+		c.JSON(http.StatusForbidden, gin.H{"error": "You are not authorized to view forward info for this message"})
+		return
+	}
+
+	originalMessageID := messageID
+	originalConversationID := conversationID
+	originalSenderID := senderID
+	if forwardedFrom != nil {
+		originalMessageID = *forwardedFrom
+		if err := h.pool.QueryRow(ctx, `
+			SELECT conversation_id, sender_id, COALESCE(forward_count, 0)
+			FROM messages
+			WHERE id = $1
+		`, originalMessageID).Scan(&originalConversationID, &originalSenderID, &forwardCount); err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				originalConversationID = 0
+				originalSenderID = 0
+				forwardCount = 0
+			} else {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load original message", "details": err.Error()})
+				return
+			}
+		}
+	}
+
+	var originalSenderUsername string
+	if originalSenderID > 0 {
+		if err := h.pool.QueryRow(ctx, `
+			SELECT username
+			FROM users
+			WHERE id = $1
+		`, originalSenderID).Scan(&originalSenderUsername); err != nil {
+			if !errors.Is(err, pgx.ErrNoRows) {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load original sender", "details": err.Error()})
+				return
+			}
+		}
+	}
+
+	var exposedOriginalConversationID *int
+	if originalConversationID > 0 {
+		canAccessOriginalConversation, err := h.canAccessConversation(ctx, originalConversationID, userID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to validate original conversation access", "details": err.Error()})
+			return
+		}
+		if canAccessOriginalConversation {
+			exposedOriginalConversationID = &originalConversationID
+		}
+	}
+
+	response := gin.H{
+		"message_id":               messageID,
+		"forwarded_from":           forwardedFrom,
+		"forward_count":            forwardCount,
+		"original_message_id":      originalMessageID,
+		"original_sender_id":       originalSenderID,
+		"original_sender":          originalSenderUsername,
+		"original_conversation_id": exposedOriginalConversationID,
+	}
+	c.JSON(http.StatusOK, response)
 }
 
 // EditMessage handles PATCH /api/v1/messages/:id
