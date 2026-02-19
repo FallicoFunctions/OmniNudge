@@ -1482,7 +1482,13 @@
       "uploadFailed": "Error al subir la media. Por favor, inténtelo de nuevo.",
       "uploadFailedFile": "Error al subir {{filename}}",
       "fallbackText": "Multimedia",
-      "attachmentFallback": "adjunto"
+      "attachmentFallback": "adjunto",
+      "preview": {
+        "open": "Abrir",
+        "fileSize": "Tamaño",
+        "pdfThumbnailAlt": "Miniatura de PDF",
+        "audioUnsupported": "Tu navegador no admite el elemento de audio."
+      }
     },
     "compose": {
       "enterUsername": "Introduce nombre de usuario...",

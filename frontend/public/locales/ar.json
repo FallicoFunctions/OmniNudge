@@ -1482,7 +1482,13 @@
       "uploadFailed": "فشل تحميل الوسائط. يرجى المحاولة مرة أخرى.",
       "uploadFailedFile": "فشل تحميل {{filename}}",
       "fallbackText": "وسائط",
-      "attachmentFallback": "مرفق"
+      "attachmentFallback": "مرفق",
+      "preview": {
+        "open": "فتح",
+        "fileSize": "حجم الملف",
+        "pdfThumbnailAlt": "صورة مصغرة لملف PDF",
+        "audioUnsupported": "متصفحك لا يدعم عنصر الصوت."
+      }
     },
     "compose": {
       "enterUsername": "أدخل اسم المستخدم...",

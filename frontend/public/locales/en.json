@@ -1482,7 +1482,13 @@
       "uploadFailed": "Failed to upload media. Please try again.",
       "uploadFailedFile": "Failed to upload {{filename}}",
       "fallbackText": "Media",
-      "attachmentFallback": "attachment"
+      "attachmentFallback": "attachment",
+      "preview": {
+        "open": "Open",
+        "fileSize": "File size",
+        "pdfThumbnailAlt": "PDF thumbnail",
+        "audioUnsupported": "Your browser does not support the audio element."
+      }
     },
     "compose": {
       "enterUsername": "Enter username...",

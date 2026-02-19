@@ -22,6 +22,7 @@ import { HighlightedText } from '../components/messages/HighlightedText';
 import { MessageReactions } from '../components/messages/MessageReactions';
 import { QuickReactButton } from '../components/messages/QuickReactButton';
 import { PinnedMessagesBar } from '../components/messages/PinnedMessagesBar';
+import FilePreview from '../components/messages/FilePreview';
 import { usePinnedMessages } from '../hooks/usePinnedMessages';
 import { useArchive } from '../hooks/useArchive';
 import { useDebounce } from '../hooks/useDebounce';
@@ -551,9 +552,8 @@ const MessageMediaPreview = ({ message, isOwnMessage, onMediaClick }: MessageMed
   const { t } = useTranslation();
   const { speakerDeviceId } = useSettings();
   const mediaSrc = useDecryptedMedia(message, isOwnMessage);
-  const filename = message.media_url?.split('/').pop() ?? 'attachment';
-
-  const resolvedType = inferMessageTypeFromMessage(message);
+  const mediaType = inferMessageTypeFromMessage(message);
+  const canOpenInViewer = mediaType === 'image' || mediaType === 'video';
 
   if (!mediaSrc) {
     return (
@@ -563,66 +563,21 @@ const MessageMediaPreview = ({ message, isOwnMessage, onMediaClick }: MessageMed
     );
   }
 
-  if (resolvedType === 'image') {
-    return (
-      <div className="mb-2">
-        <img
-          src={mediaSrc}
-          alt={t('messages.media.fallbackText')}
-          className="max-w-full rounded cursor-pointer object-contain"
-          style={{ maxHeight: '50vh' }}
-          onClick={() => (onMediaClick ? onMediaClick() : window.open(mediaSrc, '_blank'))}
-        />
-      </div>
-    );
-  }
-
-  if (resolvedType === 'video') {
-    return (
-      <div className="mb-2">
-        <video
-          src={mediaSrc}
-          controls
-          className="max-w-full rounded cursor-pointer"
-          style={{ maxHeight: '50vh' }}
-          onLoadedMetadata={(e) => {
-            void applyAudioOutputDevice(e.currentTarget, speakerDeviceId);
-          }}
-          onClick={() => onMediaClick?.()}
-        />
-      </div>
-    );
-  }
-
-  if (resolvedType === 'audio') {
-    return (
-      <div className="mb-2">
-        <audio
-          controls
-          className="w-full"
-          onLoadedMetadata={(e) => {
-            void applyAudioOutputDevice(e.currentTarget, speakerDeviceId);
-          }}
-        >
-          <source src={mediaSrc} type={message.media_type ?? 'audio/mpeg'} />
-          Your browser does not support the audio element.
-        </audio>
-      </div>
-    );
-  }
-
   return (
-    <div className="mb-2">
-      <a
-        href={mediaSrc}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="inline-flex items-center gap-1 text-sm underline hover:text-[var(--color-primary-light)]"
-        download={filename}
-      >
-        {filename}
-      </a>
-    </div>
+    <FilePreview
+      src={mediaSrc}
+      mimeType={message.media_type}
+      fileName={message.media_url?.split('/').pop() ?? t('messages.media.attachmentFallback')}
+      fileSize={message.media_size}
+      className="mb-2"
+      onOpen={canOpenInViewer ? onMediaClick : undefined}
+      onAudioLoadedMetadata={(e) => {
+        void applyAudioOutputDevice(e.currentTarget, speakerDeviceId);
+      }}
+      onVideoLoadedMetadata={(e) => {
+        void applyAudioOutputDevice(e.currentTarget, speakerDeviceId);
+      }}
+    />
   );
 };
 
