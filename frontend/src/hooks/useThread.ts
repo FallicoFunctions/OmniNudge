@@ -148,12 +148,24 @@ export function useThread({ rootMessageId, open, pageSize = 20 }: UseThreadOptio
     return () => window.removeEventListener('thread-reply-added', handleThreadReplyAdded);
   }, [applyCache, open, rootMessageId]);
 
+  const setMutedAndSyncCache = useCallback(
+    (nextMuted: boolean) => {
+      setMuted(nextMuted);
+      if (!rootMessageId) return;
+      const cached = getThreadCacheEntry(rootMessageId);
+      if (!cached) return;
+      cached.muted = nextMuted;
+      setThreadCacheEntry(rootMessageId, cached);
+    },
+    [rootMessageId]
+  );
+
   return {
     rootMessage,
     replies,
     replyCount,
     muted,
-    setMuted,
+    setMuted: setMutedAndSyncCache,
     loading,
     loadingMore,
     hasMore,

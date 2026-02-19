@@ -615,6 +615,79 @@ func TestNotifyThreadReply_SkipsMutedThread(t *testing.T) {
 	assert.Len(t, notifs, 0)
 }
 
+func TestNotifyThreadReply_IncludesModMailParticipantsWithoutThreadMessages(t *testing.T) {
+	service, db, cleanup := setupNotificationTest(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	rootAuthorID := createTestUser(t, db, uniqueNotificationName("thread_root_author"))
+	replyAuthorID := createTestUser(t, db, uniqueNotificationName("thread_reply_author"))
+	lurkerID := createTestUser(t, db, uniqueNotificationName("thread_lurker"))
+
+	var conversationID int
+	err := db.Pool.QueryRow(ctx, `
+		INSERT INTO conversations (conversation_type, status)
+		VALUES ('mod_mail', 'open')
+		RETURNING id
+	`).Scan(&conversationID)
+	require.NoError(t, err)
+
+	_, err = db.Pool.Exec(ctx, `
+		INSERT INTO conversation_participants (conversation_id, user_id, is_moderator)
+		VALUES
+			($1, $2, true),
+			($1, $3, true),
+			($1, $4, true)
+	`, conversationID, rootAuthorID, replyAuthorID, lurkerID)
+	require.NoError(t, err)
+
+	settingsRepo := models.NewUserSettingsRepository(db.Pool)
+	for _, uid := range []int{rootAuthorID, lurkerID} {
+		settings, _ := settingsRepo.GetByUserID(ctx, uid)
+		if settings == nil {
+			settings, _ = settingsRepo.CreateDefault(ctx, uid)
+		}
+		settings.NotifyCommentReplies = true
+		_, err = settingsRepo.Update(ctx, settings)
+		require.NoError(t, err)
+	}
+
+	msgRepo := models.NewMessageRepository(db.Pool)
+	rootMessage := &models.Message{
+		ConversationID:    conversationID,
+		SenderID:          rootAuthorID,
+		RecipientID:       rootAuthorID,
+		EncryptedContent:  "mod-mail-root",
+		MessageType:       "text",
+		EncryptionVersion: "v1",
+	}
+	require.NoError(t, msgRepo.Create(ctx, rootMessage))
+
+	replyMessage := &models.Message{
+		ConversationID:    conversationID,
+		SenderID:          replyAuthorID,
+		RecipientID:       replyAuthorID,
+		EncryptedContent:  "mod-mail-reply",
+		MessageType:       "text",
+		ReplyTo:           &rootMessage.ID,
+		ThreadRoot:        &rootMessage.ID,
+		EncryptionVersion: "v1",
+	}
+	require.NoError(t, msgRepo.Create(ctx, replyMessage))
+
+	service.NotifyThreadReply(ctx, conversationID, rootMessage.ID, replyMessage.ID, replyAuthorID)
+
+	rootNotifs, err := models.NewNotificationRepository(db.Pool).GetByUserID(ctx, rootAuthorID, 10, 0, false)
+	require.NoError(t, err)
+	require.Len(t, rootNotifs, 1)
+	assert.Equal(t, "thread_reply", rootNotifs[0].NotificationType)
+
+	lurkerNotifs, err := models.NewNotificationRepository(db.Pool).GetByUserID(ctx, lurkerID, 10, 0, false)
+	require.NoError(t, err)
+	require.Len(t, lurkerNotifs, 1)
+	assert.Equal(t, "thread_reply", lurkerNotifs[0].NotificationType)
+}
+
 func TestIsWithinQuietHours(t *testing.T) {
 	tz := "UTC"
 	makeTime := func(hour, minute int) time.Time {
