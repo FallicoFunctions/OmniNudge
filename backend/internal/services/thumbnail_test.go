@@ -241,3 +241,26 @@ func TestCalculateThumbnailDimensions(t *testing.T) {
 		})
 	}
 }
+
+func TestIsVideoType(t *testing.T) {
+	testCases := []struct {
+		contentType string
+		expected    bool
+	}{
+		{"video/mp4", true},
+		{"video/webm", true},
+		{"video/quicktime", true},
+		{"video/x-matroska", true},
+		{" video/mp4 ", true},
+		{"image/png", false},
+		{"application/pdf", false},
+		{"", false},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.contentType, func(t *testing.T) {
+			result := IsVideoType(tc.contentType)
+			assert.Equal(t, tc.expected, result)
+		})
+	}
+}

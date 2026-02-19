@@ -153,6 +153,46 @@ func (s *ThumbnailService) GeneratePDFThumbnailSecure(sourcePath string, timeout
 	return "", fmt.Errorf("failed to generate pdf thumbnail: %s", strings.Join(errs, " | "))
 }
 
+// GenerateVideoThumbnailSecure creates a thumbnail image from a video using ffmpeg with strict timeout.
+// It extracts a frame around the 1-second mark and writes a JPEG thumbnail.
+func (s *ThumbnailService) GenerateVideoThumbnailSecure(sourcePath string, timeout time.Duration) (string, error) {
+	if timeout <= 0 {
+		timeout = 30 * time.Second
+	}
+	if _, err := os.Stat(sourcePath); os.IsNotExist(err) {
+		return "", fmt.Errorf("source file does not exist: %w", err)
+	}
+	if !IsVideoType(mimeTypeFromExtension(sourcePath)) {
+		return "", fmt.Errorf("source is not a supported video file: %s", sourcePath)
+	}
+
+	ext := strings.ToLower(filepath.Ext(sourcePath))
+	nameWithoutExt := strings.TrimSuffix(filepath.Base(sourcePath), ext)
+	outputPath := filepath.Join(filepath.Dir(sourcePath), fmt.Sprintf("%s_thumb.jpg", nameWithoutExt))
+	_ = os.Remove(outputPath)
+
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	_, err := s.commandRunner(
+		ctx,
+		"ffmpeg",
+		"-y",
+		"-ss", "00:00:01",
+		"-i", sourcePath,
+		"-frames:v", "1",
+		"-vf", "scale='min(800,iw)':-2",
+		"-q:v", "5",
+		outputPath,
+	)
+	if err != nil {
+		return "", fmt.Errorf("failed to generate video thumbnail: %w", err)
+	}
+	if _, err := os.Stat(outputPath); err != nil {
+		return "", fmt.Errorf("failed to generate video thumbnail: output not created")
+	}
+	return outputPath, nil
+}
+
 // GetImageDimensions returns the width and height of an image
 func (s *ThumbnailService) GetImageDimensions(imagePath string) (width int, height int, err error) {
 	file, err := os.Open(imagePath)
@@ -183,6 +223,32 @@ func IsImageType(contentType string) bool {
 // IsPDFType checks if the content type is a PDF.
 func IsPDFType(contentType string) bool {
 	return strings.TrimSpace(strings.ToLower(contentType)) == "application/pdf"
+}
+
+// IsVideoType checks if the content type is a supported video.
+func IsVideoType(contentType string) bool {
+	videoTypes := map[string]bool{
+		"video/mp4":        true,
+		"video/webm":       true,
+		"video/quicktime":  true,
+		"video/x-matroska": true,
+	}
+	return videoTypes[strings.TrimSpace(strings.ToLower(contentType))]
+}
+
+func mimeTypeFromExtension(path string) string {
+	switch strings.ToLower(filepath.Ext(path)) {
+	case ".mp4":
+		return "video/mp4"
+	case ".webm":
+		return "video/webm"
+	case ".mov":
+		return "video/quicktime"
+	case ".mkv":
+		return "video/x-matroska"
+	default:
+		return ""
+	}
 }
 
 func defaultCommandRunner(ctx context.Context, name string, args ...string) ([]byte, error) {
