@@ -7,6 +7,7 @@ import type {
   ForwardMessageResponse,
   Message,
   MessageEditHistoryResponse,
+  MessageThreadResponse,
   PinnedMessagesResponse,
   SendMessageRequest,
 } from '../types/messages';
@@ -112,6 +113,18 @@ export const messagesService = {
       offset: String(offset),
     });
     return api.get<MessageEditHistoryResponse>(`/messages/${messageId}/history?${params.toString()}`);
+  },
+
+  async getMessageThread(
+    messageId: number,
+    limit = 20,
+    offset = 0
+  ): Promise<MessageThreadResponse> {
+    const params = new URLSearchParams({
+      limit: String(limit),
+      offset: String(offset),
+    });
+    return api.get<MessageThreadResponse>(`/messages/${messageId}/thread?${params.toString()}`);
   },
 
   async forwardMessage(data: ForwardMessageRequest): Promise<ForwardMessageResponse> {
@@ -238,6 +251,7 @@ export const messagesService = {
       is_multi_recipient: data.is_multi_recipient,
       shared_encryption_iv: data.shared_encryption_iv,
       recipient_keys: data.recipient_keys,
+      reply_to: data.reply_to,
     });
   },
 

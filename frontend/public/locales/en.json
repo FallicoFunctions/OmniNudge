@@ -1421,6 +1421,12 @@
       "report": "Report",
       "viewProfile": "View Profile"
     },
+    "threadPreview": {
+      "replyCount_one": "{{count}} reply",
+      "replyCount_other": "{{count}} replies",
+      "viewThread": "View thread",
+      "openAria": "Open thread"
+    },
     "pinned": {
       "title_one": "{{count}} pinned message",
       "title_other": "{{count}} pinned messages",

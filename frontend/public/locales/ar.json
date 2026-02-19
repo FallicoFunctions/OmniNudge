@@ -1421,6 +1421,12 @@
       "report": "إبلاغ",
       "viewProfile": "عرض الملف الشخصي"
     },
+    "threadPreview": {
+      "replyCount_one": "{{count}} رد",
+      "replyCount_other": "{{count}} ردود",
+      "viewThread": "عرض السلسلة",
+      "openAria": "فتح السلسلة"
+    },
     "pinned": {
       "title_one": "{{count}} رسالة مثبتة",
       "title_other": "{{count}} رسائل مثبتة",

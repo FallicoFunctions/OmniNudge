@@ -3108,14 +3108,14 @@
 ---
 
 ### F7-005: Frontend - ThreadPreview Component
-**Status:** ⬜ TODO
+**Status:** ✅ COMPLETE
 **Priority:** P1
 **Estimated Time:** 4 hours
 
 **Tasks:**
-- [ ] Create ThreadPreview.tsx component
-- [ ] Display below root message
-- [ ] Show: reply count badge ("3 replies")
+- [x] Create ThreadPreview.tsx component
+- [x] Display below root message
+- [x] Show: reply count badge ("3 replies")
 - [ ] Show: preview of latest reply
 - [ ] Show: "View thread →" button
 - [ ] Collapse/expand (optional)
