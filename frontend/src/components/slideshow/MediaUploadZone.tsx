@@ -49,7 +49,7 @@ const MIME_SIZE_LIMITS: Array<{ prefix: string; maxBytes: number }> = [
 ];
 
 const maxSizeForFile = (file: File, hardCapBytes: number): number => {
-  const fileType = file.type.toLowerCase();
+  const fileType = resolveFileType(file);
   for (const rule of MIME_SIZE_LIMITS) {
     if (rule.prefix.endsWith('/')) {
       if (fileType.startsWith(rule.prefix)) {
@@ -64,6 +64,41 @@ const maxSizeForFile = (file: File, hardCapBytes: number): number => {
   return hardCapBytes;
 };
 
+const EXTENSION_MIME_FALLBACKS: Record<string, string> = {
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  png: 'image/png',
+  gif: 'image/gif',
+  webp: 'image/webp',
+  mp4: 'video/mp4',
+  webm: 'video/webm',
+  mov: 'video/quicktime',
+  mkv: 'video/x-matroska',
+  mp3: 'audio/mpeg',
+  m4a: 'audio/mp4',
+  wav: 'audio/wav',
+  ogg: 'audio/ogg',
+  opus: 'audio/opus',
+  pdf: 'application/pdf',
+  doc: 'application/msword',
+  docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  txt: 'text/plain',
+  zip: 'application/zip',
+};
+
+const inferTypeFromName = (name: string): string => {
+  const dot = name.lastIndexOf('.');
+  if (dot < 0 || dot === name.length - 1) return '';
+  const ext = name.slice(dot + 1).toLowerCase();
+  return EXTENSION_MIME_FALLBACKS[ext] ?? '';
+};
+
+const resolveFileType = (file: File): string => {
+  const direct = (file.type || '').toLowerCase().trim();
+  if (direct) return direct;
+  return inferTypeFromName(file.name);
+};
+
 export function MediaUploadZone({
   onFilesSelected,
   maxFileSize = DEFAULT_MAX_SIZE,
@@ -75,6 +110,7 @@ export function MediaUploadZone({
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [errors, setErrors] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const normalizedAcceptedTypes = acceptedTypes.map((type) => type.toLowerCase().trim());
 
   const validateFiles = (files: File[]): { valid: File[]; errors: string[] } => {
     const valid: File[] = [];
@@ -92,7 +128,8 @@ export function MediaUploadZone({
         continue;
       }
 
-      if (!acceptedTypes.includes(file.type)) {
+      const resolvedType = resolveFileType(file);
+      if (!resolvedType || !normalizedAcceptedTypes.includes(resolvedType)) {
         errors.push(t('mediaUploadZone.errors.unsupportedType', { name: file.name }));
         continue;
       }

@@ -42,6 +42,16 @@ func (h *UploadsHandler) ServeUpload(c *gin.Context) {
 			return
 		}
 		if media == nil {
+			derivedURL, ok := deriveTrackedMediaURL(publicURL)
+			if ok {
+				media, err = h.mediaRepo.GetByPublicURL(c.Request.Context(), derivedURL)
+				if err != nil {
+					c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to validate media access"})
+					return
+				}
+			}
+		}
+		if media == nil {
 			if !allowUntracked {
 				c.Status(http.StatusNotFound)
 				return
@@ -112,4 +122,13 @@ func isUntrackedUploadPathAllowed(cleanRelPath string) bool {
 func isThumbnailPath(cleanRelPath string) bool {
 	base := strings.ToLower(filepath.Base(cleanRelPath))
 	return strings.Contains(base, "_thumb") || strings.Contains(base, "_pdfthumb")
+}
+
+func deriveTrackedMediaURL(publicURL string) (string, bool) {
+	// Secondary generated image thumbnails (_thumb_sm) are authorization-linked
+	// to the corresponding tracked primary thumbnail (_thumb).
+	if !strings.Contains(publicURL, "_thumb_sm") {
+		return "", false
+	}
+	return strings.Replace(publicURL, "_thumb_sm", "_thumb", 1), true
 }

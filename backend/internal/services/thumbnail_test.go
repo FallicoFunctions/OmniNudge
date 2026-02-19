@@ -199,11 +199,21 @@ func TestGenerateImageThumbnails(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, 800, primaryW)
 	assert.Equal(t, 600, primaryH)
+	assert.Equal(t, ".jpg", filepath.Ext(set.PrimaryPath))
 
 	smallW, smallH, err := service.GetImageDimensions(set.SmallPath)
 	require.NoError(t, err)
 	assert.Equal(t, 200, smallW)
 	assert.Equal(t, 150, smallH)
+	assert.Equal(t, ".jpg", filepath.Ext(set.SmallPath))
+
+	primaryInfo, err := os.Stat(set.PrimaryPath)
+	require.NoError(t, err)
+	assert.LessOrEqual(t, primaryInfo.Size(), int64(50*1024))
+
+	smallInfo, err := os.Stat(set.SmallPath)
+	require.NoError(t, err)
+	assert.LessOrEqual(t, smallInfo.Size(), int64(50*1024))
 }
 
 func TestIsImageType(t *testing.T) {
