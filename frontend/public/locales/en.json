@@ -1441,6 +1441,14 @@
       "replyPlaceholder": "Reply in thread...",
       "sendReply": "Reply"
     },
+    "replyIndicator": {
+      "replyingTo": "Replying to @{{username}}:",
+      "originalMessage": "Original message",
+      "attachment": "Attachment",
+      "deleted": "Deleted",
+      "unknownUser": "Unknown",
+      "openOriginalAria": "Open original message"
+    },
     "pinned": {
       "title_one": "{{count}} pinned message",
       "title_other": "{{count}} pinned messages",

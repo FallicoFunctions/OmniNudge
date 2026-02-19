@@ -1441,6 +1441,14 @@
       "replyPlaceholder": "اكتب ردًا في السلسلة...",
       "sendReply": "رد"
     },
+    "replyIndicator": {
+      "replyingTo": "ردًا على @{{username}}:",
+      "originalMessage": "الرسالة الأصلية",
+      "attachment": "مرفق",
+      "deleted": "محذوف",
+      "unknownUser": "غير معروف",
+      "openOriginalAria": "فتح الرسالة الأصلية"
+    },
     "pinned": {
       "title_one": "{{count}} رسالة مثبتة",
       "title_other": "{{count}} رسائل مثبتة",

@@ -1441,6 +1441,14 @@
       "replyPlaceholder": "Responder en el hilo...",
       "sendReply": "Responder"
     },
+    "replyIndicator": {
+      "replyingTo": "Respondiendo a @{{username}}:",
+      "originalMessage": "Mensaje original",
+      "attachment": "Adjunto",
+      "deleted": "Eliminado",
+      "unknownUser": "Desconocido",
+      "openOriginalAria": "Abrir mensaje original"
+    },
     "pinned": {
       "title_one": "{{count}} mensaje fijado",
       "title_other": "{{count}} mensajes fijados",
