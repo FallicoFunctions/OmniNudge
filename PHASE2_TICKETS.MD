@@ -3182,18 +3182,18 @@
 ---
 
 ### F7-008: Frontend - Reply Button & Hook
-**Status:** ⬜ TODO
+**Status:** ✅ COMPLETE
 **Priority:** P1
 **Estimated Time:** 3 hours
 
 **Tasks:**
-- [ ] Add "Reply" to message hover menu
-- [ ] Create useThread.ts hook
-- [ ] Fetch thread on demand
-- [ ] Subscribe to thread updates
-- [ ] Handle pagination for large threads
-- [ ] Cache thread data
-- [ ] Write tests
+- [x] Add "Reply" to message hover menu
+- [x] Create useThread.ts hook
+- [x] Fetch thread on demand
+- [x] Subscribe to thread updates
+- [x] Handle pagination for large threads
+- [x] Cache thread data
+- [x] Write tests
 
 **Acceptance Criteria:**
 - Reply button visible
