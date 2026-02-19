@@ -497,10 +497,16 @@ func (h *MediaHandler) schedulePostUploadJobs(ctx context.Context, media *models
 			}
 		}
 
-		if services.IsImageType(media.FileType) {
-			if err := h.queueClient.EnqueueThumbnailGeneration(ctx, media.ID, media.StorageURL, "image"); err != nil {
+		if services.IsImageType(media.FileType) || services.IsPDFType(media.FileType) {
+			thumbnailType := "image"
+			if services.IsPDFType(media.FileType) {
+				thumbnailType = "pdf"
+			}
+			if err := h.queueClient.EnqueueThumbnailGeneration(ctx, media.ID, media.StorageURL, thumbnailType); err != nil {
 				log.Printf("failed to enqueue thumbnail generation for media %d: %v", media.ID, err)
-				h.generateAndStoreThumbnail(ctx, media)
+				if services.IsImageType(media.FileType) {
+					h.generateAndStoreThumbnail(ctx, media)
+				}
 			}
 		}
 

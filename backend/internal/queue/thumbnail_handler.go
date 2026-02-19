@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"path/filepath"
+	"time"
 
 	"github.com/hibiken/asynq"
 	"github.com/omninudge/backend/internal/models"
@@ -33,14 +34,19 @@ func NewThumbnailGenerationHandler(
 		if err != nil {
 			return fmt.Errorf("failed to load media %d: %w", payload.FileID, err)
 		}
-		if !services.IsImageType(media.FileType) {
-			log.Printf("Skipping thumbnail generation for non-image media %d (%s)", media.ID, media.FileType)
+		var thumbnailPath string
+		var thumbnailErr error
+		switch {
+		case services.IsImageType(media.FileType):
+			thumbnailPath, thumbnailErr = thumbnailService.GenerateThumbnail(media.StoragePath)
+		case services.IsPDFType(media.FileType):
+			thumbnailPath, thumbnailErr = thumbnailService.GeneratePDFThumbnailSecure(media.StoragePath, 30*time.Second)
+		default:
+			log.Printf("Skipping thumbnail generation for unsupported media %d (%s)", media.ID, media.FileType)
 			return nil
 		}
-
-		thumbnailPath, err := thumbnailService.GenerateThumbnail(media.StoragePath)
-		if err != nil {
-			return fmt.Errorf("failed to generate thumbnail for media %d: %w", media.ID, err)
+		if thumbnailErr != nil {
+			return fmt.Errorf("failed to generate thumbnail for media %d: %w", media.ID, thumbnailErr)
 		}
 		thumbnailName := filepath.Base(thumbnailPath)
 		thumbnailURL := "/uploads/" + thumbnailName
