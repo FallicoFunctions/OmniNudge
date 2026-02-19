@@ -42,6 +42,7 @@ import {
   arrayBufferToBase64,
   decryptMultiRecipientContent,
   encryptMessage,
+  encryptForMultipleRecipients,
 } from '../utils/encryption';
 import { getOwnKeys, getUserPublicKey } from '../services/keyManagementService';
 import { encryptionService } from '../services/encryptionService';
@@ -1131,29 +1132,231 @@ export default function MessagesPage() {
       const isEncrypted =
         message.encryption_version !== 'plaintext' && message.encryption_version !== 'none';
       const sourceConversationType = selectedConversation?.conversation_type ?? 'dm';
-      if (isEncrypted && sourceConversationType === 'dm' && !message.sender_encrypted_content) {
-        throw new Error(
-          t(
-            'messages.errors.forwardMissingSenderCipher',
-            'This encrypted message cannot be forwarded because it has no sender copy.'
-          )
+
+      const getConversationById = (conversationId: number): Conversation => {
+        const conversation = allConversations.find((entry) => entry.id === conversationId);
+        if (!conversation) {
+          throw new Error(
+            t('messages.errors.forwardConversationMissing', 'Forward target conversation not found.')
+          );
+        }
+        return conversation;
+      };
+
+      const fetchModMailParticipantIDs = async (conversationId: number): Promise<number[]> => {
+        const token = localStorage.getItem('auth_token');
+        const response = await fetch(`${API_BASE_URL}/mod-mail/${conversationId}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+        if (!response.ok) {
+          throw new Error(
+            t(
+              'messages.errors.forwardLoadParticipantsFailed',
+              'Unable to load conversation participants for forwarding.'
+            )
+          );
+        }
+        const conversation = (await response.json()) as ModMailConversation;
+        const participantIDs = (conversation.participants ?? []).map((participant) => participant.user_id);
+        if (!participantIDs.length) {
+          throw new Error(
+            t(
+              'messages.errors.forwardNoParticipants',
+              'No participants found for selected conversation.'
+            )
+          );
+        }
+        return participantIDs;
+      };
+
+      const loadConversationParticipantIDs = async (conversationId: number): Promise<number[]> => {
+        const conversation = getConversationById(conversationId);
+        if (conversation.conversation_type === 'mod_mail') {
+          return fetchModMailParticipantIDs(conversationId);
+        }
+
+        if (!user?.id || !conversation.other_user?.id) {
+          throw new Error(
+            t(
+              'messages.errors.forwardParticipantResolutionFailed',
+              'Unable to resolve conversation participants for forwarding.'
+            )
+          );
+        }
+        return [user.id, conversation.other_user.id];
+      };
+
+      const normalizeParticipantSet = (participantIDs: number[]) =>
+        Array.from(new Set(participantIDs.filter((id) => Number.isFinite(id) && id > 0))).sort(
+          (a, b) => a - b
         );
+
+      const sourceParticipants = normalizeParticipantSet(
+        await loadConversationParticipantIDs(message.conversation_id)
+      );
+
+      for (const targetConversationID of targetConversationIDs) {
+        const targetParticipants = normalizeParticipantSet(
+          await loadConversationParticipantIDs(targetConversationID)
+        );
+        if (
+          targetParticipants.length !== sourceParticipants.length ||
+          targetParticipants.some((participantID, index) => participantID !== sourceParticipants[index])
+        ) {
+          throw new Error(
+            t(
+              'messages.errors.forwardParticipantsMustMatch',
+              'Encrypted forwarding requires conversations with identical participants.'
+            )
+          );
+        }
       }
+
+      let encryptedContent = undefined as string | undefined;
+      let senderEncryptedContent = undefined as string | undefined;
+      let encryptionVersion = undefined as string | undefined;
+      let isMultiRecipient = undefined as boolean | undefined;
+      let sharedEncryptionIV = undefined as string | undefined;
+      let recipientKeys = undefined as Record<number, string> | undefined;
+
+      if (isEncrypted) {
+        if ((message.media_url || message.media_file_id) && includeMedia) {
+          throw new Error(
+            t(
+              'messages.errors.forwardEncryptedMediaUnsupported',
+              'Encrypted media forwarding is not supported yet. Disable media to continue.'
+            )
+          );
+        }
+
+        const ownKeys = await getOwnKeys();
+        if (!ownKeys?.privateKey || !ownKeys?.publicKey || !user?.id) {
+          throw new Error(
+            t(
+              'messages.errors.encryptionKeysMissing',
+              'Your encryption keys are missing. Refresh and try again.'
+            )
+          );
+        }
+
+        let plaintext = '';
+        if (message.is_multi_recipient && message.shared_encryption_iv && message.recipient_keys) {
+          const encryptedKey = message.recipient_keys[user.id];
+          if (!encryptedKey) {
+            throw new Error(
+              t(
+                'messages.errors.forwardMissingRecipientKey',
+                'Cannot decrypt this message for forwarding.'
+              )
+            );
+          }
+          plaintext = await decryptMultiRecipientContent(
+            message.encrypted_content,
+            encryptedKey,
+            message.shared_encryption_iv,
+            ownKeys.privateKey
+          );
+        } else {
+          const isOwnMessage = message.sender_id === user.id;
+          const cipherText = isOwnMessage
+            ? (message.sender_encrypted_content ?? message.encrypted_content)
+            : message.encrypted_content;
+          if (!cipherText) {
+            throw new Error(
+              t('messages.errors.forwardMissingCiphertext', 'Message ciphertext is missing.')
+            );
+          }
+          plaintext = await decryptMessage(cipherText, ownKeys.privateKey);
+        }
+
+        if (sourceConversationType === 'mod_mail') {
+          const publicKeys = await encryptionService.getPublicKeys(sourceParticipants);
+          const recipients = await Promise.all(
+            sourceParticipants.map(async (participantID) => {
+              const base64PublicKey = publicKeys[participantID];
+              if (!base64PublicKey) {
+                throw new Error(
+                  t(
+                    'messages.errors.forwardRecipientKeyFetchFailed',
+                    'Missing participant key for encrypted forward.'
+                  )
+                );
+              }
+              const publicKey = await getUserPublicKey(participantID, base64PublicKey);
+              if (!publicKey) {
+                throw new Error(
+                  t(
+                    'messages.errors.forwardRecipientKeyImportFailed',
+                    'Failed to import participant key for encrypted forward.'
+                  )
+                );
+              }
+              return { userId: participantID, publicKey };
+            })
+          );
+
+          const encrypted = await encryptForMultipleRecipients(
+            plaintext,
+            recipients,
+            ownKeys.publicKey
+          );
+          encryptedContent = encrypted.encryptedContent;
+          senderEncryptedContent = encrypted.senderEncryptedContent;
+          encryptionVersion = 'v2';
+          isMultiRecipient = true;
+          sharedEncryptionIV = encrypted.sharedIv;
+          recipientKeys = encrypted.recipientKeys;
+        } else {
+          const recipientID = sourceParticipants.find((participantID) => participantID !== user.id);
+          if (!recipientID) {
+            throw new Error(
+              t('messages.errors.forwardRecipientResolutionFailed', 'Unable to resolve recipient.')
+            );
+          }
+          const publicKeys = await encryptionService.getPublicKeys([recipientID]);
+          const base64PublicKey = publicKeys[recipientID];
+          if (!base64PublicKey) {
+            throw new Error(
+              t(
+                'messages.errors.forwardRecipientKeyFetchFailed',
+                'Missing recipient key for encrypted forward.'
+              )
+            );
+          }
+          const recipientPublicKey = await getUserPublicKey(recipientID, base64PublicKey);
+          if (!recipientPublicKey) {
+            throw new Error(
+              t(
+                'messages.errors.forwardRecipientKeyImportFailed',
+                'Failed to import recipient key for encrypted forward.'
+              )
+            );
+          }
+
+          encryptedContent = await encryptMessage(plaintext, recipientPublicKey);
+          senderEncryptedContent = await encryptMessage(plaintext, ownKeys.publicKey);
+          encryptionVersion = 'v2';
+          isMultiRecipient = false;
+          sharedEncryptionIV = undefined;
+          recipientKeys = undefined;
+        }
+      }
+
       return messagesService.forwardMessage({
         message_id: message.id,
         conversation_ids: targetConversationIDs,
         include_media: includeMedia,
-        encrypted_content: isEncrypted ? message.encrypted_content : undefined,
-        sender_encrypted_content: isEncrypted
-          ? (message.sender_encrypted_content ?? undefined)
-          : undefined,
-        encryption_version: message.encryption_version,
+        encrypted_content: encryptedContent,
+        sender_encrypted_content: senderEncryptedContent,
+        encryption_version: encryptionVersion,
         media_encryption_key: message.media_encryption_key ?? undefined,
         media_encryption_iv: message.media_encryption_iv ?? undefined,
         sender_media_encryption_key: message.sender_media_encryption_key ?? undefined,
-        is_multi_recipient: message.is_multi_recipient ?? undefined,
-        shared_encryption_iv: message.shared_encryption_iv ?? undefined,
-        recipient_keys: message.recipient_keys,
+        is_multi_recipient: isMultiRecipient,
+        shared_encryption_iv: sharedEncryptionIV,
+        recipient_keys: recipientKeys,
       });
     },
     onSuccess: (_payload, variables) => {
