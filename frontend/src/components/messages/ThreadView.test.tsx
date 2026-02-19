@@ -1,12 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ThreadView } from './ThreadView';
 import { __resetThreadCacheForTests } from '../../hooks/useThread';
 import type { Message } from '../../types/messages';
 
+const useMediaQueryMock = vi.fn(() => false);
+
 vi.mock('../../hooks/useMediaQuery', () => ({
-  useMediaQuery: () => false,
+  useMediaQuery: () => useMediaQueryMock(),
 }));
 
 vi.mock('../../services/messagesService', () => ({
@@ -37,6 +39,7 @@ describe('ThreadView', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     __resetThreadCacheForTests();
+    useMediaQueryMock.mockReturnValue(false);
   });
 
   it('loads and renders root + replies', async () => {
@@ -134,6 +137,109 @@ describe('ThreadView', () => {
 
     await waitFor(() => {
       expect(onSubmitReply).toHaveBeenCalledWith({ replyTo: 100, content: 'hello thread' });
+    });
+  });
+
+  it('renders deep threads and caps nested visual depth indentation at level 3', async () => {
+    const deepReplies = Array.from({ length: 10 }, (_, index) =>
+      makeMessage(101 + index, {
+        reply_to: index === 0 ? 100 : 100 + index,
+        thread_root: 100,
+      })
+    );
+
+    getMessageThreadMock.mockResolvedValueOnce({
+      root_message: makeMessage(100),
+      replies: deepReplies,
+      reply_count: 10,
+      limit: 20,
+      offset: 0,
+    });
+
+    render(
+      <ThreadView
+        open={true}
+        rootMessageId={100}
+        currentUserId={1}
+        onClose={() => {}}
+        renderMessageContent={(message) => <span>{message.encrypted_content}</span>}
+        formatTimestamp={() => 'now'}
+      />
+    );
+
+    await waitFor(() => expect(screen.getByText('message-110')).toBeInTheDocument());
+    const deepest = document.getElementById('thread-message-110');
+    expect(deepest).toBeTruthy();
+    expect(deepest?.style.marginLeft).toBe('36px');
+  });
+
+  it('uses mobile layout classes when media query matches mobile', async () => {
+    useMediaQueryMock.mockReturnValue(true);
+    getMessageThreadMock.mockResolvedValueOnce({
+      root_message: makeMessage(100),
+      replies: [],
+      reply_count: 0,
+      limit: 20,
+      offset: 0,
+    });
+
+    const { container } = render(
+      <ThreadView
+        open={true}
+        rootMessageId={100}
+        currentUserId={1}
+        onClose={() => {}}
+        renderMessageContent={(message) => <span>{message.encrypted_content}</span>}
+        formatTimestamp={() => 'now'}
+      />
+    );
+
+    await waitFor(() => expect(screen.getByText('message-100')).toBeInTheDocument());
+    const backdrop = container.querySelector('.fixed.inset-0');
+    expect(backdrop?.className).toContain('items-center');
+    expect(backdrop?.className).toContain('p-4');
+  });
+
+  it('applies real-time thread reply updates from browser events', async () => {
+    getMessageThreadMock.mockResolvedValueOnce({
+      root_message: makeMessage(100),
+      replies: [],
+      reply_count: 0,
+      limit: 20,
+      offset: 0,
+    });
+
+    render(
+      <ThreadView
+        open={true}
+        rootMessageId={100}
+        currentUserId={1}
+        onClose={() => {}}
+        renderMessageContent={(message) => <span>{message.encrypted_content}</span>}
+        formatTimestamp={() => 'now'}
+      />
+    );
+
+    await waitFor(() => expect(screen.getByText('message-100')).toBeInTheDocument());
+
+    act(() => {
+      window.dispatchEvent(
+        new CustomEvent('thread-reply-added', {
+          detail: {
+            type: 'thread_reply_added',
+            conversation_id: 10,
+            thread_root: 100,
+            reply_id: 111,
+            reply_count: 1,
+            message: makeMessage(111, { reply_to: 100, thread_root: 100 }),
+          },
+        })
+      );
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('message-111')).toBeInTheDocument();
+      expect(screen.getByText('1 reply')).toBeInTheDocument();
     });
   });
 });
