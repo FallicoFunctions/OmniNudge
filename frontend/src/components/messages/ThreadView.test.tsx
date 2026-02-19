@@ -242,4 +242,34 @@ describe('ThreadView', () => {
       expect(screen.getByText('1 reply')).toBeInTheDocument();
     });
   });
+
+  it('shows deleted-root indicator when root is tombstoned', async () => {
+    getMessageThreadMock.mockResolvedValueOnce({
+      root_message: makeMessage(100, {
+        encrypted_content: '[deleted]',
+        deleted_for_sender: true,
+        deleted_for_recipient: true,
+      }),
+      replies: [makeMessage(101, { reply_to: 100, thread_root: 100 })],
+      reply_count: 1,
+      limit: 20,
+      offset: 0,
+    });
+
+    render(
+      <ThreadView
+        open={true}
+        rootMessageId={100}
+        currentUserId={1}
+        onClose={() => {}}
+        renderMessageContent={(message) => <span>{message.encrypted_content}</span>}
+        formatTimestamp={() => 'now'}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Message deleted')).toBeInTheDocument();
+      expect(screen.getByText('message-101')).toBeInTheDocument();
+    });
+  });
 });

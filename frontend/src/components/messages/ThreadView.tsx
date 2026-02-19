@@ -190,7 +190,13 @@ export function ThreadView({
                       <span>{formatTimestamp(message.sent_at)}</span>
                     </div>
                     <div className="text-sm text-[var(--color-text-primary)]">
-                      {renderMessageContent(message, isOwnMessage)}
+                      {isRoot && message.deleted_for_sender && message.deleted_for_recipient ? (
+                        <span className="italic text-[var(--color-text-muted)]">
+                          {t('messages.threadView.deletedRoot')}
+                        </span>
+                      ) : (
+                        renderMessageContent(message, isOwnMessage)
+                      )}
                     </div>
                     {!isRoot && (
                       <div className="mt-1 flex justify-end">

@@ -1440,7 +1440,8 @@
       "jumpToRoot": "Ir al inicio",
       "jumpToReply": "Ir",
       "replyPlaceholder": "Responder en el hilo...",
-      "sendReply": "Responder"
+      "sendReply": "Responder",
+      "deletedRoot": "Mensaje eliminado"
     },
     "replyIndicator": {
       "replyingTo": "Respondiendo a @{{username}}:",
