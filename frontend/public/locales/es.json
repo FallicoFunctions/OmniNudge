@@ -1076,7 +1076,7 @@
     "instructions": {
       "clickToUpload": "Haz clic para subir",
       "orDragAndDrop": "o arrastra y suelta",
-      "summary": "Imágenes y vídeos de hasta {{size}}MB (máx. {{max}} archivos)"
+      "summary": "Archivos multimedia y documentos hasta {{size}}MB (máx. {{max}} archivos)"
     },
     "selected": {
       "title": "Archivos seleccionados ({{count}})"

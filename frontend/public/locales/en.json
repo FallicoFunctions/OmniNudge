@@ -1076,7 +1076,7 @@
     "instructions": {
       "clickToUpload": "Click to upload",
       "orDragAndDrop": "or drag and drop",
-      "summary": "Images and videos up to {{size}}MB (max {{max}} files)"
+      "summary": "Media and documents up to {{size}}MB (max {{max}} files)"
     },
     "selected": {
       "title": "Selected files ({{count}})"

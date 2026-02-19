@@ -1076,7 +1076,7 @@
     "instructions": {
       "clickToUpload": "انقر للرفع",
       "orDragAndDrop": "أو اسحب وأفلت",
-      "summary": "صور وفيديوهات حتى {{size}}MB (الحد الأقصى {{max}} ملفات)"
+      "summary": "وسائط ومستندات حتى {{size}}MB (الحد الأقصى {{max}} ملفات)"
     },
     "selected": {
       "title": "الملفات المحددة ({{count}})"
