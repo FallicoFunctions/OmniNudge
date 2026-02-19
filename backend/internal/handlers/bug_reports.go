@@ -468,7 +468,11 @@ type notifyFeedbackPayload struct {
 }
 
 func notifyFeedbackWebhook(payload notifyFeedbackPayload) {
-	webhookURL := strings.TrimSpace(os.Getenv("FEEDBACK_SLACK_WEBHOOK_URL"))
+	webhookURL := strings.TrimSpace(os.Getenv("BUG_REPORTS_SLACK_WEBHOOK_URL"))
+	if webhookURL == "" {
+		// Backward-compatible fallback for existing environments.
+		webhookURL = strings.TrimSpace(os.Getenv("FEEDBACK_SLACK_WEBHOOK_URL"))
+	}
 	if webhookURL == "" {
 		return
 	}

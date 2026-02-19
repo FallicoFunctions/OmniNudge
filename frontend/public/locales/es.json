@@ -141,12 +141,6 @@
   "mainLayout": {
     "skipToMainContent": "Saltar al contenido principal",
     "bugReporting": "Reporte de errores",
-    "feedbackButton": "Feedback",
-    "feedbackPrompt": {
-      "title": "¿Cómo va OmniNudge?",
-      "body": "Comparte feedback rápido para mejorar mensajería y feed.",
-      "action": "Responder encuesta"
-    },
     "mobileNavigationError": "Error de navegación. Por favor, recarga la página.",
     "dontShowThisAgain": "No volver a mostrar esto"
   },
@@ -248,23 +242,12 @@
         "label": "Descripción",
         "placeholder": "Describe el bug en detalle. ¿Qué pasó? ¿Qué esperabas que pasara? Pasos para reproducirlo."
       },
-      "feedbackType": {
-        "label": "Tipo de feedback",
-        "options": {
-          "report": "Reporte de bug",
-          "feedback": "Feedback general",
-          "survey": "Encuesta",
-          "nps": "NPS"
-        }
-      },
       "category": {
         "label": "Categoría",
         "options": {
           "bug": "Bug",
           "featureRequest": "Solicitud de función",
-          "other": "Otro",
-          "survey": "Encuesta",
-          "nps": "NPS"
+          "other": "Otro"
         }
       },
       "rating": {
@@ -3497,7 +3480,6 @@
       "filters": {
         "allStatuses": "Todos los estados",
         "allCategories": "Todas las categorías",
-        "allTypes": "Todos los tipos",
         "sortNewest": "Más recientes",
         "sortOldest": "Más antiguos",
         "sortRatingHigh": "Mayor calificación",
@@ -3507,15 +3489,7 @@
       "categories": {
         "bug": "Bug",
         "featureRequest": "Solicitud de función",
-        "other": "Otro",
-        "survey": "Encuesta",
-        "nps": "NPS"
-      },
-      "types": {
-        "report": "Reporte",
-        "feedback": "Feedback",
-        "survey": "Encuesta",
-        "nps": "NPS"
+        "other": "Otro"
       },
       "status": {
         "new": "Nuevo",

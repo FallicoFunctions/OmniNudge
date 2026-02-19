@@ -1,17 +1,17 @@
-# Feedback Review Process
+# Bug Report Review Process
 
 ## Scope
-- In-app feedback submissions from `POST /api/v1/bug-reports`
-- Feedback types: `report`, `feedback`, `survey`, `nps`
-- Categories: `bug`, `feature_request`, `other`, `survey`, `nps`
+- Bug report submissions from `POST /api/v1/bug-reports`
+- Supported type: `report`
+- Categories: `bug`, `feature_request`, `other`
 
 ## Intake Channels
 - Admin dashboard: `Admin > Bug Reports`
-- Optional Slack webhook: `FEEDBACK_SLACK_WEBHOOK_URL`
+- Optional Slack webhook: `BUG_REPORTS_SLACK_WEBHOOK_URL` (legacy `FEEDBACK_SLACK_WEBHOOK_URL` still supported)
 
 ## Daily Triage (Owner: Support/PM)
 1. Filter new items (`status = new`) in admin dashboard.
-2. Review by type and category.
+2. Review by category.
 3. Assign priority:
    - P0: production breakage, data loss, auth/payment failures
    - P1: high-impact feature regressions
@@ -29,13 +29,8 @@
    - strategic alignment
 4. Create or update tickets for top themes.
 
-## NPS and Survey Cadence
-- Survey prompt cadence: approximately bi-weekly per user.
-- NPS prompt cadence: quarterly per user (90-day cooldown).
-- Both use the same feedback endpoint with distinct `feedback_type` and `feedback_category`.
-
 ## SLA Targets
-- First triage of new feedback: within 24 hours.
+- First triage of new reports: within 24 hours.
 - P0 acknowledgement: within 2 hours during active support window.
 - Duplicate detection and merge: same-day.
 
