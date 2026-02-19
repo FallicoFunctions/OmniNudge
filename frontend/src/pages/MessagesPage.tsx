@@ -24,6 +24,7 @@ import { QuickReactButton } from '../components/messages/QuickReactButton';
 import { PinnedMessagesBar } from '../components/messages/PinnedMessagesBar';
 import { ThreadPreview } from '../components/messages/ThreadPreview';
 import { ThreadView } from '../components/messages/ThreadView';
+import { ReplyIndicator } from '../components/messages/ReplyIndicator';
 import FilePreview from '../components/messages/FilePreview';
 import { usePinnedMessages } from '../hooks/usePinnedMessages';
 import { useArchive } from '../hooks/useArchive';
@@ -1810,6 +1811,10 @@ export default function MessagesPage() {
     const isModMail = selectedConversation?.conversation_type === 'mod_mail';
     return isModMail ? [...messages] : [...messages].reverse();
   }, [messages, selectedConversation?.conversation_type]);
+  const orderedMessagesById = useMemo(
+    () => new Map(orderedMessages.map((msg) => [msg.id, msg])),
+    [orderedMessages]
+  );
 
   useEffect(() => {
     setMessageSearchPage(0);
@@ -2825,6 +2830,42 @@ export default function MessagesPage() {
                         participant?.username ||
                         (isOwnMessage ? t('messages.you') : t('messages.user'));
                       const isModerator = participant?.is_moderator || false;
+                      const parentMessage = message.reply_to
+                        ? orderedMessagesById.get(message.reply_to)
+                        : undefined;
+                      const parentParticipant = isModMail
+                        ? modMailConversation?.participants?.find(
+                            (p) => p.user_id === parentMessage?.sender_id
+                          )
+                        : null;
+                      const parentUsername = parentMessage
+                        ? parentMessage.sender_id === user?.id
+                          ? t('messages.you')
+                          : isModMail
+                            ? (parentParticipant?.username ?? t('messages.user'))
+                            : (selectedConversation?.other_user?.username ?? t('messages.user'))
+                        : undefined;
+                      const parentDeleted =
+                        !!message.reply_to &&
+                        (!parentMessage ||
+                          (parentMessage.deleted_for_sender && parentMessage.deleted_for_recipient));
+                      const parentDecrypted = parentMessage
+                        ? decryptedContentMap.get(parentMessage.id)
+                        : undefined;
+                      const parentPreviewRaw =
+                        parentDeleted || !parentMessage
+                          ? undefined
+                          : parentMessage.message_type !== 'text'
+                            ? t('messages.replyIndicator.attachment')
+                            : parentDecrypted ||
+                              (parentMessage.encryption_version === 'plaintext' ||
+                              parentMessage.encryption_version === 'none'
+                                ? parentMessage.encrypted_content
+                                : t('messages.replyIndicator.originalMessage'));
+                      const parentPreview =
+                        parentPreviewRaw && parentPreviewRaw.length > 80
+                          ? `${parentPreviewRaw.slice(0, 80)}...`
+                          : parentPreviewRaw;
 
                       return (
                         <div
@@ -2844,6 +2885,25 @@ export default function MessagesPage() {
                                   : 'bg-[var(--color-surface-elevated)] text-[var(--color-text-primary)]'
                               }`}
                             >
+                              {message.reply_to && (
+                                <ReplyIndicator
+                                  parentUsername={parentUsername}
+                                  parentPreview={parentPreview}
+                                  deleted={parentDeleted}
+                                  onJumpToOriginal={() => {
+                                    if (!message.reply_to) return;
+                                    const parentElement = document.getElementById(
+                                      `message-${message.reply_to}`
+                                    );
+                                    if (parentElement) {
+                                      parentElement.scrollIntoView({
+                                        behavior: 'smooth',
+                                        block: 'center',
+                                      });
+                                    }
+                                  }}
+                                />
+                              )}
                               {message.media_url && (
                                 <MessageMediaPreview
                                   message={message}

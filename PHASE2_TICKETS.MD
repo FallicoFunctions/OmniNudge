@@ -3161,16 +3161,16 @@
 ---
 
 ### F7-007: Frontend - ReplyIndicator Component
-**Status:** ⬜ TODO
+**Status:** ✅ COMPLETE
 **Priority:** P1
 **Estimated Time:** 2 hours
 
 **Tasks:**
-- [ ] Create ReplyIndicator.tsx component
-- [ ] Show above message: "↪️ Replying to @User: 'Original message...'"
-- [ ] Click to scroll to original message
-- [ ] Handle deleted original message (show "Deleted")
-- [ ] Write component tests
+- [x] Create ReplyIndicator.tsx component
+- [x] Show above message: "↪️ Replying to @User: 'Original message...'"
+- [x] Click to scroll to original message
+- [x] Handle deleted original message (show "Deleted")
+- [x] Write component tests
 
 **Acceptance Criteria:**
 - Reply context visible
