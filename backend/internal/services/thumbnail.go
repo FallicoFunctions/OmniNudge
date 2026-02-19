@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"image"
+	"math"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -193,6 +194,10 @@ func (s *ThumbnailService) GeneratePDFThumbnailSecure(sourcePath string, timeout
 			errs = append(errs, fmt.Sprintf("%s: output not created", candidate.name))
 			continue
 		}
+		if err := optimizeJPEGFile(outputPath, thumbnailMaxBytes); err != nil {
+			errs = append(errs, fmt.Sprintf("%s: optimize failed: %v", candidate.name, err))
+			continue
+		}
 		return outputPath, nil
 	}
 
@@ -235,6 +240,9 @@ func (s *ThumbnailService) GenerateVideoThumbnailSecure(sourcePath string, timeo
 	}
 	if _, err := os.Stat(outputPath); err != nil {
 		return "", fmt.Errorf("failed to generate video thumbnail: output not created")
+	}
+	if err := optimizeJPEGFile(outputPath, thumbnailMaxBytes); err != nil {
+		return "", fmt.Errorf("failed to optimize video thumbnail: %w", err)
 	}
 	return outputPath, nil
 }
@@ -298,29 +306,54 @@ func mimeTypeFromExtension(path string) string {
 }
 
 func saveOptimizedJPEG(img image.Image, path string, maxBytes int64) error {
-	qualities := []int{80, 70, 60, 50, 40}
+	scaleSteps := []float64{1.0, 0.85, 0.7, 0.55, 0.45, 0.35, 0.25}
+	qualities := []int{80, 70, 60, 50, 40, 30, 25, 20}
 	var lastErr error
-	for _, quality := range qualities {
-		if err := imaging.Save(img, path, imaging.JPEGQuality(quality)); err != nil {
-			lastErr = err
-			continue
+	for _, scale := range scaleSteps {
+		scaled := img
+		if scale < 1.0 {
+			b := img.Bounds()
+			width := int(math.Round(float64(b.Dx()) * scale))
+			height := int(math.Round(float64(b.Dy()) * scale))
+			if width < 1 {
+				width = 1
+			}
+			if height < 1 {
+				height = 1
+			}
+			scaled = imaging.Resize(img, width, height, imaging.Lanczos)
 		}
-		if maxBytes <= 0 {
-			return nil
+		for _, quality := range qualities {
+			if err := imaging.Save(scaled, path, imaging.JPEGQuality(quality)); err != nil {
+				lastErr = err
+				continue
+			}
+			if maxBytes <= 0 {
+				return nil
+			}
+			info, err := os.Stat(path)
+			if err != nil {
+				lastErr = err
+				continue
+			}
+			if info.Size() <= maxBytes {
+				return nil
+			}
 		}
-		info, err := os.Stat(path)
-		if err != nil {
-			lastErr = err
-			continue
-		}
-		if info.Size() <= maxBytes {
-			return nil
-		}
+		lastErr = fmt.Errorf("thumbnail exceeds max size %d bytes after quality/scale passes", maxBytes)
 	}
 	if lastErr != nil {
 		return lastErr
 	}
 	return nil
+}
+
+func optimizeJPEGFile(path string, maxBytes int64) error {
+	img, err := imaging.Open(path)
+	if err != nil {
+		return fmt.Errorf("open generated thumbnail: %w", err)
+	}
+	return saveOptimizedJPEG(img, path, maxBytes)
 }
 
 func defaultCommandRunner(ctx context.Context, name string, args ...string) ([]byte, error) {

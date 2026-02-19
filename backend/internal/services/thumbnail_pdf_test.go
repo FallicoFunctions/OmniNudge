@@ -24,7 +24,7 @@ func TestGeneratePDFThumbnailSecure_UsesPreferredRenderer(t *testing.T) {
 			t.Fatalf("expected pdftoppm first, got %s", name)
 		}
 		outputPrefix := args[len(args)-1]
-		if err := os.WriteFile(outputPrefix+".jpg", []byte("jpeg-data"), 0o644); err != nil {
+		if err := writeNoisyJPEG(outputPrefix+".jpg", 600, 420); err != nil {
 			return nil, err
 		}
 		return []byte("ok"), nil
@@ -68,7 +68,7 @@ func TestGeneratePDFThumbnailSecure_FallsBackToMutool(t *testing.T) {
 		if outIndex < 0 {
 			t.Fatalf("mutool args missing -o output")
 		}
-		if err := os.WriteFile(args[outIndex], []byte("jpeg-data"), 0o644); err != nil {
+		if err := writeNoisyJPEG(args[outIndex], 640, 460); err != nil {
 			return nil, err
 		}
 		return []byte("ok"), nil
@@ -95,5 +95,39 @@ func TestGeneratePDFThumbnailSecure_RejectsNonPDF(t *testing.T) {
 	svc := NewThumbnailService()
 	if _, err := svc.GeneratePDFThumbnailSecure(txtPath, 5*time.Second); err == nil {
 		t.Fatal("expected non-pdf rejection")
+	}
+}
+
+func TestGeneratePDFThumbnailSecure_OptimizesOutputSize(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	pdfPath := filepath.Join(dir, "sample.pdf")
+	if err := os.WriteFile(pdfPath, []byte("%PDF-1.4"), 0o644); err != nil {
+		t.Fatalf("write pdf fixture: %v", err)
+	}
+
+	svc := NewThumbnailService()
+	svc.commandRunner = func(ctx context.Context, name string, args ...string) ([]byte, error) {
+		if name != "pdftoppm" {
+			t.Fatalf("expected pdftoppm first, got %s", name)
+		}
+		outputPrefix := args[len(args)-1]
+		if err := writeNoisyJPEG(outputPrefix+".jpg", 1500, 1100); err != nil {
+			return nil, err
+		}
+		return []byte("ok"), nil
+	}
+
+	thumbPath, err := svc.GeneratePDFThumbnailSecure(pdfPath, 5*time.Second)
+	if err != nil {
+		t.Fatalf("GeneratePDFThumbnailSecure returned error: %v", err)
+	}
+	info, err := os.Stat(thumbPath)
+	if err != nil {
+		t.Fatalf("stat thumb: %v", err)
+	}
+	if info.Size() > thumbnailMaxBytes {
+		t.Fatalf("expected optimized thumbnail <= %d, got %d", thumbnailMaxBytes, info.Size())
 	}
 }

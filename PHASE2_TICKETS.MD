@@ -2994,7 +2994,7 @@
 **Problem:** F6-007 is "FilePreview Component" but no backend thumbnail generation service.
 
 **Tasks:**
-- [ ] Set up thumbnail generation service (ImageMagick, Sharp, or serverless function)
+- [x] Set up thumbnail generation service (ImageMagick, Sharp, or serverless function)
 - [x] Implement image thumbnail generation (200x200px, 800x600px sizes)
 - [x] Implement video thumbnail generation (extract frame at 1s, generate thumbnail)
 - [x] Implement PDF thumbnail generation (convert first page to image)
@@ -3002,9 +3002,9 @@
 - [ ] Store thumbnails in S3 (separate bucket: app-thumbnails-{env})
 - [ ] Implement thumbnail caching (CDN, 30-day TTL)
 - [x] Generate thumbnails asynchronously (via message queue)
-- [ ] Handle thumbnail generation failures (show placeholder icon)
-- [ ] Optimize thumbnail quality (good quality, small file size <50KB)
-- [ ] Test with various file types (JPEG, PNG, GIF, MP4, PDF)
+- [x] Handle thumbnail generation failures (show placeholder icon)
+- [x] Optimize thumbnail quality (good quality, small file size <50KB)
+- [x] Test with various file types (JPEG, PNG, GIF, MP4, PDF)
 - [x] Document thumbnail generation pipeline
 
 **Acceptance Criteria:**
