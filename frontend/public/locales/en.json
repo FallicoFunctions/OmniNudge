@@ -1427,6 +1427,16 @@
       "viewThread": "View thread",
       "openAria": "Open thread"
     },
+    "threadView": {
+      "title": "Thread",
+      "replyCount_one": "{{count}} reply",
+      "replyCount_other": "{{count}} replies",
+      "closeAria": "Close thread",
+      "loadFailed": "Failed to load thread",
+      "rootMessage": "Root message",
+      "loadMore": "Load more replies",
+      "empty": "No replies in this thread yet."
+    },
     "pinned": {
       "title_one": "{{count}} pinned message",
       "title_other": "{{count}} pinned messages",

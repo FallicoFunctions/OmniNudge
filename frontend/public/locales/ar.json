@@ -1427,6 +1427,16 @@
       "viewThread": "عرض السلسلة",
       "openAria": "فتح السلسلة"
     },
+    "threadView": {
+      "title": "سلسلة الردود",
+      "replyCount_one": "{{count}} رد",
+      "replyCount_other": "{{count}} ردود",
+      "closeAria": "إغلاق السلسلة",
+      "loadFailed": "فشل تحميل السلسلة",
+      "rootMessage": "الرسالة الأساسية",
+      "loadMore": "تحميل المزيد من الردود",
+      "empty": "لا توجد ردود في هذه السلسلة بعد."
+    },
     "pinned": {
       "title_one": "{{count}} رسالة مثبتة",
       "title_other": "{{count}} رسائل مثبتة",
