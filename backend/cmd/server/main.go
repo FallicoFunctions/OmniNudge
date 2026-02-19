@@ -305,6 +305,7 @@ func main() {
 	commentsHandler := handlers.NewCommentsHandler(db.Pool, commentRepo, postRepo, hubRepo, userRepo, hubModRepo)
 	redditHandler := handlers.NewRedditHandler(redditClient, redditPostRepo)
 	conversationsHandler := handlers.NewConversationsHandler(db.Pool, conversationRepo, messageRepo, userRepo)
+	foldersHandler := handlers.NewFoldersHandler(db.Pool, conversationRepo)
 	// Initialize thumbnail service
 	thumbnailService := services.NewThumbnailService()
 
@@ -782,6 +783,15 @@ func main() {
 			protected.PUT("/conversations/:id/mute", conversationsHandler.MuteConversation)
 			protected.PUT("/conversations/:id/unmute", conversationsHandler.UnmuteConversation)
 			protected.DELETE("/conversations/:id", conversationsHandler.DeleteConversation)
+			protected.POST("/folders", foldersHandler.CreateFolder)
+			protected.GET("/folders", foldersHandler.ListFolders)
+			protected.PATCH("/folders/:id", foldersHandler.UpdateFolder)
+			protected.DELETE("/folders/:id", foldersHandler.DeleteFolder)
+			protected.POST("/folders/reorder", foldersHandler.ReorderFolders)
+			protected.POST("/folders/:id/conversations/:conv_id", foldersHandler.AddConversationToFolder)
+			protected.DELETE("/folders/:id/conversations/:conv_id", foldersHandler.RemoveConversationFromFolder)
+			protected.GET("/folders/:id/conversations", foldersHandler.GetFolderConversations)
+			protected.GET("/conversations/:id/folders", foldersHandler.GetConversationFolders)
 
 			// Protected messages routes
 			protected.POST("/messages", messagesHandler.SendMessage)

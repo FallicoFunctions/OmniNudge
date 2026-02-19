@@ -3347,23 +3347,23 @@
 ---
 
 ### F8-002: Backend - Folder API Endpoints
-**Status:** ⬜ TODO
+**Status:** ✅ COMPLETE
 **Priority:** P1
 **Estimated Time:** 4 hours
 
 **Tasks:**
-- [ ] Create POST /api/folders endpoint (create folder)
-- [ ] Create GET /api/folders endpoint (list user's folders)
-- [ ] Create PATCH /api/folders/{id} endpoint (update folder)
-- [ ] Create DELETE /api/folders/{id} endpoint (delete folder, keep conversations)
-- [ ] Create POST /api/folders/reorder endpoint (reorder folders)
-- [ ] Create POST /api/folders/{id}/conversations/{conv_id} endpoint (add to folder)
-- [ ] Create DELETE /api/folders/{id}/conversations/{conv_id} endpoint (remove from folder)
-- [ ] Create GET /api/folders/{id}/conversations endpoint (get folder conversations)
-- [ ] Create GET /api/conversations/{id}/folders endpoint (get conversation's folders)
-- [ ] Enforce 50 folder limit
-- [ ] Enforce 1000 conversations per folder limit
-- [ ] Write API tests
+- [x] Create POST /api/folders endpoint (create folder)
+- [x] Create GET /api/folders endpoint (list user's folders)
+- [x] Create PATCH /api/folders/{id} endpoint (update folder)
+- [x] Create DELETE /api/folders/{id} endpoint (delete folder, keep conversations)
+- [x] Create POST /api/folders/reorder endpoint (reorder folders)
+- [x] Create POST /api/folders/{id}/conversations/{conv_id} endpoint (add to folder)
+- [x] Create DELETE /api/folders/{id}/conversations/{conv_id} endpoint (remove from folder)
+- [x] Create GET /api/folders/{id}/conversations endpoint (get folder conversations)
+- [x] Create GET /api/conversations/{id}/folders endpoint (get conversation's folders)
+- [x] Enforce 50 folder limit
+- [x] Enforce 1000 conversations per folder limit
+- [x] Write API tests
 
 **Acceptance Criteria:**
 - Full CRUD for folders
