@@ -726,6 +726,66 @@ func TestNotifyThreadReply_SkipsMutedThread(t *testing.T) {
 	assert.Len(t, notifs, 0)
 }
 
+func TestNotifyThreadReply_RespectsQuietHours(t *testing.T) {
+	service, db, cleanup := setupNotificationTest(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	rootAuthorID := createTestUser(t, db, uniqueNotificationName("thread_root_author"))
+	replyAuthorID := createTestUser(t, db, uniqueNotificationName("thread_reply_author"))
+
+	convRepo := models.NewConversationRepository(db.Pool)
+	conv, err := convRepo.Create(ctx, rootAuthorID, replyAuthorID)
+	require.NoError(t, err)
+
+	now := time.Now().UTC()
+	currentMinute := now.Hour()*60 + now.Minute()
+	quietStart := (currentMinute + 1439) % 1440
+	quietEnd := (currentMinute + 1) % 1440
+
+	settingsRepo := models.NewUserSettingsRepository(db.Pool)
+	rootSettings, _ := settingsRepo.GetByUserID(ctx, rootAuthorID)
+	if rootSettings == nil {
+		rootSettings, _ = settingsRepo.CreateDefault(ctx, rootAuthorID)
+	}
+	rootSettings.NotifyCommentReplies = true
+	rootSettings.QuietHoursEnabled = true
+	rootSettings.QuietHoursTimezone = "UTC"
+	rootSettings.QuietHoursStartMinutes = quietStart
+	rootSettings.QuietHoursEndMinutes = quietEnd
+	_, err = settingsRepo.Update(ctx, rootSettings)
+	require.NoError(t, err)
+
+	msgRepo := models.NewMessageRepository(db.Pool)
+	rootMessage := &models.Message{
+		ConversationID:    conv.ID,
+		SenderID:          rootAuthorID,
+		RecipientID:       replyAuthorID,
+		EncryptedContent:  "root",
+		MessageType:       "text",
+		EncryptionVersion: "v1",
+	}
+	require.NoError(t, msgRepo.Create(ctx, rootMessage))
+
+	replyMessage := &models.Message{
+		ConversationID:    conv.ID,
+		SenderID:          replyAuthorID,
+		RecipientID:       rootAuthorID,
+		EncryptedContent:  "reply-1",
+		MessageType:       "text",
+		ReplyTo:           &rootMessage.ID,
+		ThreadRoot:        &rootMessage.ID,
+		EncryptionVersion: "v1",
+	}
+	require.NoError(t, msgRepo.Create(ctx, replyMessage))
+
+	service.NotifyThreadReply(ctx, conv.ID, rootMessage.ID, replyMessage.ID, replyAuthorID)
+
+	notifs, err := models.NewNotificationRepository(db.Pool).GetByUserID(ctx, rootAuthorID, 10, 0, false)
+	require.NoError(t, err)
+	assert.Len(t, notifs, 0)
+}
+
 func TestNotifyThreadReply_IncludesModMailParticipantsWithoutThreadMessages(t *testing.T) {
 	service, db, cleanup := setupNotificationTest(t)
 	defer cleanup()
