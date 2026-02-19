@@ -8,6 +8,7 @@ BEGIN
         SELECT 1
         FROM pg_constraint
         WHERE conname = 'messages_forward_count_non_negative'
+          AND conrelid = 'messages'::regclass
     ) THEN
         ALTER TABLE messages
         ADD CONSTRAINT messages_forward_count_non_negative
