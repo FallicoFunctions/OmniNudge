@@ -241,12 +241,25 @@ func main() {
 	if queueClient != nil && cfg.Redis.Addr != "" {
 		jobWorker := queue.NewWorker(cfg.Redis.Addr, cfg.Redis.Password, 10) // 10 concurrent workers
 		queueThumbnailService := services.NewThumbnailService()
+		var virusScanner services.VirusScanner
+		if cfg.VirusScan.Enabled {
+			virusScanner = services.NewClamAVScanner(
+				cfg.VirusScan.ClamAVNetwork,
+				cfg.VirusScan.ClamAVAddress,
+				time.Duration(cfg.VirusScan.TimeoutSeconds)*time.Second,
+			)
+			if err := virusScanner.Ping(context.Background()); err != nil {
+				log.Printf("Warning: ClamAV ping failed: %v", err)
+			}
+		} else {
+			log.Println("Warning: Virus scan disabled via VIRUS_SCAN_ENABLED=false")
+		}
 
 		// Register job handlers
 		jobWorker.RegisterAllHandlers(queue.JobHandlers{
 			EmailSend:           queue.NewEmailHandler(emailService),
 			DataExport:          queue.NewDataExportHandler(db.Pool, storageService, cfg.Encryption.Key, emailService),
-			VirusScan:           queue.NewVirusScanHandler(),
+			VirusScan:           queue.NewVirusScanHandler(mediaRepo, virusScanner, cfg.VirusScan.FailClosed),
 			Transcription:       queue.NewUnsupportedHandler(queue.JobTypeTranscription, "transcription backend pipeline is not yet implemented"),
 			Notification:        queue.NewNotificationHandler(tokenRepo, firebaseService),
 			ThumbnailGeneration: queue.NewThumbnailGenerationHandler(mediaRepo, queueThumbnailService),
@@ -300,7 +313,7 @@ func main() {
 
 	messagesHandler := handlers.NewMessagesHandler(db.Pool, messageRepo, conversationRepo, userSettingsRepo, hub, notificationService, queueClient)
 	usersHandler := handlers.NewUsersHandler(userRepo, userProfileRepo, userFriendshipRepo, userSettingsRepo, postRepo, commentRepo, authService, hubModRepo, cache, thumbnailService)
-	mediaHandler := handlers.NewMediaHandler(mediaRepo, thumbnailService, queueClient)
+	mediaHandler := handlers.NewMediaHandler(mediaRepo, thumbnailService, queueClient, cfg.VirusScan.FailClosed)
 	hubsHandler := handlers.NewHubsHandlerWithAccessRequest(hubRepo, postRepo, hubModRepo, hubSubRepo, hubSettingsRepo, hubAccessRequestRepo)
 	subscriptionsHandler := handlers.NewSubscriptionsHandler(hubSubRepo, subredditSubRepo, hubRepo)
 	moderationHandler := handlers.NewModerationHandler(reportRepo, hubModRepo, userRepo, notificationRepo, hub, emailService)
@@ -321,6 +334,7 @@ func main() {
 	blockingHandler := handlers.NewBlockingHandler(db.Pool, userRepo)
 	slideshowHandler := handlers.NewSlideshowHandler(db.Pool, slideshowRepo, conversationRepo, hub)
 	mediaGalleryHandler := handlers.NewMediaGalleryHandler(db.Pool)
+	uploadsHandler := handlers.NewUploadsHandler(mediaRepo, "./uploads")
 	userStatusHandler := handlers.NewUserStatusHandler(hub)
 	presenceStore := services.NewPresenceStore(10 * time.Minute)
 	subredditPresenceHandler := handlers.NewSubredditPresenceHandler(presenceStore)
@@ -378,8 +392,9 @@ func main() {
 
 	// Apply monitoring middleware
 	router.Use(monitoring.MetricsMiddleware())
-	// Serve static files with CORS headers
-	router.Static("/uploads", "./uploads")
+	// Serve uploads through scan-aware gate (fail-closed for media files).
+	router.GET("/uploads/*filepath", uploadsHandler.ServeUpload)
+	router.HEAD("/uploads/*filepath", uploadsHandler.ServeUpload)
 
 	// Health check endpoint
 	router.GET("/health", func(c *gin.Context) {

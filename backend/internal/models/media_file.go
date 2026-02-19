@@ -3,27 +3,40 @@ package models
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+)
+
+const (
+	MediaScanStatusPending  = "pending"
+	MediaScanStatusClean    = "clean"
+	MediaScanStatusInfected = "infected"
+	MediaScanStatusError    = "error"
 )
 
 // MediaFile represents an uploaded media asset
 type MediaFile struct {
-	ID               int       `json:"id"`
-	UserID           int       `json:"user_id"`
-	Filename         string    `json:"filename"`
-	OriginalFilename string    `json:"original_filename"`
-	FileType         string    `json:"file_type"`
-	FileSize         int64     `json:"file_size"`
-	StorageURL       string    `json:"storage_url"`
-	ThumbnailURL     *string   `json:"thumbnail_url,omitempty"`
-	StoragePath      string    `json:"storage_path"`
-	Width            *int      `json:"width,omitempty"`
-	Height           *int      `json:"height,omitempty"`
-	Duration         *int      `json:"duration,omitempty"`
-	UsedInMessageID  *int      `json:"used_in_message_id,omitempty"`
-	UploadedAt       time.Time `json:"uploaded_at"`
+	ID               int        `json:"id"`
+	UserID           int        `json:"user_id"`
+	Filename         string     `json:"filename"`
+	OriginalFilename string     `json:"original_filename"`
+	FileType         string     `json:"file_type"`
+	FileSize         int64      `json:"file_size"`
+	StorageURL       string     `json:"storage_url"`
+	ThumbnailURL     *string    `json:"thumbnail_url,omitempty"`
+	StoragePath      string     `json:"storage_path"`
+	Width            *int       `json:"width,omitempty"`
+	Height           *int       `json:"height,omitempty"`
+	Duration         *int       `json:"duration,omitempty"`
+	UsedInMessageID  *int       `json:"used_in_message_id,omitempty"`
+	UploadedAt       time.Time  `json:"uploaded_at"`
+	ScanStatus       string     `json:"scan_status"`
+	ScannedAt        *time.Time `json:"scanned_at,omitempty"`
+	ScanError        *string    `json:"scan_error,omitempty"`
+	QuarantinedAt    *time.Time `json:"quarantined_at,omitempty"`
 }
 
 // MediaFileRepository handles database operations for media files
@@ -38,13 +51,17 @@ func NewMediaFileRepository(pool *pgxpool.Pool) *MediaFileRepository {
 
 // Create inserts a media file record
 func (r *MediaFileRepository) Create(ctx context.Context, media *MediaFile) error {
+	if media.ScanStatus == "" {
+		media.ScanStatus = MediaScanStatusPending
+	}
+
 	query := `
 		INSERT INTO media_files (
 			user_id, filename, original_filename, file_type, file_size,
-			storage_url, thumbnail_url, storage_path, width, height, duration, used_in_message_id
+			storage_url, thumbnail_url, storage_path, width, height, duration, used_in_message_id, scan_status
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-		RETURNING id, uploaded_at
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+		RETURNING id, uploaded_at, scan_status, scanned_at, scan_error, quarantined_at
 	`
 
 	return r.pool.QueryRow(ctx, query,
@@ -60,14 +77,23 @@ func (r *MediaFileRepository) Create(ctx context.Context, media *MediaFile) erro
 		media.Height,
 		media.Duration,
 		media.UsedInMessageID,
-	).Scan(&media.ID, &media.UploadedAt)
+		media.ScanStatus,
+	).Scan(
+		&media.ID,
+		&media.UploadedAt,
+		&media.ScanStatus,
+		&media.ScannedAt,
+		&media.ScanError,
+		&media.QuarantinedAt,
+	)
 }
 
 // GetByStorageURL retrieves a media file by its storage URL.
 func (r *MediaFileRepository) GetByStorageURL(ctx context.Context, storageURL string) (*MediaFile, error) {
 	query := `
 		SELECT id, user_id, filename, original_filename, file_type, file_size,
-		       storage_url, thumbnail_url, storage_path, width, height, duration, used_in_message_id, uploaded_at
+		       storage_url, thumbnail_url, storage_path, width, height, duration, used_in_message_id, uploaded_at,
+		       scan_status, scanned_at, scan_error, quarantined_at
 		FROM media_files
 		WHERE storage_url = $1
 	`
@@ -87,6 +113,10 @@ func (r *MediaFileRepository) GetByStorageURL(ctx context.Context, storageURL st
 		&media.Duration,
 		&media.UsedInMessageID,
 		&media.UploadedAt,
+		&media.ScanStatus,
+		&media.ScannedAt,
+		&media.ScanError,
+		&media.QuarantinedAt,
 	)
 	if err != nil {
 		return nil, err
@@ -98,7 +128,8 @@ func (r *MediaFileRepository) GetByStorageURL(ctx context.Context, storageURL st
 func (r *MediaFileRepository) GetByID(ctx context.Context, id int) (*MediaFile, error) {
 	query := `
 		SELECT id, user_id, filename, original_filename, file_type, file_size,
-		       storage_url, thumbnail_url, storage_path, width, height, duration, used_in_message_id, uploaded_at
+		       storage_url, thumbnail_url, storage_path, width, height, duration, used_in_message_id, uploaded_at,
+		       scan_status, scanned_at, scan_error, quarantined_at
 		FROM media_files
 		WHERE id = $1
 	`
@@ -118,6 +149,10 @@ func (r *MediaFileRepository) GetByID(ctx context.Context, id int) (*MediaFile, 
 		&media.Duration,
 		&media.UsedInMessageID,
 		&media.UploadedAt,
+		&media.ScanStatus,
+		&media.ScannedAt,
+		&media.ScanError,
+		&media.QuarantinedAt,
 	)
 	if err != nil {
 		return nil, err
@@ -149,5 +184,89 @@ func (r *MediaFileRepository) UpdateThumbnailURL(ctx context.Context, mediaID in
 		SET thumbnail_url = $2
 		WHERE id = $1
 	`, mediaID, thumbnailURL)
+	return err
+}
+
+func (r *MediaFileRepository) DeleteByID(ctx context.Context, mediaID int) error {
+	_, err := r.pool.Exec(ctx, `
+		DELETE FROM media_files
+		WHERE id = $1
+	`, mediaID)
+	return err
+}
+
+// GetByPublicURL retrieves media metadata for storage or thumbnail URL.
+// Returns (nil, nil) when no media record maps to the URL.
+func (r *MediaFileRepository) GetByPublicURL(ctx context.Context, publicURL string) (*MediaFile, error) {
+	query := `
+		SELECT id, user_id, filename, original_filename, file_type, file_size,
+		       storage_url, thumbnail_url, storage_path, width, height, duration, used_in_message_id, uploaded_at,
+		       scan_status, scanned_at, scan_error, quarantined_at
+		FROM media_files
+		WHERE storage_url = $1 OR thumbnail_url = $1
+		LIMIT 1
+	`
+	media := &MediaFile{}
+	err := r.pool.QueryRow(ctx, query, publicURL).Scan(
+		&media.ID,
+		&media.UserID,
+		&media.Filename,
+		&media.OriginalFilename,
+		&media.FileType,
+		&media.FileSize,
+		&media.StorageURL,
+		&media.ThumbnailURL,
+		&media.StoragePath,
+		&media.Width,
+		&media.Height,
+		&media.Duration,
+		&media.UsedInMessageID,
+		&media.UploadedAt,
+		&media.ScanStatus,
+		&media.ScannedAt,
+		&media.ScanError,
+		&media.QuarantinedAt,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return media, nil
+}
+
+func (r *MediaFileRepository) MarkScanClean(ctx context.Context, mediaID int) error {
+	_, err := r.pool.Exec(ctx, `
+		UPDATE media_files
+		SET scan_status = $2,
+			scanned_at = NOW(),
+			scan_error = NULL,
+			quarantined_at = NULL
+		WHERE id = $1
+	`, mediaID, MediaScanStatusClean)
+	return err
+}
+
+func (r *MediaFileRepository) MarkScanError(ctx context.Context, mediaID int, scanErr string) error {
+	_, err := r.pool.Exec(ctx, `
+		UPDATE media_files
+		SET scan_status = $2,
+			scanned_at = NOW(),
+			scan_error = $3
+		WHERE id = $1
+	`, mediaID, MediaScanStatusError, scanErr)
+	return err
+}
+
+func (r *MediaFileRepository) MarkScanInfected(ctx context.Context, mediaID int, reason string) error {
+	_, err := r.pool.Exec(ctx, `
+		UPDATE media_files
+		SET scan_status = $2,
+			scanned_at = NOW(),
+			scan_error = $3,
+			quarantined_at = NOW()
+		WHERE id = $1
+	`, mediaID, MediaScanStatusInfected, reason)
 	return err
 }

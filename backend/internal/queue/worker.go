@@ -134,7 +134,7 @@ func (w *Worker) Shutdown() {
 // HandleVirusScan processes virus scan jobs.
 // Default behavior uses deterministic signature checks; service wiring may provide richer handlers.
 func HandleVirusScan(ctx context.Context, task *asynq.Task) error {
-	return NewVirusScanHandler()(ctx, task)
+	return NewUnsupportedHandler(JobTypeVirusScan, "virus scan handler requires repository/scanner wiring")(ctx, task)
 }
 
 // HandleTranscription processes audio transcription jobs.
