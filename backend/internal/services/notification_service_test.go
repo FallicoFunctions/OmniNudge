@@ -895,6 +895,104 @@ func TestNotifyThreadReply_IncludesModMailParticipantsWithoutThreadMessages(t *t
 	assert.Equal(t, "thread_reply", lurkerNotifs[0].NotificationType)
 }
 
+func TestNotifyThreadReply_DailyDigestQueuesBatchInsteadOfImmediateNotification(t *testing.T) {
+	service, db, cleanup := setupNotificationTest(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	rootAuthorID := createTestUser(t, db, uniqueNotificationName("thread_root_author"))
+	replyAuthorID := createTestUser(t, db, uniqueNotificationName("thread_reply_author"))
+
+	convRepo := models.NewConversationRepository(db.Pool)
+	conv, err := convRepo.Create(ctx, rootAuthorID, replyAuthorID)
+	require.NoError(t, err)
+
+	settingsRepo := models.NewUserSettingsRepository(db.Pool)
+	rootSettings, _ := settingsRepo.GetByUserID(ctx, rootAuthorID)
+	if rootSettings == nil {
+		rootSettings, _ = settingsRepo.CreateDefault(ctx, rootAuthorID)
+	}
+	rootSettings.NotifyCommentReplies = true
+	rootSettings.DailyDigest = true
+	_, err = settingsRepo.Update(ctx, rootSettings)
+	require.NoError(t, err)
+
+	msgRepo := models.NewMessageRepository(db.Pool)
+	rootMessage := &models.Message{
+		ConversationID:    conv.ID,
+		SenderID:          rootAuthorID,
+		RecipientID:       replyAuthorID,
+		EncryptedContent:  "root",
+		MessageType:       "text",
+		EncryptionVersion: "v1",
+	}
+	require.NoError(t, msgRepo.Create(ctx, rootMessage))
+
+	for i := 0; i < 2; i++ {
+		reply := &models.Message{
+			ConversationID:    conv.ID,
+			SenderID:          replyAuthorID,
+			RecipientID:       rootAuthorID,
+			EncryptedContent:  fmt.Sprintf("reply-%d", i+1),
+			MessageType:       "text",
+			ReplyTo:           &rootMessage.ID,
+			ThreadRoot:        &rootMessage.ID,
+			EncryptionVersion: "v1",
+		}
+		require.NoError(t, msgRepo.Create(ctx, reply))
+		service.NotifyThreadReply(ctx, conv.ID, rootMessage.ID, reply.ID, replyAuthorID)
+	}
+
+	notifs, err := models.NewNotificationRepository(db.Pool).GetByUserID(ctx, rootAuthorID, 10, 0, false)
+	require.NoError(t, err)
+	assert.Len(t, notifs, 0)
+
+	var batchCount int
+	var replyCount int
+	err = db.Pool.QueryRow(ctx, `
+		SELECT COUNT(1), COALESCE(MAX(milestone_count), 0)
+		FROM notification_batches
+		WHERE user_id = $1
+		  AND content_type = 'message'
+		  AND content_id = $2
+		  AND notification_type = 'thread_reply_digest'
+		  AND status = 'pending'
+	`, rootAuthorID, rootMessage.ID).Scan(&batchCount, &replyCount)
+	require.NoError(t, err)
+	assert.Equal(t, 1, batchCount)
+	assert.Equal(t, 2, replyCount)
+}
+
+func TestProcessBatchedNotifications_ThreadReplyDigestMessage(t *testing.T) {
+	service, db, cleanup := setupNotificationTest(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	userID := createTestUser(t, db, uniqueNotificationName("thread_digest_user"))
+
+	batchRepo := models.NewNotificationBatchRepository(db.Pool)
+	batch := &models.NotificationBatch{
+		UserID:           userID,
+		ContentType:      "message",
+		ContentID:        42,
+		NotificationType: "thread_reply_digest",
+		MilestoneCount:   intPtr(3),
+		ScheduledFor:     time.Now().Add(-1 * time.Minute),
+		Status:           "pending",
+	}
+	err := batchRepo.Create(ctx, batch)
+	require.NoError(t, err)
+
+	err = service.ProcessBatchedNotifications(ctx)
+	require.NoError(t, err)
+
+	notifs, err := models.NewNotificationRepository(db.Pool).GetByUserID(ctx, userID, 10, 0, false)
+	require.NoError(t, err)
+	require.Len(t, notifs, 1)
+	assert.Equal(t, "thread_reply_digest", notifs[0].NotificationType)
+	assert.Equal(t, "3 new replies in thread", notifs[0].Message)
+}
+
 func TestIsWithinQuietHours(t *testing.T) {
 	tz := "UTC"
 	makeTime := func(hour, minute int) time.Time {
@@ -966,4 +1064,14 @@ func TestBuildThreadReplyNotificationMessage(t *testing.T) {
 	assert.Equal(t, "alice replied in a thread", buildThreadReplyNotificationMessage("alice", false, 0))
 	assert.Equal(t, "5 new replies in your thread", buildThreadReplyNotificationMessage("", true, 5))
 	assert.Equal(t, "5 new replies in a thread you're following", buildThreadReplyNotificationMessage("", false, 5))
+}
+
+func TestNextDailyDigestRunAt(t *testing.T) {
+	now := time.Date(2026, time.February, 19, 23, 0, 0, 0, time.UTC)
+	next := nextDailyDigestRunAt(now, "UTC")
+	assert.Equal(t, time.Date(2026, time.February, 20, 8, 0, 0, 0, time.UTC), next)
+}
+
+func intPtr(v int) *int {
+	return &v
 }

@@ -395,6 +395,12 @@ func (s *NotificationService) NotifyThreadReply(
 		if s.isConversationMutedForUser(ctx, conversationID, recipientID) || s.isThreadMutedForUser(ctx, threadRootID, recipientID) {
 			continue
 		}
+		if settings.DailyDigest {
+			if err := s.enqueueThreadReplyDigest(ctx, recipientID, threadRootID, settings.QuietHoursTimezone); err != nil {
+				log.Printf("[NotificationService] NotifyThreadReply: failed to enqueue digest for root %d recipient %d: %v", threadRootID, recipientID, err)
+			}
+			continue
+		}
 
 		contentID := threadRootID
 		actorID := replyAuthorID
@@ -659,9 +665,83 @@ func (s *NotificationService) buildBatchNotificationMessage(batch *models.Notifi
 			return "Your post reached a new milestone!"
 		}
 		return "Your comment reached a new milestone!"
+	case "thread_reply_digest":
+		if batch.MilestoneCount != nil && *batch.MilestoneCount > 0 {
+			return fmt.Sprintf("%d new replies in thread", *batch.MilestoneCount)
+		}
+		return "You have new replies in a thread"
 	default:
 		return "You have a new notification"
 	}
+}
+
+func (s *NotificationService) enqueueThreadReplyDigest(
+	ctx context.Context,
+	userID int,
+	threadRootID int,
+	timezone string,
+) error {
+	scheduledFor := nextDailyDigestRunAt(time.Now(), timezone)
+
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	if _, err := tx.Exec(ctx, `
+		SELECT pg_advisory_xact_lock($1::integer, $2::integer)
+	`, userID, threadRootID); err != nil {
+		return err
+	}
+
+	var existingID int
+	var existingCount int
+	err = tx.QueryRow(ctx, `
+		SELECT id, COALESCE(milestone_count, 0)
+		FROM notification_batches
+		WHERE user_id = $1
+		  AND content_type = 'message'
+		  AND content_id = $2
+		  AND notification_type = 'thread_reply_digest'
+		  AND status = 'pending'
+		  AND scheduled_for = $3
+		LIMIT 1
+	`, userID, threadRootID, scheduledFor).Scan(&existingID, &existingCount)
+	if err == nil {
+		if _, err := tx.Exec(ctx, `
+			UPDATE notification_batches
+			SET milestone_count = $2
+			WHERE id = $1
+		`, existingID, existingCount+1); err != nil {
+			return err
+		}
+		return tx.Commit(ctx)
+	}
+	if !errors.Is(err, pgx.ErrNoRows) {
+		return err
+	}
+
+	if _, err := tx.Exec(ctx, `
+		INSERT INTO notification_batches (
+			user_id, content_type, content_id, notification_type,
+			milestone_count, scheduled_for, status
+		)
+		VALUES ($1, 'message', $2, 'thread_reply_digest', $3, $4, 'pending')
+	`, userID, threadRootID, 1, scheduledFor); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
+}
+
+func nextDailyDigestRunAt(now time.Time, tz string) time.Time {
+	loc, err := time.LoadLocation(tz)
+	if err != nil {
+		loc = time.UTC
+	}
+	localNow := now.In(loc)
+	nextDay := time.Date(localNow.Year(), localNow.Month(), localNow.Day()+1, 8, 0, 0, 0, loc)
+	return nextDay.UTC()
 }
 
 // SendMessagePush sends a push notification for a new message (to be called by MessagesHandler)
