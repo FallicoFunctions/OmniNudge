@@ -72,4 +72,67 @@ describe('messagesService editing helpers', () => {
       encryption_version: 'v2',
     });
   });
+
+  it('forwards message with normalized include_media default', async () => {
+    mockApi.post.mockResolvedValue({
+      original_message_id: 10,
+      forwarded_message_ids: [11, 12],
+      forwarded_count: 2,
+    });
+
+    await messagesService.forwardMessage({
+      message_id: 10,
+      conversation_ids: [101, 102],
+    });
+
+    expect(mockApi.post).toHaveBeenCalledWith(
+      '/messages/forward',
+      expect.objectContaining({
+        message_id: 10,
+        conversation_ids: [101, 102],
+        include_media: false,
+      })
+    );
+  });
+
+  it('forwards encrypted payload fields when provided', async () => {
+    mockApi.post.mockResolvedValue({
+      original_message_id: 10,
+      forwarded_message_ids: [11],
+      forwarded_count: 1,
+    });
+
+    await messagesService.forwardMessage({
+      message_id: 10,
+      conversation_ids: [101],
+      encrypted_content: 'new-recipient-cipher',
+      sender_encrypted_content: 'new-sender-cipher',
+      encryption_version: 'v2',
+      recipient_keys: { 7: 'rk' },
+    });
+
+    expect(mockApi.post).toHaveBeenCalledWith(
+      '/messages/forward',
+      expect.objectContaining({
+        encrypted_content: 'new-recipient-cipher',
+        sender_encrypted_content: 'new-sender-cipher',
+        encryption_version: 'v2',
+        recipient_keys: { 7: 'rk' },
+      })
+    );
+  });
+
+  it('fetches forward info for a message', async () => {
+    mockApi.get.mockResolvedValue({
+      message_id: 12,
+      forward_count: 1,
+      original_message_id: 10,
+      original_sender_id: 7,
+      original_sender: 'alice',
+    });
+
+    await messagesService.getForwardInfo(12);
+
+    expect(mockApi.get).toHaveBeenCalledWith('/messages/12/forward-info');
+  });
 });
