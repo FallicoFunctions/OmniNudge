@@ -14,12 +14,15 @@ vi.mock('../../hooks/useMediaQuery', () => ({
 vi.mock('../../services/messagesService', () => ({
   messagesService: {
     getMessageThread: vi.fn(),
+    muteThread: vi.fn(),
+    unmuteThread: vi.fn(),
   },
 }));
 
 import { messagesService } from '../../services/messagesService';
 
 const getMessageThreadMock = vi.mocked(messagesService.getMessageThread);
+const muteThreadMock = vi.mocked(messagesService.muteThread);
 
 function makeMessage(id: number, overrides: Partial<Message> = {}): Message {
   return {
@@ -316,5 +319,56 @@ describe('ThreadView', () => {
       expect(screen.getByText('Message deleted')).toBeInTheDocument();
       expect(screen.getByText('message-101')).toBeInTheDocument();
     });
+  });
+
+  it('persists muted state when reopening the same thread from cache', async () => {
+    getMessageThreadMock.mockResolvedValueOnce({
+      root_message: makeMessage(100),
+      replies: [],
+      reply_count: 0,
+      muted: false,
+      limit: 20,
+      offset: 0,
+    });
+    muteThreadMock.mockResolvedValueOnce(undefined);
+
+    const user = userEvent.setup();
+    const { rerender } = render(
+      <ThreadView
+        open={true}
+        rootMessageId={100}
+        currentUserId={1}
+        onClose={() => {}}
+        renderMessageContent={(message) => <span>{message.encrypted_content}</span>}
+        formatTimestamp={() => 'now'}
+      />
+    );
+
+    await waitFor(() => expect(screen.getByText('message-100')).toBeInTheDocument());
+    await user.click(screen.getByRole('button', { name: 'Mute thread' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Unmute thread' })).toBeInTheDocument());
+
+    rerender(
+      <ThreadView
+        open={false}
+        rootMessageId={100}
+        currentUserId={1}
+        onClose={() => {}}
+        renderMessageContent={(message) => <span>{message.encrypted_content}</span>}
+        formatTimestamp={() => 'now'}
+      />
+    );
+    rerender(
+      <ThreadView
+        open={true}
+        rootMessageId={100}
+        currentUserId={1}
+        onClose={() => {}}
+        renderMessageContent={(message) => <span>{message.encrypted_content}</span>}
+        formatTimestamp={() => 'now'}
+      />
+    );
+
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Unmute thread' })).toBeInTheDocument());
   });
 });

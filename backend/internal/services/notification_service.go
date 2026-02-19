@@ -2,11 +2,13 @@ package services
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/omninudge/backend/internal/models"
 	"github.com/omninudge/backend/internal/websocket"
@@ -447,13 +449,37 @@ func (s *NotificationService) getThreadParticipantIDs(ctx context.Context, conve
 		return nil, err
 	}
 
+	var conversationType string
 	var user1ID *int
 	var user2ID *int
 	if err := s.pool.QueryRow(ctx, `
-		SELECT user1_id, user2_id
+		SELECT COALESCE(conversation_type, 'dm'), user1_id, user2_id
 		FROM conversations
 		WHERE id = $1
-	`, conversationID).Scan(&user1ID, &user2ID); err == nil {
+	`, conversationID).Scan(&conversationType, &user1ID, &user2ID); err == nil {
+		if conversationType == "mod_mail" {
+			modRows, modErr := s.pool.Query(ctx, `
+				SELECT user_id
+				FROM conversation_participants
+				WHERE conversation_id = $1
+			`, conversationID)
+			if modErr != nil {
+				return nil, modErr
+			}
+			defer modRows.Close()
+			for modRows.Next() {
+				var uid int
+				if err := modRows.Scan(&uid); err != nil {
+					return nil, err
+				}
+				if uid > 0 {
+					participantSet[uid] = struct{}{}
+				}
+			}
+			if err := modRows.Err(); err != nil {
+				return nil, err
+			}
+		}
 		if user1ID != nil && *user1ID > 0 {
 			participantSet[*user1ID] = struct{}{}
 		}
@@ -741,6 +767,9 @@ func (s *NotificationService) insertThreadReplyNotificationIfNotRecent(
 			return false, err
 		}
 		return false, nil
+	}
+	if !errors.Is(err, pgx.ErrNoRows) {
+		return false, err
 	}
 
 	err = tx.QueryRow(ctx, `
