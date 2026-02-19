@@ -344,6 +344,8 @@ type forwardTargetContext struct {
 	senderEncryptedContent *string
 }
 
+const maxThreadDepth = 10
+
 func copyStringPtr(value *string) *string {
 	if value == nil {
 		return nil
@@ -402,7 +404,9 @@ func (h *MessagesHandler) SendMessage(c *gin.Context) {
 	}
 
 	var recipientID int
+	var effectiveReplyTo *int
 	var threadRoot *int
+	flattenedToRoot := false
 
 	// For mod_mail conversations, verify participation differently
 	if conversationType == "mod_mail" {
@@ -472,7 +476,8 @@ func (h *MessagesHandler) SendMessage(c *gin.Context) {
 	}
 
 	if req.ReplyTo != nil {
-		if *req.ReplyTo <= 0 {
+		effectiveReplyTo = req.ReplyTo
+		if *effectiveReplyTo <= 0 {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "reply_to must be a positive message ID"})
 			return
 		}
@@ -482,7 +487,7 @@ func (h *MessagesHandler) SendMessage(c *gin.Context) {
 			SELECT conversation_id, thread_root
 			FROM messages
 			WHERE id = $1
-		`, *req.ReplyTo).Scan(&parentConversationID, &parentThreadRoot)
+		`, *effectiveReplyTo).Scan(&parentConversationID, &parentThreadRoot)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				c.JSON(http.StatusNotFound, gin.H{"error": "Reply target message not found"})
@@ -495,11 +500,38 @@ func (h *MessagesHandler) SendMessage(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "reply_to must reference a message in the same conversation"})
 			return
 		}
-		rootID := *req.ReplyTo
+		rootID := *effectiveReplyTo
 		if parentThreadRoot.Valid {
 			rootID = int(parentThreadRoot.Int64)
 		}
 		threadRoot = &rootID
+
+		// Limit thread depth to avoid pathological nesting.
+		// If parent is already at max depth, flatten the new reply to root.
+		var parentDepth int
+		err = h.pool.QueryRow(c.Request.Context(), `
+			WITH RECURSIVE ancestors AS (
+				SELECT id, reply_to, 0 AS depth
+				FROM messages
+				WHERE id = $1
+				UNION ALL
+				SELECT m.id, m.reply_to, a.depth + 1
+				FROM messages m
+				JOIN ancestors a ON a.reply_to = m.id
+				WHERE a.reply_to IS NOT NULL AND a.depth < 100
+			)
+			SELECT COALESCE(MAX(depth), 0)
+			FROM ancestors
+		`, *effectiveReplyTo).Scan(&parentDepth)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to calculate thread depth", "details": err.Error()})
+			return
+		}
+		if parentDepth >= maxThreadDepth {
+			effectiveReplyTo = &rootID
+			threadRoot = &rootID
+			flattenedToRoot = true
+		}
 	}
 
 	if req.EncryptionVersion == "" {
@@ -556,7 +588,7 @@ func (h *MessagesHandler) SendMessage(c *gin.Context) {
 		EncryptedContent:         req.EncryptedContent,
 		SenderEncryptedContent:   req.SenderEncryptedContent,
 		MessageType:              req.MessageType,
-		ReplyTo:                  req.ReplyTo,
+		ReplyTo:                  effectiveReplyTo,
 		ThreadRoot:               threadRoot,
 		MediaFileID:              req.MediaFileID,
 		MediaURL:                 req.MediaURL,
@@ -575,12 +607,12 @@ func (h *MessagesHandler) SendMessage(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to send message", "details": err.Error()})
 		return
 	}
-	if req.ReplyTo != nil {
+	if effectiveReplyTo != nil {
 		if _, err := h.pool.Exec(c.Request.Context(), `
 			UPDATE messages
 			SET reply_count = reply_count + 1
 			WHERE id = $1
-		`, *req.ReplyTo); err != nil {
+		`, *effectiveReplyTo); err != nil {
 			_, _ = h.pool.Exec(c.Request.Context(), `DELETE FROM messages WHERE id = $1`, message.ID)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update thread metadata", "details": err.Error()})
 			return
@@ -597,6 +629,10 @@ func (h *MessagesHandler) SendMessage(c *gin.Context) {
 	if err := h.conversationRepo.UpdateLastMessageAt(c.Request.Context(), req.ConversationID); err != nil {
 		// Log error but don't fail the request
 		c.Writer.Header().Add("X-Warning", "Failed to update conversation timestamp")
+	}
+
+	if flattenedToRoot {
+		c.Writer.Header().Set("X-Thread-Flattened", "true")
 	}
 
 	// Re-add users to conversation if they had deleted it (for DM conversations only).

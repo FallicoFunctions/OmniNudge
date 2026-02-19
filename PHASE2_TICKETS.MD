@@ -3044,18 +3044,18 @@
 ---
 
 ### F7-002: Backend - Thread API Endpoints
-**Status:** ⬜ TODO
+**Status:** ✅ COMPLETE
 **Priority:** P1
 **Estimated Time:** 3 hours
 
 **Tasks:**
-- [ ] Update POST /api/messages to accept reply_to field
-- [ ] Calculate thread_root (parent.thread_root or parent.id)
-- [ ] Increment parent reply_count
-- [ ] Create GET /api/messages/{id}/thread endpoint
-- [ ] Return: root_message, replies (chronological), reply_count
-- [ ] Add pagination for large threads (20 replies per page)
-- [ ] Write API tests
+- [x] Update POST /api/messages to accept reply_to field
+- [x] Calculate thread_root (parent.thread_root or parent.id)
+- [x] Increment parent reply_count
+- [x] Create GET /api/messages/{id}/thread endpoint
+- [x] Return: root_message, replies (chronological), reply_count
+- [x] Add pagination for large threads (20 replies per page)
+- [x] Write API tests
 
 **Acceptance Criteria:**
 - Can reply to any message
@@ -3067,17 +3067,17 @@
 ---
 
 ### F7-003: Backend - Thread Depth Limit
-**Status:** ⬜ TODO
+**Status:** ✅ COMPLETE
 **Priority:** P1
 **Estimated Time:** 1 hour
 
 **Problem:** Unlimited thread depth could cause issues.
 
 **Tasks:**
-- [ ] Implement max thread depth: 10 levels
-- [ ] If reply_to is at depth 10, flatten (reply to root instead)
-- [ ] Document behavior
-- [ ] Test deep threads
+- [x] Implement max thread depth: 10 levels
+- [x] If reply_to is at depth 10, flatten (reply to root instead)
+- [x] Document behavior
+- [x] Test deep threads
 
 **Acceptance Criteria:**
 - Thread depth limited to 10
