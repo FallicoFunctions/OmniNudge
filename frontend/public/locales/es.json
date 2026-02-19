@@ -1439,6 +1439,10 @@
       "empty": "Todavía no hay respuestas en este hilo.",
       "jumpToRoot": "Ir al inicio",
       "jumpToReply": "Ir",
+      "mute": "Silenciar hilo",
+      "unmute": "Activar hilo",
+      "muting": "Silenciando...",
+      "unmuting": "Activando...",
       "replyPlaceholder": "Responder en el hilo...",
       "sendReply": "Responder",
       "deletedRoot": "Mensaje eliminado"

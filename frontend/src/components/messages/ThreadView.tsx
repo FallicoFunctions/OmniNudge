@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNo
 import { useTranslation } from 'react-i18next';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
 import { useThread } from '../../hooks/useThread';
+import { messagesService } from '../../services/messagesService';
 import type { Message } from '../../types/messages';
 
 interface ThreadViewProps {
@@ -29,11 +30,14 @@ export function ThreadView({
 }: ThreadViewProps) {
   const { t } = useTranslation();
   const [replyText, setReplyText] = useState('');
+  const [mutePending, setMutePending] = useState(false);
   const isMobile = useMediaQuery('(max-width: 767px)');
   const {
     rootMessage,
     replies,
     replyCount,
+    muted,
+    setMuted,
     loading,
     loadingMore,
     hasMore,
@@ -78,6 +82,25 @@ export function ThreadView({
     },
     [onSubmitReply, rootMessage, replyText, loadInitial]
   );
+
+  const handleToggleMute = useCallback(async () => {
+    if (!rootMessage || mutePending) return;
+    setMutePending(true);
+    try {
+      if (muted) {
+        await messagesService.unmuteThread(rootMessage.id);
+        setMuted(false);
+      } else {
+        await messagesService.muteThread(rootMessage.id);
+        setMuted(true);
+      }
+    } catch {
+      // Keep current state and refresh to ensure UI consistency.
+      await loadInitial(true);
+    } finally {
+      setMutePending(false);
+    }
+  }, [loadInitial, mutePending, muted, rootMessage, setMuted]);
 
   const depthByMessageID = useMemo(() => {
     const map = new Map<number, number>();
@@ -130,6 +153,22 @@ export function ThreadView({
             </p>
           </div>
           <div className="flex items-center gap-2">
+            {rootMessage && (
+              <button
+                type="button"
+                onClick={() => void handleToggleMute()}
+                disabled={mutePending}
+                className="rounded-md px-2 py-1 text-xs font-semibold text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-elevated)] hover:text-[var(--color-text-primary)] disabled:opacity-60"
+              >
+                {mutePending
+                  ? muted
+                    ? t('messages.threadView.unmuting')
+                    : t('messages.threadView.muting')
+                  : muted
+                    ? t('messages.threadView.unmute')
+                    : t('messages.threadView.mute')}
+              </button>
+            )}
             {rootMessage && (
               <button
                 type="button"

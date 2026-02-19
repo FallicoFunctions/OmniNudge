@@ -12,6 +12,7 @@ interface ThreadCacheEntry {
   rootMessage: Message | null;
   replies: Message[];
   replyCount: number;
+  muted: boolean;
 }
 
 const MAX_THREAD_CACHE_ENTRIES = 100;
@@ -47,6 +48,7 @@ export function useThread({ rootMessageId, open, pageSize = 20 }: UseThreadOptio
   const [rootMessage, setRootMessage] = useState<Message | null>(null);
   const [replies, setReplies] = useState<Message[]>([]);
   const [replyCount, setReplyCount] = useState(0);
+  const [muted, setMuted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -57,6 +59,7 @@ export function useThread({ rootMessageId, open, pageSize = 20 }: UseThreadOptio
     setRootMessage(entry.rootMessage);
     setReplies(entry.replies);
     setReplyCount(entry.replyCount);
+    setMuted(entry.muted);
   }, []);
 
   const loadInitial = useCallback(
@@ -77,6 +80,7 @@ export function useThread({ rootMessageId, open, pageSize = 20 }: UseThreadOptio
           rootMessage: response.root_message,
           replies: response.replies,
           replyCount: response.reply_count,
+          muted: response.muted ?? false,
         };
         setThreadCacheEntry(rootMessageId, entry);
         applyCache(entry);
@@ -100,6 +104,7 @@ export function useThread({ rootMessageId, open, pageSize = 20 }: UseThreadOptio
         rootMessage: response.root_message,
         replies: mergedReplies,
         replyCount: response.reply_count,
+        muted: response.muted ?? false,
       };
       setThreadCacheEntry(rootMessageId, entry);
       applyCache(entry);
@@ -147,6 +152,8 @@ export function useThread({ rootMessageId, open, pageSize = 20 }: UseThreadOptio
     rootMessage,
     replies,
     replyCount,
+    muted,
+    setMuted,
     loading,
     loadingMore,
     hasMore,

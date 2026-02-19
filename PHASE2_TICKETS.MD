@@ -3231,18 +3231,18 @@
 ---
 
 ### F7-010: Fix - Thread Notifications
-**Status:** ⬜ TODO
+**Status:** ✅ COMPLETE
 **Priority:** P2
 **Estimated Time:** 2 hours
 
 **Problem:** Thread notification logic not specified.
 
 **Tasks:**
-- [ ] Notify root message author when replied to
-- [ ] Notify all thread participants on new reply (opt-in setting)
-- [ ] Add "Mute thread" option
-- [ ] Don't spam if many rapid replies
-- [ ] Test notifications
+- [x] Notify root message author when replied to
+- [x] Notify all thread participants on new reply (opt-in setting)
+- [x] Add "Mute thread" option
+- [x] Don't spam if many rapid replies
+- [x] Test notifications
 
 **Acceptance Criteria:**
 - Thread participants notified
@@ -3275,14 +3275,14 @@
 ---
 
 ### F7-012: Documentation - Threading Feature
-**Status:** ⬜ TODO
+**Status:** ✅ COMPLETE
 **Priority:** P2
 **Estimated Time:** 30 minutes
 
 **Tasks:**
-- [ ] Update API documentation
-- [ ] Update user guide
-- [ ] Add to changelog
+- [x] Update API documentation
+- [x] Update user guide
+- [x] Add to changelog
 
 **Dependencies:** F7-009
 

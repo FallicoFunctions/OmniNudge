@@ -789,6 +789,8 @@ func main() {
 			protected.GET("/messages/:id/forward-info", messagesHandler.GetForwardInfo)
 			protected.GET("/conversations/:id/messages", messagesHandler.GetMessages)
 			protected.GET("/messages/:id/thread", messagesHandler.GetThread)
+			protected.PUT("/messages/:id/thread/mute", messagesHandler.MuteThread)
+			protected.PUT("/messages/:id/thread/unmute", messagesHandler.UnmuteThread)
 			protected.GET("/messages/:id/history", messagesHandler.GetMessageHistory)
 			protected.GET("/conversations/:id/pinned-messages", messagesHandler.GetPinnedMessages)
 			protected.POST("/conversations/:id/read", messagesHandler.MarkAsRead)

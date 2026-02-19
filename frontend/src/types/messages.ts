@@ -101,6 +101,7 @@ export interface MessageThreadResponse {
   root_message: Message;
   replies: Message[];
   reply_count: number;
+  muted?: boolean;
   limit: number;
   offset: number;
 }

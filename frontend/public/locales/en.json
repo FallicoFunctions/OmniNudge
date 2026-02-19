@@ -1439,6 +1439,10 @@
       "empty": "No replies in this thread yet.",
       "jumpToRoot": "Jump to root",
       "jumpToReply": "Jump",
+      "mute": "Mute thread",
+      "unmute": "Unmute thread",
+      "muting": "Muting...",
+      "unmuting": "Unmuting...",
       "replyPlaceholder": "Reply in thread...",
       "sendReply": "Reply",
       "deletedRoot": "Message deleted"
