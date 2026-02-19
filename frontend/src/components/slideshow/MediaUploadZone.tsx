@@ -10,7 +10,23 @@ interface MediaUploadZoneProps {
 }
 
 const DEFAULT_MAX_SIZE = 25 * 1024 * 1024; // 25MB
-const DEFAULT_ACCEPTED_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'video/mp4', 'video/webm', 'video/quicktime'];
+const DEFAULT_ACCEPTED_TYPES = [
+  'image/jpeg',
+  'image/png',
+  'image/gif',
+  'image/webp',
+  'video/mp4',
+  'video/webm',
+  'video/quicktime',
+  'audio/mpeg',
+  'audio/wav',
+  'audio/ogg',
+  'audio/webm',
+  'application/pdf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'text/plain',
+];
 
 export function MediaUploadZone({
   onFilesSelected,
