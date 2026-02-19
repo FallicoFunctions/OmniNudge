@@ -1496,6 +1496,14 @@
         "speed": "سرعة التشغيل",
         "speedLabel": "السرعة: {{speed}}x",
         "speedOption": "{{speed}}x"
+      },
+      "pdfViewer": {
+        "prev": "السابق",
+        "next": "التالي",
+        "zoomIn": "تكبير",
+        "zoomOut": "تصغير",
+        "pageLabel": "الصفحة {{current}} من {{total}}",
+        "loadFailed": "فشل تحميل ملف PDF."
       }
     },
     "compose": {

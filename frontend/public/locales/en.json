@@ -1496,6 +1496,14 @@
         "speed": "Playback speed",
         "speedLabel": "Speed: {{speed}}x",
         "speedOption": "{{speed}}x"
+      },
+      "pdfViewer": {
+        "prev": "Previous",
+        "next": "Next",
+        "zoomIn": "Zoom in",
+        "zoomOut": "Zoom out",
+        "pageLabel": "Page {{current}} of {{total}}",
+        "loadFailed": "Failed to load PDF."
       }
     },
     "compose": {
