@@ -3,8 +3,6 @@ package queue
 import (
 	"context"
 	"errors"
-	"os"
-	"path/filepath"
 	"testing"
 
 	"github.com/hibiken/asynq"
@@ -22,27 +20,10 @@ func TestNewUnsupportedHandler_SkipRetry(t *testing.T) {
 	require.True(t, errors.Is(err, asynq.SkipRetry))
 }
 
-func TestNewVirusScanHandler_CleanFile(t *testing.T) {
+func TestNewVirusScanHandler_RequiresMediaRepository(t *testing.T) {
 	t.Parallel()
 
-	dir := t.TempDir()
-	filePath := filepath.Join(dir, "clean.bin")
-	require.NoError(t, os.WriteFile(filePath, []byte("hello world"), 0o644))
-
-	handler := NewVirusScanHandler()
-	task := asynq.NewTask(
-		string(JobTypeVirusScan),
-		[]byte(`{"file_id":12,"file_path":"`+filePath+`","uploaded_by":1}`),
-	)
-
-	err := handler(context.Background(), task)
-	require.NoError(t, err)
-}
-
-func TestNewVirusScanHandler_MissingFile(t *testing.T) {
-	t.Parallel()
-
-	handler := NewVirusScanHandler()
+	handler := NewVirusScanHandler(nil, nil, true)
 	task := asynq.NewTask(
 		string(JobTypeVirusScan),
 		[]byte(`{"file_id":13,"file_path":"/does/not/exist","uploaded_by":1}`),
@@ -50,7 +31,6 @@ func TestNewVirusScanHandler_MissingFile(t *testing.T) {
 
 	err := handler(context.Background(), task)
 	require.Error(t, err)
-	require.False(t, errors.Is(err, asynq.SkipRetry))
 }
 
 func TestNewNotificationHandler_NoDeps_NoError(t *testing.T) {

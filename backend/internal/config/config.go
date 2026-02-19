@@ -17,6 +17,7 @@ type Config struct {
 	Reddit      RedditConfig
 	JWT         JWTConfig
 	Redis       RedisConfig
+	VirusScan   VirusScanConfig
 	Encryption  EncryptionConfig
 	Turnstile   TurnstileConfig
 	Firebase    FirebaseConfig
@@ -72,6 +73,15 @@ type RedisConfig struct {
 	Password string
 	// TTL in seconds for cached Reddit responses
 	TTLSeconds int
+}
+
+// VirusScanConfig holds antivirus scanning settings.
+type VirusScanConfig struct {
+	Enabled        bool
+	FailClosed     bool
+	ClamAVNetwork  string
+	ClamAVAddress  string
+	TimeoutSeconds int
 }
 
 // EncryptionConfig holds encryption configuration for sensitive data
@@ -134,6 +144,13 @@ func Load() (*Config, error) {
 			Addr:       getEnv("REDIS_ADDR", ""),
 			Password:   getEnv("REDIS_PASSWORD", ""),
 			TTLSeconds: getEnvAsInt("REDIS_TTL_SECONDS", 300),
+		},
+		VirusScan: VirusScanConfig{
+			Enabled:        getEnvAsBool("VIRUS_SCAN_ENABLED", true),
+			FailClosed:     getEnvAsBool("VIRUS_SCAN_FAIL_CLOSED", true),
+			ClamAVNetwork:  getEnv("CLAMAV_NETWORK", "tcp"),
+			ClamAVAddress:  getEnv("CLAMAV_ADDRESS", "127.0.0.1:3310"),
+			TimeoutSeconds: getEnvAsInt("CLAMAV_TIMEOUT_SECONDS", 15),
 		},
 		Encryption: EncryptionConfig{
 			Key: getEnv("ENCRYPTION_KEY", "dev-encryption-key-change-me!!"),

@@ -30,9 +30,10 @@ const (
 
 // MediaHandler handles media uploads
 type MediaHandler struct {
-	mediaRepo        *models.MediaFileRepository
-	thumbnailService *services.ThumbnailService
-	queueClient      *queue.QueueClient
+	mediaRepo           *models.MediaFileRepository
+	thumbnailService    *services.ThumbnailService
+	queueClient         *queue.QueueClient
+	virusScanFailClosed bool
 }
 
 // NewMediaHandler creates a new media handler
@@ -40,11 +41,13 @@ func NewMediaHandler(
 	mediaRepo *models.MediaFileRepository,
 	thumbnailService *services.ThumbnailService,
 	queueClient *queue.QueueClient,
+	virusScanFailClosed bool,
 ) *MediaHandler {
 	return &MediaHandler{
-		mediaRepo:        mediaRepo,
-		thumbnailService: thumbnailService,
-		queueClient:      queueClient,
+		mediaRepo:           mediaRepo,
+		thumbnailService:    thumbnailService,
+		queueClient:         queueClient,
+		virusScanFailClosed: virusScanFailClosed,
 	}
 }
 
@@ -122,6 +125,7 @@ func (h *MediaHandler) UploadMedia(c *gin.Context) {
 	if detected := http.DetectContentType(sniff[:n]); detected != "" {
 		contentType = detected
 	}
+	contentType = middleware.NormalizeDetectedMIME(safeName, contentType)
 
 	// Validate MIME type (P0-008 Security Audit)
 	if !middleware.ValidateMIMEType(contentType, middleware.AllowedMediaTypes) {
@@ -133,7 +137,7 @@ func (h *MediaHandler) UploadMedia(c *gin.Context) {
 				"Images: JPEG, PNG, GIF, WebP (max 10MB)",
 				"Audio/Voice: MP3, M4A, OGG, WAV, WebM, Opus (max 10MB)",
 				"Video: MP4, WebM, MOV, MKV (max 100MB)",
-				"Documents: PDF (max 25MB)",
+				"Documents/Files: PDF, DOC, DOCX, TXT, ZIP (max 25MB)",
 			},
 		})
 		return
@@ -197,6 +201,17 @@ func (h *MediaHandler) UploadMedia(c *gin.Context) {
 		return
 	}
 
+	if err := middleware.ValidateStrictDocumentStructure(storagePath, safeName, contentType, sniff[:n]); err != nil {
+		_ = os.Remove(storagePath)
+		c.JSON(http.StatusUnsupportedMediaType, gin.H{
+			"error":   "Invalid document structure",
+			"name":    safeName,
+			"type":    contentType,
+			"details": err.Error(),
+		})
+		return
+	}
+
 	var usedInMessageID *int
 	if val := c.PostForm("used_in_message_id"); val != "" {
 		if id, err := strconv.Atoi(val); err == nil {
@@ -239,7 +254,16 @@ func (h *MediaHandler) UploadMedia(c *gin.Context) {
 		return
 	}
 
-	h.schedulePostUploadJobs(c.Request.Context(), media)
+	if err := h.schedulePostUploadJobs(c.Request.Context(), media); err != nil {
+		_ = os.Remove(storagePath)
+		if deleteErr := h.mediaRepo.DeleteByID(c.Request.Context(), media.ID); deleteErr != nil {
+			log.Printf("failed to rollback media record %d after scan enqueue failure: %v", media.ID, deleteErr)
+		}
+		c.JSON(http.StatusServiceUnavailable, gin.H{
+			"error": "Upload temporarily unavailable while security scanning is offline",
+		})
+		return
+	}
 
 	c.JSON(http.StatusCreated, media)
 }
@@ -381,6 +405,7 @@ func (h *MediaHandler) processSingleUpload(ctx context.Context, userID int, head
 	if detected := http.DetectContentType(sniff[:n]); detected != "" {
 		contentType = detected
 	}
+	contentType = middleware.NormalizeDetectedMIME(safeName, contentType)
 
 	// Validate MIME type (P0-008 Security Audit)
 	if !middleware.ValidateMIMEType(contentType, middleware.AllowedMediaTypes) {
@@ -416,6 +441,11 @@ func (h *MediaHandler) processSingleUpload(ctx context.Context, userID int, head
 		return nil, fmt.Errorf("failed to save file: %w", err)
 	}
 
+	if err := middleware.ValidateStrictDocumentStructure(storagePath, safeName, contentType, sniff[:n]); err != nil {
+		_ = os.Remove(storagePath)
+		return nil, fmt.Errorf("invalid document structure: %w", err)
+	}
+
 	media := &models.MediaFile{
 		UserID:           userID,
 		Filename:         newName,
@@ -444,15 +474,27 @@ func (h *MediaHandler) processSingleUpload(ctx context.Context, userID int, head
 		return nil, fmt.Errorf("failed to save media record: %w", err)
 	}
 
-	h.schedulePostUploadJobs(ctx, media)
+	if err := h.schedulePostUploadJobs(ctx, media); err != nil {
+		_ = os.Remove(storagePath)
+		if deleteErr := h.mediaRepo.DeleteByID(ctx, media.ID); deleteErr != nil {
+			log.Printf("failed to rollback media record %d after scan enqueue failure: %v", media.ID, deleteErr)
+		}
+		return nil, fmt.Errorf("security scan unavailable: %w", err)
+	}
 
 	return media, nil
 }
 
-func (h *MediaHandler) schedulePostUploadJobs(ctx context.Context, media *models.MediaFile) {
+func (h *MediaHandler) schedulePostUploadJobs(ctx context.Context, media *models.MediaFile) error {
 	if h.queueClient != nil {
 		if err := h.queueClient.EnqueueVirusScan(ctx, media.ID, media.StoragePath, "", media.UserID); err != nil {
 			log.Printf("failed to enqueue virus scan for media %d: %v", media.ID, err)
+			if markErr := h.mediaRepo.MarkScanError(ctx, media.ID, "virus scan queue unavailable"); markErr != nil {
+				log.Printf("failed to mark media %d scan error: %v", media.ID, markErr)
+			}
+			if h.virusScanFailClosed {
+				return err
+			}
 		}
 
 		if services.IsImageType(media.FileType) {
@@ -462,14 +504,22 @@ func (h *MediaHandler) schedulePostUploadJobs(ctx context.Context, media *models
 			}
 		}
 
-		return
+		return nil
+	}
+
+	if markErr := h.mediaRepo.MarkScanError(ctx, media.ID, "virus scan queue unavailable"); markErr != nil {
+		log.Printf("failed to mark media %d scan error: %v", media.ID, markErr)
+	}
+	if h.virusScanFailClosed {
+		return fmt.Errorf("virus scan queue unavailable")
 	}
 
 	if !services.IsImageType(media.FileType) {
-		return
+		return nil
 	}
 
 	h.generateAndStoreThumbnail(ctx, media)
+	return nil
 }
 
 func (h *MediaHandler) generateAndStoreThumbnail(ctx context.Context, media *models.MediaFile) {
