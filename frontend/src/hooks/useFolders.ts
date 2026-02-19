@@ -22,6 +22,11 @@ const persistSelectedFolderId = (folderID: number | null): void => {
   window.localStorage.setItem(SELECTED_FOLDER_STORAGE_KEY, String(folderID));
 };
 
+/** Ensures conversation_count is always a number (never undefined) to keep optimistic math stable. */
+function normalizeCount(f: ConversationFolder): ConversationFolder {
+  return { ...f, conversation_count: f.conversation_count ?? 0 };
+}
+
 export function useFolders() {
   const queryClient = useQueryClient();
   const [selectedFolderId, setSelectedFolderIdState] = useState<number | null>(() =>
@@ -31,6 +36,8 @@ export function useFolders() {
   const foldersQuery = useQuery<ConversationFolder[]>({
     queryKey: ['folders'],
     queryFn: () => foldersService.listFolders(),
+    // Normalize counts so display and optimistic logic always see numbers
+    select: (data) => data.map(normalizeCount),
   });
 
   const folderConversationsQuery = useQuery<Conversation[]>({
@@ -81,7 +88,6 @@ export function useFolders() {
     mutationFn: ({ folderID, conversationID }: { folderID: number; conversationID: number }) =>
       foldersService.addConversation(folderID, conversationID),
     onMutate: ({ folderID }) => {
-      // Optimistically increment conversation_count
       queryClient.setQueryData<ConversationFolder[]>(['folders'], (old) =>
         old?.map((f) =>
           f.id === folderID ? { ...f, conversation_count: (f.conversation_count ?? 0) + 1 } : f,
@@ -93,10 +99,10 @@ export function useFolders() {
       void queryClient.invalidateQueries({ queryKey: ['folders', variables.folderID, 'conversations'] });
     },
     onError: (_, { folderID }) => {
-      // Rollback optimistic update on error
+      // Rollback: decrement, using same ?? 0 base as onMutate
       queryClient.setQueryData<ConversationFolder[]>(['folders'], (old) =>
         old?.map((f) =>
-          f.id === folderID ? { ...f, conversation_count: Math.max(0, (f.conversation_count ?? 1) - 1) } : f,
+          f.id === folderID ? { ...f, conversation_count: Math.max(0, (f.conversation_count ?? 0) - 1) } : f,
         ),
       );
     },
@@ -106,10 +112,9 @@ export function useFolders() {
     mutationFn: ({ folderID, conversationID }: { folderID: number; conversationID: number }) =>
       foldersService.removeConversation(folderID, conversationID),
     onMutate: ({ folderID }) => {
-      // Optimistically decrement conversation_count
       queryClient.setQueryData<ConversationFolder[]>(['folders'], (old) =>
         old?.map((f) =>
-          f.id === folderID ? { ...f, conversation_count: Math.max(0, (f.conversation_count ?? 1) - 1) } : f,
+          f.id === folderID ? { ...f, conversation_count: Math.max(0, (f.conversation_count ?? 0) - 1) } : f,
         ),
       );
     },
@@ -118,7 +123,7 @@ export function useFolders() {
       void queryClient.invalidateQueries({ queryKey: ['folders', variables.folderID, 'conversations'] });
     },
     onError: (_, { folderID }) => {
-      // Rollback optimistic update on error
+      // Rollback: increment, using same ?? 0 base as onMutate
       queryClient.setQueryData<ConversationFolder[]>(['folders'], (old) =>
         old?.map((f) =>
           f.id === folderID ? { ...f, conversation_count: (f.conversation_count ?? 0) + 1 } : f,
@@ -148,6 +153,8 @@ export function useFolders() {
     createFolder: createFolderMutation.mutateAsync,
     updateFolder: updateFolderMutation.mutateAsync,
     deleteFolder: deleteFolderMutation.mutateAsync,
+    isDeletingFolder: deleteFolderMutation.isPending,
+    deletingFolderId: deleteFolderMutation.variables ?? null,
     reorderFolders: reorderFoldersMutation.mutateAsync,
     addConversationToFolder: addConversationMutation.mutateAsync,
     removeConversationFromFolder: removeConversationMutation.mutateAsync,

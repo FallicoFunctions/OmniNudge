@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { ConversationFolder } from '../../types/messages';
 
@@ -14,6 +14,10 @@ interface FolderListProps {
   onEditFolder: (folder: ConversationFolder) => void;
   onDeleteFolder: (folder: ConversationFolder) => void;
   isLoading?: boolean;
+  /** ID of folder currently being deleted — shows spinner on that row */
+  deletingFolderId?: number | null;
+  /** Always show edit/delete actions (mobile — no hover) */
+  alwaysShowActions?: boolean;
 }
 
 export function FolderList({
@@ -26,9 +30,12 @@ export function FolderList({
   onEditFolder,
   onDeleteFolder,
   isLoading,
+  deletingFolderId,
+  alwaysShowActions = false,
 }: FolderListProps) {
   const { t } = useTranslation();
   const [focusedId, setFocusedId] = useState<number | null>(null);
+  const liveRef = useRef<HTMLParagraphElement>(null);
   const atLimit = folders.length >= MAX_FOLDERS;
 
   const allActive = selectedFolderId === null && smartFolder === null;
@@ -39,6 +46,16 @@ export function FolderList({
       className="flex w-44 flex-shrink-0 flex-col border-r border-[var(--color-border)] bg-[var(--color-surface)]"
       aria-label={t('messages.folders.title')}
     >
+      {/* Limit warning — at top, BEFORE the New Folder button so context is clear */}
+      {atLimit && (
+        <p
+          role="status"
+          className="mx-2 mt-2 rounded-md bg-amber-500/10 px-2 py-1 text-[10px] font-medium text-amber-600 dark:text-amber-400"
+        >
+          {t('messages.folders.maxFolders')}
+        </p>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between px-3 py-2.5">
         <span className="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-muted)]">
@@ -57,13 +74,6 @@ export function FolderList({
           </svg>
         </button>
       </div>
-
-      {/* Limit warning */}
-      {atLimit && (
-        <p className="mx-2 mb-1 rounded-md bg-[var(--color-warning,#f59e0b)]/10 px-2 py-1 text-[10px] font-medium text-[var(--color-warning,#f59e0b)]">
-          {t('messages.folders.maxFolders')}
-        </p>
-      )}
 
       {/* Smart folders */}
       <div className="px-1.5 pb-1">
@@ -87,7 +97,7 @@ export function FolderList({
         />
       </div>
 
-      {/* Divider — visually distinguishes smart from user folders */}
+      {/* Divider */}
       {(folders.length > 0 || isLoading) && (
         <div className="mx-3 mb-1 border-t border-[var(--color-border)]" />
       )}
@@ -101,13 +111,14 @@ export function FolderList({
         ) : (
           folders.map((folder) => {
             const isActive = selectedFolderId === folder.id;
-            const showActions = focusedId === folder.id;
+            const isDeleting = deletingFolderId === folder.id;
+            const showActions = alwaysShowActions || focusedId === folder.id;
             return (
               <div
                 key={folder.id}
                 className="group relative"
-                onMouseEnter={() => setFocusedId(folder.id)}
-                onMouseLeave={() => setFocusedId(null)}
+                onMouseEnter={() => !alwaysShowActions && setFocusedId(folder.id)}
+                onMouseLeave={() => !alwaysShowActions && setFocusedId(null)}
               >
                 <FolderRow
                   icon={folder.icon}
@@ -115,15 +126,18 @@ export function FolderList({
                   count={folder.conversation_count}
                   active={isActive}
                   color={folder.color}
+                  isDeleting={isDeleting}
                   onClick={() => {
-                    onSelectFolder(folder.id);
-                    onSelectSmartFolder(null);
+                    if (!isDeleting) {
+                      onSelectFolder(folder.id);
+                      onSelectSmartFolder(null);
+                    }
                   }}
                 />
-                {/* Edit / delete — visible on hover OR keyboard focus */}
+                {/* Edit / delete actions */}
                 <div
                   className={`absolute right-1 top-1/2 flex -translate-y-1/2 gap-0.5 transition-opacity duration-150 ${
-                    showActions ? 'opacity-100' : 'pointer-events-none opacity-0'
+                    showActions && !isDeleting ? 'opacity-100' : 'pointer-events-none opacity-0'
                   }`}
                 >
                   <button
@@ -134,18 +148,13 @@ export function FolderList({
                       onEditFolder(folder);
                     }}
                     onFocus={() => setFocusedId(folder.id)}
-                    onBlur={() => setFocusedId(null)}
+                    onBlur={() => !alwaysShowActions && setFocusedId(null)}
                     className="flex h-7 w-7 items-center justify-center rounded text-[var(--color-text-muted)] hover:bg-[var(--color-hover)] hover:text-[var(--color-text-primary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]"
                     aria-label={t('messages.folders.editFolder')}
                     title={t('messages.folders.editFolder')}
                   >
                     <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden>
-                      <path
-                        d="M8.5 1.5l2 2L4 10H2v-2L8.5 1.5z"
-                        stroke="currentColor"
-                        strokeWidth="1.2"
-                        strokeLinejoin="round"
-                      />
+                      <path d="M8.5 1.5l2 2L4 10H2v-2L8.5 1.5z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" />
                     </svg>
                   </button>
                   <button
@@ -156,12 +165,11 @@ export function FolderList({
                       onDeleteFolder(folder);
                     }}
                     onFocus={() => setFocusedId(folder.id)}
-                    onBlur={() => setFocusedId(null)}
+                    onBlur={() => !alwaysShowActions && setFocusedId(null)}
                     className="flex h-7 w-7 items-center justify-center rounded text-[var(--color-text-muted)] hover:bg-[var(--color-error)]/10 hover:text-[var(--color-error)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-error)]"
                     aria-label={t('messages.folders.deleteFolder')}
                     title={t('messages.folders.deleteFolder')}
                   >
-                    {/* Trash icon — simplified path */}
                     <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden>
                       <rect x="1" y="3" width="10" height="1" rx="0.5" fill="currentColor" />
                       <path d="M4 3V2h4v1" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" />
@@ -174,6 +182,9 @@ export function FolderList({
           })
         )}
       </div>
+
+      {/* Aria-live region: announces count changes to screen readers */}
+      <p ref={liveRef} className="sr-only" aria-live="polite" aria-atomic="true" />
     </nav>
   );
 }
@@ -186,27 +197,33 @@ interface FolderRowProps {
   count?: number;
   active: boolean;
   color?: string;
+  isDeleting?: boolean;
   onClick: () => void;
 }
 
-function FolderRow({ icon, label, count, active, color, onClick }: FolderRowProps) {
+function FolderRow({ icon, label, count, active, color, isDeleting, onClick }: FolderRowProps) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`flex w-full items-center gap-2 rounded-lg px-2 py-2 text-sm transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] ${
+      aria-current={active ? 'true' : undefined}
+      disabled={isDeleting}
+      className={`flex w-full items-center gap-2 rounded-lg px-2 py-2 text-sm transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] disabled:opacity-50 ${
         active
           ? 'bg-[var(--color-primary)]/10 font-semibold'
           : 'font-medium text-[var(--color-text-secondary)] hover:bg-[var(--color-hover)] hover:text-[var(--color-text-primary)]'
       }`}
     >
       <span className="inline-flex flex-shrink-0 items-center leading-none" aria-hidden>
-        {icon}
+        {isDeleting ? (
+          <svg className="h-4 w-4 animate-spin" viewBox="0 0 16 16" fill="none">
+            <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="2" strokeDasharray="28" strokeDashoffset="10" />
+          </svg>
+        ) : (
+          icon
+        )}
       </span>
-      <span
-        className="flex-1 truncate text-left"
-        style={{ color: color ?? undefined, opacity: active ? 1 : undefined }}
-      >
+      <span className="flex-1 truncate text-left" style={{ color: color ?? undefined }}>
         {label}
       </span>
       {typeof count === 'number' && count > 0 && (
