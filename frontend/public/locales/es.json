@@ -1421,6 +1421,12 @@
       "report": "Reportar",
       "viewProfile": "Ver perfil"
     },
+    "threadPreview": {
+      "replyCount_one": "{{count}} respuesta",
+      "replyCount_other": "{{count}} respuestas",
+      "viewThread": "Ver hilo",
+      "openAria": "Abrir hilo"
+    },
     "pinned": {
       "title_one": "{{count}} mensaje fijado",
       "title_other": "{{count}} mensajes fijados",

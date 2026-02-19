@@ -44,6 +44,9 @@ export interface Message {
   pinned_at?: string | null;
   deleted_for_sender?: boolean;
   deleted_for_recipient?: boolean;
+  reply_to?: number | null;
+  thread_root?: number | null;
+  reply_count?: number;
   media_file_id?: number | null;
   media_url?: string | null;
   media_type?: string | null;
@@ -91,6 +94,24 @@ export interface SendMessageRequest {
   is_multi_recipient?: boolean;
   shared_encryption_iv?: string;
   recipient_keys?: Record<number, string>;
+  reply_to?: number;
+}
+
+export interface MessageThreadResponse {
+  root_message: Message;
+  replies: Message[];
+  reply_count: number;
+  limit: number;
+  offset: number;
+}
+
+export interface WsThreadUpdateEvent {
+  type: 'thread_reply_added';
+  conversation_id: number;
+  thread_root: number;
+  reply_id: number;
+  reply_count: number;
+  message: Message;
 }
 
 export interface EditMessageRequest {

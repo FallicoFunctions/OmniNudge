@@ -22,6 +22,7 @@ import { HighlightedText } from '../components/messages/HighlightedText';
 import { MessageReactions } from '../components/messages/MessageReactions';
 import { QuickReactButton } from '../components/messages/QuickReactButton';
 import { PinnedMessagesBar } from '../components/messages/PinnedMessagesBar';
+import { ThreadPreview } from '../components/messages/ThreadPreview';
 import FilePreview from '../components/messages/FilePreview';
 import { usePinnedMessages } from '../hooks/usePinnedMessages';
 import { useArchive } from '../hooks/useArchive';
@@ -2986,6 +2987,9 @@ export default function MessagesPage() {
                               )}
                             </div>
                           </div>
+                          {!message.reply_to && (message.reply_count ?? 0) > 0 && (
+                            <ThreadPreview replyCount={message.reply_count ?? 0} />
+                          )}
                           {message.id > 0 && (
                             <div
                               className={`mt-1 flex items-center gap-1 ${isOwnMessage ? 'flex-row-reverse' : 'flex-row'}`}
