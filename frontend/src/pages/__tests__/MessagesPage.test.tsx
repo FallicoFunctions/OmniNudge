@@ -58,6 +58,7 @@ const mockConversationMessage = {
   message_type: 'text' as const,
   sent_at: new Date().toISOString(),
   encryption_version: 'v1',
+  reply_count: 1,
 };
 
 vi.mock('../../contexts/AuthContext', () => ({
@@ -118,6 +119,23 @@ vi.mock('../../services/messagesService', () => ({
     })),
     getPinnedMessages: vi.fn(async () => ({
       pinned_messages: [],
+    })),
+    getMessageThread: vi.fn(async () => ({
+      root_message: mockConversationMessage,
+      replies: [],
+      reply_count: 0,
+      limit: 20,
+      offset: 0,
+    })),
+    sendMessage: vi.fn(async () => ({
+      ...mockConversationMessage,
+      id: 9002,
+      encrypted_content: 'sent-message',
+      sender_id: 7,
+      recipient_id: 42,
+      reply_to: 9001,
+      thread_root: 9001,
+      reply_count: 0,
     })),
     pinMessage: vi.fn(async () => {}),
     unpinMessage: vi.fn(async () => {}),
@@ -293,5 +311,41 @@ describe('MessagesPage swipe archive gestures', () => {
         })
       );
     });
+  });
+
+  it('opens thread view from thread preview and requests thread data', async () => {
+    renderPage();
+
+    fireEvent.click((await screen.findAllByRole('button', { name: 'Open conversation' }))[0]);
+
+    const previewButton = await screen.findByRole('button', { name: 'Open thread' });
+    fireEvent.click(previewButton);
+
+    await waitFor(() => {
+      expect(messagesService.getMessageThread).toHaveBeenCalledWith(9001, 20, 0);
+    });
+    expect(screen.getByText('Thread')).toBeInTheDocument();
+  });
+
+  it('sends reply_to when replying from message menu', async () => {
+    renderPage();
+
+    fireEvent.click((await screen.findAllByRole('button', { name: 'Open conversation' }))[0]);
+
+    const menuButton = await screen.findByRole('button', { name: 'Message options' });
+    fireEvent.click(menuButton);
+    fireEvent.click(screen.getByRole('button', { name: 'Reply' }));
+
+    const input = screen.getByPlaceholderText('Type a message...');
+    fireEvent.change(input, { target: { value: 'Reply from menu' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }));
+
+    await waitFor(() => {
+      expect(messagesService.sendMessage).toHaveBeenCalled();
+    });
+
+    const payload = vi.mocked(messagesService.sendMessage).mock.calls.at(-1)?.[0];
+    expect(payload).toBeDefined();
+    expect(payload?.reply_to).toBe(9001);
   });
 });
