@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"fmt"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -338,6 +339,155 @@ func TestSelfReplyNoNotification(t *testing.T) {
 	notifs, err := models.NewNotificationRepository(db.Pool).GetByUserID(ctx, userID, 10, 0, false)
 	require.NoError(t, err)
 	assert.Len(t, notifs, 0, "Should not create notification for self-reply")
+}
+
+func TestNotifyMessageEdited_CreatesNotificationForParticipant(t *testing.T) {
+	service, db, cleanup := setupNotificationTest(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	editorID := createTestUser(t, db, uniqueNotificationName("editor"))
+	recipientID := createTestUser(t, db, uniqueNotificationName("recipient"))
+
+	convRepo := models.NewConversationRepository(db.Pool)
+	conv, err := convRepo.Create(ctx, editorID, recipientID)
+	require.NoError(t, err)
+
+	message := &models.Message{
+		ConversationID:    conv.ID,
+		SenderID:          editorID,
+		RecipientID:       recipientID,
+		EncryptedContent:  "ciphertext-before-edit",
+		MessageType:       "text",
+		EncryptionVersion: "v1",
+	}
+	require.NoError(t, models.NewMessageRepository(db.Pool).Create(ctx, message))
+
+	service.NotifyMessageEdited(ctx, message.ID, conv.ID, editorID, []int{editorID, recipientID})
+
+	notifs, err := models.NewNotificationRepository(db.Pool).GetByUserID(ctx, recipientID, 10, 0, false)
+	require.NoError(t, err)
+	require.Len(t, notifs, 1)
+	assert.Equal(t, "message_edited", notifs[0].NotificationType)
+	require.NotNil(t, notifs[0].ContentID)
+	assert.Equal(t, message.ID, *notifs[0].ContentID)
+	assert.Contains(t, notifs[0].Message, "edited a message")
+
+	editorNotifs, err := models.NewNotificationRepository(db.Pool).GetByUserID(ctx, editorID, 10, 0, false)
+	require.NoError(t, err)
+	assert.Len(t, editorNotifs, 0)
+}
+
+func TestNotifyMessageEdited_DeduplicatesRapidEdits(t *testing.T) {
+	service, db, cleanup := setupNotificationTest(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	editorID := createTestUser(t, db, uniqueNotificationName("editor"))
+	recipientID := createTestUser(t, db, uniqueNotificationName("recipient"))
+
+	convRepo := models.NewConversationRepository(db.Pool)
+	conv, err := convRepo.Create(ctx, editorID, recipientID)
+	require.NoError(t, err)
+
+	message := &models.Message{
+		ConversationID:    conv.ID,
+		SenderID:          editorID,
+		RecipientID:       recipientID,
+		EncryptedContent:  "ciphertext-before-edit",
+		MessageType:       "text",
+		EncryptionVersion: "v1",
+	}
+	require.NoError(t, models.NewMessageRepository(db.Pool).Create(ctx, message))
+
+	participants := []int{editorID, recipientID}
+	service.NotifyMessageEdited(ctx, message.ID, conv.ID, editorID, participants)
+	service.NotifyMessageEdited(ctx, message.ID, conv.ID, editorID, participants)
+
+	notifs, err := models.NewNotificationRepository(db.Pool).GetByUserID(ctx, recipientID, 10, 0, false)
+	require.NoError(t, err)
+	assert.Len(t, notifs, 1)
+}
+
+func TestNotifyMessageEdited_DeduplicatesConcurrentBursts(t *testing.T) {
+	service, db, cleanup := setupNotificationTest(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	editorID := createTestUser(t, db, uniqueNotificationName("editor"))
+	recipientID := createTestUser(t, db, uniqueNotificationName("recipient"))
+
+	convRepo := models.NewConversationRepository(db.Pool)
+	conv, err := convRepo.Create(ctx, editorID, recipientID)
+	require.NoError(t, err)
+
+	message := &models.Message{
+		ConversationID:    conv.ID,
+		SenderID:          editorID,
+		RecipientID:       recipientID,
+		EncryptedContent:  "ciphertext-before-edit",
+		MessageType:       "text",
+		EncryptionVersion: "v1",
+	}
+	require.NoError(t, models.NewMessageRepository(db.Pool).Create(ctx, message))
+
+	const goroutines = 8
+	var wg sync.WaitGroup
+	wg.Add(goroutines)
+	for i := 0; i < goroutines; i++ {
+		go func() {
+			defer wg.Done()
+			service.NotifyMessageEdited(ctx, message.ID, conv.ID, editorID, []int{editorID, recipientID})
+		}()
+	}
+	wg.Wait()
+
+	var count int
+	err = db.Pool.QueryRow(ctx, `
+		SELECT COUNT(*)
+		FROM notifications
+		WHERE user_id = $1
+		  AND notification_type = 'message_edited'
+		  AND content_type = 'message'
+		  AND content_id = $2
+	`, recipientID, message.ID).Scan(&count)
+	require.NoError(t, err)
+	assert.Equal(t, 1, count)
+}
+
+func TestNotifyMessageEdited_SkipsMutedConversation(t *testing.T) {
+	service, db, cleanup := setupNotificationTest(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	editorID := createTestUser(t, db, uniqueNotificationName("editor"))
+	recipientID := createTestUser(t, db, uniqueNotificationName("recipient"))
+
+	convRepo := models.NewConversationRepository(db.Pool)
+	conv, err := convRepo.Create(ctx, editorID, recipientID)
+	require.NoError(t, err)
+
+	_, err = db.Pool.Exec(ctx, `
+		INSERT INTO conversation_notification_settings (conversation_id, user_id, muted)
+		VALUES ($1, $2, TRUE)
+	`, conv.ID, recipientID)
+	require.NoError(t, err)
+
+	message := &models.Message{
+		ConversationID:    conv.ID,
+		SenderID:          editorID,
+		RecipientID:       recipientID,
+		EncryptedContent:  "ciphertext-before-edit",
+		MessageType:       "text",
+		EncryptionVersion: "v1",
+	}
+	require.NoError(t, models.NewMessageRepository(db.Pool).Create(ctx, message))
+
+	service.NotifyMessageEdited(ctx, message.ID, conv.ID, editorID, []int{editorID, recipientID})
+
+	notifs, err := models.NewNotificationRepository(db.Pool).GetByUserID(ctx, recipientID, 10, 0, false)
+	require.NoError(t, err)
+	assert.Len(t, notifs, 0)
 }
 
 func TestIsWithinQuietHours(t *testing.T) {
