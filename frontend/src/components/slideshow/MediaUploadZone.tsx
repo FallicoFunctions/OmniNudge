@@ -33,6 +33,37 @@ const DEFAULT_ACCEPTED_TYPES = [
   'application/x-zip-compressed',
 ];
 
+const MIME_SIZE_LIMITS: Array<{ prefix: string; maxBytes: number }> = [
+  { prefix: 'image/', maxBytes: 10 * 1024 * 1024 },
+  { prefix: 'audio/', maxBytes: 10 * 1024 * 1024 },
+  { prefix: 'video/', maxBytes: 100 * 1024 * 1024 },
+  { prefix: 'application/pdf', maxBytes: 25 * 1024 * 1024 },
+  { prefix: 'application/msword', maxBytes: 25 * 1024 * 1024 },
+  {
+    prefix: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    maxBytes: 25 * 1024 * 1024,
+  },
+  { prefix: 'text/plain', maxBytes: 25 * 1024 * 1024 },
+  { prefix: 'application/zip', maxBytes: 25 * 1024 * 1024 },
+  { prefix: 'application/x-zip-compressed', maxBytes: 25 * 1024 * 1024 },
+];
+
+const maxSizeForFile = (file: File, hardCapBytes: number): number => {
+  const fileType = file.type.toLowerCase();
+  for (const rule of MIME_SIZE_LIMITS) {
+    if (rule.prefix.endsWith('/')) {
+      if (fileType.startsWith(rule.prefix)) {
+        return Math.min(hardCapBytes, rule.maxBytes);
+      }
+      continue;
+    }
+    if (fileType === rule.prefix) {
+      return Math.min(hardCapBytes, rule.maxBytes);
+    }
+  }
+  return hardCapBytes;
+};
+
 export function MediaUploadZone({
   onFilesSelected,
   maxFileSize = DEFAULT_MAX_SIZE,
@@ -50,11 +81,12 @@ export function MediaUploadZone({
     const errors: string[] = [];
 
     for (const file of files) {
-      if (file.size > maxFileSize) {
+      const perTypeMax = maxSizeForFile(file, maxFileSize);
+      if (file.size > perTypeMax) {
         errors.push(
           t('mediaUploadZone.errors.fileTooLarge', {
             name: file.name,
-            size: Math.round(maxFileSize / (1024 * 1024)),
+            size: Math.round(perTypeMax / (1024 * 1024)),
           })
         );
         continue;
