@@ -611,7 +611,7 @@ func TestNotifyThreadReply_UsesSummaryMessageAfterFiveReplies(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, notifs, 1)
 	assert.Equal(t, "thread_reply", notifs[0].NotificationType)
-	assert.Equal(t, "5 new replies in thread", notifs[0].Message)
+	assert.Equal(t, "5 new replies in your thread", notifs[0].Message)
 }
 
 func TestNotifyThreadReply_DisabledBatchingCreatesOnePerReply(t *testing.T) {
@@ -863,4 +863,11 @@ func TestIsWithinQuietHours(t *testing.T) {
 			assert.Equal(t, tc.expected, actual)
 		})
 	}
+}
+
+func TestBuildThreadReplyNotificationMessage(t *testing.T) {
+	assert.Equal(t, "alice replied to your thread", buildThreadReplyNotificationMessage("alice", true, 0))
+	assert.Equal(t, "alice replied in a thread", buildThreadReplyNotificationMessage("alice", false, 0))
+	assert.Equal(t, "5 new replies in your thread", buildThreadReplyNotificationMessage("", true, 5))
+	assert.Equal(t, "5 new replies in a thread you're following", buildThreadReplyNotificationMessage("", false, 5))
 }
