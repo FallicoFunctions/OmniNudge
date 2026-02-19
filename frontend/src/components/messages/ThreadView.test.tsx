@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ThreadView } from './ThreadView';
+import { __resetThreadCacheForTests } from '../../hooks/useThread';
 import type { Message } from '../../types/messages';
 
 vi.mock('../../hooks/useMediaQuery', () => ({
@@ -35,6 +36,7 @@ function makeMessage(id: number, overrides: Partial<Message> = {}): Message {
 describe('ThreadView', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    __resetThreadCacheForTests();
   });
 
   it('loads and renders root + replies', async () => {

@@ -1,10 +1,8 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { messagesService } from '../../services/messagesService';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
-import type { Message, WsThreadUpdateEvent } from '../../types/messages';
-
-const THREAD_PAGE_SIZE = 20;
+import { useThread } from '../../hooks/useThread';
+import type { Message } from '../../types/messages';
 
 interface ThreadViewProps {
   open: boolean;
@@ -30,54 +28,19 @@ export function ThreadView({
   replySubmitting = false,
 }: ThreadViewProps) {
   const { t } = useTranslation();
-  const [rootMessage, setRootMessage] = useState<Message | null>(null);
-  const [replies, setReplies] = useState<Message[]>([]);
-  const [replyCount, setReplyCount] = useState(0);
-  const [loading, setLoading] = useState(false);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [replyText, setReplyText] = useState('');
   const isMobile = useMediaQuery('(max-width: 767px)');
-
-  const hasMore = replies.length < replyCount;
-
-  const loadThread = useCallback(
-    async (offset: number, append: boolean) => {
-      if (!rootMessageId) return;
-      if (append) {
-        setLoadingMore(true);
-      } else {
-        setLoading(true);
-      }
-      setError(null);
-      try {
-        const response = await messagesService.getMessageThread(rootMessageId, THREAD_PAGE_SIZE, offset);
-        setRootMessage(response.root_message);
-        setReplyCount(response.reply_count);
-        setReplies((prev) => (append ? [...prev, ...response.replies] : response.replies));
-      } catch (err) {
-        const message = err instanceof Error ? err.message : t('messages.threadView.loadFailed');
-        setError(message);
-      } finally {
-        setLoading(false);
-        setLoadingMore(false);
-      }
-    },
-    [rootMessageId, t]
-  );
-
-  useEffect(() => {
-    if (!open || !rootMessageId) return;
-    setRootMessage(null);
-    setReplies([]);
-    setReplyCount(0);
-    setError(null);
-  }, [open, rootMessageId]);
-
-  useEffect(() => {
-    if (!open || !rootMessageId) return;
-    void loadThread(0, false);
-  }, [open, rootMessageId, loadThread]);
+  const {
+    rootMessage,
+    replies,
+    replyCount,
+    loading,
+    loadingMore,
+    hasMore,
+    error,
+    loadInitial,
+    loadMore,
+  } = useThread({ rootMessageId, open, pageSize: 20 });
 
   useEffect(() => {
     if (!open) return;
@@ -89,24 +52,6 @@ export function ThreadView({
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [open, onClose]);
-
-  useEffect(() => {
-    if (!open || !rootMessageId) return;
-    const handleThreadReplyAdded = (event: Event) => {
-      const payload = (event as CustomEvent<WsThreadUpdateEvent>).detail;
-      if (!payload || payload.thread_root !== rootMessageId) return;
-      setReplyCount(payload.reply_count);
-      setReplies((prev) => {
-        if (prev.some((msg) => msg.id === payload.message.id)) {
-          return prev;
-        }
-        return [...prev, payload.message];
-      });
-    };
-
-    window.addEventListener('thread-reply-added', handleThreadReplyAdded);
-    return () => window.removeEventListener('thread-reply-added', handleThreadReplyAdded);
-  }, [open, rootMessageId]);
 
   const orderedItems = useMemo(() => {
     if (!rootMessage) return [];
@@ -129,9 +74,9 @@ export function ThreadView({
       if (!trimmed) return;
       await onSubmitReply({ replyTo: rootMessage.id, content: trimmed });
       setReplyText('');
-      await loadThread(0, false);
+      await loadInitial(true);
     },
-    [onSubmitReply, rootMessage, replyText, loadThread]
+    [onSubmitReply, rootMessage, replyText, loadInitial]
   );
 
   const depthByMessageID = useMemo(() => {
@@ -280,7 +225,7 @@ export function ThreadView({
           <div className="border-t border-[var(--color-border)] px-4 py-3">
             <button
               type="button"
-              onClick={() => void loadThread(replies.length, true)}
+              onClick={() => void loadMore()}
               disabled={loadingMore}
               className="rounded-md border border-[var(--color-border)] px-3 py-1 text-xs font-semibold text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-elevated)] disabled:opacity-60"
             >
