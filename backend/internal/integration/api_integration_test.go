@@ -1585,11 +1585,11 @@ func TestMediaUpload_RejectsStorageQuotaExceeded(t *testing.T) {
 	user := createUser(t, deps.UserRepo, "media_quota", "user")
 	token, _ := deps.AuthService.GenerateJWT(user.ID, "", user.Username, user.Role)
 
-	// Pre-fill near 5GB free-tier quota.
+	// Pre-fill near default 1GB free-tier quota.
 	_, err := deps.DB.Pool.Exec(context.Background(), `
 		INSERT INTO media_files (user_id, filename, original_filename, file_type, file_size, storage_url, storage_path)
 		VALUES ($1, $2, $3, $4, $5, $6, $7)
-	`, user.ID, "existing.bin", "existing.bin", "video/mp4", int64(5*1024*1024*1024-1024), "/uploads/existing.bin", "uploads/existing.bin")
+	`, user.ID, "existing.bin", "existing.bin", "video/mp4", int64(1*1024*1024*1024-1024), "/uploads/existing.bin", "uploads/existing.bin")
 	require.NoError(t, err)
 
 	var b bytes.Buffer
@@ -1604,6 +1604,65 @@ func TestMediaUpload_RejectsStorageQuotaExceeded(t *testing.T) {
 	w := doRequest(t, deps.Router, req)
 	require.Equal(t, http.StatusRequestEntityTooLarge, w.Code)
 	require.Contains(t, w.Body.String(), "Storage quota exceeded")
+}
+
+func TestUsersMeStorage_ReturnsTrackedUsageAndQuota(t *testing.T) {
+	deps := newTestDeps(t)
+	defer deps.DB.Close()
+
+	user := createUser(t, deps.UserRepo, "storage_user", "user")
+	token, _ := deps.AuthService.GenerateJWT(user.ID, "", user.Username, user.Role)
+
+	_, err := deps.DB.Pool.Exec(context.Background(), `
+		INSERT INTO media_files (user_id, filename, original_filename, file_type, file_size, storage_url, storage_path)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
+	`, user.ID, "tracked.bin", "tracked.bin", "video/mp4", int64(10*1024), "/uploads/tracked.bin", "uploads/tracked.bin")
+	require.NoError(t, err)
+
+	req, _ := http.NewRequest("GET", "/api/v1/users/me/storage", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	w := doRequest(t, deps.Router, req)
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+
+	var payload map[string]interface{}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &payload))
+
+	require.Equal(t, float64(10*1024), payload["used"])
+	require.Equal(t, float64(1*1024*1024*1024), payload["quota"])
+	require.Greater(t, payload["percentage"].(float64), 0.0)
+}
+
+func TestStorageUsedBytes_TriggerTracksInsertAndDelete(t *testing.T) {
+	deps := newTestDeps(t)
+	defer deps.DB.Close()
+
+	user := createUser(t, deps.UserRepo, "storage_trigger_user", "user")
+
+	var before int64
+	err := deps.DB.Pool.QueryRow(context.Background(), `SELECT storage_used_bytes FROM users WHERE id = $1`, user.ID).Scan(&before)
+	require.NoError(t, err)
+	require.Equal(t, int64(0), before)
+
+	var mediaID int
+	err = deps.DB.Pool.QueryRow(context.Background(), `
+		INSERT INTO media_files (user_id, filename, original_filename, file_type, file_size, storage_url, storage_path)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		RETURNING id
+	`, user.ID, "trigger.bin", "trigger.bin", "video/mp4", int64(4096), "/uploads/trigger.bin", "uploads/trigger.bin").Scan(&mediaID)
+	require.NoError(t, err)
+
+	var afterInsert int64
+	err = deps.DB.Pool.QueryRow(context.Background(), `SELECT storage_used_bytes FROM users WHERE id = $1`, user.ID).Scan(&afterInsert)
+	require.NoError(t, err)
+	require.Equal(t, int64(4096), afterInsert)
+
+	_, err = deps.DB.Pool.Exec(context.Background(), `DELETE FROM media_files WHERE id = $1`, mediaID)
+	require.NoError(t, err)
+
+	var afterDelete int64
+	err = deps.DB.Pool.QueryRow(context.Background(), `SELECT storage_used_bytes FROM users WHERE id = $1`, user.ID).Scan(&afterDelete)
+	require.NoError(t, err)
+	require.Equal(t, int64(0), afterDelete)
 }
 
 func TestMediaUpload_RejectsSuspiciousEmbeddedZipSignature(t *testing.T) {

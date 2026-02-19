@@ -17,6 +17,7 @@ type Config struct {
 	Reddit      RedditConfig
 	JWT         JWTConfig
 	Redis       RedisConfig
+	Media       MediaConfig
 	VirusScan   VirusScanConfig
 	Encryption  EncryptionConfig
 	Turnstile   TurnstileConfig
@@ -73,6 +74,11 @@ type RedisConfig struct {
 	Password string
 	// TTL in seconds for cached Reddit responses
 	TTLSeconds int
+}
+
+type MediaConfig struct {
+	FreeTierQuotaBytes int64
+	ProTierQuotaBytes  int64
 }
 
 // VirusScanConfig holds antivirus scanning settings.
@@ -144,6 +150,10 @@ func Load() (*Config, error) {
 			Addr:       getEnv("REDIS_ADDR", ""),
 			Password:   getEnv("REDIS_PASSWORD", ""),
 			TTLSeconds: getEnvAsInt("REDIS_TTL_SECONDS", 300),
+		},
+		Media: MediaConfig{
+			FreeTierQuotaBytes: getEnvAsInt64("MEDIA_FREE_TIER_QUOTA_BYTES", 1*1024*1024*1024),
+			ProTierQuotaBytes:  getEnvAsInt64("MEDIA_PRO_TIER_QUOTA_BYTES", 50*1024*1024*1024),
 		},
 		VirusScan: VirusScanConfig{
 			Enabled:        getEnvAsBool("VIRUS_SCAN_ENABLED", true),
@@ -228,6 +238,18 @@ func getEnvAsInt(key string, defaultValue int) int {
 		return defaultValue
 	}
 	value, err := strconv.Atoi(valueStr)
+	if err != nil {
+		return defaultValue
+	}
+	return value
+}
+
+func getEnvAsInt64(key string, defaultValue int64) int64 {
+	valueStr := getEnv(key, "")
+	if valueStr == "" {
+		return defaultValue
+	}
+	value, err := strconv.ParseInt(valueStr, 10, 64)
 	if err != nil {
 		return defaultValue
 	}

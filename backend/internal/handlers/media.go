@@ -24,15 +24,19 @@ const (
 	maxBatchUploadSize = 250 * 1024 * 1024 // 250MB total multipart body limit for batch uploads
 	maxBatchFiles      = 10
 	maxImageDimension  = 8000
-	freeTierStorageCap = 5 * 1024 * 1024 * 1024  // 5GB
-	proTierStorageCap  = 50 * 1024 * 1024 * 1024 // 50GB (admin/moderator elevated cap)
 )
+
+type MediaQuotaConfig struct {
+	FreeTierBytes int64
+	ProTierBytes  int64
+}
 
 // MediaHandler handles media uploads
 type MediaHandler struct {
 	mediaRepo           *models.MediaFileRepository
 	thumbnailService    *services.ThumbnailService
 	queueClient         *queue.QueueClient
+	quota               MediaQuotaConfig
 	virusScanFailClosed bool
 }
 
@@ -41,12 +45,20 @@ func NewMediaHandler(
 	mediaRepo *models.MediaFileRepository,
 	thumbnailService *services.ThumbnailService,
 	queueClient *queue.QueueClient,
+	quota MediaQuotaConfig,
 	virusScanFailClosed bool,
 ) *MediaHandler {
+	if quota.FreeTierBytes <= 0 {
+		quota.FreeTierBytes = 1 * 1024 * 1024 * 1024
+	}
+	if quota.ProTierBytes <= 0 {
+		quota.ProTierBytes = 50 * 1024 * 1024 * 1024
+	}
 	return &MediaHandler{
 		mediaRepo:           mediaRepo,
 		thumbnailService:    thumbnailService,
 		queueClient:         queueClient,
+		quota:               quota,
 		virusScanFailClosed: virusScanFailClosed,
 	}
 }
@@ -74,12 +86,12 @@ func (h *MediaHandler) UploadMedia(c *gin.Context) {
 		return
 	}
 
-	usedBytes, err := h.mediaRepo.GetTotalStorageByUserID(c.Request.Context(), userID.(int))
+	usedBytes, err := h.mediaRepo.GetTrackedStorageByUserID(c.Request.Context(), userID.(int))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to evaluate storage quota", "details": err.Error()})
 		return
 	}
-	capBytes := resolveStorageCapForRole(c.GetString("role"))
+	capBytes := resolveStorageCapForRole(c.GetString("role"), h.quota)
 	if usedBytes+header.Size > capBytes {
 		c.JSON(http.StatusRequestEntityTooLarge, gin.H{
 			"error":            "Storage quota exceeded",
@@ -296,12 +308,12 @@ func (h *MediaHandler) BatchUploadMedia(c *gin.Context) {
 		return
 	}
 
-	usedBytes, err := h.mediaRepo.GetTotalStorageByUserID(c.Request.Context(), userID.(int))
+	usedBytes, err := h.mediaRepo.GetTrackedStorageByUserID(c.Request.Context(), userID.(int))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to evaluate storage quota", "details": err.Error()})
 		return
 	}
-	capBytes := resolveStorageCapForRole(c.GetString("role"))
+	capBytes := resolveStorageCapForRole(c.GetString("role"), h.quota)
 	var incomingTotal int64
 	for _, f := range files {
 		if f.Size > 0 {
@@ -545,11 +557,11 @@ func (h *MediaHandler) generateAndStoreThumbnail(ctx context.Context, media *mod
 	media.ThumbnailURL = &thumbnailURL
 }
 
-func resolveStorageCapForRole(role string) int64 {
+func resolveStorageCapForRole(role string, quota MediaQuotaConfig) int64 {
 	switch role {
 	case "admin", "moderator":
-		return proTierStorageCap
+		return quota.ProTierBytes
 	default:
-		return freeTierStorageCap
+		return quota.FreeTierBytes
 	}
 }
