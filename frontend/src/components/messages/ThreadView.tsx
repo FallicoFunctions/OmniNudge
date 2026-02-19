@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { messagesService } from '../../services/messagesService';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
@@ -13,6 +13,9 @@ interface ThreadViewProps {
   onClose: () => void;
   renderMessageContent: (message: Message, isOwnMessage: boolean) => ReactNode;
   formatTimestamp: (isoDate: string) => string;
+  focusMessageId?: number | null;
+  onSubmitReply?: (payload: { replyTo: number; content: string }) => Promise<void> | void;
+  replySubmitting?: boolean;
 }
 
 export function ThreadView({
@@ -22,6 +25,9 @@ export function ThreadView({
   onClose,
   renderMessageContent,
   formatTimestamp,
+  focusMessageId,
+  onSubmitReply,
+  replySubmitting = false,
 }: ThreadViewProps) {
   const { t } = useTranslation();
   const [rootMessage, setRootMessage] = useState<Message | null>(null);
@@ -30,6 +36,7 @@ export function ThreadView({
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [replyText, setReplyText] = useState('');
   const isMobile = useMediaQuery('(max-width: 767px)');
 
   const hasMore = replies.length < replyCount;
@@ -106,6 +113,27 @@ export function ThreadView({
     return [rootMessage, ...replies];
   }, [rootMessage, replies]);
 
+  useEffect(() => {
+    if (!open || !focusMessageId) return;
+    const element = document.getElementById(`thread-message-${focusMessageId}`);
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, [open, focusMessageId, orderedItems]);
+
+  const handleReplySubmit = useCallback(
+    async (event: FormEvent<HTMLFormElement>) => {
+      event.preventDefault();
+      if (!onSubmitReply || !rootMessage) return;
+      const trimmed = replyText.trim();
+      if (!trimmed) return;
+      await onSubmitReply({ replyTo: rootMessage.id, content: trimmed });
+      setReplyText('');
+      await loadThread(0, false);
+    },
+    [onSubmitReply, rootMessage, replyText, loadThread]
+  );
+
   const depthByMessageID = useMemo(() => {
     const map = new Map<number, number>();
     if (!rootMessage) return map;
@@ -156,14 +184,30 @@ export function ThreadView({
               {t('messages.threadView.replyCount', { count: replyCount })}
             </p>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-md px-2 py-1 text-sm font-medium text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-elevated)] hover:text-[var(--color-text-primary)]"
-            aria-label={t('messages.threadView.closeAria')}
-          >
-            {t('common.close')}
-          </button>
+          <div className="flex items-center gap-2">
+            {rootMessage && (
+              <button
+                type="button"
+                onClick={() =>
+                  document.getElementById(`thread-message-${rootMessage.id}`)?.scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'center',
+                  })
+                }
+                className="rounded-md px-2 py-1 text-xs font-semibold text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-elevated)] hover:text-[var(--color-text-primary)]"
+              >
+                {t('messages.threadView.jumpToRoot')}
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-md px-2 py-1 text-sm font-medium text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-elevated)] hover:text-[var(--color-text-primary)]"
+              aria-label={t('messages.threadView.closeAria')}
+            >
+              {t('common.close')}
+            </button>
+          </div>
         </div>
 
         <div className="flex-1 overflow-y-auto p-4">
@@ -182,6 +226,7 @@ export function ThreadView({
                 return (
                   <div
                     key={message.id}
+                    id={`thread-message-${message.id}`}
                     style={!isRoot ? { marginLeft: `${Math.min(depthByMessageID.get(message.id) ?? 1, 3) * 12}px` } : undefined}
                     className={`rounded-lg border px-3 py-2 ${
                       isRoot
@@ -202,6 +247,22 @@ export function ThreadView({
                     <div className="text-sm text-[var(--color-text-primary)]">
                       {renderMessageContent(message, isOwnMessage)}
                     </div>
+                    {!isRoot && (
+                      <div className="mt-1 flex justify-end">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            document.getElementById(`thread-message-${message.id}`)?.scrollIntoView({
+                              behavior: 'smooth',
+                              block: 'center',
+                            })
+                          }
+                          className="text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]"
+                        >
+                          {t('messages.threadView.jumpToReply')}
+                        </button>
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -226,6 +287,30 @@ export function ThreadView({
               {loadingMore ? t('common.loading') : t('messages.threadView.loadMore')}
             </button>
           </div>
+        )}
+
+        {onSubmitReply && rootMessage && (
+          <form
+            onSubmit={(event) => void handleReplySubmit(event)}
+            className="border-t border-[var(--color-border)] px-4 py-3"
+          >
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                value={replyText}
+                onChange={(event) => setReplyText(event.target.value)}
+                placeholder={t('messages.threadView.replyPlaceholder')}
+                className="flex-1 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-2 text-sm text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
+              />
+              <button
+                type="submit"
+                disabled={replySubmitting || !replyText.trim()}
+                className="rounded-md bg-[var(--color-primary)] px-3 py-2 text-xs font-semibold text-white hover:bg-[var(--color-primary-dark)] disabled:opacity-60"
+              >
+                {replySubmitting ? t('common.loading') : t('messages.threadView.sendReply')}
+              </button>
+            </div>
+          </form>
         )}
       </div>
     </div>

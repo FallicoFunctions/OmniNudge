@@ -1435,7 +1435,11 @@
       "loadFailed": "No se pudo cargar el hilo",
       "rootMessage": "Mensaje raíz",
       "loadMore": "Cargar más respuestas",
-      "empty": "Todavía no hay respuestas en este hilo."
+      "empty": "Todavía no hay respuestas en este hilo.",
+      "jumpToRoot": "Ir al inicio",
+      "jumpToReply": "Ir",
+      "replyPlaceholder": "Responder en el hilo...",
+      "sendReply": "Responder"
     },
     "pinned": {
       "title_one": "{{count}} mensaje fijado",
