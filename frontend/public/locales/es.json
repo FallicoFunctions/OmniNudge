@@ -1488,6 +1488,14 @@
         "fileSize": "Tamaño",
         "pdfThumbnailAlt": "Miniatura de PDF",
         "audioUnsupported": "Tu navegador no admite el elemento de audio."
+      },
+      "audio": {
+        "play": "Reproducir",
+        "pause": "Pausar",
+        "seek": "Buscar",
+        "speed": "Velocidad",
+        "speedLabel": "Velocidad: {{speed}}x",
+        "speedOption": "{{speed}}x"
       }
     },
     "compose": {

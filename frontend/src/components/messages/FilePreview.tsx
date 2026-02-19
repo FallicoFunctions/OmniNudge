@@ -1,5 +1,6 @@
 import { useMemo, type SyntheticEvent } from 'react';
 import { useTranslation } from 'react-i18next';
+import AudioPlayer from './AudioPlayer';
 
 type PreviewKind = 'image' | 'video' | 'audio' | 'pdf' | 'text' | 'document' | 'file';
 
@@ -123,27 +124,17 @@ export default function FilePreview({
   if (kind === 'audio') {
     return (
       <div className={className}>
-        <audio controls className="w-full" onLoadedMetadata={onAudioLoadedMetadata}>
-          <source src={src} type={mimeType ?? 'audio/mpeg'} />
-          {t('messages.media.preview.audioUnsupported')}
-        </audio>
-        <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-[var(--color-text-muted)]">
-          <span>{displayName}</span>
-          {fileSize != null && (
-            <span>
-              {fileSizePrefix}: {sizeLabel}
-            </span>
-          )}
-          <a
-            href={src}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="underline hover:text-[var(--color-primary-light)]"
-            download={displayName}
-          >
-            {downloadLabel}
-          </a>
-        </div>
+        <AudioPlayer
+          src={src}
+          mimeType={mimeType}
+          fileName={displayName}
+          onLoadedMetadata={onAudioLoadedMetadata}
+        />
+        {fileSize != null && (
+          <div className="mt-2 text-xs text-[var(--color-text-muted)]">
+            {fileSizePrefix}: {sizeLabel}
+          </div>
+        )}
       </div>
     );
   }

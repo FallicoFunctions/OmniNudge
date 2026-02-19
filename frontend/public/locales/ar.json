@@ -1488,6 +1488,14 @@
         "fileSize": "حجم الملف",
         "pdfThumbnailAlt": "صورة مصغرة لملف PDF",
         "audioUnsupported": "متصفحك لا يدعم عنصر الصوت."
+      },
+      "audio": {
+        "play": "تشغيل",
+        "pause": "إيقاف",
+        "seek": "تقديم",
+        "speed": "سرعة التشغيل",
+        "speedLabel": "السرعة: {{speed}}x",
+        "speedOption": "{{speed}}x"
       }
     },
     "compose": {
