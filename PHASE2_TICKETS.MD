@@ -1058,31 +1058,6 @@
 
 **Dependencies:** P0-009 (Monitoring)
 
----
-
-### P0-035: User Feedback Infrastructure
-**Status:** ⏸️ ROLLED BACK (February 18, 2026)
-**Priority:** P1
-**Estimated Time:** 1 week
-
-**Problem:** This scope introduced broad feedback/survey/NPS UX, but product direction reverted to Phase 1 bug reporting only.
-
-**Tasks:**
-- [x] Remove in-app floating feedback button
-- [x] Remove survey/NPS prompt cadence UX
-- [x] Keep existing Phase 1 bug-reporting flow (`/bug-reporting`, bug modal, admin bug triage)
-- [x] Restrict bug report validation to bug-report semantics (`report` + `bug|feature_request|other`)
-- [x] Normalize historical out-of-scope rows and lock DB constraints (`075_bug_reports_feedback_scope_lock`)
-
-**Acceptance Criteria:**
-- No survey/NPS/floating feedback UX present
-- Bug reporting remains fully functional for end users/admins
-- DB and API contracts align to bug-report-only values
-
-**Dependencies:** P0-027 (Analytics)
-
----
-
 ### P0-008b: WebSocket Message Authorization
 **Status:** ✅ COMPLETE (February 6, 2026)
 **Priority:** P0 (CRITICAL SECURITY - Blocks WebSocket abuse)
