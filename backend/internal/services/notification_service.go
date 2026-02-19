@@ -375,7 +375,6 @@ func (s *NotificationService) NotifyThreadReply(
 
 	contentType := "message"
 	notificationType := "thread_reply"
-	baseMessage := fmt.Sprintf("%s replied in a thread", replyAuthorName)
 
 	for _, recipientID := range participants {
 		if recipientID == 0 || recipientID == replyAuthorID {
@@ -399,10 +398,7 @@ func (s *NotificationService) NotifyThreadReply(
 
 		contentID := threadRootID
 		actorID := replyAuthorID
-		messageText := baseMessage
-		if recipientID == rootAuthorID {
-			messageText = fmt.Sprintf("%s replied to your thread", replyAuthorName)
-		}
+		messageText := buildThreadReplyNotificationMessage(replyAuthorName, recipientID == rootAuthorID, 0)
 
 		notification := &models.Notification{
 			UserID:           recipientID,
@@ -412,7 +408,7 @@ func (s *NotificationService) NotifyThreadReply(
 			ActorID:          &actorID,
 			Message:          messageText,
 		}
-		inserted, err := s.insertThreadReplyNotification(ctx, conversationID, notification, settings.BatchNotifications)
+		inserted, err := s.insertThreadReplyNotification(ctx, conversationID, recipientID == rootAuthorID, notification, settings.BatchNotifications)
 		if err != nil {
 			log.Printf("[NotificationService] NotifyThreadReply: failed for root %d recipient %d: %v", threadRootID, recipientID, err)
 			continue
@@ -723,6 +719,7 @@ func (s *NotificationService) isThreadMutedForUser(ctx context.Context, threadRo
 func (s *NotificationService) insertThreadReplyNotification(
 	ctx context.Context,
 	conversationID int,
+	recipientIsRootAuthor bool,
 	notification *models.Notification,
 	batchEnabled bool,
 ) (bool, error) {
@@ -787,7 +784,7 @@ func (s *NotificationService) insertThreadReplyNotification(
 			return false, countErr
 		}
 		if replyCount >= 5 {
-			notification.Message = fmt.Sprintf("%d new replies in thread", replyCount)
+			notification.Message = buildThreadReplyNotificationMessage("", recipientIsRootAuthor, replyCount)
 		}
 		if _, err := tx.Exec(ctx, `
 			UPDATE notifications
@@ -853,6 +850,19 @@ func (s *NotificationService) countRecentThreadReplies(
 		return 0, err
 	}
 	return count, nil
+}
+
+func buildThreadReplyNotificationMessage(replyAuthorName string, recipientIsRootAuthor bool, replyCount int) string {
+	if replyCount >= 5 {
+		if recipientIsRootAuthor {
+			return fmt.Sprintf("%d new replies in your thread", replyCount)
+		}
+		return fmt.Sprintf("%d new replies in a thread you're following", replyCount)
+	}
+	if recipientIsRootAuthor {
+		return fmt.Sprintf("%s replied to your thread", replyAuthorName)
+	}
+	return fmt.Sprintf("%s replied in a thread", replyAuthorName)
 }
 
 func isWithinQuietHours(now time.Time, tz string, startMinutes, endMinutes int) bool {

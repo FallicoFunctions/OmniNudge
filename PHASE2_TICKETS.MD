@@ -3289,23 +3289,23 @@
 ---
 
 ### F7-013: Thread Notification Batching
-**Status:** ⬜ TODO
+**Status:** 🔵 IN_PROGRESS
 **Priority:** P2 (Medium - UX improvement)
 **Estimated Time:** 1 week
 
 **Problem:** F7-010 says "don't spam if many rapid replies" but no batching implementation.
 
 **Tasks:**
-- [ ] Implement notification batching algorithm (collect notifications for 1 minute)
-- [ ] Batch thread replies (if 5+ replies in 1 min, send 1 notification: "5 new replies in thread")
-- [ ] Implement configurable quiet hours (no notifications during sleep time)
-- [ ] Add user preference: batch_notifications (on/off), quiet_hours_start, quiet_hours_end
+- [x] Implement notification batching algorithm (collect notifications for 1 minute)
+- [x] Batch thread replies (if 5+ replies in 1 min, send 1 notification: "5 new replies in thread")
+- [x] Implement configurable quiet hours (no notifications during sleep time)
+- [x] Add user preference: batch_notifications (on/off), quiet_hours_start, quiet_hours_end
 - [ ] Implement digest notifications (optional: hourly summary, daily summary)
 - [ ] Create notification templates for batched notifications
-- [ ] Test batching (send 10 rapid messages, verify 1 notification)
-- [ ] Test quiet hours (send message during quiet hours, verify no notification)
-- [ ] Add UI for notification batching settings (in F0-005 SettingsPage)
-- [ ] Document notification batching behavior
+- [x] Test batching (send 10 rapid messages, verify 1 notification)
+- [x] Test quiet hours (send message during quiet hours, verify no notification)
+- [x] Add UI for notification batching settings (in F0-005 SettingsPage)
+- [x] Document notification batching behavior
 
 **Acceptance Criteria:**
 - Batching works (5+ rapid messages = 1 batched notification)
