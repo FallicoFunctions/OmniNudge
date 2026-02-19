@@ -2987,7 +2987,7 @@
 ---
 
 ### F6-013: File Preview & Thumbnail Generation
-**Status:** ⬜ TODO
+**Status:** 🟨 IN PROGRESS
 **Priority:** P1 (High - enhances UX)
 **Estimated Time:** 1 week
 
@@ -2995,17 +2995,17 @@
 
 **Tasks:**
 - [ ] Set up thumbnail generation service (ImageMagick, Sharp, or serverless function)
-- [ ] Implement image thumbnail generation (200x200px, 800x600px sizes)
-- [ ] Implement video thumbnail generation (extract frame at 1s, generate thumbnail)
-- [ ] Implement PDF thumbnail generation (convert first page to image)
-- [ ] Create GET /api/files/{id}/thumbnail endpoint
+- [x] Implement image thumbnail generation (200x200px, 800x600px sizes)
+- [x] Implement video thumbnail generation (extract frame at 1s, generate thumbnail)
+- [x] Implement PDF thumbnail generation (convert first page to image)
+- [x] Create GET /api/files/{id}/thumbnail endpoint
 - [ ] Store thumbnails in S3 (separate bucket: app-thumbnails-{env})
 - [ ] Implement thumbnail caching (CDN, 30-day TTL)
-- [ ] Generate thumbnails asynchronously (via message queue)
+- [x] Generate thumbnails asynchronously (via message queue)
 - [ ] Handle thumbnail generation failures (show placeholder icon)
 - [ ] Optimize thumbnail quality (good quality, small file size <50KB)
 - [ ] Test with various file types (JPEG, PNG, GIF, MP4, PDF)
-- [ ] Document thumbnail generation pipeline
+- [x] Document thumbnail generation pipeline
 
 **Acceptance Criteria:**
 - Thumbnails generated for images, videos, PDFs (tested all types)

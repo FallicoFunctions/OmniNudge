@@ -50,7 +50,12 @@ func NewThumbnailGenerationHandler(
 		var thumbnailErr error
 		switch {
 		case services.IsImageType(media.FileType):
-			thumbnailPath, thumbnailErr = thumbnailService.GenerateThumbnail(media.StoragePath)
+			thumbSet, err := thumbnailService.GenerateImageThumbnails(media.StoragePath)
+			if err != nil {
+				thumbnailErr = err
+			} else {
+				thumbnailPath = thumbSet.PrimaryPath
+			}
 		case services.IsVideoType(media.FileType):
 			thumbnailPath, thumbnailErr = thumbnailService.GenerateVideoThumbnailSecure(media.StoragePath, 30*time.Second)
 		case services.IsPDFType(media.FileType):

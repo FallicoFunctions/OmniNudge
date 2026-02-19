@@ -25,6 +25,11 @@ type ThumbnailService struct {
 	commandRunner func(ctx context.Context, name string, args ...string) ([]byte, error)
 }
 
+type ImageThumbnailSet struct {
+	PrimaryPath string
+	SmallPath   string
+}
+
 // NewThumbnailService creates a new thumbnail service
 func NewThumbnailService() *ThumbnailService {
 	return &ThumbnailService{
@@ -70,6 +75,46 @@ func (s *ThumbnailService) GenerateThumbnail(sourcePath string) (string, error) 
 	}
 
 	return thumbnailPath, nil
+}
+
+// GenerateImageThumbnails creates two image thumbnails:
+// - primary thumbnail (~800x600 max bounds) persisted in media.thumbnail_url
+// - small thumbnail (~200x200 max bounds) for compact preview surfaces
+func (s *ThumbnailService) GenerateImageThumbnails(sourcePath string) (*ImageThumbnailSet, error) {
+	if _, err := os.Stat(sourcePath); os.IsNotExist(err) {
+		return nil, fmt.Errorf("source file does not exist: %w", err)
+	}
+
+	src, err := imaging.Open(sourcePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open image: %w", err)
+	}
+	bounds := src.Bounds()
+	width := bounds.Dx()
+	height := bounds.Dy()
+
+	ext := filepath.Ext(sourcePath)
+	nameWithoutExt := strings.TrimSuffix(filepath.Base(sourcePath), ext)
+	baseDir := filepath.Dir(sourcePath)
+
+	primaryW, primaryH := calculateThumbnailDimensions(width, height, 800, 600)
+	primaryThumb := imaging.Resize(src, primaryW, primaryH, imaging.Lanczos)
+	primaryPath := filepath.Join(baseDir, fmt.Sprintf("%s_thumb%s", nameWithoutExt, ext))
+	if err := imaging.Save(primaryThumb, primaryPath); err != nil {
+		return nil, fmt.Errorf("failed to save primary thumbnail: %w", err)
+	}
+
+	smallW, smallH := calculateThumbnailDimensions(width, height, 200, 200)
+	smallThumb := imaging.Resize(src, smallW, smallH, imaging.Lanczos)
+	smallPath := filepath.Join(baseDir, fmt.Sprintf("%s_thumb_sm%s", nameWithoutExt, ext))
+	if err := imaging.Save(smallThumb, smallPath); err != nil {
+		return nil, fmt.Errorf("failed to save small thumbnail: %w", err)
+	}
+
+	return &ImageThumbnailSet{
+		PrimaryPath: primaryPath,
+		SmallPath:   smallPath,
+	}, nil
 }
 
 // GenerateSquareThumbnail creates a square center-cropped thumbnail of the requested size.

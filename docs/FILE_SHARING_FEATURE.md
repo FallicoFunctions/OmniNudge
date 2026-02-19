@@ -15,7 +15,7 @@ OmniNudge messaging supports encrypted file sharing with backend validation, mal
 2. MIME/type checks and content-signature validation run before persistence.
 3. Upload is stored and queued for asynchronous scanning/thumbnail jobs.
 4. Thumbnail jobs:
-   - Image: generated from source image
+   - Image: generated from source image (`_thumb` up to 800x600 + `_thumb_sm` up to 200x200)
    - Video: ffmpeg frame extraction at ~1s
    - PDF: first-page render to JPEG
 5. Virus scan state controls previewability and thumbnail eligibility.
