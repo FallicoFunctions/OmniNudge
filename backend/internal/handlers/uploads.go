@@ -86,6 +86,10 @@ func (h *UploadsHandler) ServeUpload(c *gin.Context) {
 		return
 	}
 
+	if isThumbnailPath(cleanRelPath) {
+		// Thumbnails are immutable assets generated from immutable upload names.
+		c.Header("Cache-Control", "public, max-age=2592000")
+	}
 	c.File(absFile)
 }
 
@@ -103,4 +107,9 @@ func cleanUploadPath(rawPath string) (string, bool) {
 
 func isUntrackedUploadPathAllowed(cleanRelPath string) bool {
 	return strings.HasPrefix(cleanRelPath, "avatars/") || strings.HasPrefix(cleanRelPath, "exports/")
+}
+
+func isThumbnailPath(cleanRelPath string) bool {
+	base := strings.ToLower(filepath.Base(cleanRelPath))
+	return strings.Contains(base, "_thumb") || strings.Contains(base, "_pdfthumb")
 }

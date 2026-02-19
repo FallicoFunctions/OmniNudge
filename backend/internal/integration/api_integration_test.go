@@ -1665,6 +1665,74 @@ func TestStorageUsedBytes_TriggerTracksInsertAndDelete(t *testing.T) {
 	require.Equal(t, int64(0), afterDelete)
 }
 
+func TestFilesThumbnailRedirect_ReturnsThumbnailURLForOwner(t *testing.T) {
+	deps := newTestDeps(t)
+	defer deps.DB.Close()
+
+	user := createUser(t, deps.UserRepo, "thumb_owner", "user")
+	token, _ := deps.AuthService.GenerateJWT(user.ID, "", user.Username, user.Role)
+
+	var mediaID int
+	err := deps.DB.Pool.QueryRow(context.Background(), `
+		INSERT INTO media_files (user_id, filename, original_filename, file_type, file_size, storage_url, thumbnail_url, storage_path, scan_status)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+		RETURNING id
+	`, user.ID, "clip.mp4", "clip.mp4", "video/mp4", int64(1024), "/uploads/clip.mp4", "/uploads/clip_thumb.jpg", "uploads/clip.mp4", models.MediaScanStatusClean).Scan(&mediaID)
+	require.NoError(t, err)
+
+	req, _ := http.NewRequest("GET", fmt.Sprintf("/api/v1/files/%d/thumbnail", mediaID), nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	w := doRequest(t, deps.Router, req)
+
+	require.Equal(t, http.StatusTemporaryRedirect, w.Code, w.Body.String())
+	require.Equal(t, "/uploads/clip_thumb.jpg", w.Header().Get("Location"))
+}
+
+func TestFilesThumbnailRedirect_RejectsNonOwner(t *testing.T) {
+	deps := newTestDeps(t)
+	defer deps.DB.Close()
+
+	owner := createUser(t, deps.UserRepo, "thumb_owner_2", "user")
+	other := createUser(t, deps.UserRepo, "thumb_other", "user")
+	token, _ := deps.AuthService.GenerateJWT(other.ID, "", other.Username, other.Role)
+
+	var mediaID int
+	err := deps.DB.Pool.QueryRow(context.Background(), `
+		INSERT INTO media_files (user_id, filename, original_filename, file_type, file_size, storage_url, thumbnail_url, storage_path, scan_status)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+		RETURNING id
+	`, owner.ID, "clip.mp4", "clip.mp4", "video/mp4", int64(1024), "/uploads/clip.mp4", "/uploads/clip_thumb.jpg", "uploads/clip.mp4", models.MediaScanStatusClean).Scan(&mediaID)
+	require.NoError(t, err)
+
+	req, _ := http.NewRequest("GET", fmt.Sprintf("/api/v1/files/%d/thumbnail", mediaID), nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	w := doRequest(t, deps.Router, req)
+
+	require.Equal(t, http.StatusForbidden, w.Code, w.Body.String())
+}
+
+func TestFilesThumbnailRedirect_BlocksPendingScan(t *testing.T) {
+	deps := newTestDeps(t)
+	defer deps.DB.Close()
+
+	user := createUser(t, deps.UserRepo, "thumb_pending", "user")
+	token, _ := deps.AuthService.GenerateJWT(user.ID, "", user.Username, user.Role)
+
+	var mediaID int
+	err := deps.DB.Pool.QueryRow(context.Background(), `
+		INSERT INTO media_files (user_id, filename, original_filename, file_type, file_size, storage_url, thumbnail_url, storage_path, scan_status)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+		RETURNING id
+	`, user.ID, "clip.mp4", "clip.mp4", "video/mp4", int64(1024), "/uploads/clip.mp4", "/uploads/clip_thumb.jpg", "uploads/clip.mp4", models.MediaScanStatusPending).Scan(&mediaID)
+	require.NoError(t, err)
+
+	req, _ := http.NewRequest("GET", fmt.Sprintf("/api/v1/files/%d/thumbnail", mediaID), nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	w := doRequest(t, deps.Router, req)
+
+	require.Equal(t, http.StatusLocked, w.Code, w.Body.String())
+}
+
 func TestMediaUpload_RejectsSuspiciousEmbeddedZipSignature(t *testing.T) {
 	defer os.RemoveAll("uploads")
 	deps := newTestDeps(t)

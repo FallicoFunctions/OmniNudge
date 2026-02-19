@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -13,6 +14,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/jackc/pgx/v5"
 	"github.com/omninudge/backend/internal/api/middleware"
 	"github.com/omninudge/backend/internal/models"
 	"github.com/omninudge/backend/internal/queue"
@@ -278,6 +280,59 @@ func (h *MediaHandler) UploadMedia(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusCreated, media)
+}
+
+// GetThumbnail handles GET /api/v1/files/:id/thumbnail
+// Returns a redirect to the thumbnail URL when available.
+func (h *MediaHandler) GetThumbnail(c *gin.Context) {
+	userID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
+	role := c.GetString("role")
+
+	mediaID, err := strconv.Atoi(c.Param("id"))
+	if err != nil || mediaID <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid media ID"})
+		return
+	}
+
+	media, err := h.mediaRepo.GetByID(c.Request.Context(), mediaID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Media file not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch media file", "details": err.Error()})
+		return
+	}
+
+	if media.UserID != userID.(int) && role != "admin" && role != "moderator" {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Forbidden"})
+		return
+	}
+
+	switch media.ScanStatus {
+	case models.MediaScanStatusClean:
+	case models.MediaScanStatusInfected:
+		c.JSON(http.StatusGone, gin.H{"error": "File is unavailable"})
+		return
+	default:
+		c.JSON(http.StatusLocked, gin.H{
+			"error":       "File is not available until security scan completes",
+			"scan_status": media.ScanStatus,
+		})
+		return
+	}
+
+	if media.ThumbnailURL == nil || *media.ThumbnailURL == "" {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Thumbnail not available"})
+		return
+	}
+
+	c.Header("Cache-Control", "private, max-age=300")
+	c.Redirect(http.StatusTemporaryRedirect, *media.ThumbnailURL)
 }
 
 // BatchUploadMedia handles POST /api/v1/media/batch-upload
