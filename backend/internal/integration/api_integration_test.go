@@ -660,6 +660,85 @@ func TestGetMessageThreadEndpoint_RejectsUnauthorizedAndOutsider_Integration(t *
 	require.Equal(t, http.StatusForbidden, outsiderResp.Code, "body=%s", outsiderResp.Body.String())
 }
 
+func TestDeleteRootMessageForBoth_PreservesThreadAsTombstone_Integration(t *testing.T) {
+	deps := newTestDeps(t)
+	defer deps.DB.Close()
+
+	sender := createUser(t, deps.UserRepo, "thread_delete_sender", "user")
+	recipient := createUser(t, deps.UserRepo, "thread_delete_recipient", "user")
+	senderToken, _ := deps.AuthService.GenerateJWT(sender.ID, "", sender.Username, sender.Role)
+	recipientToken, _ := deps.AuthService.GenerateJWT(recipient.ID, "", recipient.Username, recipient.Role)
+
+	conversation, err := deps.ConversationRepo.Create(context.Background(), sender.ID, recipient.ID)
+	require.NoError(t, err)
+
+	rootBody := []byte(fmt.Sprintf(
+		`{"conversation_id":%d,"encrypted_content":"root-to-delete","message_type":"text","encryption_version":"v1"}`,
+		conversation.ID,
+	))
+	rootReq, _ := http.NewRequest("POST", "/api/v1/messages", bytes.NewReader(rootBody))
+	rootReq.Header.Set("Authorization", "Bearer "+senderToken)
+	rootReq.Header.Set("Content-Type", "application/json")
+	rootResp := doRequest(t, deps.Router, rootReq)
+	require.Equal(t, http.StatusCreated, rootResp.Code, "root body=%s", rootResp.Body.String())
+
+	var rootMessage models.Message
+	require.NoError(t, json.Unmarshal(rootResp.Body.Bytes(), &rootMessage))
+
+	replyBody := []byte(fmt.Sprintf(
+		`{"conversation_id":%d,"encrypted_content":"reply-child","message_type":"text","encryption_version":"v1","reply_to":%d}`,
+		conversation.ID,
+		rootMessage.ID,
+	))
+	replyReq, _ := http.NewRequest("POST", "/api/v1/messages", bytes.NewReader(replyBody))
+	replyReq.Header.Set("Authorization", "Bearer "+recipientToken)
+	replyReq.Header.Set("Content-Type", "application/json")
+	replyResp := doRequest(t, deps.Router, replyReq)
+	require.Equal(t, http.StatusCreated, replyResp.Code, "reply body=%s", replyResp.Body.String())
+
+	var replyMessage models.Message
+	require.NoError(t, json.Unmarshal(replyResp.Body.Bytes(), &replyMessage))
+
+	deleteReq, _ := http.NewRequest(
+		"DELETE",
+		fmt.Sprintf("/api/v1/messages/%d?delete_for=both", rootMessage.ID),
+		nil,
+	)
+	deleteReq.Header.Set("Authorization", "Bearer "+senderToken)
+	deleteResp := doRequest(t, deps.Router, deleteReq)
+	require.Equal(t, http.StatusOK, deleteResp.Code, "delete body=%s", deleteResp.Body.String())
+
+	var tombstoneContent string
+	var deletedForSender bool
+	var deletedForRecipient bool
+	err = deps.DB.Pool.QueryRow(context.Background(), `
+		SELECT encrypted_content, deleted_for_sender, deleted_for_recipient
+		FROM messages
+		WHERE id = $1
+	`, rootMessage.ID).Scan(&tombstoneContent, &deletedForSender, &deletedForRecipient)
+	require.NoError(t, err)
+	require.Equal(t, "[deleted]", tombstoneContent)
+	require.True(t, deletedForSender)
+	require.True(t, deletedForRecipient)
+
+	threadReq, _ := http.NewRequest("GET", fmt.Sprintf("/api/v1/messages/%d/thread", replyMessage.ID), nil)
+	threadReq.Header.Set("Authorization", "Bearer "+recipientToken)
+	threadResp := doRequest(t, deps.Router, threadReq)
+	require.Equal(t, http.StatusOK, threadResp.Code, "thread body=%s", threadResp.Body.String())
+
+	var threadPayload struct {
+		RootMessage models.Message   `json:"root_message"`
+		Replies     []models.Message `json:"replies"`
+		ReplyCount  int              `json:"reply_count"`
+	}
+	require.NoError(t, json.Unmarshal(threadResp.Body.Bytes(), &threadPayload))
+	require.Equal(t, rootMessage.ID, threadPayload.RootMessage.ID)
+	require.Equal(t, "[deleted]", threadPayload.RootMessage.EncryptedContent)
+	require.Len(t, threadPayload.Replies, 1)
+	require.Equal(t, replyMessage.ID, threadPayload.Replies[0].ID)
+	require.Equal(t, 1, threadPayload.ReplyCount)
+}
+
 func TestSendMessage_ThreadDepthLimitFlattensToRoot_Integration(t *testing.T) {
 	deps := newTestDeps(t)
 	defer deps.DB.Close()
