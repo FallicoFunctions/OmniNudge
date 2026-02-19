@@ -298,6 +298,44 @@ func (h *MessagesHandler) broadcastPinEvent(
 	}
 }
 
+func (h *MessagesHandler) broadcastThreadReplyAddedEvent(
+	ctx context.Context,
+	conversationID int,
+	threadRoot int,
+	replyCount int,
+	message *models.Message,
+) {
+	if h.hub == nil {
+		return
+	}
+
+	participants, err := h.getConversationParticipantIDs(ctx, conversationID)
+	if err != nil {
+		log.Printf("[MessagesHandler] failed to get participants for thread event: conversation_id=%d err=%v", conversationID, err)
+		return
+	}
+
+	event := models.ThreadUpdateEvent{
+		Type:           "thread_reply_added",
+		ConversationID: conversationID,
+		ThreadRoot:     threadRoot,
+		ReplyID:        message.ID,
+		ReplyCount:     replyCount,
+		Message:        message,
+	}
+
+	for _, participantID := range participants {
+		if participantID == 0 {
+			continue
+		}
+		h.hub.Broadcast(&websocket.Message{
+			RecipientID: participantID,
+			Type:        "thread_reply_added",
+			Payload:     event,
+		})
+	}
+}
+
 // sendPushNotification is deprecated and removed in favor of NotificationService.SendMessagePush
 
 // SendMessageRequest represents the request body for sending a message
@@ -623,6 +661,24 @@ func (h *MessagesHandler) SendMessage(c *gin.Context) {
 	fullMessage, err := h.messageRepo.GetByID(c.Request.Context(), message.ID)
 	if err == nil {
 		message = fullMessage
+	}
+
+	if effectiveReplyTo != nil {
+		rootForEvent := *effectiveReplyTo
+		if message.ThreadRoot != nil && *message.ThreadRoot > 0 {
+			rootForEvent = *message.ThreadRoot
+		}
+
+		var parentReplyCount int
+		if err := h.pool.QueryRow(c.Request.Context(), `
+			SELECT COALESCE(reply_count, 0)
+			FROM messages
+			WHERE id = $1
+		`, *effectiveReplyTo).Scan(&parentReplyCount); err != nil {
+			log.Printf("[SendMessage] Failed to load reply_count for thread event: parent_id=%d err=%v", *effectiveReplyTo, err)
+		} else {
+			h.broadcastThreadReplyAddedEvent(c.Request.Context(), req.ConversationID, rootForEvent, parentReplyCount, message)
+		}
 	}
 
 	// Update conversation's last_message_at timestamp and re-add users if deleted
