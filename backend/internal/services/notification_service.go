@@ -2,13 +2,11 @@ package services
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log"
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/omninudge/backend/internal/models"
 	"github.com/omninudge/backend/internal/websocket"
@@ -338,22 +336,49 @@ func (s *NotificationService) insertMessageEditNotificationIfNotRecent(
 	ctx context.Context,
 	notification *models.Notification,
 ) (bool, error) {
-	err := s.pool.QueryRow(ctx, `
-		INSERT INTO notifications (
-			user_id, notification_type, content_type, content_id,
-			actor_id, milestone_count, votes_per_hour, message
-		)
-		SELECT
-			$1, $2, $3, $4, $5, $6, $7, $8
-		WHERE NOT EXISTS (
+	if notification.ContentID == nil {
+		return false, fmt.Errorf("content_id is required for message edit notification dedupe")
+	}
+
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return false, err
+	}
+	defer tx.Rollback(ctx)
+
+	if _, err := tx.Exec(ctx, `
+		SELECT pg_advisory_xact_lock($1::integer, $2::integer)
+	`, notification.UserID, *notification.ContentID); err != nil {
+		return false, err
+	}
+
+	var exists bool
+	if err := tx.QueryRow(ctx, `
+		SELECT EXISTS (
 			SELECT 1
 			FROM notifications
 			WHERE user_id = $1
 			  AND notification_type = 'message_edited'
 			  AND content_type = 'message'
-			  AND content_id = $4
+			  AND content_id = $2
 			  AND created_at > NOW() - INTERVAL '2 minutes'
 		)
+	`, notification.UserID, *notification.ContentID).Scan(&exists); err != nil {
+		return false, err
+	}
+	if exists {
+		if err := tx.Commit(ctx); err != nil {
+			return false, err
+		}
+		return false, nil
+	}
+
+	err = tx.QueryRow(ctx, `
+		INSERT INTO notifications (
+			user_id, notification_type, content_type, content_id,
+			actor_id, milestone_count, votes_per_hour, message
+		)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 		RETURNING id, created_at
 	`,
 		notification.UserID,
@@ -365,13 +390,13 @@ func (s *NotificationService) insertMessageEditNotificationIfNotRecent(
 		notification.VotesPerHour,
 		notification.Message,
 	).Scan(&notification.ID, &notification.CreatedAt)
-	if err == nil {
-		return true, nil
+	if err != nil {
+		return false, err
 	}
-	if errors.Is(err, pgx.ErrNoRows) {
-		return false, nil
+	if err := tx.Commit(ctx); err != nil {
+		return false, err
 	}
-	return false, err
+	return true, nil
 }
 
 func (s *NotificationService) deliverNotification(ctx context.Context, notification *models.Notification) {
