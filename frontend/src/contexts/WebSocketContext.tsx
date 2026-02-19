@@ -3,7 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from './AuthContext';
 import { API_BASE_URL } from '../lib/api';
 import type { InfiniteData } from '@tanstack/react-query';
-import type { Message, Conversation, WsMessagePinEvent } from '../types/messages';
+import type { Message, Conversation, WsMessagePinEvent, WsThreadUpdateEvent } from '../types/messages';
 import type { GetReactionsResponse, WsReactionAddedPayload, WsReactionRemovedPayload } from '../types/reactions';
 
 interface WebSocketMessage {
@@ -280,6 +280,35 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
           window.dispatchEvent(
             new CustomEvent('message-edited', {
               detail: data.payload,
+            })
+          );
+          break;
+        }
+
+        case 'thread_reply_added': {
+          const payload = data.payload as WsThreadUpdateEvent;
+          const { conversation_id, thread_root, reply_count } = payload;
+          console.log('[WebSocket] Thread reply added:', payload.reply_id);
+
+          queryClient.setQueryData<InfiniteData<{ messages: Message[]; next_cursor?: string }> | undefined>(
+            ['messages', conversation_id],
+            (prev) => {
+              if (!prev) return prev;
+              return {
+                ...prev,
+                pages: prev.pages.map((page) => ({
+                  ...page,
+                  messages: page.messages.map((msg) =>
+                    msg.id === thread_root ? { ...msg, reply_count } : msg
+                  ),
+                })),
+              };
+            }
+          );
+
+          window.dispatchEvent(
+            new CustomEvent('thread-reply-added', {
+              detail: payload,
             })
           );
           break;

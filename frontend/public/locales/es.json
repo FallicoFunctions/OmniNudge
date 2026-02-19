@@ -1427,6 +1427,16 @@
       "viewThread": "Ver hilo",
       "openAria": "Abrir hilo"
     },
+    "threadView": {
+      "title": "Hilo",
+      "replyCount_one": "{{count}} respuesta",
+      "replyCount_other": "{{count}} respuestas",
+      "closeAria": "Cerrar hilo",
+      "loadFailed": "No se pudo cargar el hilo",
+      "rootMessage": "Mensaje raíz",
+      "loadMore": "Cargar más respuestas",
+      "empty": "Todavía no hay respuestas en este hilo."
+    },
     "pinned": {
       "title_one": "{{count}} mensaje fijado",
       "title_other": "{{count}} mensajes fijados",
