@@ -1351,9 +1351,11 @@ export default function MessagesPage() {
         encrypted_content: encryptedContent,
         sender_encrypted_content: senderEncryptedContent,
         encryption_version: encryptionVersion,
-        media_encryption_key: message.media_encryption_key ?? undefined,
-        media_encryption_iv: message.media_encryption_iv ?? undefined,
-        sender_media_encryption_key: message.sender_media_encryption_key ?? undefined,
+        media_encryption_key: includeMedia ? (message.media_encryption_key ?? undefined) : undefined,
+        media_encryption_iv: includeMedia ? (message.media_encryption_iv ?? undefined) : undefined,
+        sender_media_encryption_key: includeMedia
+          ? (message.sender_media_encryption_key ?? undefined)
+          : undefined,
         is_multi_recipient: isMultiRecipient,
         shared_encryption_iv: sharedEncryptionIV,
         recipient_keys: recipientKeys,
