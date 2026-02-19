@@ -17,7 +17,8 @@ const (
 	// ThumbnailWidth is the target width for thumbnails
 	ThumbnailWidth = 300
 	// ThumbnailHeight is the target height for thumbnails
-	ThumbnailHeight = 300
+	ThumbnailHeight   = 300
+	thumbnailMaxBytes = 50 * 1024
 )
 
 // ThumbnailService handles thumbnail generation
@@ -99,15 +100,15 @@ func (s *ThumbnailService) GenerateImageThumbnails(sourcePath string) (*ImageThu
 
 	primaryW, primaryH := calculateThumbnailDimensions(width, height, 800, 600)
 	primaryThumb := imaging.Resize(src, primaryW, primaryH, imaging.Lanczos)
-	primaryPath := filepath.Join(baseDir, fmt.Sprintf("%s_thumb%s", nameWithoutExt, ext))
-	if err := imaging.Save(primaryThumb, primaryPath); err != nil {
+	primaryPath := filepath.Join(baseDir, fmt.Sprintf("%s_thumb.jpg", nameWithoutExt))
+	if err := saveOptimizedJPEG(primaryThumb, primaryPath, thumbnailMaxBytes); err != nil {
 		return nil, fmt.Errorf("failed to save primary thumbnail: %w", err)
 	}
 
 	smallW, smallH := calculateThumbnailDimensions(width, height, 200, 200)
 	smallThumb := imaging.Resize(src, smallW, smallH, imaging.Lanczos)
-	smallPath := filepath.Join(baseDir, fmt.Sprintf("%s_thumb_sm%s", nameWithoutExt, ext))
-	if err := imaging.Save(smallThumb, smallPath); err != nil {
+	smallPath := filepath.Join(baseDir, fmt.Sprintf("%s_thumb_sm.jpg", nameWithoutExt))
+	if err := saveOptimizedJPEG(smallThumb, smallPath, thumbnailMaxBytes); err != nil {
 		return nil, fmt.Errorf("failed to save small thumbnail: %w", err)
 	}
 
@@ -294,6 +295,32 @@ func mimeTypeFromExtension(path string) string {
 	default:
 		return ""
 	}
+}
+
+func saveOptimizedJPEG(img image.Image, path string, maxBytes int64) error {
+	qualities := []int{80, 70, 60, 50, 40}
+	var lastErr error
+	for _, quality := range qualities {
+		if err := imaging.Save(img, path, imaging.JPEGQuality(quality)); err != nil {
+			lastErr = err
+			continue
+		}
+		if maxBytes <= 0 {
+			return nil
+		}
+		info, err := os.Stat(path)
+		if err != nil {
+			lastErr = err
+			continue
+		}
+		if info.Size() <= maxBytes {
+			return nil
+		}
+	}
+	if lastErr != nil {
+		return lastErr
+	}
+	return nil
 }
 
 func defaultCommandRunner(ctx context.Context, name string, args ...string) ([]byte, error) {

@@ -55,4 +55,17 @@ describe('MediaUploadZone', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Upload 1 file' }));
     expect(onFilesSelected).toHaveBeenCalledWith([midVideo]);
   });
+
+  it('accepts supported file when browser MIME is empty but extension is known', () => {
+    const onFilesSelected = vi.fn();
+    const { container } = render(<MediaUploadZone onFilesSelected={onFilesSelected} />);
+    const input = container.querySelector('input[type="file"]') as HTMLInputElement;
+
+    const noMimeDoc = new File(['pdf-bytes'], 'scan.pdf', { type: '' });
+    fireEvent.change(input, { target: { files: [noMimeDoc] } });
+
+    expect(screen.queryByText('scan.pdf: Unsupported file type')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Upload 1 file' }));
+    expect(onFilesSelected).toHaveBeenCalledWith([noMimeDoc]);
+  });
 });
