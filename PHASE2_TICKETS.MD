@@ -1061,31 +1061,23 @@
 ---
 
 ### P0-035: User Feedback Infrastructure
-**Status:** ✅ COMPLETE (February 17, 2026)
+**Status:** ⏸️ ROLLED BACK (February 18, 2026)
 **Priority:** P1
 **Estimated Time:** 1 week
 
-**Problem:** No way to collect user feedback systematically.
+**Problem:** This scope introduced broad feedback/survey/NPS UX, but product direction reverted to Phase 1 bug reporting only.
 
 **Tasks:**
-- [x] Choose feedback service (custom in-app feedback pipeline)
-- [x] Add in-app feedback button (bottom-right corner)
-- [x] Create feedback form: rating (1-5), category (bug, feature request, other), text
-- [x] Add screenshot capture (optional)
-- [x] Send feedback to Slack channel (webhook, best-effort)
-- [x] Store feedback in database
-- [x] Create feedback dashboard (admin)
-- [x] Set up post-feature surveys (in-app survey prompt cadence)
-- [x] Implement NPS survey (quarterly cadence prompt)
-- [x] Document feedback review process
+- [x] Remove in-app floating feedback button
+- [x] Remove survey/NPS prompt cadence UX
+- [x] Keep existing Phase 1 bug-reporting flow (`/bug-reporting`, bug modal, admin bug triage)
+- [x] Restrict bug report validation to bug-report semantics (`report` + `bug|feature_request|other`)
+- [x] Normalize historical out-of-scope rows and lock DB constraints (`075_bug_reports_feedback_scope_lock`)
 
 **Acceptance Criteria:**
-- Feedback button visible on all pages
-- Feedback submitted successfully (100% delivery rate)
-- Feedback appears in Slack within 10 seconds
-- Dashboard shows all feedback (sortable, filterable)
-- Post-feature surveys show >30% response rate
-- NPS survey implemented (quarterly cadence)
+- No survey/NPS/floating feedback UX present
+- Bug reporting remains fully functional for end users/admins
+- DB and API contracts align to bug-report-only values
 
 **Dependencies:** P0-027 (Analytics)
 

@@ -352,19 +352,12 @@ func (s *AnalyticsService) GetFeatureCrashRate(ctx context.Context, featureKey s
 }
 
 // GetFeatureComplaintCount returns user complaint count for a feature within a time window.
-// Complaints are inferred from feedback_submitted analytics events and bug reports mentioning the feature key.
+// Complaints are inferred from bug reports mentioning the feature key.
 func (s *AnalyticsService) GetFeatureComplaintCount(ctx context.Context, featureKey string, window time.Duration) (int, error) {
 	var complaintCount int
 
 	query := `
-		WITH analytics_complaints AS (
-			SELECT COUNT(*)::int AS cnt
-			FROM analytics_events
-			WHERE created_at >= NOW() - make_interval(secs => $1)
-			  AND event_name = 'feedback_submitted'
-			  AND properties->'active_flags' ? $2
-		),
-		bug_report_complaints AS (
+		WITH bug_report_complaints AS (
 			SELECT COUNT(*)::int AS cnt
 			FROM bug_reports
 			WHERE created_at >= NOW() - make_interval(secs => $1)
@@ -374,8 +367,6 @@ func (s *AnalyticsService) GetFeatureComplaintCount(ctx context.Context, feature
 			  )
 		)
 		SELECT
-			COALESCE((SELECT cnt FROM analytics_complaints), 0)
-			+
 			COALESCE((SELECT cnt FROM bug_report_complaints), 0)
 	`
 

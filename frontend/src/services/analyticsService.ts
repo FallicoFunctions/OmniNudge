@@ -26,7 +26,6 @@ export type EventName =
   | 'hub_created'
   | 'subreddit_subscribed'
   | 'search_performed'
-  | 'feedback_submitted'
   // Settings
   | 'theme_changed'
   | 'language_changed'

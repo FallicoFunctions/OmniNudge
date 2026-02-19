@@ -141,12 +141,6 @@
   "mainLayout": {
     "skipToMainContent": "تخطي إلى المحتوى الرئيسي",
     "bugReporting": "الإبلاغ عن الأخطاء",
-    "feedbackButton": "Feedback",
-    "feedbackPrompt": {
-      "title": "كيف تجربتك مع OmniNudge؟",
-      "body": "شاركنا ملاحظات سريعة لتحسين الرسائل والخلاصة.",
-      "action": "إرسال الاستبيان"
-    },
     "mobileNavigationError": "خطأ في التنقل. يرجى إعادة تحميل الصفحة.",
     "dontShowThisAgain": "لا تعرض هذا مرة أخرى"
   },
@@ -248,23 +242,12 @@
         "label": "الوصف",
         "placeholder": "صف الخلل بالتفصيل. ماذا حدث؟ ماذا كنت تتوقع أن يحدث؟ خطوات إعادة الإنتاج؟"
       },
-      "feedbackType": {
-        "label": "نوع الملاحظة",
-        "options": {
-          "report": "تقرير خلل",
-          "feedback": "ملاحظة عامة",
-          "survey": "استبيان",
-          "nps": "NPS"
-        }
-      },
       "category": {
         "label": "الفئة",
         "options": {
           "bug": "خلل",
           "featureRequest": "طلب ميزة",
-          "other": "أخرى",
-          "survey": "استبيان",
-          "nps": "NPS"
+          "other": "أخرى"
         }
       },
       "rating": {
@@ -3497,7 +3480,6 @@
       "filters": {
         "allStatuses": "كل الحالات",
         "allCategories": "كل الفئات",
-        "allTypes": "كل الأنواع",
         "sortNewest": "الأحدث أولًا",
         "sortOldest": "الأقدم أولًا",
         "sortRatingHigh": "أعلى تقييم",
@@ -3507,15 +3489,7 @@
       "categories": {
         "bug": "خلل",
         "featureRequest": "طلب ميزة",
-        "other": "أخرى",
-        "survey": "استبيان",
-        "nps": "NPS"
-      },
-      "types": {
-        "report": "تقرير",
-        "feedback": "ملاحظة",
-        "survey": "استبيان",
-        "nps": "NPS"
+        "other": "أخرى"
       },
       "status": {
         "new": "جديد",
