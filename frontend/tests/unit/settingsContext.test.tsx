@@ -40,6 +40,7 @@ const defaultServerSettings = {
   quiet_hours_start_minutes: 1320,
   quiet_hours_end_minutes: 420,
   quiet_hours_timezone: 'UTC',
+  batch_notifications: true,
   show_read_receipts: true,
   show_typing_indicators: true,
   show_last_seen: true,

@@ -56,6 +56,8 @@ interface SettingsContextType {
   setQuietHoursEndMinutes: (value: number) => void;
   quietHoursTimezone: string;
   setQuietHoursTimezone: (value: string) => void;
+  batchNotifications: boolean;
+  setBatchNotifications: (value: boolean) => void;
   readReceipts: boolean;
   setReadReceipts: (value: boolean) => void;
   typingIndicators: boolean;
@@ -109,6 +111,7 @@ interface StoredSettings {
   quietHoursStartMinutes?: number;
   quietHoursEndMinutes?: number;
   quietHoursTimezone?: string;
+  batchNotifications?: boolean;
   readReceipts?: boolean;
   typingIndicators?: boolean;
   showLastSeen?: boolean;
@@ -124,7 +127,7 @@ interface StoredSettings {
   settingsVersion?: number;
 }
 
-const CURRENT_SETTINGS_VERSION = 11;
+const CURRENT_SETTINGS_VERSION = 12;
 
 const getStoredSettings = (): StoredSettings => {
   if (typeof window === 'undefined' || !window.localStorage) {
@@ -158,6 +161,7 @@ const getStoredSettings = (): StoredSettings => {
             (typeof Intl !== 'undefined'
               ? (Intl.DateTimeFormat().resolvedOptions().timeZone ?? 'UTC')
               : 'UTC'),
+          batchNotifications: parsed.batchNotifications ?? true,
           readReceipts: parsed.readReceipts ?? true,
           typingIndicators: parsed.typingIndicators ?? true,
           showLastSeen: parsed.showLastSeen ?? true,
@@ -286,6 +290,10 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         : 'UTC')
     );
   });
+  const [batchNotifications, setBatchNotificationsState] = useState<boolean>(() => {
+    const settings = getStoredSettings();
+    return settings.batchNotifications ?? true;
+  });
   const [readReceipts, setReadReceiptsState] = useState<boolean>(() => {
     const settings = getStoredSettings();
     return settings.readReceipts ?? true;
@@ -373,6 +381,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         setQuietHoursStartMinutesState(settings.quiet_hours_start_minutes ?? 1320);
         setQuietHoursEndMinutesState(settings.quiet_hours_end_minutes ?? 420);
         setQuietHoursTimezoneState(settings.quiet_hours_timezone ?? quietHoursTimezone);
+        setBatchNotificationsState(settings.batch_notifications ?? true);
         setReadReceiptsState(settings.show_read_receipts ?? true);
         setTypingIndicatorsState(settings.show_typing_indicators ?? true);
         setShowLastSeenState(settings.show_last_seen ?? true);
@@ -426,6 +435,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         quietHoursStartMinutes,
         quietHoursEndMinutes,
         quietHoursTimezone,
+        batchNotifications,
         readReceipts,
         typingIndicators,
         showLastSeen,
@@ -469,6 +479,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     quietHoursStartMinutes,
     quietHoursEndMinutes,
     quietHoursTimezone,
+    batchNotifications,
     readReceipts,
     typingIndicators,
     showLastSeen,
@@ -730,6 +741,16 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     });
   };
 
+  const setBatchNotifications = (value: boolean) => {
+    const previous = batchNotifications;
+    setBatchNotificationsState(value);
+    if (!hasAuthToken()) return;
+    void userSettingsService.update({ batch_notifications: value }).catch((error) => {
+      console.error('[Settings] Failed to update batch notifications:', error);
+      setBatchNotificationsState(previous);
+    });
+  };
+
   const setReadReceipts = (value: boolean) => {
     const previous = readReceipts;
     setReadReceiptsState(value);
@@ -901,6 +922,8 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         setQuietHoursEndMinutes,
         quietHoursTimezone,
         setQuietHoursTimezone,
+        batchNotifications,
+        setBatchNotifications,
         readReceipts,
         setReadReceipts,
         typingIndicators,

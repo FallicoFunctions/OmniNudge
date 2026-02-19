@@ -69,6 +69,8 @@ export default function SettingsPage() {
     quietHoursEndMinutes,
     setQuietHoursEndMinutes,
     quietHoursTimezone,
+    batchNotifications,
+    setBatchNotifications,
     readReceipts,
     setReadReceipts,
     typingIndicators,
@@ -527,6 +529,13 @@ export default function SettingsPage() {
 
             <div className="mt-4 space-y-4">
               {[
+                {
+                  key: 'batch-notifications',
+                  label: t('settings.notificationPreferences.batchNotifications'),
+                  help: t('settings.notificationPreferences.batchNotificationsHelp'),
+                  value: batchNotifications,
+                  onToggle: () => setBatchNotifications(!batchNotifications),
+                },
                 {
                   key: 'notify-comment-replies',
                   label: t('settings.notificationPreferences.commentReplies'),

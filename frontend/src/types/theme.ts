@@ -84,6 +84,7 @@ export interface UserSettings {
   quiet_hours_start_minutes: number;
   quiet_hours_end_minutes: number;
   quiet_hours_timezone: string;
+  batch_notifications: boolean;
   auto_append_invitation: boolean;
   theme: string;
   notify_comment_replies: boolean;

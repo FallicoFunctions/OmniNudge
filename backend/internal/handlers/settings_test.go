@@ -189,6 +189,33 @@ func TestUpdateSettings_PersistsAutoUnarchiveOnMessage(t *testing.T) {
 	assert.False(t, settings.AutoUnarchiveOnMessage)
 }
 
+func TestUpdateSettings_PersistsBatchNotifications(t *testing.T) {
+	handler, settingsRepo, userID, cleanup := setupSettingsHandlerTest(t)
+	defer cleanup()
+
+	router := gin.Default()
+	router.PUT("/settings", func(c *gin.Context) {
+		c.Set("user_id", userID)
+		handler.UpdateSettings(c)
+	})
+
+	body := map[string]any{
+		"batch_notifications": false,
+	}
+	payload, _ := json.Marshal(body)
+
+	req := httptest.NewRequest(http.MethodPut, "/settings", bytes.NewReader(payload))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	require.Equal(t, http.StatusOK, w.Code, "response: %s", w.Body.String())
+
+	settings, err := settingsRepo.GetByUserID(context.Background(), userID)
+	require.NoError(t, err)
+	require.NotNil(t, settings)
+	assert.False(t, settings.BatchNotifications)
+}
+
 func TestUpdateSettings_RejectsInvalidQuietHoursTimezone(t *testing.T) {
 	handler, _, userID, cleanup := setupSettingsHandlerTest(t)
 	defer cleanup()

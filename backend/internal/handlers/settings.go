@@ -70,6 +70,7 @@ type updateSettingsRequest struct {
 	QuietHoursStartMinutes       *int    `json:"quiet_hours_start_minutes"`
 	QuietHoursEndMinutes         *int    `json:"quiet_hours_end_minutes"`
 	QuietHoursTimezone           *string `json:"quiet_hours_timezone"`
+	BatchNotifications           *bool   `json:"batch_notifications"`
 
 	// Notification preferences
 	NotifyCommentReplies   *bool `json:"notify_comment_replies"`
@@ -271,6 +272,9 @@ func (h *SettingsHandler) UpdateSettings(c *gin.Context) {
 			"error": "quiet_hours_start_minutes and quiet_hours_end_minutes must differ when quiet hours are enabled",
 		})
 		return
+	}
+	if req.BatchNotifications != nil {
+		settings.BatchNotifications = *req.BatchNotifications
 	}
 
 	// Update notification preferences

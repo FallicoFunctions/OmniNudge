@@ -2094,6 +2094,8 @@
     "notificationPreferences": {
       "title": "Notification Preferences",
       "description": "Choose which message and engagement events trigger notifications.",
+      "batchNotifications": "Batch thread reply notifications",
+      "batchNotificationsHelp": "Group rapid thread replies into a single notification summary.",
       "commentReplies": "Comment replies",
       "commentRepliesHelp": "Notify when someone replies to your comments.",
       "postMilestones": "Post milestones",

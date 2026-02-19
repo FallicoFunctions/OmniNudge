@@ -428,6 +428,7 @@ Get the authenticated user's full settings object. If no settings row exists yet
   "quiet_hours_start_minutes": 1320,
   "quiet_hours_end_minutes": 420,
   "quiet_hours_timezone": "UTC",
+  "batch_notifications": true,
   "access_request_cooldown_display": "days",
   "notify_archived_messages": false,
   "auto_unarchive_on_message": true,
@@ -474,6 +475,7 @@ Update settings fields. Request body is partial; only provided keys are changed.
   "quiet_hours_start_minutes": 1320,
   "quiet_hours_end_minutes": 420,
   "quiet_hours_timezone": "America/New_York",
+  "batch_notifications": true,
   "auto_unarchive_on_message": false,
   "access_request_cooldown_display": "both",
   "transcription_opt_in": true,
@@ -510,6 +512,7 @@ Update settings fields. Request body is partial; only provided keys are changed.
 - `quiet_hours_start_minutes`, `quiet_hours_end_minutes`: `0..1439`
 - `quiet_hours_timezone`: valid IANA timezone
 - When `quiet_hours_enabled=true`, start and end minutes must differ
+- `batch_notifications`: when true, rapid thread replies may be grouped into a summary notification
 
 **Normalization Notes:**
 - Enum string inputs are case-insensitive and trimmed before validation.
