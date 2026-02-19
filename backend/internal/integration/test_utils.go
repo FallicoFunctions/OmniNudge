@@ -221,6 +221,7 @@ func newTestDeps(t *testing.T) *TestDeps {
 			protected.GET("/conversations/archived", conversationsHandler.GetArchivedConversations)
 			protected.POST("/conversations/archive-batch", conversationsHandler.ArchiveConversationBatch)
 			protected.GET("/conversations/:id/messages", messagesHandler.GetMessages)
+			protected.GET("/messages/:id/thread", messagesHandler.GetThread)
 			protected.GET("/messages/:id/history", messagesHandler.GetMessageHistory)
 			protected.GET("/conversations/:id/pinned-messages", messagesHandler.GetPinnedMessages)
 			protected.POST("/conversations/:id/read", messagesHandler.MarkAsRead)

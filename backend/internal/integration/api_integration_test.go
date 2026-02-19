@@ -495,6 +495,171 @@ func TestSendMessage_AutoUnarchivesRecipientWhenEnabled_Integration(t *testing.T
 	require.False(t, recipientArchived, "recipient archive flag should be cleared when auto-unarchive is enabled")
 }
 
+func TestSendMessage_ReplyToSetsThreadFieldsAndParentReplyCount_Integration(t *testing.T) {
+	deps := newTestDeps(t)
+	defer deps.DB.Close()
+
+	sender := createUser(t, deps.UserRepo, "thread_sender_api", "user")
+	recipient := createUser(t, deps.UserRepo, "thread_recipient_api", "user")
+	senderToken, _ := deps.AuthService.GenerateJWT(sender.ID, "", sender.Username, sender.Role)
+	recipientToken, _ := deps.AuthService.GenerateJWT(recipient.ID, "", recipient.Username, recipient.Role)
+
+	conversation, err := deps.ConversationRepo.Create(context.Background(), sender.ID, recipient.ID)
+	require.NoError(t, err)
+
+	rootBody := []byte(fmt.Sprintf(
+		`{"conversation_id":%d,"encrypted_content":"root-message","message_type":"text","encryption_version":"v1"}`,
+		conversation.ID,
+	))
+	rootReq, _ := http.NewRequest("POST", "/api/v1/messages", bytes.NewReader(rootBody))
+	rootReq.Header.Set("Authorization", "Bearer "+senderToken)
+	rootReq.Header.Set("Content-Type", "application/json")
+	rootResp := doRequest(t, deps.Router, rootReq)
+	require.Equal(t, http.StatusCreated, rootResp.Code, "root body=%s", rootResp.Body.String())
+
+	var rootMessage models.Message
+	require.NoError(t, json.Unmarshal(rootResp.Body.Bytes(), &rootMessage))
+	require.Nil(t, rootMessage.ReplyTo)
+	require.Nil(t, rootMessage.ThreadRoot)
+	require.Equal(t, 0, rootMessage.ReplyCount)
+
+	replyBody := []byte(fmt.Sprintf(
+		`{"conversation_id":%d,"encrypted_content":"reply-message","message_type":"text","encryption_version":"v1","reply_to":%d}`,
+		conversation.ID,
+		rootMessage.ID,
+	))
+	replyReq, _ := http.NewRequest("POST", "/api/v1/messages", bytes.NewReader(replyBody))
+	replyReq.Header.Set("Authorization", "Bearer "+recipientToken)
+	replyReq.Header.Set("Content-Type", "application/json")
+	replyResp := doRequest(t, deps.Router, replyReq)
+	require.Equal(t, http.StatusCreated, replyResp.Code, "reply body=%s", replyResp.Body.String())
+
+	var replyMessage models.Message
+	require.NoError(t, json.Unmarshal(replyResp.Body.Bytes(), &replyMessage))
+	require.NotNil(t, replyMessage.ReplyTo)
+	require.Equal(t, rootMessage.ID, *replyMessage.ReplyTo)
+	require.NotNil(t, replyMessage.ThreadRoot)
+	require.Equal(t, rootMessage.ID, *replyMessage.ThreadRoot)
+
+	updatedRoot, err := deps.MessageRepo.GetByID(context.Background(), rootMessage.ID)
+	require.NoError(t, err)
+	require.Equal(t, 1, updatedRoot.ReplyCount)
+}
+
+func TestGetMessageThreadEndpoint_ReturnsRepliesWithPagination_Integration(t *testing.T) {
+	deps := newTestDeps(t)
+	defer deps.DB.Close()
+
+	sender := createUser(t, deps.UserRepo, "thread_page_sender", "user")
+	recipient := createUser(t, deps.UserRepo, "thread_page_recipient", "user")
+	senderToken, _ := deps.AuthService.GenerateJWT(sender.ID, "", sender.Username, sender.Role)
+	recipientToken, _ := deps.AuthService.GenerateJWT(recipient.ID, "", recipient.Username, recipient.Role)
+
+	conversation, err := deps.ConversationRepo.Create(context.Background(), sender.ID, recipient.ID)
+	require.NoError(t, err)
+
+	rootBody := []byte(fmt.Sprintf(
+		`{"conversation_id":%d,"encrypted_content":"thread-root","message_type":"text","encryption_version":"v1"}`,
+		conversation.ID,
+	))
+	rootReq, _ := http.NewRequest("POST", "/api/v1/messages", bytes.NewReader(rootBody))
+	rootReq.Header.Set("Authorization", "Bearer "+senderToken)
+	rootReq.Header.Set("Content-Type", "application/json")
+	rootResp := doRequest(t, deps.Router, rootReq)
+	require.Equal(t, http.StatusCreated, rootResp.Code, "root body=%s", rootResp.Body.String())
+
+	var rootMessage models.Message
+	require.NoError(t, json.Unmarshal(rootResp.Body.Bytes(), &rootMessage))
+
+	for i := 0; i < 3; i++ {
+		replyBody := []byte(fmt.Sprintf(
+			`{"conversation_id":%d,"encrypted_content":"thread-reply-%d","message_type":"text","encryption_version":"v1","reply_to":%d}`,
+			conversation.ID,
+			i,
+			rootMessage.ID,
+		))
+		replyReq, _ := http.NewRequest("POST", "/api/v1/messages", bytes.NewReader(replyBody))
+		replyReq.Header.Set("Authorization", "Bearer "+recipientToken)
+		replyReq.Header.Set("Content-Type", "application/json")
+		replyResp := doRequest(t, deps.Router, replyReq)
+		require.Equal(t, http.StatusCreated, replyResp.Code, "reply %d body=%s", i, replyResp.Body.String())
+		time.Sleep(5 * time.Millisecond)
+	}
+
+	threadReq, _ := http.NewRequest("GET", fmt.Sprintf("/api/v1/messages/%d/thread?limit=2&offset=0", rootMessage.ID), nil)
+	threadReq.Header.Set("Authorization", "Bearer "+senderToken)
+	threadResp := doRequest(t, deps.Router, threadReq)
+	require.Equal(t, http.StatusOK, threadResp.Code, "thread body=%s", threadResp.Body.String())
+
+	var threadPayload struct {
+		RootMessage models.Message   `json:"root_message"`
+		Replies     []models.Message `json:"replies"`
+		ReplyCount  int              `json:"reply_count"`
+		Limit       int              `json:"limit"`
+		Offset      int              `json:"offset"`
+	}
+	require.NoError(t, json.Unmarshal(threadResp.Body.Bytes(), &threadPayload))
+	require.Equal(t, rootMessage.ID, threadPayload.RootMessage.ID)
+	require.Len(t, threadPayload.Replies, 2)
+	require.Equal(t, 3, threadPayload.ReplyCount)
+	require.Equal(t, 2, threadPayload.Limit)
+	require.Equal(t, 0, threadPayload.Offset)
+	require.True(t, threadPayload.Replies[0].SentAt.Before(threadPayload.Replies[1].SentAt) || threadPayload.Replies[0].SentAt.Equal(threadPayload.Replies[1].SentAt))
+
+	threadReqPage2, _ := http.NewRequest("GET", fmt.Sprintf("/api/v1/messages/%d/thread?limit=2&offset=2", rootMessage.ID), nil)
+	threadReqPage2.Header.Set("Authorization", "Bearer "+senderToken)
+	threadRespPage2 := doRequest(t, deps.Router, threadReqPage2)
+	require.Equal(t, http.StatusOK, threadRespPage2.Code, "thread page2 body=%s", threadRespPage2.Body.String())
+
+	var threadPayloadPage2 struct {
+		Replies    []models.Message `json:"replies"`
+		ReplyCount int              `json:"reply_count"`
+		Limit      int              `json:"limit"`
+		Offset     int              `json:"offset"`
+	}
+	require.NoError(t, json.Unmarshal(threadRespPage2.Body.Bytes(), &threadPayloadPage2))
+	require.Len(t, threadPayloadPage2.Replies, 1)
+	require.Equal(t, 3, threadPayloadPage2.ReplyCount)
+	require.Equal(t, 2, threadPayloadPage2.Limit)
+	require.Equal(t, 2, threadPayloadPage2.Offset)
+}
+
+func TestGetMessageThreadEndpoint_RejectsUnauthorizedAndOutsider_Integration(t *testing.T) {
+	deps := newTestDeps(t)
+	defer deps.DB.Close()
+
+	sender := createUser(t, deps.UserRepo, "thread_auth_sender", "user")
+	recipient := createUser(t, deps.UserRepo, "thread_auth_recipient", "user")
+	outsider := createUser(t, deps.UserRepo, "thread_auth_outsider", "user")
+	senderToken, _ := deps.AuthService.GenerateJWT(sender.ID, "", sender.Username, sender.Role)
+	outsiderToken, _ := deps.AuthService.GenerateJWT(outsider.ID, "", outsider.Username, outsider.Role)
+
+	conversation, err := deps.ConversationRepo.Create(context.Background(), sender.ID, recipient.ID)
+	require.NoError(t, err)
+
+	rootBody := []byte(fmt.Sprintf(
+		`{"conversation_id":%d,"encrypted_content":"thread-auth-root","message_type":"text","encryption_version":"v1"}`,
+		conversation.ID,
+	))
+	rootReq, _ := http.NewRequest("POST", "/api/v1/messages", bytes.NewReader(rootBody))
+	rootReq.Header.Set("Authorization", "Bearer "+senderToken)
+	rootReq.Header.Set("Content-Type", "application/json")
+	rootResp := doRequest(t, deps.Router, rootReq)
+	require.Equal(t, http.StatusCreated, rootResp.Code, "root body=%s", rootResp.Body.String())
+
+	var rootMessage models.Message
+	require.NoError(t, json.Unmarshal(rootResp.Body.Bytes(), &rootMessage))
+
+	unauthReq, _ := http.NewRequest("GET", fmt.Sprintf("/api/v1/messages/%d/thread", rootMessage.ID), nil)
+	unauthResp := doRequest(t, deps.Router, unauthReq)
+	require.Equal(t, http.StatusUnauthorized, unauthResp.Code)
+
+	outsiderReq, _ := http.NewRequest("GET", fmt.Sprintf("/api/v1/messages/%d/thread", rootMessage.ID), nil)
+	outsiderReq.Header.Set("Authorization", "Bearer "+outsiderToken)
+	outsiderResp := doRequest(t, deps.Router, outsiderReq)
+	require.Equal(t, http.StatusForbidden, outsiderResp.Code, "body=%s", outsiderResp.Body.String())
+}
+
 func TestEditMessageEndpoint_UpdatesMessageAndHistory(t *testing.T) {
 	deps := newTestDeps(t)
 	defer deps.DB.Close()

@@ -27,6 +27,9 @@ type Message struct {
 	PinnedAt                 *time.Time     `json:"pinned_at,omitempty"`
 	DeletedForSender         bool           `json:"deleted_for_sender"`
 	DeletedForRecipient      bool           `json:"deleted_for_recipient"`
+	ReplyTo                  *int           `json:"reply_to,omitempty"`
+	ThreadRoot               *int           `json:"thread_root,omitempty"`
+	ReplyCount               int            `json:"reply_count"`
 	MediaFileID              *int           `json:"media_file_id,omitempty"` // References media_files table
 	MediaURL                 *string        `json:"media_url,omitempty"`
 	MediaType                *string        `json:"media_type,omitempty"`
@@ -69,11 +72,11 @@ func (r *MessageRepository) Create(ctx context.Context, message *Message) error 
 	query := `
 		INSERT INTO messages (
 			conversation_id, sender_id, recipient_id, encrypted_content, sender_encrypted_content,
-			message_type, media_file_id, media_url, media_type, media_size, encryption_version,
+			message_type, reply_to, thread_root, media_file_id, media_url, media_type, media_size, encryption_version,
 			media_encryption_key, media_encryption_iv, sender_media_encryption_key,
 			is_multi_recipient, shared_encryption_iv
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
 		RETURNING id, sent_at
 	`
 
@@ -85,6 +88,8 @@ func (r *MessageRepository) Create(ctx context.Context, message *Message) error 
 		message.EncryptedContent,
 		message.SenderEncryptedContent,
 		message.MessageType,
+		message.ReplyTo,
+		message.ThreadRoot,
 		message.MediaFileID,
 		message.MediaURL,
 		message.MediaType,
@@ -156,6 +161,7 @@ func (r *MessageRepository) GetByID(ctx context.Context, id int) (*Message, erro
 		       m.message_type, m.sent_at, m.delivered_at, m.read_at,
 		       COALESCE(m.edited, FALSE) AS edited, m.edited_at,
 		       m.deleted_for_sender, m.deleted_for_recipient,
+		       m.reply_to, m.thread_root, COALESCE(m.reply_count, 0) AS reply_count,
 		       m.media_file_id,
 		       COALESCE(mf.storage_url, m.media_url) as media_url,
 		       COALESCE(m.media_type, mf.file_type) as media_type,
@@ -186,6 +192,9 @@ func (r *MessageRepository) GetByID(ctx context.Context, id int) (*Message, erro
 		&message.EditedAt,
 		&message.DeletedForSender,
 		&message.DeletedForRecipient,
+		&message.ReplyTo,
+		&message.ThreadRoot,
+		&message.ReplyCount,
 		&message.MediaFileID,
 		&message.MediaURL,
 		&message.MediaType,
@@ -219,6 +228,7 @@ func (r *MessageRepository) GetByConversationID(ctx context.Context, conversatio
 		       m.message_type, m.sent_at, m.delivered_at, m.read_at,
 		       COALESCE(m.edited, FALSE) AS edited, m.edited_at,
 		       m.deleted_for_sender, m.deleted_for_recipient,
+		       m.reply_to, m.thread_root, COALESCE(m.reply_count, 0) AS reply_count,
 		       m.media_file_id,
 		       COALESCE(mf.storage_url, m.media_url) as media_url,
 		       COALESCE(m.media_type, mf.file_type) as media_type,
@@ -270,6 +280,9 @@ func (r *MessageRepository) GetByConversationID(ctx context.Context, conversatio
 			&message.EditedAt,
 			&message.DeletedForSender,
 			&message.DeletedForRecipient,
+			&message.ReplyTo,
+			&message.ThreadRoot,
+			&message.ReplyCount,
 			&message.MediaFileID,
 			&message.MediaURL,
 			&message.MediaType,
@@ -310,6 +323,7 @@ func (r *MessageRepository) GetByConversationIDWithCursor(
 		       m.sender_encrypted_content,
 		       m.message_type, m.sent_at, m.delivered_at, m.read_at,
 		       m.deleted_for_sender, m.deleted_for_recipient,
+		       m.reply_to, m.thread_root, COALESCE(m.reply_count, 0) AS reply_count,
 		       m.media_file_id,
 		       COALESCE(mf.storage_url, m.media_url) as media_url,
 		       COALESCE(m.media_type, mf.file_type) as media_type,
@@ -366,6 +380,9 @@ func (r *MessageRepository) GetByConversationIDWithCursor(
 			&message.ReadAt,
 			&message.DeletedForSender,
 			&message.DeletedForRecipient,
+			&message.ReplyTo,
+			&message.ThreadRoot,
+			&message.ReplyCount,
 			&message.MediaFileID,
 			&message.MediaURL,
 			&message.MediaType,
@@ -399,6 +416,7 @@ func (r *MessageRepository) GetByConversationIDForAll(ctx context.Context, conve
 		       m.sender_encrypted_content,
 		       m.message_type, m.sent_at, m.delivered_at, m.read_at,
 		       m.deleted_for_sender, m.deleted_for_recipient,
+		       m.reply_to, m.thread_root, COALESCE(m.reply_count, 0) AS reply_count,
 		       m.media_file_id,
 		       COALESCE(mf.storage_url, m.media_url) as media_url,
 		       COALESCE(m.media_type, mf.file_type) as media_type,
@@ -445,6 +463,9 @@ func (r *MessageRepository) GetByConversationIDForAll(ctx context.Context, conve
 			&message.ReadAt,
 			&message.DeletedForSender,
 			&message.DeletedForRecipient,
+			&message.ReplyTo,
+			&message.ThreadRoot,
+			&message.ReplyCount,
 			&message.MediaFileID,
 			&message.MediaURL,
 			&message.MediaType,
@@ -485,6 +506,7 @@ func (r *MessageRepository) GetByConversationIDForAllWithCursor(
 		       m.sender_encrypted_content,
 		       m.message_type, m.sent_at, m.delivered_at, m.read_at,
 		       m.deleted_for_sender, m.deleted_for_recipient,
+		       m.reply_to, m.thread_root, COALESCE(m.reply_count, 0) AS reply_count,
 		       m.media_file_id,
 		       COALESCE(mf.storage_url, m.media_url) as media_url,
 		       COALESCE(m.media_type, mf.file_type) as media_type,
@@ -538,6 +560,9 @@ func (r *MessageRepository) GetByConversationIDForAllWithCursor(
 			&message.ReadAt,
 			&message.DeletedForSender,
 			&message.DeletedForRecipient,
+			&message.ReplyTo,
+			&message.ThreadRoot,
+			&message.ReplyCount,
 			&message.MediaFileID,
 			&message.MediaURL,
 			&message.MediaType,
@@ -712,6 +737,7 @@ func (r *MessageRepository) GetLatestMessage(ctx context.Context, conversationID
 		       m.sender_encrypted_content,
 		       m.message_type, m.sent_at, m.delivered_at, m.read_at,
 		       m.deleted_for_sender, m.deleted_for_recipient,
+		       m.reply_to, m.thread_root, COALESCE(m.reply_count, 0) AS reply_count,
 		       m.media_file_id,
 		       COALESCE(mf.storage_url, m.media_url) as media_url,
 		       COALESCE(m.media_type, mf.file_type) as media_type,
@@ -747,6 +773,9 @@ func (r *MessageRepository) GetLatestMessage(ctx context.Context, conversationID
 		&message.ReadAt,
 		&message.DeletedForSender,
 		&message.DeletedForRecipient,
+		&message.ReplyTo,
+		&message.ThreadRoot,
+		&message.ReplyCount,
 		&message.MediaFileID,
 		&message.MediaURL,
 		&message.MediaType,

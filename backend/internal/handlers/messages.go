@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"log"
@@ -305,7 +306,8 @@ type SendMessageRequest struct {
 	EncryptedContent         string         `json:"encrypted_content,omitempty"` // Base64 encoded encrypted blob
 	SenderEncryptedContent   *string        `json:"sender_encrypted_content,omitempty"`
 	MessageType              string         `json:"message_type" binding:"required"` // "text", "image", "video", "audio", "file"
-	MediaFileID              *int           `json:"media_file_id,omitempty"`         // References media_files table
+	ReplyTo                  *int           `json:"reply_to,omitempty"`
+	MediaFileID              *int           `json:"media_file_id,omitempty"` // References media_files table
 	MediaURL                 *string        `json:"media_url,omitempty"`
 	MediaType                *string        `json:"media_type,omitempty"`
 	MediaSize                *int           `json:"media_size,omitempty"`
@@ -400,6 +402,7 @@ func (h *MessagesHandler) SendMessage(c *gin.Context) {
 	}
 
 	var recipientID int
+	var threadRoot *int
 
 	// For mod_mail conversations, verify participation differently
 	if conversationType == "mod_mail" {
@@ -468,6 +471,37 @@ func (h *MessagesHandler) SendMessage(c *gin.Context) {
 		}
 	}
 
+	if req.ReplyTo != nil {
+		if *req.ReplyTo <= 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "reply_to must be a positive message ID"})
+			return
+		}
+		var parentConversationID int
+		var parentThreadRoot sql.NullInt64
+		err = h.pool.QueryRow(c.Request.Context(), `
+			SELECT conversation_id, thread_root
+			FROM messages
+			WHERE id = $1
+		`, *req.ReplyTo).Scan(&parentConversationID, &parentThreadRoot)
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				c.JSON(http.StatusNotFound, gin.H{"error": "Reply target message not found"})
+				return
+			}
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to validate reply target", "details": err.Error()})
+			return
+		}
+		if parentConversationID != req.ConversationID {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "reply_to must reference a message in the same conversation"})
+			return
+		}
+		rootID := *req.ReplyTo
+		if parentThreadRoot.Valid {
+			rootID = int(parentThreadRoot.Int64)
+		}
+		threadRoot = &rootID
+	}
+
 	if req.EncryptionVersion == "" {
 		if req.IsMultiRecipient {
 			req.EncryptionVersion = "v2"
@@ -522,6 +556,8 @@ func (h *MessagesHandler) SendMessage(c *gin.Context) {
 		EncryptedContent:         req.EncryptedContent,
 		SenderEncryptedContent:   req.SenderEncryptedContent,
 		MessageType:              req.MessageType,
+		ReplyTo:                  req.ReplyTo,
+		ThreadRoot:               threadRoot,
 		MediaFileID:              req.MediaFileID,
 		MediaURL:                 req.MediaURL,
 		MediaType:                req.MediaType,
@@ -538,6 +574,17 @@ func (h *MessagesHandler) SendMessage(c *gin.Context) {
 	if err := h.messageRepo.Create(c.Request.Context(), message); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to send message", "details": err.Error()})
 		return
+	}
+	if req.ReplyTo != nil {
+		if _, err := h.pool.Exec(c.Request.Context(), `
+			UPDATE messages
+			SET reply_count = reply_count + 1
+			WHERE id = $1
+		`, *req.ReplyTo); err != nil {
+			_, _ = h.pool.Exec(c.Request.Context(), `DELETE FROM messages WHERE id = $1`, message.ID)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update thread metadata", "details": err.Error()})
+			return
+		}
 	}
 
 	// Reload message to include joined media data (URLs, types, etc.)
@@ -1652,6 +1699,191 @@ func (h *MessagesHandler) GetMessages(c *gin.Context) {
 		response["next_cursor"] = nextCursor
 	}
 	c.JSON(http.StatusOK, response)
+}
+
+// GetThread handles GET /api/v1/messages/:id/thread
+// Returns the thread root and paginated replies in chronological order.
+func (h *MessagesHandler) GetThread(c *gin.Context) {
+	userIDValue, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
+	userID := userIDValue.(int)
+
+	messageID, err := strconv.Atoi(c.Param("id"))
+	if err != nil || messageID <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid message ID"})
+		return
+	}
+
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
+	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
+	if limit < 1 || limit > 100 {
+		limit = 20
+	}
+	if offset < 0 {
+		offset = 0
+	}
+
+	targetMessage, err := h.messageRepo.GetByID(c.Request.Context(), messageID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Message not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load message", "details": err.Error()})
+		return
+	}
+
+	canAccess, err := h.canAccessConversation(c.Request.Context(), targetMessage.ConversationID, userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to validate conversation access", "details": err.Error()})
+		return
+	}
+	if !canAccess {
+		c.JSON(http.StatusForbidden, gin.H{"error": "You are not authorized to access this message"})
+		return
+	}
+
+	rootID := targetMessage.ID
+	if targetMessage.ThreadRoot != nil && *targetMessage.ThreadRoot > 0 {
+		rootID = *targetMessage.ThreadRoot
+	}
+
+	rootMessage := targetMessage
+	if rootID != targetMessage.ID {
+		rootMessage, err = h.messageRepo.GetByID(c.Request.Context(), rootID)
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				c.JSON(http.StatusNotFound, gin.H{"error": "Thread root message not found"})
+				return
+			}
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load thread root", "details": err.Error()})
+			return
+		}
+	}
+
+	conversationType, err := h.getConversationType(c.Request.Context(), rootMessage.ConversationID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load conversation type", "details": err.Error()})
+		return
+	}
+
+	var countQuery string
+	var idQuery string
+	if conversationType == "mod_mail" {
+		countQuery = `
+			SELECT COUNT(*)
+			FROM messages m
+			WHERE m.conversation_id = $1
+			  AND m.thread_root = $2
+			  AND m.id <> $2
+			  AND NOT (m.deleted_for_sender = TRUE AND m.deleted_for_recipient = TRUE)
+			  AND NOT EXISTS (
+			    SELECT 1 FROM blocked_users bu
+			    WHERE bu.blocker_id = $3
+			      AND bu.blocked_id = m.sender_id
+			  )
+		`
+		idQuery = `
+			SELECT m.id
+			FROM messages m
+			WHERE m.conversation_id = $1
+			  AND m.thread_root = $2
+			  AND m.id <> $2
+			  AND NOT (m.deleted_for_sender = TRUE AND m.deleted_for_recipient = TRUE)
+			  AND NOT EXISTS (
+			    SELECT 1 FROM blocked_users bu
+			    WHERE bu.blocker_id = $3
+			      AND bu.blocked_id = m.sender_id
+			  )
+			ORDER BY m.sent_at ASC, m.id ASC
+			LIMIT $4 OFFSET $5
+		`
+	} else {
+		countQuery = `
+			SELECT COUNT(*)
+			FROM messages m
+			WHERE m.conversation_id = $1
+			  AND m.thread_root = $2
+			  AND m.id <> $2
+			  AND (
+			    (m.sender_id = $3 AND m.deleted_for_sender = FALSE)
+			    OR
+			    (m.recipient_id = $3 AND m.deleted_for_recipient = FALSE)
+			  )
+			  AND NOT EXISTS (
+			    SELECT 1 FROM blocked_users bu
+			    WHERE bu.blocker_id = $3
+			      AND bu.blocked_id = m.sender_id
+			  )
+		`
+		idQuery = `
+			SELECT m.id
+			FROM messages m
+			WHERE m.conversation_id = $1
+			  AND m.thread_root = $2
+			  AND m.id <> $2
+			  AND (
+			    (m.sender_id = $3 AND m.deleted_for_sender = FALSE)
+			    OR
+			    (m.recipient_id = $3 AND m.deleted_for_recipient = FALSE)
+			  )
+			  AND NOT EXISTS (
+			    SELECT 1 FROM blocked_users bu
+			    WHERE bu.blocker_id = $3
+			      AND bu.blocked_id = m.sender_id
+			  )
+			ORDER BY m.sent_at ASC, m.id ASC
+			LIMIT $4 OFFSET $5
+		`
+	}
+
+	var totalReplies int
+	if err := h.pool.QueryRow(c.Request.Context(), countQuery, rootMessage.ConversationID, rootID, userID).Scan(&totalReplies); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to count thread replies", "details": err.Error()})
+		return
+	}
+
+	rows, err := h.pool.Query(c.Request.Context(), idQuery, rootMessage.ConversationID, rootID, userID, limit, offset)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to list thread replies", "details": err.Error()})
+		return
+	}
+	defer rows.Close()
+
+	replyIDs := make([]int, 0, limit)
+	for rows.Next() {
+		var id int
+		if err := rows.Scan(&id); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to scan thread replies", "details": err.Error()})
+			return
+		}
+		replyIDs = append(replyIDs, id)
+	}
+	if err := rows.Err(); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to read thread replies", "details": err.Error()})
+		return
+	}
+
+	replies := make([]*models.Message, 0, len(replyIDs))
+	for _, id := range replyIDs {
+		msg, err := h.messageRepo.GetByID(c.Request.Context(), id)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load thread reply", "details": err.Error()})
+			return
+		}
+		replies = append(replies, msg)
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"root_message": rootMessage,
+		"replies":      replies,
+		"reply_count":  totalReplies,
+		"limit":        limit,
+		"offset":       offset,
+	})
 }
 
 // MarkAsRead handles POST /api/v1/conversations/:id/read
