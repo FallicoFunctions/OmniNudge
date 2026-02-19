@@ -1419,7 +1419,8 @@
     "actions": {
       "loadOlder": "تحميل الرسائل الأقدم",
       "report": "إبلاغ",
-      "viewProfile": "عرض الملف الشخصي"
+      "viewProfile": "عرض الملف الشخصي",
+      "reply": "رد"
     },
     "threadPreview": {
       "replyCount_one": "{{count}} رد",

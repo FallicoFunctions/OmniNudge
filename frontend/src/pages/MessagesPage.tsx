@@ -636,6 +636,7 @@ export default function MessagesPage() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploadingMedia, setUploadingMedia] = useState(false);
   const [messageMenuOpen, setMessageMenuOpen] = useState<number | null>(null);
+  const [replyTargetMessage, setReplyTargetMessage] = useState<Message | null>(null);
   const [deleteDialogMessage, setDeleteDialogMessage] = useState<Message | null>(null);
   const [deleteScopeInFlight, setDeleteScopeInFlight] = useState<'self' | 'both' | null>(null);
   const [forwardDialogMessage, setForwardDialogMessage] = useState<Message | null>(null);
@@ -825,6 +826,7 @@ export default function MessagesPage() {
 
   useEffect(() => {
     setThreadRootMessageId(null);
+    setReplyTargetMessage(null);
   }, [selectedConversationId]);
 
   const selectedConversation = conversations?.find((c) => c.id === selectedConversationId);
@@ -966,6 +968,7 @@ export default function MessagesPage() {
       queryClient.invalidateQueries({ queryKey: ['conversations', 'all'] });
       setMessageText('');
       setSelectedFile(null);
+      setReplyTargetMessage(null);
       if (!variables.conversation_id && variables.recipient_username) {
         setSelectedConversationId(message.conversation_id);
         setIsCreatingChat(false);
@@ -1707,6 +1710,7 @@ export default function MessagesPage() {
           media_encryption_key: mediaEncryptionKey,
           media_encryption_iv: mediaEncryptionIv,
           sender_media_encryption_key: senderMediaEncryptionKey,
+          reply_to: replyTargetMessage?.id ?? undefined,
         });
         return;
       }
@@ -1733,6 +1737,7 @@ export default function MessagesPage() {
           media_encryption_key: mediaEncryptionKey,
           media_encryption_iv: mediaEncryptionIv,
           sender_media_encryption_key: senderMediaEncryptionKey,
+          reply_to: replyTargetMessage?.id ?? undefined,
         });
       }
     } catch (error) {
@@ -3059,6 +3064,16 @@ export default function MessagesPage() {
                                   <button
                                     type="button"
                                     className="w-full rounded-md px-3 py-2 text-left text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
+                                    onClick={() => {
+                                      setReplyTargetMessage(message);
+                                      setMessageMenuOpen(null);
+                                    }}
+                                  >
+                                    {t('messages.actions.reply')}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="w-full rounded-md px-3 py-2 text-left text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
                                     onClick={() => handleOpenForwardDialog(message)}
                                   >
                                     {t('messages.actions.forward', { defaultValue: 'Forward' })}
@@ -3222,6 +3237,38 @@ export default function MessagesPage() {
                           })) || []
                     }
                   />
+                )}
+
+                {replyTargetMessage && !isCreatingChat && (
+                  <div className="mb-2 flex items-center justify-between gap-2 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-2 py-1">
+                    <ReplyIndicator
+                      parentUsername={
+                        replyTargetMessage.sender_id === user?.id
+                          ? t('messages.you')
+                          : (selectedConversation?.other_user?.username ?? t('messages.user'))
+                      }
+                      parentPreview={
+                        replyTargetMessage.message_type !== 'text'
+                          ? t('messages.replyIndicator.attachment')
+                          : t('messages.replyIndicator.originalMessage')
+                      }
+                      onJumpToOriginal={() => {
+                        const parentElement = document.getElementById(
+                          `message-${replyTargetMessage.id}`
+                        );
+                        if (parentElement) {
+                          parentElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        }
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setReplyTargetMessage(null)}
+                      className="rounded px-2 py-1 text-xs font-semibold text-[var(--color-text-secondary)] hover:bg-[var(--color-surface)]"
+                    >
+                      {t('common.cancel')}
+                    </button>
+                  </div>
                 )}
 
                 <form onSubmit={handleSendMessage} className="flex gap-2">

@@ -1419,7 +1419,8 @@
     "actions": {
       "loadOlder": "Load older messages",
       "report": "Report",
-      "viewProfile": "View Profile"
+      "viewProfile": "View Profile",
+      "reply": "Reply"
     },
     "threadPreview": {
       "replyCount_one": "{{count}} reply",
