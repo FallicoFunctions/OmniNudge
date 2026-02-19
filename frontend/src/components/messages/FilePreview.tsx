@@ -1,6 +1,7 @@
-import { useMemo, type SyntheticEvent } from 'react';
+import { useMemo, useState, type SyntheticEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import AudioPlayer from './AudioPlayer';
+import PDFViewerModal from './PDFViewerModal';
 
 type PreviewKind = 'image' | 'video' | 'audio' | 'pdf' | 'text' | 'document' | 'file';
 
@@ -84,6 +85,7 @@ export default function FilePreview({
 }: FilePreviewProps) {
   const { t } = useTranslation();
   const kind = useMemo(() => detectPreviewKind(mimeType), [mimeType]);
+  const [pdfModalOpen, setPdfModalOpen] = useState(false);
   const displayName =
     fileName?.trim() || fallbackFileNameFromSrc(src, t('messages.media.attachmentFallback'));
   const sizeLabel = formatFileSize(fileSize);
@@ -141,45 +143,59 @@ export default function FilePreview({
 
   if (kind === 'pdf') {
     return (
-      <div className={`rounded border border-[var(--color-border)] p-3 ${className}`.trim()}>
-        <div className="mb-2 flex items-start gap-3">
-          {thumbnailUrl ? (
-            <img
-              src={thumbnailUrl}
-              alt={t('messages.media.preview.pdfThumbnailAlt')}
-              className="h-16 w-12 rounded border border-[var(--color-border)] object-cover"
-            />
-          ) : (
-            <div className="flex h-16 w-12 items-center justify-center rounded border border-[var(--color-border)] text-xs font-semibold">
-              PDF
-            </div>
-          )}
-          <div className="min-w-0 flex-1">
-            <div className="truncate text-sm font-medium">{displayName}</div>
-            <div className="text-xs text-[var(--color-text-muted)]">
-              {fileSizePrefix}: {sizeLabel}
+      <>
+        <div className={`rounded border border-[var(--color-border)] p-3 ${className}`.trim()}>
+          <div className="mb-2 flex items-start gap-3">
+            {thumbnailUrl ? (
+              <img
+                src={thumbnailUrl}
+                alt={t('messages.media.preview.pdfThumbnailAlt')}
+                className="h-16 w-12 rounded border border-[var(--color-border)] object-cover"
+              />
+            ) : (
+              <div className="flex h-16 w-12 items-center justify-center rounded border border-[var(--color-border)] text-xs font-semibold">
+                PDF
+              </div>
+            )}
+            <div className="min-w-0 flex-1">
+              <div className="truncate text-sm font-medium">{displayName}</div>
+              <div className="text-xs text-[var(--color-text-muted)]">
+                {fileSizePrefix}: {sizeLabel}
+              </div>
             </div>
           </div>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                if (onOpen) {
+                  onOpen();
+                  return;
+                }
+                setPdfModalOpen(true);
+              }}
+              className="rounded bg-[var(--color-primary)] px-2 py-1 text-xs font-semibold text-white"
+            >
+              {openLabel}
+            </button>
+            <a
+              href={src}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="rounded border border-[var(--color-border)] px-2 py-1 text-xs font-semibold"
+              download={displayName}
+            >
+              {downloadLabel}
+            </a>
+          </div>
         </div>
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={() => (onOpen ? onOpen() : window.open(src, '_blank'))}
-            className="rounded bg-[var(--color-primary)] px-2 py-1 text-xs font-semibold text-white"
-          >
-            {openLabel}
-          </button>
-          <a
-            href={src}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="rounded border border-[var(--color-border)] px-2 py-1 text-xs font-semibold"
-            download={displayName}
-          >
-            {downloadLabel}
-          </a>
-        </div>
-      </div>
+        <PDFViewerModal
+          isOpen={pdfModalOpen}
+          pdfUrl={src}
+          fileName={displayName}
+          onClose={() => setPdfModalOpen(false)}
+        />
+      </>
     );
   }
 

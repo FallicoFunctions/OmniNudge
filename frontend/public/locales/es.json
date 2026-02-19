@@ -1496,6 +1496,14 @@
         "speed": "Velocidad",
         "speedLabel": "Velocidad: {{speed}}x",
         "speedOption": "{{speed}}x"
+      },
+      "pdfViewer": {
+        "prev": "Anterior",
+        "next": "Siguiente",
+        "zoomIn": "Acercar",
+        "zoomOut": "Alejar",
+        "pageLabel": "Página {{current}} de {{total}}",
+        "loadFailed": "No se pudo cargar el PDF."
       }
     },
     "compose": {
