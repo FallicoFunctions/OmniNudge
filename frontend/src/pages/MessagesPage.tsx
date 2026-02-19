@@ -25,9 +25,14 @@ import { PinnedMessagesBar } from '../components/messages/PinnedMessagesBar';
 import { ThreadPreview } from '../components/messages/ThreadPreview';
 import { ThreadView } from '../components/messages/ThreadView';
 import { ReplyIndicator } from '../components/messages/ReplyIndicator';
+import { FolderList } from '../components/messages/FolderList';
+import { FolderModal } from '../components/messages/FolderModal';
+import { FolderBadge } from '../components/messages/FolderBadge';
+import { ConversationFolderMenu } from '../components/messages/ConversationFolderMenu';
 import FilePreview from '../components/messages/FilePreview';
 import { usePinnedMessages } from '../hooks/usePinnedMessages';
 import { useArchive } from '../hooks/useArchive';
+import { useFolders } from '../hooks/useFolders';
 import { useDebounce } from '../hooks/useDebounce';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import type {
@@ -690,6 +695,21 @@ export default function MessagesPage() {
   const isInChat = Boolean(selectedConversationId || isCreatingChat);
   const [showMessageSearch, setShowMessageSearch] = useState(false);
   const [threadRootMessageId, setThreadRootMessageId] = useState<number | null>(null);
+  const [smartFolder, setSmartFolder] = useState<'unread' | null>(null);
+  const {
+    folders,
+    selectedFolderId,
+    setSelectedFolderId,
+    filterConversationsBySelectedFolder,
+    isLoadingFolders,
+    createFolder,
+    updateFolder,
+    deleteFolder,
+    addConversationToFolder,
+    removeConversationFromFolder,
+  } = useFolders();
+  const [folderModalOpen, setFolderModalOpen] = useState<'new' | { folder: import('../types/messages').ConversationFolder } | null>(null);
+  const [deleteFolderTarget, setDeleteFolderTarget] = useState<import('../types/messages').ConversationFolder | null>(null);
   const resetMessageSearch = useCallback(() => {
     setMessageSearchQuery('');
     setMessageSearchSenderFilter('all');
@@ -765,8 +785,13 @@ export default function MessagesPage() {
     if (activeTab === 'archived') {
       return allConversations.filter((c) => isArchived(c));
     }
-    return allConversations.filter((c) => !isArchived(c));
-  }, [allConversations, activeTab]);
+    const activeConversations = allConversations.filter((c) => !isArchived(c));
+    const folderFiltered = filterConversationsBySelectedFolder(activeConversations);
+    if (smartFolder === 'unread') {
+      return folderFiltered.filter((c) => c.unread_count > 0);
+    }
+    return folderFiltered;
+  }, [allConversations, activeTab, filterConversationsBySelectedFolder, smartFolder]);
 
   // Apply search filter
   const conversations = useMemo(() => {
@@ -2233,10 +2258,27 @@ export default function MessagesPage() {
         <div
           className={
             isMobile
-              ? `absolute inset-0 overflow-hidden border-r border-[var(--color-border)] bg-[var(--color-surface)] will-change-transform transition-transform duration-[250ms] ease-in-out ${isInChat ? '-translate-x-full' : 'translate-x-0'}`
-              : 'w-80 flex-shrink-0 overflow-hidden border-r border-[var(--color-border)] bg-[var(--color-surface)]'
+              ? `absolute inset-0 flex overflow-hidden border-r border-[var(--color-border)] bg-[var(--color-surface)] will-change-transform transition-transform duration-[250ms] ease-in-out ${isInChat ? '-translate-x-full' : 'translate-x-0'}`
+              : 'flex w-80 flex-shrink-0 overflow-hidden border-r border-[var(--color-border)] bg-[var(--color-surface)]'
           }
         >
+          {/* Folder sidebar — hidden on mobile */}
+          {!isMobile && folders.length > 0 && (
+            <FolderList
+              folders={folders}
+              selectedFolderId={selectedFolderId}
+              smartFolder={smartFolder}
+              onSelectFolder={setSelectedFolderId}
+              onSelectSmartFolder={setSmartFolder}
+              onNewFolder={() => setFolderModalOpen('new')}
+              onEditFolder={(folder) => setFolderModalOpen({ folder })}
+              onDeleteFolder={(folder) => setDeleteFolderTarget(folder)}
+              isLoading={isLoadingFolders}
+            />
+          )}
+
+          {/* Conversation list panel */}
+          <div className="flex flex-1 flex-col overflow-hidden">
           <div className="border-b border-[var(--color-border)] p-4">
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-lg font-semibold text-[var(--color-text-primary)]">
@@ -2308,7 +2350,7 @@ export default function MessagesPage() {
             </div>
           </div>
 
-          <div className="overflow-y-auto" style={{ height: 'calc(100% - 180px)' }}>
+          <div className="flex-1 overflow-y-auto min-h-0">
             {loadingConversations && (
               <div className="p-4 text-center">
                 <LoadingMessage className="text-sm">{t('common.loading')}</LoadingMessage>
@@ -2435,6 +2477,15 @@ export default function MessagesPage() {
                         className="mt-1 text-sm text-[var(--color-text-secondary)] line-clamp-2"
                       />
                     )}
+                  {/* Show folder badge when viewing a specific folder */}
+                  {selectedFolderId !== null && (() => {
+                    const activeFolder = folders.find((f) => f.id === selectedFolderId);
+                    return activeFolder ? (
+                      <span className="mt-1 block">
+                        <FolderBadge folder={activeFolder} />
+                      </span>
+                    ) : null;
+                  })()}
                 </div>
                 {/* Context Menu */}
                 {conversationMenuOpen === conversation.id && (
@@ -2487,6 +2538,18 @@ export default function MessagesPage() {
                     >
                       {t('common.delete')}
                     </button>
+                    {folders.length > 0 && (
+                      <ConversationFolderMenu
+                        conversationId={conversation.id}
+                        folders={folders}
+                        onAdd={(folderID) =>
+                          addConversationToFolder({ folderID, conversationID: conversation.id })
+                        }
+                        onRemove={(folderID) =>
+                          removeConversationFromFolder({ folderID, conversationID: conversation.id })
+                        }
+                      />
+                    )}
                   </div>
                 )}
               </div>
@@ -2511,6 +2574,7 @@ export default function MessagesPage() {
               </div>
             )}
           </div>
+          </div>{/* end conversation list panel */}
         </div>
 
         {/* Chat Area */}
@@ -3832,6 +3896,58 @@ export default function MessagesPage() {
           }}
           includeTextPosts={true}
         />
+      )}
+
+      {/* Folder create/edit modal */}
+      {folderModalOpen !== null && (
+        <FolderModal
+          folder={folderModalOpen !== 'new' ? folderModalOpen.folder : undefined}
+          onSave={async (data) => {
+            if (folderModalOpen === 'new') {
+              await createFolder(data);
+            } else {
+              await updateFolder({ id: folderModalOpen.folder.id, patch: data });
+            }
+          }}
+          onClose={() => setFolderModalOpen(null)}
+        />
+      )}
+
+      {/* Delete folder confirmation */}
+      {deleteFolderTarget !== null && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          role="dialog"
+          aria-modal="true"
+        >
+          <div className="w-full max-w-sm rounded-xl bg-[var(--color-surface)] p-6 shadow-xl">
+            <h2 className="mb-2 text-base font-semibold text-[var(--color-text-primary)]">
+              {t('messages.folders.deleteFolder')}
+            </h2>
+            <p className="mb-4 text-sm text-[var(--color-text-secondary)]">
+              {t('messages.folders.deleteConfirm', { name: deleteFolderTarget.name })}
+            </p>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setDeleteFolderTarget(null)}
+                className="flex-1 rounded-lg border border-[var(--color-border)] py-2 text-sm font-semibold text-[var(--color-text-secondary)] hover:bg-[var(--color-hover)]"
+              >
+                {t('messages.folders.cancel')}
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  await deleteFolder(deleteFolderTarget.id);
+                  setDeleteFolderTarget(null);
+                }}
+                className="flex-1 rounded-lg bg-[var(--color-error)] py-2 text-sm font-semibold text-white hover:opacity-90"
+              >
+                {t('messages.folders.deleteFolder')}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </>
   );

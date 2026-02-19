@@ -1647,7 +1647,31 @@
     "loadingSuggestions": "Loading suggestions...",
     "noSuggestions": "No suggestions found",
     "loadScroll": "Load Scroll",
-    "unsupportedMedia": "Unsupported media type"
+    "unsupportedMedia": "Unsupported media type",
+    "folders": {
+      "title": "Folders",
+      "allConversations": "All",
+      "unread": "Unread",
+      "newFolder": "New Folder",
+      "editFolder": "Edit Folder",
+      "deleteFolder": "Delete Folder",
+      "deleteConfirm": "Delete \"{{name}}\"? Conversations will not be deleted.",
+      "namePlaceholder": "Folder name",
+      "nameLabel": "Name",
+      "colorLabel": "Color",
+      "iconLabel": "Icon",
+      "save": "Save",
+      "cancel": "Cancel",
+      "addToFolder": "Add to Folder",
+      "removeFromFolder": "Remove from Folder",
+      "manageFolder": "Manage Folders",
+      "folderEmpty": "No conversations in this folder.",
+      "folderCount_one": "{{count}} conversation",
+      "folderCount_other": "{{count}} conversations",
+      "maxFolders": "You've reached the 50-folder limit.",
+      "loading": "Loading folders...",
+      "error": "Failed to load folders"
+    }
   },
   "posts": {
     "title": "Posts",

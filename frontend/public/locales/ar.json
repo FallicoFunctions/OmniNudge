@@ -1647,7 +1647,31 @@
     "loadingSuggestions": "جارٍ تحميل الاقتراحات...",
     "noSuggestions": "لم يتم العثور على اقتراحات",
     "loadScroll": "تحميل السّكرول",
-    "unsupportedMedia": "نوع الوسائط غير مدعوم"
+    "unsupportedMedia": "نوع الوسائط غير مدعوم",
+    "folders": {
+      "title": "المجلدات",
+      "allConversations": "الكل",
+      "unread": "غير مقروء",
+      "newFolder": "مجلد جديد",
+      "editFolder": "تعديل المجلد",
+      "deleteFolder": "حذف المجلد",
+      "deleteConfirm": "حذف \"{{name}}\"؟ لن يتم حذف المحادثات.",
+      "namePlaceholder": "اسم المجلد",
+      "nameLabel": "الاسم",
+      "colorLabel": "اللون",
+      "iconLabel": "الأيقونة",
+      "save": "حفظ",
+      "cancel": "إلغاء",
+      "addToFolder": "إضافة إلى مجلد",
+      "removeFromFolder": "إزالة من المجلد",
+      "manageFolder": "إدارة المجلدات",
+      "folderEmpty": "لا توجد محادثات في هذا المجلد.",
+      "folderCount_one": "{{count}} محادثة",
+      "folderCount_other": "{{count}} محادثة",
+      "maxFolders": "لقد وصلت إلى حد 50 مجلدًا.",
+      "loading": "جاري تحميل المجلدات...",
+      "error": "فشل تحميل المجلدات"
+    }
   },
   "posts": {
     "title": "المنشورات",
