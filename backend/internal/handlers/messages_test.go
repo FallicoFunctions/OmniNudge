@@ -15,6 +15,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/omninudge/backend/internal/database"
 	"github.com/omninudge/backend/internal/models"
+	"github.com/omninudge/backend/internal/services"
 	"github.com/omninudge/backend/internal/websocket"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -1594,6 +1595,61 @@ func TestEditMessage_RejectsModMailConversation(t *testing.T) {
 
 	assert.Equal(t, http.StatusForbidden, w.Code, w.Body.String())
 	assert.Contains(t, w.Body.String(), "Editing mod mail messages is not supported")
+}
+
+func TestEditMessage_CreatesParticipantNotification(t *testing.T) {
+	handler, db, user1ID, user2ID, convID, _, cleanup := setupMessagesHandlerTest(t)
+	defer cleanup()
+
+	handler.notifService = services.NewNotificationService(
+		db.Pool,
+		models.NewNotificationRepository(db.Pool),
+		models.NewUserBaselineRepository(db.Pool),
+		models.NewNotificationBatchRepository(db.Pool),
+		models.NewUserSettingsRepository(db.Pool),
+		models.NewPlatformPostRepository(db.Pool),
+		models.NewPostCommentRepository(db.Pool),
+		models.NewDeviceTokenRepository(db.Pool),
+		nil,
+		nil,
+	)
+
+	message := &models.Message{
+		ConversationID:    convID,
+		SenderID:          user1ID,
+		RecipientID:       user2ID,
+		EncryptedContent:  "original-encrypted",
+		MessageType:       "text",
+		EncryptionVersion: "v1",
+	}
+	require.NoError(t, handler.messageRepo.Create(context.Background(), message))
+
+	router := gin.Default()
+	router.PATCH("/messages/:id", func(c *gin.Context) {
+		c.Set("user_id", user1ID)
+		handler.EditMessage(c)
+	})
+
+	body := map[string]any{
+		"encrypted_content": "updated-encrypted",
+	}
+	bodyJSON, _ := json.Marshal(body)
+	req := httptest.NewRequest(http.MethodPatch, fmt.Sprintf("/messages/%d", message.ID), bytes.NewBuffer(bodyJSON))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+
+	require.Eventually(t, func() bool {
+		var count int
+		err := db.Pool.QueryRow(context.Background(), `
+			SELECT COUNT(*)
+			FROM notifications
+			WHERE user_id = $1 AND notification_type = 'message_edited' AND content_id = $2
+		`, user2ID, message.ID).Scan(&count)
+		require.NoError(t, err)
+		return count == 1
+	}, 2*time.Second, 50*time.Millisecond)
 }
 
 func TestGetMessageHistory_SuccessWithPagination(t *testing.T) {

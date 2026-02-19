@@ -758,28 +758,33 @@ func (h *MessagesHandler) EditMessage(c *gin.Context) {
 	updatedMessage.Edited = true
 	updatedMessage.EditedAt = &editedAt
 
-	if h.hub != nil {
+	if h.hub != nil || h.notifService != nil {
 		participantIDs, err := h.getConversationParticipantIDs(ctx, conversationID)
 		if err != nil {
 			log.Printf("[EditMessage] failed to load participants for websocket broadcast: conversation_id=%d err=%v", conversationID, err)
 		} else {
-			for _, participantID := range participantIDs {
-				if participantID == 0 {
-					continue
+			if h.hub != nil {
+				for _, participantID := range participantIDs {
+					if participantID == 0 {
+						continue
+					}
+					h.hub.Broadcast(&websocket.Message{
+						RecipientID: participantID,
+						Type:        "message_edited",
+						Payload: gin.H{
+							"message_id":               messageID,
+							"conversation_id":          conversationID,
+							"edited_at":                editedAt,
+							"edited_by":                userID,
+							"encrypted_content":        req.EncryptedContent,
+							"sender_encrypted_content": req.SenderEncryptedContent,
+							"encryption_version":       nextEncryptionVersion,
+						},
+					})
 				}
-				h.hub.Broadcast(&websocket.Message{
-					RecipientID: participantID,
-					Type:        "message_edited",
-					Payload: gin.H{
-						"message_id":               messageID,
-						"conversation_id":          conversationID,
-						"edited_at":                editedAt,
-						"edited_by":                userID,
-						"encrypted_content":        req.EncryptedContent,
-						"sender_encrypted_content": req.SenderEncryptedContent,
-						"encryption_version":       nextEncryptionVersion,
-					},
-				})
+			}
+			if h.notifService != nil {
+				go h.notifService.NotifyMessageEdited(context.Background(), messageID, conversationID, userID, participantIDs)
 			}
 		}
 	}

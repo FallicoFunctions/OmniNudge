@@ -2,11 +2,13 @@ package services
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/omninudge/backend/internal/models"
 	"github.com/omninudge/backend/internal/websocket"
@@ -279,49 +281,100 @@ func (s *NotificationService) NotifyMessageReaction(
 	}
 }
 
-// ProcessBatchedNotifications processes all pending notification batches
-// Called by the worker every 15 minutes
-func (s *NotificationService) ProcessBatchedNotifications(ctx context.Context) error {
-	batches, err := s.batchRepo.GetPendingBatches(ctx, time.Now())
-	if err != nil {
-		return err
+// NotifyMessageEdited notifies conversation participants that a message was edited.
+// It skips the editor, muted conversations, online users, and deduplicates bursts.
+func (s *NotificationService) NotifyMessageEdited(
+	ctx context.Context,
+	messageID int,
+	conversationID int,
+	editorID int,
+	participantIDs []int,
+) {
+	if len(participantIDs) == 0 {
+		return
 	}
 
-	log.Printf("Processing %d notification batches", len(batches))
+	editorName := "Someone"
+	if err := s.pool.QueryRow(ctx, "SELECT username FROM users WHERE id = $1", editorID).Scan(&editorName); err != nil {
+		editorName = "Someone"
+	}
 
-	for _, batch := range batches {
-		// Create notification from batch
-		notification := &models.Notification{
-			UserID:           batch.UserID,
-			NotificationType: batch.NotificationType,
-			ContentType:      &batch.ContentType,
-			ContentID:        &batch.ContentID,
-			VotesPerHour:     batch.VotesPerHour,
-			MilestoneCount:   batch.MilestoneCount,
-			Message:          s.buildVelocityMessage(batch.ContentType, *batch.VotesPerHour),
+	contentType := "message"
+	notificationType := "message_edited"
+
+	for _, recipientID := range participantIDs {
+		if recipientID == 0 || recipientID == editorID {
+			continue
 		}
-
-		if err := s.sendNotification(ctx, notification); err != nil {
-			log.Printf("Failed to send batched notification: %v", err)
+		if s.hub != nil && s.hub.IsUserOnline(recipientID) {
+			continue
+		}
+		if s.isConversationMutedForUser(ctx, conversationID, recipientID) {
 			continue
 		}
 
-		// Mark batch as processed
-		if err := s.batchRepo.MarkAsProcessed(ctx, batch.ID); err != nil {
-			log.Printf("Failed to mark batch as processed: %v", err)
+		contentID := messageID
+		actorID := editorID
+		notification := &models.Notification{
+			UserID:           recipientID,
+			NotificationType: notificationType,
+			ContentType:      &contentType,
+			ContentID:        &contentID,
+			ActorID:          &actorID,
+			Message:          fmt.Sprintf("%s edited a message", editorName),
+		}
+		inserted, err := s.insertMessageEditNotificationIfNotRecent(ctx, notification)
+		if err != nil {
+			log.Printf("[NotificationService] NotifyMessageEdited: failed for message %d recipient %d: %v", messageID, recipientID, err)
+			continue
+		}
+		if inserted {
+			s.deliverNotification(ctx, notification)
 		}
 	}
-
-	return nil
 }
 
-// sendNotification creates and delivers a notification
-func (s *NotificationService) sendNotification(ctx context.Context, notification *models.Notification) error {
-	// Save to database (persistent storage)
-	if err := s.notifRepo.Create(ctx, notification); err != nil {
-		return err
+func (s *NotificationService) insertMessageEditNotificationIfNotRecent(
+	ctx context.Context,
+	notification *models.Notification,
+) (bool, error) {
+	err := s.pool.QueryRow(ctx, `
+		INSERT INTO notifications (
+			user_id, notification_type, content_type, content_id,
+			actor_id, milestone_count, votes_per_hour, message
+		)
+		SELECT
+			$1, $2, $3, $4, $5, $6, $7, $8
+		WHERE NOT EXISTS (
+			SELECT 1
+			FROM notifications
+			WHERE user_id = $1
+			  AND notification_type = 'message_edited'
+			  AND content_type = 'message'
+			  AND content_id = $4
+			  AND created_at > NOW() - INTERVAL '2 minutes'
+		)
+		RETURNING id, created_at
+	`,
+		notification.UserID,
+		notification.NotificationType,
+		notification.ContentType,
+		notification.ContentID,
+		notification.ActorID,
+		notification.MilestoneCount,
+		notification.VotesPerHour,
+		notification.Message,
+	).Scan(&notification.ID, &notification.CreatedAt)
+	if err == nil {
+		return true, nil
 	}
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false, nil
+	}
+	return false, err
+}
 
+func (s *NotificationService) deliverNotification(ctx context.Context, notification *models.Notification) {
 	// 1. Send via WebSocket if user is online
 	online := false
 	if s.hub != nil && s.hub.IsUserOnline(notification.UserID) {
@@ -352,6 +405,51 @@ func (s *NotificationService) sendNotification(ctx context.Context, notification
 				// Use background context for detachment (survives request completion)
 				go s.sendPushToUser(context.Background(), notification)
 			}
+		}
+	}
+}
+
+// sendNotification creates and delivers a notification
+func (s *NotificationService) sendNotification(ctx context.Context, notification *models.Notification) error {
+	// Save to database (persistent storage)
+	if err := s.notifRepo.Create(ctx, notification); err != nil {
+		return err
+	}
+
+	s.deliverNotification(ctx, notification)
+	return nil
+}
+
+// ProcessBatchedNotifications processes all pending notification batches
+// Called by the worker every 15 minutes
+func (s *NotificationService) ProcessBatchedNotifications(ctx context.Context) error {
+	batches, err := s.batchRepo.GetPendingBatches(ctx, time.Now())
+	if err != nil {
+		return err
+	}
+
+	log.Printf("Processing %d notification batches", len(batches))
+
+	for _, batch := range batches {
+		// Create notification from batch
+		notification := &models.Notification{
+			UserID:           batch.UserID,
+			NotificationType: batch.NotificationType,
+			ContentType:      &batch.ContentType,
+			ContentID:        &batch.ContentID,
+			VotesPerHour:     batch.VotesPerHour,
+			MilestoneCount:   batch.MilestoneCount,
+			Message:          s.buildVelocityMessage(batch.ContentType, *batch.VotesPerHour),
+		}
+
+		if err := s.sendNotification(ctx, notification); err != nil {
+			log.Printf("Failed to send batched notification: %v", err)
+			continue
+		}
+
+		// Mark batch as processed
+		if err := s.batchRepo.MarkAsProcessed(ctx, batch.ID); err != nil {
+			log.Printf("Failed to mark batch as processed: %v", err)
 		}
 	}
 

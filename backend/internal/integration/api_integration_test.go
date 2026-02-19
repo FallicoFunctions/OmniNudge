@@ -945,7 +945,8 @@ func TestSearchMessagesReflectsContentUpdatesIntegration(t *testing.T) {
 
 	user1 := createUser(t, deps.UserRepo, "searchmsg_update_user1", "user")
 	user2 := createUser(t, deps.UserRepo, "searchmsg_update_user2", "user")
-	token, _ := deps.AuthService.GenerateJWT(user1.ID, "", user1.Username, user1.Role)
+	recipientToken, _ := deps.AuthService.GenerateJWT(user1.ID, "", user1.Username, user1.Role)
+	senderToken, _ := deps.AuthService.GenerateJWT(user2.ID, "", user2.Username, user2.Role)
 
 	conv, err := deps.ConversationRepo.Create(context.Background(), user1.ID, user2.ID)
 	require.NoError(t, err)
@@ -961,7 +962,7 @@ func TestSearchMessagesReflectsContentUpdatesIntegration(t *testing.T) {
 	require.NoError(t, deps.MessageRepo.Create(context.Background(), msg))
 
 	searchOld, _ := http.NewRequest("GET", "/api/v1/search/messages?q=old-content-token", nil)
-	searchOld.Header.Set("Authorization", "Bearer "+token)
+	searchOld.Header.Set("Authorization", "Bearer "+recipientToken)
 	w := doRequest(t, deps.Router, searchOld)
 	require.Equal(t, http.StatusOK, w.Code, "body=%s", w.Body.String())
 
@@ -971,15 +972,18 @@ func TestSearchMessagesReflectsContentUpdatesIntegration(t *testing.T) {
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &beforeUpdate))
 	require.Equal(t, 1, beforeUpdate.Total)
 
-	_, err = deps.DB.Pool.Exec(
-		context.Background(),
-		`UPDATE messages SET encrypted_content = 'new-content-token', sender_encrypted_content = 'new-content-token' WHERE id = $1`,
-		msg.ID,
+	editReq, _ := http.NewRequest(
+		"PATCH",
+		fmt.Sprintf("/api/v1/messages/%d", msg.ID),
+		bytes.NewReader([]byte(`{"encrypted_content":"new-content-token","sender_encrypted_content":"new-content-token"}`)),
 	)
-	require.NoError(t, err)
+	editReq.Header.Set("Authorization", "Bearer "+senderToken)
+	editReq.Header.Set("Content-Type", "application/json")
+	editResp := doRequest(t, deps.Router, editReq)
+	require.Equal(t, http.StatusOK, editResp.Code, "body=%s", editResp.Body.String())
 
 	searchOldAfter, _ := http.NewRequest("GET", "/api/v1/search/messages?q=old-content-token", nil)
-	searchOldAfter.Header.Set("Authorization", "Bearer "+token)
+	searchOldAfter.Header.Set("Authorization", "Bearer "+recipientToken)
 	w = doRequest(t, deps.Router, searchOldAfter)
 	require.Equal(t, http.StatusOK, w.Code, "body=%s", w.Body.String())
 
@@ -990,7 +994,7 @@ func TestSearchMessagesReflectsContentUpdatesIntegration(t *testing.T) {
 	require.Equal(t, 0, afterOldQuery.Total)
 
 	searchNew, _ := http.NewRequest("GET", "/api/v1/search/messages?q=new-content-token", nil)
-	searchNew.Header.Set("Authorization", "Bearer "+token)
+	searchNew.Header.Set("Authorization", "Bearer "+recipientToken)
 	w = doRequest(t, deps.Router, searchNew)
 	require.Equal(t, http.StatusOK, w.Code, "body=%s", w.Body.String())
 
