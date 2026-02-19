@@ -21,6 +21,10 @@ type authResp struct {
 	User  *models.User `json:"user"`
 }
 
+func stringPtr(value string) *string {
+	return &value
+}
+
 func TestAuthRegisterLoginMe(t *testing.T) {
 	deps := newTestDeps(t)
 	defer deps.DB.Close()
@@ -434,6 +438,375 @@ func TestEditMessageEndpoint_UpdatesMessageAndHistory(t *testing.T) {
 	require.Equal(t, 1, historyCount)
 	require.NotNil(t, historyContent)
 	require.Equal(t, "original-ciphertext", *historyContent)
+}
+
+func TestForwardMessageEndpoint_Success(t *testing.T) {
+	deps := newTestDeps(t)
+	defer deps.DB.Close()
+
+	sender := createUser(t, deps.UserRepo, "forward_sender", "user")
+	recipient := createUser(t, deps.UserRepo, "forward_recipient", "user")
+	senderToken, _ := deps.AuthService.GenerateJWT(sender.ID, "", sender.Username, sender.Role)
+
+	sourceConversation, err := deps.ConversationRepo.Create(context.Background(), sender.ID, recipient.ID)
+	require.NoError(t, err)
+	targetConversation, err := deps.ConversationRepo.Create(context.Background(), sender.ID, recipient.ID)
+	require.NoError(t, err)
+
+	original := &models.Message{
+		ConversationID:         sourceConversation.ID,
+		SenderID:               recipient.ID,
+		RecipientID:            sender.ID,
+		EncryptedContent:       "forward-original-content",
+		SenderEncryptedContent: stringPtr("forward-original-content-sender"),
+		MessageType:            "text",
+		EncryptionVersion:      "v1",
+	}
+	require.NoError(t, deps.MessageRepo.Create(context.Background(), original))
+
+	forwardBody := []byte(fmt.Sprintf(`{"message_id":%d,"conversation_ids":[%d],"include_media":true,"encrypted_content":"forward-new-recipient-cipher","sender_encrypted_content":"forward-new-sender-cipher","encryption_version":"v1"}`, original.ID, targetConversation.ID))
+	req, _ := http.NewRequest("POST", "/api/v1/messages/forward", bytes.NewReader(forwardBody))
+	req.Header.Set("Authorization", "Bearer "+senderToken)
+	req.Header.Set("Content-Type", "application/json")
+	resp := doRequest(t, deps.Router, req)
+	require.Equal(t, http.StatusOK, resp.Code, "body=%s", resp.Body.String())
+
+	var payload struct {
+		ForwardedMessageIDs []int `json:"forwarded_message_ids"`
+		ForwardedCount      int   `json:"forwarded_count"`
+	}
+	require.NoError(t, json.Unmarshal(resp.Body.Bytes(), &payload))
+	require.Equal(t, 1, payload.ForwardedCount)
+	require.Len(t, payload.ForwardedMessageIDs, 1)
+
+	var forwardedFrom *int
+	var forwardCount int
+	err = deps.DB.Pool.QueryRow(context.Background(), `
+		SELECT forwarded_from
+		FROM messages
+		WHERE id = $1
+	`, payload.ForwardedMessageIDs[0]).Scan(&forwardedFrom)
+	require.NoError(t, err)
+	require.NotNil(t, forwardedFrom)
+	require.Equal(t, original.ID, *forwardedFrom)
+
+	err = deps.DB.Pool.QueryRow(context.Background(), `
+		SELECT forward_count
+		FROM messages
+		WHERE id = $1
+	`, original.ID).Scan(&forwardCount)
+	require.NoError(t, err)
+	require.Equal(t, 1, forwardCount)
+
+	var forwardedEncryptedContent string
+	var forwardedSenderEncryptedContent *string
+	err = deps.DB.Pool.QueryRow(context.Background(), `
+		SELECT encrypted_content, sender_encrypted_content
+		FROM messages
+		WHERE id = $1
+	`, payload.ForwardedMessageIDs[0]).Scan(&forwardedEncryptedContent, &forwardedSenderEncryptedContent)
+	require.NoError(t, err)
+	require.Equal(t, "forward-new-recipient-cipher", forwardedEncryptedContent)
+	require.NotNil(t, forwardedSenderEncryptedContent)
+	require.Equal(t, "forward-new-sender-cipher", *forwardedSenderEncryptedContent)
+}
+
+func TestForwardMessageEndpoint_RejectsMoreThanTenTargets(t *testing.T) {
+	deps := newTestDeps(t)
+	defer deps.DB.Close()
+
+	sender := createUser(t, deps.UserRepo, "forward_limit_sender", "user")
+	recipient := createUser(t, deps.UserRepo, "forward_limit_recipient", "user")
+	senderToken, _ := deps.AuthService.GenerateJWT(sender.ID, "", sender.Username, sender.Role)
+
+	sourceConversation, err := deps.ConversationRepo.Create(context.Background(), sender.ID, recipient.ID)
+	require.NoError(t, err)
+	original := &models.Message{
+		ConversationID:         sourceConversation.ID,
+		SenderID:               recipient.ID,
+		RecipientID:            sender.ID,
+		EncryptedContent:       "forward-original-content",
+		SenderEncryptedContent: stringPtr("forward-original-content-sender"),
+		MessageType:            "text",
+		EncryptionVersion:      "v1",
+	}
+	require.NoError(t, deps.MessageRepo.Create(context.Background(), original))
+
+	forwardBody := []byte(fmt.Sprintf(`{"message_id":%d,"conversation_ids":[1,2,3,4,5,6,7,8,9,10,11],"include_media":true}`, original.ID))
+	req, _ := http.NewRequest("POST", "/api/v1/messages/forward", bytes.NewReader(forwardBody))
+	req.Header.Set("Authorization", "Bearer "+senderToken)
+	req.Header.Set("Content-Type", "application/json")
+	resp := doRequest(t, deps.Router, req)
+	require.Equal(t, http.StatusBadRequest, resp.Code, "body=%s", resp.Body.String())
+}
+
+func TestForwardMessageEndpoint_RejectsEncryptedForwardWithoutNewPayload(t *testing.T) {
+	deps := newTestDeps(t)
+	defer deps.DB.Close()
+
+	sender := createUser(t, deps.UserRepo, "forward_payload_sender", "user")
+	recipient := createUser(t, deps.UserRepo, "forward_payload_recipient", "user")
+	senderToken, _ := deps.AuthService.GenerateJWT(sender.ID, "", sender.Username, sender.Role)
+
+	sourceConversation, err := deps.ConversationRepo.Create(context.Background(), sender.ID, recipient.ID)
+	require.NoError(t, err)
+	targetConversation, err := deps.ConversationRepo.Create(context.Background(), sender.ID, recipient.ID)
+	require.NoError(t, err)
+
+	original := &models.Message{
+		ConversationID:         sourceConversation.ID,
+		SenderID:               recipient.ID,
+		RecipientID:            sender.ID,
+		EncryptedContent:       "forward-original-content",
+		SenderEncryptedContent: stringPtr("forward-original-content-sender"),
+		MessageType:            "text",
+		EncryptionVersion:      "v1",
+	}
+	require.NoError(t, deps.MessageRepo.Create(context.Background(), original))
+
+	forwardBody := []byte(fmt.Sprintf(`{"message_id":%d,"conversation_ids":[%d],"include_media":true}`, original.ID, targetConversation.ID))
+	req, _ := http.NewRequest("POST", "/api/v1/messages/forward", bytes.NewReader(forwardBody))
+	req.Header.Set("Authorization", "Bearer "+senderToken)
+	req.Header.Set("Content-Type", "application/json")
+	resp := doRequest(t, deps.Router, req)
+	require.Equal(t, http.StatusUnprocessableEntity, resp.Code, "body=%s", resp.Body.String())
+	require.Contains(t, resp.Body.String(), "Encrypted forwards require new encrypted_content")
+}
+
+func TestForwardMessageEndpoint_RejectsEncryptedDMForwardWithoutSenderCopy(t *testing.T) {
+	deps := newTestDeps(t)
+	defer deps.DB.Close()
+
+	sender := createUser(t, deps.UserRepo, "forward_sender_copy_sender", "user")
+	recipient := createUser(t, deps.UserRepo, "forward_sender_copy_recipient", "user")
+	senderToken, _ := deps.AuthService.GenerateJWT(sender.ID, "", sender.Username, sender.Role)
+
+	sourceConversation, err := deps.ConversationRepo.Create(context.Background(), sender.ID, recipient.ID)
+	require.NoError(t, err)
+	targetConversation, err := deps.ConversationRepo.Create(context.Background(), sender.ID, recipient.ID)
+	require.NoError(t, err)
+
+	original := &models.Message{
+		ConversationID:         sourceConversation.ID,
+		SenderID:               recipient.ID,
+		RecipientID:            sender.ID,
+		EncryptedContent:       "forward-original-content",
+		SenderEncryptedContent: stringPtr("forward-original-content-sender"),
+		MessageType:            "text",
+		EncryptionVersion:      "v1",
+	}
+	require.NoError(t, deps.MessageRepo.Create(context.Background(), original))
+
+	forwardBody := []byte(fmt.Sprintf(`{"message_id":%d,"conversation_ids":[%d],"include_media":true,"encrypted_content":"forward-new-recipient-cipher","encryption_version":"v1"}`, original.ID, targetConversation.ID))
+	req, _ := http.NewRequest("POST", "/api/v1/messages/forward", bytes.NewReader(forwardBody))
+	req.Header.Set("Authorization", "Bearer "+senderToken)
+	req.Header.Set("Content-Type", "application/json")
+	resp := doRequest(t, deps.Router, req)
+	require.Equal(t, http.StatusUnprocessableEntity, resp.Code, "body=%s", resp.Body.String())
+	require.Contains(t, resp.Body.String(), "Encrypted DM forwards require new sender_encrypted_content")
+}
+
+func TestForwardMessageEndpoint_RejectsEncryptedForwardDowngrade(t *testing.T) {
+	deps := newTestDeps(t)
+	defer deps.DB.Close()
+
+	sender := createUser(t, deps.UserRepo, "forward_downgrade_sender", "user")
+	recipient := createUser(t, deps.UserRepo, "forward_downgrade_recipient", "user")
+	senderToken, _ := deps.AuthService.GenerateJWT(sender.ID, "", sender.Username, sender.Role)
+
+	sourceConversation, err := deps.ConversationRepo.Create(context.Background(), sender.ID, recipient.ID)
+	require.NoError(t, err)
+	targetConversation, err := deps.ConversationRepo.Create(context.Background(), sender.ID, recipient.ID)
+	require.NoError(t, err)
+
+	original := &models.Message{
+		ConversationID:         sourceConversation.ID,
+		SenderID:               recipient.ID,
+		RecipientID:            sender.ID,
+		EncryptedContent:       "forward-original-content",
+		SenderEncryptedContent: stringPtr("forward-original-content-sender"),
+		MessageType:            "text",
+		EncryptionVersion:      "v1",
+	}
+	require.NoError(t, deps.MessageRepo.Create(context.Background(), original))
+
+	forwardBody := []byte(fmt.Sprintf(`{"message_id":%d,"conversation_ids":[%d],"include_media":true,"encrypted_content":"forward-new-recipient-cipher","sender_encrypted_content":"forward-new-sender-cipher","encryption_version":"plaintext"}`, original.ID, targetConversation.ID))
+	req, _ := http.NewRequest("POST", "/api/v1/messages/forward", bytes.NewReader(forwardBody))
+	req.Header.Set("Authorization", "Bearer "+senderToken)
+	req.Header.Set("Content-Type", "application/json")
+	resp := doRequest(t, deps.Router, req)
+	require.Equal(t, http.StatusUnprocessableEntity, resp.Code, "body=%s", resp.Body.String())
+	require.Contains(t, resp.Body.String(), "Encrypted forwards cannot downgrade encryption_version")
+}
+
+func TestForwardMessageEndpoint_RejectsDMForwardMarkedMultiRecipient(t *testing.T) {
+	deps := newTestDeps(t)
+	defer deps.DB.Close()
+
+	sender := createUser(t, deps.UserRepo, "forward_dm_multi_sender", "user")
+	recipient := createUser(t, deps.UserRepo, "forward_dm_multi_recipient", "user")
+	senderToken, _ := deps.AuthService.GenerateJWT(sender.ID, "", sender.Username, sender.Role)
+
+	sourceConversation, err := deps.ConversationRepo.Create(context.Background(), sender.ID, recipient.ID)
+	require.NoError(t, err)
+	targetConversation, err := deps.ConversationRepo.Create(context.Background(), sender.ID, recipient.ID)
+	require.NoError(t, err)
+
+	original := &models.Message{
+		ConversationID:         sourceConversation.ID,
+		SenderID:               recipient.ID,
+		RecipientID:            sender.ID,
+		EncryptedContent:       "forward-original-content",
+		SenderEncryptedContent: stringPtr("forward-original-content-sender"),
+		MessageType:            "text",
+		EncryptionVersion:      "v1",
+	}
+	require.NoError(t, deps.MessageRepo.Create(context.Background(), original))
+
+	forwardBody := []byte(fmt.Sprintf(`{"message_id":%d,"conversation_ids":[%d],"include_media":true,"encrypted_content":"forward-new-recipient-cipher","sender_encrypted_content":"forward-new-sender-cipher","encryption_version":"v1","is_multi_recipient":true}`, original.ID, targetConversation.ID))
+	req, _ := http.NewRequest("POST", "/api/v1/messages/forward", bytes.NewReader(forwardBody))
+	req.Header.Set("Authorization", "Bearer "+senderToken)
+	req.Header.Set("Content-Type", "application/json")
+	resp := doRequest(t, deps.Router, req)
+	require.Equal(t, http.StatusUnprocessableEntity, resp.Code, "body=%s", resp.Body.String())
+	require.Contains(t, resp.Body.String(), "DM forwards cannot be multi-recipient")
+}
+
+func TestForwardMessageEndpoint_DeduplicatesBeforeLimit(t *testing.T) {
+	deps := newTestDeps(t)
+	defer deps.DB.Close()
+
+	sender := createUser(t, deps.UserRepo, "forward_dedupe_sender", "user")
+	recipient := createUser(t, deps.UserRepo, "forward_dedupe_recipient", "user")
+	senderToken, _ := deps.AuthService.GenerateJWT(sender.ID, "", sender.Username, sender.Role)
+
+	sourceConversation, err := deps.ConversationRepo.Create(context.Background(), sender.ID, recipient.ID)
+	require.NoError(t, err)
+	original := &models.Message{
+		ConversationID:         sourceConversation.ID,
+		SenderID:               recipient.ID,
+		RecipientID:            sender.ID,
+		EncryptedContent:       "forward-original-content",
+		SenderEncryptedContent: stringPtr("forward-original-content-sender"),
+		MessageType:            "text",
+		EncryptionVersion:      "v1",
+	}
+	require.NoError(t, deps.MessageRepo.Create(context.Background(), original))
+
+	forwardBody := []byte(fmt.Sprintf(`{"message_id":%d,"conversation_ids":[%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d],"include_media":true,"encrypted_content":"forward-new-recipient-cipher","sender_encrypted_content":"forward-new-sender-cipher","encryption_version":"v1"}`,
+		original.ID,
+		sourceConversation.ID, sourceConversation.ID, sourceConversation.ID, sourceConversation.ID, sourceConversation.ID,
+		sourceConversation.ID, sourceConversation.ID, sourceConversation.ID, sourceConversation.ID, sourceConversation.ID, sourceConversation.ID,
+	))
+	req, _ := http.NewRequest("POST", "/api/v1/messages/forward", bytes.NewReader(forwardBody))
+	req.Header.Set("Authorization", "Bearer "+senderToken)
+	req.Header.Set("Content-Type", "application/json")
+	resp := doRequest(t, deps.Router, req)
+	require.Equal(t, http.StatusOK, resp.Code, "body=%s", resp.Body.String())
+}
+
+func TestForwardMessageEndpoint_IsAtomicOnMixedAccessibleTargets(t *testing.T) {
+	deps := newTestDeps(t)
+	defer deps.DB.Close()
+
+	sender := createUser(t, deps.UserRepo, "forward_atomic_sender", "user")
+	recipient := createUser(t, deps.UserRepo, "forward_atomic_recipient", "user")
+	outsider := createUser(t, deps.UserRepo, "forward_atomic_outsider", "user")
+	senderToken, _ := deps.AuthService.GenerateJWT(sender.ID, "", sender.Username, sender.Role)
+
+	sourceConversation, err := deps.ConversationRepo.Create(context.Background(), sender.ID, recipient.ID)
+	require.NoError(t, err)
+	validTarget, err := deps.ConversationRepo.Create(context.Background(), sender.ID, recipient.ID)
+	require.NoError(t, err)
+	inaccessibleTarget, err := deps.ConversationRepo.Create(context.Background(), outsider.ID, recipient.ID)
+	require.NoError(t, err)
+
+	original := &models.Message{
+		ConversationID:         sourceConversation.ID,
+		SenderID:               recipient.ID,
+		RecipientID:            sender.ID,
+		EncryptedContent:       "forward-original-content",
+		SenderEncryptedContent: stringPtr("forward-original-content-sender"),
+		MessageType:            "text",
+		EncryptionVersion:      "v1",
+	}
+	require.NoError(t, deps.MessageRepo.Create(context.Background(), original))
+
+	forwardBody := []byte(fmt.Sprintf(`{"message_id":%d,"conversation_ids":[%d,%d],"include_media":true,"encrypted_content":"forward-new-recipient-cipher","sender_encrypted_content":"forward-new-sender-cipher","encryption_version":"v1"}`, original.ID, validTarget.ID, inaccessibleTarget.ID))
+	req, _ := http.NewRequest("POST", "/api/v1/messages/forward", bytes.NewReader(forwardBody))
+	req.Header.Set("Authorization", "Bearer "+senderToken)
+	req.Header.Set("Content-Type", "application/json")
+	resp := doRequest(t, deps.Router, req)
+	require.Equal(t, http.StatusForbidden, resp.Code, "body=%s", resp.Body.String())
+
+	var forwardedCount int
+	err = deps.DB.Pool.QueryRow(context.Background(), `
+		SELECT COUNT(*)
+		FROM messages
+		WHERE forwarded_from = $1
+	`, original.ID).Scan(&forwardedCount)
+	require.NoError(t, err)
+	require.Equal(t, 0, forwardedCount)
+}
+
+func TestForwardInfoEndpoint_PrivacyAwareResponse(t *testing.T) {
+	deps := newTestDeps(t)
+	defer deps.DB.Close()
+
+	user := createUser(t, deps.UserRepo, "forward_info_user", "user")
+	recipient := createUser(t, deps.UserRepo, "forward_info_recipient", "user")
+	outsider := createUser(t, deps.UserRepo, "forward_info_outsider", "user")
+	userToken, _ := deps.AuthService.GenerateJWT(user.ID, "", user.Username, user.Role)
+
+	visibleConversation, err := deps.ConversationRepo.Create(context.Background(), user.ID, recipient.ID)
+	require.NoError(t, err)
+	hiddenConversation, err := deps.ConversationRepo.Create(context.Background(), outsider.ID, recipient.ID)
+	require.NoError(t, err)
+
+	original := &models.Message{
+		ConversationID:    hiddenConversation.ID,
+		SenderID:          recipient.ID,
+		RecipientID:       outsider.ID,
+		EncryptedContent:  "forward-original-content",
+		MessageType:       "text",
+		EncryptionVersion: "v1",
+	}
+	require.NoError(t, deps.MessageRepo.Create(context.Background(), original))
+
+	forwarded := &models.Message{
+		ConversationID:    visibleConversation.ID,
+		SenderID:          user.ID,
+		RecipientID:       recipient.ID,
+		EncryptedContent:  "forwarded-content",
+		MessageType:       "text",
+		EncryptionVersion: "v1",
+	}
+	require.NoError(t, deps.MessageRepo.Create(context.Background(), forwarded))
+
+	_, err = deps.DB.Pool.Exec(context.Background(), `
+		UPDATE messages
+		SET forwarded_from = $2
+		WHERE id = $1
+	`, forwarded.ID, original.ID)
+	require.NoError(t, err)
+	_, err = deps.DB.Pool.Exec(context.Background(), `
+		UPDATE messages
+		SET forward_count = 3
+		WHERE id = $1
+	`, original.ID)
+	require.NoError(t, err)
+
+	req, _ := http.NewRequest("GET", fmt.Sprintf("/api/v1/messages/%d/forward-info", forwarded.ID), nil)
+	req.Header.Set("Authorization", "Bearer "+userToken)
+	resp := doRequest(t, deps.Router, req)
+	require.Equal(t, http.StatusOK, resp.Code, "body=%s", resp.Body.String())
+
+	var payload map[string]any
+	require.NoError(t, json.Unmarshal(resp.Body.Bytes(), &payload))
+	require.Equal(t, float64(original.ID), payload["original_message_id"])
+	require.Equal(t, float64(recipient.ID), payload["original_sender_id"])
+	require.Equal(t, float64(3), payload["forward_count"])
+	require.Nil(t, payload["original_conversation_id"])
 }
 
 func TestEditMessageEndpoint_RejectsModMailConversation(t *testing.T) {
