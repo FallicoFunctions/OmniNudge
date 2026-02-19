@@ -114,3 +114,35 @@ export interface MessageEditHistoryResponse {
   limit: number;
   offset: number;
 }
+
+export interface ForwardMessageRequest {
+  message_id: number;
+  conversation_ids: number[];
+  include_media?: boolean;
+  encrypted_content?: string;
+  sender_encrypted_content?: string;
+  encryption_version?: string;
+  media_encryption_key?: string;
+  media_encryption_iv?: string;
+  sender_media_encryption_key?: string;
+  is_multi_recipient?: boolean;
+  shared_encryption_iv?: string;
+  recipient_keys?: Record<number, string>;
+}
+
+export interface ForwardMessageResponse {
+  original_message_id: number;
+  forwarded_message_ids: number[];
+  forwarded_count: number;
+  queue_warning?: string;
+}
+
+export interface ForwardInfoResponse {
+  message_id: number;
+  forwarded_from?: number | null;
+  forward_count: number;
+  original_message_id: number;
+  original_sender_id: number;
+  original_sender?: string;
+  original_conversation_id?: number | null;
+}

@@ -2,6 +2,9 @@ import { api } from '../lib/api';
 import type {
   Conversation,
   EditMessageRequest,
+  ForwardInfoResponse,
+  ForwardMessageRequest,
+  ForwardMessageResponse,
   Message,
   MessageEditHistoryResponse,
   PinnedMessagesResponse,
@@ -109,6 +112,27 @@ export const messagesService = {
       offset: String(offset),
     });
     return api.get<MessageEditHistoryResponse>(`/messages/${messageId}/history?${params.toString()}`);
+  },
+
+  async forwardMessage(data: ForwardMessageRequest): Promise<ForwardMessageResponse> {
+    return api.post<ForwardMessageResponse>('/messages/forward', {
+      message_id: data.message_id,
+      conversation_ids: data.conversation_ids,
+      include_media: data.include_media ?? false,
+      encrypted_content: data.encrypted_content,
+      sender_encrypted_content: data.sender_encrypted_content,
+      encryption_version: data.encryption_version,
+      media_encryption_key: data.media_encryption_key,
+      media_encryption_iv: data.media_encryption_iv,
+      sender_media_encryption_key: data.sender_media_encryption_key,
+      is_multi_recipient: data.is_multi_recipient,
+      shared_encryption_iv: data.shared_encryption_iv,
+      recipient_keys: data.recipient_keys,
+    });
+  },
+
+  async getForwardInfo(messageId: number): Promise<ForwardInfoResponse> {
+    return api.get<ForwardInfoResponse>(`/messages/${messageId}/forward-info`);
   },
 
   async getPinnedMessages(conversationId: number): Promise<PinnedMessagesResponse> {
