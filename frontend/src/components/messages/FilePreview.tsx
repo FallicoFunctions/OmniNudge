@@ -70,6 +70,13 @@ function fallbackFileNameFromSrc(src: string, fallbackName: string): string {
   return raw && raw.length > 0 ? decodeURIComponent(raw) : fallbackName;
 }
 
+function openInNewTab(url: string): void {
+  const newWindow = window.open(url, '_blank', 'noopener,noreferrer');
+  if (newWindow) {
+    newWindow.opener = null;
+  }
+}
+
 export default function FilePreview({
   src,
   mimeType,
@@ -102,7 +109,7 @@ export default function FilePreview({
           alt={t('messages.media.fallbackText')}
           className="max-w-full rounded cursor-pointer object-contain"
           style={{ maxHeight: '50vh' }}
-          onClick={() => (onOpen ? onOpen() : window.open(src, '_blank'))}
+          onClick={() => (onOpen ? onOpen() : openInNewTab(src))}
         />
       </div>
     );
@@ -117,8 +124,25 @@ export default function FilePreview({
           className="max-w-full rounded cursor-pointer"
           style={{ maxHeight: '50vh' }}
           onLoadedMetadata={onVideoLoadedMetadata}
-          onClick={() => (onOpen ? onOpen() : window.open(src, '_blank'))}
         />
+        <div className="mt-2 flex gap-2">
+          <button
+            type="button"
+            onClick={() => (onOpen ? onOpen() : openInNewTab(src))}
+            className="rounded bg-[var(--color-primary)] px-2 py-1 text-xs font-semibold text-white"
+          >
+            {openLabel}
+          </button>
+          <a
+            href={src}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="rounded border border-[var(--color-border)] px-2 py-1 text-xs font-semibold"
+            download={displayName}
+          >
+            {downloadLabel}
+          </a>
+        </div>
       </div>
     );
   }
@@ -211,7 +235,7 @@ export default function FilePreview({
         <div className="mt-2 flex gap-2">
           <button
             type="button"
-            onClick={() => (onOpen ? onOpen() : window.open(src, '_blank'))}
+            onClick={() => (onOpen ? onOpen() : openInNewTab(src))}
             className="rounded bg-[var(--color-primary)] px-2 py-1 text-xs font-semibold text-white"
           >
             {openLabel}
@@ -239,7 +263,7 @@ export default function FilePreview({
       <div className="flex gap-2">
         <button
           type="button"
-          onClick={() => (onOpen ? onOpen() : window.open(src, '_blank'))}
+          onClick={() => (onOpen ? onOpen() : openInNewTab(src))}
           className="rounded bg-[var(--color-primary)] px-2 py-1 text-xs font-semibold text-white"
         >
           {openLabel}
