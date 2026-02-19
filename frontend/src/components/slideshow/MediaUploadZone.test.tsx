@@ -35,4 +35,24 @@ describe('MediaUploadZone', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Upload 1 file' }));
     expect(onFilesSelected).toHaveBeenCalledWith([pdf]);
   });
+
+  it('enforces file-size limits by MIME type', () => {
+    const onFilesSelected = vi.fn();
+    const { container } = render(<MediaUploadZone onFilesSelected={onFilesSelected} />);
+    const input = container.querySelector('input[type="file"]') as HTMLInputElement;
+
+    const oversizedPdf = new File(['pdf'], 'huge.pdf', { type: 'application/pdf' });
+    Object.defineProperty(oversizedPdf, 'size', { value: 30 * 1024 * 1024 });
+
+    fireEvent.change(input, { target: { files: [oversizedPdf] } });
+    expect(screen.getByText('huge.pdf: File size exceeds 25MB')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Upload 1 file' })).not.toBeInTheDocument();
+
+    const midVideo = new File(['video'], 'clip.mp4', { type: 'video/mp4' });
+    Object.defineProperty(midVideo, 'size', { value: 30 * 1024 * 1024 });
+
+    fireEvent.change(input, { target: { files: [midVideo] } });
+    fireEvent.click(screen.getByRole('button', { name: 'Upload 1 file' }));
+    expect(onFilesSelected).toHaveBeenCalledWith([midVideo]);
+  });
 });
