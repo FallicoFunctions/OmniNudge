@@ -1488,6 +1488,14 @@
         "fileSize": "File size",
         "pdfThumbnailAlt": "PDF thumbnail",
         "audioUnsupported": "Your browser does not support the audio element."
+      },
+      "audio": {
+        "play": "Play",
+        "pause": "Pause",
+        "seek": "Seek",
+        "speed": "Playback speed",
+        "speedLabel": "Speed: {{speed}}x",
+        "speedOption": "{{speed}}x"
       }
     },
     "compose": {
