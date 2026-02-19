@@ -698,14 +698,58 @@ func (r *MessageRepository) SoftDeleteForBoth(ctx context.Context, messageID int
 
 // HardDelete permanently deletes a message if both users have soft deleted it
 func (r *MessageRepository) HardDelete(ctx context.Context, messageID int) error {
-	query := `
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	// If the message is a thread root/ancestor, preserve its ID as a tombstone so replies remain navigable.
+	_, err = tx.Exec(ctx, `
+		UPDATE messages
+		SET encrypted_content = '[deleted]',
+		    sender_encrypted_content = NULL,
+		    message_type = 'text',
+		    media_file_id = NULL,
+		    media_url = NULL,
+		    media_type = NULL,
+		    media_size = NULL,
+		    media_encryption_key = NULL,
+		    media_encryption_iv = NULL,
+		    sender_media_encryption_key = NULL,
+		    is_multi_recipient = FALSE,
+		    shared_encryption_iv = NULL,
+		    deleted_for_sender = TRUE,
+		    deleted_for_recipient = TRUE
+		WHERE id = $1
+		  AND deleted_for_sender = TRUE
+		  AND deleted_for_recipient = TRUE
+		  AND EXISTS (
+		    SELECT 1
+		    FROM messages child
+		    WHERE child.reply_to = $1 OR child.thread_root = $1
+		  )
+	`, messageID)
+	if err != nil {
+		return err
+	}
+
+	_, err = tx.Exec(ctx, `
 		DELETE FROM messages
 		WHERE id = $1
-		  AND deleted_for_sender = true
-		  AND deleted_for_recipient = true
-	`
-	_, err := r.pool.Exec(ctx, query, messageID)
-	return err
+		  AND deleted_for_sender = TRUE
+		  AND deleted_for_recipient = TRUE
+		  AND NOT EXISTS (
+		    SELECT 1
+		    FROM messages child
+		    WHERE child.reply_to = $1 OR child.thread_root = $1
+		  )
+	`, messageID)
+	if err != nil {
+		return err
+	}
+
+	return tx.Commit(ctx)
 }
 
 // GetUnreadCount gets the count of unread messages for a user in a conversation
