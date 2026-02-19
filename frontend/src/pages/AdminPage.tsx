@@ -1251,7 +1251,6 @@ function BugReportsTab() {
   const [pageSize, setPageSize] = useState(50);
   const [statusFilter, setStatusFilter] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
-  const [typeFilter, setTypeFilter] = useState('');
   const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'rating_desc' | 'rating_asc'>(
     'newest'
   );
@@ -1259,12 +1258,11 @@ function BugReportsTab() {
 
   const currentCursor = cursorStack[cursorStack.length - 1] ?? '';
   const { data, isLoading } = useQuery({
-    queryKey: ['adminBugReports', statusFilter, categoryFilter, typeFilter, pageSize, currentCursor],
+    queryKey: ['adminBugReports', statusFilter, categoryFilter, pageSize, currentCursor],
     queryFn: () =>
       bugReportService.getBugReports({
         status: statusFilter || undefined,
         feedbackCategory: categoryFilter || undefined,
-        feedbackType: typeFilter || undefined,
         limit: pageSize,
         offset: 0,
         cursor: currentCursor,
@@ -1320,22 +1318,6 @@ function BugReportsTab() {
             <option value="bug">{t('adminPage.bugReports.categories.bug')}</option>
             <option value="feature_request">{t('adminPage.bugReports.categories.featureRequest')}</option>
             <option value="other">{t('adminPage.bugReports.categories.other')}</option>
-            <option value="survey">{t('adminPage.bugReports.categories.survey')}</option>
-            <option value="nps">{t('adminPage.bugReports.categories.nps')}</option>
-          </select>
-          <select
-            value={typeFilter}
-            onChange={(e) => {
-              setTypeFilter(e.target.value);
-              setCursorStack(['']);
-            }}
-            className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-[var(--color-text-primary)]"
-          >
-            <option value="">{t('adminPage.bugReports.filters.allTypes')}</option>
-            <option value="report">{t('adminPage.bugReports.types.report')}</option>
-            <option value="feedback">{t('adminPage.bugReports.types.feedback')}</option>
-            <option value="survey">{t('adminPage.bugReports.types.survey')}</option>
-            <option value="nps">{t('adminPage.bugReports.types.nps')}</option>
           </select>
           <select
             value={sortBy}

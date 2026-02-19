@@ -407,7 +407,7 @@ func (h *BugReportsHandler) DeleteKnownBug(c *gin.Context) {
 
 func isValidFeedbackType(value string) bool {
 	switch value {
-	case "report", "feedback", "survey", "nps":
+	case "report":
 		return true
 	default:
 		return false
@@ -416,7 +416,7 @@ func isValidFeedbackType(value string) bool {
 
 func isValidFeedbackCategory(value string) bool {
 	switch value {
-	case "bug", "feature_request", "other", "nps", "survey":
+	case "bug", "feature_request", "other":
 		return true
 	default:
 		return false
