@@ -26,6 +26,16 @@ export interface Conversation {
   unread_count: number;
 }
 
+export interface ConversationFolder {
+  id: number;
+  user_id: number;
+  name: string;
+  color: string;
+  icon: string;
+  position: number;
+  conversation_count?: number;
+}
+
 export interface Message {
   id: number;
   conversation_id: number;
