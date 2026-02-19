@@ -38,6 +38,7 @@ function makeMessage(id: number, overrides: Partial<Message> = {}): Message {
 describe('ThreadView', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    getMessageThreadMock.mockReset();
     __resetThreadCacheForTests();
     useMediaQueryMock.mockReturnValue(false);
   });
@@ -171,6 +172,50 @@ describe('ThreadView', () => {
     const deepest = document.getElementById('thread-message-110');
     expect(deepest).toBeTruthy();
     expect(deepest?.style.marginLeft).toBe('36px');
+  });
+
+  it('jumps to parent message when Jump action is clicked on a reply', async () => {
+    getMessageThreadMock.mockResolvedValueOnce({
+      root_message: makeMessage(100),
+      replies: [makeMessage(101, { reply_to: 100, thread_root: 100 })],
+      reply_count: 1,
+      limit: 20,
+      offset: 0,
+    });
+
+    const scrollSpy = vi.fn();
+    const originalScrollIntoView = Element.prototype.scrollIntoView;
+    Object.defineProperty(Element.prototype, 'scrollIntoView', {
+      configurable: true,
+      value: scrollSpy,
+    });
+    try {
+      const user = userEvent.setup();
+      render(
+        <ThreadView
+          open={true}
+          rootMessageId={100}
+          currentUserId={1}
+          onClose={() => {}}
+          renderMessageContent={(message) => <span>{message.encrypted_content}</span>}
+          formatTimestamp={() => 'now'}
+        />
+      );
+
+      await waitFor(() => expect(screen.getByText('message-101')).toBeInTheDocument());
+      await user.click(screen.getByRole('button', { name: 'Jump' }));
+
+      expect(scrollSpy).toHaveBeenCalledTimes(1);
+    } finally {
+      if (originalScrollIntoView) {
+        Object.defineProperty(Element.prototype, 'scrollIntoView', {
+          configurable: true,
+          value: originalScrollIntoView,
+        });
+      } else {
+        Reflect.deleteProperty(Element.prototype, 'scrollIntoView');
+      }
+    }
   });
 
   it('uses mobile layout classes when media query matches mobile', async () => {

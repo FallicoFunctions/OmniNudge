@@ -646,6 +646,7 @@ func (h *MessagesHandler) SendMessage(c *gin.Context) {
 		return
 	}
 	if effectiveReplyTo != nil {
+		// Keep parent direct-reply count for message-level metadata.
 		if _, err := h.pool.Exec(c.Request.Context(), `
 			UPDATE messages
 			SET reply_count = reply_count + 1
@@ -654,6 +655,19 @@ func (h *MessagesHandler) SendMessage(c *gin.Context) {
 			_, _ = h.pool.Exec(c.Request.Context(), `DELETE FROM messages WHERE id = $1`, message.ID)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update thread metadata", "details": err.Error()})
 			return
+		}
+
+		// Also increment root aggregate so root preview count tracks total thread replies.
+		if threadRoot != nil && *threadRoot > 0 && *threadRoot != *effectiveReplyTo {
+			if _, err := h.pool.Exec(c.Request.Context(), `
+				UPDATE messages
+				SET reply_count = reply_count + 1
+				WHERE id = $1
+			`, *threadRoot); err != nil {
+				_, _ = h.pool.Exec(c.Request.Context(), `DELETE FROM messages WHERE id = $1`, message.ID)
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update root thread metadata", "details": err.Error()})
+				return
+			}
 		}
 	}
 
@@ -669,15 +683,15 @@ func (h *MessagesHandler) SendMessage(c *gin.Context) {
 			rootForEvent = *message.ThreadRoot
 		}
 
-		var parentReplyCount int
+		var rootReplyCount int
 		if err := h.pool.QueryRow(c.Request.Context(), `
 			SELECT COALESCE(reply_count, 0)
 			FROM messages
 			WHERE id = $1
-		`, *effectiveReplyTo).Scan(&parentReplyCount); err != nil {
-			log.Printf("[SendMessage] Failed to load reply_count for thread event: parent_id=%d err=%v", *effectiveReplyTo, err)
+		`, rootForEvent).Scan(&rootReplyCount); err != nil {
+			log.Printf("[SendMessage] Failed to load root reply_count for thread event: root_id=%d err=%v", rootForEvent, err)
 		} else {
-			h.broadcastThreadReplyAddedEvent(c.Request.Context(), req.ConversationID, rootForEvent, parentReplyCount, message)
+			h.broadcastThreadReplyAddedEvent(c.Request.Context(), req.ConversationID, rootForEvent, rootReplyCount, message)
 		}
 	}
 
