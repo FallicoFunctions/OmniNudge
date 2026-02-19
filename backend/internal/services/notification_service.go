@@ -412,7 +412,7 @@ func (s *NotificationService) NotifyThreadReply(
 			ActorID:          &actorID,
 			Message:          messageText,
 		}
-		inserted, err := s.insertThreadReplyNotificationIfNotRecent(ctx, notification)
+		inserted, err := s.insertThreadReplyNotification(ctx, conversationID, notification, settings.BatchNotifications)
 		if err != nil {
 			log.Printf("[NotificationService] NotifyThreadReply: failed for root %d recipient %d: %v", threadRootID, recipientID, err)
 			continue
@@ -720,9 +720,11 @@ func (s *NotificationService) isThreadMutedForUser(ctx context.Context, threadRo
 	return muted
 }
 
-func (s *NotificationService) insertThreadReplyNotificationIfNotRecent(
+func (s *NotificationService) insertThreadReplyNotification(
 	ctx context.Context,
+	conversationID int,
 	notification *models.Notification,
+	batchEnabled bool,
 ) (bool, error) {
 	if notification.ContentID == nil {
 		return false, fmt.Errorf("content_id is required for thread reply notification dedupe")
@@ -740,6 +742,33 @@ func (s *NotificationService) insertThreadReplyNotificationIfNotRecent(
 		return false, err
 	}
 
+	if !batchEnabled {
+		err = tx.QueryRow(ctx, `
+			INSERT INTO notifications (
+				user_id, notification_type, content_type, content_id,
+				actor_id, milestone_count, votes_per_hour, message
+			)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+			RETURNING id, created_at
+		`,
+			notification.UserID,
+			notification.NotificationType,
+			notification.ContentType,
+			notification.ContentID,
+			notification.ActorID,
+			notification.MilestoneCount,
+			notification.VotesPerHour,
+			notification.Message,
+		).Scan(&notification.ID, &notification.CreatedAt)
+		if err != nil {
+			return false, err
+		}
+		if err := tx.Commit(ctx); err != nil {
+			return false, err
+		}
+		return true, nil
+	}
+
 	var recentID int
 	err = tx.QueryRow(ctx, `
 		SELECT id
@@ -753,6 +782,13 @@ func (s *NotificationService) insertThreadReplyNotificationIfNotRecent(
 		LIMIT 1
 	`, notification.UserID, *notification.ContentID).Scan(&recentID)
 	if err == nil {
+		replyCount, countErr := s.countRecentThreadReplies(ctx, tx, conversationID, *notification.ContentID, notification.UserID)
+		if countErr != nil {
+			return false, countErr
+		}
+		if replyCount >= 5 {
+			notification.Message = fmt.Sprintf("%d new replies in thread", replyCount)
+		}
 		if _, err := tx.Exec(ctx, `
 			UPDATE notifications
 			SET created_at = CURRENT_TIMESTAMP,
@@ -796,6 +832,27 @@ func (s *NotificationService) insertThreadReplyNotificationIfNotRecent(
 		return false, err
 	}
 	return true, nil
+}
+
+func (s *NotificationService) countRecentThreadReplies(
+	ctx context.Context,
+	tx pgx.Tx,
+	conversationID int,
+	threadRootID int,
+	recipientID int,
+) (int, error) {
+	var count int
+	if err := tx.QueryRow(ctx, `
+		SELECT COUNT(1)
+		FROM messages
+		WHERE conversation_id = $1
+		  AND thread_root = $2
+		  AND sender_id <> $3
+		  AND sent_at > NOW() - INTERVAL '1 minute'
+	`, conversationID, threadRootID, recipientID).Scan(&count); err != nil {
+		return 0, err
+	}
+	return count, nil
 }
 
 func isWithinQuietHours(now time.Time, tz string, startMinutes, endMinutes int) bool {

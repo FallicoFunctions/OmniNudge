@@ -508,6 +508,7 @@ func TestNotifyThreadReply_CreatesAndDeduplicates(t *testing.T) {
 		rootSettings, _ = settingsRepo.CreateDefault(ctx, rootAuthorID)
 	}
 	rootSettings.NotifyCommentReplies = true
+	rootSettings.BatchNotifications = true
 	_, err = settingsRepo.Update(ctx, rootSettings)
 	require.NoError(t, err)
 
@@ -556,6 +557,116 @@ func TestNotifyThreadReply_CreatesAndDeduplicates(t *testing.T) {
 	require.NotNil(t, notifs[0].ContentID)
 	assert.Equal(t, rootMessage.ID, *notifs[0].ContentID)
 	assert.Contains(t, notifs[0].Message, "replied to your thread")
+}
+
+func TestNotifyThreadReply_UsesSummaryMessageAfterFiveReplies(t *testing.T) {
+	service, db, cleanup := setupNotificationTest(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	rootAuthorID := createTestUser(t, db, uniqueNotificationName("thread_root_author"))
+	replyAuthorID := createTestUser(t, db, uniqueNotificationName("thread_reply_author"))
+
+	convRepo := models.NewConversationRepository(db.Pool)
+	conv, err := convRepo.Create(ctx, rootAuthorID, replyAuthorID)
+	require.NoError(t, err)
+
+	settingsRepo := models.NewUserSettingsRepository(db.Pool)
+	rootSettings, _ := settingsRepo.GetByUserID(ctx, rootAuthorID)
+	if rootSettings == nil {
+		rootSettings, _ = settingsRepo.CreateDefault(ctx, rootAuthorID)
+	}
+	rootSettings.NotifyCommentReplies = true
+	rootSettings.BatchNotifications = true
+	_, err = settingsRepo.Update(ctx, rootSettings)
+	require.NoError(t, err)
+
+	msgRepo := models.NewMessageRepository(db.Pool)
+	rootMessage := &models.Message{
+		ConversationID:    conv.ID,
+		SenderID:          rootAuthorID,
+		RecipientID:       replyAuthorID,
+		EncryptedContent:  "root",
+		MessageType:       "text",
+		EncryptionVersion: "v1",
+	}
+	require.NoError(t, msgRepo.Create(ctx, rootMessage))
+
+	for i := 0; i < 5; i++ {
+		reply := &models.Message{
+			ConversationID:    conv.ID,
+			SenderID:          replyAuthorID,
+			RecipientID:       rootAuthorID,
+			EncryptedContent:  fmt.Sprintf("reply-%d", i+1),
+			MessageType:       "text",
+			ReplyTo:           &rootMessage.ID,
+			ThreadRoot:        &rootMessage.ID,
+			EncryptionVersion: "v1",
+		}
+		require.NoError(t, msgRepo.Create(ctx, reply))
+		service.NotifyThreadReply(ctx, conv.ID, rootMessage.ID, reply.ID, replyAuthorID)
+	}
+
+	notifs, err := models.NewNotificationRepository(db.Pool).GetByUserID(ctx, rootAuthorID, 10, 0, false)
+	require.NoError(t, err)
+	require.Len(t, notifs, 1)
+	assert.Equal(t, "thread_reply", notifs[0].NotificationType)
+	assert.Equal(t, "5 new replies in thread", notifs[0].Message)
+}
+
+func TestNotifyThreadReply_DisabledBatchingCreatesOnePerReply(t *testing.T) {
+	service, db, cleanup := setupNotificationTest(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	rootAuthorID := createTestUser(t, db, uniqueNotificationName("thread_root_author"))
+	replyAuthorID := createTestUser(t, db, uniqueNotificationName("thread_reply_author"))
+
+	convRepo := models.NewConversationRepository(db.Pool)
+	conv, err := convRepo.Create(ctx, rootAuthorID, replyAuthorID)
+	require.NoError(t, err)
+
+	settingsRepo := models.NewUserSettingsRepository(db.Pool)
+	rootSettings, _ := settingsRepo.GetByUserID(ctx, rootAuthorID)
+	if rootSettings == nil {
+		rootSettings, _ = settingsRepo.CreateDefault(ctx, rootAuthorID)
+	}
+	rootSettings.NotifyCommentReplies = true
+	rootSettings.BatchNotifications = false
+	_, err = settingsRepo.Update(ctx, rootSettings)
+	require.NoError(t, err)
+
+	msgRepo := models.NewMessageRepository(db.Pool)
+	rootMessage := &models.Message{
+		ConversationID:    conv.ID,
+		SenderID:          rootAuthorID,
+		RecipientID:       replyAuthorID,
+		EncryptedContent:  "root",
+		MessageType:       "text",
+		EncryptionVersion: "v1",
+	}
+	require.NoError(t, msgRepo.Create(ctx, rootMessage))
+
+	for i := 0; i < 2; i++ {
+		reply := &models.Message{
+			ConversationID:    conv.ID,
+			SenderID:          replyAuthorID,
+			RecipientID:       rootAuthorID,
+			EncryptedContent:  fmt.Sprintf("reply-%d", i+1),
+			MessageType:       "text",
+			ReplyTo:           &rootMessage.ID,
+			ThreadRoot:        &rootMessage.ID,
+			EncryptionVersion: "v1",
+		}
+		require.NoError(t, msgRepo.Create(ctx, reply))
+		service.NotifyThreadReply(ctx, conv.ID, rootMessage.ID, reply.ID, replyAuthorID)
+	}
+
+	notifs, err := models.NewNotificationRepository(db.Pool).GetByUserID(ctx, rootAuthorID, 10, 0, false)
+	require.NoError(t, err)
+	require.Len(t, notifs, 2)
+	assert.Equal(t, "thread_reply", notifs[0].NotificationType)
+	assert.Equal(t, "thread_reply", notifs[1].NotificationType)
 }
 
 func TestNotifyThreadReply_SkipsMutedThread(t *testing.T) {

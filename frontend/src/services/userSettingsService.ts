@@ -34,6 +34,7 @@ export type UpdateUserSettingsRequest = Partial<
     | 'quiet_hours_start_minutes'
     | 'quiet_hours_end_minutes'
     | 'quiet_hours_timezone'
+    | 'batch_notifications'
     | 'notify_comment_replies'
     | 'notify_post_milestone'
     | 'notify_post_velocity'

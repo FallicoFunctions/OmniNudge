@@ -2094,6 +2094,8 @@
     "notificationPreferences": {
       "title": "Preferencias de notificación",
       "description": "Elige qué eventos de mensajes y actividad deben generar notificaciones.",
+      "batchNotifications": "Agrupar notificaciones de respuestas en hilos",
+      "batchNotificationsHelp": "Agrupa respuestas rápidas en hilos en una sola notificación de resumen.",
       "commentReplies": "Respuestas a comentarios",
       "commentRepliesHelp": "Notificar cuando alguien responda a tus comentarios.",
       "postMilestones": "Hitos de publicaciones",

@@ -2094,6 +2094,8 @@
     "notificationPreferences": {
       "title": "تفضيلات الإشعارات",
       "description": "اختر أحداث الرسائل والتفاعل التي يجب أن تؤدي إلى إشعارات.",
+      "batchNotifications": "تجميع إشعارات الردود في السلاسل",
+      "batchNotificationsHelp": "اجمع الردود السريعة في السلاسل ضمن إشعار ملخص واحد.",
       "commentReplies": "الردود على التعليقات",
       "commentRepliesHelp": "إشعار عندما يرد أحد على تعليقاتك.",
       "postMilestones": "إنجازات المنشورات",

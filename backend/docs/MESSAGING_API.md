@@ -311,6 +311,8 @@ Send a new message in a conversation.
 - Reply depth is capped to avoid pathological nesting.
 - If a reply exceeds max depth, backend flattens it to thread root and sets `X-Thread-Flattened: true` on response.
 - Root message `reply_count` is maintained as an aggregate count for thread preview UI.
+- Thread reply notifications respect user settings for quiet hours and `batch_notifications`.
+- With batching enabled, rapid replies are collapsed into one notification (e.g. `5 new replies in thread`).
 
 ---
 
