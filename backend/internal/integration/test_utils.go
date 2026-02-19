@@ -233,6 +233,7 @@ func newTestDeps(t *testing.T) *TestDeps {
 			protected.GET("/search/messages", searchHandler.SearchMessages)
 			protected.GET("/users/me/profile", usersHandler.GetMyProfile)
 			protected.GET("/users/me/storage", storageHandler.GetMyStorage)
+			protected.GET("/files/:id/thumbnail", mediaHandler.GetThumbnail)
 			protected.PUT("/users/me/profile", usersHandler.UpdateProfile)
 			protected.POST("/users/me/avatar", usersHandler.UploadMyAvatar)
 			protected.GET("/settings", settingsHandler.GetSettings)

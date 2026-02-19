@@ -844,6 +844,7 @@ func main() {
 			protected.POST("/media/upload", uploadRateLimiter.Middleware(), mediaHandler.UploadMedia)
 			// Batch media upload (same request rate limiter as single upload; per-request file count capped in handler)
 			protected.POST("/media/batch-upload", uploadRateLimiter.Middleware(), mediaHandler.BatchUploadMedia)
+			protected.GET("/files/:id/thumbnail", mediaHandler.GetThumbnail)
 			// Audio encoding for iOS Safari (P0-003)
 			protected.POST("/media/encode-audio", audioEncoderHandler.EncodeAudio)
 
