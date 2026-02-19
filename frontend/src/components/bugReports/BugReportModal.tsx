@@ -10,9 +10,6 @@ type BugReportModalProps = {
   onClose: () => void;
   initialUrl?: string;
   onNavigateToPage?: () => void;
-  defaultFeedbackType?: 'report' | 'feedback' | 'survey' | 'nps';
-  defaultFeedbackCategory?: 'bug' | 'feature_request' | 'other' | 'nps' | 'survey';
-  hidePageLinkAction?: boolean;
 };
 
 export default function BugReportModal({
@@ -20,19 +17,13 @@ export default function BugReportModal({
   onClose,
   initialUrl,
   onNavigateToPage,
-  defaultFeedbackType = 'report',
-  defaultFeedbackCategory = 'bug',
-  hidePageLinkAction = false,
 }: BugReportModalProps) {
   const { t } = useTranslation();
   const [pageUrl, setPageUrl] = useState('');
   const [description, setDescription] = useState('');
-  const [feedbackType, setFeedbackType] = useState<'report' | 'feedback' | 'survey' | 'nps'>(
-    defaultFeedbackType
+  const [feedbackCategory, setFeedbackCategory] = useState<'bug' | 'feature_request' | 'other'>(
+    'bug'
   );
-  const [feedbackCategory, setFeedbackCategory] = useState<
-    'bug' | 'feature_request' | 'other' | 'nps' | 'survey'
-  >(defaultFeedbackCategory);
   const [rating, setRating] = useState<number | ''>('');
   const [screenshot, setScreenshot] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -42,14 +33,13 @@ export default function BugReportModal({
   useEffect(() => {
     if (!isOpen) return;
     setPageUrl(initialUrl ?? '');
-    setFeedbackType(defaultFeedbackType);
-    setFeedbackCategory(defaultFeedbackCategory);
+    setFeedbackCategory('bug');
     setRating('');
     setDescription('');
     setScreenshot(null);
     setShowSuccess(false);
     setErrorMessage('');
-  }, [defaultFeedbackCategory, defaultFeedbackType, initialUrl, isOpen]);
+  }, [initialUrl, isOpen]);
 
   const submitBugMutation = useMutation({
     mutationFn: async (screenshotUrl?: string) => {
@@ -57,7 +47,7 @@ export default function BugReportModal({
         page_url: pageUrl,
         description,
         screenshot_url: screenshotUrl,
-        feedback_type: feedbackType,
+        feedback_type: 'report',
         feedback_category: feedbackCategory,
         rating: rating === '' ? undefined : rating,
         context: {
@@ -74,8 +64,7 @@ export default function BugReportModal({
     onSuccess: () => {
       setPageUrl(initialUrl ?? '');
       setDescription('');
-      setFeedbackType(defaultFeedbackType);
-      setFeedbackCategory(defaultFeedbackCategory);
+      setFeedbackCategory('bug');
       setRating('');
       setScreenshot(null);
       setShowSuccess(true);
@@ -216,34 +205,12 @@ export default function BugReportModal({
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <label className="block text-sm font-medium text-[var(--color-text-primary)] mb-2">
-                {t('bugReportModal.form.feedbackType.label')}
-              </label>
-              <select
-                value={feedbackType}
-                onChange={(e) =>
-                  setFeedbackType(e.target.value as 'report' | 'feedback' | 'survey' | 'nps')
-                }
-                className="w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-2 text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
-              >
-                <option value="report">{t('bugReportModal.form.feedbackType.options.report')}</option>
-                <option value="feedback">
-                  {t('bugReportModal.form.feedbackType.options.feedback')}
-                </option>
-                <option value="survey">{t('bugReportModal.form.feedbackType.options.survey')}</option>
-                <option value="nps">{t('bugReportModal.form.feedbackType.options.nps')}</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-[var(--color-text-primary)] mb-2">
                 {t('bugReportModal.form.category.label')}
               </label>
               <select
                 value={feedbackCategory}
                 onChange={(e) =>
-                  setFeedbackCategory(
-                    e.target.value as 'bug' | 'feature_request' | 'other' | 'nps' | 'survey'
-                  )
+                  setFeedbackCategory(e.target.value as 'bug' | 'feature_request' | 'other')
                 }
                 className="w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-2 text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
               >
@@ -252,8 +219,6 @@ export default function BugReportModal({
                   {t('bugReportModal.form.category.options.featureRequest')}
                 </option>
                 <option value="other">{t('bugReportModal.form.category.options.other')}</option>
-                <option value="survey">{t('bugReportModal.form.category.options.survey')}</option>
-                <option value="nps">{t('bugReportModal.form.category.options.nps')}</option>
               </select>
             </div>
           </div>
@@ -316,7 +281,7 @@ export default function BugReportModal({
           </div>
 
           <div className="flex flex-col gap-3 pt-4 sm:flex-row sm:items-center sm:justify-between">
-            {!hidePageLinkAction && onNavigateToPage && (
+            {onNavigateToPage && (
               <button
                 type="button"
                 onClick={onNavigateToPage}

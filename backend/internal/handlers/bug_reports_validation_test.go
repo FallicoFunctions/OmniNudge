@@ -6,14 +6,14 @@ import (
 )
 
 func TestIsValidFeedbackType(t *testing.T) {
-	valid := []string{"report", "feedback", "survey", "nps"}
+	valid := []string{"report"}
 	for _, value := range valid {
 		if !isValidFeedbackType(value) {
 			t.Fatalf("expected feedback type %q to be valid", value)
 		}
 	}
 
-	invalid := []string{"", "bug", "other", "NPS"}
+	invalid := []string{"", "bug", "other", "feedback", "survey", "nps", "NPS"}
 	for _, value := range invalid {
 		if isValidFeedbackType(value) {
 			t.Fatalf("expected feedback type %q to be invalid", value)
@@ -22,14 +22,14 @@ func TestIsValidFeedbackType(t *testing.T) {
 }
 
 func TestIsValidFeedbackCategory(t *testing.T) {
-	valid := []string{"bug", "feature_request", "other", "nps", "survey"}
+	valid := []string{"bug", "feature_request", "other"}
 	for _, value := range valid {
 		if !isValidFeedbackCategory(value) {
 			t.Fatalf("expected feedback category %q to be valid", value)
 		}
 	}
 
-	invalid := []string{"", "feature", "feedback", "BUG"}
+	invalid := []string{"", "feature", "feedback", "BUG", "nps", "survey"}
 	for _, value := range invalid {
 		if isValidFeedbackCategory(value) {
 			t.Fatalf("expected feedback category %q to be invalid", value)

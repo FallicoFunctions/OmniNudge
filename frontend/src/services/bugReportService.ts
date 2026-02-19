@@ -6,8 +6,8 @@ export interface BugReport {
   page_url: string;
   description: string;
   screenshot_url?: string;
-  feedback_type: 'report' | 'feedback' | 'survey' | 'nps';
-  feedback_category: 'bug' | 'feature_request' | 'other' | 'nps' | 'survey';
+  feedback_type: 'report';
+  feedback_category: 'bug' | 'feature_request' | 'other';
   rating?: number;
   context?: Record<string, unknown>;
   status: 'new' | 'investigating' | 'fixed' | 'wont_fix' | 'duplicate';
@@ -35,8 +35,8 @@ export interface CreateBugReportRequest {
   page_url: string;
   description: string;
   screenshot_url?: string;
-  feedback_type?: 'report' | 'feedback' | 'survey' | 'nps';
-  feedback_category?: 'bug' | 'feature_request' | 'other' | 'nps' | 'survey';
+  feedback_type?: 'report';
+  feedback_category?: 'bug' | 'feature_request' | 'other';
   rating?: number;
   context?: Record<string, unknown>;
 }

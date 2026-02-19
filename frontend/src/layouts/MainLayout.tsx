@@ -63,47 +63,7 @@ export default function MainLayout() {
   const aboutModalStorageKey = 'omninudge_about_modal_dismissed';
   const [showBugReportModal, setShowBugReportModal] = useState(false);
   const [bugReportUrl, setBugReportUrl] = useState('');
-  const [bugReportDefaults, setBugReportDefaults] = useState<{
-    feedbackType: 'report' | 'feedback' | 'survey' | 'nps';
-    feedbackCategory: 'bug' | 'feature_request' | 'other' | 'nps' | 'survey';
-  }>({ feedbackType: 'report', feedbackCategory: 'bug' });
-  const [showSurveyPrompt, setShowSurveyPrompt] = useState(false);
-  const [surveyPromptType, setSurveyPromptType] = useState<'survey' | 'nps'>('survey');
   const toasts = useToasts();
-
-  const readFeedbackPromptState = () => {
-    if (typeof window === 'undefined') {
-      return {} as {
-        visits?: number;
-        lastPromptDismissedAt?: string;
-        lastSurveyPromptedAt?: string;
-        lastNpsPromptedAt?: string;
-      };
-    }
-    try {
-      const raw = window.localStorage.getItem('omninudge_feedback_prompt_state');
-      return raw
-        ? (JSON.parse(raw) as {
-            visits?: number;
-            lastPromptDismissedAt?: string;
-            lastSurveyPromptedAt?: string;
-            lastNpsPromptedAt?: string;
-          })
-        : {};
-    } catch {
-      return {};
-    }
-  };
-
-  const writeFeedbackPromptState = (next: {
-    visits?: number;
-    lastPromptDismissedAt?: string;
-    lastSurveyPromptedAt?: string;
-    lastNpsPromptedAt?: string;
-  }) => {
-    if (typeof window === 'undefined') return;
-    window.localStorage.setItem('omninudge_feedback_prompt_state', JSON.stringify(next));
-  };
 
   // Enable notification sounds globally
   useNotificationSound();
@@ -174,40 +134,6 @@ export default function MainLayout() {
 
     ping();
   }, [user, location.pathname, queryClient]);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const parsed = readFeedbackPromptState();
-    const visits = (parsed.visits ?? 0) + 1;
-    const dismissedAt = parsed.lastPromptDismissedAt
-      ? new Date(parsed.lastPromptDismissedAt).getTime()
-      : 0;
-    const lastSurveyPromptedAt = parsed.lastSurveyPromptedAt
-      ? new Date(parsed.lastSurveyPromptedAt).getTime()
-      : 0;
-    const lastNpsPromptedAt = parsed.lastNpsPromptedAt ? new Date(parsed.lastNpsPromptedAt).getTime() : 0;
-    const now = Date.now();
-    const dismissCooldownMs = 1000 * 60 * 60 * 24 * 2;
-    const surveyCooldownMs = 1000 * 60 * 60 * 24 * 14;
-    const npsCooldownMs = 1000 * 60 * 60 * 24 * 90;
-    const canPromptNow = !dismissedAt || now - dismissedAt > dismissCooldownMs;
-    const surveyDue = visits >= 3 && (!lastSurveyPromptedAt || now - lastSurveyPromptedAt > surveyCooldownMs);
-    const npsDue = visits >= 3 && (!lastNpsPromptedAt || now - lastNpsPromptedAt > npsCooldownMs);
-
-    let nextPromptType: 'survey' | 'nps' | null = null;
-    if (canPromptNow && npsDue) {
-      nextPromptType = 'nps';
-    } else if (canPromptNow && surveyDue) {
-      nextPromptType = 'survey';
-    }
-
-    writeFeedbackPromptState({ ...parsed, visits });
-    if (nextPromptType) {
-      setSurveyPromptType(nextPromptType);
-      const timer = window.setTimeout(() => setShowSurveyPrompt(true), 3000);
-      return () => window.clearTimeout(timer);
-    }
-  }, [location.pathname]);
 
   useEffect(() => {
     const handler = (event: Event) => {
@@ -348,10 +274,6 @@ export default function MainLayout() {
                         type="button"
                         onClick={() => {
                           setBugReportUrl(window.location.href);
-                          setBugReportDefaults({
-                            feedbackType: 'report',
-                            feedbackCategory: 'bug',
-                          });
                           setShowBugReportModal(true);
                         }}
                         onMouseEnter={() => prefetchRoutes.bugReporting()}
@@ -439,10 +361,6 @@ export default function MainLayout() {
                           label: t('mainLayout.bugReporting'),
                           onClick: () => {
                             setBugReportUrl(window.location.href);
-                            setBugReportDefaults({
-                              feedbackType: 'report',
-                              feedbackCategory: 'bug',
-                            });
                             setShowBugReportModal(true);
                           },
                         },
@@ -555,10 +473,6 @@ export default function MainLayout() {
                         type="button"
                         onClick={() => {
                           setBugReportUrl(window.location.href);
-                          setBugReportDefaults({
-                            feedbackType: 'report',
-                            feedbackCategory: 'bug',
-                          });
                           setShowBugReportModal(true);
                         }}
                         onMouseEnter={() => prefetchRoutes.bugReporting()}
@@ -598,10 +512,6 @@ export default function MainLayout() {
                           label: t('mainLayout.bugReporting'),
                           onClick: () => {
                             setBugReportUrl(window.location.href);
-                            setBugReportDefaults({
-                              feedbackType: 'report',
-                              feedbackCategory: 'bug',
-                            });
                             setShowBugReportModal(true);
                           },
                         },
@@ -689,8 +599,6 @@ export default function MainLayout() {
         isOpen={showBugReportModal}
         onClose={() => setShowBugReportModal(false)}
         initialUrl={bugReportUrl}
-        defaultFeedbackType={bugReportDefaults.feedbackType}
-        defaultFeedbackCategory={bugReportDefaults.feedbackCategory}
         onNavigateToPage={() => {
           setShowBugReportModal(false);
           navigate('/bug-reporting');
@@ -724,89 +632,6 @@ export default function MainLayout() {
           }}
         />
       )}
-
-      {showSurveyPrompt && (
-        <div className="fixed bottom-[84px] right-4 z-[55] w-[320px] rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-lg">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <h3 className="text-sm font-semibold text-[var(--color-text-primary)]">
-                {surveyPromptType === 'nps'
-                  ? t('mainLayout.feedbackPrompt.npsTitle')
-                  : t('mainLayout.feedbackPrompt.title')}
-              </h3>
-              <p className="mt-1 text-xs text-[var(--color-text-secondary)]">
-                {surveyPromptType === 'nps'
-                  ? t('mainLayout.feedbackPrompt.npsBody')
-                  : t('mainLayout.feedbackPrompt.body')}
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() => {
-                setShowSurveyPrompt(false);
-                writeFeedbackPromptState({
-                  ...readFeedbackPromptState(),
-                  lastPromptDismissedAt: new Date().toISOString(),
-                });
-              }}
-              className="text-xs text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
-            >
-              {t('common.close')}
-            </button>
-          </div>
-          <div className="mt-3 flex items-center justify-end gap-2">
-            <button
-              type="button"
-              onClick={() => setShowSurveyPrompt(false)}
-              className="rounded-md border border-[var(--color-border)] px-3 py-1.5 text-xs text-[var(--color-text-primary)]"
-            >
-              {t('common.later')}
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setShowSurveyPrompt(false);
-                setBugReportUrl(window.location.href);
-                setBugReportDefaults({
-                  feedbackType: surveyPromptType === 'nps' ? 'nps' : 'survey',
-                  feedbackCategory: surveyPromptType === 'nps' ? 'nps' : 'survey',
-                });
-                setShowBugReportModal(true);
-                const nowIso = new Date().toISOString();
-                const existingState = readFeedbackPromptState();
-                writeFeedbackPromptState({
-                  ...existingState,
-                  lastPromptDismissedAt: nowIso,
-                  lastSurveyPromptedAt:
-                    surveyPromptType === 'survey' ? nowIso : existingState.lastSurveyPromptedAt,
-                  lastNpsPromptedAt:
-                    surveyPromptType === 'nps' ? nowIso : existingState.lastNpsPromptedAt,
-                });
-              }}
-              className="rounded-md bg-[var(--color-primary)] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[var(--color-primary-dark)]"
-            >
-              {t('mainLayout.feedbackPrompt.action')}
-            </button>
-          </div>
-        </div>
-      )}
-
-      <button
-        type="button"
-        onClick={() => {
-          setBugReportUrl(window.location.href);
-          setBugReportDefaults({
-            feedbackType: 'feedback',
-            feedbackCategory: 'other',
-          });
-          setShowBugReportModal(true);
-        }}
-        className={`fixed right-4 z-[55] rounded-full bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white shadow-lg hover:bg-[var(--color-primary-dark)] ${
-          isMobile ? 'bottom-[72px]' : 'bottom-[16px]'
-        }`}
-      >
-        {t('mainLayout.feedbackButton')}
-      </button>
 
       <ToastContainer
         toasts={toasts.map((toast) => ({
