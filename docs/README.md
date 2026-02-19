@@ -85,6 +85,7 @@
 
 **Media:**
 - `../FILE_UPLOAD_VALIDATION.md` - File upload security
+- `FILE_SHARING_FEATURE.md` - End-to-end file sharing UX, quota model, and preview behavior
 - `../IOS_VOICE_RECORDING.md` - iOS voice recording
 
 **External Services:**
