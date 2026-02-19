@@ -7,6 +7,7 @@ import MessagesPage from '../MessagesPage';
 import type { Conversation } from '../../types/messages';
 import { hubsService } from '../../services/hubsService';
 import { redditService } from '../../services/redditService';
+import { messagesService } from '../../services/messagesService';
 
 const archiveConversation = vi.fn();
 const archiveConversationsBatch = vi.fn();
@@ -36,6 +37,27 @@ const archivedConversation: Conversation = {
     id: 43,
     username: 'bob',
   },
+};
+
+const forwardTargetConversation: Conversation = {
+  ...activeConversation,
+  id: 303,
+  other_user: {
+    id: 42,
+    username: 'alice-archive',
+  },
+};
+
+const mockConversationMessage = {
+  id: 9001,
+  conversation_id: 101,
+  sender_id: 42,
+  recipient_id: 7,
+  encrypted_content: 'source-encrypted',
+  sender_encrypted_content: 'source-sender-encrypted',
+  message_type: 'text' as const,
+  sent_at: new Date().toISOString(),
+  encryption_version: 'v1',
 };
 
 vi.mock('../../contexts/AuthContext', () => ({
@@ -83,15 +105,62 @@ vi.mock('../../hooks/useMediaQuery', () => ({
 vi.mock('../../services/messagesService', () => ({
   messagesService: {
     getConversationsPage: vi.fn(async () => ({
-      conversations: [activeConversation],
+      conversations: [activeConversation, forwardTargetConversation],
       next_cursor: undefined,
     })),
     getArchivedConversationsPage: vi.fn(async () => ({
       conversations: [archivedConversation],
       next_cursor: undefined,
     })),
+    getMessagesPage: vi.fn(async () => ({
+      messages: [mockConversationMessage],
+      next_cursor: undefined,
+    })),
+    getPinnedMessages: vi.fn(async () => ({
+      pinned_messages: [],
+    })),
+    pinMessage: vi.fn(async () => {}),
+    unpinMessage: vi.fn(async () => {}),
+    forwardMessage: vi.fn(async () => ({
+      original_message_id: 9001,
+      forwarded_message_ids: [9002],
+      forwarded_count: 1,
+    })),
   },
 }));
+
+vi.mock('../../services/encryptionService', () => ({
+  encryptionService: {
+    getPublicKeys: vi.fn(async () => ({
+      42: 'recipient-public-key-b64',
+    })),
+  },
+}));
+
+vi.mock('../../services/keyManagementService', () => ({
+  getOwnKeys: vi.fn(async () => ({
+    publicKey: {} as CryptoKey,
+    privateKey: {} as CryptoKey,
+  })),
+  getUserPublicKey: vi.fn(async () => ({} as CryptoKey)),
+}));
+
+vi.mock('../../utils/encryption', async () => {
+  const actual = await vi.importActual<typeof import('../../utils/encryption')>(
+    '../../utils/encryption'
+  );
+  return {
+    ...actual,
+    decryptMessage: vi.fn(async () => 'decrypted-forward-plaintext'),
+    encryptMessage: vi.fn(async () => 'fresh-forward-cipher'),
+    encryptForMultipleRecipients: vi.fn(async () => ({
+      encryptedContent: 'fresh-multi-cipher',
+      senderEncryptedContent: 'fresh-multi-sender-cipher',
+      sharedIv: 'shared-iv',
+      recipientKeys: { 7: 'rk7', 42: 'rk42' },
+    })),
+  };
+});
 
 vi.mock('../../services/hubsService', () => ({
   hubsService: {
@@ -133,7 +202,7 @@ describe('MessagesPage swipe archive gestures', () => {
     renderPage();
 
     await screen.findByText('alice');
-    const row = await screen.findByRole('button', { name: 'Open conversation' });
+    const row = (await screen.findAllByRole('button', { name: 'Open conversation' }))[0];
 
     fireEvent.touchStart(row, {
       touches: [{ clientX: 240, clientY: 24 }],
@@ -151,7 +220,7 @@ describe('MessagesPage swipe archive gestures', () => {
     renderPage();
 
     fireEvent.click(await screen.findByRole('button', { name: 'Archived' }));
-    const row = await screen.findByRole('button', { name: 'Open conversation' });
+    const row = (await screen.findAllByRole('button', { name: 'Open conversation' }))[0];
 
     fireEvent.touchStart(row, {
       touches: [{ clientX: 120, clientY: 20 }],
@@ -169,7 +238,7 @@ describe('MessagesPage swipe archive gestures', () => {
     const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
     renderPage();
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Open conversation' }));
+    fireEvent.click((await screen.findAllByRole('button', { name: 'Open conversation' }))[0]);
     fireEvent.click(await screen.findByRole('button', { name: 'Browse Reddit/Hub' }));
     const input = await screen.findByPlaceholderText('e.g., r/pics or h/gaming');
     fireEvent.change(input, { target: { value: 'h/' } });
@@ -189,9 +258,40 @@ describe('MessagesPage swipe archive gestures', () => {
 
     await screen.findByText('alice');
     setActiveConversationId.mockClear();
-    const checkbox = await screen.findByRole('checkbox');
+    const checkbox = (await screen.findAllByRole('checkbox'))[0];
     fireEvent.keyDown(checkbox, { key: ' ', code: 'Space' });
 
     expect(setActiveConversationId).not.toHaveBeenCalled();
+  });
+
+  it('forwards with fresh encrypted payload from message menu action', async () => {
+    renderPage();
+
+    fireEvent.click((await screen.findAllByRole('button', { name: 'Open conversation' }))[0]);
+
+    const messageOptionButtons = await screen.findAllByLabelText('Message options');
+    fireEvent.click(messageOptionButtons[0]);
+    fireEvent.click(
+      await screen.findByRole('button', {
+        name: /forward|messages\.actions\.forward/i,
+      })
+    );
+    fireEvent.click(await screen.findByLabelText('alice-archive'));
+
+    const forwardButtons = screen.getAllByRole('button', {
+      name: /forward|messages\.actions\.forward/i,
+    });
+    fireEvent.click(forwardButtons[forwardButtons.length - 1]);
+
+    await waitFor(() => {
+      expect(messagesService.forwardMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message_id: 9001,
+          conversation_ids: [303],
+          encrypted_content: 'fresh-forward-cipher',
+          sender_encrypted_content: 'fresh-forward-cipher',
+        })
+      );
+    });
   });
 });
