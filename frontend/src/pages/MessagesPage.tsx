@@ -679,6 +679,11 @@ export default function MessagesPage() {
   const [messageMenuOpen, setMessageMenuOpen] = useState<number | null>(null);
   const [deleteDialogMessage, setDeleteDialogMessage] = useState<Message | null>(null);
   const [deleteScopeInFlight, setDeleteScopeInFlight] = useState<'self' | 'both' | null>(null);
+  const [forwardDialogMessage, setForwardDialogMessage] = useState<Message | null>(null);
+  const [forwardTargetConversationIDs, setForwardTargetConversationIDs] = useState<Set<number>>(
+    new Set()
+  );
+  const [forwardIncludeMedia, setForwardIncludeMedia] = useState(true);
   const [activeTab, setActiveTab] = useState<'active' | 'archived'>('active');
   const [conversationMenuOpen, setConversationMenuOpen] = useState<number | null>(null);
   const [slideshowOpen, setSlideshowOpen] = useState(false);
@@ -1113,6 +1118,60 @@ export default function MessagesPage() {
     },
   });
 
+  const forwardMessageMutation = useMutation({
+    mutationFn: async ({
+      message,
+      targetConversationIDs,
+      includeMedia,
+    }: {
+      message: Message;
+      targetConversationIDs: number[];
+      includeMedia: boolean;
+    }) => {
+      const isEncrypted =
+        message.encryption_version !== 'plaintext' && message.encryption_version !== 'none';
+      const sourceConversationType = selectedConversation?.conversation_type ?? 'dm';
+      if (isEncrypted && sourceConversationType === 'dm' && !message.sender_encrypted_content) {
+        throw new Error(
+          t(
+            'messages.errors.forwardMissingSenderCipher',
+            'This encrypted message cannot be forwarded because it has no sender copy.'
+          )
+        );
+      }
+      return messagesService.forwardMessage({
+        message_id: message.id,
+        conversation_ids: targetConversationIDs,
+        include_media: includeMedia,
+        encrypted_content: isEncrypted ? message.encrypted_content : undefined,
+        sender_encrypted_content: isEncrypted
+          ? (message.sender_encrypted_content ?? undefined)
+          : undefined,
+        encryption_version: message.encryption_version,
+        media_encryption_key: message.media_encryption_key ?? undefined,
+        media_encryption_iv: message.media_encryption_iv ?? undefined,
+        sender_media_encryption_key: message.sender_media_encryption_key ?? undefined,
+        is_multi_recipient: message.is_multi_recipient ?? undefined,
+        shared_encryption_iv: message.shared_encryption_iv ?? undefined,
+        recipient_keys: message.recipient_keys,
+      });
+    },
+    onSuccess: (_payload, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['conversations'] });
+      queryClient.invalidateQueries({ queryKey: ['conversations', 'all'] });
+      variables.targetConversationIDs.forEach((conversationID) => {
+        queryClient.invalidateQueries({ queryKey: ['messages', conversationID] });
+      });
+      setForwardDialogMessage(null);
+      setForwardTargetConversationIDs(new Set());
+      setForwardIncludeMedia(true);
+      setMessageMenuOpen(null);
+    },
+    onError: (error) => {
+      alert(error instanceof Error ? error.message : t('messages.errors.forwardFailed'));
+    },
+  });
+
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -1513,6 +1572,45 @@ export default function MessagesPage() {
     });
   };
 
+  const handleOpenForwardDialog = (message: Message) => {
+    setMessageMenuOpen(null);
+    setForwardDialogMessage(message);
+    setForwardTargetConversationIDs(new Set());
+    setForwardIncludeMedia(Boolean(message.media_url || message.media_file_id));
+  };
+
+  const handleToggleForwardTargetConversation = (conversationID: number) => {
+    setForwardTargetConversationIDs((prev) => {
+      const next = new Set(prev);
+      if (next.has(conversationID)) {
+        next.delete(conversationID);
+        return next;
+      }
+      if (next.size >= 10) return next;
+      next.add(conversationID);
+      return next;
+    });
+  };
+
+  const handleConfirmForward = () => {
+    if (!forwardDialogMessage) return;
+    const targetConversationIDs = Array.from(forwardTargetConversationIDs);
+    if (targetConversationIDs.length === 0) {
+      alert(
+        t(
+          'messages.errors.forwardSelectConversation',
+          'Select at least one conversation to forward to.'
+        )
+      );
+      return;
+    }
+    forwardMessageMutation.mutate({
+      message: forwardDialogMessage,
+      targetConversationIDs,
+      includeMedia: forwardIncludeMedia,
+    });
+  };
+
   // For mod_mail conversations, backend returns messages in ASC order (oldest first)
   // For DM conversations, backend returns messages in DESC order (newest first)
   // We want to display oldest-to-newest (newest at bottom), so only reverse for DMs
@@ -1696,6 +1794,12 @@ export default function MessagesPage() {
   const canDeleteForBoth = Boolean(
     deleteDialogMessage && deleteDialogMessage.sender_id === user?.id
   );
+  const forwardCandidateConversations = useMemo(() => {
+    if (!forwardDialogMessage) return [];
+    return allConversations.filter(
+      (conversation) => conversation.id !== forwardDialogMessage.conversation_id
+    );
+  }, [allConversations, forwardDialogMessage]);
 
   const markConversationAsRead = useCallback(
     async (conversationId: number) => {
@@ -1755,6 +1859,8 @@ export default function MessagesPage() {
   useEffect(() => {
     setMessageMenuOpen(null);
     setDeleteDialogMessage(null);
+    setForwardDialogMessage(null);
+    setForwardTargetConversationIDs(new Set());
     setShowMessageSearch(false);
     setExpandedPinnedMessages(false);
   }, [selectedConversationId]);
@@ -2702,6 +2808,13 @@ export default function MessagesPage() {
                                   <button
                                     type="button"
                                     className="w-full rounded-md px-3 py-2 text-left text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
+                                    onClick={() => handleOpenForwardDialog(message)}
+                                  >
+                                    {t('messages.actions.forward', { defaultValue: 'Forward' })}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="w-full rounded-md px-3 py-2 text-left text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
                                     onClick={() => {
                                       setMessageMenuOpen(null);
                                       setDeleteDialogMessage(message);
@@ -3023,6 +3136,111 @@ export default function MessagesPage() {
                   }
                 }}
                 disabled={deleteMessageMutation.isPending}
+              >
+                {t('common.cancel')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {forwardDialogMessage && (
+        <div
+          className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4"
+          role="dialog"
+          aria-modal="true"
+          onClick={() => {
+            if (!forwardMessageMutation.isPending) {
+              setForwardDialogMessage(null);
+              setForwardTargetConversationIDs(new Set());
+            }
+          }}
+        >
+          <div
+            className="w-full max-w-lg rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6 shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">
+              {t('messages.forward.title', { defaultValue: 'Forward Message' })}
+            </h3>
+            <p className="mt-2 text-sm text-[var(--color-text-secondary)]">
+              {t('messages.forward.subtitle', {
+                defaultValue: 'Choose up to 10 conversations.',
+              })}
+            </p>
+            {Boolean(forwardDialogMessage.media_url || forwardDialogMessage.media_file_id) && (
+              <label className="mt-4 flex items-center gap-2 text-sm text-[var(--color-text-primary)]">
+                <input
+                  type="checkbox"
+                  checked={forwardIncludeMedia}
+                  onChange={(event) => setForwardIncludeMedia(event.target.checked)}
+                  disabled={forwardMessageMutation.isPending}
+                />
+                {t('messages.forward.includeMedia', { defaultValue: 'Include media' })}
+              </label>
+            )}
+            <div className="mt-4 max-h-72 space-y-2 overflow-y-auto rounded-md border border-[var(--color-border)] p-2">
+              {forwardCandidateConversations.length === 0 ? (
+                <p className="text-sm text-[var(--color-text-secondary)]">
+                  {t('messages.forward.noEligibleConversations', {
+                    defaultValue: 'No eligible conversations found.',
+                  })}
+                </p>
+              ) : (
+                forwardCandidateConversations.map((conversation) => {
+                  const selected = forwardTargetConversationIDs.has(conversation.id);
+                  const isModMail = conversation.conversation_type === 'mod_mail';
+                  const label = isModMail
+                    ? `${t('common.prefix.hub', 'h/')}${conversation.hub_name ?? t('messages.hubFallback')}`
+                    : (conversation.other_user?.username ?? t('messages.user'));
+                  return (
+                    <label
+                      key={conversation.id}
+                      className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1 hover:bg-[var(--color-surface-elevated)]"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selected}
+                        onChange={() => handleToggleForwardTargetConversation(conversation.id)}
+                        disabled={
+                          forwardMessageMutation.isPending ||
+                          (!selected && forwardTargetConversationIDs.size >= 10)
+                        }
+                      />
+                      <span className="text-sm text-[var(--color-text-primary)]">{label}</span>
+                    </label>
+                  );
+                })
+              )}
+            </div>
+            <p className="mt-2 text-xs text-[var(--color-text-secondary)]">
+              {t('messages.forward.selectionCount', {
+                defaultValue: '{{count}} selected',
+                count: forwardTargetConversationIDs.size,
+              })}
+            </p>
+            <div className="mt-6 flex flex-col gap-3">
+              <button
+                type="button"
+                className="rounded-md bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)] disabled:opacity-50"
+                onClick={handleConfirmForward}
+                disabled={
+                  forwardMessageMutation.isPending || forwardTargetConversationIDs.size === 0
+                }
+              >
+                {forwardMessageMutation.isPending
+                  ? t('messages.forward.forwarding', { defaultValue: 'Forwarding...' })
+                  : t('messages.actions.forward', { defaultValue: 'Forward' })}
+              </button>
+              <button
+                type="button"
+                className="rounded-md px-4 py-2 text-sm font-semibold text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
+                onClick={() => {
+                  if (!forwardMessageMutation.isPending) {
+                    setForwardDialogMessage(null);
+                    setForwardTargetConversationIDs(new Set());
+                  }
+                }}
+                disabled={forwardMessageMutation.isPending}
               >
                 {t('common.cancel')}
               </button>
