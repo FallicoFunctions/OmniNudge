@@ -660,6 +660,82 @@ func TestGetMessageThreadEndpoint_RejectsUnauthorizedAndOutsider_Integration(t *
 	require.Equal(t, http.StatusForbidden, outsiderResp.Code, "body=%s", outsiderResp.Body.String())
 }
 
+func TestSendMessage_ThreadDepthLimitFlattensToRoot_Integration(t *testing.T) {
+	deps := newTestDeps(t)
+	defer deps.DB.Close()
+
+	sender := createUser(t, deps.UserRepo, "thread_depth_sender", "user")
+	recipient := createUser(t, deps.UserRepo, "thread_depth_recipient", "user")
+	senderToken, _ := deps.AuthService.GenerateJWT(sender.ID, "", sender.Username, sender.Role)
+	recipientToken, _ := deps.AuthService.GenerateJWT(recipient.ID, "", recipient.Username, recipient.Role)
+
+	conversation, err := deps.ConversationRepo.Create(context.Background(), sender.ID, recipient.ID)
+	require.NoError(t, err)
+
+	rootBody := []byte(fmt.Sprintf(
+		`{"conversation_id":%d,"encrypted_content":"depth-root","message_type":"text","encryption_version":"v1"}`,
+		conversation.ID,
+	))
+	rootReq, _ := http.NewRequest("POST", "/api/v1/messages", bytes.NewReader(rootBody))
+	rootReq.Header.Set("Authorization", "Bearer "+senderToken)
+	rootReq.Header.Set("Content-Type", "application/json")
+	rootResp := doRequest(t, deps.Router, rootReq)
+	require.Equal(t, http.StatusCreated, rootResp.Code, "root body=%s", rootResp.Body.String())
+
+	var rootMessage models.Message
+	require.NoError(t, json.Unmarshal(rootResp.Body.Bytes(), &rootMessage))
+
+	parentID := rootMessage.ID
+	for i := 1; i <= 10; i++ {
+		token := senderToken
+		if i%2 == 0 {
+			token = recipientToken
+		}
+		replyBody := []byte(fmt.Sprintf(
+			`{"conversation_id":%d,"encrypted_content":"depth-%d","message_type":"text","encryption_version":"v1","reply_to":%d}`,
+			conversation.ID,
+			i,
+			parentID,
+		))
+		replyReq, _ := http.NewRequest("POST", "/api/v1/messages", bytes.NewReader(replyBody))
+		replyReq.Header.Set("Authorization", "Bearer "+token)
+		replyReq.Header.Set("Content-Type", "application/json")
+		replyResp := doRequest(t, deps.Router, replyReq)
+		require.Equal(t, http.StatusCreated, replyResp.Code, "depth %d body=%s", i, replyResp.Body.String())
+
+		var replyMessage models.Message
+		require.NoError(t, json.Unmarshal(replyResp.Body.Bytes(), &replyMessage))
+		parentID = replyMessage.ID
+	}
+
+	flattenBody := []byte(fmt.Sprintf(
+		`{"conversation_id":%d,"encrypted_content":"depth-flatten","message_type":"text","encryption_version":"v1","reply_to":%d}`,
+		conversation.ID,
+		parentID,
+	))
+	flattenReq, _ := http.NewRequest("POST", "/api/v1/messages", bytes.NewReader(flattenBody))
+	flattenReq.Header.Set("Authorization", "Bearer "+senderToken)
+	flattenReq.Header.Set("Content-Type", "application/json")
+	flattenResp := doRequest(t, deps.Router, flattenReq)
+	require.Equal(t, http.StatusCreated, flattenResp.Code, "flatten body=%s", flattenResp.Body.String())
+	require.Equal(t, "true", flattenResp.Header().Get("X-Thread-Flattened"))
+
+	var flattenedMessage models.Message
+	require.NoError(t, json.Unmarshal(flattenResp.Body.Bytes(), &flattenedMessage))
+	require.NotNil(t, flattenedMessage.ReplyTo)
+	require.Equal(t, rootMessage.ID, *flattenedMessage.ReplyTo)
+	require.NotNil(t, flattenedMessage.ThreadRoot)
+	require.Equal(t, rootMessage.ID, *flattenedMessage.ThreadRoot)
+
+	deepestMessage, err := deps.MessageRepo.GetByID(context.Background(), parentID)
+	require.NoError(t, err)
+	require.Equal(t, 0, deepestMessage.ReplyCount)
+
+	updatedRoot, err := deps.MessageRepo.GetByID(context.Background(), rootMessage.ID)
+	require.NoError(t, err)
+	require.Equal(t, 2, updatedRoot.ReplyCount)
+}
+
 func TestEditMessageEndpoint_UpdatesMessageAndHistory(t *testing.T) {
 	deps := newTestDeps(t)
 	defer deps.DB.Close()
