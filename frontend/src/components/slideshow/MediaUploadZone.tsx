@@ -9,7 +9,7 @@ interface MediaUploadZoneProps {
   maxFiles?: number;
 }
 
-const DEFAULT_MAX_SIZE = 25 * 1024 * 1024; // 25MB
+const DEFAULT_MAX_SIZE = 100 * 1024 * 1024; // 100MB (matches backend hard cap)
 const DEFAULT_ACCEPTED_TYPES = [
   'image/jpeg',
   'image/png',
@@ -18,14 +18,19 @@ const DEFAULT_ACCEPTED_TYPES = [
   'video/mp4',
   'video/webm',
   'video/quicktime',
+  'video/x-matroska',
   'audio/mpeg',
+  'audio/mp4',
   'audio/wav',
   'audio/ogg',
   'audio/webm',
+  'audio/opus',
   'application/pdf',
   'application/msword',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   'text/plain',
+  'application/zip',
+  'application/x-zip-compressed',
 ];
 
 export function MediaUploadZone({
