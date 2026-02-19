@@ -34,6 +34,18 @@ func NewThumbnailGenerationHandler(
 		if err != nil {
 			return fmt.Errorf("failed to load media %d: %w", payload.FileID, err)
 		}
+		switch media.ScanStatus {
+		case models.MediaScanStatusClean:
+			// proceed
+		case models.MediaScanStatusPending:
+			return fmt.Errorf("media %d scan pending; defer thumbnail generation", media.ID)
+		case models.MediaScanStatusInfected:
+			return fmt.Errorf("media %d infected; skipping thumbnail generation: %w", media.ID, asynq.SkipRetry)
+		case models.MediaScanStatusError:
+			return fmt.Errorf("media %d scan error; skipping thumbnail generation: %w", media.ID, asynq.SkipRetry)
+		default:
+			return fmt.Errorf("media %d unknown scan status %q; skipping thumbnail generation: %w", media.ID, media.ScanStatus, asynq.SkipRetry)
+		}
 		var thumbnailPath string
 		var thumbnailErr error
 		switch {
