@@ -3022,17 +3022,17 @@
 ## FEATURE 7: MESSAGE THREADING (1.5 weeks)
 
 ### F7-001: Backend - Database Schema
-**Status:** ⬜ TODO
+**Status:** ✅ COMPLETE
 **Priority:** P1
 **Estimated Time:** 1 hour
 
 **Tasks:**
-- [ ] Create migration: add columns to messages table
-- [ ] Add reply_to INTEGER REFERENCES messages(id)
-- [ ] Add thread_root INTEGER REFERENCES messages(id)
-- [ ] Add reply_count INTEGER DEFAULT 0
-- [ ] Add indexes: reply_to, thread_root, (thread_root, created_at)
-- [ ] Test migration
+- [x] Create migration: add columns to messages table
+- [x] Add reply_to INTEGER REFERENCES messages(id)
+- [x] Add thread_root INTEGER REFERENCES messages(id)
+- [x] Add reply_count INTEGER DEFAULT 0
+- [x] Add indexes: reply_to, thread_root, (thread_root, sent_at)
+- [x] Test migration
 
 **Acceptance Criteria:**
 - Migration runs successfully
