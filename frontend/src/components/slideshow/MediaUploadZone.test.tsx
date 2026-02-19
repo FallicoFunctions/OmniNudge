@@ -15,6 +15,11 @@ describe('MediaUploadZone', () => {
     );
     expect(input.accept).toContain('text/plain');
     expect(input.accept).toContain('audio/mpeg');
+    expect(input.accept).toContain('audio/mp4');
+    expect(input.accept).toContain('audio/opus');
+    expect(input.accept).toContain('video/x-matroska');
+    expect(input.accept).toContain('application/zip');
+    expect(input.accept).toContain('application/x-zip-compressed');
   });
 
   it('accepts supported files and rejects unsupported files', () => {
@@ -31,4 +36,3 @@ describe('MediaUploadZone', () => {
     expect(onFilesSelected).toHaveBeenCalledWith([pdf]);
   });
 });
-
