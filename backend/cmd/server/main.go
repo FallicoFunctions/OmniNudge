@@ -313,7 +313,12 @@ func main() {
 
 	messagesHandler := handlers.NewMessagesHandler(db.Pool, messageRepo, conversationRepo, userSettingsRepo, hub, notificationService, queueClient)
 	usersHandler := handlers.NewUsersHandler(userRepo, userProfileRepo, userFriendshipRepo, userSettingsRepo, postRepo, commentRepo, authService, hubModRepo, cache, thumbnailService)
-	mediaHandler := handlers.NewMediaHandler(mediaRepo, thumbnailService, queueClient, cfg.VirusScan.FailClosed)
+	mediaQuota := handlers.MediaQuotaConfig{
+		FreeTierBytes: cfg.Media.FreeTierQuotaBytes,
+		ProTierBytes:  cfg.Media.ProTierQuotaBytes,
+	}
+	mediaHandler := handlers.NewMediaHandler(mediaRepo, thumbnailService, queueClient, mediaQuota, cfg.VirusScan.FailClosed)
+	storageHandler := handlers.NewStorageHandler(mediaRepo, mediaQuota)
 	hubsHandler := handlers.NewHubsHandlerWithAccessRequest(hubRepo, postRepo, hubModRepo, hubSubRepo, hubSettingsRepo, hubAccessRequestRepo)
 	subscriptionsHandler := handlers.NewSubscriptionsHandler(hubSubRepo, subredditSubRepo, hubRepo)
 	moderationHandler := handlers.NewModerationHandler(reportRepo, hubModRepo, userRepo, notificationRepo, hub, emailService)
@@ -844,6 +849,7 @@ func main() {
 
 			// User profile management
 			protected.GET("/users/me/profile", usersHandler.GetMyProfile)
+			protected.GET("/users/me/storage", storageHandler.GetMyStorage)
 			protected.PUT("/users/me/profile", usersHandler.UpdateProfile)
 			protected.POST("/users/me/avatar", usersHandler.UploadMyAvatar)
 			protected.PUT("/users/profile", usersHandler.UpdateProfile)

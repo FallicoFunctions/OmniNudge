@@ -127,7 +127,13 @@ func newTestDeps(t *testing.T) *TestDeps {
 	settingsHandler := handlers.NewSettingsHandler(userSettingsRepo)
 	thumbnailService := services.NewThumbnailService()
 	usersHandler := handlers.NewUsersHandler(userRepo, userProfileRepo, userFriendshipRepo, userSettingsRepo, postRepo, commentRepo, nil, modRepo, services.NoopCache{}, thumbnailService)
-	mediaHandler := handlers.NewMediaHandler(models.NewMediaFileRepository(db.Pool), thumbnailService, nil, false)
+	mediaQuota := handlers.MediaQuotaConfig{
+		FreeTierBytes: cfg.Media.FreeTierQuotaBytes,
+		ProTierBytes:  cfg.Media.ProTierQuotaBytes,
+	}
+	mediaRepo := models.NewMediaFileRepository(db.Pool)
+	mediaHandler := handlers.NewMediaHandler(mediaRepo, thumbnailService, nil, mediaQuota, false)
+	storageHandler := handlers.NewStorageHandler(mediaRepo, mediaQuota)
 	hubSubRepo := models.NewHubSubscriptionRepository(db.Pool)
 	hubsHandler := handlers.NewHubsHandler(hubRepo, postRepo, modRepo, hubSubRepo, hubSettingsRepo)
 	moderationHandler := handlers.NewModerationHandler(reportRepo, modRepo, userRepo, notifRepo, hub, nil)
@@ -226,6 +232,7 @@ func newTestDeps(t *testing.T) *TestDeps {
 			protected.POST("/conversations", conversationsHandler.CreateConversation)
 			protected.GET("/search/messages", searchHandler.SearchMessages)
 			protected.GET("/users/me/profile", usersHandler.GetMyProfile)
+			protected.GET("/users/me/storage", storageHandler.GetMyStorage)
 			protected.PUT("/users/me/profile", usersHandler.UpdateProfile)
 			protected.POST("/users/me/avatar", usersHandler.UploadMyAvatar)
 			protected.GET("/settings", settingsHandler.GetSettings)

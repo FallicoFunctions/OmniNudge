@@ -177,6 +177,23 @@ func (r *MediaFileRepository) GetTotalStorageByUserID(ctx context.Context, userI
 	return total.Int64, nil
 }
 
+// GetTrackedStorageByUserID returns tracked storage usage from users.storage_used_bytes.
+func (r *MediaFileRepository) GetTrackedStorageByUserID(ctx context.Context, userID int) (int64, error) {
+	var total sql.NullInt64
+	err := r.pool.QueryRow(ctx, `
+		SELECT storage_used_bytes
+		FROM users
+		WHERE id = $1
+	`, userID).Scan(&total)
+	if err != nil {
+		return 0, err
+	}
+	if !total.Valid {
+		return 0, nil
+	}
+	return total.Int64, nil
+}
+
 // UpdateThumbnailURL updates thumbnail_url for an existing media record.
 func (r *MediaFileRepository) UpdateThumbnailURL(ctx context.Context, mediaID int, thumbnailURL string) error {
 	_, err := r.pool.Exec(ctx, `
