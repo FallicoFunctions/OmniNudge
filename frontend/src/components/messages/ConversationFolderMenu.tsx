@@ -34,17 +34,18 @@ export function ConversationFolderMenu({
   if (folders.length === 0) return null;
 
   const handleToggle = async (folder: ConversationFolder) => {
-    if (pendingId !== null) return; // prevent double-click
+    if (pendingId !== null) return;
     const inFolder = assignedIds.has(folder.id);
     setPendingId(folder.id);
-    setErrorId(null);
+    setErrorId(null); // clear any previous error before attempting
     try {
       if (inFolder) {
         await onRemove(folder.id);
       } else {
         await onAdd(folder.id);
       }
-      // Invalidate so the checkbox reflects server truth
+      // Success: clear error (in case this folder had a prior error)
+      setErrorId(null);
       void queryClient.invalidateQueries({ queryKey: ['conversation-folders', conversationId] });
     } catch {
       setErrorId(folder.id);
@@ -94,11 +95,17 @@ export function ConversationFolderMenu({
                 </span>
                 <span className="flex-1 truncate text-left">{folder.name}</span>
               </button>
-              {/* Per-row error feedback */}
               {hasError && (
-                <p className="px-3 pb-1 text-xs text-[var(--color-error)]">
-                  {t('messages.folders.error')}
-                </p>
+                <div className="flex items-center justify-between px-3 pb-1">
+                  <p className="text-xs text-[var(--color-error)]">{t('messages.folders.error')}</p>
+                  <button
+                    type="button"
+                    onClick={() => void handleToggle(folder)}
+                    className="text-xs font-semibold text-[var(--color-primary)] hover:underline focus:outline-none"
+                  >
+                    Retry
+                  </button>
+                </div>
               )}
             </div>
           );

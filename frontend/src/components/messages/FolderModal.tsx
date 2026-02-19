@@ -14,12 +14,72 @@ const FOLDER_COLORS: { hex: string; name: string }[] = [
 ];
 
 const FOLDER_ICONS = ['📁', '⭐', '💼', '🏠', '🔖', '💡', '🎯', '🔥', '💬', '🤝', '📌', '🛡️'];
+const MAX_NAME_LENGTH = 50;
 
 interface FolderModalProps {
-  /** If provided, we're editing an existing folder. */
   folder?: ConversationFolder;
   onSave: (data: { name: string; color: string; icon: string }) => Promise<void>;
   onClose: () => void;
+}
+
+/** Focus trap: tab cycles within `containerRef`. */
+function useFocusTrap(containerRef: React.RefObject<HTMLElement | null>, active: boolean) {
+  useEffect(() => {
+    if (!active) return;
+    const el = containerRef.current;
+    if (!el) return;
+
+    const getFocusable = () =>
+      Array.from(
+        el.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ),
+      );
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Tab') return;
+      const focusable = getFocusable();
+      if (!focusable.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (e.shiftKey) {
+        if (document.activeElement === first) { e.preventDefault(); last.focus(); }
+      } else {
+        if (document.activeElement === last) { e.preventDefault(); first.focus(); }
+      }
+    };
+
+    el.addEventListener('keydown', handleKeyDown);
+    // Move focus inside on mount
+    const focusable = getFocusable();
+    focusable[0]?.focus();
+    return () => el.removeEventListener('keydown', handleKeyDown);
+  }, [active, containerRef]);
+}
+
+/** Arrow key navigation for a flat grid of buttons. */
+function useGridKeyNav(
+  containerRef: React.RefObject<HTMLElement | null>,
+  selector: string,
+  cols: number,
+) {
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const items = Array.from(el.querySelectorAll<HTMLElement>(selector));
+      const idx = items.indexOf(document.activeElement as HTMLElement);
+      if (idx === -1) return;
+      let next = -1;
+      if (e.key === 'ArrowRight') next = Math.min(idx + 1, items.length - 1);
+      else if (e.key === 'ArrowLeft') next = Math.max(idx - 1, 0);
+      else if (e.key === 'ArrowDown') next = Math.min(idx + cols, items.length - 1);
+      else if (e.key === 'ArrowUp') next = Math.max(idx - cols, 0);
+      if (next !== -1) { e.preventDefault(); items[next].focus(); }
+    };
+    el.addEventListener('keydown', handleKeyDown);
+    return () => el.removeEventListener('keydown', handleKeyDown);
+  }, [containerRef, selector, cols]);
 }
 
 export function FolderModal({ folder, onSave, onClose }: FolderModalProps) {
@@ -29,28 +89,57 @@ export function FolderModal({ folder, onSave, onClose }: FolderModalProps) {
   const [icon, setIcon] = useState(folder?.icon ?? FOLDER_ICONS[0]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const inputRef = useRef<HTMLInputElement>(null);
-  const titleId = 'folder-modal-title';
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
 
+  const titleId = 'folder-modal-title';
+  const containerRef = useRef<HTMLDivElement>(null);
+  const colorGridRef = useRef<HTMLDivElement>(null);
+  const iconGridRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+
+  // Capture the element that triggered the modal so focus can return on close
   useEffect(() => {
-    inputRef.current?.focus();
+    triggerRef.current = document.activeElement as HTMLButtonElement;
   }, []);
 
-  // Close on Escape
+  const isDirty =
+    name !== (folder?.name ?? '') ||
+    color !== (folder?.color ?? FOLDER_COLORS[0].hex) ||
+    icon !== (folder?.icon ?? FOLDER_ICONS[0]);
+
+  useFocusTrap(containerRef, true);
+  useGridKeyNav(colorGridRef, '[data-color-btn]', 8);
+  useGridKeyNav(iconGridRef, '[data-icon-btn]', 6);
+
+  // Restore focus on unmount
+  useEffect(() => {
+    return () => {
+      triggerRef.current?.focus();
+    };
+  }, []);
+
+  // Escape key: guard unsaved changes
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !saving) onClose();
+      if (e.key !== 'Escape' || saving) return;
+      if (isDirty && !confirmDiscard) {
+        e.preventDefault();
+        setConfirmDiscard(true);
+      } else {
+        onClose();
+      }
     };
     document.addEventListener('keydown', handler);
     return () => document.removeEventListener('keydown', handler);
-  }, [onClose, saving]);
+  }, [onClose, saving, isDirty, confirmDiscard]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const trimmed = name.trim();
-    if (!trimmed) return; // button is disabled; guard is belt-and-suspenders
+    if (!trimmed) return;
     setSaving(true);
     setError('');
+    setConfirmDiscard(false);
     try {
       await onSave({ name: trimmed, color, icon });
       onClose();
@@ -60,7 +149,14 @@ export function FolderModal({ folder, onSave, onClose }: FolderModalProps) {
     }
   };
 
+  const handleBackdropClick = (e: React.MouseEvent) => {
+    if (e.target !== e.currentTarget || saving) return;
+    if (isDirty && !confirmDiscard) { setConfirmDiscard(true); return; }
+    onClose();
+  };
+
   const title = folder ? t('messages.folders.editFolder') : t('messages.folders.newFolder');
+  const charsLeft = MAX_NAME_LENGTH - name.length;
 
   return (
     <div
@@ -68,18 +164,47 @@ export function FolderModal({ folder, onSave, onClose }: FolderModalProps) {
       role="dialog"
       aria-modal="true"
       aria-labelledby={titleId}
-      onClick={(e) => {
-        if (e.target === e.currentTarget && !saving) onClose();
-      }}
+      onClick={handleBackdropClick}
     >
-      <div className="w-full max-w-sm rounded-xl bg-[var(--color-surface)] p-6 shadow-xl">
+      <div
+        ref={containerRef}
+        className="w-full max-w-sm rounded-xl bg-[var(--color-surface)] p-6 shadow-xl"
+      >
+        {/* Discard confirmation overlay */}
+        {confirmDiscard && (
+          <div className="mb-4 rounded-lg border border-[var(--color-warning,#f59e0b)]/30 bg-amber-50/80 p-3 dark:bg-amber-900/20">
+            <p className="mb-2 text-sm font-medium text-amber-800 dark:text-amber-200">
+              Discard unsaved changes?
+            </p>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={onClose}
+                className="rounded-md bg-amber-600 px-3 py-1 text-xs font-semibold text-white hover:bg-amber-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
+              >
+                Discard
+              </button>
+              <button
+                type="button"
+                onClick={() => setConfirmDiscard(false)}
+                className="rounded-md border border-[var(--color-border)] px-3 py-1 text-xs font-semibold text-[var(--color-text-secondary)] hover:bg-[var(--color-hover)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]"
+              >
+                Keep editing
+              </button>
+            </div>
+          </div>
+        )}
+
         <div className="mb-4 flex items-center justify-between">
           <h2 id={titleId} className="text-base font-semibold text-[var(--color-text-primary)]">
             {title}
           </h2>
           <button
             type="button"
-            onClick={onClose}
+            onClick={() => {
+              if (isDirty && !confirmDiscard) { setConfirmDiscard(true); return; }
+              onClose();
+            }}
             disabled={saving}
             className="flex h-8 w-8 items-center justify-center rounded-lg text-[var(--color-text-secondary)] hover:bg-[var(--color-hover)] hover:text-[var(--color-text-primary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] disabled:opacity-40"
             aria-label={t('messages.folders.cancel')}
@@ -91,26 +216,31 @@ export function FolderModal({ folder, onSave, onClose }: FolderModalProps) {
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Name */}
           <div>
-            <label
-              htmlFor="folder-name-input"
-              className="mb-1 block text-xs font-semibold text-[var(--color-text-secondary)]"
-            >
-              {t('messages.folders.nameLabel')}
-            </label>
+            <div className="mb-1 flex items-center justify-between">
+              <label
+                htmlFor="folder-name-input"
+                className="text-xs font-semibold text-[var(--color-text-secondary)]"
+              >
+                {t('messages.folders.nameLabel')}
+              </label>
+              <span
+                className={`text-[10px] tabular-nums ${charsLeft <= 10 ? 'text-[var(--color-error)]' : 'text-[var(--color-text-muted)]'}`}
+                aria-live="polite"
+              >
+                {charsLeft}
+              </span>
+            </div>
             <input
               id="folder-name-input"
-              ref={inputRef}
               type="text"
               value={name}
               onChange={(e) => {
                 setName(e.target.value);
                 if (error) setError('');
-              }}
-              onBlur={() => {
-                if (!name.trim()) setError(t('messages.folders.namePlaceholder'));
+                if (confirmDiscard) setConfirmDiscard(false);
               }}
               placeholder={t('messages.folders.namePlaceholder')}
-              maxLength={50}
+              maxLength={MAX_NAME_LENGTH}
               disabled={saving}
               aria-label={t('messages.folders.nameLabel')}
               aria-invalid={!!error}
@@ -129,20 +259,22 @@ export function FolderModal({ folder, onSave, onClose }: FolderModalProps) {
             <label className="mb-2 block text-xs font-semibold text-[var(--color-text-secondary)]">
               {t('messages.folders.colorLabel')}
             </label>
-            <div className="flex flex-wrap gap-2">
+            <div ref={colorGridRef} className="flex flex-wrap gap-2" role="radiogroup" aria-label={t('messages.folders.colorLabel')}>
               {FOLDER_COLORS.map(({ hex, name: colorName }) => (
                 <button
                   key={hex}
                   type="button"
+                  data-color-btn
                   onClick={() => setColor(hex)}
                   disabled={saving}
+                  role="radio"
+                  aria-checked={color === hex}
                   className="h-7 w-7 rounded-full transition-transform hover:scale-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[var(--color-primary)] disabled:opacity-60"
                   style={{
                     backgroundColor: hex,
                     boxShadow: color === hex ? `0 0 0 3px ${hex}, 0 0 0 5px var(--color-surface)` : undefined,
                   }}
                   aria-label={`${t('messages.folders.colorLabel')}: ${colorName}`}
-                  aria-pressed={color === hex}
                 />
               ))}
             </div>
@@ -153,19 +285,21 @@ export function FolderModal({ folder, onSave, onClose }: FolderModalProps) {
             <label className="mb-2 block text-xs font-semibold text-[var(--color-text-secondary)]">
               {t('messages.folders.iconLabel')}
             </label>
-            <div className="flex flex-wrap gap-1.5">
+            <div ref={iconGridRef} className="flex flex-wrap gap-1.5" role="radiogroup" aria-label={t('messages.folders.iconLabel')}>
               {FOLDER_ICONS.map((ic) => (
                 <button
                   key={ic}
                   type="button"
+                  data-icon-btn
                   onClick={() => setIcon(ic)}
                   disabled={saving}
+                  role="radio"
+                  aria-checked={icon === ic}
                   className={`inline-flex h-8 w-8 items-center justify-center rounded-lg text-base transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] disabled:opacity-60 ${
                     icon === ic
                       ? 'scale-110 bg-[var(--color-primary)]/15 ring-1 ring-[var(--color-primary)]'
                       : 'hover:scale-110 hover:bg-[var(--color-hover)]'
                   }`}
-                  aria-pressed={icon === ic}
                   aria-label={`${t('messages.folders.iconLabel')}: ${ic}`}
                 >
                   {ic}
@@ -174,7 +308,7 @@ export function FolderModal({ folder, onSave, onClose }: FolderModalProps) {
             </div>
           </div>
 
-          {/* Preview */}
+          {/* Preview — matches actual FolderRow rendering (color applied, no opacity manipulation) */}
           <div className="flex items-center gap-2 rounded-lg border border-[var(--color-border)] bg-[var(--color-background)] px-3 py-2">
             <span className="inline-flex flex-shrink-0 items-center text-base leading-none" aria-hidden>
               {icon}
@@ -185,13 +319,19 @@ export function FolderModal({ folder, onSave, onClose }: FolderModalProps) {
             >
               {name.trim() || t('messages.folders.namePlaceholder')}
             </span>
+            <span className="flex-shrink-0 text-[10px] text-[var(--color-text-muted)]">
+              {t('messages.folders.title')}
+            </span>
           </div>
 
           {/* Actions */}
           <div className="flex gap-2 pt-1">
             <button
               type="button"
-              onClick={onClose}
+              onClick={() => {
+                if (isDirty && !confirmDiscard) { setConfirmDiscard(true); return; }
+                onClose();
+              }}
               disabled={saving}
               className="flex-1 rounded-lg border border-[var(--color-border)] py-2 text-sm font-semibold text-[var(--color-text-secondary)] hover:bg-[var(--color-hover)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] disabled:opacity-50"
             >

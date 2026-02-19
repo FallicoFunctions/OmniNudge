@@ -37,6 +37,7 @@ import { useDebounce } from '../hooks/useDebounce';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import type {
   Conversation,
+  ConversationFolder,
   Message,
   PinnedMessagesResponse,
   SendMessageRequest,
@@ -705,11 +706,15 @@ export default function MessagesPage() {
     createFolder,
     updateFolder,
     deleteFolder,
+    deletingFolderId,
     addConversationToFolder,
     removeConversationFromFolder,
   } = useFolders();
-  const [folderModalOpen, setFolderModalOpen] = useState<'new' | { folder: import('../types/messages').ConversationFolder } | null>(null);
-  const [deleteFolderTarget, setDeleteFolderTarget] = useState<import('../types/messages').ConversationFolder | null>(null);
+  const [folderModalOpen, setFolderModalOpen] = useState<'new' | { folder: ConversationFolder } | null>(null);
+  const [deleteFolderTarget, setDeleteFolderTarget] = useState<ConversationFolder | null>(null);
+  const [deleteFolderError, setDeleteFolderError] = useState('');
+  const [isDeletingFolderConfirm, setIsDeletingFolderConfirm] = useState(false);
+  const [showMobileFolderSheet, setShowMobileFolderSheet] = useState(false);
   const resetMessageSearch = useCallback(() => {
     setMessageSearchQuery('');
     setMessageSearchSenderFilter('all');
@@ -2272,8 +2277,9 @@ export default function MessagesPage() {
               onSelectSmartFolder={setSmartFolder}
               onNewFolder={() => setFolderModalOpen('new')}
               onEditFolder={(folder) => setFolderModalOpen({ folder })}
-              onDeleteFolder={(folder) => setDeleteFolderTarget(folder)}
+              onDeleteFolder={(folder) => { setDeleteFolderTarget(folder); setDeleteFolderError(''); }}
               isLoading={isLoadingFolders}
+              deletingFolderId={deletingFolderId}
             />
           )}
 
@@ -2332,6 +2338,63 @@ export default function MessagesPage() {
                 {t('messages.tabs.archived')}
               </button>
             </div>
+
+            {/* Mobile folder filter bar */}
+            {isMobile && (
+              <div className="flex items-center gap-1.5 overflow-x-auto border-b border-[var(--color-border)] px-3 py-2 [scrollbar-width:none]">
+                {/* All */}
+                <button
+                  type="button"
+                  onClick={() => { setSelectedFolderId(null); setSmartFolder(null); }}
+                  className={`flex-shrink-0 rounded-full border px-2.5 py-1 text-xs font-semibold transition-colors ${
+                    selectedFolderId === null && smartFolder === null
+                      ? 'border-[var(--color-primary)] bg-[var(--color-primary)] text-white'
+                      : 'border-[var(--color-border)] text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
+                  }`}
+                >
+                  {t('messages.folders.allConversations')}
+                </button>
+                {/* Unread */}
+                <button
+                  type="button"
+                  onClick={() => { setSelectedFolderId(null); setSmartFolder('unread'); }}
+                  className={`flex-shrink-0 rounded-full border px-2.5 py-1 text-xs font-semibold transition-colors ${
+                    smartFolder === 'unread'
+                      ? 'border-[var(--color-primary)] bg-[var(--color-primary)] text-white'
+                      : 'border-[var(--color-border)] text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
+                  }`}
+                >
+                  {t('messages.folders.unread')}
+                </button>
+                {/* User folders */}
+                {folders.map((folder) => (
+                  <button
+                    key={folder.id}
+                    type="button"
+                    onClick={() => { setSelectedFolderId(folder.id); setSmartFolder(null); }}
+                    className={`flex-shrink-0 inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-semibold transition-colors ${
+                      selectedFolderId === folder.id
+                        ? 'border-[var(--color-primary)] bg-[var(--color-primary)] text-white'
+                        : 'border-[var(--color-border)] text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
+                    }`}
+                    style={selectedFolderId === folder.id ? undefined : { borderColor: folder.color + '66' }}
+                  >
+                    <span aria-hidden>{folder.icon}</span>
+                    <span className="max-w-[5rem] truncate">{folder.name}</span>
+                  </button>
+                ))}
+                {/* Manage folders button */}
+                <button
+                  type="button"
+                  onClick={() => setShowMobileFolderSheet(true)}
+                  className="flex-shrink-0 rounded-full border border-[var(--color-border)] px-2.5 py-1 text-xs font-semibold text-[var(--color-text-secondary)] hover:bg-[var(--color-hover)] hover:text-[var(--color-text-primary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]"
+                  aria-label={t('messages.folders.manageFolder')}
+                  title={t('messages.folders.manageFolder')}
+                >
+                  ⚙
+                </button>
+              </div>
+            )}
 
             {/* Search input */}
             <div className="p-3 border-b border-[var(--color-border)]">
@@ -3896,6 +3959,59 @@ export default function MessagesPage() {
         />
       )}
 
+      {/* Mobile folder management sheet (S1) */}
+      {showMobileFolderSheet && (
+        <div
+          className="fixed inset-0 z-50 flex flex-col justify-end"
+          role="dialog"
+          aria-modal="true"
+          aria-label={t('messages.folders.manageFolder')}
+        >
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0 bg-black/50"
+            onClick={() => setShowMobileFolderSheet(false)}
+          />
+          {/* Sheet */}
+          <div className="relative max-h-[80vh] overflow-hidden rounded-t-2xl bg-[var(--color-surface)] pb-safe">
+            {/* Handle */}
+            <div className="flex justify-center pt-3 pb-1">
+              <div className="h-1 w-10 rounded-full bg-[var(--color-border)]" />
+            </div>
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-[var(--color-border)] px-4 py-3">
+              <h2 className="text-base font-semibold text-[var(--color-text-primary)]">
+                {t('messages.folders.manageFolder')}
+              </h2>
+              <button
+                type="button"
+                onClick={() => setShowMobileFolderSheet(false)}
+                className="flex h-8 w-8 items-center justify-center rounded-lg text-[var(--color-text-secondary)] hover:bg-[var(--color-hover)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]"
+                aria-label={t('messages.folders.cancel')}
+              >
+                ✕
+              </button>
+            </div>
+            {/* Folder list in full management mode */}
+            <div className="overflow-y-auto">
+              <FolderList
+                folders={folders}
+                selectedFolderId={selectedFolderId}
+                smartFolder={smartFolder}
+                onSelectFolder={(id) => { setSelectedFolderId(id); setShowMobileFolderSheet(false); }}
+                onSelectSmartFolder={(s) => { setSmartFolder(s); setShowMobileFolderSheet(false); }}
+                onNewFolder={() => { setShowMobileFolderSheet(false); setFolderModalOpen('new'); }}
+                onEditFolder={(folder) => { setShowMobileFolderSheet(false); setFolderModalOpen({ folder }); }}
+                onDeleteFolder={(folder) => { setShowMobileFolderSheet(false); setDeleteFolderTarget(folder); setDeleteFolderError(''); }}
+                isLoading={isLoadingFolders}
+                deletingFolderId={deletingFolderId}
+                alwaysShowActions
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Folder create/edit modal */}
       {folderModalOpen !== null && (
         <FolderModal
@@ -3929,23 +4045,47 @@ export default function MessagesPage() {
             <p className="mb-4 text-sm text-[var(--color-text-secondary)]">
               {t('messages.folders.deleteConfirm', { name: deleteFolderTarget.name })}
             </p>
+            {deleteFolderError && (
+              <p className="mb-3 rounded-lg bg-[var(--color-error)]/10 px-3 py-2 text-xs font-medium text-[var(--color-error)]">
+                {deleteFolderError}
+              </p>
+            )}
             <div className="flex gap-2">
               <button
                 type="button"
-                onClick={() => setDeleteFolderTarget(null)}
-                className="flex-1 rounded-lg border border-[var(--color-border)] py-2 text-sm font-semibold text-[var(--color-text-secondary)] hover:bg-[var(--color-hover)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]"
+                onClick={() => { setDeleteFolderTarget(null); setDeleteFolderError(''); }}
+                disabled={isDeletingFolderConfirm}
+                className="flex-1 rounded-lg border border-[var(--color-border)] py-2 text-sm font-semibold text-[var(--color-text-secondary)] hover:bg-[var(--color-hover)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] disabled:opacity-50"
               >
                 {t('messages.folders.cancel')}
               </button>
               <button
                 type="button"
+                disabled={isDeletingFolderConfirm}
                 onClick={async () => {
-                  await deleteFolder(deleteFolderTarget.id);
-                  setDeleteFolderTarget(null);
+                  setIsDeletingFolderConfirm(true);
+                  setDeleteFolderError('');
+                  try {
+                    await deleteFolder(deleteFolderTarget.id);
+                    setDeleteFolderTarget(null);
+                  } catch {
+                    setDeleteFolderError(t('messages.folders.error'));
+                  } finally {
+                    setIsDeletingFolderConfirm(false);
+                  }
                 }}
-                className="flex-1 rounded-lg bg-[var(--color-error)] py-2 text-sm font-semibold text-white hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-error)]"
+                className="flex-1 rounded-lg bg-[var(--color-error)] py-2 text-sm font-semibold text-white hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-error)] disabled:opacity-50"
               >
-                {t('messages.folders.deleteFolder')}
+                {isDeletingFolderConfirm ? (
+                  <span className="inline-flex items-center justify-center gap-1.5">
+                    <svg className="h-3.5 w-3.5 animate-spin" viewBox="0 0 16 16" fill="none" aria-hidden>
+                      <circle cx="8" cy="8" r="6" stroke="white" strokeWidth="2" strokeDasharray="28" strokeDashoffset="10" />
+                    </svg>
+                    {t('messages.folders.deleteFolder')}
+                  </span>
+                ) : (
+                  t('messages.folders.deleteFolder')
+                )}
               </button>
             </div>
           </div>
