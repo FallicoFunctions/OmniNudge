@@ -1,6 +1,7 @@
 package integration
 
 import (
+	"archive/zip"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -275,6 +276,111 @@ func TestMediaUpload_AllowsPDFDocument(t *testing.T) {
 	req.Header.Set("Content-Type", writer.FormDataContentType())
 	w := doRequest(t, deps.Router, req)
 	require.Equal(t, http.StatusCreated, w.Code, w.Body.String())
+}
+
+func TestMediaUpload_AllowsExpandedDocumentAndArchiveTypes(t *testing.T) {
+	defer os.RemoveAll("uploads")
+	deps := newTestDeps(t)
+	defer deps.DB.Close()
+
+	user := createUser(t, deps.UserRepo, "media_docs", "user")
+	token, _ := deps.AuthService.GenerateJWT(user.ID, "", user.Username, user.Role)
+
+	cases := []struct {
+		name     string
+		filename string
+		content  []byte
+	}{
+		{
+			name:     "text file",
+			filename: "notes.txt",
+			content:  []byte("plain text document"),
+		},
+		{
+			name:     "word doc",
+			filename: "document.doc",
+			content:  []byte{0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1, 0x00, 0x00, 0x00, 0x00},
+		},
+		{
+			name:     "word docx",
+			filename: "document.docx",
+			content:  buildDocxPayload(t, true),
+		},
+		{
+			name:     "zip archive",
+			filename: "archive.zip",
+			content:  []byte{'P', 'K', 0x03, 0x04, 0x14, 0x00, 0x00, 0x00},
+		},
+	}
+
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			var b bytes.Buffer
+			writer := multipart.NewWriter(&b)
+			part, err := writer.CreateFormFile("file", tc.filename)
+			require.NoError(t, err)
+			_, err = part.Write(tc.content)
+			require.NoError(t, err)
+			require.NoError(t, writer.Close())
+
+			req, err := http.NewRequest("POST", "/api/v1/media/upload", &b)
+			require.NoError(t, err)
+			req.Header.Set("Authorization", "Bearer "+token)
+			req.Header.Set("Content-Type", writer.FormDataContentType())
+
+			w := doRequest(t, deps.Router, req)
+			require.Equal(t, http.StatusCreated, w.Code, "body=%s", w.Body.String())
+		})
+	}
+}
+
+func TestMediaUpload_RejectsRenamedZipAsDocx(t *testing.T) {
+	defer os.RemoveAll("uploads")
+	deps := newTestDeps(t)
+	defer deps.DB.Close()
+
+	user := createUser(t, deps.UserRepo, "media_bad_docx", "user")
+	token, _ := deps.AuthService.GenerateJWT(user.ID, "", user.Username, user.Role)
+
+	var b bytes.Buffer
+	writer := multipart.NewWriter(&b)
+	part, err := writer.CreateFormFile("file", "fake.docx")
+	require.NoError(t, err)
+	_, err = part.Write(buildDocxPayload(t, false))
+	require.NoError(t, err)
+	require.NoError(t, writer.Close())
+
+	req, err := http.NewRequest("POST", "/api/v1/media/upload", &b)
+	require.NoError(t, err)
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+
+	w := doRequest(t, deps.Router, req)
+	require.Equal(t, http.StatusUnsupportedMediaType, w.Code, "body=%s", w.Body.String())
+	require.Contains(t, strings.ToLower(w.Body.String()), "invalid document structure")
+}
+
+func buildDocxPayload(t *testing.T, includeWordDocument bool) []byte {
+	t.Helper()
+	var b bytes.Buffer
+	zw := zip.NewWriter(&b)
+
+	writeZipEntry := func(name, body string) {
+		w, err := zw.Create(name)
+		require.NoError(t, err)
+		_, err = w.Write([]byte(body))
+		require.NoError(t, err)
+	}
+
+	writeZipEntry("[Content_Types].xml", "<Types></Types>")
+	writeZipEntry("_rels/.rels", "<Relationships></Relationships>")
+	if includeWordDocument {
+		writeZipEntry("word/document.xml", "<w:document></w:document>")
+	}
+	require.NoError(t, zw.Close())
+
+	return b.Bytes()
 }
 
 func TestSendMessage_RespectsRecipientAutoUnarchiveSetting_Integration(t *testing.T) {
