@@ -4,6 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"image"
+	"image/color"
+	"image/png"
 	"os"
 	"path/filepath"
 	"testing"
@@ -79,4 +82,35 @@ func TestThumbnailGenerationHandler_SkipRetryWhenScanInfected(t *testing.T) {
 	err := handler(context.Background(), task)
 	require.Error(t, err)
 	require.True(t, errors.Is(err, asynq.SkipRetry))
+}
+
+func TestThumbnailGenerationHandler_GeneratesThumbnailForCleanImage(t *testing.T) {
+	_, mediaRepo, userID := setupThumbnailDB(t)
+	dir := t.TempDir()
+	imagePath := filepath.Join(dir, "clean.png")
+
+	img := image.NewRGBA(image.Rect(0, 0, 640, 480))
+	for y := 0; y < 480; y++ {
+		for x := 0; x < 640; x++ {
+			img.Set(x, y, color.RGBA{R: 120, G: 180, B: 220, A: 255})
+		}
+	}
+	file, err := os.Create(imagePath)
+	require.NoError(t, err)
+	require.NoError(t, png.Encode(file, img))
+	require.NoError(t, file.Close())
+
+	media := createThumbnailTestMedia(t, mediaRepo, userID, imagePath, "image/png")
+	require.NoError(t, mediaRepo.MarkScanClean(context.Background(), media.ID))
+
+	handler := NewThumbnailGenerationHandler(mediaRepo, services.NewThumbnailService())
+	task := asynq.NewTask(string(JobTypeThumbnailGeneration), []byte(fmt.Sprintf(`{"file_id":%d}`, media.ID)))
+
+	err = handler(context.Background(), task)
+	require.NoError(t, err)
+
+	refreshed, err := mediaRepo.GetByID(context.Background(), media.ID)
+	require.NoError(t, err)
+	require.NotNil(t, refreshed.ThumbnailURL)
+	require.Contains(t, *refreshed.ThumbnailURL, "_thumb")
 }
