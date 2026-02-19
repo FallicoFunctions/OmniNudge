@@ -313,6 +313,7 @@ Send a new message in a conversation.
 - Root message `reply_count` is maintained as an aggregate count for thread preview UI.
 - Thread reply notifications respect user settings for quiet hours and `batch_notifications`.
 - With batching enabled, rapid replies are collapsed into one notification (e.g. `5 new replies in thread`).
+- If `daily_digest` is enabled for a user, thread replies are queued and delivered as a daily digest summary notification.
 
 ---
 

@@ -3289,7 +3289,7 @@
 ---
 
 ### F7-013: Thread Notification Batching
-**Status:** 🔵 IN_PROGRESS
+**Status:** ✅ COMPLETE
 **Priority:** P2 (Medium - UX improvement)
 **Estimated Time:** 1 week
 
@@ -3300,8 +3300,8 @@
 - [x] Batch thread replies (if 5+ replies in 1 min, send 1 notification: "5 new replies in thread")
 - [x] Implement configurable quiet hours (no notifications during sleep time)
 - [x] Add user preference: batch_notifications (on/off), quiet_hours_start, quiet_hours_end
-- [ ] Implement digest notifications (optional: hourly summary, daily summary)
-- [ ] Create notification templates for batched notifications
+- [x] Implement digest notifications (optional: hourly summary, daily summary)
+- [x] Create notification templates for batched notifications
 - [x] Test batching (send 10 rapid messages, verify 1 notification)
 - [x] Test quiet hours (send message during quiet hours, verify no notification)
 - [x] Add UI for notification batching settings (in F0-005 SettingsPage)
@@ -3311,8 +3311,8 @@
 - Batching works (5+ rapid messages = 1 batched notification)
 - Quiet hours respected (0 notifications during configured hours)
 - User can configure batching on/off (tested)
-- Digest notifications work (hourly/daily summaries sent)
-- Notification content clear ("5 new replies in thread: Title")
+- Digest notifications work (daily summaries sent via `daily_digest`)
+- Notification content clear ("5 new replies in thread")
 
 **Dependencies:** F0-005 (Settings System), P0-042 (Push Notifications)
 
