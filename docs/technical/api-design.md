@@ -467,7 +467,11 @@ Content-Type: image/jpeg
 ```
 
 **Limits and Validation:**
-- Allowed types: JPEG, PNG, WebP, GIF, MP4, QuickTime, WebM
+- Allowed types:
+  - Images: JPEG, PNG, GIF, WebP
+  - Video: MP4, WebM, QuickTime
+  - Audio: MP3/MPEG, WAV, OGG, WebM audio
+  - Documents/Text: PDF, DOC, DOCX, TXT
 - Max size: 25MB
 - Unsupported types or oversized files return `400 Bad Request`
 
@@ -478,6 +482,23 @@ Content-Type: image/jpeg
 ---
 
 ### User Management
+
+#### `GET /users/me/storage`
+
+Get current authenticated user's storage usage and quota.
+
+**Response:**
+```json
+{
+  "used": 104857600,
+  "quota": 1073741824,
+  "percentage": 9.77
+}
+```
+
+**Notes:**
+- `used` and `quota` are bytes.
+- Quota is role/tier dependent and configured by server env.
 
 #### `GET /users/:id`
 
@@ -1157,7 +1178,7 @@ When making breaking changes:
 ### Implemented Features
 - **Hubs (site communities):** Any authenticated user can create a hub via `POST /api/v1/hubs`; the creator is auto-added as a moderator. Hub moderators can be added via `/api/v1/admin/hubs/:name/moderators`.
 - **Voting:** `is_upvote` accepts `true` (upvote), `false` (downvote), or `null` (remove vote) on posts and comments.
-- **Media upload:** `POST /api/v1/media/upload` accepts JPEG/PNG/WebP/GIF and MP4/QuickTime/WebM up to 25MB; unsupported types or oversized files return 400.
+- **Media upload:** `POST /api/v1/media/upload` accepts images, video, audio, and document/text attachments up to 25MB; unsupported types or oversized files return 400.
 - **Moderation:** Submit reports with `POST /api/v1/reports`. Moderators/admins: list/update via `/api/v1/mod/reports` and role/admin actions via `/api/v1/admin/users/:id/role`, `/api/v1/admin/hubs/:name/moderators`.
 - **WebSocket:** Connect with `Authorization: Bearer <token>` header; supports real-time notification delivery.
 
