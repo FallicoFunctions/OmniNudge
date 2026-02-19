@@ -914,6 +914,65 @@ func TestSendMessage_ReplyBroadcastsThreadUpdateEvent(t *testing.T) {
 	}
 }
 
+func TestMuteThreadAndGetThreadMutedState(t *testing.T) {
+	handler, _, user1ID, user2ID, convID, _, cleanup := setupMessagesHandlerTest(t)
+	defer cleanup()
+
+	rootMessage := &models.Message{
+		ConversationID:    convID,
+		SenderID:          user1ID,
+		RecipientID:       user2ID,
+		EncryptedContent:  "thread-root",
+		MessageType:       "text",
+		EncryptionVersion: "v1",
+	}
+	require.NoError(t, handler.messageRepo.Create(context.Background(), rootMessage))
+
+	replyBody := map[string]interface{}{
+		"conversation_id":    convID,
+		"encrypted_content":  "thread-reply",
+		"message_type":       "text",
+		"encryption_version": "v1",
+		"reply_to":           rootMessage.ID,
+	}
+	replyJSON, _ := json.Marshal(replyBody)
+
+	sendRouter := gin.Default()
+	sendRouter.POST("/messages", func(c *gin.Context) {
+		c.Set("user_id", user2ID)
+		handler.SendMessage(c)
+	})
+	sendReq := httptest.NewRequest("POST", "/messages", bytes.NewBuffer(replyJSON))
+	sendReq.Header.Set("Content-Type", "application/json")
+	sendResp := httptest.NewRecorder()
+	sendRouter.ServeHTTP(sendResp, sendReq)
+	require.Equal(t, http.StatusCreated, sendResp.Code, "send body: %s", sendResp.Body.String())
+
+	threadRouter := gin.Default()
+	threadRouter.PUT("/messages/:id/thread/mute", func(c *gin.Context) {
+		c.Set("user_id", user1ID)
+		handler.MuteThread(c)
+	})
+	threadRouter.GET("/messages/:id/thread", func(c *gin.Context) {
+		c.Set("user_id", user1ID)
+		handler.GetThread(c)
+	})
+
+	muteReq := httptest.NewRequest("PUT", fmt.Sprintf("/messages/%d/thread/mute", rootMessage.ID), nil)
+	muteResp := httptest.NewRecorder()
+	threadRouter.ServeHTTP(muteResp, muteReq)
+	require.Equal(t, http.StatusOK, muteResp.Code, "mute body: %s", muteResp.Body.String())
+
+	getReq := httptest.NewRequest("GET", fmt.Sprintf("/messages/%d/thread", rootMessage.ID), nil)
+	getResp := httptest.NewRecorder()
+	threadRouter.ServeHTTP(getResp, getReq)
+	require.Equal(t, http.StatusOK, getResp.Code, "thread body: %s", getResp.Body.String())
+
+	var payload map[string]interface{}
+	require.NoError(t, json.Unmarshal(getResp.Body.Bytes(), &payload))
+	assert.Equal(t, true, payload["muted"])
+}
+
 func TestSendMessage_AutoUnarchivesRecipientDM(t *testing.T) {
 	handler, db, user1ID, user2ID, convID, hub, cleanup := setupMessagesHandlerTest(t)
 	defer cleanup()

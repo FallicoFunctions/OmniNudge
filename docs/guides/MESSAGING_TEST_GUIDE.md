@@ -717,6 +717,76 @@ Using Playwright or Cypress:
 
 ---
 
+## **THREADING TESTS (FEATURE 7)**
+
+### **Test T1: Reply to Specific Message**
+**Objective**: Verify reply action creates a threaded reply and shows reply indicator.
+
+**Steps**:
+1. Open `/messages` and select a conversation with at least one message.
+2. Open message menu (`...`) and click **Reply** on a target message.
+3. Confirm composer shows reply target context.
+4. Send the reply.
+
+**Expected Results**:
+- ✅ New message is sent with thread metadata (`reply_to`, `thread_root`)
+- ✅ Reply indicator appears on the new message
+- ✅ Original message can be jumped to from reply indicator
+
+### **Test T2: Open Thread from Preview**
+**Objective**: Verify root messages with replies expose thread preview and open side panel.
+
+**Steps**:
+1. In a conversation with replies, find a root message showing **View thread**.
+2. Click thread preview chip.
+3. Confirm thread panel opens with root + replies.
+
+**Expected Results**:
+- ✅ Thread panel opens without full page reload
+- ✅ Replies are sorted chronologically
+- ✅ Reply count in panel matches API `reply_count`
+
+### **Test T3: Deep Thread Flattening**
+**Objective**: Verify backend depth protection and frontend behavior stay consistent.
+
+**Steps**:
+1. Build a deep chain by repeatedly replying to the latest reply.
+2. Continue until depth limit is exceeded.
+3. Send one additional reply.
+
+**Expected Results**:
+- ✅ Send succeeds (no crash/validation regression)
+- ✅ Additional reply is attached to root thread (flattened behavior)
+- ✅ Thread remains navigable and preview count increments correctly
+
+### **Test T4: Deleted Root Thread Survivability**
+**Objective**: Verify deleting root message does not break thread access.
+
+**Steps**:
+1. Create a threaded message with at least one reply.
+2. Delete the root message for both participants (sender action).
+3. Open thread from remaining reply context.
+
+**Expected Results**:
+- ✅ Thread still loads
+- ✅ Root displays **Message deleted**
+- ✅ Replies remain readable and navigable
+
+### **Test T5: Real-Time Thread Updates**
+**Objective**: Verify `thread_reply_added` updates other active clients.
+
+**Steps**:
+1. Open same conversation in two browsers.
+2. In Browser 1, send a threaded reply.
+3. Observe Browser 2 without refreshing.
+
+**Expected Results**:
+- ✅ Thread preview count updates in Browser 2
+- ✅ Open thread panel receives the new reply in real time
+- ✅ No duplicate reply rendering
+
+---
+
 ## **ACCEPTANCE CRITERIA**
 
 Phase 1 messaging is **PRODUCTION READY** when:

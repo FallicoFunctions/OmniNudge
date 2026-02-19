@@ -332,6 +332,143 @@ func (s *NotificationService) NotifyMessageEdited(
 	}
 }
 
+// NotifyThreadReply notifies thread participants (including root author) about a new reply.
+// It respects user opt-in (notify_comment_replies), quiet hours, conversation mute, thread mute,
+// and deduplicates rapid bursts to avoid notification spam.
+func (s *NotificationService) NotifyThreadReply(
+	ctx context.Context,
+	conversationID int,
+	threadRootID int,
+	replyID int,
+	replyAuthorID int,
+) {
+	if threadRootID <= 0 || replyID <= 0 {
+		return
+	}
+
+	var rootAuthorID int
+	var rootConversationID int
+	if err := s.pool.QueryRow(ctx, `
+		SELECT sender_id, conversation_id
+		FROM messages
+		WHERE id = $1
+	`, threadRootID).Scan(&rootAuthorID, &rootConversationID); err != nil {
+		log.Printf("[NotificationService] NotifyThreadReply: failed to load thread root %d: %v", threadRootID, err)
+		return
+	}
+	if rootConversationID != conversationID {
+		return
+	}
+
+	participants, err := s.getThreadParticipantIDs(ctx, conversationID, threadRootID)
+	if err != nil {
+		log.Printf("[NotificationService] NotifyThreadReply: failed to list participants for root %d: %v", threadRootID, err)
+		return
+	}
+
+	replyAuthorName := "Someone"
+	if err := s.pool.QueryRow(ctx, "SELECT username FROM users WHERE id = $1", replyAuthorID).Scan(&replyAuthorName); err != nil {
+		replyAuthorName = "Someone"
+	}
+
+	contentType := "message"
+	notificationType := "thread_reply"
+	baseMessage := fmt.Sprintf("%s replied in a thread", replyAuthorName)
+
+	for _, recipientID := range participants {
+		if recipientID == 0 || recipientID == replyAuthorID {
+			continue
+		}
+
+		settings, err := s.getOrCreateSettings(ctx, recipientID)
+		if err != nil {
+			log.Printf("[NotificationService] NotifyThreadReply: failed to load settings for user %d: %v", recipientID, err)
+			continue
+		}
+		if !settings.NotifyCommentReplies {
+			continue
+		}
+		if settings.QuietHoursEnabled && isWithinQuietHours(time.Now(), settings.QuietHoursTimezone, settings.QuietHoursStartMinutes, settings.QuietHoursEndMinutes) {
+			continue
+		}
+		if s.isConversationMutedForUser(ctx, conversationID, recipientID) || s.isThreadMutedForUser(ctx, threadRootID, recipientID) {
+			continue
+		}
+
+		contentID := threadRootID
+		actorID := replyAuthorID
+		messageText := baseMessage
+		if recipientID == rootAuthorID {
+			messageText = fmt.Sprintf("%s replied to your thread", replyAuthorName)
+		}
+
+		notification := &models.Notification{
+			UserID:           recipientID,
+			NotificationType: notificationType,
+			ContentType:      &contentType,
+			ContentID:        &contentID,
+			ActorID:          &actorID,
+			Message:          messageText,
+		}
+		inserted, err := s.insertThreadReplyNotificationIfNotRecent(ctx, notification)
+		if err != nil {
+			log.Printf("[NotificationService] NotifyThreadReply: failed for root %d recipient %d: %v", threadRootID, recipientID, err)
+			continue
+		}
+		if inserted {
+			s.deliverNotification(ctx, notification)
+		}
+	}
+}
+
+func (s *NotificationService) getThreadParticipantIDs(ctx context.Context, conversationID int, threadRootID int) ([]int, error) {
+	rows, err := s.pool.Query(ctx, `
+		SELECT DISTINCT sender_id
+		FROM messages
+		WHERE conversation_id = $1
+		  AND (id = $2 OR thread_root = $2)
+	`, conversationID, threadRootID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	participantSet := make(map[int]struct{}, 8)
+	for rows.Next() {
+		var uid int
+		if err := rows.Scan(&uid); err != nil {
+			return nil, err
+		}
+		if uid > 0 {
+			participantSet[uid] = struct{}{}
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	var user1ID *int
+	var user2ID *int
+	if err := s.pool.QueryRow(ctx, `
+		SELECT user1_id, user2_id
+		FROM conversations
+		WHERE id = $1
+	`, conversationID).Scan(&user1ID, &user2ID); err == nil {
+		if user1ID != nil && *user1ID > 0 {
+			participantSet[*user1ID] = struct{}{}
+		}
+		if user2ID != nil && *user2ID > 0 {
+			participantSet[*user2ID] = struct{}{}
+		}
+	}
+
+	participants := make([]int, 0, len(participantSet))
+	for uid := range participantSet {
+		participants = append(participants, uid)
+	}
+	return participants, nil
+}
+
 func (s *NotificationService) insertMessageEditNotificationIfNotRecent(
 	ctx context.Context,
 	notification *models.Notification,
@@ -542,6 +679,94 @@ func (s *NotificationService) isConversationMutedForUser(ctx context.Context, co
 		return false
 	}
 	return muted
+}
+
+func (s *NotificationService) isThreadMutedForUser(ctx context.Context, threadRootID int, userID int) bool {
+	var muted bool
+	err := s.pool.QueryRow(ctx, `
+		SELECT COALESCE(muted, false)
+		FROM thread_notification_settings
+		WHERE thread_root_id = $1 AND user_id = $2
+	`, threadRootID, userID).Scan(&muted)
+	if err != nil {
+		return false
+	}
+	return muted
+}
+
+func (s *NotificationService) insertThreadReplyNotificationIfNotRecent(
+	ctx context.Context,
+	notification *models.Notification,
+) (bool, error) {
+	if notification.ContentID == nil {
+		return false, fmt.Errorf("content_id is required for thread reply notification dedupe")
+	}
+
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return false, err
+	}
+	defer tx.Rollback(ctx)
+
+	if _, err := tx.Exec(ctx, `
+		SELECT pg_advisory_xact_lock($1::integer, $2::integer)
+	`, notification.UserID, *notification.ContentID); err != nil {
+		return false, err
+	}
+
+	var recentID int
+	err = tx.QueryRow(ctx, `
+		SELECT id
+		FROM notifications
+		WHERE user_id = $1
+		  AND notification_type = 'thread_reply'
+		  AND content_type = 'message'
+		  AND content_id = $2
+		  AND created_at > NOW() - INTERVAL '1 minute'
+		ORDER BY created_at DESC
+		LIMIT 1
+	`, notification.UserID, *notification.ContentID).Scan(&recentID)
+	if err == nil {
+		if _, err := tx.Exec(ctx, `
+			UPDATE notifications
+			SET created_at = CURRENT_TIMESTAMP,
+			    actor_id = $2,
+			    message = $3,
+			    read = false
+			WHERE id = $1
+		`, recentID, notification.ActorID, notification.Message); err != nil {
+			return false, err
+		}
+		if err := tx.Commit(ctx); err != nil {
+			return false, err
+		}
+		return false, nil
+	}
+
+	err = tx.QueryRow(ctx, `
+		INSERT INTO notifications (
+			user_id, notification_type, content_type, content_id,
+			actor_id, milestone_count, votes_per_hour, message
+		)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		RETURNING id, created_at
+	`,
+		notification.UserID,
+		notification.NotificationType,
+		notification.ContentType,
+		notification.ContentID,
+		notification.ActorID,
+		notification.MilestoneCount,
+		notification.VotesPerHour,
+		notification.Message,
+	).Scan(&notification.ID, &notification.CreatedAt)
+	if err != nil {
+		return false, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 func isWithinQuietHours(now time.Time, tz string, startMinutes, endMinutes int) bool {

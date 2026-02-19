@@ -5,6 +5,7 @@
 - [Authentication](#authentication)
 - [Conversations](#conversations)
 - [Messages](#messages)
+- [Threading](#threading)
 - [Media Upload](#media-upload)
 - [User Status](#user-status)
 - [User Blocking](#user-blocking)
@@ -256,6 +257,7 @@ Send a new message in a conversation.
   "encrypted_content": "base64-encoded-encrypted-blob",
   "message_type": "text",
   "encryption_version": "v1",
+  "reply_to": 123,
   "media_url": "/uploads/image_123.jpg",
   "media_type": "image/jpeg",
   "media_size": 245760
@@ -265,8 +267,9 @@ Send a new message in a conversation.
 **Fields:**
 - `conversation_id` (required) - ID of the conversation
 - `encrypted_content` (required) - Base64 encoded encrypted message content
-- `message_type` (required) - One of: `text`, `image`, `video`, `audio`
+- `message_type` (required) - One of: `text`, `image`, `video`, `audio`, `file`
 - `encryption_version` (required) - Encryption version (currently "v1")
+- `reply_to` (optional) - Parent message ID when sending a thread reply
 - `media_url` (optional) - URL to uploaded media file
 - `media_type` (optional) - MIME type of media
 - `media_size` (optional) - Size of media in bytes
@@ -280,6 +283,9 @@ Send a new message in a conversation.
   "recipient_id": 5,
   "encrypted_content": "base64-encoded-encrypted-blob",
   "message_type": "text",
+  "reply_to": 123,
+  "thread_root": 120,
+  "reply_count": 4,
   "sent_at": "2025-01-15T11:45:00Z",
   "delivered_at": "2025-01-15T11:45:01Z",
   "read_at": null,
@@ -299,6 +305,12 @@ Send a new message in a conversation.
 - `new_message` - Sent to recipient (if online)
 - `message_delivered` - Sent to sender (if recipient online)
 - `conversation_unarchived` - Sent to recipient when their archived DM is auto-unarchived by an incoming message
+- `thread_reply_added` - Sent to participants when the message is a thread reply
+
+**Threading Notes:**
+- Reply depth is capped to avoid pathological nesting.
+- If a reply exceeds max depth, backend flattens it to thread root and sets `X-Thread-Flattened: true` on response.
+- Root message `reply_count` is maintained as an aggregate count for thread preview UI.
 
 ---
 
@@ -551,6 +563,103 @@ Retrieve pinned messages for a conversation in chronological pin order.
 **Notes:**
 - Order is `pinned_at ASC`, then `id ASC` for deterministic ties.
 - Maximum returned pinned messages: `10`.
+
+---
+
+## Threading
+
+### Get Message Thread
+Fetch a thread root and paginated replies in chronological order.
+
+**Endpoint:** `GET /messages/:id/thread`
+**Auth Required:** Yes
+
+**Query Parameters:**
+- `limit` (optional, default: `20`, max: `100`) - Number of replies to return
+- `offset` (optional, default: `0`) - Reply offset for pagination
+
+**Behavior:**
+- If `:id` is itself a reply, API resolves to that message's root thread.
+- Root message is returned as `root_message`.
+- Replies are ordered by `sent_at ASC`, then `id ASC`.
+
+**Response:** `200 OK`
+```json
+{
+  "root_message": {
+    "id": 120,
+    "conversation_id": 42,
+    "sender_id": 1,
+    "recipient_id": 5,
+    "encrypted_content": "base64-encoded-encrypted-blob",
+    "message_type": "text",
+    "reply_count": 5,
+    "sent_at": "2026-02-19T10:00:00Z",
+    "encryption_version": "v1"
+  },
+  "replies": [
+    {
+      "id": 123,
+      "conversation_id": 42,
+      "sender_id": 5,
+      "recipient_id": 1,
+      "encrypted_content": "base64-encoded-encrypted-blob",
+      "message_type": "text",
+      "reply_to": 120,
+      "thread_root": 120,
+      "sent_at": "2026-02-19T10:02:00Z",
+      "encryption_version": "v1"
+    }
+  ],
+  "reply_count": 5,
+  "limit": 20,
+  "offset": 0
+}
+```
+
+**Error Codes:**
+- `400` - Invalid message ID, limit, or offset
+- `401` - Not authenticated
+- `403` - Not authorized to access the thread conversation
+- `404` - Message not found
+
+---
+
+### Mute Thread Notifications
+Mute notifications for a specific thread (for the authenticated user only).
+
+**Endpoint:** `PUT /messages/:id/thread/mute`
+**Auth Required:** Yes
+
+**Behavior:**
+- `:id` can be either the root message or any reply in the thread.
+- Setting applies per user and does not affect other participants.
+
+**Response:** `200 OK`
+```json
+{
+  "message": "Thread notification setting updated",
+  "thread_root": 120,
+  "muted": true
+}
+```
+
+---
+
+### Unmute Thread Notifications
+Unmute notifications for a specific thread.
+
+**Endpoint:** `PUT /messages/:id/thread/unmute`
+**Auth Required:** Yes
+
+**Response:** `200 OK`
+```json
+{
+  "message": "Thread notification setting updated",
+  "thread_root": 120,
+  "muted": false
+}
+```
 
 ---
 
@@ -869,6 +978,36 @@ Sent when an incoming DM auto-unarchives a conversation for the recipient.
     "conversation_id": 42,
     "user_id": 5,
     "trigger": "new_message"
+  }
+}
+```
+
+---
+
+#### 10. Thread Reply Added
+Sent when a new reply is added to a thread.
+
+```json
+{
+  "type": "thread_reply_added",
+  "payload": {
+    "type": "thread_reply_added",
+    "conversation_id": 42,
+    "thread_root": 120,
+    "reply_id": 124,
+    "reply_count": 6,
+    "message": {
+      "id": 124,
+      "conversation_id": 42,
+      "sender_id": 1,
+      "recipient_id": 5,
+      "encrypted_content": "base64-encoded-encrypted-blob",
+      "message_type": "text",
+      "reply_to": 123,
+      "thread_root": 120,
+      "sent_at": "2026-02-19T10:03:00Z",
+      "encryption_version": "v1"
+    }
   }
 }
 ```

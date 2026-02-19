@@ -695,6 +695,16 @@ func (h *MessagesHandler) SendMessage(c *gin.Context) {
 		}
 	}
 
+	if effectiveReplyTo != nil && message.ThreadRoot != nil && *message.ThreadRoot > 0 && h.notifService != nil {
+		go h.notifService.NotifyThreadReply(
+			context.Background(),
+			req.ConversationID,
+			*message.ThreadRoot,
+			message.ID,
+			message.SenderID,
+		)
+	}
+
 	// Update conversation's last_message_at timestamp and re-add users if deleted
 	if err := h.conversationRepo.UpdateLastMessageAt(c.Request.Context(), req.ConversationID); err != nil {
 		// Log error but don't fail the request
@@ -1987,9 +1997,90 @@ func (h *MessagesHandler) GetThread(c *gin.Context) {
 		"root_message": rootMessage,
 		"replies":      replies,
 		"reply_count":  totalReplies,
+		"muted":        h.isThreadMutedForUser(c.Request.Context(), rootID, userID),
 		"limit":        limit,
 		"offset":       offset,
 	})
+}
+
+func (h *MessagesHandler) isThreadMutedForUser(ctx context.Context, rootID int, userID int) bool {
+	var muted bool
+	err := h.pool.QueryRow(ctx, `
+		SELECT COALESCE(muted, false)
+		FROM thread_notification_settings
+		WHERE thread_root_id = $1 AND user_id = $2
+	`, rootID, userID).Scan(&muted)
+	if err != nil {
+		return false
+	}
+	return muted
+}
+
+func (h *MessagesHandler) setThreadMuted(c *gin.Context, muted bool) {
+	userIDValue, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
+	userID := userIDValue.(int)
+
+	messageID, err := strconv.Atoi(c.Param("id"))
+	if err != nil || messageID <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid message ID"})
+		return
+	}
+
+	targetMessage, err := h.messageRepo.GetByID(c.Request.Context(), messageID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Message not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load message", "details": err.Error()})
+		return
+	}
+
+	canAccess, err := h.canAccessConversation(c.Request.Context(), targetMessage.ConversationID, userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to validate conversation access", "details": err.Error()})
+		return
+	}
+	if !canAccess {
+		c.JSON(http.StatusForbidden, gin.H{"error": "You are not authorized to modify this thread"})
+		return
+	}
+
+	rootID := targetMessage.ID
+	if targetMessage.ThreadRoot != nil && *targetMessage.ThreadRoot > 0 {
+		rootID = *targetMessage.ThreadRoot
+	}
+
+	_, err = h.pool.Exec(c.Request.Context(), `
+		INSERT INTO thread_notification_settings (thread_root_id, user_id, muted, updated_at)
+		VALUES ($1, $2, $3, CURRENT_TIMESTAMP)
+		ON CONFLICT (thread_root_id, user_id)
+		DO UPDATE SET muted = EXCLUDED.muted, updated_at = CURRENT_TIMESTAMP
+	`, rootID, userID, muted)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update thread mute setting", "details": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message":     "Thread notification setting updated",
+		"thread_root": rootID,
+		"muted":       muted,
+	})
+}
+
+// MuteThread handles PUT /api/v1/messages/:id/thread/mute
+func (h *MessagesHandler) MuteThread(c *gin.Context) {
+	h.setThreadMuted(c, true)
+}
+
+// UnmuteThread handles PUT /api/v1/messages/:id/thread/unmute
+func (h *MessagesHandler) UnmuteThread(c *gin.Context) {
+	h.setThreadMuted(c, false)
 }
 
 // MarkAsRead handles POST /api/v1/conversations/:id/read

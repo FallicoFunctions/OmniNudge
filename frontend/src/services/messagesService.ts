@@ -327,6 +327,14 @@ export const messagesService = {
     await api.put(`/conversations/${conversationId}/unmute`, {});
   },
 
+  async muteThread(messageId: number): Promise<void> {
+    await api.put(`/messages/${messageId}/thread/mute`, {});
+  },
+
+  async unmuteThread(messageId: number): Promise<void> {
+    await api.put(`/messages/${messageId}/thread/unmute`, {});
+  },
+
   async deleteConversation(
     conversationId: number,
     options?: { deleteFor?: 'me' | 'both' }
