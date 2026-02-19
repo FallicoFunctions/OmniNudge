@@ -62,6 +62,33 @@ describe('FilePreview', () => {
     expect(screen.getByText('PDF')).toBeInTheDocument();
   });
 
+  it('resets PDF thumbnail failure state when thumbnail/source props change', () => {
+    const { rerender } = render(
+      <FilePreview
+        src="/uploads/report-a.pdf"
+        mimeType="application/pdf"
+        fileName="report-a.pdf"
+        fileSize={4096}
+        thumbnailUrl="/uploads/report-a_thumb.jpg"
+      />
+    );
+
+    fireEvent.error(screen.getByAltText('PDF thumbnail'));
+    expect(screen.getByText('PDF')).toBeInTheDocument();
+
+    rerender(
+      <FilePreview
+        src="/uploads/report-b.pdf"
+        mimeType="application/pdf"
+        fileName="report-b.pdf"
+        fileSize={4096}
+        thumbnailUrl="/uploads/report-b_thumb.jpg"
+      />
+    );
+
+    expect(screen.getByAltText('PDF thumbnail')).toBeInTheDocument();
+  });
+
   it('renders text preview and truncates at max length', () => {
     const longText = 'a'.repeat(250);
     render(
