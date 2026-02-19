@@ -1,0 +1,123 @@
+import { useMemo, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { foldersService } from '../services/foldersService';
+import type { Conversation, ConversationFolder } from '../types/messages';
+
+const SELECTED_FOLDER_STORAGE_KEY = 'messages.selected_folder_id';
+
+const loadSelectedFolderId = (): number | null => {
+  if (typeof window === 'undefined') return null;
+  const raw = window.localStorage.getItem(SELECTED_FOLDER_STORAGE_KEY);
+  if (!raw) return null;
+  const parsed = Number.parseInt(raw, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+};
+
+const persistSelectedFolderId = (folderID: number | null): void => {
+  if (typeof window === 'undefined') return;
+  if (folderID === null) {
+    window.localStorage.removeItem(SELECTED_FOLDER_STORAGE_KEY);
+    return;
+  }
+  window.localStorage.setItem(SELECTED_FOLDER_STORAGE_KEY, String(folderID));
+};
+
+export function useFolders() {
+  const queryClient = useQueryClient();
+  const [selectedFolderId, setSelectedFolderIdState] = useState<number | null>(() =>
+    loadSelectedFolderId()
+  );
+
+  const foldersQuery = useQuery<ConversationFolder[]>({
+    queryKey: ['folders'],
+    queryFn: () => foldersService.listFolders(),
+  });
+
+  const folderConversationsQuery = useQuery<Conversation[]>({
+    queryKey: ['folders', selectedFolderId, 'conversations'],
+    queryFn: () => foldersService.getFolderConversations(selectedFolderId as number),
+    enabled: selectedFolderId !== null,
+  });
+
+  const setSelectedFolderId = (folderID: number | null) => {
+    setSelectedFolderIdState(folderID);
+    persistSelectedFolderId(folderID);
+  };
+
+  const createFolderMutation = useMutation({
+    mutationFn: foldersService.createFolder,
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['folders'] });
+    },
+  });
+
+  const updateFolderMutation = useMutation({
+    mutationFn: ({ id, patch }: { id: number; patch: { name?: string; color?: string; icon?: string } }) =>
+      foldersService.updateFolder(id, patch),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['folders'] });
+    },
+  });
+
+  const deleteFolderMutation = useMutation({
+    mutationFn: (id: number) => foldersService.deleteFolder(id),
+    onSuccess: (_, folderID) => {
+      if (selectedFolderId === folderID) {
+        setSelectedFolderId(null);
+      }
+      void queryClient.invalidateQueries({ queryKey: ['folders'] });
+      void queryClient.invalidateQueries({ queryKey: ['folders', folderID, 'conversations'] });
+    },
+  });
+
+  const reorderFoldersMutation = useMutation({
+    mutationFn: (folderIDs: number[]) => foldersService.reorderFolders(folderIDs),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['folders'] });
+    },
+  });
+
+  const addConversationMutation = useMutation({
+    mutationFn: ({ folderID, conversationID }: { folderID: number; conversationID: number }) =>
+      foldersService.addConversation(folderID, conversationID),
+    onSuccess: (_, variables) => {
+      void queryClient.invalidateQueries({ queryKey: ['folders'] });
+      void queryClient.invalidateQueries({ queryKey: ['folders', variables.folderID, 'conversations'] });
+    },
+  });
+
+  const removeConversationMutation = useMutation({
+    mutationFn: ({ folderID, conversationID }: { folderID: number; conversationID: number }) =>
+      foldersService.removeConversation(folderID, conversationID),
+    onSuccess: (_, variables) => {
+      void queryClient.invalidateQueries({ queryKey: ['folders'] });
+      void queryClient.invalidateQueries({ queryKey: ['folders', variables.folderID, 'conversations'] });
+    },
+  });
+
+  const selectedFolderConversationIDs = useMemo(() => {
+    if (!selectedFolderId) return null;
+    return new Set((folderConversationsQuery.data ?? []).map((c) => c.id));
+  }, [selectedFolderId, folderConversationsQuery.data]);
+
+  const filterConversationsBySelectedFolder = (conversations: Conversation[]): Conversation[] => {
+    if (!selectedFolderConversationIDs) return conversations;
+    return conversations.filter((conversation) => selectedFolderConversationIDs.has(conversation.id));
+  };
+
+  return {
+    folders: foldersQuery.data ?? [],
+    isLoadingFolders: foldersQuery.isLoading,
+    selectedFolderId,
+    setSelectedFolderId,
+    selectedFolderConversations: folderConversationsQuery.data ?? [],
+    isLoadingSelectedFolderConversations: folderConversationsQuery.isLoading,
+    filterConversationsBySelectedFolder,
+    createFolder: createFolderMutation.mutateAsync,
+    updateFolder: updateFolderMutation.mutateAsync,
+    deleteFolder: deleteFolderMutation.mutateAsync,
+    reorderFolders: reorderFoldersMutation.mutateAsync,
+    addConversationToFolder: addConversationMutation.mutateAsync,
+    removeConversationFromFolder: removeConversationMutation.mutateAsync,
+  };
+}

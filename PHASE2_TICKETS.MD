@@ -3466,18 +3466,18 @@
 ---
 
 ### F8-007: Frontend - useFolders Hook
-**Status:** ⬜ TODO
+**Status:** ✅ COMPLETE
 **Priority:** P1
 **Estimated Time:** 3 hours
 
 **Tasks:**
-- [ ] Create useFolders.ts hook
-- [ ] Fetch folders with React Query
-- [ ] Implement CRUD mutations
-- [ ] Manage selected folder state
-- [ ] Persist selected folder (localStorage)
-- [ ] Filter conversations by folder
-- [ ] Write tests
+- [x] Create useFolders.ts hook
+- [x] Fetch folders with React Query
+- [x] Implement CRUD mutations
+- [x] Manage selected folder state
+- [x] Persist selected folder (localStorage)
+- [x] Filter conversations by folder
+- [x] Write tests
 
 **Acceptance Criteria:**
 - Folder state managed
