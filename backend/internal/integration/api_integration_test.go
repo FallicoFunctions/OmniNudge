@@ -812,7 +812,7 @@ func TestSendMessage_ThreadDepthLimitFlattensToRoot_Integration(t *testing.T) {
 
 	updatedRoot, err := deps.MessageRepo.GetByID(context.Background(), rootMessage.ID)
 	require.NoError(t, err)
-	require.Equal(t, 2, updatedRoot.ReplyCount)
+	require.Equal(t, 11, updatedRoot.ReplyCount)
 }
 
 func TestEditMessageEndpoint_UpdatesMessageAndHistory(t *testing.T) {

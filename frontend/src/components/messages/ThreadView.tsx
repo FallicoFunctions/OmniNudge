@@ -202,12 +202,13 @@ export function ThreadView({
                       <div className="mt-1 flex justify-end">
                         <button
                           type="button"
-                          onClick={() =>
-                            document.getElementById(`thread-message-${message.id}`)?.scrollIntoView({
+                          onClick={() => {
+                            if (!message.reply_to) return;
+                            document.getElementById(`thread-message-${message.reply_to}`)?.scrollIntoView({
                               behavior: 'smooth',
                               block: 'center',
-                            })
-                          }
+                            });
+                          }}
                           className="text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]"
                         >
                           {t('messages.threadView.jumpToReply')}

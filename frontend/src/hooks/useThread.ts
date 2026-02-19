@@ -14,7 +14,30 @@ interface ThreadCacheEntry {
   replyCount: number;
 }
 
+const MAX_THREAD_CACHE_ENTRIES = 100;
 const threadCache = new Map<number, ThreadCacheEntry>();
+
+function getThreadCacheEntry(rootMessageId: number): ThreadCacheEntry | undefined {
+  const cached = threadCache.get(rootMessageId);
+  if (!cached) return undefined;
+  // Refresh insertion order for simple LRU behavior.
+  threadCache.delete(rootMessageId);
+  threadCache.set(rootMessageId, cached);
+  return cached;
+}
+
+function setThreadCacheEntry(rootMessageId: number, entry: ThreadCacheEntry) {
+  if (threadCache.has(rootMessageId)) {
+    threadCache.delete(rootMessageId);
+  }
+  threadCache.set(rootMessageId, entry);
+  if (threadCache.size > MAX_THREAD_CACHE_ENTRIES) {
+    const oldestKey = threadCache.keys().next().value;
+    if (oldestKey !== undefined) {
+      threadCache.delete(oldestKey);
+    }
+  }
+}
 
 export function __resetThreadCacheForTests() {
   threadCache.clear();
@@ -41,7 +64,7 @@ export function useThread({ rootMessageId, open, pageSize = 20 }: UseThreadOptio
       if (!open || !rootMessageId) return;
       setError(null);
 
-      const cached = threadCache.get(rootMessageId);
+      const cached = getThreadCacheEntry(rootMessageId);
       if (!force && cached) {
         applyCache(cached);
         return;
@@ -55,7 +78,7 @@ export function useThread({ rootMessageId, open, pageSize = 20 }: UseThreadOptio
           replies: response.replies,
           replyCount: response.reply_count,
         };
-        threadCache.set(rootMessageId, entry);
+        setThreadCacheEntry(rootMessageId, entry);
         applyCache(entry);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load thread');
@@ -78,7 +101,7 @@ export function useThread({ rootMessageId, open, pageSize = 20 }: UseThreadOptio
         replies: mergedReplies,
         replyCount: response.reply_count,
       };
-      threadCache.set(rootMessageId, entry);
+      setThreadCacheEntry(rootMessageId, entry);
       applyCache(entry);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load thread');
@@ -98,13 +121,13 @@ export function useThread({ rootMessageId, open, pageSize = 20 }: UseThreadOptio
       const payload = (event as CustomEvent<WsThreadUpdateEvent>).detail;
       if (!payload || payload.thread_root !== rootMessageId) return;
 
-      const cached = threadCache.get(rootMessageId);
+      const cached = getThreadCacheEntry(rootMessageId);
       if (cached) {
         if (!cached.replies.some((msg) => msg.id === payload.message.id)) {
           cached.replies = [...cached.replies, payload.message];
         }
         cached.replyCount = payload.reply_count;
-        threadCache.set(rootMessageId, cached);
+        setThreadCacheEntry(rootMessageId, cached);
         applyCache(cached);
         return;
       }
