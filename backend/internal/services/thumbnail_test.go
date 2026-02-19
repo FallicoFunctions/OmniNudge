@@ -187,6 +187,25 @@ func TestGenerateSquareThumbnail(t *testing.T) {
 	os.Remove(thumbnailPath)
 }
 
+func TestGenerateImageThumbnails(t *testing.T) {
+	service := NewThumbnailService()
+	imagePath := createTestImage(t, 1600, 1200)
+
+	set, err := service.GenerateImageThumbnails(imagePath)
+	require.NoError(t, err)
+	require.NotNil(t, set)
+
+	primaryW, primaryH, err := service.GetImageDimensions(set.PrimaryPath)
+	require.NoError(t, err)
+	assert.Equal(t, 800, primaryW)
+	assert.Equal(t, 600, primaryH)
+
+	smallW, smallH, err := service.GetImageDimensions(set.SmallPath)
+	require.NoError(t, err)
+	assert.Equal(t, 200, smallW)
+	assert.Equal(t, 150, smallH)
+}
+
 func TestIsImageType(t *testing.T) {
 	testCases := []struct {
 		contentType string

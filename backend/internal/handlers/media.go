@@ -598,10 +598,21 @@ func (h *MediaHandler) schedulePostUploadJobs(ctx context.Context, media *models
 }
 
 func (h *MediaHandler) generateAndStoreThumbnail(ctx context.Context, media *models.MediaFile) {
-	thumbnailPath, err := h.thumbnailService.GenerateThumbnail(media.StoragePath)
-	if err != nil {
-		log.Printf("failed to generate thumbnail for media %d: %v", media.ID, err)
-		return
+	var thumbnailPath string
+	if services.IsImageType(media.FileType) {
+		thumbSet, err := h.thumbnailService.GenerateImageThumbnails(media.StoragePath)
+		if err != nil {
+			log.Printf("failed to generate thumbnail for media %d: %v", media.ID, err)
+			return
+		}
+		thumbnailPath = thumbSet.PrimaryPath
+	} else {
+		var err error
+		thumbnailPath, err = h.thumbnailService.GenerateThumbnail(media.StoragePath)
+		if err != nil {
+			log.Printf("failed to generate thumbnail for media %d: %v", media.ID, err)
+			return
+		}
 	}
 
 	thumbnailName := filepath.Base(thumbnailPath)
