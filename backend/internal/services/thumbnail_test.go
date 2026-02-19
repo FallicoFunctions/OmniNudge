@@ -3,6 +3,7 @@ package services
 import (
 	"image"
 	"image/color"
+	"image/gif"
 	"image/png"
 	"os"
 	"path/filepath"
@@ -41,6 +42,28 @@ func createTestImage(t *testing.T, width, height int) string {
 	err = png.Encode(file, img)
 	require.NoError(t, err)
 
+	return imagePath
+}
+
+func createTestGIFImage(t *testing.T, width, height int) string {
+	t.Helper()
+	img := image.NewPaletted(image.Rect(0, 0, width, height), []color.Color{
+		color.Black,
+		color.White,
+		color.RGBA{R: 200, G: 80, B: 30, A: 255},
+	})
+	for y := 0; y < height; y++ {
+		for x := 0; x < width; x++ {
+			img.SetColorIndex(x, y, uint8((x+y)%3))
+		}
+	}
+	tmpDir := t.TempDir()
+	imagePath := filepath.Join(tmpDir, "test_image.gif")
+	file, err := os.Create(imagePath)
+	require.NoError(t, err)
+	defer file.Close()
+	err = gif.Encode(file, img, nil)
+	require.NoError(t, err)
 	return imagePath
 }
 
@@ -214,6 +237,17 @@ func TestGenerateImageThumbnails(t *testing.T) {
 	smallInfo, err := os.Stat(set.SmallPath)
 	require.NoError(t, err)
 	assert.LessOrEqual(t, smallInfo.Size(), int64(50*1024))
+}
+
+func TestGenerateImageThumbnails_GIFSource(t *testing.T) {
+	service := NewThumbnailService()
+	imagePath := createTestGIFImage(t, 1200, 800)
+
+	set, err := service.GenerateImageThumbnails(imagePath)
+	require.NoError(t, err)
+	require.NotNil(t, set)
+	assert.Equal(t, ".jpg", filepath.Ext(set.PrimaryPath))
+	assert.Equal(t, ".jpg", filepath.Ext(set.SmallPath))
 }
 
 func TestIsImageType(t *testing.T) {

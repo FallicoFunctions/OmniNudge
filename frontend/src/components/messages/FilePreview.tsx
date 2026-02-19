@@ -93,6 +93,7 @@ export default function FilePreview({
   const { t } = useTranslation();
   const kind = useMemo(() => detectPreviewKind(mimeType), [mimeType]);
   const [pdfModalOpen, setPdfModalOpen] = useState(false);
+  const [pdfThumbLoadFailed, setPdfThumbLoadFailed] = useState(false);
   const displayName =
     fileName?.trim() || fallbackFileNameFromSrc(src, t('messages.media.attachmentFallback'));
   const sizeLabel = formatFileSize(fileSize);
@@ -170,11 +171,12 @@ export default function FilePreview({
       <>
         <div className={`rounded border border-[var(--color-border)] p-3 ${className}`.trim()}>
           <div className="mb-2 flex items-start gap-3">
-            {thumbnailUrl ? (
+            {thumbnailUrl && !pdfThumbLoadFailed ? (
               <img
                 src={thumbnailUrl}
                 alt={t('messages.media.preview.pdfThumbnailAlt')}
                 className="h-16 w-12 rounded border border-[var(--color-border)] object-cover"
+                onError={() => setPdfThumbLoadFailed(true)}
               />
             ) : (
               <div className="flex h-16 w-12 items-center justify-center rounded border border-[var(--color-border)] text-xs font-semibold">

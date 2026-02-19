@@ -46,6 +46,22 @@ describe('FilePreview', () => {
     );
   });
 
+  it('falls back to PDF placeholder when thumbnail image fails to load', () => {
+    render(
+      <FilePreview
+        src="/uploads/report.pdf"
+        mimeType="application/pdf"
+        fileName="report.pdf"
+        fileSize={4096}
+        thumbnailUrl="/uploads/report_thumb.jpg"
+      />
+    );
+
+    const img = screen.getByAltText('PDF thumbnail');
+    fireEvent.error(img);
+    expect(screen.getByText('PDF')).toBeInTheDocument();
+  });
+
   it('renders text preview and truncates at max length', () => {
     const longText = 'a'.repeat(250);
     render(
