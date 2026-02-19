@@ -1,0 +1,116 @@
+package integration
+
+import (
+	"context"
+	"database/sql"
+	"testing"
+
+	"github.com/omninudge/backend/internal/models"
+	"github.com/stretchr/testify/require"
+)
+
+func TestThreadingSchema_HardDeleteParent_SetsChildReferencesNull(t *testing.T) {
+	deps := newTestDeps(t)
+	defer deps.DB.Close()
+	ctx := context.Background()
+
+	user1 := createUser(t, deps.UserRepo, uniqueMessagingUsername("thread_parent"), "user")
+	user2 := createUser(t, deps.UserRepo, uniqueMessagingUsername("thread_child"), "user")
+
+	conversation, err := deps.ConversationRepo.Create(ctx, user1.ID, user2.ID)
+	require.NoError(t, err)
+
+	parent := &models.Message{
+		ConversationID:    conversation.ID,
+		SenderID:          user1.ID,
+		RecipientID:       user2.ID,
+		EncryptedContent:  "enc_parent",
+		MessageType:       "text",
+		EncryptionVersion: "v1",
+	}
+	require.NoError(t, deps.MessageRepo.Create(ctx, parent))
+
+	child := &models.Message{
+		ConversationID:    conversation.ID,
+		SenderID:          user2.ID,
+		RecipientID:       user1.ID,
+		EncryptedContent:  "enc_child",
+		MessageType:       "text",
+		EncryptionVersion: "v1",
+	}
+	require.NoError(t, deps.MessageRepo.Create(ctx, child))
+
+	_, err = deps.DB.Pool.Exec(ctx, `
+		UPDATE messages
+		SET reply_to = $2,
+		    thread_root = $2
+		WHERE id = $1
+	`, child.ID, parent.ID)
+	require.NoError(t, err)
+
+	require.NoError(t, deps.MessageRepo.SoftDeleteForBoth(ctx, parent.ID))
+	require.NoError(t, deps.MessageRepo.HardDelete(ctx, parent.ID))
+
+	var replyTo, threadRoot sql.NullInt32
+	err = deps.DB.Pool.QueryRow(ctx, `
+		SELECT reply_to, thread_root
+		FROM messages
+		WHERE id = $1
+	`, child.ID).Scan(&replyTo, &threadRoot)
+	require.NoError(t, err)
+	require.False(t, replyTo.Valid, "reply_to should be NULL after parent deletion")
+	require.False(t, threadRoot.Valid, "thread_root should be NULL after parent deletion")
+}
+
+func TestThreadingSchema_HardDeleteMessagesBySender_SetsReferencesNull(t *testing.T) {
+	deps := newTestDeps(t)
+	defer deps.DB.Close()
+	ctx := context.Background()
+
+	user1 := createUser(t, deps.UserRepo, uniqueMessagingUsername("thread_sender"), "user")
+	user2 := createUser(t, deps.UserRepo, uniqueMessagingUsername("thread_recipient"), "user")
+
+	conversation, err := deps.ConversationRepo.Create(ctx, user1.ID, user2.ID)
+	require.NoError(t, err)
+
+	parent := &models.Message{
+		ConversationID:    conversation.ID,
+		SenderID:          user1.ID,
+		RecipientID:       user2.ID,
+		EncryptedContent:  "enc_parent_2",
+		MessageType:       "text",
+		EncryptionVersion: "v1",
+	}
+	require.NoError(t, deps.MessageRepo.Create(ctx, parent))
+
+	child := &models.Message{
+		ConversationID:    conversation.ID,
+		SenderID:          user2.ID,
+		RecipientID:       user1.ID,
+		EncryptedContent:  "enc_child_2",
+		MessageType:       "text",
+		EncryptionVersion: "v1",
+	}
+	require.NoError(t, deps.MessageRepo.Create(ctx, child))
+
+	_, err = deps.DB.Pool.Exec(ctx, `
+		UPDATE messages
+		SET reply_to = $2,
+		    thread_root = $2
+		WHERE id = $1
+	`, child.ID, parent.ID)
+	require.NoError(t, err)
+
+	require.NoError(t, deps.ConversationRepo.HardDeleteMessages(ctx, conversation.ID, user1.ID))
+
+	var replyTo, threadRoot sql.NullInt32
+	err = deps.DB.Pool.QueryRow(ctx, `
+		SELECT reply_to, thread_root
+		FROM messages
+		WHERE id = $1
+	`, child.ID).Scan(&replyTo, &threadRoot)
+	require.NoError(t, err)
+	require.False(t, replyTo.Valid, "reply_to should be NULL after sender hard delete")
+	require.False(t, threadRoot.Valid, "thread_root should be NULL after sender hard delete")
+}
+
