@@ -3321,21 +3321,21 @@
 ## FEATURE 8: CONVERSATION FOLDERS (1 week)
 
 ### F8-001: Backend - Database Schema
-**Status:** ⬜ TODO
+**Status:** ✅ COMPLETE
 **Priority:** P1
 **Estimated Time:** 1 hour
 
 **Tasks:**
-- [ ] Create migration: conversation_folders table
-- [ ] Add columns: id, user_id, name, color, icon, position, created_at
-- [ ] Add UNIQUE constraint (user_id, name)
-- [ ] Add CHECK constraint: max 50 folders per user
-- [ ] Create conversation_folder_members table
-- [ ] Add columns: id, folder_id, conversation_id, added_at
-- [ ] Add UNIQUE constraint (folder_id, conversation_id)
-- [ ] Add foreign keys with CASCADE delete
-- [ ] Add indexes
-- [ ] Test migration
+- [x] Create migration: conversation_folders table
+- [x] Add columns: id, user_id, name, color, icon, position, created_at
+- [x] Add UNIQUE constraint (user_id, name)
+- [x] Add DB-enforced limit: max 50 folders per user (trigger)
+- [x] Create conversation_folder_members table
+- [x] Add columns: id, folder_id, conversation_id, added_at
+- [x] Add UNIQUE constraint (folder_id, conversation_id)
+- [x] Add foreign keys with CASCADE delete
+- [x] Add indexes
+- [x] Test migration
 
 **Acceptance Criteria:**
 - Migration runs successfully
