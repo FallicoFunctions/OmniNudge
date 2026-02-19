@@ -1,4 +1,4 @@
-import { useMemo, useState, type SyntheticEvent } from 'react';
+import { useEffect, useMemo, useState, type SyntheticEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import AudioPlayer from './AudioPlayer';
 import PDFViewerModal from './PDFViewerModal';
@@ -101,6 +101,10 @@ export default function FilePreview({
   const openLabel = t('messages.media.preview.open');
   const downloadLabel = t('common.download');
   const fileSizePrefix = t('messages.media.preview.fileSize');
+
+  useEffect(() => {
+    setPdfThumbLoadFailed(false);
+  }, [src, thumbnailUrl, kind]);
 
   if (kind === 'image') {
     return (
