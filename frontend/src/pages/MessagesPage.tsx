@@ -3571,6 +3571,15 @@ export default function MessagesPage() {
         currentUserId={user?.id}
         onClose={() => setThreadRootMessageId(null)}
         renderMessageContent={renderThreadMessageContent}
+        onSubmitReply={async ({ replyTo, content }) => {
+          if (!selectedConversationId) return;
+          await sendMessageMutation.mutateAsync({
+            conversation_id: selectedConversationId,
+            content,
+            reply_to: replyTo,
+          });
+        }}
+        replySubmitting={sendMessageMutation.isPending}
         formatTimestamp={(isoDate) =>
           formatDate(isoDate, {
             month: 'short',

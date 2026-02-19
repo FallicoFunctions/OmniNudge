@@ -1435,7 +1435,11 @@
       "loadFailed": "Failed to load thread",
       "rootMessage": "Root message",
       "loadMore": "Load more replies",
-      "empty": "No replies in this thread yet."
+      "empty": "No replies in this thread yet.",
+      "jumpToRoot": "Jump to root",
+      "jumpToReply": "Jump",
+      "replyPlaceholder": "Reply in thread...",
+      "sendReply": "Reply"
     },
     "pinned": {
       "title_one": "{{count}} pinned message",
