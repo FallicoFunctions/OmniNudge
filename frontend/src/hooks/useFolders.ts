@@ -80,18 +80,50 @@ export function useFolders() {
   const addConversationMutation = useMutation({
     mutationFn: ({ folderID, conversationID }: { folderID: number; conversationID: number }) =>
       foldersService.addConversation(folderID, conversationID),
+    onMutate: ({ folderID }) => {
+      // Optimistically increment conversation_count
+      queryClient.setQueryData<ConversationFolder[]>(['folders'], (old) =>
+        old?.map((f) =>
+          f.id === folderID ? { ...f, conversation_count: (f.conversation_count ?? 0) + 1 } : f,
+        ),
+      );
+    },
     onSuccess: (_, variables) => {
       void queryClient.invalidateQueries({ queryKey: ['folders'] });
       void queryClient.invalidateQueries({ queryKey: ['folders', variables.folderID, 'conversations'] });
+    },
+    onError: (_, { folderID }) => {
+      // Rollback optimistic update on error
+      queryClient.setQueryData<ConversationFolder[]>(['folders'], (old) =>
+        old?.map((f) =>
+          f.id === folderID ? { ...f, conversation_count: Math.max(0, (f.conversation_count ?? 1) - 1) } : f,
+        ),
+      );
     },
   });
 
   const removeConversationMutation = useMutation({
     mutationFn: ({ folderID, conversationID }: { folderID: number; conversationID: number }) =>
       foldersService.removeConversation(folderID, conversationID),
+    onMutate: ({ folderID }) => {
+      // Optimistically decrement conversation_count
+      queryClient.setQueryData<ConversationFolder[]>(['folders'], (old) =>
+        old?.map((f) =>
+          f.id === folderID ? { ...f, conversation_count: Math.max(0, (f.conversation_count ?? 1) - 1) } : f,
+        ),
+      );
+    },
     onSuccess: (_, variables) => {
       void queryClient.invalidateQueries({ queryKey: ['folders'] });
       void queryClient.invalidateQueries({ queryKey: ['folders', variables.folderID, 'conversations'] });
+    },
+    onError: (_, { folderID }) => {
+      // Rollback optimistic update on error
+      queryClient.setQueryData<ConversationFolder[]>(['folders'], (old) =>
+        old?.map((f) =>
+          f.id === folderID ? { ...f, conversation_count: (f.conversation_count ?? 0) + 1 } : f,
+        ),
+      );
     },
   });
 

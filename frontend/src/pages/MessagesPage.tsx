@@ -2262,8 +2262,8 @@ export default function MessagesPage() {
               : 'flex w-80 flex-shrink-0 overflow-hidden border-r border-[var(--color-border)] bg-[var(--color-surface)]'
           }
         >
-          {/* Folder sidebar — hidden on mobile */}
-          {!isMobile && folders.length > 0 && (
+          {/* Folder sidebar — desktop only */}
+          {!isMobile && (
             <FolderList
               folders={folders}
               selectedFolderId={selectedFolderId}
@@ -2481,9 +2481,7 @@ export default function MessagesPage() {
                   {selectedFolderId !== null && (() => {
                     const activeFolder = folders.find((f) => f.id === selectedFolderId);
                     return activeFolder ? (
-                      <span className="mt-1 block">
-                        <FolderBadge folder={activeFolder} />
-                      </span>
+                      <FolderBadge folder={activeFolder} />
                     ) : null;
                   })()}
                 </div>
@@ -3919,9 +3917,13 @@ export default function MessagesPage() {
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
           role="dialog"
           aria-modal="true"
+          aria-labelledby="delete-folder-dialog-title"
         >
           <div className="w-full max-w-sm rounded-xl bg-[var(--color-surface)] p-6 shadow-xl">
-            <h2 className="mb-2 text-base font-semibold text-[var(--color-text-primary)]">
+            <h2
+              id="delete-folder-dialog-title"
+              className="mb-2 text-base font-semibold text-[var(--color-text-primary)]"
+            >
               {t('messages.folders.deleteFolder')}
             </h2>
             <p className="mb-4 text-sm text-[var(--color-text-secondary)]">
@@ -3931,7 +3933,7 @@ export default function MessagesPage() {
               <button
                 type="button"
                 onClick={() => setDeleteFolderTarget(null)}
-                className="flex-1 rounded-lg border border-[var(--color-border)] py-2 text-sm font-semibold text-[var(--color-text-secondary)] hover:bg-[var(--color-hover)]"
+                className="flex-1 rounded-lg border border-[var(--color-border)] py-2 text-sm font-semibold text-[var(--color-text-secondary)] hover:bg-[var(--color-hover)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]"
               >
                 {t('messages.folders.cancel')}
               </button>
@@ -3941,7 +3943,7 @@ export default function MessagesPage() {
                   await deleteFolder(deleteFolderTarget.id);
                   setDeleteFolderTarget(null);
                 }}
-                className="flex-1 rounded-lg bg-[var(--color-error)] py-2 text-sm font-semibold text-white hover:opacity-90"
+                className="flex-1 rounded-lg bg-[var(--color-error)] py-2 text-sm font-semibold text-white hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-error)]"
               >
                 {t('messages.folders.deleteFolder')}
               </button>

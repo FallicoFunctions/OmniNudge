@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { ConversationFolder } from '../../types/messages';
 
+const MAX_FOLDERS = 50;
+
 interface FolderListProps {
   folders: ConversationFolder[];
   selectedFolderId: number | null;
@@ -26,14 +28,15 @@ export function FolderList({
   isLoading,
 }: FolderListProps) {
   const { t } = useTranslation();
-  const [hoveredId, setHoveredId] = useState<number | null>(null);
+  const [focusedId, setFocusedId] = useState<number | null>(null);
+  const atLimit = folders.length >= MAX_FOLDERS;
 
   const allActive = selectedFolderId === null && smartFolder === null;
   const unreadActive = smartFolder === 'unread';
 
   return (
     <nav
-      className="flex flex-col border-r border-[var(--color-border)] bg-[var(--color-surface)]"
+      className="flex w-44 flex-shrink-0 flex-col border-r border-[var(--color-border)] bg-[var(--color-surface)]"
       aria-label={t('messages.folders.title')}
     >
       {/* Header */}
@@ -44,15 +47,23 @@ export function FolderList({
         <button
           type="button"
           onClick={onNewFolder}
-          className="flex h-6 w-6 items-center justify-center rounded-md text-[var(--color-text-secondary)] hover:bg-[var(--color-hover)] hover:text-[var(--color-text-primary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]"
-          aria-label={t('messages.folders.newFolder')}
-          title={t('messages.folders.newFolder')}
+          disabled={atLimit}
+          className="flex h-7 w-7 items-center justify-center rounded-md text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-hover)] hover:text-[var(--color-text-primary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] disabled:cursor-not-allowed disabled:opacity-40"
+          aria-label={atLimit ? t('messages.folders.maxFolders') : t('messages.folders.newFolder')}
+          title={atLimit ? t('messages.folders.maxFolders') : t('messages.folders.newFolder')}
         >
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
             <path d="M7 2v10M2 7h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
           </svg>
         </button>
       </div>
+
+      {/* Limit warning */}
+      {atLimit && (
+        <p className="mx-2 mb-1 rounded-md bg-[var(--color-warning,#f59e0b)]/10 px-2 py-1 text-[10px] font-medium text-[var(--color-warning,#f59e0b)]">
+          {t('messages.folders.maxFolders')}
+        </p>
+      )}
 
       {/* Smart folders */}
       <div className="px-1.5 pb-1">
@@ -76,9 +87,9 @@ export function FolderList({
         />
       </div>
 
-      {/* Divider */}
+      {/* Divider — visually distinguishes smart from user folders */}
       {(folders.length > 0 || isLoading) && (
-        <div className="mx-3 border-t border-[var(--color-border)]" />
+        <div className="mx-3 mb-1 border-t border-[var(--color-border)]" />
       )}
 
       {/* User folders */}
@@ -88,35 +99,45 @@ export function FolderList({
             {t('messages.folders.loading')}
           </p>
         ) : (
-          folders.map((folder) => (
-            <div
-              key={folder.id}
-              className="group relative"
-              onMouseEnter={() => setHoveredId(folder.id)}
-              onMouseLeave={() => setHoveredId(null)}
-            >
-              <FolderRow
-                icon={folder.icon}
-                label={folder.name}
-                count={folder.conversation_count}
-                active={selectedFolderId === folder.id}
-                color={folder.color}
-                onClick={() => {
-                  onSelectFolder(folder.id);
-                  onSelectSmartFolder(null);
-                }}
-              />
-              {/* Edit / delete actions on hover */}
-              {hoveredId === folder.id && (
-                <div className="absolute right-1 top-1/2 flex -translate-y-1/2 gap-0.5">
+          folders.map((folder) => {
+            const isActive = selectedFolderId === folder.id;
+            const showActions = focusedId === folder.id;
+            return (
+              <div
+                key={folder.id}
+                className="group relative"
+                onMouseEnter={() => setFocusedId(folder.id)}
+                onMouseLeave={() => setFocusedId(null)}
+              >
+                <FolderRow
+                  icon={folder.icon}
+                  label={folder.name}
+                  count={folder.conversation_count}
+                  active={isActive}
+                  color={folder.color}
+                  onClick={() => {
+                    onSelectFolder(folder.id);
+                    onSelectSmartFolder(null);
+                  }}
+                />
+                {/* Edit / delete — visible on hover OR keyboard focus */}
+                <div
+                  className={`absolute right-1 top-1/2 flex -translate-y-1/2 gap-0.5 transition-opacity duration-150 ${
+                    showActions ? 'opacity-100' : 'pointer-events-none opacity-0'
+                  }`}
+                >
                   <button
                     type="button"
+                    tabIndex={showActions ? 0 : -1}
                     onClick={(e) => {
                       e.stopPropagation();
                       onEditFolder(folder);
                     }}
-                    className="flex h-6 w-6 items-center justify-center rounded text-[var(--color-text-muted)] hover:bg-[var(--color-hover)] hover:text-[var(--color-text-primary)]"
+                    onFocus={() => setFocusedId(folder.id)}
+                    onBlur={() => setFocusedId(null)}
+                    className="flex h-7 w-7 items-center justify-center rounded text-[var(--color-text-muted)] hover:bg-[var(--color-hover)] hover:text-[var(--color-text-primary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]"
                     aria-label={t('messages.folders.editFolder')}
+                    title={t('messages.folders.editFolder')}
                   >
                     <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden>
                       <path
@@ -129,27 +150,28 @@ export function FolderList({
                   </button>
                   <button
                     type="button"
+                    tabIndex={showActions ? 0 : -1}
                     onClick={(e) => {
                       e.stopPropagation();
                       onDeleteFolder(folder);
                     }}
-                    className="flex h-6 w-6 items-center justify-center rounded text-[var(--color-text-muted)] hover:bg-[var(--color-error)] hover:bg-opacity-10 hover:text-[var(--color-error)]"
+                    onFocus={() => setFocusedId(folder.id)}
+                    onBlur={() => setFocusedId(null)}
+                    className="flex h-7 w-7 items-center justify-center rounded text-[var(--color-text-muted)] hover:bg-[var(--color-error)]/10 hover:text-[var(--color-error)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-error)]"
                     aria-label={t('messages.folders.deleteFolder')}
+                    title={t('messages.folders.deleteFolder')}
                   >
+                    {/* Trash icon — simplified path */}
                     <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden>
-                      <path
-                        d="M2 3h8M5 3V2h2v1M4.5 3v6M7.5 3v6M3 3l.5 7h5L9 3"
-                        stroke="currentColor"
-                        strokeWidth="1.2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
+                      <rect x="1" y="3" width="10" height="1" rx="0.5" fill="currentColor" />
+                      <path d="M4 3V2h4v1" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" />
+                      <path d="M2.5 4l.7 6h5.6l.7-6" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
                   </button>
                 </div>
-              )}
-            </div>
-          ))
+              </div>
+            );
+          })
         )}
       </div>
     </nav>
@@ -172,18 +194,18 @@ function FolderRow({ icon, label, count, active, color, onClick }: FolderRowProp
     <button
       type="button"
       onClick={onClick}
-      className={`flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-sm transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] ${
+      className={`flex w-full items-center gap-2 rounded-lg px-2 py-2 text-sm transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] ${
         active
-          ? 'bg-[var(--color-primary)] bg-opacity-10 font-semibold text-[var(--color-primary)]'
+          ? 'bg-[var(--color-primary)]/10 font-semibold'
           : 'font-medium text-[var(--color-text-secondary)] hover:bg-[var(--color-hover)] hover:text-[var(--color-text-primary)]'
       }`}
     >
-      <span className="flex-shrink-0 text-base leading-none" aria-hidden>
+      <span className="inline-flex flex-shrink-0 items-center leading-none" aria-hidden>
         {icon}
       </span>
       <span
         className="flex-1 truncate text-left"
-        style={active && color ? { color } : undefined}
+        style={{ color: color ?? undefined, opacity: active ? 1 : undefined }}
       >
         {label}
       </span>
