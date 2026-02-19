@@ -23,6 +23,19 @@ func TestGenerateVideoThumbnailSecure_UsesFFmpeg(t *testing.T) {
 		if name != "ffmpeg" {
 			t.Fatalf("expected ffmpeg, got %s", name)
 		}
+		hasFilter := false
+		for i := 0; i < len(args)-1; i++ {
+			if args[i] == "-vf" {
+				hasFilter = true
+				if args[i+1] != "scale=min(800\\,iw):-2" {
+					t.Fatalf("unexpected ffmpeg scale filter: %s", args[i+1])
+				}
+				break
+			}
+		}
+		if !hasFilter {
+			t.Fatal("expected ffmpeg -vf filter argument")
+		}
 		out := args[len(args)-1]
 		if !strings.HasSuffix(out, "_thumb.jpg") {
 			t.Fatalf("unexpected output path: %s", out)

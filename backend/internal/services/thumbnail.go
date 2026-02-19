@@ -180,7 +180,7 @@ func (s *ThumbnailService) GenerateVideoThumbnailSecure(sourcePath string, timeo
 		"-ss", "00:00:01",
 		"-i", sourcePath,
 		"-frames:v", "1",
-		"-vf", "scale='min(800,iw)':-2",
+		"-vf", "scale=min(800\\,iw):-2",
 		"-q:v", "5",
 		outputPath,
 	)
