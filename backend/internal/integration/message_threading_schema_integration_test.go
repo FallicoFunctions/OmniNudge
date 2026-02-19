@@ -3,6 +3,7 @@ package integration
 import (
 	"context"
 	"database/sql"
+	"strings"
 	"testing"
 
 	"github.com/omninudge/backend/internal/models"
@@ -114,3 +115,32 @@ func TestThreadingSchema_HardDeleteMessagesBySender_SetsReferencesNull(t *testin
 	require.False(t, threadRoot.Valid, "thread_root should be NULL after sender hard delete")
 }
 
+func TestThreadingSchema_RejectsPartialThreadingState(t *testing.T) {
+	deps := newTestDeps(t)
+	defer deps.DB.Close()
+	ctx := context.Background()
+
+	user1 := createUser(t, deps.UserRepo, uniqueMessagingUsername("thread_partial_1"), "user")
+	user2 := createUser(t, deps.UserRepo, uniqueMessagingUsername("thread_partial_2"), "user")
+
+	conversation, err := deps.ConversationRepo.Create(ctx, user1.ID, user2.ID)
+	require.NoError(t, err)
+
+	message := &models.Message{
+		ConversationID:    conversation.ID,
+		SenderID:          user1.ID,
+		RecipientID:       user2.ID,
+		EncryptedContent:  "enc_partial",
+		MessageType:       "text",
+		EncryptionVersion: "v1",
+	}
+	require.NoError(t, deps.MessageRepo.Create(ctx, message))
+
+	_, err = deps.DB.Pool.Exec(ctx, `
+		UPDATE messages
+		SET thread_root = $2
+		WHERE id = $1
+	`, message.ID, message.ID)
+	require.Error(t, err)
+	require.True(t, strings.Contains(err.Error(), "messages_threading_consistency"), err.Error())
+}
