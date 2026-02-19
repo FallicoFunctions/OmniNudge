@@ -3254,17 +3254,17 @@
 ---
 
 ### F7-011: Fix - Deleted Root Message
-**Status:** ⬜ TODO
+**Status:** ✅ COMPLETE
 **Priority:** P2
 **Estimated Time:** 1 hour
 
 **Problem:** What if thread root message is deleted?
 
 **Tasks:**
-- [ ] Keep thread structure (don't cascade delete)
-- [ ] Show "Message deleted" as root
-- [ ] Replies still accessible
-- [ ] Test deletion
+- [x] Keep thread structure (don't cascade delete)
+- [x] Show "Message deleted" as root
+- [x] Replies still accessible
+- [x] Test deletion
 
 **Acceptance Criteria:**
 - Thread survives root deletion
