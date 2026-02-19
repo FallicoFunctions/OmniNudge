@@ -1647,7 +1647,31 @@
     "loadingSuggestions": "Cargando sugerencias...",
     "noSuggestions": "No se encontraron sugerencias",
     "loadScroll": "Cargar scroll",
-    "unsupportedMedia": "Tipo de archivo multimedia no compatible"
+    "unsupportedMedia": "Tipo de archivo multimedia no compatible",
+    "folders": {
+      "title": "Carpetas",
+      "allConversations": "Todas",
+      "unread": "No leídas",
+      "newFolder": "Nueva carpeta",
+      "editFolder": "Editar carpeta",
+      "deleteFolder": "Eliminar carpeta",
+      "deleteConfirm": "¿Eliminar \"{{name}}\"? Las conversaciones no se eliminarán.",
+      "namePlaceholder": "Nombre de carpeta",
+      "nameLabel": "Nombre",
+      "colorLabel": "Color",
+      "iconLabel": "Icono",
+      "save": "Guardar",
+      "cancel": "Cancelar",
+      "addToFolder": "Agregar a carpeta",
+      "removeFromFolder": "Quitar de carpeta",
+      "manageFolder": "Gestionar carpetas",
+      "folderEmpty": "No hay conversaciones en esta carpeta.",
+      "folderCount_one": "{{count}} conversación",
+      "folderCount_other": "{{count}} conversaciones",
+      "maxFolders": "Has alcanzado el límite de 50 carpetas.",
+      "loading": "Cargando carpetas...",
+      "error": "No se pudieron cargar las carpetas"
+    }
   },
   "posts": {
     "title": "Posts",
