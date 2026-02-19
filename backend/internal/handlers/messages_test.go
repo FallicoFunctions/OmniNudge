@@ -850,6 +850,70 @@ func TestSendMessage_NotBlocked(t *testing.T) {
 	assert.Equal(t, http.StatusCreated, w.Code, "Response body: %s", w.Body.String())
 }
 
+func TestSendMessage_ReplyBroadcastsThreadUpdateEvent(t *testing.T) {
+	handler, _, user1ID, user2ID, convID, hub, cleanup := setupMessagesHandlerTest(t)
+	defer cleanup()
+
+	rootMessage := &models.Message{
+		ConversationID:    convID,
+		SenderID:          user1ID,
+		RecipientID:       user2ID,
+		EncryptedContent:  "thread-root",
+		MessageType:       "text",
+		EncryptionVersion: "v1",
+	}
+	require.NoError(t, handler.messageRepo.Create(context.Background(), rootMessage))
+
+	router := gin.Default()
+	router.POST("/messages", func(c *gin.Context) {
+		c.Set("user_id", user2ID)
+		handler.SendMessage(c)
+	})
+
+	body := map[string]interface{}{
+		"conversation_id":    convID,
+		"encrypted_content":  "thread-reply",
+		"message_type":       "text",
+		"encryption_version": "v1",
+		"reply_to":           rootMessage.ID,
+	}
+	bodyJSON, _ := json.Marshal(body)
+	req := httptest.NewRequest("POST", "/messages", bytes.NewBuffer(bodyJSON))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusCreated, w.Code, "Response body: %s", w.Body.String())
+
+	var sentReply models.Message
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &sentReply))
+	require.NotZero(t, sentReply.ID)
+
+	calls := hub.SnapshotBroadcastCalls()
+	events := make([]*websocket.Message, 0, len(calls))
+	for _, call := range calls {
+		if call.Type == "thread_reply_added" {
+			events = append(events, call)
+		}
+	}
+	require.Len(t, events, 2, "should broadcast thread event to both participants")
+
+	for _, recipientID := range []int{user1ID, user2ID} {
+		call := findBroadcastByTypeAndRecipient(events, "thread_reply_added", recipientID)
+		require.NotNil(t, call, "missing thread_reply_added for recipient %d", recipientID)
+
+		payload, ok := call.Payload.(models.ThreadUpdateEvent)
+		require.True(t, ok)
+		assert.Equal(t, "thread_reply_added", payload.Type)
+		assert.Equal(t, convID, payload.ConversationID)
+		assert.Equal(t, rootMessage.ID, payload.ThreadRoot)
+		assert.Equal(t, sentReply.ID, payload.ReplyID)
+		assert.Equal(t, 1, payload.ReplyCount)
+		require.NotNil(t, payload.Message)
+		assert.Equal(t, sentReply.ID, payload.Message.ID)
+	}
+}
+
 func TestSendMessage_AutoUnarchivesRecipientDM(t *testing.T) {
 	handler, db, user1ID, user2ID, convID, hub, cleanup := setupMessagesHandlerTest(t)
 	defer cleanup()

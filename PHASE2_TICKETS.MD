@@ -3088,16 +3088,16 @@
 ---
 
 ### F7-004: Backend - WebSocket Thread Events
-**Status:** ⬜ TODO
+**Status:** ✅ COMPLETE
 **Priority:** P1
 **Estimated Time:** 2 hours
 
 **Tasks:**
-- [ ] Create ThreadUpdateEvent struct
-- [ ] Broadcast thread_reply_added event
-- [ ] Include: thread_root, reply_id, reply_count, message
-- [ ] Update thread participants
-- [ ] Test real-time delivery
+- [x] Create ThreadUpdateEvent struct
+- [x] Broadcast thread_reply_added event
+- [x] Include: thread_root, reply_id, reply_count, message
+- [x] Update thread participants
+- [x] Test real-time delivery
 
 **Acceptance Criteria:**
 - Thread updates in real-time
