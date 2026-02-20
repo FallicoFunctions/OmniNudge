@@ -30,6 +30,7 @@ type MessagesHandler struct {
 	hub              HubInterface
 	notifService     *services.NotificationService
 	queueClient      *queue.QueueClient
+	cache            services.Cache
 }
 
 // HubInterface defines the methods we need from the WebSocket hub
@@ -46,6 +47,7 @@ func NewMessagesHandler(
 	userSettingsRepo *models.UserSettingsRepository,
 	hub HubInterface,
 	notifService *services.NotificationService,
+	cache services.Cache,
 	queueClient ...*queue.QueueClient,
 ) *MessagesHandler {
 	var qc *queue.QueueClient
@@ -60,6 +62,7 @@ func NewMessagesHandler(
 		hub:              hub,
 		notifService:     notifService,
 		queueClient:      qc,
+		cache:            cache,
 	}
 }
 
@@ -445,6 +448,57 @@ func (h *MessagesHandler) SendMessage(c *gin.Context) {
 	var effectiveReplyTo *int
 	var threadRoot *int
 	flattenedToRoot := false
+
+	// For group conversations, enforce mute/ban and slow mode restrictions
+	if conversationType == "group" {
+		var restrictionType string
+		var restrictionExpiresAt *time.Time
+		restrErr := h.pool.QueryRow(c.Request.Context(), `
+			SELECT restriction_type, expires_at
+			FROM group_member_restrictions
+			WHERE conversation_id = $1 AND user_id = $2
+			  AND (expires_at IS NULL OR expires_at > NOW())
+			ORDER BY restriction_type ASC
+			LIMIT 1
+		`, req.ConversationID, userID.(int)).Scan(&restrictionType, &restrictionExpiresAt)
+		if restrErr == nil && restrictionType != "" {
+			if restrictionType == "ban" {
+				c.JSON(http.StatusForbidden, gin.H{"error": "You are banned from this group"})
+				return
+			}
+			if restrictionType == "mute" {
+				c.JSON(http.StatusForbidden, gin.H{"error": "You are muted in this group"})
+				return
+			}
+		}
+
+		// Check slow mode (skip for admins/owners)
+		var userRole string
+		h.pool.QueryRow(c.Request.Context(), `
+			SELECT role FROM conversation_participants WHERE conversation_id=$1 AND user_id=$2
+		`, req.ConversationID, userID.(int)).Scan(&userRole)
+
+		if userRole != "admin" && userRole != "owner" {
+			var slowMode int
+			h.pool.QueryRow(c.Request.Context(), `SELECT slow_mode_seconds FROM conversations WHERE id=$1`, req.ConversationID).Scan(&slowMode)
+			if slowMode > 0 && h.cache != nil {
+				cacheKey := fmt.Sprintf("slowmode:%d:%d", req.ConversationID, userID.(int))
+				if val, exists, _ := h.cache.Get(c.Request.Context(), cacheKey); exists {
+					expiryUnix, _ := strconv.ParseInt(val, 10, 64)
+					remaining := time.Until(time.Unix(expiryUnix, 0))
+					if remaining > 0 {
+						c.JSON(http.StatusTooManyRequests, gin.H{
+							"error":               "Slow mode is active",
+							"retry_after_seconds": int(remaining.Seconds()) + 1,
+						})
+						return
+					}
+				}
+				expiryTime := time.Now().Add(time.Duration(slowMode) * time.Second)
+				h.cache.Set(c.Request.Context(), cacheKey, strconv.FormatInt(expiryTime.Unix(), 10), time.Duration(slowMode)*time.Second)
+			}
+		}
+	}
 
 	// For mod_mail conversations, verify participation differently
 	if conversationType == "mod_mail" {

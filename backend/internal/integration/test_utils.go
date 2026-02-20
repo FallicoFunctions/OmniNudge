@@ -123,7 +123,7 @@ func newTestDeps(t *testing.T) *TestDeps {
 		redditPostRepo,
 	)
 	conversationsHandler := handlers.NewConversationsHandler(db.Pool, conversationRepo, messageRepo, userRepo)
-	messagesHandler := handlers.NewMessagesHandler(db.Pool, messageRepo, conversationRepo, userSettingsRepo, hub, nil)
+	messagesHandler := handlers.NewMessagesHandler(db.Pool, messageRepo, conversationRepo, userSettingsRepo, hub, nil, services.NoopCache{})
 	settingsHandler := handlers.NewSettingsHandler(userSettingsRepo)
 	thumbnailService := services.NewThumbnailService()
 	usersHandler := handlers.NewUsersHandler(userRepo, userProfileRepo, userFriendshipRepo, userSettingsRepo, postRepo, commentRepo, nil, modRepo, services.NoopCache{}, thumbnailService)
