@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const EDIT_WINDOW_SECONDS = 15 * 60;
@@ -10,6 +10,8 @@ interface MessageEditModeProps {
   onCancel: () => void;
   isSaving?: boolean;
   maxLength?: number;
+  /** True when rendered inside an own-message (primary-color) bubble. */
+  isOwnMessage?: boolean;
 }
 
 function parseSentAt(sentAt: string | Date): number {
@@ -30,14 +32,24 @@ export function MessageEditMode({
   onCancel,
   isSaving = false,
   maxLength,
+  isOwnMessage = false,
 }: MessageEditModeProps) {
   const { t } = useTranslation();
   const sentAtMs = useMemo(() => parseSentAt(sentAt), [sentAt]);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const [content, setContent] = useState(initialContent);
   const [localSaving, setLocalSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [nowMs, setNowMs] = useState(Date.now());
+
+  // Fix 2: auto-focus textarea and place cursor at end on mount
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.focus();
+    el.setSelectionRange(el.value.length, el.value.length);
+  }, []);
 
   useEffect(() => {
     const timer = window.setInterval(() => setNowMs(Date.now()), 1000);
@@ -47,6 +59,18 @@ export function MessageEditMode({
   useEffect(() => {
     setContent(initialContent);
   }, [initialContent]);
+
+  // Fix 11: Escape cancels the edit
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        onCancel();
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [onCancel]);
 
   const elapsedSeconds = Math.floor((nowMs - sentAtMs) / 1000);
   const remainingSeconds = Math.max(0, EDIT_WINDOW_SECONDS - elapsedSeconds);
@@ -74,18 +98,36 @@ export function MessageEditMode({
     }
   };
 
+  // Fix 3: adjust colors when inside an own-message (primary/blue) bubble
+  const textareaClass = isOwnMessage
+    ? 'w-full rounded-md border border-white/30 bg-white/15 px-3 py-2 text-sm text-white placeholder-white/50 focus:border-white/60 focus:outline-none focus:ring-1 focus:ring-white/60'
+    : 'w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]';
+
+  const metaClass = isOwnMessage
+    ? 'flex items-center justify-between text-xs text-white/70'
+    : 'flex items-center justify-between text-xs text-[var(--color-text-secondary)]';
+
+  const cancelClass = isOwnMessage
+    ? 'rounded-md border border-white/30 bg-white/10 px-3 py-1.5 text-sm font-medium text-white hover:bg-white/20'
+    : 'rounded-md border border-[var(--color-border)] px-3 py-1.5 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]';
+
+  const saveClass = isOwnMessage
+    ? 'rounded-md bg-white px-3 py-1.5 text-sm font-semibold text-[var(--color-primary)] hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60'
+    : 'rounded-md bg-[var(--color-primary)] px-3 py-1.5 text-sm font-semibold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60';
+
   return (
     <form onSubmit={handleSubmit} className="space-y-2">
       <textarea
+        ref={textareaRef}
         value={content}
         onChange={(event) => setContent(event.target.value)}
         maxLength={maxLength}
-        className="w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
-        rows={3}
+        className={textareaClass}
+        rows={Math.min(Math.max(2, content.split('\n').length), 8)}
         aria-label={t('messages.editing.ariaInput')}
       />
 
-      <div className="flex items-center justify-between text-xs text-[var(--color-text-secondary)]">
+      <div className={metaClass}>
         <span>
           {editExpired
             ? t('messages.editing.expired')
@@ -101,24 +143,16 @@ export function MessageEditMode({
       </div>
 
       {error && (
-        <p className="text-xs font-medium text-red-600" role="alert">
+        <p className={`text-xs font-medium ${isOwnMessage ? 'text-white/90' : 'text-[var(--color-error)]'}`} role="alert">
           {error}
         </p>
       )}
 
       <div className="flex gap-2">
-        <button
-          type="button"
-          onClick={onCancel}
-          className="rounded-md border border-[var(--color-border)] px-3 py-1.5 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
-        >
+        <button type="button" onClick={onCancel} className={cancelClass}>
           {t('common.cancel')}
         </button>
-        <button
-          type="submit"
-          disabled={saveDisabled}
-          className="rounded-md bg-[var(--color-primary)] px-3 py-1.5 text-sm font-semibold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
-        >
+        <button type="submit" disabled={saveDisabled} className={saveClass}>
           {localSaving || isSaving ? t('messages.editing.saving') : t('common.save')}
         </button>
       </div>
