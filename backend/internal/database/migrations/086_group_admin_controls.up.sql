@@ -11,8 +11,9 @@ CREATE TABLE group_member_restrictions (
     created_at       TIMESTAMPTZ  NOT NULL DEFAULT NOW()
 );
 
--- Fast lookup for restriction checks on every message send
-CREATE INDEX idx_gmr_conv_user_type ON group_member_restrictions (conversation_id, user_id, restriction_type);
+-- UNIQUE constraint required by ON CONFLICT upserts in group admin handler.
+-- Also serves as the fast lookup index for restriction checks on every message send.
+CREATE UNIQUE INDEX idx_gmr_conv_user_type ON group_member_restrictions (conversation_id, user_id, restriction_type);
 -- Enables efficient expiry cleanup jobs
 CREATE INDEX idx_gmr_expires ON group_member_restrictions (expires_at) WHERE expires_at IS NOT NULL;
 

@@ -3801,7 +3801,18 @@
       "memberMutedUntil": "أنت مكتوم حتى {{date}}",
       "exportCsv": "تصدير CSV",
       "restrictions": "القيود",
-      "noRestrictions": "لا توجد قيود نشطة"
+      "noRestrictions": "لا توجد قيود نشطة",
+      "muting": "جارٍ الكتم…",
+      "banning": "جارٍ الحظر…",
+      "slowModeInfo": "الوضع البطيء: {{duration}}",
+      "allActions": "جميع الإجراءات",
+      "filterByAction": "تصفية حسب الإجراء",
+      "loadMore": "تحميل المزيد",
+      "colTime": "الوقت",
+      "colAdmin": "المشرف",
+      "colAction": "الإجراء",
+      "colTarget": "المستهدف",
+      "colDetails": "التفاصيل"
     }
   }
 }

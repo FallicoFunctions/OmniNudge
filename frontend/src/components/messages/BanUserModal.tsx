@@ -62,7 +62,7 @@ export function BanUserModal({ username, onConfirm, onCancel, isLoading }: BanUs
             disabled={isLoading}
             className="flex-1 rounded-md bg-[var(--color-error)] px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60"
           >
-            {isLoading ? '...' : t('groups.admin.ban')}
+            {isLoading ? t('groups.admin.banning', { defaultValue: 'Banning…' }) : t('groups.admin.ban')}
           </button>
         </div>
       </div>

@@ -3801,7 +3801,18 @@
       "memberMutedUntil": "Estás silenciado hasta {{date}}",
       "exportCsv": "Exportar CSV",
       "restrictions": "Restricciones",
-      "noRestrictions": "Sin restricciones activas"
+      "noRestrictions": "Sin restricciones activas",
+      "muting": "Silenciando…",
+      "banning": "Baneando…",
+      "slowModeInfo": "Modo lento: {{duration}}",
+      "allActions": "Todas las acciones",
+      "filterByAction": "Filtrar por acción",
+      "loadMore": "Cargar más",
+      "colTime": "Tiempo",
+      "colAdmin": "Admin",
+      "colAction": "Acción",
+      "colTarget": "Objetivo",
+      "colDetails": "Detalles"
     }
   }
 }

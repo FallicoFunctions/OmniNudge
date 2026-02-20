@@ -6,16 +6,16 @@ interface SlowModeControlProps {
   isLoading?: boolean;
 }
 
-const SLOW_MODE_OPTIONS = [
-  { label: 'Off', value: 0 },
-  { label: '10 seconds', value: 10 },
-  { label: '30 seconds', value: 30 },
-  { label: '1 minute', value: 60 },
-  { label: '5 minutes', value: 300 },
-  { label: '10 minutes', value: 600 },
-  { label: '30 minutes', value: 1800 },
-  { label: '1 hour', value: 3600 },
-] as const;
+const SLOW_MODE_OPTIONS: { labelKey: string; value: number }[] = [
+  { labelKey: 'groups.admin.slowModeOff', value: 0 },
+  { labelKey: 'groups.admin.slowMode10s', value: 10 },
+  { labelKey: 'groups.admin.slowMode30s', value: 30 },
+  { labelKey: 'groups.admin.slowMode1m', value: 60 },
+  { labelKey: 'groups.admin.slowMode5m', value: 300 },
+  { labelKey: 'groups.admin.slowMode10m', value: 600 },
+  { labelKey: 'groups.admin.slowMode30m', value: 1800 },
+  { labelKey: 'groups.admin.slowMode1h', value: 3600 },
+];
 
 export function SlowModeControl({ currentSeconds, onSetSlowMode, isLoading }: SlowModeControlProps) {
   const { t } = useTranslation();
@@ -33,7 +33,7 @@ export function SlowModeControl({ currentSeconds, onSetSlowMode, isLoading }: Sl
       >
         {SLOW_MODE_OPTIONS.map((opt) => (
           <option key={opt.value} value={opt.value}>
-            {opt.label}
+            {t(opt.labelKey)}
           </option>
         ))}
       </select>

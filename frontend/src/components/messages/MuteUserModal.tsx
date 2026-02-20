@@ -8,12 +8,12 @@ interface MuteUserModalProps {
   isLoading?: boolean;
 }
 
-const DURATION_OPTIONS = [
-  { label: '1 hour', value: 60 },
-  { label: '24 hours', value: 1440 },
-  { label: '7 days', value: 10080 },
-  { label: 'Permanent', value: 0 },
-] as const;
+const DURATION_OPTIONS: { labelKey: string; value: number }[] = [
+  { labelKey: 'groups.admin.duration1h', value: 60 },
+  { labelKey: 'groups.admin.duration24h', value: 1440 },
+  { labelKey: 'groups.admin.duration7d', value: 10080 },
+  { labelKey: 'groups.admin.durationPermanent', value: 0 },
+];
 
 export function MuteUserModal({ username, onConfirm, onCancel, isLoading }: MuteUserModalProps) {
   const { t } = useTranslation();
@@ -47,7 +47,7 @@ export function MuteUserModal({ username, onConfirm, onCancel, isLoading }: Mute
                     : 'border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-[var(--color-hover)]'
                 }`}
               >
-                {opt.label}
+                {t(opt.labelKey)}
               </button>
             ))}
           </div>
@@ -80,7 +80,7 @@ export function MuteUserModal({ username, onConfirm, onCancel, isLoading }: Mute
             disabled={isLoading}
             className="flex-1 rounded-md bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60"
           >
-            {isLoading ? '...' : t('groups.admin.mute')}
+            {isLoading ? t('groups.admin.muting', { defaultValue: 'Muting…' }) : t('groups.admin.mute')}
           </button>
         </div>
       </div>
