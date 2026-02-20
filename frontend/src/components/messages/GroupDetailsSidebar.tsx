@@ -2,6 +2,13 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useGroupConversation } from '../../hooks/useGroupConversation';
 import { GroupAvatar } from './GroupAvatar';
+import { AdminBadge } from './AdminBadge';
+import { MuteUserModal } from './MuteUserModal';
+import { BanUserModal } from './BanUserModal';
+import { SlowModeControl } from './SlowModeControl';
+import { GroupAuditLog } from './GroupAuditLog';
+import { adminGroupsService } from '../../services/adminGroupsService';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import type { Conversation, GroupParticipant, GroupRole } from '../../types/messages';
 
 interface GroupDetailsSidebarProps {
@@ -9,6 +16,8 @@ interface GroupDetailsSidebarProps {
   currentUserId: number;
   onClose: () => void;
 }
+
+type SidebarTab = 'members' | 'settings' | 'audit';
 
 function RoleBadge({ role }: { role: GroupRole }) {
   const { t } = useTranslation();
@@ -30,12 +39,16 @@ function ParticipantRow({
   currentUserId,
   onRemove,
   onChangeRole,
+  onMute,
+  onBan,
 }: {
   participant: GroupParticipant;
   currentUserRole: GroupRole | null;
   currentUserId: number;
   onRemove: (userId: number) => void;
   onChangeRole: (userId: number, role: 'admin' | 'member') => void;
+  onMute: (participant: GroupParticipant) => void;
+  onBan: (participant: GroupParticipant) => void;
 }) {
   const { t } = useTranslation();
   const [showMenu, setShowMenu] = useState(false);
@@ -51,12 +64,17 @@ function ParticipantRow({
         {participant.username[0].toUpperCase()}
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-[var(--color-text-primary)] truncate">
-          {participant.username}
-          {isCurrentUser && (
-            <span className="ml-1.5 text-xs text-[var(--color-text-muted)]">{t('common.you')}</span>
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <p className="text-sm font-medium text-[var(--color-text-primary)] truncate">
+            {participant.username}
+            {isCurrentUser && (
+              <span className="ml-1.5 text-xs text-[var(--color-text-muted)]">{t('common.you')}</span>
+            )}
+          </p>
+          {(participant.role === 'owner' || participant.role === 'admin') && (
+            <AdminBadge role={participant.role as 'owner' | 'admin'} />
           )}
-        </p>
+        </div>
       </div>
       <RoleBadge role={participant.role} />
       {canManage && (
@@ -74,7 +92,7 @@ function ParticipantRow({
             </svg>
           </button>
           {showMenu && (
-            <div className="absolute right-0 top-8 z-10 w-44 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] shadow-xl">
+            <div className="absolute right-0 top-8 z-10 w-48 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] shadow-xl">
               {participant.role === 'member' && currentUserRole === 'owner' && (
                 <button
                   type="button"
@@ -95,6 +113,21 @@ function ParticipantRow({
               )}
               <button
                 type="button"
+                className="w-full px-3 py-2 text-left text-sm text-amber-600 hover:bg-[var(--color-hover)]"
+                onClick={() => { onMute(participant); setShowMenu(false); }}
+              >
+                {t('groups.admin.mute')}
+              </button>
+              <button
+                type="button"
+                className="w-full px-3 py-2 text-left text-sm text-[var(--color-error)] hover:bg-[var(--color-hover)]"
+                onClick={() => { onBan(participant); setShowMenu(false); }}
+              >
+                {t('groups.admin.ban')}
+              </button>
+              <div className="my-0.5 border-t border-[var(--color-border)]" />
+              <button
+                type="button"
                 className="w-full px-3 py-2 text-left text-sm text-[var(--color-error)] hover:bg-[var(--color-hover)]"
                 onClick={() => { onRemove(participant.user_id); setShowMenu(false); }}
               >
@@ -110,9 +143,13 @@ function ParticipantRow({
 
 export function GroupDetailsSidebar({ conversation, currentUserId, onClose }: GroupDetailsSidebarProps) {
   const { t } = useTranslation();
+  const queryClient = useQueryClient();
+  const [activeTab, setActiveTab] = useState<SidebarTab>('members');
   const [isEditingName, setIsEditingName] = useState(false);
   const [editedName, setEditedName] = useState(conversation.group_name ?? '');
   const [leaveError, setLeaveError] = useState('');
+  const [muteTarget, setMuteTarget] = useState<GroupParticipant | null>(null);
+  const [banTarget, setBanTarget] = useState<GroupParticipant | null>(null);
 
   const {
     participants,
@@ -129,7 +166,29 @@ export function GroupDetailsSidebar({ conversation, currentUserId, onClose }: Gr
     isUpdatingGroup,
   } = useGroupConversation({ conversationId: conversation.id, currentUserId });
 
-  // Sort: owner → admins → members
+  const muteMutation = useMutation({
+    mutationFn: ({ userId, durationMinutes, reason }: { userId: number; durationMinutes: number; reason: string }) =>
+      adminGroupsService.muteUser(conversation.id, userId, { duration_minutes: durationMinutes, reason }),
+    onSuccess: () => {
+      setMuteTarget(null);
+      queryClient.invalidateQueries({ queryKey: ['group-restrictions', conversation.id] });
+    },
+  });
+
+  const banMutation = useMutation({
+    mutationFn: ({ userId, reason, deleteMessages }: { userId: number; reason: string; deleteMessages: boolean }) =>
+      adminGroupsService.banUser(conversation.id, userId, { reason, delete_messages: deleteMessages }),
+    onSuccess: () => {
+      setBanTarget(null);
+      queryClient.invalidateQueries({ queryKey: ['group-restrictions', conversation.id] });
+      queryClient.invalidateQueries({ queryKey: ['group-participants', conversation.id] });
+    },
+  });
+
+  const slowModeMutation = useMutation({
+    mutationFn: (seconds: number) => adminGroupsService.setSlowMode(conversation.id, seconds),
+  });
+
   const sorted = [...participants].sort((a, b) => {
     const order = { owner: 0, admin: 1, member: 2 };
     return (order[a.role] ?? 3) - (order[b.role] ?? 3);
@@ -152,6 +211,14 @@ export function GroupDetailsSidebar({ conversation, currentUserId, onClose }: Gr
       );
     }
   };
+
+  const tabs: { id: SidebarTab; label: string; adminOnly?: boolean }[] = [
+    { id: 'members', label: t('groups.members') },
+    { id: 'settings', label: t('groups.settingsSection'), adminOnly: true },
+    { id: 'audit', label: t('groups.admin.auditLog'), adminOnly: true },
+  ];
+
+  const visibleTabs = tabs.filter((tab) => !tab.adminOnly || isAdmin);
 
   return (
     <div className="flex h-full flex-col border-l border-[var(--color-border)] bg-[var(--color-surface)]">
@@ -229,42 +296,79 @@ export function GroupDetailsSidebar({ conversation, currentUserId, onClose }: Gr
           </p>
         </div>
 
-        {/* Settings (admin only) */}
-        {isAdmin && settings && (
-          <div className="px-4 py-4 border-b border-[var(--color-border)]">
-            <h4 className="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-muted)] mb-3">
-              {t('groups.settingsSection')}
-            </h4>
-            <div className="space-y-2 text-sm text-[var(--color-text-secondary)]">
-              <p>{settings.anyone_can_invite ? '✓' : '✗'} {t('groups.settings.anyoneCanInvite')}</p>
-              <p>{settings.anyone_can_pin ? '✓' : '✗'} {t('groups.settings.anyoneCanPin')}</p>
-              <p>{settings.message_history_visible ? '✓' : '✗'} {t('groups.settings.historyVisible')}</p>
+        {/* Tab navigation */}
+        {visibleTabs.length > 1 && (
+          <div className="flex border-b border-[var(--color-border)]">
+            {visibleTabs.map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex-1 px-3 py-2.5 text-xs font-semibold transition-colors ${
+                  activeTab === tab.id
+                    ? 'border-b-2 border-[var(--color-primary)] text-[var(--color-primary)]'
+                    : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Members tab */}
+        {activeTab === 'members' && (
+          <div className="py-2">
+            {loadingParticipants ? (
+              <p className="px-4 text-sm text-[var(--color-text-muted)]">{t('common.loading')}</p>
+            ) : (
+              sorted.map((p) => (
+                <ParticipantRow
+                  key={p.user_id}
+                  participant={p}
+                  currentUserRole={currentUserRole}
+                  currentUserId={currentUserId}
+                  onRemove={removeParticipant}
+                  onChangeRole={changeRole}
+                  onMute={setMuteTarget}
+                  onBan={setBanTarget}
+                />
+              ))
+            )}
+          </div>
+        )}
+
+        {/* Settings tab (admin only) */}
+        {activeTab === 'settings' && isAdmin && (
+          <div className="px-4 py-4 space-y-4">
+            {settings && (
+              <div className="space-y-2 text-sm text-[var(--color-text-secondary)]">
+                <p>{settings.anyone_can_invite ? '✓' : '✗'} {t('groups.settings.anyoneCanInvite')}</p>
+                <p>{settings.anyone_can_pin ? '✓' : '✗'} {t('groups.settings.anyoneCanPin')}</p>
+                <p>{settings.message_history_visible ? '✓' : '✗'} {t('groups.settings.historyVisible')}</p>
+              </div>
+            )}
+            <div className="pt-2 border-t border-[var(--color-border)]">
+              <h4 className="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-muted)] mb-3">
+                {t('groups.admin.slowMode')}
+              </h4>
+              <SlowModeControl
+                currentSeconds={settings?.slow_mode_seconds ?? 0}
+                onSetSlowMode={(seconds) => slowModeMutation.mutate(seconds)}
+                isLoading={slowModeMutation.isPending}
+              />
             </div>
           </div>
         )}
 
-        {/* Participants */}
-        <div className="py-2">
-          <h4 className="px-4 py-2 text-xs font-semibold uppercase tracking-wide text-[var(--color-text-muted)]">
-            {t('groups.members')} ({participants.length})
-          </h4>
-          {loadingParticipants ? (
-            <p className="px-4 text-sm text-[var(--color-text-muted)]">{t('common.loading')}</p>
-          ) : (
-            sorted.map((p) => (
-              <ParticipantRow
-                key={p.user_id}
-                participant={p}
-                currentUserRole={currentUserRole}
-                currentUserId={currentUserId}
-                onRemove={removeParticipant}
-                onChangeRole={changeRole}
-              />
-            ))
-          )}
-        </div>
+        {/* Audit Log tab (admin only) */}
+        {activeTab === 'audit' && isAdmin && (
+          <div className="px-4 py-4">
+            <GroupAuditLog conversationId={conversation.id} />
+          </div>
+        )}
 
-        {/* Leave group */}
+        {/* Leave group (always visible at bottom) */}
         <div className="px-4 py-4 border-t border-[var(--color-border)]">
           {leaveError && (
             <p className="mb-2 text-xs text-[var(--color-error)]">{leaveError}</p>
@@ -282,6 +386,30 @@ export function GroupDetailsSidebar({ conversation, currentUserId, onClose }: Gr
           </button>
         </div>
       </div>
+
+      {/* Mute modal */}
+      {muteTarget && (
+        <MuteUserModal
+          username={muteTarget.username}
+          onConfirm={(durationMinutes, reason) =>
+            muteMutation.mutate({ userId: muteTarget.user_id, durationMinutes, reason })
+          }
+          onCancel={() => setMuteTarget(null)}
+          isLoading={muteMutation.isPending}
+        />
+      )}
+
+      {/* Ban modal */}
+      {banTarget && (
+        <BanUserModal
+          username={banTarget.username}
+          onConfirm={(reason, deleteMessages) =>
+            banMutation.mutate({ userId: banTarget.user_id, reason, deleteMessages })
+          }
+          onCancel={() => setBanTarget(null)}
+          isLoading={banMutation.isPending}
+        />
+      )}
     </div>
   );
 }
