@@ -1,6 +1,7 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { ConversationFolder } from '../../types/messages';
+import { getContrastColor, hexToRgba } from './FolderBadge';
 
 const MAX_FOLDERS = 50;
 
@@ -18,6 +19,8 @@ interface FolderListProps {
   deletingFolderId?: number | null;
   /** Always show edit/delete actions (mobile — no hover) */
   alwaysShowActions?: boolean;
+  /** Additional className applied to the root <nav> element */
+  className?: string;
 }
 
 export function FolderList({
@@ -32,19 +35,30 @@ export function FolderList({
   isLoading,
   deletingFolderId,
   alwaysShowActions = false,
+  className,
 }: FolderListProps) {
   const { t } = useTranslation();
   const [focusedId, setFocusedId] = useState<number | null>(null);
   const liveRef = useRef<HTMLParagraphElement>(null);
   const atLimit = folders.length >= MAX_FOLDERS;
 
+  // H1: Announce folder count changes to screen readers
+  const prevCountRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (isLoading) return;
+    if (prevCountRef.current !== null && prevCountRef.current !== folders.length && liveRef.current) {
+      liveRef.current.textContent = t('messages.folders.folderCount', { count: folders.length });
+    }
+    prevCountRef.current = folders.length;
+  }, [folders.length, isLoading, t]);
+
   const allActive = selectedFolderId === null && smartFolder === null;
   const unreadActive = smartFolder === 'unread';
 
   return (
     <nav
-      className="flex w-44 flex-shrink-0 flex-col border-r border-[var(--color-border)] bg-[var(--color-surface)]"
-      aria-label={t('messages.folders.title')}
+      className={`flex flex-col bg-[var(--color-surface)]${className ? ` ${className}` : ''}`}
+      aria-label={t('messages.folders.nav')}
     >
       {/* Limit warning — at top, BEFORE the New Folder button so context is clear */}
       {atLimit && (
@@ -87,7 +101,11 @@ export function FolderList({
           }}
         />
         <FolderRow
-          icon="🔵"
+          icon={
+            <svg width="10" height="10" viewBox="0 0 10 10" fill="var(--color-primary)" aria-hidden>
+              <circle cx="5" cy="5" r="5" />
+            </svg>
+          }
           label={t('messages.folders.unread')}
           active={unreadActive}
           onClick={() => {
@@ -97,16 +115,18 @@ export function FolderList({
         />
       </div>
 
-      {/* Divider */}
-      {(folders.length > 0 || isLoading) && (
-        <div className="mx-3 mb-1 border-t border-[var(--color-border)]" />
-      )}
+      {/* Divider — always visible to separate smart folders from user-folder area */}
+      <div className="mx-3 mb-1 border-t border-[var(--color-border)]" />
 
       {/* User folders */}
       <div className="flex-1 overflow-y-auto px-1.5 py-1">
         {isLoading ? (
           <p className="px-2 py-1.5 text-xs text-[var(--color-text-muted)]">
             {t('messages.folders.loading')}
+          </p>
+        ) : folders.length === 0 ? (
+          <p className="px-2 py-3 text-center text-xs text-[var(--color-text-muted)]">
+            {t('messages.folders.emptyHint')}
           </p>
         ) : (
           folders.map((folder) => {
@@ -119,6 +139,13 @@ export function FolderList({
                 className="group relative"
                 onMouseEnter={() => !alwaysShowActions && setFocusedId(folder.id)}
                 onMouseLeave={() => !alwaysShowActions && setFocusedId(null)}
+                onFocus={() => !alwaysShowActions && setFocusedId(folder.id)}
+                onBlur={(e) => {
+                  // Only clear when focus truly leaves this row (not when moving between edit/delete buttons)
+                  if (!alwaysShowActions && !e.currentTarget.contains(e.relatedTarget as Node)) {
+                    setFocusedId(null);
+                  }
+                }}
               >
                 <FolderRow
                   icon={folder.icon}
@@ -127,6 +154,7 @@ export function FolderList({
                   active={isActive}
                   color={folder.color}
                   isDeleting={isDeleting}
+                  padRight
                   onClick={() => {
                     if (!isDeleting) {
                       onSelectFolder(folder.id);
@@ -147,8 +175,6 @@ export function FolderList({
                       e.stopPropagation();
                       onEditFolder(folder);
                     }}
-                    onFocus={() => setFocusedId(folder.id)}
-                    onBlur={() => !alwaysShowActions && setFocusedId(null)}
                     className="flex h-7 w-7 items-center justify-center rounded text-[var(--color-text-muted)] hover:bg-[var(--color-hover)] hover:text-[var(--color-text-primary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]"
                     aria-label={t('messages.folders.editFolder')}
                     title={t('messages.folders.editFolder')}
@@ -164,8 +190,6 @@ export function FolderList({
                       e.stopPropagation();
                       onDeleteFolder(folder);
                     }}
-                    onFocus={() => setFocusedId(folder.id)}
-                    onBlur={() => !alwaysShowActions && setFocusedId(null)}
                     className="flex h-7 w-7 items-center justify-center rounded text-[var(--color-text-muted)] hover:bg-[var(--color-error)]/10 hover:text-[var(--color-error)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-error)]"
                     aria-label={t('messages.folders.deleteFolder')}
                     title={t('messages.folders.deleteFolder')}
@@ -192,32 +216,43 @@ export function FolderList({
 // ─── Internal row component ───────────────────────────────────────────────────
 
 interface FolderRowProps {
-  icon: string;
+  icon: string | React.ReactNode;
   label: string;
   count?: number;
   active: boolean;
   color?: string;
   isDeleting?: boolean;
   onClick: () => void;
+  /** Reserve right-side padding so absolutely-positioned action buttons don't overlap the name */
+  padRight?: boolean;
 }
 
-function FolderRow({ icon, label, count, active, color, isDeleting, onClick }: FolderRowProps) {
+function FolderRow({ icon, label, count, active, color, isDeleting, onClick, padRight }: FolderRowProps) {
+  // H2: when a custom color is set, use it for the active background tint so
+  // label color and background always share the same hue.
+  const activeBg = active
+    ? (color ? hexToRgba(color, 0.12) : undefined)
+    : undefined;
+
   return (
     <button
       type="button"
       onClick={onClick}
-      aria-current={active ? 'true' : undefined}
+      aria-current={active ? 'page' : undefined}
       disabled={isDeleting}
-      className={`flex w-full items-center gap-2 rounded-lg px-2 py-2 text-sm transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] disabled:opacity-50 ${
+      style={activeBg ? { backgroundColor: activeBg } : undefined}
+      className={`flex w-full items-center gap-2 rounded-lg pl-2 py-2 text-sm transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] disabled:opacity-50 ${
+        padRight ? 'pr-16' : 'pr-2'
+      } ${
         active
-          ? 'bg-[var(--color-primary)]/10 font-semibold'
+          ? 'bg-[var(--color-primary)]/10 font-semibold text-[var(--color-text-primary)]'
           : 'font-medium text-[var(--color-text-secondary)] hover:bg-[var(--color-hover)] hover:text-[var(--color-text-primary)]'
       }`}
     >
       <span className="inline-flex flex-shrink-0 items-center leading-none" aria-hidden>
         {isDeleting ? (
           <svg className="h-4 w-4 animate-spin" viewBox="0 0 16 16" fill="none">
-            <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="2" strokeDasharray="28" strokeDashoffset="10" />
+            <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="2" strokeDasharray="9.4 28.3" strokeDashoffset="0" />
           </svg>
         ) : (
           icon
@@ -227,7 +262,13 @@ function FolderRow({ icon, label, count, active, color, isDeleting, onClick }: F
         {label}
       </span>
       {typeof count === 'number' && count > 0 && (
-        <span className="flex-shrink-0 rounded-full bg-[var(--color-primary)] px-1.5 py-0.5 text-[10px] font-semibold leading-none text-white">
+        <span
+          className="flex-shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold leading-none"
+          style={{
+            backgroundColor: color ?? 'var(--color-primary)',
+            color: color ? getContrastColor(color) : '#ffffff',
+          }}
+        >
           {count > 99 ? '99+' : count}
         </span>
       )}

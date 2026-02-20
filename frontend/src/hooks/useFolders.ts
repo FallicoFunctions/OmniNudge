@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { foldersService } from '../services/foldersService';
 import type { Conversation, ConversationFolder } from '../types/messages';
@@ -44,12 +44,13 @@ export function useFolders() {
     queryKey: ['folders', selectedFolderId, 'conversations'],
     queryFn: () => foldersService.getFolderConversations(selectedFolderId as number),
     enabled: selectedFolderId !== null,
+    staleTime: 60_000,
   });
 
-  const setSelectedFolderId = (folderID: number | null) => {
+  const setSelectedFolderId = useCallback((folderID: number | null) => {
     setSelectedFolderIdState(folderID);
     persistSelectedFolderId(folderID);
-  };
+  }, []);
 
   const createFolderMutation = useMutation({
     mutationFn: foldersService.createFolder,
@@ -87,48 +88,50 @@ export function useFolders() {
   const addConversationMutation = useMutation({
     mutationFn: ({ folderID, conversationID }: { folderID: number; conversationID: number }) =>
       foldersService.addConversation(folderID, conversationID),
-    onMutate: ({ folderID }) => {
+    onMutate: async ({ folderID }) => {
+      // Cancel in-flight refetches so they don't overwrite optimistic update
+      await queryClient.cancelQueries({ queryKey: ['folders'] });
+      const previousFolders = queryClient.getQueryData<ConversationFolder[]>(['folders']);
       queryClient.setQueryData<ConversationFolder[]>(['folders'], (old) =>
         old?.map((f) =>
           f.id === folderID ? { ...f, conversation_count: (f.conversation_count ?? 0) + 1 } : f,
         ),
       );
+      return { previousFolders };
     },
     onSuccess: (_, variables) => {
       void queryClient.invalidateQueries({ queryKey: ['folders'] });
       void queryClient.invalidateQueries({ queryKey: ['folders', variables.folderID, 'conversations'] });
     },
-    onError: (_, { folderID }) => {
-      // Rollback: decrement, using same ?? 0 base as onMutate
-      queryClient.setQueryData<ConversationFolder[]>(['folders'], (old) =>
-        old?.map((f) =>
-          f.id === folderID ? { ...f, conversation_count: Math.max(0, (f.conversation_count ?? 0) - 1) } : f,
-        ),
-      );
+    onError: (_, __, context) => {
+      // Restore snapshot — guaranteed accurate regardless of concurrent mutations
+      if (context?.previousFolders !== undefined) {
+        queryClient.setQueryData(['folders'], context.previousFolders);
+      }
     },
   });
 
   const removeConversationMutation = useMutation({
     mutationFn: ({ folderID, conversationID }: { folderID: number; conversationID: number }) =>
       foldersService.removeConversation(folderID, conversationID),
-    onMutate: ({ folderID }) => {
+    onMutate: async ({ folderID }) => {
+      await queryClient.cancelQueries({ queryKey: ['folders'] });
+      const previousFolders = queryClient.getQueryData<ConversationFolder[]>(['folders']);
       queryClient.setQueryData<ConversationFolder[]>(['folders'], (old) =>
         old?.map((f) =>
           f.id === folderID ? { ...f, conversation_count: Math.max(0, (f.conversation_count ?? 0) - 1) } : f,
         ),
       );
+      return { previousFolders };
     },
     onSuccess: (_, variables) => {
       void queryClient.invalidateQueries({ queryKey: ['folders'] });
       void queryClient.invalidateQueries({ queryKey: ['folders', variables.folderID, 'conversations'] });
     },
-    onError: (_, { folderID }) => {
-      // Rollback: increment, using same ?? 0 base as onMutate
-      queryClient.setQueryData<ConversationFolder[]>(['folders'], (old) =>
-        old?.map((f) =>
-          f.id === folderID ? { ...f, conversation_count: (f.conversation_count ?? 0) + 1 } : f,
-        ),
-      );
+    onError: (_, __, context) => {
+      if (context?.previousFolders !== undefined) {
+        queryClient.setQueryData(['folders'], context.previousFolders);
+      }
     },
   });
 
@@ -137,10 +140,10 @@ export function useFolders() {
     return new Set((folderConversationsQuery.data ?? []).map((c) => c.id));
   }, [selectedFolderId, folderConversationsQuery.data]);
 
-  const filterConversationsBySelectedFolder = (conversations: Conversation[]): Conversation[] => {
+  const filterConversationsBySelectedFolder = useCallback((conversations: Conversation[]): Conversation[] => {
     if (!selectedFolderConversationIDs) return conversations;
     return conversations.filter((conversation) => selectedFolderConversationIDs.has(conversation.id));
-  };
+  }, [selectedFolderConversationIDs]);
 
   return {
     folders: foldersQuery.data ?? [],
