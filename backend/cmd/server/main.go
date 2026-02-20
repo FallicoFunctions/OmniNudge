@@ -312,7 +312,7 @@ func main() {
 	// Initialize CSS sanitizer
 	cssSanitizer := services.NewCSSSanitizer()
 
-	messagesHandler := handlers.NewMessagesHandler(db.Pool, messageRepo, conversationRepo, userSettingsRepo, hub, notificationService, queueClient)
+	messagesHandler := handlers.NewMessagesHandler(db.Pool, messageRepo, conversationRepo, userSettingsRepo, hub, notificationService, cache, queueClient)
 	usersHandler := handlers.NewUsersHandler(userRepo, userProfileRepo, userFriendshipRepo, userSettingsRepo, postRepo, commentRepo, authService, hubModRepo, cache, thumbnailService)
 	mediaQuota := handlers.MediaQuotaConfig{
 		FreeTierBytes: cfg.Media.FreeTierQuotaBytes,
@@ -833,6 +833,18 @@ func main() {
 			protected.POST("/groups/:id/invites", groupHandler.CreateGroupInvite)
 			protected.POST("/groups/:id/leave", groupHandler.LeaveGroup)
 			protected.POST("/groups/:id/transfer-ownership", groupHandler.TransferOwnership)
+
+			// Group admin controls (F10)
+			groupAdminHandler := handlers.NewGroupAdminHandler(db.Pool, hub, cache)
+			protected.POST("/groups/:id/members/:user_id/mute", groupAdminHandler.MuteGroupMember)
+			protected.DELETE("/groups/:id/members/:user_id/mute", groupAdminHandler.UnmuteGroupMember)
+			protected.POST("/groups/:id/members/:user_id/ban", groupAdminHandler.BanGroupMember)
+			protected.DELETE("/groups/:id/members/:user_id/ban", groupAdminHandler.UnbanGroupMember)
+			protected.GET("/groups/:id/restrictions", groupAdminHandler.GetGroupRestrictions)
+			protected.GET("/groups/:id/my-restriction", groupAdminHandler.GetMyGroupRestriction)
+			protected.DELETE("/groups/:id/messages/:message_id", groupAdminHandler.AdminDeleteMessage)
+			protected.PUT("/groups/:id/slow-mode", groupAdminHandler.SetSlowMode)
+			protected.GET("/groups/:id/audit-log", groupAdminHandler.GetAuditLog)
 
 			// Mod mail routes
 			protected.POST("/mod-mail", modMailHandler.CreateModMail)
