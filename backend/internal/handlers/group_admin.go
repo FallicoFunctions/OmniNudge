@@ -156,17 +156,17 @@ func getCallerID(c *gin.Context) (int, bool) {
 	return val.(int), true
 }
 
-// isGroupOwner returns true when targetUserID holds the 'owner' role in the conversation.
-func isGroupOwner(ctx context.Context, pool *pgxpool.Pool, convID, targetUserID int) (bool, error) {
+// targetMemberRole returns the role of targetUserID in the group, or ("", nil) if not a member.
+func targetMemberRole(ctx context.Context, pool *pgxpool.Pool, convID, targetUserID int) (string, error) {
 	var role string
 	err := pool.QueryRow(ctx, `SELECT role FROM conversation_participants WHERE conversation_id=$1 AND user_id=$2`, convID, targetUserID).Scan(&role)
 	if err != nil {
 		if err == pgx.ErrNoRows {
-			return false, nil
+			return "", nil
 		}
-		return false, fmt.Errorf("isGroupOwner: %w", err)
+		return "", fmt.Errorf("targetMemberRole: %w", err)
 	}
-	return role == "owner", nil
+	return role, nil
 }
 
 // ─── Endpoints ────────────────────────────────────────────────────────────────
@@ -188,18 +188,28 @@ func (h *GroupAdminHandler) MuteGroupMember(c *gin.Context) {
 
 	ctx := c.Request.Context()
 
-	if _, err := requireGroupAdmin(ctx, h.pool, convID, callerID); err != nil {
+	callerRole, err := requireGroupAdmin(ctx, h.pool, convID, callerID)
+	if err != nil {
 		c.JSON(http.StatusForbidden, gin.H{"error": "Only group admins can perform this action"})
 		return
 	}
 
-	owner, err := isGroupOwner(ctx, h.pool, convID, targetUserID)
+	targetRole, err := targetMemberRole(ctx, h.pool, convID, targetUserID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check target role"})
 		return
 	}
-	if owner {
+	if targetRole == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Target user is not a member of this group"})
+		return
+	}
+	if targetRole == "owner" {
 		c.JSON(http.StatusForbidden, gin.H{"error": "Cannot mute the group owner"})
+		return
+	}
+	// Admins cannot mute other admins — only the owner can.
+	if targetRole == "admin" && callerRole != "owner" {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Only the group owner can mute admins"})
 		return
 	}
 
@@ -304,18 +314,24 @@ func (h *GroupAdminHandler) BanGroupMember(c *gin.Context) {
 
 	ctx := c.Request.Context()
 
-	if _, err := requireGroupAdmin(ctx, h.pool, convID, callerID); err != nil {
+	callerRole, err := requireGroupAdmin(ctx, h.pool, convID, callerID)
+	if err != nil {
 		c.JSON(http.StatusForbidden, gin.H{"error": "Only group admins can perform this action"})
 		return
 	}
 
-	owner, err := isGroupOwner(ctx, h.pool, convID, targetUserID)
+	targetRole, err := targetMemberRole(ctx, h.pool, convID, targetUserID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check target role"})
 		return
 	}
-	if owner {
+	if targetRole == "owner" {
 		c.JSON(http.StatusForbidden, gin.H{"error": "Cannot ban the group owner"})
+		return
+	}
+	// Admins cannot ban other admins — only the owner can.
+	if targetRole == "admin" && callerRole != "owner" {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Only the group owner can ban admins"})
 		return
 	}
 
@@ -325,7 +341,27 @@ func (h *GroupAdminHandler) BanGroupMember(c *gin.Context) {
 		return
 	}
 
-	_, err = h.pool.Exec(ctx, `
+	// Notify the banned user before removing them so their client can react.
+	h.hub.Broadcast(&websocket.Message{
+		RecipientID: targetUserID,
+		Type:        "group_member_banned",
+		Payload: gin.H{
+			"conversation_id": convID,
+			"user_id":         targetUserID,
+			"reason":          req.Reason,
+		},
+	})
+
+	// Use a transaction: ban record + optional message wipe + participant removal are atomic.
+	tx, err := h.pool.Begin(ctx)
+	if err != nil {
+		log.Printf("[GroupAdmin] BanGroupMember: begin tx err=%v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to ban member"})
+		return
+	}
+	defer tx.Rollback(ctx) //nolint:errcheck
+
+	if _, err = tx.Exec(ctx, `
 		INSERT INTO group_member_restrictions (conversation_id, user_id, restricted_by, restriction_type, reason, expires_at)
 		VALUES ($1, $2, $3, 'ban', $4, NULL)
 		ON CONFLICT (conversation_id, user_id, restriction_type) DO UPDATE
@@ -333,25 +369,32 @@ func (h *GroupAdminHandler) BanGroupMember(c *gin.Context) {
 		      reason        = EXCLUDED.reason,
 		      expires_at    = NULL,
 		      created_at    = NOW()
-	`, convID, targetUserID, callerID, req.Reason)
-	if err != nil {
+	`, convID, targetUserID, callerID, req.Reason); err != nil {
 		log.Printf("[GroupAdmin] BanGroupMember: insert restriction err=%v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to ban member"})
 		return
 	}
 
 	if req.DeleteMessages {
-		if _, err := h.pool.Exec(ctx, `
+		if _, err = tx.Exec(ctx, `
 			UPDATE messages SET deleted_by_admin=TRUE WHERE conversation_id=$1 AND sender_id=$2
 		`, convID, targetUserID); err != nil {
 			log.Printf("[GroupAdmin] BanGroupMember: delete messages err=%v", err)
 		}
 	}
 
-	if _, err := h.pool.Exec(ctx, `
+	if _, err = tx.Exec(ctx, `
 		DELETE FROM conversation_participants WHERE conversation_id=$1 AND user_id=$2
 	`, convID, targetUserID); err != nil {
 		log.Printf("[GroupAdmin] BanGroupMember: remove participant err=%v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to remove member from group"})
+		return
+	}
+
+	if err = tx.Commit(ctx); err != nil {
+		log.Printf("[GroupAdmin] BanGroupMember: commit err=%v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to ban member"})
+		return
 	}
 
 	logAuditAction(ctx, h.pool, convID, callerID, "ban_member", &targetUserID, map[string]any{
@@ -359,6 +402,7 @@ func (h *GroupAdminHandler) BanGroupMember(c *gin.Context) {
 		"delete_messages": req.DeleteMessages,
 	})
 
+	// Broadcast to remaining group members (banned user already notified above).
 	broadcastToGroup(ctx, h.pool, h.hub, convID, "group_member_banned", gin.H{
 		"conversation_id": convID,
 		"user_id":         targetUserID,
@@ -566,20 +610,15 @@ func (h *GroupAdminHandler) SetSlowMode(c *gin.Context) {
 		return
 	}
 
-	var req SetSlowModeRequest
-	// Allow seconds=0 so we can't use "required" tag — bind manually
-	if err := c.ShouldBindJSON(&req); err != nil {
-		// Try binding without required validation
-		type rawReq struct {
-			Seconds *int `json:"seconds"`
-		}
-		var raw rawReq
-		if err2 := c.ShouldBindJSON(&raw); err2 != nil || raw.Seconds == nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "seconds field is required"})
-			return
-		}
-		req.Seconds = *raw.Seconds
+	// Use *int so we can distinguish "seconds=0" (valid: disable) from "field absent" (invalid).
+	var raw struct {
+		Seconds *int `json:"seconds"`
 	}
+	if err := c.ShouldBindJSON(&raw); err != nil || raw.Seconds == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "seconds field is required"})
+		return
+	}
+	req := SetSlowModeRequest{Seconds: *raw.Seconds}
 
 	allowed := map[int]bool{0: true, 10: true, 30: true, 60: true, 300: true, 600: true, 1800: true, 3600: true}
 	if !allowed[req.Seconds] {
