@@ -256,8 +256,10 @@ export const messagesService = {
   },
 
   async editMessage(messageId: number, data: EditMessageRequest): Promise<Message> {
-    const conversation = await this.getConversation(data.conversation_id);
-    const recipientId = conversation.other_user?.id;
+    // Use caller-supplied recipient_id when available to skip the extra API round-trip.
+    const recipientId = data.recipient_id !== undefined
+      ? data.recipient_id
+      : (await this.getConversation(data.conversation_id)).other_user?.id;
 
     let encryptedContent = data.content;
     let senderEncryptedContent = data.content;
