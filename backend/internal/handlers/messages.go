@@ -1221,12 +1221,14 @@ type EditMessageRequest struct {
 }
 
 type MessageEditHistoryEntry struct {
-	ID               int       `json:"id"`
-	MessageID        int       `json:"message_id"`
-	Content          *string   `json:"content,omitempty"`
-	EncryptedContent *string   `json:"encrypted_content,omitempty"`
-	EditedAt         time.Time `json:"edited_at"`
-	EditedBy         int       `json:"edited_by"`
+	ID                     int       `json:"id"`
+	MessageID              int       `json:"message_id"`
+	Content                *string   `json:"content,omitempty"`
+	EncryptedContent       *string   `json:"encrypted_content,omitempty"`
+	SenderEncryptedContent *string   `json:"sender_encrypted_content,omitempty"`
+	EncryptionVersion      string    `json:"encryption_version"`
+	EditedAt               time.Time `json:"edited_at"`
+	EditedBy               int       `json:"edited_by"`
 }
 
 // GetForwardInfo handles GET /api/v1/messages/:id/forward-info
@@ -1425,9 +1427,10 @@ func (h *MessagesHandler) EditMessage(c *gin.Context) {
 	}
 
 	if _, err := tx.Exec(ctx, `
-		INSERT INTO message_edit_history (message_id, content, encrypted_content, edited_by)
-		VALUES ($1, $2, $3, $4)
-	`, messageID, currentEncryptedContent, currentEncryptedContent, userID); err != nil {
+		INSERT INTO message_edit_history
+		    (message_id, content, encrypted_content, sender_encrypted_content, encryption_version, edited_by)
+		VALUES ($1, $2, $3, $4, $5, $6)
+	`, messageID, currentEncryptedContent, currentEncryptedContent, currentSenderEncryptedContent, currentEncryptionVersion, userID); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to store edit history", "details": err.Error()})
 		return
 	}
@@ -1585,7 +1588,8 @@ func (h *MessagesHandler) GetMessageHistory(c *gin.Context) {
 	}
 
 	rows, err := h.pool.Query(ctx, `
-		SELECT id, message_id, content, encrypted_content, edited_at, edited_by
+		SELECT id, message_id, content, encrypted_content, sender_encrypted_content,
+		       COALESCE(encryption_version, 'plaintext'), edited_at, edited_by
 		FROM message_edit_history
 		WHERE message_id = $1
 		ORDER BY edited_at ASC, id ASC
@@ -1605,6 +1609,8 @@ func (h *MessagesHandler) GetMessageHistory(c *gin.Context) {
 			&entry.MessageID,
 			&entry.Content,
 			&entry.EncryptedContent,
+			&entry.SenderEncryptedContent,
+			&entry.EncryptionVersion,
 			&entry.EditedAt,
 			&entry.EditedBy,
 		); err != nil {
