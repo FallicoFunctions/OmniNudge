@@ -9,16 +9,16 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// Conversation represents a 1-on-1 chat between two users or a mod mail thread
+// Conversation represents a 1-on-1 chat between two users, a mod mail thread, or a group conversation
 type Conversation struct {
 	ID               int        `json:"id"`
-	User1ID          *int       `json:"user1_id,omitempty"` // NULL for mod_mail
-	User2ID          *int       `json:"user2_id,omitempty"` // NULL for mod_mail
+	User1ID          *int       `json:"user1_id,omitempty"` // NULL for mod_mail and group
+	User2ID          *int       `json:"user2_id,omitempty"` // NULL for mod_mail and group
 	User1            *User      `json:"user1,omitempty"`    // Optional populated user info
 	User2            *User      `json:"user2,omitempty"`    // Optional populated user info
 	CreatedAt        time.Time  `json:"created_at"`
 	LastMessageAt    time.Time  `json:"last_message_at"`
-	ConversationType string     `json:"conversation_type"` // 'dm' or 'mod_mail'
+	ConversationType string     `json:"conversation_type"` // 'dm', 'mod_mail', or 'group'
 	HubID            *int       `json:"hub_id,omitempty"`  // For mod_mail conversations
 	Subject          *string    `json:"subject,omitempty"` // For mod_mail conversations
 	Status           *string    `json:"status,omitempty"`  // For mod_mail: 'open', 'archived', 'resolved'
@@ -26,11 +26,19 @@ type Conversation struct {
 	ArchivedBy       *int       `json:"archived_by"`       // User who archived it (explicit null when active)
 	Muted            bool       `json:"muted"`             // Whether this conversation is muted for current user
 
-	// Phase 2 features (not implemented yet)
+	// Phase 2 features
 	User1AutoDeleteAfter *string `json:"user1_auto_delete_after,omitempty"`
 	User2AutoDeleteAfter *string `json:"user2_auto_delete_after,omitempty"`
 	User1Pseudonym       *string `json:"user1_pseudonym,omitempty"`
 	User2Pseudonym       *string `json:"user2_pseudonym,omitempty"`
+
+	// Group conversation fields (populated when conversation_type = 'group')
+	IsGroup          bool    `json:"is_group"`
+	GroupName        *string `json:"group_name,omitempty"`
+	GroupAvatarURL   *string `json:"group_avatar_url,omitempty"`
+	GroupDescription *string `json:"group_description,omitempty"`
+	CurrentUserRole  *string `json:"current_user_role,omitempty"` // computed: role of requesting user
+	ParticipantCount *int    `json:"participant_count,omitempty"` // computed
 }
 
 // ConversationRepository handles database operations for conversations
@@ -158,10 +166,16 @@ func (r *ConversationRepository) GetByUserID(ctx context.Context, userID int, li
 		       user1_auto_delete_after, user2_auto_delete_after,
 		       user1_pseudonym, user2_pseudonym,
 		       conversation_type, hub_id, subject, status, archived_at, archived_by,
-		       COALESCE(cns.muted, false) AS muted
+		       COALESCE(cns.muted, false) AS muted,
+		       COALESCE(conversations.is_group, false) AS is_group,
+		       conversations.group_name, conversations.group_avatar_url, conversations.group_description,
+		       cp_me.role AS current_user_role,
+		       (SELECT COUNT(*) FROM conversation_participants cp2 WHERE cp2.conversation_id = conversations.id) AS participant_count
 		FROM conversations
 		LEFT JOIN conversation_notification_settings cns
 		       ON cns.conversation_id = conversations.id AND cns.user_id = $1
+		LEFT JOIN conversation_participants cp_me
+		       ON cp_me.conversation_id = conversations.id AND cp_me.user_id = $1
 		WHERE (
 			-- DM conversations (including legacy conversations with NULL conversation_type)
 			(
@@ -176,13 +190,17 @@ func (r *ConversationRepository) GetByUserID(ctx context.Context, userID int, li
 				FROM conversation_participants
 				WHERE user_id = $1 AND is_moderator = FALSE
 			))
+			OR
+			-- Group conversations where user is a participant
+			(conversation_type = 'group' AND id IN (
+				SELECT conversation_id
+				FROM conversation_participants
+				WHERE user_id = $1
+			))
 		)
 	`
 
 	if !includeArchived {
-		// For DMs: check per-user archive flags
-		// Also honor legacy conversation-level archived_at values as archived
-		// For mod_mail: check conversation-level archived_at
 		query += ` AND (
 			(conversation_type = 'dm' AND NOT (
 				(user1_id = $1 AND archived_for_user1 = TRUE) OR
@@ -190,6 +208,7 @@ func (r *ConversationRepository) GetByUserID(ctx context.Context, userID int, li
 				archived_at IS NOT NULL
 			))
 			OR (conversation_type = 'mod_mail' AND archived_at IS NULL)
+			OR (conversation_type = 'group' AND archived_at IS NULL)
 		)`
 	}
 
@@ -222,6 +241,12 @@ func (r *ConversationRepository) GetByUserID(ctx context.Context, userID int, li
 			&conversation.ArchivedAt,
 			&conversation.ArchivedBy,
 			&conversation.Muted,
+			&conversation.IsGroup,
+			&conversation.GroupName,
+			&conversation.GroupAvatarURL,
+			&conversation.GroupDescription,
+			&conversation.CurrentUserRole,
+			&conversation.ParticipantCount,
 		)
 		if err != nil {
 			return nil, err
@@ -245,10 +270,16 @@ func (r *ConversationRepository) GetByUserIDWithCursor(
 		       user1_auto_delete_after, user2_auto_delete_after,
 		       user1_pseudonym, user2_pseudonym,
 		       conversation_type, hub_id, subject, status, archived_at, archived_by,
-		       COALESCE(cns.muted, false) AS muted
+		       COALESCE(cns.muted, false) AS muted,
+		       COALESCE(conversations.is_group, false) AS is_group,
+		       conversations.group_name, conversations.group_avatar_url, conversations.group_description,
+		       cp_me.role AS current_user_role,
+		       (SELECT COUNT(*) FROM conversation_participants cp2 WHERE cp2.conversation_id = conversations.id) AS participant_count
 		FROM conversations
 		LEFT JOIN conversation_notification_settings cns
 		       ON cns.conversation_id = conversations.id AND cns.user_id = $1
+		LEFT JOIN conversation_participants cp_me
+		       ON cp_me.conversation_id = conversations.id AND cp_me.user_id = $1
 		WHERE (
 			(
 				(conversation_type = 'dm' OR conversation_type IS NULL) AND
@@ -260,6 +291,12 @@ func (r *ConversationRepository) GetByUserIDWithCursor(
 				SELECT conversation_id
 				FROM conversation_participants
 				WHERE user_id = $1 AND is_moderator = FALSE
+			))
+			OR
+			(conversation_type = 'group' AND id IN (
+				SELECT conversation_id
+				FROM conversation_participants
+				WHERE user_id = $1
 			))
 		)
 	`
@@ -275,6 +312,7 @@ func (r *ConversationRepository) GetByUserIDWithCursor(
 				archived_at IS NOT NULL
 			))
 			OR (conversation_type = 'mod_mail' AND archived_at IS NULL)
+			OR (conversation_type = 'group' AND archived_at IS NULL)
 		)`
 	}
 
@@ -314,6 +352,12 @@ func (r *ConversationRepository) GetByUserIDWithCursor(
 			&conversation.ArchivedAt,
 			&conversation.ArchivedBy,
 			&conversation.Muted,
+			&conversation.IsGroup,
+			&conversation.GroupName,
+			&conversation.GroupAvatarURL,
+			&conversation.GroupDescription,
+			&conversation.CurrentUserRole,
+			&conversation.ParticipantCount,
 		)
 		if err != nil {
 			return nil, err
@@ -331,10 +375,16 @@ func (r *ConversationRepository) GetArchivedByUserID(ctx context.Context, userID
 		       user1_auto_delete_after, user2_auto_delete_after,
 		       user1_pseudonym, user2_pseudonym,
 		       conversation_type, hub_id, subject, status, archived_at, archived_by,
-		       COALESCE(cns.muted, false) AS muted
+		       COALESCE(cns.muted, false) AS muted,
+		       COALESCE(conversations.is_group, false) AS is_group,
+		       conversations.group_name, conversations.group_avatar_url, conversations.group_description,
+		       cp_me.role AS current_user_role,
+		       (SELECT COUNT(*) FROM conversation_participants cp2 WHERE cp2.conversation_id = conversations.id) AS participant_count
 		FROM conversations
 		LEFT JOIN conversation_notification_settings cns
 		       ON cns.conversation_id = conversations.id AND cns.user_id = $1
+		LEFT JOIN conversation_participants cp_me
+		       ON cp_me.conversation_id = conversations.id AND cp_me.user_id = $1
 		WHERE (
 			(
 				(conversation_type = 'dm' OR conversation_type IS NULL) AND
@@ -353,6 +403,16 @@ func (r *ConversationRepository) GetArchivedByUserID(ctx context.Context, userID
 					SELECT conversation_id
 					FROM conversation_participants
 					WHERE user_id = $1 AND is_moderator = FALSE
+				) AND
+				archived_at IS NOT NULL
+			)
+			OR
+			(
+				conversation_type = 'group' AND
+				id IN (
+					SELECT conversation_id
+					FROM conversation_participants
+					WHERE user_id = $1
 				) AND
 				archived_at IS NOT NULL
 			)
@@ -387,6 +447,12 @@ func (r *ConversationRepository) GetArchivedByUserID(ctx context.Context, userID
 			&conversation.ArchivedAt,
 			&conversation.ArchivedBy,
 			&conversation.Muted,
+			&conversation.IsGroup,
+			&conversation.GroupName,
+			&conversation.GroupAvatarURL,
+			&conversation.GroupDescription,
+			&conversation.CurrentUserRole,
+			&conversation.ParticipantCount,
 		)
 		if err != nil {
 			return nil, err
@@ -408,10 +474,16 @@ func (r *ConversationRepository) GetArchivedByUserIDWithCursor(
 		       user1_auto_delete_after, user2_auto_delete_after,
 		       user1_pseudonym, user2_pseudonym,
 		       conversation_type, hub_id, subject, status, archived_at, archived_by,
-		       COALESCE(cns.muted, false) AS muted
+		       COALESCE(cns.muted, false) AS muted,
+		       COALESCE(conversations.is_group, false) AS is_group,
+		       conversations.group_name, conversations.group_avatar_url, conversations.group_description,
+		       cp_me.role AS current_user_role,
+		       (SELECT COUNT(*) FROM conversation_participants cp2 WHERE cp2.conversation_id = conversations.id) AS participant_count
 		FROM conversations
 		LEFT JOIN conversation_notification_settings cns
 		       ON cns.conversation_id = conversations.id AND cns.user_id = $1
+		LEFT JOIN conversation_participants cp_me
+		       ON cp_me.conversation_id = conversations.id AND cp_me.user_id = $1
 		WHERE (
 			(
 				(conversation_type = 'dm' OR conversation_type IS NULL) AND
@@ -430,6 +502,16 @@ func (r *ConversationRepository) GetArchivedByUserIDWithCursor(
 					SELECT conversation_id
 					FROM conversation_participants
 					WHERE user_id = $1 AND is_moderator = FALSE
+				) AND
+				archived_at IS NOT NULL
+			)
+			OR
+			(
+				conversation_type = 'group' AND
+				id IN (
+					SELECT conversation_id
+					FROM conversation_participants
+					WHERE user_id = $1
 				) AND
 				archived_at IS NOT NULL
 			)
@@ -473,6 +555,12 @@ func (r *ConversationRepository) GetArchivedByUserIDWithCursor(
 			&conversation.ArchivedAt,
 			&conversation.ArchivedBy,
 			&conversation.Muted,
+			&conversation.IsGroup,
+			&conversation.GroupName,
+			&conversation.GroupAvatarURL,
+			&conversation.GroupDescription,
+			&conversation.CurrentUserRole,
+			&conversation.ParticipantCount,
 		)
 		if err != nil {
 			return nil, err

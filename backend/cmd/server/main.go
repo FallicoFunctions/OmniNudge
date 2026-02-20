@@ -369,6 +369,7 @@ func main() {
 	dataExportHandler := handlers.NewDataExportHandler(db.Pool, queueClient, cfg.Encryption.Key)
 	analyticsHandler := handlers.NewAnalyticsHandler(analyticsService)
 	logHandler := handlers.NewLogHandler(analyticsService)
+	groupHandler := handlers.NewGroupHandler(db.Pool)
 	dataRetentionHandler := handlers.NewDataRetentionHandler(db.Pool)
 	pushNotificationHandler := handlers.NewPushNotificationHandler(db.Pool, tokenRepo, firebaseService)
 
@@ -815,6 +816,23 @@ func main() {
 			protected.GET("/messages/:id/reactions", reactionsHandler.GetReactions)
 			protected.POST("/messages/:id/reactions", reactionRateLimiter.Middleware(), reactionsHandler.AddReaction)
 			protected.DELETE("/messages/:id/reactions/:reaction_id", reactionRateLimiter.Middleware(), reactionsHandler.RemoveReaction)
+
+			// Group conversation routes
+			protected.POST("/groups", groupHandler.CreateGroup)
+			protected.GET("/groups", groupHandler.DiscoverGroups)
+			protected.GET("/groups/invites", groupHandler.GetMyGroupInvites)
+			protected.POST("/groups/invites/:invite_id/accept", groupHandler.AcceptGroupInvite)
+			protected.POST("/groups/invites/:invite_id/decline", groupHandler.DeclineGroupInvite)
+			protected.GET("/groups/:id/participants", groupHandler.GetGroupParticipants)
+			protected.POST("/groups/:id/participants", groupHandler.AddGroupParticipant)
+			protected.DELETE("/groups/:id/participants/:user_id", groupHandler.RemoveGroupParticipant)
+			protected.PATCH("/groups/:id/participants/:user_id/role", groupHandler.UpdateParticipantRole)
+			protected.PUT("/groups/:id", groupHandler.UpdateGroup)
+			protected.GET("/groups/:id/settings", groupHandler.GetGroupSettings)
+			protected.PUT("/groups/:id/settings", groupHandler.UpdateGroupSettings)
+			protected.POST("/groups/:id/invites", groupHandler.CreateGroupInvite)
+			protected.POST("/groups/:id/leave", groupHandler.LeaveGroup)
+			protected.POST("/groups/:id/transfer-ownership", groupHandler.TransferOwnership)
 
 			// Mod mail routes
 			protected.POST("/mod-mail", modMailHandler.CreateModMail)
