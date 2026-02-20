@@ -1420,7 +1420,10 @@
       "loadOlder": "Load older messages",
       "report": "Report",
       "viewProfile": "View Profile",
-      "reply": "Reply"
+      "reply": "Reply",
+      "edit": "Edit",
+      "forward": "Forward",
+      "viewEditHistory": "View Edit History"
     },
     "threadPreview": {
       "replyCount_one": "{{count}} reply",
@@ -1570,10 +1573,23 @@
       "saving": "Saving...",
       "timeLeft": "Editable for {{time}}",
       "expired": "Edit window expired",
+      "edited": "(edited)",
       "errors": {
         "empty": "Message cannot be empty",
         "saveFailed": "Failed to save edits"
       }
+    },
+    "editHistory": {
+      "dialogLabel": "Message edit history",
+      "title": "Edit History",
+      "loadError": "Failed to load edit history",
+      "noHistory": "No edit history",
+      "current": "Current",
+      "original": "Original",
+      "version": "Version {{n}}",
+      "edit": "Edit {{n}}",
+      "decrypting": "Decrypting…",
+      "cannotDecrypt": "Content encrypted for recipient only"
     },
     "messageOptions": {
       "ariaLabel": "Message options"
@@ -1670,7 +1686,27 @@
       "folderCount_other": "{{count}} conversations",
       "maxFolders": "You've reached the 50-folder limit.",
       "loading": "Loading folders...",
-      "error": "Failed to load folders"
+      "error": "Failed to load folders",
+      "saveError": "Failed to save folder. Please try again.",
+      "discardChanges": "Discard unsaved changes?",
+      "discard": "Discard",
+      "keepEditing": "Keep editing",
+      "retry": "Retry",
+      "preview": "Preview",
+      "nav": "Message folders",
+      "colorBlue": "Blue",
+      "colorGreen": "Green",
+      "colorAmber": "Amber",
+      "colorRed": "Red",
+      "colorPurple": "Purple",
+      "colorPink": "Pink",
+      "colorCyan": "Cyan",
+      "colorOrange": "Orange",
+      "badgeLabel": "Folder: {{name}}",
+      "toggleError": "Failed to update folder. Please try again.",
+      "deleteError": "Failed to delete folder. Please try again.",
+      "previewLabel": "Folder preview: {{name}}",
+      "emptyHint": "No folders yet — press + to create one"
     }
   },
   "posts": {
@@ -3661,5 +3697,67 @@
       "step2": "Navigate through feed, post, and profile pages and verify skeletons render immediately.",
       "step3": "Confirm no layout shift regressions and that progress bars remain visible on long operations."
     }
+  },
+  "groups": {
+    "unknownGroup": "Unknown Group",
+    "invitedBy": "Invited by {{name}}",
+    "decline": "Decline",
+    "accept": "Accept",
+    "pendingInvites": "Pending Invites",
+    "groupInfo": "Group Info",
+    "editName": "Edit group name",
+    "participantActions": "Participant actions",
+    "makeAdmin": "Make Admin",
+    "removeAdmin": "Remove Admin",
+    "removeFromGroup": "Remove from Group",
+    "roles": {
+      "owner": "Owner",
+      "admin": "Admin",
+      "member": "Member"
+    },
+    "settingsSection": "Settings",
+    "settings": {
+      "anyoneCanInvite": "Anyone can invite",
+      "anyoneCanPin": "Anyone can pin messages",
+      "historyVisible": "Message history visible to new members"
+    },
+    "members": "Members",
+    "participantCount": "{{count}} members",
+    "transferOwnershipHint": "Transfer ownership before leaving.",
+    "leaveOwnerError": "You must transfer ownership before leaving.",
+    "leaveError": "Failed to leave group. Please try again.",
+    "leaving": "Leaving\u2026",
+    "leaveGroup": "Leave Group",
+    "step1Title": "Create Group \u2014 Name",
+    "step2Title": "Create Group \u2014 Members",
+    "step3Title": "Create Group \u2014 Settings",
+    "nameRequired": "Group name is required.",
+    "minParticipants": "Add at least 2 other members.",
+    "nameLabel": "Group Name",
+    "namePlaceholder": "Enter a group name",
+    "avatarLabel": "Avatar URL (optional)",
+    "avatarPlaceholder": "https://example.com/avatar.png",
+    "descriptionLabel": "Description (optional)",
+    "descriptionPlaceholder": "What is this group about?",
+    "selectedCount": "{{count}} selected",
+    "searchUsersPlaceholder": "Search users\u2026",
+    "removeUser": "Remove {{name}}",
+    "reviewSummary": "\"{{name}}\" \u2014 {{count}} members total",
+    "creating": "Creating\u2026",
+    "createButton": "Create Group",
+    "createError": "Failed to create group. Please try again.",
+    "systemMessages": {
+      "memberAdded": "{{actor}} added {{target}}",
+      "memberRemoved": "{{actor}} removed {{target}}",
+      "userLeft": "{{actor}} left the group",
+      "roleChanged": "{{actor}} changed {{target}}'s role",
+      "groupUpdated": "{{actor}} updated the group",
+      "ownershipTransferred": "{{actor}} transferred ownership to {{target}}"
+    },
+    "newGroup": "New Group",
+    "groupConversation": "Group",
+    "addMembers": "Add Members",
+    "inviteSent": "Invite sent",
+    "inviteFailed": "Failed to send invite"
   }
 }

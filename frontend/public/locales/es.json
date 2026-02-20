@@ -1420,7 +1420,10 @@
       "loadOlder": "Cargar mensajes anteriores",
       "report": "Reportar",
       "viewProfile": "Ver perfil",
-      "reply": "Responder"
+      "reply": "Responder",
+      "edit": "Editar",
+      "forward": "Reenviar",
+      "viewEditHistory": "Ver historial de ediciones"
     },
     "threadPreview": {
       "replyCount_one": "{{count}} respuesta",
@@ -1570,10 +1573,23 @@
       "saving": "Guardando...",
       "timeLeft": "Editable durante {{time}}",
       "expired": "La ventana de edición expiró",
+      "edited": "(editado)",
       "errors": {
         "empty": "El mensaje no puede estar vacío",
         "saveFailed": "No se pudieron guardar los cambios"
       }
+    },
+    "editHistory": {
+      "dialogLabel": "Historial de ediciones del mensaje",
+      "title": "Historial de ediciones",
+      "loadError": "No se pudo cargar el historial de ediciones",
+      "noHistory": "Sin historial de ediciones",
+      "current": "Actual",
+      "original": "Original",
+      "version": "Versión {{n}}",
+      "edit": "Edición {{n}}",
+      "decrypting": "Descifrando…",
+      "cannotDecrypt": "Contenido cifrado solo para el destinatario"
     },
     "messageOptions": {
       "ariaLabel": "Opciones de mensaje"
@@ -1670,7 +1686,27 @@
       "folderCount_other": "{{count}} conversaciones",
       "maxFolders": "Has alcanzado el límite de 50 carpetas.",
       "loading": "Cargando carpetas...",
-      "error": "No se pudieron cargar las carpetas"
+      "error": "No se pudieron cargar las carpetas",
+      "saveError": "No se pudo guardar la carpeta. Inténtalo de nuevo.",
+      "discardChanges": "¿Descartar cambios no guardados?",
+      "discard": "Descartar",
+      "keepEditing": "Seguir editando",
+      "retry": "Reintentar",
+      "preview": "Vista previa",
+      "nav": "Carpetas de mensajes",
+      "colorBlue": "Azul",
+      "colorGreen": "Verde",
+      "colorAmber": "Ámbar",
+      "colorRed": "Rojo",
+      "colorPurple": "Morado",
+      "colorPink": "Rosa",
+      "colorCyan": "Cian",
+      "colorOrange": "Naranja",
+      "badgeLabel": "Carpeta: {{name}}",
+      "toggleError": "No se pudo actualizar la carpeta. Inténtalo de nuevo.",
+      "deleteError": "No se pudo eliminar la carpeta. Inténtalo de nuevo.",
+      "previewLabel": "Vista previa de carpeta: {{name}}",
+      "emptyHint": "Aún no hay carpetas — pulsa + para crear una"
     }
   },
   "posts": {
@@ -3661,5 +3697,67 @@
       "step2": "Navega por feed, post y perfil y verifica que los skeletons aparezcan de inmediato.",
       "step3": "Confirma que no haya regresiones de layout shift y que las barras de progreso sigan visibles en operaciones largas."
     }
+  },
+  "groups": {
+    "unknownGroup": "Grupo desconocido",
+    "invitedBy": "Invitado por {{name}}",
+    "decline": "Rechazar",
+    "accept": "Aceptar",
+    "pendingInvites": "Invitaciones pendientes",
+    "groupInfo": "Info del grupo",
+    "editName": "Editar nombre del grupo",
+    "participantActions": "Acciones del participante",
+    "makeAdmin": "Hacer administrador",
+    "removeAdmin": "Quitar administrador",
+    "removeFromGroup": "Eliminar del grupo",
+    "roles": {
+      "owner": "Propietario",
+      "admin": "Admin",
+      "member": "Miembro"
+    },
+    "settingsSection": "Configuraci\u00f3n",
+    "settings": {
+      "anyoneCanInvite": "Cualquiera puede invitar",
+      "anyoneCanPin": "Cualquiera puede fijar mensajes",
+      "historyVisible": "El historial es visible para nuevos miembros"
+    },
+    "members": "Miembros",
+    "participantCount": "{{count}} miembros",
+    "transferOwnershipHint": "Transfiere la propiedad antes de salir.",
+    "leaveOwnerError": "Debes transferir la propiedad antes de salir.",
+    "leaveError": "Error al salir del grupo. Int\u00e9ntalo de nuevo.",
+    "leaving": "Saliendo\u2026",
+    "leaveGroup": "Salir del grupo",
+    "step1Title": "Crear grupo \u2014 Nombre",
+    "step2Title": "Crear grupo \u2014 Miembros",
+    "step3Title": "Crear grupo \u2014 Configuraci\u00f3n",
+    "nameRequired": "El nombre del grupo es obligatorio.",
+    "minParticipants": "A\u00f1ade al menos 2 miembros m\u00e1s.",
+    "nameLabel": "Nombre del grupo",
+    "namePlaceholder": "Introduce un nombre para el grupo",
+    "avatarLabel": "URL del avatar (opcional)",
+    "avatarPlaceholder": "https://example.com/avatar.png",
+    "descriptionLabel": "Descripci\u00f3n (opcional)",
+    "descriptionPlaceholder": "\u00bfDe qu\u00e9 trata este grupo?",
+    "selectedCount": "{{count}} seleccionados",
+    "searchUsersPlaceholder": "Buscar usuarios\u2026",
+    "removeUser": "Eliminar a {{name}}",
+    "reviewSummary": "\"{{name}}\" \u2014 {{count}} miembros en total",
+    "creating": "Creando\u2026",
+    "createButton": "Crear grupo",
+    "createError": "Error al crear el grupo. Int\u00e9ntalo de nuevo.",
+    "systemMessages": {
+      "memberAdded": "{{actor}} a\u00f1adi\u00f3 a {{target}}",
+      "memberRemoved": "{{actor}} elimin\u00f3 a {{target}}",
+      "userLeft": "{{actor}} abandon\u00f3 el grupo",
+      "roleChanged": "{{actor}} cambi\u00f3 el rol de {{target}}",
+      "groupUpdated": "{{actor}} actualiz\u00f3 el grupo",
+      "ownershipTransferred": "{{actor}} transfiri\u00f3 la propiedad a {{target}}"
+    },
+    "newGroup": "Nuevo grupo",
+    "groupConversation": "Grupo",
+    "addMembers": "A\u00f1adir miembros",
+    "inviteSent": "Invitaci\u00f3n enviada",
+    "inviteFailed": "Error al enviar la invitaci\u00f3n"
   }
 }
