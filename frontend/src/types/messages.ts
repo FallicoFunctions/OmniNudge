@@ -6,13 +6,42 @@ export interface ConversationUser {
   karma?: number;
 }
 
+export type GroupRole = 'owner' | 'admin' | 'member';
+
+export interface GroupParticipant {
+  user_id: number;
+  username: string;
+  avatar_url?: string | null;
+  role: GroupRole;
+  joined_at: string;
+  invited_by?: number | null;
+}
+
+export interface GroupSettings {
+  anyone_can_invite: boolean;
+  anyone_can_pin: boolean;
+  message_history_visible: boolean;
+  slow_mode_seconds: number;
+}
+
+export interface GroupInvite {
+  id: number;
+  conversation_id: number;
+  group_name?: string | null;
+  group_avatar_url?: string | null;
+  invited_by_username?: string | null;
+  status: 'pending' | 'accepted' | 'declined' | 'expired';
+  expires_at: string;
+  created_at: string;
+}
+
 export interface Conversation {
   id: number;
-  user1_id?: number | null; // NULL for mod_mail
-  user2_id?: number | null; // NULL for mod_mail
+  user1_id?: number | null; // NULL for mod_mail or group
+  user2_id?: number | null; // NULL for mod_mail or group
   created_at: string;
   last_message_at: string;
-  conversation_type: 'dm' | 'mod_mail';
+  conversation_type: 'dm' | 'mod_mail' | 'group';
   hub_id?: number | null; // For mod_mail conversations
   hub_name?: string | null; // For mod_mail conversations
   subject?: string | null; // For mod_mail conversations
@@ -24,6 +53,19 @@ export interface Conversation {
   other_user?: ConversationUser; // Only for DM conversations
   latest_message?: Message;
   unread_count: number;
+  // Group conversation fields
+  is_group?: boolean;
+  group_name?: string | null;
+  group_avatar_url?: string | null;
+  group_description?: string | null;
+  created_by?: number | null;
+  max_participants?: number;
+  is_public?: boolean;
+  is_discoverable?: boolean;
+  is_verified?: boolean;
+  participant_count?: number;
+  current_user_role?: GroupRole | null;
+  group_settings?: GroupSettings | null;
 }
 
 export interface ConversationFolder {
@@ -128,6 +170,8 @@ export interface WsThreadUpdateEvent {
 export interface EditMessageRequest {
   conversation_id: number;
   content: string;
+  /** Skip the extra getConversation API call when caller already knows the recipient. */
+  recipient_id?: number;
 }
 
 export interface MessageEditHistoryEntry {
@@ -135,6 +179,8 @@ export interface MessageEditHistoryEntry {
   message_id: number;
   content?: string | null;
   encrypted_content?: string | null;
+  sender_encrypted_content?: string | null;
+  encryption_version: string;
   edited_at: string;
   edited_by: number;
 }
@@ -177,4 +223,56 @@ export interface ForwardInfoResponse {
   original_sender_id: number;
   original_sender?: string;
   original_conversation_id?: number | null;
+}
+
+// ─── Group Conversation Types ───────────────────────────────────────────────
+
+export interface CreateGroupRequest {
+  name: string;
+  participant_ids: number[];
+  avatar_url?: string;
+  description?: string;
+  settings?: Partial<GroupSettings>;
+}
+
+export interface UpdateGroupRequest {
+  name?: string;
+  avatar_url?: string;
+  description?: string;
+}
+
+export interface UpdateParticipantRoleRequest {
+  role: 'admin' | 'member';
+}
+
+export interface TransferOwnershipRequest {
+  new_owner_user_id: number;
+}
+
+export interface CreateGroupInviteRequest {
+  user_id: number;
+}
+
+// WebSocket group events
+export interface WsGroupEvent {
+  type:
+    | 'group_created'
+    | 'member_added'
+    | 'member_removed'
+    | 'role_changed'
+    | 'group_updated'
+    | 'user_left'
+    | 'ownership_transferred'
+    | 'group_settings_updated';
+  conversation_id: number;
+  actor_id?: number;
+  user_id?: number;
+  data?: Record<string, unknown>;
+}
+
+export interface WsSystemMessageEvent {
+  type: 'system_message';
+  conversation_id: number;
+  text: string;
+  created_at: string;
 }
