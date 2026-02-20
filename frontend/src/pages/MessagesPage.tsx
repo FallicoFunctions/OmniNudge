@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   type InfiniteData,
@@ -27,12 +27,19 @@ import { ThreadView } from '../components/messages/ThreadView';
 import { ReplyIndicator } from '../components/messages/ReplyIndicator';
 import { FolderList } from '../components/messages/FolderList';
 import { FolderModal } from '../components/messages/FolderModal';
-import { FolderBadge } from '../components/messages/FolderBadge';
+import { FolderBadge, hexToRgba } from '../components/messages/FolderBadge';
 import { ConversationFolderMenu } from '../components/messages/ConversationFolderMenu';
+import { MessageEditMode } from '../components/messages/MessageEditMode';
+import { MessageEditHistory } from '../components/messages/MessageEditHistory';
+import { GroupInvitesList } from '../components/messages/GroupInviteCard';
+import { GroupDetailsSidebar } from '../components/messages/GroupDetailsSidebar';
+import { CreateGroupModal } from '../components/messages/CreateGroupModal';
+import { GroupAvatar } from '../components/messages/GroupAvatar';
 import FilePreview from '../components/messages/FilePreview';
 import { usePinnedMessages } from '../hooks/usePinnedMessages';
 import { useArchive } from '../hooks/useArchive';
 import { useFolders } from '../hooks/useFolders';
+import { useMessageEdit, isEditable } from '../hooks/useMessageEdit';
 import { useDebounce } from '../hooks/useDebounce';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import type {
@@ -557,6 +564,36 @@ function useDecryptedMedia(message: Message, isOwnMessage: boolean): string | nu
   return mediaSrc;
 }
 
+/**
+ * Fix 7: Decrypt a message's text content on demand (one-shot, for edit form).
+ * Mirrors the logic in useDecryptedContent but returns a Promise instead of state.
+ */
+async function decryptMessageForEdit(message: Message, isOwnMessage: boolean): Promise<string> {
+  const cipherText = isOwnMessage
+    ? (message.sender_encrypted_content ?? message.encrypted_content)
+    : message.encrypted_content;
+
+  if (!cipherText) return '';
+
+  const shouldAttemptDecrypt = Boolean(
+    (isOwnMessage && message.sender_encrypted_content) ||
+    (!isOwnMessage &&
+      (message.encryption_version === 'v1' ||
+        message.encryption_version === 'v2' ||
+        cipherText.startsWith('v2:')))
+  );
+
+  if (!shouldAttemptDecrypt) return cipherText;
+
+  try {
+    const keys = await getOwnKeys();
+    if (!keys?.privateKey) return cipherText;
+    return await decryptMessage(cipherText, keys.privateKey);
+  } catch {
+    return cipherText;
+  }
+}
+
 const MessageMediaPreview = ({ message, isOwnMessage, onMediaClick }: MessageMediaPreviewProps) => {
   const { t } = useTranslation();
   const { speakerDeviceId } = useSettings();
@@ -653,6 +690,8 @@ export default function MessagesPage() {
   const [activeTab, setActiveTab] = useState<'active' | 'archived'>('active');
   const [conversationMenuOpen, setConversationMenuOpen] = useState<number | null>(null);
   const [slideshowOpen, setSlideshowOpen] = useState(false);
+  const [showGroupSidebar, setShowGroupSidebar] = useState(false);
+  const [showCreateGroupModal, setShowCreateGroupModal] = useState(false);
   const [showMultiUpload, setShowMultiUpload] = useState(false);
   const [deleteConversationDialog, setDeleteConversationDialog] = useState<Conversation | null>(
     null
@@ -688,6 +727,8 @@ export default function MessagesPage() {
   const swipeHandledRef = useRef<number | null>(null);
   const debouncedMessageSearch = useDebounce(messageSearchQuery, 300);
   const [decryptedContentMap, setDecryptedContentMap] = useState<Map<number, string>>(new Map());
+  // Fix 14: current decrypted content of the message whose history is open
+  const [historyCurrentContent, setHistoryCurrentContent] = useState<string | undefined>(undefined);
   const [isDecryptingForSearch, setIsDecryptingForSearch] = useState(false);
   const typingTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
   const currentConversationRef = useRef<number | null>(null);
@@ -706,6 +747,7 @@ export default function MessagesPage() {
     createFolder,
     updateFolder,
     deleteFolder,
+    isDeletingFolder,
     deletingFolderId,
     addConversationToFolder,
     removeConversationFromFolder,
@@ -713,8 +755,32 @@ export default function MessagesPage() {
   const [folderModalOpen, setFolderModalOpen] = useState<'new' | { folder: ConversationFolder } | null>(null);
   const [deleteFolderTarget, setDeleteFolderTarget] = useState<ConversationFolder | null>(null);
   const [deleteFolderError, setDeleteFolderError] = useState('');
-  const [isDeletingFolderConfirm, setIsDeletingFolderConfirm] = useState(false);
   const [showMobileFolderSheet, setShowMobileFolderSheet] = useState(false);
+  const deleteFolderDialogTitleId = useId();
+
+  // Close delete-folder dialog on Escape (if not mid-delete)
+  useEffect(() => {
+    if (!deleteFolderTarget) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !isDeletingFolder) {
+        setDeleteFolderTarget(null);
+        setDeleteFolderError('');
+      }
+    };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [deleteFolderTarget, isDeletingFolder]);
+
+  // H5: Close mobile folder sheet on Escape
+  useEffect(() => {
+    if (!showMobileFolderSheet) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setShowMobileFolderSheet(false);
+    };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [showMobileFolderSheet]);
+
   const resetMessageSearch = useCallback(() => {
     setMessageSearchQuery('');
     setMessageSearchSenderFilter('all');
@@ -861,6 +927,23 @@ export default function MessagesPage() {
 
   const selectedConversation = conversations?.find((c) => c.id === selectedConversationId);
   const selectedConversationExists = Boolean(selectedConversation);
+
+  // Fix 18: placed after selectedConversation so we can pass recipientId directly
+  const {
+    editingMessageId,
+    editingContent,
+    startEdit,
+    cancelEdit,
+    saveEdit,
+    isSaving: isEditSaving,
+    historyMessageId,
+    openHistory,
+    closeHistory,
+  } = useMessageEdit({
+    conversationId: selectedConversationId ?? 0,
+    currentUserId: user?.id,
+    recipientId: selectedConversation?.other_user?.id,
+  });
 
   const {
     data: messagesData,
@@ -2280,6 +2363,7 @@ export default function MessagesPage() {
               onDeleteFolder={(folder) => { setDeleteFolderTarget(folder); setDeleteFolderError(''); }}
               isLoading={isLoadingFolders}
               deletingFolderId={deletingFolderId}
+              className="w-44 flex-shrink-0 border-r border-[var(--color-border)]"
             />
           )}
 
@@ -2313,6 +2397,17 @@ export default function MessagesPage() {
                 >
                   {t('messages.newConversation')}
                 </button>
+                <button
+                  onClick={() => setShowCreateGroupModal(true)}
+                  title={t('groups.newGroup')}
+                  className="flex items-center justify-center h-8 w-8 rounded-md border border-[var(--color-border)] text-[var(--color-text-muted)] hover:bg-[var(--color-hover)] hover:text-[var(--color-text-primary)]"
+                >
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
+                    <path d="M12 7H9V4a1 1 0 0 0-2 0v3H4a1 1 0 0 0 0 2h3v3a1 1 0 0 0 2 0V9h3a1 1 0 0 0 0-2z" fill="currentColor"/>
+                    <circle cx="3" cy="3" r="1.5" fill="currentColor" opacity="0.4"/>
+                    <circle cx="13" cy="3" r="1.5" fill="currentColor" opacity="0.4"/>
+                  </svg>
+                </button>
               </div>
             </div>
             {/* Tabs */}
@@ -2341,12 +2436,13 @@ export default function MessagesPage() {
 
             {/* Mobile folder filter bar */}
             {isMobile && (
-              <div className="flex items-center gap-1.5 overflow-x-auto border-b border-[var(--color-border)] px-3 py-2 [scrollbar-width:none]">
+              <nav aria-label={t('messages.folders.title')} className="flex items-center gap-1.5 overflow-x-auto border-b border-[var(--color-border)] px-3 py-2 [scrollbar-width:none]">
                 {/* All */}
                 <button
                   type="button"
                   onClick={() => { setSelectedFolderId(null); setSmartFolder(null); }}
-                  className={`flex-shrink-0 rounded-full border px-2.5 py-1 text-xs font-semibold transition-colors ${
+                  aria-current={selectedFolderId === null && smartFolder === null ? 'page' : undefined}
+                  className={`flex-shrink-0 rounded-full border px-2.5 py-1 text-xs font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] ${
                     selectedFolderId === null && smartFolder === null
                       ? 'border-[var(--color-primary)] bg-[var(--color-primary)] text-white'
                       : 'border-[var(--color-border)] text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
@@ -2358,7 +2454,8 @@ export default function MessagesPage() {
                 <button
                   type="button"
                   onClick={() => { setSelectedFolderId(null); setSmartFolder('unread'); }}
-                  className={`flex-shrink-0 rounded-full border px-2.5 py-1 text-xs font-semibold transition-colors ${
+                  aria-current={smartFolder === 'unread' ? 'page' : undefined}
+                  className={`flex-shrink-0 rounded-full border px-2.5 py-1 text-xs font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] ${
                     smartFolder === 'unread'
                       ? 'border-[var(--color-primary)] bg-[var(--color-primary)] text-white'
                       : 'border-[var(--color-border)] text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
@@ -2372,12 +2469,13 @@ export default function MessagesPage() {
                     key={folder.id}
                     type="button"
                     onClick={() => { setSelectedFolderId(folder.id); setSmartFolder(null); }}
-                    className={`flex-shrink-0 inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-semibold transition-colors ${
+                    aria-current={selectedFolderId === folder.id ? 'page' : undefined}
+                    className={`flex-shrink-0 inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] ${
                       selectedFolderId === folder.id
                         ? 'border-[var(--color-primary)] bg-[var(--color-primary)] text-white'
                         : 'border-[var(--color-border)] text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
                     }`}
-                    style={selectedFolderId === folder.id ? undefined : { borderColor: folder.color + '66' }}
+                    style={selectedFolderId === folder.id ? undefined : { borderColor: hexToRgba(folder.color, 0.4) }}
                   >
                     <span aria-hidden>{folder.icon}</span>
                     <span className="max-w-[5rem] truncate">{folder.name}</span>
@@ -2391,9 +2489,12 @@ export default function MessagesPage() {
                   aria-label={t('messages.folders.manageFolder')}
                   title={t('messages.folders.manageFolder')}
                 >
-                  ⚙
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden>
+                    <circle cx="6" cy="6" r="2" stroke="currentColor" strokeWidth="1.2"/>
+                    <path d="M6 1v1.5M6 9.5V11M1 6h1.5M9.5 6H11M2.4 2.4l1.1 1.1M8.5 8.5l1.1 1.1M9.6 2.4L8.5 3.5M3.5 8.5l-1.1 1.1" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+                  </svg>
                 </button>
-              </div>
+              </nav>
             )}
 
             {/* Search input */}
@@ -2419,6 +2520,8 @@ export default function MessagesPage() {
                 <LoadingMessage className="text-sm">{t('common.loading')}</LoadingMessage>
               </div>
             )}
+
+            <GroupInvitesList onConversationOpened={setSelectedConversationId} />
 
             {conversations?.map((conversation) => (
               <div
@@ -2469,7 +2572,9 @@ export default function MessagesPage() {
                           >
                             {conversation.conversation_type === 'mod_mail'
                               ? `${getHubDisplayTitle(conversation.hub_name)} - ${t('messages.modMail')} - ${conversation.subject || t('messages.untitled')}`
-                              : conversation.other_user?.username || t('messages.unknown')}
+                              : conversation.conversation_type === 'group'
+                                ? conversation.group_name || t('groups.groupConversation')
+                                : conversation.other_user?.username || t('messages.unknown')}
                           </span>
                           {conversation.other_user?.id && (
                             <OnlineStatusIndicator userId={conversation.other_user.id} />
@@ -2685,8 +2790,17 @@ export default function MessagesPage() {
                         ? t('messages.newConversation')
                         : selectedConversation?.conversation_type === 'mod_mail'
                           ? `${getHubDisplayTitle(selectedConversation?.hub_name)} - ${t('messages.modMail')} - ${selectedConversation?.subject || t('messages.untitled')}`
-                          : selectedConversation?.other_user?.username || t('messages.unknown')}
+                          : selectedConversation?.conversation_type === 'group'
+                            ? selectedConversation?.group_name || t('groups.groupConversation')
+                            : selectedConversation?.other_user?.username || t('messages.unknown')}
                     </h3>
+                    {!isCreatingChat &&
+                      selectedConversation?.conversation_type === 'group' &&
+                      selectedConversation?.participant_count != null && (
+                        <span className="text-xs text-[var(--color-text-muted)]">
+                          {t('groups.participantCount', { count: selectedConversation.participant_count })}
+                        </span>
+                      )}
                     {!isCreatingChat &&
                       selectedConversation?.conversation_type === 'dm' &&
                       selectedConversation?.other_user?.id && (
@@ -2696,6 +2810,20 @@ export default function MessagesPage() {
 
                   {/* Slideshow buttons */}
                   <div className="flex items-center gap-2">
+                    {/* Group info button */}
+                    {!isCreatingChat && selectedConversation?.conversation_type === 'group' && (
+                      <button
+                        type="button"
+                        onClick={() => setShowGroupSidebar((s) => !s)}
+                        className="flex items-center justify-center h-8 w-8 rounded-md border border-[var(--color-border)] text-[var(--color-text-muted)] hover:bg-[var(--color-hover)] hover:text-[var(--color-text-primary)]"
+                        aria-label={t('groups.groupInfo')}
+                      >
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
+                          <circle cx="8" cy="8" r="6.5" stroke="currentColor" strokeWidth="1.3"/>
+                          <path d="M8 7v4M8 5.5v.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                        </svg>
+                      </button>
+                    )}
                     {/* Reddit/Hub slideshow button */}
                     {!isCreatingChat && (
                       <button
@@ -3043,13 +3171,24 @@ export default function MessagesPage() {
                               )}
                               {message.encrypted_content &&
                                 !isAutoGeneratedMediaCaption(message) && (
-                                  <DecryptedMessageContent
-                                    message={message}
-                                    isOwnMessage={isOwnMessage}
-                                    currentUserId={user?.id}
-                                    className="text-sm mb-1"
-                                    highlightText={debouncedMessageSearch}
-                                  />
+                                  editingMessageId === message.id ? (
+                                    <MessageEditMode
+                                      initialContent={editingContent}
+                                      sentAt={message.sent_at}
+                                      isSaving={isEditSaving}
+                                      onSave={(content) => saveEdit(message.id, content)}
+                                      onCancel={cancelEdit}
+                                      isOwnMessage={isOwnMessage}
+                                    />
+                                  ) : (
+                                    <DecryptedMessageContent
+                                      message={message}
+                                      isOwnMessage={isOwnMessage}
+                                      currentUserId={user?.id}
+                                      className="text-sm mb-1"
+                                      highlightText={debouncedMessageSearch}
+                                    />
+                                  )
                                 )}
                               {hasActiveMessageSearch && searchResultMetaByMessageId.get(message.id)?.snippet && (
                                 <p
@@ -3104,6 +3243,11 @@ export default function MessagesPage() {
                                     minute: '2-digit',
                                   })}
                                 </span>
+                                {message.edited && (
+                                  <span className="italic opacity-70">
+                                    {t('messages.editing.edited')}
+                                  </span>
+                                )}
                                 {isOwnMessage && (
                                   <MessageStatusIndicator
                                     message={message}
@@ -3186,6 +3330,35 @@ export default function MessagesPage() {
                                           : t('messages.pinned.unpinNotAllowed')
                                         : t('messages.pinned.pin')}
                                   </button>
+                                  {isEditable(message, user?.id) && (
+                                    <button
+                                      type="button"
+                                      className="w-full rounded-md px-3 py-2 text-left text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
+                                      onClick={async () => {
+                                        // Fix 7: decrypt on demand so edit form always starts with correct content
+                                        const content = await decryptMessageForEdit(message, isOwnMessage);
+                                        startEdit(message, content);
+                                        setMessageMenuOpen(null);
+                                      }}
+                                    >
+                                      {t('messages.actions.edit')}
+                                    </button>
+                                  )}
+                                  {isOwnMessage && message.edited && (
+                                    <button
+                                      type="button"
+                                      className="w-full rounded-md px-3 py-2 text-left text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
+                                      onClick={async () => {
+                                        // Fix 14: decrypt current content to show at top of history modal
+                                        const content = await decryptMessageForEdit(message, isOwnMessage);
+                                        setHistoryCurrentContent(content);
+                                        openHistory(message.id);
+                                        setMessageMenuOpen(null);
+                                      }}
+                                    >
+                                      {t('messages.actions.viewEditHistory')}
+                                    </button>
+                                  )}
                                   <button
                                     type="button"
                                     className="w-full rounded-md px-3 py-2 text-left text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
@@ -3201,7 +3374,7 @@ export default function MessagesPage() {
                                     className="w-full rounded-md px-3 py-2 text-left text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
                                     onClick={() => handleOpenForwardDialog(message)}
                                   >
-                                    {t('messages.actions.forward', { defaultValue: 'Forward' })}
+                                    {t('messages.actions.forward')}
                                   </button>
                                   <button
                                     type="button"
@@ -3510,6 +3683,17 @@ export default function MessagesPage() {
           )}
         </div>
       </div>
+      {historyMessageId !== null && (
+        <MessageEditHistory
+          messageId={historyMessageId}
+          currentContent={historyCurrentContent}
+          onClose={() => {
+            closeHistory();
+            setHistoryCurrentContent(undefined);
+          }}
+        />
+      )}
+
       {deleteDialogMessage && (
         <div
           className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4"
@@ -3658,7 +3842,7 @@ export default function MessagesPage() {
               >
                 {forwardMessageMutation.isPending
                   ? t('messages.forward.forwarding', { defaultValue: 'Forwarding...' })
-                  : t('messages.actions.forward', { defaultValue: 'Forward' })}
+                  : t('messages.actions.forward')}
               </button>
               <button
                 type="button"
@@ -3989,7 +4173,9 @@ export default function MessagesPage() {
                 className="flex h-8 w-8 items-center justify-center rounded-lg text-[var(--color-text-secondary)] hover:bg-[var(--color-hover)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]"
                 aria-label={t('messages.folders.cancel')}
               >
-                ✕
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
+                  <path d="M2 2l10 10M12 2L2 12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                </svg>
               </button>
             </div>
             {/* Folder list in full management mode */}
@@ -4006,6 +4192,7 @@ export default function MessagesPage() {
                 isLoading={isLoadingFolders}
                 deletingFolderId={deletingFolderId}
                 alwaysShowActions
+                className="w-full"
               />
             </div>
           </div>
@@ -4033,11 +4220,17 @@ export default function MessagesPage() {
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
           role="dialog"
           aria-modal="true"
-          aria-labelledby="delete-folder-dialog-title"
+          aria-labelledby={deleteFolderDialogTitleId}
+          onClick={(e) => {
+            if (e.target === e.currentTarget && !isDeletingFolder) {
+              setDeleteFolderTarget(null);
+              setDeleteFolderError('');
+            }
+          }}
         >
           <div className="w-full max-w-sm rounded-xl bg-[var(--color-surface)] p-6 shadow-xl">
             <h2
-              id="delete-folder-dialog-title"
+              id={deleteFolderDialogTitleId}
               className="mb-2 text-base font-semibold text-[var(--color-text-primary)]"
             >
               {t('messages.folders.deleteFolder')}
@@ -4054,29 +4247,26 @@ export default function MessagesPage() {
               <button
                 type="button"
                 onClick={() => { setDeleteFolderTarget(null); setDeleteFolderError(''); }}
-                disabled={isDeletingFolderConfirm}
+                disabled={isDeletingFolder}
                 className="flex-1 rounded-lg border border-[var(--color-border)] py-2 text-sm font-semibold text-[var(--color-text-secondary)] hover:bg-[var(--color-hover)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] disabled:opacity-50"
               >
                 {t('messages.folders.cancel')}
               </button>
               <button
                 type="button"
-                disabled={isDeletingFolderConfirm}
+                disabled={isDeletingFolder}
                 onClick={async () => {
-                  setIsDeletingFolderConfirm(true);
                   setDeleteFolderError('');
                   try {
                     await deleteFolder(deleteFolderTarget.id);
                     setDeleteFolderTarget(null);
                   } catch {
-                    setDeleteFolderError(t('messages.folders.error'));
-                  } finally {
-                    setIsDeletingFolderConfirm(false);
+                    setDeleteFolderError(t('messages.folders.deleteError'));
                   }
                 }}
                 className="flex-1 rounded-lg bg-[var(--color-error)] py-2 text-sm font-semibold text-white hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-error)] disabled:opacity-50"
               >
-                {isDeletingFolderConfirm ? (
+                {isDeletingFolder ? (
                   <span className="inline-flex items-center justify-center gap-1.5">
                     <svg className="h-3.5 w-3.5 animate-spin" viewBox="0 0 16 16" fill="none" aria-hidden>
                       <circle cx="8" cy="8" r="6" stroke="white" strokeWidth="2" strokeDasharray="28" strokeDashoffset="10" />
@@ -4088,6 +4278,43 @@ export default function MessagesPage() {
                 )}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Create Group Modal */}
+      {showCreateGroupModal && (
+        <CreateGroupModal
+          onClose={() => setShowCreateGroupModal(false)}
+          onCreated={(conversation) => {
+            setShowCreateGroupModal(false);
+            setSelectedConversationId(conversation.id);
+          }}
+          searchUsers={async (query) => {
+            const res = await fetch(
+              `${API_BASE_URL}/api/v1/users/search?q=${encodeURIComponent(query)}&limit=10`,
+              { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
+            );
+            if (!res.ok) return [];
+            const data = await res.json() as { users?: { id: number; username: string; avatar_url?: string }[] };
+            return data.users ?? [];
+          }}
+        />
+      )}
+
+      {/* Group Details Sidebar (slide-in panel) */}
+      {showGroupSidebar && selectedConversation?.conversation_type === 'group' && user?.id && (
+        <div className="fixed inset-0 z-40 flex justify-end">
+          <div
+            className="absolute inset-0 bg-black/30"
+            onClick={() => setShowGroupSidebar(false)}
+          />
+          <div className="relative z-50 h-full w-80 max-w-full">
+            <GroupDetailsSidebar
+              conversation={selectedConversation}
+              currentUserId={user.id}
+              onClose={() => setShowGroupSidebar(false)}
+            />
           </div>
         </div>
       )}
