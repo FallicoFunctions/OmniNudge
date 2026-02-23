@@ -185,14 +185,14 @@ func (r *ConversationRepository) GetByUserID(ctx context.Context, userID int, li
 			)
 			OR
 			-- Mod mail conversations where user is a participant but NOT a moderator
-			(conversation_type = 'mod_mail' AND id IN (
+			(conversation_type = 'mod_mail' AND conversations.id IN (
 				SELECT conversation_id
 				FROM conversation_participants
 				WHERE user_id = $1 AND is_moderator = FALSE
 			))
 			OR
 			-- Group conversations where user is a participant
-			(conversation_type = 'group' AND id IN (
+			(conversation_type = 'group' AND conversations.id IN (
 				SELECT conversation_id
 				FROM conversation_participants
 				WHERE user_id = $1
@@ -212,7 +212,7 @@ func (r *ConversationRepository) GetByUserID(ctx context.Context, userID int, li
 		)`
 	}
 
-	query += ` ORDER BY last_message_at DESC LIMIT $2 OFFSET $3`
+	query += ` ORDER BY conversations.last_message_at DESC LIMIT $2 OFFSET $3`
 
 	rows, err := r.pool.Query(ctx, query, userID, limit, offset)
 	if err != nil {
@@ -287,13 +287,13 @@ func (r *ConversationRepository) GetByUserIDWithCursor(
 				NOT ((user1_id = $1 AND deleted_for_user1 = TRUE) OR (user2_id = $1 AND deleted_for_user2 = TRUE))
 			)
 			OR
-			(conversation_type = 'mod_mail' AND id IN (
+			(conversation_type = 'mod_mail' AND conversations.id IN (
 				SELECT conversation_id
 				FROM conversation_participants
 				WHERE user_id = $1 AND is_moderator = FALSE
 			))
 			OR
-			(conversation_type = 'group' AND id IN (
+			(conversation_type = 'group' AND conversations.id IN (
 				SELECT conversation_id
 				FROM conversation_participants
 				WHERE user_id = $1
@@ -322,7 +322,7 @@ func (r *ConversationRepository) GetByUserIDWithCursor(
 		paramIdx += 2
 	}
 
-	query += fmt.Sprintf(" ORDER BY last_message_at DESC, id DESC LIMIT $%d", paramIdx)
+	query += fmt.Sprintf(" ORDER BY conversations.last_message_at DESC, conversations.id DESC LIMIT $%d", paramIdx)
 	args = append(args, limit)
 
 	rows, err := r.pool.Query(ctx, query, args...)
@@ -399,7 +399,7 @@ func (r *ConversationRepository) GetArchivedByUserID(ctx context.Context, userID
 			OR
 			(
 				conversation_type = 'mod_mail' AND
-				id IN (
+				conversations.id IN (
 					SELECT conversation_id
 					FROM conversation_participants
 					WHERE user_id = $1 AND is_moderator = FALSE
@@ -409,7 +409,7 @@ func (r *ConversationRepository) GetArchivedByUserID(ctx context.Context, userID
 			OR
 			(
 				conversation_type = 'group' AND
-				id IN (
+				conversations.id IN (
 					SELECT conversation_id
 					FROM conversation_participants
 					WHERE user_id = $1
@@ -417,7 +417,7 @@ func (r *ConversationRepository) GetArchivedByUserID(ctx context.Context, userID
 				archived_at IS NOT NULL
 			)
 		)
-		ORDER BY last_message_at DESC, id DESC
+		ORDER BY conversations.last_message_at DESC, conversations.id DESC
 		LIMIT $2 OFFSET $3
 	`
 
@@ -498,7 +498,7 @@ func (r *ConversationRepository) GetArchivedByUserIDWithCursor(
 			OR
 			(
 				conversation_type = 'mod_mail' AND
-				id IN (
+				conversations.id IN (
 					SELECT conversation_id
 					FROM conversation_participants
 					WHERE user_id = $1 AND is_moderator = FALSE
@@ -508,7 +508,7 @@ func (r *ConversationRepository) GetArchivedByUserIDWithCursor(
 			OR
 			(
 				conversation_type = 'group' AND
-				id IN (
+				conversations.id IN (
 					SELECT conversation_id
 					FROM conversation_participants
 					WHERE user_id = $1
@@ -526,7 +526,7 @@ func (r *ConversationRepository) GetArchivedByUserIDWithCursor(
 		paramIdx += 2
 	}
 
-	query += fmt.Sprintf(" ORDER BY last_message_at DESC, id DESC LIMIT $%d", paramIdx)
+	query += fmt.Sprintf(" ORDER BY conversations.last_message_at DESC, conversations.id DESC LIMIT $%d", paramIdx)
 	args = append(args, limit)
 
 	rows, err := r.pool.Query(ctx, query, args...)
