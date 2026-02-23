@@ -79,6 +79,7 @@ export const adminGroupsService = {
     if (params?.limit) query.set('limit', String(params.limit));
     if (params?.action_type) query.set('action_type', params.action_type);
     const qs = query.toString();
-    return api.get(`/groups/${groupId}/audit-log${qs ? \`?\${qs}\` : ''}`);
+    const url = `/groups/${groupId}/audit-log` + (qs ? `?${qs}` : '');
+    return api.get(url);
   },
 };
