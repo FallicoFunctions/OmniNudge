@@ -3866,6 +3866,18 @@
     "history": "Call history",
     "noHistory": "No calls yet",
     "incoming": "Incoming",
-    "outgoing": "Outgoing"
+    "outgoing": "Outgoing",
+    "shareScreen": "Share screen",
+    "stopSharing": "Stop sharing",
+    "youAreSharing": "You are sharing your screen",
+    "peerIsSharing": "{{name}} is sharing their screen",
+    "screenShareNotSupported": "Screen sharing is not supported in this browser",
+    "flipCamera": "Flip camera",
+    "quality": {
+      "label": "Video quality",
+      "low": "Low quality",
+      "medium": "Medium quality",
+      "high": "High quality"
+    }
   }
 }
