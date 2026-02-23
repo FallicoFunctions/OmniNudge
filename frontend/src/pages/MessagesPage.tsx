@@ -2415,7 +2415,7 @@ export default function MessagesPage() {
           className={
             isMobile
               ? `absolute inset-0 flex overflow-hidden border-r border-[var(--color-border)] bg-[var(--color-surface)] will-change-transform transition-transform duration-[250ms] ease-in-out ${isInChat ? '-translate-x-full' : 'translate-x-0'}`
-              : 'flex w-80 flex-shrink-0 overflow-hidden border-r border-[var(--color-border)] bg-[var(--color-surface)]'
+              : 'flex w-[31rem] flex-shrink-0 overflow-hidden border-r border-[var(--color-border)] bg-[var(--color-surface)]'
           }
         >
           {/* Folder sidebar — desktop only */}

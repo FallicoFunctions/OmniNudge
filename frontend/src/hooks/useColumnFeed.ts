@@ -69,6 +69,10 @@ export function useColumnFeed(columnId: string, config: ColumnConfig) {
     getNextPageParam: (lastPage: unknown) => {
       // Handle different response formats
       if (lastPage && typeof lastPage === 'object') {
+        // Subreddit / home feed: backend flattens Reddit listing to top-level `after`
+        if ('after' in lastPage && lastPage.after) {
+          return lastPage.after as string;
+        }
         if ('next_cursor' in lastPage && lastPage.next_cursor) {
           return lastPage.next_cursor as string;
         }
