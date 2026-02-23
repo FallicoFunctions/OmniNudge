@@ -69,17 +69,17 @@ export const groupsService = {
 
   /** Accept a group invite */
   async acceptInvite(inviteId: number): Promise<void> {
-    await api.post(`/group-invites/${inviteId}/accept`, {});
+    await api.post(`/groups/invites/${inviteId}/accept`, {});
   },
 
   /** Decline a group invite */
   async declineInvite(inviteId: number): Promise<void> {
-    await api.delete(`/group-invites/${inviteId}/decline`);
+    await api.post(`/groups/invites/${inviteId}/decline`, {});
   },
 
   /** Get pending group invites for the current user */
   async getMyInvites(): Promise<GroupInvite[]> {
-    const res = await api.get<{ invites: GroupInvite[] }>('/users/me/group-invites');
+    const res = await api.get<{ invites: GroupInvite[] }>('/groups/invites');
     return res.invites;
   },
 

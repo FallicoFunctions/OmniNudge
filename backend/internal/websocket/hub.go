@@ -72,7 +72,11 @@ func (h *Hub) Run() {
 
 		case client := <-h.unregister:
 			h.mu.Lock()
-			if _, ok := h.clients[client.UserID]; ok {
+			// Only unregister if this is still the current client for this user.
+			// If the user reconnected, the old client was already removed from the
+			// map (and its Send channel closed) in the register path, so we must
+			// not close it again or delete the new client.
+			if current, ok := h.clients[client.UserID]; ok && current == client {
 				delete(h.clients, client.UserID)
 				close(client.Send)
 				log.Printf("Client unregistered: user_id=%d", client.UserID)
