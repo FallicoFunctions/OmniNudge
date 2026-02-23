@@ -1,3 +1,15 @@
+
+export interface VoiceMessage {
+  id: number
+  message_id: number
+  duration_seconds: number
+  waveform_data: number[] | null  // 100 floats [0.0–1.0]
+  transcription: string | null
+  signed_url: string
+  mime_type: string
+  file_size: number
+}
+
 export interface ConversationUser {
   id: number;
   username: string;
@@ -112,6 +124,7 @@ export interface Message {
   recipient_keys?: Record<number, string>;
   /** Set by the server. True when ≥1 reaction exists. Avoids per-message reaction fetches. */
   has_reactions?: boolean;
+  voice_message?: VoiceMessage;
 }
 
 export interface PinnedMessagesResponse {
