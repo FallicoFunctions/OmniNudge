@@ -382,6 +382,7 @@ func main() {
 	groupHandler := handlers.NewGroupHandler(db.Pool)
 	dataRetentionHandler := handlers.NewDataRetentionHandler(db.Pool)
 	pushNotificationHandler := handlers.NewPushNotificationHandler(db.Pool, tokenRepo, firebaseService)
+	callsHandler := handlers.NewCallsHandler(db.Pool, hub)
 
 	// Feature 1: Message Reactions handler + rate limiter
 	reactionsHandler := handlers.NewReactionsHandler(reactionService)
@@ -884,6 +885,15 @@ func main() {
 			protected.POST("/hubs/:name/themes/:id/activate", hubThemesHandler.ActivateTheme)
 			protected.DELETE("/hubs/:name/themes/:id", hubThemesHandler.DeleteTheme)
 			protected.POST("/hubs/:name/themes/preview", hubThemesHandler.PreviewTheme)
+
+			// Voice/Video Call routes (F12)
+			protected.POST("/conversations/:id/calls", callsHandler.StartCall)
+			protected.GET("/conversations/:id/calls", callsHandler.GetCallHistory)
+			protected.POST("/calls/:id/answer", callsHandler.AnswerCall)
+			protected.POST("/calls/:id/reject", callsHandler.RejectCall)
+			protected.POST("/calls/:id/end", callsHandler.EndCall)
+			protected.POST("/calls/:id/signal", callsHandler.Signal)
+			protected.GET("/calls/ice-servers", callsHandler.GetICEServers)
 
 			// Slideshow routes
 			protected.POST("/conversations/:id/slideshow", slideshowHandler.StartSlideshow)
