@@ -3866,6 +3866,18 @@
     "history": "Historial de llamadas",
     "noHistory": "Sin llamadas aun",
     "incoming": "Entrante",
-    "outgoing": "Saliente"
+    "outgoing": "Saliente",
+    "shareScreen": "Compartir pantalla",
+    "stopSharing": "Dejar de compartir",
+    "youAreSharing": "Estás compartiendo tu pantalla",
+    "peerIsSharing": "{{name}} está compartiendo su pantalla",
+    "screenShareNotSupported": "El uso compartido de pantalla no es compatible con este navegador",
+    "flipCamera": "Cambiar cámara",
+    "quality": {
+      "label": "Calidad de video",
+      "low": "Calidad baja",
+      "medium": "Calidad media",
+      "high": "Calidad alta"
+    }
   }
 }

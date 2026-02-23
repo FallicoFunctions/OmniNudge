@@ -3866,6 +3866,18 @@
     "history": "Call history",
     "noHistory": "No calls yet",
     "incoming": "Incoming",
-    "outgoing": "Outgoing"
+    "outgoing": "Outgoing",
+    "shareScreen": "مشاركة الشاشة",
+    "stopSharing": "إيقاف المشاركة",
+    "youAreSharing": "أنت تشارك شاشتك",
+    "peerIsSharing": "{{name}} يشارك شاشته",
+    "screenShareNotSupported": "مشاركة الشاشة غير مدعومة في هذا المتصفح",
+    "flipCamera": "تبديل الكاميرا",
+    "quality": {
+      "label": "جودة الفيديو",
+      "low": "جودة منخفضة",
+      "medium": "جودة متوسطة",
+      "high": "جودة عالية"
+    }
   }
 }
