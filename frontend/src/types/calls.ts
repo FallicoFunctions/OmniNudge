@@ -12,7 +12,13 @@ export interface Call {
   ended_by?: number
   caller_username?: string
   callee_username?: string
+  // Screen sharing fields (F14)
+  is_screen_sharing?: boolean
+  screen_share_started_at?: string
+  screen_share_ended_at?: string
 }
+
+export type VideoQuality = 'low' | 'medium' | 'high'
 
 export interface ICEServer {
   urls: string | string[]

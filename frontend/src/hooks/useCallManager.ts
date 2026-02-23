@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { callsService } from '../services/callsService'
-import type { Call, CallManagerState, CallSignal } from '../types/calls'
+import type { Call, CallManagerState, CallSignal, VideoQuality } from '../types/calls'
 
 interface UseCallManagerReturn {
   callState: CallManagerState
@@ -10,12 +10,28 @@ interface UseCallManagerReturn {
   isMuted: boolean
   isCameraOff: boolean
   callDuration: number
+  // F13: camera device selection
+  cameraDevices: MediaDeviceInfo[]
+  selectedCameraId: string | null
+  videoQuality: VideoQuality
+  switchCamera: (deviceId: string) => Promise<void>
+  refreshDevices: () => Promise<void>
+  setVideoQuality: (q: VideoQuality) => void
+  // F14: screen share peer state (local sharing managed in useScreenShare)
+  peerIsSharing: boolean
+  peerConnectionRef: React.MutableRefObject<RTCPeerConnection | null>
   startCall: (conversationId: number, callType: 'voice' | 'video') => Promise<void>
   answerCall: () => Promise<void>
   rejectCall: () => void
   endCall: () => void
   toggleMute: () => void
   toggleCamera: () => void
+}
+
+const VIDEO_QUALITY_CONSTRAINTS: Record<VideoQuality, MediaTrackConstraints> = {
+  low: { width: 320, height: 240, frameRate: 15 },
+  medium: { width: 640, height: 480, frameRate: 24 },
+  high: { width: 1280, height: 720, frameRate: 30 },
 }
 
 export function useCallManager(): UseCallManagerReturn {
@@ -26,6 +42,12 @@ export function useCallManager(): UseCallManagerReturn {
   const [isMuted, setIsMuted] = useState(false)
   const [isCameraOff, setIsCameraOff] = useState(false)
   const [callDuration, setCallDuration] = useState(0)
+  // F13: camera devices and quality
+  const [cameraDevices, setCameraDevices] = useState<MediaDeviceInfo[]>([])
+  const [selectedCameraId, setSelectedCameraId] = useState<string | null>(null)
+  const [videoQuality, setVideoQualityState] = useState<VideoQuality>('medium')
+  // F14: peer screen share state
+  const [peerIsSharing, setPeerIsSharing] = useState(false)
 
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null)
   const durationTimerRef = useRef<NodeJS.Timeout | undefined>(undefined)
@@ -53,6 +75,7 @@ export function useCallManager(): UseCallManagerReturn {
     setCallDuration(0)
     setIsMuted(false)
     setIsCameraOff(false)
+    setPeerIsSharing(false)
   }, [])
 
   // Start call duration timer when call becomes active.
@@ -111,16 +134,126 @@ export function useCallManager(): UseCallManagerReturn {
     [getIceConfig, startDurationTimer],
   )
 
+  // F13: enumerate video input devices.
+  const refreshDevices = useCallback(async () => {
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices()
+      const videoInputs = devices.filter((d) => d.kind === 'videoinput')
+      setCameraDevices(videoInputs)
+    } catch (err) {
+      console.error('[useCallManager] refreshDevices error:', err)
+    }
+  }, [])
+
+  // F13: switch to a different camera device.
+  const switchCamera = useCallback(
+    async (deviceId: string) => {
+      try {
+        const constraints = VIDEO_QUALITY_CONSTRAINTS[videoQuality]
+        const newStream = await navigator.mediaDevices.getUserMedia({
+          video: { ...constraints, deviceId: { exact: deviceId } },
+          audio: false,
+        })
+        const newVideoTrack = newStream.getVideoTracks()[0]
+        if (!newVideoTrack) return
+
+        const pc = peerConnectionRef.current
+        if (pc) {
+          const sender = pc.getSenders().find((s) => s.track?.kind === 'video')
+          if (sender) {
+            await sender.replaceTrack(newVideoTrack)
+          }
+        }
+
+        setLocalStream((prev) => {
+          if (prev) {
+            // Stop old video track(s) but keep audio.
+            prev.getVideoTracks().forEach((t) => t.stop())
+            prev.getVideoTracks().forEach((t) => prev.removeTrack(t))
+            prev.addTrack(newVideoTrack)
+            return prev
+          }
+          return newStream
+        })
+
+        setSelectedCameraId(deviceId)
+      } catch (err) {
+        console.error('[useCallManager] switchCamera error:', err)
+      }
+    },
+    [videoQuality],
+  )
+
+  // F13: change video quality mid-call.
+  const setVideoQuality = useCallback(
+    async (q: VideoQuality) => {
+      setVideoQualityState(q)
+      const constraints = VIDEO_QUALITY_CONSTRAINTS[q]
+
+      try {
+        const newStream = await navigator.mediaDevices.getUserMedia({
+          video: selectedCameraId
+            ? { ...constraints, deviceId: { exact: selectedCameraId } }
+            : constraints,
+          audio: false,
+        })
+        const newVideoTrack = newStream.getVideoTracks()[0]
+        if (!newVideoTrack) return
+
+        const pc = peerConnectionRef.current
+        if (pc) {
+          const sender = pc.getSenders().find((s) => s.track?.kind === 'video')
+          if (sender) {
+            await sender.replaceTrack(newVideoTrack)
+          }
+        }
+
+        setLocalStream((prev) => {
+          if (prev) {
+            prev.getVideoTracks().forEach((t) => t.stop())
+            prev.getVideoTracks().forEach((t) => prev.removeTrack(t))
+            prev.addTrack(newVideoTrack)
+            return prev
+          }
+          return newStream
+        })
+      } catch (err) {
+        console.error('[useCallManager] setVideoQuality error:', err)
+      }
+    },
+    [selectedCameraId],
+  )
+
+  // Listen for device changes (plugged in / removed).
+  useEffect(() => {
+    refreshDevices()
+    const handler = () => refreshDevices()
+    navigator.mediaDevices?.addEventListener('devicechange', handler)
+    return () => navigator.mediaDevices?.removeEventListener('devicechange', handler)
+  }, [refreshDevices])
+
   // startCall: initiate an outgoing call.
   const startCall = useCallback(
     async (conversationId: number, callType: 'voice' | 'video') => {
       if (callState !== 'idle') return
 
       try {
+        const qualityConstraints = VIDEO_QUALITY_CONSTRAINTS[videoQuality]
         const constraints: MediaStreamConstraints =
-          callType === 'video' ? { audio: true, video: true } : { audio: true }
+          callType === 'video'
+            ? { audio: true, video: qualityConstraints }
+            : { audio: true }
         const stream = await navigator.mediaDevices.getUserMedia(constraints)
         setLocalStream(stream)
+
+        // Capture first camera device id.
+        if (callType === 'video') {
+          const videoTrack = stream.getVideoTracks()[0]
+          if (videoTrack) {
+            setSelectedCameraId(videoTrack.getSettings().deviceId ?? null)
+          }
+          await refreshDevices()
+        }
 
         const call = await callsService.startCall(conversationId, callType)
         setActiveCall(call)
@@ -139,7 +272,7 @@ export function useCallManager(): UseCallManagerReturn {
         setActiveCall(null)
       }
     },
-    [callState, createPeerConnection, cleanup],
+    [callState, createPeerConnection, cleanup, videoQuality, refreshDevices],
   )
 
   // answerCall: accept an incoming call.
@@ -148,10 +281,21 @@ export function useCallManager(): UseCallManagerReturn {
 
     try {
       const callType = activeCall.call_type
+      const qualityConstraints = VIDEO_QUALITY_CONSTRAINTS[videoQuality]
       const constraints: MediaStreamConstraints =
-        callType === 'video' ? { audio: true, video: true } : { audio: true }
+        callType === 'video'
+          ? { audio: true, video: qualityConstraints }
+          : { audio: true }
       const stream = await navigator.mediaDevices.getUserMedia(constraints)
       setLocalStream(stream)
+
+      if (callType === 'video') {
+        const videoTrack = stream.getVideoTracks()[0]
+        if (videoTrack) {
+          setSelectedCameraId(videoTrack.getSettings().deviceId ?? null)
+        }
+        await refreshDevices()
+      }
 
       await callsService.answerCall(activeCall.id)
       setActiveCall((prev) => (prev ? { ...prev, status: 'active' } : prev))
@@ -186,7 +330,7 @@ export function useCallManager(): UseCallManagerReturn {
       setCallState('idle')
       setActiveCall(null)
     }
-  }, [callState, activeCall, createPeerConnection, startDurationTimer, cleanup])
+  }, [callState, activeCall, createPeerConnection, startDurationTimer, cleanup, videoQuality, refreshDevices])
 
   // rejectCall: decline an incoming call.
   const rejectCall = useCallback(() => {
@@ -316,6 +460,16 @@ export function useCallManager(): UseCallManagerReturn {
           break
         }
 
+        case 'screen_share_started': {
+          setPeerIsSharing(true)
+          break
+        }
+
+        case 'screen_share_stopped': {
+          setPeerIsSharing(false)
+          break
+        }
+
         default:
           break
       }
@@ -354,6 +508,14 @@ export function useCallManager(): UseCallManagerReturn {
     isMuted,
     isCameraOff,
     callDuration,
+    cameraDevices,
+    selectedCameraId,
+    videoQuality,
+    switchCamera,
+    refreshDevices,
+    setVideoQuality,
+    peerIsSharing,
+    peerConnectionRef,
     startCall,
     answerCall,
     rejectCall,
