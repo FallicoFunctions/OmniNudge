@@ -894,6 +894,8 @@ func main() {
 			protected.POST("/calls/:id/end", callsHandler.EndCall)
 			protected.POST("/calls/:id/signal", callsHandler.Signal)
 			protected.GET("/calls/ice-servers", callsHandler.GetICEServers)
+			protected.POST("/calls/:id/screen-share/start", callsHandler.StartScreenShare)
+			protected.POST("/calls/:id/screen-share/stop", callsHandler.StopScreenShare)
 
 			// Slideshow routes
 			protected.POST("/conversations/:id/slideshow", slideshowHandler.StartSlideshow)

@@ -467,6 +467,128 @@ func (h *CallsHandler) GetICEServers(c *gin.Context) {
 	})
 }
 
+// StartScreenShare handles POST /api/v1/calls/:id/screen-share/start
+// @Summary Signal that the caller has started screen sharing
+// @Tags calls
+// @Produce json
+// @Param id path int true "Call ID"
+// @Success 200 {object} gin.H
+// @Failure 400 {object} gin.H
+// @Failure 403 {object} gin.H
+// @Router /calls/{id}/screen-share/start [post]
+func (h *CallsHandler) StartScreenShare(c *gin.Context) {
+	userID := c.GetInt("user_id")
+
+	callID, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid call ID"})
+		return
+	}
+
+	ctx := c.Request.Context()
+
+	var callerID, calleeID int
+	var status string
+	err = h.pool.QueryRow(ctx, `
+		SELECT caller_id, callee_id, status FROM calls WHERE id = $1
+	`, callID).Scan(&callerID, &calleeID, &status)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Call not found"})
+		return
+	}
+
+	if userID != callerID && userID != calleeID {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Not authorized to modify this call"})
+		return
+	}
+
+	_, err = h.pool.Exec(ctx, `
+		UPDATE calls SET is_screen_sharing = TRUE, screen_share_started_at = NOW() WHERE id = $1
+	`, callID)
+	if err != nil {
+		log.Printf("[CallsHandler] StartScreenShare: update error: call_id=%d err=%v", callID, err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
+		return
+	}
+
+	// Notify the other participant.
+	otherID := calleeID
+	if userID == calleeID {
+		otherID = callerID
+	}
+
+	if h.hub != nil {
+		h.hub.Broadcast(&websocket.Message{
+			RecipientID: otherID,
+			Type:        "screen_share_started",
+			Payload:     gin.H{"call_id": callID, "sharer_id": userID},
+		})
+	}
+
+	c.JSON(http.StatusOK, gin.H{"ok": true})
+}
+
+// StopScreenShare handles POST /api/v1/calls/:id/screen-share/stop
+// @Summary Signal that the caller has stopped screen sharing
+// @Tags calls
+// @Produce json
+// @Param id path int true "Call ID"
+// @Success 200 {object} gin.H
+// @Failure 400 {object} gin.H
+// @Failure 403 {object} gin.H
+// @Router /calls/{id}/screen-share/stop [post]
+func (h *CallsHandler) StopScreenShare(c *gin.Context) {
+	userID := c.GetInt("user_id")
+
+	callID, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid call ID"})
+		return
+	}
+
+	ctx := c.Request.Context()
+
+	var callerID, calleeID int
+	var status string
+	err = h.pool.QueryRow(ctx, `
+		SELECT caller_id, callee_id, status FROM calls WHERE id = $1
+	`, callID).Scan(&callerID, &calleeID, &status)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Call not found"})
+		return
+	}
+
+	if userID != callerID && userID != calleeID {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Not authorized to modify this call"})
+		return
+	}
+
+	_, err = h.pool.Exec(ctx, `
+		UPDATE calls SET is_screen_sharing = FALSE, screen_share_ended_at = NOW() WHERE id = $1
+	`, callID)
+	if err != nil {
+		log.Printf("[CallsHandler] StopScreenShare: update error: call_id=%d err=%v", callID, err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
+		return
+	}
+
+	// Notify the other participant.
+	otherID := calleeID
+	if userID == calleeID {
+		otherID = callerID
+	}
+
+	if h.hub != nil {
+		h.hub.Broadcast(&websocket.Message{
+			RecipientID: otherID,
+			Type:        "screen_share_stopped",
+			Payload:     gin.H{"call_id": callID},
+		})
+	}
+
+	c.JSON(http.StatusOK, gin.H{"ok": true})
+}
+
 // GetCallHistory handles GET /api/v1/conversations/:id/calls
 // @Summary Get call history for a conversation
 // @Tags calls
