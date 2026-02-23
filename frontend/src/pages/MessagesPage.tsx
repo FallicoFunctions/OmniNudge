@@ -729,6 +729,13 @@ export default function MessagesPage() {
     isMuted,
     isCameraOff,
     callDuration,
+    cameraDevices,
+    selectedCameraId,
+    videoQuality,
+    switchCamera,
+    setVideoQuality,
+    peerIsSharing,
+    peerConnectionRef,
     startCall,
     answerCall,
     rejectCall,
@@ -4429,6 +4436,13 @@ export default function MessagesPage() {
           isCameraOff={isCameraOff}
           callDuration={callDuration}
           isConnecting={callState === 'ringing_outgoing'}
+          cameraDevices={cameraDevices}
+          selectedCameraId={selectedCameraId}
+          videoQuality={videoQuality}
+          onSwitchCamera={switchCamera}
+          onSetVideoQuality={setVideoQuality}
+          peerIsSharing={peerIsSharing}
+          peerConnection={peerConnectionRef.current}
           onToggleMute={toggleMute}
           onToggleCamera={toggleCamera}
           onEndCall={endCall}
