@@ -35,6 +35,9 @@ import { GroupInvitesList } from '../components/messages/GroupInviteCard';
 import { GroupDetailsSidebar } from '../components/messages/GroupDetailsSidebar';
 import { CreateGroupModal } from '../components/messages/CreateGroupModal';
 import { GroupAvatar } from '../components/messages/GroupAvatar';
+import { VoiceRecorderButton } from '../components/messages/VoiceRecorderButton';
+import { VoiceMessageBubble } from '../components/messages/VoiceMessageBubble';
+import { voiceMessagesService } from '../services/voiceMessagesService';
 import FilePreview from '../components/messages/FilePreview';
 import { usePinnedMessages } from '../hooks/usePinnedMessages';
 import { useArchive } from '../hooks/useArchive';
@@ -1643,6 +1646,24 @@ export default function MessagesPage() {
     }
   };
 
+  const handleVoiceMessage = async (blob: Blob, durationSeconds: number) => {
+    if (!selectedConversationId || !user) return;
+    try {
+      // Send an empty placeholder message with type 'audio' then upload the blob.
+      const req = {
+        conversation_id: selectedConversationId,
+        encrypted_content: '',
+        sender_encrypted_content: '',
+        message_type: 'audio' as const,
+        encryption_version: 'none',
+      };
+      const msg = await messagesService.sendMessage(req);
+      await voiceMessagesService.upload(msg.id, blob, durationSeconds);
+    } catch (err) {
+      console.error('Failed to send voice message:', err);
+    }
+  };
+
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     const trimmedMessage = messageText.trim();
@@ -3180,6 +3201,11 @@ export default function MessagesPage() {
                                       onCancel={cancelEdit}
                                       isOwnMessage={isOwnMessage}
                                     />
+                                  ) : message.voice_message ? (
+                                    <VoiceMessageBubble
+                                      voiceMessage={message.voice_message}
+                                      isOwn={isOwnMessage}
+                                    />
                                   ) : (
                                     <DecryptedMessageContent
                                       message={message}
@@ -3661,6 +3687,10 @@ export default function MessagesPage() {
                     }}
                     placeholder={t('messages.compose.placeholder')}
                     className="flex-1 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-2 text-sm text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
+                  />
+                  <VoiceRecorderButton
+                    onVoiceMessage={handleVoiceMessage}
+                    disabled={sendMessageMutation.isPending || uploadingMedia}
                   />
                   <button
                     type="submit"
