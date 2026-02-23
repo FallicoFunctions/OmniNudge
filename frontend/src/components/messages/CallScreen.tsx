@@ -2,7 +2,11 @@ import { useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { CallControls } from './CallControls'
 import { CallQualityIndicator } from './CallQualityIndicator'
+import { VideoQualitySelector } from './VideoQualitySelector'
+import { ScreenShareView } from './ScreenShareView'
+import { useScreenShare } from '../../hooks/useScreenShare'
 import type { Call } from '../../types/calls'
+import type { VideoQuality } from '../../types/calls'
 
 interface CallScreenProps {
   call: Call
@@ -12,6 +16,15 @@ interface CallScreenProps {
   isCameraOff: boolean
   callDuration: number
   isConnecting?: boolean
+  // F13
+  cameraDevices: MediaDeviceInfo[]
+  selectedCameraId: string | null
+  videoQuality: VideoQuality
+  onSwitchCamera: (deviceId: string) => Promise<void>
+  onSetVideoQuality: (q: VideoQuality) => void
+  // F14
+  peerIsSharing: boolean
+  peerConnection: RTCPeerConnection | null
   onToggleMute: () => void
   onToggleCamera: () => void
   onEndCall: () => void
@@ -35,6 +48,13 @@ export function CallScreen({
   isCameraOff,
   callDuration,
   isConnecting = false,
+  cameraDevices,
+  selectedCameraId,
+  videoQuality,
+  onSwitchCamera,
+  onSetVideoQuality,
+  peerIsSharing,
+  peerConnection,
   onToggleMute,
   onToggleCamera,
   onEndCall,
@@ -42,6 +62,11 @@ export function CallScreen({
   const { t } = useTranslation()
   const remoteVideoRef = useRef<HTMLVideoElement>(null)
   const localVideoRef = useRef<HTMLVideoElement>(null)
+
+  const { isSharing, screenStream, startSharing, stopSharing } = useScreenShare(
+    call.id,
+    peerConnection,
+  )
 
   // Attach remote stream to video element.
   useEffect(() => {
@@ -59,6 +84,7 @@ export function CallScreen({
 
   const isVideo = call.call_type === 'video'
   const remoteName = call.caller_username ?? call.callee_username ?? t('common.unknown', 'Unknown')
+  const isCallActive = call.status === 'active'
 
   return (
     <div
@@ -86,9 +112,26 @@ export function CallScreen({
           </div>
         )}
 
+        {/* Screen share overlay — replaces/overlays main video area when active */}
+        <ScreenShareView
+          isSharing={isSharing}
+          screenStream={screenStream}
+          peerIsSharing={peerIsSharing}
+          remoteStream={remoteStream}
+          remoteName={remoteName}
+          onStopSharing={stopSharing}
+        />
+
         {/* Quality indicator */}
-        <div className="absolute top-4 right-4">
+        <div className="absolute top-4 right-4 flex flex-col items-end gap-2">
           <CallQualityIndicator quality={null} />
+          {/* F13: Video quality selector — only for video calls */}
+          {isVideo && isCallActive && (
+            <VideoQualitySelector
+              videoQuality={videoQuality}
+              setVideoQuality={onSetVideoQuality}
+            />
+          )}
         </div>
 
         {/* Duration / status overlay */}
@@ -103,7 +146,7 @@ export function CallScreen({
         </div>
 
         {/* Local video picture-in-picture */}
-        {isVideo && localStream && !isCameraOff && (
+        {isVideo && localStream && !isCameraOff && !isSharing && !peerIsSharing && (
           <div className="absolute bottom-4 right-4 w-28 h-40 rounded-xl overflow-hidden border-2 border-white/30 shadow-lg">
             <video
               ref={localVideoRef}
@@ -123,6 +166,15 @@ export function CallScreen({
           isMuted={isMuted}
           isCameraOff={isCameraOff}
           callType={call.call_type}
+          callId={call.id}
+          isCallActive={isCallActive}
+          cameraDevices={cameraDevices}
+          selectedCameraId={selectedCameraId}
+          onSwitchCamera={onSwitchCamera}
+          isSharing={isSharing}
+          peerIsSharing={peerIsSharing}
+          onStartSharing={startSharing}
+          onStopSharing={stopSharing}
           onToggleMute={onToggleMute}
           onToggleCamera={onToggleCamera}
           onEndCall={onEndCall}
