@@ -549,7 +549,9 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
         case 'call_answered':
         case 'call_rejected':
         case 'call_ended':
-        case 'call_signal': {
+        case 'call_signal':
+        case 'screen_share_started':
+        case 'screen_share_stopped': {
           window.dispatchEvent(new CustomEvent('ws-call-event', {
             detail: { type: data.type, payload: data.payload },
           }));
