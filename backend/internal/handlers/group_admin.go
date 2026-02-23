@@ -219,6 +219,13 @@ func (h *GroupAdminHandler) MuteGroupMember(c *gin.Context) {
 		return
 	}
 
+	// duration_minutes=0 means permanent; any other value must be 1–43200 (30 days).
+	const maxMuteDurationMinutes = 43200
+	if req.DurationMinutes < 0 || (req.DurationMinutes > 0 && req.DurationMinutes > maxMuteDurationMinutes) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "duration_minutes must be 0 (permanent) or 1–43200"})
+		return
+	}
+
 	var expiresAt *time.Time
 	if req.DurationMinutes > 0 {
 		t := time.Now().Add(time.Duration(req.DurationMinutes) * time.Minute)

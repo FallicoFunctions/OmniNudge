@@ -28,7 +28,17 @@ export function VoiceRecorderButton({ onVoiceMessage, disabled = false }: VoiceR
   )
 
   React.useEffect(() => {
+    // Destroy old Audio element when previewUrl changes (re-record) or on unmount
     return () => {
+      if (previewAudioRef.current) {
+        previewAudioRef.current.pause()
+        previewAudioRef.current.src = ''
+        previewAudioRef.current.ontimeupdate = null
+        previewAudioRef.current.onended = null
+        previewAudioRef.current = null
+      }
+      setIsPlaying(false)
+      setPreviewProgress(0)
       if (previewUrl) URL.revokeObjectURL(previewUrl)
     }
   }, [previewUrl])

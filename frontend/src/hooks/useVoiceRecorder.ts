@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
+import i18n from 'i18next'
 
 export type RecordingState = 'idle' | 'requesting' | 'recording' | 'paused' | 'stopped' | 'error'
 
@@ -86,14 +87,14 @@ export function useVoiceRecorder(): UseVoiceRecorderReturn {
     } catch (err: unknown) {
       if (err instanceof Error) {
         if (err.name === 'NotAllowedError') {
-          setError('Microphone permission denied')
+          setError(i18n.t('voice.permissionDenied'))
         } else if (err.name === 'NotFoundError') {
-          setError('No microphone found')
+          setError(i18n.t('voice.noMicrophone'))
         } else {
-          setError('Recording failed. Please try again.')
+          setError(i18n.t('voice.recordingError'))
         }
       } else {
-        setError('Recording failed. Please try again.')
+        setError(i18n.t('voice.recordingError'))
       }
       setState('error')
       return
@@ -110,12 +111,13 @@ export function useVoiceRecorder(): UseVoiceRecorderReturn {
     source.connect(analyser)
     analyserRef.current = analyser
 
+    const freqData = new Uint8Array(analyser.frequencyBinCount)
     levelIntervalRef.current = setInterval(() => {
       if (!analyserRef.current) return
-      const dataArray = new Uint8Array(analyserRef.current.frequencyBinCount)
-      analyserRef.current.getByteFrequencyData(dataArray)
-      const avg = dataArray.reduce((a, b) => a + b, 0) / dataArray.length
-      setAudioLevel(Math.min(1, avg / 128))
+      analyserRef.current.getByteFrequencyData(freqData)
+      let max = 0
+      for (let i = 0; i < freqData.length; i++) { if (freqData[i] > max) max = freqData[i] }
+      setAudioLevel(max / 255)
     }, 50)
 
     // Set up MediaRecorder.
@@ -165,12 +167,13 @@ export function useVoiceRecorder(): UseVoiceRecorderReturn {
         setDurationSeconds(prev => prev + 1)
       }, 1000)
 
+      const resumeFreqData = new Uint8Array(analyserRef.current!.frequencyBinCount)
       levelIntervalRef.current = setInterval(() => {
         if (!analyserRef.current) return
-        const dataArray = new Uint8Array(analyserRef.current.frequencyBinCount)
-        analyserRef.current.getByteFrequencyData(dataArray)
-        const avg = dataArray.reduce((a, b) => a + b, 0) / dataArray.length
-        setAudioLevel(Math.min(1, avg / 128))
+        analyserRef.current.getByteFrequencyData(resumeFreqData)
+        let max = 0
+        for (let i = 0; i < resumeFreqData.length; i++) { if (resumeFreqData[i] > max) max = resumeFreqData[i] }
+        setAudioLevel(max / 255)
       }, 50)
     }
   }, [])
