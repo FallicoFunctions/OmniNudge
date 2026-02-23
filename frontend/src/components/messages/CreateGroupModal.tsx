@@ -100,7 +100,7 @@ export function CreateGroupModal({ onClose, onCreated, searchUsers }: CreateGrou
       setError('');
       setStep(2);
     } else if (step === 2) {
-      if (selectedUsers.length < 2) { setError(t('groups.minParticipants')); return; }
+      if (selectedUsers.length < 1) { setError(t('groups.minParticipants')); return; }
       setError('');
       setStep(3);
     } else {

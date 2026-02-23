@@ -161,9 +161,11 @@ export function GroupDetailsSidebar({ conversation, currentUserId, onClose }: Gr
     removeParticipant,
     changeRole,
     updateGroup,
+    updateSettings,
     leaveGroup,
     isLeavingGroup,
     isUpdatingGroup,
+    isUpdatingSettings,
   } = useGroupConversation({ conversationId: conversation.id, currentUserId });
 
   const muteMutation = useMutation({
@@ -342,10 +344,34 @@ export function GroupDetailsSidebar({ conversation, currentUserId, onClose }: Gr
         {activeTab === 'settings' && isAdmin && (
           <div className="px-4 py-4 space-y-4">
             {settings && (
-              <div className="space-y-2 text-sm text-[var(--color-text-secondary)]">
-                <p>{settings.anyone_can_invite ? '✓' : '✗'} {t('groups.settings.anyoneCanInvite')}</p>
-                <p>{settings.anyone_can_pin ? '✓' : '✗'} {t('groups.settings.anyoneCanPin')}</p>
-                <p>{settings.message_history_visible ? '✓' : '✗'} {t('groups.settings.historyVisible')}</p>
+              <div className="space-y-3">
+                {(
+                  [
+                    { key: 'anyone_can_invite', labelKey: 'groups.settings.anyoneCanInvite' },
+                    { key: 'anyone_can_pin', labelKey: 'groups.settings.anyoneCanPin' },
+                    { key: 'message_history_visible', labelKey: 'groups.settings.historyVisible' },
+                  ] as const
+                ).map(({ key, labelKey }) => (
+                  <label key={key} className="flex cursor-pointer items-center justify-between gap-3">
+                    <span className="text-sm text-[var(--color-text-primary)]">{t(labelKey)}</span>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={settings[key]}
+                      onClick={() => updateSettings({ [key]: !settings[key] })}
+                      disabled={isUpdatingSettings}
+                      className={`relative h-6 w-11 shrink-0 rounded-full transition-colors disabled:opacity-60 ${
+                        settings[key] ? 'bg-[var(--color-primary)]' : 'bg-[var(--color-border)]'
+                      }`}
+                    >
+                      <span
+                        className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${
+                          settings[key] ? 'translate-x-5' : 'translate-x-0'
+                        }`}
+                      />
+                    </button>
+                  </label>
+                ))}
               </div>
             )}
             <div className="pt-2 border-t border-[var(--color-border)]">
