@@ -3814,5 +3814,27 @@
       "colTarget": "Target",
       "colDetails": "Details"
     }
+  },
+  "voice": {
+    "record": "Record voice message",
+    "recording": "Recording…",
+    "send": "Send voice message",
+    "cancel": "Cancel recording",
+    "preview": "Preview",
+    "reRecord": "Re-record",
+    "permissionDenied": "Microphone permission denied. Please allow microphone access.",
+    "noMicrophone": "No microphone found.",
+    "recordingError": "Recording failed. Please try again.",
+    "uploadError": "Failed to upload voice message.",
+    "tooLong": "Voice messages are limited to 5 minutes.",
+    "tooLarge": "Voice message file is too large (max 10MB).",
+    "playbackError": "Could not play voice message.",
+    "transcription": "Transcription",
+    "showTranscription": "Show transcription",
+    "hideTranscription": "Hide transcription",
+    "speed": "Playback speed",
+    "virusDetected": "File rejected for security reasons.",
+    "processing": "Processing…",
+    "duration": "Duration"
   }
 }

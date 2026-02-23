@@ -3814,5 +3814,27 @@
       "colTarget": "Objetivo",
       "colDetails": "Detalles"
     }
+  },
+  "voice": {
+    "record": "Grabar mensaje de voz",
+    "recording": "Grabando…",
+    "send": "Enviar mensaje de voz",
+    "cancel": "Cancelar grabación",
+    "preview": "Vista previa",
+    "reRecord": "Volver a grabar",
+    "permissionDenied": "Permiso de micrófono denegado. Por favor, permite el acceso al micrófono.",
+    "noMicrophone": "No se encontró micrófono.",
+    "recordingError": "Falló la grabación. Por favor, inténtelo de nuevo.",
+    "uploadError": "No se pudo subir el mensaje de voz.",
+    "tooLong": "Los mensajes de voz están limitados a 5 minutos.",
+    "tooLarge": "El archivo de mensaje de voz es demasiado grande (máx. 10 MB).",
+    "playbackError": "No se pudo reproducir el mensaje de voz.",
+    "transcription": "Transcripción",
+    "showTranscription": "Mostrar transcripción",
+    "hideTranscription": "Ocultar transcripción",
+    "speed": "Velocidad de reproducción",
+    "virusDetected": "Archivo rechazado por razones de seguridad.",
+    "processing": "Procesando…",
+    "duration": "Duración"
   }
 }
