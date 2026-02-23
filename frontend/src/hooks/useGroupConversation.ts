@@ -1,7 +1,6 @@
-import { useCallback, useEffect } from 'react';
+import { useCallback } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { groupsService } from '../services/groupsService';
-import { useWebSocket } from '../contexts/WebSocketContext';
 import type {
   Conversation,
   GroupInvite,
@@ -10,7 +9,6 @@ import type {
   GroupSettings,
   TransferOwnershipRequest,
   UpdateGroupRequest,
-  WsGroupEvent,
 } from '../types/messages';
 
 interface UseGroupConversationOptions {
@@ -20,7 +18,6 @@ interface UseGroupConversationOptions {
 
 export function useGroupConversation({ conversationId, currentUserId }: UseGroupConversationOptions) {
   const queryClient = useQueryClient();
-  const { lastMessage } = useWebSocket();
 
   // ── Queries ──────────────────────────────────────────────────────────────
 
@@ -50,30 +47,6 @@ export function useGroupConversation({ conversationId, currentUserId }: UseGroup
     participants.find((p) => p.user_id === currentUserId)?.role ?? null;
   const isOwner = currentUserRole === 'owner';
   const isAdmin = currentUserRole === 'admin' || isOwner;
-
-  // ── WebSocket event handler ───────────────────────────────────────────────
-
-  useEffect(() => {
-    if (!lastMessage || !conversationId) return;
-    const event = lastMessage as WsGroupEvent;
-    if (
-      (event.type === 'member_added' ||
-        event.type === 'member_removed' ||
-        event.type === 'role_changed' ||
-        event.type === 'user_left' ||
-        event.type === 'ownership_transferred') &&
-      event.conversation_id === conversationId
-    ) {
-      queryClient.invalidateQueries({ queryKey: ['group-participants', conversationId] });
-    }
-    if (
-      (event.type === 'group_updated' || event.type === 'group_settings_updated') &&
-      event.conversation_id === conversationId
-    ) {
-      queryClient.invalidateQueries({ queryKey: ['conversations'] });
-      queryClient.invalidateQueries({ queryKey: ['group-settings', conversationId] });
-    }
-  }, [lastMessage, conversationId, queryClient]);
 
   // ── Mutations ────────────────────────────────────────────────────────────
 

@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { callsService } from '../services/callsService'
-import type { Call, CallManagerState, CallSignal, VideoQuality } from '../types/calls'
+import type { Call, CallManagerState, VideoQuality } from '../types/calls'
 
 interface UseCallManagerReturn {
   callState: CallManagerState

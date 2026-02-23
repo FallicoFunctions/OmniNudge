@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react'
+import { useState, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Play, Pause, ChevronDown, ChevronUp } from 'lucide-react'
 import type { VoiceMessage } from '../../types/messages'

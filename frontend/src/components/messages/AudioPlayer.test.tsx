@@ -9,12 +9,12 @@ describe('AudioPlayer', () => {
   });
 
   it('supports play/pause, seek, speed, and download actions', async () => {
-    const playMock = vi.spyOn(HTMLMediaElement.prototype, 'play').mockImplementation(function () {
+    const playMock = vi.spyOn(HTMLMediaElement.prototype, 'play').mockImplementation(function (this: HTMLMediaElement) {
       Object.defineProperty(this, 'paused', { configurable: true, get: () => false });
       this.dispatchEvent(new Event('play'));
       return Promise.resolve();
     });
-    const pauseMock = vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(function () {
+    const pauseMock = vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(function (this: HTMLMediaElement) {
       Object.defineProperty(this, 'paused', { configurable: true, get: () => true });
       this.dispatchEvent(new Event('pause'));
     });
