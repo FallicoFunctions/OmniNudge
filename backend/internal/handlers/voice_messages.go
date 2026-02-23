@@ -135,6 +135,11 @@ func (h *VoiceMessagesHandler) UploadVoice(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid duration_seconds"})
 		return
 	}
+	const maxDurationSeconds = 300 // 5 minutes
+	if durationSeconds > maxDurationSeconds {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Voice messages are limited to 5 minutes"})
+		return
+	}
 
 	// Write to temp file for virus scanning.
 	tmpFile, err := os.CreateTemp("", "voice-upload-*")
@@ -227,6 +232,8 @@ func (h *VoiceMessagesHandler) UploadVoice(c *gin.Context) {
 
 // GetVoiceMessage handles GET /api/v1/messages/:id/voice
 func (h *VoiceMessagesHandler) GetVoiceMessage(c *gin.Context) {
+	userID := c.GetInt("user_id")
+
 	messageID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid message ID"})
@@ -242,15 +249,28 @@ func (h *VoiceMessagesHandler) GetVoiceMessage(c *gin.Context) {
 		storageKey      string
 		fileSize        int64
 		mimeType        string
+		hasAccess       bool
 	)
 
+	// Verify caller is a participant in the conversation containing this message.
 	err = h.pool.QueryRow(c.Request.Context(), `
-		SELECT id, message_id, duration_seconds, waveform_data::text, transcription, storage_key, file_size, mime_type
-		FROM voice_messages
-		WHERE message_id = $1
-	`, messageID).Scan(&id, &msgID, &durationSeconds, &waveformRaw, &transcription, &storageKey, &fileSize, &mimeType)
+		SELECT vm.id, vm.message_id, vm.duration_seconds, vm.waveform_data::text,
+		       vm.transcription, vm.storage_key, vm.file_size, vm.mime_type,
+		       EXISTS(
+		           SELECT 1
+		           FROM conversation_participants cp
+		           JOIN messages m ON m.conversation_id = cp.conversation_id
+		           WHERE m.id = vm.message_id AND cp.user_id = $2
+		       ) AS has_access
+		FROM voice_messages vm
+		WHERE vm.message_id = $1
+	`, messageID, userID).Scan(&id, &msgID, &durationSeconds, &waveformRaw, &transcription, &storageKey, &fileSize, &mimeType, &hasAccess)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Voice message not found"})
+		return
+	}
+	if !hasAccess {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Forbidden"})
 		return
 	}
 

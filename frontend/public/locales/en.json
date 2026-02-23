@@ -3821,6 +3821,8 @@
     "send": "Send voice message",
     "cancel": "Cancel recording",
     "preview": "Preview",
+    "play": "Play",
+    "pause": "Pause",
     "reRecord": "Re-record",
     "permissionDenied": "Microphone permission denied. Please allow microphone access.",
     "noMicrophone": "No microphone found.",

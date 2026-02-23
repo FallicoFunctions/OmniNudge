@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 
 // Global singleton — only one voice message plays at a time.
 const globalAudioRef: { current: HTMLAudioElement | null; stopCallback: (() => void) | null } = {
@@ -30,6 +30,25 @@ export function useVoicePlayer(): UseVoicePlayerReturn {
 
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const lastUpdateRef = useRef(0)
+  const mountedRef = useRef(true)
+
+  useEffect(() => {
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+      // Stop and release audio on unmount
+      const audio = audioRef.current
+      if (audio) {
+        audio.pause()
+        audio.src = ''
+        audioRef.current = null
+      }
+      if (globalAudioRef.stopCallback === stopCurrentRef.current) {
+        globalAudioRef.stopCallback = null
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const stopCurrent = useCallback(() => {
     const audio = audioRef.current
@@ -38,10 +57,16 @@ export function useVoicePlayer(): UseVoicePlayerReturn {
       audio.src = ''
       audioRef.current = null
     }
-    setState('idle')
-    setCurrentTime(0)
-    setDuration(0)
+    if (mountedRef.current) {
+      setState('idle')
+      setCurrentTime(0)
+      setDuration(0)
+    }
   }, [])
+
+  // Keep a stable ref so the cleanup effect can compare without causing re-runs
+  const stopCurrentRef = useRef(stopCurrent)
+  stopCurrentRef.current = stopCurrent
 
   const play = useCallback((url: string) => {
     // Stop any currently playing audio globally.
@@ -52,50 +77,58 @@ export function useVoicePlayer(): UseVoicePlayerReturn {
     const audio = new Audio(url)
     audioRef.current = audio
     globalAudioRef.current = audio
-    globalAudioRef.stopCallback = stopCurrent
+    globalAudioRef.stopCallback = stopCurrentRef.current
 
-    setState('loading')
-    setError(null)
-    setCurrentTime(0)
+    if (mountedRef.current) {
+      setState('loading')
+      setError(null)
+      setCurrentTime(0)
+    }
 
     audio.playbackRate = playbackRate
 
     audio.addEventListener('loadedmetadata', () => {
-      setDuration(audio.duration)
+      if (mountedRef.current) setDuration(audio.duration)
     })
 
     audio.addEventListener('timeupdate', () => {
       const now = Date.now()
       if (now - lastUpdateRef.current < 250) return
       lastUpdateRef.current = now
-      setCurrentTime(audio.currentTime)
+      if (mountedRef.current) setCurrentTime(audio.currentTime)
     })
 
     audio.addEventListener('playing', () => {
-      setState('playing')
+      if (mountedRef.current) setState('playing')
     })
 
     audio.addEventListener('pause', () => {
-      if (!audio.ended) setState('paused')
+      if (!audio.ended && mountedRef.current) setState('paused')
     })
 
     audio.addEventListener('ended', () => {
-      setState('ended')
-      setCurrentTime(audio.duration)
+      if (mountedRef.current) {
+        setState('ended')
+        setCurrentTime(audio.duration)
+      }
       globalAudioRef.stopCallback = null
     })
 
     audio.addEventListener('error', () => {
-      setError('Could not play voice message.')
-      setState('error')
+      if (mountedRef.current) {
+        setError('Could not play voice message.')
+        setState('error')
+      }
       globalAudioRef.stopCallback = null
     })
 
     audio.play().catch(() => {
-      setError('Could not play voice message.')
-      setState('error')
+      if (mountedRef.current) {
+        setError('Could not play voice message.')
+        setState('error')
+      }
     })
-  }, [playbackRate, stopCurrent])
+  }, [playbackRate])
 
   const pause = useCallback(() => {
     audioRef.current?.pause()
@@ -105,7 +138,7 @@ export function useVoicePlayer(): UseVoicePlayerReturn {
     const audio = audioRef.current
     if (audio && audio.duration) {
       audio.currentTime = progress * audio.duration
-      setCurrentTime(audio.currentTime)
+      if (mountedRef.current) setCurrentTime(audio.currentTime)
     }
   }, [])
 
