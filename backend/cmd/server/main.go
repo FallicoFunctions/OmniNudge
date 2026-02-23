@@ -216,6 +216,15 @@ func main() {
 		log.Fatalf("Failed to initialize storage service: %v", err)
 	}
 
+	// Initialize voice storage service (F11)
+	voiceStorage, err := services.NewLocalStorageService("./uploads/voice", cfg.FrontendURL+"/uploads/voice")
+	if err != nil {
+		log.Fatalf("Failed to initialize voice storage: %v", err)
+	}
+
+	// Declare virusScanner at package scope so it can be passed to voice handler.
+	var virusScanner services.VirusScanner
+
 	// Initialize scrubber service (P0-017)
 	scrubberService := services.NewScrubberService(db.Pool, storageService)
 
@@ -241,7 +250,6 @@ func main() {
 	if queueClient != nil && cfg.Redis.Addr != "" {
 		jobWorker := queue.NewWorker(cfg.Redis.Addr, cfg.Redis.Password, 10) // 10 concurrent workers
 		queueThumbnailService := services.NewThumbnailService()
-		var virusScanner services.VirusScanner
 		if cfg.VirusScan.Enabled {
 			virusScanner = services.NewClamAVScanner(
 				cfg.VirusScan.ClamAVNetwork,
@@ -265,6 +273,7 @@ func main() {
 			ThumbnailGeneration: queue.NewThumbnailGenerationHandler(mediaRepo, queueThumbnailService),
 			ContentModeration:   queue.NewUnsupportedHandler(queue.JobTypeContentModeration, "content moderation backend is not yet implemented"),
 			MessageReencrypt:    queue.NewUnsupportedHandler(queue.JobTypeMessageReencrypt, "message re-encryption backend pipeline is not yet implemented"),
+			WaveformGeneration:  queue.NewWaveformJobHandler(db.Pool, voiceStorage).Handle,
 		})
 
 		// Start worker in background
@@ -364,6 +373,7 @@ func main() {
 	accessRequestHandler := handlers.NewAccessRequestHandler(hubAccessRequestRepo, hubRepo, hubSettingsRepo, userRepo)
 	jobsHandler := handlers.NewJobsHandler(queueClient)
 	audioEncoderHandler := handlers.NewAudioEncoderHandler(mediaRepo, userSettingsRepo, queueClient)
+	voiceHandler := handlers.NewVoiceMessagesHandler(db.Pool, voiceStorage, virusScanner, hub, queueClient)
 	featureFlagsHandler := handlers.NewFeatureFlagHandler(featureFlagService)
 	accountDeletionHandler := handlers.NewAccountDeletionHandler(db.Pool, queueClient)
 	dataExportHandler := handlers.NewDataExportHandler(db.Pool, queueClient, cfg.Encryption.Key)
@@ -810,6 +820,11 @@ func main() {
 			protected.DELETE("/messages/:id", messagesHandler.DeleteMessage)
 			protected.POST("/messages/:id/pin", messagesHandler.PinMessage)
 			protected.DELETE("/messages/:id/pin", messagesHandler.UnpinMessage)
+
+			// Voice messages (F11)
+			protected.POST("/messages/:id/voice", voiceHandler.UploadVoice)
+			protected.GET("/messages/:id/voice", voiceHandler.GetVoiceMessage)
+			protected.GET("/voice/:id/download", voiceHandler.DownloadVoice)
 			protected.GET("/search/messages", searchHandler.SearchMessages)
 
 			// Feature 1: Message Reactions (rate-limited on mutating endpoints)
