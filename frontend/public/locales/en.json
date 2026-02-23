@@ -3719,7 +3719,8 @@
     "settings": {
       "anyoneCanInvite": "Anyone can invite",
       "anyoneCanPin": "Anyone can pin messages",
-      "historyVisible": "Message history visible to new members"
+      "historyVisible": "Message history visible to new members",
+      "updateError": "Failed to save settings. Please try again."
     },
     "members": "Members",
     "participantCount": "{{count}} members",
@@ -3838,5 +3839,33 @@
     "virusDetected": "File rejected for security reasons.",
     "processing": "Processing…",
     "duration": "Duration"
+  },
+  "calls": {
+    "startVoiceCall": "Start voice call",
+    "startVideoCall": "Start video call",
+    "incomingVoiceCall": "Incoming voice call",
+    "incomingVideoCall": "Incoming video call",
+    "accept": "Accept",
+    "decline": "Decline",
+    "endCall": "End call",
+    "mute": "Mute",
+    "unmute": "Unmute",
+    "cameraOff": "Turn off camera",
+    "cameraOn": "Turn on camera",
+    "calling": "Calling...",
+    "connecting": "Connecting...",
+    "callEnded": "Call ended",
+    "callMissed": "Missed call",
+    "callRejected": "Call declined",
+    "duration": "{{duration}}",
+    "callBack": "Call back",
+    "noAnswer": "No answer",
+    "failed": "Call failed",
+    "voiceCall": "Voice call",
+    "videoCall": "Video call",
+    "history": "Call history",
+    "noHistory": "No calls yet",
+    "incoming": "Incoming",
+    "outgoing": "Outgoing"
   }
 }

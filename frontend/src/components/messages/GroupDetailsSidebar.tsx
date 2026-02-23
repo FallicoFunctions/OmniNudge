@@ -1,8 +1,7 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useGroupConversation } from '../../hooks/useGroupConversation';
 import { GroupAvatar } from './GroupAvatar';
-import { AdminBadge } from './AdminBadge';
 import { MuteUserModal } from './MuteUserModal';
 import { BanUserModal } from './BanUserModal';
 import { SlowModeControl } from './SlowModeControl';
@@ -52,7 +51,20 @@ function ParticipantRow({
 }) {
   const { t } = useTranslation();
   const [showMenu, setShowMenu] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
   const isCurrentUser = participant.user_id === currentUserId;
+
+  // Close on outside click
+  useEffect(() => {
+    if (!showMenu) return;
+    const handler = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setShowMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showMenu]);
   const canManage =
     (currentUserRole === 'owner' || currentUserRole === 'admin') &&
     !isCurrentUser &&
@@ -71,14 +83,11 @@ function ParticipantRow({
               <span className="ml-1.5 text-xs text-[var(--color-text-muted)]">{t('common.you')}</span>
             )}
           </p>
-          {(participant.role === 'owner' || participant.role === 'admin') && (
-            <AdminBadge role={participant.role as 'owner' | 'admin'} />
-          )}
         </div>
       </div>
       <RoleBadge role={participant.role} />
       {canManage && (
-        <div className="relative">
+        <div className="relative" ref={menuRef}>
           <button
             type="button"
             onClick={() => setShowMenu((s) => !s)}
@@ -148,6 +157,7 @@ export function GroupDetailsSidebar({ conversation, currentUserId, onClose }: Gr
   const [isEditingName, setIsEditingName] = useState(false);
   const [editedName, setEditedName] = useState(conversation.group_name ?? '');
   const [leaveError, setLeaveError] = useState('');
+  const [settingsError, setSettingsError] = useState('');
   const [muteTarget, setMuteTarget] = useState<GroupParticipant | null>(null);
   const [banTarget, setBanTarget] = useState<GroupParticipant | null>(null);
 
@@ -293,9 +303,11 @@ export function GroupDetailsSidebar({ conversation, currentUserId, onClose }: Gr
               {conversation.group_description}
             </p>
           )}
-          <p className="text-xs text-[var(--color-text-muted)]">
-            {t('groups.participantCount', { count: participants.length })}
-          </p>
+          {!loadingParticipants && (
+            <p className="text-xs text-[var(--color-text-muted)]">
+              {t('groups.participantCount', { count: participants.length })}
+            </p>
+          )}
         </div>
 
         {/* Tab navigation */}
@@ -358,7 +370,12 @@ export function GroupDetailsSidebar({ conversation, currentUserId, onClose }: Gr
                       type="button"
                       role="switch"
                       aria-checked={settings[key]}
-                      onClick={() => updateSettings({ [key]: !settings[key] })}
+                      onClick={() => {
+                        setSettingsError('');
+                        updateSettings({ [key]: !settings[key] }).catch(() =>
+                          setSettingsError(t('groups.settings.updateError'))
+                        );
+                      }}
                       disabled={isUpdatingSettings}
                       className={`relative h-6 w-11 shrink-0 rounded-full transition-colors disabled:opacity-60 ${
                         settings[key] ? 'bg-[var(--color-primary)]' : 'bg-[var(--color-border)]'
@@ -373,6 +390,9 @@ export function GroupDetailsSidebar({ conversation, currentUserId, onClose }: Gr
                   </label>
                 ))}
               </div>
+            )}
+            {settingsError && (
+              <p className="text-xs text-[var(--color-error)]" role="alert">{settingsError}</p>
             )}
             <div className="pt-2 border-t border-[var(--color-border)]">
               <h4 className="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-muted)] mb-3">

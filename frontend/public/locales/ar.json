@@ -3719,7 +3719,8 @@
     "settings": {
       "anyoneCanInvite": "يمكن لأي شخص الدعوة",
       "anyoneCanPin": "يمكن لأي شخص تثبيت الرسائل",
-      "historyVisible": "تاريخ الرسائل مرئي للأعضاء الجدد"
+      "historyVisible": "تاريخ الرسائل مرئي للأعضاء الجدد",
+      "updateError": "فشل حفظ الإعدادات. يُرجى المحاولة مرة أخرى."
     },
     "members": "الأعضاء",
     "participantCount": "{{count}} أعضاء",
@@ -3838,5 +3839,33 @@
     "virusDetected": "تم رفض الملف لأسباب أمنية.",
     "processing": "جارٍ المعالجة…",
     "duration": "المدة"
+  },
+  "calls": {
+    "startVoiceCall": "Start voice call",
+    "startVideoCall": "Start video call",
+    "incomingVoiceCall": "Incoming voice call",
+    "incomingVideoCall": "Incoming video call",
+    "accept": "Accept",
+    "decline": "Decline",
+    "endCall": "End call",
+    "mute": "Mute",
+    "unmute": "Unmute",
+    "cameraOff": "Turn off camera",
+    "cameraOn": "Turn on camera",
+    "calling": "Calling...",
+    "connecting": "Connecting...",
+    "callEnded": "Call ended",
+    "callMissed": "Missed call",
+    "callRejected": "Call declined",
+    "duration": "{{duration}}",
+    "callBack": "Call back",
+    "noAnswer": "No answer",
+    "failed": "Call failed",
+    "voiceCall": "Voice call",
+    "videoCall": "Video call",
+    "history": "Call history",
+    "noHistory": "No calls yet",
+    "incoming": "Incoming",
+    "outgoing": "Outgoing"
   }
 }

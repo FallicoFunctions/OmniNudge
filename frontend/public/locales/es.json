@@ -3719,7 +3719,8 @@
     "settings": {
       "anyoneCanInvite": "Cualquiera puede invitar",
       "anyoneCanPin": "Cualquiera puede fijar mensajes",
-      "historyVisible": "El historial es visible para nuevos miembros"
+      "historyVisible": "El historial es visible para nuevos miembros",
+      "updateError": "Error al guardar la configuración. Por favor, inténtalo de nuevo."
     },
     "members": "Miembros",
     "participantCount": "{{count}} miembros",
@@ -3838,5 +3839,33 @@
     "virusDetected": "Archivo rechazado por razones de seguridad.",
     "processing": "Procesando…",
     "duration": "Duración"
+  },
+  "calls": {
+    "startVoiceCall": "Iniciar llamada de voz",
+    "startVideoCall": "Iniciar videollamada",
+    "incomingVoiceCall": "Llamada de voz entrante",
+    "incomingVideoCall": "Videollamada entrante",
+    "accept": "Aceptar",
+    "decline": "Rechazar",
+    "endCall": "Finalizar llamada",
+    "mute": "Silenciar",
+    "unmute": "Activar audio",
+    "cameraOff": "Apagar camara",
+    "cameraOn": "Encender camara",
+    "calling": "Llamando...",
+    "connecting": "Conectando...",
+    "callEnded": "Llamada finalizada",
+    "callMissed": "Llamada perdida",
+    "callRejected": "Llamada rechazada",
+    "duration": "{{duration}}",
+    "callBack": "Devolver llamada",
+    "noAnswer": "Sin respuesta",
+    "failed": "Llamada fallida",
+    "voiceCall": "Llamada de voz",
+    "videoCall": "Videollamada",
+    "history": "Historial de llamadas",
+    "noHistory": "Sin llamadas aun",
+    "incoming": "Entrante",
+    "outgoing": "Saliente"
   }
 }
