@@ -16,6 +16,8 @@ interface CallScreenProps {
   isCameraOff: boolean
   callDuration: number
   isConnecting?: boolean
+  // Issue 4: real quality value from useCallManager
+  callQuality?: 'excellent' | 'good' | 'fair' | 'poor' | null
   // F13
   cameraDevices: MediaDeviceInfo[]
   selectedCameraId: string | null
@@ -48,6 +50,7 @@ export function CallScreen({
   isCameraOff,
   callDuration,
   isConnecting = false,
+  callQuality = null,
   cameraDevices,
   selectedCameraId,
   videoQuality,
@@ -92,6 +95,11 @@ export function CallScreen({
       role="dialog"
       aria-label={isVideo ? t('calls.videoCall') : t('calls.voiceCall')}
     >
+      {/* Issue 5: aria-live region for screen-reader call status announcements */}
+      <div aria-live="polite" className="sr-only">
+        {isConnecting ? t('calls.connecting') : isCallActive ? t('calls.callActive') : ''}
+      </div>
+
       {/* Remote area */}
       <div className="relative flex-1 flex items-center justify-center bg-black overflow-hidden">
         {isVideo && remoteStream ? (
@@ -105,7 +113,12 @@ export function CallScreen({
         ) : (
           /* Voice call or no video: show avatar */
           <div className="flex flex-col items-center gap-4">
-            <div className="flex items-center justify-center w-24 h-24 rounded-full bg-[var(--color-primary)] text-white text-4xl font-bold">
+            {/* Issue 5: add role="img" and aria-label to avatar */}
+            <div
+              className="flex items-center justify-center w-24 h-24 rounded-full bg-[var(--color-primary)] text-white text-4xl font-bold"
+              role="img"
+              aria-label={t('calls.remoteUserAvatar', { name: remoteName })}
+            >
               {remoteName.charAt(0).toUpperCase()}
             </div>
             <p className="text-xl font-semibold text-white">{remoteName}</p>
@@ -124,7 +137,8 @@ export function CallScreen({
 
         {/* Quality indicator */}
         <div className="absolute top-4 right-4 flex flex-col items-end gap-2">
-          <CallQualityIndicator quality={null} />
+          {/* Issue 4: pass real callQuality instead of hardcoded null */}
+          <CallQualityIndicator quality={callQuality} />
           {/* F13: Video quality selector — only for video calls */}
           {isVideo && isCallActive && (
             <VideoQualitySelector

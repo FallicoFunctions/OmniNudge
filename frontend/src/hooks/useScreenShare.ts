@@ -59,14 +59,19 @@ export function useScreenShare(
     try {
       setError(null)
       const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false })
-      screenStreamRef.current = stream
-      setScreenStream(stream)
 
+      // Issue 3: validate that a video track actually exists before proceeding.
+      // Do NOT assign screenStreamRef until we know the track is valid.
       const videoTrack = stream.getVideoTracks()[0]
       if (!videoTrack) {
         stream.getTracks().forEach((t) => t.stop())
+        setError('screenShareNotSupported')
         return
       }
+
+      // Track is valid — now store references.
+      screenStreamRef.current = stream
+      setScreenStream(stream)
 
       // When user clicks the browser's "Stop sharing" button.
       videoTrack.onended = () => {

@@ -14,7 +14,7 @@ const QUALITY_BARS: Record<NonNullable<Quality>, number> = {
 const QUALITY_COLORS: Record<NonNullable<Quality>, string> = {
   excellent: 'var(--color-success, #22c55e)',
   good: 'var(--color-success, #22c55e)',
-  fair: '#f59e0b',
+  fair: 'var(--color-warning, #f59e0b)',
   poor: 'var(--color-error)',
 }
 

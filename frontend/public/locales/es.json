@@ -3873,6 +3873,13 @@
     "peerIsSharing": "{{name}} está compartiendo su pantalla",
     "screenShareNotSupported": "El uso compartido de pantalla no es compatible con este navegador",
     "flipCamera": "Cambiar cámara",
+    "permissionDenied": "Permiso de cámara o micrófono denegado. Por favor, permite el acceso en la configuración de tu navegador.",
+    "deviceNotFound": "No se encontró ninguna cámara ni micrófono.",
+    "deviceInUse": "La cámara o el micrófono ya está siendo usado por otra aplicación.",
+    "startFailed": "No se pudo iniciar la llamada. Por favor, inténtalo de nuevo.",
+    "callActive": "Llamada activa",
+    "remoteUserAvatar": "Foto de perfil de {{name}}",
+    "localScreenPreview": "Vista previa de tu pantalla compartida",
     "quality": {
       "label": "Calidad de video",
       "low": "Calidad baja",

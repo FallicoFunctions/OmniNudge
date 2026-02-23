@@ -63,7 +63,7 @@ export function ScreenShareView({
               playsInline
               muted
               className="max-w-xs rounded-xl border border-white/20 shadow-lg"
-              aria-label={t('calls.youAreSharing')}
+              aria-label={t('calls.localScreenPreview', 'Your screen share preview')}
             />
           )}
         </div>
@@ -78,7 +78,7 @@ export function ScreenShareView({
             playsInline
             muted
             className="w-full h-full object-cover"
-            aria-label={t('calls.youAreSharing')}
+            aria-label={t('calls.localScreenPreview', 'Your screen share preview')}
           />
         </div>
       )}
