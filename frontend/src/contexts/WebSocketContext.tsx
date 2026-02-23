@@ -545,6 +545,17 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
           break;
         }
 
+        case 'call_incoming':
+        case 'call_answered':
+        case 'call_rejected':
+        case 'call_ended':
+        case 'call_signal': {
+          window.dispatchEvent(new CustomEvent('ws-call-event', {
+            detail: { type: data.type, payload: data.payload },
+          }));
+          break;
+        }
+
         default:
           console.log('[WebSocket] Unknown message type:', data.type);
       }

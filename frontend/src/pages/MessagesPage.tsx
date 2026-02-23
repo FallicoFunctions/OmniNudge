@@ -38,6 +38,9 @@ import { GroupAvatar } from '../components/messages/GroupAvatar';
 import { VoiceRecorderButton } from '../components/messages/VoiceRecorderButton';
 import { VoiceMessageBubble } from '../components/messages/VoiceMessageBubble';
 import { voiceMessagesService } from '../services/voiceMessagesService';
+import { IncomingCallModal } from '../components/messages/IncomingCallModal';
+import { CallScreen } from '../components/messages/CallScreen';
+import { useCallManager } from '../hooks/useCallManager';
 import FilePreview from '../components/messages/FilePreview';
 import { usePinnedMessages } from '../hooks/usePinnedMessages';
 import { useArchive } from '../hooks/useArchive';
@@ -716,8 +719,23 @@ export default function MessagesPage() {
   const [searchParams] = useSearchParams();
   const toUsernameParam = searchParams.get('to');
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const { sendTypingIndicator, lastMessage } = useWebSocket();
+  const { sendTypingIndicator } = useWebSocket();
   const { typingIndicators, readReceipts, speakerDeviceId } = useSettings();
+  const {
+    callState,
+    activeCall,
+    localStream,
+    remoteStream,
+    isMuted,
+    isCameraOff,
+    callDuration,
+    startCall,
+    answerCall,
+    rejectCall,
+    endCall,
+    toggleMute,
+    toggleCamera,
+  } = useCallManager();
   const [searchQuery, setSearchQuery] = useState('');
   const [messageSearchQuery, setMessageSearchQuery] = useState('');
   const [messageSearchSenderFilter, setMessageSearchSenderFilter] = useState<'all' | 'mine' | 'others'>('all');
@@ -941,10 +959,14 @@ export default function MessagesPage() {
 
   // Route incoming WS events to useGroupAdmin handler
   useEffect(() => {
-    if (!lastMessage || selectedConversation?.conversation_type !== 'group') return;
-    const msg = lastMessage as { type: string; payload?: unknown };
-    groupAdmin.handleWebSocketEvent(msg.type, msg.payload);
-  }, [lastMessage, selectedConversation?.conversation_type, groupAdmin.handleWebSocketEvent]);
+    if (selectedConversation?.conversation_type !== 'group') return;
+    const handler = (event: Event) => {
+      const { type, payload } = (event as CustomEvent<{ type: string; payload?: unknown }>).detail;
+      groupAdmin.handleWebSocketEvent(type, payload);
+    };
+    window.addEventListener('ws-group-event', handler);
+    return () => window.removeEventListener('ws-group-event', handler);
+  }, [selectedConversation?.conversation_type, groupAdmin.handleWebSocketEvent]);
 
   // Fix 18: placed after selectedConversation so we can pass recipientId directly
   const {
@@ -2846,6 +2868,30 @@ export default function MessagesPage() {
 
                   {/* Slideshow buttons */}
                   <div className="flex items-center gap-2">
+                    {/* Voice / Video call buttons — DM conversations only */}
+                    {!isCreatingChat &&
+                      selectedConversation?.conversation_type === 'dm' &&
+                      callState === 'idle' && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => startCall(selectedConversation.id, 'voice')}
+                            className="flex items-center justify-center h-8 w-8 rounded-md border border-[var(--color-border)] text-[var(--color-text-muted)] hover:bg-[var(--color-hover)] hover:text-[var(--color-text-primary)]"
+                            aria-label={t('calls.startVoiceCall')}
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 13.5a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.61 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 9.91a16 16 0 0 0 6.08 6.08l.95-.95a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => startCall(selectedConversation.id, 'video')}
+                            className="flex items-center justify-center h-8 w-8 rounded-md border border-[var(--color-border)] text-[var(--color-text-muted)] hover:bg-[var(--color-hover)] hover:text-[var(--color-text-primary)]"
+                            aria-label={t('calls.startVideoCall')}
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
+                          </button>
+                        </>
+                      )}
+
                     {/* Group info button */}
                     {!isCreatingChat && selectedConversation?.conversation_type === 'group' && (
                       <button
@@ -4362,6 +4408,31 @@ export default function MessagesPage() {
             />
           </div>
         </div>
+      )}
+
+      {/* Incoming call modal */}
+      {callState === 'ringing_incoming' && activeCall && (
+        <IncomingCallModal
+          call={activeCall}
+          onAccept={answerCall}
+          onDecline={rejectCall}
+        />
+      )}
+
+      {/* Active / outgoing call screen */}
+      {(callState === 'active' || callState === 'ringing_outgoing') && activeCall && (
+        <CallScreen
+          call={activeCall}
+          localStream={localStream}
+          remoteStream={remoteStream}
+          isMuted={isMuted}
+          isCameraOff={isCameraOff}
+          callDuration={callDuration}
+          isConnecting={callState === 'ringing_outgoing'}
+          onToggleMute={toggleMute}
+          onToggleCamera={toggleCamera}
+          onEndCall={endCall}
+        />
       )}
     </>
   );
