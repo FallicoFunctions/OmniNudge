@@ -12,6 +12,34 @@ const NUM_BARS = 80
 const BAR_GAP = 2
 const MIN_BAR_HEIGHT = 3
 
+/** Polyfill for ctx.roundRect — not available on iOS Safari < 15.4 */
+function fillRoundRect(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  r: number,
+) {
+  if (typeof ctx.roundRect === 'function') {
+    ctx.beginPath()
+    ctx.roundRect(x, y, w, h, r)
+  } else {
+    const radius = Math.min(r, w / 2, h / 2)
+    ctx.beginPath()
+    ctx.moveTo(x + radius, y)
+    ctx.lineTo(x + w - radius, y)
+    ctx.arcTo(x + w, y, x + w, y + radius, radius)
+    ctx.lineTo(x + w, y + h - radius)
+    ctx.arcTo(x + w, y + h, x + w - radius, y + h, radius)
+    ctx.lineTo(x + radius, y + h)
+    ctx.arcTo(x, y + h, x, y + h - radius, radius)
+    ctx.lineTo(x, y + radius)
+    ctx.arcTo(x, y, x + radius, y, radius)
+    ctx.closePath()
+  }
+}
+
 export function WaveformVisualizer({
   data,
   progress,
@@ -22,6 +50,24 @@ export function WaveformVisualizer({
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const rafRef = useRef<number | null>(null)
   const liveBufferRef = useRef<number[]>(Array(NUM_BARS).fill(0))
+  // Cache colors on mount — reading computed styles on every frame forces style recalc
+  const colorsRef = useRef<{ primary: string; faded: string } | null>(null)
+
+  const getColors = useCallback(() => {
+    if (!colorsRef.current) {
+      const style = getComputedStyle(document.documentElement)
+      const primary = style.getPropertyValue('--color-primary').trim() || '#3b82f6'
+      colorsRef.current = { primary, faded: primary + '4D' } // ~30% opacity
+    }
+    return colorsRef.current
+  }, [])
+
+  // Invalidate color cache when theme changes (theme toggle adds/removes class on <html>)
+  useEffect(() => {
+    const observer = new MutationObserver(() => { colorsRef.current = null })
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class', 'data-theme'] })
+    return () => observer.disconnect()
+  }, [])
 
   const draw = useCallback(() => {
     const canvas = canvasRef.current
@@ -32,23 +78,17 @@ export function WaveformVisualizer({
     const { width, height } = canvas
     ctx.clearRect(0, 0, width, height)
 
-    // Get CSS variable colors by measuring a dummy element
-    const style = getComputedStyle(document.documentElement)
-    const primaryColor = style.getPropertyValue('--color-primary').trim() || '#3b82f6'
-    const primaryAlpha = primaryColor + '4D' // ~30% opacity
-
+    const { primary, faded } = getColors()
     const barWidth = (width - BAR_GAP * (NUM_BARS - 1)) / NUM_BARS
     const playedCount = Math.round(progress * NUM_BARS)
 
     let bars: number[]
     if (isLive) {
-      // Shift buffer and append new level
       const buf = liveBufferRef.current
       buf.shift()
       buf.push(liveLevel)
       bars = buf
     } else {
-      // Downsample/upsample data to NUM_BARS
       bars = Array.from({ length: NUM_BARS }, (_, i) => {
         if (!data || data.length === 0) return 0.1
         const idx = Math.floor((i / NUM_BARS) * data.length)
@@ -61,18 +101,13 @@ export function WaveformVisualizer({
       const x = i * (barWidth + BAR_GAP)
       const y = (height - barHeight) / 2
 
-      ctx.beginPath()
-      ctx.roundRect(x, y, barWidth, barHeight, barWidth / 2)
-
-      if (!isLive && i < playedCount) {
-        ctx.fillStyle = primaryColor
-      } else {
-        ctx.fillStyle = primaryAlpha
-      }
+      ctx.fillStyle = !isLive && i < playedCount ? primary : faded
+      fillRoundRect(ctx, x, y, barWidth, barHeight, barWidth / 2)
       ctx.fill()
     })
-  }, [data, progress, isLive, liveLevel])
+  }, [data, progress, isLive, liveLevel, getColors])
 
+  // ResizeObserver — keeps canvas pixel-accurate when container resizes
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas) return
@@ -91,8 +126,9 @@ export function WaveformVisualizer({
     return () => ro.disconnect()
   }, [draw])
 
+  // rAF loop — ONLY when live (recording visualization). Static waveforms draw on prop change above.
   useEffect(() => {
-    if (rafRef.current) cancelAnimationFrame(rafRef.current)
+    if (!isLive) return
     const animate = () => {
       draw()
       rafRef.current = requestAnimationFrame(animate)
@@ -101,26 +137,21 @@ export function WaveformVisualizer({
     return () => {
       if (rafRef.current) cancelAnimationFrame(rafRef.current)
     }
-  }, [draw])
+  }, [isLive, draw])
 
   const handleClick = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     if (!onSeek) return
     const rect = e.currentTarget.getBoundingClientRect()
     const x = e.clientX - rect.left
-    const newProgress = Math.max(0, Math.min(1, x / rect.width))
-    onSeek(newProgress)
+    onSeek(Math.max(0, Math.min(1, x / rect.width)))
   }, [onSeek])
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLCanvasElement>) => {
     if (!onSeek) return
-    let delta = 0
-    if (e.key === 'ArrowRight') delta = 0.05
-    else if (e.key === 'ArrowLeft') delta = -0.05
-    else if (e.key === 'Home') { onSeek(0); return }
-    else if (e.key === 'End') { onSeek(1); return }
-    else return
-    e.preventDefault()
-    onSeek(Math.max(0, Math.min(1, progress + delta)))
+    if (e.key === 'ArrowRight') { e.preventDefault(); onSeek(Math.max(0, Math.min(1, progress + 0.05))); return }
+    if (e.key === 'ArrowLeft') { e.preventDefault(); onSeek(Math.max(0, Math.min(1, progress - 0.05))); return }
+    if (e.key === 'Home') { e.preventDefault(); onSeek(0); return }
+    if (e.key === 'End') { e.preventDefault(); onSeek(1); return }
   }, [onSeek, progress])
 
   return (

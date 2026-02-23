@@ -67,24 +67,17 @@ export function VoiceRecorderButton({ onVoiceMessage, disabled = false }: VoiceR
   // Idle: show microphone button
   if (state === 'idle' || state === 'requesting' || state === 'error') {
     return (
-      <div className="flex flex-col items-center">
-        <button
-          type="button"
-          onClick={start}
-          disabled={disabled || state === 'requesting'}
-          title={t('voice.record')}
-          aria-label={t('voice.record')}
-          className="flex items-center justify-center w-8 h-8 rounded-full transition-colors"
-          style={{ color: 'var(--color-text-muted)' }}
-        >
-          <Mic size={18} />
-        </button>
-        {error && (
-          <p className="text-xs mt-1" style={{ color: 'var(--color-error)' }}>
-            {error}
-          </p>
-        )}
-      </div>
+      <button
+        type="button"
+        onClick={start}
+        disabled={disabled || state === 'requesting'}
+        title={error ?? t('voice.record')}
+        aria-label={error ?? t('voice.record')}
+        className="flex items-center justify-center w-8 h-8 rounded-full transition-colors"
+        style={{ color: error ? 'var(--color-error)' : 'var(--color-text-muted)' }}
+      >
+        <Mic size={18} />
+      </button>
     )
   }
 
@@ -164,7 +157,8 @@ export function VoiceRecorderButton({ onVoiceMessage, disabled = false }: VoiceR
         <button
           type="button"
           onClick={togglePreviewPlay}
-          title={isPlaying ? t('voice.preview') : t('voice.preview')}
+          title={isPlaying ? t('voice.pause') : t('voice.play')}
+          aria-label={isPlaying ? t('voice.pause') : t('voice.play')}
           className="flex items-center justify-center w-8 h-8 rounded-full flex-shrink-0"
           style={{ color: 'var(--color-primary)' }}
         >

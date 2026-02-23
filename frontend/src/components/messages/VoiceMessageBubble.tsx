@@ -54,7 +54,7 @@ export function VoiceMessageBubble({ voiceMessage, isOwn }: VoiceMessageBubblePr
           type="button"
           onClick={handlePlayPause}
           disabled={isLoading}
-          aria-label={isPlaying ? 'Pause' : 'Play'}
+          aria-label={isPlaying ? t('voice.pause') : t('voice.play')}
           className="flex items-center justify-center w-8 h-8 rounded-full flex-shrink-0 transition-opacity"
           style={{
             background: isOwn ? 'rgba(255,255,255,0.2)' : 'var(--color-primary)',
