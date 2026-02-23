@@ -16,6 +16,11 @@ type Call struct {
 	DurationSeconds *int       `json:"duration_seconds,omitempty"`
 	EndedBy         *int       `json:"ended_by,omitempty"`
 
+	// Screen sharing fields (F14).
+	IsScreenSharing      bool       `json:"is_screen_sharing"`
+	ScreenShareStartedAt *time.Time `json:"screen_share_started_at,omitempty"`
+	ScreenShareEndedAt   *time.Time `json:"screen_share_ended_at,omitempty"`
+
 	// Joined fields for API responses.
 	CallerUsername *string `json:"caller_username,omitempty"`
 	CalleeUsername *string `json:"callee_username,omitempty"`
