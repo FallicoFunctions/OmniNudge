@@ -43,6 +43,7 @@ import { usePinnedMessages } from '../hooks/usePinnedMessages';
 import { useArchive } from '../hooks/useArchive';
 import { useFolders } from '../hooks/useFolders';
 import { useMessageEdit, isEditable } from '../hooks/useMessageEdit';
+import { useGroupAdmin } from '../hooks/useGroupAdmin';
 import { useDebounce } from '../hooks/useDebounce';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import type {
@@ -715,7 +716,7 @@ export default function MessagesPage() {
   const [searchParams] = useSearchParams();
   const toUsernameParam = searchParams.get('to');
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const { sendTypingIndicator } = useWebSocket();
+  const { sendTypingIndicator, lastMessage } = useWebSocket();
   const { typingIndicators, readReceipts, speakerDeviceId } = useSettings();
   const [searchQuery, setSearchQuery] = useState('');
   const [messageSearchQuery, setMessageSearchQuery] = useState('');
@@ -930,6 +931,20 @@ export default function MessagesPage() {
 
   const selectedConversation = conversations?.find((c) => c.id === selectedConversationId);
   const selectedConversationExists = Boolean(selectedConversation);
+
+  // Group admin controls — wires real-time mute/ban/slow-mode WS events
+  const groupAdmin = useGroupAdmin({
+    conversationId: selectedConversationId ?? 0,
+    conversationType: selectedConversation?.conversation_type,
+    isAdmin: selectedConversation?.current_user_role === 'admin' || selectedConversation?.current_user_role === 'owner',
+  });
+
+  // Route incoming WS events to useGroupAdmin handler
+  useEffect(() => {
+    if (!lastMessage || selectedConversation?.conversation_type !== 'group') return;
+    const msg = lastMessage as { type: string; payload?: unknown };
+    groupAdmin.handleWebSocketEvent(msg.type, msg.payload);
+  }, [lastMessage, selectedConversation?.conversation_type, groupAdmin.handleWebSocketEvent]);
 
   // Fix 18: placed after selectedConversation so we can pass recipientId directly
   const {

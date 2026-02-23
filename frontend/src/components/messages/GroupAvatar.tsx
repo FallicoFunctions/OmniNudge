@@ -7,18 +7,28 @@ interface GroupAvatarProps {
   className?: string;
 }
 
-/** Deterministic color from group name */
-function nameToColor(name: string): string {
-  const colors = [
-    '#3b82f6', '#8b5cf6', '#ec4899', '#ef4444',
-    '#f97316', '#eab308', '#22c55e', '#14b8a6',
-    '#06b6d4', '#6366f1',
-  ];
+// CSS variable names for avatar colors — defined in the design system.
+// Using data-color index + CSS variables keeps colors theme-aware (dark mode works).
+const AVATAR_COLOR_VARS = [
+  'var(--color-primary)',
+  'var(--color-purple, #8b5cf6)',
+  'var(--color-pink, #ec4899)',
+  'var(--color-error)',
+  'var(--color-orange, #f97316)',
+  'var(--color-yellow, #eab308)',
+  'var(--color-success)',
+  'var(--color-teal, #14b8a6)',
+  'var(--color-cyan, #06b6d4)',
+  'var(--color-indigo, #6366f1)',
+] as const;
+
+/** Deterministic color index from group name — stable across renders */
+function nameToColorVar(name: string): string {
   let hash = 0;
   for (let i = 0; i < name.length; i++) {
     hash = (hash * 31 + name.charCodeAt(i)) >>> 0;
   }
-  return colors[hash % colors.length];
+  return AVATAR_COLOR_VARS[hash % AVATAR_COLOR_VARS.length];
 }
 
 /** Get initials (up to 2 chars) from group name */
@@ -35,14 +45,14 @@ export function GroupAvatar({ name, avatarUrl, size = 40, className = '' }: Grou
     return (
       <img
         src={avatarUrl}
-        alt={name}
+        alt={`${name} group avatar`}
         style={style}
         className={`object-cover ${className}`}
       />
     );
   }
 
-  const bg = nameToColor(name);
+  const bg = nameToColorVar(name);
   const initials = nameToInitials(name);
   const fontSize = Math.round(size * 0.38);
 
@@ -50,7 +60,8 @@ export function GroupAvatar({ name, avatarUrl, size = 40, className = '' }: Grou
     <div
       style={{ ...style, background: bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
       className={`font-semibold text-white select-none ${className}`}
-      aria-label={name}
+      aria-label={`${name} group avatar`}
+      role="img"
     >
       <span style={{ fontSize }}>{initials}</span>
     </div>
