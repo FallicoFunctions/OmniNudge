@@ -38,6 +38,14 @@ export const callsService = {
     return api.get<{ ice_servers: ICEServer[] }>('/calls/ice-servers')
   },
 
+  async startScreenShare(callId: number): Promise<void> {
+    await api.post<{ ok: boolean }>(`/calls/${callId}/screen-share/start`, {})
+  },
+
+  async stopScreenShare(callId: number): Promise<void> {
+    await api.post<{ ok: boolean }>(`/calls/${callId}/screen-share/stop`, {})
+  },
+
   async getCallHistory(
     conversationId: number,
     limit = 20,
