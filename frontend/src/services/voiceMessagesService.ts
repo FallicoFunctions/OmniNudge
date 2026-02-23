@@ -1,4 +1,4 @@
-import { VoiceMessage } from '../types/messages'
+import type { VoiceMessage } from '../types/messages'
 
 const API_BASE = '/api/v1'
 

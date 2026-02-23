@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Play, Pause, ChevronDown, ChevronUp } from 'lucide-react'
-import { VoiceMessage } from '../../types/messages'
+import type { VoiceMessage } from '../../types/messages'
 import { useVoicePlayer } from '../../hooks/useVoicePlayer'
 import { WaveformVisualizer } from './WaveformVisualizer'
 
