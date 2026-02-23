@@ -105,6 +105,9 @@ func (w *Worker) RegisterAllHandlers(handlers JobHandlers) {
 	if handlers.MessageReencrypt != nil {
 		w.RegisterHandler(JobTypeMessageReencrypt, handlers.MessageReencrypt)
 	}
+	if handlers.WaveformGeneration != nil {
+		w.RegisterHandler(JobTypeWaveform, handlers.WaveformGeneration)
+	}
 }
 
 // JobHandlers groups all job handler functions
@@ -117,6 +120,7 @@ type JobHandlers struct {
 	DataExport          JobHandler
 	ContentModeration   JobHandler
 	MessageReencrypt    JobHandler
+	WaveformGeneration  JobHandler
 }
 
 // Start starts the worker server
