@@ -3873,6 +3873,13 @@
     "peerIsSharing": "{{name}} is sharing their screen",
     "screenShareNotSupported": "Screen sharing is not supported in this browser",
     "flipCamera": "Flip camera",
+    "permissionDenied": "Camera or microphone permission denied. Please allow access in your browser settings.",
+    "deviceNotFound": "No camera or microphone found.",
+    "deviceInUse": "Camera or microphone is already in use by another app.",
+    "startFailed": "Could not start the call. Please try again.",
+    "callActive": "Call active",
+    "remoteUserAvatar": "{{name}}'s profile picture",
+    "localScreenPreview": "Your screen share preview",
     "quality": {
       "label": "Video quality",
       "low": "Low quality",

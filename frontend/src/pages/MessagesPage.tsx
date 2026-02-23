@@ -728,6 +728,10 @@ export default function MessagesPage() {
     isMuted,
     isCameraOff,
     callDuration,
+    isConnecting: callIsConnecting,
+    callQuality,
+    callError,
+    clearCallError,
     cameraDevices,
     selectedCameraId,
     videoQuality,
@@ -4434,7 +4438,8 @@ export default function MessagesPage() {
           isMuted={isMuted}
           isCameraOff={isCameraOff}
           callDuration={callDuration}
-          isConnecting={callState === 'ringing_outgoing'}
+          isConnecting={callState === 'ringing_outgoing' || callIsConnecting}
+          callQuality={callQuality}
           cameraDevices={cameraDevices}
           selectedCameraId={selectedCameraId}
           videoQuality={videoQuality}
@@ -4446,6 +4451,21 @@ export default function MessagesPage() {
           onToggleCamera={toggleCamera}
           onEndCall={endCall}
         />
+      )}
+
+      {/* Issue 10: Call error overlay — shown when media permissions or device access fails */}
+      {callError && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+          <div className="bg-[var(--color-surface)] rounded-2xl p-6 max-w-sm mx-4 text-center shadow-xl">
+            <p className="text-[var(--color-text-primary)] font-semibold mb-4">{callError}</p>
+            <button
+              onClick={clearCallError}
+              className="px-6 py-2 rounded-full bg-[var(--color-primary)] text-white font-semibold"
+            >
+              {t('common.ok')}
+            </button>
+          </div>
+        </div>
       )}
     </>
   );
