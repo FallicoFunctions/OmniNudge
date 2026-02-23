@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { adminGroupsService } from '../services/adminGroupsService';
-import type { GroupRestriction } from '../services/adminGroupsService';
 
 interface UseGroupAdminOptions {
   conversationId: number;

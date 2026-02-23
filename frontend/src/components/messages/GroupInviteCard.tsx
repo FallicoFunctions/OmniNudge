@@ -60,7 +60,7 @@ export function GroupInviteCard({
 }
 
 /** Displays all pending group invites for the current user */
-export function GroupInvitesList({ onConversationOpened }: { onConversationOpened?: (id: number) => void }) {
+export function GroupInvitesList({ onConversationOpened: _onConversationOpened }: { onConversationOpened?: (id: number) => void }) {
   const { t } = useTranslation();
   const { invites, isLoading, acceptInvite, declineInvite, isAccepting, isDeclining } = useGroupInvites();
 

@@ -28,7 +28,7 @@ export interface UseMessageEditReturn {
   editingContent: string;
   startEdit: (message: Message, initialContent: string) => void;
   cancelEdit: () => void;
-  saveEdit: (messageId: number, content: string) => Promise<void>;
+  saveEdit: (messageId: number, content: string) => Promise<Message>;
   isSaving: boolean;
   historyMessageId: number | null;
   openHistory: (messageId: number) => void;

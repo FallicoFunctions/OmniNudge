@@ -34,7 +34,6 @@ import { MessageEditHistory } from '../components/messages/MessageEditHistory';
 import { GroupInvitesList } from '../components/messages/GroupInviteCard';
 import { GroupDetailsSidebar } from '../components/messages/GroupDetailsSidebar';
 import { CreateGroupModal } from '../components/messages/CreateGroupModal';
-import { GroupAvatar } from '../components/messages/GroupAvatar';
 import { VoiceRecorderButton } from '../components/messages/VoiceRecorderButton';
 import { VoiceMessageBubble } from '../components/messages/VoiceMessageBubble';
 import { voiceMessagesService } from '../services/voiceMessagesService';
@@ -3265,7 +3264,7 @@ export default function MessagesPage() {
                                       initialContent={editingContent}
                                       sentAt={message.sent_at}
                                       isSaving={isEditSaving}
-                                      onSave={(content) => saveEdit(message.id, content)}
+                                      onSave={(content) => saveEdit(message.id, content).then(() => undefined)}
                                       onCancel={cancelEdit}
                                       isOwnMessage={isOwnMessage}
                                     />
