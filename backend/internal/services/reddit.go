@@ -85,19 +85,26 @@ func (r *RedditClient) SetHTTPClient(client *http.Client) {
 	r.httpClient = client
 }
 
-
 // doAPIRequest executes an HTTP request against the Reddit API and records
 // Prometheus metrics for the call. endpoint is a short label (e.g. "subreddit_posts").
 func (r *RedditClient) doAPIRequest(req *http.Request, endpoint string) (*http.Response, error) {
+	start := time.Now()
 	resp, err := r.httpClient.Do(req)
+	duration := time.Since(start)
+	metrics.RedditAPIRequestDuration.WithLabelValues(endpoint).Observe(duration.Seconds())
 	if err != nil {
-		metrics.RedditAPIRequestsTotal.WithLabelValues(endpoint, "error").Inc()
+		metrics.RedditAPIRequestsTotal.WithLabelValues(endpoint, "network_error").Inc()
 		return nil, err
 	}
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		metrics.RedditAPIRequestsTotal.WithLabelValues(endpoint, "error").Inc()
-	} else {
-		metrics.RedditAPIRequestsTotal.WithLabelValues(endpoint, "success").Inc()
+	switch {
+	case resp.StatusCode >= 500:
+		metrics.RedditAPIRequestsTotal.WithLabelValues(endpoint, "5xx").Inc()
+	case resp.StatusCode >= 400:
+		metrics.RedditAPIRequestsTotal.WithLabelValues(endpoint, "4xx").Inc()
+	case resp.StatusCode >= 200 && resp.StatusCode < 300:
+		metrics.RedditAPIRequestsTotal.WithLabelValues(endpoint, "2xx").Inc()
+	default:
+		metrics.RedditAPIRequestsTotal.WithLabelValues(endpoint, "other").Inc()
 	}
 	if remaining := resp.Header.Get("X-Ratelimit-Remaining"); remaining != "" {
 		if val, err := strconv.ParseFloat(remaining, 64); err == nil {
