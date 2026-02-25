@@ -1,0 +1,176 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  # ─── Backend: Go ────────────────────────────────────────────────────────────
+  backend:
+    name: Backend (Go)
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: omninudge
+          POSTGRES_PASSWORD: omninudge
+          POSTGRES_DB: omninudge_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+
+      - name: Download dependencies
+        working-directory: backend
+        run: go mod download
+
+      - name: Verify dependencies
+        working-directory: backend
+        run: go mod verify
+
+      - name: Run vet
+        working-directory: backend
+        run: go vet ./...
+
+      - name: Install golangci-lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          working-directory: backend
+          args: --timeout=5m
+          skip-cache: false
+
+      - name: Run unit tests
+        working-directory: backend
+        env:
+          TEST_DATABASE_URL: postgres://omninudge:omninudge@localhost:5432/omninudge_test?sslmode=disable
+          REDIS_ADDR: localhost:6379
+        run: go test -v -race -count=1 -timeout=5m -coverprofile=coverage.out ./internal/...
+
+      - name: Show coverage summary
+        working-directory: backend
+        run: go tool cover -func=coverage.out | tail -1
+
+      - name: Build
+        working-directory: backend
+        run: go build ./cmd/server/...
+
+  # ─── Frontend: TypeScript + React ──────────────────────────────────────────
+  frontend:
+    name: Frontend (TypeScript)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: TypeScript type check
+        working-directory: frontend
+        run: npx tsc --noEmit
+
+      - name: Lint
+        working-directory: frontend
+        run: npm run lint
+
+      - name: Check formatting
+        working-directory: frontend
+        run: npx prettier --check "src/**/*.{ts,tsx,css}" --log-level warn
+
+      - name: Check i18n completeness
+        working-directory: frontend
+        run: npm run i18n:verify
+
+      - name: Run tests with coverage
+        working-directory: frontend
+        run: npm test -- --run --coverage --reporter=verbose
+
+      - name: Build
+        working-directory: frontend
+        run: npm run build
+
+  # ─── Migration safety check ────────────────────────────────────────────────
+  migrations:
+    name: Migration rollback safety
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: omninudge
+          POSTGRES_PASSWORD: omninudge
+          POSTGRES_DB: omninudge_migrations
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+
+      - name: Run migrations up
+        working-directory: backend
+        env:
+          DATABASE_URL: postgres://omninudge:omninudge@localhost:5432/omninudge_migrations?sslmode=disable
+        run: go run ./cmd/migrate/... up
+
+      - name: Verify all up files have matching down files
+        working-directory: backend/internal/database/migrations
+        run: |
+          missing=0
+          for up in *.up.sql; do
+            down="${up%.up.sql}.down.sql"
+            if [ ! -f "$down" ]; then
+              echo "MISSING rollback: $down"
+              missing=$((missing + 1))
+            fi
+          done
+          if [ $missing -gt 0 ]; then
+            echo "ERROR: $missing migration(s) are missing rollback files"
+            exit 1
+          fi
+          echo "All migrations have rollback files ✓"

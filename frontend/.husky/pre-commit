@@ -1,0 +1,2 @@
+cd frontend
+npm run i18n:verify

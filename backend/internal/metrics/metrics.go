@@ -166,21 +166,29 @@ var (
 		[]string{"operation", "algorithm"},
 	)
 
-	// Cache metrics
-	CacheHitsTotal = promauto.NewCounterVec(
+	// Cache metrics (with key_prefix label for per-prefix observability)
+	CacheHits = promauto.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "omninudge_cache_hits_total",
-			Help: "Total number of cache hits",
+			Help: "Total cache hits",
 		},
-		[]string{"cache_type"},
+		[]string{"cache_type", "key_prefix"},
 	)
 
-	CacheMissesTotal = promauto.NewCounterVec(
+	CacheMisses = promauto.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "omninudge_cache_misses_total",
-			Help: "Total number of cache misses",
+			Help: "Total cache misses",
 		},
-		[]string{"cache_type"},
+		[]string{"cache_type", "key_prefix"},
+	)
+
+	CacheErrors = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "omninudge_cache_errors_total",
+			Help: "Total cache errors",
+		},
+		[]string{"cache_type", "operation"},
 	)
 
 	CacheEvictionsTotal = promauto.NewCounterVec(
@@ -334,16 +342,6 @@ func statusCategory(status int) string {
 	default:
 		return "unknown"
 	}
-}
-
-// RecordCacheHit records a cache hit
-func RecordCacheHit(cacheType string) {
-	CacheHitsTotal.WithLabelValues(cacheType).Inc()
-}
-
-// RecordCacheMiss records a cache miss
-func RecordCacheMiss(cacheType string) {
-	CacheMissesTotal.WithLabelValues(cacheType).Inc()
 }
 
 // RecordDatabaseQuery records a database query

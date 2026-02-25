@@ -15,7 +15,7 @@
     "i18n:guard": "node ./scripts/i18n-hardcoded-guard.mjs",
     "i18n:guard:update": "node ./scripts/i18n-hardcoded-guard.mjs --update-baseline",
     "i18n:verify": "npm run i18n:check && npm run i18n:guard",
-    "prepare": "husky"
+    "prepare": "cd .. && husky frontend/.husky"
   },
   "dependencies": {
     "@marsidev/react-turnstile": "^1.4.1",

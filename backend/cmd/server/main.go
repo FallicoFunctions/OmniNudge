@@ -12,6 +12,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/omninudge/backend/internal/api/middleware"
 	"github.com/omninudge/backend/internal/config"
+	"github.com/omninudge/backend/internal/tracing"
 	"github.com/omninudge/backend/internal/database"
 	"github.com/omninudge/backend/internal/handlers"
 	"github.com/omninudge/backend/internal/models"
@@ -26,6 +27,16 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
+// serviceName is the OTel / log service identifier — single source of truth.
+const serviceName = "omninudge-api"
+
+// appVersion is set at build time via:
+//
+//	go build -ldflags="-X main.appVersion=1.2.3" ./cmd/server/...
+//
+// Falls back to "dev" when not injected.
+var appVersion = "dev"
+
 func main() {
 	// Load configuration
 	cfg, err := config.Load()
@@ -33,7 +44,20 @@ func main() {
 		log.Fatalf("Failed to load config: %v", err)
 	}
 
-	log.Printf("Starting OmniNudge server...")
+	log.Printf("Starting OmniNudge server (version=%s env=%s)", appVersion, cfg.AppEnv)
+
+	// Initialize OpenTelemetry tracing (P0-040)
+	tracingShutdown, err := tracing.Setup(context.Background(), serviceName, appVersion)
+	if err != nil {
+		log.Printf("Warning: failed to initialize tracing: %v", err)
+	} else {
+		defer func() {
+			if err := tracingShutdown(context.Background()); err != nil {
+				log.Printf("Warning: tracing shutdown error: %v", err)
+			}
+		}()
+		log.Println("OpenTelemetry tracing initialized")
+	}
 
 	// Initialize email encryption
 	if err := utils.SetEncryptionKey(cfg.Encryption.Key); err != nil {
@@ -51,7 +75,9 @@ func main() {
 
 	if cfg.Database.AutoMigrate {
 		log.Println("Running database migrations...")
-		if err := db.Migrate(context.Background()); err != nil {
+		migrateCtx, migrateCancel := context.WithTimeout(context.Background(), 2*time.Minute)
+		defer migrateCancel()
+		if err := db.Migrate(migrateCtx); err != nil {
 			log.Fatalf("Failed to run migrations: %v", err)
 		}
 		log.Println("Migrations complete")
@@ -147,13 +173,17 @@ func main() {
 	}
 
 	var cache services.Cache
+	var cacheType string
 	if redisAvailable {
 		cache = services.NewRedisCache(cfg.Redis.Addr, cfg.Redis.Password, 2*time.Second)
+		cacheType = "redis"
 	} else {
 		// Use in-memory cache as fallback
 		cache = services.NewMemoryCache()
+		cacheType = "memory"
 		log.Println("Using in-memory cache (Redis unavailable)")
 	}
+	cache = services.NewInstrumentedCache(cache, cacheType)
 	redditClient := services.NewRedditClient(
 		cfg.Reddit.UserAgent,
 		cache,
@@ -399,31 +429,56 @@ func main() {
 	postsHandler.SetNotificationService(notificationService)
 	commentsHandler.SetNotificationService(notificationService)
 
-	// Setup Gin router
-	router := gin.Default()
-
-	// Apply CORS middleware BEFORE static files
+	// ── Middleware stack ─────────────────────────────────────────────────────
+	// ORDER IS CRITICAL — do not rearrange without understanding the effects:
+	//  1. Recovery    — catches panics before anything else can observe them
+	//  2. RequestID   — sets X-Request-ID so every downstream log has a trace ID
+	//  3. Tracing     — starts OTel span; before Logger so trace/span IDs are in logs
+	//  4. Logger      — logs after handlers so it has status code + latency
+	//  5. CORS        — must precede static-file serving (preflight OPTIONS)
+	//  6. Security    — adds response security headers early
+	//  7. APIVersion  — adds X-API-Version header
+	//  8. CacheCtrl   — adds Cache-Control before any response body is written
+	//  9. Compression — wraps response writer; must come before Metrics so that
+	//                   Prometheus measures compressed-bytes, not raw bytes
+	// 10. MaxBodySize — rejects oversized request bodies before handler reads them
+	// 11. Timeout     — sets 30s context deadline; handlers/DB drivers that honour
+	//                   ctx.Done() will be cancelled automatically
+	// 12. Metrics     — measures handler latency last so compression is included
+	router := gin.New()
+	router.Use(gin.Recovery())
+	router.Use(middleware.RequestID())
+	router.Use(middleware.Tracing(serviceName))
+	router.Use(middleware.StructuredLogger())
 	router.Use(middleware.CORS())
-
-	// Apply security headers (CSP, X-Frame-Options, etc.)
 	router.Use(middleware.SecurityHeaders())
-
-	// Apply monitoring middleware
+	router.Use(middleware.APIVersion())
+	router.Use(middleware.CacheControl())
+	router.Use(middleware.Compression())
+	// Reject request bodies larger than 50 MB (protects against OOM DoS)
+	router.Use(func(c *gin.Context) {
+		c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 50<<20)
+		c.Next()
+	})
+	router.Use(middleware.Timeout(30 * time.Second))
 	router.Use(monitoring.MetricsMiddleware())
-	// Serve uploads through scan-aware gate (fail-closed for media files).
+
+	// Serve uploads through scan-aware gate (fail-closed for media files)
 	router.GET("/uploads/*filepath", uploadsHandler.ServeUpload)
 	router.HEAD("/uploads/*filepath", uploadsHandler.ServeUpload)
 
-	// Health check endpoint
+	// Health check — used by load balancers; avoids DB hit on every LB ping by
+	// relying on a lightweight pool.Ping rather than a full query.
 	router.GET("/health", func(c *gin.Context) {
 		ctx, cancel := context.WithTimeout(c.Request.Context(), 2*time.Second)
 		defer cancel()
 
 		if err := db.Health(ctx); err != nil {
+			c.Header("Retry-After", "10")
 			c.JSON(http.StatusServiceUnavailable, gin.H{
 				"status":   "unhealthy",
 				"database": "disconnected",
-				"error":    err.Error(),
+				"version":  appVersion,
 			})
 			return
 		}
@@ -431,30 +486,56 @@ func main() {
 		c.JSON(http.StatusOK, gin.H{
 			"status":   "healthy",
 			"database": "connected",
+			"version":  appVersion,
 		})
 	})
 
-	// Prometheus metrics endpoint
-	router.GET("/metrics", gin.WrapH(promhttp.Handler()))
-
-	// Detailed health check endpoints (for monitoring)
-	router.GET("/health/liveness", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{"status": "alive"})
+	// Prometheus metrics endpoint — restricted to internal/admin traffic.
+	// In production, place this behind a firewall or use the METRICS_TOKEN env var.
+	router.GET("/metrics", func(c *gin.Context) {
+		if token := cfg.MetricsToken; token != "" {
+			if c.GetHeader("Authorization") != "Bearer "+token {
+				c.AbortWithStatus(http.StatusUnauthorized)
+				return
+			}
+		}
+		promhttp.Handler().ServeHTTP(c.Writer, c.Request)
 	})
 
+	// Liveness — process is running (used by Kubernetes liveness probe)
+	router.GET("/health/liveness", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"status": "alive", "version": appVersion})
+	})
+
+	// Readiness — service can handle traffic (checks DB + Redis)
 	router.GET("/health/readiness", func(c *gin.Context) {
 		ctx, cancel := context.WithTimeout(c.Request.Context(), 2*time.Second)
 		defer cancel()
 
+		deps := gin.H{"database": "ok", "redis": "ok"}
 		ready := true
+
 		if err := db.Health(ctx); err != nil {
+			deps["database"] = "disconnected"
 			ready = false
 		}
 
+		if redisAvailable {
+			// Use a fresh context so the 500ms Redis ping timeout is independent of
+			// the outer 2s handler timeout (a nested deadline is bounded by its parent).
+			pingCtx, pingCancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+			defer pingCancel()
+			if err := redisClient.Ping(pingCtx).Err(); err != nil {
+				deps["redis"] = "disconnected"
+				ready = false
+			}
+		}
+
 		if ready {
-			c.JSON(http.StatusOK, gin.H{"status": "ready"})
+			c.JSON(http.StatusOK, gin.H{"status": "ready", "deps": deps, "version": appVersion})
 		} else {
-			c.JSON(http.StatusServiceUnavailable, gin.H{"status": "not ready"})
+			c.Header("Retry-After", "5")
+			c.JSON(http.StatusServiceUnavailable, gin.H{"status": "not ready", "deps": deps, "version": appVersion})
 		}
 	})
 
