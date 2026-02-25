@@ -18,7 +18,7 @@ import {
 } from '../../utils/encryption';
 import { getOwnKeys, getUserPublicKey } from '../../services/keyManagementService';
 import { resolveMediaUrl } from '../../utils/mediaUrl';
-import { normalizeReportReason, reportService, type ReportReason } from '../../services/reportService';
+import { ReportModal } from '../moderation/ReportModal';
 
 const MAX_UPLOAD_SIZE = 25 * 1024 * 1024; // 25MB
 
@@ -325,7 +325,7 @@ export function ExpandedMessage({ conversation, onCollapse }: ExpandedMessagePro
   const [messageText, setMessageText] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploadingMedia, setUploadingMedia] = useState(false);
-  const [reportingMessageID, setReportingMessageID] = useState<number | null>(null);
+  const [reportModalMessageID, setReportModalMessageID] = useState<number | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -369,52 +369,8 @@ export function ExpandedMessage({ conversation, onCollapse }: ExpandedMessagePro
     },
   });
 
-  const reportMessageMutation = useMutation({
-    mutationFn: async ({
-      messageID,
-      reason,
-      description,
-    }: {
-      messageID: number;
-      reason: ReportReason;
-      description?: string;
-    }) => {
-      await reportService.createReport({
-        targetType: 'message',
-        targetId: messageID,
-        reason,
-        description,
-      });
-    },
-  });
-
-  const handleReportMessage = async (message: Message) => {
-    const reasonInput = window.prompt(t('reporting.reasonPrompt'));
-    if (reasonInput === null) return;
-    const reason = normalizeReportReason(reasonInput);
-    if (!reason) {
-      alert(t('reporting.invalidReason'));
-      return;
-    }
-    const detailsInput = window.prompt(t('reporting.detailsPrompt'));
-
-    setReportingMessageID(message.id);
-    try {
-      await reportMessageMutation.mutateAsync({
-        messageID: message.id,
-        reason,
-        description: detailsInput ?? undefined,
-      });
-      alert(t('reporting.success'));
-    } catch (error) {
-      alert(
-        t('comments.errors.reportFailed', {
-          message: error instanceof Error ? error.message : t('common.error'),
-        })
-      );
-    } finally {
-      setReportingMessageID(null);
-    }
+  const handleReportMessage = (message: Message) => {
+    setReportModalMessageID(message.id);
   };
 
   const handleSendMessage = async () => {
@@ -600,7 +556,7 @@ export function ExpandedMessage({ conversation, onCollapse }: ExpandedMessagePro
                 message={message}
                 isOwnMessage={message.sender_id === user?.id}
                 currentUserId={user?.id}
-                reporting={reportingMessageID === message.id}
+                reporting={false}
                 onReport={handleReportMessage}
               />
             ))}
@@ -664,6 +620,15 @@ export function ExpandedMessage({ conversation, onCollapse }: ExpandedMessagePro
           </button>
         </div>
       </div>
+
+      {reportModalMessageID !== null && (
+        <ReportModal
+          isOpen={true}
+          onClose={() => setReportModalMessageID(null)}
+          targetType="message"
+          targetId={reportModalMessageID}
+        />
+      )}
     </div>
   );
 }

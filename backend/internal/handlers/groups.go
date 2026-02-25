@@ -24,11 +24,11 @@ func NewGroupHandler(pool *pgxpool.Pool) *GroupHandler {
 // ─── Request / Response Types ─────────────────────────────────────────────────
 
 type CreateGroupRequest struct {
-	Name         string             `json:"name"          binding:"required"`
-	ParticipantIDs []int            `json:"participant_ids" binding:"required"`
-	AvatarURL    string             `json:"avatar_url"`
-	Description  string             `json:"description"`
-	Settings     *GroupSettingsInput `json:"settings"`
+	Name           string              `json:"name"          binding:"required"`
+	ParticipantIDs []int               `json:"participant_ids" binding:"required"`
+	AvatarURL      string              `json:"avatar_url"`
+	Description    string              `json:"description"`
+	Settings       *GroupSettingsInput `json:"settings"`
 }
 
 type GroupSettingsInput struct {
@@ -100,14 +100,14 @@ type GroupSettingsResponse struct {
 }
 
 type GroupInviteResponse struct {
-	ID                 int       `json:"id"`
-	ConversationID     int       `json:"conversation_id"`
-	GroupName          *string   `json:"group_name,omitempty"`
-	GroupAvatarURL     *string   `json:"group_avatar_url,omitempty"`
-	InvitedByUsername  *string   `json:"invited_by_username,omitempty"`
-	Status             string    `json:"status"`
-	ExpiresAt          time.Time `json:"expires_at"`
-	CreatedAt          time.Time `json:"created_at"`
+	ID                int       `json:"id"`
+	ConversationID    int       `json:"conversation_id"`
+	GroupName         *string   `json:"group_name,omitempty"`
+	GroupAvatarURL    *string   `json:"group_avatar_url,omitempty"`
+	InvitedByUsername *string   `json:"invited_by_username,omitempty"`
+	Status            string    `json:"status"`
+	ExpiresAt         time.Time `json:"expires_at"`
+	CreatedAt         time.Time `json:"created_at"`
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -167,6 +167,64 @@ func (h *GroupHandler) ensureGroupExists(c *gin.Context) (int, bool) {
 	return conversationID, true
 }
 
+func (h *GroupHandler) hasBlockingRelationship(ctx *gin.Context, userA, userB int) (bool, error) {
+	var blocked bool
+	err := h.pool.QueryRow(ctx.Request.Context(), `
+		SELECT EXISTS (
+			SELECT 1
+			FROM blocked_users
+			WHERE (blocker_id = $1 AND blocked_id = $2)
+			   OR (blocker_id = $2 AND blocked_id = $1)
+		)
+	`, userA, userB).Scan(&blocked)
+	return blocked, err
+}
+
+func (h *GroupHandler) hasBlockingWithinUsers(ctx *gin.Context, userIDs []int) (bool, error) {
+	if len(userIDs) < 2 {
+		return false, nil
+	}
+
+	var blocked bool
+	err := h.pool.QueryRow(ctx.Request.Context(), `
+		WITH participant_ids AS (
+			SELECT UNNEST($1::int[]) AS user_id
+		)
+		SELECT EXISTS (
+			SELECT 1
+			FROM blocked_users bu
+			JOIN participant_ids p1 ON p1.user_id = bu.blocker_id
+			JOIN participant_ids p2 ON p2.user_id = bu.blocked_id
+		)
+	`, userIDs).Scan(&blocked)
+	return blocked, err
+}
+
+func (h *GroupHandler) getGroupParticipantIDs(ctx *gin.Context, conversationID int) ([]int, error) {
+	rows, err := h.pool.Query(ctx.Request.Context(), `
+		SELECT user_id
+		FROM conversation_participants
+		WHERE conversation_id = $1
+	`, conversationID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	participants := make([]int, 0, 16)
+	for rows.Next() {
+		var userID int
+		if err := rows.Scan(&userID); err != nil {
+			return nil, err
+		}
+		participants = append(participants, userID)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return participants, nil
+}
+
 // ─── CreateGroup ──────────────────────────────────────────────────────────────
 
 // CreateGroup handles POST /api/v1/conversations/groups
@@ -200,6 +258,19 @@ func (h *GroupHandler) CreateGroup(c *gin.Context) {
 	}
 	if len(unique) > 249 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Maximum 250 participants per group"})
+		return
+	}
+	participants := make([]int, 0, len(unique)+1)
+	participants = append(participants, userID)
+	participants = append(participants, unique...)
+
+	blocked, err := h.hasBlockingWithinUsers(c, participants)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check blocking status"})
+		return
+	}
+	if blocked {
+		c.JSON(http.StatusForbidden, gin.H{"error": blockingSettingsErrorMessage})
 		return
 	}
 
@@ -400,6 +471,21 @@ func (h *GroupHandler) AddGroupParticipant(c *gin.Context) {
 	}
 	if existingRole != "" {
 		c.JSON(http.StatusConflict, gin.H{"error": "User is already a member"})
+		return
+	}
+	participants, err := h.getGroupParticipantIDs(c, conversationID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check blocking status"})
+		return
+	}
+	participants = append(participants, req.UserID)
+	blocked, err := h.hasBlockingWithinUsers(c, participants)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check blocking status"})
+		return
+	}
+	if blocked {
+		c.JSON(http.StatusForbidden, gin.H{"error": blockingSettingsErrorMessage})
 		return
 	}
 
@@ -697,9 +783,24 @@ func (h *GroupHandler) CreateGroupInvite(c *gin.Context) {
 		c.JSON(http.StatusConflict, gin.H{"error": "User is already a member"})
 		return
 	}
+	participants, err := h.getGroupParticipantIDs(c, conversationID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check blocking status"})
+		return
+	}
+	participants = append(participants, req.UserID)
+	blocked, err := h.hasBlockingWithinUsers(c, participants)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check blocking status"})
+		return
+	}
+	if blocked {
+		c.JSON(http.StatusForbidden, gin.H{"error": blockingSettingsErrorMessage})
+		return
+	}
 
 	var invite GroupInviteResponse
-	err := h.pool.QueryRow(c.Request.Context(), `
+	err = h.pool.QueryRow(c.Request.Context(), `
 		INSERT INTO group_invites (conversation_id, invited_user_id, invited_by, status, expires_at)
 		VALUES ($1, $2, $3, 'pending', CURRENT_TIMESTAMP + INTERVAL '7 days')
 		ON CONFLICT (conversation_id, invited_user_id) DO UPDATE
@@ -730,13 +831,14 @@ func (h *GroupHandler) AcceptGroupInvite(c *gin.Context) {
 
 	ctx := c.Request.Context()
 	var conversationID int
+	var invitedBy int
 	var status string
 	var expiresAt time.Time
 	err = h.pool.QueryRow(ctx, `
-		SELECT conversation_id, status, expires_at
+		SELECT conversation_id, invited_by, status, expires_at
 		FROM group_invites
 		WHERE id = $1 AND invited_user_id = $2
-	`, inviteID, userID).Scan(&conversationID, &status, &expiresAt)
+	`, inviteID, userID).Scan(&conversationID, &invitedBy, &status, &expiresAt)
 	if err == pgx.ErrNoRows {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Invite not found"})
 		return
@@ -751,6 +853,30 @@ func (h *GroupHandler) AcceptGroupInvite(c *gin.Context) {
 	}
 	if expiresAt.Before(time.Now()) {
 		c.JSON(http.StatusGone, gin.H{"error": "Invite has expired"})
+		return
+	}
+	blocked, err := h.hasBlockingRelationship(c, userID, invitedBy)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check blocking status"})
+		return
+	}
+	if blocked {
+		c.JSON(http.StatusForbidden, gin.H{"error": blockingSettingsErrorMessage})
+		return
+	}
+	participants, err := h.getGroupParticipantIDs(c, conversationID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check blocking status"})
+		return
+	}
+	participants = append(participants, userID)
+	blocked, err = h.hasBlockingWithinUsers(c, participants)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check blocking status"})
+		return
+	}
+	if blocked {
+		c.JSON(http.StatusForbidden, gin.H{"error": blockingSettingsErrorMessage})
 		return
 	}
 

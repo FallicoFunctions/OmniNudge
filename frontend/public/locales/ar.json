@@ -1853,7 +1853,30 @@
     "reasonPrompt": "سبب الإبلاغ (اختر واحدًا): spam, harassment, illegal_content, csam, violence, hate_speech, other",
     "detailsPrompt": "تفاصيل إضافية (اختياري):",
     "invalidReason": "سبب غير صالح. استخدم أحد القيم التالية: spam, harassment, illegal_content, csam, violence, hate_speech, other.",
-    "success": "شكرًا! تم إبلاغ فريق الإشراف."
+    "success": "شكرًا! تم إبلاغ فريق الإشراف.",
+    "reasons": {
+      "spam": "بريد مزعج",
+      "harassment": "مضايقة",
+      "illegalContent": "محتوى غير قانوني",
+      "csam": "CSAM",
+      "violence": "عنف",
+      "hateSpeech": "خطاب كراهية",
+      "other": "أخرى"
+    },
+    "modal": {
+      "title": "إرسال بلاغ",
+      "titleWithName": "الإبلاغ عن {{name}}",
+      "reasonLabel": "السبب",
+      "descriptionLabel": "تفاصيل إضافية",
+      "descriptionPlaceholder": "قدم أي سياق إضافي قد يساعد فريق الإشراف لدينا...",
+      "submit": "إرسال البلاغ",
+      "submitting": "جارٍ الإرسال...",
+      "cancel": "إلغاء"
+    },
+    "errors": {
+      "rateLimited": "لقد أرسلت عددًا كبيرًا جدًا من البلاغات مؤخرًا. يرجى الانتظار قبل إرسال بلاغ آخر.",
+      "failed": "فشل إرسال البلاغ: {{message}}"
+    }
   },
   "comments": {
     "title": "التعليقات",
