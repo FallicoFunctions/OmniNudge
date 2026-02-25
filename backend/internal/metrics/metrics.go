@@ -216,6 +216,30 @@ var (
 		[]string{"limit_type"},
 	)
 
+	RateLimitWarningsTotal = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "omninudge_rate_limit_warnings_total",
+			Help: "Total number of rate limit warnings (token budget < 20%)",
+		},
+		[]string{"endpoint"},
+	)
+
+	RateLimitThrottledTotal = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "omninudge_rate_limit_throttled_total",
+			Help: "Total number of throttled requests (artificial delay applied)",
+		},
+		[]string{"endpoint"},
+	)
+
+	RateLimitBlockedTotal = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "omninudge_rate_limit_blocked_total",
+			Help: "Total number of blocked requests (429 returned)",
+		},
+		[]string{"endpoint"},
+	)
+
 	// File upload metrics
 	FileUploadsTotal = promauto.NewCounterVec(
 		prometheus.CounterOpts{
