@@ -91,6 +91,8 @@ func (r *RedditClient) doAPIRequest(req *http.Request, endpoint string) (*http.R
 	start := time.Now()
 	resp, err := r.httpClient.Do(req)
 	duration := time.Since(start)
+	// Duration is observed before the error check so that network timeouts
+	// (which hit the full httpClient.Timeout) are captured in the histogram.
 	metrics.RedditAPIRequestDuration.WithLabelValues(endpoint).Observe(duration.Seconds())
 	if err != nil {
 		metrics.RedditAPIRequestsTotal.WithLabelValues(endpoint, "network_error").Inc()

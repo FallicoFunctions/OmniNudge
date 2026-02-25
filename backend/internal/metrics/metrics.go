@@ -200,12 +200,11 @@ var (
 	)
 
 	// Rate limiting metrics
-	RateLimitHitsTotal = promauto.NewCounterVec(
+	RateLimitHitsTotal = promauto.NewCounter(
 		prometheus.CounterOpts{
 			Name: "omninudge_rate_limit_hits_total",
-			Help: "Total number of rate limit hits (429 responses)",
+			Help: "Total number of rate limit events across all tiers (warn + throttle + block).",
 		},
-		[]string{"limit_type"},
 	)
 
 	RateLimitRequestsTotal = promauto.NewCounterVec(
