@@ -10,6 +10,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"golang.org/x/time/rate"
+
+	"github.com/omninudge/backend/internal/metrics"
 )
 
 // limiterEntry pairs a rate limiter with the last time it was accessed,
@@ -138,6 +140,8 @@ func (rl *RateLimiter) Middleware() gin.HandlerFunc {
 		if delay > maxThrottleWait {
 			// Block tier — cancel the reservation so the token is returned.
 			r.Cancel()
+			metrics.RateLimitBlockedTotal.WithLabelValues(c.FullPath()).Inc()
+			metrics.RateLimitHitsTotal.WithLabelValues("general").Inc()
 			retryAfter := int(math.Max(1, math.Ceil(delay.Seconds())))
 			resetAt := time.Now().Add(delay).Unix()
 			c.Header("Retry-After", fmt.Sprintf("%d", retryAfter))
@@ -152,10 +156,12 @@ func (rl *RateLimiter) Middleware() gin.HandlerFunc {
 		if delay > 0 {
 			// Throttle tier — sleep 100 ms regardless of exact delay.
 			c.Header("X-RateLimit-Throttled", "true")
+			metrics.RateLimitThrottledTotal.WithLabelValues(c.FullPath()).Inc()
 			time.Sleep(100 * time.Millisecond)
 		} else if tokens < float64(rl.burst)*0.20 {
 			// Warn tier — token budget nearly exhausted.
 			c.Header("X-RateLimit-Warning", "approaching limit")
+			metrics.RateLimitWarningsTotal.WithLabelValues(c.FullPath()).Inc()
 		}
 
 		c.Next()

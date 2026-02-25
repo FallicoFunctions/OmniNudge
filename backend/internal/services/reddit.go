@@ -16,6 +16,8 @@ import (
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
+
+	"github.com/omninudge/backend/internal/metrics"
 )
 
 // RedditClient handles interactions with Reddit's public JSON API
@@ -81,6 +83,28 @@ func (r *RedditClient) HTTPClientForTest() *http.Client {
 // SetHTTPClient allows setting a custom HTTP client (for testing)
 func (r *RedditClient) SetHTTPClient(client *http.Client) {
 	r.httpClient = client
+}
+
+
+// doAPIRequest executes an HTTP request against the Reddit API and records
+// Prometheus metrics for the call. endpoint is a short label (e.g. "subreddit_posts").
+func (r *RedditClient) doAPIRequest(req *http.Request, endpoint string) (*http.Response, error) {
+	resp, err := r.httpClient.Do(req)
+	if err != nil {
+		metrics.RedditAPIRequestsTotal.WithLabelValues(endpoint, "error").Inc()
+		return nil, err
+	}
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		metrics.RedditAPIRequestsTotal.WithLabelValues(endpoint, "error").Inc()
+	} else {
+		metrics.RedditAPIRequestsTotal.WithLabelValues(endpoint, "success").Inc()
+	}
+	if remaining := resp.Header.Get("X-Ratelimit-Remaining"); remaining != "" {
+		if val, err := strconv.ParseFloat(remaining, 64); err == nil {
+			metrics.RedditAPIRateLimitRemaining.Set(val)
+		}
+	}
+	return resp, nil
 }
 
 func (r *RedditClient) redditBaseURL() string {
@@ -447,7 +471,7 @@ func (r *RedditClient) GetSubredditPosts(ctx context.Context, subreddit string, 
 	req.URL.RawQuery = q.Encode()
 
 	// Make request
-	resp, err := r.httpClient.Do(req)
+	resp, err := r.doAPIRequest(req, "subreddit_posts")
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch subreddit: %w", err)
 	}
@@ -455,8 +479,6 @@ func (r *RedditClient) GetSubredditPosts(ctx context.Context, subreddit string, 
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		// Log the full error for debugging
-		fmt.Printf("[Reddit API Error] Status: %d, URL: %s, Body: %s\n", resp.StatusCode, req.URL.String(), string(body))
 		return nil, fmt.Errorf("reddit API returned status %d: %s", resp.StatusCode, string(body))
 	}
 
@@ -466,21 +488,6 @@ func (r *RedditClient) GetSubredditPosts(ctx context.Context, subreddit string, 
 		return nil, fmt.Errorf("failed to decode response: %w", err)
 	}
 
-	// Debug: Check if preview data exists for gallery posts
-	for i, child := range listing.Data.Children {
-		if child.Data.URL != "" && (strings.Contains(child.Data.URL, "/gallery/") || child.Data.IsGallery) {
-			hasPreview := child.Data.Preview != nil && len(child.Data.Preview.Images) > 0
-			previewCount := 0
-			if child.Data.Preview != nil {
-				previewCount = len(child.Data.Preview.Images)
-			}
-			fmt.Printf("[DEBUG] Gallery post %d: ID=%s, HasPreview=%v, PreviewImages=%d\n",
-				i, child.Data.ID, hasPreview, previewCount)
-			if hasPreview {
-				fmt.Printf("[DEBUG]   First preview URL: %s\n", child.Data.Preview.Images[0].Source.URL)
-			}
-		}
-	}
 
 	_ = r.setCachedListing(ctx, cacheKey, listing)
 	return &listing, nil
@@ -519,7 +526,7 @@ func (r *RedditClient) GetFrontPage(ctx context.Context, sort string, timeFilter
 	req.URL.RawQuery = q.Encode()
 
 	// Make request
-	resp, err := r.httpClient.Do(req)
+	resp, err := r.doAPIRequest(req, "front_page")
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch front page: %w", err)
 	}
@@ -554,7 +561,7 @@ func (r *RedditClient) GetPostInfo(ctx context.Context, subreddit string, reddit
 	}
 	req.Header.Set("User-Agent", r.userAgent)
 
-	resp, err := r.httpClient.Do(req)
+	resp, err := r.doAPIRequest(req, "post_info")
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch post info: %w", err)
 	}
@@ -616,7 +623,7 @@ func (r *RedditClient) GetPostComments(ctx context.Context, subreddit string, po
 	req.URL.RawQuery = q.Encode()
 
 	// Make request
-	resp, err := r.httpClient.Do(req)
+	resp, err := r.doAPIRequest(req, "post_comments")
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch comments: %w", err)
 	}
@@ -684,7 +691,7 @@ func (r *RedditClient) SearchPosts(ctx context.Context, query string, subreddit 
 	req.URL.RawQuery = q.Encode()
 
 	// Make request
-	resp, err := r.httpClient.Do(req)
+	resp, err := r.doAPIRequest(req, "search_posts")
 	if err != nil {
 		return nil, fmt.Errorf("failed to search: %w", err)
 	}
@@ -725,7 +732,7 @@ func (r *RedditClient) SearchUsers(ctx context.Context, query string, limit int,
 	q.Add("include_over_18", strconv.FormatBool(includeNSFW))
 	req.URL.RawQuery = q.Encode()
 
-	resp, err := r.httpClient.Do(req)
+	resp, err := r.doAPIRequest(req, "search_users")
 	if err != nil {
 		return nil, fmt.Errorf("failed to search users: %w", err)
 	}
@@ -796,7 +803,7 @@ func (r *RedditClient) AutocompleteSubreddits(ctx context.Context, query string,
 	q.Set("include_profiles", "false")
 	req.URL.RawQuery = q.Encode()
 
-	resp, err := r.httpClient.Do(req)
+	resp, err := r.doAPIRequest(req, "autocomplete_subreddits")
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch subreddit suggestions: %w", err)
 	}
@@ -857,7 +864,7 @@ func (r *RedditClient) SearchSubreddits(ctx context.Context, query string, limit
 	}
 	req.URL.RawQuery = q.Encode()
 
-	resp, err := r.httpClient.Do(req)
+	resp, err := r.doAPIRequest(req, "search_subreddits")
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to search subreddits: %w", err)
 	}
@@ -936,7 +943,7 @@ func (r *RedditClient) GetUserListing(ctx context.Context, username, section, so
 	}
 	req.URL.RawQuery = q.Encode()
 
-	resp, err := r.httpClient.Do(req)
+	resp, err := r.doAPIRequest(req, "user_listing")
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch user listing: %w", err)
 	}
@@ -1002,7 +1009,7 @@ func (r *RedditClient) GetUserAbout(ctx context.Context, username string) (*Redd
 	}
 	req.Header.Set("User-Agent", r.userAgent)
 
-	resp, err := r.httpClient.Do(req)
+	resp, err := r.doAPIRequest(req, "user_about")
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch user: %w", err)
 	}
@@ -1064,7 +1071,7 @@ func (r *RedditClient) GetUserTrophies(ctx context.Context, username string) ([]
 	}
 	req.Header.Set("User-Agent", r.userAgent)
 
-	resp, err := r.httpClient.Do(req)
+	resp, err := r.doAPIRequest(req, "user_trophies")
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch trophies: %w", err)
 	}
@@ -1133,7 +1140,7 @@ func (r *RedditClient) GetUserModeratedSubreddits(ctx context.Context, username 
 	}
 	req.Header.Set("User-Agent", r.userAgent)
 
-	resp, err := r.httpClient.Do(req)
+	resp, err := r.doAPIRequest(req, "user_moderated_subreddits")
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch moderated subreddits: %w", err)
 	}
@@ -1193,7 +1200,7 @@ func (r *RedditClient) GetSubredditAbout(ctx context.Context, subreddit string) 
 	}
 	req.Header.Set("User-Agent", r.userAgent)
 
-	resp, err := r.httpClient.Do(req)
+	resp, err := r.doAPIRequest(req, "subreddit_about")
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch subreddit about: %w", err)
 	}
@@ -1229,7 +1236,6 @@ func (r *RedditClient) GetSubredditAbout(ctx context.Context, subreddit string) 
 		Over18:              raw.Data.Over18,
 	}
 
-	fmt.Printf("DEBUG: GetSubredditAbout for %s: over18=%v\n", subreddit, about.Over18)
 
 	if data, err := json.Marshal(about); err == nil {
 		_ = r.cache.Set(ctx, cacheKey, string(data), r.cacheTTL)
@@ -1302,7 +1308,7 @@ func (r *RedditClient) fetchSubredditModeratorsAPI(ctx context.Context, subreddi
 		req.Header.Set("Authorization", "Bearer "+token)
 	}
 
-	resp, err := r.httpClient.Do(req)
+	resp, err := r.doAPIRequest(req, "subreddit_moderators")
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch subreddit moderators: %w", err)
 	}
@@ -1347,7 +1353,7 @@ func (r *RedditClient) fetchSubredditModeratorsFromHTML(ctx context.Context, sub
 	}
 	req.Header.Set("User-Agent", r.userAgent)
 
-	resp, err := r.httpClient.Do(req)
+	resp, err := r.doAPIRequest(req, "subreddit_moderators_html")
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch moderators fallback: %w", err)
 	}
@@ -1437,7 +1443,7 @@ func (r *RedditClient) getAppAccessToken(ctx context.Context) (string, error) {
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("User-Agent", r.userAgent)
 
-	resp, err := r.httpClient.Do(req)
+	resp, err := r.doAPIRequest(req, "app_access_token")
 	if err != nil {
 		return "", fmt.Errorf("failed to request reddit token: %w", err)
 	}
@@ -1509,7 +1515,7 @@ func (r *RedditClient) GetSubredditWikiPage(ctx context.Context, subreddit strin
 	}
 	req.Header.Set("User-Agent", r.userAgent)
 
-	resp, err := r.httpClient.Do(req)
+	resp, err := r.doAPIRequest(req, "subreddit_wiki_page")
 	if err != nil {
 		return nil, err
 	}
@@ -1543,7 +1549,7 @@ func (r *RedditClient) GetWikiPage(ctx context.Context, pagePath string) (map[st
 	}
 	req.Header.Set("User-Agent", r.userAgent)
 
-	resp, err := r.httpClient.Do(req)
+	resp, err := r.doAPIRequest(req, "wiki_page")
 	if err != nil {
 		return nil, err
 	}
@@ -1595,7 +1601,7 @@ func (r *RedditClient) GetSubredditWikiRevisions(ctx context.Context, subreddit,
 	}
 	req.Header.Set("User-Agent", r.userAgent)
 
-	resp, err := r.httpClient.Do(req)
+	resp, err := r.doAPIRequest(req, "subreddit_wiki_revisions")
 	if err != nil {
 		return nil, err
 	}
@@ -1653,7 +1659,7 @@ func (r *RedditClient) GetSubredditWikiDiscussions(ctx context.Context, subreddi
 	}
 	req.Header.Set("User-Agent", r.userAgent)
 
-	resp, err := r.httpClient.Do(req)
+	resp, err := r.doAPIRequest(req, "subreddit_wiki_discussions")
 	if err != nil {
 		return nil, err
 	}
