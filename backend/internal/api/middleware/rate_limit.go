@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"fmt"
 	"log"
 	"math"
 	"net/http"
@@ -22,6 +23,7 @@ type limiterEntry struct {
 }
 
 // RateLimiter manages per-user token-bucket rate limiters.
+// Always construct via NewRateLimiter — zero-value is invalid (nil done channel).
 type RateLimiter struct {
 	limiters map[int]*limiterEntry
 	mu       sync.RWMutex
@@ -80,10 +82,13 @@ func (rl *RateLimiter) getLimiter(userID int) *rate.Limiter {
 	rl.mu.RUnlock()
 
 	if exists {
-		// Update lastAccess under a write lock to avoid a data race.
-		rl.mu.Lock()
-		rl.limiters[userID].lastAccess = time.Now()
-		rl.mu.Unlock()
+		// Only refresh lastAccess if it's been more than a minute — avoids a
+		// write-lock round-trip on every request for the 24-hour eviction window.
+		if time.Since(entry.lastAccess) > time.Minute {
+			rl.mu.Lock()
+			rl.limiters[userID].lastAccess = time.Now()
+			rl.mu.Unlock()
+		}
 		return entry.limiter
 	}
 
@@ -113,6 +118,8 @@ const maxThrottleWait = 500 * time.Millisecond
 // Three tiers:
 //   - Warn  (< 20% tokens remaining):  request proceeds normally, adds
 //     X-RateLimit-Warning header.
+//   - Note: during recovery from throttle, a request may trigger warn (tokens < 20%)
+//     without being throttled, since the delay dropped to 0 as the bucket refilled.
 //   - Throttle (0 tokens, reserve delay ≤ 500 ms): request proceeds after a
 //     100 ms artificial delay, adds X-RateLimit-Throttled header.
 //   - Block (reserve delay > 500 ms): returns HTTP 429 with Retry-After and
@@ -131,12 +138,14 @@ func (rl *RateLimiter) Middleware() gin.HandlerFunc {
 		userID, ok := rawID.(int)
 		if !ok {
 			// user_id is present but wrong type — log and skip rather than panic.
-			log.Printf(`{"level":"WARN","msg":"unexpected user_id type in rate limiter","type":"%T"}`, rawID)
+			typeName := fmt.Sprintf("%T", rawID)
+			log.Printf(`{"level":"WARN","msg":"unexpected user_id type in rate limiter","type":%q}`, typeName)
 			c.Next()
 			return
 		}
 
 		limiter := rl.getLimiter(userID)
+		metrics.RateLimitRequestsTotal.WithLabelValues("general").Inc()
 
 		// Try to reserve one token to determine the wait duration without
 		// immediately blocking the goroutine.
@@ -151,6 +160,8 @@ func (rl *RateLimiter) Middleware() gin.HandlerFunc {
 		if delay > maxThrottleWait {
 			// Block tier — cancel the reservation so the token is returned.
 			r.Cancel()
+			// Override Remaining now that the token has been returned.
+			c.Header("X-RateLimit-Remaining", strconv.Itoa(int(math.Max(0, limiter.Tokens()))))
 			metrics.RateLimitHitsTotal.Inc()
 			metrics.RateLimitBlockedTotal.WithLabelValues(c.FullPath()).Inc()
 			retryAfter := int(math.Max(1, math.Ceil(delay.Seconds())))
@@ -181,32 +192,28 @@ func (rl *RateLimiter) Middleware() gin.HandlerFunc {
 	}
 }
 
-// UploadRateLimiter creates a rate limiter specifically for media uploads
-// Allows 10 uploads per minute (10 requests / 60 seconds = ~0.1667 requests/second)
+// UploadRateLimiter creates a rate limiter specifically for media uploads.
+// Allows 10 uploads per minute (10 requests / 60 seconds = ~0.1667 requests/second).
 func UploadRateLimiter() *RateLimiter {
-	// 10 uploads per minute with burst of 3.
 	return NewRateLimiter(rate.Limit(10.0/60.0), 3)
 }
 
-// ThemeCreationRateLimiter creates a rate limiter for theme creation/updates
-// Allows 10 theme saves per hour (10 requests / 3600 seconds = ~0.00278 requests/second)
+// ThemeCreationRateLimiter creates a rate limiter for theme creation/updates.
+// Allows 10 theme saves per hour (10 requests / 3600 seconds = ~0.00278 requests/second).
 func ThemeCreationRateLimiter() *RateLimiter {
-	// 10 theme saves per hour with burst of 2
 	return NewRateLimiter(rate.Limit(10.0/3600.0), 2)
 }
 
-// ThemePreviewRateLimiter creates a rate limiter for theme previews
-// Allows 50 previews per hour (50 requests / 3600 seconds = ~0.0139 requests/second)
-// This is more permissive since previews are read-only operations
+// ThemePreviewRateLimiter creates a rate limiter for theme previews.
+// Allows 50 previews per hour (50 requests / 3600 seconds = ~0.0139 requests/second).
+// This is more permissive since previews are read-only operations.
 func ThemePreviewRateLimiter() *RateLimiter {
-	// 50 previews per hour with burst of 10
 	return NewRateLimiter(rate.Limit(50.0/3600.0), 10)
 }
 
-// GeneralAPIRateLimiter creates a general rate limiter for standard API operations
-// Allows 100 requests per minute (100 requests / 60 seconds = ~1.67 requests/second)
+// GeneralAPIRateLimiter creates a general rate limiter for standard API operations.
+// Allows 100 requests per minute (100 requests / 60 seconds = ~1.67 requests/second).
 func GeneralAPIRateLimiter() *RateLimiter {
-	// 100 requests per minute with burst of 20
 	return NewRateLimiter(rate.Limit(100.0/60.0), 20)
 }
 
