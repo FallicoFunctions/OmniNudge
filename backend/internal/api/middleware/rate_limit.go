@@ -1,10 +1,10 @@
 package middleware
 
 import (
-	"fmt"
 	"log"
 	"math"
 	"net/http"
+	"strconv"
 	"sync"
 	"time"
 
@@ -27,6 +27,7 @@ type RateLimiter struct {
 	mu       sync.RWMutex
 	limit    rate.Limit
 	burst    int // Maximum tokens available in the bucket
+	done     chan struct{}
 }
 
 // NewRateLimiter creates a new rate limiter and starts a background goroutine
@@ -37,9 +38,15 @@ func NewRateLimiter(limit rate.Limit, burst int) *RateLimiter {
 		limiters: make(map[int]*limiterEntry),
 		limit:    limit,
 		burst:    burst,
+		done:     make(chan struct{}),
 	}
 	go rl.evictStale()
 	return rl
+}
+
+// Stop shuts down the background eviction goroutine.
+func (rl *RateLimiter) Stop() {
+	close(rl.done)
 }
 
 // evictStale removes limiters that have not been accessed in 24 hours.
@@ -47,15 +54,20 @@ func NewRateLimiter(limit rate.Limit, burst int) *RateLimiter {
 func (rl *RateLimiter) evictStale() {
 	ticker := time.NewTicker(1 * time.Hour)
 	defer ticker.Stop()
-	for range ticker.C {
-		cutoff := time.Now().Add(-24 * time.Hour)
-		rl.mu.Lock()
-		for id, entry := range rl.limiters {
-			if entry.lastAccess.Before(cutoff) {
-				delete(rl.limiters, id)
+	for {
+		select {
+		case <-rl.done:
+			return
+		case <-ticker.C:
+			cutoff := time.Now().Add(-24 * time.Hour)
+			rl.mu.Lock()
+			for id, entry := range rl.limiters {
+				if entry.lastAccess.Before(cutoff) {
+					delete(rl.limiters, id)
+				}
 			}
+			rl.mu.Unlock()
 		}
-		rl.mu.Unlock()
 	}
 }
 
@@ -117,35 +129,32 @@ func (rl *RateLimiter) Middleware() gin.HandlerFunc {
 		userID, ok := rawID.(int)
 		if !ok {
 			// user_id is present but wrong type — log and skip rather than panic.
-			log.Printf("[rate_limit] unexpected user_id type %T; skipping rate limit", rawID)
+			log.Printf(`{"level":"WARN","msg":"unexpected user_id type in rate limiter","type":"%T"}`, rawID)
 			c.Next()
 			return
 		}
 
 		limiter := rl.getLimiter(userID)
 
-		// Snapshot approximate remaining tokens before consuming one.
-		tokens := limiter.Tokens()
-		remaining := int(math.Max(0, tokens-1))
-
-		// Always set informational headers.
-		c.Header("X-RateLimit-Limit", fmt.Sprintf("%d", rl.burst))
-		c.Header("X-RateLimit-Remaining", fmt.Sprintf("%d", remaining))
-
 		// Try to reserve one token to determine the wait duration without
 		// immediately blocking the goroutine.
 		r := limiter.Reserve()
 		delay := r.Delay()
 
+		// Set informational headers after the reservation so Remaining reflects
+		// post-reservation state.
+		c.Header("X-RateLimit-Limit", strconv.Itoa(rl.burst))
+		c.Header("X-RateLimit-Remaining", strconv.Itoa(int(math.Max(0, limiter.Tokens()))))
+
 		if delay > maxThrottleWait {
 			// Block tier — cancel the reservation so the token is returned.
 			r.Cancel()
-			metrics.RateLimitBlockedTotal.WithLabelValues(c.FullPath()).Inc()
 			metrics.RateLimitHitsTotal.WithLabelValues("general").Inc()
+			metrics.RateLimitBlockedTotal.WithLabelValues(c.FullPath()).Inc()
 			retryAfter := int(math.Max(1, math.Ceil(delay.Seconds())))
 			resetAt := time.Now().Add(delay).Unix()
-			c.Header("Retry-After", fmt.Sprintf("%d", retryAfter))
-			c.Header("X-RateLimit-Reset", fmt.Sprintf("%d", resetAt))
+			c.Header("Retry-After", strconv.Itoa(retryAfter))
+			c.Header("X-RateLimit-Reset", strconv.FormatInt(resetAt, 10))
 			c.JSON(http.StatusTooManyRequests, gin.H{
 				"error": "Rate limit exceeded. Please try again later.",
 			})
@@ -153,14 +162,19 @@ func (rl *RateLimiter) Middleware() gin.HandlerFunc {
 			return
 		}
 
+		// Snapshot tokens before consuming for warn-tier check.
+		tokens := limiter.Tokens()
+
 		if delay > 0 {
 			// Throttle tier — sleep 100 ms regardless of exact delay.
 			c.Header("X-RateLimit-Throttled", "true")
+			metrics.RateLimitHitsTotal.WithLabelValues("general").Inc()
 			metrics.RateLimitThrottledTotal.WithLabelValues(c.FullPath()).Inc()
 			time.Sleep(100 * time.Millisecond)
-		} else if tokens < float64(rl.burst)*0.20 {
+		} else if tokens-1 < float64(rl.burst)*0.20 {
 			// Warn tier — token budget nearly exhausted.
 			c.Header("X-RateLimit-Warning", "approaching limit")
+			metrics.RateLimitHitsTotal.WithLabelValues("general").Inc()
 			metrics.RateLimitWarningsTotal.WithLabelValues(c.FullPath()).Inc()
 		}
 
