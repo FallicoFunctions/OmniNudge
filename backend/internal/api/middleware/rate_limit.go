@@ -28,6 +28,7 @@ type RateLimiter struct {
 	limit    rate.Limit
 	burst    int // Maximum tokens available in the bucket
 	done     chan struct{}
+	once     sync.Once
 }
 
 // NewRateLimiter creates a new rate limiter and starts a background goroutine
@@ -45,8 +46,9 @@ func NewRateLimiter(limit rate.Limit, burst int) *RateLimiter {
 }
 
 // Stop shuts down the background eviction goroutine.
+// Safe to call multiple times; only the first call closes the channel.
 func (rl *RateLimiter) Stop() {
-	close(rl.done)
+	rl.once.Do(func() { close(rl.done) })
 }
 
 // evictStale removes limiters that have not been accessed in 24 hours.
@@ -141,15 +143,15 @@ func (rl *RateLimiter) Middleware() gin.HandlerFunc {
 		r := limiter.Reserve()
 		delay := r.Delay()
 
-		// Set informational headers after the reservation so Remaining reflects
-		// post-reservation state.
+		// Single post-reservation snapshot — avoids two inconsistent reads.
+		tokens := limiter.Tokens()
 		c.Header("X-RateLimit-Limit", strconv.Itoa(rl.burst))
-		c.Header("X-RateLimit-Remaining", strconv.Itoa(int(math.Max(0, limiter.Tokens()))))
+		c.Header("X-RateLimit-Remaining", strconv.Itoa(int(math.Max(0, tokens))))
 
 		if delay > maxThrottleWait {
 			// Block tier — cancel the reservation so the token is returned.
 			r.Cancel()
-			metrics.RateLimitHitsTotal.WithLabelValues("general").Inc()
+			metrics.RateLimitHitsTotal.Inc()
 			metrics.RateLimitBlockedTotal.WithLabelValues(c.FullPath()).Inc()
 			retryAfter := int(math.Max(1, math.Ceil(delay.Seconds())))
 			resetAt := time.Now().Add(delay).Unix()
@@ -162,19 +164,16 @@ func (rl *RateLimiter) Middleware() gin.HandlerFunc {
 			return
 		}
 
-		// Snapshot tokens before consuming for warn-tier check.
-		tokens := limiter.Tokens()
-
 		if delay > 0 {
 			// Throttle tier — sleep 100 ms regardless of exact delay.
 			c.Header("X-RateLimit-Throttled", "true")
-			metrics.RateLimitHitsTotal.WithLabelValues("general").Inc()
+			metrics.RateLimitHitsTotal.Inc()
 			metrics.RateLimitThrottledTotal.WithLabelValues(c.FullPath()).Inc()
 			time.Sleep(100 * time.Millisecond)
-		} else if tokens-1 < float64(rl.burst)*0.20 {
+		} else if tokens < float64(rl.burst)*0.20 {
 			// Warn tier — token budget nearly exhausted.
 			c.Header("X-RateLimit-Warning", "approaching limit")
-			metrics.RateLimitHitsTotal.WithLabelValues("general").Inc()
+			metrics.RateLimitHitsTotal.Inc()
 			metrics.RateLimitWarningsTotal.WithLabelValues(c.FullPath()).Inc()
 		}
 

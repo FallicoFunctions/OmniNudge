@@ -418,6 +418,12 @@ func main() {
 	reactionsHandler := handlers.NewReactionsHandler(reactionService)
 	reactionRateLimiter := middleware.ReactionRateLimiter()
 
+	// Rate limiters hoisted so they are accessible at graceful shutdown.
+	themeCreationLimiter := middleware.ThemeCreationRateLimiter()
+	themePreviewLimiter := middleware.ThemePreviewRateLimiter()
+	generalLimiter := middleware.GeneralAPIRateLimiter()
+	uploadRateLimiter := middleware.UploadRateLimiter()
+
 	// Check ffmpeg availability for iOS audio encoding (P0-003)
 	if err := handlers.CheckFFmpegAvailability(); err != nil {
 		log.Printf("Warning: FFmpeg not available - iOS voice recording will not work: %v", err)
@@ -774,9 +780,6 @@ func main() {
 			protected.GET("/hubs/agent-targets", hubsHandler.GetAgentTargets)
 
 			// Theme customization routes with rate limiting
-			themeCreationLimiter := middleware.ThemeCreationRateLimiter()
-			themePreviewLimiter := middleware.ThemePreviewRateLimiter()
-			generalLimiter := middleware.GeneralAPIRateLimiter()
 
 			// Predefined themes (public access within protected routes, general rate limit)
 			protected.GET("/themes/predefined", generalLimiter.Middleware(), themesHandler.GetPredefinedThemes)
@@ -991,7 +994,6 @@ func main() {
 			protected.GET("/conversations/:id/media/:messageId/index", mediaGalleryHandler.FindMediaIndex)
 
 			// Media upload (with rate limiting: 10 uploads per minute)
-			uploadRateLimiter := middleware.UploadRateLimiter()
 			protected.POST("/media/upload", uploadRateLimiter.Middleware(), mediaHandler.UploadMedia)
 			// Batch media upload (same request rate limiter as single upload; per-request file count capped in handler)
 			protected.POST("/media/batch-upload", uploadRateLimiter.Middleware(), mediaHandler.BatchUploadMedia)
@@ -1170,6 +1172,13 @@ func main() {
 	if err := srv.Shutdown(ctx); err != nil {
 		log.Fatalf("Server forced to shutdown: %v", err)
 	}
+
+	// Stop rate limiter eviction goroutines.
+	reactionRateLimiter.Stop()
+	themeCreationLimiter.Stop()
+	themePreviewLimiter.Stop()
+	generalLimiter.Stop()
+	uploadRateLimiter.Stop()
 
 	log.Println("Server exited")
 }
