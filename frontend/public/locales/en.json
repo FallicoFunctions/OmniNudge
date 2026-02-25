@@ -1853,7 +1853,30 @@
     "reasonPrompt": "Report reason (type one): spam, harassment, illegal_content, csam, violence, hate_speech, other",
     "detailsPrompt": "Additional details (optional):",
     "invalidReason": "Invalid reason. Use one of: spam, harassment, illegal_content, csam, violence, hate_speech, other.",
-    "success": "Thanks! The moderation team has been notified."
+    "success": "Thanks! The moderation team has been notified.",
+    "reasons": {
+      "spam": "Spam",
+      "harassment": "Harassment",
+      "illegalContent": "Illegal Content",
+      "csam": "CSAM",
+      "violence": "Violence",
+      "hateSpeech": "Hate Speech",
+      "other": "Other"
+    },
+    "modal": {
+      "title": "Submit a Report",
+      "titleWithName": "Report {{name}}",
+      "reasonLabel": "Reason",
+      "descriptionLabel": "Additional details",
+      "descriptionPlaceholder": "Provide any additional context that may help our moderation team...",
+      "submit": "Submit Report",
+      "submitting": "Submitting...",
+      "cancel": "Cancel"
+    },
+    "errors": {
+      "rateLimited": "You have submitted too many reports recently. Please wait before submitting another.",
+      "failed": "Failed to submit report: {{message}}"
+    }
   },
   "comments": {
     "title": "Comments",

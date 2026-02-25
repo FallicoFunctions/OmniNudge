@@ -80,7 +80,7 @@ import { hubsService } from '../services/hubsService';
 import { useHubSubredditAutocomplete } from '../hooks/useHubSubredditAutocomplete';
 import type { LocalSubredditPost } from '../services/hubsService';
 import type { RedditApiPost } from '../types/reddit';
-import { buildUserReport, reportService, type ReportReason } from '../services/reportService';
+import { ReportModal } from '../components/moderation/ReportModal';
 import { searchMessages, type MessageSearchFilters, type MessageSearchResult } from '../utils/messageSearch';
 import { formatRedditSlideshowInput, parseRedditSlideshowInput } from '../utils/redditSlideshowInput';
 
@@ -685,6 +685,7 @@ export default function MessagesPage() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploadingMedia, setUploadingMedia] = useState(false);
   const [messageMenuOpen, setMessageMenuOpen] = useState<number | null>(null);
+  const [reportModalMessageId, setReportModalMessageId] = useState<number | null>(null);
   const [replyTargetMessage, setReplyTargetMessage] = useState<Message | null>(null);
   const [deleteDialogMessage, setDeleteDialogMessage] = useState<Message | null>(null);
   const [deleteScopeInFlight, setDeleteScopeInFlight] = useState<'self' | 'both' | null>(null);
@@ -1192,34 +1193,6 @@ export default function MessagesPage() {
     },
   });
 
-  const reportMessageMutation = useMutation({
-    mutationFn: ({
-      messageId,
-      reason,
-      description,
-    }: {
-      messageId: number;
-      reason: ReportReason;
-      description?: string;
-    }) =>
-      reportService.createReport({
-        targetType: 'message',
-        targetId: messageId,
-        reason,
-        description,
-      }),
-    onSuccess: () => {
-      alert(t('reporting.success'));
-      setMessageMenuOpen(null);
-    },
-    onError: (error) => {
-      alert(
-        t('messages.errors.reportFailed', {
-          message: error instanceof Error ? error.message : t('common.error'),
-        })
-      );
-    },
-  });
 
   const muteConversationMutation = useMutation({
     mutationFn: (conversationId: number) => messagesService.muteConversation(conversationId),
@@ -1938,16 +1911,8 @@ export default function MessagesPage() {
   };
 
   const handleReportMessage = (message: Message) => {
-    const reasonInput = window.prompt(t('reporting.reasonPrompt'));
-    if (reasonInput === null) return;
-    const detailsInput = window.prompt(t('reporting.detailsPrompt'));
-    const { reason, description } = buildUserReport(reasonInput, detailsInput);
-
-    reportMessageMutation.mutate({
-      messageId: message.id,
-      reason,
-      description,
-    });
+    setMessageMenuOpen(null);
+    setReportModalMessageId(message.id);
   };
 
   const handleOpenForwardDialog = (message: Message) => {
@@ -3395,12 +3360,9 @@ export default function MessagesPage() {
                                     <button
                                       type="button"
                                       className="w-full rounded-md px-3 py-2 text-left text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
-                                      disabled={reportMessageMutation.isPending}
                                       onClick={() => handleReportMessage(message)}
                                     >
-                                      {reportMessageMutation.isPending
-                                        ? t('messages.status.reporting')
-                                        : t('messages.actions.report')}
+                                      {t('messages.actions.report')}
                                     </button>
                                   )}
                                   <button
@@ -4466,6 +4428,15 @@ export default function MessagesPage() {
             </button>
           </div>
         </div>
+      )}
+
+      {reportModalMessageId !== null && (
+        <ReportModal
+          isOpen={true}
+          onClose={() => setReportModalMessageId(null)}
+          targetType="message"
+          targetId={reportModalMessageId}
+        />
       )}
     </>
   );

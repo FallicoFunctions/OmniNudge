@@ -121,6 +121,17 @@ func (h *MessagesHandler) canAccessConversation(ctx context.Context, conversatio
 	return conversation.IsParticipant(userID), nil
 }
 
+func (h *MessagesHandler) isSenderBlockedByViewer(ctx context.Context, viewerID, senderID int) (bool, error) {
+	var blocked bool
+	err := h.pool.QueryRow(ctx, `
+		SELECT EXISTS (
+			SELECT 1 FROM blocked_users
+			WHERE blocker_id = $1 AND blocked_id = $2
+		)
+	`, viewerID, senderID).Scan(&blocked)
+	return blocked, err
+}
+
 func (h *MessagesHandler) unarchiveDMForRecipient(
 	ctx context.Context,
 	conversationID int,
@@ -562,7 +573,7 @@ func (h *MessagesHandler) SendMessage(c *gin.Context) {
 		}
 
 		if isBlocked {
-			c.JSON(http.StatusForbidden, gin.H{"error": "You cannot send messages to this user"})
+			c.JSON(http.StatusForbidden, gin.H{"error": blockingSettingsErrorMessage})
 			return
 		}
 	}
@@ -1006,7 +1017,7 @@ func (h *MessagesHandler) ForwardMessage(c *gin.Context) {
 				return
 			}
 			if isBlocked {
-				c.JSON(http.StatusForbidden, gin.H{"error": "You cannot send messages to this user"})
+				c.JSON(http.StatusForbidden, gin.H{"error": blockingSettingsErrorMessage})
 				return
 			}
 		} else {
@@ -1921,6 +1932,15 @@ func (h *MessagesHandler) GetThread(c *gin.Context) {
 		c.JSON(http.StatusForbidden, gin.H{"error": "You are not authorized to access this message"})
 		return
 	}
+	blocked, err := h.isSenderBlockedByViewer(c.Request.Context(), userID, targetMessage.SenderID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check blocking status", "details": err.Error()})
+		return
+	}
+	if blocked && targetMessage.SenderID != userID {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Message not found"})
+		return
+	}
 
 	rootID := targetMessage.ID
 	if targetMessage.ThreadRoot != nil && *targetMessage.ThreadRoot > 0 {
@@ -1936,6 +1956,21 @@ func (h *MessagesHandler) GetThread(c *gin.Context) {
 				return
 			}
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load thread root", "details": err.Error()})
+			return
+		}
+	}
+	blocked, err = h.isSenderBlockedByViewer(c.Request.Context(), userID, rootMessage.SenderID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check blocking status", "details": err.Error()})
+		return
+	}
+	if blocked && rootMessage.SenderID != userID {
+		// Keep thread access for a viewer-owned target message while preventing root content disclosure.
+		// The target acts as a visible surrogate root in this response only.
+		if targetMessage.SenderID == userID {
+			rootMessage = targetMessage
+		} else {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Thread root message not found"})
 			return
 		}
 	}
@@ -2743,8 +2778,17 @@ func (h *MessagesHandler) GetPinnedMessages(c *gin.Context) {
 
 	var rows pgx.Rows
 	if conversationType == "mod_mail" {
-		query += ` ORDER BY m.pinned_at ASC, m.id ASC LIMIT 10`
-		rows, err = h.pool.Query(c.Request.Context(), query, conversationID)
+		query += `
+		  AND NOT (m.deleted_for_sender = TRUE AND m.deleted_for_recipient = TRUE)
+		  AND NOT EXISTS (
+		    SELECT 1 FROM blocked_users bu
+		    WHERE bu.blocker_id = $2
+		      AND bu.blocked_id = m.sender_id
+		  )
+		  ORDER BY m.pinned_at ASC, m.id ASC
+		  LIMIT 10
+		`
+		rows, err = h.pool.Query(c.Request.Context(), query, conversationID, userID)
 	} else {
 		query += `
 		  AND (

@@ -32,6 +32,10 @@ func stringPtr(value string) *string {
 	return &value
 }
 
+func timePtr(value time.Time) *time.Time {
+	return &value
+}
+
 type mockHub struct {
 	mu             sync.Mutex
 	broadcastCalls []*websocket.Message
@@ -817,7 +821,7 @@ func TestSendMessage_Blocked(t *testing.T) {
 	var response map[string]interface{}
 	err = json.Unmarshal(w.Body.Bytes(), &response)
 	require.NoError(t, err)
-	assert.Contains(t, response["error"], "cannot send messages to this user")
+	assert.Contains(t, response["error"], "blocking settings")
 }
 
 func TestSendMessage_NotBlocked(t *testing.T) {
@@ -1545,6 +1549,160 @@ func TestGetPinnedMessages_ChronologicalOrder(t *testing.T) {
 	assert.Equal(t, float64(secondPinned), second["id"])
 }
 
+func TestGetPinnedMessages_ModMailFiltersBlockedSenders(t *testing.T) {
+	handler, db, user1ID, user2ID, _, _, cleanup := setupMessagesHandlerTest(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	var modMailConversationID int
+	err := db.Pool.QueryRow(ctx, `
+		INSERT INTO conversations (conversation_type, created_at, last_message_at)
+		VALUES ('mod_mail', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+		RETURNING id
+	`).Scan(&modMailConversationID)
+	require.NoError(t, err)
+
+	_, err = db.Pool.Exec(ctx, `
+		INSERT INTO conversation_participants (conversation_id, user_id, role, joined_at)
+		VALUES
+			($1, $2, 'member', CURRENT_TIMESTAMP),
+			($1, $3, 'member', CURRENT_TIMESTAMP)
+	`, modMailConversationID, user1ID, user2ID)
+	require.NoError(t, err)
+
+	ownPinned := &models.Message{
+		ConversationID:    modMailConversationID,
+		SenderID:          user1ID,
+		RecipientID:       user1ID,
+		EncryptedContent:  "own modmail message",
+		MessageType:       "text",
+		EncryptionVersion: "v1",
+		Pinned:            true,
+		PinnedBy:          &user1ID,
+		PinnedAt:          timePtr(time.Now().UTC().Add(-2 * time.Minute)),
+	}
+	require.NoError(t, handler.messageRepo.Create(ctx, ownPinned))
+
+	blockedPinned := &models.Message{
+		ConversationID:    modMailConversationID,
+		SenderID:          user2ID,
+		RecipientID:       user2ID,
+		EncryptedContent:  "blocked modmail message",
+		MessageType:       "text",
+		EncryptionVersion: "v1",
+		Pinned:            true,
+		PinnedBy:          &user2ID,
+		PinnedAt:          timePtr(time.Now().UTC().Add(-1 * time.Minute)),
+	}
+	require.NoError(t, handler.messageRepo.Create(ctx, blockedPinned))
+
+	_, err = db.Pool.Exec(ctx, `
+		INSERT INTO blocked_users (blocker_id, blocked_id)
+		VALUES ($1, $2)
+	`, user1ID, user2ID)
+	require.NoError(t, err)
+
+	router := gin.Default()
+	router.GET("/conversations/:id/pinned-messages", func(c *gin.Context) {
+		c.Set("user_id", user1ID)
+		handler.GetPinnedMessages(c)
+	})
+
+	req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/conversations/%d/pinned-messages", modMailConversationID), nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+
+	var resp map[string]interface{}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+	pinned := resp["pinned_messages"].([]interface{})
+	require.Len(t, pinned, 1)
+
+	first := pinned[0].(map[string]interface{})
+	assert.Equal(t, float64(ownPinned.ID), first["id"])
+}
+
+func TestGetThread_HidesBlockedRootMessage(t *testing.T) {
+	handler, db, user1ID, user2ID, convID, _, cleanup := setupMessagesHandlerTest(t)
+	defer cleanup()
+
+	msg := &models.Message{
+		ConversationID:    convID,
+		SenderID:          user2ID,
+		RecipientID:       user1ID,
+		EncryptedContent:  "blocked root message",
+		MessageType:       "text",
+		EncryptionVersion: "v1",
+	}
+	require.NoError(t, handler.messageRepo.Create(context.Background(), msg))
+
+	_, err := db.Pool.Exec(context.Background(), `
+		INSERT INTO blocked_users (blocker_id, blocked_id)
+		VALUES ($1, $2)
+	`, user1ID, user2ID)
+	require.NoError(t, err)
+
+	router := gin.Default()
+	router.GET("/messages/:id/thread", func(c *gin.Context) {
+		c.Set("user_id", user1ID)
+		handler.GetThread(c)
+	})
+
+	req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/messages/%d/thread", msg.ID), nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	require.Equal(t, http.StatusNotFound, w.Code, w.Body.String())
+}
+
+func TestGetThread_AllowsViewerOwnedReplyWhenRootBlocked(t *testing.T) {
+	handler, db, user1ID, user2ID, convID, _, cleanup := setupMessagesHandlerTest(t)
+	defer cleanup()
+
+	root := &models.Message{
+		ConversationID:    convID,
+		SenderID:          user2ID,
+		RecipientID:       user1ID,
+		EncryptedContent:  "blocked root",
+		MessageType:       "text",
+		EncryptionVersion: "v1",
+	}
+	require.NoError(t, handler.messageRepo.Create(context.Background(), root))
+
+	reply := &models.Message{
+		ConversationID:    convID,
+		SenderID:          user1ID,
+		RecipientID:       user2ID,
+		EncryptedContent:  "viewer reply",
+		MessageType:       "text",
+		EncryptionVersion: "v1",
+		ReplyTo:           &root.ID,
+		ThreadRoot:        &root.ID,
+	}
+	require.NoError(t, handler.messageRepo.Create(context.Background(), reply))
+
+	_, err := db.Pool.Exec(context.Background(), `
+		INSERT INTO blocked_users (blocker_id, blocked_id)
+		VALUES ($1, $2)
+	`, user1ID, user2ID)
+	require.NoError(t, err)
+
+	router := gin.Default()
+	router.GET("/messages/:id/thread", func(c *gin.Context) {
+		c.Set("user_id", user1ID)
+		handler.GetThread(c)
+	})
+
+	req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/messages/%d/thread", reply.ID), nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+
+	var resp map[string]interface{}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+	rootMessage := resp["root_message"].(map[string]interface{})
+	assert.Equal(t, float64(reply.ID), rootMessage["id"])
+}
+
 func TestEditMessage_Success(t *testing.T) {
 	handler, db, user1ID, user2ID, convID, hub, cleanup := setupMessagesHandlerTest(t)
 	defer cleanup()
@@ -1793,7 +1951,7 @@ func TestForwardMessage_RejectsWhenTargetUserBlockedSender(t *testing.T) {
 	router.ServeHTTP(w, req)
 
 	require.Equal(t, http.StatusForbidden, w.Code, w.Body.String())
-	require.Contains(t, w.Body.String(), "cannot send messages to this user")
+	require.Contains(t, w.Body.String(), "blocking settings")
 }
 
 func TestForwardMessage_RejectsMoreThanTenTargets(t *testing.T) {

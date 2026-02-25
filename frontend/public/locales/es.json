@@ -1853,7 +1853,30 @@
     "reasonPrompt": "Motivo del reporte (elige uno): spam, harassment, illegal_content, csam, violence, hate_speech, other",
     "detailsPrompt": "Detalles adicionales (opcional):",
     "invalidReason": "Motivo inválido. Usa uno de: spam, harassment, illegal_content, csam, violence, hate_speech, other.",
-    "success": "¡Gracias! El equipo de moderación ha sido notificado."
+    "success": "¡Gracias! El equipo de moderación ha sido notificado.",
+    "reasons": {
+      "spam": "Spam",
+      "harassment": "Acoso",
+      "illegalContent": "Contenido Ilegal",
+      "csam": "CSAM",
+      "violence": "Violencia",
+      "hateSpeech": "Discurso de Odio",
+      "other": "Otro"
+    },
+    "modal": {
+      "title": "Enviar un Reporte",
+      "titleWithName": "Reportar a {{name}}",
+      "reasonLabel": "Motivo",
+      "descriptionLabel": "Detalles adicionales",
+      "descriptionPlaceholder": "Proporciona cualquier contexto adicional que pueda ayudar a nuestro equipo de moderación...",
+      "submit": "Enviar Reporte",
+      "submitting": "Enviando...",
+      "cancel": "Cancelar"
+    },
+    "errors": {
+      "rateLimited": "Has enviado demasiados reportes recientemente. Por favor espera antes de enviar otro.",
+      "failed": "Error al enviar el reporte: {{message}}"
+    }
   },
   "comments": {
     "title": "Comentarios",

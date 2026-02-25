@@ -147,7 +147,7 @@ func (h *ConversationsHandler) CreateConversation(c *gin.Context) {
 		return
 	}
 	if blockedByEither {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Cannot create conversation due to blocking settings"})
+		c.JSON(http.StatusForbidden, gin.H{"error": blockingSettingsErrorMessage})
 		return
 	}
 

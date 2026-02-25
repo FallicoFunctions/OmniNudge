@@ -19,7 +19,7 @@ import { Panel } from '../components/common/Panel';
 import { ErrorMessage } from '../components/common/StatusMessage';
 import { Skeleton } from '../components/common/LoadingStates';
 import { useFormat } from '../hooks/useFormat';
-import { normalizeReportReason, reportService, type ReportReason } from '../services/reportService';
+import { ReportModal } from '../components/moderation/ReportModal';
 import EditProfileModal from '../components/profile/EditProfileModal';
 
 const BASE_TABS = [
@@ -225,6 +225,7 @@ export default function UserProfilePage() {
   const [activeTab, setActiveTab] = useState<TabKey>('overview');
   const canViewPrivateTabs = user?.username === username;
   const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
+  const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   const originState = useMemo(
     () => ({ originPath: `${location.pathname}${location.search}` }),
     [location.pathname, location.search]
@@ -320,17 +321,6 @@ export default function UserProfilePage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['blocked-users'] });
-    },
-  });
-
-  const reportUserMutation = useMutation({
-    mutationFn: async (payload: { userId: number; reason: ReportReason; description?: string }) => {
-      await reportService.createReport({
-        targetType: 'user',
-        targetId: payload.userId,
-        reason: payload.reason,
-        description: payload.description,
-      });
     },
   });
 
@@ -623,7 +613,7 @@ export default function UserProfilePage() {
                 )}
                 <button
                   type="button"
-                  disabled={blockMutation.isPending || unblockMutation.isPending || reportUserMutation.isPending}
+                  disabled={blockMutation.isPending || unblockMutation.isPending}
                   onClick={() => {
                     if (!profile) return;
                     if (isBlocked) {
@@ -653,34 +643,8 @@ export default function UserProfilePage() {
                 )}
                 <button
                   type="button"
-                  disabled={reportUserMutation.isPending}
-                  onClick={() => {
-                    if (!profile) return;
-                    const reasonInput = window.prompt(t('reporting.reasonPrompt'));
-                    if (reasonInput === null) return;
-                    const reason = normalizeReportReason(reasonInput);
-                    if (!reason) {
-                      alert(t('reporting.invalidReason'));
-                      return;
-                    }
-                    const detailsInput = window.prompt(t('reporting.detailsPrompt'));
-                    reportUserMutation.mutate(
-                      { userId: profile.id, reason, description: detailsInput ?? undefined },
-                      {
-                        onSuccess: () => {
-                          alert(t('reporting.success'));
-                        },
-                        onError: (error) => {
-                          alert(
-                            t('userProfilePage.actions.reportFailed', {
-                              message: error instanceof Error ? error.message : t('common.error'),
-                            })
-                          );
-                        },
-                      }
-                    );
-                  }}
-                  className="inline-flex items-center justify-center rounded-md border border-[var(--color-error)] px-4 py-2 text-sm font-semibold text-[var(--color-error)] hover:opacity-80 disabled:opacity-50"
+                  onClick={() => setIsReportModalOpen(true)}
+                  className="inline-flex items-center justify-center rounded-md border border-[var(--color-error)] px-4 py-2 text-sm font-semibold text-[var(--color-error)] hover:opacity-80"
                 >
                   {t('userProfilePage.actions.report')}
                 </button>
@@ -744,6 +708,16 @@ export default function UserProfilePage() {
       </div>
 
       <div className="mt-6">{renderActiveTab()}</div>
+
+      {profile && (
+        <ReportModal
+          isOpen={isReportModalOpen}
+          onClose={() => setIsReportModalOpen(false)}
+          targetType="user"
+          targetId={profile.id}
+          targetName={profile.username}
+        />
+      )}
 
       <EditProfileModal
         isOpen={isEditProfileOpen}
