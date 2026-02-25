@@ -9,6 +9,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/omninudge/backend/internal/metrics"
 )
 
 // Cache defines minimal cache operations
@@ -194,8 +196,11 @@ func readReply(conn net.Conn) (string, bool, error) {
 		if err != nil {
 			return "", false, err
 		}
+		if size < -1 {
+			return "", false, fmt.Errorf("invalid redis bulk string size: %d", size)
+		}
 		if size == -1 {
-			return "", false, nil // nil bulk
+			return "", false, nil // nil bulk — key does not exist
 		}
 		buf := make([]byte, size+2) // include CRLF
 		if _, err := ioReadFull(reader, buf); err != nil {
@@ -213,10 +218,62 @@ func ioReadFull(r *bufio.Reader, buf []byte) (int, error) {
 	total := 0
 	for total < len(buf) {
 		n, err := r.Read(buf[total:])
+		if n == 0 && err == nil {
+			// A zero-byte read with no error should not happen on a buffered
+			// reader backed by a real connection. Guard against an infinite loop.
+			return total, fmt.Errorf("unexpected zero-byte read after %d/%d bytes", total, len(buf))
+		}
 		total += n
 		if err != nil {
 			return total, err
 		}
 	}
 	return total, nil
+}
+
+// keyPrefix returns the first colon-delimited segment of a cache key,
+// used as the key_prefix Prometheus label.
+// e.g. "reddit:subreddit:golang" → "reddit"
+func keyPrefix(key string) string {
+	if idx := strings.Index(key, ":"); idx > 0 {
+		return key[:idx]
+	}
+	return key
+}
+
+// InstrumentedCache wraps any Cache implementation and records Prometheus
+// hit/miss metrics broken down by cache type and key prefix.
+type InstrumentedCache struct {
+	inner     Cache
+	cacheType string // "redis" or "memory"
+}
+
+// NewInstrumentedCache creates an InstrumentedCache wrapping inner.
+func NewInstrumentedCache(inner Cache, cacheType string) *InstrumentedCache {
+	return &InstrumentedCache{inner: inner, cacheType: cacheType}
+}
+
+// Get delegates to the inner cache and records a hit, miss, or error metric.
+func (ic *InstrumentedCache) Get(ctx context.Context, key string) (string, bool, error) {
+	prefix := keyPrefix(key)
+	value, found, err := ic.inner.Get(ctx, key)
+	if err != nil {
+		metrics.CacheErrors.WithLabelValues(ic.cacheType, "get").Inc()
+		return value, found, err
+	}
+	if found {
+		metrics.CacheHits.WithLabelValues(ic.cacheType, prefix).Inc()
+	} else {
+		metrics.CacheMisses.WithLabelValues(ic.cacheType, prefix).Inc()
+	}
+	return value, found, nil
+}
+
+// Set delegates to the inner cache and records an error metric on failure.
+func (ic *InstrumentedCache) Set(ctx context.Context, key string, value string, ttl time.Duration) error {
+	if err := ic.inner.Set(ctx, key, value, ttl); err != nil {
+		metrics.CacheErrors.WithLabelValues(ic.cacheType, "set").Inc()
+		return err
+	}
+	return nil
 }

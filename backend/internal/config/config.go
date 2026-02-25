@@ -24,8 +24,9 @@ type Config struct {
 	Firebase    FirebaseConfig
 	SMTP        SMTPConfig
 	Retention   RetentionConfig
-	FrontendURL string
-	AppEnv      string
+	FrontendURL  string
+	AppEnv       string
+	MetricsToken string // Bearer token for /metrics endpoint; empty = unrestricted (dev only)
 }
 
 // RetentionConfig holds data retention settings
@@ -106,12 +107,23 @@ type FirebaseConfig struct {
 	CredentialsPath string
 }
 
-// SMTPConfig holds email (SMTP) configuration
+// SMTPConfig holds email delivery configuration.
+//
+// When MailgunAPIKey is set the application uses the Mailgun HTTP API.
+// Otherwise it falls back to direct SMTP using Host/Port/User/Password.
+// Never populate Host with an API key — they serve different purposes.
 type SMTPConfig struct {
-	Host        string
-	Port        string
-	User        string
-	Password    string
+	// Mailgun HTTP API credentials (preferred when available)
+	MailgunAPIKey string
+	MailgunDomain string
+
+	// SMTP fallback credentials
+	Host     string
+	Port     string
+	User     string
+	Password string
+
+	// Shared sender identity
 	FromAddress string
 	FromName    string
 }
@@ -172,14 +184,14 @@ func Load() (*Config, error) {
 			CredentialsPath: getEnv("FIREBASE_CREDENTIALS_PATH", ""),
 		},
 		SMTP: SMTPConfig{
-			// Mailgun HTTP API (preferred)
-			Host: getEnv("MAILGUN_API_KEY", getEnv("SMTP_HOST", "")),
-			User: getEnv("MAILGUN_DOMAIN", getEnv("SMTP_USER", "")),
-			// SMTP fallback
-			Port:        getEnv("SMTP_PORT", "587"),
-			Password:    getEnv("SMTP_PASSWORD", ""),
-			FromAddress: getEnv("SMTP_FROM_ADDRESS", "noreply@omninudge.com"),
-			FromName:    getEnv("SMTP_FROM_NAME", "OmniNudge"),
+			MailgunAPIKey: getEnv("MAILGUN_API_KEY", ""),
+			MailgunDomain: getEnv("MAILGUN_DOMAIN", ""),
+			Host:          getEnv("SMTP_HOST", ""),
+			Port:          getEnv("SMTP_PORT", "587"),
+			User:          getEnv("SMTP_USER", ""),
+			Password:      getEnv("SMTP_PASSWORD", ""),
+			FromAddress:   getEnv("SMTP_FROM_ADDRESS", "noreply@omninudge.com"),
+			FromName:      getEnv("SMTP_FROM_NAME", "OmniNudge"),
 		},
 		Retention: RetentionConfig{
 			MessageRetentionYears: getEnvAsInt("RETENTION_MESSAGE_YEARS", 3),
@@ -188,8 +200,9 @@ func Load() (*Config, error) {
 			DeletionGraceDays:     getEnvAsInt("RETENTION_GRACE_DAYS", 30),
 			DryRun:                getEnvAsBool("RETENTION_DRY_RUN", false),
 		},
-		FrontendURL: getEnv("FRONTEND_URL", "http://localhost:5176"),
-		AppEnv:      getEnv("APP_ENV", "development"),
+		FrontendURL:  getEnv("FRONTEND_URL", "http://localhost:5176"),
+		AppEnv:       getEnv("APP_ENV", "development"),
+		MetricsToken: getEnv("METRICS_TOKEN", ""),
 	}
 
 	return cfg, nil
