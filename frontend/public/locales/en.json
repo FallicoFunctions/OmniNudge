@@ -1872,7 +1872,8 @@
       "descriptionPlaceholder": "Provide any additional context that may help our moderation team...",
       "submit": "Submit Report",
       "submitting": "Submitting...",
-      "cancel": "Cancel"
+      "cancel": "Cancel",
+      "screenReaderDescription": "Use this form to report content that violates our community guidelines. Select a reason and optionally provide additional details."
     },
     "errors": {
       "rateLimited": "You have submitted too many reports recently. Please wait before submitting another.",

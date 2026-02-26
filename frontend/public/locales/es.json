@@ -1872,7 +1872,8 @@
       "descriptionPlaceholder": "Proporciona cualquier contexto adicional que pueda ayudar a nuestro equipo de moderación...",
       "submit": "Enviar Reporte",
       "submitting": "Enviando...",
-      "cancel": "Cancelar"
+      "cancel": "Cancelar",
+      "screenReaderDescription": "Usa este formulario para reportar contenido que viola nuestras pautas de la comunidad. Selecciona un motivo y opcionalmente proporciona detalles adicionales."
     },
     "errors": {
       "rateLimited": "Has enviado demasiados reportes recientemente. Por favor espera antes de enviar otro.",
