@@ -1854,6 +1854,7 @@
     "detailsPrompt": "تفاصيل إضافية (اختياري):",
     "invalidReason": "سبب غير صالح. استخدم أحد القيم التالية: spam, harassment, illegal_content, csam, violence, hate_speech, other.",
     "success": "شكرًا! تم إبلاغ فريق الإشراف.",
+    "successDetail": "سيراجع فريقنا تقريرك ويتخذ إجراءات خلال 24 ساعة.",
     "reasons": {
       "spam": "بريد مزعج",
       "harassment": "مضايقة",

@@ -1854,6 +1854,7 @@
     "detailsPrompt": "Detalles adicionales (opcional):",
     "invalidReason": "Motivo inválido. Usa uno de: spam, harassment, illegal_content, csam, violence, hate_speech, other.",
     "success": "¡Gracias! El equipo de moderación ha sido notificado.",
+    "successDetail": "Nuestro equipo revisará tu reporte y tomará medidas en 24 horas.",
     "reasons": {
       "spam": "Spam",
       "harassment": "Acoso",

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { reportService, type ReportReason, type ReportTargetType } from '../../services/reportService';
 
@@ -20,27 +20,38 @@ export interface ReportModalProps {
   targetType: ReportTargetType;
   targetId: number;
   targetName?: string;
+  defaultReason?: ReportReason;
 }
 
-export function ReportModal({ isOpen, onClose, targetType, targetId, targetName }: ReportModalProps) {
+export function ReportModal({ isOpen, onClose, targetType, targetId, targetName, defaultReason }: ReportModalProps) {
   const { t } = useTranslation();
-  const [reason, setReason] = useState<ReportReason>('spam');
+  const [reason, setReason] = useState<ReportReason>(defaultReason ?? 'spam');
   const [description, setDescription] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitSuccess, setSubmitSuccess] = useState(false);
+  const autoCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      setReason(defaultReason ?? 'spam');
+      setDescription('');
+      setSubmitError(null);
+      setSubmitSuccess(false);
+    }
+  }, [isOpen, defaultReason]);
 
   if (!isOpen) return null;
 
   const handleClose = () => {
-    setReason('spam');
-    setDescription('');
-    setSubmitError(null);
-    setSubmitSuccess(false);
+    if (autoCloseTimerRef.current) {
+      clearTimeout(autoCloseTimerRef.current);
+      autoCloseTimerRef.current = null;
+    }
     onClose();
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
     setSubmitError(null);
@@ -53,12 +64,16 @@ export function ReportModal({ isOpen, onClose, targetType, targetId, targetName 
         description: description.trim() || undefined,
       });
       setSubmitSuccess(true);
-      setTimeout(() => {
+      autoCloseTimerRef.current = setTimeout(() => {
         handleClose();
       }, 1500);
     } catch (error) {
       const isRateLimited =
-        error instanceof Error && error.message.includes('429');
+        (error instanceof Error && (
+          error.message.includes('429') ||
+          error.message.toLowerCase().includes('rate limit') ||
+          ('status' in error && (error as any).status === 429)
+        ));
       if (isRateLimited) {
         setSubmitError(t('reporting.errors.rateLimited'));
       } else {
@@ -84,6 +99,7 @@ export function ReportModal({ isOpen, onClose, targetType, targetId, targetName 
       role="dialog"
       aria-modal="true"
       aria-labelledby="report-modal-title"
+      onKeyDown={(e) => { if (e.key === 'Escape') handleClose(); }}
     >
       <div
         className="absolute inset-0 bg-black/60 backdrop-blur-sm"
@@ -106,6 +122,13 @@ export function ReportModal({ isOpen, onClose, targetType, targetId, targetName 
             onClick={handleClose}
             aria-label={t('common.close')}
             className="flex h-10 w-10 items-center justify-center rounded-md text-[var(--color-text-secondary)] transition hover:bg-[var(--color-surface-elevated)] hover:text-[var(--color-text-primary)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-primary)]"
+            onKeyDown={(e) => {
+              if (e.key === 'Tab' && e.shiftKey) {
+                e.preventDefault();
+                const submitBtn = document.querySelector<HTMLButtonElement>('[data-report-submit]');
+                submitBtn?.focus();
+              }
+            }}
           >
             <svg
               className="h-5 w-5"
@@ -146,6 +169,9 @@ export function ReportModal({ isOpen, onClose, targetType, targetId, targetName 
             <p className="text-sm font-semibold text-[var(--color-text-primary)]">
               {t('reporting.success')}
             </p>
+            <p className="text-sm text-[var(--color-text-secondary)]">
+              {t('reporting.successDetail')}
+            </p>
           </div>
         ) : (
           /* Form */
@@ -166,6 +192,7 @@ export function ReportModal({ isOpen, onClose, targetType, targetId, targetName 
                 value={reason}
                 onChange={(e) => setReason(e.target.value as ReportReason)}
                 required
+                autoFocus
                 className="w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
               >
                 {REASON_OPTIONS.map((opt) => (
@@ -190,11 +217,7 @@ export function ReportModal({ isOpen, onClose, targetType, targetId, targetName 
               <textarea
                 id="report-description"
                 value={description}
-                onChange={(e) => {
-                  if (e.target.value.length <= MAX_DESCRIPTION_LENGTH) {
-                    setDescription(e.target.value);
-                  }
-                }}
+                onChange={(e) => setDescription(e.target.value.slice(0, MAX_DESCRIPTION_LENGTH))}
                 rows={3}
                 placeholder={t('reporting.modal.descriptionPlaceholder')}
                 className="w-full resize-none rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
@@ -227,7 +250,14 @@ export function ReportModal({ isOpen, onClose, targetType, targetId, targetName 
               <button
                 type="submit"
                 disabled={isSubmitting}
+                data-report-submit
                 className="flex-1 rounded-md bg-[var(--color-error)] px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-primary)]"
+                onKeyDown={(e) => {
+                  if (e.key === 'Tab' && !e.shiftKey) {
+                    e.preventDefault();
+                    document.getElementById('report-reason')?.focus();
+                  }
+                }}
               >
                 {isSubmitting ? t('reporting.modal.submitting') : t('reporting.modal.submit')}
               </button>

@@ -4436,6 +4436,7 @@ export default function MessagesPage() {
           onClose={() => setReportModalMessageId(null)}
           targetType="message"
           targetId={reportModalMessageId}
+          defaultReason="harassment"
         />
       )}
     </>
