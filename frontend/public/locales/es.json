@@ -1873,7 +1873,8 @@
       "submit": "Enviar Reporte",
       "submitting": "Enviando...",
       "cancel": "Cancelar",
-      "screenReaderDescription": "Usa este formulario para reportar contenido que viola nuestras pautas de la comunidad. Selecciona un motivo y opcionalmente proporciona detalles adicionales."
+      "screenReaderDescription": "Usa este formulario para reportar contenido que viola nuestras pautas de la comunidad. Selecciona un motivo y opcionalmente proporciona detalles adicionales.",
+      "characterCount": "{{current}} de {{max}} caracteres"
     },
     "errors": {
       "rateLimited": "Has enviado demasiados reportes recientemente. Por favor espera antes de enviar otro.",
