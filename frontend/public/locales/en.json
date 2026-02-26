@@ -1873,7 +1873,8 @@
       "submit": "Submit Report",
       "submitting": "Submitting...",
       "cancel": "Cancel",
-      "screenReaderDescription": "Use this form to report content that violates our community guidelines. Select a reason and optionally provide additional details."
+      "screenReaderDescription": "Use this form to report content that violates our community guidelines. Select a reason and optionally provide additional details.",
+      "characterCount": "{{current}} of {{max}} characters"
     },
     "errors": {
       "rateLimited": "You have submitted too many reports recently. Please wait before submitting another.",

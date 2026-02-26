@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, type FormEvent } from 'react';
+import { useState, useEffect, useRef, useCallback, useId, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { reportService, type ReportReason, type ReportTargetType } from '../../services/reportService';
 
@@ -25,6 +25,7 @@ export interface ReportModalProps {
 
 export function ReportModal({ isOpen, onClose, targetType, targetId, targetName, defaultReason }: ReportModalProps) {
   const { t } = useTranslation();
+  const uid = useId();
   const [reason, setReason] = useState<ReportReason>(defaultReason ?? 'spam');
   const [description, setDescription] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -85,7 +86,7 @@ export function ReportModal({ isOpen, onClose, targetType, targetId, targetName,
       cancelBtnRef.current,
       submitBtnRef.current,
       successCloseBtnRef.current,
-    ].filter((el): el is HTMLElement => el !== null),
+    ].filter((el): el is HTMLElement => el !== null && !(el as HTMLButtonElement | HTMLSelectElement | HTMLTextAreaElement).disabled),
   []);
 
   useEffect(() => {
@@ -115,7 +116,8 @@ export function ReportModal({ isOpen, onClose, targetType, targetId, targetName,
     ? t('reporting.modal.titleWithName', { name: targetName })
     : t('reporting.modal.title');
 
-  const descriptionId = 'report-modal-description';
+  const titleId = `${uid}-title`;
+  const descriptionId = `${uid}-description`;
 
   if (!isOpen) return null;
 
@@ -124,7 +126,7 @@ export function ReportModal({ isOpen, onClose, targetType, targetId, targetName,
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
       role="dialog"
       aria-modal="true"
-      aria-labelledby="report-modal-title"
+      aria-labelledby={titleId}
       aria-describedby={descriptionId}
       tabIndex={-1}
       onKeyDown={(e) => { if (e.key === 'Escape') handleClose(); }}
@@ -164,7 +166,7 @@ export function ReportModal({ isOpen, onClose, targetType, targetId, targetName,
         {/* Header */}
         <div className="flex items-center justify-between border-b border-[var(--color-border)] px-6 py-4">
           <h2
-            id="report-modal-title"
+            id={titleId}
             className="text-base font-semibold text-[var(--color-text-primary)]"
           >
             {headerLabel}
@@ -248,6 +250,7 @@ export function ReportModal({ isOpen, onClose, targetType, targetId, targetName,
                 value={reason}
                 onChange={(e) => setReason(e.target.value as ReportReason)}
                 required
+                aria-required="true"
                 disabled={isSubmitting}
                 className="w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)] disabled:opacity-50"
               >
@@ -283,7 +286,7 @@ export function ReportModal({ isOpen, onClose, targetType, targetId, targetName,
               />
               <p
                 className="text-right text-xs text-[var(--color-text-muted)]"
-                aria-label={`${description.length} of ${MAX_DESCRIPTION_LENGTH} characters`}
+                aria-label={t('reporting.modal.characterCount', { current: description.length, max: MAX_DESCRIPTION_LENGTH })}
               >
                 {description.length}/{MAX_DESCRIPTION_LENGTH}
               </p>
