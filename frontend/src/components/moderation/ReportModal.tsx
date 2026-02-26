@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, type FormEvent } from 'react';
+import { useState, useEffect, useRef, useCallback, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { reportService, type ReportReason, type ReportTargetType } from '../../services/reportService';
 
@@ -31,6 +31,18 @@ export function ReportModal({ isOpen, onClose, targetType, targetId, targetName,
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const autoCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const submitBtnRef = useRef<HTMLButtonElement>(null);
+  const cancelBtnRef = useRef<HTMLButtonElement>(null);
+
+  // Issue 3: handleClose memoized with useCallback, defined before early return
+  const handleClose = useCallback(() => {
+    if (autoCloseTimerRef.current) {
+      clearTimeout(autoCloseTimerRef.current);
+      autoCloseTimerRef.current = null;
+    }
+    onClose();
+  }, [onClose]);
 
   useEffect(() => {
     if (isOpen) {
@@ -41,15 +53,14 @@ export function ReportModal({ isOpen, onClose, targetType, targetId, targetName,
     }
   }, [isOpen, defaultReason]);
 
-  if (!isOpen) return null;
+  // Issue 4: cleanup effect for autoCloseTimerRef on unmount
+  useEffect(() => {
+    return () => {
+      if (autoCloseTimerRef.current) clearTimeout(autoCloseTimerRef.current);
+    };
+  }, []);
 
-  const handleClose = () => {
-    if (autoCloseTimerRef.current) {
-      clearTimeout(autoCloseTimerRef.current);
-      autoCloseTimerRef.current = null;
-    }
-    onClose();
-  };
+  if (!isOpen) return null;
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -94,11 +105,13 @@ export function ReportModal({ isOpen, onClose, targetType, targetId, targetName,
 
   return (
     /* Backdrop */
+    // Issue 5: tabIndex={-1} added to dialog div
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
       role="dialog"
       aria-modal="true"
       aria-labelledby="report-modal-title"
+      tabIndex={-1}
       onKeyDown={(e) => { if (e.key === 'Escape') handleClose(); }}
     >
       <div
@@ -107,8 +120,34 @@ export function ReportModal({ isOpen, onClose, targetType, targetId, targetName,
         aria-hidden="true"
       />
 
-      {/* Modal panel */}
-      <div className="relative z-10 w-full max-w-md rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-xl">
+      {/* Modal panel — Issues 1 & 2: ref-based focus trap via onKeyDown */}
+      <div
+        className="relative z-10 w-full max-w-md rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-xl"
+        onKeyDown={(e) => {
+          if (e.key !== 'Tab') return;
+          const focusable = [
+            closeButtonRef.current,
+            document.getElementById('report-reason'),
+            document.getElementById('report-description'),
+            cancelBtnRef.current,
+            submitBtnRef.current,
+          ].filter(Boolean) as HTMLElement[];
+          if (focusable.length === 0) return;
+          const first = focusable[0];
+          const last = focusable[focusable.length - 1];
+          if (e.shiftKey) {
+            if (document.activeElement === first) {
+              e.preventDefault();
+              last.focus();
+            }
+          } else {
+            if (document.activeElement === last) {
+              e.preventDefault();
+              first.focus();
+            }
+          }
+        }}
+      >
         {/* Header */}
         <div className="flex items-center justify-between border-b border-[var(--color-border)] px-6 py-4">
           <h2
@@ -117,18 +156,13 @@ export function ReportModal({ isOpen, onClose, targetType, targetId, targetName,
           >
             {headerLabel}
           </h2>
+          {/* Issue 1: ref attached, per-button onKeyDown removed */}
           <button
+            ref={closeButtonRef}
             type="button"
             onClick={handleClose}
             aria-label={t('common.close')}
             className="flex h-10 w-10 items-center justify-center rounded-md text-[var(--color-text-secondary)] transition hover:bg-[var(--color-surface-elevated)] hover:text-[var(--color-text-primary)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-primary)]"
-            onKeyDown={(e) => {
-              if (e.key === 'Tab' && e.shiftKey) {
-                e.preventDefault();
-                const submitBtn = document.querySelector<HTMLButtonElement>('[data-report-submit]');
-                submitBtn?.focus();
-              }
-            }}
           >
             <svg
               className="h-5 w-5"
@@ -148,8 +182,8 @@ export function ReportModal({ isOpen, onClose, targetType, targetId, targetName,
         </div>
 
         {submitSuccess ? (
-          /* Success state */
-          <div className="flex flex-col items-center gap-3 px-6 py-10 text-center">
+          /* Success state — Issue 6: role="status" added */
+          <div role="status" className="flex flex-col items-center gap-3 px-6 py-10 text-center">
             <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[var(--color-success)]/15">
               <svg
                 className="h-6 w-6 text-[var(--color-success)]"
@@ -222,7 +256,12 @@ export function ReportModal({ isOpen, onClose, targetType, targetId, targetName,
                 placeholder={t('reporting.modal.descriptionPlaceholder')}
                 className="w-full resize-none rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
               />
-              <p className="text-right text-xs text-[var(--color-text-muted)]">
+              {/* Issue 7: aria-live and aria-label added to character counter */}
+              <p
+                className="text-right text-xs text-[var(--color-text-muted)]"
+                aria-live="polite"
+                aria-label={`${description.length} of ${MAX_DESCRIPTION_LENGTH} characters`}
+              >
                 {description.length}/{MAX_DESCRIPTION_LENGTH}
               </p>
             </div>
@@ -239,7 +278,9 @@ export function ReportModal({ isOpen, onClose, targetType, targetId, targetName,
 
             {/* Actions */}
             <div className="flex gap-3 pt-1">
+              {/* Issue 1: ref attached, per-button onKeyDown removed */}
               <button
+                ref={cancelBtnRef}
                 type="button"
                 onClick={handleClose}
                 disabled={isSubmitting}
@@ -247,17 +288,12 @@ export function ReportModal({ isOpen, onClose, targetType, targetId, targetName,
               >
                 {t('common.cancel')}
               </button>
+              {/* Issues 1, 2, 8: ref attached, data-report-submit removed, per-button onKeyDown removed */}
               <button
+                ref={submitBtnRef}
                 type="submit"
                 disabled={isSubmitting}
-                data-report-submit
                 className="flex-1 rounded-md bg-[var(--color-error)] px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-primary)]"
-                onKeyDown={(e) => {
-                  if (e.key === 'Tab' && !e.shiftKey) {
-                    e.preventDefault();
-                    document.getElementById('report-reason')?.focus();
-                  }
-                }}
               >
                 {isSubmitting ? t('reporting.modal.submitting') : t('reporting.modal.submit')}
               </button>
