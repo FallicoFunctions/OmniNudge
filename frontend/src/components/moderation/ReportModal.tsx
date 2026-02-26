@@ -118,6 +118,8 @@ export function ReportModal({ isOpen, onClose, targetType, targetId, targetName,
 
   const titleId = `${uid}-title`;
   const descriptionId = `${uid}-description`;
+  const reasonId = `${uid}-reason`;
+  const detailsId = `${uid}-details`;
 
   if (!isOpen) return null;
 
@@ -236,7 +238,7 @@ export function ReportModal({ isOpen, onClose, targetType, targetId, targetName,
             {/* Reason selector */}
             <div className="space-y-1.5">
               <label
-                htmlFor="report-reason"
+                htmlFor={reasonId}
                 className="block text-sm font-semibold text-[var(--color-text-primary)]"
               >
                 {t('reporting.modal.reasonLabel')}
@@ -246,13 +248,13 @@ export function ReportModal({ isOpen, onClose, targetType, targetId, targetName,
               </label>
               <select
                 ref={selectRef}
-                id="report-reason"
+                id={reasonId}
                 value={reason}
                 onChange={(e) => setReason(e.target.value as ReportReason)}
                 required
                 aria-required="true"
                 disabled={isSubmitting}
-                className="w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)] disabled:opacity-50"
+                className="w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)] disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {REASON_OPTIONS.map((opt) => (
                   <option key={opt.value} value={opt.value}>
@@ -265,7 +267,7 @@ export function ReportModal({ isOpen, onClose, targetType, targetId, targetName,
             {/* Optional description */}
             <div className="space-y-1.5">
               <label
-                htmlFor="report-description"
+                htmlFor={detailsId}
                 className="block text-sm font-semibold text-[var(--color-text-primary)]"
               >
                 {t('reporting.modal.descriptionLabel')}
@@ -275,14 +277,14 @@ export function ReportModal({ isOpen, onClose, targetType, targetId, targetName,
               </label>
               <textarea
                 ref={textareaRef}
-                id="report-description"
+                id={detailsId}
                 value={description}
                 onChange={(e) => setDescription(e.target.value.slice(0, MAX_DESCRIPTION_LENGTH))}
                 onBlur={(e) => setDescription(e.target.value.trim())}
                 rows={3}
                 placeholder={t('reporting.modal.descriptionPlaceholder')}
                 disabled={isSubmitting}
-                className="w-full resize-none rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)] disabled:opacity-50"
+                className="w-full resize-none rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)] disabled:cursor-not-allowed disabled:opacity-50"
               />
               <p
                 className="text-right text-xs text-[var(--color-text-muted)]"
