@@ -30,12 +30,16 @@ export function ReportModal({ isOpen, onClose, targetType, targetId, targetName,
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitSuccess, setSubmitSuccess] = useState(false);
+
+  // Timer
   const autoCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Focusable element refs for the focus trap
   const closeButtonRef = useRef<HTMLButtonElement>(null);
-  const submitBtnRef = useRef<HTMLButtonElement>(null);
-  const cancelBtnRef = useRef<HTMLButtonElement>(null);
   const selectRef = useRef<HTMLSelectElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const cancelBtnRef = useRef<HTMLButtonElement>(null);
+  const submitBtnRef = useRef<HTMLButtonElement>(null);
   const successCloseBtnRef = useRef<HTMLButtonElement>(null);
 
   const handleClose = useCallback(() => {
@@ -94,6 +98,14 @@ export function ReportModal({ isOpen, onClose, targetType, targetId, targetName,
   }, [isOpen, defaultReason]);
 
   useEffect(() => {
+    if (isOpen) selectRef.current?.focus();
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (submitSuccess) successCloseBtnRef.current?.focus();
+  }, [submitSuccess]);
+
+  useEffect(() => {
     return () => {
       if (autoCloseTimerRef.current) clearTimeout(autoCloseTimerRef.current);
     };
@@ -121,7 +133,7 @@ export function ReportModal({ isOpen, onClose, targetType, targetId, targetName,
       />
 
       <div
-        className="relative z-10 w-full max-w-md rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-xl"
+        className="relative z-10 w-full max-w-md max-h-[90vh] overflow-y-auto rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-xl"
         onKeyDown={(e) => {
           if (e.key !== 'Tab') return;
           const focusable = getFocusable();
@@ -228,7 +240,6 @@ export function ReportModal({ isOpen, onClose, targetType, targetId, targetName,
                 value={reason}
                 onChange={(e) => setReason(e.target.value as ReportReason)}
                 required
-                autoFocus
                 className="w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
               >
                 {REASON_OPTIONS.map((opt) => (
@@ -255,6 +266,7 @@ export function ReportModal({ isOpen, onClose, targetType, targetId, targetName,
                 id="report-description"
                 value={description}
                 onChange={(e) => setDescription(e.target.value.slice(0, MAX_DESCRIPTION_LENGTH))}
+                onBlur={(e) => setDescription(e.target.value.trim())}
                 rows={3}
                 placeholder={t('reporting.modal.descriptionPlaceholder')}
                 className="w-full resize-none rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
