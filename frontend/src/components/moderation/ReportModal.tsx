@@ -115,6 +115,8 @@ export function ReportModal({ isOpen, onClose, targetType, targetId, targetName,
     ? t('reporting.modal.titleWithName', { name: targetName })
     : t('reporting.modal.title');
 
+  const descriptionId = 'report-modal-description';
+
   if (!isOpen) return null;
 
   return (
@@ -123,6 +125,7 @@ export function ReportModal({ isOpen, onClose, targetType, targetId, targetName,
       role="dialog"
       aria-modal="true"
       aria-labelledby="report-modal-title"
+      aria-describedby={descriptionId}
       tabIndex={-1}
       onKeyDown={(e) => { if (e.key === 'Escape') handleClose(); }}
     >
@@ -153,6 +156,11 @@ export function ReportModal({ isOpen, onClose, targetType, targetId, targetName,
           }
         }}
       >
+        {/* Visually-hidden description for screen readers */}
+        <p id={descriptionId} className="sr-only">
+          {t('reporting.modal.screenReaderDescription')}
+        </p>
+
         {/* Header */}
         <div className="flex items-center justify-between border-b border-[var(--color-border)] px-6 py-4">
           <h2
@@ -240,7 +248,8 @@ export function ReportModal({ isOpen, onClose, targetType, targetId, targetName,
                 value={reason}
                 onChange={(e) => setReason(e.target.value as ReportReason)}
                 required
-                className="w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
+                disabled={isSubmitting}
+                className="w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)] disabled:opacity-50"
               >
                 {REASON_OPTIONS.map((opt) => (
                   <option key={opt.value} value={opt.value}>
@@ -269,7 +278,8 @@ export function ReportModal({ isOpen, onClose, targetType, targetId, targetName,
                 onBlur={(e) => setDescription(e.target.value.trim())}
                 rows={3}
                 placeholder={t('reporting.modal.descriptionPlaceholder')}
-                className="w-full resize-none rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
+                disabled={isSubmitting}
+                className="w-full resize-none rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)] disabled:opacity-50"
               />
               <p
                 className="text-right text-xs text-[var(--color-text-muted)]"
@@ -306,7 +316,31 @@ export function ReportModal({ isOpen, onClose, targetType, targetId, targetName,
                 disabled={isSubmitting}
                 className="flex-1 rounded-md bg-[var(--color-error)] px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-primary)]"
               >
-                {isSubmitting ? t('reporting.modal.submitting') : t('reporting.modal.submit')}
+                {isSubmitting ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <svg
+                      className="h-4 w-4 animate-spin"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      aria-hidden="true"
+                    >
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                      />
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                      />
+                    </svg>
+                    {t('reporting.modal.submitting')}
+                  </span>
+                ) : t('reporting.modal.submit')}
               </button>
             </div>
           </form>
