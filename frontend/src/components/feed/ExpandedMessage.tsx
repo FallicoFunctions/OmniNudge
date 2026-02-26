@@ -627,6 +627,7 @@ export function ExpandedMessage({ conversation, onCollapse }: ExpandedMessagePro
           onClose={() => setReportModalMessageID(null)}
           targetType="message"
           targetId={reportModalMessageID}
+          defaultReason="harassment"
         />
       )}
     </div>

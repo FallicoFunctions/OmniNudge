@@ -1,3 +1,3 @@
 package handlers
 
-const blockingSettingsErrorMessage = "Cannot proceed due to blocking settings"
+const blockingSettingsErrorMessage = "This action isn't available"

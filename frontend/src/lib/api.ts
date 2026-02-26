@@ -55,7 +55,9 @@ class ApiClient {
         localStorage.removeItem('user');
       }
 
-      throw new Error(error.message || error.error);
+      const err = new Error(error.message || error.error);
+      (err as any).status = response.status;
+      throw err;
     }
 
     if (response.status === 204) {
