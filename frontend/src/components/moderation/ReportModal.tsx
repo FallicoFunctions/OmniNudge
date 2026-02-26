@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, type FormEvent } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { reportService, type ReportReason, type ReportTargetType } from '../../services/reportService';
 
@@ -34,8 +34,10 @@ export function ReportModal({ isOpen, onClose, targetType, targetId, targetName,
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const submitBtnRef = useRef<HTMLButtonElement>(null);
   const cancelBtnRef = useRef<HTMLButtonElement>(null);
+  // Issue 1: refs for select and textarea instead of getElementById
+  const selectRef = useRef<HTMLSelectElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // Issue 3: handleClose memoized with useCallback, defined before early return
   const handleClose = useCallback(() => {
     if (autoCloseTimerRef.current) {
       clearTimeout(autoCloseTimerRef.current);
@@ -43,6 +45,38 @@ export function ReportModal({ isOpen, onClose, targetType, targetId, targetName,
     }
     onClose();
   }, [onClose]);
+
+  // Issue 2 & 3: handleSubmit moved before early return and wrapped in useCallback
+  const handleSubmit = useCallback(async (e: FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    setSubmitError(null);
+    try {
+      await reportService.createReport({ targetType, targetId, reason, description: description.trim() || undefined });
+      setSubmitSuccess(true);
+      // Issue 6: increased delay to 2000ms
+      autoCloseTimerRef.current = setTimeout(() => { handleClose(); }, 2000);
+    } catch (error) {
+      const isRateLimited = error instanceof Error && (
+        error.message.includes('429') ||
+        error.message.toLowerCase().includes('rate limit') ||
+        ('status' in error && (error as any).status === 429)
+      );
+      if (isRateLimited) {
+        setSubmitError(t('reporting.errors.rateLimited'));
+      } else {
+        setSubmitError(t('reporting.errors.failed', { message: error instanceof Error ? error.message : t('common.error') }));
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [targetType, targetId, reason, description, handleClose, t]);
+
+  // Issue 5: getFocusable helper using useCallback
+  const getFocusable = useCallback(() =>
+    [closeButtonRef.current, selectRef.current, textareaRef.current, cancelBtnRef.current, submitBtnRef.current]
+      .filter((el): el is HTMLElement => el !== null),
+  []);
 
   useEffect(() => {
     if (isOpen) {
@@ -53,7 +87,6 @@ export function ReportModal({ isOpen, onClose, targetType, targetId, targetName,
     }
   }, [isOpen, defaultReason]);
 
-  // Issue 4: cleanup effect for autoCloseTimerRef on unmount
   useEffect(() => {
     return () => {
       if (autoCloseTimerRef.current) clearTimeout(autoCloseTimerRef.current);
@@ -62,50 +95,11 @@ export function ReportModal({ isOpen, onClose, targetType, targetId, targetName,
 
   if (!isOpen) return null;
 
-  const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault();
-    setIsSubmitting(true);
-    setSubmitError(null);
-
-    try {
-      await reportService.createReport({
-        targetType,
-        targetId,
-        reason,
-        description: description.trim() || undefined,
-      });
-      setSubmitSuccess(true);
-      autoCloseTimerRef.current = setTimeout(() => {
-        handleClose();
-      }, 1500);
-    } catch (error) {
-      const isRateLimited =
-        (error instanceof Error && (
-          error.message.includes('429') ||
-          error.message.toLowerCase().includes('rate limit') ||
-          ('status' in error && (error as any).status === 429)
-        ));
-      if (isRateLimited) {
-        setSubmitError(t('reporting.errors.rateLimited'));
-      } else {
-        setSubmitError(
-          t('reporting.errors.failed', {
-            message: error instanceof Error ? error.message : t('common.error'),
-          })
-        );
-      }
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
   const headerLabel = targetName
     ? t('reporting.modal.titleWithName', { name: targetName })
     : t('reporting.modal.title');
 
   return (
-    /* Backdrop */
-    // Issue 5: tabIndex={-1} added to dialog div
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
       role="dialog"
@@ -114,24 +108,20 @@ export function ReportModal({ isOpen, onClose, targetType, targetId, targetName,
       tabIndex={-1}
       onKeyDown={(e) => { if (e.key === 'Escape') handleClose(); }}
     >
+      {/* Issue 7: guard backdrop click during submission */}
       <div
         className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-        onClick={handleClose}
+        onClick={() => { if (!isSubmitting) handleClose(); }}
         aria-hidden="true"
       />
 
-      {/* Modal panel — Issues 1 & 2: ref-based focus trap via onKeyDown */}
+      {/* Modal panel — Issue 1 & 5: ref-based focus trap */}
       <div
         className="relative z-10 w-full max-w-md rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-xl"
         onKeyDown={(e) => {
           if (e.key !== 'Tab') return;
-          const focusable = [
-            closeButtonRef.current,
-            document.getElementById('report-reason'),
-            document.getElementById('report-description'),
-            cancelBtnRef.current,
-            submitBtnRef.current,
-          ].filter(Boolean) as HTMLElement[];
+          // Issue 5: use getFocusable helper
+          const focusable = getFocusable();
           if (focusable.length === 0) return;
           const first = focusable[0];
           const last = focusable[focusable.length - 1];
@@ -156,7 +146,6 @@ export function ReportModal({ isOpen, onClose, targetType, targetId, targetName,
           >
             {headerLabel}
           </h2>
-          {/* Issue 1: ref attached, per-button onKeyDown removed */}
           <button
             ref={closeButtonRef}
             type="button"
@@ -182,7 +171,7 @@ export function ReportModal({ isOpen, onClose, targetType, targetId, targetName,
         </div>
 
         {submitSuccess ? (
-          /* Success state — Issue 6: role="status" added */
+          /* Success state */
           <div role="status" className="flex flex-col items-center gap-3 px-6 py-10 text-center">
             <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[var(--color-success)]/15">
               <svg
@@ -206,6 +195,14 @@ export function ReportModal({ isOpen, onClose, targetType, targetId, targetName,
             <p className="text-sm text-[var(--color-text-secondary)]">
               {t('reporting.successDetail')}
             </p>
+            {/* Issue 6: Close button in success state */}
+            <button
+              type="button"
+              onClick={handleClose}
+              className="mt-2 rounded-md border border-[var(--color-border)] px-4 py-2 text-sm font-semibold text-[var(--color-text-primary)] transition hover:border-[var(--color-text-secondary)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-primary)]"
+            >
+              {t('common.close')}
+            </button>
           </div>
         ) : (
           /* Form */
@@ -221,7 +218,9 @@ export function ReportModal({ isOpen, onClose, targetType, targetId, targetName,
                   *
                 </span>
               </label>
+              {/* Issue 1: ref={selectRef} added */}
               <select
+                ref={selectRef}
                 id="report-reason"
                 value={reason}
                 onChange={(e) => setReason(e.target.value as ReportReason)}
@@ -248,7 +247,9 @@ export function ReportModal({ isOpen, onClose, targetType, targetId, targetName,
                   {t('common.optional')}
                 </span>
               </label>
+              {/* Issue 1: ref={textareaRef} added */}
               <textarea
+                ref={textareaRef}
                 id="report-description"
                 value={description}
                 onChange={(e) => setDescription(e.target.value.slice(0, MAX_DESCRIPTION_LENGTH))}
@@ -256,10 +257,9 @@ export function ReportModal({ isOpen, onClose, targetType, targetId, targetName,
                 placeholder={t('reporting.modal.descriptionPlaceholder')}
                 className="w-full resize-none rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
               />
-              {/* Issue 7: aria-live and aria-label added to character counter */}
+              {/* Issue 4: removed aria-live, kept aria-label only */}
               <p
                 className="text-right text-xs text-[var(--color-text-muted)]"
-                aria-live="polite"
                 aria-label={`${description.length} of ${MAX_DESCRIPTION_LENGTH} characters`}
               >
                 {description.length}/{MAX_DESCRIPTION_LENGTH}
@@ -278,7 +278,6 @@ export function ReportModal({ isOpen, onClose, targetType, targetId, targetName,
 
             {/* Actions */}
             <div className="flex gap-3 pt-1">
-              {/* Issue 1: ref attached, per-button onKeyDown removed */}
               <button
                 ref={cancelBtnRef}
                 type="button"
@@ -288,7 +287,6 @@ export function ReportModal({ isOpen, onClose, targetType, targetId, targetName,
               >
                 {t('common.cancel')}
               </button>
-              {/* Issues 1, 2, 8: ref attached, data-report-submit removed, per-button onKeyDown removed */}
               <button
                 ref={submitBtnRef}
                 type="submit"
