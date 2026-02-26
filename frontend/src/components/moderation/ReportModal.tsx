@@ -60,15 +60,16 @@ export function ReportModal({ isOpen, onClose, targetType, targetId, targetName,
       setSubmitSuccess(true);
       autoCloseTimerRef.current = setTimeout(() => { handleClose(); }, 2000);
     } catch (error) {
-      const isRateLimited = error instanceof Error && (
-        error.message.includes('429') ||
-        error.message.toLowerCase().includes('rate limit') ||
-        ('status' in error && (error as any).status === 429)
-      );
+      const status = (error as any)?.status;
+      const message = error instanceof Error ? error.message : '';
+      const isRateLimited =
+        status === 429 ||
+        message.includes('429') ||
+        message.toLowerCase().includes('rate limit');
       if (isRateLimited) {
         setSubmitError(t('reporting.errors.rateLimited'));
       } else {
-        setSubmitError(t('reporting.errors.failed', { message: error instanceof Error ? error.message : t('common.error') }));
+        setSubmitError(t('reporting.errors.failed', { message: message || t('common.error') }));
       }
     } finally {
       setIsSubmitting(false);
@@ -179,7 +180,7 @@ export function ReportModal({ isOpen, onClose, targetType, targetId, targetName,
             onClick={handleClose}
             disabled={isSubmitting}
             aria-label={t('common.close')}
-            className="flex h-10 w-10 items-center justify-center rounded-md text-[var(--color-text-secondary)] transition hover:bg-[var(--color-surface-elevated)] hover:text-[var(--color-text-primary)] disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-primary)]"
+            className="flex h-10 w-10 items-center justify-center rounded-md text-[var(--color-text-secondary)] transition hover:bg-[var(--color-surface-elevated)] hover:text-[var(--color-text-primary)] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-primary)]"
           >
             <svg
               className="h-5 w-5"
@@ -311,7 +312,7 @@ export function ReportModal({ isOpen, onClose, targetType, targetId, targetName,
                 type="button"
                 onClick={handleClose}
                 disabled={isSubmitting}
-                className="flex-1 rounded-md border border-[var(--color-border)] px-4 py-2 text-sm font-semibold text-[var(--color-text-primary)] transition hover:border-[var(--color-text-secondary)] disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-primary)]"
+                className="flex-1 rounded-md border border-[var(--color-border)] px-4 py-2 text-sm font-semibold text-[var(--color-text-primary)] transition hover:border-[var(--color-text-secondary)] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-primary)]"
               >
                 {t('common.cancel')}
               </button>
