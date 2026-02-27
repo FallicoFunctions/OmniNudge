@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -68,6 +69,9 @@ func (r *HubAccessRequestRepository) GetByID(ctx context.Context, id int) (*HubA
 		&req.ID, &req.HubID, &req.UserID, &req.Status, &req.Message,
 		&req.CreatedAt, &req.UpdatedAt,
 	)
+	if err == pgx.ErrNoRows {
+		return nil, nil
+	}
 	if err != nil {
 		return nil, err
 	}

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -155,6 +156,9 @@ func (r *EmailVerificationRepository) GetByToken(ctx context.Context, token stri
 		&verification.VerifiedAt,
 		&verification.CreatedAt,
 	)
+	if err == pgx.ErrNoRows {
+		return nil, nil
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -184,6 +188,9 @@ func (r *EmailVerificationRepository) GetPendingVerification(ctx context.Context
 		&verification.VerifiedAt,
 		&verification.CreatedAt,
 	)
+	if err == pgx.ErrNoRows {
+		return nil, nil
+	}
 	if err != nil {
 		return nil, err
 	}

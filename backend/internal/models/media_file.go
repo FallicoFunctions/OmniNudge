@@ -154,6 +154,9 @@ func (r *MediaFileRepository) GetByID(ctx context.Context, id int) (*MediaFile, 
 		&media.ScanError,
 		&media.QuarantinedAt,
 	)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
 	if err != nil {
 		return nil, err
 	}

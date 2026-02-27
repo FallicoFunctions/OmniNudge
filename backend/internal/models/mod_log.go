@@ -23,12 +23,14 @@ func (j *JSONB) Scan(value interface{}) error {
 		return nil
 	}
 
-	bytes, ok := value.([]byte)
-	if !ok {
+	switch v := value.(type) {
+	case []byte:
+		return json.Unmarshal(v, j)
+	case string:
+		return json.Unmarshal([]byte(v), j)
+	default:
 		return fmt.Errorf("failed to unmarshal JSONB value: %v", value)
 	}
-
-	return json.Unmarshal(bytes, j)
 }
 
 type ModLog struct {
