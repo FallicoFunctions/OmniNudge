@@ -137,6 +137,9 @@ func (s *FeatureFlagService) UpdateFlag(ctx context.Context, key string, updates
 	if err != nil {
 		return err
 	}
+	if oldFlag == nil {
+		return fmt.Errorf("flag not found: %s", key)
+	}
 
 	// Apply updates
 	newFlag := *oldFlag
