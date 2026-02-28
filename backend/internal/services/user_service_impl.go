@@ -28,6 +28,8 @@ type UserService interface {
 
 	// DeleteUser soft-deletes the target user after checking deletion rules
 	// via the UserAggregate and publishes a UserDeleted event.
+	// Note: a user cannot delete their own account through this method; use the
+	// dedicated account-deletion endpoint for self-service deletion.
 	DeleteUser(ctx context.Context, userID int, reason string, deletedBy int) error
 
 	// ChangePassword changes a user's password, verifying the old one first.
@@ -148,7 +150,7 @@ func (s *userServiceImpl) UnbanUser(ctx context.Context, userID int, reason stri
 		return InternalError(fmt.Errorf("load aggregate: %w", err))
 	}
 
-	agg.Unban(unbannedBy)
+	agg.Unban(reason, unbannedBy)
 
 	evts := agg.GetEvents()
 	if len(evts) == 0 {
