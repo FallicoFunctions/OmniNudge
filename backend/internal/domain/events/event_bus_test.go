@@ -183,16 +183,14 @@ func TestEventBus_ClearHandlers(t *testing.T) {
 	bus.Clear()
 	bus.Publish(UserRegistered{UserID: 2, RegisteredAt: time.Now()})
 
-	// Event log is synchronous; if a handler were registered it would be
-	// dispatched in a goroutine — but with no handlers nothing runs.
-	// A brief pause ensures no stray goroutine mutates `called`.
-	wg2 := sync.WaitGroup{}
-	_ = wg2 // no-op; absence of panic and called==false is the assertion
+	// ClearHandlers removes all subscriptions, so Publish spawns no goroutines.
+	// The event log append is synchronous, so there is no race: by the time
+	// Publish returns, the log has been written and no handler goroutine exists.
 	mu.Lock()
 	assert.False(t, called, "handler must not fire after ClearHandlers")
 	mu.Unlock()
 
-	// Only the second publish is logged (first was cleared).
+	// Only the second publish is logged (first was cleared by bus.Clear()).
 	assert.Len(t, bus.GetEventLog(), 1)
 }
 

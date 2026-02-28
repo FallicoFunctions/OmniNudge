@@ -13,7 +13,10 @@ var (
 	ErrUsernameInvalidChar = errors.New("username can only contain letters, numbers, hyphens, and underscores")
 )
 
-var usernameRegex = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
+// usernameRegex requires start and end to be alphanumeric; hyphens and
+// underscores are only permitted in the middle. This prevents usernames like
+// "-user", "user_", or "__admin__" which look odd and can confuse URL parsers.
+var usernameRegex = regexp.MustCompile(`^[a-zA-Z0-9]([a-zA-Z0-9_-]*[a-zA-Z0-9])?$`)
 
 // Username is an immutable, self-validating value object for usernames.
 type Username struct {

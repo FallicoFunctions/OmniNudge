@@ -52,6 +52,26 @@ func TestUsername_JSON(t *testing.T) {
 	assert.Equal(t, username, decoded)
 }
 
+func TestNewUsername_RejectLeadingTrailingSpecial(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+	}{
+		{"leading hyphen", "-user"},
+		{"trailing hyphen", "user-"},
+		{"leading underscore", "_user"},
+		{"trailing underscore", "user_"},
+		{"only hyphens", "---"},
+		{"only underscores", "___"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := NewUsername(tt.input)
+			require.ErrorIs(t, err, ErrUsernameInvalidChar)
+		})
+	}
+}
+
 func TestUsernameFromString(t *testing.T) {
 	// UsernameFromString bypasses validation — useful for legacy short usernames.
 	u := UsernameFromString("ab")

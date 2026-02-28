@@ -69,7 +69,7 @@ func (h *UserEventHandlers) OnUserUnbanned(event events.Event) {
 		return
 	}
 
-	log.Printf("[eventhandlers] User unbanned: id=%d username=%s", e.UserID, e.Username)
+	log.Printf("[eventhandlers] User unbanned: id=%d username=%s reason=%q unbanned_by=%d", e.UserID, e.Username, e.Reason, e.UnbannedBy)
 
 	// TODO: send unban-notification email
 }

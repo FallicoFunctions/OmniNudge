@@ -21,6 +21,18 @@ func TestNewUserAggregate(t *testing.T) {
 	assert.Empty(t, user.GetEvents())
 }
 
+func TestUserAggregate_RecordRegistration_ZeroID(t *testing.T) {
+	// RecordRegistration before SetID must be a silent no-op — the aggregate
+	// has no DB identity yet, so emitting a UserRegistered event with id==0
+	// would be meaningless.
+	user, _ := NewUserAggregate("testuser", "test@example.com", "Password123")
+	// Deliberately do NOT call SetID.
+
+	user.RecordRegistration()
+
+	assert.Empty(t, user.GetEvents(), "RecordRegistration with id==0 must not emit event")
+}
+
 func TestUserAggregate_RecordRegistration(t *testing.T) {
 	user, _ := NewUserAggregate("testuser", "test@example.com", "Password123")
 	user.SetID(42)
@@ -217,6 +229,24 @@ func TestUserAggregate_ChangePassword(t *testing.T) {
 
 		require.Error(t, err)
 	})
+
+	t.Run("banned user cannot change password", func(t *testing.T) {
+		u, _ := NewUserAggregate("testuser", "test@example.com", "Password123")
+		_ = u.Ban("spam", false, 999)
+
+		err := u.ChangePassword("Password123", "NewPassword456")
+
+		require.ErrorIs(t, err, ErrUserBanned)
+	})
+
+	t.Run("deleted user cannot change password", func(t *testing.T) {
+		u, _ := NewUserAggregate("testuser", "test@example.com", "Password123")
+		_ = u.Delete("cleanup", 999)
+
+		err := u.ChangePassword("Password123", "NewPassword456")
+
+		require.ErrorIs(t, err, ErrUserDeleted)
+	})
 }
 
 func TestUserAggregate_CanLogin(t *testing.T) {
@@ -247,14 +277,14 @@ func TestUserAggregate_UpdateProfile(t *testing.T) {
 	bio := "Hello world"
 	avatar := "https://example.com/avatar.png"
 	nsfw := true
-	user.UpdateProfile(&avatar, &bio, &nsfw)
+	user.UpdateProfile(&bio, &avatar, &nsfw)
 
 	entity := user.ToEntity()
 	assert.Equal(t, bio, *entity.Bio)
 	assert.Equal(t, avatar, *entity.AvatarURL)
 	assert.True(t, entity.NSFW)
 
-	// Nil pointers are no-ops.
+	// Nil pointers are no-ops (subset update).
 	user.UpdateProfile(nil, nil, nil)
 	entity2 := user.ToEntity()
 	assert.Equal(t, bio, *entity2.Bio)

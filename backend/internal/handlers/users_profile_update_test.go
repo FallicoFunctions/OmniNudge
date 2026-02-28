@@ -227,7 +227,7 @@ func TestUpdateProfile_InvalidatesCachedPublicProfile(t *testing.T) {
 	defer cleanup()
 
 	initialBio := "before cache"
-	require.NoError(t, userRepo.UpdateProfile(context.Background(), owner.ID, &initialBio, nil))
+	require.NoError(t, userRepo.UpdateProfile(context.Background(), owner.ID, &initialBio, nil, nil))
 
 	handler := NewUsersHandler(userRepo, nil, nil, settingsRepo, nil, nil, nil, nil, services.NewMemoryCache(), nil)
 	router := newUsersProfileUpdateRouter(handler)
@@ -563,7 +563,7 @@ func TestUploadMyAvatar_RemovesPreviousLocalAvatarFile(t *testing.T) {
 	oldPath := "uploads/avatars/old_avatar.png"
 	require.NoError(t, os.WriteFile(oldPath, createPNGImagePayload(t, 300, 300), 0o644))
 	oldURL := "/uploads/avatars/old_avatar.png"
-	require.NoError(t, userRepo.UpdateProfile(context.Background(), owner.ID, nil, &oldURL))
+	require.NoError(t, userRepo.UpdateProfile(context.Background(), owner.ID, nil, &oldURL, nil))
 
 	handler := NewUsersHandler(
 		userRepo,

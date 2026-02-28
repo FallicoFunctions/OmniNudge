@@ -159,13 +159,16 @@ func (m *UserRepository) UpdatePublicKey(_ context.Context, userID int, publicKe
 	return nil
 }
 
-func (m *UserRepository) UpdateProfile(_ context.Context, userID int, bio *string, avatarURL *string) error {
+func (m *UserRepository) UpdateProfile(_ context.Context, userID int, bio *string, avatarURL *string, nsfw *bool) error {
 	if u, ok := m.users[userID]; ok {
 		if bio != nil {
 			u.Bio = bio
 		}
 		if avatarURL != nil {
 			u.AvatarURL = avatarURL
+		}
+		if nsfw != nil {
+			u.NSFW = *nsfw
 		}
 	}
 	return nil

@@ -72,8 +72,8 @@ func (r *PostgresUserRepository) UpdatePublicKey(ctx context.Context, userID int
 	return r.inner.UpdatePublicKey(ctx, userID, publicKey)
 }
 
-func (r *PostgresUserRepository) UpdateProfile(ctx context.Context, userID int, bio *string, avatarURL *string) error {
-	return r.inner.UpdateProfile(ctx, userID, bio, avatarURL)
+func (r *PostgresUserRepository) UpdateProfile(ctx context.Context, userID int, bio *string, avatarURL *string, nsfw *bool) error {
+	return r.inner.UpdateProfile(ctx, userID, bio, avatarURL, nsfw)
 }
 
 func (r *PostgresUserRepository) UpdatePassword(ctx context.Context, userID int, passwordHash string) error {

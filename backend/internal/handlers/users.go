@@ -496,7 +496,7 @@ func (h *UsersHandler) UpdateProfile(c *gin.Context) {
 		}
 	}
 	// Update profile
-	if err := h.userRepo.UpdateProfile(c.Request.Context(), user.ID, user.Bio, user.AvatarURL); err != nil {
+	if err := h.userRepo.UpdateProfile(c.Request.Context(), user.ID, user.Bio, user.AvatarURL, nil); err != nil {
 		RespondError(c, http.StatusInternalServerError, "Failed to update profile")
 		return
 	}
@@ -653,7 +653,7 @@ func (h *UsersHandler) UploadMyAvatar(c *gin.Context) {
 	}
 	user.AvatarURL = &avatarURL
 
-	if err := h.userRepo.UpdateProfile(c.Request.Context(), user.ID, user.Bio, user.AvatarURL); err != nil {
+	if err := h.userRepo.UpdateProfile(c.Request.Context(), user.ID, user.Bio, user.AvatarURL, nil); err != nil {
 		RespondError(c, http.StatusInternalServerError, "Failed to update user avatar")
 		return
 	}

@@ -186,7 +186,7 @@ func TestGetUserProfile_UsesCachedResponseUntilTTLExpiry(t *testing.T) {
 	defer cleanup()
 
 	initialBio := "cached bio"
-	require.NoError(t, userRepo.UpdateProfile(context.Background(), owner.ID, &initialBio, nil))
+	require.NoError(t, userRepo.UpdateProfile(context.Background(), owner.ID, &initialBio, nil, nil))
 
 	handler := NewUsersHandler(userRepo, nil, nil, settingsRepo, nil, nil, nil, nil, services.NewMemoryCache(), nil)
 	router := newUsersVisibilityRouter(handler)
@@ -198,7 +198,7 @@ func TestGetUserProfile_UsesCachedResponseUntilTTLExpiry(t *testing.T) {
 	assert.Contains(t, firstW.Body.String(), initialBio)
 
 	updatedBio := "fresh bio"
-	require.NoError(t, userRepo.UpdateProfile(context.Background(), owner.ID, &updatedBio, nil))
+	require.NoError(t, userRepo.UpdateProfile(context.Background(), owner.ID, &updatedBio, nil, nil))
 
 	secondReq := httptest.NewRequest(http.MethodGet, "/users/"+owner.Username, nil)
 	secondW := httptest.NewRecorder()

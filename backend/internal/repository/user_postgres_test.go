@@ -140,7 +140,8 @@ func TestPostgresUserRepository_UpdateProfile(t *testing.T) {
 	bio := "My test bio"
 	avatar := "https://example.com/avatar.png"
 
-	err := repo.UpdateProfile(ctx, user.ID, &bio, &avatar)
+	nsfw := true
+	err := repo.UpdateProfile(ctx, user.ID, &bio, &avatar, &nsfw)
 	require.NoError(t, err)
 
 	got, err := repo.GetByID(ctx, user.ID)
