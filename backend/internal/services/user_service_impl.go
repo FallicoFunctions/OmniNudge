@@ -35,8 +35,9 @@ type UserService interface {
 	// ChangePassword changes a user's password, verifying the old one first.
 	ChangePassword(ctx context.Context, userID int, oldPassword, newPassword string) error
 
-	// UpdateProfile updates optional profile fields (bio, avatar URL).
-	UpdateProfile(ctx context.Context, userID int, bio *string, avatarURL *string) error
+	// UpdateProfile updates optional profile fields. Nil parameters are
+	// ignored (no-op for that field), so callers may update a subset.
+	UpdateProfile(ctx context.Context, userID int, bio *string, avatarURL *string, nsfw *bool) error
 }
 
 // userServiceImpl is the default production implementation of UserService.
@@ -227,8 +228,8 @@ func (s *userServiceImpl) ChangePassword(ctx context.Context, userID int, oldPas
 }
 
 // UpdateProfile delegates to the repository's dedicated profile-update method.
-func (s *userServiceImpl) UpdateProfile(ctx context.Context, userID int, bio *string, avatarURL *string) error {
-	if err := s.userRepo.UpdateProfile(ctx, userID, bio, avatarURL); err != nil {
+func (s *userServiceImpl) UpdateProfile(ctx context.Context, userID int, bio *string, avatarURL *string, nsfw *bool) error {
+	if err := s.userRepo.UpdateProfile(ctx, userID, bio, avatarURL, nsfw); err != nil {
 		return InternalError(fmt.Errorf("update profile: %w", err))
 	}
 	return nil

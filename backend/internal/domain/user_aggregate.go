@@ -207,7 +207,14 @@ func (u *UserAggregate) Delete(reason string, deletedBy int) error {
 
 // ChangePassword validates the old password then replaces it with a newly
 // created Password value object (which enforces strength requirements).
+// Returns ErrUserBanned or ErrUserDeleted if the account is not active.
 func (u *UserAggregate) ChangePassword(oldPassword, newPassword string) error {
+	if u.banned {
+		return ErrUserBanned
+	}
+	if u.deleted {
+		return ErrUserDeleted
+	}
 	if !u.password.Verify(oldPassword) {
 		return ErrInvalidPassword
 	}
@@ -227,13 +234,14 @@ func (u *UserAggregate) ChangePassword(oldPassword, newPassword string) error {
 	return nil
 }
 
-// UpdateProfile sets optional profile fields. Nil pointers are ignored.
-func (u *UserAggregate) UpdateProfile(avatarURL, bio *string, nsfw *bool) {
-	if avatarURL != nil {
-		u.avatarURL = avatarURL
-	}
+// UpdateProfile sets optional profile fields. Nil pointers are ignored (no-op
+// for that field), allowing callers to update a subset of fields.
+func (u *UserAggregate) UpdateProfile(bio, avatarURL *string, nsfw *bool) {
 	if bio != nil {
 		u.bio = bio
+	}
+	if avatarURL != nil {
+		u.avatarURL = avatarURL
 	}
 	if nsfw != nil {
 		u.nsfw = *nsfw

@@ -64,6 +64,11 @@ func (s *UserDomainService) CheckEmailAvailable(ctx context.Context, email strin
 // Business rules:
 //   - Only admins may ban.
 //   - Admins cannot ban other admins.
+//
+// Note: accepts raw User entities (not aggregates) intentionally. These checks
+// happen before the target aggregate is loaded — accepting entities avoids an
+// extra DB round-trip. The aggregate enforces the same invariants when Ban() is
+// later called, providing defence-in-depth.
 func (s *UserDomainService) CanUserBan(banner, target *domain.User) error {
 	if banner.Role != "admin" {
 		return errors.New("only administrators can ban users")
@@ -80,6 +85,8 @@ func (s *UserDomainService) CanUserBan(banner, target *domain.User) error {
 //   - Users may not delete their own account through this path.
 //   - Only admins may delete other users.
 //   - Admins may not delete other admin accounts.
+//
+// Note: same raw-entity design rationale as CanUserBan.
 func (s *UserDomainService) CanUserDelete(deleter, target *domain.User) error {
 	if deleter.ID == target.ID {
 		return errors.New("cannot delete your own account")

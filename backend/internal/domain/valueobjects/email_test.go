@@ -58,6 +58,15 @@ func TestEmail_JSON(t *testing.T) {
 	assert.Equal(t, email, decoded)
 }
 
+func TestNewEmail_SingleCharAddresses(t *testing.T) {
+	// Single-character local part and/or domain label must be accepted.
+	tests := []string{"a@b.co", "a@example.com", "user@x.io"}
+	for _, addr := range tests {
+		_, err := NewEmail(addr)
+		require.NoError(t, err, "address %q should be valid", addr)
+	}
+}
+
 func TestNewEmail_RejectLeadingAndConsecutiveDots(t *testing.T) {
 	tests := []struct {
 		name  string

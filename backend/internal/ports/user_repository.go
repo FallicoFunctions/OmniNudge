@@ -21,7 +21,7 @@ type UserRepository interface {
 	UpdateLastSeen(ctx context.Context, userID int) error
 	UpdateRole(ctx context.Context, userID int, role string) error
 	UpdatePublicKey(ctx context.Context, userID int, publicKey string) error
-	UpdateProfile(ctx context.Context, userID int, bio *string, avatarURL *string) error
+	UpdateProfile(ctx context.Context, userID int, bio *string, avatarURL *string, nsfw *bool) error
 	UpdatePassword(ctx context.Context, userID int, passwordHash string) error
 	UpdateLastAgentPostAt(ctx context.Context, userID int, timestamp time.Time) error
 	UpdateLastAgentBrowseAt(ctx context.Context, userID int, timestamp time.Time) error
