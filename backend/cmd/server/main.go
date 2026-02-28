@@ -15,9 +15,10 @@ import (
 	"github.com/omninudge/backend/internal/tracing"
 	"github.com/omninudge/backend/internal/database"
 	"github.com/omninudge/backend/internal/handlers"
-	"github.com/omninudge/backend/internal/models"
 	"github.com/omninudge/backend/internal/monitoring"
 	"github.com/omninudge/backend/internal/queue"
+	"github.com/omninudge/backend/internal/domain/events"
+	"github.com/omninudge/backend/internal/eventhandlers"
 	"github.com/omninudge/backend/internal/repository"
 	"github.com/omninudge/backend/internal/services"
 	"github.com/omninudge/backend/internal/utils"
@@ -86,42 +87,42 @@ func main() {
 	}
 
 	// Initialize repositories
-	userRepo := models.NewUserRepository(db.Pool)
-	userSettingsRepo := models.NewUserSettingsRepository(db.Pool)
-	postRepo := models.NewPlatformPostRepository(db.Pool)
-	commentRepo := models.NewPostCommentRepository(db.Pool)
-	conversationRepo := models.NewConversationRepository(db.Pool)
-	messageRepo := models.NewMessageRepository(db.Pool)
-	mediaRepo := models.NewMediaFileRepository(db.Pool)
-	hubRepo := models.NewHubRepository(db.Pool)
-	reportRepo := models.NewReportRepository(db.Pool)
-	hubModRepo := models.NewHubModeratorRepository(db.Pool)
-	notificationRepo := models.NewNotificationRepository(db.Pool)
-	baselineRepo := models.NewUserBaselineRepository(db.Pool)
-	batchRepo := models.NewNotificationBatchRepository(db.Pool)
-	slideshowRepo := models.NewSlideshowRepository(db.Pool)
-	redditPostRepo := models.NewRedditPostRepository(db.Pool)
-	passwordResetRepo := models.NewPasswordResetRepository(db.Pool)
-	feedRepo := models.NewFeedRepository(db.Pool)
-	themeRepo := models.NewUserThemeRepository(db.Pool)
-	themeOverrideRepo := models.NewUserThemeOverrideRepository(db.Pool)
-	installedThemeRepo := models.NewUserInstalledThemeRepository(db.Pool)
-	redditCommentRepo := models.NewRedditPostCommentRepository(db.Pool)
-	savedItemsRepo := models.NewSavedItemsRepository(db.Pool)
-	hubSubRepo := models.NewHubSubscriptionRepository(db.Pool)
-	subredditSubRepo := models.NewSubredditSubscriptionRepository(db.Pool)
-	tokenRepo := models.NewDeviceTokenRepository(db.Pool)
+	userRepo := repository.NewPostgresUserRepository(db.Pool)
+	userSettingsRepo := repository.NewPostgresUserSettingsRepository(db.Pool)
+	postRepo := repository.NewPostgresPlatformPostRepository(db.Pool)
+	commentRepo := repository.NewPostgresPostCommentRepository(db.Pool)
+	conversationRepo := repository.NewPostgresConversationRepository(db.Pool)
+	messageRepo := repository.NewPostgresMessageRepository(db.Pool)
+	mediaRepo := repository.NewPostgresMediaFileRepository(db.Pool)
+	hubRepo := repository.NewPostgresHubRepository(db.Pool)
+	reportRepo := repository.NewPostgresReportRepository(db.Pool)
+	hubModRepo := repository.NewPostgresHubModeratorRepository(db.Pool)
+	notificationRepo := repository.NewPostgresNotificationRepository(db.Pool)
+	baselineRepo := repository.NewPostgresUserBaselineRepository(db.Pool)
+	batchRepo := repository.NewPostgresNotificationBatchRepository(db.Pool)
+	slideshowRepo := repository.NewPostgresSlideshowRepository(db.Pool)
+	redditPostRepo := repository.NewPostgresRedditPostRepository(db.Pool)
+	passwordResetRepo := repository.NewPostgresPasswordResetRepository(db.Pool)
+	feedRepo := repository.NewPostgresFeedRepository(db.Pool)
+	themeRepo := repository.NewPostgresUserThemeRepository(db.Pool)
+	themeOverrideRepo := repository.NewPostgresUserThemeOverrideRepository(db.Pool)
+	installedThemeRepo := repository.NewPostgresUserInstalledThemeRepository(db.Pool)
+	redditCommentRepo := repository.NewPostgresRedditPostCommentRepository(db.Pool)
+	savedItemsRepo := repository.NewPostgresSavedItemsRepository(db.Pool)
+	hubSubRepo := repository.NewPostgresHubSubscriptionRepository(db.Pool)
+	subredditSubRepo := repository.NewPostgresSubredditSubscriptionRepository(db.Pool)
+	tokenRepo := repository.NewPostgresDeviceTokenRepository(db.Pool)
 
 	// Feature 1: Message Reactions repository
-	messageReactionRepo := models.NewMessageReactionRepository(db.Pool)
-	userProfileRepo := models.NewUserProfileRepository(db.Pool)
-	userFriendshipRepo := models.NewUserFriendshipRepository(db.Pool)
+	messageReactionRepo := repository.NewPostgresMessageReactionRepository(db.Pool)
+	userProfileRepo := repository.NewPostgresUserProfileRepository(db.Pool)
+	userFriendshipRepo := repository.NewPostgresUserFriendshipRepository(db.Pool)
 
 	// Moderation Phase 1 repositories
-	hubBanRepo := models.NewHubBanRepository(db.Pool)
-	removalReasonRepo := models.NewRemovalReasonRepository(db.Pool)
-	removedContentRepo := models.NewRemovedContentRepository(db.Pool)
-	modLogRepo := models.NewModLogRepository(db.Pool)
+	hubBanRepo := repository.NewPostgresHubBanRepository(db.Pool)
+	removalReasonRepo := repository.NewPostgresRemovalReasonRepository(db.Pool)
+	removedContentRepo := repository.NewPostgresRemovedContentRepository(db.Pool)
+	modLogRepo := repository.NewPostgresModLogRepository(db.Pool)
 
 	// Hub Settings and Themes repositories (from repository package)
 	hubSettingsRepo := repository.NewHubSettingsRepository(db.Pool)
@@ -129,15 +130,24 @@ func main() {
 	hubWikiRepo := repository.NewHubWikiRepository(db.Pool)
 
 	// Access request repository
-	hubAccessRequestRepo := models.NewHubAccessRequestRepository(db.Pool)
+	hubAccessRequestRepo := repository.NewPostgresHubAccessRequestRepository(db.Pool)
 
 	// Bug reporting repositories
-	bugReportRepo := models.NewBugReportRepository(db.Pool)
-	knownBugRepo := models.NewKnownBugRepository(db.Pool)
+	bugReportRepo := repository.NewPostgresBugReportRepository(db.Pool)
+	knownBugRepo := repository.NewPostgresKnownBugRepository(db.Pool)
 
 	// Initialize WebSocket hub
 	hub := websocket.NewHub()
 	go hub.Run()
+
+	// Initialize domain event bus and register event handlers.
+	eventBus := events.NewEventBus(true)
+	userEventHandlers := eventhandlers.NewUserEventHandlers()
+	eventBus.Subscribe("UserRegistered", userEventHandlers.OnUserRegistered)
+	eventBus.Subscribe("UserBanned", userEventHandlers.OnUserBanned)
+	eventBus.Subscribe("UserUnbanned", userEventHandlers.OnUserUnbanned)
+	eventBus.Subscribe("PasswordChanged", userEventHandlers.OnPasswordChanged)
+	log.Println("Domain event bus initialized")
 
 	// Initialize services
 	authService := services.NewAuthService(
@@ -335,7 +345,7 @@ func main() {
 	go retentionWorker.Start(workerCtx)
 
 	// Initialize repositories for email verification
-	emailVerificationRepo := models.NewEmailVerificationRepository(db.Pool)
+	emailVerificationRepo := repository.NewPostgresEmailVerificationRepository(db.Pool)
 
 	// Initialize handlers
 	authHandler := handlers.NewAuthHandler(authService, userRepo, emailService, passwordResetRepo, emailVerificationRepo, cfg.FrontendURL)
