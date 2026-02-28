@@ -15,11 +15,12 @@ func (e UserRegistered) OccurredAt() time.Time { return e.RegisteredAt }
 
 // UserBanned is published when a user is banned.
 type UserBanned struct {
-	UserID   int
-	Username string
-	Reason   string
-	BannedBy int
-	BannedAt time.Time
+	UserID       int
+	Username     string
+	Reason       string
+	ReasonPublic bool // whether the ban reason is shown to the user
+	BannedBy     int
+	BannedAt     time.Time
 }
 
 func (e UserBanned) EventName() string  { return "UserBanned" }
@@ -40,6 +41,7 @@ func (e UserUnbanned) OccurredAt() time.Time { return e.UnbannedAt }
 type UserDeleted struct {
 	UserID    int
 	Username  string
+	Reason    string
 	DeletedBy int
 	DeletedAt time.Time
 }

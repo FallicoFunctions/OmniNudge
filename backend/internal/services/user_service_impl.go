@@ -113,7 +113,7 @@ func (s *userServiceImpl) BanUser(ctx context.Context, userID int, reason string
 	}
 
 	// Enforce business rules (cannot ban admin, cannot ban deleted user).
-	if err := agg.Ban(reason, bannedBy); err != nil {
+	if err := agg.Ban(reason, showReason, bannedBy); err != nil {
 		return BadRequest(err)
 	}
 
@@ -150,11 +150,17 @@ func (s *userServiceImpl) UnbanUser(ctx context.Context, userID int, reason stri
 
 	agg.Unban(unbannedBy)
 
+	evts := agg.GetEvents()
+	if len(evts) == 0 {
+		// User was not banned — idempotent, skip DB write.
+		return nil
+	}
+
 	if err := s.userRepo.UnbanUser(ctx, userID, reason, unbannedBy); err != nil {
 		return InternalError(fmt.Errorf("unban user: %w", err))
 	}
 
-	s.publishEvents(agg.GetEvents())
+	s.publishEvents(evts)
 	return nil
 }
 
@@ -175,15 +181,17 @@ func (s *userServiceImpl) DeleteUser(ctx context.Context, userID int, reason str
 	}
 
 	// Enforce business rules (cannot delete already-deleted user).
-	if err := agg.Delete(deletedBy); err != nil {
+	if err := agg.Delete(reason, deletedBy); err != nil {
 		return BadRequest(err)
 	}
+
+	evts := agg.GetEvents()
 
 	if err := s.userRepo.SoftDeleteUser(ctx, userID, reason, deletedBy); err != nil {
 		return InternalError(fmt.Errorf("delete user: %w", err))
 	}
 
-	s.publishEvents(agg.GetEvents())
+	s.publishEvents(evts)
 	return nil
 }
 

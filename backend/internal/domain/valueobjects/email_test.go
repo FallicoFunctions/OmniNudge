@@ -58,6 +58,29 @@ func TestEmail_JSON(t *testing.T) {
 	assert.Equal(t, email, decoded)
 }
 
+func TestNewEmail_RejectLeadingAndConsecutiveDots(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+	}{
+		{"leading dot in local", ".user@example.com"},
+		{"trailing dot in local", "user.@example.com"},
+		{"consecutive dots in local", "user..name@example.com"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := NewEmail(tt.input)
+			require.ErrorIs(t, err, ErrEmailInvalid)
+		})
+	}
+}
+
+func TestEmailFromString(t *testing.T) {
+	// EmailFromString bypasses validation — useful for legacy/trusted DB values.
+	e := EmailFromString("legacy..email@old.example")
+	assert.Equal(t, "legacy..email@old.example", e.String())
+}
+
 func TestEmail_JSON_SpecialCharacters(t *testing.T) {
 	email, _ := NewEmail("test+tag@example.com")
 
