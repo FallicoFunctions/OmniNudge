@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"github.com/omninudge/backend/internal/api/middleware"
 	"log"
 	"net/http"
 	"net/url"
@@ -77,24 +78,9 @@ func (h *WebSocketHandler) HandleWebSocket(c *gin.Context) {
 	log.Printf("WebSocket connection attempt from %s", c.ClientIP())
 
 	// Get user ID from context (set by AuthRequired middleware)
-	userID, exists := c.Get("user_id")
-	if !exists {
-		log.Printf("WebSocket rejected: User not authenticated")
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
-		return
-	}
-	uid, ok := userID.(int)
+	uid, ok := middleware.GetAuthenticatedUserID(c)
 	if !ok {
-		switch v := userID.(type) {
-		case int64:
-			uid = int(v)
-		case float64:
-			uid = int(v)
-		default:
-			log.Printf("Invalid user_id type for websocket: %T", userID)
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid user context"})
-			return
-		}
+		return
 	}
 
 	log.Printf("Upgrading WebSocket for user_id=%d", uid)

@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"github.com/omninudge/backend/internal/ports"
 	"net/http"
 	"strconv"
 
@@ -10,11 +11,11 @@ import (
 
 // NotificationsHandler handles notification-related HTTP requests
 type NotificationsHandler struct {
-	notifRepo *models.NotificationRepository
+	notifRepo ports.NotificationRepository
 }
 
 // NewNotificationsHandler creates a new notifications handler
-func NewNotificationsHandler(notifRepo *models.NotificationRepository) *NotificationsHandler {
+func NewNotificationsHandler(notifRepo ports.NotificationRepository) *NotificationsHandler {
 	return &NotificationsHandler{notifRepo: notifRepo}
 }
 
@@ -38,7 +39,7 @@ func (h *NotificationsHandler) GetNotifications(c *gin.Context) {
 	if cursorParam != "" {
 		decoded, err := decodeTimeCursor(cursorParam)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid cursor"})
+			RespondError(c, http.StatusBadRequest, "Invalid cursor")
 			return
 		}
 		cursor = decoded
@@ -62,7 +63,7 @@ func (h *NotificationsHandler) GetNotifications(c *gin.Context) {
 		notifications, err = h.notifRepo.GetByUserID(c.Request.Context(), userID, limitArg, offset, unreadOnly)
 	}
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch notifications"})
+		RespondError(c, http.StatusInternalServerError, "Failed to fetch notifications")
 		return
 	}
 
@@ -93,7 +94,7 @@ func (h *NotificationsHandler) GetUnreadCount(c *gin.Context) {
 
 	count, err := h.notifRepo.GetUnreadCount(c.Request.Context(), userID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch unread count"})
+		RespondError(c, http.StatusInternalServerError, "Failed to fetch unread count")
 		return
 	}
 
@@ -106,12 +107,12 @@ func (h *NotificationsHandler) MarkAsRead(c *gin.Context) {
 	userID := c.GetInt("user_id")
 	notificationID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid notification ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid notification ID")
 		return
 	}
 
 	if err := h.notifRepo.MarkAsRead(c.Request.Context(), notificationID, userID); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to mark notification as read"})
+		RespondError(c, http.StatusInternalServerError, "Failed to mark notification as read")
 		return
 	}
 
@@ -124,7 +125,7 @@ func (h *NotificationsHandler) MarkAllAsRead(c *gin.Context) {
 	userID := c.GetInt("user_id")
 
 	if err := h.notifRepo.MarkAllAsRead(c.Request.Context(), userID); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to mark all notifications as read"})
+		RespondError(c, http.StatusInternalServerError, "Failed to mark all notifications as read")
 		return
 	}
 
@@ -137,12 +138,12 @@ func (h *NotificationsHandler) DeleteNotification(c *gin.Context) {
 	userID := c.GetInt("user_id")
 	notificationID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid notification ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid notification ID")
 		return
 	}
 
 	if err := h.notifRepo.Delete(c.Request.Context(), notificationID, userID); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete notification"})
+		RespondError(c, http.StatusInternalServerError, "Failed to delete notification")
 		return
 	}
 

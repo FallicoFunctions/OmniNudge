@@ -8,17 +8,17 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5"
-	"github.com/omninudge/backend/internal/models"
 	"github.com/omninudge/backend/internal/permissions"
+	"github.com/omninudge/backend/internal/ports"
 )
 
 func RequireHubModeratorOrAdmin(
-	hubRepo *models.HubRepository,
-	hubModRepo *models.HubModeratorRepository,
-	postRepo *models.PlatformPostRepository,
-	commentRepo *models.PostCommentRepository,
-	removalReasonRepo *models.RemovalReasonRepository,
-	accessRequestRepo *models.HubAccessRequestRepository,
+	hubRepo ports.HubRepository,
+	hubModRepo ports.HubModeratorRepository,
+	postRepo ports.PlatformPostRepository,
+	commentRepo ports.PostCommentRepository,
+	removalReasonRepo ports.RemovalReasonRepository,
+	accessRequestRepo ports.HubAccessRequestRepository,
 ) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		hubID, err := resolveHubIDForModeration(c, hubRepo, postRepo, commentRepo, removalReasonRepo, accessRequestRepo)
@@ -72,11 +72,11 @@ var errMissingHubAssociation = errors.New("moderation target is not associated w
 
 func resolveHubIDForModeration(
 	c *gin.Context,
-	hubRepo *models.HubRepository,
-	postRepo *models.PlatformPostRepository,
-	commentRepo *models.PostCommentRepository,
-	removalReasonRepo *models.RemovalReasonRepository,
-	accessRequestRepo *models.HubAccessRequestRepository,
+	hubRepo ports.HubRepository,
+	postRepo ports.PlatformPostRepository,
+	commentRepo ports.PostCommentRepository,
+	removalReasonRepo ports.RemovalReasonRepository,
+	accessRequestRepo ports.HubAccessRequestRepository,
 ) (int, error) {
 	fullPath := c.FullPath()
 	if fullPath == "" {

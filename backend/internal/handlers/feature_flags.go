@@ -25,7 +25,7 @@ func NewFeatureFlagHandler(svc *services.FeatureFlagService) *FeatureFlagHandler
 func (h *FeatureFlagHandler) ListFlags(c *gin.Context) {
 	flags, err := h.svc.ListFlags(c.Request.Context())
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to list flags"})
+		RespondError(c, http.StatusInternalServerError, "Failed to list flags")
 		return
 	}
 
@@ -39,7 +39,7 @@ func (h *FeatureFlagHandler) GetFeatureFlag(c *gin.Context) {
 
 	flag, err := h.svc.GetFeatureFlag(c.Request.Context(), key)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Flag not found"})
+		RespondError(c, http.StatusNotFound, "Flag not found")
 		return
 	}
 
@@ -58,12 +58,12 @@ func (h *FeatureFlagHandler) CreateFlag(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		RespondError(c, http.StatusBadRequest, err.Error())
 		return
 	}
 
 	if req.Percentage != nil && (*req.Percentage < 0 || *req.Percentage > 100) {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Percentage must be 0-100"})
+		RespondError(c, http.StatusBadRequest, "Percentage must be 0-100")
 		return
 	}
 
@@ -82,7 +82,7 @@ func (h *FeatureFlagHandler) CreateFlag(c *gin.Context) {
 
 	adminID := int64(c.GetInt("user_id"))
 	if err := h.svc.CreateFlag(c.Request.Context(), flag, adminID); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		RespondError(c, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -101,12 +101,12 @@ func (h *FeatureFlagHandler) UpdateFlag(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		RespondError(c, http.StatusBadRequest, err.Error())
 		return
 	}
 
 	if req.Percentage != nil && (*req.Percentage < 0 || *req.Percentage > 100) {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Percentage must be 0-100"})
+		RespondError(c, http.StatusBadRequest, "Percentage must be 0-100")
 		return
 	}
 
@@ -123,7 +123,7 @@ func (h *FeatureFlagHandler) UpdateFlag(c *gin.Context) {
 
 	adminID := int64(c.GetInt("user_id"))
 	if err := h.svc.UpdateFlag(c.Request.Context(), key, updates, adminID); err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		RespondError(c, http.StatusNotFound, err.Error())
 		return
 	}
 
@@ -137,7 +137,7 @@ func (h *FeatureFlagHandler) DeleteFlag(c *gin.Context) {
 	adminID := int64(c.GetInt("user_id"))
 
 	if err := h.svc.DeleteFlag(c.Request.Context(), key, adminID); err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		RespondError(c, http.StatusNotFound, err.Error())
 		return
 	}
 
@@ -155,13 +155,13 @@ func (h *FeatureFlagHandler) SetOverride(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		RespondError(c, http.StatusBadRequest, err.Error())
 		return
 	}
 
 	adminID := int64(c.GetInt("user_id"))
 	if err := h.svc.SetUserOverride(c.Request.Context(), key, req.UserID, req.Enabled, adminID); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		RespondError(c, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -174,13 +174,13 @@ func (h *FeatureFlagHandler) RemoveOverride(c *gin.Context) {
 	key := c.Param("key")
 	userID, err := strconv.ParseInt(c.Param("userID"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid user ID")
 		return
 	}
 
 	adminID := int64(c.GetInt("user_id"))
 	if err := h.svc.RemoveUserOverride(c.Request.Context(), key, userID, adminID); err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		RespondError(c, http.StatusNotFound, err.Error())
 		return
 	}
 
@@ -195,7 +195,7 @@ func (h *FeatureFlagHandler) GetAuditLog(c *gin.Context) {
 
 	logs, err := h.svc.GetAuditLog(c.Request.Context(), key, limit)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get audit log"})
+		RespondError(c, http.StatusInternalServerError, "Failed to get audit log")
 		return
 	}
 
@@ -231,7 +231,7 @@ func (h *FeatureFlagHandler) GetUserFlags(c *gin.Context) {
 		// Return all enabled flags for user
 		flags, err := h.svc.GetUserFlags(c.Request.Context(), userID)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get flags"})
+			RespondError(c, http.StatusInternalServerError, "Failed to get flags")
 			return
 		}
 

@@ -1582,6 +1582,11 @@ func TestGetPinnedMessages_ModMailFiltersBlockedSenders(t *testing.T) {
 		PinnedAt:          timePtr(time.Now().UTC().Add(-2 * time.Minute)),
 	}
 	require.NoError(t, handler.messageRepo.Create(ctx, ownPinned))
+	_, err = db.Pool.Exec(ctx, `
+		UPDATE messages SET pinned = TRUE, pinned_by = $2, pinned_at = NOW() - INTERVAL '2 minutes'
+		WHERE id = $1
+	`, ownPinned.ID, user1ID)
+	require.NoError(t, err)
 
 	blockedPinned := &models.Message{
 		ConversationID:    modMailConversationID,
@@ -1595,6 +1600,11 @@ func TestGetPinnedMessages_ModMailFiltersBlockedSenders(t *testing.T) {
 		PinnedAt:          timePtr(time.Now().UTC().Add(-1 * time.Minute)),
 	}
 	require.NoError(t, handler.messageRepo.Create(ctx, blockedPinned))
+	_, err = db.Pool.Exec(ctx, `
+		UPDATE messages SET pinned = TRUE, pinned_by = $2, pinned_at = NOW() - INTERVAL '1 minute'
+		WHERE id = $1
+	`, blockedPinned.ID, user2ID)
+	require.NoError(t, err)
 
 	_, err = db.Pool.Exec(ctx, `
 		INSERT INTO blocked_users (blocker_id, blocked_id)

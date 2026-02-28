@@ -39,15 +39,17 @@ type UserService interface {
 
 // userServiceImpl is the default production implementation of UserService.
 type userServiceImpl struct {
-	userRepo ports.UserRepository
-	eventBus *domainevents.EventBus
+	userRepo    ports.UserRepository
+	eventBus    *domainevents.EventBus
+	domainSvc   *domainservices.UserDomainService
 }
 
 // NewUserService creates a production UserService.
 func NewUserService(userRepo ports.UserRepository, eventBus *domainevents.EventBus) UserService {
 	return &userServiceImpl{
-		userRepo: userRepo,
-		eventBus: eventBus,
+		userRepo:  userRepo,
+		eventBus:  eventBus,
+		domainSvc: domainservices.NewUserDomainService(userRepo),
 	}
 }
 
@@ -62,17 +64,15 @@ func (s *userServiceImpl) RegisterUser(ctx context.Context, username, email, pla
 		return nil, BadRequest(err)
 	}
 
-	// Check uniqueness via domain service.
-	ds := domainservices.NewUserDomainService(s.userRepo)
-
-	if err := ds.CheckUsernameAvailable(ctx, username); err != nil {
+	// Check uniqueness via injected domain service.
+	if err := s.domainSvc.CheckUsernameAvailable(ctx, username); err != nil {
 		if errors.Is(err, domainservices.ErrUsernameTaken) {
 			return nil, Conflict(err)
 		}
 		return nil, InternalError(fmt.Errorf("check username: %w", err))
 	}
 
-	if err := ds.CheckEmailAvailable(ctx, email); err != nil {
+	if err := s.domainSvc.CheckEmailAvailable(ctx, email); err != nil {
 		if errors.Is(err, domainservices.ErrEmailTaken) {
 			return nil, Conflict(err)
 		}
@@ -117,12 +117,19 @@ func (s *userServiceImpl) BanUser(ctx context.Context, userID int, reason string
 		return BadRequest(err)
 	}
 
+	// Collect events before checking for no-op.
+	evts := agg.GetEvents()
+	if len(evts) == 0 {
+		// Aggregate detected user was already banned — idempotent, skip DB write.
+		return nil
+	}
+
 	// Persist via dedicated method.
 	if err := s.userRepo.BanUser(ctx, userID, reason, showReason, bannedBy); err != nil {
 		return InternalError(fmt.Errorf("ban user: %w", err))
 	}
 
-	s.publishEvents(agg.GetEvents())
+	s.publishEvents(evts)
 	return nil
 }
 
@@ -201,7 +208,7 @@ func (s *userServiceImpl) ChangePassword(ctx context.Context, userID int, oldPas
 	}
 
 	// Persist the new hash via the dedicated repo method.
-	if err := s.userRepo.UpdatePassword(ctx, userID, agg.ToEntity().PasswordHash); err != nil {
+	if err := s.userRepo.UpdatePassword(ctx, userID, agg.PasswordHash()); err != nil {
 		return InternalError(fmt.Errorf("update password: %w", err))
 	}
 

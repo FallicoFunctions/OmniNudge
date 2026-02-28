@@ -141,7 +141,10 @@ func main() {
 	go hub.Run()
 
 	// Initialize domain event bus and register event handlers.
-	eventBus := events.NewEventBus(true)
+	// Log events in non-production environments so they can be inspected via
+	// GetEventLog in tests and staging. In production the log is disabled to
+	// prevent the slice growing without bound.
+	eventBus := events.NewEventBus(cfg.AppEnv != "production")
 	userEventHandlers := eventhandlers.NewUserEventHandlers()
 	eventBus.Subscribe("UserRegistered", userEventHandlers.OnUserRegistered)
 	eventBus.Subscribe("UserBanned", userEventHandlers.OnUserBanned)

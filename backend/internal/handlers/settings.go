@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"github.com/omninudge/backend/internal/ports"
+	"github.com/omninudge/backend/internal/api/middleware"
 	"net/http"
 	"strings"
 	"time"
@@ -11,11 +13,11 @@ import (
 
 // SettingsHandler handles user settings endpoints.
 type SettingsHandler struct {
-	settingsRepo *models.UserSettingsRepository
+	settingsRepo ports.UserSettingsRepository
 }
 
 // NewSettingsHandler constructs a settings handler.
-func NewSettingsHandler(settingsRepo *models.UserSettingsRepository) *SettingsHandler {
+func NewSettingsHandler(settingsRepo ports.UserSettingsRepository) *SettingsHandler {
 	return &SettingsHandler{
 		settingsRepo: settingsRepo,
 	}
@@ -30,7 +32,7 @@ func (h *SettingsHandler) GetSettings(c *gin.Context) {
 
 	settings, err := h.getOrCreateSettings(c, userID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load settings"})
+		RespondError(c, http.StatusInternalServerError, "Failed to load settings")
 		return
 	}
 
@@ -90,13 +92,13 @@ func (h *SettingsHandler) UpdateSettings(c *gin.Context) {
 
 	var req updateSettingsRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
+		RespondError(c, http.StatusBadRequest, "Invalid request body")
 		return
 	}
 
 	settings, err := h.getOrCreateSettings(c, userID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load settings"})
+		RespondError(c, http.StatusInternalServerError, "Failed to load settings")
 		return
 	}
 
@@ -118,7 +120,7 @@ func (h *SettingsHandler) UpdateSettings(c *gin.Context) {
 		case "public", "friends_only", "private":
 			settings.ProfileVisibility = v
 		default:
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid profile_visibility"})
+			RespondError(c, http.StatusBadRequest, "Invalid profile_visibility")
 			return
 		}
 	}
@@ -131,7 +133,7 @@ func (h *SettingsHandler) UpdateSettings(c *gin.Context) {
 	if req.Theme != nil {
 		theme := strings.ToLower(strings.TrimSpace(*req.Theme))
 		if theme == "" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Theme cannot be empty"})
+			RespondError(c, http.StatusBadRequest, "Theme cannot be empty")
 			return
 		}
 		if theme == "auto" {
@@ -144,7 +146,7 @@ func (h *SettingsHandler) UpdateSettings(c *gin.Context) {
 			"system": true,
 		}
 		if !allowedThemes[theme] {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid theme"})
+			RespondError(c, http.StatusBadRequest, "Invalid theme")
 			return
 		}
 		settings.Theme = theme
@@ -197,7 +199,7 @@ func (h *SettingsHandler) UpdateSettings(c *gin.Context) {
 		case "days", "date", "both":
 			settings.AccessRequestCooldownDisplay = v
 		default:
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid access_request_cooldown_display"})
+			RespondError(c, http.StatusBadRequest, "Invalid access_request_cooldown_display")
 			return
 		}
 	}
@@ -207,7 +209,7 @@ func (h *SettingsHandler) UpdateSettings(c *gin.Context) {
 		case "small", "medium", "large":
 			settings.FontSize = v
 		default:
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid font_size"})
+			RespondError(c, http.StatusBadRequest, "Invalid font_size")
 			return
 		}
 	}
@@ -217,7 +219,7 @@ func (h *SettingsHandler) UpdateSettings(c *gin.Context) {
 	if req.MicDeviceID != nil {
 		v := strings.TrimSpace(*req.MicDeviceID)
 		if len(v) > 255 {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid mic_device_id"})
+			RespondError(c, http.StatusBadRequest, "Invalid mic_device_id")
 			return
 		}
 		settings.MicDeviceID = v
@@ -225,7 +227,7 @@ func (h *SettingsHandler) UpdateSettings(c *gin.Context) {
 	if req.CameraDeviceID != nil {
 		v := strings.TrimSpace(*req.CameraDeviceID)
 		if len(v) > 255 {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid camera_device_id"})
+			RespondError(c, http.StatusBadRequest, "Invalid camera_device_id")
 			return
 		}
 		settings.CameraDeviceID = v
@@ -233,7 +235,7 @@ func (h *SettingsHandler) UpdateSettings(c *gin.Context) {
 	if req.SpeakerDeviceID != nil {
 		v := strings.TrimSpace(*req.SpeakerDeviceID)
 		if len(v) > 255 {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid speaker_device_id"})
+			RespondError(c, http.StatusBadRequest, "Invalid speaker_device_id")
 			return
 		}
 		settings.SpeakerDeviceID = v
@@ -243,14 +245,14 @@ func (h *SettingsHandler) UpdateSettings(c *gin.Context) {
 	}
 	if req.QuietHoursStartMinutes != nil {
 		if *req.QuietHoursStartMinutes < 0 || *req.QuietHoursStartMinutes > 1439 {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid quiet_hours_start_minutes"})
+			RespondError(c, http.StatusBadRequest, "Invalid quiet_hours_start_minutes")
 			return
 		}
 		settings.QuietHoursStartMinutes = *req.QuietHoursStartMinutes
 	}
 	if req.QuietHoursEndMinutes != nil {
 		if *req.QuietHoursEndMinutes < 0 || *req.QuietHoursEndMinutes > 1439 {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid quiet_hours_end_minutes"})
+			RespondError(c, http.StatusBadRequest, "Invalid quiet_hours_end_minutes")
 			return
 		}
 		settings.QuietHoursEndMinutes = *req.QuietHoursEndMinutes
@@ -258,11 +260,11 @@ func (h *SettingsHandler) UpdateSettings(c *gin.Context) {
 	if req.QuietHoursTimezone != nil {
 		v := strings.TrimSpace(*req.QuietHoursTimezone)
 		if v == "" || len(v) > 64 {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid quiet_hours_timezone"})
+			RespondError(c, http.StatusBadRequest, "Invalid quiet_hours_timezone")
 			return
 		}
 		if _, err := time.LoadLocation(v); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid quiet_hours_timezone"})
+			RespondError(c, http.StatusBadRequest, "Invalid quiet_hours_timezone")
 			return
 		}
 		settings.QuietHoursTimezone = v
@@ -299,7 +301,7 @@ func (h *SettingsHandler) UpdateSettings(c *gin.Context) {
 
 	updated, err := h.settingsRepo.Update(c.Request.Context(), settings)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update settings"})
+		RespondError(c, http.StatusInternalServerError, "Failed to update settings")
 		return
 	}
 
@@ -307,19 +309,7 @@ func (h *SettingsHandler) UpdateSettings(c *gin.Context) {
 }
 
 func (h *SettingsHandler) getUserID(c *gin.Context) (int, bool) {
-	userIDValue, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Not authenticated"})
-		return 0, false
-	}
-
-	userID, ok := userIDValue.(int)
-	if !ok {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid user id"})
-		return 0, false
-	}
-
-	return userID, true
+	return middleware.GetAuthenticatedUserID(c)
 }
 
 func (h *SettingsHandler) getOrCreateSettings(c *gin.Context, userID int) (*models.UserSettings, error) {

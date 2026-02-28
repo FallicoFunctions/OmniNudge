@@ -25,13 +25,13 @@ func (h *JobsHandler) GetJobStatus(c *gin.Context) {
 	jobID := c.Param("id")
 
 	if queueName == "" || jobID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "queue and id are required"})
+		RespondError(c, http.StatusBadRequest, "queue and id are required")
 		return
 	}
 
 	info, err := h.queueClient.GetJobInfo(queueName, jobID)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Job not found"})
+		RespondError(c, http.StatusNotFound, "Job not found")
 		return
 	}
 

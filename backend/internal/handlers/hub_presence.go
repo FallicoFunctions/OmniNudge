@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"github.com/omninudge/backend/internal/api/middleware"
 	"fmt"
 	"net/http"
 	"strings"
@@ -21,7 +22,7 @@ func NewHubPresenceHandler(presence *services.PresenceStore) *HubPresenceHandler
 func (h *HubPresenceHandler) PingHubPresence(c *gin.Context) {
 	hubName := strings.TrimSpace(c.Param("name"))
 	if hubName == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Hub name required"})
+		RespondError(c, http.StatusBadRequest, "Hub name required")
 		return
 	}
 
@@ -39,7 +40,7 @@ func (h *HubPresenceHandler) PingHubPresence(c *gin.Context) {
 func (h *HubPresenceHandler) GetHubActiveUsers(c *gin.Context) {
 	hubName := strings.TrimSpace(c.Param("name"))
 	if hubName == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Hub name required"})
+		RespondError(c, http.StatusBadRequest, "Hub name required")
 		return
 	}
 
@@ -54,8 +55,8 @@ func (h *HubPresenceHandler) GetHubActiveUsers(c *gin.Context) {
 }
 
 func (h *HubPresenceHandler) resolvePresenceKey(c *gin.Context) string {
-	if userID, exists := c.Get("user_id"); exists {
-		return fmt.Sprintf("u:%d", userID.(int))
+	if userID, _ := middleware.GetOptionalUserID(c); userID != 0 {
+		return fmt.Sprintf("u:%d", userID)
 	}
 
 	return fmt.Sprintf("ip:%s:%s", c.ClientIP(), c.GetHeader("User-Agent"))

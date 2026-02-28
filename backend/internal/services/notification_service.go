@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/omninudge/backend/internal/models"
+	"github.com/omninudge/backend/internal/ports"
 	"github.com/omninudge/backend/internal/websocket"
 )
 
@@ -24,28 +25,28 @@ type VelocityDetector interface {
 // NotificationService handles all notification business logic
 type NotificationService struct {
 	pool             *pgxpool.Pool
-	notifRepo        *models.NotificationRepository
-	baselineRepo     *models.UserBaselineRepository
-	batchRepo        *models.NotificationBatchRepository
-	settingsRepo     *models.UserSettingsRepository
-	postRepo         *models.PlatformPostRepository
-	commentRepo      *models.PostCommentRepository
+	notifRepo        ports.NotificationRepository
+	baselineRepo     ports.UserBaselineRepository
+	batchRepo        ports.NotificationBatchRepository
+	settingsRepo     ports.UserSettingsRepository
+	postRepo         ports.PlatformPostRepository
+	commentRepo      ports.PostCommentRepository
 	hub              *websocket.Hub
 	velocityDetector VelocityDetector
-	tokenRepo        *models.DeviceTokenRepository
+	tokenRepo        ports.DeviceTokenRepository
 	firebase         *FirebaseService
 }
 
 // NewNotificationService creates a new notification service
 func NewNotificationService(
 	pool *pgxpool.Pool,
-	notifRepo *models.NotificationRepository,
-	baselineRepo *models.UserBaselineRepository,
-	batchRepo *models.NotificationBatchRepository,
-	settingsRepo *models.UserSettingsRepository,
-	postRepo *models.PlatformPostRepository,
-	commentRepo *models.PostCommentRepository,
-	tokenRepo *models.DeviceTokenRepository,
+	notifRepo ports.NotificationRepository,
+	baselineRepo ports.UserBaselineRepository,
+	batchRepo ports.NotificationBatchRepository,
+	settingsRepo ports.UserSettingsRepository,
+	postRepo ports.PlatformPostRepository,
+	commentRepo ports.PostCommentRepository,
+	tokenRepo ports.DeviceTokenRepository,
 	firebase *FirebaseService,
 	hub *websocket.Hub,
 ) *NotificationService {

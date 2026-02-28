@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"github.com/omninudge/backend/internal/ports"
+	"github.com/omninudge/backend/internal/api/middleware"
 	"bytes"
 	"encoding/json"
 	"errors"
@@ -20,16 +22,16 @@ import (
 
 // BugReportsHandler handles bug report-related requests
 type BugReportsHandler struct {
-	bugReportRepo *models.BugReportRepository
-	knownBugRepo  *models.KnownBugRepository
-	mediaRepo     *models.MediaFileRepository
+	bugReportRepo ports.BugReportRepository
+	knownBugRepo  ports.KnownBugRepository
+	mediaRepo     ports.MediaFileRepository
 }
 
 // NewBugReportsHandler creates a new bug reports handler
 func NewBugReportsHandler(
-	bugReportRepo *models.BugReportRepository,
-	knownBugRepo *models.KnownBugRepository,
-	mediaRepo *models.MediaFileRepository,
+	bugReportRepo ports.BugReportRepository,
+	knownBugRepo ports.KnownBugRepository,
+	mediaRepo ports.MediaFileRepository,
 ) *BugReportsHandler {
 	return &BugReportsHandler{
 		bugReportRepo: bugReportRepo,
@@ -62,7 +64,7 @@ func (h *BugReportsHandler) CreateBugReport(c *gin.Context) {
 		feedbackType = "report"
 	}
 	if !isValidFeedbackType(feedbackType) {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid feedback type"})
+		RespondError(c, http.StatusBadRequest, "Invalid feedback type")
 		return
 	}
 
@@ -74,12 +76,12 @@ func (h *BugReportsHandler) CreateBugReport(c *gin.Context) {
 		category = "bug"
 	}
 	if !isValidFeedbackCategory(category) {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid feedback category"})
+		RespondError(c, http.StatusBadRequest, "Invalid feedback category")
 		return
 	}
 
 	if req.Rating != nil && (*req.Rating < 1 || *req.Rating > 5) {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Rating must be between 1 and 5"})
+		RespondError(c, http.StatusBadRequest, "Rating must be between 1 and 5")
 		return
 	}
 
@@ -89,7 +91,7 @@ func (h *BugReportsHandler) CreateBugReport(c *gin.Context) {
 		if strings.HasPrefix(normalizedURL, "http://") || strings.HasPrefix(normalizedURL, "https://") {
 			parsedURL, err := url.Parse(normalizedURL)
 			if err != nil || parsedURL.Path == "" {
-				c.JSON(http.StatusBadRequest, gin.H{"error": "Screenshot URL is invalid"})
+				RespondError(c, http.StatusBadRequest, "Screenshot URL is invalid")
 				return
 			}
 			normalizedURL = parsedURL.Path
@@ -98,7 +100,7 @@ func (h *BugReportsHandler) CreateBugReport(c *gin.Context) {
 		media, err := h.mediaRepo.GetByStorageURL(c.Request.Context(), normalizedURL)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
-				c.JSON(http.StatusBadRequest, gin.H{"error": "Screenshot file not found"})
+				RespondError(c, http.StatusBadRequest, "Screenshot file not found")
 				return
 			}
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to validate screenshot", "details": err.Error()})
@@ -106,7 +108,7 @@ func (h *BugReportsHandler) CreateBugReport(c *gin.Context) {
 		}
 
 		if !strings.HasPrefix(media.FileType, "image/") {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Screenshot must be an image file"})
+			RespondError(c, http.StatusBadRequest, "Screenshot must be an image file")
 			return
 		}
 		normalizedScreenshotURL = &normalizedURL
@@ -114,8 +116,8 @@ func (h *BugReportsHandler) CreateBugReport(c *gin.Context) {
 
 	// Get user ID (optional - users can report bugs while logged out)
 	var userID *int
-	if uid, exists := c.Get("user_id"); exists {
-		uidInt := uid.(int)
+	if uid, _ := middleware.GetOptionalUserID(c); uid != 0 {
+		uidInt := uid
 		userID = &uidInt
 	}
 
@@ -170,7 +172,7 @@ func (h *BugReportsHandler) GetBugReports(c *gin.Context) {
 	var categoryPtr *string
 	if category != "" {
 		if !isValidFeedbackCategory(category) {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid feedback category"})
+			RespondError(c, http.StatusBadRequest, "Invalid feedback category")
 			return
 		}
 		categoryPtr = &category
@@ -178,7 +180,7 @@ func (h *BugReportsHandler) GetBugReports(c *gin.Context) {
 	var feedbackTypePtr *string
 	if feedbackType != "" {
 		if !isValidFeedbackType(feedbackType) {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid feedback type"})
+			RespondError(c, http.StatusBadRequest, "Invalid feedback type")
 			return
 		}
 		feedbackTypePtr = &feedbackType
@@ -188,7 +190,7 @@ func (h *BugReportsHandler) GetBugReports(c *gin.Context) {
 	if cursorParam != "" {
 		decoded, err := decodeTimeCursor(cursorParam)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid cursor"})
+			RespondError(c, http.StatusBadRequest, "Invalid cursor")
 			return
 		}
 		cursor = decoded
@@ -264,7 +266,7 @@ type UpdateBugReportRequest struct {
 func (h *BugReportsHandler) UpdateBugReport(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid bug report ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid bug report ID")
 		return
 	}
 
@@ -355,7 +357,7 @@ type UpdateKnownBugRequest struct {
 func (h *BugReportsHandler) UpdateKnownBug(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid known bug ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid known bug ID")
 		return
 	}
 
@@ -393,7 +395,7 @@ func (h *BugReportsHandler) UpdateKnownBug(c *gin.Context) {
 func (h *BugReportsHandler) DeleteKnownBug(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid known bug ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid known bug ID")
 		return
 	}
 

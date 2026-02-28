@@ -42,7 +42,7 @@ func (h *DataExportHandler) RequestDataExport(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request: password is required"})
+		RespondError(c, http.StatusBadRequest, "Invalid request: password is required")
 		return
 	}
 
@@ -54,12 +54,12 @@ func (h *DataExportHandler) RequestDataExport(c *gin.Context) {
 	`, userID).Scan(&username, &passwordHash, &encryptedPrivateKey)
 
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch user data"})
+		RespondError(c, http.StatusInternalServerError, "Failed to fetch user data")
 		return
 	}
 
 	if err := utils.CheckPassword(passwordHash, req.Password); err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid password"})
+		RespondError(c, http.StatusUnauthorized, "Invalid password")
 		return
 	}
 
@@ -89,7 +89,7 @@ func (h *DataExportHandler) RequestDataExport(c *gin.Context) {
 	// Generate unique export ID
 	exportID, err := generateExportID()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate export ID"})
+		RespondError(c, http.StatusInternalServerError, "Failed to generate export ID")
 		return
 	}
 
@@ -99,7 +99,7 @@ func (h *DataExportHandler) RequestDataExport(c *gin.Context) {
 		privKeyPEM, err := utils.DecryptWithPassword(*encryptedPrivateKey, req.Password, base64.StdEncoding.EncodeToString([]byte(username)))
 		if err != nil {
 			fmt.Printf("[EXPORT] Private key decryption failed for user %d: %v\n", userID, err)
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to decrypt encryption keys. Please update your security settings."})
+			RespondError(c, http.StatusInternalServerError, "Failed to decrypt encryption keys. Please update your security settings.")
 			return
 		}
 
@@ -152,7 +152,7 @@ func (h *DataExportHandler) RequestDataExport(c *gin.Context) {
 	`, userID, exportID, req.DataTypes, req.IncludeDeleted, expiresAt)
 
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create export request"})
+		RespondError(c, http.StatusInternalServerError, "Failed to create export request")
 		return
 	}
 
@@ -173,7 +173,7 @@ func (h *DataExportHandler) RequestDataExport(c *gin.Context) {
 				WHERE export_id = $1
 			`, exportID)
 
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to queue export job"})
+			RespondError(c, http.StatusInternalServerError, "Failed to queue export job")
 			return
 		}
 	}
@@ -204,7 +204,7 @@ func (h *DataExportHandler) GetExportStatus(c *gin.Context) {
 	`, exportID, userID).Scan(&status, &createdAt, &completedAt, &expiresAt, &downloadURL)
 
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Export request not found"})
+		RespondError(c, http.StatusNotFound, "Export request not found")
 		return
 	}
 
@@ -251,7 +251,7 @@ func (h *DataExportHandler) ListExportRequests(c *gin.Context) {
 	`, userID)
 
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch export requests"})
+		RespondError(c, http.StatusInternalServerError, "Failed to fetch export requests")
 		return
 	}
 	defer rows.Close()

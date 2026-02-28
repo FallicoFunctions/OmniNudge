@@ -16,6 +16,7 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/omninudge/backend/internal/models"
+	"github.com/omninudge/backend/internal/ports"
 	"github.com/omninudge/backend/internal/utils"
 	"golang.org/x/oauth2"
 )
@@ -229,7 +230,7 @@ type LoginRequest struct {
 }
 
 // Register creates a new user with username/password
-func (s *AuthService) Register(ctx context.Context, userRepo *models.UserRepository, req *RegisterRequest) (*models.User, string, error) {
+func (s *AuthService) Register(ctx context.Context, userRepo ports.UserRepository, req *RegisterRequest) (*models.User, string, error) {
 	username := strings.TrimSpace(req.Username)
 
 	// Validate input
@@ -303,7 +304,7 @@ func (s *AuthService) Register(ctx context.Context, userRepo *models.UserReposit
 }
 
 // Login authenticates a user with username/password
-func (s *AuthService) Login(ctx context.Context, userRepo *models.UserRepository, req *LoginRequest) (*models.User, string, error) {
+func (s *AuthService) Login(ctx context.Context, userRepo ports.UserRepository, req *LoginRequest) (*models.User, string, error) {
 	username := strings.TrimSpace(req.Username)
 
 	// Get user by username

@@ -10,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/omninudge/backend/internal/models"
+	"github.com/omninudge/backend/internal/ports"
 	"github.com/omninudge/backend/internal/validation"
 	"github.com/omninudge/backend/internal/websocket"
 )
@@ -40,8 +41,8 @@ type ReactionHubInterface interface {
 // ReactionService handles all business logic for message reactions.
 type ReactionService struct {
 	pool         *pgxpool.Pool
-	reactionRepo *models.MessageReactionRepository
-	messageRepo  *models.MessageRepository
+	reactionRepo ports.MessageReactionRepository
+	messageRepo  ports.MessageRepository
 	notifService *NotificationService
 	hub          ReactionHubInterface
 }
@@ -49,8 +50,8 @@ type ReactionService struct {
 // NewReactionService creates a new ReactionService.
 func NewReactionService(
 	pool *pgxpool.Pool,
-	reactionRepo *models.MessageReactionRepository,
-	messageRepo *models.MessageRepository,
+	reactionRepo ports.MessageReactionRepository,
+	messageRepo ports.MessageRepository,
 	notifService *NotificationService,
 	hub ReactionHubInterface,
 ) *ReactionService {

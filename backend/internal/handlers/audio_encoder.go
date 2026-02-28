@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"github.com/omninudge/backend/internal/ports"
 	"context"
 	"fmt"
 	"io"
@@ -19,15 +20,15 @@ import (
 
 // AudioEncoderHandler handles server-side audio encoding for iOS devices
 type AudioEncoderHandler struct {
-	mediaRepo    *models.MediaFileRepository
-	settingsRepo *models.UserSettingsRepository
+	mediaRepo    ports.MediaFileRepository
+	settingsRepo ports.UserSettingsRepository
 	queueClient  *queue.QueueClient
 }
 
 // NewAudioEncoderHandler creates a new audio encoder handler
 func NewAudioEncoderHandler(
-	mediaRepo *models.MediaFileRepository,
-	settingsRepo *models.UserSettingsRepository,
+	mediaRepo ports.MediaFileRepository,
+	settingsRepo ports.UserSettingsRepository,
 	queueClient *queue.QueueClient,
 ) *AudioEncoderHandler {
 	return &AudioEncoderHandler{
@@ -45,7 +46,7 @@ func (h *AudioEncoderHandler) EncodeAudio(c *gin.Context) {
 	// Parse multipart form
 	file, header, err := c.Request.FormFile("audio")
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "No audio file provided"})
+		RespondError(c, http.StatusBadRequest, "No audio file provided")
 		return
 	}
 	defer file.Close()
@@ -55,7 +56,7 @@ func (h *AudioEncoderHandler) EncodeAudio(c *gin.Context) {
 
 	// Validate file size (max 50MB for raw WAV)
 	if header.Size > 50*1024*1024 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Audio file too large (max 50MB)"})
+		RespondError(c, http.StatusBadRequest, "Audio file too large (max 50MB)")
 		return
 	}
 
@@ -63,7 +64,7 @@ func (h *AudioEncoderHandler) EncodeAudio(c *gin.Context) {
 	tempDir := filepath.Join(os.TempDir(), fmt.Sprintf("audio-encode-%d-%d", userID, time.Now().Unix()))
 	if err := os.MkdirAll(tempDir, 0755); err != nil {
 		log.Printf("Failed to create temp directory: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to process audio"})
+		RespondError(c, http.StatusInternalServerError, "Failed to process audio")
 		return
 	}
 	defer os.RemoveAll(tempDir)
@@ -75,7 +76,7 @@ func (h *AudioEncoderHandler) EncodeAudio(c *gin.Context) {
 	inputFile, err := os.Create(inputPath)
 	if err != nil {
 		log.Printf("Failed to create input file: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to process audio"})
+		RespondError(c, http.StatusInternalServerError, "Failed to process audio")
 		return
 	}
 
@@ -83,7 +84,7 @@ func (h *AudioEncoderHandler) EncodeAudio(c *gin.Context) {
 	inputFile.Close()
 	if err != nil {
 		log.Printf("Failed to save input file: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to process audio"})
+		RespondError(c, http.StatusInternalServerError, "Failed to process audio")
 		return
 	}
 
@@ -120,7 +121,7 @@ func (h *AudioEncoderHandler) EncodeAudio(c *gin.Context) {
 	encodedData, err := os.ReadFile(outputPath)
 	if err != nil {
 		log.Printf("Failed to read encoded file: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to process audio"})
+		RespondError(c, http.StatusInternalServerError, "Failed to process audio")
 		return
 	}
 
@@ -128,7 +129,7 @@ func (h *AudioEncoderHandler) EncodeAudio(c *gin.Context) {
 	fileInfo, err := os.Stat(outputPath)
 	if err != nil {
 		log.Printf("Failed to stat encoded file: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to process audio"})
+		RespondError(c, http.StatusInternalServerError, "Failed to process audio")
 		return
 	}
 
@@ -136,7 +137,7 @@ func (h *AudioEncoderHandler) EncodeAudio(c *gin.Context) {
 	uploadsDir := "./uploads/voice"
 	if err := os.MkdirAll(uploadsDir, 0755); err != nil {
 		log.Printf("Failed to create uploads directory: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save audio"})
+		RespondError(c, http.StatusInternalServerError, "Failed to save audio")
 		return
 	}
 
@@ -145,7 +146,7 @@ func (h *AudioEncoderHandler) EncodeAudio(c *gin.Context) {
 
 	if err := os.WriteFile(finalPath, encodedData, 0644); err != nil {
 		log.Printf("Failed to write encoded file: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save audio"})
+		RespondError(c, http.StatusInternalServerError, "Failed to save audio")
 		return
 	}
 
@@ -164,7 +165,7 @@ func (h *AudioEncoderHandler) EncodeAudio(c *gin.Context) {
 
 	if err := h.mediaRepo.Create(c.Request.Context(), mediaFile); err != nil {
 		log.Printf("Failed to create media file record: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save audio metadata"})
+		RespondError(c, http.StatusInternalServerError, "Failed to save audio metadata")
 		return
 	}
 

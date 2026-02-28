@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"github.com/omninudge/backend/internal/api/middleware"
 	"errors"
 	"log"
 	"net/http"
@@ -27,17 +28,7 @@ func NewReactionsHandler(reactionService *services.ReactionService) *ReactionsHa
 // user_id is stored as a different numeric type, which would otherwise
 // cause an unrecovered panic in production.
 func requireUserID(c *gin.Context) (int, bool) {
-	v, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
-		return 0, false
-	}
-	id, ok := v.(int)
-	if !ok {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
-		return 0, false
-	}
-	return id, true
+	return middleware.GetAuthenticatedUserID(c)
 }
 
 // AddReactionRequest is the JSON body for POST /api/v1/messages/:id/reactions.
@@ -77,7 +68,7 @@ func (h *ReactionsHandler) AddReaction(c *gin.Context) {
 
 	messageID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid message ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid message ID")
 		return
 	}
 
@@ -91,18 +82,18 @@ func (h *ReactionsHandler) AddReaction(c *gin.Context) {
 	if err != nil {
 		switch {
 		case errors.Is(err, services.ErrInvalidEmoji):
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			RespondError(c, http.StatusBadRequest, err.Error())
 		case errors.Is(err, services.ErrMessageNotFound):
-			c.JSON(http.StatusNotFound, gin.H{"error": "Message not found"})
+			RespondError(c, http.StatusNotFound, "Message not found")
 		case errors.Is(err, services.ErrNotParticipant):
-			c.JSON(http.StatusForbidden, gin.H{"error": "You are not a participant in this conversation"})
+			RespondError(c, http.StatusForbidden, "You are not a participant in this conversation")
 		case errors.Is(err, services.ErrTooManyEmoji):
-			c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
+			RespondError(c, http.StatusConflict, err.Error())
 		case errors.Is(err, services.ErrAlreadyReacted):
-			c.JSON(http.StatusConflict, gin.H{"error": "You have already reacted with this emoji"})
+			RespondError(c, http.StatusConflict, "You have already reacted with this emoji")
 		default:
 			log.Printf("[ReactionsHandler] AddReaction error: message=%d user=%d: %v", messageID, userID, err)
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to add reaction"})
+			RespondError(c, http.StatusInternalServerError, "Failed to add reaction")
 		}
 		return
 	}
@@ -138,25 +129,25 @@ func (h *ReactionsHandler) RemoveReaction(c *gin.Context) {
 
 	messageID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid message ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid message ID")
 		return
 	}
 
 	reactionID, err := strconv.Atoi(c.Param("reaction_id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid reaction ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid reaction ID")
 		return
 	}
 
 	if err := h.reactionService.RemoveReaction(c.Request.Context(), messageID, reactionID, userID); err != nil {
 		switch {
 		case errors.Is(err, services.ErrReactionNotFound):
-			c.JSON(http.StatusNotFound, gin.H{"error": "Reaction not found"})
+			RespondError(c, http.StatusNotFound, "Reaction not found")
 		case errors.Is(err, services.ErrNotReactionOwner):
-			c.JSON(http.StatusForbidden, gin.H{"error": "You can only remove your own reactions"})
+			RespondError(c, http.StatusForbidden, "You can only remove your own reactions")
 		default:
 			log.Printf("[ReactionsHandler] RemoveReaction error: message=%d reaction=%d user=%d: %v", messageID, reactionID, userID, err)
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to remove reaction"})
+			RespondError(c, http.StatusInternalServerError, "Failed to remove reaction")
 		}
 		return
 	}
@@ -207,7 +198,7 @@ func (h *ReactionsHandler) GetReactions(c *gin.Context) {
 
 	messageID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid message ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid message ID")
 		return
 	}
 
@@ -215,12 +206,12 @@ func (h *ReactionsHandler) GetReactions(c *gin.Context) {
 	if err != nil {
 		switch {
 		case errors.Is(err, services.ErrMessageNotFound):
-			c.JSON(http.StatusNotFound, gin.H{"error": "Message not found"})
+			RespondError(c, http.StatusNotFound, "Message not found")
 		case errors.Is(err, services.ErrNotParticipant):
-			c.JSON(http.StatusForbidden, gin.H{"error": "You are not a participant in this conversation"})
+			RespondError(c, http.StatusForbidden, "You are not a participant in this conversation")
 		default:
 			log.Printf("[ReactionsHandler] GetReactions error: message=%d user=%d: %v", messageID, userID, err)
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get reactions"})
+			RespondError(c, http.StatusInternalServerError, "Failed to get reactions")
 		}
 		return
 	}

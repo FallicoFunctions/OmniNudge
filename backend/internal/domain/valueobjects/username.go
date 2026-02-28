@@ -39,6 +39,13 @@ func NewUsername(username string) (Username, error) {
 	return Username{value: username}, nil
 }
 
+// UsernameFromString creates a Username bypassing validation.
+// Use only when loading from the database where the value is already trusted
+// (e.g. legacy records that pre-date the length/charset rules).
+func UsernameFromString(raw string) Username {
+	return Username{value: raw}
+}
+
 // String returns the username.
 func (u Username) String() string {
 	return u.value

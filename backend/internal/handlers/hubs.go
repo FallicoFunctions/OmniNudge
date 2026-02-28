@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"github.com/omninudge/backend/internal/ports"
+	"github.com/omninudge/backend/internal/api/middleware"
 	"context"
 	"errors"
 	"io"
@@ -20,16 +22,16 @@ import (
 
 // HubsHandler handles hub CRUD
 type HubsHandler struct {
-	hubRepo           *models.HubRepository
-	postRepo          *models.PlatformPostRepository
-	modRepo           *models.HubModeratorRepository
-	hubSubRepo        *models.HubSubscriptionRepository
+	hubRepo           ports.HubRepository
+	postRepo          ports.PlatformPostRepository
+	modRepo           ports.HubModeratorRepository
+	hubSubRepo        ports.HubSubscriptionRepository
 	settingsRepo      *repository.HubSettingsRepository
-	accessRequestRepo *models.HubAccessRequestRepository
+	accessRequestRepo ports.HubAccessRequestRepository
 }
 
 // NewHubsHandler creates a new handler
-func NewHubsHandler(hubRepo *models.HubRepository, postRepo *models.PlatformPostRepository, modRepo *models.HubModeratorRepository, hubSubRepo *models.HubSubscriptionRepository, settingsRepo *repository.HubSettingsRepository) *HubsHandler {
+func NewHubsHandler(hubRepo ports.HubRepository, postRepo ports.PlatformPostRepository, modRepo ports.HubModeratorRepository, hubSubRepo ports.HubSubscriptionRepository, settingsRepo *repository.HubSettingsRepository) *HubsHandler {
 	return &HubsHandler{
 		hubRepo:      hubRepo,
 		postRepo:     postRepo,
@@ -40,7 +42,7 @@ func NewHubsHandler(hubRepo *models.HubRepository, postRepo *models.PlatformPost
 }
 
 // NewHubsHandlerWithAccessRequest creates a handler with access request support
-func NewHubsHandlerWithAccessRequest(hubRepo *models.HubRepository, postRepo *models.PlatformPostRepository, modRepo *models.HubModeratorRepository, hubSubRepo *models.HubSubscriptionRepository, settingsRepo *repository.HubSettingsRepository, accessReqRepo *models.HubAccessRequestRepository) *HubsHandler {
+func NewHubsHandlerWithAccessRequest(hubRepo ports.HubRepository, postRepo ports.PlatformPostRepository, modRepo ports.HubModeratorRepository, hubSubRepo ports.HubSubscriptionRepository, settingsRepo *repository.HubSettingsRepository, accessReqRepo ports.HubAccessRequestRepository) *HubsHandler {
 	return &HubsHandler{
 		hubRepo:           hubRepo,
 		postRepo:          postRepo,
@@ -68,9 +70,8 @@ type CreateHubRequest struct {
 
 // Create handles POST /api/v1/hubs
 func (h *HubsHandler) Create(c *gin.Context) {
-	userID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
 		return
 	}
 
@@ -81,14 +82,14 @@ func (h *HubsHandler) Create(c *gin.Context) {
 	}
 
 	if len(req.Name) < 3 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Hub name must be at least 3 characters"})
+		RespondError(c, http.StatusBadRequest, "Hub name must be at least 3 characters")
 		return
 	}
 
 	// Validate hub name: no spaces, alphanumeric + underscore only, lowercase
 	namePattern := regexp.MustCompile(`^[a-z0-9_]+$`)
 	if !namePattern.MatchString(req.Name) {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Hub name must be lowercase alphanumeric with underscores only, no spaces"})
+		RespondError(c, http.StatusBadRequest, "Hub name must be lowercase alphanumeric with underscores only, no spaces")
 		return
 	}
 
@@ -96,7 +97,7 @@ func (h *HubsHandler) Create(c *gin.Context) {
 
 	// Validate description length (max 10000 chars)
 	if req.Description != nil && len(*req.Description) > maxHubDescriptionLength {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Description must be less than 10,000 characters"})
+		RespondError(c, http.StatusBadRequest, "Description must be less than 10,000 characters")
 		return
 	}
 
@@ -105,7 +106,7 @@ func (h *HubsHandler) Create(c *gin.Context) {
 		req.Type = "public"
 	}
 	if req.Type != "public" && req.Type != "private" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Type must be 'public' or 'private'"})
+		RespondError(c, http.StatusBadRequest, "Type must be 'public' or 'private'")
 		return
 	}
 
@@ -120,13 +121,13 @@ func (h *HubsHandler) Create(c *gin.Context) {
 		req.ContentOptions = "any"
 	}
 	if req.ContentOptions != "any" && req.ContentOptions != "links_only" && req.ContentOptions != "text_only" && req.ContentOptions != "images_only" && req.ContentOptions != "videos_only" && req.ContentOptions != "custom" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Content options must be 'any', 'links_only', 'text_only', 'images_only', 'videos_only', or 'custom'"})
+		RespondError(c, http.StatusBadRequest, "Content options must be 'any', 'links_only', 'text_only', 'images_only', 'videos_only', or 'custom'")
 		return
 	}
 
 	if hasExplicitOptions {
 		if !allowText && !allowLink && !allowImage && !allowVideo {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "At least one post type must be allowed"})
+			RespondError(c, http.StatusBadRequest, "At least one post type must be allowed")
 			return
 		}
 		if allowText && allowLink && allowImage && allowVideo {
@@ -144,14 +145,14 @@ func (h *HubsHandler) Create(c *gin.Context) {
 		Description:    req.Description,
 		Type:           req.Type,
 		ContentOptions: req.ContentOptions,
-		CreatedBy:      intPtr(userID.(int)),
+		CreatedBy:      intPtr(userID),
 		NSFW:           req.NSFW,
 	}
 
 	if err := h.hubRepo.Create(c.Request.Context(), hub); err != nil {
 		var pgErr *pgconn.PgError
 		if ok := errors.As(err, &pgErr); ok && pgErr.Code == "23505" {
-			c.JSON(http.StatusConflict, gin.H{"error": "Hub already exists"})
+			RespondError(c, http.StatusConflict, "Hub already exists")
 			return
 		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create hub", "details": err.Error()})
@@ -167,7 +168,7 @@ func (h *HubsHandler) Create(c *gin.Context) {
 
 	if h.settingsRepo != nil {
 		settings := buildDefaultHubSettings(hub.ID, req.Type, allowText, allowLink, allowImage, allowVideo)
-		creatorID := userID.(int)
+		creatorID := userID
 		if err := h.settingsRepo.EnsureDefaults(c.Request.Context(), settings, &creatorID); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to initialize hub settings", "details": err.Error()})
 			return
@@ -176,7 +177,7 @@ func (h *HubsHandler) Create(c *gin.Context) {
 
 	// Creator becomes moderator of the hub
 	if h.modRepo != nil {
-		_ = h.modRepo.AddModerator(c.Request.Context(), hub.ID, userID.(int))
+		_ = h.modRepo.AddModerator(c.Request.Context(), hub.ID, userID)
 	}
 
 	c.JSON(http.StatusCreated, gin.H{"hub": hubResponse(hub)})
@@ -191,7 +192,7 @@ func (h *HubsHandler) Get(c *gin.Context) {
 		return
 	}
 	if hub == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Hub not found"})
+		RespondError(c, http.StatusNotFound, "Hub not found")
 		return
 	}
 	response := hubResponse(hub)
@@ -246,7 +247,7 @@ func (h *HubsHandler) GetPosts(c *gin.Context) {
 		return
 	}
 	if hub == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Hub not found"})
+		RespondError(c, http.StatusNotFound, "Hub not found")
 		return
 	}
 
@@ -260,8 +261,8 @@ func (h *HubsHandler) GetPosts(c *gin.Context) {
 
 	// Get optional user ID for vote information
 	var userID *int
-	if uid, exists := c.Get("user_id"); exists {
-		uidInt := uid.(int)
+	if uid, _ := middleware.GetOptionalUserID(c); uid != 0 {
+		uidInt := uid
 		userID = &uidInt
 	}
 
@@ -314,7 +315,7 @@ func (h *HubsHandler) GetPosts(c *gin.Context) {
 
 	startTime, endTime, timeRangeKey, err := parseTopTimeRange(c, sortBy)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		RespondError(c, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -322,7 +323,7 @@ func (h *HubsHandler) GetPosts(c *gin.Context) {
 	if cursorParam != "" {
 		decoded, err := decodePlatformPostCursor(cursorParam)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid cursor"})
+			RespondError(c, http.StatusBadRequest, "Invalid cursor")
 			return
 		}
 		cursor = decoded
@@ -477,7 +478,7 @@ func (h *HubsHandler) AddModerator(c *gin.Context) {
 		return
 	}
 	if hub == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Hub not found"})
+		RespondError(c, http.StatusNotFound, "Hub not found")
 		return
 	}
 
@@ -490,7 +491,7 @@ func (h *HubsHandler) AddModerator(c *gin.Context) {
 	}
 
 	if h.modRepo == nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Mod repo not configured"})
+		RespondError(c, http.StatusInternalServerError, "Mod repo not configured")
 		return
 	}
 
@@ -504,9 +505,8 @@ func (h *HubsHandler) AddModerator(c *gin.Context) {
 
 // GetUserHubs handles GET /api/v1/users/me/hubs - returns hubs user can post to
 func (h *HubsHandler) GetUserHubs(c *gin.Context) {
-	userID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
 		return
 	}
 
@@ -551,9 +551,8 @@ type CrosspostRequest struct {
 
 // CrosspostToHub handles POST /api/v1/hubs/:name/crosspost
 func (h *HubsHandler) CrosspostToHub(c *gin.Context) {
-	userID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
 		return
 	}
 
@@ -564,7 +563,7 @@ func (h *HubsHandler) CrosspostToHub(c *gin.Context) {
 		return
 	}
 	if hub == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Hub not found"})
+		RespondError(c, http.StatusNotFound, "Hub not found")
 		return
 	}
 
@@ -581,24 +580,24 @@ func (h *HubsHandler) CrosspostToHub(c *gin.Context) {
 	originalTitle := c.Query("original_title")     // Original title before user edited
 
 	if originType == "" || originPostID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Missing crosspost origin information"})
+		RespondError(c, http.StatusBadRequest, "Missing crosspost origin information")
 		return
 	}
 
 	if originType != "reddit" && originType != "platform" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid origin_type. Must be 'reddit' or 'platform'"})
+		RespondError(c, http.StatusBadRequest, "Invalid origin_type. Must be 'reddit' or 'platform'")
 		return
 	}
 
 	if originType == "reddit" && originSubreddit == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "origin_subreddit required for Reddit crossposts"})
+		RespondError(c, http.StatusBadRequest, "origin_subreddit required for Reddit crossposts")
 		return
 	}
 
 	// Create the crosspost as a new platform post
 	hubIDPtr := &hub.ID
 	post := &models.PlatformPost{
-		AuthorID:                 userID.(int),
+		AuthorID:                 userID,
 		HubID:                    hubIDPtr,
 		Title:                    req.Title,
 		Body:                     req.Body,
@@ -693,15 +692,14 @@ func moderatorsResponse(mods []models.HubModeratorUser) []gin.H {
 // CrosspostToSubreddit handles POST /api/v1/subreddits/:name/crosspost
 // Creates a local platform post associated with a subreddit context
 func (h *HubsHandler) CrosspostToSubreddit(c *gin.Context) {
-	userID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
 		return
 	}
 
 	subredditName := c.Param("name")
 	if subredditName == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Subreddit name is required"})
+		RespondError(c, http.StatusBadRequest, "Subreddit name is required")
 		return
 	}
 
@@ -718,24 +716,24 @@ func (h *HubsHandler) CrosspostToSubreddit(c *gin.Context) {
 	originalTitle := c.Query("original_title")     // Original title before user edited
 
 	if originType == "" || originPostID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Missing crosspost origin information"})
+		RespondError(c, http.StatusBadRequest, "Missing crosspost origin information")
 		return
 	}
 
 	if originType != "reddit" && originType != "platform" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid origin_type. Must be 'reddit' or 'platform'"})
+		RespondError(c, http.StatusBadRequest, "Invalid origin_type. Must be 'reddit' or 'platform'")
 		return
 	}
 
 	if originType == "reddit" && originSubreddit == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "origin_subreddit required for Reddit crossposts"})
+		RespondError(c, http.StatusBadRequest, "origin_subreddit required for Reddit crossposts")
 		return
 	}
 
 	// Create the crosspost as a new platform post with target_subreddit set
 	// No hub association - this post belongs to the subreddit only
 	post := &models.PlatformPost{
-		AuthorID:                 userID.(int),
+		AuthorID:                 userID,
 		HubID:                    nil, // No hub for subreddit-only posts
 		Title:                    req.Title,
 		Body:                     req.Body,
@@ -783,11 +781,10 @@ func (h *HubsHandler) GetPopularFeed(c *gin.Context) {
 	var subscribedHubIDs []int
 
 	// Check if user is authenticated
-	userID, authenticated := c.Get("user_id")
-	if authenticated {
+	if userID, ok := middleware.GetOptionalUserID(c); ok {
 		// Get user's subscribed hub IDs
 		var err error
-		subscribedHubIDs, err = h.hubSubRepo.GetSubscribedHubIDs(c.Request.Context(), userID.(int))
+		subscribedHubIDs, err = h.hubSubRepo.GetSubscribedHubIDs(c.Request.Context(), userID)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch subscriptions", "details": err.Error()})
 			return
@@ -797,7 +794,7 @@ func (h *HubsHandler) GetPopularFeed(c *gin.Context) {
 
 	startTime, endTime, timeRangeKey, err := parseTopTimeRange(c, sortBy)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		RespondError(c, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -805,7 +802,7 @@ func (h *HubsHandler) GetPopularFeed(c *gin.Context) {
 	if cursorParam != "" {
 		decoded, err := decodePlatformPostCursor(cursorParam)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid cursor"})
+			RespondError(c, http.StatusBadRequest, "Invalid cursor")
 			return
 		}
 		cursor = decoded
@@ -881,7 +878,7 @@ func (h *HubsHandler) GetAllFeed(c *gin.Context) {
 
 	startTime, endTime, timeRangeKey, err := parseTopTimeRange(c, sortBy)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		RespondError(c, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -889,7 +886,7 @@ func (h *HubsHandler) GetAllFeed(c *gin.Context) {
 	if cursorParam != "" {
 		decoded, err := decodePlatformPostCursor(cursorParam)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid cursor"})
+			RespondError(c, http.StatusBadRequest, "Invalid cursor")
 			return
 		}
 		cursor = decoded
@@ -940,7 +937,7 @@ func (h *HubsHandler) GetAllFeed(c *gin.Context) {
 func (h *HubsHandler) SearchHubs(c *gin.Context) {
 	query := c.Query("q")
 	if query == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Query parameter 'q' is required"})
+		RespondError(c, http.StatusBadRequest, "Query parameter 'q' is required")
 		return
 	}
 
@@ -983,9 +980,8 @@ func (h *HubsHandler) GetTrendingHubs(c *gin.Context) {
 
 // UpdateHubNSFW handles PUT /api/v1/hubs/:name/nsfw
 func (h *HubsHandler) UpdateHubNSFW(c *gin.Context) {
-	userID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
 		return
 	}
 
@@ -996,15 +992,15 @@ func (h *HubsHandler) UpdateHubNSFW(c *gin.Context) {
 		return
 	}
 	if hub == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Hub not found"})
+		RespondError(c, http.StatusNotFound, "Hub not found")
 		return
 	}
 
 	// Check permissions: must be owner or admin
 	if !helpers.IsAdmin(c) {
-		role, err := h.settingsRepo.GetModeratorRole(c.Request.Context(), hub.ID, userID.(int))
+		role, err := h.settingsRepo.GetModeratorRole(c.Request.Context(), hub.ID, userID)
 		if err != nil || role == nil || (*role != models.ModeratorRoleOwner && *role != models.ModeratorRoleFullModerator) {
-			c.JSON(http.StatusForbidden, gin.H{"error": "Requires owner or full_moderator role"})
+			RespondError(c, http.StatusForbidden, "Requires owner or full_moderator role")
 			return
 		}
 	}

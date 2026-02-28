@@ -203,6 +203,8 @@ func TestUserAggregate_ToFromEntity(t *testing.T) {
 }
 
 func TestUserAggregateFromEntity_NilEmail(t *testing.T) {
+	// Reddit-only users have no email. The aggregate must load successfully
+	// with a zero Email value object rather than returning an error.
 	entity := &User{
 		ID:           1,
 		Username:     "testuser",
@@ -212,22 +214,26 @@ func TestUserAggregateFromEntity_NilEmail(t *testing.T) {
 
 	agg, err := UserAggregateFromEntity(entity)
 
-	require.Error(t, err)
-	assert.Nil(t, agg)
-	assert.Contains(t, err.Error(), "email cannot be nil")
+	require.NoError(t, err)
+	require.NotNil(t, agg)
+	assert.Equal(t, "", agg.Email().String()) // zero email
 }
 
-func TestUserAggregateFromEntity_InvalidUsername(t *testing.T) {
+func TestUserAggregateFromEntity_LegacyShortUsername(t *testing.T) {
+	// Users created before the 3-char minimum rule must still load successfully.
+	// UserAggregateFromEntity is lenient: it uses UsernameFromString rather than
+	// NewUsername so legacy records are never blocked.
 	email := "test@example.com"
 	entity := &User{
 		ID:           1,
-		Username:     "ab", // too short
+		Username:     "ab", // shorter than current minimum — legacy record
 		Email:        &email,
 		PasswordHash: "hash",
 	}
 
 	agg, err := UserAggregateFromEntity(entity)
 
-	require.Error(t, err)
-	assert.Nil(t, agg)
+	require.NoError(t, err)
+	require.NotNil(t, agg)
+	assert.Equal(t, "ab", agg.Username().String())
 }

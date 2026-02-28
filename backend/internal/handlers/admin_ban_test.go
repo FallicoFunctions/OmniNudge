@@ -187,7 +187,7 @@ func TestBanUserHandler(t *testing.T) {
 
 		router.ServeHTTP(w, req)
 
-		assert.Equal(t, http.StatusForbidden, w.Code)
+		assert.Equal(t, http.StatusUnauthorized, w.Code)
 	})
 }
 

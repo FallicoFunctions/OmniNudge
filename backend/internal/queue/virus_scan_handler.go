@@ -10,12 +10,12 @@ import (
 
 	"github.com/hibiken/asynq"
 	"github.com/jackc/pgx/v5"
-	"github.com/omninudge/backend/internal/models"
+	"github.com/omninudge/backend/internal/ports"
 	"github.com/omninudge/backend/internal/services"
 )
 
 // NewVirusScanHandler scans uploaded files and stores scan state in media_files.
-func NewVirusScanHandler(mediaRepo *models.MediaFileRepository, scanner services.VirusScanner, failClosed bool) JobHandler {
+func NewVirusScanHandler(mediaRepo ports.MediaFileRepository, scanner services.VirusScanner, failClosed bool) JobHandler {
 	return func(ctx context.Context, task *asynq.Task) error {
 		if mediaRepo == nil {
 			return fmt.Errorf("virus scan misconfigured: media repository is nil")

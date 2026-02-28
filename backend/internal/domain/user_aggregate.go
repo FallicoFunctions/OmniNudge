@@ -50,8 +50,9 @@ type UserAggregate struct {
 }
 
 // NewUserAggregate creates a fresh UserAggregate, validating all inputs via
-// value objects. A UserRegistered event is recorded so callers can publish it
-// after the entity is persisted and given a real ID.
+// value objects. No domain events are recorded at construction time because the
+// aggregate has no ID yet. The application service must call SetID followed by
+// RecordRegistration after the entity has been persisted.
 func NewUserAggregate(username, email, plainPassword string) (*UserAggregate, error) {
 	un, err := valueobjects.NewUsername(username)
 	if err != nil {
@@ -89,10 +90,24 @@ func NewUserAggregate(username, email, plainPassword string) (*UserAggregate, er
 	return u, nil
 }
 
-// RecordRegistration records a UserRegistered domain event. Must be called by
-// the application service after the entity has been persisted and assigned an
-// ID (i.e., after SetID has been called).
+// registered tracks whether RecordRegistration has already been called.
+// Stored as a field so the guard survives multiple method calls.
+
+// RecordRegistration records a UserRegistered domain event. Must be called
+// exactly once by the application service after the entity has been persisted
+// and SetID has been called. Subsequent calls are a no-op.
 func (u *UserAggregate) RecordRegistration() {
+	if u.id == 0 {
+		// Called before persistence — programmer error; silently ignore so we
+		// don't publish an event with a meaningless zero ID.
+		return
+	}
+	// Guard: only record the event once.
+	for _, e := range u.pendingEvents {
+		if e.EventName() == "UserRegistered" {
+			return
+		}
+	}
 	u.recordEvent(domainevents.UserRegistered{
 		UserID:       u.id,
 		Username:     u.username.String(),
@@ -229,6 +244,12 @@ func (u *UserAggregate) VerifyPassword(plainPassword string) bool {
 	return u.password.Verify(plainPassword)
 }
 
+// PasswordHash returns the bcrypt hash of the current password.
+// Use this instead of ToEntity().PasswordHash when only the hash is needed.
+func (u *UserAggregate) PasswordHash() string {
+	return u.password.Hash()
+}
+
 // RecordLastSeen updates the last-seen timestamp.
 func (u *UserAggregate) RecordLastSeen() {
 	u.lastSeen = time.Now()
@@ -267,21 +288,27 @@ func (u *UserAggregate) ToEntity() *User {
 }
 
 // UserAggregateFromEntity reconstructs an aggregate from a persisted entity.
-// Returns an error if the entity has an invalid email or username (which
-// would indicate data corruption in the database).
+//
+// Leniency policy: validation rules applied by NewUserAggregate (min username
+// length, email format) are NOT re-enforced here. Users created before those
+// rules existed — or via Reddit OAuth which never sets an email — must still
+// load correctly. The aggregate therefore accepts:
+//   - nil email  (Reddit-only accounts)
+//   - short/legacy usernames (pre-dates the 3-char minimum)
 func UserAggregateFromEntity(user *User) (*UserAggregate, error) {
-	if user.Email == nil {
-		return nil, errors.New("user email cannot be nil")
-	}
+	// Username: use the lenient loader so legacy short usernames don't block.
+	username := valueobjects.UsernameFromString(user.Username)
 
-	username, err := valueobjects.NewUsername(user.Username)
-	if err != nil {
-		return nil, err
-	}
-
-	email, err := valueobjects.NewEmail(*user.Email)
-	if err != nil {
-		return nil, err
+	// Email: Reddit-only users have no email; use a zero Email value object.
+	var email valueobjects.Email
+	if user.Email != nil && *user.Email != "" {
+		var err error
+		email, err = valueobjects.NewEmail(*user.Email)
+		if err != nil {
+			// Stored value is malformed — log and continue with zero email rather
+			// than blocking all operations on this user.
+			email = valueobjects.EmailFromString(*user.Email)
+		}
 	}
 
 	return &UserAggregate{

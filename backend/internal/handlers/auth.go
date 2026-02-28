@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"github.com/omninudge/backend/internal/ports"
+	"github.com/omninudge/backend/internal/api/middleware"
 	"fmt"
 	"net/http"
 	"strings"
@@ -14,15 +16,15 @@ import (
 // AuthHandler handles authentication endpoints
 type AuthHandler struct {
 	authService             *services.AuthService
-	userRepo                *models.UserRepository
+	userRepo                ports.UserRepository
 	emailService            *services.EmailService
-	passwordResetRepo       *models.PasswordResetRepository
-	emailVerificationRepo   *models.EmailVerificationRepository
+	passwordResetRepo       ports.PasswordResetRepository
+	emailVerificationRepo   ports.EmailVerificationRepository
 	frontendURL             string
 }
 
 // NewAuthHandler creates a new auth handler
-func NewAuthHandler(authService *services.AuthService, userRepo *models.UserRepository, emailService *services.EmailService, passwordResetRepo *models.PasswordResetRepository, emailVerificationRepo *models.EmailVerificationRepository, frontendURL string) *AuthHandler {
+func NewAuthHandler(authService *services.AuthService, userRepo ports.UserRepository, emailService *services.EmailService, passwordResetRepo ports.PasswordResetRepository, emailVerificationRepo ports.EmailVerificationRepository, frontendURL string) *AuthHandler {
 	return &AuthHandler{
 		authService:           authService,
 		userRepo:              userRepo,
@@ -37,7 +39,7 @@ func NewAuthHandler(authService *services.AuthService, userRepo *models.UserRepo
 func (h *AuthHandler) RedditLogin(c *gin.Context) {
 	state, err := h.authService.GenerateState()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate state"})
+		RespondError(c, http.StatusInternalServerError, "Failed to generate state")
 		return
 	}
 
@@ -56,33 +58,33 @@ func (h *AuthHandler) RedditCallback(c *gin.Context) {
 
 	// Check for OAuth errors
 	if errorParam != "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "OAuth error: " + errorParam})
+		RespondError(c, http.StatusBadRequest, "OAuth error: " + errorParam)
 		return
 	}
 
 	if code == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "No authorization code provided"})
+		RespondError(c, http.StatusBadRequest, "No authorization code provided")
 		return
 	}
 
 	// Validate state (in production, compare with stored state)
 	storedState, _ := c.Cookie("oauth_state")
 	if state != storedState {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid state parameter"})
+		RespondError(c, http.StatusBadRequest, "Invalid state parameter")
 		return
 	}
 
 	// Exchange code for token
 	token, err := h.authService.ExchangeCode(c.Request.Context(), code)
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Failed to exchange code: " + err.Error()})
+		RespondError(c, http.StatusUnauthorized, "Failed to exchange code: " + err.Error())
 		return
 	}
 
 	// Get Reddit user info
 	redditUser, err := h.authService.GetRedditUser(c.Request.Context(), token)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get Reddit user info: " + err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to get Reddit user info: " + err.Error())
 		return
 	}
 
@@ -105,7 +107,7 @@ func (h *AuthHandler) RedditCallback(c *gin.Context) {
 	}
 
 	if err := h.userRepo.CreateOrUpdateFromReddit(c.Request.Context(), user); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create/update user: " + err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to create/update user: " + err.Error())
 		return
 	}
 
@@ -116,7 +118,7 @@ func (h *AuthHandler) RedditCallback(c *gin.Context) {
 	}
 	jwtToken, err := h.authService.GenerateJWT(user.ID, redditID, user.Username, user.Role)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate token"})
+		RespondError(c, http.StatusInternalServerError, "Failed to generate token")
 		return
 	}
 
@@ -133,15 +135,14 @@ func (h *AuthHandler) RedditCallback(c *gin.Context) {
 
 // GetMe returns the current authenticated user
 func (h *AuthHandler) GetMe(c *gin.Context) {
-	userID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Not authenticated"})
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
 		return
 	}
 
-	user, err := h.userRepo.GetByID(c.Request.Context(), userID.(int))
+	user, err := h.userRepo.GetByID(c.Request.Context(), userID)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		RespondError(c, http.StatusNotFound, "User not found")
 		return
 	}
 
@@ -162,13 +163,13 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 func (h *AuthHandler) Register(c *gin.Context) {
 	var req services.RegisterRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
+		RespondError(c, http.StatusBadRequest, "Invalid request body")
 		return
 	}
 
 	user, token, err := h.authService.Register(c.Request.Context(), h.userRepo, &req)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		RespondError(c, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -211,13 +212,13 @@ func (h *AuthHandler) Register(c *gin.Context) {
 func (h *AuthHandler) Login(c *gin.Context) {
 	var req services.LoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
+		RespondError(c, http.StatusBadRequest, "Invalid request body")
 		return
 	}
 
 	user, token, err := h.authService.Login(c.Request.Context(), h.userRepo, &req)
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		RespondError(c, http.StatusUnauthorized, err.Error())
 		return
 	}
 
@@ -230,9 +231,8 @@ func (h *AuthHandler) Login(c *gin.Context) {
 // UpdatePublicKey handles updating user's public encryption key
 func (h *AuthHandler) UpdatePublicKey(c *gin.Context) {
 	// Get user ID from context
-	userID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
 		return
 	}
 
@@ -246,7 +246,7 @@ func (h *AuthHandler) UpdatePublicKey(c *gin.Context) {
 	}
 
 	// Update public key in database
-	if err := h.userRepo.UpdatePublicKey(c.Request.Context(), userID.(int), req.PublicKey); err != nil {
+	if err := h.userRepo.UpdatePublicKey(c.Request.Context(), userID, req.PublicKey); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update public key", "details": err.Error()})
 		return
 	}
@@ -258,7 +258,7 @@ func (h *AuthHandler) UpdatePublicKey(c *gin.Context) {
 func (h *AuthHandler) GetPublicKeys(c *gin.Context) {
 	userIDsParam := c.Query("user_ids")
 	if userIDsParam == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "user_ids parameter is required"})
+		RespondError(c, http.StatusBadRequest, "user_ids parameter is required")
 		return
 	}
 
@@ -272,7 +272,7 @@ func (h *AuthHandler) GetPublicKeys(c *gin.Context) {
 	}
 
 	if len(userIDs) == 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "No valid user IDs provided"})
+		RespondError(c, http.StatusBadRequest, "No valid user IDs provided")
 		return
 	}
 
@@ -288,9 +288,8 @@ func (h *AuthHandler) GetPublicKeys(c *gin.Context) {
 
 // UpdateEncryptedPrivateKey handles updating user's encrypted private key for cross-browser sync
 func (h *AuthHandler) UpdateEncryptedPrivateKey(c *gin.Context) {
-	userID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
 		return
 	}
 
@@ -299,12 +298,12 @@ func (h *AuthHandler) UpdateEncryptedPrivateKey(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
+		RespondError(c, http.StatusBadRequest, "Invalid request body")
 		return
 	}
 
-	if err := h.userRepo.UpdateEncryptedPrivateKey(c.Request.Context(), userID.(int), req.EncryptedPrivateKey); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update encrypted private key"})
+	if err := h.userRepo.UpdateEncryptedPrivateKey(c.Request.Context(), userID, req.EncryptedPrivateKey); err != nil {
+		RespondError(c, http.StatusInternalServerError, "Failed to update encrypted private key")
 		return
 	}
 
@@ -313,15 +312,14 @@ func (h *AuthHandler) UpdateEncryptedPrivateKey(c *gin.Context) {
 
 // GetEncryptedPrivateKey handles fetching user's encrypted private key for cross-browser sync
 func (h *AuthHandler) GetEncryptedPrivateKey(c *gin.Context) {
-	userID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
 		return
 	}
 
-	user, err := h.userRepo.GetByID(c.Request.Context(), userID.(int))
+	user, err := h.userRepo.GetByID(c.Request.Context(), userID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch user data"})
+		RespondError(c, http.StatusInternalServerError, "Failed to fetch user data")
 		return
 	}
 
@@ -340,7 +338,7 @@ func (h *AuthHandler) ForgotPassword(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Username is required"})
+		RespondError(c, http.StatusBadRequest, "Username is required")
 		return
 	}
 
@@ -368,7 +366,7 @@ func (h *AuthHandler) ForgotPassword(c *gin.Context) {
 	resetToken, err := h.passwordResetRepo.GenerateToken(c.Request.Context(), user.ID)
 	if err != nil {
 		fmt.Printf("[ERROR] Failed to generate password reset token: %v\n", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to process password reset request"})
+		RespondError(c, http.StatusInternalServerError, "Failed to process password reset request")
 		return
 	}
 
@@ -402,21 +400,21 @@ func (h *AuthHandler) ResetPassword(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request. Password must be at least 8 characters"})
+		RespondError(c, http.StatusBadRequest, "Invalid request. Password must be at least 8 characters")
 		return
 	}
 
 	// Validate token
 	valid, userID, err := h.passwordResetRepo.IsValid(c.Request.Context(), req.Token)
 	if err != nil || !valid {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid or expired reset token"})
+		RespondError(c, http.StatusBadRequest, "Invalid or expired reset token")
 		return
 	}
 
 	// Get user
 	user, err := h.userRepo.GetByID(c.Request.Context(), userID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "User not found"})
+		RespondError(c, http.StatusInternalServerError, "User not found")
 		return
 	}
 
@@ -424,14 +422,14 @@ func (h *AuthHandler) ResetPassword(c *gin.Context) {
 	hashedPassword, err := utils.HashPassword(req.NewPassword)
 	if err != nil {
 		fmt.Printf("[ERROR] Failed to hash password: %v\n", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to reset password"})
+		RespondError(c, http.StatusInternalServerError, "Failed to reset password")
 		return
 	}
 
 	err = h.userRepo.UpdatePassword(c.Request.Context(), userID, hashedPassword)
 	if err != nil {
 		fmt.Printf("[ERROR] Failed to update password: %v\n", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to reset password"})
+		RespondError(c, http.StatusInternalServerError, "Failed to reset password")
 		return
 	}
 
@@ -455,7 +453,7 @@ func (h *AuthHandler) ResetPassword(c *gin.Context) {
 func (h *AuthHandler) ValidateResetToken(c *gin.Context) {
 	token := c.Query("token")
 	if token == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Token is required"})
+		RespondError(c, http.StatusBadRequest, "Token is required")
 		return
 	}
 
@@ -482,7 +480,7 @@ func (h *AuthHandler) ValidateResetToken(c *gin.Context) {
 func (h *AuthHandler) VerifyEmail(c *gin.Context) {
 	token := c.Query("token")
 	if token == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Token is required"})
+		RespondError(c, http.StatusBadRequest, "Token is required")
 		return
 	}
 
@@ -490,7 +488,7 @@ func (h *AuthHandler) VerifyEmail(c *gin.Context) {
 	verification, err := h.emailVerificationRepo.Verify(c.Request.Context(), token)
 	if err != nil {
 		fmt.Printf("[ERROR] Email verification failed: %v\n", err)
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid or expired verification token"})
+		RespondError(c, http.StatusBadRequest, "Invalid or expired verification token")
 		return
 	}
 
@@ -498,7 +496,7 @@ func (h *AuthHandler) VerifyEmail(c *gin.Context) {
 	user, err := h.userRepo.GetByID(c.Request.Context(), verification.UserID)
 	if err != nil {
 		fmt.Printf("[ERROR] Failed to get user: %v\n", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to verify email"})
+		RespondError(c, http.StatusInternalServerError, "Failed to verify email")
 		return
 	}
 
@@ -506,19 +504,13 @@ func (h *AuthHandler) VerifyEmail(c *gin.Context) {
 	encryptedEmail, err := utils.EncryptEmail(verification.Email)
 	if err != nil {
 		fmt.Printf("[ERROR] Failed to encrypt email: %v\n", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to verify email"})
+		RespondError(c, http.StatusInternalServerError, "Failed to verify email")
 		return
 	}
 
-	query := `
-		UPDATE users
-		SET email = $1, email_verified = true, email_encrypted = true
-		WHERE id = $2
-	`
-	_, err = h.userRepo.GetPool().Exec(c.Request.Context(), query, encryptedEmail, verification.UserID)
-	if err != nil {
+	if err = h.userRepo.UpdateVerifiedEmail(c.Request.Context(), verification.UserID, encryptedEmail); err != nil {
 		fmt.Printf("[ERROR] Failed to update user email: %v\n", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to verify email"})
+		RespondError(c, http.StatusInternalServerError, "Failed to verify email")
 		return
 	}
 
@@ -538,12 +530,13 @@ func (h *AuthHandler) ResendVerification(c *gin.Context) {
 	}
 
 	// Check if user is authenticated (for logged-in resend)
-	userID, authenticated := c.Get("user_id")
-
-	// If not authenticated, require username
-	if !authenticated {
+	var userID int
+	if uid, authenticated := middleware.GetOptionalUserID(c); authenticated {
+		userID = uid
+	} else {
+		// If not authenticated, require username
 		if err := c.ShouldBindJSON(&req); err != nil || req.Username == "" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Username is required"})
+			RespondError(c, http.StatusBadRequest, "Username is required")
 			return
 		}
 
@@ -557,7 +550,7 @@ func (h *AuthHandler) ResendVerification(c *gin.Context) {
 	}
 
 	// Get user
-	user, err := h.userRepo.GetByID(c.Request.Context(), userID.(int))
+	user, err := h.userRepo.GetByID(c.Request.Context(), userID)
 	if err != nil {
 		c.JSON(http.StatusOK, gin.H{"message": "If the account exists, a verification email has been sent"})
 		return
@@ -565,13 +558,13 @@ func (h *AuthHandler) ResendVerification(c *gin.Context) {
 
 	// Check if user has an email
 	if user.Email == nil || *user.Email == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "No email address on file"})
+		RespondError(c, http.StatusBadRequest, "No email address on file")
 		return
 	}
 
 	// Check if already verified
 	if user.EmailVerified {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Email already verified"})
+		RespondError(c, http.StatusBadRequest, "Email already verified")
 		return
 	}
 
@@ -582,7 +575,7 @@ func (h *AuthHandler) ResendVerification(c *gin.Context) {
 	verification, err := h.emailVerificationRepo.GenerateToken(c.Request.Context(), user.ID, *user.Email, "registration")
 	if err != nil {
 		fmt.Printf("[ERROR] Failed to generate verification token: %v\n", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to send verification email"})
+		RespondError(c, http.StatusInternalServerError, "Failed to send verification email")
 		return
 	}
 
@@ -600,7 +593,7 @@ func (h *AuthHandler) ResendVerification(c *gin.Context) {
 		)
 		if err != nil {
 			fmt.Printf("[ERROR] Failed to send verification email: %v\n", err)
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to send verification email"})
+			RespondError(c, http.StatusInternalServerError, "Failed to send verification email")
 			return
 		}
 	}
@@ -633,9 +626,8 @@ func maskEmail(email string) string {
 
 // UpdateEmail updates user's email address (requires verification)
 func (h *AuthHandler) UpdateEmail(c *gin.Context) {
-	userID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
 		return
 	}
 
@@ -645,20 +637,20 @@ func (h *AuthHandler) UpdateEmail(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Valid email is required"})
+		RespondError(c, http.StatusBadRequest, "Valid email is required")
 		return
 	}
 
 	// Validate emails match
 	if req.Email != req.EmailConfirm {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Email addresses do not match"})
+		RespondError(c, http.StatusBadRequest, "Email addresses do not match")
 		return
 	}
 
 	// Get user
-	user, err := h.userRepo.GetByID(c.Request.Context(), userID.(int))
+	user, err := h.userRepo.GetByID(c.Request.Context(), userID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get user"})
+		RespondError(c, http.StatusInternalServerError, "Failed to get user")
 		return
 	}
 
@@ -669,7 +661,7 @@ func (h *AuthHandler) UpdateEmail(c *gin.Context) {
 	verification, err := h.emailVerificationRepo.GenerateToken(c.Request.Context(), user.ID, req.Email, "update_email")
 	if err != nil {
 		fmt.Printf("[ERROR] Failed to generate verification token: %v\n", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to send verification email"})
+		RespondError(c, http.StatusInternalServerError, "Failed to send verification email")
 		return
 	}
 
@@ -687,7 +679,7 @@ func (h *AuthHandler) UpdateEmail(c *gin.Context) {
 		)
 		if err != nil {
 			fmt.Printf("[ERROR] Failed to send verification email: %v\n", err)
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to send verification email"})
+			RespondError(c, http.StatusInternalServerError, "Failed to send verification email")
 			return
 		}
 	}

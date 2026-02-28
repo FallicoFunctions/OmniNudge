@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"github.com/omninudge/backend/internal/ports"
+	"github.com/omninudge/backend/internal/api/middleware"
 	"context"
 	"net/http"
 	"strconv"
@@ -16,21 +18,21 @@ import (
 // ModMailHandler handles mod mail conversations
 type ModMailHandler struct {
 	pool             *pgxpool.Pool
-	conversationRepo *models.ConversationRepository
-	messageRepo      *models.MessageRepository
-	userRepo         *models.UserRepository
-	hubModRepo       *models.HubModeratorRepository
-	hubRepo          *models.HubRepository
+	conversationRepo ports.ConversationRepository
+	messageRepo      ports.MessageRepository
+	userRepo         ports.UserRepository
+	hubModRepo       ports.HubModeratorRepository
+	hubRepo          ports.HubRepository
 }
 
 // NewModMailHandler creates a new mod mail handler
 func NewModMailHandler(
 	pool *pgxpool.Pool,
-	conversationRepo *models.ConversationRepository,
-	messageRepo *models.MessageRepository,
-	userRepo *models.UserRepository,
-	hubModRepo *models.HubModeratorRepository,
-	hubRepo *models.HubRepository,
+	conversationRepo ports.ConversationRepository,
+	messageRepo ports.MessageRepository,
+	userRepo ports.UserRepository,
+	hubModRepo ports.HubModeratorRepository,
+	hubRepo ports.HubRepository,
 ) *ModMailHandler {
 	return &ModMailHandler{
 		pool:             pool,
@@ -131,9 +133,8 @@ func (h *ModMailHandler) enrichConversationDetails(ctx context.Context, conv *Mo
 // GetModMailRecipients handles GET /api/v1/mod-mail/hubs/:hub_name/recipients
 // Returns user IDs for hub moderators and admins for encryption recipients.
 func (h *ModMailHandler) GetModMailRecipients(c *gin.Context) {
-	userID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
 		return
 	}
 
@@ -144,7 +145,7 @@ func (h *ModMailHandler) GetModMailRecipients(c *gin.Context) {
 		return
 	}
 	if hub == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Hub not found"})
+		RespondError(c, http.StatusNotFound, "Hub not found")
 		return
 	}
 
@@ -161,23 +162,23 @@ func (h *ModMailHandler) GetModMailRecipients(c *gin.Context) {
 		    WHERE (bu.blocker_id = $2 AND bu.blocked_id = hm.user_id)
 		       OR (bu.blocked_id = $2 AND bu.blocker_id = hm.user_id)
 		  )
-	`, hub.ID, userID.(int))
+	`, hub.ID, userID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get moderators"})
+		RespondError(c, http.StatusInternalServerError, "Failed to get moderators")
 		return
 	}
 	for rows.Next() {
 		var modID int
 		if err := rows.Scan(&modID); err != nil {
 			rows.Close()
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to scan moderators"})
+			RespondError(c, http.StatusInternalServerError, "Failed to scan moderators")
 			return
 		}
 		recipientIDs[modID] = struct{}{}
 	}
 	if err := rows.Err(); err != nil {
 		rows.Close()
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to read moderators"})
+		RespondError(c, http.StatusInternalServerError, "Failed to read moderators")
 		return
 	}
 	rows.Close()
@@ -194,23 +195,23 @@ func (h *ModMailHandler) GetModMailRecipients(c *gin.Context) {
 		    WHERE (bu.blocker_id = $1 AND bu.blocked_id = u.id)
 		       OR (bu.blocked_id = $1 AND bu.blocker_id = u.id)
 		  )
-	`, userID.(int))
+	`, userID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get admins"})
+		RespondError(c, http.StatusInternalServerError, "Failed to get admins")
 		return
 	}
 	for adminRows.Next() {
 		var adminID int
 		if err := adminRows.Scan(&adminID); err != nil {
 			adminRows.Close()
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to scan admins"})
+			RespondError(c, http.StatusInternalServerError, "Failed to scan admins")
 			return
 		}
 		recipientIDs[adminID] = struct{}{}
 	}
 	if err := adminRows.Err(); err != nil {
 		adminRows.Close()
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to read admins"})
+		RespondError(c, http.StatusInternalServerError, "Failed to read admins")
 		return
 	}
 	adminRows.Close()
@@ -229,9 +230,8 @@ func (h *ModMailHandler) GetModMailRecipients(c *gin.Context) {
 // CreateModMail handles POST /api/v1/mod-mail
 // Allows any logged-in user to message the mods of a hub
 func (h *ModMailHandler) CreateModMail(c *gin.Context) {
-	userID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
 		return
 	}
 
@@ -242,7 +242,7 @@ func (h *ModMailHandler) CreateModMail(c *gin.Context) {
 	}
 
 	if strings.TrimSpace(req.Message) == "" && strings.TrimSpace(req.EncryptedContent) == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Message content is required"})
+		RespondError(c, http.StatusBadRequest, "Message content is required")
 		return
 	}
 
@@ -262,14 +262,14 @@ func (h *ModMailHandler) CreateModMail(c *gin.Context) {
 		return
 	}
 	if hub == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Hub not found"})
+		RespondError(c, http.StatusNotFound, "Hub not found")
 		return
 	}
 
 	// Begin transaction
 	tx, err := h.pool.Begin(c.Request.Context())
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to start transaction"})
+		RespondError(c, http.StatusInternalServerError, "Failed to start transaction")
 		return
 	}
 	defer tx.Rollback(c.Request.Context())
@@ -290,9 +290,9 @@ func (h *ModMailHandler) CreateModMail(c *gin.Context) {
 	_, err = tx.Exec(c.Request.Context(), `
 		INSERT INTO conversation_participants (conversation_id, user_id, is_moderator, joined_at)
 		VALUES ($1, $2, FALSE, NOW())
-	`, conversationID, userID.(int))
+	`, conversationID, userID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to add participant"})
+		RespondError(c, http.StatusInternalServerError, "Failed to add participant")
 		return
 	}
 
@@ -301,7 +301,7 @@ func (h *ModMailHandler) CreateModMail(c *gin.Context) {
 		SELECT user_id FROM hub_moderators WHERE hub_id = $1
 	`, hub.ID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get moderators"})
+		RespondError(c, http.StatusInternalServerError, "Failed to get moderators")
 		return
 	}
 	defer rows.Close()
@@ -310,13 +310,13 @@ func (h *ModMailHandler) CreateModMail(c *gin.Context) {
 	for rows.Next() {
 		var modID int
 		if err := rows.Scan(&modID); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to scan moderator"})
+			RespondError(c, http.StatusInternalServerError, "Failed to scan moderator")
 			return
 		}
 		moderatorIDs = append(moderatorIDs, modID)
 	}
 	if err := rows.Err(); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to read moderators"})
+		RespondError(c, http.StatusInternalServerError, "Failed to read moderators")
 		return
 	}
 
@@ -330,9 +330,9 @@ func (h *ModMailHandler) CreateModMail(c *gin.Context) {
 				WHERE (bu.blocker_id = $1 AND bu.blocked_id = ANY($2::int[]))
 				   OR (bu.blocked_id = $1 AND bu.blocker_id = ANY($2::int[]))
 			)
-		`, userID.(int), moderatorIDs).Scan(&hasBlockingConflict)
+		`, userID, moderatorIDs).Scan(&hasBlockingConflict)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check blocking relationships"})
+			RespondError(c, http.StatusInternalServerError, "Failed to check blocking relationships")
 			return
 		}
 		if hasBlockingConflict {
@@ -351,7 +351,7 @@ func (h *ModMailHandler) CreateModMail(c *gin.Context) {
 			ON CONFLICT (conversation_id, user_id) DO UPDATE SET is_moderator = TRUE
 		`, conversationID, moderatorIDs)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to add moderators"})
+			RespondError(c, http.StatusInternalServerError, "Failed to add moderators")
 			return
 		}
 	}
@@ -359,7 +359,7 @@ func (h *ModMailHandler) CreateModMail(c *gin.Context) {
 	// Validate encryption payloads for multi-recipient encryption
 	if req.IsMultiRecipient {
 		if req.SharedEncryptionIV == nil || len(req.RecipientKeys) == 0 {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Missing encryption payloads for multi-recipient mod mail"})
+			RespondError(c, http.StatusBadRequest, "Missing encryption payloads for multi-recipient mod mail")
 			return
 		}
 
@@ -386,7 +386,7 @@ func (h *ModMailHandler) CreateModMail(c *gin.Context) {
 		)
 		VALUES ($1, $2, $2, $3, $4, 'text', NULL, NULL, NULL, NULL, $5, NULL, NULL, NULL, $6, $7)
 		RETURNING id
-	`, conversationID, userID.(int), encryptedContent, req.SenderEncryptedContent, req.EncryptionVersion, isMulti, req.SharedEncryptionIV).Scan(&messageID)
+	`, conversationID, userID, encryptedContent, req.SenderEncryptedContent, req.EncryptionVersion, isMulti, req.SharedEncryptionIV).Scan(&messageID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create message", "details": err.Error()})
 		return
@@ -413,7 +413,7 @@ func (h *ModMailHandler) CreateModMail(c *gin.Context) {
 
 	// Commit transaction
 	if err := tx.Commit(c.Request.Context()); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to commit transaction"})
+		RespondError(c, http.StatusInternalServerError, "Failed to commit transaction")
 		return
 	}
 
@@ -428,9 +428,8 @@ func (h *ModMailHandler) CreateModMail(c *gin.Context) {
 // GetModMailForHub handles GET /api/v1/mod-mail/hubs/:hub_name
 // Returns all mod mail for a hub (moderators only)
 func (h *ModMailHandler) GetModMailForHub(c *gin.Context) {
-	userID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
 		return
 	}
 
@@ -440,18 +439,18 @@ func (h *ModMailHandler) GetModMailForHub(c *gin.Context) {
 	// Get hub
 	hub, err := h.hubRepo.GetByName(c.Request.Context(), hubName)
 	if err != nil || hub == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Hub not found"})
+		RespondError(c, http.StatusNotFound, "Hub not found")
 		return
 	}
 
 	// Check if user is a moderator of this hub (or admin)
 	isMod, err := permissions.RequireHubModeratorOrAdmin(c, hub.ID, h.hubModRepo)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check permissions"})
+		RespondError(c, http.StatusInternalServerError, "Failed to check permissions")
 		return
 	}
 	if !isMod {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Only moderators can access mod mail"})
+		RespondError(c, http.StatusForbidden, "Only moderators can access mod mail")
 		return
 	}
 
@@ -500,7 +499,7 @@ func (h *ModMailHandler) GetModMailForHub(c *gin.Context) {
 
 	for i := range conversations {
 		go func(idx int) {
-			err := h.enrichConversationDetails(c.Request.Context(), &conversations[idx], userID.(int))
+			err := h.enrichConversationDetails(c.Request.Context(), &conversations[idx], userID)
 			resultsChan <- enrichResult{index: idx, err: err}
 		}(i)
 	}
@@ -524,9 +523,8 @@ func (h *ModMailHandler) GetModMailForHub(c *gin.Context) {
 // GetUserModMail handles GET /api/v1/mod-mail/user
 // Returns all mod mail conversations the user has created
 func (h *ModMailHandler) GetUserModMail(c *gin.Context) {
-	userID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
 		return
 	}
 
@@ -543,9 +541,9 @@ func (h *ModMailHandler) GetUserModMail(c *gin.Context) {
 		LIMIT 50
 	`
 
-	rows, err := h.pool.Query(c.Request.Context(), query, userID.(int))
+	rows, err := h.pool.Query(c.Request.Context(), query, userID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get conversations"})
+		RespondError(c, http.StatusInternalServerError, "Failed to get conversations")
 		return
 	}
 	defer rows.Close()
@@ -554,7 +552,7 @@ func (h *ModMailHandler) GetUserModMail(c *gin.Context) {
 	for rows.Next() {
 		var conv ModMailConversationDetails
 		if err := rows.Scan(&conv.ID, &conv.HubID, &conv.Subject, &conv.Status, &conv.CreatedAt, &conv.LastMessageAt, &conv.HubName); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to scan conversation"})
+			RespondError(c, http.StatusInternalServerError, "Failed to scan conversation")
 			return
 		}
 		conversations = append(conversations, conv)
@@ -570,7 +568,7 @@ func (h *ModMailHandler) GetUserModMail(c *gin.Context) {
 
 	for i := range conversations {
 		go func(idx int) {
-			err := h.enrichConversationDetails(c.Request.Context(), &conversations[idx], userID.(int))
+			err := h.enrichConversationDetails(c.Request.Context(), &conversations[idx], userID)
 			resultsChan <- enrichResult{index: idx, err: err}
 		}(i)
 	}
@@ -592,15 +590,14 @@ func (h *ModMailHandler) GetUserModMail(c *gin.Context) {
 // GetModMailConversation handles GET /api/v1/mod-mail/:id
 // Returns details for a single mod mail conversation
 func (h *ModMailHandler) GetModMailConversation(c *gin.Context) {
-	userID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
 		return
 	}
 
 	conversationID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid conversation ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid conversation ID")
 		return
 	}
 
@@ -621,7 +618,7 @@ func (h *ModMailHandler) GetModMailConversation(c *gin.Context) {
 		&conv.LastMessageAt,
 	)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Conversation not found"})
+		RespondError(c, http.StatusNotFound, "Conversation not found")
 		return
 	}
 
@@ -633,29 +630,29 @@ func (h *ModMailHandler) GetModMailConversation(c *gin.Context) {
 			SELECT 1 FROM conversation_participants
 			WHERE conversation_id = $1 AND user_id = $2
 		)
-	`, conversationID, userID.(int)).Scan(&isParticipant)
+	`, conversationID, userID).Scan(&isParticipant)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check participant status"})
+		RespondError(c, http.StatusInternalServerError, "Failed to check participant status")
 		return
 	}
 
 	// Check if user is an admin
 	err = h.pool.QueryRow(c.Request.Context(), `
 		SELECT role = 'admin' FROM users WHERE id = $1
-	`, userID.(int)).Scan(&isAdmin)
+	`, userID).Scan(&isAdmin)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check admin status"})
+		RespondError(c, http.StatusInternalServerError, "Failed to check admin status")
 		return
 	}
 
 	if !isParticipant && !isAdmin {
-		c.JSON(http.StatusForbidden, gin.H{"error": "You are not a participant in this conversation"})
+		RespondError(c, http.StatusForbidden, "You are not a participant in this conversation")
 		return
 	}
 
 	// Enrich with participants, latest message, and unread count
-	if err := h.enrichConversationDetails(c.Request.Context(), &conv, userID.(int)); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load conversation details"})
+	if err := h.enrichConversationDetails(c.Request.Context(), &conv, userID); err != nil {
+		RespondError(c, http.StatusInternalServerError, "Failed to load conversation details")
 		return
 	}
 
@@ -665,15 +662,14 @@ func (h *ModMailHandler) GetModMailConversation(c *gin.Context) {
 // UpdateModMailStatus handles PATCH /api/v1/mod-mail/:id/status
 // Allows moderators to archive or resolve mod mail
 func (h *ModMailHandler) UpdateModMailStatus(c *gin.Context) {
-	userID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
 		return
 	}
 
 	conversationID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid conversation ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid conversation ID")
 		return
 	}
 
@@ -686,7 +682,7 @@ func (h *ModMailHandler) UpdateModMailStatus(c *gin.Context) {
 	}
 
 	// Debug logging
-	println("UpdateModMailStatus: conversationID =", conversationID, "status =", req.Status, "userID =", userID.(int))
+	println("UpdateModMailStatus: conversationID =", conversationID, "status =", req.Status, "userID =", userID)
 
 	// Get conversation to check hub
 	var hubID int
@@ -705,7 +701,7 @@ func (h *ModMailHandler) UpdateModMailStatus(c *gin.Context) {
 		return
 	}
 	if !isMod {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Only moderators can update mod mail status"})
+		RespondError(c, http.StatusForbidden, "Only moderators can update mod mail status")
 		return
 	}
 
@@ -717,7 +713,7 @@ func (h *ModMailHandler) UpdateModMailStatus(c *gin.Context) {
 		    archived_at = CASE WHEN $1::varchar = 'archived' OR $1::varchar = 'resolved' THEN NOW() ELSE NULL END,
 		    archived_by = CASE WHEN $1::varchar = 'archived' OR $1::varchar = 'resolved' THEN $2::integer ELSE NULL END
 		WHERE id = $3
-	`, req.Status, userID.(int), conversationID)
+	`, req.Status, userID, conversationID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update status", "details": err.Error()})
 		return

@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"github.com/omninudge/backend/internal/ports"
+	"github.com/omninudge/backend/internal/api/middleware"
 	"net/http"
 	"strconv"
 	"time"
@@ -11,17 +13,17 @@ import (
 )
 
 type AccessRequestHandler struct {
-	accessReqRepo *models.HubAccessRequestRepository
-	hubRepo       *models.HubRepository
+	accessReqRepo ports.HubAccessRequestRepository
+	hubRepo       ports.HubRepository
 	settingsRepo  *repository.HubSettingsRepository
-	userRepo      *models.UserRepository
+	userRepo      ports.UserRepository
 }
 
 func NewAccessRequestHandler(
-	accessReqRepo *models.HubAccessRequestRepository,
-	hubRepo *models.HubRepository,
+	accessReqRepo ports.HubAccessRequestRepository,
+	hubRepo ports.HubRepository,
 	settingsRepo *repository.HubSettingsRepository,
-	userRepo *models.UserRepository,
+	userRepo ports.UserRepository,
 ) *AccessRequestHandler {
 	return &AccessRequestHandler{
 		accessReqRepo: accessReqRepo,
@@ -40,9 +42,8 @@ type AddUserAccessRequest struct {
 }
 
 func (h *AccessRequestHandler) CreateRequest(c *gin.Context) {
-	userID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
 		return
 	}
 
@@ -53,7 +54,7 @@ func (h *AccessRequestHandler) CreateRequest(c *gin.Context) {
 		return
 	}
 	if hub == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Hub not found"})
+		RespondError(c, http.StatusNotFound, "Hub not found")
 		return
 	}
 
@@ -64,7 +65,7 @@ func (h *AccessRequestHandler) CreateRequest(c *gin.Context) {
 	}
 
 	if settings.PrivacyType != "private" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Hub is not private"})
+		RespondError(c, http.StatusBadRequest, "Hub is not private")
 		return
 	}
 
@@ -74,18 +75,18 @@ func (h *AccessRequestHandler) CreateRequest(c *gin.Context) {
 		return
 	}
 
-	hasPending, err := h.accessReqRepo.HasPendingRequest(c.Request.Context(), hub.ID, userID.(int))
+	hasPending, err := h.accessReqRepo.HasPendingRequest(c.Request.Context(), hub.ID, userID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check existing requests", "details": err.Error()})
 		return
 	}
 	if hasPending {
-		c.JSON(http.StatusConflict, gin.H{"error": "You already have a pending request for this hub"})
+		RespondError(c, http.StatusConflict, "You already have a pending request for this hub")
 		return
 	}
 
 	if settings.AccessRequestCooldownDays > 0 {
-		accessReq, err := h.accessReqRepo.GetByUserAndHub(c.Request.Context(), hub.ID, userID.(int))
+		accessReq, err := h.accessReqRepo.GetByUserAndHub(c.Request.Context(), hub.ID, userID)
 		if err == nil && accessReq != nil && accessReq.Status == "denied" {
 			cooldown := time.Duration(settings.AccessRequestCooldownDays) * 24 * time.Hour
 			nextAllowed := accessReq.UpdatedAt.Add(cooldown)
@@ -102,7 +103,7 @@ func (h *AccessRequestHandler) CreateRequest(c *gin.Context) {
 
 	accessReq := &models.HubAccessRequest{
 		HubID:  hub.ID,
-		UserID: userID.(int),
+		UserID: userID,
 	}
 	if req.Message != nil {
 		accessReq.Message = req.Message
@@ -136,7 +137,7 @@ func (h *AccessRequestHandler) GetPendingRequests(c *gin.Context) {
 		return
 	}
 	if hub == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Hub not found"})
+		RespondError(c, http.StatusNotFound, "Hub not found")
 		return
 	}
 
@@ -156,13 +157,13 @@ func (h *AccessRequestHandler) ApproveRequest(c *gin.Context) {
 	requestIDStr := c.Param("request_id")
 	requestID, err := strconv.Atoi(requestIDStr)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid request ID")
 		return
 	}
 
 	accessReq, err := h.accessReqRepo.GetByID(c.Request.Context(), requestID)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Request not found"})
+		RespondError(c, http.StatusNotFound, "Request not found")
 		return
 	}
 
@@ -178,13 +179,13 @@ func (h *AccessRequestHandler) DenyRequest(c *gin.Context) {
 	requestIDStr := c.Param("request_id")
 	requestID, err := strconv.Atoi(requestIDStr)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid request ID")
 		return
 	}
 
 	accessReq, err := h.accessReqRepo.GetByID(c.Request.Context(), requestID)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Request not found"})
+		RespondError(c, http.StatusNotFound, "Request not found")
 		return
 	}
 
@@ -207,7 +208,7 @@ func (h *AccessRequestHandler) AddUserAccessByUsername(c *gin.Context) {
 		return
 	}
 	if hub == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Hub not found"})
+		RespondError(c, http.StatusNotFound, "Hub not found")
 		return
 	}
 
@@ -217,13 +218,13 @@ func (h *AccessRequestHandler) AddUserAccessByUsername(c *gin.Context) {
 		return
 	}
 	if settings.PrivacyType != "private" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Hub is not private"})
+		RespondError(c, http.StatusBadRequest, "Hub is not private")
 		return
 	}
 
 	var req AddUserAccessRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
+		RespondError(c, http.StatusBadRequest, "Invalid request body")
 		return
 	}
 
@@ -233,7 +234,7 @@ func (h *AccessRequestHandler) AddUserAccessByUsername(c *gin.Context) {
 		return
 	}
 	if user == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		RespondError(c, http.StatusNotFound, "User not found")
 		return
 	}
 
@@ -278,13 +279,12 @@ func (h *AccessRequestHandler) AddUserAccessByUsername(c *gin.Context) {
 }
 
 func (h *AccessRequestHandler) GetUserRequests(c *gin.Context) {
-	userID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
 		return
 	}
 
-	requests, err := h.accessReqRepo.GetUserAccessRequests(c.Request.Context(), userID.(int))
+	requests, err := h.accessReqRepo.GetUserAccessRequests(c.Request.Context(), userID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch requests", "details": err.Error()})
 		return
@@ -297,9 +297,8 @@ func (h *AccessRequestHandler) GetUserRequests(c *gin.Context) {
 }
 
 func (h *AccessRequestHandler) CheckRequestStatus(c *gin.Context) {
-	userID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
 		return
 	}
 
@@ -310,11 +309,11 @@ func (h *AccessRequestHandler) CheckRequestStatus(c *gin.Context) {
 		return
 	}
 	if hub == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Hub not found"})
+		RespondError(c, http.StatusNotFound, "Hub not found")
 		return
 	}
 
-	accessReq, err := h.accessReqRepo.GetByUserAndHub(c.Request.Context(), hub.ID, userID.(int))
+	accessReq, err := h.accessReqRepo.GetByUserAndHub(c.Request.Context(), hub.ID, userID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check request status", "details": err.Error()})
 		return
