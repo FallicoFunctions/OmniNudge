@@ -42,8 +42,9 @@ func NewUsername(username string) (Username, error) {
 // UsernameFromString creates a Username bypassing validation.
 // Use only when loading from the database where the value is already trusted
 // (e.g. legacy records that pre-date the length/charset rules).
+// Spaces are trimmed for consistency with NewUsername.
 func UsernameFromString(raw string) Username {
-	return Username{value: raw}
+	return Username{value: strings.TrimSpace(raw)}
 }
 
 // String returns the username.

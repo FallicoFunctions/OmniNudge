@@ -1,6 +1,8 @@
 package valueobjects
 
 import (
+	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -31,6 +33,21 @@ func TestNewPassword(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestNewPassword_BcryptCost(t *testing.T) {
+	// Bcrypt hash format: $2a$<cost>$<22-char salt><31-char hash>
+	// This test guards against accidentally lowering the cost below 12.
+	pwd, err := NewPassword("Password123")
+	require.NoError(t, err)
+
+	hash := pwd.Hash()
+	parts := strings.Split(hash, "$")
+	require.Len(t, parts, 4, "bcrypt hash must have format $2a$cost$salt+hash")
+
+	cost, err := strconv.Atoi(parts[2])
+	require.NoError(t, err, "bcrypt cost field must be numeric")
+	assert.GreaterOrEqual(t, cost, 12, "bcrypt cost must be >= 12 per CODING_STANDARDS.md security rules")
 }
 
 func TestPassword_Verify(t *testing.T) {

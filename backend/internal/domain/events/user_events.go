@@ -30,6 +30,7 @@ func (e UserBanned) OccurredAt() time.Time { return e.BannedAt }
 type UserUnbanned struct {
 	UserID     int
 	Username   string
+	Reason     string // moderator's explanation for the unban
 	UnbannedBy int
 	UnbannedAt time.Time
 }

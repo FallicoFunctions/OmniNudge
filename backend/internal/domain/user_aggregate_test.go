@@ -104,11 +104,44 @@ func TestUserAggregate_Unban(t *testing.T) {
 	_ = user.Ban("Spam", false, 999)
 	user.GetEvents() // clear ban event
 
-	user.Unban(999)
+	user.Unban("appeal approved", 999)
 
 	evts := user.GetEvents()
 	require.Len(t, evts, 1)
 	assert.Equal(t, "UserUnbanned", evts[0].EventName())
+}
+
+func TestUserAggregate_RecordRegistration_Idempotent_AfterReload(t *testing.T) {
+	// Create user, persist (SetID), and record registration.
+	user, _ := NewUserAggregate("testuser", "test@example.com", "Password123")
+	user.SetID(42)
+	user.RecordRegistration()
+	evts := user.GetEvents()
+	require.Len(t, evts, 1, "first RecordRegistration should emit one event")
+
+	// Simulate a DB round-trip: ToEntity + UserAggregateFromEntity.
+	entity := user.ToEntity()
+	loaded, err := UserAggregateFromEntity(entity)
+	require.NoError(t, err)
+
+	// Calling RecordRegistration on a reloaded aggregate must be a no-op.
+	loaded.RecordRegistration()
+	assert.Empty(t, loaded.GetEvents(), "RecordRegistration must be no-op after DB reload")
+}
+
+func TestUserAggregate_Ban_Idempotent_AfterReload(t *testing.T) {
+	user, _ := NewUserAggregate("testuser", "test@example.com", "Password123")
+	_ = user.Ban("Spam", false, 999)
+
+	// Simulate a DB round-trip.
+	entity := user.ToEntity()
+	loaded, err := UserAggregateFromEntity(entity)
+	require.NoError(t, err)
+
+	// Banning an already-banned user must be a no-op — no event, no error.
+	err = loaded.Ban("Another reason", false, 999)
+	require.NoError(t, err)
+	assert.Empty(t, loaded.GetEvents(), "re-banning after reload must produce no event")
 }
 
 func TestUserAggregate_Delete(t *testing.T) {

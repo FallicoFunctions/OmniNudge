@@ -50,9 +50,16 @@ func (eb *EventBus) Subscribe(eventName string, handler Handler) {
 	eb.handlers[eventName] = append(eb.handlers[eventName], handler)
 }
 
-// Publish dispatches event to every registered handler asynchronously.
-// When logEvents is true, the event is also appended to the internal log
-// before handlers are called.
+// Publish dispatches event to every registered handler ASYNCHRONOUSLY in
+// separate goroutines. Important guarantees:
+//   - Event ordering is NOT guaranteed; goroutines may complete in any order.
+//   - Handlers MUST be idempotent and safe for concurrent use.
+//   - Handlers MUST NOT assume other handlers have completed.
+//   - Panics inside handlers are recovered and logged by the bus.
+//
+// When logEvents is true, the event is appended to the internal log
+// synchronously (before handlers are launched) so GetEventLog is safe to
+// call immediately after Publish in tests.
 func (eb *EventBus) Publish(event Event) {
 	if eb.logEvents {
 		eb.mu.Lock()
@@ -88,10 +95,19 @@ func (eb *EventBus) GetEventLog() []Event {
 	return snapshot
 }
 
-// Clear empties the event log (for testing).
+// Clear empties the event log (for testing). Does NOT remove registered handlers.
 func (eb *EventBus) Clear() {
 	eb.mu.Lock()
 	defer eb.mu.Unlock()
 
 	eb.eventLog = eb.eventLog[:0]
+}
+
+// ClearHandlers removes all registered handlers (for test isolation).
+// Does NOT clear the event log; call Clear() for that.
+func (eb *EventBus) ClearHandlers() {
+	eb.mu.Lock()
+	defer eb.mu.Unlock()
+
+	eb.handlers = make(map[string][]Handler)
 }

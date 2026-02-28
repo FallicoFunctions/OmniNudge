@@ -13,13 +13,19 @@ var (
 )
 
 // emailRegex validates a simplified but practical email format.
-// Rules enforced:
-//   - Local part: alphanumerics plus . _ % + -; no leading/trailing/consecutive dots.
-//   - Domain: alphanumerics and hyphens separated by dots; TLD ≥ 2 chars.
+// Rules enforced by the regex:
+//   - Local part: must start AND end with an alphanumeric character;
+//     middle characters may include . _ % + -
+//   - Domain: must start and end with alphanumeric; hyphens only in the middle.
+//   - TLD: ≥ 2 alpha characters.
+//
+// Additional post-regex checks (see NewEmail) handle:
+//   - Consecutive dots in the local part ("user..name@")
+//   - Consecutive hyphens in the domain ("ex--ample.com")
 //
 // This is intentionally not RFC 5321-exhaustive; it rejects pathological
-// addresses that would cause problems in practice (e.g. "..user@example.com").
-var emailRegex = regexp.MustCompile(`^[a-zA-Z0-9_%+\-]([a-zA-Z0-9._%+\-]*[a-zA-Z0-9_%+\-])?@[a-zA-Z0-9]([a-zA-Z0-9.\-]*[a-zA-Z0-9])?\.[a-zA-Z]{2,}$`)
+// addresses that cause practical problems while accepting all common forms.
+var emailRegex = regexp.MustCompile(`^[a-zA-Z0-9]([a-zA-Z0-9._%+\-]*[a-zA-Z0-9])?@[a-zA-Z0-9]([a-zA-Z0-9.\-]*[a-zA-Z0-9])?\.[a-zA-Z]{2,}$`)
 
 // Email is an immutable, self-validating value object for email addresses.
 type Email struct {
@@ -39,10 +45,17 @@ func NewEmail(email string) (Email, error) {
 		return Email{}, ErrEmailInvalid
 	}
 
-	// Reject consecutive dots in the local part (the regex allows them via
-	// the middle character class which includes ".").
 	atIdx := strings.Index(email, "@")
-	if strings.Contains(email[:atIdx], "..") {
+	localPart := email[:atIdx]
+	domainPart := email[atIdx+1:]
+
+	// Reject consecutive dots in the local part ("user..name@").
+	if strings.Contains(localPart, "..") {
+		return Email{}, ErrEmailInvalid
+	}
+
+	// Reject consecutive hyphens in the domain ("ex--ample.com").
+	if strings.Contains(domainPart, "--") {
 		return Email{}, ErrEmailInvalid
 	}
 
@@ -53,8 +66,9 @@ func NewEmail(email string) (Email, error) {
 // Use only when loading from the database where the value is already trusted
 // (e.g. a stored address that fails the current regex due to an edge case, or
 // a malformed legacy row that must not block all operations on that user).
+// The value is normalised to lower-case for consistent comparisons.
 func EmailFromString(raw string) Email {
-	return Email{value: raw}
+	return Email{value: strings.ToLower(raw)}
 }
 
 // String returns the normalised email address.

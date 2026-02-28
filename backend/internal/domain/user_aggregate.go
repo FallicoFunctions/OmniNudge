@@ -39,9 +39,12 @@ type UserAggregate struct {
 	nsfw      bool
 
 	// Status
-	role         string
-	banned       bool
+	role string
+	// shadowBanned is set via repository.ShadowBanUser only — not exposed
+	// as an aggregate mutation. Shadow-banned users can still log in; the
+	// feed layer silently restricts their content without surfacing this flag.
 	shadowBanned bool
+	banned       bool
 	banReason    *string
 	bannedAt     *time.Time
 	deleted      bool
@@ -164,7 +167,8 @@ func (u *UserAggregate) Ban(reason string, showReason bool, bannedBy int) error 
 }
 
 // Unban lifts the ban. Idempotent — no-op if not currently banned.
-func (u *UserAggregate) Unban(unbannedBy int) {
+// reason is the moderator's explanation (persisted in the event for the audit trail).
+func (u *UserAggregate) Unban(reason string, unbannedBy int) {
 	if !u.banned {
 		return
 	}
@@ -176,6 +180,7 @@ func (u *UserAggregate) Unban(unbannedBy int) {
 	u.recordEvent(domainevents.UserUnbanned{
 		UserID:     u.id,
 		Username:   u.username.String(),
+		Reason:     reason,
 		UnbannedBy: unbannedBy,
 		UnbannedAt: time.Now(),
 	})
@@ -339,6 +344,10 @@ func UserAggregateFromEntity(user *User) (*UserAggregate, error) {
 		deleted:       user.Deleted,
 		createdAt:     user.CreatedAt,
 		lastSeen:      user.LastSeen,
+		// Any user that exists in the DB has already been registered.
+		// Setting registered=true prevents RecordRegistration from
+		// re-publishing a UserRegistered event on a reloaded aggregate.
+		registered:    user.ID != 0,
 		pendingEvents: make([]domainevents.Event, 0),
 	}, nil
 }

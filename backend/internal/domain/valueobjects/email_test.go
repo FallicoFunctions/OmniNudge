@@ -75,10 +75,51 @@ func TestNewEmail_RejectLeadingAndConsecutiveDots(t *testing.T) {
 	}
 }
 
+func TestNewEmail_RejectConsecutiveHyphensInDomain(t *testing.T) {
+	_, err := NewEmail("user@ex--ample.com")
+	require.ErrorIs(t, err, ErrEmailInvalid)
+}
+
+func TestNewEmail_RejectTrailingSpecialInLocalPart(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+	}{
+		{"trailing plus", "user+@example.com"},
+		{"trailing minus", "user-@example.com"},
+		{"trailing percent", "user%@example.com"},
+		{"trailing underscore", "user_@example.com"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := NewEmail(tt.input)
+			require.ErrorIs(t, err, ErrEmailInvalid)
+		})
+	}
+}
+
+func TestNewEmail_RejectSingleSpecialLocalPart(t *testing.T) {
+	tests := []string{"+@example.com", "-@example.com", "%@example.com", "_@example.com"}
+	for _, addr := range tests {
+		_, err := NewEmail(addr)
+		require.ErrorIs(t, err, ErrEmailInvalid, "address %q should be rejected", addr)
+	}
+}
+
 func TestEmailFromString(t *testing.T) {
 	// EmailFromString bypasses validation — useful for legacy/trusted DB values.
+	// Value is normalised to lower-case for consistent comparisons.
 	e := EmailFromString("legacy..email@old.example")
 	assert.Equal(t, "legacy..email@old.example", e.String())
+
+	// Normalises case.
+	e2 := EmailFromString("User@Example.COM")
+	assert.Equal(t, "user@example.com", e2.String())
+
+	// Two EmailFromString values with the same address compare equal regardless
+	// of the original casing.
+	e3 := EmailFromString("user@example.com")
+	assert.True(t, e2.Equals(e3))
 }
 
 func TestEmail_JSON_SpecialCharacters(t *testing.T) {
