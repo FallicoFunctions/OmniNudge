@@ -76,10 +76,8 @@ func TestEventBus_EventLog(t *testing.T) {
 	bus.Publish(UserRegistered{UserID: 1, RegisteredAt: time.Now()})
 	bus.Publish(UserRegistered{UserID: 2, RegisteredAt: time.Now()})
 
-	// Give goroutines time to settle (event log is written synchronously, so no
-	// sleep is strictly needed, but handlers run async).
-	time.Sleep(10 * time.Millisecond)
-
+	// Event log is written synchronously inside Publish (before handlers run),
+	// so no sleep is needed here.
 	log := bus.GetEventLog()
 	assert.Len(t, log, 2)
 
@@ -124,8 +122,7 @@ func TestEventBus_ConcurrentPublish(t *testing.T) {
 	}
 
 	wg.Wait()
-	time.Sleep(20 * time.Millisecond) // let any in-flight goroutine handler settle
-
+	// Event log is written synchronously; all 100 entries are guaranteed after wg.Wait().
 	log := bus.GetEventLog()
 	assert.Len(t, log, eventCount)
 }

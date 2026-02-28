@@ -53,6 +53,8 @@ func PasswordFromHash(hash string) Password {
 }
 
 // Hash returns the bcrypt hash string.
+// This is intentionally public for persistence purposes only (writing to DB,
+// returning from PasswordHash() on the aggregate). Never log or transmit it.
 func (p Password) Hash() string {
 	return p.hash
 }

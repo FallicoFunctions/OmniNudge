@@ -57,7 +57,7 @@ func TestUserAggregate_Ban(t *testing.T) {
 		user, _ := NewUserAggregate("testuser", "test@example.com", "Password123")
 		user.GetEvents() // clear registration event
 
-		err := user.Ban("Spam", 999)
+		err := user.Ban("Spam", false, 999)
 
 		require.NoError(t, err)
 		evts := user.GetEvents()
@@ -69,8 +69,8 @@ func TestUserAggregate_Ban(t *testing.T) {
 		user, _ := NewUserAggregate("testuser", "test@example.com", "Password123")
 		user.GetEvents()
 
-		_ = user.Ban("Spam", 999)
-		err := user.Ban("Spam again", 999) // should not error
+		_ = user.Ban("Spam", false, 999)
+		err := user.Ban("Spam again", false, 999) // should not error
 
 		require.NoError(t, err)
 		// Only the first ban records an event; second call is a no-op.
@@ -82,16 +82,16 @@ func TestUserAggregate_Ban(t *testing.T) {
 		user, _ := NewUserAggregate("admin", "admin@example.com", "Password123")
 		user.role = "admin"
 
-		err := user.Ban("Test", 999)
+		err := user.Ban("Test", false, 999)
 
 		require.ErrorIs(t, err, ErrCannotBanAdmin)
 	})
 
 	t.Run("cannot ban deleted user", func(t *testing.T) {
 		user, _ := NewUserAggregate("testuser", "test@example.com", "Password123")
-		_ = user.Delete(999)
+		_ = user.Delete("test", 999)
 
-		err := user.Ban("Test", 999)
+		err := user.Ban("Test", false, 999)
 
 		require.ErrorIs(t, err, ErrUserDeleted)
 	})
@@ -101,7 +101,7 @@ func TestUserAggregate_Unban(t *testing.T) {
 	user, _ := NewUserAggregate("testuser", "test@example.com", "Password123")
 	user.GetEvents()
 
-	_ = user.Ban("Spam", 999)
+	_ = user.Ban("Spam", false, 999)
 	user.GetEvents() // clear ban event
 
 	user.Unban(999)
@@ -116,7 +116,7 @@ func TestUserAggregate_Delete(t *testing.T) {
 		user, _ := NewUserAggregate("testuser", "test@example.com", "Password123")
 		user.GetEvents()
 
-		err := user.Delete(999)
+		err := user.Delete("cleanup", 999)
 
 		require.NoError(t, err)
 		evts := user.GetEvents()
@@ -126,9 +126,9 @@ func TestUserAggregate_Delete(t *testing.T) {
 
 	t.Run("cannot delete twice", func(t *testing.T) {
 		user, _ := NewUserAggregate("testuser", "test@example.com", "Password123")
-		_ = user.Delete(999)
+		_ = user.Delete("cleanup", 999)
 
-		err := user.Delete(999)
+		err := user.Delete("cleanup", 999)
 
 		require.ErrorIs(t, err, ErrUserDeleted)
 	})
@@ -172,17 +172,36 @@ func TestUserAggregate_CanLogin(t *testing.T) {
 
 	t.Run("banned user cannot login", func(t *testing.T) {
 		user, _ := NewUserAggregate("testuser", "test@example.com", "Password123")
-		_ = user.Ban("Spam", 999)
+		_ = user.Ban("Spam", false, 999)
 
 		require.ErrorIs(t, user.CanLogin(), ErrUserBanned)
 	})
 
 	t.Run("deleted user cannot login", func(t *testing.T) {
 		user, _ := NewUserAggregate("testuser", "test@example.com", "Password123")
-		_ = user.Delete(999)
+		_ = user.Delete("cleanup", 999)
 
 		require.ErrorIs(t, user.CanLogin(), ErrUserDeleted)
 	})
+}
+
+func TestUserAggregate_UpdateProfile(t *testing.T) {
+	user, _ := NewUserAggregate("testuser", "test@example.com", "Password123")
+
+	bio := "Hello world"
+	avatar := "https://example.com/avatar.png"
+	nsfw := true
+	user.UpdateProfile(&avatar, &bio, &nsfw)
+
+	entity := user.ToEntity()
+	assert.Equal(t, bio, *entity.Bio)
+	assert.Equal(t, avatar, *entity.AvatarURL)
+	assert.True(t, entity.NSFW)
+
+	// Nil pointers are no-ops.
+	user.UpdateProfile(nil, nil, nil)
+	entity2 := user.ToEntity()
+	assert.Equal(t, bio, *entity2.Bio)
 }
 
 func TestUserAggregate_ToFromEntity(t *testing.T) {

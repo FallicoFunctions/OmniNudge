@@ -2,6 +2,7 @@ package domain
 
 import (
 	"errors"
+	"log"
 	"time"
 
 	domainevents "github.com/omninudge/backend/internal/domain/events"
@@ -19,6 +20,10 @@ var (
 // UserAggregate wraps a User entity and encapsulates all business rules.
 // External code manipulates a user only through the aggregate's methods;
 // direct field access is intentionally unavailable.
+//
+// Concurrency: UserAggregate is NOT safe for concurrent use. In keeping with
+// standard DDD practice, an aggregate is always loaded, mutated, and persisted
+// within a single request/transaction; it must never be shared across goroutines.
 type UserAggregate struct {
 	// Identity
 	id       int
@@ -44,6 +49,10 @@ type UserAggregate struct {
 	// Timestamps
 	createdAt time.Time
 	lastSeen  time.Time
+
+	// registered guards RecordRegistration so the UserRegistered event is
+	// emitted exactly once, even if the method is called more than once.
+	registered bool
 
 	// Pending domain events (cleared by GetEvents).
 	pendingEvents []domainevents.Event
@@ -90,9 +99,6 @@ func NewUserAggregate(username, email, plainPassword string) (*UserAggregate, er
 	return u, nil
 }
 
-// registered tracks whether RecordRegistration has already been called.
-// Stored as a field so the guard survives multiple method calls.
-
 // RecordRegistration records a UserRegistered domain event. Must be called
 // exactly once by the application service after the entity has been persisted
 // and SetID has been called. Subsequent calls are a no-op.
@@ -102,12 +108,10 @@ func (u *UserAggregate) RecordRegistration() {
 		// don't publish an event with a meaningless zero ID.
 		return
 	}
-	// Guard: only record the event once.
-	for _, e := range u.pendingEvents {
-		if e.EventName() == "UserRegistered" {
-			return
-		}
+	if u.registered {
+		return // idempotent
 	}
+	u.registered = true
 	u.recordEvent(domainevents.UserRegistered{
 		UserID:       u.id,
 		Username:     u.username.String(),
@@ -130,7 +134,8 @@ func (u *UserAggregate) Email() valueobjects.Email { return u.email }
 
 // Ban bans the user with a reason. Returns an error if the user is an admin,
 // already deleted, or already banned (idempotent — no error on re-ban).
-func (u *UserAggregate) Ban(reason string, bannedBy int) error {
+// showReason controls whether the ban reason is visible to the banned user.
+func (u *UserAggregate) Ban(reason string, showReason bool, bannedBy int) error {
 	if u.role == "admin" {
 		return ErrCannotBanAdmin
 	}
@@ -147,11 +152,12 @@ func (u *UserAggregate) Ban(reason string, bannedBy int) error {
 	u.bannedAt = &now
 
 	u.recordEvent(domainevents.UserBanned{
-		UserID:   u.id,
-		Username: u.username.String(),
-		Reason:   reason,
-		BannedBy: bannedBy,
-		BannedAt: now,
+		UserID:       u.id,
+		Username:     u.username.String(),
+		Reason:       reason,
+		ReasonPublic: showReason,
+		BannedBy:     bannedBy,
+		BannedAt:     now,
 	})
 
 	return nil
@@ -176,7 +182,7 @@ func (u *UserAggregate) Unban(unbannedBy int) {
 }
 
 // Delete soft-deletes the user. Returns ErrUserDeleted if already deleted.
-func (u *UserAggregate) Delete(deletedBy int) error {
+func (u *UserAggregate) Delete(reason string, deletedBy int) error {
 	if u.deleted {
 		return ErrUserDeleted
 	}
@@ -186,6 +192,7 @@ func (u *UserAggregate) Delete(deletedBy int) error {
 	u.recordEvent(domainevents.UserDeleted{
 		UserID:    u.id,
 		Username:  u.username.String(),
+		Reason:    reason,
 		DeletedBy: deletedBy,
 		DeletedAt: time.Now(),
 	})
@@ -229,6 +236,8 @@ func (u *UserAggregate) UpdateProfile(avatarURL, bio *string, nsfw *bool) {
 }
 
 // CanLogin returns an error explaining why the user cannot log in, or nil.
+// Note: shadow-banned users are intentionally allowed to log in; the feed
+// layer silently restricts their visibility without revealing the restriction.
 func (u *UserAggregate) CanLogin() error {
 	if u.deleted {
 		return ErrUserDeleted
@@ -263,9 +272,11 @@ func (u *UserAggregate) GetEvents() []domainevents.Event {
 }
 
 // ToEntity converts the aggregate back to a plain User entity for persistence.
-// Note: fields that live only on the DB model (reddit tokens, encrypted email,
-// etc.) are not tracked by the aggregate; callers must preserve them by loading
-// the entity first, then merging changed fields.
+// Only fields tracked by the aggregate are written; fields that live solely on
+// the DB model (e.g. reddit tokens, encrypted email, karma counters) are NOT
+// touched. Callers should load the full entity first and merge only the fields
+// they need to update rather than blindly saving the aggregate's ToEntity()
+// output, to avoid clobbering DB-side fields that the aggregate doesn't own.
 func (u *UserAggregate) ToEntity() *User {
 	email := u.email.String()
 	return &User{
@@ -305,8 +316,9 @@ func UserAggregateFromEntity(user *User) (*UserAggregate, error) {
 		var err error
 		email, err = valueobjects.NewEmail(*user.Email)
 		if err != nil {
-			// Stored value is malformed — log and continue with zero email rather
-			// than blocking all operations on this user.
+			// Stored value is malformed — log a warning and continue with the
+			// raw value rather than blocking all operations on this user.
+			log.Printf("WARN UserAggregateFromEntity: user %d has malformed email %q: %v", user.ID, *user.Email, err)
 			email = valueobjects.EmailFromString(*user.Email)
 		}
 	}

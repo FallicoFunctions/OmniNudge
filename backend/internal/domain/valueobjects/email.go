@@ -12,8 +12,14 @@ var (
 	ErrEmailInvalid = errors.New("email format is invalid")
 )
 
-// Compile regex at package level for performance.
-var emailRegex = regexp.MustCompile(`^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$`)
+// emailRegex validates a simplified but practical email format.
+// Rules enforced:
+//   - Local part: alphanumerics plus . _ % + -; no leading/trailing/consecutive dots.
+//   - Domain: alphanumerics and hyphens separated by dots; TLD ≥ 2 chars.
+//
+// This is intentionally not RFC 5321-exhaustive; it rejects pathological
+// addresses that would cause problems in practice (e.g. "..user@example.com").
+var emailRegex = regexp.MustCompile(`^[a-zA-Z0-9_%+\-]([a-zA-Z0-9._%+\-]*[a-zA-Z0-9_%+\-])?@[a-zA-Z0-9]([a-zA-Z0-9.\-]*[a-zA-Z0-9])?\.[a-zA-Z]{2,}$`)
 
 // Email is an immutable, self-validating value object for email addresses.
 type Email struct {
@@ -30,6 +36,13 @@ func NewEmail(email string) (Email, error) {
 	}
 
 	if !emailRegex.MatchString(email) {
+		return Email{}, ErrEmailInvalid
+	}
+
+	// Reject consecutive dots in the local part (the regex allows them via
+	// the middle character class which includes ".").
+	atIdx := strings.Index(email, "@")
+	if strings.Contains(email[:atIdx], "..") {
 		return Email{}, ErrEmailInvalid
 	}
 

@@ -52,6 +52,12 @@ func TestUsername_JSON(t *testing.T) {
 	assert.Equal(t, username, decoded)
 }
 
+func TestUsernameFromString(t *testing.T) {
+	// UsernameFromString bypasses validation — useful for legacy short usernames.
+	u := UsernameFromString("ab")
+	assert.Equal(t, "ab", u.String())
+}
+
 func TestUsername_Equals(t *testing.T) {
 	u1, _ := NewUsername("testuser")
 	u2, _ := NewUsername("testuser")
