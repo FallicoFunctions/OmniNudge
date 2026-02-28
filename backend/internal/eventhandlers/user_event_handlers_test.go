@@ -73,6 +73,26 @@ func TestOnUserUnbanned_WrongEventType(t *testing.T) {
 	})
 }
 
+func TestOnUserDeleted_CorrectEventType(t *testing.T) {
+	h := NewUserEventHandlers()
+	assert.NotPanics(t, func() {
+		h.OnUserDeleted(events.UserDeleted{
+			UserID:    1,
+			Username:  "testuser",
+			Reason:    "violation",
+			DeletedBy: 99,
+			DeletedAt: time.Now(),
+		})
+	})
+}
+
+func TestOnUserDeleted_WrongEventType(t *testing.T) {
+	h := NewUserEventHandlers()
+	assert.NotPanics(t, func() {
+		h.OnUserDeleted(events.UserRegistered{UserID: 1, RegisteredAt: time.Now()})
+	})
+}
+
 func TestOnPasswordChanged_CorrectEventType(t *testing.T) {
 	h := NewUserEventHandlers()
 	assert.NotPanics(t, func() {
@@ -96,15 +116,17 @@ func TestHandlers_ViaEventBus(t *testing.T) {
 	bus.Subscribe("UserRegistered", h.OnUserRegistered)
 	bus.Subscribe("UserBanned", h.OnUserBanned)
 	bus.Subscribe("UserUnbanned", h.OnUserUnbanned)
+	bus.Subscribe("UserDeleted", h.OnUserDeleted)
 	bus.Subscribe("PasswordChanged", h.OnPasswordChanged)
 
 	assert.NotPanics(t, func() {
 		bus.Publish(events.UserRegistered{UserID: 1, Username: "u", Email: "u@e.com", RegisteredAt: time.Now()})
 		bus.Publish(events.UserBanned{UserID: 1, BannedAt: time.Now()})
 		bus.Publish(events.UserUnbanned{UserID: 1, UnbannedAt: time.Now()})
+		bus.Publish(events.UserDeleted{UserID: 1, DeletedAt: time.Now()})
 		bus.Publish(events.PasswordChanged{UserID: 1, ChangedAt: time.Now()})
 	})
 
 	// Event log is written synchronously.
-	assert.Len(t, bus.GetEventLog(), 4)
+	assert.Len(t, bus.GetEventLog(), 5)
 }

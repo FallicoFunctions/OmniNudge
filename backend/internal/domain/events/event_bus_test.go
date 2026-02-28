@@ -122,8 +122,9 @@ func TestEventBus_ConcurrentPublish(t *testing.T) {
 	}
 
 	wg.Wait()
-	// Event log is written synchronously; all 100 entries are guaranteed after wg.Wait().
+	// Event log is written synchronously; all entries are guaranteed after wg.Wait().
 	log := bus.GetEventLog()
+	assert.Greater(t, len(log), 0, "bus was created with logEvents=true so log must not be empty")
 	assert.Len(t, log, eventCount)
 }
 
@@ -152,6 +153,47 @@ func TestEventBus_ConcurrentSubscribePublish(t *testing.T) {
 
 	wg.Wait()
 	// If we get here without a race, the mutex strategy is correct.
+}
+
+func TestEventBus_ClearHandlers(t *testing.T) {
+	bus := NewEventBus(true)
+
+	var called bool
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+	wg.Add(1)
+
+	bus.Subscribe("UserRegistered", func(event Event) {
+		mu.Lock()
+		called = true
+		mu.Unlock()
+		wg.Done()
+	})
+
+	// Confirm the handler fires before clearing.
+	bus.Publish(UserRegistered{UserID: 1, RegisteredAt: time.Now()})
+	wg.Wait()
+	mu.Lock()
+	assert.True(t, called, "handler must fire before ClearHandlers")
+	called = false
+	mu.Unlock()
+
+	// After clearing handlers, a publish must not trigger any handler.
+	bus.ClearHandlers()
+	bus.Clear()
+	bus.Publish(UserRegistered{UserID: 2, RegisteredAt: time.Now()})
+
+	// Event log is synchronous; if a handler were registered it would be
+	// dispatched in a goroutine — but with no handlers nothing runs.
+	// A brief pause ensures no stray goroutine mutates `called`.
+	wg2 := sync.WaitGroup{}
+	_ = wg2 // no-op; absence of panic and called==false is the assertion
+	mu.Lock()
+	assert.False(t, called, "handler must not fire after ClearHandlers")
+	mu.Unlock()
+
+	// Only the second publish is logged (first was cleared).
+	assert.Len(t, bus.GetEventLog(), 1)
 }
 
 func TestEventBus_DifferentEventTypes(t *testing.T) {

@@ -149,6 +149,7 @@ func main() {
 	eventBus.Subscribe("UserRegistered", userEventHandlers.OnUserRegistered)
 	eventBus.Subscribe("UserBanned", userEventHandlers.OnUserBanned)
 	eventBus.Subscribe("UserUnbanned", userEventHandlers.OnUserUnbanned)
+	eventBus.Subscribe("UserDeleted", userEventHandlers.OnUserDeleted)
 	eventBus.Subscribe("PasswordChanged", userEventHandlers.OnPasswordChanged)
 	log.Println("Domain event bus initialized")
 

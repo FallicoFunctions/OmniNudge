@@ -98,17 +98,40 @@ func TestUserAggregate_Ban(t *testing.T) {
 }
 
 func TestUserAggregate_Unban(t *testing.T) {
-	user, _ := NewUserAggregate("testuser", "test@example.com", "Password123")
-	user.GetEvents()
+	t.Run("unban lifts ban and records event", func(t *testing.T) {
+		user, _ := NewUserAggregate("testuser", "test@example.com", "Password123")
+		user.GetEvents()
+		_ = user.Ban("Spam", false, 999)
+		user.GetEvents() // clear ban event
 
-	_ = user.Ban("Spam", false, 999)
-	user.GetEvents() // clear ban event
+		user.Unban("appeal approved", 999)
 
-	user.Unban("appeal approved", 999)
+		evts := user.GetEvents()
+		require.Len(t, evts, 1)
+		assert.Equal(t, "UserUnbanned", evts[0].EventName())
+	})
 
-	evts := user.GetEvents()
-	require.Len(t, evts, 1)
-	assert.Equal(t, "UserUnbanned", evts[0].EventName())
+	t.Run("unban is idempotent when not banned", func(t *testing.T) {
+		user, _ := NewUserAggregate("testuser", "test@example.com", "Password123")
+		user.GetEvents()
+
+		// Call Unban on a user who was never banned — must be a silent no-op.
+		user.Unban("no reason", 999)
+
+		assert.Empty(t, user.GetEvents(), "Unban on non-banned user must produce no event")
+	})
+
+	t.Run("unban clears ban fields", func(t *testing.T) {
+		user, _ := NewUserAggregate("testuser", "test@example.com", "Password123")
+		_ = user.Ban("Spam", false, 999)
+		user.GetEvents()
+
+		user.Unban("appeal approved", 999)
+		user.GetEvents()
+
+		// After unbanning, CanLogin must succeed.
+		assert.NoError(t, user.CanLogin())
+	})
 }
 
 func TestUserAggregate_RecordRegistration_Idempotent_AfterReload(t *testing.T) {
@@ -252,6 +275,30 @@ func TestUserAggregate_ToFromEntity(t *testing.T) {
 	assert.Equal(t, agg.id, loaded.id)
 	assert.Equal(t, agg.username, loaded.username)
 	assert.Equal(t, agg.email, loaded.email)
+}
+
+func TestUserAggregate_ToEntity_NilEmailRoundTrip(t *testing.T) {
+	// Reddit-only users have no email. ToEntity() must produce a nil Email
+	// pointer (not a pointer-to-empty-string), so the round-trip preserves the
+	// nil semantic on re-load.
+	entity := &User{
+		ID:           10,
+		Username:     "reddituser",
+		Email:        nil,
+		PasswordHash: "hash",
+	}
+
+	agg, err := UserAggregateFromEntity(entity)
+	require.NoError(t, err)
+
+	// ToEntity round-trip must keep Email nil.
+	out := agg.ToEntity()
+	assert.Nil(t, out.Email, "ToEntity must return nil Email for Reddit-only users")
+
+	// A second UserAggregateFromEntity from the round-tripped entity must also work.
+	agg2, err := UserAggregateFromEntity(out)
+	require.NoError(t, err)
+	assert.Equal(t, "", agg2.Email().String())
 }
 
 func TestUserAggregateFromEntity_NilEmail(t *testing.T) {
