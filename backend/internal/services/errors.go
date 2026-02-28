@@ -6,11 +6,6 @@ import "errors"
 var (
 	// Authentication
 	ErrInvalidCredentials = errors.New("invalid credentials")
-	ErrPasswordTooShort   = errors.New("password must be at least 8 characters")
-	ErrPasswordTooWeak    = errors.New("password must contain uppercase, lowercase, and numbers")
-	ErrUsernameTaken      = errors.New("username already taken")
-	ErrEmailTaken         = errors.New("email already registered")
-	ErrEmailInvalid       = errors.New("invalid email format")
 
 	// Authorization
 	ErrUnauthorized = errors.New("unauthorized")
@@ -25,9 +20,11 @@ var (
 	ErrMissingField     = errors.New("required field missing")
 	ErrNoFieldsToUpdate = errors.New("no fields to update")
 
-	// Business rules
+	// Business rules — password/username/email validation is now owned by
+	// domain/valueobjects; ban/delete rules are owned by domain.UserAggregate.
+	// ErrCannotDeleteSelf is kept here as it is a cross-service rule not
+	// expressible inside a single aggregate.
 	ErrCannotDeleteSelf = errors.New("cannot delete your own account")
-	ErrCannotBanAdmin   = errors.New("cannot ban an administrator")
 )
 
 // ServiceError wraps an underlying error with an HTTP status code and a

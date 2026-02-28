@@ -104,7 +104,7 @@ func TestGetSettings_RequiresAuth(t *testing.T) {
 	router.ServeHTTP(w, req)
 
 	assert.Equal(t, http.StatusUnauthorized, w.Code)
-	assert.Contains(t, w.Body.String(), "Not authenticated")
+	assert.Contains(t, w.Body.String(), "not authenticated")
 }
 
 func TestUpdateSettings_RejectsTooLongDeviceID(t *testing.T) {

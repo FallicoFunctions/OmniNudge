@@ -1,18 +1,19 @@
 package handlers
 
 import (
+	"github.com/omninudge/backend/internal/ports"
+	"github.com/omninudge/backend/internal/api/middleware"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/omninudge/backend/internal/models"
 )
 
 type StorageHandler struct {
-	mediaRepo *models.MediaFileRepository
+	mediaRepo ports.MediaFileRepository
 	quota     MediaQuotaConfig
 }
 
-func NewStorageHandler(mediaRepo *models.MediaFileRepository, quota MediaQuotaConfig) *StorageHandler {
+func NewStorageHandler(mediaRepo ports.MediaFileRepository, quota MediaQuotaConfig) *StorageHandler {
 	if quota.FreeTierBytes <= 0 {
 		quota.FreeTierBytes = 1 * 1024 * 1024 * 1024
 	}
@@ -28,13 +29,12 @@ func NewStorageHandler(mediaRepo *models.MediaFileRepository, quota MediaQuotaCo
 // GetMyStorage returns tracked storage usage and quota.
 // GET /api/v1/users/me/storage
 func (h *StorageHandler) GetMyStorage(c *gin.Context) {
-	userID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
 		return
 	}
 
-	used, err := h.mediaRepo.GetTrackedStorageByUserID(c.Request.Context(), userID.(int))
+	used, err := h.mediaRepo.GetTrackedStorageByUserID(c.Request.Context(), userID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get storage usage", "details": err.Error()})
 		return

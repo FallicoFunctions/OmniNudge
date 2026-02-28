@@ -30,7 +30,7 @@ func (h *AnalyticsHandler) TrackEvent(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request"})
+		RespondError(c, http.StatusBadRequest, "Invalid request")
 		return
 	}
 
@@ -58,7 +58,7 @@ func (h *AnalyticsHandler) TrackEvent(c *gin.Context) {
 	}
 
 	if err := h.svc.TrackEvent(c.Request.Context(), event); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to track event"})
+		RespondError(c, http.StatusInternalServerError, "Failed to track event")
 		return
 	}
 
@@ -76,19 +76,19 @@ func (h *AnalyticsHandler) StartSession(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		RespondError(c, http.StatusBadRequest, err.Error())
 		return
 	}
 
 	sessionID, err := uuid.Parse(req.SessionID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid session ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid session ID")
 		return
 	}
 
 	anonymousID, err := uuid.Parse(req.AnonymousID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid anonymous ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid anonymous ID")
 		return
 	}
 
@@ -98,7 +98,7 @@ func (h *AnalyticsHandler) StartSession(c *gin.Context) {
 	}
 
 	if err := h.svc.StartSession(c.Request.Context(), sessionID, anonymousID, uidPtr, c.Request.UserAgent(), c.ClientIP()); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to start session"})
+		RespondError(c, http.StatusInternalServerError, "Failed to start session")
 		return
 	}
 
@@ -113,18 +113,18 @@ func (h *AnalyticsHandler) EndSession(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		RespondError(c, http.StatusBadRequest, err.Error())
 		return
 	}
 
 	sessionID, err := uuid.Parse(req.SessionID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid session ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid session ID")
 		return
 	}
 
 	if err := h.svc.EndSession(c.Request.Context(), sessionID); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to end session"})
+		RespondError(c, http.StatusInternalServerError, "Failed to end session")
 		return
 	}
 
@@ -136,7 +136,7 @@ func (h *AnalyticsHandler) EndSession(c *gin.Context) {
 func (h *AnalyticsHandler) Identify(c *gin.Context) {
 	userID := c.GetInt("user_id")
 	if userID == 0 {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Authentication required"})
+		RespondError(c, http.StatusUnauthorized, "Authentication required")
 		return
 	}
 
@@ -145,18 +145,18 @@ func (h *AnalyticsHandler) Identify(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		RespondError(c, http.StatusBadRequest, err.Error())
 		return
 	}
 
 	anonymousID, err := uuid.Parse(req.AnonymousID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid anonymous ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid anonymous ID")
 		return
 	}
 
 	if err := h.svc.AliasUser(c.Request.Context(), userID, anonymousID); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to alias user"})
+		RespondError(c, http.StatusInternalServerError, "Failed to alias user")
 		return
 	}
 
@@ -169,13 +169,13 @@ func (h *AnalyticsHandler) GetDashboard(c *gin.Context) {
 	days := 30
 	dau, err := h.svc.GetDailyActiveUsers(c.Request.Context(), days)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get DAU"})
+		RespondError(c, http.StatusInternalServerError, "Failed to get DAU")
 		return
 	}
 
 	topEvents, err := h.svc.GetTopEvents(c.Request.Context(), 10)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get top events"})
+		RespondError(c, http.StatusInternalServerError, "Failed to get top events")
 		return
 	}
 
@@ -195,7 +195,7 @@ func (h *AnalyticsHandler) GetDashboard(c *gin.Context) {
 // POST /api/v1/admin/analytics/refresh
 func (h *AnalyticsHandler) RefreshAnalytics(c *gin.Context) {
 	if err := h.svc.RefreshMaterializedViews(c.Request.Context()); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to refresh views"})
+		RespondError(c, http.StatusInternalServerError, "Failed to refresh views")
 		return
 	}
 

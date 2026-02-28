@@ -35,7 +35,7 @@ func (h *AccountDeletionHandler) RequestAccountDeletion(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request"})
+		RespondError(c, http.StatusBadRequest, "Invalid request")
 		return
 	}
 
@@ -55,13 +55,13 @@ func (h *AccountDeletionHandler) RequestAccountDeletion(c *gin.Context) {
 		SELECT password_hash, email, username FROM users WHERE id = $1
 	`, userID).Scan(&storedPasswordHash, &email, &username)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to verify user"})
+		RespondError(c, http.StatusInternalServerError, "Failed to verify user")
 		return
 	}
 
 	// Verify password using bcrypt
 	if err := utils.CheckPassword(storedPasswordHash, req.Password); err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid password"})
+		RespondError(c, http.StatusUnauthorized, "Invalid password")
 		return
 	}
 
@@ -78,7 +78,7 @@ func (h *AccountDeletionHandler) RequestAccountDeletion(c *gin.Context) {
 	`, deletionDate, userID)
 
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete account"})
+		RespondError(c, http.StatusInternalServerError, "Failed to delete account")
 		return
 	}
 
@@ -173,7 +173,7 @@ func (h *AccountDeletionHandler) CancelAccountDeletion(c *gin.Context) {
 	`, userID)
 
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to cancel deletion"})
+		RespondError(c, http.StatusInternalServerError, "Failed to cancel deletion")
 		return
 	}
 
@@ -230,7 +230,7 @@ func (h *AccountDeletionHandler) GetAccountDeletionStatus(c *gin.Context) {
 	`, userID).Scan(&deletedAt, &permanentDeletionAt)
 
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check deletion status"})
+		RespondError(c, http.StatusInternalServerError, "Failed to check deletion status")
 		return
 	}
 

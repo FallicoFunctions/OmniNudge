@@ -15,8 +15,10 @@ var (
 	ErrEmailTaken    = errors.New("email is already registered")
 )
 
-// UserRepository is the minimal read interface needed by the domain service.
-// It is satisfied by ports.UserRepository.
+// UserRepository is the minimal read interface required by UserDomainService.
+// It is a subset of ports.UserRepository, which satisfies it automatically.
+// Defining the subset here keeps the domain layer free of a direct dependency
+// on the ports package (dependency inversion).
 type UserRepository interface {
 	GetByUsername(ctx context.Context, username string) (*domain.User, error)
 	GetByEmail(ctx context.Context, email string) (*domain.User, error)

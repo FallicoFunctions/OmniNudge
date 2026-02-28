@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"github.com/omninudge/backend/internal/ports"
 	"log"
 	"net/http"
 	"strconv"
@@ -13,19 +14,19 @@ import (
 
 // ThemesHandler handles user theme customization endpoints.
 type ThemesHandler struct {
-	themeRepo         *models.UserThemeRepository
-	themeOverrideRepo *models.UserThemeOverrideRepository
-	installedRepo     *models.UserInstalledThemeRepository
-	settingsRepo      *models.UserSettingsRepository
+	themeRepo         ports.UserThemeRepository
+	themeOverrideRepo ports.UserThemeOverrideRepository
+	installedRepo     ports.UserInstalledThemeRepository
+	settingsRepo      ports.UserSettingsRepository
 	sanitizer         *services.CSSSanitizer
 }
 
 // NewThemesHandler creates a new themes handler.
 func NewThemesHandler(
-	themeRepo *models.UserThemeRepository,
-	themeOverrideRepo *models.UserThemeOverrideRepository,
-	installedRepo *models.UserInstalledThemeRepository,
-	settingsRepo *models.UserSettingsRepository,
+	themeRepo ports.UserThemeRepository,
+	themeOverrideRepo ports.UserThemeOverrideRepository,
+	installedRepo ports.UserInstalledThemeRepository,
+	settingsRepo ports.UserSettingsRepository,
 	sanitizer *services.CSSSanitizer,
 ) *ThemesHandler {
 	return &ThemesHandler{
@@ -143,39 +144,39 @@ func (h *ThemesHandler) CreateTheme(c *gin.Context) {
 
 	// Validate theme name
 	if err := h.validateThemeName(req.ThemeName); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		RespondError(c, http.StatusBadRequest, err.Error())
 		return
 	}
 
 	// Validate theme type
 	if !validThemeTypes[req.ThemeType] {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid theme_type. Must be: predefined, variable_customization, or full_css"})
+		RespondError(c, http.StatusBadRequest, "Invalid theme_type. Must be: predefined, variable_customization, or full_css")
 		return
 	}
 
 	// Validate scope type
 	if !validScopeTypes[req.ScopeType] {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid scope_type. Must be: global or per_page"})
+		RespondError(c, http.StatusBadRequest, "Invalid scope_type. Must be: global or per_page")
 		return
 	}
 
 	// If per_page, target_page is required
 	if req.ScopeType == "per_page" && (req.TargetPage == nil || *req.TargetPage == "") {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "target_page is required when scope_type is per_page"})
+		RespondError(c, http.StatusBadRequest, "target_page is required when scope_type is per_page")
 		return
 	}
 
 	// Validate target page if provided
 	if req.TargetPage != nil {
 		if !validPageNames[*req.TargetPage] {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid target_page. Must be: feed, profile, settings, messages, notifications, or search"})
+			RespondError(c, http.StatusBadRequest, "Invalid target_page. Must be: feed, profile, settings, messages, notifications, or search")
 			return
 		}
 	}
 
 	// Validate CSS variables
 	if err := h.validateCSSVariables(req.CSSVariables); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		RespondError(c, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -222,7 +223,7 @@ func (h *ThemesHandler) CreateTheme(c *gin.Context) {
 func (h *ThemesHandler) GetTheme(c *gin.Context) {
 	themeID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid theme ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid theme ID")
 		return
 	}
 
@@ -233,7 +234,7 @@ func (h *ThemesHandler) GetTheme(c *gin.Context) {
 	}
 
 	if theme == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Theme not found"})
+		RespondError(c, http.StatusNotFound, "Theme not found")
 		return
 	}
 
@@ -255,7 +256,7 @@ func (h *ThemesHandler) GetMyThemes(c *gin.Context) {
 	if cursorParam != "" {
 		decoded, err := decodeTimeCursor(cursorParam)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid cursor"})
+			RespondError(c, http.StatusBadRequest, "Invalid cursor")
 			return
 		}
 		cursor = decoded
@@ -324,37 +325,37 @@ func (h *ThemesHandler) UpdateTheme(c *gin.Context) {
 	userID := c.GetInt("user_id")
 	themeID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid theme ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid theme ID")
 		return
 	}
 
 	// Get existing theme
 	theme, err := h.themeRepo.GetByID(c.Request.Context(), themeID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch theme"})
+		RespondError(c, http.StatusInternalServerError, "Failed to fetch theme")
 		return
 	}
 	if theme == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Theme not found"})
+		RespondError(c, http.StatusNotFound, "Theme not found")
 		return
 	}
 
 	// Verify ownership
 	if theme.UserID != userID {
-		c.JSON(http.StatusForbidden, gin.H{"error": "You can only update your own themes"})
+		RespondError(c, http.StatusForbidden, "You can only update your own themes")
 		return
 	}
 
 	var req updateThemeRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request"})
+		RespondError(c, http.StatusBadRequest, "Invalid request")
 		return
 	}
 
 	// Update fields
 	if req.ThemeName != nil {
 		if len(*req.ThemeName) > 100 {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Theme name must be 100 characters or less"})
+			RespondError(c, http.StatusBadRequest, "Theme name must be 100 characters or less")
 			return
 		}
 		theme.ThemeName = *req.ThemeName
@@ -390,14 +391,14 @@ func (h *ThemesHandler) UpdateTheme(c *gin.Context) {
 	}
 
 	if err := h.themeRepo.Update(c.Request.Context(), theme); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update theme"})
+		RespondError(c, http.StatusInternalServerError, "Failed to update theme")
 		return
 	}
 
 	// Re-fetch the updated theme to return
 	updated, err := h.themeRepo.GetByID(c.Request.Context(), themeID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch updated theme"})
+		RespondError(c, http.StatusInternalServerError, "Failed to fetch updated theme")
 		return
 	}
 
@@ -409,29 +410,29 @@ func (h *ThemesHandler) DeleteTheme(c *gin.Context) {
 	userID := c.GetInt("user_id")
 	themeID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid theme ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid theme ID")
 		return
 	}
 
 	// Get existing theme
 	theme, err := h.themeRepo.GetByID(c.Request.Context(), themeID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch theme"})
+		RespondError(c, http.StatusInternalServerError, "Failed to fetch theme")
 		return
 	}
 	if theme == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Theme not found"})
+		RespondError(c, http.StatusNotFound, "Theme not found")
 		return
 	}
 
 	// Verify ownership
 	if theme.UserID != userID {
-		c.JSON(http.StatusForbidden, gin.H{"error": "You can only delete your own themes"})
+		RespondError(c, http.StatusForbidden, "You can only delete your own themes")
 		return
 	}
 
 	if err := h.themeRepo.Delete(c.Request.Context(), themeID, userID); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete theme"})
+		RespondError(c, http.StatusInternalServerError, "Failed to delete theme")
 		return
 	}
 
@@ -484,7 +485,7 @@ func (h *ThemesHandler) BrowseThemes(c *gin.Context) {
 	if cursorParam != "" {
 		decoded, err := decodeThemePublicCursor(cursorParam)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid cursor"})
+			RespondError(c, http.StatusBadRequest, "Invalid cursor")
 			return
 		}
 		cursor = decoded
@@ -547,18 +548,18 @@ func (h *ThemesHandler) InstallTheme(c *gin.Context) {
 
 	var req installThemeRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request"})
+		RespondError(c, http.StatusBadRequest, "Invalid request")
 		return
 	}
 
 	// Check if theme exists
 	theme, err := h.themeRepo.GetByID(c.Request.Context(), req.ThemeID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch theme"})
+		RespondError(c, http.StatusInternalServerError, "Failed to fetch theme")
 		return
 	}
 	if theme == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Theme not found"})
+		RespondError(c, http.StatusNotFound, "Theme not found")
 		return
 	}
 
@@ -566,10 +567,10 @@ func (h *ThemesHandler) InstallTheme(c *gin.Context) {
 	_, err = h.installedRepo.Install(c.Request.Context(), userID, req.ThemeID, 0)
 	if err != nil {
 		if strings.Contains(err.Error(), "duplicate key") {
-			c.JSON(http.StatusConflict, gin.H{"error": "Theme already installed"})
+			RespondError(c, http.StatusConflict, "Theme already installed")
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to install theme"})
+		RespondError(c, http.StatusInternalServerError, "Failed to install theme")
 		return
 	}
 
@@ -581,12 +582,12 @@ func (h *ThemesHandler) UninstallTheme(c *gin.Context) {
 	userID := c.GetInt("user_id")
 	themeID, err := strconv.Atoi(c.Param("themeId"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid theme ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid theme ID")
 		return
 	}
 
 	if err := h.installedRepo.Uninstall(c.Request.Context(), userID, themeID); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to uninstall theme"})
+		RespondError(c, http.StatusInternalServerError, "Failed to uninstall theme")
 		return
 	}
 
@@ -603,20 +604,20 @@ func (h *ThemesHandler) SetActiveTheme(c *gin.Context) {
 
 	var req setActiveThemeRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request"})
+		RespondError(c, http.StatusBadRequest, "Invalid request")
 		return
 	}
 
 	// Set as active theme
 	if err := h.installedRepo.SetActive(c.Request.Context(), userID, req.ThemeID); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to set active theme"})
+		RespondError(c, http.StatusInternalServerError, "Failed to set active theme")
 		return
 	}
 
 	// Update user_settings.active_theme_id
 	settings, err := h.settingsRepo.GetByUserID(c.Request.Context(), userID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch settings"})
+		RespondError(c, http.StatusInternalServerError, "Failed to fetch settings")
 		return
 	}
 
@@ -624,14 +625,14 @@ func (h *ThemesHandler) SetActiveTheme(c *gin.Context) {
 		// Create default settings
 		settings, err = h.settingsRepo.CreateDefault(c.Request.Context(), userID)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create settings"})
+			RespondError(c, http.StatusInternalServerError, "Failed to create settings")
 			return
 		}
 	}
 
 	settings.ActiveThemeID = &req.ThemeID
 	if _, err := h.settingsRepo.Update(c.Request.Context(), settings); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update settings"})
+		RespondError(c, http.StatusInternalServerError, "Failed to update settings")
 		return
 	}
 
@@ -644,7 +645,7 @@ func (h *ThemesHandler) GetInstalledThemes(c *gin.Context) {
 
 	themes, err := h.installedRepo.GetUserInstalledThemes(c.Request.Context(), userID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch installed themes"})
+		RespondError(c, http.StatusInternalServerError, "Failed to fetch installed themes")
 		return
 	}
 
@@ -669,7 +670,7 @@ func (h *ThemesHandler) SetPageOverride(c *gin.Context) {
 
 	var req setPageOverrideRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request"})
+		RespondError(c, http.StatusBadRequest, "Invalid request")
 		return
 	}
 
@@ -683,24 +684,24 @@ func (h *ThemesHandler) SetPageOverride(c *gin.Context) {
 		"search":        true,
 	}
 	if !validPages[req.PageName] {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid page_name"})
+		RespondError(c, http.StatusBadRequest, "Invalid page_name")
 		return
 	}
 
 	// Check if theme exists
 	theme, err := h.themeRepo.GetByID(c.Request.Context(), req.ThemeID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch theme"})
+		RespondError(c, http.StatusInternalServerError, "Failed to fetch theme")
 		return
 	}
 	if theme == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Theme not found"})
+		RespondError(c, http.StatusNotFound, "Theme not found")
 		return
 	}
 
 	override, err := h.themeOverrideRepo.SetOverride(c.Request.Context(), userID, req.PageName, req.ThemeID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to set page override"})
+		RespondError(c, http.StatusInternalServerError, "Failed to set page override")
 		return
 	}
 
@@ -714,12 +715,12 @@ func (h *ThemesHandler) GetPageOverride(c *gin.Context) {
 
 	override, err := h.themeOverrideRepo.GetOverride(c.Request.Context(), userID, pageName)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch page override"})
+		RespondError(c, http.StatusInternalServerError, "Failed to fetch page override")
 		return
 	}
 
 	if override == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "No override found for this page"})
+		RespondError(c, http.StatusNotFound, "No override found for this page")
 		return
 	}
 
@@ -732,7 +733,7 @@ func (h *ThemesHandler) GetAllOverrides(c *gin.Context) {
 
 	overrides, err := h.themeOverrideRepo.GetAllOverrides(c.Request.Context(), userID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch overrides"})
+		RespondError(c, http.StatusInternalServerError, "Failed to fetch overrides")
 		return
 	}
 
@@ -748,7 +749,7 @@ func (h *ThemesHandler) DeletePageOverride(c *gin.Context) {
 	pageName := c.Param("pageName")
 
 	if err := h.themeOverrideRepo.DeleteOverride(c.Request.Context(), userID, pageName); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete page override"})
+		RespondError(c, http.StatusInternalServerError, "Failed to delete page override")
 		return
 	}
 
@@ -769,20 +770,20 @@ func (h *ThemesHandler) SetAdvancedMode(c *gin.Context) {
 
 	var req setAdvancedModeRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request"})
+		RespondError(c, http.StatusBadRequest, "Invalid request")
 		return
 	}
 
 	settings, err := h.settingsRepo.GetByUserID(c.Request.Context(), userID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch settings"})
+		RespondError(c, http.StatusInternalServerError, "Failed to fetch settings")
 		return
 	}
 
 	if settings == nil {
 		settings, err = h.settingsRepo.CreateDefault(c.Request.Context(), userID)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create settings"})
+			RespondError(c, http.StatusInternalServerError, "Failed to create settings")
 			return
 		}
 	}
@@ -790,7 +791,7 @@ func (h *ThemesHandler) SetAdvancedMode(c *gin.Context) {
 	settings.AdvancedModeEnabled = req.AdvancedModeEnabled
 	updated, err := h.settingsRepo.Update(c.Request.Context(), settings)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update settings"})
+		RespondError(c, http.StatusInternalServerError, "Failed to update settings")
 		return
 	}
 
@@ -816,7 +817,7 @@ func (h *ThemesHandler) RateTheme(c *gin.Context) {
 
 	var req rateThemeRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request. Rating must be 1-5"})
+		RespondError(c, http.StatusBadRequest, "Invalid request. Rating must be 1-5")
 		return
 	}
 
@@ -826,7 +827,7 @@ func (h *ThemesHandler) RateTheme(c *gin.Context) {
 	}
 
 	if err := h.installedRepo.RateTheme(c.Request.Context(), userID, req.ThemeID, req.Rating, reviewPtr); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to rate theme"})
+		RespondError(c, http.StatusInternalServerError, "Failed to rate theme")
 		return
 	}
 

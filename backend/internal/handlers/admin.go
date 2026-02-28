@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"github.com/omninudge/backend/internal/ports"
+	"github.com/omninudge/backend/internal/api/middleware"
 	"net/http"
 	"strconv"
 	"strings"
@@ -13,13 +15,13 @@ import (
 
 // AdminHandler handles admin-level actions
 type AdminHandler struct {
-	userRepo   *models.UserRepository
-	hubModRepo *models.HubModeratorRepository
+	userRepo   ports.UserRepository
+	hubModRepo ports.HubModeratorRepository
 	pool       *pgxpool.Pool
 }
 
 // NewAdminHandler creates a new admin handler
-func NewAdminHandler(userRepo *models.UserRepository, hubModRepo *models.HubModeratorRepository, pool *pgxpool.Pool) *AdminHandler {
+func NewAdminHandler(userRepo ports.UserRepository, hubModRepo ports.HubModeratorRepository, pool *pgxpool.Pool) *AdminHandler {
 	return &AdminHandler{
 		userRepo:   userRepo,
 		hubModRepo: hubModRepo,
@@ -31,7 +33,7 @@ func NewAdminHandler(userRepo *models.UserRepository, hubModRepo *models.HubMode
 func (h *AdminHandler) PromoteUser(c *gin.Context) {
 	targetID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid user ID")
 		return
 	}
 
@@ -65,7 +67,7 @@ func (h *AdminHandler) PromoteUser(c *gin.Context) {
 func (h *AdminHandler) BanUser(c *gin.Context) {
 	targetID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid user ID")
 		return
 	}
 
@@ -74,17 +76,16 @@ func (h *AdminHandler) BanUser(c *gin.Context) {
 		ShowReason bool   `json:"show_reason"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil || strings.TrimSpace(req.Reason) == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Reason is required"})
+		RespondError(c, http.StatusBadRequest, "Reason is required")
 		return
 	}
 
-	adminID, ok := c.Get("user_id")
+	adminID, ok := middleware.GetAuthenticatedUserID(c)
 	if !ok {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Missing admin context"})
 		return
 	}
 
-	if err := h.userRepo.BanUser(c.Request.Context(), targetID, req.Reason, req.ShowReason, adminID.(int)); err != nil {
+	if err := h.userRepo.BanUser(c.Request.Context(), targetID, req.Reason, req.ShowReason, adminID); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to ban user", "details": err.Error()})
 		return
 	}
@@ -96,7 +97,7 @@ func (h *AdminHandler) BanUser(c *gin.Context) {
 func (h *AdminHandler) ShadowBanUser(c *gin.Context) {
 	targetID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid user ID")
 		return
 	}
 
@@ -105,17 +106,16 @@ func (h *AdminHandler) ShadowBanUser(c *gin.Context) {
 		ShowReason bool   `json:"show_reason"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil || strings.TrimSpace(req.Reason) == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Reason is required"})
+		RespondError(c, http.StatusBadRequest, "Reason is required")
 		return
 	}
 
-	adminID, ok := c.Get("user_id")
+	adminID, ok := middleware.GetAuthenticatedUserID(c)
 	if !ok {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Missing admin context"})
 		return
 	}
 
-	if err := h.userRepo.ShadowBanUser(c.Request.Context(), targetID, req.Reason, req.ShowReason, adminID.(int)); err != nil {
+	if err := h.userRepo.ShadowBanUser(c.Request.Context(), targetID, req.Reason, req.ShowReason, adminID); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to shadow ban user", "details": err.Error()})
 		return
 	}
@@ -127,7 +127,7 @@ func (h *AdminHandler) ShadowBanUser(c *gin.Context) {
 func (h *AdminHandler) UnbanUser(c *gin.Context) {
 	targetID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid user ID")
 		return
 	}
 
@@ -135,17 +135,16 @@ func (h *AdminHandler) UnbanUser(c *gin.Context) {
 		Reason string `json:"reason" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil || strings.TrimSpace(req.Reason) == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Reason is required"})
+		RespondError(c, http.StatusBadRequest, "Reason is required")
 		return
 	}
 
-	adminID, ok := c.Get("user_id")
+	adminID, ok := middleware.GetAuthenticatedUserID(c)
 	if !ok {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Missing admin context"})
 		return
 	}
 
-	if err := h.userRepo.UnbanUser(c.Request.Context(), targetID, req.Reason, adminID.(int)); err != nil {
+	if err := h.userRepo.UnbanUser(c.Request.Context(), targetID, req.Reason, adminID); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to unban user", "details": err.Error()})
 		return
 	}
@@ -157,7 +156,7 @@ func (h *AdminHandler) UnbanUser(c *gin.Context) {
 func (h *AdminHandler) SoftDeleteUser(c *gin.Context) {
 	targetID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid user ID")
 		return
 	}
 
@@ -165,17 +164,16 @@ func (h *AdminHandler) SoftDeleteUser(c *gin.Context) {
 		Reason string `json:"reason" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil || strings.TrimSpace(req.Reason) == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Reason is required"})
+		RespondError(c, http.StatusBadRequest, "Reason is required")
 		return
 	}
 
-	adminID, ok := c.Get("user_id")
+	adminID, ok := middleware.GetAuthenticatedUserID(c)
 	if !ok {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Missing admin context"})
 		return
 	}
 
-	if err := h.userRepo.SoftDeleteUser(c.Request.Context(), targetID, req.Reason, adminID.(int)); err != nil {
+	if err := h.userRepo.SoftDeleteUser(c.Request.Context(), targetID, req.Reason, adminID); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete user", "details": err.Error()})
 		return
 	}
@@ -187,7 +185,7 @@ func (h *AdminHandler) SoftDeleteUser(c *gin.Context) {
 func (h *AdminHandler) GetBanHistory(c *gin.Context) {
 	targetID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid user ID")
 		return
 	}
 
@@ -214,7 +212,7 @@ func (h *AdminHandler) GetAllBanHistory(c *gin.Context) {
 	if cursorParam != "" {
 		decoded, err := decodeTimeCursor(cursorParam)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid cursor"})
+			RespondError(c, http.StatusBadRequest, "Invalid cursor")
 			return
 		}
 		cursor = decoded
@@ -288,7 +286,7 @@ func (h *AdminHandler) ListUsers(c *gin.Context) {
 	if cursorParam != "" {
 		decoded, err := decodeTimeCursor(cursorParam)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid cursor"})
+			RespondError(c, http.StatusBadRequest, "Invalid cursor")
 			return
 		}
 		cursor = decoded
@@ -573,7 +571,7 @@ func (h *AdminHandler) GetSiteStats(c *gin.Context) {
 func (h *AdminHandler) GetHubModerators(c *gin.Context) {
 	hubID, err := strconv.Atoi(c.Param("hub_id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid hub ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid hub ID")
 		return
 	}
 
@@ -618,13 +616,13 @@ func (h *AdminHandler) GetHubModerators(c *gin.Context) {
 func (h *AdminHandler) RemoveHubModerator(c *gin.Context) {
 	hubID, err := strconv.Atoi(c.Param("hub_id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid hub ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid hub ID")
 		return
 	}
 
 	userID, err := strconv.Atoi(c.Param("user_id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid user ID")
 		return
 	}
 

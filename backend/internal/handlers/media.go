@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"github.com/omninudge/backend/internal/ports"
 	"context"
 	"errors"
 	"fmt"
@@ -35,7 +36,7 @@ type MediaQuotaConfig struct {
 
 // MediaHandler handles media uploads
 type MediaHandler struct {
-	mediaRepo           *models.MediaFileRepository
+	mediaRepo           ports.MediaFileRepository
 	thumbnailService    *services.ThumbnailService
 	queueClient         *queue.QueueClient
 	quota               MediaQuotaConfig
@@ -44,7 +45,7 @@ type MediaHandler struct {
 
 // NewMediaHandler creates a new media handler
 func NewMediaHandler(
-	mediaRepo *models.MediaFileRepository,
+	mediaRepo ports.MediaFileRepository,
 	thumbnailService *services.ThumbnailService,
 	queueClient *queue.QueueClient,
 	quota MediaQuotaConfig,
@@ -68,9 +69,8 @@ func NewMediaHandler(
 // UploadMedia handles POST /api/v1/media/upload
 func (h *MediaHandler) UploadMedia(c *gin.Context) {
 	// Get user ID from context
-	userID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
 		return
 	}
 
@@ -84,11 +84,11 @@ func (h *MediaHandler) UploadMedia(c *gin.Context) {
 	}
 	defer file.Close()
 	if header.Size <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Empty file is not allowed"})
+		RespondError(c, http.StatusBadRequest, "Empty file is not allowed")
 		return
 	}
 
-	usedBytes, err := h.mediaRepo.GetTrackedStorageByUserID(c.Request.Context(), userID.(int))
+	usedBytes, err := h.mediaRepo.GetTrackedStorageByUserID(c.Request.Context(), userID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to evaluate storage quota", "details": err.Error()})
 		return
@@ -234,7 +234,7 @@ func (h *MediaHandler) UploadMedia(c *gin.Context) {
 	}
 
 	media := &models.MediaFile{
-		UserID:           userID.(int),
+		UserID:           userID,
 		Filename:         newName,
 		OriginalFilename: safeName,
 		FileType:         contentType,
@@ -285,38 +285,37 @@ func (h *MediaHandler) UploadMedia(c *gin.Context) {
 // GetThumbnail handles GET /api/v1/files/:id/thumbnail
 // Returns a redirect to the thumbnail URL when available.
 func (h *MediaHandler) GetThumbnail(c *gin.Context) {
-	userID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
 		return
 	}
 	role := c.GetString("role")
 
 	mediaID, err := strconv.Atoi(c.Param("id"))
 	if err != nil || mediaID <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid media ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid media ID")
 		return
 	}
 
 	media, err := h.mediaRepo.GetByID(c.Request.Context(), mediaID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Media file not found"})
+			RespondError(c, http.StatusNotFound, "Media file not found")
 			return
 		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch media file", "details": err.Error()})
 		return
 	}
 
-	if media.UserID != userID.(int) && role != "admin" && role != "moderator" {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Forbidden"})
+	if media.UserID != userID && role != "admin" && role != "moderator" {
+		RespondError(c, http.StatusForbidden, "Forbidden")
 		return
 	}
 
 	switch media.ScanStatus {
 	case models.MediaScanStatusClean:
 	case models.MediaScanStatusInfected:
-		c.JSON(http.StatusGone, gin.H{"error": "File is unavailable"})
+		RespondError(c, http.StatusGone, "File is unavailable")
 		return
 	default:
 		c.JSON(http.StatusLocked, gin.H{
@@ -327,7 +326,7 @@ func (h *MediaHandler) GetThumbnail(c *gin.Context) {
 	}
 
 	if media.ThumbnailURL == nil || *media.ThumbnailURL == "" {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Thumbnail not available"})
+		RespondError(c, http.StatusNotFound, "Thumbnail not available")
 		return
 	}
 
@@ -338,9 +337,8 @@ func (h *MediaHandler) GetThumbnail(c *gin.Context) {
 // BatchUploadMedia handles POST /api/v1/media/batch-upload
 func (h *MediaHandler) BatchUploadMedia(c *gin.Context) {
 	// Get user ID from context
-	userID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
 		return
 	}
 
@@ -352,7 +350,7 @@ func (h *MediaHandler) BatchUploadMedia(c *gin.Context) {
 
 	files := c.Request.MultipartForm.File["files"]
 	if len(files) == 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "No files provided"})
+		RespondError(c, http.StatusBadRequest, "No files provided")
 		return
 	}
 	if len(files) > maxBatchFiles {
@@ -363,7 +361,7 @@ func (h *MediaHandler) BatchUploadMedia(c *gin.Context) {
 		return
 	}
 
-	usedBytes, err := h.mediaRepo.GetTrackedStorageByUserID(c.Request.Context(), userID.(int))
+	usedBytes, err := h.mediaRepo.GetTrackedStorageByUserID(c.Request.Context(), userID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to evaluate storage quota", "details": err.Error()})
 		return
@@ -397,7 +395,7 @@ func (h *MediaHandler) BatchUploadMedia(c *gin.Context) {
 
 	for i, fileHeader := range files {
 		go func(idx int, header *multipart.FileHeader) {
-			media, err := h.processSingleUpload(c.Request.Context(), userID.(int), header)
+			media, err := h.processSingleUpload(c.Request.Context(), userID, header)
 			resultsChan <- uploadResult{media: media, err: err, index: idx}
 		}(i, fileHeader)
 	}

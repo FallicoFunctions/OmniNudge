@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"github.com/omninudge/backend/internal/ports"
+	"github.com/omninudge/backend/internal/api/middleware"
 	"net/http"
 	"strconv"
 	"strings"
@@ -15,17 +17,17 @@ import (
 // ConversationsHandler handles HTTP requests for conversations
 type ConversationsHandler struct {
 	pool             *pgxpool.Pool
-	conversationRepo *models.ConversationRepository
-	messageRepo      *models.MessageRepository
-	userRepo         *models.UserRepository
+	conversationRepo ports.ConversationRepository
+	messageRepo      ports.MessageRepository
+	userRepo         ports.UserRepository
 }
 
 // NewConversationsHandler creates a new conversations handler
 func NewConversationsHandler(
 	pool *pgxpool.Pool,
-	conversationRepo *models.ConversationRepository,
-	messageRepo *models.MessageRepository,
-	userRepo *models.UserRepository,
+	conversationRepo ports.ConversationRepository,
+	messageRepo ports.MessageRepository,
+	userRepo ports.UserRepository,
 ) *ConversationsHandler {
 	return &ConversationsHandler{
 		pool:             pool,
@@ -71,14 +73,14 @@ func (h *ConversationsHandler) ensureConversationParticipant(c *gin.Context, con
 		return nil, false
 	}
 	if conversation == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Conversation not found"})
+		RespondError(c, http.StatusNotFound, "Conversation not found")
 		return nil, false
 	}
 
 	switch conversation.ConversationType {
 	case "dm", "":
 		if !conversation.IsParticipant(userID) {
-			c.JSON(http.StatusForbidden, gin.H{"error": "You are not a participant in this conversation"})
+			RespondError(c, http.StatusForbidden, "You are not a participant in this conversation")
 			return nil, false
 		}
 	case "mod_mail":
@@ -92,7 +94,7 @@ func (h *ConversationsHandler) ensureConversationParticipant(c *gin.Context, con
 			return nil, false
 		}
 		if count == 0 {
-			c.JSON(http.StatusForbidden, gin.H{"error": "You are not a participant in this mod mail conversation"})
+			RespondError(c, http.StatusForbidden, "You are not a participant in this mod mail conversation")
 			return nil, false
 		}
 	}
@@ -103,9 +105,8 @@ func (h *ConversationsHandler) ensureConversationParticipant(c *gin.Context, con
 // CreateConversation handles POST /api/v1/conversations
 func (h *ConversationsHandler) CreateConversation(c *gin.Context) {
 	// Get user ID from context (set by AuthRequired middleware)
-	userID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
 		return
 	}
 
@@ -116,8 +117,8 @@ func (h *ConversationsHandler) CreateConversation(c *gin.Context) {
 	}
 
 	// Validate that user is not trying to message themselves
-	if req.OtherUserID == userID.(int) {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Cannot create conversation with yourself"})
+	if req.OtherUserID == userID {
+		RespondError(c, http.StatusBadRequest, "Cannot create conversation with yourself")
 		return
 	}
 
@@ -128,7 +129,7 @@ func (h *ConversationsHandler) CreateConversation(c *gin.Context) {
 		return
 	}
 	if otherUser == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		RespondError(c, http.StatusNotFound, "User not found")
 		return
 	}
 
@@ -141,18 +142,18 @@ func (h *ConversationsHandler) CreateConversation(c *gin.Context) {
 			WHERE (blocker_id = $1 AND blocked_id = $2)
 			   OR (blocker_id = $2 AND blocked_id = $1)
 		)
-	`, userID.(int), req.OtherUserID).Scan(&blockedByEither)
+	`, userID, req.OtherUserID).Scan(&blockedByEither)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check blocking status", "details": err.Error()})
 		return
 	}
 	if blockedByEither {
-		c.JSON(http.StatusForbidden, gin.H{"error": blockingSettingsErrorMessage})
+		RespondError(c, http.StatusForbidden, blockingSettingsErrorMessage)
 		return
 	}
 
 	// Create or get existing conversation
-	conversation, err := h.conversationRepo.Create(c.Request.Context(), userID.(int), req.OtherUserID)
+	conversation, err := h.conversationRepo.Create(c.Request.Context(), userID, req.OtherUserID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create conversation", "details": err.Error()})
 		return
@@ -164,9 +165,8 @@ func (h *ConversationsHandler) CreateConversation(c *gin.Context) {
 // GetConversations handles GET /api/v1/conversations
 func (h *ConversationsHandler) GetConversations(c *gin.Context) {
 	// Get user ID from context
-	userID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
 		return
 	}
 
@@ -189,7 +189,7 @@ func (h *ConversationsHandler) GetConversations(c *gin.Context) {
 	if cursorParam != "" {
 		decoded, err := decodeTimeCursor(cursorParam)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid cursor"})
+			RespondError(c, http.StatusBadRequest, "Invalid cursor")
 			return
 		}
 		cursor = decoded
@@ -209,15 +209,15 @@ func (h *ConversationsHandler) GetConversations(c *gin.Context) {
 			payload = &models.TimeCursor{ID: cursor.ID, Timestamp: cursor.Timestamp}
 		}
 		if archivedOnly {
-			conversations, err = h.conversationRepo.GetArchivedByUserIDWithCursor(c.Request.Context(), userID.(int), limitArg, payload)
+			conversations, err = h.conversationRepo.GetArchivedByUserIDWithCursor(c.Request.Context(), userID, limitArg, payload)
 		} else {
-			conversations, err = h.conversationRepo.GetByUserIDWithCursor(c.Request.Context(), userID.(int), limitArg, includeArchived, payload)
+			conversations, err = h.conversationRepo.GetByUserIDWithCursor(c.Request.Context(), userID, limitArg, includeArchived, payload)
 		}
 	} else {
 		if archivedOnly {
-			conversations, err = h.conversationRepo.GetArchivedByUserID(c.Request.Context(), userID.(int), limitArg, offset)
+			conversations, err = h.conversationRepo.GetArchivedByUserID(c.Request.Context(), userID, limitArg, offset)
 		} else {
-			conversations, err = h.conversationRepo.GetByUserID(c.Request.Context(), userID.(int), limitArg, offset, includeArchived)
+			conversations, err = h.conversationRepo.GetByUserID(c.Request.Context(), userID, limitArg, offset, includeArchived)
 		}
 	}
 	if err != nil {
@@ -246,7 +246,7 @@ func (h *ConversationsHandler) GetConversations(c *gin.Context) {
 
 			// Get other user info (only for DM conversations)
 			if conversation.ConversationType == "dm" {
-				otherUserID := conversation.GetOtherUserID(userID.(int))
+				otherUserID := conversation.GetOtherUserID(userID)
 				if otherUserID != 0 {
 					otherUser, err := h.userRepo.GetByID(ctx, otherUserID)
 					if err == nil && otherUser != nil {
@@ -269,13 +269,13 @@ func (h *ConversationsHandler) GetConversations(c *gin.Context) {
 			}
 
 			// Get latest message
-			latestMsg, err := h.messageRepo.GetLatestMessage(ctx, conversation.ID, userID.(int))
+			latestMsg, err := h.messageRepo.GetLatestMessage(ctx, conversation.ID, userID)
 			if err == nil && latestMsg != nil {
 				details.LatestMessage = latestMsg
 			}
 
 			// Get unread count
-			unreadCount, err := h.messageRepo.GetUnreadCount(ctx, conversation.ID, userID.(int))
+			unreadCount, err := h.messageRepo.GetUnreadCount(ctx, conversation.ID, userID)
 			if err == nil {
 				details.UnreadCount = unreadCount
 			}
@@ -289,8 +289,8 @@ func (h *ConversationsHandler) GetConversations(c *gin.Context) {
 				`, conversation.ID).Scan(&archivedForUser1, &archivedForUser2)
 				if err == nil {
 					legacyArchived := conversation.ArchivedAt != nil
-					details.IsArchived = (conversation.User1ID != nil && *conversation.User1ID == userID.(int) && archivedForUser1) ||
-						(conversation.User2ID != nil && *conversation.User2ID == userID.(int) && archivedForUser2) ||
+					details.IsArchived = (conversation.User1ID != nil && *conversation.User1ID == userID && archivedForUser1) ||
+						(conversation.User2ID != nil && *conversation.User2ID == userID && archivedForUser2) ||
 						legacyArchived
 				}
 			}
@@ -337,15 +337,14 @@ func (h *ConversationsHandler) GetArchivedConversations(c *gin.Context) {
 // GetConversation handles GET /api/v1/conversations/:id
 func (h *ConversationsHandler) GetConversation(c *gin.Context) {
 	// Get user ID from context
-	userID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
 		return
 	}
 
 	conversationID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid conversation ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid conversation ID")
 		return
 	}
 
@@ -357,7 +356,7 @@ func (h *ConversationsHandler) GetConversation(c *gin.Context) {
 		WHERE id = $1
 	`, conversationID).Scan(&conversationType)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Conversation not found"})
+		RespondError(c, http.StatusNotFound, "Conversation not found")
 		return
 	}
 
@@ -370,9 +369,9 @@ func (h *ConversationsHandler) GetConversation(c *gin.Context) {
 				SELECT 1 FROM conversation_participants
 				WHERE conversation_id = $1 AND user_id = $2
 			)
-		`, conversationID, userID.(int)).Scan(&isParticipant)
+		`, conversationID, userID).Scan(&isParticipant)
 		if err != nil || !isParticipant {
-			c.JSON(http.StatusForbidden, gin.H{"error": "You are not a participant in this conversation"})
+			RespondError(c, http.StatusForbidden, "You are not a participant in this conversation")
 			return
 		}
 
@@ -386,7 +385,7 @@ func (h *ConversationsHandler) GetConversation(c *gin.Context) {
 			return
 		}
 
-		uid := userID.(int)
+		uid := userID
 		conv := &models.Conversation{
 			ID:               conversationID,
 			User1ID:          &uid, // placeholder to pass IsParticipant checks elsewhere if needed
@@ -398,12 +397,12 @@ func (h *ConversationsHandler) GetConversation(c *gin.Context) {
 		details := &ConversationWithDetails{Conversation: conv}
 
 		// Latest message
-		latestMsg, _ := h.messageRepo.GetLatestMessage(c.Request.Context(), conversationID, userID.(int))
+		latestMsg, _ := h.messageRepo.GetLatestMessage(c.Request.Context(), conversationID, userID)
 		if latestMsg != nil {
 			details.LatestMessage = latestMsg
 		}
 		// Unread count
-		if unreadCount, err := h.messageRepo.GetUnreadCount(c.Request.Context(), conversationID, userID.(int)); err == nil {
+		if unreadCount, err := h.messageRepo.GetUnreadCount(c.Request.Context(), conversationID, userID); err == nil {
 			details.UnreadCount = unreadCount
 		}
 
@@ -418,13 +417,13 @@ func (h *ConversationsHandler) GetConversation(c *gin.Context) {
 	}
 
 	if conversation == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Conversation not found"})
+		RespondError(c, http.StatusNotFound, "Conversation not found")
 		return
 	}
 
 	// Verify user is a participant
-	if !conversation.IsParticipant(userID.(int)) {
-		c.JSON(http.StatusForbidden, gin.H{"error": "You are not a participant in this conversation"})
+	if !conversation.IsParticipant(userID) {
+		RespondError(c, http.StatusForbidden, "You are not a participant in this conversation")
 		return
 	}
 
@@ -433,7 +432,7 @@ func (h *ConversationsHandler) GetConversation(c *gin.Context) {
 		Conversation: conversation,
 	}
 
-	otherUserID := conversation.GetOtherUserID(userID.(int))
+	otherUserID := conversation.GetOtherUserID(userID)
 	otherUser, err := h.userRepo.GetByID(c.Request.Context(), otherUserID)
 	if err == nil && otherUser != nil {
 		details.OtherUser = &ConversationUser{
@@ -446,13 +445,13 @@ func (h *ConversationsHandler) GetConversation(c *gin.Context) {
 	}
 
 	// Get latest message
-	latestMsg, err := h.messageRepo.GetLatestMessage(c.Request.Context(), conversation.ID, userID.(int))
+	latestMsg, err := h.messageRepo.GetLatestMessage(c.Request.Context(), conversation.ID, userID)
 	if err == nil && latestMsg != nil {
 		details.LatestMessage = latestMsg
 	}
 
 	// Get unread count
-	unreadCount, err := h.messageRepo.GetUnreadCount(c.Request.Context(), conversation.ID, userID.(int))
+	unreadCount, err := h.messageRepo.GetUnreadCount(c.Request.Context(), conversation.ID, userID)
 	if err == nil {
 		details.UnreadCount = unreadCount
 	}
@@ -463,22 +462,21 @@ func (h *ConversationsHandler) GetConversation(c *gin.Context) {
 // DeleteConversation handles DELETE /api/v1/conversations/:id
 func (h *ConversationsHandler) DeleteConversation(c *gin.Context) {
 	// Get user ID from context
-	userID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
 		return
 	}
 
 	conversationID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid conversation ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid conversation ID")
 		return
 	}
 
 	// Get delete scope from query parameter
 	deleteFor := strings.ToLower(strings.TrimSpace(c.DefaultQuery("delete_for", "me")))
 	if deleteFor != "me" && deleteFor != "both" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid delete_for value. Must be 'me' or 'both'"})
+		RespondError(c, http.StatusBadRequest, "Invalid delete_for value. Must be 'me' or 'both'")
 		return
 	}
 
@@ -490,25 +488,25 @@ func (h *ConversationsHandler) DeleteConversation(c *gin.Context) {
 	}
 
 	if conversation == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Conversation not found"})
+		RespondError(c, http.StatusNotFound, "Conversation not found")
 		return
 	}
 
-	if !conversation.IsParticipant(userID.(int)) {
-		c.JSON(http.StatusForbidden, gin.H{"error": "You are not a participant in this conversation"})
+	if !conversation.IsParticipant(userID) {
+		RespondError(c, http.StatusForbidden, "You are not a participant in this conversation")
 		return
 	}
 
 	if deleteFor == "both" {
 		// Hard delete all user's messages
-		if err := h.conversationRepo.HardDeleteMessages(c.Request.Context(), conversationID, userID.(int)); err != nil {
+		if err := h.conversationRepo.HardDeleteMessages(c.Request.Context(), conversationID, userID); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete messages", "details": err.Error()})
 			return
 		}
 	}
 
 	// Soft delete conversation for this user
-	if err := h.conversationRepo.SoftDeleteForUser(c.Request.Context(), conversationID, userID.(int)); err != nil {
+	if err := h.conversationRepo.SoftDeleteForUser(c.Request.Context(), conversationID, userID); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete conversation", "details": err.Error()})
 		return
 	}
@@ -526,15 +524,14 @@ func (h *ConversationsHandler) DeleteConversation(c *gin.Context) {
 // ArchiveConversation handles PUT /api/v1/conversations/:id/archive
 func (h *ConversationsHandler) ArchiveConversation(c *gin.Context) {
 	// Get user ID from context
-	userID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
 		return
 	}
 
 	conversationID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid conversation ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid conversation ID")
 		return
 	}
 
@@ -546,15 +543,15 @@ func (h *ConversationsHandler) ArchiveConversation(c *gin.Context) {
 	}
 
 	if conversation == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Conversation not found"})
+		RespondError(c, http.StatusNotFound, "Conversation not found")
 		return
 	}
 
 	// Check permissions based on conversation type
 	switch conversation.ConversationType {
 	case "dm", "":
-		if !conversation.IsParticipant(userID.(int)) {
-			c.JSON(http.StatusForbidden, gin.H{"error": "You are not a participant in this conversation"})
+		if !conversation.IsParticipant(userID) {
+			RespondError(c, http.StatusForbidden, "You are not a participant in this conversation")
 			return
 		}
 	case "mod_mail":
@@ -563,15 +560,15 @@ func (h *ConversationsHandler) ArchiveConversation(c *gin.Context) {
 		err := h.pool.QueryRow(c.Request.Context(), `
 			SELECT COUNT(*) FROM conversation_participants
 			WHERE conversation_id = $1 AND user_id = $2
-		`, conversationID, userID.(int)).Scan(&count)
+		`, conversationID, userID).Scan(&count)
 		if err != nil || count == 0 {
-			c.JSON(http.StatusForbidden, gin.H{"error": "You are not a participant in this mod mail conversation"})
+			RespondError(c, http.StatusForbidden, "You are not a participant in this mod mail conversation")
 			return
 		}
 	}
 
 	// Archive the conversation
-	if err := h.conversationRepo.Archive(c.Request.Context(), conversationID, userID.(int)); err != nil {
+	if err := h.conversationRepo.Archive(c.Request.Context(), conversationID, userID); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to archive conversation", "details": err.Error()})
 		return
 	}
@@ -581,9 +578,8 @@ func (h *ConversationsHandler) ArchiveConversation(c *gin.Context) {
 
 // ArchiveConversationBatch handles POST /api/v1/conversations/archive-batch
 func (h *ConversationsHandler) ArchiveConversationBatch(c *gin.Context) {
-	userID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
 		return
 	}
 
@@ -593,11 +589,11 @@ func (h *ConversationsHandler) ArchiveConversationBatch(c *gin.Context) {
 		return
 	}
 	if len(req.ConversationIDs) == 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "conversation_ids must contain at least one ID"})
+		RespondError(c, http.StatusBadRequest, "conversation_ids must contain at least one ID")
 		return
 	}
 	if len(req.ConversationIDs) > 100 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "conversation_ids cannot exceed 100 IDs"})
+		RespondError(c, http.StatusBadRequest, "conversation_ids cannot exceed 100 IDs")
 		return
 	}
 
@@ -605,7 +601,7 @@ func (h *ConversationsHandler) ArchiveConversationBatch(c *gin.Context) {
 	uniqueIDs := make([]int, 0, len(req.ConversationIDs))
 	for _, id := range req.ConversationIDs {
 		if id <= 0 {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "conversation_ids must contain only positive IDs"})
+			RespondError(c, http.StatusBadRequest, "conversation_ids must contain only positive IDs")
 			return
 		}
 		if _, ok := seen[id]; ok {
@@ -615,7 +611,7 @@ func (h *ConversationsHandler) ArchiveConversationBatch(c *gin.Context) {
 		uniqueIDs = append(uniqueIDs, id)
 	}
 
-	if err := h.conversationRepo.ArchiveBatch(c.Request.Context(), uniqueIDs, userID.(int)); err != nil {
+	if err := h.conversationRepo.ArchiveBatch(c.Request.Context(), uniqueIDs, userID); err != nil {
 		if err == pgx.ErrNoRows {
 			c.JSON(http.StatusForbidden, gin.H{
 				"error": "One or more conversations are invalid or you are not a participant",
@@ -635,22 +631,21 @@ func (h *ConversationsHandler) ArchiveConversationBatch(c *gin.Context) {
 // UnarchiveConversation handles PUT /api/v1/conversations/:id/unarchive
 func (h *ConversationsHandler) UnarchiveConversation(c *gin.Context) {
 	// Get user ID from context
-	userID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
 		return
 	}
 
 	conversationID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid conversation ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid conversation ID")
 		return
 	}
 
 	// Unarchive the conversation (permission check is done in the repository method)
-	if err := h.conversationRepo.Unarchive(c.Request.Context(), conversationID, userID.(int)); err != nil {
+	if err := h.conversationRepo.Unarchive(c.Request.Context(), conversationID, userID); err != nil {
 		if err == pgx.ErrNoRows {
-			c.JSON(http.StatusForbidden, gin.H{"error": "You are not a participant in this conversation or conversation is not archived"})
+			RespondError(c, http.StatusForbidden, "You are not a participant in this conversation or conversation is not archived")
 			return
 		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to unarchive conversation", "details": err.Error()})
@@ -662,16 +657,14 @@ func (h *ConversationsHandler) UnarchiveConversation(c *gin.Context) {
 
 // MuteConversation handles PUT /api/v1/conversations/:id/mute
 func (h *ConversationsHandler) MuteConversation(c *gin.Context) {
-	userIDValue, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
 		return
 	}
-	userID := userIDValue.(int)
 
 	conversationID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid conversation ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid conversation ID")
 		return
 	}
 
@@ -689,16 +682,14 @@ func (h *ConversationsHandler) MuteConversation(c *gin.Context) {
 
 // UnmuteConversation handles PUT /api/v1/conversations/:id/unmute
 func (h *ConversationsHandler) UnmuteConversation(c *gin.Context) {
-	userIDValue, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
 		return
 	}
-	userID := userIDValue.(int)
 
 	conversationID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid conversation ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid conversation ID")
 		return
 	}
 

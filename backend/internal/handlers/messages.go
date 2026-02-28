@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"github.com/omninudge/backend/internal/ports"
+	"github.com/omninudge/backend/internal/api/middleware"
 	"context"
 	"database/sql"
 	"errors"
@@ -24,9 +26,9 @@ import (
 // MessagesHandler handles HTTP requests for messages
 type MessagesHandler struct {
 	pool             *pgxpool.Pool
-	messageRepo      *models.MessageRepository
-	conversationRepo *models.ConversationRepository
-	userSettingsRepo *models.UserSettingsRepository
+	messageRepo      ports.MessageRepository
+	conversationRepo ports.ConversationRepository
+	userSettingsRepo ports.UserSettingsRepository
 	hub              HubInterface
 	notifService     *services.NotificationService
 	queueClient      *queue.QueueClient
@@ -42,9 +44,9 @@ type HubInterface interface {
 // NewMessagesHandler creates a new messages handler
 func NewMessagesHandler(
 	pool *pgxpool.Pool,
-	messageRepo *models.MessageRepository,
-	conversationRepo *models.ConversationRepository,
-	userSettingsRepo *models.UserSettingsRepository,
+	messageRepo ports.MessageRepository,
+	conversationRepo ports.ConversationRepository,
+	userSettingsRepo ports.UserSettingsRepository,
 	hub HubInterface,
 	notifService *services.NotificationService,
 	cache services.Cache,
@@ -409,9 +411,8 @@ func copyStringPtr(value *string) *string {
 // SendMessage handles POST /api/v1/messages
 func (h *MessagesHandler) SendMessage(c *gin.Context) {
 	// Get user ID from context (set by AuthRequired middleware)
-	userID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
 		return
 	}
 
@@ -424,7 +425,7 @@ func (h *MessagesHandler) SendMessage(c *gin.Context) {
 	// Validate message type
 	validTypes := map[string]bool{"text": true, "image": true, "video": true, "audio": true, "file": true}
 	if !validTypes[req.MessageType] {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid message type. Must be: text, image, video, audio, or file"})
+		RespondError(c, http.StatusBadRequest, "Invalid message type. Must be: text, image, video, audio, or file")
 		return
 	}
 
@@ -434,7 +435,7 @@ func (h *MessagesHandler) SendMessage(c *gin.Context) {
 	}
 
 	if strings.TrimSpace(req.EncryptedContent) == "" && !hasMedia {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Message content or media is required"})
+		RespondError(c, http.StatusBadRequest, "Message content or media is required")
 		return
 	}
 
@@ -448,7 +449,7 @@ func (h *MessagesHandler) SendMessage(c *gin.Context) {
 	`, req.ConversationID).Scan(&conversationType)
 	if err != nil {
 		if err.Error() == "no rows in result set" {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Conversation not found"})
+			RespondError(c, http.StatusNotFound, "Conversation not found")
 		} else {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get conversation", "details": err.Error()})
 		}
@@ -471,14 +472,14 @@ func (h *MessagesHandler) SendMessage(c *gin.Context) {
 			  AND (expires_at IS NULL OR expires_at > NOW())
 			ORDER BY restriction_type ASC
 			LIMIT 1
-		`, req.ConversationID, userID.(int)).Scan(&restrictionType, &restrictionExpiresAt)
+		`, req.ConversationID, userID).Scan(&restrictionType, &restrictionExpiresAt)
 		if restrErr == nil && restrictionType != "" {
 			if restrictionType == "ban" {
-				c.JSON(http.StatusForbidden, gin.H{"error": "You are banned from this group"})
+				RespondError(c, http.StatusForbidden, "You are banned from this group")
 				return
 			}
 			if restrictionType == "mute" {
-				c.JSON(http.StatusForbidden, gin.H{"error": "You are muted in this group"})
+				RespondError(c, http.StatusForbidden, "You are muted in this group")
 				return
 			}
 		}
@@ -487,13 +488,13 @@ func (h *MessagesHandler) SendMessage(c *gin.Context) {
 		var userRole string
 		h.pool.QueryRow(c.Request.Context(), `
 			SELECT role FROM conversation_participants WHERE conversation_id=$1 AND user_id=$2
-		`, req.ConversationID, userID.(int)).Scan(&userRole)
+		`, req.ConversationID, userID).Scan(&userRole)
 
 		if userRole != "admin" && userRole != "owner" {
 			var slowMode int
 			h.pool.QueryRow(c.Request.Context(), `SELECT slow_mode_seconds FROM conversations WHERE id=$1`, req.ConversationID).Scan(&slowMode)
 			if slowMode > 0 && h.cache != nil {
-				cacheKey := fmt.Sprintf("slowmode:%d:%d", req.ConversationID, userID.(int))
+				cacheKey := fmt.Sprintf("slowmode:%d:%d", req.ConversationID, userID)
 				if val, exists, _ := h.cache.Get(c.Request.Context(), cacheKey); exists {
 					expiryUnix, _ := strconv.ParseInt(val, 10, 64)
 					remaining := time.Until(time.Unix(expiryUnix, 0))
@@ -519,24 +520,24 @@ func (h *MessagesHandler) SendMessage(c *gin.Context) {
 				SELECT 1 FROM conversation_participants
 				WHERE conversation_id = $1 AND user_id = $2
 			)
-		`, req.ConversationID, userID.(int)).Scan(&isParticipant)
+		`, req.ConversationID, userID).Scan(&isParticipant)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check participant status"})
+			RespondError(c, http.StatusInternalServerError, "Failed to check participant status")
 			return
 		}
 		if !isParticipant {
-			isAdmin, err := h.isAdmin(c.Request.Context(), userID.(int))
+			isAdmin, err := h.isAdmin(c.Request.Context(), userID)
 			if err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check admin status"})
+				RespondError(c, http.StatusInternalServerError, "Failed to check admin status")
 				return
 			}
 			if !isAdmin {
-				c.JSON(http.StatusForbidden, gin.H{"error": "You are not a participant in this conversation"})
+				RespondError(c, http.StatusForbidden, "You are not a participant in this conversation")
 				return
 			}
 		}
 		// For mod mail, we don't target a single recipient; use sender as recipient to satisfy schema
-		recipientID = userID.(int)
+		recipientID = userID
 	} else {
 		// For regular conversations, use the existing method
 		conversation, err := h.conversationRepo.GetByID(c.Request.Context(), req.ConversationID)
@@ -546,17 +547,17 @@ func (h *MessagesHandler) SendMessage(c *gin.Context) {
 		}
 
 		if conversation == nil {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Conversation not found"})
+			RespondError(c, http.StatusNotFound, "Conversation not found")
 			return
 		}
 
-		if !conversation.IsParticipant(userID.(int)) {
-			c.JSON(http.StatusForbidden, gin.H{"error": "You are not a participant in this conversation"})
+		if !conversation.IsParticipant(userID) {
+			RespondError(c, http.StatusForbidden, "You are not a participant in this conversation")
 			return
 		}
 
 		// Determine recipient (the other user in the conversation)
-		recipientID = conversation.GetOtherUserID(userID.(int))
+		recipientID = conversation.GetOtherUserID(userID)
 
 		// Check if sender is blocked by recipient
 		var isBlocked bool
@@ -566,14 +567,14 @@ func (h *MessagesHandler) SendMessage(c *gin.Context) {
 				WHERE blocker_id = $1 AND blocked_id = $2
 			)
 		`
-		err = h.pool.QueryRow(c.Request.Context(), blockCheckQuery, recipientID, userID.(int)).Scan(&isBlocked)
+		err = h.pool.QueryRow(c.Request.Context(), blockCheckQuery, recipientID, userID).Scan(&isBlocked)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check blocking status"})
+			RespondError(c, http.StatusInternalServerError, "Failed to check blocking status")
 			return
 		}
 
 		if isBlocked {
-			c.JSON(http.StatusForbidden, gin.H{"error": blockingSettingsErrorMessage})
+			RespondError(c, http.StatusForbidden, blockingSettingsErrorMessage)
 			return
 		}
 	}
@@ -581,7 +582,7 @@ func (h *MessagesHandler) SendMessage(c *gin.Context) {
 	if req.ReplyTo != nil {
 		effectiveReplyTo = req.ReplyTo
 		if *effectiveReplyTo <= 0 {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "reply_to must be a positive message ID"})
+			RespondError(c, http.StatusBadRequest, "reply_to must be a positive message ID")
 			return
 		}
 		var parentConversationID int
@@ -593,14 +594,14 @@ func (h *MessagesHandler) SendMessage(c *gin.Context) {
 		`, *effectiveReplyTo).Scan(&parentConversationID, &parentThreadRoot)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
-				c.JSON(http.StatusNotFound, gin.H{"error": "Reply target message not found"})
+				RespondError(c, http.StatusNotFound, "Reply target message not found")
 				return
 			}
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to validate reply target", "details": err.Error()})
 			return
 		}
 		if parentConversationID != req.ConversationID {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "reply_to must reference a message in the same conversation"})
+			RespondError(c, http.StatusBadRequest, "reply_to must reference a message in the same conversation")
 			return
 		}
 		rootID := *effectiveReplyTo
@@ -686,7 +687,7 @@ func (h *MessagesHandler) SendMessage(c *gin.Context) {
 	// Create message
 	message := &models.Message{
 		ConversationID:           req.ConversationID,
-		SenderID:                 userID.(int),
+		SenderID:                 userID,
 		RecipientID:              recipientID,
 		EncryptedContent:         req.EncryptedContent,
 		SenderEncryptedContent:   req.SenderEncryptedContent,
@@ -850,12 +851,10 @@ func (h *MessagesHandler) SendMessage(c *gin.Context) {
 
 // ForwardMessage handles POST /api/v1/messages/forward
 func (h *MessagesHandler) ForwardMessage(c *gin.Context) {
-	userIDValue, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
 		return
 	}
-	userID := userIDValue.(int)
 
 	var req ForwardMessageRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -863,11 +862,11 @@ func (h *MessagesHandler) ForwardMessage(c *gin.Context) {
 		return
 	}
 	if req.MessageID <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid message_id"})
+		RespondError(c, http.StatusBadRequest, "Invalid message_id")
 		return
 	}
 	if len(req.ConversationIDs) == 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "conversation_ids is required"})
+		RespondError(c, http.StatusBadRequest, "conversation_ids is required")
 		return
 	}
 
@@ -875,7 +874,7 @@ func (h *MessagesHandler) ForwardMessage(c *gin.Context) {
 	dedupedConversationIDs := make([]int, 0, len(req.ConversationIDs))
 	for _, conversationID := range req.ConversationIDs {
 		if conversationID <= 0 {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "conversation_ids must contain valid IDs"})
+			RespondError(c, http.StatusBadRequest, "conversation_ids must contain valid IDs")
 			return
 		}
 		if _, ok := seen[conversationID]; ok {
@@ -885,7 +884,7 @@ func (h *MessagesHandler) ForwardMessage(c *gin.Context) {
 		dedupedConversationIDs = append(dedupedConversationIDs, conversationID)
 	}
 	if len(dedupedConversationIDs) > 10 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Cannot forward to more than 10 conversations"})
+		RespondError(c, http.StatusBadRequest, "Cannot forward to more than 10 conversations")
 		return
 	}
 
@@ -893,7 +892,7 @@ func (h *MessagesHandler) ForwardMessage(c *gin.Context) {
 	original, err := h.messageRepo.GetByID(ctx, req.MessageID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Message not found"})
+			RespondError(c, http.StatusNotFound, "Message not found")
 			return
 		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load message", "details": err.Error()})
@@ -906,7 +905,7 @@ func (h *MessagesHandler) ForwardMessage(c *gin.Context) {
 		return
 	}
 	if !canAccessOriginalConversation {
-		c.JSON(http.StatusForbidden, gin.H{"error": "You are not authorized to forward this message"})
+		RespondError(c, http.StatusForbidden, "You are not authorized to forward this message")
 		return
 	}
 
@@ -917,7 +916,7 @@ func (h *MessagesHandler) ForwardMessage(c *gin.Context) {
 	}
 	if sourceConversationType == "dm" {
 		if (original.SenderID == userID && original.DeletedForSender) || (original.RecipientID == userID && original.DeletedForRecipient) {
-			c.JSON(http.StatusForbidden, gin.H{"error": "Cannot forward a message that is deleted for you"})
+			RespondError(c, http.StatusForbidden, "Cannot forward a message that is deleted for you")
 			return
 		}
 	}
@@ -942,11 +941,11 @@ func (h *MessagesHandler) ForwardMessage(c *gin.Context) {
 	}
 	if isEncryptedForward {
 		if forwardEncryptionVersion == "plaintext" || forwardEncryptionVersion == "none" {
-			c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "Encrypted forwards cannot downgrade encryption_version"})
+			RespondError(c, http.StatusUnprocessableEntity, "Encrypted forwards cannot downgrade encryption_version")
 			return
 		}
 		if req.EncryptedContent == nil || strings.TrimSpace(*req.EncryptedContent) == "" {
-			c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "Encrypted forwards require new encrypted_content"})
+			RespondError(c, http.StatusUnprocessableEntity, "Encrypted forwards require new encrypted_content")
 			return
 		}
 	}
@@ -958,7 +957,7 @@ func (h *MessagesHandler) ForwardMessage(c *gin.Context) {
 			return
 		}
 		if !canAccessTargetConversation {
-			c.JSON(http.StatusForbidden, gin.H{"error": fmt.Sprintf("You are not a participant in conversation %d", targetConversationID)})
+			RespondError(c, http.StatusForbidden, fmt.Sprintf("You are not a participant in conversation %d", targetConversationID))
 			return
 		}
 		targetParticipantIDs, err := h.getConversationParticipantIDs(ctx, targetConversationID)
@@ -981,12 +980,12 @@ func (h *MessagesHandler) ForwardMessage(c *gin.Context) {
 		}
 		if isEncryptedForward {
 			if len(sourceParticipants) != len(targetParticipants) {
-				c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "Encrypted forward requires identical participants"})
+				RespondError(c, http.StatusUnprocessableEntity, "Encrypted forward requires identical participants")
 				return
 			}
 			for participantID := range sourceParticipants {
 				if _, ok := targetParticipants[participantID]; !ok {
-					c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "Encrypted forward requires identical participants"})
+					RespondError(c, http.StatusUnprocessableEntity, "Encrypted forward requires identical participants")
 					return
 				}
 			}
@@ -1000,7 +999,7 @@ func (h *MessagesHandler) ForwardMessage(c *gin.Context) {
 				return
 			}
 			if targetConversation == nil {
-				c.JSON(http.StatusNotFound, gin.H{"error": "Target conversation not found"})
+				RespondError(c, http.StatusNotFound, "Target conversation not found")
 				return
 			}
 			targetRecipientID = targetConversation.GetOtherUserID(userID)
@@ -1017,7 +1016,7 @@ func (h *MessagesHandler) ForwardMessage(c *gin.Context) {
 				return
 			}
 			if isBlocked {
-				c.JSON(http.StatusForbidden, gin.H{"error": blockingSettingsErrorMessage})
+				RespondError(c, http.StatusForbidden, blockingSettingsErrorMessage)
 				return
 			}
 		} else {
@@ -1031,7 +1030,7 @@ func (h *MessagesHandler) ForwardMessage(c *gin.Context) {
 			resolvedEncryptedContent = strings.TrimSpace(*req.EncryptedContent)
 			if targetConversationType == "dm" {
 				if req.SenderEncryptedContent == nil || strings.TrimSpace(*req.SenderEncryptedContent) == "" {
-					c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "Encrypted DM forwards require new sender_encrypted_content"})
+					RespondError(c, http.StatusUnprocessableEntity, "Encrypted DM forwards require new sender_encrypted_content")
 					return
 				}
 				resolvedSenderEncryptedContent = copyStringPtr(req.SenderEncryptedContent)
@@ -1115,7 +1114,7 @@ func (h *MessagesHandler) ForwardMessage(c *gin.Context) {
 				newMessage.IsMultiRecipient = *req.IsMultiRecipient
 			}
 			if target.conversationType == "dm" && newMessage.IsMultiRecipient {
-				c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "DM forwards cannot be multi-recipient"})
+				RespondError(c, http.StatusUnprocessableEntity, "DM forwards cannot be multi-recipient")
 				return
 			}
 			if req.SharedEncryptionIV != nil {
@@ -1124,12 +1123,12 @@ func (h *MessagesHandler) ForwardMessage(c *gin.Context) {
 			if req.RecipientKeys != nil {
 				newMessage.RecipientKeys = req.RecipientKeys
 			} else if newMessage.IsMultiRecipient {
-				c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "Encrypted multi-recipient forwards require recipient_keys"})
+				RespondError(c, http.StatusUnprocessableEntity, "Encrypted multi-recipient forwards require recipient_keys")
 				return
 			}
 			if newMessage.IsMultiRecipient {
 				if len(newMessage.RecipientKeys) != len(target.participantIDs) {
-					c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "recipient_keys must match target participants"})
+					RespondError(c, http.StatusUnprocessableEntity, "recipient_keys must match target participants")
 					return
 				}
 				for _, participantID := range target.participantIDs {
@@ -1137,7 +1136,7 @@ func (h *MessagesHandler) ForwardMessage(c *gin.Context) {
 						continue
 					}
 					if _, ok := newMessage.RecipientKeys[participantID]; !ok {
-						c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "recipient_keys must match target participants"})
+						RespondError(c, http.StatusUnprocessableEntity, "recipient_keys must match target participants")
 						return
 					}
 				}
@@ -1145,11 +1144,11 @@ func (h *MessagesHandler) ForwardMessage(c *gin.Context) {
 		}
 		if target.conversationType == "mod_mail" {
 			if newMessage.EncryptionVersion == "plaintext" || newMessage.EncryptionVersion == "none" || newMessage.EncryptionVersion == "" {
-				c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "Mod mail forwards must remain encrypted"})
+				RespondError(c, http.StatusUnprocessableEntity, "Mod mail forwards must remain encrypted")
 				return
 			}
 			if !newMessage.IsMultiRecipient || newMessage.SharedEncryptionIV == nil || len(newMessage.RecipientKeys) == 0 {
-				c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "Mod mail forwards require multi-recipient encryption payloads"})
+				RespondError(c, http.StatusUnprocessableEntity, "Mod mail forwards require multi-recipient encryption payloads")
 				return
 			}
 		}
@@ -1298,16 +1297,14 @@ type MessageEditHistoryEntry struct {
 
 // GetForwardInfo handles GET /api/v1/messages/:id/forward-info
 func (h *MessagesHandler) GetForwardInfo(c *gin.Context) {
-	userIDValue, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
 		return
 	}
-	userID := userIDValue.(int)
 
 	messageID, err := strconv.Atoi(c.Param("id"))
 	if err != nil || messageID <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid message ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid message ID")
 		return
 	}
 
@@ -1324,7 +1321,7 @@ func (h *MessagesHandler) GetForwardInfo(c *gin.Context) {
 	`, messageID).Scan(&conversationID, &senderID, &forwardedFrom, &forwardCount)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Message not found"})
+			RespondError(c, http.StatusNotFound, "Message not found")
 			return
 		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load message", "details": err.Error()})
@@ -1337,7 +1334,7 @@ func (h *MessagesHandler) GetForwardInfo(c *gin.Context) {
 		return
 	}
 	if !canAccessConversation {
-		c.JSON(http.StatusForbidden, gin.H{"error": "You are not authorized to view forward info for this message"})
+		RespondError(c, http.StatusForbidden, "You are not authorized to view forward info for this message")
 		return
 	}
 
@@ -1402,16 +1399,14 @@ func (h *MessagesHandler) GetForwardInfo(c *gin.Context) {
 
 // EditMessage handles PATCH /api/v1/messages/:id
 func (h *MessagesHandler) EditMessage(c *gin.Context) {
-	userIDValue, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
 		return
 	}
-	userID := userIDValue.(int)
 
 	messageID, err := strconv.Atoi(c.Param("id"))
 	if err != nil || messageID <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid message ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid message ID")
 		return
 	}
 
@@ -1421,14 +1416,14 @@ func (h *MessagesHandler) EditMessage(c *gin.Context) {
 		return
 	}
 	if strings.TrimSpace(req.EncryptedContent) == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "encrypted_content is required"})
+		RespondError(c, http.StatusBadRequest, "encrypted_content is required")
 		return
 	}
 
 	ctx := c.Request.Context()
 	tx, err := h.pool.Begin(ctx)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to start edit transaction"})
+		RespondError(c, http.StatusInternalServerError, "Failed to start edit transaction")
 		return
 	}
 	defer tx.Rollback(ctx)
@@ -1467,7 +1462,7 @@ func (h *MessagesHandler) EditMessage(c *gin.Context) {
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Message not found"})
+			RespondError(c, http.StatusNotFound, "Message not found")
 			return
 		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load message", "details": err.Error()})
@@ -1475,19 +1470,19 @@ func (h *MessagesHandler) EditMessage(c *gin.Context) {
 	}
 
 	if senderID != userID {
-		c.JSON(http.StatusForbidden, gin.H{"error": "You can only edit your own messages"})
+		RespondError(c, http.StatusForbidden, "You can only edit your own messages")
 		return
 	}
 	if deletedForSender {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Cannot edit deleted message"})
+		RespondError(c, http.StatusBadRequest, "Cannot edit deleted message")
 		return
 	}
 	if time.Since(sentAt) > 15*time.Minute {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Message can only be edited within 15 minutes"})
+		RespondError(c, http.StatusForbidden, "Message can only be edited within 15 minutes")
 		return
 	}
 	if conversationType == "mod_mail" {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Editing mod mail messages is not supported"})
+		RespondError(c, http.StatusForbidden, "Editing mod mail messages is not supported")
 		return
 	}
 
@@ -1532,7 +1527,7 @@ func (h *MessagesHandler) EditMessage(c *gin.Context) {
 	}
 
 	if err := tx.Commit(ctx); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to commit message edit"})
+		RespondError(c, http.StatusInternalServerError, "Failed to commit message edit")
 		return
 	}
 
@@ -1592,16 +1587,14 @@ func (h *MessagesHandler) EditMessage(c *gin.Context) {
 
 // GetMessageHistory handles GET /api/v1/messages/:id/history
 func (h *MessagesHandler) GetMessageHistory(c *gin.Context) {
-	userIDValue, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
 		return
 	}
-	userID := userIDValue.(int)
 
 	messageID, err := strconv.Atoi(c.Param("id"))
 	if err != nil || messageID <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid message ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid message ID")
 		return
 	}
 
@@ -1624,7 +1617,7 @@ func (h *MessagesHandler) GetMessageHistory(c *gin.Context) {
 	`, messageID).Scan(&conversationID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Message not found"})
+			RespondError(c, http.StatusNotFound, "Message not found")
 			return
 		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load message", "details": err.Error()})
@@ -1637,7 +1630,7 @@ func (h *MessagesHandler) GetMessageHistory(c *gin.Context) {
 		return
 	}
 	if !canAccess {
-		c.JSON(http.StatusForbidden, gin.H{"error": "You are not a participant in this conversation"})
+		RespondError(c, http.StatusForbidden, "You are not a participant in this conversation")
 		return
 	}
 
@@ -1701,9 +1694,8 @@ func (h *MessagesHandler) GetMessageHistory(c *gin.Context) {
 // GetMessages handles GET /api/v1/conversations/:id/messages
 func (h *MessagesHandler) GetMessages(c *gin.Context) {
 	// Get user ID from context
-	userID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
 		return
 	}
 	if c.GetBool("shadow_banned") {
@@ -1714,7 +1706,7 @@ func (h *MessagesHandler) GetMessages(c *gin.Context) {
 
 	conversationID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid conversation ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid conversation ID")
 		return
 	}
 
@@ -1726,7 +1718,7 @@ func (h *MessagesHandler) GetMessages(c *gin.Context) {
 	`, conversationID).Scan(&conversationType, &hubID)
 	if err != nil {
 		if err.Error() == "no rows in result set" {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Conversation not found"})
+			RespondError(c, http.StatusNotFound, "Conversation not found")
 		} else {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get conversation", "details": err.Error()})
 		}
@@ -1741,19 +1733,19 @@ func (h *MessagesHandler) GetMessages(c *gin.Context) {
 				SELECT 1 FROM conversation_participants
 				WHERE conversation_id = $1 AND user_id = $2
 			)
-		`, conversationID, userID.(int)).Scan(&isParticipant)
+		`, conversationID, userID).Scan(&isParticipant)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check participant status"})
+			RespondError(c, http.StatusInternalServerError, "Failed to check participant status")
 			return
 		}
 		if !isParticipant {
-			isAdmin, err := h.isAdmin(c.Request.Context(), userID.(int))
+			isAdmin, err := h.isAdmin(c.Request.Context(), userID)
 			if err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check admin status"})
+				RespondError(c, http.StatusInternalServerError, "Failed to check admin status")
 				return
 			}
 			if !isAdmin {
-				c.JSON(http.StatusForbidden, gin.H{"error": "You are not a participant in this conversation"})
+				RespondError(c, http.StatusForbidden, "You are not a participant in this conversation")
 				return
 			}
 		}
@@ -1766,12 +1758,12 @@ func (h *MessagesHandler) GetMessages(c *gin.Context) {
 		}
 
 		if conversation == nil {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Conversation not found"})
+			RespondError(c, http.StatusNotFound, "Conversation not found")
 			return
 		}
 
-		if !conversation.IsParticipant(userID.(int)) {
-			c.JSON(http.StatusForbidden, gin.H{"error": "You are not a participant in this conversation"})
+		if !conversation.IsParticipant(userID) {
+			RespondError(c, http.StatusForbidden, "You are not a participant in this conversation")
 			return
 		}
 	}
@@ -1790,7 +1782,7 @@ func (h *MessagesHandler) GetMessages(c *gin.Context) {
 	if cursorParam != "" {
 		decoded, err := decodeTimeCursor(cursorParam)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid cursor"})
+			RespondError(c, http.StatusBadRequest, "Invalid cursor")
 			return
 		}
 		cursor = decoded
@@ -1814,7 +1806,7 @@ func (h *MessagesHandler) GetMessages(c *gin.Context) {
 			messages, err = h.messageRepo.GetByConversationIDForAllWithCursor(
 				c.Request.Context(),
 				conversationID,
-				userID.(int),
+				userID,
 				limitArg,
 				payload,
 			)
@@ -1822,7 +1814,7 @@ func (h *MessagesHandler) GetMessages(c *gin.Context) {
 			messages, err = h.messageRepo.GetByConversationIDForAll(
 				c.Request.Context(),
 				conversationID,
-				userID.(int),
+				userID,
 				limitArg,
 				offset,
 			)
@@ -1833,9 +1825,9 @@ func (h *MessagesHandler) GetMessages(c *gin.Context) {
 			if cursor != nil {
 				payload = &models.TimeCursor{ID: cursor.ID, Timestamp: cursor.Timestamp}
 			}
-			messages, err = h.messageRepo.GetByConversationIDWithCursor(c.Request.Context(), conversationID, userID.(int), limitArg, payload)
+			messages, err = h.messageRepo.GetByConversationIDWithCursor(c.Request.Context(), conversationID, userID, limitArg, payload)
 		} else {
-			messages, err = h.messageRepo.GetByConversationID(c.Request.Context(), conversationID, userID.(int), limitArg, offset)
+			messages, err = h.messageRepo.GetByConversationID(c.Request.Context(), conversationID, userID, limitArg, offset)
 		}
 	}
 	if err != nil {
@@ -1845,7 +1837,7 @@ func (h *MessagesHandler) GetMessages(c *gin.Context) {
 
 	// Mark undelivered messages as delivered for this recipient and notify senders (concurrent broadcasts)
 	if h.hub != nil {
-		delivered, err := h.messageRepo.MarkUndeliveredAsDelivered(c.Request.Context(), conversationID, userID.(int))
+		delivered, err := h.messageRepo.MarkUndeliveredAsDelivered(c.Request.Context(), conversationID, userID)
 		if err == nil {
 			for _, dm := range delivered {
 				// Reload message to get delivered_at timestamp
@@ -1891,16 +1883,14 @@ func (h *MessagesHandler) GetMessages(c *gin.Context) {
 // GetThread handles GET /api/v1/messages/:id/thread
 // Returns the thread root and paginated replies in chronological order.
 func (h *MessagesHandler) GetThread(c *gin.Context) {
-	userIDValue, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
 		return
 	}
-	userID := userIDValue.(int)
 
 	messageID, err := strconv.Atoi(c.Param("id"))
 	if err != nil || messageID <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid message ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid message ID")
 		return
 	}
 
@@ -1916,7 +1906,7 @@ func (h *MessagesHandler) GetThread(c *gin.Context) {
 	targetMessage, err := h.messageRepo.GetByID(c.Request.Context(), messageID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Message not found"})
+			RespondError(c, http.StatusNotFound, "Message not found")
 			return
 		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load message", "details": err.Error()})
@@ -1929,7 +1919,7 @@ func (h *MessagesHandler) GetThread(c *gin.Context) {
 		return
 	}
 	if !canAccess {
-		c.JSON(http.StatusForbidden, gin.H{"error": "You are not authorized to access this message"})
+		RespondError(c, http.StatusForbidden, "You are not authorized to access this message")
 		return
 	}
 	blocked, err := h.isSenderBlockedByViewer(c.Request.Context(), userID, targetMessage.SenderID)
@@ -1938,7 +1928,7 @@ func (h *MessagesHandler) GetThread(c *gin.Context) {
 		return
 	}
 	if blocked && targetMessage.SenderID != userID {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Message not found"})
+		RespondError(c, http.StatusNotFound, "Message not found")
 		return
 	}
 
@@ -1952,7 +1942,7 @@ func (h *MessagesHandler) GetThread(c *gin.Context) {
 		rootMessage, err = h.messageRepo.GetByID(c.Request.Context(), rootID)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
-				c.JSON(http.StatusNotFound, gin.H{"error": "Thread root message not found"})
+				RespondError(c, http.StatusNotFound, "Thread root message not found")
 				return
 			}
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load thread root", "details": err.Error()})
@@ -1970,7 +1960,7 @@ func (h *MessagesHandler) GetThread(c *gin.Context) {
 		if targetMessage.SenderID == userID {
 			rootMessage = targetMessage
 		} else {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Thread root message not found"})
+			RespondError(c, http.StatusNotFound, "Thread root message not found")
 			return
 		}
 	}
@@ -2112,23 +2102,21 @@ func (h *MessagesHandler) isThreadMutedForUser(ctx context.Context, rootID int, 
 }
 
 func (h *MessagesHandler) setThreadMuted(c *gin.Context, muted bool) {
-	userIDValue, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
 		return
 	}
-	userID := userIDValue.(int)
 
 	messageID, err := strconv.Atoi(c.Param("id"))
 	if err != nil || messageID <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid message ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid message ID")
 		return
 	}
 
 	targetMessage, err := h.messageRepo.GetByID(c.Request.Context(), messageID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Message not found"})
+			RespondError(c, http.StatusNotFound, "Message not found")
 			return
 		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load message", "details": err.Error()})
@@ -2141,7 +2129,7 @@ func (h *MessagesHandler) setThreadMuted(c *gin.Context, muted bool) {
 		return
 	}
 	if !canAccess {
-		c.JSON(http.StatusForbidden, gin.H{"error": "You are not authorized to modify this thread"})
+		RespondError(c, http.StatusForbidden, "You are not authorized to modify this thread")
 		return
 	}
 
@@ -2181,15 +2169,14 @@ func (h *MessagesHandler) UnmuteThread(c *gin.Context) {
 // MarkAsRead handles POST /api/v1/conversations/:id/read
 func (h *MessagesHandler) MarkAsRead(c *gin.Context) {
 	// Get user ID from context
-	userID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
 		return
 	}
 
 	conversationID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid conversation ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid conversation ID")
 		return
 	}
 
@@ -2203,7 +2190,7 @@ func (h *MessagesHandler) MarkAsRead(c *gin.Context) {
 
 	if err != nil {
 		if err.Error() == "no rows in result set" {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Conversation not found"})
+			RespondError(c, http.StatusNotFound, "Conversation not found")
 		} else {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get conversation", "details": err.Error()})
 		}
@@ -2218,19 +2205,19 @@ func (h *MessagesHandler) MarkAsRead(c *gin.Context) {
 				SELECT 1 FROM conversation_participants
 				WHERE conversation_id = $1 AND user_id = $2
 			)
-		`, conversationID, userID.(int)).Scan(&isParticipant)
+		`, conversationID, userID).Scan(&isParticipant)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check participant status"})
+			RespondError(c, http.StatusInternalServerError, "Failed to check participant status")
 			return
 		}
 		if !isParticipant {
-			isAdmin, err := h.isAdmin(c.Request.Context(), userID.(int))
+			isAdmin, err := h.isAdmin(c.Request.Context(), userID)
 			if err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check admin status"})
+				RespondError(c, http.StatusInternalServerError, "Failed to check admin status")
 				return
 			}
 			if !isAdmin {
-				c.JSON(http.StatusForbidden, gin.H{"error": "You are not a participant in this conversation"})
+				RespondError(c, http.StatusForbidden, "You are not a participant in this conversation")
 				return
 			}
 		}
@@ -2242,11 +2229,11 @@ func (h *MessagesHandler) MarkAsRead(c *gin.Context) {
 			return
 		}
 		if conversation == nil {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Conversation not found"})
+			RespondError(c, http.StatusNotFound, "Conversation not found")
 			return
 		}
-		if !conversation.IsParticipant(userID.(int)) {
-			c.JSON(http.StatusForbidden, gin.H{"error": "You are not a participant in this conversation"})
+		if !conversation.IsParticipant(userID) {
+			RespondError(c, http.StatusForbidden, "You are not a participant in this conversation")
 			return
 		}
 	}
@@ -2265,7 +2252,7 @@ func (h *MessagesHandler) MarkAsRead(c *gin.Context) {
 		      AND bu.blocked_id = messages.sender_id
 		  )
 	`
-	rows, err := h.pool.Query(c.Request.Context(), query, conversationID, userID.(int))
+	rows, err := h.pool.Query(c.Request.Context(), query, conversationID, userID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get unread messages", "details": err.Error()})
 		return
@@ -2289,7 +2276,7 @@ func (h *MessagesHandler) MarkAsRead(c *gin.Context) {
 	}
 
 	// Check if user has read receipts enabled before marking as read
-	userSettings, err := h.userSettingsRepo.GetByUserID(c.Request.Context(), userID.(int))
+	userSettings, err := h.userSettingsRepo.GetByUserID(c.Request.Context(), userID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get user settings", "details": err.Error()})
 		return
@@ -2297,7 +2284,7 @@ func (h *MessagesHandler) MarkAsRead(c *gin.Context) {
 
 	// If settings don't exist, create defaults (which have read receipts enabled by default)
 	if userSettings == nil {
-		userSettings, err = h.userSettingsRepo.CreateDefault(c.Request.Context(), userID.(int))
+		userSettings, err = h.userSettingsRepo.CreateDefault(c.Request.Context(), userID)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create user settings", "details": err.Error()})
 			return
@@ -2306,13 +2293,13 @@ func (h *MessagesHandler) MarkAsRead(c *gin.Context) {
 
 	// If user has disabled read receipts, return success without marking as read or broadcasting
 	if !userSettings.ShowReadReceipts {
-		log.Printf("[MarkAsRead] User %d has read receipts disabled, skipping read receipt update", userID.(int))
+		log.Printf("[MarkAsRead] User %d has read receipts disabled, skipping read receipt update", userID)
 		c.JSON(http.StatusOK, gin.H{"message": "Read receipts disabled"})
 		return
 	}
 
 	// Mark all messages as read for this user
-	if err := h.messageRepo.MarkAllAsRead(c.Request.Context(), conversationID, userID.(int)); err != nil {
+	if err := h.messageRepo.MarkAllAsRead(c.Request.Context(), conversationID, userID); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to mark messages as read", "details": err.Error()})
 		return
 	}
@@ -2335,7 +2322,7 @@ func (h *MessagesHandler) MarkAsRead(c *gin.Context) {
 				Payload: gin.H{
 					"message_id":      msg.ID,
 					"conversation_id": conversationID,
-					"reader_id":       userID.(int),
+					"reader_id":       userID,
 					"read_at":         readAt,
 				},
 			})
@@ -2347,7 +2334,7 @@ func (h *MessagesHandler) MarkAsRead(c *gin.Context) {
 			rows, err := h.pool.Query(c.Request.Context(), `
 				SELECT user_id FROM conversation_participants
 				WHERE conversation_id = $1 AND user_id != $2
-			`, conversationID, userID.(int))
+			`, conversationID, userID)
 			if err == nil {
 				defer rows.Close()
 				for rows.Next() {
@@ -2358,7 +2345,7 @@ func (h *MessagesHandler) MarkAsRead(c *gin.Context) {
 							Type:        "conversation_read",
 							Payload: gin.H{
 								"conversation_id": conversationID,
-								"reader_id":       userID.(int),
+								"reader_id":       userID,
 							},
 						})
 					}
@@ -2368,14 +2355,14 @@ func (h *MessagesHandler) MarkAsRead(c *gin.Context) {
 			// For DM conversations, notify the other participant
 			conversation, err := h.conversationRepo.GetByID(c.Request.Context(), conversationID)
 			if err == nil && conversation != nil {
-				otherUserID := conversation.GetOtherUserID(userID.(int))
+				otherUserID := conversation.GetOtherUserID(userID)
 				if otherUserID != 0 {
 					h.hub.Broadcast(&websocket.Message{
 						RecipientID: otherUserID,
 						Type:        "conversation_read",
 						Payload: gin.H{
 							"conversation_id": conversationID,
-							"reader_id":       userID.(int),
+							"reader_id":       userID,
 						},
 					})
 				}
@@ -2389,15 +2376,14 @@ func (h *MessagesHandler) MarkAsRead(c *gin.Context) {
 // MarkSingleMessageAsRead handles POST /api/v1/messages/:id/read
 func (h *MessagesHandler) MarkSingleMessageAsRead(c *gin.Context) {
 	// Get user ID from context
-	userID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
 		return
 	}
 
 	messageID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid message ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid message ID")
 		return
 	}
 
@@ -2409,13 +2395,13 @@ func (h *MessagesHandler) MarkSingleMessageAsRead(c *gin.Context) {
 	}
 
 	if message == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Message not found"})
+		RespondError(c, http.StatusNotFound, "Message not found")
 		return
 	}
 
 	// Only the recipient can mark a message as read
-	if message.RecipientID != userID.(int) {
-		c.JSON(http.StatusForbidden, gin.H{"error": "You can only mark your own received messages as read"})
+	if message.RecipientID != userID {
+		RespondError(c, http.StatusForbidden, "You can only mark your own received messages as read")
 		return
 	}
 
@@ -2426,7 +2412,7 @@ func (h *MessagesHandler) MarkSingleMessageAsRead(c *gin.Context) {
 	}
 
 	// Check if user has read receipts enabled before marking as read
-	userSettings, err := h.userSettingsRepo.GetByUserID(c.Request.Context(), userID.(int))
+	userSettings, err := h.userSettingsRepo.GetByUserID(c.Request.Context(), userID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get user settings", "details": err.Error()})
 		return
@@ -2434,7 +2420,7 @@ func (h *MessagesHandler) MarkSingleMessageAsRead(c *gin.Context) {
 
 	// If settings don't exist, create defaults (which have read receipts enabled by default)
 	if userSettings == nil {
-		userSettings, err = h.userSettingsRepo.CreateDefault(c.Request.Context(), userID.(int))
+		userSettings, err = h.userSettingsRepo.CreateDefault(c.Request.Context(), userID)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create user settings", "details": err.Error()})
 			return
@@ -2443,7 +2429,7 @@ func (h *MessagesHandler) MarkSingleMessageAsRead(c *gin.Context) {
 
 	// If user has disabled read receipts, return success without marking as read or broadcasting
 	if !userSettings.ShowReadReceipts {
-		log.Printf("[MarkSingleMessageAsRead] User %d has read receipts disabled, skipping read receipt update", userID.(int))
+		log.Printf("[MarkSingleMessageAsRead] User %d has read receipts disabled, skipping read receipt update", userID)
 		c.JSON(http.StatusOK, gin.H{"message": "Read receipts disabled"})
 		return
 	}
@@ -2469,7 +2455,7 @@ func (h *MessagesHandler) MarkSingleMessageAsRead(c *gin.Context) {
 			Payload: gin.H{
 				"message_id":      messageID,
 				"conversation_id": message.ConversationID,
-				"reader_id":       userID.(int),
+				"reader_id":       userID,
 				"read_at":         updatedMsg.ReadAt,
 			},
 		})
@@ -2481,9 +2467,8 @@ func (h *MessagesHandler) MarkSingleMessageAsRead(c *gin.Context) {
 // DeleteMessage handles DELETE /api/v1/messages/:id
 func (h *MessagesHandler) DeleteMessage(c *gin.Context) {
 	// Get user ID from context
-	userID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
 		return
 	}
 
@@ -2492,13 +2477,13 @@ func (h *MessagesHandler) DeleteMessage(c *gin.Context) {
 		deleteScope = "self"
 	}
 	if deleteScope != "self" && deleteScope != "both" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid delete_for value. Must be 'self' or 'both'"})
+		RespondError(c, http.StatusBadRequest, "Invalid delete_for value. Must be 'self' or 'both'")
 		return
 	}
 
 	messageID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid message ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid message ID")
 		return
 	}
 
@@ -2510,18 +2495,18 @@ func (h *MessagesHandler) DeleteMessage(c *gin.Context) {
 	}
 
 	if message == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Message not found"})
+		RespondError(c, http.StatusNotFound, "Message not found")
 		return
 	}
 
-	if !message.IsParticipant(userID.(int)) {
-		c.JSON(http.StatusForbidden, gin.H{"error": "You are not a participant in this message"})
+	if !message.IsParticipant(userID) {
+		RespondError(c, http.StatusForbidden, "You are not a participant in this message")
 		return
 	}
 
 	if deleteScope == "both" {
-		if message.SenderID != userID.(int) {
-			c.JSON(http.StatusForbidden, gin.H{"error": "Only the message sender can delete for both users"})
+		if message.SenderID != userID {
+			RespondError(c, http.StatusForbidden, "Only the message sender can delete for both users")
 			return
 		}
 
@@ -2531,7 +2516,7 @@ func (h *MessagesHandler) DeleteMessage(c *gin.Context) {
 		}
 	} else {
 		// Soft delete for this user
-		if err := h.messageRepo.SoftDeleteForUser(c.Request.Context(), messageID, userID.(int)); err != nil {
+		if err := h.messageRepo.SoftDeleteForUser(c.Request.Context(), messageID, userID); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete message", "details": err.Error()})
 			return
 		}
@@ -2550,16 +2535,14 @@ func (h *MessagesHandler) DeleteMessage(c *gin.Context) {
 
 // PinMessage handles POST /api/v1/messages/:id/pin
 func (h *MessagesHandler) PinMessage(c *gin.Context) {
-	userIDValue, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
 		return
 	}
-	userID := userIDValue.(int)
 
 	messageID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid message ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid message ID")
 		return
 	}
 
@@ -2574,20 +2557,20 @@ func (h *MessagesHandler) PinMessage(c *gin.Context) {
 	`, messageID).Scan(&conversationID, &isPinned, &encryptedContent, &messageType)
 	if err != nil {
 		if err.Error() == "no rows in result set" {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Message not found"})
+			RespondError(c, http.StatusNotFound, "Message not found")
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load message"})
+		RespondError(c, http.StatusInternalServerError, "Failed to load message")
 		return
 	}
 
 	canAccess, err := h.canAccessConversation(c.Request.Context(), conversationID, userID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to verify conversation access"})
+		RespondError(c, http.StatusInternalServerError, "Failed to verify conversation access")
 		return
 	}
 	if !canAccess {
-		c.JSON(http.StatusForbidden, gin.H{"error": "You are not a participant in this conversation"})
+		RespondError(c, http.StatusForbidden, "You are not a participant in this conversation")
 		return
 	}
 
@@ -2606,10 +2589,10 @@ func (h *MessagesHandler) PinMessage(c *gin.Context) {
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.ConstraintName == "messages_max_pinned_per_conversation" {
-			c.JSON(http.StatusConflict, gin.H{"error": "Conversation already has maximum pinned messages (10)"})
+			RespondError(c, http.StatusConflict, "Conversation already has maximum pinned messages (10)")
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to pin message"})
+		RespondError(c, http.StatusInternalServerError, "Failed to pin message")
 		return
 	}
 
@@ -2629,16 +2612,14 @@ func (h *MessagesHandler) PinMessage(c *gin.Context) {
 
 // UnpinMessage handles DELETE /api/v1/messages/:id/pin
 func (h *MessagesHandler) UnpinMessage(c *gin.Context) {
-	userIDValue, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
 		return
 	}
-	userID := userIDValue.(int)
 
 	messageID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid message ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid message ID")
 		return
 	}
 
@@ -2655,26 +2636,26 @@ func (h *MessagesHandler) UnpinMessage(c *gin.Context) {
 	`, messageID).Scan(&conversationID, &isPinned, &pinnedBy, &pinnedAt, &encryptedContent, &messageType)
 	if err != nil {
 		if err.Error() == "no rows in result set" {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Message not found"})
+			RespondError(c, http.StatusNotFound, "Message not found")
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load message"})
+		RespondError(c, http.StatusInternalServerError, "Failed to load message")
 		return
 	}
 
 	canAccess, err := h.canAccessConversation(c.Request.Context(), conversationID, userID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to verify conversation access"})
+		RespondError(c, http.StatusInternalServerError, "Failed to verify conversation access")
 		return
 	}
 	if !canAccess {
 		isAdmin, adminErr := h.isAdmin(c.Request.Context(), userID)
 		if adminErr != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to verify unpin permissions"})
+			RespondError(c, http.StatusInternalServerError, "Failed to verify unpin permissions")
 			return
 		}
 		if !isAdmin {
-			c.JSON(http.StatusForbidden, gin.H{"error": "You are not a participant in this conversation"})
+			RespondError(c, http.StatusForbidden, "You are not a participant in this conversation")
 			return
 		}
 	}
@@ -2686,11 +2667,11 @@ func (h *MessagesHandler) UnpinMessage(c *gin.Context) {
 
 	isAdmin, err := h.isAdmin(c.Request.Context(), userID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to verify unpin permissions"})
+		RespondError(c, http.StatusInternalServerError, "Failed to verify unpin permissions")
 		return
 	}
 	if pinnedBy == nil || (*pinnedBy != userID && !isAdmin) {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Only the pinner or an admin can unpin this message"})
+		RespondError(c, http.StatusForbidden, "Only the pinner or an admin can unpin this message")
 		return
 	}
 
@@ -2700,7 +2681,7 @@ func (h *MessagesHandler) UnpinMessage(c *gin.Context) {
 		WHERE id = $1
 	`, messageID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to unpin message"})
+		RespondError(c, http.StatusInternalServerError, "Failed to unpin message")
 		return
 	}
 
@@ -2720,36 +2701,34 @@ func (h *MessagesHandler) UnpinMessage(c *gin.Context) {
 
 // GetPinnedMessages handles GET /api/v1/conversations/:id/pinned-messages
 func (h *MessagesHandler) GetPinnedMessages(c *gin.Context) {
-	userIDValue, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
 		return
 	}
-	userID := userIDValue.(int)
 
 	conversationID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid conversation ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid conversation ID")
 		return
 	}
 
 	conversationType, err := h.getConversationType(c.Request.Context(), conversationID)
 	if err != nil {
 		if err.Error() == "no rows in result set" {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Conversation not found"})
+			RespondError(c, http.StatusNotFound, "Conversation not found")
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load conversation"})
+		RespondError(c, http.StatusInternalServerError, "Failed to load conversation")
 		return
 	}
 
 	canAccess, err := h.canAccessConversation(c.Request.Context(), conversationID, userID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to verify conversation access"})
+		RespondError(c, http.StatusInternalServerError, "Failed to verify conversation access")
 		return
 	}
 	if !canAccess {
-		c.JSON(http.StatusForbidden, gin.H{"error": "You are not a participant in this conversation"})
+		RespondError(c, http.StatusForbidden, "You are not a participant in this conversation")
 		return
 	}
 
@@ -2806,7 +2785,7 @@ func (h *MessagesHandler) GetPinnedMessages(c *gin.Context) {
 		rows, err = h.pool.Query(c.Request.Context(), query, conversationID, userID)
 	}
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get pinned messages"})
+		RespondError(c, http.StatusInternalServerError, "Failed to get pinned messages")
 		return
 	}
 	defer rows.Close()
@@ -2843,13 +2822,13 @@ func (h *MessagesHandler) GetPinnedMessages(c *gin.Context) {
 			&message.HasReactions,
 		)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to read pinned messages"})
+			RespondError(c, http.StatusInternalServerError, "Failed to read pinned messages")
 			return
 		}
 		messages = append(messages, message)
 	}
 	if err := rows.Err(); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to iterate pinned messages"})
+		RespondError(c, http.StatusInternalServerError, "Failed to iterate pinned messages")
 		return
 	}
 

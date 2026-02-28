@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"github.com/omninudge/backend/internal/ports"
+	"github.com/omninudge/backend/internal/api/middleware"
 	"net/http"
 	"strings"
 
@@ -12,13 +14,13 @@ import (
 )
 
 type HubWikiHandler struct {
-	hubRepo      *models.HubRepository
+	hubRepo      ports.HubRepository
 	settingsRepo *repository.HubSettingsRepository
 	wikiRepo     *repository.HubWikiRepository
 }
 
 func NewHubWikiHandler(
-	hubRepo *models.HubRepository,
+	hubRepo ports.HubRepository,
 	settingsRepo *repository.HubSettingsRepository,
 	wikiRepo *repository.HubWikiRepository,
 ) *HubWikiHandler {
@@ -39,23 +41,23 @@ func (h *HubWikiHandler) GetHubWikiPage(c *gin.Context) {
 
 	hub, err := h.hubRepo.GetByName(c.Request.Context(), hubName)
 	if err != nil || hub == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Hub not found"})
+		RespondError(c, http.StatusNotFound, "Hub not found")
 		return
 	}
 
 	settings, err := h.ensureHubSettings(c, hub)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch hub settings"})
+		RespondError(c, http.StatusInternalServerError, "Failed to fetch hub settings")
 		return
 	}
 	if settings == nil || !settings.EnableWiki {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Wiki not enabled"})
+		RespondError(c, http.StatusNotFound, "Wiki not enabled")
 		return
 	}
 
 	page, err := h.wikiRepo.GetByHubIDAndSlug(c.Request.Context(), hub.ID, pagePath)
 	if err != nil && err != pgx.ErrNoRows {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch wiki page"})
+		RespondError(c, http.StatusInternalServerError, "Failed to fetch wiki page")
 		return
 	}
 	if err == pgx.ErrNoRows {
@@ -73,9 +75,8 @@ func (h *HubWikiHandler) GetHubWikiPage(c *gin.Context) {
 
 // UpdateHubWikiPage handles PUT /api/v1/hubs/:name/wiki/:pagePath
 func (h *HubWikiHandler) UpdateHubWikiPage(c *gin.Context) {
-	userID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
 		return
 	}
 
@@ -87,29 +88,29 @@ func (h *HubWikiHandler) UpdateHubWikiPage(c *gin.Context) {
 
 	hub, err := h.hubRepo.GetByName(c.Request.Context(), hubName)
 	if err != nil || hub == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Hub not found"})
+		RespondError(c, http.StatusNotFound, "Hub not found")
 		return
 	}
 
 	settings, err := h.ensureHubSettings(c, hub)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch hub settings"})
+		RespondError(c, http.StatusInternalServerError, "Failed to fetch hub settings")
 		return
 	}
 	if settings == nil || !settings.EnableWiki {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Wiki not enabled"})
+		RespondError(c, http.StatusBadRequest, "Wiki not enabled")
 		return
 	}
 
 	if !helpers.IsAdmin(c) {
-		role, err := h.settingsRepo.GetModeratorRole(c.Request.Context(), hub.ID, userID.(int))
+		role, err := h.settingsRepo.GetModeratorRole(c.Request.Context(), hub.ID, userID)
 		if err != nil || role == nil {
-			c.JSON(http.StatusForbidden, gin.H{"error": "Not a moderator"})
+			RespondError(c, http.StatusForbidden, "Not a moderator")
 			return
 		}
 
 		if *role != models.ModeratorRoleOwner && *role != models.ModeratorRoleFullModerator {
-			c.JSON(http.StatusForbidden, gin.H{"error": "Requires owner or full_moderator role"})
+			RespondError(c, http.StatusForbidden, "Requires owner or full_moderator role")
 			return
 		}
 	}
@@ -118,13 +119,13 @@ func (h *HubWikiHandler) UpdateHubWikiPage(c *gin.Context) {
 		Content string `json:"content"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
+		RespondError(c, http.StatusBadRequest, "Invalid request body")
 		return
 	}
 
-	page, err := h.wikiRepo.Upsert(c.Request.Context(), hub.ID, pagePath, req.Content, intPointer(userID.(int)))
+	page, err := h.wikiRepo.Upsert(c.Request.Context(), hub.ID, pagePath, req.Content, intPointer(userID))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update wiki page"})
+		RespondError(c, http.StatusInternalServerError, "Failed to update wiki page")
 		return
 	}
 

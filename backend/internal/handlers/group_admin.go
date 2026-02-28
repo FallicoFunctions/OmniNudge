@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"github.com/omninudge/backend/internal/api/middleware"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -132,7 +133,7 @@ type AuditLogRow struct {
 func parseGroupID(c *gin.Context) (int, bool) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid group ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid group ID")
 		return 0, false
 	}
 	return id, true
@@ -141,19 +142,18 @@ func parseGroupID(c *gin.Context) (int, bool) {
 func parseTargetUserID(c *gin.Context) (int, bool) {
 	id, err := strconv.Atoi(c.Param("user_id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid user ID")
 		return 0, false
 	}
 	return id, true
 }
 
 func getCallerID(c *gin.Context) (int, bool) {
-	val, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
 		return 0, false
 	}
-	return val.(int), true
+	return userID, true
 }
 
 // targetMemberRole returns the role of targetUserID in the group, or ("", nil) if not a member.
@@ -190,39 +190,39 @@ func (h *GroupAdminHandler) MuteGroupMember(c *gin.Context) {
 
 	callerRole, err := requireGroupAdmin(ctx, h.pool, convID, callerID)
 	if err != nil {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Only group admins can perform this action"})
+		RespondError(c, http.StatusForbidden, "Only group admins can perform this action")
 		return
 	}
 
 	targetRole, err := targetMemberRole(ctx, h.pool, convID, targetUserID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check target role"})
+		RespondError(c, http.StatusInternalServerError, "Failed to check target role")
 		return
 	}
 	if targetRole == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Target user is not a member of this group"})
+		RespondError(c, http.StatusBadRequest, "Target user is not a member of this group")
 		return
 	}
 	if targetRole == "owner" {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Cannot mute the group owner"})
+		RespondError(c, http.StatusForbidden, "Cannot mute the group owner")
 		return
 	}
 	// Admins cannot mute other admins — only the owner can.
 	if targetRole == "admin" && callerRole != "owner" {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Only the group owner can mute admins"})
+		RespondError(c, http.StatusForbidden, "Only the group owner can mute admins")
 		return
 	}
 
 	var req MuteGroupMemberRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
+		RespondError(c, http.StatusBadRequest, "Invalid request body")
 		return
 	}
 
 	// duration_minutes=0 means permanent; any other value must be 1–43200 (30 days).
 	const maxMuteDurationMinutes = 43200
 	if req.DurationMinutes < 0 || (req.DurationMinutes > 0 && req.DurationMinutes > maxMuteDurationMinutes) {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "duration_minutes must be 0 (permanent) or 1–43200"})
+		RespondError(c, http.StatusBadRequest, "duration_minutes must be 0 (permanent) or 1–43200")
 		return
 	}
 
@@ -243,7 +243,7 @@ func (h *GroupAdminHandler) MuteGroupMember(c *gin.Context) {
 	`, convID, targetUserID, callerID, req.Reason, expiresAt)
 	if err != nil {
 		log.Printf("[GroupAdmin] MuteGroupMember: err=%v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to mute member"})
+		RespondError(c, http.StatusInternalServerError, "Failed to mute member")
 		return
 	}
 
@@ -280,7 +280,7 @@ func (h *GroupAdminHandler) UnmuteGroupMember(c *gin.Context) {
 	ctx := c.Request.Context()
 
 	if _, err := requireGroupAdmin(ctx, h.pool, convID, callerID); err != nil {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Only group admins can perform this action"})
+		RespondError(c, http.StatusForbidden, "Only group admins can perform this action")
 		return
 	}
 
@@ -290,7 +290,7 @@ func (h *GroupAdminHandler) UnmuteGroupMember(c *gin.Context) {
 	`, convID, targetUserID)
 	if err != nil {
 		log.Printf("[GroupAdmin] UnmuteGroupMember: err=%v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to unmute member"})
+		RespondError(c, http.StatusInternalServerError, "Failed to unmute member")
 		return
 	}
 
@@ -323,28 +323,28 @@ func (h *GroupAdminHandler) BanGroupMember(c *gin.Context) {
 
 	callerRole, err := requireGroupAdmin(ctx, h.pool, convID, callerID)
 	if err != nil {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Only group admins can perform this action"})
+		RespondError(c, http.StatusForbidden, "Only group admins can perform this action")
 		return
 	}
 
 	targetRole, err := targetMemberRole(ctx, h.pool, convID, targetUserID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check target role"})
+		RespondError(c, http.StatusInternalServerError, "Failed to check target role")
 		return
 	}
 	if targetRole == "owner" {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Cannot ban the group owner"})
+		RespondError(c, http.StatusForbidden, "Cannot ban the group owner")
 		return
 	}
 	// Admins cannot ban other admins — only the owner can.
 	if targetRole == "admin" && callerRole != "owner" {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Only the group owner can ban admins"})
+		RespondError(c, http.StatusForbidden, "Only the group owner can ban admins")
 		return
 	}
 
 	var req BanGroupMemberRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
+		RespondError(c, http.StatusBadRequest, "Invalid request body")
 		return
 	}
 
@@ -363,7 +363,7 @@ func (h *GroupAdminHandler) BanGroupMember(c *gin.Context) {
 	tx, err := h.pool.Begin(ctx)
 	if err != nil {
 		log.Printf("[GroupAdmin] BanGroupMember: begin tx err=%v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to ban member"})
+		RespondError(c, http.StatusInternalServerError, "Failed to ban member")
 		return
 	}
 	defer tx.Rollback(ctx) //nolint:errcheck
@@ -378,7 +378,7 @@ func (h *GroupAdminHandler) BanGroupMember(c *gin.Context) {
 		      created_at    = NOW()
 	`, convID, targetUserID, callerID, req.Reason); err != nil {
 		log.Printf("[GroupAdmin] BanGroupMember: insert restriction err=%v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to ban member"})
+		RespondError(c, http.StatusInternalServerError, "Failed to ban member")
 		return
 	}
 
@@ -394,13 +394,13 @@ func (h *GroupAdminHandler) BanGroupMember(c *gin.Context) {
 		DELETE FROM conversation_participants WHERE conversation_id=$1 AND user_id=$2
 	`, convID, targetUserID); err != nil {
 		log.Printf("[GroupAdmin] BanGroupMember: remove participant err=%v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to remove member from group"})
+		RespondError(c, http.StatusInternalServerError, "Failed to remove member from group")
 		return
 	}
 
 	if err = tx.Commit(ctx); err != nil {
 		log.Printf("[GroupAdmin] BanGroupMember: commit err=%v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to ban member"})
+		RespondError(c, http.StatusInternalServerError, "Failed to ban member")
 		return
 	}
 
@@ -437,7 +437,7 @@ func (h *GroupAdminHandler) UnbanGroupMember(c *gin.Context) {
 	ctx := c.Request.Context()
 
 	if _, err := requireGroupAdmin(ctx, h.pool, convID, callerID); err != nil {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Only group admins can perform this action"})
+		RespondError(c, http.StatusForbidden, "Only group admins can perform this action")
 		return
 	}
 
@@ -447,7 +447,7 @@ func (h *GroupAdminHandler) UnbanGroupMember(c *gin.Context) {
 	`, convID, targetUserID)
 	if err != nil {
 		log.Printf("[GroupAdmin] UnbanGroupMember: err=%v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to unban member"})
+		RespondError(c, http.StatusInternalServerError, "Failed to unban member")
 		return
 	}
 
@@ -470,7 +470,7 @@ func (h *GroupAdminHandler) GetGroupRestrictions(c *gin.Context) {
 	ctx := c.Request.Context()
 
 	if _, err := requireGroupAdmin(ctx, h.pool, convID, callerID); err != nil {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Only group admins can view restrictions"})
+		RespondError(c, http.StatusForbidden, "Only group admins can view restrictions")
 		return
 	}
 
@@ -488,7 +488,7 @@ func (h *GroupAdminHandler) GetGroupRestrictions(c *gin.Context) {
 	`, convID)
 	if err != nil {
 		log.Printf("[GroupAdmin] GetGroupRestrictions: err=%v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get restrictions"})
+		RespondError(c, http.StatusInternalServerError, "Failed to get restrictions")
 		return
 	}
 	defer rows.Close()
@@ -542,7 +542,7 @@ func (h *GroupAdminHandler) GetMyGroupRestriction(c *gin.Context) {
 			return
 		}
 		log.Printf("[GroupAdmin] GetMyGroupRestriction: err=%v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check restriction"})
+		RespondError(c, http.StatusInternalServerError, "Failed to check restriction")
 		return
 	}
 
@@ -563,14 +563,14 @@ func (h *GroupAdminHandler) AdminDeleteMessage(c *gin.Context) {
 	messageIDStr := c.Param("message_id")
 	messageID, err := strconv.Atoi(messageIDStr)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid message ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid message ID")
 		return
 	}
 
 	ctx := c.Request.Context()
 
 	if _, err := requireGroupAdmin(ctx, h.pool, convID, callerID); err != nil {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Only group admins can delete messages"})
+		RespondError(c, http.StatusForbidden, "Only group admins can delete messages")
 		return
 	}
 
@@ -579,11 +579,11 @@ func (h *GroupAdminHandler) AdminDeleteMessage(c *gin.Context) {
 	`, messageID, convID)
 	if err != nil {
 		log.Printf("[GroupAdmin] AdminDeleteMessage: err=%v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete message"})
+		RespondError(c, http.StatusInternalServerError, "Failed to delete message")
 		return
 	}
 	if tag.RowsAffected() == 0 {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Message not found"})
+		RespondError(c, http.StatusNotFound, "Message not found")
 		return
 	}
 
@@ -613,7 +613,7 @@ func (h *GroupAdminHandler) SetSlowMode(c *gin.Context) {
 	ctx := c.Request.Context()
 
 	if _, err := requireGroupAdmin(ctx, h.pool, convID, callerID); err != nil {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Only group admins can set slow mode"})
+		RespondError(c, http.StatusForbidden, "Only group admins can set slow mode")
 		return
 	}
 
@@ -622,20 +622,20 @@ func (h *GroupAdminHandler) SetSlowMode(c *gin.Context) {
 		Seconds *int `json:"seconds"`
 	}
 	if err := c.ShouldBindJSON(&raw); err != nil || raw.Seconds == nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "seconds field is required"})
+		RespondError(c, http.StatusBadRequest, "seconds field is required")
 		return
 	}
 	req := SetSlowModeRequest{Seconds: *raw.Seconds}
 
 	allowed := map[int]bool{0: true, 10: true, 30: true, 60: true, 300: true, 600: true, 1800: true, 3600: true}
 	if !allowed[req.Seconds] {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid slow mode value. Allowed: 0,10,30,60,300,600,1800,3600"})
+		RespondError(c, http.StatusBadRequest, "Invalid slow mode value. Allowed: 0,10,30,60,300,600,1800,3600")
 		return
 	}
 
 	if _, err := h.pool.Exec(ctx, `UPDATE conversations SET slow_mode_seconds=$1 WHERE id=$2`, req.Seconds, convID); err != nil {
 		log.Printf("[GroupAdmin] SetSlowMode: err=%v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to set slow mode"})
+		RespondError(c, http.StatusInternalServerError, "Failed to set slow mode")
 		return
 	}
 
@@ -665,7 +665,7 @@ func (h *GroupAdminHandler) GetAuditLog(c *gin.Context) {
 	ctx := c.Request.Context()
 
 	if _, err := requireGroupAdmin(ctx, h.pool, convID, callerID); err != nil {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Only group admins can view the audit log"})
+		RespondError(c, http.StatusForbidden, "Only group admins can view the audit log")
 		return
 	}
 
@@ -714,7 +714,7 @@ func (h *GroupAdminHandler) GetAuditLog(c *gin.Context) {
 	rows, err := h.pool.Query(ctx, query, args...)
 	if err != nil {
 		log.Printf("[GroupAdmin] GetAuditLog: err=%v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get audit log"})
+		RespondError(c, http.StatusInternalServerError, "Failed to get audit log")
 		return
 	}
 	defer rows.Close()

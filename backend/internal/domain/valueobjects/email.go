@@ -36,6 +36,14 @@ func NewEmail(email string) (Email, error) {
 	return Email{value: strings.ToLower(email)}, nil
 }
 
+// EmailFromString creates an Email bypassing validation.
+// Use only when loading from the database where the value is already trusted
+// (e.g. a stored address that fails the current regex due to an edge case, or
+// a malformed legacy row that must not block all operations on that user).
+func EmailFromString(raw string) Email {
+	return Email{value: raw}
+}
+
 // String returns the normalised email address.
 func (e Email) String() string {
 	return e.value

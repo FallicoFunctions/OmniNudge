@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"github.com/omninudge/backend/internal/api/middleware"
 	"net/http"
 	"strconv"
 	"strings"
@@ -27,7 +28,7 @@ func NewSearchHandler(pool *pgxpool.Pool) *SearchHandler {
 func (h *SearchHandler) SearchPosts(c *gin.Context) {
 	query := c.Query("q")
 	if query == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Search query is required"})
+		RespondError(c, http.StatusBadRequest, "Search query is required")
 		return
 	}
 
@@ -45,7 +46,7 @@ func (h *SearchHandler) SearchPosts(c *gin.Context) {
 	if cursorParam != "" {
 		decoded, err := decodeSearchCursor(cursorParam)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid cursor"})
+			RespondError(c, http.StatusBadRequest, "Invalid cursor")
 			return
 		}
 		cursor = decoded
@@ -118,7 +119,7 @@ func (h *SearchHandler) SearchPosts(c *gin.Context) {
 			&hubName, &authorUsername, &rank,
 		)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to parse results"})
+			RespondError(c, http.StatusInternalServerError, "Failed to parse results")
 			return
 		}
 		if hubName != nil {
@@ -164,7 +165,7 @@ func (h *SearchHandler) SearchPosts(c *gin.Context) {
 func (h *SearchHandler) SearchComments(c *gin.Context) {
 	query := c.Query("q")
 	if query == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Search query is required"})
+		RespondError(c, http.StatusBadRequest, "Search query is required")
 		return
 	}
 
@@ -180,7 +181,7 @@ func (h *SearchHandler) SearchComments(c *gin.Context) {
 	if cursorParam != "" {
 		decoded, err := decodeSearchCursor(cursorParam)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid cursor"})
+			RespondError(c, http.StatusBadRequest, "Invalid cursor")
 			return
 		}
 		cursor = decoded
@@ -229,7 +230,7 @@ func (h *SearchHandler) SearchComments(c *gin.Context) {
 			&comment.CreatedAt, &rank,
 		)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to parse results"})
+			RespondError(c, http.StatusInternalServerError, "Failed to parse results")
 			return
 		}
 		results = append(results, searchCommentResult{comment: comment, rank: rank})
@@ -269,7 +270,7 @@ func (h *SearchHandler) SearchComments(c *gin.Context) {
 func (h *SearchHandler) SearchUsers(c *gin.Context) {
 	query := c.Query("q")
 	if query == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Search query is required"})
+		RespondError(c, http.StatusBadRequest, "Search query is required")
 		return
 	}
 
@@ -287,7 +288,7 @@ func (h *SearchHandler) SearchUsers(c *gin.Context) {
 	if cursorParam != "" {
 		decoded, err := decodeSearchCursor(cursorParam)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid cursor"})
+			RespondError(c, http.StatusBadRequest, "Invalid cursor")
 			return
 		}
 		cursor = decoded
@@ -348,7 +349,7 @@ func (h *SearchHandler) SearchUsers(c *gin.Context) {
 			&user.CreatedAt, &rank,
 		)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to parse results"})
+			RespondError(c, http.StatusInternalServerError, "Failed to parse results")
 			return
 		}
 		results = append(results, searchUserResult{user: user, rank: rank})
@@ -388,7 +389,7 @@ func (h *SearchHandler) SearchUsers(c *gin.Context) {
 func (h *SearchHandler) SearchHubs(c *gin.Context) {
 	query := c.Query("q")
 	if query == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Search query is required"})
+		RespondError(c, http.StatusBadRequest, "Search query is required")
 		return
 	}
 
@@ -406,7 +407,7 @@ func (h *SearchHandler) SearchHubs(c *gin.Context) {
 	if cursorParam != "" {
 		decoded, err := decodeSearchCursor(cursorParam)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid cursor"})
+			RespondError(c, http.StatusBadRequest, "Invalid cursor")
 			return
 		}
 		cursor = decoded
@@ -476,7 +477,7 @@ func (h *SearchHandler) SearchHubs(c *gin.Context) {
 			&rank,
 		)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to parse results"})
+			RespondError(c, http.StatusInternalServerError, "Failed to parse results")
 			return
 		}
 		results = append(results, searchHubResult{hub: hub, rank: rank})
@@ -527,15 +528,8 @@ func (h *SearchHandler) SearchMessages(c *gin.Context) {
 		)
 	}()
 
-	userID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Authentication required"})
-		return
-	}
-
-	authUserID, ok := userID.(int)
-	if !ok || authUserID == 0 {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid user context"})
+	authUserID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
 		return
 	}
 
@@ -561,7 +555,7 @@ func (h *SearchHandler) SearchMessages(c *gin.Context) {
 	if rawConversationID := strings.TrimSpace(c.Query("conversation_id")); rawConversationID != "" {
 		id, err := strconv.Atoi(rawConversationID)
 		if err != nil || id <= 0 {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid conversation_id"})
+			RespondError(c, http.StatusBadRequest, "Invalid conversation_id")
 			return
 		}
 		conversationID = &id
@@ -571,7 +565,7 @@ func (h *SearchHandler) SearchMessages(c *gin.Context) {
 	if rawSenderID := strings.TrimSpace(c.Query("sender_id")); rawSenderID != "" {
 		id, err := strconv.Atoi(rawSenderID)
 		if err != nil || id <= 0 {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid sender_id"})
+			RespondError(c, http.StatusBadRequest, "Invalid sender_id")
 			return
 		}
 		senderID = &id
@@ -581,7 +575,7 @@ func (h *SearchHandler) SearchMessages(c *gin.Context) {
 	if rawStartDate := strings.TrimSpace(c.Query("start_date")); rawStartDate != "" {
 		parsed, err := time.Parse(time.RFC3339, rawStartDate)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid start_date (expected RFC3339)"})
+			RespondError(c, http.StatusBadRequest, "Invalid start_date (expected RFC3339)")
 			return
 		}
 		startDate = &parsed
@@ -591,14 +585,14 @@ func (h *SearchHandler) SearchMessages(c *gin.Context) {
 	if rawEndDate := strings.TrimSpace(c.Query("end_date")); rawEndDate != "" {
 		parsed, err := time.Parse(time.RFC3339, rawEndDate)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid end_date (expected RFC3339)"})
+			RespondError(c, http.StatusBadRequest, "Invalid end_date (expected RFC3339)")
 			return
 		}
 		endDate = &parsed
 	}
 
 	if startDate != nil && endDate != nil && endDate.Before(*startDate) {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "end_date must be after start_date"})
+		RespondError(c, http.StatusBadRequest, "end_date must be after start_date")
 		return
 	}
 
@@ -803,7 +797,7 @@ func (h *SearchHandler) SearchMessages(c *gin.Context) {
 			&message.SenderUsername,
 			&message.SearchSnippet,
 		); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to parse results"})
+			RespondError(c, http.StatusInternalServerError, "Failed to parse results")
 			return
 		}
 		messages = append(messages, message)

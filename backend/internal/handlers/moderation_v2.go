@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"github.com/omninudge/backend/internal/ports"
+	"github.com/omninudge/backend/internal/api/middleware"
 	"net/http"
 	"strconv"
 	"time"
@@ -10,21 +12,21 @@ import (
 )
 
 type ModerationHandlerV2 struct {
-	hubBanRepo           *models.HubBanRepository
-	removalReasonRepo    *models.RemovalReasonRepository
-	removedContentRepo   *models.RemovedContentRepository
-	modLogRepo           *models.ModLogRepository
-	postRepo             *models.PlatformPostRepository
-	commentRepo          *models.PostCommentRepository
+	hubBanRepo           ports.HubBanRepository
+	removalReasonRepo    ports.RemovalReasonRepository
+	removedContentRepo   ports.RemovedContentRepository
+	modLogRepo           ports.ModLogRepository
+	postRepo             ports.PlatformPostRepository
+	commentRepo          ports.PostCommentRepository
 }
 
 func NewModerationHandlerV2(
-	hubBanRepo *models.HubBanRepository,
-	removalReasonRepo *models.RemovalReasonRepository,
-	removedContentRepo *models.RemovedContentRepository,
-	modLogRepo *models.ModLogRepository,
-	postRepo *models.PlatformPostRepository,
-	commentRepo *models.PostCommentRepository,
+	hubBanRepo ports.HubBanRepository,
+	removalReasonRepo ports.RemovalReasonRepository,
+	removedContentRepo ports.RemovedContentRepository,
+	modLogRepo ports.ModLogRepository,
+	postRepo ports.PlatformPostRepository,
+	commentRepo ports.PostCommentRepository,
 ) *ModerationHandlerV2 {
 	return &ModerationHandlerV2{
 		hubBanRepo:         hubBanRepo,
@@ -40,15 +42,14 @@ func NewModerationHandlerV2(
 
 // BanUser - POST /api/v1/mod/hubs/:hubname/ban
 func (h *ModerationHandlerV2) BanUser(c *gin.Context) {
-	userID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
 		return
 	}
 
 	hubID, ok := getHubIDFromContext(c)
 	if !ok {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Missing hub context"})
+		RespondError(c, http.StatusBadRequest, "Missing hub context")
 		return
 	}
 
@@ -61,32 +62,32 @@ func (h *ModerationHandlerV2) BanUser(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		RespondError(c, http.StatusBadRequest, err.Error())
 		return
 	}
 
 	var expiresAt *time.Time
 	if req.BanType == "temporary" {
 		if req.ExpiresAt == nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "expires_at required for temporary bans"})
+			RespondError(c, http.StatusBadRequest, "expires_at required for temporary bans")
 			return
 		}
 		parsed, err := time.Parse(time.RFC3339, *req.ExpiresAt)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid expires_at format"})
+			RespondError(c, http.StatusBadRequest, "Invalid expires_at format")
 			return
 		}
 		expiresAt = &parsed
 	}
 
-	ban, err := h.hubBanRepo.BanUser(c.Request.Context(), hubID, req.UserID, userID.(int), req.Reason, req.Note, req.BanType, expiresAt)
+	ban, err := h.hubBanRepo.BanUser(c.Request.Context(), hubID, req.UserID, userID, req.Reason, req.Note, req.BanType, expiresAt)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		RespondError(c, http.StatusInternalServerError, err.Error())
 		return
 	}
 
 	// Log the action
-	_, _ = h.modLogRepo.Log(c.Request.Context(), hubID, userID.(int), "ban_user", "user", req.UserID, models.JSONB{
+	_, _ = h.modLogRepo.Log(c.Request.Context(), hubID, userID, "ban_user", "user", req.UserID, models.JSONB{
 		"ban_type":   req.BanType,
 		"reason":     req.Reason,
 		"expires_at": expiresAt,
@@ -97,32 +98,31 @@ func (h *ModerationHandlerV2) BanUser(c *gin.Context) {
 
 // UnbanUser - DELETE /api/v1/mod/hubs/:hubname/ban/:userid
 func (h *ModerationHandlerV2) UnbanUser(c *gin.Context) {
-	userID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
 		return
 	}
 
 	targetUserID, err := strconv.Atoi(c.Param("userid"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid user ID")
 		return
 	}
 
 	hubID, ok := getHubIDFromContext(c)
 	if !ok {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Missing hub context"})
+		RespondError(c, http.StatusBadRequest, "Missing hub context")
 		return
 	}
 
 	err = h.hubBanRepo.UnbanUser(c.Request.Context(), hubID, targetUserID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		RespondError(c, http.StatusInternalServerError, err.Error())
 		return
 	}
 
 	// Log the action
-	_, _ = h.modLogRepo.Log(c.Request.Context(), hubID, userID.(int), "unban_user", "user", targetUserID, models.JSONB{})
+	_, _ = h.modLogRepo.Log(c.Request.Context(), hubID, userID, "unban_user", "user", targetUserID, models.JSONB{})
 
 	c.JSON(http.StatusOK, gin.H{"message": "User unbanned successfully"})
 }
@@ -131,13 +131,13 @@ func (h *ModerationHandlerV2) UnbanUser(c *gin.Context) {
 func (h *ModerationHandlerV2) GetBannedUsers(c *gin.Context) {
 	hubID, ok := getHubIDFromContext(c)
 	if !ok {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Missing hub context"})
+		RespondError(c, http.StatusBadRequest, "Missing hub context")
 		return
 	}
 
 	bans, err := h.hubBanRepo.GetBannedUsers(c.Request.Context(), hubID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		RespondError(c, http.StatusInternalServerError, err.Error())
 		return
 	}
 
@@ -148,15 +148,14 @@ func (h *ModerationHandlerV2) GetBannedUsers(c *gin.Context) {
 
 // RemovePost - POST /api/v1/mod/posts/:id/remove
 func (h *ModerationHandlerV2) RemovePost(c *gin.Context) {
-	userID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
 		return
 	}
 
 	postID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid post ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid post ID")
 		return
 	}
 
@@ -167,41 +166,41 @@ func (h *ModerationHandlerV2) RemovePost(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		RespondError(c, http.StatusBadRequest, err.Error())
 		return
 	}
 
 	// Get the post to verify hub and permissions
 	post, err := h.postRepo.GetByID(c.Request.Context(), postID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		RespondError(c, http.StatusInternalServerError, err.Error())
 		return
 	}
 	if post == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Post not found"})
+		RespondError(c, http.StatusNotFound, "Post not found")
 		return
 	}
 	if post.HubID == nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Cannot remove posts without a hub"})
+		RespondError(c, http.StatusBadRequest, "Cannot remove posts without a hub")
 		return
 	}
 
 	// Mark post as removed
-	err = h.postRepo.MarkAsRemoved(c.Request.Context(), postID, userID.(int))
+	err = h.postRepo.MarkAsRemoved(c.Request.Context(), postID, userID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		RespondError(c, http.StatusInternalServerError, err.Error())
 		return
 	}
 
 	// Track removal
-	_, err = h.removedContentRepo.RemoveContent(c.Request.Context(), "post", postID, post.HubID, userID.(int), req.RemovalReasonID, req.CustomReason, req.ModNote)
+	_, err = h.removedContentRepo.RemoveContent(c.Request.Context(), "post", postID, post.HubID, userID, req.RemovalReasonID, req.CustomReason, req.ModNote)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		RespondError(c, http.StatusInternalServerError, err.Error())
 		return
 	}
 
 	// Log the action
-	_, _ = h.modLogRepo.Log(c.Request.Context(), *post.HubID, userID.(int), "remove_post", "post", postID, models.JSONB{
+	_, _ = h.modLogRepo.Log(c.Request.Context(), *post.HubID, userID, "remove_post", "post", postID, models.JSONB{
 		"removal_reason_id": req.RemovalReasonID,
 		"custom_reason":     req.CustomReason,
 	})
@@ -211,37 +210,36 @@ func (h *ModerationHandlerV2) RemovePost(c *gin.Context) {
 
 // ApprovePost - POST /api/v1/mod/posts/:id/approve
 func (h *ModerationHandlerV2) ApprovePost(c *gin.Context) {
-	userID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
 		return
 	}
 
 	postID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid post ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid post ID")
 		return
 	}
 
 	// Get the post
 	post, err := h.postRepo.GetByID(c.Request.Context(), postID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		RespondError(c, http.StatusInternalServerError, err.Error())
 		return
 	}
 	if post == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Post not found"})
+		RespondError(c, http.StatusNotFound, "Post not found")
 		return
 	}
 	if post.HubID == nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Cannot approve posts without a hub"})
+		RespondError(c, http.StatusBadRequest, "Cannot approve posts without a hub")
 		return
 	}
 
 	// Unmark as removed
 	err = h.postRepo.MarkAsApproved(c.Request.Context(), postID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		RespondError(c, http.StatusInternalServerError, err.Error())
 		return
 	}
 
@@ -249,22 +247,21 @@ func (h *ModerationHandlerV2) ApprovePost(c *gin.Context) {
 	_ = h.removedContentRepo.RestoreContent(c.Request.Context(), "post", postID)
 
 	// Log the action
-	_, _ = h.modLogRepo.Log(c.Request.Context(), *post.HubID, userID.(int), "approve_post", "post", postID, models.JSONB{})
+	_, _ = h.modLogRepo.Log(c.Request.Context(), *post.HubID, userID, "approve_post", "post", postID, models.JSONB{})
 
 	c.JSON(http.StatusOK, gin.H{"message": "Post approved successfully"})
 }
 
 // RemoveComment - POST /api/v1/mod/comments/:id/remove
 func (h *ModerationHandlerV2) RemoveComment(c *gin.Context) {
-	userID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
 		return
 	}
 
 	commentID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid comment ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid comment ID")
 		return
 	}
 
@@ -275,48 +272,48 @@ func (h *ModerationHandlerV2) RemoveComment(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		RespondError(c, http.StatusBadRequest, err.Error())
 		return
 	}
 
 	// Get the comment to verify post and hub
 	comment, err := h.commentRepo.GetByID(c.Request.Context(), commentID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		RespondError(c, http.StatusInternalServerError, err.Error())
 		return
 	}
 	if comment == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Comment not found"})
+		RespondError(c, http.StatusNotFound, "Comment not found")
 		return
 	}
 
 	// Get the post to check hub
 	post, err := h.postRepo.GetByID(c.Request.Context(), comment.PostID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		RespondError(c, http.StatusInternalServerError, err.Error())
 		return
 	}
 	if post.HubID == nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Cannot remove comments on posts without a hub"})
+		RespondError(c, http.StatusBadRequest, "Cannot remove comments on posts without a hub")
 		return
 	}
 
 	// Mark comment as removed
-	err = h.commentRepo.MarkAsRemoved(c.Request.Context(), commentID, userID.(int))
+	err = h.commentRepo.MarkAsRemoved(c.Request.Context(), commentID, userID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		RespondError(c, http.StatusInternalServerError, err.Error())
 		return
 	}
 
 	// Track removal
-	_, err = h.removedContentRepo.RemoveContent(c.Request.Context(), "comment", commentID, post.HubID, userID.(int), req.RemovalReasonID, req.CustomReason, req.ModNote)
+	_, err = h.removedContentRepo.RemoveContent(c.Request.Context(), "comment", commentID, post.HubID, userID, req.RemovalReasonID, req.CustomReason, req.ModNote)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		RespondError(c, http.StatusInternalServerError, err.Error())
 		return
 	}
 
 	// Log the action
-	_, _ = h.modLogRepo.Log(c.Request.Context(), *post.HubID, userID.(int), "remove_comment", "comment", commentID, models.JSONB{
+	_, _ = h.modLogRepo.Log(c.Request.Context(), *post.HubID, userID, "remove_comment", "comment", commentID, models.JSONB{
 		"removal_reason_id": req.RemovalReasonID,
 		"custom_reason":     req.CustomReason,
 	})
@@ -326,44 +323,43 @@ func (h *ModerationHandlerV2) RemoveComment(c *gin.Context) {
 
 // ApproveComment - POST /api/v1/mod/comments/:id/approve
 func (h *ModerationHandlerV2) ApproveComment(c *gin.Context) {
-	userID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
 		return
 	}
 
 	commentID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid comment ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid comment ID")
 		return
 	}
 
 	// Get the comment
 	comment, err := h.commentRepo.GetByID(c.Request.Context(), commentID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		RespondError(c, http.StatusInternalServerError, err.Error())
 		return
 	}
 	if comment == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Comment not found"})
+		RespondError(c, http.StatusNotFound, "Comment not found")
 		return
 	}
 
 	// Get the post to check hub
 	post, err := h.postRepo.GetByID(c.Request.Context(), comment.PostID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		RespondError(c, http.StatusInternalServerError, err.Error())
 		return
 	}
 	if post.HubID == nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Cannot approve comments on posts without a hub"})
+		RespondError(c, http.StatusBadRequest, "Cannot approve comments on posts without a hub")
 		return
 	}
 
 	// Unmark as removed
 	err = h.commentRepo.MarkAsApproved(c.Request.Context(), commentID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		RespondError(c, http.StatusInternalServerError, err.Error())
 		return
 	}
 
@@ -371,7 +367,7 @@ func (h *ModerationHandlerV2) ApproveComment(c *gin.Context) {
 	_ = h.removedContentRepo.RestoreContent(c.Request.Context(), "comment", commentID)
 
 	// Log the action
-	_, _ = h.modLogRepo.Log(c.Request.Context(), *post.HubID, userID.(int), "approve_comment", "comment", commentID, models.JSONB{})
+	_, _ = h.modLogRepo.Log(c.Request.Context(), *post.HubID, userID, "approve_comment", "comment", commentID, models.JSONB{})
 
 	c.JSON(http.StatusOK, gin.H{"message": "Comment approved successfully"})
 }
@@ -380,171 +376,166 @@ func (h *ModerationHandlerV2) ApproveComment(c *gin.Context) {
 
 // LockPost - POST /api/v1/mod/posts/:id/lock
 func (h *ModerationHandlerV2) LockPost(c *gin.Context) {
-	userID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
 		return
 	}
 
 	postID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid post ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid post ID")
 		return
 	}
 
 	post, err := h.postRepo.GetByID(c.Request.Context(), postID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		RespondError(c, http.StatusInternalServerError, err.Error())
 		return
 	}
 	if post == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Post not found"})
+		RespondError(c, http.StatusNotFound, "Post not found")
 		return
 	}
 	if post.HubID == nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Cannot lock posts without a hub"})
+		RespondError(c, http.StatusBadRequest, "Cannot lock posts without a hub")
 		return
 	}
 
 	err = h.postRepo.LockPost(c.Request.Context(), postID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		RespondError(c, http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	_, _ = h.modLogRepo.Log(c.Request.Context(), *post.HubID, userID.(int), "lock_post", "post", postID, models.JSONB{})
+	_, _ = h.modLogRepo.Log(c.Request.Context(), *post.HubID, userID, "lock_post", "post", postID, models.JSONB{})
 
 	c.JSON(http.StatusOK, gin.H{"message": "Post locked successfully"})
 }
 
 // UnlockPost - POST /api/v1/mod/posts/:id/unlock
 func (h *ModerationHandlerV2) UnlockPost(c *gin.Context) {
-	userID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
 		return
 	}
 
 	postID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid post ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid post ID")
 		return
 	}
 
 	post, err := h.postRepo.GetByID(c.Request.Context(), postID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		RespondError(c, http.StatusInternalServerError, err.Error())
 		return
 	}
 	if post == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Post not found"})
+		RespondError(c, http.StatusNotFound, "Post not found")
 		return
 	}
 	if post.HubID == nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Cannot unlock posts without a hub"})
+		RespondError(c, http.StatusBadRequest, "Cannot unlock posts without a hub")
 		return
 	}
 
 	err = h.postRepo.UnlockPost(c.Request.Context(), postID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		RespondError(c, http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	_, _ = h.modLogRepo.Log(c.Request.Context(), *post.HubID, userID.(int), "unlock_post", "post", postID, models.JSONB{})
+	_, _ = h.modLogRepo.Log(c.Request.Context(), *post.HubID, userID, "unlock_post", "post", postID, models.JSONB{})
 
 	c.JSON(http.StatusOK, gin.H{"message": "Post unlocked successfully"})
 }
 
 // PinPost - POST /api/v1/mod/posts/:id/pin
 func (h *ModerationHandlerV2) PinPost(c *gin.Context) {
-	userID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
 		return
 	}
 
 	postID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid post ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid post ID")
 		return
 	}
 
 	post, err := h.postRepo.GetByID(c.Request.Context(), postID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		RespondError(c, http.StatusInternalServerError, err.Error())
 		return
 	}
 	if post == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Post not found"})
+		RespondError(c, http.StatusNotFound, "Post not found")
 		return
 	}
 	if post.HubID == nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Cannot pin posts without a hub"})
+		RespondError(c, http.StatusBadRequest, "Cannot pin posts without a hub")
 		return
 	}
 
 	err = h.postRepo.PinPost(c.Request.Context(), postID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		RespondError(c, http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	_, _ = h.modLogRepo.Log(c.Request.Context(), *post.HubID, userID.(int), "pin_post", "post", postID, models.JSONB{})
+	_, _ = h.modLogRepo.Log(c.Request.Context(), *post.HubID, userID, "pin_post", "post", postID, models.JSONB{})
 
 	c.JSON(http.StatusOK, gin.H{"message": "Post pinned successfully"})
 }
 
 // UnpinPost - POST /api/v1/mod/posts/:id/unpin
 func (h *ModerationHandlerV2) UnpinPost(c *gin.Context) {
-	userID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
 		return
 	}
 
 	postID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid post ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid post ID")
 		return
 	}
 
 	post, err := h.postRepo.GetByID(c.Request.Context(), postID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		RespondError(c, http.StatusInternalServerError, err.Error())
 		return
 	}
 	if post == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Post not found"})
+		RespondError(c, http.StatusNotFound, "Post not found")
 		return
 	}
 	if post.HubID == nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Cannot unpin posts without a hub"})
+		RespondError(c, http.StatusBadRequest, "Cannot unpin posts without a hub")
 		return
 	}
 
 	err = h.postRepo.UnpinPost(c.Request.Context(), postID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		RespondError(c, http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	_, _ = h.modLogRepo.Log(c.Request.Context(), *post.HubID, userID.(int), "unpin_post", "post", postID, models.JSONB{})
+	_, _ = h.modLogRepo.Log(c.Request.Context(), *post.HubID, userID, "unpin_post", "post", postID, models.JSONB{})
 
 	c.JSON(http.StatusOK, gin.H{"message": "Post unpinned successfully"})
 }
 
 // UpdatePinnedOrder - POST /api/v1/mod/hubs/:hub_name/pinned-order
 func (h *ModerationHandlerV2) UpdatePinnedOrder(c *gin.Context) {
-	userID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
 		return
 	}
 
 	hubID, ok := getHubIDFromContext(c)
 	if !ok {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Missing hub context"})
+		RespondError(c, http.StatusBadRequest, "Missing hub context")
 		return
 	}
 
@@ -553,22 +544,22 @@ func (h *ModerationHandlerV2) UpdatePinnedOrder(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		RespondError(c, http.StatusBadRequest, err.Error())
 		return
 	}
 	if len(req.PostIDs) == 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Post IDs are required"})
+		RespondError(c, http.StatusBadRequest, "Post IDs are required")
 		return
 	}
 
 	seen := make(map[int]struct{}, len(req.PostIDs))
 	for _, id := range req.PostIDs {
 		if id <= 0 {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid post ID"})
+			RespondError(c, http.StatusBadRequest, "Invalid post ID")
 			return
 		}
 		if _, exists := seen[id]; exists {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Duplicate post ID"})
+			RespondError(c, http.StatusBadRequest, "Duplicate post ID")
 			return
 		}
 		seen[id] = struct{}{}
@@ -576,29 +567,29 @@ func (h *ModerationHandlerV2) UpdatePinnedOrder(c *gin.Context) {
 
 	pinnedIDs, err := h.postRepo.GetPinnedIDsByHub(c.Request.Context(), hubID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch pinned posts"})
+		RespondError(c, http.StatusInternalServerError, "Failed to fetch pinned posts")
 		return
 	}
 	if len(pinnedIDs) != len(req.PostIDs) {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Pinned post list is out of date"})
+		RespondError(c, http.StatusBadRequest, "Pinned post list is out of date")
 		return
 	}
 	for _, id := range pinnedIDs {
 		if _, ok := seen[id]; !ok {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Pinned post list is out of date"})
+			RespondError(c, http.StatusBadRequest, "Pinned post list is out of date")
 			return
 		}
 	}
 
 	if err := h.postRepo.UpdatePinnedOrder(c.Request.Context(), hubID, req.PostIDs); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update pinned order"})
+		RespondError(c, http.StatusInternalServerError, "Failed to update pinned order")
 		return
 	}
 
 	_, _ = h.modLogRepo.Log(
 		c.Request.Context(),
 		hubID,
-		userID.(int),
+		userID,
 		"reorder_pinned_posts",
 		"hub",
 		hubID,
@@ -612,15 +603,14 @@ func (h *ModerationHandlerV2) UpdatePinnedOrder(c *gin.Context) {
 
 // CreateRemovalReason - POST /api/v1/mod/hubs/:hubname/removal-reasons
 func (h *ModerationHandlerV2) CreateRemovalReason(c *gin.Context) {
-	userID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
 		return
 	}
 
 	hubID, ok := getHubIDFromContext(c)
 	if !ok {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Missing hub context"})
+		RespondError(c, http.StatusBadRequest, "Missing hub context")
 		return
 	}
 
@@ -630,17 +620,17 @@ func (h *ModerationHandlerV2) CreateRemovalReason(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		RespondError(c, http.StatusBadRequest, err.Error())
 		return
 	}
 
-	reason, err := h.removalReasonRepo.Create(c.Request.Context(), hubID, userID.(int), req.Title, req.Message)
+	reason, err := h.removalReasonRepo.Create(c.Request.Context(), hubID, userID, req.Title, req.Message)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		RespondError(c, http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	_, _ = h.modLogRepo.Log(c.Request.Context(), hubID, userID.(int), "create_removal_reason", "removal_reason", reason.ID, models.JSONB{
+	_, _ = h.modLogRepo.Log(c.Request.Context(), hubID, userID, "create_removal_reason", "removal_reason", reason.ID, models.JSONB{
 		"title": req.Title,
 	})
 
@@ -649,26 +639,25 @@ func (h *ModerationHandlerV2) CreateRemovalReason(c *gin.Context) {
 
 // UpdateRemovalReason - PUT /api/v1/mod/removal-reasons/:id
 func (h *ModerationHandlerV2) UpdateRemovalReason(c *gin.Context) {
-	userID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
 		return
 	}
 
 	reasonID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid reason ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid reason ID")
 		return
 	}
 
 	// Get the removal reason to check hub
 	existingReason, err := h.removalReasonRepo.GetByID(c.Request.Context(), reasonID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		RespondError(c, http.StatusInternalServerError, err.Error())
 		return
 	}
 	if existingReason == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Removal reason not found"})
+		RespondError(c, http.StatusNotFound, "Removal reason not found")
 		return
 	}
 
@@ -678,17 +667,17 @@ func (h *ModerationHandlerV2) UpdateRemovalReason(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		RespondError(c, http.StatusBadRequest, err.Error())
 		return
 	}
 
 	reason, err := h.removalReasonRepo.Update(c.Request.Context(), reasonID, req.Title, req.Message)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		RespondError(c, http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	_, _ = h.modLogRepo.Log(c.Request.Context(), existingReason.HubID, userID.(int), "update_removal_reason", "removal_reason", reasonID, models.JSONB{
+	_, _ = h.modLogRepo.Log(c.Request.Context(), existingReason.HubID, userID, "update_removal_reason", "removal_reason", reasonID, models.JSONB{
 		"title": req.Title,
 	})
 
@@ -697,36 +686,35 @@ func (h *ModerationHandlerV2) UpdateRemovalReason(c *gin.Context) {
 
 // DeleteRemovalReason - DELETE /api/v1/mod/removal-reasons/:id
 func (h *ModerationHandlerV2) DeleteRemovalReason(c *gin.Context) {
-	userID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
 		return
 	}
 
 	reasonID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid reason ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid reason ID")
 		return
 	}
 
 	// Get the removal reason to check hub
 	existingReason, err := h.removalReasonRepo.GetByID(c.Request.Context(), reasonID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		RespondError(c, http.StatusInternalServerError, err.Error())
 		return
 	}
 	if existingReason == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Removal reason not found"})
+		RespondError(c, http.StatusNotFound, "Removal reason not found")
 		return
 	}
 
 	err = h.removalReasonRepo.Delete(c.Request.Context(), reasonID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		RespondError(c, http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	_, _ = h.modLogRepo.Log(c.Request.Context(), existingReason.HubID, userID.(int), "delete_removal_reason", "removal_reason", reasonID, models.JSONB{})
+	_, _ = h.modLogRepo.Log(c.Request.Context(), existingReason.HubID, userID, "delete_removal_reason", "removal_reason", reasonID, models.JSONB{})
 
 	c.JSON(http.StatusOK, gin.H{"message": "Removal reason deleted successfully"})
 }
@@ -735,13 +723,13 @@ func (h *ModerationHandlerV2) DeleteRemovalReason(c *gin.Context) {
 func (h *ModerationHandlerV2) GetRemovalReasons(c *gin.Context) {
 	hubID, ok := getHubIDFromContext(c)
 	if !ok {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Missing hub context"})
+		RespondError(c, http.StatusBadRequest, "Missing hub context")
 		return
 	}
 
 	reasons, err := h.removalReasonRepo.GetByHub(c.Request.Context(), hubID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		RespondError(c, http.StatusInternalServerError, err.Error())
 		return
 	}
 
@@ -754,7 +742,7 @@ func (h *ModerationHandlerV2) GetRemovalReasons(c *gin.Context) {
 func (h *ModerationHandlerV2) GetModLog(c *gin.Context) {
 	hubID, ok := getHubIDFromContext(c)
 	if !ok {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Missing hub context"})
+		RespondError(c, http.StatusBadRequest, "Missing hub context")
 		return
 	}
 
@@ -770,7 +758,7 @@ func (h *ModerationHandlerV2) GetModLog(c *gin.Context) {
 	if cursorParam != "" {
 		decoded, err := decodeTimeCursor(cursorParam)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid cursor"})
+			RespondError(c, http.StatusBadRequest, "Invalid cursor")
 			return
 		}
 		cursor = decoded
@@ -796,7 +784,7 @@ func (h *ModerationHandlerV2) GetModLog(c *gin.Context) {
 		logs, err = h.modLogRepo.GetByHub(c.Request.Context(), hubID, limitArg, offset)
 	}
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		RespondError(c, http.StatusInternalServerError, err.Error())
 		return
 	}
 

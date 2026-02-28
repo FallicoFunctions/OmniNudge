@@ -76,7 +76,7 @@ func (h *VoiceMessagesHandler) UploadVoice(c *gin.Context) {
 
 	messageID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid message ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid message ID")
 		return
 	}
 
@@ -86,23 +86,23 @@ func (h *VoiceMessagesHandler) UploadVoice(c *gin.Context) {
 		`SELECT sender_id FROM messages WHERE id = $1`, messageID,
 	).Scan(&ownerID)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Message not found"})
+		RespondError(c, http.StatusNotFound, "Message not found")
 		return
 	}
 	if ownerID != userID {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Forbidden"})
+		RespondError(c, http.StatusForbidden, "Forbidden")
 		return
 	}
 
 	// Parse multipart form.
 	if err := c.Request.ParseMultipartForm(11 * 1024 * 1024); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to parse form"})
+		RespondError(c, http.StatusBadRequest, "Failed to parse form")
 		return
 	}
 
 	file, header, err := c.Request.FormFile("audio")
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "No audio file provided"})
+		RespondError(c, http.StatusBadRequest, "No audio file provided")
 		return
 	}
 	defer file.Close()
@@ -114,30 +114,30 @@ func (h *VoiceMessagesHandler) UploadVoice(c *gin.Context) {
 	}
 	baseMIME := strings.TrimSpace(strings.SplitN(mimeType, ";", 2)[0])
 	if !strings.HasPrefix(baseMIME, "audio/") {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "File must be an audio file"})
+		RespondError(c, http.StatusBadRequest, "File must be an audio file")
 		return
 	}
 
 	// Validate file size.
 	if header.Size > maxVoiceFileSize {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "File too large (max 10MB)"})
+		RespondError(c, http.StatusBadRequest, "File too large (max 10MB)")
 		return
 	}
 
 	// Parse duration.
 	durationStr := c.PostForm("duration_seconds")
 	if durationStr == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "duration_seconds is required"})
+		RespondError(c, http.StatusBadRequest, "duration_seconds is required")
 		return
 	}
 	durationSeconds, err := strconv.ParseFloat(durationStr, 64)
 	if err != nil || durationSeconds <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid duration_seconds"})
+		RespondError(c, http.StatusBadRequest, "Invalid duration_seconds")
 		return
 	}
 	const maxDurationSeconds = 300 // 5 minutes
 	if durationSeconds > maxDurationSeconds {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Voice messages are limited to 5 minutes"})
+		RespondError(c, http.StatusBadRequest, "Voice messages are limited to 5 minutes")
 		return
 	}
 
@@ -145,7 +145,7 @@ func (h *VoiceMessagesHandler) UploadVoice(c *gin.Context) {
 	tmpFile, err := os.CreateTemp("", "voice-upload-*")
 	if err != nil {
 		log.Printf("voice upload: create temp file: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal error"})
+		RespondError(c, http.StatusInternalServerError, "Internal error")
 		return
 	}
 	tmpPath := tmpFile.Name()
@@ -154,7 +154,7 @@ func (h *VoiceMessagesHandler) UploadVoice(c *gin.Context) {
 	if _, err := io.Copy(tmpFile, file); err != nil {
 		tmpFile.Close()
 		log.Printf("voice upload: write temp file: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal error"})
+		RespondError(c, http.StatusInternalServerError, "Internal error")
 		return
 	}
 	tmpFile.Close()
@@ -167,7 +167,7 @@ func (h *VoiceMessagesHandler) UploadVoice(c *gin.Context) {
 			log.Printf("voice upload: virus scan error: %v", scanErr)
 			// Fail open — treat as skipped.
 		} else if result.Infected {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "File rejected by virus scanner"})
+			RespondError(c, http.StatusBadRequest, "File rejected by virus scanner")
 			return
 		} else {
 			scanStatus = "clean"
@@ -182,14 +182,14 @@ func (h *VoiceMessagesHandler) UploadVoice(c *gin.Context) {
 	f, err := os.Open(tmpPath)
 	if err != nil {
 		log.Printf("voice upload: open temp file for upload: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal error"})
+		RespondError(c, http.StatusInternalServerError, "Internal error")
 		return
 	}
 	defer f.Close()
 
 	if _, err := h.storage.Upload(c.Request.Context(), storageKey, f); err != nil {
 		log.Printf("voice upload: storage upload failed: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to store audio file"})
+		RespondError(c, http.StatusInternalServerError, "Failed to store audio file")
 		return
 	}
 
@@ -207,7 +207,7 @@ func (h *VoiceMessagesHandler) UploadVoice(c *gin.Context) {
 	`, messageID, durationSeconds, storageKey, fileSize, mimeType, scanStatus).Scan(&voiceMessageID)
 	if err != nil {
 		log.Printf("voice upload: db insert: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save voice message"})
+		RespondError(c, http.StatusInternalServerError, "Failed to save voice message")
 		return
 	}
 
@@ -236,7 +236,7 @@ func (h *VoiceMessagesHandler) GetVoiceMessage(c *gin.Context) {
 
 	messageID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid message ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid message ID")
 		return
 	}
 
@@ -266,18 +266,18 @@ func (h *VoiceMessagesHandler) GetVoiceMessage(c *gin.Context) {
 		WHERE vm.message_id = $1
 	`, messageID, userID).Scan(&id, &msgID, &durationSeconds, &waveformRaw, &transcription, &storageKey, &fileSize, &mimeType, &hasAccess)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Voice message not found"})
+		RespondError(c, http.StatusNotFound, "Voice message not found")
 		return
 	}
 	if !hasAccess {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Forbidden"})
+		RespondError(c, http.StatusForbidden, "Forbidden")
 		return
 	}
 
 	signedURL, err := h.storage.GetSignedURL(c.Request.Context(), storageKey, time.Hour)
 	if err != nil {
 		log.Printf("voice get: signed URL: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate download URL"})
+		RespondError(c, http.StatusInternalServerError, "Failed to generate download URL")
 		return
 	}
 
@@ -304,7 +304,7 @@ func (h *VoiceMessagesHandler) DownloadVoice(c *gin.Context) {
 
 	voiceID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid voice message ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid voice message ID")
 		return
 	}
 
@@ -323,18 +323,18 @@ func (h *VoiceMessagesHandler) DownloadVoice(c *gin.Context) {
 		WHERE vm.id = $1
 	`, voiceID, userID).Scan(&storageKey, &hasAccess)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Voice message not found"})
+		RespondError(c, http.StatusNotFound, "Voice message not found")
 		return
 	}
 	if !hasAccess {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Forbidden"})
+		RespondError(c, http.StatusForbidden, "Forbidden")
 		return
 	}
 
 	signedURL, err := h.storage.GetSignedURL(c.Request.Context(), storageKey, time.Hour)
 	if err != nil {
 		log.Printf("voice download: signed URL: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate download URL"})
+		RespondError(c, http.StatusInternalServerError, "Failed to generate download URL")
 		return
 	}
 

@@ -36,19 +36,19 @@ func NewLogHandler(analytics *services.AnalyticsService) *LogHandler {
 func (h *LogHandler) HandleFrontendLogs(c *gin.Context) {
 	var entry FrontendLogEntry
 	if err := c.ShouldBindJSON(&entry); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid log entry"})
+		RespondError(c, http.StatusBadRequest, "Invalid log entry")
 		return
 	}
 
 	// Validate log level (only accept warn and error from frontend)
 	if entry.Level != "warn" && entry.Level != "error" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Only warn/error logs accepted"})
+		RespondError(c, http.StatusBadRequest, "Only warn/error logs accepted")
 		return
 	}
 
 	// Validate message is not empty
 	if entry.Message == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Message is required"})
+		RespondError(c, http.StatusBadRequest, "Message is required")
 		return
 	}
 
@@ -78,7 +78,7 @@ func (h *LogHandler) HandleFrontendLogs(c *gin.Context) {
 	logJSON, err := json.Marshal(logData)
 	if err != nil {
 		log.Printf("[ERROR] Failed to marshal frontend log: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to process log"})
+		RespondError(c, http.StatusInternalServerError, "Failed to process log")
 		return
 	}
 

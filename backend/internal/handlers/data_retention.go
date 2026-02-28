@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"github.com/omninudge/backend/internal/api/middleware"
 	"fmt"
 	"net/http"
 	"time"
@@ -36,7 +37,7 @@ func (h *DataRetentionHandler) GetRetentionStatus(c *gin.Context) {
 		SELECT data_type, retention_days FROM retention_settings WHERE enabled = TRUE
 	`)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load retention settings"})
+		RespondError(c, http.StatusInternalServerError, "Failed to load retention settings")
 		return
 	}
 	defer settingsRows.Close()
@@ -169,7 +170,7 @@ func (h *DataRetentionHandler) GetRetentionPolicy(c *gin.Context) {
 			END
 	`)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch retention policies"})
+		RespondError(c, http.StatusInternalServerError, "Failed to fetch retention policies")
 		return
 	}
 	defer rows.Close()
@@ -215,9 +216,8 @@ func (h *DataRetentionHandler) UpdateRetentionPolicy(c *gin.Context) {
 	dataType := c.Param("data_type")
 
 	// Get user ID from context (set by auth middleware)
-	userID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
 		return
 	}
 
@@ -228,7 +228,7 @@ func (h *DataRetentionHandler) UpdateRetentionPolicy(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		RespondError(c, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -238,7 +238,7 @@ func (h *DataRetentionHandler) UpdateRetentionPolicy(c *gin.Context) {
 		SELECT EXISTS(SELECT 1 FROM retention_settings WHERE data_type = $1)
 	`, dataType).Scan(&exists_check)
 	if err != nil || !exists_check {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Data type not found"})
+		RespondError(c, http.StatusNotFound, "Data type not found")
 		return
 	}
 
@@ -269,7 +269,7 @@ func (h *DataRetentionHandler) UpdateRetentionPolicy(c *gin.Context) {
 
 	_, err = h.db.Exec(ctx, query, args...)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update retention policy"})
+		RespondError(c, http.StatusInternalServerError, "Failed to update retention policy")
 		return
 	}
 
@@ -310,7 +310,7 @@ func (h *DataRetentionHandler) GetRetentionHistory(c *gin.Context) {
 
 	rows, err := h.db.Query(ctx, query, args...)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch retention history"})
+		RespondError(c, http.StatusInternalServerError, "Failed to fetch retention history")
 		return
 	}
 	defer rows.Close()

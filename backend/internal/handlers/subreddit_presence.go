@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"github.com/omninudge/backend/internal/api/middleware"
 	"fmt"
 	"net/http"
 	"strings"
@@ -21,13 +22,13 @@ func NewSubredditPresenceHandler(presence *services.PresenceStore) *SubredditPre
 func (h *SubredditPresenceHandler) PingSubredditPresence(c *gin.Context) {
 	subreddit := strings.TrimSpace(c.Param("name"))
 	if subreddit == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Subreddit name required"})
+		RespondError(c, http.StatusBadRequest, "Subreddit name required")
 		return
 	}
 
 	var key string
-	if userID, exists := c.Get("user_id"); exists {
-		key = fmt.Sprintf("u:%d", userID.(int))
+	if userID, _ := middleware.GetOptionalUserID(c); userID != 0 {
+		key = fmt.Sprintf("u:%d", userID)
 	} else {
 		key = fmt.Sprintf("ip:%s:%s", c.ClientIP(), c.GetHeader("User-Agent"))
 	}
@@ -45,13 +46,13 @@ func (h *SubredditPresenceHandler) PingSubredditPresence(c *gin.Context) {
 func (h *SubredditPresenceHandler) GetSubredditActiveUsers(c *gin.Context) {
 	subreddit := strings.TrimSpace(c.Param("name"))
 	if subreddit == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Subreddit name required"})
+		RespondError(c, http.StatusBadRequest, "Subreddit name required")
 		return
 	}
 
 	activeUsers := 0
-	if userID, exists := c.Get("user_id"); exists {
-		activeUsers = h.presence.Touch(subreddit, fmt.Sprintf("u:%d", userID.(int)))
+	if userID, _ := middleware.GetOptionalUserID(c); userID != 0 {
+		activeUsers = h.presence.Touch(subreddit, fmt.Sprintf("u:%d", userID))
 	} else {
 		activeUsers = h.presence.Touch(subreddit, fmt.Sprintf("ip:%s:%s", c.ClientIP(), c.GetHeader("User-Agent")))
 	}

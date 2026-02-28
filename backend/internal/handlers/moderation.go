@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"github.com/omninudge/backend/internal/ports"
+	"github.com/omninudge/backend/internal/api/middleware"
 	"context"
 	"log"
 	"net/http"
@@ -15,10 +17,10 @@ import (
 
 // ModerationHandler handles moderation reports
 type ModerationHandler struct {
-	reportRepo       *models.ReportRepository
-	modRepo          *models.HubModeratorRepository
-	userRepo         *models.UserRepository
-	notificationRepo *models.NotificationRepository
+	reportRepo       ports.ReportRepository
+	modRepo          ports.HubModeratorRepository
+	userRepo         ports.UserRepository
+	notificationRepo ports.NotificationRepository
 	broadcaster      ModerationEventBroadcaster
 	emailSender      ModerationEmailSender
 }
@@ -69,10 +71,10 @@ var resolvedReportStatuses = map[string]struct{}{
 
 // NewModerationHandler creates a moderation handler
 func NewModerationHandler(
-	reportRepo *models.ReportRepository,
-	modRepo *models.HubModeratorRepository,
-	userRepo *models.UserRepository,
-	notificationRepo *models.NotificationRepository,
+	reportRepo ports.ReportRepository,
+	modRepo ports.HubModeratorRepository,
+	userRepo ports.UserRepository,
+	notificationRepo ports.NotificationRepository,
 	broadcaster ModerationEventBroadcaster,
 	emailSender ModerationEmailSender,
 ) *ModerationHandler {
@@ -96,9 +98,8 @@ type CreateReportRequest struct {
 
 // CreateReport handles POST /api/v1/reports
 func (h *ModerationHandler) CreateReport(c *gin.Context) {
-	userID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
 		return
 	}
 
@@ -111,18 +112,18 @@ func (h *ModerationHandler) CreateReport(c *gin.Context) {
 	switch req.TargetType {
 	case "post", "comment", "user", "message", "reddit_comment":
 	default:
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid target_type. Use post, comment, message, user, or reddit_comment"})
+		RespondError(c, http.StatusBadRequest, "Invalid target_type. Use post, comment, message, user, or reddit_comment")
 		return
 	}
-	if req.TargetType == "user" && req.TargetID == userID.(int) {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "You cannot report yourself"})
+	if req.TargetType == "user" && req.TargetID == userID {
+		RespondError(c, http.StatusBadRequest, "You cannot report yourself")
 		return
 	}
 
 	req.Reason = strings.TrimSpace(strings.ToLower(req.Reason))
 	req.Description = strings.TrimSpace(req.Description)
 	if len(req.Description) > 1000 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Description must be 1000 characters or less"})
+		RespondError(c, http.StatusBadRequest, "Description must be 1000 characters or less")
 		return
 	}
 	if _, ok := validReportReasons[req.Reason]; !ok {
@@ -132,7 +133,7 @@ func (h *ModerationHandler) CreateReport(c *gin.Context) {
 		return
 	}
 
-	reportCount, err := h.reportRepo.CountByReporterSince(c.Request.Context(), userID.(int), time.Now().Add(-24*time.Hour))
+	reportCount, err := h.reportRepo.CountByReporterSince(c.Request.Context(), userID, time.Now().Add(-24*time.Hour))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check report limit", "details": err.Error()})
 		return
@@ -151,7 +152,7 @@ func (h *ModerationHandler) CreateReport(c *gin.Context) {
 	}
 
 	report := &models.Report{
-		ReporterID:  userID.(int),
+		ReporterID:  userID,
 		TargetType:  req.TargetType,
 		TargetID:    req.TargetID,
 		Reason:      req.Reason,
@@ -185,7 +186,7 @@ func (h *ModerationHandler) CreateReport(c *gin.Context) {
 	}
 
 	if req.Reason == "csam" || req.Reason == "illegal_content" {
-		if err := h.notifyHighPriorityReport(c.Request.Context(), userID.(int), report); err != nil {
+		if err := h.notifyHighPriorityReport(c.Request.Context(), userID, report); err != nil {
 			log.Printf("Warning: failed to notify moderators for high-priority report %d: %v", report.ID, err)
 		}
 	}
@@ -291,7 +292,7 @@ func (h *ModerationHandler) ListReports(c *gin.Context) {
 	status := c.DefaultQuery("status", "open")
 	sort := c.DefaultQuery("sort", "priority")
 	if sort != "priority" && sort != "recent" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid sort. Use 'priority' or 'recent'"})
+		RespondError(c, http.StatusBadRequest, "Invalid sort. Use 'priority' or 'recent'")
 		return
 	}
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "50"))
@@ -305,7 +306,7 @@ func (h *ModerationHandler) ListReports(c *gin.Context) {
 	if cursorParam != "" {
 		decoded, err := decodeTimeCursor(cursorParam)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid cursor"})
+			RespondError(c, http.StatusBadRequest, "Invalid cursor")
 			return
 		}
 		cursor = decoded
@@ -361,7 +362,7 @@ func (h *ModerationHandler) ListReports(c *gin.Context) {
 func (h *ModerationHandler) UpdateReportStatus(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid report ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid report ID")
 		return
 	}
 
@@ -375,7 +376,7 @@ func (h *ModerationHandler) UpdateReportStatus(c *gin.Context) {
 
 	req.Status = strings.TrimSpace(strings.ToLower(req.Status))
 	if _, ok := validReportStatuses[req.Status]; !ok {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid status"})
+		RespondError(c, http.StatusBadRequest, "Invalid status")
 		return
 	}
 
