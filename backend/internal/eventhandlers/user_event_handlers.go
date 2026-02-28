@@ -49,10 +49,14 @@ func (h *UserEventHandlers) OnUserBanned(event events.Event) {
 		return
 	}
 
-	log.Printf("[eventhandlers] User banned: id=%d username=%s reason=%s", e.UserID, e.Username, e.Reason)
+	reasonVisibility := "hidden"
+	if e.ReasonPublic {
+		reasonVisibility = "public"
+	}
+	log.Printf("[eventhandlers] User banned: id=%d username=%s reason=%q (%s)", e.UserID, e.Username, e.Reason, reasonVisibility)
 
 	// TODO: revoke all active sessions for e.UserID
-	// TODO: send ban-notification email if reason is public
+	// TODO: send ban-notification email when e.ReasonPublic is true
 	// TODO: write to audit log
 }
 
@@ -68,6 +72,21 @@ func (h *UserEventHandlers) OnUserUnbanned(event events.Event) {
 	log.Printf("[eventhandlers] User unbanned: id=%d username=%s", e.UserID, e.Username)
 
 	// TODO: send unban-notification email
+}
+
+// OnUserDeleted handles UserDeleted events.
+// Side effects: write audit log, clean up user data, notify relevant parties.
+func (h *UserEventHandlers) OnUserDeleted(event events.Event) {
+	e, ok := event.(events.UserDeleted)
+	if !ok {
+		log.Printf("[eventhandlers] OnUserDeleted: unexpected event type %T", event)
+		return
+	}
+
+	log.Printf("[eventhandlers] User deleted: id=%d username=%s reason=%q deleted_by=%d", e.UserID, e.Username, e.Reason, e.DeletedBy)
+
+	// TODO: write to audit log
+	// TODO: schedule data retention cleanup
 }
 
 // OnPasswordChanged handles PasswordChanged events.

@@ -283,11 +283,17 @@ func (u *UserAggregate) GetEvents() []domainevents.Event {
 // they need to update rather than blindly saving the aggregate's ToEntity()
 // output, to avoid clobbering DB-side fields that the aggregate doesn't own.
 func (u *UserAggregate) ToEntity() *User {
-	email := u.email.String()
+	// Preserve nil email for Reddit-only users. A zero Email value object
+	// (empty string) must not be persisted as a pointer-to-empty-string,
+	// because that would break the nil vs "no email" distinction on reload.
+	var emailPtr *string
+	if s := u.email.String(); s != "" {
+		emailPtr = &s
+	}
 	return &User{
 		ID:           u.id,
 		Username:     u.username.String(),
-		Email:        &email,
+		Email:        emailPtr,
 		PasswordHash: u.password.Hash(),
 		Bio:          u.bio,
 		AvatarURL:    u.avatarURL,
@@ -305,12 +311,14 @@ func (u *UserAggregate) ToEntity() *User {
 
 // UserAggregateFromEntity reconstructs an aggregate from a persisted entity.
 //
-// Leniency policy: validation rules applied by NewUserAggregate (min username
-// length, email format) are NOT re-enforced here. Users created before those
-// rules existed — or via Reddit OAuth which never sets an email — must still
-// load correctly. The aggregate therefore accepts:
-//   - nil email  (Reddit-only accounts)
-//   - short/legacy usernames (pre-dates the 3-char minimum)
+// Intentional leniency for legacy/OAuth compatibility: validation rules applied
+// by NewUserAggregate are NOT re-enforced here so that users created under old
+// rules can still load and operate without errors. The aggregate accepts:
+//   - nil / empty email  (Reddit OAuth accounts that never set an email)
+//   - short usernames    (pre-dates the 3-char minimum)
+//   - malformed emails   (legacy rows; a WARN is logged and the raw value used)
+//
+// This is a deliberate design choice, not an oversight.
 func UserAggregateFromEntity(user *User) (*UserAggregate, error) {
 	// Username: use the lenient loader so legacy short usernames don't block.
 	username := valueobjects.UsernameFromString(user.Username)

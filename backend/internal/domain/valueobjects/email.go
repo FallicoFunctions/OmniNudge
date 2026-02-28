@@ -12,19 +12,20 @@ var (
 	ErrEmailInvalid = errors.New("email format is invalid")
 )
 
-// emailRegex validates a simplified but practical email format.
-// Rules enforced by the regex:
+// emailRegex is Phase 1 of a two-phase validation in NewEmail.
+// It enforces structural rules:
 //   - Local part: must start AND end with an alphanumeric character;
 //     middle characters may include . _ % + -
 //   - Domain: must start and end with alphanumeric; hyphens only in the middle.
 //   - TLD: ≥ 2 alpha characters.
 //
-// Additional post-regex checks (see NewEmail) handle:
-//   - Consecutive dots in the local part ("user..name@")
-//   - Consecutive hyphens in the domain ("ex--ample.com")
+// Phase 2 (post-regex string checks in NewEmail) handles cases the regex
+// cannot express compactly:
+//   - Consecutive dots in the local part  ("user..name@")
+//   - Consecutive hyphens in the domain   ("ex--ample.com")
 //
-// This is intentionally not RFC 5321-exhaustive; it rejects pathological
-// addresses that cause practical problems while accepting all common forms.
+// This is intentionally not RFC 5321-exhaustive; the goal is practical
+// rejection of addresses that fail at SMTP delivery.
 var emailRegex = regexp.MustCompile(`^[a-zA-Z0-9]([a-zA-Z0-9._%+\-]*[a-zA-Z0-9])?@[a-zA-Z0-9]([a-zA-Z0-9.\-]*[a-zA-Z0-9])?\.[a-zA-Z]{2,}$`)
 
 // Email is an immutable, self-validating value object for email addresses.
