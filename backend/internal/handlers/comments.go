@@ -55,7 +55,20 @@ type UpdateCommentRequest struct {
 	Body string `json:"body" binding:"required,min=1"`
 }
 
-// CreateComment handles POST /api/v1/posts/:postId/comments
+// CreateComment adds a comment to a post.
+// @Summary      Create comment
+// @Tags         Comments
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Param        id    path  int                    true  "Post ID"
+// @Param        body  body  CreateCommentRequest   true  "Comment"
+// @Success      201  {object}  models.PostComment
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      404  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /posts/{id}/comments [post]
 func (h *CommentsHandler) CreateComment(c *gin.Context) {
 	// Get user ID from context (set by AuthRequired middleware)
 	userID, ok := middleware.GetAuthenticatedUserID(c)
@@ -147,7 +160,18 @@ func (h *CommentsHandler) CreateComment(c *gin.Context) {
 	c.JSON(http.StatusCreated, fullComment)
 }
 
-// GetComments handles GET /api/v1/posts/:postId/comments
+// GetComments returns top-level comments for a post.
+// @Summary      Get post comments
+// @Tags         Comments
+// @Produce      json
+// @Param        id      path   int     true   "Post ID"
+// @Param        limit   query  int     false  "Page size (default 20)"
+// @Param        offset  query  int     false  "Offset"
+// @Param        sort    query  string  false  "Sort: hot | new | top"
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /posts/{id}/comments [get]
 func (h *CommentsHandler) GetComments(c *gin.Context) {
 	postID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
@@ -188,7 +212,16 @@ func (h *CommentsHandler) GetComments(c *gin.Context) {
 	})
 }
 
-// GetComment handles GET /api/v1/comments/:id
+// GetComment returns a single comment.
+// @Summary      Get comment
+// @Tags         Comments
+// @Produce      json
+// @Param        id  path  int  true  "Comment ID"
+// @Success      200  {object}  models.PostComment
+// @Failure      400  {object}  gin.H
+// @Failure      404  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /comments/{id} [get]
 func (h *CommentsHandler) GetComment(c *gin.Context) {
 	commentID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
@@ -210,7 +243,17 @@ func (h *CommentsHandler) GetComment(c *gin.Context) {
 	c.JSON(http.StatusOK, comment)
 }
 
-// GetCommentReplies handles GET /api/v1/comments/:id/replies
+// GetCommentReplies returns replies to a comment.
+// @Summary      Get comment replies
+// @Tags         Comments
+// @Produce      json
+// @Param        id      path   int  true   "Comment ID"
+// @Param        limit   query  int  false  "Page size"
+// @Param        offset  query  int  false  "Offset"
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /comments/{id}/replies [get]
 func (h *CommentsHandler) GetCommentReplies(c *gin.Context) {
 	commentID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
@@ -251,7 +294,21 @@ func (h *CommentsHandler) GetCommentReplies(c *gin.Context) {
 	})
 }
 
-// UpdateComment handles PUT /api/v1/comments/:id
+// UpdateComment edits a comment's text.
+// @Summary      Update comment
+// @Tags         Comments
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Param        id    path  int                   true  "Comment ID"
+// @Param        body  body  UpdateCommentRequest  true  "Updated comment"
+// @Success      200  {object}  models.PostComment
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      404  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /comments/{id} [put]
 func (h *CommentsHandler) UpdateComment(c *gin.Context) {
 	// Get user ID from context
 	userID, ok := middleware.GetAuthenticatedUserID(c)
@@ -312,7 +369,20 @@ func (h *CommentsHandler) UpdateComment(c *gin.Context) {
 	c.JSON(http.StatusOK, existingComment)
 }
 
-// DeleteComment handles DELETE /api/v1/comments/:id
+// DeleteComment removes a comment.
+// @Summary      Delete comment
+// @Tags         Comments
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Param        id  path  int  true  "Comment ID"
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      404  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /comments/{id} [delete]
 type DeleteCommentRequest struct {
 	Reason string `json:"reason"`
 }
@@ -516,7 +586,19 @@ type UpdateCommentPreferencesRequest struct {
 	DisableInboxReplies bool `json:"disable_inbox_replies"`
 }
 
-// UpdateCommentPreferences handles POST /api/v1/posts/:postId/comments/:commentId/preferences
+// UpdateCommentPreferences toggles reply notification preferences for a comment.
+// @Summary      Update comment preferences
+// @Tags         Comments
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Param        id         path  int  true  "Post ID"
+// @Param        commentId  path  int  true  "Comment ID"
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /posts/{id}/comments/{commentId}/preferences [post]
 func (h *CommentsHandler) UpdateCommentPreferences(c *gin.Context) {
 	userID, ok := middleware.GetAuthenticatedUserID(c)
 	if !ok {
@@ -564,7 +646,19 @@ func (h *CommentsHandler) UpdateCommentPreferences(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"disable_inbox_replies": req.DisableInboxReplies})
 }
 
-// VoteComment handles POST /api/v1/comments/:id/vote
+// VoteComment votes on a comment.
+// @Summary      Vote on comment
+// @Tags         Comments
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Param        id  path  int  true  "Comment ID"
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      404  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /comments/{id}/vote [post]
 func (h *CommentsHandler) VoteComment(c *gin.Context) {
 	// Get user ID from context
 	userID, ok := middleware.GetAuthenticatedUserID(c)

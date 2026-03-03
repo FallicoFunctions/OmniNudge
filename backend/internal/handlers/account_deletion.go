@@ -24,8 +24,17 @@ func NewAccountDeletionHandler(db *pgxpool.Pool, queueClient *queue.QueueClient)
 	}
 }
 
-// RequestAccountDeletion soft-deletes account with 30-day grace period
-// POST /api/v1/account/delete
+// RequestAccountDeletion schedules account deletion with a 30-day grace period.
+// @Summary      Request account deletion
+// @Tags         Account
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /account/delete [post]
 func (h *AccountDeletionHandler) RequestAccountDeletion(c *gin.Context) {
 	userID := c.GetInt("user_id")
 
@@ -132,8 +141,16 @@ This is an automated message. Please do not reply to this email.`,
 	})
 }
 
-// CancelAccountDeletion cancels pending deletion during grace period
-// POST /api/v1/account/cancel-deletion
+// CancelAccountDeletion cancels a pending account deletion during the grace period.
+// @Summary      Cancel account deletion
+// @Tags         Account
+// @Security     BearerAuth
+// @Produce      json
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /account/cancel-deletion [post]
 func (h *AccountDeletionHandler) CancelAccountDeletion(c *gin.Context) {
 	userID := c.GetInt("user_id")
 
@@ -216,8 +233,15 @@ This is an automated message. Please do not reply to this email.`,
 	})
 }
 
-// GetAccountDeletionStatus checks if account is pending deletion
-// GET /api/v1/account/deletion-status
+// GetAccountDeletionStatus returns whether the account is pending deletion.
+// @Summary      Get account deletion status
+// @Tags         Account
+// @Security     BearerAuth
+// @Produce      json
+// @Success      200  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /account/deletion-status [get]
 func (h *AccountDeletionHandler) GetAccountDeletionStatus(c *gin.Context) {
 	userID := c.GetInt("user_id")
 

@@ -102,7 +102,17 @@ func (h *ConversationsHandler) ensureConversationParticipant(c *gin.Context, con
 	return conversation, true
 }
 
-// CreateConversation handles POST /api/v1/conversations
+// CreateConversation creates a new direct conversation.
+// @Summary      Create conversation
+// @Tags         Conversations
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Success      201  {object}  models.Conversation
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /conversations [post]
 func (h *ConversationsHandler) CreateConversation(c *gin.Context) {
 	// Get user ID from context (set by AuthRequired middleware)
 	userID, ok := middleware.GetAuthenticatedUserID(c)
@@ -162,7 +172,15 @@ func (h *ConversationsHandler) CreateConversation(c *gin.Context) {
 	c.JSON(http.StatusCreated, conversation)
 }
 
-// GetConversations handles GET /api/v1/conversations
+// GetConversations returns conversations for the current user.
+// @Summary      Get conversations
+// @Tags         Conversations
+// @Security     BearerAuth
+// @Produce      json
+// @Success      200  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /conversations [get]
 func (h *ConversationsHandler) GetConversations(c *gin.Context) {
 	// Get user ID from context
 	userID, ok := middleware.GetAuthenticatedUserID(c)
@@ -325,7 +343,15 @@ func (h *ConversationsHandler) GetConversations(c *gin.Context) {
 	c.JSON(http.StatusOK, response)
 }
 
-// GetArchivedConversations handles GET /api/v1/conversations/archived
+// GetArchivedConversations returns archived conversations.
+// @Summary      Get archived conversations
+// @Tags         Conversations
+// @Security     BearerAuth
+// @Produce      json
+// @Success      200  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /conversations/archived [get]
 func (h *ConversationsHandler) GetArchivedConversations(c *gin.Context) {
 	query := c.Request.URL.Query()
 	query.Set("include_archived", "true")
@@ -334,7 +360,19 @@ func (h *ConversationsHandler) GetArchivedConversations(c *gin.Context) {
 	h.GetConversations(c)
 }
 
-// GetConversation handles GET /api/v1/conversations/:id
+// GetConversation returns a single conversation by ID.
+// @Summary      Get conversation
+// @Tags         Conversations
+// @Security     BearerAuth
+// @Produce      json
+// @Param        id  path  int  true  "Conversation ID"
+// @Success      200  {object}  models.Conversation
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      404  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /conversations/{id} [get]
 func (h *ConversationsHandler) GetConversation(c *gin.Context) {
 	// Get user ID from context
 	userID, ok := middleware.GetAuthenticatedUserID(c)
@@ -459,7 +497,18 @@ func (h *ConversationsHandler) GetConversation(c *gin.Context) {
 	c.JSON(http.StatusOK, details)
 }
 
-// DeleteConversation handles DELETE /api/v1/conversations/:id
+// DeleteConversation deletes a conversation.
+// @Summary      Delete conversation
+// @Tags         Conversations
+// @Security     BearerAuth
+// @Produce      json
+// @Param        id  path  int  true  "Conversation ID"
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /conversations/{id} [delete]
 func (h *ConversationsHandler) DeleteConversation(c *gin.Context) {
 	// Get user ID from context
 	userID, ok := middleware.GetAuthenticatedUserID(c)
@@ -521,7 +570,18 @@ func (h *ConversationsHandler) DeleteConversation(c *gin.Context) {
 	}
 }
 
-// ArchiveConversation handles PUT /api/v1/conversations/:id/archive
+// ArchiveConversation archives a conversation.
+// @Summary      Archive conversation
+// @Tags         Conversations
+// @Security     BearerAuth
+// @Produce      json
+// @Param        id  path  int  true  "Conversation ID"
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /conversations/{id}/archive [put]
 func (h *ConversationsHandler) ArchiveConversation(c *gin.Context) {
 	// Get user ID from context
 	userID, ok := middleware.GetAuthenticatedUserID(c)
@@ -576,7 +636,17 @@ func (h *ConversationsHandler) ArchiveConversation(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Conversation archived successfully"})
 }
 
-// ArchiveConversationBatch handles POST /api/v1/conversations/archive-batch
+// ArchiveConversationBatch archives multiple conversations at once.
+// @Summary      Archive conversations in batch
+// @Tags         Conversations
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /conversations/archive-batch [post]
 func (h *ConversationsHandler) ArchiveConversationBatch(c *gin.Context) {
 	userID, ok := middleware.GetAuthenticatedUserID(c)
 	if !ok {
@@ -628,7 +698,17 @@ func (h *ConversationsHandler) ArchiveConversationBatch(c *gin.Context) {
 	})
 }
 
-// UnarchiveConversation handles PUT /api/v1/conversations/:id/unarchive
+// UnarchiveConversation restores an archived conversation.
+// @Summary      Unarchive conversation
+// @Tags         Conversations
+// @Security     BearerAuth
+// @Produce      json
+// @Param        id  path  int  true  "Conversation ID"
+// @Success      200  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /conversations/{id}/unarchive [put]
 func (h *ConversationsHandler) UnarchiveConversation(c *gin.Context) {
 	// Get user ID from context
 	userID, ok := middleware.GetAuthenticatedUserID(c)
@@ -655,7 +735,17 @@ func (h *ConversationsHandler) UnarchiveConversation(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Conversation unarchived successfully"})
 }
 
-// MuteConversation handles PUT /api/v1/conversations/:id/mute
+// MuteConversation mutes notifications for a conversation.
+// @Summary      Mute conversation
+// @Tags         Conversations
+// @Security     BearerAuth
+// @Produce      json
+// @Param        id  path  int  true  "Conversation ID"
+// @Success      200  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /conversations/{id}/mute [put]
 func (h *ConversationsHandler) MuteConversation(c *gin.Context) {
 	userID, ok := middleware.GetAuthenticatedUserID(c)
 	if !ok {
@@ -680,7 +770,17 @@ func (h *ConversationsHandler) MuteConversation(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Conversation muted successfully"})
 }
 
-// UnmuteConversation handles PUT /api/v1/conversations/:id/unmute
+// UnmuteConversation unmutes notifications for a conversation.
+// @Summary      Unmute conversation
+// @Tags         Conversations
+// @Security     BearerAuth
+// @Produce      json
+// @Param        id  path  int  true  "Conversation ID"
+// @Success      200  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /conversations/{id}/unmute [put]
 func (h *ConversationsHandler) UnmuteConversation(c *gin.Context) {
 	userID, ok := middleware.GetAuthenticatedUserID(c)
 	if !ok {

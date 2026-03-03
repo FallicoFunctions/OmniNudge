@@ -66,7 +66,19 @@ func NewMediaHandler(
 	}
 }
 
-// UploadMedia handles POST /api/v1/media/upload
+// UploadMedia uploads a media file.
+// @Summary      Upload media
+// @Tags         Media
+// @Security     BearerAuth
+// @Accept       multipart/form-data
+// @Produce      json
+// @Param        file  formData  file  true  "Media file"
+// @Success      201  {object}  models.MediaFile
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      413  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /media/upload [post]
 func (h *MediaHandler) UploadMedia(c *gin.Context) {
 	// Get user ID from context
 	userID, ok := middleware.GetAuthenticatedUserID(c)
@@ -282,8 +294,17 @@ func (h *MediaHandler) UploadMedia(c *gin.Context) {
 	c.JSON(http.StatusCreated, media)
 }
 
-// GetThumbnail handles GET /api/v1/files/:id/thumbnail
-// Returns a redirect to the thumbnail URL when available.
+// GetThumbnail returns the thumbnail for a media file.
+// @Summary      Get file thumbnail
+// @Tags         Media
+// @Security     BearerAuth
+// @Produce      image/jpeg
+// @Param        id  path  int  true  "File ID"
+// @Success      200
+// @Failure      401  {object}  gin.H
+// @Failure      404  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /files/{id}/thumbnail [get]
 func (h *MediaHandler) GetThumbnail(c *gin.Context) {
 	userID, ok := middleware.GetAuthenticatedUserID(c)
 	if !ok {
@@ -334,7 +355,17 @@ func (h *MediaHandler) GetThumbnail(c *gin.Context) {
 	c.Redirect(http.StatusTemporaryRedirect, *media.ThumbnailURL)
 }
 
-// BatchUploadMedia handles POST /api/v1/media/batch-upload
+// BatchUploadMedia uploads multiple media files at once.
+// @Summary      Batch upload media
+// @Tags         Media
+// @Security     BearerAuth
+// @Accept       multipart/form-data
+// @Produce      json
+// @Success      200  {array}   models.MediaFile
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /media/batch-upload [post]
 func (h *MediaHandler) BatchUploadMedia(c *gin.Context) {
 	// Get user ID from context
 	userID, ok := middleware.GetAuthenticatedUserID(c)

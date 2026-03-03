@@ -130,6 +130,16 @@ func (h *ModMailHandler) enrichConversationDetails(ctx context.Context, conv *Mo
 	return nil
 }
 
+// GetModMailRecipients returns eligible recipients for a hub mod mail thread.
+// @Summary      Get mod mail recipients
+// @Tags         ModMail
+// @Security     BearerAuth
+// @Produce      json
+// @Param        hub_name  path  string  true  "Hub name"
+// @Success      200  {array}   gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /mod-mail/hubs/{hub_name}/recipients [get]
 // GetModMailRecipients handles GET /api/v1/mod-mail/hubs/:hub_name/recipients
 // Returns user IDs for hub moderators and admins for encryption recipients.
 func (h *ModMailHandler) GetModMailRecipients(c *gin.Context) {
@@ -227,6 +237,17 @@ func (h *ModMailHandler) GetModMailRecipients(c *gin.Context) {
 	})
 }
 
+// CreateModMail creates a new mod mail conversation.
+// @Summary      Create mod mail
+// @Tags         ModMail
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Success      201  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /mod-mail [post]
 // CreateModMail handles POST /api/v1/mod-mail
 // Allows any logged-in user to message the mods of a hub
 func (h *ModMailHandler) CreateModMail(c *gin.Context) {
@@ -425,6 +446,17 @@ func (h *ModMailHandler) CreateModMail(c *gin.Context) {
 	})
 }
 
+// GetModMailForHub returns mod mail conversations for a hub.
+// @Summary      List hub mod mail
+// @Tags         ModMail
+// @Security     BearerAuth
+// @Produce      json
+// @Param        hub_name  path  string  true  "Hub name"
+// @Success      200  {array}   gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /mod-mail/hubs/{hub_name} [get]
 // GetModMailForHub handles GET /api/v1/mod-mail/hubs/:hub_name
 // Returns all mod mail for a hub (moderators only)
 func (h *ModMailHandler) GetModMailForHub(c *gin.Context) {
@@ -520,6 +552,15 @@ func (h *ModMailHandler) GetModMailForHub(c *gin.Context) {
 	})
 }
 
+// GetUserModMail returns mod mail conversations for the current user.
+// @Summary      Get my mod mail
+// @Tags         ModMail
+// @Security     BearerAuth
+// @Produce      json
+// @Success      200  {array}   gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /mod-mail/user [get]
 // GetUserModMail handles GET /api/v1/mod-mail/user
 // Returns all mod mail conversations the user has created
 func (h *ModMailHandler) GetUserModMail(c *gin.Context) {
@@ -587,6 +628,18 @@ func (h *ModMailHandler) GetUserModMail(c *gin.Context) {
 	})
 }
 
+// GetModMailConversation returns a single mod mail conversation.
+// @Summary      Get mod mail conversation
+// @Tags         ModMail
+// @Security     BearerAuth
+// @Produce      json
+// @Param        id  path  int  true  "Conversation ID"
+// @Success      200  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      404  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /mod-mail/{id} [get]
 // GetModMailConversation handles GET /api/v1/mod-mail/:id
 // Returns details for a single mod mail conversation
 func (h *ModMailHandler) GetModMailConversation(c *gin.Context) {
@@ -659,6 +712,19 @@ func (h *ModMailHandler) GetModMailConversation(c *gin.Context) {
 	c.JSON(http.StatusOK, conv)
 }
 
+// UpdateModMailStatus updates the status of a mod mail conversation.
+// @Summary      Update mod mail status
+// @Tags         ModMail
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Param        id    path  int   true  "Conversation ID"
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /mod-mail/{id}/status [patch]
 // UpdateModMailStatus handles PATCH /api/v1/mod-mail/:id/status
 // Allows moderators to archive or resolve mod mail
 func (h *ModMailHandler) UpdateModMailStatus(c *gin.Context) {

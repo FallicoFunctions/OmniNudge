@@ -24,8 +24,17 @@ func NewPushNotificationHandler(db *pgxpool.Pool, tokenRepo ports.DeviceTokenRep
 	}
 }
 
-// RegisterDeviceToken registers a device token for push notifications
-// POST /api/v1/devices/register
+// RegisterDeviceToken registers a device token for push notifications.
+// @Summary      Register device token
+// @Tags         PushNotifications
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /devices/register [post]
 func (h *PushNotificationHandler) RegisterDeviceToken(c *gin.Context) {
 	userID := c.GetInt("user_id")
 
@@ -55,8 +64,17 @@ func (h *PushNotificationHandler) RegisterDeviceToken(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"status": "registered", "device": dt})
 }
 
-// UnregisterDeviceToken removes a device token
-// DELETE /api/v1/devices/unregister
+// UnregisterDeviceToken removes a device push token.
+// @Summary      Unregister device token
+// @Tags         PushNotifications
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /devices/unregister [delete]
 func (h *PushNotificationHandler) UnregisterDeviceToken(c *gin.Context) {
 	userID := c.GetInt("user_id")
 
@@ -77,8 +95,15 @@ func (h *PushNotificationHandler) UnregisterDeviceToken(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"status": "unregistered"})
 }
 
-// GetUserDevices returns all registered devices for the current user
-// GET /api/v1/devices
+// GetUserDevices returns all registered push devices for the current user.
+// @Summary      Get registered devices
+// @Tags         PushNotifications
+// @Security     BearerAuth
+// @Produce      json
+// @Success      200  {array}   gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /devices [get]
 func (h *PushNotificationHandler) GetUserDevices(c *gin.Context) {
 	userID := c.GetInt("user_id")
 
@@ -91,8 +116,15 @@ func (h *PushNotificationHandler) GetUserDevices(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"devices": devices})
 }
 
-// TestNotification sends a test notification to the current user (for testing)
-// POST /api/v1/devices/test
+// TestNotification sends a test push notification to the current user.
+// @Summary      Send test notification
+// @Tags         PushNotifications
+// @Security     BearerAuth
+// @Produce      json
+// @Success      200  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /devices/test [post]
 func (h *PushNotificationHandler) TestNotification(c *gin.Context) {
 	userID := c.GetInt("user_id")
 

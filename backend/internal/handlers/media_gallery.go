@@ -33,7 +33,20 @@ type MediaItem struct {
 	IsMine        bool      `json:"is_mine"`    // True if current user sent it
 }
 
-// GetConversationMedia handles GET /api/v1/conversations/:id/media
+// GetConversationMedia returns paginated media files for a conversation.
+// @Summary      Get conversation media
+// @Tags         Media
+// @Security     BearerAuth
+// @Produce      json
+// @Param        id          path   int     true   "Conversation ID"
+// @Param        media_type  query  string  false  "Filter by type (image, video, audio)"
+// @Param        limit       query  int     false  "Max results"
+// @Param        before_id   query  int     false  "Cursor"
+// @Success      200  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /conversations/{id}/media [get]
 func (h *MediaGalleryHandler) GetConversationMedia(c *gin.Context) {
 	userID := c.GetInt("user_id")
 	conversationID, err := strconv.Atoi(c.Param("id"))
@@ -182,8 +195,20 @@ func (h *MediaGalleryHandler) GetConversationMedia(c *gin.Context) {
 	})
 }
 
-// FindMediaIndex handles GET /api/v1/conversations/:id/media/:messageId/index
-// Returns the index of a specific message in the filtered media gallery
+// FindMediaIndex returns the gallery index of a specific media message.
+// @Summary      Find media index
+// @Tags         Media
+// @Security     BearerAuth
+// @Produce      json
+// @Param        id         path   int     true   "Conversation ID"
+// @Param        messageId  path   int     true   "Message ID"
+// @Param        media_type query  string  false  "Media type filter"
+// @Success      200  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      404  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /conversations/{id}/media/{messageId}/index [get]
 func (h *MediaGalleryHandler) FindMediaIndex(c *gin.Context) {
 	userID := c.GetInt("user_id")
 	conversationID, err := strconv.Atoi(c.Param("id"))

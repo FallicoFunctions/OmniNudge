@@ -49,8 +49,17 @@ func (h *PostsHandler) SetNotificationService(notifService *services.Notificatio
 	h.notifService = notifService
 }
 
-// GetSubredditPosts handles GET /api/v1/subreddits/:name/posts
-// Returns local platform posts that have been crossposted to a subreddit
+// GetSubredditPosts returns local platform posts crossposted to a subreddit.
+// @Summary      Get subreddit posts
+// @Tags         Posts
+// @Produce      json
+// @Param        name    path   string  true   "Subreddit name"
+// @Param        limit   query  int     false  "Page size (default 20)"
+// @Param        offset  query  int     false  "Offset"
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /subreddits/{name}/posts [get]
 func (h *PostsHandler) GetSubredditPosts(c *gin.Context) {
 	subredditName := c.Param("name")
 	if subredditName == "" {
@@ -167,7 +176,18 @@ type UpdatePostRequest struct {
 	ThumbnailURL *string  `json:"thumbnail_url"`
 }
 
-// CreatePost handles POST /api/v1/posts
+// CreatePost creates a new post.
+// @Summary      Create post
+// @Tags         Posts
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Success      201  {object}  models.PlatformPost
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /posts [post]
 func (h *PostsHandler) CreatePost(c *gin.Context) {
 	// Get user ID from context (set by AuthRequired middleware)
 	userID, ok := middleware.GetAuthenticatedUserID(c)
@@ -325,7 +345,16 @@ func (h *PostsHandler) CreatePost(c *gin.Context) {
 	c.JSON(http.StatusCreated, updatedPost)
 }
 
-// GetPost handles GET /api/v1/posts/:id
+// GetPost returns a single post by ID.
+// @Summary      Get post
+// @Tags         Posts
+// @Produce      json
+// @Param        id  path  int  true  "Post ID"
+// @Success      200  {object}  models.PlatformPost
+// @Failure      400  {object}  gin.H
+// @Failure      404  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /posts/{id} [get]
 func (h *PostsHandler) GetPost(c *gin.Context) {
 	postID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
@@ -406,7 +435,17 @@ func resolvePostContentType(req CreatePostRequest) string {
 	return "link"
 }
 
-// GetFeed handles GET /api/v1/posts/feed
+// GetFeed returns a paginated feed of posts for a hub.
+// @Summary      Get posts feed
+// @Tags         Posts
+// @Produce      json
+// @Param        hub      query  string  false  "Hub name"
+// @Param        sort     query  string  false  "Sort: hot | new | top"
+// @Param        limit    query  int     false  "Page size (default 20)"
+// @Param        offset   query  int     false  "Offset"
+// @Success      200  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /posts/feed [get]
 func (h *PostsHandler) GetFeed(c *gin.Context) {
 	// Parse query parameters
 	sortBy := c.DefaultQuery("sort", "new") // "new", "hot", "score"
@@ -469,14 +508,33 @@ func (h *PostsHandler) GetFeed(c *gin.Context) {
 	})
 }
 
-// GetUserPosts handles GET /api/v1/posts/user/:username
+// GetUserPosts returns posts by a specific user (internal helper).
+// @Summary      Get user posts (internal)
+// @Tags         Posts
+// @Produce      json
+// @Success      200  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /posts/user/:username [get]
 func (h *PostsHandler) GetUserPosts(c *gin.Context) {
 	// This would require looking up the user by username first
 	// For now, we'll skip this and implement it later when needed
 	RespondError(c, http.StatusNotImplemented, "Not implemented yet")
 }
 
-// UpdatePost handles PUT /api/v1/posts/:id
+// UpdatePost updates an existing post.
+// @Summary      Update post
+// @Tags         Posts
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Param        id  path  int  true  "Post ID"
+// @Success      200  {object}  models.PlatformPost
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      404  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /posts/{id} [put]
 func (h *PostsHandler) UpdatePost(c *gin.Context) {
 	// Get user ID from context
 	userID, ok := middleware.GetAuthenticatedUserID(c)
@@ -543,7 +601,20 @@ func (h *PostsHandler) UpdatePost(c *gin.Context) {
 	c.JSON(http.StatusOK, existingPost)
 }
 
-// DeletePost handles DELETE /api/v1/posts/:id
+// DeletePost deletes a post.
+// @Summary      Delete post
+// @Tags         Posts
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Param        id  path  int  true  "Post ID"
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      404  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /posts/{id} [delete]
 type DeletePostRequest struct {
 	Reason string `json:"reason"`
 }
@@ -727,7 +798,19 @@ func (h *PostsHandler) sendPostDeletionModMail(post *models.PlatformPost, modera
 	tx.Commit(ctx)
 }
 
-// VotePost handles POST /api/v1/posts/:id/vote
+// VotePost votes on a post (upvote, downvote, or clear).
+// @Summary      Vote on post
+// @Tags         Posts
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Param        id  path  int  true  "Post ID"
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      404  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /posts/{id}/vote [post]
 func (h *PostsHandler) VotePost(c *gin.Context) {
 	// Get user ID from context
 	userID, ok := middleware.GetAuthenticatedUserID(c)

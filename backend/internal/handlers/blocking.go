@@ -27,8 +27,18 @@ type blockUserRequest struct {
 	Username string `json:"username" binding:"required"`
 }
 
-// BlockUser blocks a user
-// POST /api/v1/users/block
+// BlockUser blocks another user.
+// @Summary      Block user
+// @Tags         Users
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      404  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /users/block [post]
 func (h *BlockingHandler) BlockUser(c *gin.Context) {
 	blockerID := c.GetInt("user_id")
 
@@ -67,8 +77,17 @@ func (h *BlockingHandler) BlockUser(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "User blocked successfully"})
 }
 
-// UnblockUser unblocks a user
-// DELETE /api/v1/users/block/:username
+// UnblockUser removes a block on another user.
+// @Summary      Unblock user
+// @Tags         Users
+// @Security     BearerAuth
+// @Produce      json
+// @Param        username  path  string  true  "Username to unblock"
+// @Success      200  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      404  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /users/block/{username} [delete]
 func (h *BlockingHandler) UnblockUser(c *gin.Context) {
 	blockerID := c.GetInt("user_id")
 	username := c.Param("username")
@@ -100,8 +119,15 @@ func (h *BlockingHandler) UnblockUser(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "User unblocked successfully"})
 }
 
-// GetBlockedUsers returns list of blocked users
-// GET /api/v1/users/blocked
+// GetBlockedUsers returns the list of blocked users.
+// @Summary      Get blocked users
+// @Tags         Users
+// @Security     BearerAuth
+// @Produce      json
+// @Success      200  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /users/blocked [get]
 func (h *BlockingHandler) GetBlockedUsers(c *gin.Context) {
 	blockerID := c.GetInt("user_id")
 

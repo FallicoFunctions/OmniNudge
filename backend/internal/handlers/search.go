@@ -23,8 +23,20 @@ func NewSearchHandler(pool *pgxpool.Pool) *SearchHandler {
 	return &SearchHandler{pool: pool}
 }
 
-// SearchPosts searches posts using full-text search
-// GET /api/v1/search/posts?q=query&limit=20&offset=0
+// SearchPosts searches posts using full-text search.
+// @Summary      Search posts
+// @Tags         Search
+// @Produce      json
+// @Param        q            query  string  true   "Search query"
+// @Param        limit        query  int     false  "Page size (default 20, max 100)"
+// @Param        offset       query  int     false  "Offset"
+// @Param        sort         query  string  false  "Sort: relevance | new | old"
+// @Param        include_nsfw query  bool    false  "Include NSFW content"
+// @Param        cursor       query  string  false  "Pagination cursor"
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /search/posts [get]
 func (h *SearchHandler) SearchPosts(c *gin.Context) {
 	query := c.Query("q")
 	if query == "" {
@@ -160,8 +172,18 @@ func (h *SearchHandler) SearchPosts(c *gin.Context) {
 	c.JSON(http.StatusOK, response)
 }
 
-// SearchComments searches comments using full-text search
-// GET /api/v1/search/comments?q=query&limit=20&offset=0
+// SearchComments searches comments using full-text search.
+// @Summary      Search comments
+// @Tags         Search
+// @Produce      json
+// @Param        q       query  string  true   "Search query"
+// @Param        limit   query  int     false  "Page size (default 20, max 100)"
+// @Param        offset  query  int     false  "Offset"
+// @Param        cursor  query  string  false  "Pagination cursor"
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /search/comments [get]
 func (h *SearchHandler) SearchComments(c *gin.Context) {
 	query := c.Query("q")
 	if query == "" {
@@ -265,8 +287,20 @@ func (h *SearchHandler) SearchComments(c *gin.Context) {
 	c.JSON(http.StatusOK, response)
 }
 
-// SearchUsers searches users using full-text search
-// GET /api/v1/search/users?q=query&limit=20&offset=0
+// SearchUsers searches users using full-text search.
+// @Summary      Search users
+// @Tags         Search
+// @Produce      json
+// @Param        q            query  string  true   "Search query"
+// @Param        limit        query  int     false  "Page size (default 20, max 100)"
+// @Param        offset       query  int     false  "Offset"
+// @Param        sort         query  string  false  "Sort: relevance | new | old"
+// @Param        include_nsfw query  bool    false  "Include NSFW profiles"
+// @Param        cursor       query  string  false  "Pagination cursor"
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /search/users [get]
 func (h *SearchHandler) SearchUsers(c *gin.Context) {
 	query := c.Query("q")
 	if query == "" {
@@ -384,8 +418,20 @@ func (h *SearchHandler) SearchUsers(c *gin.Context) {
 	c.JSON(http.StatusOK, response)
 }
 
-// SearchHubs searches hubs using full-text search
-// GET /api/v1/search/hubs?q=query&limit=20&offset=0
+// SearchHubs searches hubs using full-text search.
+// @Summary      Search hubs
+// @Tags         Search
+// @Produce      json
+// @Param        q            query  string  true   "Search query"
+// @Param        limit        query  int     false  "Page size (default 20, max 100)"
+// @Param        offset       query  int     false  "Offset"
+// @Param        sort         query  string  false  "Sort: relevance | new | old"
+// @Param        include_nsfw query  bool    false  "Include NSFW hubs"
+// @Param        cursor       query  string  false  "Pagination cursor"
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /search/hubs [get]
 func (h *SearchHandler) SearchHubs(c *gin.Context) {
 	query := c.Query("q")
 	if query == "" {
@@ -513,7 +559,24 @@ func (h *SearchHandler) SearchHubs(c *gin.Context) {
 }
 
 // SearchMessages searches messages visible to the authenticated user.
-// GET /api/v1/search/messages?q=query&conversation_id=1&sender_id=2&has_files=true&start_date=...&end_date=...&limit=50&offset=0
+// @Summary      Search messages
+// @Tags         Search
+// @Security     BearerAuth
+// @Produce      json
+// @Param        q               query  string  false  "Search query"
+// @Param        conversation_id query  int     false  "Filter by conversation ID"
+// @Param        sender_id       query  int     false  "Filter by sender ID"
+// @Param        has_files       query  bool    false  "Filter messages with file attachments"
+// @Param        start_date      query  string  false  "Start date (RFC3339)"
+// @Param        end_date        query  string  false  "End date (RFC3339)"
+// @Param        limit           query  int     false  "Page size (default 50, max 200)"
+// @Param        offset          query  int     false  "Offset"
+// @Param        sort            query  string  false  "Sort: relevance | newest | oldest"
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /search/messages [get]
 func (h *SearchHandler) SearchMessages(c *gin.Context) {
 	startedAt := time.Now()
 	searchSuccess := false

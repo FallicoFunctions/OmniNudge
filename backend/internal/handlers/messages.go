@@ -408,7 +408,18 @@ func copyStringPtr(value *string) *string {
 	return &copied
 }
 
-// SendMessage handles POST /api/v1/messages
+// SendMessage sends a new message in a conversation.
+// @Summary      Send message
+// @Tags         Messages
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Success      201  {object}  models.Message
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /messages [post]
 func (h *MessagesHandler) SendMessage(c *gin.Context) {
 	// Get user ID from context (set by AuthRequired middleware)
 	userID, ok := middleware.GetAuthenticatedUserID(c)
@@ -849,7 +860,18 @@ func (h *MessagesHandler) SendMessage(c *gin.Context) {
 	c.JSON(http.StatusCreated, message)
 }
 
-// ForwardMessage handles POST /api/v1/messages/forward
+// ForwardMessage forwards a message to another conversation.
+// @Summary      Forward message
+// @Tags         Messages
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Success      201  {object}  models.Message
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /messages/forward [post]
 func (h *MessagesHandler) ForwardMessage(c *gin.Context) {
 	userID, ok := middleware.GetAuthenticatedUserID(c)
 	if !ok {
@@ -1295,7 +1317,18 @@ type MessageEditHistoryEntry struct {
 	EditedBy               int       `json:"edited_by"`
 }
 
-// GetForwardInfo handles GET /api/v1/messages/:id/forward-info
+// GetForwardInfo returns forward chain info for a message.
+// @Summary      Get message forward info
+// @Tags         Messages
+// @Security     BearerAuth
+// @Produce      json
+// @Param        id  path  int  true  "Message ID"
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /messages/{id}/forward-info [get]
 func (h *MessagesHandler) GetForwardInfo(c *gin.Context) {
 	userID, ok := middleware.GetAuthenticatedUserID(c)
 	if !ok {
@@ -1397,7 +1430,19 @@ func (h *MessagesHandler) GetForwardInfo(c *gin.Context) {
 	c.JSON(http.StatusOK, response)
 }
 
-// EditMessage handles PATCH /api/v1/messages/:id
+// EditMessage edits the content of an existing message.
+// @Summary      Edit message
+// @Tags         Messages
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Param        id  path  int  true  "Message ID"
+// @Success      200  {object}  models.Message
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /messages/{id} [patch]
 func (h *MessagesHandler) EditMessage(c *gin.Context) {
 	userID, ok := middleware.GetAuthenticatedUserID(c)
 	if !ok {
@@ -1585,7 +1630,18 @@ func (h *MessagesHandler) EditMessage(c *gin.Context) {
 	c.JSON(http.StatusOK, updatedMessage)
 }
 
-// GetMessageHistory handles GET /api/v1/messages/:id/history
+// GetMessageHistory returns the edit history for a message.
+// @Summary      Get message edit history
+// @Tags         Messages
+// @Security     BearerAuth
+// @Produce      json
+// @Param        id  path  int  true  "Message ID"
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /messages/{id}/history [get]
 func (h *MessagesHandler) GetMessageHistory(c *gin.Context) {
 	userID, ok := middleware.GetAuthenticatedUserID(c)
 	if !ok {
@@ -1691,7 +1747,21 @@ func (h *MessagesHandler) GetMessageHistory(c *gin.Context) {
 	})
 }
 
-// GetMessages handles GET /api/v1/conversations/:id/messages
+// GetMessages returns messages for a conversation.
+// @Summary      Get conversation messages
+// @Tags         Messages
+// @Security     BearerAuth
+// @Produce      json
+// @Param        id      path   int    true   "Conversation ID"
+// @Param        limit   query  int    false  "Page size (default 50)"
+// @Param        before  query  int    false  "Load messages before this ID"
+// @Param        after   query  int    false  "Load messages after this ID"
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /conversations/{id}/messages [get]
 func (h *MessagesHandler) GetMessages(c *gin.Context) {
 	// Get user ID from context
 	userID, ok := middleware.GetAuthenticatedUserID(c)
@@ -1880,8 +1950,18 @@ func (h *MessagesHandler) GetMessages(c *gin.Context) {
 	c.JSON(http.StatusOK, response)
 }
 
-// GetThread handles GET /api/v1/messages/:id/thread
-// Returns the thread root and paginated replies in chronological order.
+// GetThread returns the thread root and paginated replies in chronological order.
+// @Summary      Get message thread
+// @Tags         Messages
+// @Security     BearerAuth
+// @Produce      json
+// @Param        id  path  int  true  "Root message ID"
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /messages/{id}/thread [get]
 func (h *MessagesHandler) GetThread(c *gin.Context) {
 	userID, ok := middleware.GetAuthenticatedUserID(c)
 	if !ok {
@@ -2156,17 +2236,46 @@ func (h *MessagesHandler) setThreadMuted(c *gin.Context, muted bool) {
 	})
 }
 
-// MuteThread handles PUT /api/v1/messages/:id/thread/mute
+// MuteThread mutes notifications for a message thread.
+// @Summary      Mute thread
+// @Tags         Messages
+// @Security     BearerAuth
+// @Produce      json
+// @Param        id  path  int  true  "Root message ID"
+// @Success      200  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /messages/{id}/thread/mute [put]
 func (h *MessagesHandler) MuteThread(c *gin.Context) {
 	h.setThreadMuted(c, true)
 }
 
-// UnmuteThread handles PUT /api/v1/messages/:id/thread/unmute
+// UnmuteThread unmutes a message thread.
+// @Summary      Unmute thread
+// @Tags         Messages
+// @Security     BearerAuth
+// @Produce      json
+// @Param        id  path  int  true  "Root message ID"
+// @Success      200  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /messages/{id}/thread/unmute [put]
 func (h *MessagesHandler) UnmuteThread(c *gin.Context) {
 	h.setThreadMuted(c, false)
 }
 
-// MarkAsRead handles POST /api/v1/conversations/:id/read
+// MarkAsRead marks all messages in a conversation as read.
+// @Summary      Mark conversation as read
+// @Tags         Messages
+// @Security     BearerAuth
+// @Produce      json
+// @Param        id  path  int  true  "Conversation ID"
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /conversations/{id}/read [post]
 func (h *MessagesHandler) MarkAsRead(c *gin.Context) {
 	// Get user ID from context
 	userID, ok := middleware.GetAuthenticatedUserID(c)
@@ -2373,7 +2482,17 @@ func (h *MessagesHandler) MarkAsRead(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Messages marked as read"})
 }
 
-// MarkSingleMessageAsRead handles POST /api/v1/messages/:id/read
+// MarkSingleMessageAsRead marks a single message as read.
+// @Summary      Mark single message as read
+// @Tags         Messages
+// @Security     BearerAuth
+// @Produce      json
+// @Param        id  path  int  true  "Message ID"
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /messages/{id}/read [post]
 func (h *MessagesHandler) MarkSingleMessageAsRead(c *gin.Context) {
 	// Get user ID from context
 	userID, ok := middleware.GetAuthenticatedUserID(c)
@@ -2464,7 +2583,18 @@ func (h *MessagesHandler) MarkSingleMessageAsRead(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Message marked as read"})
 }
 
-// DeleteMessage handles DELETE /api/v1/messages/:id
+// DeleteMessage deletes a message.
+// @Summary      Delete message
+// @Tags         Messages
+// @Security     BearerAuth
+// @Produce      json
+// @Param        id  path  int  true  "Message ID"
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /messages/{id} [delete]
 func (h *MessagesHandler) DeleteMessage(c *gin.Context) {
 	// Get user ID from context
 	userID, ok := middleware.GetAuthenticatedUserID(c)
@@ -2533,7 +2663,18 @@ func (h *MessagesHandler) DeleteMessage(c *gin.Context) {
 	}
 }
 
-// PinMessage handles POST /api/v1/messages/:id/pin
+// PinMessage pins a message in a conversation.
+// @Summary      Pin message
+// @Tags         Messages
+// @Security     BearerAuth
+// @Produce      json
+// @Param        id  path  int  true  "Message ID"
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /messages/{id}/pin [post]
 func (h *MessagesHandler) PinMessage(c *gin.Context) {
 	userID, ok := middleware.GetAuthenticatedUserID(c)
 	if !ok {
@@ -2610,7 +2751,18 @@ func (h *MessagesHandler) PinMessage(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Message pinned"})
 }
 
-// UnpinMessage handles DELETE /api/v1/messages/:id/pin
+// UnpinMessage unpins a message.
+// @Summary      Unpin message
+// @Tags         Messages
+// @Security     BearerAuth
+// @Produce      json
+// @Param        id  path  int  true  "Message ID"
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /messages/{id}/pin [delete]
 func (h *MessagesHandler) UnpinMessage(c *gin.Context) {
 	userID, ok := middleware.GetAuthenticatedUserID(c)
 	if !ok {
@@ -2699,7 +2851,18 @@ func (h *MessagesHandler) UnpinMessage(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Message unpinned"})
 }
 
-// GetPinnedMessages handles GET /api/v1/conversations/:id/pinned-messages
+// GetPinnedMessages returns pinned messages for a conversation.
+// @Summary      Get pinned messages
+// @Tags         Messages
+// @Security     BearerAuth
+// @Produce      json
+// @Param        id  path  int  true  "Conversation ID"
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /conversations/{id}/pinned-messages [get]
 func (h *MessagesHandler) GetPinnedMessages(c *gin.Context) {
 	userID, ok := middleware.GetAuthenticatedUserID(c)
 	if !ok {
