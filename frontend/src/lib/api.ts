@@ -2,8 +2,10 @@
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080/api/v1';
 
 interface ApiError {
+  code?: string;
   error: string;
   message?: string;
+  request_id?: string;
 }
 
 class ApiClient {
@@ -45,12 +47,14 @@ class ApiClient {
 
     if (!response.ok) {
       const error: ApiError =
-        (await parseJson().catch(() => ({ error: 'Unknown error' }))) || {
+        (await parseJson().catch(() => ({ error: 'Unknown error', message: 'Unknown error' }))) || {
           error: 'Unknown error',
+          message: 'Unknown error',
         };
 
       // If banned/deleted, clear auth and surface reason
-      if (response.status === 401 && error.error && error.error.toLowerCase().includes('ban')) {
+      const errorText = `${error.message || ''} ${error.error || ''}`.toLowerCase();
+      if (response.status === 401 && errorText.includes('ban')) {
         localStorage.removeItem('auth_token');
         localStorage.removeItem('user');
       }
@@ -119,6 +123,7 @@ class ApiClient {
     if (!response.ok) {
       const error: ApiError = await response.json().catch(() => ({
         error: 'Upload failed',
+        message: 'Upload failed',
       }));
       throw new Error(error.message || error.error);
     }

@@ -836,16 +836,8 @@ type updateEmailRequest struct {
 }
 
 // UpdateEmail updates the authenticated user's email address.
-// @Summary      Update email
-// @Tags         Users
-// @Security     BearerAuth
-// @Accept       json
-// @Produce      json
-// @Success      200  {object}  gin.H
-// @Failure      400  {object}  gin.H
-// @Failure      401  {object}  gin.H
-// @Failure      500  {object}  gin.H
-// @Router       /users/email [put]
+// NOTE: this legacy path is not registered in main router; the active
+// /users/email endpoint is served by AuthHandler.UpdateEmail.
 func (h *UsersHandler) UpdateEmail(c *gin.Context) {
 	userID := c.GetInt("user_id")
 

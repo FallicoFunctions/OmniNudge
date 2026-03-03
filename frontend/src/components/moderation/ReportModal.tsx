@@ -87,7 +87,12 @@ export function ReportModal({ isOpen, onClose, targetType, targetId, targetName,
       cancelBtnRef.current,
       submitBtnRef.current,
       successCloseBtnRef.current,
-    ].filter((el): el is HTMLElement => el !== null && !(el as HTMLButtonElement | HTMLSelectElement | HTMLTextAreaElement).disabled),
+    ].filter(
+      (
+        el,
+      ): el is HTMLButtonElement | HTMLSelectElement | HTMLTextAreaElement =>
+        el !== null && !el.disabled,
+    ),
   []);
 
   useEffect(() => {
@@ -148,6 +153,7 @@ export function ReportModal({ isOpen, onClose, targetType, targetId, targetName,
           if (focusable.length === 0) return;
           const first = focusable[0];
           const last = focusable[focusable.length - 1];
+          if (!first || !last) return;
           if (e.shiftKey) {
             if (document.activeElement === first) {
               e.preventDefault();
