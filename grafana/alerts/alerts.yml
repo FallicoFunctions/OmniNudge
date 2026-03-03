@@ -1,0 +1,69 @@
+# Grafana unified alerting rules for OmniNudge API.
+# Import via Grafana UI: Alerting > Alert rules > Import, or via provisioning.
+
+groups:
+  - name: omninudge-api
+    interval: 1m
+    rules:
+
+      # -----------------------------------------------------------------------
+      # Error rate > 1% for 5 minutes
+      # -----------------------------------------------------------------------
+      - alert: HighErrorRate
+        expr: >
+          (
+            sum(rate(http_requests_total{status=~"5.."}[5m]))
+            /
+            sum(rate(http_requests_total[5m]))
+          ) > 0.01
+        for: 5m
+        labels:
+          severity: critical
+          team: backend
+        annotations:
+          summary: "High HTTP 5xx error rate"
+          description: >
+            The 5xx error rate is {{ humanizePercentage $value }} which exceeds
+            the 1% SLO threshold. Investigate recent deployments, database
+            connectivity, and upstream dependencies.
+
+      # -----------------------------------------------------------------------
+      # p99 latency > 500ms for 5 minutes
+      # -----------------------------------------------------------------------
+      - alert: HighP99Latency
+        expr: >
+          histogram_quantile(
+            0.99,
+            sum(rate(http_request_duration_seconds_bucket[5m])) by (le)
+          ) > 0.5
+        for: 5m
+        labels:
+          severity: warning
+          team: backend
+        annotations:
+          summary: "p99 API latency exceeds 500ms"
+          description: >
+            The p99 request latency is {{ humanizeDuration $value }}s which
+            exceeds the 500ms SLO target. Check slow queries, cache hit rates,
+            and external API call times.
+
+      # -----------------------------------------------------------------------
+      # Rate limit block rate > 5% for 5 minutes
+      # -----------------------------------------------------------------------
+      - alert: HighRateLimitBlockRate
+        expr: >
+          (
+            sum(rate(rate_limit_blocked_total[5m]))
+            /
+            (sum(rate(rate_limit_blocked_total[5m])) + sum(rate(http_requests_total[5m])))
+          ) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+          team: backend
+        annotations:
+          summary: "High rate limit block rate"
+          description: >
+            {{ humanizePercentage $value }} of requests are being blocked by
+            rate limiting. This may indicate a misconfigured client, abuse, or
+            rate limits that are too aggressive for current traffic.

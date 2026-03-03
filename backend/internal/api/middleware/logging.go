@@ -1,59 +1,61 @@
 package middleware
 
 import (
-	"encoding/json"
 	"fmt"
-	"log"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/omninudge/backend/pkg/logger"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 )
 
-// LogLevel defines log severity levels
-type LogLevel string
-
-const (
-	LogLevelInfo  LogLevel = "INFO"
-	LogLevelWarn  LogLevel = "WARN"
-	LogLevelError LogLevel = "ERROR"
-)
-
-// logEntry is the structured log record emitted for every request.
-type logEntry struct {
-	Timestamp string `json:"timestamp"`
-	Level     string `json:"level"`
-	RequestID string `json:"request_id"`
-	TraceID   string `json:"trace_id,omitempty"`
-	SpanID    string `json:"span_id,omitempty"`
-	Method    string `json:"method"`
-	Path      string `json:"path"`
-	Query     string `json:"query,omitempty"`
-	Status    int    `json:"status"`
-	LatencyMS int64  `json:"latency_ms"`
-	ClientIP  string `json:"client_ip"`
-	UserID    string `json:"user_id"`
-	UserAgent string `json:"user_agent,omitempty"`
-	Errors    string `json:"errors,omitempty"`
+// healthPaths are never logged — they are high-frequency probes that would
+// drown out meaningful signal.
+var healthPaths = map[string]struct{}{
+	"/health":           {},
+	"/ready":            {},
+	"/live":             {},
+	"/health/liveness":  {},
+	"/health/readiness": {},
 }
 
-// StructuredLogger logs each request as a single JSON line to stdout.
-// In production, pipe stdout to your log aggregator (ELK, Datadog, etc.).
+// StructuredLogger logs each request as a single JSON line using zerolog.
+//
+// Log level selection:
+//   - 5xx → Error
+//   - 4xx → Warn
+//   - 2xx / 3xx → Info
+//
+// PII rules:
+//   - The Authorization header value is never logged.
+//   - The "password" query parameter is never logged.
+//   - User-supplied strings (path, user-agent) are sanitized to prevent log
+//     injection via embedded newlines or control characters.
 func StructuredLogger() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		start := time.Now()
 		path := c.Request.URL.Path
-		query := c.Request.URL.RawQuery
+
+		// Skip health/readiness probes entirely.
+		if _, skip := healthPaths[path]; skip {
+			c.Next()
+			return
+		}
 
 		c.Next()
 
 		latency := time.Since(start)
 		status := c.Writer.Status()
 
-		level := LogLevelInfo
-		if status >= 500 {
-			level = LogLevelError
-		} else if status >= 400 {
-			level = LogLevelWarn
+		var ev *zerolog.Event
+		switch {
+		case status >= 500:
+			ev = log.Error()
+		case status >= 400:
+			ev = log.Warn()
+		default:
+			ev = log.Info()
 		}
 
 		userID := "-"
@@ -76,44 +78,34 @@ func StructuredLogger() gin.HandlerFunc {
 			spanID = fmt.Sprintf("%v", sid)
 		}
 
-		entry := logEntry{
-			Timestamp: start.UTC().Format(time.RFC3339),
-			Level:     string(level),
-			RequestID: requestID,
-			TraceID:   traceID,
-			SpanID:    spanID,
-			Method:    c.Request.Method,
-			Path:      path,
-			Query:     query,
-			Status:    status,
-			LatencyMS: latency.Milliseconds(),
-			ClientIP:  c.ClientIP(),
-			UserID:    userID,
-			UserAgent: c.Request.UserAgent(),
-		}
+		// Sanitize user-controlled strings to prevent log injection.
+		safePath := logger.SanitizeLogMessage(path)
+		safeAgent := logger.SanitizeLogMessage(c.Request.UserAgent())
+
+		ev = ev.
+			Str("request_id", requestID).
+			Str("trace_id", traceID).
+			Str("span_id", spanID).
+			Str("user_id", userID).
+			Str("method", c.Request.Method).
+			Str("path", safePath).
+			Int("status", status).
+			Int64("duration_ms", latency.Milliseconds()).
+			Int("response_size", c.Writer.Size()).
+			Str("client_ip", c.ClientIP()).
+			Str("user_agent", safeAgent)
 
 		// Log only public errors — private errors may contain sensitive internal
-		// details (tokens, passwords, stack frames) that must never leave the process.
+		// details (tokens, passwords, stack frames).
 		if errs := c.Errors.ByType(gin.ErrorTypePublic).String(); errs != "" {
-			entry.Errors = errs
+			ev = ev.Str("errors", errs)
 		}
 
-		line, err := json.Marshal(entry)
-		if err != nil {
-			log.Printf("[logger] failed to marshal log entry: %v", err)
-			return
-		}
-		log.Println(string(line))
-
-		// Alert on 5xx — TODO: replace with Sentry/PagerDuty integration
-		if status >= 500 {
-			log.Printf(`{"level":"ALERT","request_id":%q,"path":%q,"status":%d}`,
-				requestID, path, status)
-		}
+		ev.Msg("request")
 	}
 }
 
-// AuditLogger logs security-relevant events as JSON lines.
+// AuditLogger logs security-relevant events as JSON lines via zerolog.
 func AuditLogger() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if !isSecurityRelevant(c.Request.Method, c.FullPath()) {
@@ -134,37 +126,19 @@ func AuditLogger() gin.HandlerFunc {
 		start := time.Now()
 		c.Next()
 
-		type auditRecord struct {
-			Timestamp  string `json:"timestamp"`
-			Level      string `json:"level"`
-			EventType  string `json:"event_type"`
-			RequestID  string `json:"request_id"`
-			Method     string `json:"method"`
-			Path       string `json:"path"`
-			UserID     string `json:"user_id"`
-			ClientIP   string `json:"client_ip"`
-			Status     int    `json:"status"`
-			Success    bool   `json:"success"`
-			LatencyMS  int64  `json:"latency_ms"`
-		}
-
-		rec := auditRecord{
-			Timestamp: start.UTC().Format(time.RFC3339),
-			Level:     "AUDIT",
-			EventType: "api_access",
-			RequestID: requestID,
-			Method:    c.Request.Method,
-			Path:      c.FullPath(),
-			UserID:    userID,
-			ClientIP:  c.ClientIP(),
-			Status:    c.Writer.Status(),
-			Success:   c.Writer.Status() < 400,
-			LatencyMS: time.Since(start).Milliseconds(),
-		}
-
-		if line, err := json.Marshal(rec); err == nil {
-			log.Println(string(line))
-		}
+		status := c.Writer.Status()
+		log.Info().
+			Str("event_type", "api_access").
+			Str("request_id", requestID).
+			Str("method", c.Request.Method).
+			Str("path", logger.SanitizeLogMessage(c.FullPath())).
+			Str("user_id", userID).
+			Str("client_ip", c.ClientIP()).
+			Int("status", status).
+			Bool("success", status < 400).
+			Int64("duration_ms", time.Since(start).Milliseconds()).
+			Str("level_tag", "AUDIT").
+			Msg("audit")
 	}
 }
 
@@ -189,13 +163,12 @@ func isSecurityRelevant(method, path string) bool {
 	return false
 }
 
-// ErrorReporter logs handler errors. Integrate with Sentry here when ready.
+// ErrorReporter logs handler errors via zerolog. Integrate with Sentry separately.
 func ErrorReporter() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		c.Next()
 		for _, ginErr := range c.Errors {
-			// TODO: sentry.CaptureException(ginErr.Err)
-			log.Printf(`{"level":"ERROR","error":%q}`, ginErr.Err)
+			log.Error().Err(ginErr.Err).Msg("handler error")
 		}
 	}
 }

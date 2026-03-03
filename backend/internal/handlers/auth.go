@@ -1,30 +1,61 @@
 package handlers
 
 import (
-	"github.com/omninudge/backend/internal/ports"
-	"github.com/omninudge/backend/internal/api/middleware"
+	"context"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strings"
 
+	"github.com/gin-gonic/gin"
+	"github.com/omninudge/backend/internal/api/middleware"
+	"github.com/omninudge/backend/internal/audit"
 	"github.com/omninudge/backend/internal/models"
+	"github.com/omninudge/backend/internal/ports"
 	"github.com/omninudge/backend/internal/services"
 	"github.com/omninudge/backend/internal/utils"
-	"github.com/gin-gonic/gin"
 )
 
 // AuthHandler handles authentication endpoints
 type AuthHandler struct {
-	authService             *services.AuthService
-	userRepo                ports.UserRepository
-	emailService            *services.EmailService
-	passwordResetRepo       ports.PasswordResetRepository
-	emailVerificationRepo   ports.EmailVerificationRepository
-	frontendURL             string
+	authService           *services.AuthService
+	userRepo              ports.UserRepository
+	emailService          *services.EmailService
+	passwordResetRepo     ports.PasswordResetRepository
+	emailVerificationRepo ports.EmailVerificationRepository
+	frontendURL           string
+	auditLogger           *audit.AuditLogger
+	lockoutService        *services.AccountLockoutService
+}
+
+// logAudit writes a structured audit event. It is a nil-safe wrapper around
+// h.auditLogger.Log that:
+//   - silently no-ops when h.auditLogger is nil (e.g. in unit tests), and
+//   - logs any write failure via slog rather than discarding it silently.
+//
+// Fix 23: all audit log call sites in AuthHandler must use this helper instead
+// of calling h.auditLogger.Log directly, so nil-guard and error logging are
+// applied consistently.
+func (h *AuthHandler) logAudit(ctx context.Context, userID *int, action, targetType string, targetID *int, ip, ua string, meta map[string]any) {
+	if h.auditLogger == nil {
+		return
+	}
+	if err := h.auditLogger.Log(ctx, userID, action, targetType, targetID, ip, ua, meta); err != nil {
+		slog.Error("audit log write failed", "error", err, "action", action)
+	}
 }
 
 // NewAuthHandler creates a new auth handler
-func NewAuthHandler(authService *services.AuthService, userRepo ports.UserRepository, emailService *services.EmailService, passwordResetRepo ports.PasswordResetRepository, emailVerificationRepo ports.EmailVerificationRepository, frontendURL string) *AuthHandler {
+func NewAuthHandler(
+	authService *services.AuthService,
+	userRepo ports.UserRepository,
+	emailService *services.EmailService,
+	passwordResetRepo ports.PasswordResetRepository,
+	emailVerificationRepo ports.EmailVerificationRepository,
+	frontendURL string,
+	auditLogger *audit.AuditLogger,
+	lockoutService *services.AccountLockoutService,
+) *AuthHandler {
 	return &AuthHandler{
 		authService:           authService,
 		userRepo:              userRepo,
@@ -32,10 +63,18 @@ func NewAuthHandler(authService *services.AuthService, userRepo ports.UserReposi
 		passwordResetRepo:     passwordResetRepo,
 		emailVerificationRepo: emailVerificationRepo,
 		frontendURL:           frontendURL,
+		auditLogger:           auditLogger,
+		lockoutService:        lockoutService,
 	}
 }
 
-// RedditLogin initiates the Reddit OAuth flow
+// RedditLogin initiates the Reddit OAuth flow.
+// @Summary      Initiate Reddit OAuth
+// @Tags         Auth
+// @Produce      json
+// @Success      307  {string}  string  "Redirect to Reddit"
+// @Failure      500  {object}  gin.H
+// @Router       /auth/reddit [get]
 func (h *AuthHandler) RedditLogin(c *gin.Context) {
 	state, err := h.authService.GenerateState()
 	if err != nil {
@@ -50,7 +89,17 @@ func (h *AuthHandler) RedditLogin(c *gin.Context) {
 	c.Redirect(http.StatusTemporaryRedirect, url)
 }
 
-// RedditCallback handles the OAuth callback from Reddit
+// RedditCallback handles the OAuth callback from Reddit.
+// @Summary      Reddit OAuth callback
+// @Tags         Auth
+// @Produce      json
+// @Param        code   query  string  true  "Authorization code"
+// @Param        state  query  string  true  "State token"
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /auth/reddit/callback [get]
 func (h *AuthHandler) RedditCallback(c *gin.Context) {
 	code := c.Query("code")
 	state := c.Query("state")
@@ -58,7 +107,7 @@ func (h *AuthHandler) RedditCallback(c *gin.Context) {
 
 	// Check for OAuth errors
 	if errorParam != "" {
-		RespondError(c, http.StatusBadRequest, "OAuth error: " + errorParam)
+		RespondError(c, http.StatusBadRequest, "OAuth error: "+errorParam)
 		return
 	}
 
@@ -77,14 +126,14 @@ func (h *AuthHandler) RedditCallback(c *gin.Context) {
 	// Exchange code for token
 	token, err := h.authService.ExchangeCode(c.Request.Context(), code)
 	if err != nil {
-		RespondError(c, http.StatusUnauthorized, "Failed to exchange code: " + err.Error())
+		RespondError(c, http.StatusUnauthorized, "Failed to exchange code: "+err.Error())
 		return
 	}
 
 	// Get Reddit user info
 	redditUser, err := h.authService.GetRedditUser(c.Request.Context(), token)
 	if err != nil {
-		RespondError(c, http.StatusInternalServerError, "Failed to get Reddit user info: " + err.Error())
+		RespondError(c, http.StatusInternalServerError, "Failed to get Reddit user info: "+err.Error())
 		return
 	}
 
@@ -107,7 +156,7 @@ func (h *AuthHandler) RedditCallback(c *gin.Context) {
 	}
 
 	if err := h.userRepo.CreateOrUpdateFromReddit(c.Request.Context(), user); err != nil {
-		RespondError(c, http.StatusInternalServerError, "Failed to create/update user: " + err.Error())
+		RespondError(c, http.StatusInternalServerError, "Failed to create/update user: "+err.Error())
 		return
 	}
 
@@ -133,7 +182,15 @@ func (h *AuthHandler) RedditCallback(c *gin.Context) {
 	})
 }
 
-// GetMe returns the current authenticated user
+// GetMe returns the current authenticated user.
+// @Summary      Get current user
+// @Tags         Auth
+// @Security     BearerAuth
+// @Produce      json
+// @Success      200  {object}  models.User
+// @Failure      401  {object}  gin.H
+// @Failure      404  {object}  gin.H
+// @Router       /auth/me [get]
 func (h *AuthHandler) GetMe(c *gin.Context) {
 	userID, ok := middleware.GetAuthenticatedUserID(c)
 	if !ok {
@@ -152,15 +209,35 @@ func (h *AuthHandler) GetMe(c *gin.Context) {
 	c.JSON(http.StatusOK, user)
 }
 
-// Logout handles user logout (client-side token removal)
+// Logout handles user logout (client-side token removal).
+// @Summary      Logout
+// @Tags         Auth
+// @Security     BearerAuth
+// @Produce      json
+// @Success      200  {object}  gin.H
+// @Router       /auth/logout [post]
 func (h *AuthHandler) Logout(c *gin.Context) {
-	// JWT tokens are stateless, so logout is handled client-side
-	// In production, you might want to add token to a blacklist in Redis
+	// JWT tokens are stateless, so logout is handled client-side.
+	// In production, you might want to add the token to a blacklist in Redis.
+	if userID, ok := middleware.GetAuthenticatedUserID(c); ok {
+		h.logAudit(c.Request.Context(), &userID, "logout", "user", &userID,
+			c.ClientIP(), c.Request.UserAgent(), nil)
+	}
 	c.JSON(http.StatusOK, gin.H{"message": "Logged out successfully"})
 }
 
-// Register handles user registration with username/password
+// Register handles user registration with username/password.
+// @Summary      Register a new user
+// @Tags         Auth
+// @Accept       json
+// @Produce      json
+// @Param        body  body  services.RegisterRequest  true  "Registration request"
+// @Success      201  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Router       /auth/register [post]
 func (h *AuthHandler) Register(c *gin.Context) {
+	ipAddress := c.ClientIP()
+
 	var req services.RegisterRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		RespondError(c, http.StatusBadRequest, "Invalid request body")
@@ -173,13 +250,17 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		return
 	}
 
+	uid := user.ID
+	h.logAudit(c.Request.Context(), &uid, "register_success", "user", &uid,
+		ipAddress, c.Request.UserAgent(), nil)
+
 	// If user provided an email, send verification email
 	emailVerificationSent := false
 	if req.Email != nil && *req.Email != "" && h.emailService != nil && h.emailVerificationRepo != nil {
 		// Generate verification token
 		verification, err := h.emailVerificationRepo.GenerateToken(c.Request.Context(), user.ID, *req.Email, "registration")
 		if err != nil {
-			fmt.Printf("[ERROR] Failed to generate email verification token: %v\n", err)
+			slog.Error("failed to generate email verification token", "error", err)
 		} else {
 			// Send verification email
 			verifyURL := fmt.Sprintf("%s/verify-email?token=%s", h.frontendURL, verification.Token)
@@ -193,10 +274,10 @@ func (h *AuthHandler) Register(c *gin.Context) {
 				},
 			)
 			if err != nil {
-				fmt.Printf("[ERROR] Failed to send verification email: %v\n", err)
+				slog.Error("failed to send verification email", "error", err)
 			} else {
 				emailVerificationSent = true
-				fmt.Printf("[EMAIL] Verification email sent to %s\n", *req.Email)
+				slog.Info("verification email sent", "email_masked", maskEmail(*req.Email))
 			}
 		}
 	}
@@ -208,19 +289,79 @@ func (h *AuthHandler) Register(c *gin.Context) {
 	})
 }
 
-// Login handles user login with username/password
+// Login handles user login with username/password.
+// @Summary      Login
+// @Tags         Auth
+// @Accept       json
+// @Produce      json
+// @Param        body  body  services.LoginRequest  true  "Login request"
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Router       /auth/login [post]
 func (h *AuthHandler) Login(c *gin.Context) {
 	var req services.LoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		RespondError(c, http.StatusBadRequest, "Invalid request body")
 		return
 	}
+	normalizedUsername := strings.TrimSpace(req.Username)
 
-	user, token, err := h.authService.Login(c.Request.Context(), h.userRepo, &req)
+	ipAddress := c.ClientIP()
+	ctx := c.Request.Context()
+
+	// Check account/IP lockout before attempting authentication.
+	// Fix 1: fail closed on DB error — return 503 rather than allowing the
+	// request to continue without a lockout check.
+	if h.lockoutService != nil {
+		locked, err := h.lockoutService.IsLocked(ctx, normalizedUsername, ipAddress)
+		if err != nil {
+			slog.Error("lockout check failed", "error", err, "ip", ipAddress)
+			c.JSON(http.StatusServiceUnavailable, gin.H{"error": "service temporarily unavailable"})
+			c.Abort()
+			return
+		}
+		if locked {
+			// Fix 4: no numeric user ID is available at this point, so targetType
+			// and targetID are left empty/nil. Username is captured in metadata only.
+			h.logAudit(ctx, nil, "login_blocked_lockout", "", nil,
+				ipAddress, c.Request.UserAgent(),
+				map[string]any{"username": normalizedUsername})
+			RespondError(c, http.StatusTooManyRequests, "Account temporarily locked due to too many failed attempts")
+			c.Abort()
+			return
+		}
+	}
+
+	user, token, err := h.authService.Login(ctx, h.userRepo, &req)
 	if err != nil {
+		// Record the failure for lockout tracking.
+		// Fix 9: RecordFailure failure means this attempt is not counted toward
+		// lockout — partial fail-open by design.
+		if h.lockoutService != nil {
+			if rfErr := h.lockoutService.RecordFailure(ctx, normalizedUsername, ipAddress); rfErr != nil {
+				slog.Error("lockout record failure", "error", rfErr)
+			}
+		}
+		h.logAudit(ctx, nil, "login_failed", "user", nil,
+			ipAddress, c.Request.UserAgent(),
+			map[string]any{"username": normalizedUsername})
 		RespondError(c, http.StatusUnauthorized, err.Error())
 		return
 	}
+
+	// Successful login — clear active-window failures and emit audit event.
+	if h.lockoutService != nil {
+		if resetErr := h.lockoutService.Reset(ctx, normalizedUsername); resetErr != nil {
+			slog.Error("lockout reset", "error", resetErr)
+		}
+		if resetErr := h.lockoutService.ResetIP(ctx, ipAddress); resetErr != nil {
+			slog.Error("lockout reset IP", "error", resetErr)
+		}
+	}
+	h.logAudit(ctx, &user.ID, "login_success", "user", &user.ID,
+		ipAddress, c.Request.UserAgent(),
+		map[string]any{"username": user.Username})
 
 	c.JSON(http.StatusOK, gin.H{
 		"token": token,
@@ -228,7 +369,17 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	})
 }
 
-// UpdatePublicKey handles updating user's public encryption key
+// UpdatePublicKey handles updating user's public encryption key.
+// @Summary      Update public key
+// @Tags         Auth
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /auth/public-key [put]
 func (h *AuthHandler) UpdatePublicKey(c *gin.Context) {
 	// Get user ID from context
 	userID, ok := middleware.GetAuthenticatedUserID(c)
@@ -254,7 +405,17 @@ func (h *AuthHandler) UpdatePublicKey(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Public key updated successfully"})
 }
 
-// GetPublicKeys handles fetching public keys for multiple users
+// GetPublicKeys handles fetching public keys for multiple users.
+// @Summary      Get public keys
+// @Tags         Auth
+// @Security     BearerAuth
+// @Produce      json
+// @Param        user_ids  query  string  true  "Comma-separated user IDs"
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /auth/public-keys [get]
 func (h *AuthHandler) GetPublicKeys(c *gin.Context) {
 	userIDsParam := c.Query("user_ids")
 	if userIDsParam == "" {
@@ -286,7 +447,17 @@ func (h *AuthHandler) GetPublicKeys(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"public_keys": publicKeys})
 }
 
-// UpdateEncryptedPrivateKey handles updating user's encrypted private key for cross-browser sync
+// UpdateEncryptedPrivateKey handles updating user's encrypted private key for cross-browser sync.
+// @Summary      Update encrypted private key
+// @Tags         Auth
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /auth/encrypted-private-key [put]
 func (h *AuthHandler) UpdateEncryptedPrivateKey(c *gin.Context) {
 	userID, ok := middleware.GetAuthenticatedUserID(c)
 	if !ok {
@@ -310,7 +481,15 @@ func (h *AuthHandler) UpdateEncryptedPrivateKey(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Encrypted private key updated successfully"})
 }
 
-// GetEncryptedPrivateKey handles fetching user's encrypted private key for cross-browser sync
+// GetEncryptedPrivateKey handles fetching user's encrypted private key for cross-browser sync.
+// @Summary      Get encrypted private key
+// @Tags         Auth
+// @Security     BearerAuth
+// @Produce      json
+// @Success      200  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /auth/encrypted-private-key [get]
 func (h *AuthHandler) GetEncryptedPrivateKey(c *gin.Context) {
 	userID, ok := middleware.GetAuthenticatedUserID(c)
 	if !ok {
@@ -331,7 +510,15 @@ func (h *AuthHandler) GetEncryptedPrivateKey(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"encrypted_private_key": *user.EncryptedPrivateKey})
 }
 
-// ForgotPassword handles password reset requests
+// ForgotPassword handles password reset requests.
+// @Summary      Request password reset
+// @Tags         Auth
+// @Accept       json
+// @Produce      json
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /auth/forgot-password [post]
 func (h *AuthHandler) ForgotPassword(c *gin.Context) {
 	var req struct {
 		Username string `json:"username" binding:"required"`
@@ -345,27 +532,26 @@ func (h *AuthHandler) ForgotPassword(c *gin.Context) {
 	// Find user by username
 	user, err := h.userRepo.GetByUsername(c.Request.Context(), req.Username)
 	if err != nil {
-		// Log error for debugging (but don't reveal to user)
-		fmt.Printf("[DEBUG] GetByUsername failed for %s: %v\n", req.Username, err)
-		// Don't reveal whether user exists (security best practice)
+		// Don't reveal whether user exists (security best practice).
+		slog.Debug("GetByUsername not found during forgot-password", "error", err)
 		c.JSON(http.StatusOK, gin.H{"message": "If an account exists with a verified email, a password reset link has been sent"})
 		return
 	}
 
 	// Check if user has a verified email
 	if user.Email == nil || *user.Email == "" || !user.EmailVerified {
-		fmt.Printf("[DEBUG] User %s has no verified email\n", user.Username)
-		// Don't reveal whether user exists or has email (security best practice)
+		// Don't reveal whether user exists or has email (security best practice).
+		slog.Debug("forgot-password: user has no verified email", "user_id", user.ID)
 		c.JSON(http.StatusOK, gin.H{"message": "If an account exists with a verified email, a password reset link has been sent"})
 		return
 	}
 
-	fmt.Printf("[DEBUG] Found user: id=%d username=%s with verified email\n", user.ID, user.Username)
+	slog.Debug("forgot-password: found user with verified email", "user_id", user.ID)
 
 	// Generate password reset token
 	resetToken, err := h.passwordResetRepo.GenerateToken(c.Request.Context(), user.ID)
 	if err != nil {
-		fmt.Printf("[ERROR] Failed to generate password reset token: %v\n", err)
+		slog.Error("failed to generate password reset token", "error", err, "user_id", user.ID)
 		RespondError(c, http.StatusInternalServerError, "Failed to process password reset request")
 		return
 	}
@@ -384,7 +570,7 @@ func (h *AuthHandler) ForgotPassword(c *gin.Context) {
 			},
 		)
 		if err != nil {
-			fmt.Printf("[ERROR] Failed to send password reset email: %v\n", err)
+			slog.Error("failed to send password reset email", "error", err, "user_id", user.ID)
 			// Continue anyway - don't reveal email send failure to user
 		}
 	}
@@ -392,7 +578,15 @@ func (h *AuthHandler) ForgotPassword(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "If the email exists, a password reset link has been sent"})
 }
 
-// ResetPassword handles password reset with token
+// ResetPassword handles password reset with token.
+// @Summary      Reset password
+// @Tags         Auth
+// @Accept       json
+// @Produce      json
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /auth/reset-password [post]
 func (h *AuthHandler) ResetPassword(c *gin.Context) {
 	var req struct {
 		Token       string `json:"token" binding:"required"`
@@ -421,14 +615,14 @@ func (h *AuthHandler) ResetPassword(c *gin.Context) {
 	// Update password (hash using bcrypt)
 	hashedPassword, err := utils.HashPassword(req.NewPassword)
 	if err != nil {
-		fmt.Printf("[ERROR] Failed to hash password: %v\n", err)
+		slog.Error("failed to hash password during reset", "error", err)
 		RespondError(c, http.StatusInternalServerError, "Failed to reset password")
 		return
 	}
 
 	err = h.userRepo.UpdatePassword(c.Request.Context(), userID, hashedPassword)
 	if err != nil {
-		fmt.Printf("[ERROR] Failed to update password: %v\n", err)
+		slog.Error("failed to update password", "error", err)
 		RespondError(c, http.StatusInternalServerError, "Failed to reset password")
 		return
 	}
@@ -436,7 +630,7 @@ func (h *AuthHandler) ResetPassword(c *gin.Context) {
 	// Mark token as used
 	err = h.passwordResetRepo.MarkAsUsed(c.Request.Context(), req.Token)
 	if err != nil {
-		fmt.Printf("[ERROR] Failed to mark token as used: %v\n", err)
+		slog.Error("failed to mark reset token as used", "error", err)
 		// Continue anyway - password was updated
 	}
 
@@ -444,12 +638,19 @@ func (h *AuthHandler) ResetPassword(c *gin.Context) {
 	_ = h.passwordResetRepo.InvalidateUserTokens(c.Request.Context(), userID)
 
 	c.JSON(http.StatusOK, gin.H{
-		"message": "Password successfully reset",
+		"message":  "Password successfully reset",
 		"username": user.Username,
 	})
 }
 
-// ValidateResetToken checks if a reset token is valid (for frontend validation)
+// ValidateResetToken checks if a reset token is valid (for frontend validation).
+// @Summary      Validate reset token
+// @Tags         Auth
+// @Produce      json
+// @Param        token  query  string  true  "Reset token"
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Router       /auth/validate-reset-token [get]
 func (h *AuthHandler) ValidateResetToken(c *gin.Context) {
 	token := c.Query("token")
 	if token == "" {
@@ -471,12 +672,20 @@ func (h *AuthHandler) ValidateResetToken(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"valid": true,
+		"valid":    true,
 		"username": user.Username,
 	})
 }
 
-// VerifyEmail handles email verification with token
+// VerifyEmail handles email verification with token.
+// @Summary      Verify email address
+// @Tags         Auth
+// @Produce      json
+// @Param        token  query  string  true  "Verification token"
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /auth/verify-email [get]
 func (h *AuthHandler) VerifyEmail(c *gin.Context) {
 	token := c.Query("token")
 	if token == "" {
@@ -487,7 +696,7 @@ func (h *AuthHandler) VerifyEmail(c *gin.Context) {
 	// Verify the token
 	verification, err := h.emailVerificationRepo.Verify(c.Request.Context(), token)
 	if err != nil {
-		fmt.Printf("[ERROR] Email verification failed: %v\n", err)
+		slog.Error("email verification failed", "error", err)
 		RespondError(c, http.StatusBadRequest, "Invalid or expired verification token")
 		return
 	}
@@ -495,7 +704,7 @@ func (h *AuthHandler) VerifyEmail(c *gin.Context) {
 	// Get user
 	user, err := h.userRepo.GetByID(c.Request.Context(), verification.UserID)
 	if err != nil {
-		fmt.Printf("[ERROR] Failed to get user: %v\n", err)
+		slog.Error("failed to get user during email verification", "error", err, "user_id", verification.UserID)
 		RespondError(c, http.StatusInternalServerError, "Failed to verify email")
 		return
 	}
@@ -503,18 +712,18 @@ func (h *AuthHandler) VerifyEmail(c *gin.Context) {
 	// Update user's email and mark as verified
 	encryptedEmail, err := utils.EncryptEmail(verification.Email)
 	if err != nil {
-		fmt.Printf("[ERROR] Failed to encrypt email: %v\n", err)
+		slog.Error("failed to encrypt email during verification", "error", err)
 		RespondError(c, http.StatusInternalServerError, "Failed to verify email")
 		return
 	}
 
 	if err = h.userRepo.UpdateVerifiedEmail(c.Request.Context(), verification.UserID, encryptedEmail); err != nil {
-		fmt.Printf("[ERROR] Failed to update user email: %v\n", err)
+		slog.Error("failed to update verified email", "error", err, "user_id", verification.UserID)
 		RespondError(c, http.StatusInternalServerError, "Failed to verify email")
 		return
 	}
 
-	fmt.Printf("[EMAIL] Email verified for user %s: %s\n", user.Username, verification.Email)
+	slog.Info("email verified", "user_id", user.ID)
 
 	c.JSON(http.StatusOK, gin.H{
 		"verified": true,
@@ -523,7 +732,15 @@ func (h *AuthHandler) VerifyEmail(c *gin.Context) {
 	})
 }
 
-// ResendVerification resends email verification
+// ResendVerification resends email verification.
+// @Summary      Resend verification email
+// @Tags         Auth
+// @Accept       json
+// @Produce      json
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /auth/resend-verification [post]
 func (h *AuthHandler) ResendVerification(c *gin.Context) {
 	var req struct {
 		Username string `json:"username"`
@@ -574,7 +791,7 @@ func (h *AuthHandler) ResendVerification(c *gin.Context) {
 	// Generate new verification token
 	verification, err := h.emailVerificationRepo.GenerateToken(c.Request.Context(), user.ID, *user.Email, "registration")
 	if err != nil {
-		fmt.Printf("[ERROR] Failed to generate verification token: %v\n", err)
+		slog.Error("failed to generate verification token", "error", err, "user_id", user.ID)
 		RespondError(c, http.StatusInternalServerError, "Failed to send verification email")
 		return
 	}
@@ -592,7 +809,7 @@ func (h *AuthHandler) ResendVerification(c *gin.Context) {
 			},
 		)
 		if err != nil {
-			fmt.Printf("[ERROR] Failed to send verification email: %v\n", err)
+			slog.Error("failed to send verification email", "error", err, "user_id", user.ID)
 			RespondError(c, http.StatusInternalServerError, "Failed to send verification email")
 			return
 		}
@@ -624,7 +841,17 @@ func maskEmail(email string) string {
 	return masked + "@" + domain
 }
 
-// UpdateEmail updates user's email address (requires verification)
+// UpdateEmail updates user's email address (requires verification).
+// @Summary      Update email address
+// @Tags         Auth
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /users/email [put]
 func (h *AuthHandler) UpdateEmail(c *gin.Context) {
 	userID, ok := middleware.GetAuthenticatedUserID(c)
 	if !ok {
@@ -660,7 +887,7 @@ func (h *AuthHandler) UpdateEmail(c *gin.Context) {
 	// Generate verification token
 	verification, err := h.emailVerificationRepo.GenerateToken(c.Request.Context(), user.ID, req.Email, "update_email")
 	if err != nil {
-		fmt.Printf("[ERROR] Failed to generate verification token: %v\n", err)
+		slog.Error("failed to generate email update verification token", "error", err, "user_id", user.ID)
 		RespondError(c, http.StatusInternalServerError, "Failed to send verification email")
 		return
 	}
@@ -678,7 +905,7 @@ func (h *AuthHandler) UpdateEmail(c *gin.Context) {
 			},
 		)
 		if err != nil {
-			fmt.Printf("[ERROR] Failed to send verification email: %v\n", err)
+			slog.Error("failed to send email update verification email", "error", err, "user_id", user.ID)
 			RespondError(c, http.StatusInternalServerError, "Failed to send verification email")
 			return
 		}

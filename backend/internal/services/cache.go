@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	"io"
 	"net"
 	"strconv"
 	"strings"
@@ -27,10 +28,19 @@ func (NoopCache) Set(ctx context.Context, key string, value string, ttl time.Dur
 	return nil
 }
 
-// MemoryCache is a simple in-memory cache with TTL support
+// defaultMemoryCacheMaxSize is the default maximum number of entries in a
+// MemoryCache. When the limit is reached, Set silently drops the new entry
+// rather than evicting an existing one (no LRU). Tune via NewMemoryCacheWithMax.
+const defaultMemoryCacheMaxSize = 10_000
+
+// MemoryCache is a simple in-memory cache with TTL support and an entry-count cap.
+// Call Stop() to release the background cleanup goroutine when the cache is
+// no longer needed (e.g. during server shutdown or in tests).
 type MemoryCache struct {
-	data  map[string]*cacheEntry
-	mutex sync.RWMutex
+	data    map[string]*cacheEntry
+	maxSize int
+	mutex   sync.RWMutex
+	stopCh  chan struct{}
 }
 
 type cacheEntry struct {
@@ -38,36 +48,77 @@ type cacheEntry struct {
 	expiration time.Time
 }
 
-// NewMemoryCache creates an in-memory cache
+// NewMemoryCache creates an in-memory cache with a default cap of 10,000 entries
+// and starts a background cleanup goroutine that evicts expired entries every
+// minute. Call Stop() to terminate the goroutine when the cache is no longer needed.
 func NewMemoryCache() *MemoryCache {
-	cache := &MemoryCache{
-		data: make(map[string]*cacheEntry),
+	return NewMemoryCacheWithMax(defaultMemoryCacheMaxSize)
+}
+
+// NewMemoryCacheWithMax creates a MemoryCache with a custom entry cap.
+// When the cache reaches maxSize entries, new Set calls are silently dropped
+// until the cleanup goroutine evicts expired entries.
+func NewMemoryCacheWithMax(maxSize int) *MemoryCache {
+	if maxSize <= 0 {
+		maxSize = defaultMemoryCacheMaxSize
 	}
-	// Start background cleanup goroutine
+	cache := &MemoryCache{
+		data:    make(map[string]*cacheEntry, maxSize),
+		maxSize: maxSize,
+		stopCh:  make(chan struct{}),
+	}
 	go cache.cleanup()
 	return cache
 }
 
-func (m *MemoryCache) Get(ctx context.Context, key string) (string, bool, error) {
-	m.mutex.RLock()
-	defer m.mutex.RUnlock()
+// Stop terminates the background cleanup goroutine. It is safe to call
+// multiple times; subsequent calls are no-ops.
+func (m *MemoryCache) Stop() {
+	select {
+	case <-m.stopCh:
+		// already stopped
+	default:
+		close(m.stopCh)
+	}
+}
 
+func (m *MemoryCache) Get(ctx context.Context, key string) (string, bool, error) {
+	// Fast path: entry exists and is not expired.
+	m.mutex.RLock()
 	entry, exists := m.data[key]
+	m.mutex.RUnlock()
+
 	if !exists {
 		return "", false, nil
 	}
-
-	// Check if expired
-	if time.Now().After(entry.expiration) {
-		return "", false, nil
+	if !time.Now().After(entry.expiration) {
+		// Entry is still valid. The pointer was read under the RLock and the
+		// underlying struct is never mutated after insertion, so this is safe.
+		return entry.value, true, nil
 	}
 
-	return entry.value, true, nil
+	// Lazy eviction: entry exists but has expired.
+	// Acquire write lock and re-check: a concurrent Set may have refreshed the
+	// entry between the RUnlock above and now.
+	m.mutex.Lock()
+	if e, ok := m.data[key]; ok && time.Now().After(e.expiration) {
+		delete(m.data, key)
+	}
+	m.mutex.Unlock()
+	return "", false, nil
 }
 
 func (m *MemoryCache) Set(ctx context.Context, key string, value string, ttl time.Duration) error {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
+
+	// Allow overwriting an existing key regardless of size (it does not grow the map).
+	// If the map is at capacity and this is a new key, drop silently rather than
+	// evicting an existing entry — this avoids the complexity of LRU bookkeeping.
+	_, exists := m.data[key]
+	if !exists && len(m.data) >= m.maxSize {
+		return nil
+	}
 
 	m.data[key] = &cacheEntry{
 		value:      value,
@@ -77,31 +128,44 @@ func (m *MemoryCache) Set(ctx context.Context, key string, value string, ttl tim
 	return nil
 }
 
-// cleanup removes expired entries every minute
+// cleanup removes expired entries every minute until Stop() is called.
 func (m *MemoryCache) cleanup() {
 	ticker := time.NewTicker(1 * time.Minute)
 	defer ticker.Stop()
 
-	for range ticker.C {
-		m.mutex.Lock()
-		now := time.Now()
-		for key, entry := range m.data {
-			if now.After(entry.expiration) {
-				delete(m.data, key)
+	for {
+		select {
+		case <-m.stopCh:
+			return
+		case <-ticker.C:
+			m.mutex.Lock()
+			now := time.Now()
+			for key, entry := range m.data {
+				if now.After(entry.expiration) {
+					delete(m.data, key)
+				}
 			}
+			m.mutex.Unlock()
 		}
-		m.mutex.Unlock()
 	}
 }
 
-// RedisCache is a lightweight Redis client using RESP for simple GET/SETEX
+// RedisCache is a lightweight Redis client using raw RESP for simple GET/SETEX.
+//
+// Deprecated: RedisCache opens a new TCP connection on every Get and Set call,
+// making it unsuitable for any non-trivial production load (connection setup
+// overhead + ephemeral port exhaustion). Use ResilientRedisCache instead,
+// which wraps go-redis with a connection pool, circuit breaker, and singleflight.
+// RedisCache is retained only for environments where go-redis cannot be imported.
 type RedisCache struct {
 	addr     string
 	password string
 	timeout  time.Duration
 }
 
-// NewRedisCache creates a Redis-backed cache
+// NewRedisCache creates a Redis-backed cache.
+//
+// Deprecated: see RedisCache type comment. Use NewResilientRedisCache instead.
 func NewRedisCache(addr, password string, timeout time.Duration) *RedisCache {
 	return &RedisCache{
 		addr:     addr,
@@ -111,6 +175,10 @@ func NewRedisCache(addr, password string, timeout time.Duration) *RedisCache {
 }
 
 func (r *RedisCache) dial(ctx context.Context) (net.Conn, error) {
+	// r.timeout serves as BOTH the dial deadline AND the per-operation deadline
+	// set on the connection after it is established. This means the total budget
+	// for a Get/Set call is up to 2×r.timeout (dial + op). Pass a timeout that
+	// is at most half of your desired end-to-end deadline.
 	dialer := &net.Dialer{Timeout: r.timeout}
 	conn, err := dialer.DialContext(ctx, "tcp", r.addr)
 	if err != nil {
@@ -151,16 +219,28 @@ func (r *RedisCache) Get(ctx context.Context, key string) (string, bool, error) 
 	return resp, ok, nil
 }
 
-// Set sets value with TTL using SETEX
+// Set sets value with TTL using SETEX.
+// Returns an error if ttl is zero or negative — Redis SETEX requires a positive
+// integer TTL and would return an error anyway; failing early gives a clearer message.
+// Note: sub-second TTLs (e.g. 500ms) are truncated to whole seconds by SETEX.
+// If you need sub-second expiry, use the PSETEX command instead (not supported here).
 func (r *RedisCache) Set(ctx context.Context, key string, value string, ttl time.Duration) error {
+	if ttl <= 0 {
+		return fmt.Errorf("RedisCache.Set: ttl must be positive, got %v", ttl)
+	}
+	seconds := int64(ttl.Seconds())
+	if seconds == 0 {
+		// ttl was positive but less than 1 second — truncation would produce 0,
+		// which Redis SETEX rejects. Round up to 1 second.
+		seconds = 1
+	}
 	conn, err := r.dial(ctx)
 	if err != nil {
 		return err
 	}
 	defer conn.Close()
 
-	seconds := strconv.FormatInt(int64(ttl.Seconds()), 10)
-	if err := writeCommand(conn, "SETEX", key, seconds, value); err != nil {
+	if err := writeCommand(conn, "SETEX", key, strconv.FormatInt(seconds, 10), value); err != nil {
 		return err
 	}
 	_, _, err = readReply(conn)
@@ -203,7 +283,7 @@ func readReply(conn net.Conn) (string, bool, error) {
 			return "", false, nil // nil bulk — key does not exist
 		}
 		buf := make([]byte, size+2) // include CRLF
-		if _, err := ioReadFull(reader, buf); err != nil {
+		if _, err := io.ReadFull(reader, buf); err != nil {
 			return "", false, err
 		}
 		return string(buf[:size]), true, nil
@@ -212,23 +292,6 @@ func readReply(conn net.Conn) (string, bool, error) {
 	default:
 		return "", false, fmt.Errorf("unexpected redis reply: %s", line)
 	}
-}
-
-func ioReadFull(r *bufio.Reader, buf []byte) (int, error) {
-	total := 0
-	for total < len(buf) {
-		n, err := r.Read(buf[total:])
-		if n == 0 && err == nil {
-			// A zero-byte read with no error should not happen on a buffered
-			// reader backed by a real connection. Guard against an infinite loop.
-			return total, fmt.Errorf("unexpected zero-byte read after %d/%d bytes", total, len(buf))
-		}
-		total += n
-		if err != nil {
-			return total, err
-		}
-	}
-	return total, nil
 }
 
 // keyPrefix returns the first colon-delimited segment of a cache key,
@@ -245,7 +308,7 @@ func keyPrefix(key string) string {
 // hit/miss metrics broken down by cache type and key prefix.
 type InstrumentedCache struct {
 	inner     Cache
-	cacheType string // "redis" or "memory"
+	cacheType string // fixed at construction; used as a Prometheus label (e.g. "redis", "memory")
 }
 
 // NewInstrumentedCache creates an InstrumentedCache wrapping inner.

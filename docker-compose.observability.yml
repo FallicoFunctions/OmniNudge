@@ -1,0 +1,69 @@
+# Observability stack: Grafana + Loki + Promtail
+# Usage: docker compose -f docker-compose.observability.yml up -d
+# Grafana UI: http://localhost:3000 (admin/admin)
+# Loki API:   http://localhost:3100
+
+version: "3.8"
+
+volumes:
+  grafana-data:
+  loki-data:
+
+networks:
+  observability:
+    driver: bridge
+
+services:
+  # ---------------------------------------------------------------------------
+  # Loki — log aggregation backend
+  # ---------------------------------------------------------------------------
+  loki:
+    image: grafana/loki:2.9.4
+    container_name: omninudge-loki
+    restart: unless-stopped
+    ports:
+      - "3100:3100"
+    command: -config.file=/etc/loki/local-config.yaml
+    volumes:
+      - loki-data:/loki
+    networks:
+      - observability
+
+  # ---------------------------------------------------------------------------
+  # Promtail — log collector that tails Docker container logs → Loki
+  # ---------------------------------------------------------------------------
+  promtail:
+    image: grafana/promtail:2.9.4
+    container_name: omninudge-promtail
+    restart: unless-stopped
+    volumes:
+      - /var/log:/var/log:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - ./monitoring/promtail-config.yml:/etc/promtail/config.yml:ro
+    command: -config.file=/etc/promtail/config.yml
+    networks:
+      - observability
+    depends_on:
+      - loki
+
+  # ---------------------------------------------------------------------------
+  # Grafana — dashboards for Loki logs + Prometheus metrics
+  # ---------------------------------------------------------------------------
+  grafana:
+    image: grafana/grafana:10.4.2
+    container_name: omninudge-grafana
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_PATHS_PROVISIONING: /etc/grafana/provisioning
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    networks:
+      - observability
+    depends_on:
+      - loki

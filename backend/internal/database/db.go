@@ -3,16 +3,44 @@ package database
 import (
 	"context"
 	"fmt"
+	"log/slog"
+	"math"
+	"os"
+	"strconv"
+	"sync"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// DB wraps the PostgreSQL connection pool
+// DB wraps the PostgreSQL connection pool. It is safe for concurrent use;
+// the connection pool itself handles multiplexing. The test advisory lock
+// helpers (acquireTestLock / releaseTestLock) are guarded by testLockMu.
 type DB struct {
 	Pool         *pgxpool.Pool
+	closeOnce    sync.Once
+	testLockMu   sync.Mutex
 	testLockKey  *int64
 	testLockConn *pgxpool.Conn
+}
+
+// poolIntEnv reads an env var as a positive integer, returning defaultVal on
+// missing or invalid input.
+func poolIntEnv(key string, defaultVal int32) int32 {
+	s := os.Getenv(key)
+	if s == "" {
+		return defaultVal
+	}
+	v, err := strconv.Atoi(s)
+	if err != nil || v <= 0 || v > math.MaxInt32 {
+		slog.Warn("invalid pool size env var; using default",
+			slog.String("key", key),
+			slog.String("value", s),
+			slog.Int("default", int(defaultVal)),
+		)
+		return defaultVal
+	}
+	return int32(v)
 }
 
 // New creates a new database connection pool
@@ -22,23 +50,47 @@ func New(databaseURL string) (*DB, error) {
 		return nil, fmt.Errorf("failed to parse database URL: %w", err)
 	}
 
-	// Configure connection pool settings
-	config.MaxConns = 25
-	config.MinConns = 5
-	config.MaxConnLifetime = 5 * time.Minute
+	// Configure connection pool settings.
+	// DB_MAX_CONNS and DB_MIN_CONNS env vars override the compiled-in defaults.
+	// Budget note: set DB_MAX_CONNS so that all application instances combined
+	// stay below Postgres max_connections (typically 100). For example: with 2
+	// replicas and a Postgres max of 100, set DB_MAX_CONNS=45 (leaving 10 for
+	// admin/monitoring connections).
+	maxConns := poolIntEnv("DB_MAX_CONNS", 50)
+	minConns := poolIntEnv("DB_MIN_CONNS", 10)
+	if minConns > maxConns {
+		slog.Warn("DB_MIN_CONNS > DB_MAX_CONNS; clamping min to max",
+			slog.Int("min_conns", int(minConns)),
+			slog.Int("max_conns", int(maxConns)),
+		)
+		minConns = maxConns
+	}
+	config.MaxConns = maxConns
+	config.MinConns = minConns
+	config.MaxConnLifetime = 30 * time.Minute
 	config.MaxConnIdleTime = 1 * time.Minute
 
-	// Create connection pool with timeout
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
+	// Wire slow-query analyzer into the pool tracer.
+	// Passing nil for logger causes slow-query logs to use slog.Default() at
+	// log time, so any default-logger replacement after startup is respected.
+	config.ConnConfig.Tracer = NewQueryAnalyzer(100*time.Millisecond, nil)
 
-	pool, err := pgxpool.NewWithConfig(ctx, config)
+	// Create connection pool. A 10-second timeout covers TCP dial + TLS + auth.
+	// A separate context is used for Ping below; reusing this one after
+	// pgxpool.NewWithConfig may leave it with very little budget remaining.
+	poolCtx, poolCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer poolCancel()
+
+	pool, err := pgxpool.NewWithConfig(poolCtx, config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create connection pool: %w", err)
 	}
 
-	// Verify connection
-	if err := pool.Ping(ctx); err != nil {
+	// Verify connection with a fresh context so the Ping has the full 5-second
+	// budget independent of how long pool creation took.
+	pingCtx, pingCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer pingCancel()
+	if err := pool.Ping(pingCtx); err != nil {
 		pool.Close()
 		return nil, fmt.Errorf("failed to ping database: %w", err)
 	}
@@ -46,15 +98,15 @@ func New(databaseURL string) (*DB, error) {
 	return &DB{Pool: pool}, nil
 }
 
-// Close closes the database connection pool. Safe to call multiple times.
+// Close closes the database connection pool. Safe to call multiple times;
+// subsequent calls are no-ops guaranteed by sync.Once.
 func (db *DB) Close() {
-	if db.Pool == nil {
-		return
-	}
-	db.releaseTestLock()
-	pool := db.Pool
-	db.Pool = nil // prevent double-close panic in pgxpool
-	pool.Close()
+	db.closeOnce.Do(func() {
+		db.releaseTestLock()
+		if db.Pool != nil {
+			db.Pool.Close()
+		}
+	})
 }
 
 // Health checks if the database connection is healthy
@@ -64,27 +116,41 @@ func (db *DB) Health(ctx context.Context) error {
 
 // acquireTestLock grabs a process-wide advisory lock so different test packages
 // don't truncate each other's tables concurrently.
+// The 30-second timeout is intentional: pg_advisory_lock blocks until the lock
+// is granted. Under normal test conditions, the wait is sub-second. 30 seconds
+// provides a safety margin against a hung test process that holds the lock.
 func (db *DB) acquireTestLock(key int64) error {
+	db.testLockMu.Lock()
+	defer db.testLockMu.Unlock()
+
 	if db.testLockConn != nil {
 		return nil
 	}
 
-	conn, err := db.Pool.Acquire(context.Background())
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	conn, err := db.Pool.Acquire(ctx)
 	if err != nil {
-		return err
+		return fmt.Errorf("acquire test lock connection: %w", err)
 	}
 
-	if _, err := conn.Exec(context.Background(), "SELECT pg_advisory_lock($1)", key); err != nil {
+	if _, err := conn.Exec(ctx, "SELECT pg_advisory_lock($1)", key); err != nil {
 		conn.Release()
 		return err
 	}
 
 	db.testLockConn = conn
-	db.testLockKey = &key
+	// Copy key to heap so the pointer outlives this stack frame.
+	k := key
+	db.testLockKey = &k
 	return nil
 }
 
 func (db *DB) releaseTestLock() {
+	db.testLockMu.Lock()
+	defer db.testLockMu.Unlock()
+
 	if db.testLockConn == nil || db.testLockKey == nil {
 		return
 	}
