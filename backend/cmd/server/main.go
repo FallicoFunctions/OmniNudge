@@ -609,6 +609,10 @@ func main() {
 	// Protected by ASYNQMON_TOKEN bearer token; empty token allows unrestricted access (dev only).
 	// In production always set ASYNQMON_TOKEN to a strong random secret.
 	if redisAvailable {
+		if cfg.AsynqmonToken == "" {
+			zlog.Warn().Msg("ASYNQMON_TOKEN is not set — /admin/queues dashboard is publicly accessible; set this in production")
+		}
+
 		mon := asynqmon.New(asynqmon.Options{
 			RootPath: "/admin/queues",
 			RedisConnOpt: asynq.RedisClientOpt{
@@ -616,24 +620,37 @@ func main() {
 				Password: cfg.Redis.Password,
 			},
 		})
-		router.Any("/admin/queues", func(c *gin.Context) {
+
+		// asynqmonAuth enforces bearer token protection for all queue dashboard routes.
+		asynqmonAuth := func(c *gin.Context) {
 			if token := cfg.AsynqmonToken; token != "" {
 				if c.GetHeader("Authorization") != "Bearer "+token {
 					c.AbortWithStatus(http.StatusUnauthorized)
 					return
 				}
 			}
+			c.Next()
+		}
+
+		// asynqmonHandler bridges net/http to gin for the asynqmon SPA.
+		asynqmonHandler := func(c *gin.Context) {
 			mon.ServeHTTP(c.Writer, c.Request)
-		})
-		router.Any("/admin/queues/*path", func(c *gin.Context) {
-			if token := cfg.AsynqmonToken; token != "" {
-				if c.GetHeader("Authorization") != "Bearer "+token {
-					c.AbortWithStatus(http.StatusUnauthorized)
-					return
-				}
-			}
-			mon.ServeHTTP(c.Writer, c.Request)
-		})
+		}
+
+		// Asynqmon uses GET for the UI, POST/DELETE for job management actions.
+		// @Summary      Queue monitoring dashboard
+		// @Description  Asynqmon web UI — view and manage background job queues.
+		// @Tags         Admin
+		// @Security     BearerAuth
+		// @Success      200  "HTML dashboard"
+		// @Failure      401  "Unauthorized"
+		// @Router       /admin/queues [get]
+		adminQueues := router.Group("/admin/queues", asynqmonAuth)
+		for _, method := range []string{http.MethodGet, http.MethodPost, http.MethodDelete} {
+			adminQueues.Handle(method, "", asynqmonHandler)
+			adminQueues.Handle(method, "/*path", asynqmonHandler)
+		}
+
 		zlog.Info().Str("path", "/admin/queues").Msg("Asynqmon queue dashboard enabled")
 	}
 
