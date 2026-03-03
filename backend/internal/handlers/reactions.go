@@ -1,13 +1,13 @@
 package handlers
 
 import (
-	"github.com/omninudge/backend/internal/api/middleware"
 	"errors"
-	"log"
+	"log/slog"
 	"net/http"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
+	"github.com/omninudge/backend/internal/api/middleware"
 	"github.com/omninudge/backend/internal/models"
 	"github.com/omninudge/backend/internal/services"
 )
@@ -92,7 +92,7 @@ func (h *ReactionsHandler) AddReaction(c *gin.Context) {
 		case errors.Is(err, services.ErrAlreadyReacted):
 			RespondError(c, http.StatusConflict, "You have already reacted with this emoji")
 		default:
-			log.Printf("[ReactionsHandler] AddReaction error: message=%d user=%d: %v", messageID, userID, err)
+			slog.Error("reactions: add reaction", "message_id", messageID, "user_id", userID, "error", err)
 			RespondError(c, http.StatusInternalServerError, "Failed to add reaction")
 		}
 		return
@@ -146,7 +146,7 @@ func (h *ReactionsHandler) RemoveReaction(c *gin.Context) {
 		case errors.Is(err, services.ErrNotReactionOwner):
 			RespondError(c, http.StatusForbidden, "You can only remove your own reactions")
 		default:
-			log.Printf("[ReactionsHandler] RemoveReaction error: message=%d reaction=%d user=%d: %v", messageID, reactionID, userID, err)
+			slog.Error("reactions: remove reaction", "message_id", messageID, "reaction_id", reactionID, "user_id", userID, "error", err)
 			RespondError(c, http.StatusInternalServerError, "Failed to remove reaction")
 		}
 		return
@@ -210,7 +210,7 @@ func (h *ReactionsHandler) GetReactions(c *gin.Context) {
 		case errors.Is(err, services.ErrNotParticipant):
 			RespondError(c, http.StatusForbidden, "You are not a participant in this conversation")
 		default:
-			log.Printf("[ReactionsHandler] GetReactions error: message=%d user=%d: %v", messageID, userID, err)
+			slog.Error("reactions: get reactions", "message_id", messageID, "user_id", userID, "error", err)
 			RespondError(c, http.StatusInternalServerError, "Failed to get reactions")
 		}
 		return

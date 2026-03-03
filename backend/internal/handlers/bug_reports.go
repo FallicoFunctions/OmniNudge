@@ -52,7 +52,16 @@ type CreateBugReportRequest struct {
 	Context          map[string]interface{} `json:"context"`
 }
 
-// CreateBugReport handles POST /api/v1/bug-reports
+// CreateBugReport submits a new bug report or feedback.
+// @Summary      Submit bug report
+// @Tags         BugReports
+// @Accept       json
+// @Produce      json
+// @Param        body  body  CreateBugReportRequest  true  "Bug report"
+// @Success      201  {object}  models.BugReport
+// @Failure      400  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /bug-reports [post]
 func (h *BugReportsHandler) CreateBugReport(c *gin.Context) {
 	var req CreateBugReportRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -152,7 +161,22 @@ func (h *BugReportsHandler) CreateBugReport(c *gin.Context) {
 	c.JSON(http.StatusCreated, report)
 }
 
-// GetBugReports handles GET /api/v1/bug-reports (admin only)
+// GetBugReports returns paginated bug reports (admin only).
+// @Summary      List bug reports
+// @Tags         Admin
+// @Security     BearerAuth
+// @Produce      json
+// @Param        status          query  string  false  "Filter by status"
+// @Param        feedback_type   query  string  false  "Filter by feedback type"
+// @Param        feedback_category query string false  "Filter by category"
+// @Param        limit           query  int     false  "Page size (default 50)"
+// @Param        offset          query  int     false  "Offset"
+// @Param        cursor          query  string  false  "Pagination cursor"
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /admin/bug-reports [get]
 func (h *BugReportsHandler) GetBugReports(c *gin.Context) {
 	status := c.Query("status")
 	category := c.Query("feedback_category")
@@ -262,7 +286,19 @@ type UpdateBugReportRequest struct {
 	AdminNotes *string `json:"admin_notes"`
 }
 
-// UpdateBugReport handles PUT /api/v1/bug-reports/:id (admin only)
+// UpdateBugReport updates a bug report status (admin only).
+// @Summary      Update bug report
+// @Tags         Admin
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Param        id    path  int                      true  "Bug report ID"
+// @Param        body  body  UpdateBugReportRequest   true  "Update request"
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /admin/bug-reports/{id} [put]
 func (h *BugReportsHandler) UpdateBugReport(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
@@ -284,7 +320,14 @@ func (h *BugReportsHandler) UpdateBugReport(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Bug report updated successfully"})
 }
 
-// GetKnownBugs handles GET /api/v1/known-bugs
+// GetKnownBugs returns publicly visible known bugs.
+// @Summary      Get known bugs
+// @Tags         BugReports
+// @Produce      json
+// @Param        status  query  string  false  "Filter by status"
+// @Success      200  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /bug-reports/known [get]
 func (h *BugReportsHandler) GetKnownBugs(c *gin.Context) {
 	status := c.Query("status")
 	var statusPtr *string
@@ -316,7 +359,18 @@ type CreateKnownBugRequest struct {
 	Workaround     *string  `json:"workaround"`
 }
 
-// CreateKnownBug handles POST /api/v1/known-bugs (admin only)
+// CreateKnownBug creates a publicly visible known bug entry (admin only).
+// @Summary      Create known bug
+// @Tags         Admin
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Param        body  body  CreateKnownBugRequest  true  "Known bug"
+// @Success      201  {object}  models.KnownBug
+// @Failure      400  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /admin/known-bugs [post]
 func (h *BugReportsHandler) CreateKnownBug(c *gin.Context) {
 	var req CreateKnownBugRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -353,7 +407,19 @@ type UpdateKnownBugRequest struct {
 	Workaround     *string  `json:"workaround"`
 }
 
-// UpdateKnownBug handles PUT /api/v1/known-bugs/:id (admin only)
+// UpdateKnownBug updates a known bug entry (admin only).
+// @Summary      Update known bug
+// @Tags         Admin
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Param        id    path  int                    true  "Known bug ID"
+// @Param        body  body  UpdateKnownBugRequest  true  "Update request"
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /admin/known-bugs/{id} [put]
 func (h *BugReportsHandler) UpdateKnownBug(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
@@ -391,7 +457,17 @@ func (h *BugReportsHandler) UpdateKnownBug(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Known bug updated successfully"})
 }
 
-// DeleteKnownBug handles DELETE /api/v1/known-bugs/:id (admin only)
+// DeleteKnownBug deletes a known bug entry (admin only).
+// @Summary      Delete known bug
+// @Tags         Admin
+// @Security     BearerAuth
+// @Produce      json
+// @Param        id  path  int  true  "Known bug ID"
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /admin/known-bugs/{id} [delete]
 func (h *BugReportsHandler) DeleteKnownBug(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {

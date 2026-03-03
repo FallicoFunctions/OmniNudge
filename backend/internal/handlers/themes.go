@@ -132,7 +132,17 @@ type createThemeRequest struct {
 	ThumbnailURL     *string                `json:"thumbnail_url"`
 }
 
-// CreateTheme handles POST /api/v1/themes
+// CreateTheme creates a new user-defined theme.
+// @Summary      Create theme
+// @Tags         Themes
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Success      201  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /themes [post]
 func (h *ThemesHandler) CreateTheme(c *gin.Context) {
 	userID := c.GetInt("user_id")
 
@@ -219,7 +229,17 @@ func (h *ThemesHandler) CreateTheme(c *gin.Context) {
 	c.JSON(http.StatusCreated, created)
 }
 
-// GetTheme handles GET /api/v1/themes/:id
+// GetTheme returns a theme by ID.
+// @Summary      Get theme
+// @Tags         Themes
+// @Security     BearerAuth
+// @Produce      json
+// @Param        id  path  int  true  "Theme ID"
+// @Success      200  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      404  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /themes/{id} [get]
 func (h *ThemesHandler) GetTheme(c *gin.Context) {
 	themeID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
@@ -241,7 +261,15 @@ func (h *ThemesHandler) GetTheme(c *gin.Context) {
 	c.JSON(http.StatusOK, theme)
 }
 
-// GetMyThemes handles GET /api/v1/themes/my
+// GetMyThemes returns themes created by the current user.
+// @Summary      Get my themes
+// @Tags         Themes
+// @Security     BearerAuth
+// @Produce      json
+// @Success      200  {array}   gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /themes/my [get]
 func (h *ThemesHandler) GetMyThemes(c *gin.Context) {
 	userID := c.GetInt("user_id")
 
@@ -320,7 +348,19 @@ type updateThemeRequest struct {
 	ThumbnailURL     *string                `json:"thumbnail_url"`
 }
 
-// UpdateTheme handles PUT /api/v1/themes/:id
+// UpdateTheme updates an existing theme.
+// @Summary      Update theme
+// @Tags         Themes
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Param        id  path  int  true  "Theme ID"
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /themes/{id} [put]
 func (h *ThemesHandler) UpdateTheme(c *gin.Context) {
 	userID := c.GetInt("user_id")
 	themeID, err := strconv.Atoi(c.Param("id"))
@@ -405,7 +445,17 @@ func (h *ThemesHandler) UpdateTheme(c *gin.Context) {
 	c.JSON(http.StatusOK, updated)
 }
 
-// DeleteTheme handles DELETE /api/v1/themes/:id
+// DeleteTheme deletes a theme.
+// @Summary      Delete theme
+// @Tags         Themes
+// @Security     BearerAuth
+// @Produce      json
+// @Param        id  path  int  true  "Theme ID"
+// @Success      204
+// @Failure      401  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /themes/{id} [delete]
 func (h *ThemesHandler) DeleteTheme(c *gin.Context) {
 	userID := c.GetInt("user_id")
 	themeID, err := strconv.Atoi(c.Param("id"))
@@ -443,7 +493,12 @@ func (h *ThemesHandler) DeleteTheme(c *gin.Context) {
 // Predefined Themes
 // ============================================================================
 
-// GetPredefinedThemes handles GET /api/v1/themes/predefined
+// GetPredefinedThemes returns the built-in theme presets.
+// @Summary      Get predefined themes
+// @Tags         Themes
+// @Produce      json
+// @Success      200  {array}   gin.H
+// @Router       /themes/predefined [get]
 func (h *ThemesHandler) GetPredefinedThemes(c *gin.Context) {
 	themes, err := h.themeRepo.GetPredefinedThemes(c.Request.Context())
 	if err != nil {
@@ -466,7 +521,17 @@ func (h *ThemesHandler) GetPredefinedThemes(c *gin.Context) {
 // Public Theme Browser (Phase 2c - Community Sharing)
 // ============================================================================
 
-// BrowseThemes handles GET /api/v1/themes/browse
+// BrowseThemes returns community-published themes.
+// @Summary      Browse themes
+// @Tags         Themes
+// @Security     BearerAuth
+// @Produce      json
+// @Param        q       query  string  false  "Search query"
+// @Param        limit   query  int     false  "Max results"
+// @Param        offset  query  int     false  "Pagination offset"
+// @Success      200  {array}   gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /themes/browse [get]
 func (h *ThemesHandler) BrowseThemes(c *gin.Context) {
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
 	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))

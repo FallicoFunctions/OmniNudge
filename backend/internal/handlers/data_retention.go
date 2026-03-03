@@ -27,8 +27,16 @@ type RetentionStatus struct {
 	SizeEstimate    string    `json:"size_estimate"`
 }
 
-// GetRetentionStatus returns the status of data retention policies
-// GET /api/v1/admin/retention/status
+// GetRetentionStatus returns the current data retention status.
+// @Summary      Get retention status
+// @Tags         DataRetention
+// @Security     BearerAuth
+// @Produce      json
+// @Success      200  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /admin/retention/status [get]
 func (h *DataRetentionHandler) GetRetentionStatus(c *gin.Context) {
 	ctx := c.Request.Context()
 
@@ -150,8 +158,16 @@ func (h *DataRetentionHandler) GetRetentionStatus(c *gin.Context) {
 	})
 }
 
-// GetRetentionPolicy returns the current retention policies from database
-// GET /api/v1/admin/retention/policy
+// GetRetentionPolicy returns configured data retention policies.
+// @Summary      Get retention policies
+// @Tags         DataRetention
+// @Security     BearerAuth
+// @Produce      json
+// @Success      200  {array}   gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /admin/retention/policy [get]
 func (h *DataRetentionHandler) GetRetentionPolicy(c *gin.Context) {
 	ctx := c.Request.Context()
 
@@ -209,8 +225,19 @@ func (h *DataRetentionHandler) GetRetentionPolicy(c *gin.Context) {
 	})
 }
 
-// UpdateRetentionPolicy updates a retention policy
-// PUT /api/v1/admin/retention/policy/:data_type
+// UpdateRetentionPolicy updates a data retention policy.
+// @Summary      Update retention policy
+// @Tags         DataRetention
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Param        data_type  path  string  true  "Data type"
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /admin/retention/policy/{data_type} [put]
 func (h *DataRetentionHandler) UpdateRetentionPolicy(c *gin.Context) {
 	ctx := c.Request.Context()
 	dataType := c.Param("data_type")
@@ -280,8 +307,16 @@ func (h *DataRetentionHandler) UpdateRetentionPolicy(c *gin.Context) {
 	})
 }
 
-// GetRetentionHistory returns the audit history of retention policy changes
-// GET /api/v1/admin/retention/history
+// GetRetentionHistory returns audit history of retention policy changes.
+// @Summary      Get retention history
+// @Tags         DataRetention
+// @Security     BearerAuth
+// @Produce      json
+// @Success      200  {array}   gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /admin/retention/history [get]
 func (h *DataRetentionHandler) GetRetentionHistory(c *gin.Context) {
 	ctx := c.Request.Context()
 	dataType := c.Query("data_type") // optional filter

@@ -17,8 +17,15 @@ func NewAnalyticsHandler(svc *services.AnalyticsService) *AnalyticsHandler {
 	return &AnalyticsHandler{svc: svc}
 }
 
-// TrackEvent records an analytics event
-// POST /api/v1/analytics/track
+// TrackEvent records an analytics event.
+// @Summary      Track analytics event
+// @Tags         Analytics
+// @Accept       json
+// @Produce      json
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /analytics/track [post]
 func (h *AnalyticsHandler) TrackEvent(c *gin.Context) {
 	userID := c.GetInt("user_id") // May be 0 if not authenticated
 
@@ -65,8 +72,15 @@ func (h *AnalyticsHandler) TrackEvent(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"status": "tracked"})
 }
 
-// StartSession creates a new session
-// POST /api/v1/analytics/session/start
+// StartSession creates a new analytics session.
+// @Summary      Start analytics session
+// @Tags         Analytics
+// @Accept       json
+// @Produce      json
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /analytics/session/start [post]
 func (h *AnalyticsHandler) StartSession(c *gin.Context) {
 	userID := c.GetInt("user_id")
 
@@ -105,8 +119,15 @@ func (h *AnalyticsHandler) StartSession(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"status": "started"})
 }
 
-// EndSession ends a session
-// POST /api/v1/analytics/session/end
+// EndSession ends an analytics session.
+// @Summary      End analytics session
+// @Tags         Analytics
+// @Accept       json
+// @Produce      json
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /analytics/session/end [post]
 func (h *AnalyticsHandler) EndSession(c *gin.Context) {
 	var req struct {
 		SessionID string `json:"session_id" binding:"required"`
@@ -131,8 +152,16 @@ func (h *AnalyticsHandler) EndSession(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"status": "ended"})
 }
 
-// Identify links an anonymous ID to a logged-in user
-// POST /api/v1/analytics/identify
+// Identify links an anonymous ID to a logged-in user.
+// @Summary      Identify analytics user
+// @Tags         Analytics
+// @Accept       json
+// @Produce      json
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /analytics/identify [post]
 func (h *AnalyticsHandler) Identify(c *gin.Context) {
 	userID := c.GetInt("user_id")
 	if userID == 0 {
@@ -163,8 +192,15 @@ func (h *AnalyticsHandler) Identify(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"status": "identified"})
 }
 
-// GetDashboard returns analytics dashboard data (admin only)
-// GET /api/v1/admin/analytics/dashboard
+// GetDashboard returns analytics dashboard data.
+// @Summary      Get analytics dashboard
+// @Tags         Admin
+// @Security     BearerAuth
+// @Produce      json
+// @Success      200  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /admin/analytics/dashboard [get]
 func (h *AnalyticsHandler) GetDashboard(c *gin.Context) {
 	days := 30
 	dau, err := h.svc.GetDailyActiveUsers(c.Request.Context(), days)
@@ -191,8 +227,15 @@ func (h *AnalyticsHandler) GetDashboard(c *gin.Context) {
 	})
 }
 
-// RefreshAnalytics manually refreshes materialized views (admin only)
-// POST /api/v1/admin/analytics/refresh
+// RefreshAnalytics manually refreshes analytics materialized views.
+// @Summary      Refresh analytics views
+// @Tags         Admin
+// @Security     BearerAuth
+// @Produce      json
+// @Success      200  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /admin/analytics/refresh [post]
 func (h *AnalyticsHandler) RefreshAnalytics(c *gin.Context) {
 	if err := h.svc.RefreshMaterializedViews(c.Request.Context()); err != nil {
 		RespondError(c, http.StatusInternalServerError, "Failed to refresh views")

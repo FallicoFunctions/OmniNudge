@@ -35,7 +35,18 @@ func NewSlideshowHandler(
 	}
 }
 
-// StartSlideshow handles POST /api/v1/conversations/:id/slideshow
+// StartSlideshow starts a slideshow for a conversation.
+// @Summary      Start slideshow
+// @Tags         Slideshow
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Param        id  path  int  true  "Conversation ID"
+// @Success      201  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /conversations/{id}/slideshow [post]
 func (h *SlideshowHandler) StartSlideshow(c *gin.Context) {
 	userID := c.GetInt("user_id")
 	conversationID, err := strconv.Atoi(c.Param("id"))
@@ -169,7 +180,19 @@ func (h *SlideshowHandler) StartSlideshow(c *gin.Context) {
 	c.JSON(http.StatusCreated, session)
 }
 
-// NavigateSlideshow handles POST /api/v1/slideshows/:id/navigate
+// NavigateSlideshow advances to the next/previous slide.
+// @Summary      Navigate slideshow
+// @Tags         Slideshow
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Param        id  path  int  true  "Slideshow ID"
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /slideshows/{id}/navigate [post]
 func (h *SlideshowHandler) NavigateSlideshow(c *gin.Context) {
 	userID := c.GetInt("user_id")
 	sessionID, err := strconv.Atoi(c.Param("id"))
@@ -244,7 +267,19 @@ func (h *SlideshowHandler) NavigateSlideshow(c *gin.Context) {
 	})
 }
 
-// TransferControl handles POST /api/v1/slideshows/:id/transfer-control
+// TransferControl transfers slideshow control to another user.
+// @Summary      Transfer slideshow control
+// @Tags         Slideshow
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Param        id  path  int  true  "Slideshow ID"
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /slideshows/{id}/transfer-control [post]
 func (h *SlideshowHandler) TransferControl(c *gin.Context) {
 	userID := c.GetInt("user_id")
 	sessionID, err := strconv.Atoi(c.Param("id"))
@@ -310,7 +345,19 @@ func (h *SlideshowHandler) TransferControl(c *gin.Context) {
 	})
 }
 
-// UpdateAutoAdvance handles PUT /api/v1/slideshows/:id/auto-advance
+// UpdateAutoAdvance toggles auto-advance for a slideshow.
+// @Summary      Update auto-advance
+// @Tags         Slideshow
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Param        id  path  int  true  "Slideshow ID"
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /slideshows/{id}/auto-advance [put]
 func (h *SlideshowHandler) UpdateAutoAdvance(c *gin.Context) {
 	userID := c.GetInt("user_id")
 	sessionID, err := strconv.Atoi(c.Param("id"))
@@ -396,7 +443,17 @@ func (h *SlideshowHandler) UpdateAutoAdvance(c *gin.Context) {
 	})
 }
 
-// StopSlideshow handles DELETE /api/v1/slideshows/:id
+// StopSlideshow stops an active slideshow.
+// @Summary      Stop slideshow
+// @Tags         Slideshow
+// @Security     BearerAuth
+// @Produce      json
+// @Param        id  path  int  true  "Slideshow ID"
+// @Success      200  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /slideshows/{id} [delete]
 func (h *SlideshowHandler) StopSlideshow(c *gin.Context) {
 	userID := c.GetInt("user_id")
 	sessionID, err := strconv.Atoi(c.Param("id"))
@@ -452,7 +509,17 @@ func (h *SlideshowHandler) StopSlideshow(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Slideshow stopped successfully"})
 }
 
-// GetSlideshow handles GET /api/v1/conversations/:id/slideshow
+// GetSlideshow returns the current slideshow state for a conversation.
+// @Summary      Get slideshow
+// @Tags         Slideshow
+// @Security     BearerAuth
+// @Produce      json
+// @Param        id  path  int  true  "Conversation ID"
+// @Success      200  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      404  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /conversations/{id}/slideshow [get]
 func (h *SlideshowHandler) GetSlideshow(c *gin.Context) {
 	userID := c.GetInt("user_id")
 	conversationID, err := strconv.Atoi(c.Param("id"))

@@ -70,7 +70,19 @@ func extFromMIME(mimeType string) string {
 	}
 }
 
-// UploadVoice handles POST /api/v1/messages/:id/voice
+// UploadVoice attaches a voice recording to a message.
+// @Summary      Upload voice message
+// @Tags         VoiceMessages
+// @Security     BearerAuth
+// @Accept       multipart/form-data
+// @Produce      json
+// @Param        id     path      int   true  "Message ID"
+// @Param        audio  formData  file  true  "Audio file"
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /messages/{id}/voice [post]
 func (h *VoiceMessagesHandler) UploadVoice(c *gin.Context) {
 	userID := c.GetInt("user_id")
 
@@ -230,7 +242,17 @@ func (h *VoiceMessagesHandler) UploadVoice(c *gin.Context) {
 	})
 }
 
-// GetVoiceMessage handles GET /api/v1/messages/:id/voice
+// GetVoiceMessage returns metadata for a voice message.
+// @Summary      Get voice message
+// @Tags         VoiceMessages
+// @Security     BearerAuth
+// @Produce      json
+// @Param        id  path  int  true  "Message ID"
+// @Success      200  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      404  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /messages/{id}/voice [get]
 func (h *VoiceMessagesHandler) GetVoiceMessage(c *gin.Context) {
 	userID := c.GetInt("user_id")
 
@@ -298,7 +320,17 @@ func (h *VoiceMessagesHandler) GetVoiceMessage(c *gin.Context) {
 	})
 }
 
-// DownloadVoice handles GET /api/v1/voice/:id/download
+// DownloadVoice streams the audio file for a voice message.
+// @Summary      Download voice message
+// @Tags         VoiceMessages
+// @Security     BearerAuth
+// @Produce      application/octet-stream
+// @Param        id  path  int  true  "Voice message ID"
+// @Success      200
+// @Failure      401  {object}  gin.H
+// @Failure      404  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /voice/{id}/download [get]
 func (h *VoiceMessagesHandler) DownloadVoice(c *gin.Context) {
 	userID := c.GetInt("user_id")
 

@@ -40,7 +40,19 @@ func NewModerationHandlerV2(
 
 // ===== USER BANS =====
 
-// BanUser - POST /api/v1/mod/hubs/:hubname/ban
+// BanUser bans a user from a hub.
+// @Summary      Ban user from hub
+// @Tags         ModerationV2
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Param        hubname  path  string  true  "Hub name"
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /mod/hubs/{hubname}/ban [post]
 func (h *ModerationHandlerV2) BanUser(c *gin.Context) {
 	userID, ok := middleware.GetAuthenticatedUserID(c)
 	if !ok {
@@ -96,7 +108,18 @@ func (h *ModerationHandlerV2) BanUser(c *gin.Context) {
 	c.JSON(http.StatusOK, ban)
 }
 
-// UnbanUser - DELETE /api/v1/mod/hubs/:hubname/ban/:userid
+// UnbanUser removes a hub ban from a user.
+// @Summary      Unban user from hub
+// @Tags         ModerationV2
+// @Security     BearerAuth
+// @Produce      json
+// @Param        hubname  path  string  true  "Hub name"
+// @Param        userid   path  int     true  "User ID"
+// @Success      200  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /mod/hubs/{hubname}/ban/{userid} [delete]
 func (h *ModerationHandlerV2) UnbanUser(c *gin.Context) {
 	userID, ok := middleware.GetAuthenticatedUserID(c)
 	if !ok {
@@ -127,7 +150,17 @@ func (h *ModerationHandlerV2) UnbanUser(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "User unbanned successfully"})
 }
 
-// GetBannedUsers - GET /api/v1/mod/hubs/:hubname/bans
+// GetBannedUsers returns all banned users for a hub.
+// @Summary      List hub bans
+// @Tags         ModerationV2
+// @Security     BearerAuth
+// @Produce      json
+// @Param        hubname  path  string  true  "Hub name"
+// @Success      200  {array}   models.HubBan
+// @Failure      401  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /mod/hubs/{hubname}/bans [get]
 func (h *ModerationHandlerV2) GetBannedUsers(c *gin.Context) {
 	hubID, ok := getHubIDFromContext(c)
 	if !ok {
@@ -146,7 +179,19 @@ func (h *ModerationHandlerV2) GetBannedUsers(c *gin.Context) {
 
 // ===== CONTENT REMOVAL =====
 
-// RemovePost - POST /api/v1/mod/posts/:id/remove
+// RemovePost removes a post as a moderator.
+// @Summary      Remove post
+// @Tags         ModerationV2
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Param        id    path  int  true  "Post ID"
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /mod/posts/{id}/remove [post]
 func (h *ModerationHandlerV2) RemovePost(c *gin.Context) {
 	userID, ok := middleware.GetAuthenticatedUserID(c)
 	if !ok {
@@ -208,7 +253,17 @@ func (h *ModerationHandlerV2) RemovePost(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Post removed successfully"})
 }
 
-// ApprovePost - POST /api/v1/mod/posts/:id/approve
+// ApprovePost approves a removed post.
+// @Summary      Approve post
+// @Tags         ModerationV2
+// @Security     BearerAuth
+// @Produce      json
+// @Param        id  path  int  true  "Post ID"
+// @Success      200  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /mod/posts/{id}/approve [post]
 func (h *ModerationHandlerV2) ApprovePost(c *gin.Context) {
 	userID, ok := middleware.GetAuthenticatedUserID(c)
 	if !ok {
@@ -252,7 +307,19 @@ func (h *ModerationHandlerV2) ApprovePost(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Post approved successfully"})
 }
 
-// RemoveComment - POST /api/v1/mod/comments/:id/remove
+// RemoveComment removes a comment as a moderator.
+// @Summary      Remove comment
+// @Tags         ModerationV2
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Param        id    path  int  true  "Comment ID"
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /mod/comments/{id}/remove [post]
 func (h *ModerationHandlerV2) RemoveComment(c *gin.Context) {
 	userID, ok := middleware.GetAuthenticatedUserID(c)
 	if !ok {
@@ -321,7 +388,17 @@ func (h *ModerationHandlerV2) RemoveComment(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Comment removed successfully"})
 }
 
-// ApproveComment - POST /api/v1/mod/comments/:id/approve
+// ApproveComment approves a removed comment.
+// @Summary      Approve comment
+// @Tags         ModerationV2
+// @Security     BearerAuth
+// @Produce      json
+// @Param        id  path  int  true  "Comment ID"
+// @Success      200  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /mod/comments/{id}/approve [post]
 func (h *ModerationHandlerV2) ApproveComment(c *gin.Context) {
 	userID, ok := middleware.GetAuthenticatedUserID(c)
 	if !ok {
@@ -374,7 +451,17 @@ func (h *ModerationHandlerV2) ApproveComment(c *gin.Context) {
 
 // ===== POST MODERATION (LOCK/PIN) =====
 
-// LockPost - POST /api/v1/mod/posts/:id/lock
+// LockPost locks comments on a post.
+// @Summary      Lock post comments
+// @Tags         ModerationV2
+// @Security     BearerAuth
+// @Produce      json
+// @Param        id  path  int  true  "Post ID"
+// @Success      200  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /mod/posts/{id}/lock [post]
 func (h *ModerationHandlerV2) LockPost(c *gin.Context) {
 	userID, ok := middleware.GetAuthenticatedUserID(c)
 	if !ok {
@@ -412,7 +499,17 @@ func (h *ModerationHandlerV2) LockPost(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Post locked successfully"})
 }
 
-// UnlockPost - POST /api/v1/mod/posts/:id/unlock
+// UnlockPost unlocks comments on a post.
+// @Summary      Unlock post comments
+// @Tags         ModerationV2
+// @Security     BearerAuth
+// @Produce      json
+// @Param        id  path  int  true  "Post ID"
+// @Success      200  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /mod/posts/{id}/unlock [post]
 func (h *ModerationHandlerV2) UnlockPost(c *gin.Context) {
 	userID, ok := middleware.GetAuthenticatedUserID(c)
 	if !ok {
@@ -450,7 +547,17 @@ func (h *ModerationHandlerV2) UnlockPost(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Post unlocked successfully"})
 }
 
-// PinPost - POST /api/v1/mod/posts/:id/pin
+// PinPost pins a post in a hub.
+// @Summary      Pin post
+// @Tags         ModerationV2
+// @Security     BearerAuth
+// @Produce      json
+// @Param        id  path  int  true  "Post ID"
+// @Success      200  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /mod/posts/{id}/pin [post]
 func (h *ModerationHandlerV2) PinPost(c *gin.Context) {
 	userID, ok := middleware.GetAuthenticatedUserID(c)
 	if !ok {
@@ -488,7 +595,17 @@ func (h *ModerationHandlerV2) PinPost(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Post pinned successfully"})
 }
 
-// UnpinPost - POST /api/v1/mod/posts/:id/unpin
+// UnpinPost unpins a post.
+// @Summary      Unpin post
+// @Tags         ModerationV2
+// @Security     BearerAuth
+// @Produce      json
+// @Param        id  path  int  true  "Post ID"
+// @Success      200  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /mod/posts/{id}/unpin [post]
 func (h *ModerationHandlerV2) UnpinPost(c *gin.Context) {
 	userID, ok := middleware.GetAuthenticatedUserID(c)
 	if !ok {
@@ -526,7 +643,19 @@ func (h *ModerationHandlerV2) UnpinPost(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Post unpinned successfully"})
 }
 
-// UpdatePinnedOrder - POST /api/v1/mod/hubs/:hub_name/pinned-order
+// UpdatePinnedOrder reorders pinned posts in a hub.
+// @Summary      Update pinned post order
+// @Tags         ModerationV2
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Param        hub_name  path  string  true  "Hub name"
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /mod/hubs/{hub_name}/pinned-order [post]
 func (h *ModerationHandlerV2) UpdatePinnedOrder(c *gin.Context) {
 	userID, ok := middleware.GetAuthenticatedUserID(c)
 	if !ok {
@@ -601,7 +730,19 @@ func (h *ModerationHandlerV2) UpdatePinnedOrder(c *gin.Context) {
 
 // ===== REMOVAL REASONS =====
 
-// CreateRemovalReason - POST /api/v1/mod/hubs/:hubname/removal-reasons
+// CreateRemovalReason creates a removal reason for a hub.
+// @Summary      Create removal reason
+// @Tags         ModerationV2
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Param        hubname  path  string  true  "Hub name"
+// @Success      201  {object}  models.RemovalReason
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /mod/hubs/{hubname}/removal-reasons [post]
 func (h *ModerationHandlerV2) CreateRemovalReason(c *gin.Context) {
 	userID, ok := middleware.GetAuthenticatedUserID(c)
 	if !ok {
@@ -637,7 +778,19 @@ func (h *ModerationHandlerV2) CreateRemovalReason(c *gin.Context) {
 	c.JSON(http.StatusCreated, reason)
 }
 
-// UpdateRemovalReason - PUT /api/v1/mod/removal-reasons/:id
+// UpdateRemovalReason updates a hub removal reason.
+// @Summary      Update removal reason
+// @Tags         ModerationV2
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Param        id    path  int  true  "Removal reason ID"
+// @Success      200  {object}  models.RemovalReason
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /mod/removal-reasons/{id} [put]
 func (h *ModerationHandlerV2) UpdateRemovalReason(c *gin.Context) {
 	userID, ok := middleware.GetAuthenticatedUserID(c)
 	if !ok {
@@ -684,7 +837,17 @@ func (h *ModerationHandlerV2) UpdateRemovalReason(c *gin.Context) {
 	c.JSON(http.StatusOK, reason)
 }
 
-// DeleteRemovalReason - DELETE /api/v1/mod/removal-reasons/:id
+// DeleteRemovalReason deletes a removal reason.
+// @Summary      Delete removal reason
+// @Tags         ModerationV2
+// @Security     BearerAuth
+// @Produce      json
+// @Param        id  path  int  true  "Removal reason ID"
+// @Success      204
+// @Failure      401  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /mod/removal-reasons/{id} [delete]
 func (h *ModerationHandlerV2) DeleteRemovalReason(c *gin.Context) {
 	userID, ok := middleware.GetAuthenticatedUserID(c)
 	if !ok {
@@ -719,7 +882,16 @@ func (h *ModerationHandlerV2) DeleteRemovalReason(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Removal reason deleted successfully"})
 }
 
-// GetRemovalReasons - GET /api/v1/mod/hubs/:hubname/removal-reasons
+// GetRemovalReasons returns removal reasons for a hub.
+// @Summary      List removal reasons
+// @Tags         ModerationV2
+// @Security     BearerAuth
+// @Produce      json
+// @Param        hubname  path  string  true  "Hub name"
+// @Success      200  {array}   models.RemovalReason
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /mod/hubs/{hubname}/removal-reasons [get]
 func (h *ModerationHandlerV2) GetRemovalReasons(c *gin.Context) {
 	hubID, ok := getHubIDFromContext(c)
 	if !ok {
@@ -738,7 +910,19 @@ func (h *ModerationHandlerV2) GetRemovalReasons(c *gin.Context) {
 
 // ===== MOD LOG =====
 
-// GetModLog - GET /api/v1/mod/hubs/:hubname/logs
+// GetModLog returns the moderation log for a hub.
+// @Summary      Get moderation log
+// @Tags         ModerationV2
+// @Security     BearerAuth
+// @Produce      json
+// @Param        hubname  path   string  true   "Hub name"
+// @Param        limit    query  int     false  "Max results"
+// @Param        offset   query  int     false  "Pagination offset"
+// @Success      200  {array}   models.ModLogEntry
+// @Failure      401  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /mod/hubs/{hubname}/logs [get]
 func (h *ModerationHandlerV2) GetModLog(c *gin.Context) {
 	hubID, ok := getHubIDFromContext(c)
 	if !ok {

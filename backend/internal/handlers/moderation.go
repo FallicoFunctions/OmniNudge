@@ -96,7 +96,19 @@ type CreateReportRequest struct {
 	Description string `json:"description"`
 }
 
-// CreateReport handles POST /api/v1/reports
+// CreateReport submits a new moderation report.
+// @Summary      Create moderation report
+// @Tags         Moderation
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Param        body  body  CreateReportRequest  true  "Report details"
+// @Success      201  {object}  models.Report
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      429  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /reports [post]
 func (h *ModerationHandler) CreateReport(c *gin.Context) {
 	userID, ok := middleware.GetAuthenticatedUserID(c)
 	if !ok {
@@ -287,7 +299,20 @@ func (h *ModerationHandler) broadcastModerationReportEvent(
 	return nil
 }
 
-// ListReports handles GET /api/v1/mod/reports?status=open
+// ListReports returns moderation reports filtered by status.
+// @Summary      List moderation reports
+// @Tags         Moderation
+// @Security     BearerAuth
+// @Produce      json
+// @Param        status  query  string  false  "Filter by status (open, resolved, dismissed)"
+// @Param        hub_id  query  int     false  "Filter by hub ID"
+// @Param        limit   query  int     false  "Max results"
+// @Param        offset  query  int     false  "Pagination offset"
+// @Success      200  {array}   models.Report
+// @Failure      401  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /mod/reports [get]
 func (h *ModerationHandler) ListReports(c *gin.Context) {
 	status := c.DefaultQuery("status", "open")
 	sort := c.DefaultQuery("sort", "priority")
@@ -358,7 +383,21 @@ func (h *ModerationHandler) ListReports(c *gin.Context) {
 	c.JSON(http.StatusOK, response)
 }
 
-// UpdateReportStatus handles POST /api/v1/mod/reports/:id/status
+// UpdateReportStatus updates the status of a moderation report.
+// @Summary      Update report status
+// @Tags         Moderation
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Param        id    path  int                       true  "Report ID"
+// @Param        body  body  UpdateReportStatusRequest true  "New status"
+// @Success      200  {object}  models.Report
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      404  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /mod/reports/{id}/status [post]
 func (h *ModerationHandler) UpdateReportStatus(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {

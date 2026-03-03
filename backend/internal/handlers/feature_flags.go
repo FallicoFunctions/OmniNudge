@@ -20,8 +20,16 @@ func NewFeatureFlagHandler(svc *services.FeatureFlagService) *FeatureFlagHandler
 
 // Admin endpoints
 
-// ListFlags returns all feature flags (admin only)
-// GET /api/v1/admin/feature-flags
+// ListFlags returns all feature flags.
+// @Summary      List feature flags
+// @Tags         FeatureFlags
+// @Security     BearerAuth
+// @Produce      json
+// @Success      200  {array}   models.FeatureFlag
+// @Failure      401  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /admin/feature-flags [get]
 func (h *FeatureFlagHandler) ListFlags(c *gin.Context) {
 	flags, err := h.svc.ListFlags(c.Request.Context())
 	if err != nil {
@@ -32,8 +40,17 @@ func (h *FeatureFlagHandler) ListFlags(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"flags": flags})
 }
 
-// GetFeatureFlag returns a specific flag (admin only)
-// GET /api/v1/admin/feature-flags/:key
+// GetFeatureFlag returns a specific feature flag.
+// @Summary      Get feature flag
+// @Tags         FeatureFlags
+// @Security     BearerAuth
+// @Produce      json
+// @Param        key  path  string  true  "Flag key"
+// @Success      200  {object}  models.FeatureFlag
+// @Failure      401  {object}  gin.H
+// @Failure      404  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /admin/feature-flags/{key} [get]
 func (h *FeatureFlagHandler) GetFeatureFlag(c *gin.Context) {
 	key := c.Param("key")
 
@@ -46,8 +63,17 @@ func (h *FeatureFlagHandler) GetFeatureFlag(c *gin.Context) {
 	c.JSON(http.StatusOK, flag)
 }
 
-// CreateFlag creates a new feature flag (admin only)
-// POST /api/v1/admin/feature-flags
+// CreateFlag creates a new feature flag.
+// @Summary      Create feature flag
+// @Tags         FeatureFlags
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Success      201  {object}  models.FeatureFlag
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /admin/feature-flags [post]
 func (h *FeatureFlagHandler) CreateFlag(c *gin.Context) {
 	var req struct {
 		Key         string `json:"key" binding:"required"`
@@ -89,8 +115,19 @@ func (h *FeatureFlagHandler) CreateFlag(c *gin.Context) {
 	c.JSON(http.StatusCreated, flag)
 }
 
-// UpdateFlag updates a feature flag (admin only)
-// PUT /api/v1/admin/feature-flags/:key
+// UpdateFlag updates an existing feature flag.
+// @Summary      Update feature flag
+// @Tags         FeatureFlags
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Param        key  path  string  true  "Flag key"
+// @Success      200  {object}  models.FeatureFlag
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      404  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /admin/feature-flags/{key} [put]
 func (h *FeatureFlagHandler) UpdateFlag(c *gin.Context) {
 	key := c.Param("key")
 
@@ -130,8 +167,16 @@ func (h *FeatureFlagHandler) UpdateFlag(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"success": true})
 }
 
-// DeleteFlag deletes a feature flag (admin only)
-// DELETE /api/v1/admin/feature-flags/:key
+// DeleteFlag deletes a feature flag.
+// @Summary      Delete feature flag
+// @Tags         FeatureFlags
+// @Security     BearerAuth
+// @Produce      json
+// @Param        key  path  string  true  "Flag key"
+// @Success      204
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /admin/feature-flags/{key} [delete]
 func (h *FeatureFlagHandler) DeleteFlag(c *gin.Context) {
 	key := c.Param("key")
 	adminID := int64(c.GetInt("user_id"))
@@ -144,8 +189,18 @@ func (h *FeatureFlagHandler) DeleteFlag(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"success": true})
 }
 
-// SetOverride sets a user override (admin only)
-// POST /api/v1/admin/feature-flags/:key/overrides
+// SetOverride sets a per-user flag override.
+// @Summary      Set flag override
+// @Tags         FeatureFlags
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Param        key  path  string  true  "Flag key"
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /admin/feature-flags/{key}/overrides [post]
 func (h *FeatureFlagHandler) SetOverride(c *gin.Context) {
 	key := c.Param("key")
 
@@ -168,8 +223,17 @@ func (h *FeatureFlagHandler) SetOverride(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"success": true})
 }
 
-// RemoveOverride removes a user override (admin only)
-// DELETE /api/v1/admin/feature-flags/:key/overrides/:userID
+// RemoveOverride removes a per-user flag override.
+// @Summary      Remove flag override
+// @Tags         FeatureFlags
+// @Security     BearerAuth
+// @Produce      json
+// @Param        key     path  string  true  "Flag key"
+// @Param        userID  path  int     true  "User ID"
+// @Success      204
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /admin/feature-flags/{key}/overrides/{userID} [delete]
 func (h *FeatureFlagHandler) RemoveOverride(c *gin.Context) {
 	key := c.Param("key")
 	userID, err := strconv.ParseInt(c.Param("userID"), 10, 64)
@@ -187,8 +251,16 @@ func (h *FeatureFlagHandler) RemoveOverride(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"success": true})
 }
 
-// GetAuditLog returns audit log for a flag (admin only)
-// GET /api/v1/admin/feature-flags/:key/audit
+// GetAuditLog returns the audit log for a feature flag.
+// @Summary      Get flag audit log
+// @Tags         FeatureFlags
+// @Security     BearerAuth
+// @Produce      json
+// @Param        key  path  string  true  "Flag key"
+// @Success      200  {array}   gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /admin/feature-flags/{key}/audit [get]
 func (h *FeatureFlagHandler) GetAuditLog(c *gin.Context) {
 	key := c.Param("key")
 	limit := 100
@@ -204,9 +276,16 @@ func (h *FeatureFlagHandler) GetAuditLog(c *gin.Context) {
 
 // Client endpoint
 
-// GetUserFlags returns enabled flags for current user
-// GET /api/v1/feature-flags
-// Supports batch query: ?keys=feature_groups,feature_reactions
+// GetUserFlags returns enabled feature flags for the current user.
+// @Summary      Get my feature flags
+// @Tags         FeatureFlags
+// @Security     BearerAuth
+// @Produce      json
+// @Param        keys  query  string  false  "Comma-separated flag keys"
+// @Success      200  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /feature-flags [get]
 func (h *FeatureFlagHandler) GetUserFlags(c *gin.Context) {
 	userID := int64(c.GetInt("user_id"))
 

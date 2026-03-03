@@ -228,7 +228,17 @@ func (h *GroupHandler) getGroupParticipantIDs(ctx *gin.Context, conversationID i
 
 // ─── CreateGroup ──────────────────────────────────────────────────────────────
 
-// CreateGroup handles POST /api/v1/conversations/groups
+// CreateGroup creates a new group conversation.
+// @Summary      Create group
+// @Tags         Groups
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Success      201  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /conversations/groups [post]
 func (h *GroupHandler) CreateGroup(c *gin.Context) {
 	userID, ok := middleware.GetAuthenticatedUserID(c)
 	if !ok {
@@ -375,7 +385,17 @@ func (h *GroupHandler) CreateGroup(c *gin.Context) {
 
 // ─── GetGroupParticipants ─────────────────────────────────────────────────────
 
-// GetGroupParticipants handles GET /api/v1/conversations/:id/participants
+// GetGroupParticipants returns participants of a group conversation.
+// @Summary      Get group participants
+// @Tags         Groups
+// @Security     BearerAuth
+// @Produce      json
+// @Param        id  path  int  true  "Conversation ID"
+// @Success      200  {array}   gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /conversations/{id}/participants [get]
 func (h *GroupHandler) GetGroupParticipants(c *gin.Context) {
 	userID, ok := middleware.GetAuthenticatedUserID(c)
 	if !ok {
@@ -424,7 +444,19 @@ func (h *GroupHandler) GetGroupParticipants(c *gin.Context) {
 
 // ─── AddGroupParticipant ──────────────────────────────────────────────────────
 
-// AddGroupParticipant handles POST /api/v1/conversations/:id/participants
+// AddGroupParticipant adds a user to a group conversation.
+// @Summary      Add group participant
+// @Tags         Groups
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Param        id  path  int  true  "Conversation ID"
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /conversations/{id}/participants [post]
 func (h *GroupHandler) AddGroupParticipant(c *gin.Context) {
 	userID, ok := middleware.GetAuthenticatedUserID(c)
 	if !ok {
@@ -510,7 +542,18 @@ func (h *GroupHandler) AddGroupParticipant(c *gin.Context) {
 
 // ─── RemoveGroupParticipant ───────────────────────────────────────────────────
 
-// RemoveGroupParticipant handles DELETE /api/v1/conversations/:id/participants/:user_id
+// RemoveGroupParticipant removes a user from a group conversation.
+// @Summary      Remove group participant
+// @Tags         Groups
+// @Security     BearerAuth
+// @Produce      json
+// @Param        id       path  int  true  "Conversation ID"
+// @Param        user_id  path  int  true  "User ID"
+// @Success      200  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /conversations/{id}/participants/{user_id} [delete]
 func (h *GroupHandler) RemoveGroupParticipant(c *gin.Context) {
 	userID, ok := middleware.GetAuthenticatedUserID(c)
 	if !ok {
@@ -569,7 +612,20 @@ func (h *GroupHandler) RemoveGroupParticipant(c *gin.Context) {
 
 // ─── UpdateParticipantRole ────────────────────────────────────────────────────
 
-// UpdateParticipantRole handles PATCH /api/v1/conversations/:id/participants/:user_id
+// UpdateParticipantRole updates a participant's role in a group.
+// @Summary      Update participant role
+// @Tags         Groups
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Param        id       path  int  true  "Conversation ID"
+// @Param        user_id  path  int  true  "User ID"
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /conversations/{id}/participants/{user_id} [patch]
 func (h *GroupHandler) UpdateParticipantRole(c *gin.Context) {
 	userID, ok := middleware.GetAuthenticatedUserID(c)
 	if !ok {
@@ -628,7 +684,19 @@ func (h *GroupHandler) UpdateParticipantRole(c *gin.Context) {
 
 // ─── UpdateGroup ──────────────────────────────────────────────────────────────
 
-// UpdateGroup handles PATCH /api/v1/conversations/:id/group
+// UpdateGroup updates group metadata (name, avatar, description).
+// @Summary      Update group
+// @Tags         Groups
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Param        id  path  int  true  "Conversation ID"
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /conversations/{id}/group [patch]
 func (h *GroupHandler) UpdateGroup(c *gin.Context) {
 	userID, ok := middleware.GetAuthenticatedUserID(c)
 	if !ok {
@@ -679,7 +747,17 @@ func (h *GroupHandler) UpdateGroup(c *gin.Context) {
 
 // ─── GetGroupSettings ─────────────────────────────────────────────────────────
 
-// GetGroupSettings handles GET /api/v1/conversations/:id/settings
+// GetGroupSettings returns settings for a group conversation.
+// @Summary      Get group settings
+// @Tags         Groups
+// @Security     BearerAuth
+// @Produce      json
+// @Param        id  path  int  true  "Conversation ID"
+// @Success      200  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /conversations/{id}/settings [get]
 func (h *GroupHandler) GetGroupSettings(c *gin.Context) {
 	userID, ok := middleware.GetAuthenticatedUserID(c)
 	if !ok {
@@ -713,7 +791,19 @@ func (h *GroupHandler) GetGroupSettings(c *gin.Context) {
 
 // ─── UpdateGroupSettings ──────────────────────────────────────────────────────
 
-// UpdateGroupSettings handles PATCH /api/v1/conversations/:id/settings
+// UpdateGroupSettings updates settings for a group conversation.
+// @Summary      Update group settings
+// @Tags         Groups
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Param        id  path  int  true  "Conversation ID"
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /conversations/{id}/settings [patch]
 func (h *GroupHandler) UpdateGroupSettings(c *gin.Context) {
 	userID, ok := middleware.GetAuthenticatedUserID(c)
 	if !ok {
@@ -762,7 +852,19 @@ func (h *GroupHandler) UpdateGroupSettings(c *gin.Context) {
 
 // ─── CreateGroupInvite ────────────────────────────────────────────────────────
 
-// CreateGroupInvite handles POST /api/v1/conversations/:id/invites
+// CreateGroupInvite creates an invite to a group conversation.
+// @Summary      Create group invite
+// @Tags         Groups
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Param        id  path  int  true  "Conversation ID"
+// @Success      201  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /conversations/{id}/invites [post]
 func (h *GroupHandler) CreateGroupInvite(c *gin.Context) {
 	userID, ok := middleware.GetAuthenticatedUserID(c)
 	if !ok {
@@ -837,7 +939,17 @@ func (h *GroupHandler) CreateGroupInvite(c *gin.Context) {
 
 // ─── AcceptGroupInvite ────────────────────────────────────────────────────────
 
-// AcceptGroupInvite handles POST /api/v1/group-invites/:id/accept
+// AcceptGroupInvite accepts a group conversation invite.
+// @Summary      Accept group invite
+// @Tags         Groups
+// @Security     BearerAuth
+// @Produce      json
+// @Param        id  path  int  true  "Invite ID"
+// @Success      200  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      404  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /group-invites/{id}/accept [post]
 func (h *GroupHandler) AcceptGroupInvite(c *gin.Context) {
 	userID, ok := middleware.GetAuthenticatedUserID(c)
 	if !ok {
@@ -937,7 +1049,17 @@ func (h *GroupHandler) AcceptGroupInvite(c *gin.Context) {
 
 // ─── DeclineGroupInvite ───────────────────────────────────────────────────────
 
-// DeclineGroupInvite handles DELETE /api/v1/group-invites/:id/decline
+// DeclineGroupInvite declines a group conversation invite.
+// @Summary      Decline group invite
+// @Tags         Groups
+// @Security     BearerAuth
+// @Produce      json
+// @Param        id  path  int  true  "Invite ID"
+// @Success      200  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      404  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /group-invites/{id}/decline [delete]
 func (h *GroupHandler) DeclineGroupInvite(c *gin.Context) {
 	userID, ok := middleware.GetAuthenticatedUserID(c)
 	if !ok {
@@ -969,7 +1091,15 @@ func (h *GroupHandler) DeclineGroupInvite(c *gin.Context) {
 
 // ─── GetMyGroupInvites ────────────────────────────────────────────────────────
 
-// GetMyGroupInvites handles GET /api/v1/users/me/group-invites
+// GetMyGroupInvites returns pending group invites for the current user.
+// @Summary      Get my group invites
+// @Tags         Groups
+// @Security     BearerAuth
+// @Produce      json
+// @Success      200  {array}   gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /users/me/group-invites [get]
 func (h *GroupHandler) GetMyGroupInvites(c *gin.Context) {
 	userID, ok := middleware.GetAuthenticatedUserID(c)
 	if !ok {
@@ -1015,7 +1145,17 @@ func (h *GroupHandler) GetMyGroupInvites(c *gin.Context) {
 
 // ─── LeaveGroup ───────────────────────────────────────────────────────────────
 
-// LeaveGroup handles POST /api/v1/conversations/:id/leave
+// LeaveGroup removes the current user from a group conversation.
+// @Summary      Leave group
+// @Tags         Groups
+// @Security     BearerAuth
+// @Produce      json
+// @Param        id  path  int  true  "Conversation ID"
+// @Success      200  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /conversations/{id}/leave [post]
 func (h *GroupHandler) LeaveGroup(c *gin.Context) {
 	userID, ok := middleware.GetAuthenticatedUserID(c)
 	if !ok {
@@ -1049,7 +1189,19 @@ func (h *GroupHandler) LeaveGroup(c *gin.Context) {
 
 // ─── TransferOwnership ────────────────────────────────────────────────────────
 
-// TransferOwnership handles POST /api/v1/conversations/:id/transfer-ownership
+// TransferOwnership transfers group ownership to another participant.
+// @Summary      Transfer group ownership
+// @Tags         Groups
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Param        id  path  int  true  "Conversation ID"
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /conversations/{id}/transfer-ownership [post]
 func (h *GroupHandler) TransferOwnership(c *gin.Context) {
 	userID, ok := middleware.GetAuthenticatedUserID(c)
 	if !ok {
@@ -1122,7 +1274,17 @@ func (h *GroupHandler) TransferOwnership(c *gin.Context) {
 
 // ─── DiscoverGroups ───────────────────────────────────────────────────────────
 
-// DiscoverGroups handles GET /api/v1/groups/discover
+// DiscoverGroups returns public groups available to join.
+// @Summary      Discover groups
+// @Tags         Groups
+// @Security     BearerAuth
+// @Produce      json
+// @Param        q      query  string  false  "Search query"
+// @Param        limit  query  int     false  "Max results"
+// @Success      200  {array}   gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /groups/discover [get]
 func (h *GroupHandler) DiscoverGroups(c *gin.Context) {
 	query := c.Query("q")
 	limit := 20

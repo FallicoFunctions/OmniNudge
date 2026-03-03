@@ -84,9 +84,17 @@ type homeFeedResponse struct {
 	TimeRangeEnd   *time.Time         `json:"time_range_end,omitempty"`
 }
 
-// GetHomeFeed returns combined hub + Reddit posts using interleaved lazy fetching
-// If authenticated: returns posts from subscribed hubs + subscribed subreddits
-// If unauthenticated: returns popular posts from all hubs + r/popular
+// GetHomeFeed returns combined hub + Reddit posts using interleaved lazy fetching.
+// @Summary      Get home feed
+// @Tags         Feed
+// @Security     BearerAuth
+// @Produce      json
+// @Param        sort    query  string  false  "Sort order (hot, new, top)"
+// @Param        after   query  string  false  "Pagination cursor"
+// @Param        limit   query  int     false  "Max results"
+// @Success      200  {array}   CombinedFeedItem
+// @Failure      500  {object}  gin.H
+// @Router       /feed [get]
 func (h *FeedHandler) GetHomeFeed(c *gin.Context) {
 	sortBy := c.DefaultQuery("sort", "hot")
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "50"))

@@ -61,6 +61,17 @@ func (h *FoldersHandler) getUserID(c *gin.Context) (int, bool) {
 	return userID, true
 }
 
+// CreateFolder creates a new conversation folder.
+// @Summary      Create folder
+// @Tags         Folders
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Success      201  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /folders [post]
 func (h *FoldersHandler) CreateFolder(c *gin.Context) {
 	userID, ok := h.getUserID(c)
 	if !ok {
@@ -114,6 +125,15 @@ func (h *FoldersHandler) CreateFolder(c *gin.Context) {
 	c.JSON(http.StatusCreated, folder)
 }
 
+// ListFolders returns all folders for the current user.
+// @Summary      List folders
+// @Tags         Folders
+// @Security     BearerAuth
+// @Produce      json
+// @Success      200  {array}   gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /folders [get]
 func (h *FoldersHandler) ListFolders(c *gin.Context) {
 	userID, ok := h.getUserID(c)
 	if !ok {
@@ -156,6 +176,19 @@ func (h *FoldersHandler) ListFolders(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"folders": folders})
 }
 
+// UpdateFolder updates a conversation folder.
+// @Summary      Update folder
+// @Tags         Folders
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Param        id  path  int  true  "Folder ID"
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      404  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /folders/{id} [put]
 func (h *FoldersHandler) UpdateFolder(c *gin.Context) {
 	userID, ok := h.getUserID(c)
 	if !ok {
@@ -242,6 +275,17 @@ func (h *FoldersHandler) UpdateFolder(c *gin.Context) {
 	c.JSON(http.StatusOK, current)
 }
 
+// DeleteFolder deletes a conversation folder.
+// @Summary      Delete folder
+// @Tags         Folders
+// @Security     BearerAuth
+// @Produce      json
+// @Param        id  path  int  true  "Folder ID"
+// @Success      204
+// @Failure      401  {object}  gin.H
+// @Failure      404  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /folders/{id} [delete]
 func (h *FoldersHandler) DeleteFolder(c *gin.Context) {
 	userID, ok := h.getUserID(c)
 	if !ok {
@@ -269,6 +313,17 @@ func (h *FoldersHandler) DeleteFolder(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Folder deleted"})
 }
 
+// ReorderFolders updates the display order of folders.
+// @Summary      Reorder folders
+// @Tags         Folders
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /folders/reorder [put]
 func (h *FoldersHandler) ReorderFolders(c *gin.Context) {
 	userID, ok := h.getUserID(c)
 	if !ok {
@@ -327,6 +382,19 @@ func (h *FoldersHandler) ReorderFolders(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Folders reordered"})
 }
 
+// AddConversationToFolder adds a conversation to a folder.
+// @Summary      Add conversation to folder
+// @Tags         Folders
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Param        id  path  int  true  "Folder ID"
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      404  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /folders/{id}/conversations [post]
 func (h *FoldersHandler) AddConversationToFolder(c *gin.Context) {
 	userID, ok := h.getUserID(c)
 	if !ok {
@@ -356,6 +424,18 @@ func (h *FoldersHandler) AddConversationToFolder(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{"message": "Conversation added to folder"})
 }
 
+// RemoveConversationFromFolder removes a conversation from a folder.
+// @Summary      Remove conversation from folder
+// @Tags         Folders
+// @Security     BearerAuth
+// @Produce      json
+// @Param        id               path  int  true  "Folder ID"
+// @Param        conversation_id  path  int  true  "Conversation ID"
+// @Success      204
+// @Failure      401  {object}  gin.H
+// @Failure      404  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /folders/{id}/conversations/{conversation_id} [delete]
 func (h *FoldersHandler) RemoveConversationFromFolder(c *gin.Context) {
 	userID, ok := h.getUserID(c)
 	if !ok {
@@ -386,6 +466,17 @@ func (h *FoldersHandler) RemoveConversationFromFolder(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Conversation removed from folder"})
 }
 
+// GetFolderConversations returns conversations in a folder.
+// @Summary      Get folder conversations
+// @Tags         Folders
+// @Security     BearerAuth
+// @Produce      json
+// @Param        id  path  int  true  "Folder ID"
+// @Success      200  {array}   gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      404  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /folders/{id}/conversations [get]
 func (h *FoldersHandler) GetFolderConversations(c *gin.Context) {
 	userID, ok := h.getUserID(c)
 	if !ok {
@@ -427,6 +518,16 @@ func (h *FoldersHandler) GetFolderConversations(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"conversations": conversations})
 }
 
+// GetConversationFolders returns folders containing a conversation.
+// @Summary      Get conversation folders
+// @Tags         Folders
+// @Security     BearerAuth
+// @Produce      json
+// @Param        conversation_id  path  int  true  "Conversation ID"
+// @Success      200  {array}   gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /conversations/{conversation_id}/folders [get]
 func (h *FoldersHandler) GetConversationFolders(c *gin.Context) {
 	userID, ok := h.getUserID(c)
 	if !ok {

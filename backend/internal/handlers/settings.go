@@ -24,6 +24,14 @@ func NewSettingsHandler(settingsRepo ports.UserSettingsRepository) *SettingsHand
 }
 
 // GetSettings returns the current user's settings, creating defaults if needed.
+// @Summary      Get user settings
+// @Tags         Settings
+// @Security     BearerAuth
+// @Produce      json
+// @Success      200  {object}  models.UserSettings
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /settings [get]
 func (h *SettingsHandler) GetSettings(c *gin.Context) {
 	userID, ok := h.getUserID(c)
 	if !ok {
@@ -84,6 +92,16 @@ type updateSettingsRequest struct {
 }
 
 // UpdateSettings updates the current user's settings.
+// @Summary      Update user settings
+// @Tags         Settings
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Success      200  {object}  models.UserSettings
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /settings [put]
 func (h *SettingsHandler) UpdateSettings(c *gin.Context) {
 	userID, ok := h.getUserID(c)
 	if !ok {

@@ -19,8 +19,19 @@ func NewNotificationsHandler(notifRepo ports.NotificationRepository) *Notificati
 	return &NotificationsHandler{notifRepo: notifRepo}
 }
 
-// GetNotifications returns notifications for the authenticated user
-// GET /api/v1/notifications?limit=20&offset=0&unread_only=false
+// GetNotifications returns notifications for the authenticated user.
+// @Summary      Get notifications
+// @Tags         Notifications
+// @Security     BearerAuth
+// @Produce      json
+// @Param        limit       query  int   false  "Page size (default 20, max 100)"
+// @Param        offset      query  int   false  "Offset"
+// @Param        unread_only query  bool  false  "Filter unread only"
+// @Param        cursor      query  string false "Pagination cursor"
+// @Success      200  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /notifications [get]
 func (h *NotificationsHandler) GetNotifications(c *gin.Context) {
 	userID := c.GetInt("user_id")
 
@@ -87,8 +98,15 @@ func (h *NotificationsHandler) GetNotifications(c *gin.Context) {
 	c.JSON(http.StatusOK, response)
 }
 
-// GetUnreadCount returns the count of unread notifications
-// GET /api/v1/notifications/unread/count
+// GetUnreadCount returns the count of unread notifications.
+// @Summary      Get unread notification count
+// @Tags         Notifications
+// @Security     BearerAuth
+// @Produce      json
+// @Success      200  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /notifications/unread/count [get]
 func (h *NotificationsHandler) GetUnreadCount(c *gin.Context) {
 	userID := c.GetInt("user_id")
 
@@ -101,8 +119,17 @@ func (h *NotificationsHandler) GetUnreadCount(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"unread_count": count})
 }
 
-// MarkAsRead marks a notification as read
-// POST /api/v1/notifications/:id/read
+// MarkAsRead marks a notification as read.
+// @Summary      Mark notification as read
+// @Tags         Notifications
+// @Security     BearerAuth
+// @Produce      json
+// @Param        id  path  int  true  "Notification ID"
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /notifications/{id}/read [post]
 func (h *NotificationsHandler) MarkAsRead(c *gin.Context) {
 	userID := c.GetInt("user_id")
 	notificationID, err := strconv.Atoi(c.Param("id"))
@@ -119,8 +146,15 @@ func (h *NotificationsHandler) MarkAsRead(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Notification marked as read"})
 }
 
-// MarkAllAsRead marks all notifications as read for the user
-// POST /api/v1/notifications/read-all
+// MarkAllAsRead marks all notifications as read for the user.
+// @Summary      Mark all notifications as read
+// @Tags         Notifications
+// @Security     BearerAuth
+// @Produce      json
+// @Success      200  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /notifications/read-all [post]
 func (h *NotificationsHandler) MarkAllAsRead(c *gin.Context) {
 	userID := c.GetInt("user_id")
 
@@ -132,8 +166,17 @@ func (h *NotificationsHandler) MarkAllAsRead(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "All notifications marked as read"})
 }
 
-// DeleteNotification deletes a notification
-// DELETE /api/v1/notifications/:id
+// DeleteNotification deletes a notification.
+// @Summary      Delete notification
+// @Tags         Notifications
+// @Security     BearerAuth
+// @Produce      json
+// @Param        id  path  int  true  "Notification ID"
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /notifications/{id} [delete]
 func (h *NotificationsHandler) DeleteNotification(c *gin.Context) {
 	userID := c.GetInt("user_id")
 	notificationID, err := strconv.Atoi(c.Param("id"))

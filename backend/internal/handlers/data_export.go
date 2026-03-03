@@ -30,8 +30,16 @@ func NewDataExportHandler(db *pgxpool.Pool, queueClient *queue.QueueClient, mast
 	}
 }
 
-// RequestDataExport initiates a GDPR data export for the user
-// POST /api/v1/account/export
+// RequestDataExport initiates a GDPR data export for the current user.
+// @Summary      Request data export
+// @Tags         DataExport
+// @Security     BearerAuth
+// @Produce      json
+// @Success      202  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      429  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /account/export [post]
 func (h *DataExportHandler) RequestDataExport(c *gin.Context) {
 	userID := c.GetInt("user_id")
 
@@ -187,8 +195,17 @@ func (h *DataExportHandler) RequestDataExport(c *gin.Context) {
 	})
 }
 
-// GetExportStatus checks the status of a data export request
-// GET /api/v1/account/export/:export_id
+// GetExportStatus checks the status of a data export request.
+// @Summary      Get export status
+// @Tags         DataExport
+// @Security     BearerAuth
+// @Produce      json
+// @Param        export_id  path  string  true  "Export ID"
+// @Success      200  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      404  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /account/export/{export_id} [get]
 func (h *DataExportHandler) GetExportStatus(c *gin.Context) {
 	userID := c.GetInt("user_id")
 	exportID := c.Param("export_id")
@@ -237,8 +254,15 @@ func (h *DataExportHandler) GetExportStatus(c *gin.Context) {
 	c.JSON(http.StatusOK, response)
 }
 
-// ListExportRequests lists all export requests for the user
-// GET /api/v1/account/exports
+// ListExportRequests lists all data export requests for the current user.
+// @Summary      List export requests
+// @Tags         DataExport
+// @Security     BearerAuth
+// @Produce      json
+// @Success      200  {array}   gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /account/exports [get]
 func (h *DataExportHandler) ListExportRequests(c *gin.Context) {
 	userID := c.GetInt("user_id")
 

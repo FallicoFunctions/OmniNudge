@@ -104,7 +104,15 @@ type AgentStateResponse struct {
 	RepliedComments []int `json:"replied_comments"`
 }
 
-// GetUserProfile handles GET /api/v1/users/:username
+// GetUserProfile returns a public user profile by username.
+// @Summary      Get user profile
+// @Tags         Users
+// @Produce      json
+// @Param        username  path  string  true  "Username"
+// @Success      200  {object}  UserProfileResponse
+// @Failure      404  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /users/{username} [get]
 func (h *UsersHandler) GetUserProfile(c *gin.Context) {
 	username := c.Param("username")
 	h.getUserProfileResponse(c, func() (*models.User, error) {
@@ -112,7 +120,16 @@ func (h *UsersHandler) GetUserProfile(c *gin.Context) {
 	})
 }
 
-// GetUserProfileByID handles GET /api/v1/users/id/:id/profile
+// GetUserProfileByID returns a public user profile by numeric ID.
+// @Summary      Get user profile by ID
+// @Tags         Users
+// @Produce      json
+// @Param        id  path  int  true  "User ID"
+// @Success      200  {object}  UserProfileResponse
+// @Failure      400  {object}  gin.H
+// @Failure      404  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /users/id/{id}/profile [get]
 func (h *UsersHandler) GetUserProfileByID(c *gin.Context) {
 	idStr := c.Param("id")
 	userID, err := strconv.Atoi(idStr)
@@ -271,7 +288,18 @@ func canViewerSeeProfile(profileUserID, viewerID int, profileVisibility string, 
 	}
 }
 
-// GetUserPosts handles GET /api/v1/users/:username/posts
+// GetUserPosts returns posts by a user.
+// @Summary      Get user posts
+// @Tags         Users
+// @Produce      json
+// @Param        username  path   string  true   "Username"
+// @Param        limit     query  int     false  "Page size (default 20)"
+// @Param        offset    query  int     false  "Offset"
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      404  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /users/{username}/posts [get]
 func (h *UsersHandler) GetUserPosts(c *gin.Context) {
 	username := c.Param("username")
 
@@ -304,7 +332,15 @@ func (h *UsersHandler) GetUserPosts(c *gin.Context) {
 	})
 }
 
-// GetAgentState handles POST /api/v1/users/me/agent/state
+// GetAgentState returns the authenticated user's agent activity state.
+// @Summary      Get agent state
+// @Tags         Users
+// @Security     BearerAuth
+// @Produce      json
+// @Success      200  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /users/me/agent/state [post]
 func (h *UsersHandler) GetAgentState(c *gin.Context) {
 	userID, ok := middleware.GetAuthenticatedUserID(c)
 	if !ok {
@@ -351,7 +387,18 @@ func (h *UsersHandler) GetAgentState(c *gin.Context) {
 	})
 }
 
-// GetUserComments handles GET /api/v1/users/:username/comments
+// GetUserComments returns comments by a user.
+// @Summary      Get user comments
+// @Tags         Users
+// @Produce      json
+// @Param        username  path   string  true   "Username"
+// @Param        limit     query  int     false  "Page size (default 20)"
+// @Param        offset    query  int     false  "Offset"
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      404  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /users/{username}/comments [get]
 func (h *UsersHandler) GetUserComments(c *gin.Context) {
 	username := c.Param("username")
 
@@ -422,7 +469,17 @@ func isRequestBodyTooLarge(err error) bool {
 	return strings.Contains(strings.ToLower(err.Error()), "request body too large")
 }
 
-// UpdateProfile handles PUT /api/v1/users/profile
+// UpdateProfile updates the authenticated user's profile.
+// @Summary      Update profile
+// @Tags         Users
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Success      200  {object}  models.User
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /users/me/profile [put]
 func (h *UsersHandler) UpdateProfile(c *gin.Context) {
 	userID := c.GetInt("user_id")
 
@@ -524,7 +581,17 @@ func (h *UsersHandler) UpdateProfile(c *gin.Context) {
 	})
 }
 
-// UploadMyAvatar handles POST /api/v1/users/me/avatar
+// UploadMyAvatar uploads a new avatar image for the authenticated user.
+// @Summary      Upload avatar
+// @Tags         Users
+// @Security     BearerAuth
+// @Accept       multipart/form-data
+// @Produce      json
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /users/me/avatar [post]
 func (h *UsersHandler) UploadMyAvatar(c *gin.Context) {
 	userID := c.GetInt("user_id")
 
@@ -689,7 +756,15 @@ func (h *UsersHandler) UploadMyAvatar(c *gin.Context) {
 	})
 }
 
-// GetMyProfile handles GET /api/v1/users/me/profile
+// GetMyProfile returns the authenticated user's own profile.
+// @Summary      Get my profile
+// @Tags         Users
+// @Security     BearerAuth
+// @Produce      json
+// @Success      200  {object}  UserProfileResponse
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /users/me/profile [get]
 func (h *UsersHandler) GetMyProfile(c *gin.Context) {
 	userID := c.GetInt("user_id")
 	h.getUserProfileResponse(c, func() (*models.User, error) {
@@ -702,7 +777,17 @@ type changePasswordRequest struct {
 	NewPassword     string `json:"new_password" binding:"required,min=8"`
 }
 
-// ChangePassword handles POST /api/v1/users/change-password
+// ChangePassword changes the authenticated user's password.
+// @Summary      Change password
+// @Tags         Users
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /users/change-password [post]
 func (h *UsersHandler) ChangePassword(c *gin.Context) {
 	userID := c.GetInt("user_id")
 
@@ -750,7 +835,17 @@ type updateEmailRequest struct {
 	EmailConfirm string `json:"email_confirm" binding:"required"`
 }
 
-// UpdateEmail handles PUT /api/v1/users/email
+// UpdateEmail updates the authenticated user's email address.
+// @Summary      Update email
+// @Tags         Users
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /users/email [put]
 func (h *UsersHandler) UpdateEmail(c *gin.Context) {
 	userID := c.GetInt("user_id")
 
@@ -785,7 +880,15 @@ func (h *UsersHandler) UpdateEmail(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Email updated successfully"})
 }
 
-// Ping updates the user's last_seen timestamp without fetching the profile
+// Ping updates the user's last_seen timestamp without fetching the profile.
+// @Summary      Ping (update last seen)
+// @Tags         Users
+// @Security     BearerAuth
+// @Produce      json
+// @Success      200  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /users/me/ping [post]
 func (h *UsersHandler) Ping(c *gin.Context) {
 	userID, ok := middleware.GetAuthenticatedUserID(c)
 	if !ok {
@@ -850,7 +953,15 @@ func (h *UsersHandler) invalidateProfileResponseCache(ctx context.Context, profi
 	}
 }
 
-// UpdateLastAgentPostAt updates the last_agent_post_at timestamp for the authenticated user
+// UpdateLastAgentPostAt updates the last_agent_post_at timestamp for the authenticated user.
+// @Summary      Record agent post activity
+// @Tags         Users
+// @Security     BearerAuth
+// @Produce      json
+// @Success      200  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /users/me/agent/post [post]
 func (h *UsersHandler) UpdateLastAgentPostAt(c *gin.Context) {
 	userID, ok := middleware.GetAuthenticatedUserID(c)
 	if !ok {
@@ -869,7 +980,15 @@ func (h *UsersHandler) UpdateLastAgentPostAt(c *gin.Context) {
 	})
 }
 
-// UpdateLastAgentBrowseAt updates the last_agent_browse_at timestamp for the authenticated user
+// UpdateLastAgentBrowseAt updates the last_agent_browse_at timestamp for the authenticated user.
+// @Summary      Record agent browse activity
+// @Tags         Users
+// @Security     BearerAuth
+// @Produce      json
+// @Success      200  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /users/me/agent/browse [post]
 func (h *UsersHandler) UpdateLastAgentBrowseAt(c *gin.Context) {
 	userID, ok := middleware.GetAuthenticatedUserID(c)
 	if !ok {

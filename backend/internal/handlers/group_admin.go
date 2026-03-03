@@ -171,7 +171,20 @@ func targetMemberRole(ctx context.Context, pool *pgxpool.Pool, convID, targetUse
 
 // ─── Endpoints ────────────────────────────────────────────────────────────────
 
-// MuteGroupMember POST /groups/:id/members/:user_id/mute
+// MuteGroupMember mutes a member in a group conversation.
+// @Summary      Mute group member
+// @Tags         GroupAdmin
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Param        id       path  int  true  "Group ID"
+// @Param        user_id  path  int  true  "User ID"
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /groups/{id}/members/{user_id}/mute [post]
 func (h *GroupAdminHandler) MuteGroupMember(c *gin.Context) {
 	convID, ok := parseGroupID(c)
 	if !ok {
@@ -262,7 +275,18 @@ func (h *GroupAdminHandler) MuteGroupMember(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Member muted"})
 }
 
-// UnmuteGroupMember DELETE /groups/:id/members/:user_id/mute
+// UnmuteGroupMember unmutes a group member.
+// @Summary      Unmute group member
+// @Tags         GroupAdmin
+// @Security     BearerAuth
+// @Produce      json
+// @Param        id       path  int  true  "Group ID"
+// @Param        user_id  path  int  true  "User ID"
+// @Success      200  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /groups/{id}/members/{user_id}/mute [delete]
 func (h *GroupAdminHandler) UnmuteGroupMember(c *gin.Context) {
 	convID, ok := parseGroupID(c)
 	if !ok {
@@ -304,7 +328,20 @@ func (h *GroupAdminHandler) UnmuteGroupMember(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Member unmuted"})
 }
 
-// BanGroupMember POST /groups/:id/members/:user_id/ban
+// BanGroupMember bans a member from a group conversation.
+// @Summary      Ban group member
+// @Tags         GroupAdmin
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Param        id       path  int  true  "Group ID"
+// @Param        user_id  path  int  true  "User ID"
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /groups/{id}/members/{user_id}/ban [post]
 func (h *GroupAdminHandler) BanGroupMember(c *gin.Context) {
 	convID, ok := parseGroupID(c)
 	if !ok {
@@ -419,7 +456,18 @@ func (h *GroupAdminHandler) BanGroupMember(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Member banned"})
 }
 
-// UnbanGroupMember DELETE /groups/:id/members/:user_id/ban
+// UnbanGroupMember lifts a group member ban.
+// @Summary      Unban group member
+// @Tags         GroupAdmin
+// @Security     BearerAuth
+// @Produce      json
+// @Param        id       path  int  true  "Group ID"
+// @Param        user_id  path  int  true  "User ID"
+// @Success      200  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /groups/{id}/members/{user_id}/ban [delete]
 func (h *GroupAdminHandler) UnbanGroupMember(c *gin.Context) {
 	convID, ok := parseGroupID(c)
 	if !ok {
@@ -456,7 +504,17 @@ func (h *GroupAdminHandler) UnbanGroupMember(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Member unbanned"})
 }
 
-// GetGroupRestrictions GET /groups/:id/restrictions
+// GetGroupRestrictions returns all member restrictions for a group.
+// @Summary      Get group restrictions
+// @Tags         GroupAdmin
+// @Security     BearerAuth
+// @Produce      json
+// @Param        id  path  int  true  "Group ID"
+// @Success      200  {array}   gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /groups/{id}/restrictions [get]
 func (h *GroupAdminHandler) GetGroupRestrictions(c *gin.Context) {
 	convID, ok := parseGroupID(c)
 	if !ok {
@@ -510,7 +568,16 @@ func (h *GroupAdminHandler) GetGroupRestrictions(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"restrictions": restrictions})
 }
 
-// GetMyGroupRestriction GET /groups/:id/my-restriction
+// GetMyGroupRestriction returns the current user's restriction in a group.
+// @Summary      Get my group restriction
+// @Tags         GroupAdmin
+// @Security     BearerAuth
+// @Produce      json
+// @Param        id  path  int  true  "Group ID"
+// @Success      200  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /groups/{id}/my-restriction [get]
 func (h *GroupAdminHandler) GetMyGroupRestriction(c *gin.Context) {
 	convID, ok := parseGroupID(c)
 	if !ok {
@@ -549,7 +616,18 @@ func (h *GroupAdminHandler) GetMyGroupRestriction(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"restriction": r})
 }
 
-// AdminDeleteMessage DELETE /groups/:id/messages/:message_id
+// AdminDeleteMessage deletes a message as a group admin.
+// @Summary      Admin delete message
+// @Tags         GroupAdmin
+// @Security     BearerAuth
+// @Produce      json
+// @Param        id          path  int  true  "Group ID"
+// @Param        message_id  path  int  true  "Message ID"
+// @Success      200  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /groups/{id}/messages/{message_id} [delete]
 func (h *GroupAdminHandler) AdminDeleteMessage(c *gin.Context) {
 	convID, ok := parseGroupID(c)
 	if !ok {
@@ -599,7 +677,19 @@ func (h *GroupAdminHandler) AdminDeleteMessage(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Message deleted"})
 }
 
-// SetSlowMode PUT /groups/:id/slow-mode
+// SetSlowMode configures slow mode for a group.
+// @Summary      Set slow mode
+// @Tags         GroupAdmin
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Param        id  path  int  true  "Group ID"
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /groups/{id}/slow-mode [put]
 func (h *GroupAdminHandler) SetSlowMode(c *gin.Context) {
 	convID, ok := parseGroupID(c)
 	if !ok {
@@ -651,7 +741,19 @@ func (h *GroupAdminHandler) SetSlowMode(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"slow_mode_seconds": req.Seconds})
 }
 
-// GetAuditLog GET /groups/:id/audit-log
+// GetAuditLog returns the audit log for a group.
+// @Summary      Get group audit log
+// @Tags         GroupAdmin
+// @Security     BearerAuth
+// @Produce      json
+// @Param        id      path   int  true   "Group ID"
+// @Param        limit   query  int  false  "Max results"
+// @Param        offset  query  int  false  "Pagination offset"
+// @Success      200  {array}   gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /groups/{id}/audit-log [get]
 func (h *GroupAdminHandler) GetAuditLog(c *gin.Context) {
 	convID, ok := parseGroupID(c)
 	if !ok {
