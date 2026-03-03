@@ -228,7 +228,11 @@ func (s *userServiceImpl) ChangePassword(ctx context.Context, userID int, oldPas
 }
 
 // UpdateProfile delegates to the repository's dedicated profile-update method.
+// Returns immediately if all parameters are nil to avoid an unnecessary DB round-trip.
 func (s *userServiceImpl) UpdateProfile(ctx context.Context, userID int, bio *string, avatarURL *string, nsfw *bool) error {
+	if bio == nil && avatarURL == nil && nsfw == nil {
+		return nil
+	}
 	if err := s.userRepo.UpdateProfile(ctx, userID, bio, avatarURL, nsfw); err != nil {
 		return InternalError(fmt.Errorf("update profile: %w", err))
 	}

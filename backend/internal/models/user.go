@@ -557,9 +557,10 @@ func (r *UserRepository) UpdatePublicKey(ctx context.Context, userID int, public
 }
 
 // UpdateProfile updates a user's bio, avatar URL, and NSFW preference.
-// Nil parameters are coalesced to the existing column value (no change).
+// NULL parameters are written as NULL (clearing the column). The service layer
+// is responsible for omitting this call entirely when no fields need updating.
 func (r *UserRepository) UpdateProfile(ctx context.Context, userID int, bio *string, avatarURL *string, nsfw *bool) error {
-	query := `UPDATE users SET bio = COALESCE($1, bio), avatar_url = COALESCE($2, avatar_url), nsfw = COALESCE($3, nsfw) WHERE id = $4`
+	query := `UPDATE users SET bio = $1, avatar_url = $2, nsfw = COALESCE($3, nsfw) WHERE id = $4`
 	_, err := r.pool.Exec(ctx, query, bio, avatarURL, nsfw, userID)
 	return err
 }

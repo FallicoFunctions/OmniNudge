@@ -203,10 +203,10 @@ func TestUserAggregate_Delete(t *testing.T) {
 }
 
 func TestUserAggregate_ChangePassword(t *testing.T) {
-	user, _ := NewUserAggregate("testuser", "test@example.com", "Password123")
-	user.GetEvents()
-
 	t.Run("successful change", func(t *testing.T) {
+		user, _ := NewUserAggregate("testuser", "test@example.com", "Password123")
+		user.GetEvents()
+
 		err := user.ChangePassword("Password123", "NewPassword456")
 
 		require.NoError(t, err)
@@ -219,13 +219,17 @@ func TestUserAggregate_ChangePassword(t *testing.T) {
 	})
 
 	t.Run("wrong old password", func(t *testing.T) {
+		user, _ := NewUserAggregate("testuser", "test@example.com", "Password123")
+
 		err := user.ChangePassword("WrongPassword", "NewPassword789")
 
 		require.ErrorIs(t, err, ErrInvalidPassword)
 	})
 
 	t.Run("weak new password", func(t *testing.T) {
-		err := user.ChangePassword("NewPassword456", "weak")
+		user, _ := NewUserAggregate("testuser", "test@example.com", "Password123")
+
+		err := user.ChangePassword("Password123", "weak")
 
 		require.Error(t, err)
 	})
@@ -288,6 +292,12 @@ func TestUserAggregate_UpdateProfile(t *testing.T) {
 	user.UpdateProfile(nil, nil, nil)
 	entity2 := user.ToEntity()
 	assert.Equal(t, bio, *entity2.Bio)
+
+	// Explicitly setting nsfw to false must update the field, not be treated as no-op.
+	nsfwFalse := false
+	user.UpdateProfile(nil, nil, &nsfwFalse)
+	entity3 := user.ToEntity()
+	assert.False(t, entity3.NSFW)
 }
 
 func TestUserAggregate_ToFromEntity(t *testing.T) {
