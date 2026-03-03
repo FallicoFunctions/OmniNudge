@@ -34,6 +34,41 @@ func TestRequestSizeLimiter_RejectsTooLargeContentLength(t *testing.T) {
 	require.Equal(t, http.StatusRequestEntityTooLarge, rec.Code)
 }
 
+type infiniteBody struct{}
+
+func (infiniteBody) Read(p []byte) (int, error) {
+	for i := range p {
+		p[i] = 'a'
+	}
+	return len(p), nil
+}
+
+func (infiniteBody) Close() error { return nil }
+
+func TestRequestSizeLimiter_BlocksUnknownLengthOversizeOnPartialRead(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	router.Use(RequestSizeLimiter(1024))
+	router.POST("/test", func(c *gin.Context) {
+		buf := make([]byte, 8)
+		_, err := c.Request.Body.Read(buf)
+		var maxErr *http.MaxBytesError
+		if err != nil && errors.As(err, &maxErr) {
+			c.Status(http.StatusRequestEntityTooLarge)
+			return
+		}
+		require.NoError(t, err)
+		c.Status(http.StatusOK)
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "/test", infiniteBody{})
+	req.ContentLength = -1 // emulate chunked/unknown-length request body
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusRequestEntityTooLarge, rec.Code)
+}
+
 func TestRequestSizeLimiter_ExactLimitAllowed(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
