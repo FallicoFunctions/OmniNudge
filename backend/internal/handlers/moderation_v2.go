@@ -918,7 +918,7 @@ func (h *ModerationHandlerV2) GetRemovalReasons(c *gin.Context) {
 // @Param        hubname  path   string  true   "Hub name"
 // @Param        limit    query  int     false  "Max results"
 // @Param        offset   query  int     false  "Pagination offset"
-// @Success      200  {array}   models.ModLogEntry
+// @Success      200  {array}   models.ModLog
 // @Failure      401  {object}  gin.H
 // @Failure      403  {object}  gin.H
 // @Failure      500  {object}  gin.H

@@ -96,6 +96,11 @@ type CreateReportRequest struct {
 	Description string `json:"description"`
 }
 
+// UpdateReportStatusRequest payload
+type UpdateReportStatusRequest struct {
+	Status string `json:"status" binding:"required"` // open, approved, rejected, no_action (+ legacy)
+}
+
 // CreateReport submits a new moderation report.
 // @Summary      Create moderation report
 // @Tags         Moderation
@@ -391,7 +396,7 @@ func (h *ModerationHandler) ListReports(c *gin.Context) {
 // @Produce      json
 // @Param        id    path  int                       true  "Report ID"
 // @Param        body  body  UpdateReportStatusRequest true  "New status"
-// @Success      200  {object}  models.Report
+// @Success      200  {object}  gin.H
 // @Failure      400  {object}  gin.H
 // @Failure      401  {object}  gin.H
 // @Failure      403  {object}  gin.H
@@ -405,9 +410,7 @@ func (h *ModerationHandler) UpdateReportStatus(c *gin.Context) {
 		return
 	}
 
-	var req struct {
-		Status string `json:"status" binding:"required"` // open, approved, rejected, no_action (+ legacy)
-	}
+	var req UpdateReportStatusRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body", "details": err.Error()})
 		return
