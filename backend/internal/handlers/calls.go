@@ -86,13 +86,13 @@ func (h *CallsHandler) StartCall(c *gin.Context) {
 
 	conversationID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid conversation ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid conversation ID")
 		return
 	}
 
 	var req startCallRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
+		RespondError(c, http.StatusBadRequest, "Invalid request body")
 		return
 	}
 
@@ -101,18 +101,18 @@ func (h *CallsHandler) StartCall(c *gin.Context) {
 	ok, err := h.callsIsConversationParticipant(ctx, conversationID, callerID)
 	if err != nil {
 		log.Printf("[CallsHandler] StartCall: check participant error: conversation_id=%d caller_id=%d err=%v", conversationID, callerID, err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
+		RespondError(c, http.StatusInternalServerError, "Internal server error")
 		return
 	}
 	if !ok {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Not a participant in this conversation"})
+		RespondError(c, http.StatusForbidden, "Not a participant in this conversation")
 		return
 	}
 
 	calleeID, calleeUsername, err := h.callsGetOtherParticipant(ctx, conversationID, callerID)
 	if err != nil {
 		log.Printf("[CallsHandler] StartCall: get other participant error: conversation_id=%d caller_id=%d err=%v", conversationID, callerID, err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
+		RespondError(c, http.StatusInternalServerError, "Internal server error")
 		return
 	}
 
@@ -120,7 +120,7 @@ func (h *CallsHandler) StartCall(c *gin.Context) {
 	var callerUsername string
 	if err := h.pool.QueryRow(ctx, `SELECT username FROM users WHERE id = $1`, callerID).Scan(&callerUsername); err != nil {
 		log.Printf("[CallsHandler] StartCall: get caller username error: caller_id=%d err=%v", callerID, err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
+		RespondError(c, http.StatusInternalServerError, "Internal server error")
 		return
 	}
 
@@ -140,7 +140,7 @@ func (h *CallsHandler) StartCall(c *gin.Context) {
 	)
 	if err != nil {
 		log.Printf("[CallsHandler] StartCall: insert call error: conversation_id=%d caller_id=%d err=%v", conversationID, callerID, err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
+		RespondError(c, http.StatusInternalServerError, "Internal server error")
 		return
 	}
 
@@ -179,7 +179,7 @@ func (h *CallsHandler) AnswerCall(c *gin.Context) {
 
 	callID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid call ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid call ID")
 		return
 	}
 
@@ -194,16 +194,16 @@ func (h *CallsHandler) AnswerCall(c *gin.Context) {
 		&call.CallType, &call.Status, &call.StartedAt,
 	)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Call not found"})
+		RespondError(c, http.StatusNotFound, "Call not found")
 		return
 	}
 
 	if call.CalleeID != userID {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Not authorized to answer this call"})
+		RespondError(c, http.StatusForbidden, "Not authorized to answer this call")
 		return
 	}
 	if call.Status != "ringing" {
-		c.JSON(http.StatusConflict, gin.H{"error": "Call is not in ringing state"})
+		RespondError(c, http.StatusConflict, "Call is not in ringing state")
 		return
 	}
 
@@ -213,7 +213,7 @@ func (h *CallsHandler) AnswerCall(c *gin.Context) {
 	`, now, callID)
 	if err != nil {
 		log.Printf("[CallsHandler] AnswerCall: update error: call_id=%d err=%v", callID, err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
+		RespondError(c, http.StatusInternalServerError, "Internal server error")
 		return
 	}
 
@@ -246,7 +246,7 @@ func (h *CallsHandler) RejectCall(c *gin.Context) {
 
 	callID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid call ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid call ID")
 		return
 	}
 
@@ -261,16 +261,16 @@ func (h *CallsHandler) RejectCall(c *gin.Context) {
 		&call.CallType, &call.Status, &call.StartedAt,
 	)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Call not found"})
+		RespondError(c, http.StatusNotFound, "Call not found")
 		return
 	}
 
 	if call.CalleeID != userID {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Not authorized to reject this call"})
+		RespondError(c, http.StatusForbidden, "Not authorized to reject this call")
 		return
 	}
 	if call.Status != "ringing" {
-		c.JSON(http.StatusConflict, gin.H{"error": "Call is not in ringing state"})
+		RespondError(c, http.StatusConflict, "Call is not in ringing state")
 		return
 	}
 
@@ -280,7 +280,7 @@ func (h *CallsHandler) RejectCall(c *gin.Context) {
 	`, now, callID)
 	if err != nil {
 		log.Printf("[CallsHandler] RejectCall: update error: call_id=%d err=%v", callID, err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
+		RespondError(c, http.StatusInternalServerError, "Internal server error")
 		return
 	}
 
@@ -313,7 +313,7 @@ func (h *CallsHandler) EndCall(c *gin.Context) {
 
 	callID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid call ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid call ID")
 		return
 	}
 
@@ -328,16 +328,16 @@ func (h *CallsHandler) EndCall(c *gin.Context) {
 		&call.CallType, &call.Status, &call.StartedAt, &call.AnsweredAt,
 	)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Call not found"})
+		RespondError(c, http.StatusNotFound, "Call not found")
 		return
 	}
 
 	if call.CallerID != userID && call.CalleeID != userID {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Not authorized to end this call"})
+		RespondError(c, http.StatusForbidden, "Not authorized to end this call")
 		return
 	}
 	if call.Status != "ringing" && call.Status != "active" {
-		c.JSON(http.StatusConflict, gin.H{"error": "Call is already ended"})
+		RespondError(c, http.StatusConflict, "Call is already ended")
 		return
 	}
 
@@ -355,7 +355,7 @@ func (h *CallsHandler) EndCall(c *gin.Context) {
 	`, now, durationSeconds, userID, callID)
 	if err != nil {
 		log.Printf("[CallsHandler] EndCall: update error: call_id=%d err=%v", callID, err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
+		RespondError(c, http.StatusInternalServerError, "Internal server error")
 		return
 	}
 
@@ -397,13 +397,13 @@ func (h *CallsHandler) Signal(c *gin.Context) {
 
 	callID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid call ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid call ID")
 		return
 	}
 
 	var req signalRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
+		RespondError(c, http.StatusBadRequest, "Invalid request body")
 		return
 	}
 
@@ -415,12 +415,12 @@ func (h *CallsHandler) Signal(c *gin.Context) {
 		SELECT caller_id, callee_id, status FROM calls WHERE id = $1
 	`, callID).Scan(&callerID, &calleeID, &status)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Call not found"})
+		RespondError(c, http.StatusNotFound, "Call not found")
 		return
 	}
 
 	if userID != callerID && userID != calleeID {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Not authorized to signal in this call"})
+		RespondError(c, http.StatusForbidden, "Not authorized to signal in this call")
 		return
 	}
 
@@ -481,7 +481,7 @@ func (h *CallsHandler) StartScreenShare(c *gin.Context) {
 
 	callID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid call ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid call ID")
 		return
 	}
 
@@ -493,12 +493,12 @@ func (h *CallsHandler) StartScreenShare(c *gin.Context) {
 		SELECT caller_id, callee_id, status FROM calls WHERE id = $1
 	`, callID).Scan(&callerID, &calleeID, &status)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Call not found"})
+		RespondError(c, http.StatusNotFound, "Call not found")
 		return
 	}
 
 	if userID != callerID && userID != calleeID {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Not authorized to modify this call"})
+		RespondError(c, http.StatusForbidden, "Not authorized to modify this call")
 		return
 	}
 
@@ -507,7 +507,7 @@ func (h *CallsHandler) StartScreenShare(c *gin.Context) {
 	`, callID)
 	if err != nil {
 		log.Printf("[CallsHandler] StartScreenShare: update error: call_id=%d err=%v", callID, err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
+		RespondError(c, http.StatusInternalServerError, "Internal server error")
 		return
 	}
 
@@ -542,7 +542,7 @@ func (h *CallsHandler) StopScreenShare(c *gin.Context) {
 
 	callID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid call ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid call ID")
 		return
 	}
 
@@ -554,12 +554,12 @@ func (h *CallsHandler) StopScreenShare(c *gin.Context) {
 		SELECT caller_id, callee_id, status FROM calls WHERE id = $1
 	`, callID).Scan(&callerID, &calleeID, &status)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Call not found"})
+		RespondError(c, http.StatusNotFound, "Call not found")
 		return
 	}
 
 	if userID != callerID && userID != calleeID {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Not authorized to modify this call"})
+		RespondError(c, http.StatusForbidden, "Not authorized to modify this call")
 		return
 	}
 
@@ -568,7 +568,7 @@ func (h *CallsHandler) StopScreenShare(c *gin.Context) {
 	`, callID)
 	if err != nil {
 		log.Printf("[CallsHandler] StopScreenShare: update error: call_id=%d err=%v", callID, err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
+		RespondError(c, http.StatusInternalServerError, "Internal server error")
 		return
 	}
 
@@ -605,7 +605,7 @@ func (h *CallsHandler) GetCallHistory(c *gin.Context) {
 
 	conversationID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid conversation ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid conversation ID")
 		return
 	}
 
@@ -619,11 +619,11 @@ func (h *CallsHandler) GetCallHistory(c *gin.Context) {
 	ok, err := h.callsIsConversationParticipant(ctx, conversationID, userID)
 	if err != nil {
 		log.Printf("[CallsHandler] GetCallHistory: check participant error: conversation_id=%d user_id=%d err=%v", conversationID, userID, err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
+		RespondError(c, http.StatusInternalServerError, "Internal server error")
 		return
 	}
 	if !ok {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Not a participant in this conversation"})
+		RespondError(c, http.StatusForbidden, "Not a participant in this conversation")
 		return
 	}
 
@@ -667,7 +667,7 @@ func (h *CallsHandler) GetCallHistory(c *gin.Context) {
 	r, err := h.pool.Query(ctx, query, args...)
 	if err != nil {
 		log.Printf("[CallsHandler] GetCallHistory: query error: conversation_id=%d err=%v", conversationID, err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
+		RespondError(c, http.StatusInternalServerError, "Internal server error")
 		return
 	}
 	defer r.Close()

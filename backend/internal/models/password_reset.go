@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -40,7 +41,7 @@ func (r *PasswordResetRepository) GenerateToken(ctx context.Context, userID int)
 	token := base64.URLEncoding.EncodeToString(tokenBytes)
 
 	// Token expires in 1 hour
-	expiresAt := time.Now().Add(1 * time.Hour)
+	expiresAt := time.Now().UTC().Add(1 * time.Hour)
 
 	// Insert token into database
 	query := `
@@ -82,6 +83,9 @@ func (r *PasswordResetRepository) GetByToken(ctx context.Context, token string) 
 		&reset.UsedAt,
 		&reset.CreatedAt,
 	)
+	if err == pgx.ErrNoRows {
+		return nil, nil
+	}
 	if err != nil {
 		return nil, fmt.Errorf("password reset token not found: %w", err)
 	}
@@ -116,13 +120,18 @@ func (r *PasswordResetRepository) IsValid(ctx context.Context, token string) (bo
 		return false, 0, err
 	}
 
+	// Token not found
+	if reset == nil {
+		return false, 0, fmt.Errorf("token not found")
+	}
+
 	// Check if already used
 	if reset.UsedAt != nil {
 		return false, 0, fmt.Errorf("token already used")
 	}
 
 	// Check if expired
-	if time.Now().After(reset.ExpiresAt) {
+	if time.Now().UTC().After(reset.ExpiresAt.UTC()) {
 		return false, 0, fmt.Errorf("token expired")
 	}
 

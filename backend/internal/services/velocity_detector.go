@@ -3,21 +3,21 @@ package services
 import (
 	"context"
 
-	"github.com/omninudge/backend/internal/models"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/omninudge/backend/internal/ports"
 )
 
 // RuleBasedVelocityDetector implements simple rule-based velocity detection
 // Can be replaced with ML-based detector later without changing the interface
 type RuleBasedVelocityDetector struct {
 	pool         *pgxpool.Pool
-	baselineRepo *models.UserBaselineRepository
+	baselineRepo ports.UserBaselineRepository
 }
 
 // NewRuleBasedVelocityDetector creates a new rule-based velocity detector
 func NewRuleBasedVelocityDetector(
 	pool *pgxpool.Pool,
-	baselineRepo *models.UserBaselineRepository,
+	baselineRepo ports.UserBaselineRepository,
 ) *RuleBasedVelocityDetector {
 	return &RuleBasedVelocityDetector{
 		pool:         pool,

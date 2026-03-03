@@ -4,12 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/omninudge/backend/internal/models"
+	"github.com/omninudge/backend/internal/ports"
 	"github.com/omninudge/backend/internal/validation"
 	"github.com/omninudge/backend/internal/websocket"
 )
@@ -40,8 +41,8 @@ type ReactionHubInterface interface {
 // ReactionService handles all business logic for message reactions.
 type ReactionService struct {
 	pool         *pgxpool.Pool
-	reactionRepo *models.MessageReactionRepository
-	messageRepo  *models.MessageRepository
+	reactionRepo ports.MessageReactionRepository
+	messageRepo  ports.MessageRepository
 	notifService *NotificationService
 	hub          ReactionHubInterface
 }
@@ -49,8 +50,8 @@ type ReactionService struct {
 // NewReactionService creates a new ReactionService.
 func NewReactionService(
 	pool *pgxpool.Pool,
-	reactionRepo *models.MessageReactionRepository,
-	messageRepo *models.MessageRepository,
+	reactionRepo ports.MessageReactionRepository,
+	messageRepo ports.MessageRepository,
 	notifService *NotificationService,
 	hub ReactionHubInterface,
 ) *ReactionService {
@@ -83,6 +84,9 @@ func (s *ReactionService) AddReaction(ctx context.Context, messageID, userID int
 	// 2. Verify the message exists and the caller is a participant
 	message, err := s.messageRepo.GetByID(ctx, messageID)
 	if err != nil {
+		return nil, ErrMessageNotFound
+	}
+	if message == nil {
 		return nil, ErrMessageNotFound
 	}
 
@@ -157,7 +161,9 @@ func (s *ReactionService) AddReaction(ctx context.Context, messageID, userID int
 	}
 
 	// Enrich with username after commit (non-fatal if user was just deleted)
-	_ = s.pool.QueryRow(ctx, `SELECT username FROM users WHERE id = $1`, userID).Scan(&reaction.Username)
+	if err := s.pool.QueryRow(ctx, `SELECT username FROM users WHERE id = $1`, userID).Scan(&reaction.Username); err != nil {
+		slog.Debug("reaction: username enrichment skipped", "user_id", userID, "error", err)
+	}
 
 	// 5. Broadcast reaction_added to all other participants (non-blocking).
 	//    A bounded context prevents goroutine leaks on server shutdown.
@@ -208,6 +214,9 @@ func (s *ReactionService) RemoveReaction(ctx context.Context, messageID, reactio
 	if err != nil {
 		return fmt.Errorf("get message for reaction broadcast: %w", err)
 	}
+	if message == nil {
+		return fmt.Errorf("get message for reaction broadcast: message not found")
+	}
 
 	// 2. Delete
 	if err := s.reactionRepo.RemoveReaction(ctx, reactionID); err != nil {
@@ -234,6 +243,9 @@ func (s *ReactionService) RemoveReaction(ctx context.Context, messageID, reactio
 func (s *ReactionService) GetReactions(ctx context.Context, messageID, userID int) ([]models.ReactionSummary, bool, error) {
 	message, err := s.messageRepo.GetByID(ctx, messageID)
 	if err != nil {
+		return nil, false, ErrMessageNotFound
+	}
+	if message == nil {
 		return nil, false, ErrMessageNotFound
 	}
 
@@ -324,7 +336,7 @@ func (s *ReactionService) broadcastReactionAdded(ctx context.Context, conversati
 	}
 	participants, err := s.getConversationParticipants(ctx, conversationID)
 	if err != nil {
-		log.Printf("[ReactionService] broadcastReactionAdded: failed to get participants for conv %d: %v", conversationID, err)
+		slog.Error("reaction: broadcast reaction_added: get participants", "conversation_id", conversationID, "error", err)
 		return
 	}
 	for _, uid := range participants {
@@ -353,7 +365,7 @@ func (s *ReactionService) broadcastReactionRemoved(ctx context.Context, conversa
 	}
 	participants, err := s.getConversationParticipants(ctx, conversationID)
 	if err != nil {
-		log.Printf("[ReactionService] broadcastReactionRemoved: failed to get participants for conv %d: %v", conversationID, err)
+		slog.Error("reaction: broadcast reaction_removed: get participants", "conversation_id", conversationID, "error", err)
 		return
 	}
 	for _, uid := range participants {

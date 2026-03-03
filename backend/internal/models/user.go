@@ -2,12 +2,12 @@ package models
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"log"
 	"strings"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/omninudge/backend/internal/utils"
 )
@@ -192,7 +192,7 @@ func (r *UserRepository) GetByID(ctx context.Context, id int) (*User, error) {
 	)
 
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if err == pgx.ErrNoRows {
 			return nil, nil
 		}
 		return nil, err
@@ -371,7 +371,7 @@ func (r *UserRepository) queryUser(ctx context.Context, query string, arg interf
 	)
 
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if err == pgx.ErrNoRows {
 			return nil, nil
 		}
 		return nil, err
@@ -436,7 +436,7 @@ func (r *UserRepository) GetByRedditID(ctx context.Context, redditID string) (*U
 	)
 
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if err == pgx.ErrNoRows {
 			return nil, nil
 		}
 		return nil, err
@@ -556,10 +556,12 @@ func (r *UserRepository) UpdatePublicKey(ctx context.Context, userID int, public
 	return err
 }
 
-// UpdateProfile updates a user's bio and avatar
-func (r *UserRepository) UpdateProfile(ctx context.Context, userID int, bio *string, avatarURL *string) error {
-	query := `UPDATE users SET bio = $1, avatar_url = $2 WHERE id = $3`
-	_, err := r.pool.Exec(ctx, query, bio, avatarURL, userID)
+// UpdateProfile updates a user's bio, avatar URL, and NSFW preference.
+// NULL parameters are written as NULL (clearing the column). The service layer
+// is responsible for omitting this call entirely when no fields need updating.
+func (r *UserRepository) UpdateProfile(ctx context.Context, userID int, bio *string, avatarURL *string, nsfw *bool) error {
+	query := `UPDATE users SET bio = $1, avatar_url = $2, nsfw = COALESCE($3, nsfw) WHERE id = $4`
+	_, err := r.pool.Exec(ctx, query, bio, avatarURL, nsfw, userID)
 	return err
 }
 
@@ -595,7 +597,7 @@ func (r *UserRepository) GetBanStatus(ctx context.Context, userID int) (*BanStat
 	)
 
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if err == pgx.ErrNoRows {
 			return nil, nil
 		}
 		return nil, err
@@ -893,5 +895,13 @@ func (r *UserRepository) UpdateEmail(ctx context.Context, userID int, email *str
 
 	query := `UPDATE users SET email = $1, email_encrypted = $2 WHERE id = $3`
 	_, err := r.pool.Exec(ctx, query, encryptedEmail, emailEncrypted, userID)
+	return err
+}
+
+// UpdateVerifiedEmail stores an already-encrypted email address and marks it as
+// verified in a single statement. The caller is responsible for encryption.
+func (r *UserRepository) UpdateVerifiedEmail(ctx context.Context, userID int, encryptedEmail string) error {
+	query := `UPDATE users SET email = $1, email_verified = true, email_encrypted = true WHERE id = $2`
+	_, err := r.pool.Exec(ctx, query, encryptedEmail, userID)
 	return err
 }

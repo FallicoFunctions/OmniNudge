@@ -7,13 +7,13 @@ import (
 	"log"
 
 	"github.com/hibiken/asynq"
-	"github.com/omninudge/backend/internal/models"
+	"github.com/omninudge/backend/internal/ports"
 	"github.com/omninudge/backend/internal/services"
 )
 
 // NewNotificationHandler creates a push notification queue handler.
 func NewNotificationHandler(
-	tokenRepo *models.DeviceTokenRepository,
+	tokenRepo ports.DeviceTokenRepository,
 	firebase *services.FirebaseService,
 ) JobHandler {
 	return func(ctx context.Context, task *asynq.Task) error {

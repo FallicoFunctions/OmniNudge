@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"github.com/omninudge/backend/internal/api/middleware"
+	"github.com/omninudge/backend/internal/ports"
 	"context"
 	"encoding/base64"
 	"encoding/json"
@@ -19,9 +21,9 @@ import (
 
 // FeedHandler handles combined feed operations (hub posts + Reddit posts)
 type FeedHandler struct {
-	postRepo         *models.PlatformPostRepository
-	hubSubRepo       *models.HubSubscriptionRepository
-	subredditSubRepo *models.SubredditSubscriptionRepository
+	postRepo         ports.PlatformPostRepository
+	hubSubRepo       ports.HubSubscriptionRepository
+	subredditSubRepo ports.SubredditSubscriptionRepository
 	redditClient     *services.RedditClient
 	cache            services.Cache
 	cacheTTL         time.Duration
@@ -29,9 +31,9 @@ type FeedHandler struct {
 
 // NewFeedHandler creates a new feed handler
 func NewFeedHandler(
-	postRepo *models.PlatformPostRepository,
-	hubSubRepo *models.HubSubscriptionRepository,
-	subredditSubRepo *models.SubredditSubscriptionRepository,
+	postRepo ports.PlatformPostRepository,
+	hubSubRepo ports.HubSubscriptionRepository,
+	subredditSubRepo ports.SubredditSubscriptionRepository,
 	redditClient *services.RedditClient,
 	cache services.Cache,
 	cacheTTL time.Duration,
@@ -82,9 +84,17 @@ type homeFeedResponse struct {
 	TimeRangeEnd   *time.Time         `json:"time_range_end,omitempty"`
 }
 
-// GetHomeFeed returns combined hub + Reddit posts using interleaved lazy fetching
-// If authenticated: returns posts from subscribed hubs + subscribed subreddits
-// If unauthenticated: returns popular posts from all hubs + r/popular
+// GetHomeFeed returns combined hub + Reddit posts using interleaved lazy fetching.
+// @Summary      Get home feed
+// @Tags         Feed
+// @Security     BearerAuth
+// @Produce      json
+// @Param        sort    query  string  false  "Sort order (hot, new, top)"
+// @Param        after   query  string  false  "Pagination cursor"
+// @Param        limit   query  int     false  "Max results"
+// @Success      200  {array}   CombinedFeedItem
+// @Failure      500  {object}  gin.H
+// @Router       /feed [get]
 func (h *FeedHandler) GetHomeFeed(c *gin.Context) {
 	sortBy := c.DefaultQuery("sort", "hot")
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "50"))
@@ -109,7 +119,7 @@ func (h *FeedHandler) GetHomeFeed(c *gin.Context) {
 
 	startTime, endTime, timeRangeKey, err := parseTopTimeRange(c, sortBy)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		RespondError(c, http.StatusBadRequest, err.Error())
 		return
 	}
 	redditTimeFilter := ""
@@ -118,14 +128,14 @@ func (h *FeedHandler) GetHomeFeed(c *gin.Context) {
 	}
 
 	// Check if user is authenticated
-	userID, authenticated := c.Get("user_id")
+	userID, authenticated := middleware.GetOptionalUserID(c)
 
 	// Decode cursor if provided
 	var cursor *feedCursor
 	if cursorParam != "" {
 		cursor, err = decodeFeedCursor(cursorParam)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid cursor"})
+			RespondError(c, http.StatusBadRequest, "Invalid cursor")
 			return
 		}
 	}
@@ -135,12 +145,12 @@ func (h *FeedHandler) GetHomeFeed(c *gin.Context) {
 
 	if authenticated && !forcePopular {
 		// Authenticated user with subscriptions - use interleaved fetching
-		uidInt := userID.(int)
+		uidInt := userID
 
 		// Get user's subscriptions
 		subscriptions, err := h.subredditSubRepo.GetUserSubscriptions(c.Request.Context(), uidInt)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch subscriptions"})
+			RespondError(c, http.StatusInternalServerError, "Failed to fetch subscriptions")
 			return
 		}
 
@@ -151,7 +161,7 @@ func (h *FeedHandler) GetHomeFeed(c *gin.Context) {
 
 		subscribedHubIDs, err := h.hubSubRepo.GetSubscribedHubIDs(c.Request.Context(), uidInt)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch hub subscriptions"})
+			RespondError(c, http.StatusInternalServerError, "Failed to fetch hub subscriptions")
 			return
 		}
 
@@ -223,7 +233,7 @@ func (h *FeedHandler) GetHomeFeed(c *gin.Context) {
 	if newCursor != nil {
 		if authenticated && !forcePopular {
 			// For interleaved feed, check if sources are exhausted
-			subscriptions, _ := h.subredditSubRepo.GetUserSubscriptions(c.Request.Context(), userID.(int))
+			subscriptions, _ := h.subredditSubRepo.GetUserSubscriptions(c.Request.Context(), userID)
 			subredditNames := make([]string, len(subscriptions))
 			for i, sub := range subscriptions {
 				subredditNames[i] = sub.SubredditName

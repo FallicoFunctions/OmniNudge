@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"github.com/omninudge/backend/internal/ports"
+	"github.com/omninudge/backend/internal/api/middleware"
 	"context"
 	"errors"
 	"io"
@@ -20,16 +22,16 @@ import (
 
 // HubsHandler handles hub CRUD
 type HubsHandler struct {
-	hubRepo           *models.HubRepository
-	postRepo          *models.PlatformPostRepository
-	modRepo           *models.HubModeratorRepository
-	hubSubRepo        *models.HubSubscriptionRepository
+	hubRepo           ports.HubRepository
+	postRepo          ports.PlatformPostRepository
+	modRepo           ports.HubModeratorRepository
+	hubSubRepo        ports.HubSubscriptionRepository
 	settingsRepo      *repository.HubSettingsRepository
-	accessRequestRepo *models.HubAccessRequestRepository
+	accessRequestRepo ports.HubAccessRequestRepository
 }
 
 // NewHubsHandler creates a new handler
-func NewHubsHandler(hubRepo *models.HubRepository, postRepo *models.PlatformPostRepository, modRepo *models.HubModeratorRepository, hubSubRepo *models.HubSubscriptionRepository, settingsRepo *repository.HubSettingsRepository) *HubsHandler {
+func NewHubsHandler(hubRepo ports.HubRepository, postRepo ports.PlatformPostRepository, modRepo ports.HubModeratorRepository, hubSubRepo ports.HubSubscriptionRepository, settingsRepo *repository.HubSettingsRepository) *HubsHandler {
 	return &HubsHandler{
 		hubRepo:      hubRepo,
 		postRepo:     postRepo,
@@ -40,7 +42,7 @@ func NewHubsHandler(hubRepo *models.HubRepository, postRepo *models.PlatformPost
 }
 
 // NewHubsHandlerWithAccessRequest creates a handler with access request support
-func NewHubsHandlerWithAccessRequest(hubRepo *models.HubRepository, postRepo *models.PlatformPostRepository, modRepo *models.HubModeratorRepository, hubSubRepo *models.HubSubscriptionRepository, settingsRepo *repository.HubSettingsRepository, accessReqRepo *models.HubAccessRequestRepository) *HubsHandler {
+func NewHubsHandlerWithAccessRequest(hubRepo ports.HubRepository, postRepo ports.PlatformPostRepository, modRepo ports.HubModeratorRepository, hubSubRepo ports.HubSubscriptionRepository, settingsRepo *repository.HubSettingsRepository, accessReqRepo ports.HubAccessRequestRepository) *HubsHandler {
 	return &HubsHandler{
 		hubRepo:           hubRepo,
 		postRepo:          postRepo,
@@ -66,11 +68,22 @@ type CreateHubRequest struct {
 	DenyKeywords    []string `json:"deny_keywords"`
 }
 
-// Create handles POST /api/v1/hubs
+// Create creates a new hub community.
+// @Summary      Create hub
+// @Tags         Hubs
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Param        body  body  CreateHubRequest  true  "Hub details"
+// @Success      201  {object}  models.Hub
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      409  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /hubs [post]
 func (h *HubsHandler) Create(c *gin.Context) {
-	userID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
 		return
 	}
 
@@ -81,14 +94,14 @@ func (h *HubsHandler) Create(c *gin.Context) {
 	}
 
 	if len(req.Name) < 3 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Hub name must be at least 3 characters"})
+		RespondError(c, http.StatusBadRequest, "Hub name must be at least 3 characters")
 		return
 	}
 
 	// Validate hub name: no spaces, alphanumeric + underscore only, lowercase
 	namePattern := regexp.MustCompile(`^[a-z0-9_]+$`)
 	if !namePattern.MatchString(req.Name) {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Hub name must be lowercase alphanumeric with underscores only, no spaces"})
+		RespondError(c, http.StatusBadRequest, "Hub name must be lowercase alphanumeric with underscores only, no spaces")
 		return
 	}
 
@@ -96,7 +109,7 @@ func (h *HubsHandler) Create(c *gin.Context) {
 
 	// Validate description length (max 10000 chars)
 	if req.Description != nil && len(*req.Description) > maxHubDescriptionLength {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Description must be less than 10,000 characters"})
+		RespondError(c, http.StatusBadRequest, "Description must be less than 10,000 characters")
 		return
 	}
 
@@ -105,7 +118,7 @@ func (h *HubsHandler) Create(c *gin.Context) {
 		req.Type = "public"
 	}
 	if req.Type != "public" && req.Type != "private" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Type must be 'public' or 'private'"})
+		RespondError(c, http.StatusBadRequest, "Type must be 'public' or 'private'")
 		return
 	}
 
@@ -120,13 +133,13 @@ func (h *HubsHandler) Create(c *gin.Context) {
 		req.ContentOptions = "any"
 	}
 	if req.ContentOptions != "any" && req.ContentOptions != "links_only" && req.ContentOptions != "text_only" && req.ContentOptions != "images_only" && req.ContentOptions != "videos_only" && req.ContentOptions != "custom" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Content options must be 'any', 'links_only', 'text_only', 'images_only', 'videos_only', or 'custom'"})
+		RespondError(c, http.StatusBadRequest, "Content options must be 'any', 'links_only', 'text_only', 'images_only', 'videos_only', or 'custom'")
 		return
 	}
 
 	if hasExplicitOptions {
 		if !allowText && !allowLink && !allowImage && !allowVideo {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "At least one post type must be allowed"})
+			RespondError(c, http.StatusBadRequest, "At least one post type must be allowed")
 			return
 		}
 		if allowText && allowLink && allowImage && allowVideo {
@@ -144,14 +157,14 @@ func (h *HubsHandler) Create(c *gin.Context) {
 		Description:    req.Description,
 		Type:           req.Type,
 		ContentOptions: req.ContentOptions,
-		CreatedBy:      intPtr(userID.(int)),
+		CreatedBy:      intPtr(userID),
 		NSFW:           req.NSFW,
 	}
 
 	if err := h.hubRepo.Create(c.Request.Context(), hub); err != nil {
 		var pgErr *pgconn.PgError
 		if ok := errors.As(err, &pgErr); ok && pgErr.Code == "23505" {
-			c.JSON(http.StatusConflict, gin.H{"error": "Hub already exists"})
+			RespondError(c, http.StatusConflict, "Hub already exists")
 			return
 		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create hub", "details": err.Error()})
@@ -167,7 +180,7 @@ func (h *HubsHandler) Create(c *gin.Context) {
 
 	if h.settingsRepo != nil {
 		settings := buildDefaultHubSettings(hub.ID, req.Type, allowText, allowLink, allowImage, allowVideo)
-		creatorID := userID.(int)
+		creatorID := userID
 		if err := h.settingsRepo.EnsureDefaults(c.Request.Context(), settings, &creatorID); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to initialize hub settings", "details": err.Error()})
 			return
@@ -176,13 +189,21 @@ func (h *HubsHandler) Create(c *gin.Context) {
 
 	// Creator becomes moderator of the hub
 	if h.modRepo != nil {
-		_ = h.modRepo.AddModerator(c.Request.Context(), hub.ID, userID.(int))
+		_ = h.modRepo.AddModerator(c.Request.Context(), hub.ID, userID)
 	}
 
 	c.JSON(http.StatusCreated, gin.H{"hub": hubResponse(hub)})
 }
 
-// Get handles GET /api/v1/hubs/:name
+// Get returns a hub by name.
+// @Summary      Get hub
+// @Tags         Hubs
+// @Produce      json
+// @Param        name  path  string  true  "Hub name"
+// @Success      200  {object}  models.Hub
+// @Failure      404  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /hubs/{name} [get]
 func (h *HubsHandler) Get(c *gin.Context) {
 	name := c.Param("name")
 	hub, err := h.hubRepo.GetByName(c.Request.Context(), name)
@@ -191,7 +212,7 @@ func (h *HubsHandler) Get(c *gin.Context) {
 		return
 	}
 	if hub == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Hub not found"})
+		RespondError(c, http.StatusNotFound, "Hub not found")
 		return
 	}
 	response := hubResponse(hub)
@@ -208,7 +229,15 @@ func (h *HubsHandler) Get(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"hub": response})
 }
 
-// List handles GET /api/v1/hubs
+// List returns a paginated list of hubs.
+// @Summary      List hubs
+// @Tags         Hubs
+// @Produce      json
+// @Param        limit   query  int  false  "Page size (default 20)"
+// @Param        offset  query  int  false  "Offset"
+// @Success      200  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /hubs [get]
 func (h *HubsHandler) List(c *gin.Context) {
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "50"))
 	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
@@ -237,7 +266,19 @@ func (h *HubsHandler) List(c *gin.Context) {
 	})
 }
 
-// GetPosts handles GET /api/v1/hubs/:name/posts
+// GetPosts returns posts from a hub.
+// @Summary      Get hub posts
+// @Tags         Hubs
+// @Produce      json
+// @Param        name    path   string  true   "Hub name"
+// @Param        sort    query  string  false  "Sort: hot | new | top | rising"
+// @Param        limit   query  int     false  "Page size (default 20)"
+// @Param        offset  query  int     false  "Offset"
+// @Param        cursor  query  string  false  "Pagination cursor"
+// @Success      200  {object}  gin.H
+// @Failure      404  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /hubs/{name}/posts [get]
 func (h *HubsHandler) GetPosts(c *gin.Context) {
 	name := c.Param("name")
 	hub, err := h.hubRepo.GetByName(c.Request.Context(), name)
@@ -246,7 +287,7 @@ func (h *HubsHandler) GetPosts(c *gin.Context) {
 		return
 	}
 	if hub == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Hub not found"})
+		RespondError(c, http.StatusNotFound, "Hub not found")
 		return
 	}
 
@@ -260,8 +301,8 @@ func (h *HubsHandler) GetPosts(c *gin.Context) {
 
 	// Get optional user ID for vote information
 	var userID *int
-	if uid, exists := c.Get("user_id"); exists {
-		uidInt := uid.(int)
+	if uid, _ := middleware.GetOptionalUserID(c); uid != 0 {
+		uidInt := uid
 		userID = &uidInt
 	}
 
@@ -314,7 +355,7 @@ func (h *HubsHandler) GetPosts(c *gin.Context) {
 
 	startTime, endTime, timeRangeKey, err := parseTopTimeRange(c, sortBy)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		RespondError(c, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -322,7 +363,7 @@ func (h *HubsHandler) GetPosts(c *gin.Context) {
 	if cursorParam != "" {
 		decoded, err := decodePlatformPostCursor(cursorParam)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid cursor"})
+			RespondError(c, http.StatusBadRequest, "Invalid cursor")
 			return
 		}
 		cursor = decoded
@@ -468,7 +509,19 @@ func (h *HubsHandler) GetPosts(c *gin.Context) {
 	c.JSON(http.StatusOK, response)
 }
 
-// AddModerator handles POST /api/v1/hubs/:name/moderators
+// AddModerator adds a moderator to a hub (admin only).
+// @Summary      Add hub moderator
+// @Tags         Admin
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Param        name  path  string  true  "Hub name"
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /admin/hubs/{name}/moderators [post]
 func (h *HubsHandler) AddModerator(c *gin.Context) {
 	name := c.Param("name")
 	hub, err := h.hubRepo.GetByName(c.Request.Context(), name)
@@ -477,7 +530,7 @@ func (h *HubsHandler) AddModerator(c *gin.Context) {
 		return
 	}
 	if hub == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Hub not found"})
+		RespondError(c, http.StatusNotFound, "Hub not found")
 		return
 	}
 
@@ -490,7 +543,7 @@ func (h *HubsHandler) AddModerator(c *gin.Context) {
 	}
 
 	if h.modRepo == nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Mod repo not configured"})
+		RespondError(c, http.StatusInternalServerError, "Mod repo not configured")
 		return
 	}
 
@@ -502,11 +555,18 @@ func (h *HubsHandler) AddModerator(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{"message": "Moderator added"})
 }
 
-// GetUserHubs handles GET /api/v1/users/me/hubs - returns hubs user can post to
+// GetUserHubs returns hubs the authenticated user can post to.
+// @Summary      Get my hubs
+// @Tags         Hubs
+// @Security     BearerAuth
+// @Produce      json
+// @Success      200  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /users/me/hubs [get]
 func (h *HubsHandler) GetUserHubs(c *gin.Context) {
-	userID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
 		return
 	}
 
@@ -528,7 +588,15 @@ func (h *HubsHandler) GetUserHubs(c *gin.Context) {
 	})
 }
 
-// GetAgentTargets handles GET /api/v1/hubs/agent-targets
+// GetAgentTargets returns hubs available as agent posting targets.
+// @Summary      Get agent hub targets
+// @Tags         Hubs
+// @Security     BearerAuth
+// @Produce      json
+// @Success      200  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /hubs/agent-targets [get]
 func (h *HubsHandler) GetAgentTargets(c *gin.Context) {
 	targets, err := h.hubRepo.ListAgentTargets(c.Request.Context())
 	if err != nil {
@@ -549,11 +617,23 @@ type CrosspostRequest struct {
 	ThumbnailURL       *string `json:"thumbnail_url"`
 }
 
-// CrosspostToHub handles POST /api/v1/hubs/:name/crosspost
+// CrosspostToHub crossposts a Reddit post to a hub.
+// @Summary      Crosspost to hub
+// @Tags         Hubs
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Param        name  path  string          true  "Hub name"
+// @Param        body  body  CrosspostRequest  true  "Crosspost details"
+// @Success      201  {object}  models.PlatformPost
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /hubs/{name}/crosspost [post]
 func (h *HubsHandler) CrosspostToHub(c *gin.Context) {
-	userID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
 		return
 	}
 
@@ -564,7 +644,7 @@ func (h *HubsHandler) CrosspostToHub(c *gin.Context) {
 		return
 	}
 	if hub == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Hub not found"})
+		RespondError(c, http.StatusNotFound, "Hub not found")
 		return
 	}
 
@@ -581,24 +661,24 @@ func (h *HubsHandler) CrosspostToHub(c *gin.Context) {
 	originalTitle := c.Query("original_title")     // Original title before user edited
 
 	if originType == "" || originPostID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Missing crosspost origin information"})
+		RespondError(c, http.StatusBadRequest, "Missing crosspost origin information")
 		return
 	}
 
 	if originType != "reddit" && originType != "platform" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid origin_type. Must be 'reddit' or 'platform'"})
+		RespondError(c, http.StatusBadRequest, "Invalid origin_type. Must be 'reddit' or 'platform'")
 		return
 	}
 
 	if originType == "reddit" && originSubreddit == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "origin_subreddit required for Reddit crossposts"})
+		RespondError(c, http.StatusBadRequest, "origin_subreddit required for Reddit crossposts")
 		return
 	}
 
 	// Create the crosspost as a new platform post
 	hubIDPtr := &hub.ID
 	post := &models.PlatformPost{
-		AuthorID:                 userID.(int),
+		AuthorID:                 userID,
 		HubID:                    hubIDPtr,
 		Title:                    req.Title,
 		Body:                     req.Body,
@@ -690,18 +770,28 @@ func moderatorsResponse(mods []models.HubModeratorUser) []gin.H {
 	return out
 }
 
-// CrosspostToSubreddit handles POST /api/v1/subreddits/:name/crosspost
-// Creates a local platform post associated with a subreddit context
+// CrosspostToSubreddit creates a local platform post associated with a subreddit context.
+// @Summary      Crosspost to subreddit
+// @Tags         Hubs
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Param        name  path  string          true  "Subreddit name"
+// @Param        body  body  CrosspostRequest  true  "Crosspost details"
+// @Success      201  {object}  models.PlatformPost
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /subreddits/{name}/crosspost [post]
 func (h *HubsHandler) CrosspostToSubreddit(c *gin.Context) {
-	userID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
 		return
 	}
 
 	subredditName := c.Param("name")
 	if subredditName == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Subreddit name is required"})
+		RespondError(c, http.StatusBadRequest, "Subreddit name is required")
 		return
 	}
 
@@ -718,24 +808,24 @@ func (h *HubsHandler) CrosspostToSubreddit(c *gin.Context) {
 	originalTitle := c.Query("original_title")     // Original title before user edited
 
 	if originType == "" || originPostID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Missing crosspost origin information"})
+		RespondError(c, http.StatusBadRequest, "Missing crosspost origin information")
 		return
 	}
 
 	if originType != "reddit" && originType != "platform" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid origin_type. Must be 'reddit' or 'platform'"})
+		RespondError(c, http.StatusBadRequest, "Invalid origin_type. Must be 'reddit' or 'platform'")
 		return
 	}
 
 	if originType == "reddit" && originSubreddit == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "origin_subreddit required for Reddit crossposts"})
+		RespondError(c, http.StatusBadRequest, "origin_subreddit required for Reddit crossposts")
 		return
 	}
 
 	// Create the crosspost as a new platform post with target_subreddit set
 	// No hub association - this post belongs to the subreddit only
 	post := &models.PlatformPost{
-		AuthorID:                 userID.(int),
+		AuthorID:                 userID,
 		HubID:                    nil, // No hub for subreddit-only posts
 		Title:                    req.Title,
 		Body:                     req.Body,
@@ -769,8 +859,16 @@ func (h *HubsHandler) CrosspostToSubreddit(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{"post": post})
 }
 
-// GetPopularFeed handles GET /api/v1/h/popular (auth optional)
-// Returns filtered, personalized feed (excludes quarantined, filters by subscriptions if authenticated)
+// GetPopularFeed returns the popular combined hub feed.
+// @Summary      Get popular hub feed
+// @Tags         Hubs
+// @Produce      json
+// @Param        sort    query  string  false  "Sort: hot | new | top"
+// @Param        limit   query  int     false  "Page size (default 20)"
+// @Param        cursor  query  string  false  "Pagination cursor"
+// @Success      200  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /hubs/h/popular [get]
 func (h *HubsHandler) GetPopularFeed(c *gin.Context) {
 	sortBy := c.DefaultQuery("sort", "hot")
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "25"))
@@ -783,11 +881,10 @@ func (h *HubsHandler) GetPopularFeed(c *gin.Context) {
 	var subscribedHubIDs []int
 
 	// Check if user is authenticated
-	userID, authenticated := c.Get("user_id")
-	if authenticated {
+	if userID, ok := middleware.GetOptionalUserID(c); ok {
 		// Get user's subscribed hub IDs
 		var err error
-		subscribedHubIDs, err = h.hubSubRepo.GetSubscribedHubIDs(c.Request.Context(), userID.(int))
+		subscribedHubIDs, err = h.hubSubRepo.GetSubscribedHubIDs(c.Request.Context(), userID)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch subscriptions", "details": err.Error()})
 			return
@@ -797,7 +894,7 @@ func (h *HubsHandler) GetPopularFeed(c *gin.Context) {
 
 	startTime, endTime, timeRangeKey, err := parseTopTimeRange(c, sortBy)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		RespondError(c, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -805,7 +902,7 @@ func (h *HubsHandler) GetPopularFeed(c *gin.Context) {
 	if cursorParam != "" {
 		decoded, err := decodePlatformPostCursor(cursorParam)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid cursor"})
+			RespondError(c, http.StatusBadRequest, "Invalid cursor")
 			return
 		}
 		cursor = decoded
@@ -868,8 +965,16 @@ func (h *HubsHandler) GetPopularFeed(c *gin.Context) {
 	c.JSON(http.StatusOK, response)
 }
 
-// GetAllFeed handles GET /api/v1/h/all (public)
-// Returns global firehose (includes everything, no filtering)
+// GetAllFeed returns the global hub firehose (no filtering).
+// @Summary      Get all hubs feed
+// @Tags         Hubs
+// @Produce      json
+// @Param        sort    query  string  false  "Sort: hot | new | top"
+// @Param        limit   query  int     false  "Page size (default 25)"
+// @Param        cursor  query  string  false  "Pagination cursor"
+// @Success      200  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /hubs/h/all [get]
 func (h *HubsHandler) GetAllFeed(c *gin.Context) {
 	sortBy := c.DefaultQuery("sort", "hot")
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "25"))
@@ -881,7 +986,7 @@ func (h *HubsHandler) GetAllFeed(c *gin.Context) {
 
 	startTime, endTime, timeRangeKey, err := parseTopTimeRange(c, sortBy)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		RespondError(c, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -889,7 +994,7 @@ func (h *HubsHandler) GetAllFeed(c *gin.Context) {
 	if cursorParam != "" {
 		decoded, err := decodePlatformPostCursor(cursorParam)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid cursor"})
+			RespondError(c, http.StatusBadRequest, "Invalid cursor")
 			return
 		}
 		cursor = decoded
@@ -936,11 +1041,20 @@ func (h *HubsHandler) GetAllFeed(c *gin.Context) {
 	c.JSON(http.StatusOK, response)
 }
 
-// SearchHubs handles GET /api/v1/hubs/search?q=cats (autocomplete)
+// SearchHubs searches/autocompletes hub names.
+// @Summary      Search hubs autocomplete
+// @Tags         Hubs
+// @Produce      json
+// @Param        q      query  string  true   "Search query"
+// @Param        limit  query  int     false  "Max results (default 10)"
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /hubs/search [get]
 func (h *HubsHandler) SearchHubs(c *gin.Context) {
 	query := c.Query("q")
 	if query == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Query parameter 'q' is required"})
+		RespondError(c, http.StatusBadRequest, "Query parameter 'q' is required")
 		return
 	}
 
@@ -962,7 +1076,14 @@ func (h *HubsHandler) SearchHubs(c *gin.Context) {
 	})
 }
 
-// GetTrendingHubs handles GET /api/v1/hubs/trending (popular hubs)
+// GetTrendingHubs returns trending hubs by subscriber growth.
+// @Summary      Get trending hubs
+// @Tags         Hubs
+// @Produce      json
+// @Param        limit  query  int  false  "Max results (default 10, max 50)"
+// @Success      200  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /hubs/trending [get]
 func (h *HubsHandler) GetTrendingHubs(c *gin.Context) {
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
 	if limit < 1 || limit > 50 {
@@ -981,11 +1102,22 @@ func (h *HubsHandler) GetTrendingHubs(c *gin.Context) {
 	})
 }
 
-// UpdateHubNSFW handles PUT /api/v1/hubs/:name/nsfw
+// UpdateHubNSFW updates the NSFW flag for a hub.
+// @Summary      Update hub NSFW flag
+// @Tags         Hubs
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Param        name  path  string  true  "Hub name"
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /hubs/{name}/nsfw [put]
 func (h *HubsHandler) UpdateHubNSFW(c *gin.Context) {
-	userID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
 		return
 	}
 
@@ -996,15 +1128,15 @@ func (h *HubsHandler) UpdateHubNSFW(c *gin.Context) {
 		return
 	}
 	if hub == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Hub not found"})
+		RespondError(c, http.StatusNotFound, "Hub not found")
 		return
 	}
 
 	// Check permissions: must be owner or admin
 	if !helpers.IsAdmin(c) {
-		role, err := h.settingsRepo.GetModeratorRole(c.Request.Context(), hub.ID, userID.(int))
+		role, err := h.settingsRepo.GetModeratorRole(c.Request.Context(), hub.ID, userID)
 		if err != nil || role == nil || (*role != models.ModeratorRoleOwner && *role != models.ModeratorRoleFullModerator) {
-			c.JSON(http.StatusForbidden, gin.H{"error": "Requires owner or full_moderator role"})
+			RespondError(c, http.StatusForbidden, "Requires owner or full_moderator role")
 			return
 		}
 	}

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -207,6 +208,9 @@ func (r *MessageRepository) GetByID(ctx context.Context, id int) (*Message, erro
 		&message.SharedEncryptionIV,
 	)
 
+	if err == pgx.ErrNoRows {
+		return nil, nil
+	}
 	if err != nil {
 		return nil, err
 	}

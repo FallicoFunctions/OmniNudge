@@ -31,7 +31,7 @@ func (h *AnalyticsEnhancedHandler) TrackEvent(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request"})
+		RespondError(c, http.StatusBadRequest, "Invalid request")
 		return
 	}
 
@@ -51,7 +51,7 @@ func (h *AnalyticsEnhancedHandler) TrackEvent(c *gin.Context) {
 
 	// Track asynchronously
 	if err := h.svc.TrackEventAsync(c.Request.Context(), enriched); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to track event"})
+		RespondError(c, http.StatusInternalServerError, "Failed to track event")
 		return
 	}
 
@@ -138,7 +138,7 @@ func (h *AnalyticsEnhancedHandler) GetDashboard(c *gin.Context) {
 		case r := <-countChan:
 			eventCount = r.value
 		case <-timeout:
-			c.JSON(http.StatusGatewayTimeout, gin.H{"error": "Dashboard generation timeout"})
+			RespondError(c, http.StatusGatewayTimeout, "Dashboard generation timeout")
 			return
 		}
 	}
@@ -158,7 +158,7 @@ func (h *AnalyticsEnhancedHandler) GetDashboard(c *gin.Context) {
 func (h *AnalyticsEnhancedHandler) GetEventStats(c *gin.Context) {
 	eventName := c.Param("event_name")
 	if eventName == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "event_name required"})
+		RespondError(c, http.StatusBadRequest, "event_name required")
 		return
 	}
 
@@ -172,7 +172,7 @@ func (h *AnalyticsEnhancedHandler) GetEventStats(c *gin.Context) {
 
 	count, err := h.svc.GetEventStats(c.Request.Context(), eventName, since)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch stats"})
+		RespondError(c, http.StatusInternalServerError, "Failed to fetch stats")
 		return
 	}
 
@@ -188,13 +188,13 @@ func (h *AnalyticsEnhancedHandler) GetEventStats(c *gin.Context) {
 func (h *AnalyticsEnhancedHandler) GetUserCohort(c *gin.Context) {
 	dateParam := c.Query("signup_date")
 	if dateParam == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "signup_date required (YYYY-MM-DD)"})
+		RespondError(c, http.StatusBadRequest, "signup_date required (YYYY-MM-DD)")
 		return
 	}
 
 	signupDate, err := time.Parse("2006-01-02", dateParam)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid date format (use YYYY-MM-DD)"})
+		RespondError(c, http.StatusBadRequest, "Invalid date format (use YYYY-MM-DD)")
 		return
 	}
 
@@ -206,7 +206,7 @@ func (h *AnalyticsEnhancedHandler) GetUserCohort(c *gin.Context) {
 
 	retention, err := h.svc.GetUserCohort(c.Request.Context(), signupDate, daysAfter)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch cohort data"})
+		RespondError(c, http.StatusInternalServerError, "Failed to fetch cohort data")
 		return
 	}
 
@@ -225,7 +225,7 @@ func (h *AnalyticsEnhancedHandler) GetFunnelAnalysis(c *gin.Context) {
 	endEvent := c.Query("end_event")
 
 	if startEvent == "" || endEvent == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "start_event and end_event required"})
+		RespondError(c, http.StatusBadRequest, "start_event and end_event required")
 		return
 	}
 
@@ -237,7 +237,7 @@ func (h *AnalyticsEnhancedHandler) GetFunnelAnalysis(c *gin.Context) {
 
 	conversion, err := h.svc.GetFunnelConversion(c.Request.Context(), startEvent, endEvent, windowDays)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch funnel data"})
+		RespondError(c, http.StatusInternalServerError, "Failed to fetch funnel data")
 		return
 	}
 
@@ -382,7 +382,7 @@ func (h *AnalyticsEnhancedHandler) RefreshMaterializedViews(c *gin.Context) {
 
 	_, err := h.svc.DB.Exec(ctx, "SELECT refresh_analytics_views()")
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to refresh views"})
+		RespondError(c, http.StatusInternalServerError, "Failed to refresh views")
 		return
 	}
 

@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"github.com/omninudge/backend/internal/ports"
+	"github.com/omninudge/backend/internal/api/middleware"
 	"net/http"
 	"strconv"
 	"strings"
@@ -13,13 +15,13 @@ import (
 
 // AdminHandler handles admin-level actions
 type AdminHandler struct {
-	userRepo   *models.UserRepository
-	hubModRepo *models.HubModeratorRepository
+	userRepo   ports.UserRepository
+	hubModRepo ports.HubModeratorRepository
 	pool       *pgxpool.Pool
 }
 
 // NewAdminHandler creates a new admin handler
-func NewAdminHandler(userRepo *models.UserRepository, hubModRepo *models.HubModeratorRepository, pool *pgxpool.Pool) *AdminHandler {
+func NewAdminHandler(userRepo ports.UserRepository, hubModRepo ports.HubModeratorRepository, pool *pgxpool.Pool) *AdminHandler {
 	return &AdminHandler{
 		userRepo:   userRepo,
 		hubModRepo: hubModRepo,
@@ -27,11 +29,23 @@ func NewAdminHandler(userRepo *models.UserRepository, hubModRepo *models.HubMode
 	}
 }
 
-// PromoteUser handles POST /api/v1/admin/users/:id/role
+// PromoteUser promotes or changes a user's role.
+// @Summary      Change user role
+// @Tags         Admin
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Param        id    path  int     true  "User ID"
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /admin/users/{id}/role [post]
 func (h *AdminHandler) PromoteUser(c *gin.Context) {
 	targetID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid user ID")
 		return
 	}
 
@@ -61,11 +75,23 @@ func (h *AdminHandler) PromoteUser(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Role updated", "user_id": targetID, "role": req.Role})
 }
 
-// BanUser handles POST /api/v1/admin/users/:id/ban (regular ban)
+// BanUser bans a user from the platform.
+// @Summary      Ban user
+// @Tags         Admin
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Param        id  path  int  true  "User ID"
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /admin/users/{id}/ban [post]
 func (h *AdminHandler) BanUser(c *gin.Context) {
 	targetID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid user ID")
 		return
 	}
 
@@ -74,17 +100,16 @@ func (h *AdminHandler) BanUser(c *gin.Context) {
 		ShowReason bool   `json:"show_reason"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil || strings.TrimSpace(req.Reason) == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Reason is required"})
+		RespondError(c, http.StatusBadRequest, "Reason is required")
 		return
 	}
 
-	adminID, ok := c.Get("user_id")
+	adminID, ok := middleware.GetAuthenticatedUserID(c)
 	if !ok {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Missing admin context"})
 		return
 	}
 
-	if err := h.userRepo.BanUser(c.Request.Context(), targetID, req.Reason, req.ShowReason, adminID.(int)); err != nil {
+	if err := h.userRepo.BanUser(c.Request.Context(), targetID, req.Reason, req.ShowReason, adminID); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to ban user", "details": err.Error()})
 		return
 	}
@@ -92,11 +117,22 @@ func (h *AdminHandler) BanUser(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "User banned", "user_id": targetID})
 }
 
-// ShadowBanUser handles POST /api/v1/admin/users/:id/shadow-ban
+// ShadowBanUser shadow-bans a user (user sees content, others do not).
+// @Summary      Shadow ban user
+// @Tags         Admin
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Param        id  path  int  true  "User ID"
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /admin/users/{id}/shadow-ban [post]
 func (h *AdminHandler) ShadowBanUser(c *gin.Context) {
 	targetID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid user ID")
 		return
 	}
 
@@ -105,17 +141,16 @@ func (h *AdminHandler) ShadowBanUser(c *gin.Context) {
 		ShowReason bool   `json:"show_reason"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil || strings.TrimSpace(req.Reason) == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Reason is required"})
+		RespondError(c, http.StatusBadRequest, "Reason is required")
 		return
 	}
 
-	adminID, ok := c.Get("user_id")
+	adminID, ok := middleware.GetAuthenticatedUserID(c)
 	if !ok {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Missing admin context"})
 		return
 	}
 
-	if err := h.userRepo.ShadowBanUser(c.Request.Context(), targetID, req.Reason, req.ShowReason, adminID.(int)); err != nil {
+	if err := h.userRepo.ShadowBanUser(c.Request.Context(), targetID, req.Reason, req.ShowReason, adminID); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to shadow ban user", "details": err.Error()})
 		return
 	}
@@ -123,11 +158,22 @@ func (h *AdminHandler) ShadowBanUser(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "User shadow banned", "user_id": targetID})
 }
 
-// UnbanUser handles POST /api/v1/admin/users/:id/unban
+// UnbanUser removes a ban from a user.
+// @Summary      Unban user
+// @Tags         Admin
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Param        id  path  int  true  "User ID"
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /admin/users/{id}/unban [post]
 func (h *AdminHandler) UnbanUser(c *gin.Context) {
 	targetID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid user ID")
 		return
 	}
 
@@ -135,17 +181,16 @@ func (h *AdminHandler) UnbanUser(c *gin.Context) {
 		Reason string `json:"reason" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil || strings.TrimSpace(req.Reason) == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Reason is required"})
+		RespondError(c, http.StatusBadRequest, "Reason is required")
 		return
 	}
 
-	adminID, ok := c.Get("user_id")
+	adminID, ok := middleware.GetAuthenticatedUserID(c)
 	if !ok {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Missing admin context"})
 		return
 	}
 
-	if err := h.userRepo.UnbanUser(c.Request.Context(), targetID, req.Reason, adminID.(int)); err != nil {
+	if err := h.userRepo.UnbanUser(c.Request.Context(), targetID, req.Reason, adminID); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to unban user", "details": err.Error()})
 		return
 	}
@@ -153,11 +198,22 @@ func (h *AdminHandler) UnbanUser(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "User unbanned", "user_id": targetID})
 }
 
-// SoftDeleteUser handles POST /api/v1/admin/users/:id/delete
+// SoftDeleteUser soft-deletes a user account.
+// @Summary      Soft delete user
+// @Tags         Admin
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Param        id  path  int  true  "User ID"
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /admin/users/{id}/delete [post]
 func (h *AdminHandler) SoftDeleteUser(c *gin.Context) {
 	targetID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid user ID")
 		return
 	}
 
@@ -165,17 +221,16 @@ func (h *AdminHandler) SoftDeleteUser(c *gin.Context) {
 		Reason string `json:"reason" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil || strings.TrimSpace(req.Reason) == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Reason is required"})
+		RespondError(c, http.StatusBadRequest, "Reason is required")
 		return
 	}
 
-	adminID, ok := c.Get("user_id")
+	adminID, ok := middleware.GetAuthenticatedUserID(c)
 	if !ok {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Missing admin context"})
 		return
 	}
 
-	if err := h.userRepo.SoftDeleteUser(c.Request.Context(), targetID, req.Reason, adminID.(int)); err != nil {
+	if err := h.userRepo.SoftDeleteUser(c.Request.Context(), targetID, req.Reason, adminID); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete user", "details": err.Error()})
 		return
 	}
@@ -183,11 +238,21 @@ func (h *AdminHandler) SoftDeleteUser(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "User soft deleted", "user_id": targetID})
 }
 
-// GetBanHistory handles GET /api/v1/admin/users/:id/ban-history
+// GetBanHistory returns ban history for a specific user.
+// @Summary      Get user ban history
+// @Tags         Admin
+// @Security     BearerAuth
+// @Produce      json
+// @Param        id  path  int  true  "User ID"
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /admin/users/{id}/ban-history [get]
 func (h *AdminHandler) GetBanHistory(c *gin.Context) {
 	targetID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid user ID")
 		return
 	}
 
@@ -200,7 +265,19 @@ func (h *AdminHandler) GetBanHistory(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"history": history})
 }
 
-// GetAllBanHistory handles GET /api/v1/admin/ban-history
+// GetAllBanHistory returns ban history across all users.
+// @Summary      Get all ban history
+// @Tags         Admin
+// @Security     BearerAuth
+// @Produce      json
+// @Param        limit   query  int     false  "Page size (default 50, max 200)"
+// @Param        offset  query  int     false  "Offset"
+// @Param        cursor  query  string  false  "Cursor for pagination"
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /admin/ban-history [get]
 func (h *AdminHandler) GetAllBanHistory(c *gin.Context) {
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "50"))
 	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
@@ -214,7 +291,7 @@ func (h *AdminHandler) GetAllBanHistory(c *gin.Context) {
 	if cursorParam != "" {
 		decoded, err := decodeTimeCursor(cursorParam)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid cursor"})
+			RespondError(c, http.StatusBadRequest, "Invalid cursor")
 			return
 		}
 		cursor = decoded
@@ -271,7 +348,19 @@ func (h *AdminHandler) GetAllBanHistory(c *gin.Context) {
 	c.JSON(http.StatusOK, response)
 }
 
-// ListUsers handles GET /api/v1/admin/users
+// ListUsers returns a paginated list of all users.
+// @Summary      List users
+// @Tags         Admin
+// @Security     BearerAuth
+// @Produce      json
+// @Param        limit   query  int     false  "Page size (default 20)"
+// @Param        offset  query  int     false  "Offset"
+// @Param        search  query  string  false  "Search by username or email"
+// @Success      200  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /admin/users [get]
 func (h *AdminHandler) ListUsers(c *gin.Context) {
 	search := c.Query("search")
 	roleFilter := c.Query("role")
@@ -288,7 +377,7 @@ func (h *AdminHandler) ListUsers(c *gin.Context) {
 	if cursorParam != "" {
 		decoded, err := decodeTimeCursor(cursorParam)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid cursor"})
+			RespondError(c, http.StatusBadRequest, "Invalid cursor")
 			return
 		}
 		cursor = decoded
@@ -468,7 +557,15 @@ func (h *AdminHandler) ListUsers(c *gin.Context) {
 	c.JSON(http.StatusOK, response)
 }
 
-// GetSiteStats handles GET /api/v1/admin/stats
+// GetSiteStats returns platform-wide statistics.
+// @Summary      Get site statistics
+// @Tags         Admin
+// @Security     BearerAuth
+// @Produce      json
+// @Success      200  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /admin/stats [get]
 func (h *AdminHandler) GetSiteStats(c *gin.Context) {
 	type Stats struct {
 		TotalUsers               int     `json:"total_users"`
@@ -569,11 +666,21 @@ func (h *AdminHandler) GetSiteStats(c *gin.Context) {
 	c.JSON(http.StatusOK, stats)
 }
 
-// GetHubModerators handles GET /api/v1/admin/hubs/:hub_id/moderators
+// GetHubModerators returns the list of moderators for a hub.
+// @Summary      Get hub moderators
+// @Tags         Admin
+// @Security     BearerAuth
+// @Produce      json
+// @Param        hub_id  path  int  true  "Hub ID"
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /admin/hubs/{hub_id}/moderators [get]
 func (h *AdminHandler) GetHubModerators(c *gin.Context) {
 	hubID, err := strconv.Atoi(c.Param("hub_id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid hub ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid hub ID")
 		return
 	}
 
@@ -614,17 +721,28 @@ func (h *AdminHandler) GetHubModerators(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"moderators": moderators})
 }
 
-// RemoveHubModerator handles DELETE /api/v1/admin/hubs/:hub_id/moderators/:user_id
+// RemoveHubModerator removes a moderator from a hub.
+// @Summary      Remove hub moderator
+// @Tags         Admin
+// @Security     BearerAuth
+// @Produce      json
+// @Param        hub_id   path  int  true  "Hub ID"
+// @Param        user_id  path  int  true  "User ID"
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /admin/hubs/{hub_id}/moderators/{user_id} [delete]
 func (h *AdminHandler) RemoveHubModerator(c *gin.Context) {
 	hubID, err := strconv.Atoi(c.Param("hub_id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid hub ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid hub ID")
 		return
 	}
 
 	userID, err := strconv.Atoi(c.Param("user_id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid user ID")
 		return
 	}
 

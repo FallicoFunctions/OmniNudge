@@ -10,12 +10,13 @@ import (
 
 	"github.com/hibiken/asynq"
 	"github.com/omninudge/backend/internal/models"
+	"github.com/omninudge/backend/internal/ports"
 	"github.com/omninudge/backend/internal/services"
 )
 
 // NewThumbnailGenerationHandler creates a real thumbnail generation handler.
 func NewThumbnailGenerationHandler(
-	mediaRepo *models.MediaFileRepository,
+	mediaRepo ports.MediaFileRepository,
 	thumbnailService *services.ThumbnailService,
 ) JobHandler {
 	return func(ctx context.Context, task *asynq.Task) error {

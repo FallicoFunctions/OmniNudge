@@ -95,7 +95,7 @@ func (r *RemovedContentRepository) GetByContent(ctx context.Context, contentType
 		SELECT rc.id, rc.content_type, rc.content_id, rc.hub_id, rc.removed_by,
 			   rc.removal_reason_id, rc.custom_reason, rc.mod_note, rc.removed_at,
 			   u.username as removed_by_name,
-			   rr.title as reason_title, rr.message as reason_message
+			   COALESCE(rr.title, '') as reason_title, COALESCE(rr.message, '') as reason_message
 		FROM removed_content rc
 		JOIN users u ON rc.removed_by = u.id
 		LEFT JOIN removal_reasons rr ON rc.removal_reason_id = rr.id
@@ -124,7 +124,7 @@ func (r *RemovedContentRepository) GetByHub(ctx context.Context, hubID int, limi
 		SELECT rc.id, rc.content_type, rc.content_id, rc.hub_id, rc.removed_by,
 			   rc.removal_reason_id, rc.custom_reason, rc.mod_note, rc.removed_at,
 			   u.username as removed_by_name,
-			   rr.title as reason_title, rr.message as reason_message
+			   COALESCE(rr.title, '') as reason_title, COALESCE(rr.message, '') as reason_message
 		FROM removed_content rc
 		JOIN users u ON rc.removed_by = u.id
 		LEFT JOIN removal_reasons rr ON rc.removal_reason_id = rr.id

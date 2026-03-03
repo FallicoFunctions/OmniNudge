@@ -8,11 +8,15 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/omninudge/backend/internal/models"
+	"github.com/omninudge/backend/internal/ports"
 )
 
 type FeatureFlagRepository struct {
 	pool *pgxpool.Pool
 }
+
+// Compile-time interface check.
+var _ ports.FeatureFlagRepository = (*FeatureFlagRepository)(nil)
 
 func NewFeatureFlagRepository(pool *pgxpool.Pool) *FeatureFlagRepository {
 	return &FeatureFlagRepository{pool: pool}
@@ -35,7 +39,7 @@ func (r *FeatureFlagRepository) GetFlag(ctx context.Context, key string) (*model
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, errors.New("flag not found")
+			return nil, nil
 		}
 		return nil, err
 	}

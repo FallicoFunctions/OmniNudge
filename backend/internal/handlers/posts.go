@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"github.com/omninudge/backend/internal/ports"
+	"github.com/omninudge/backend/internal/api/middleware"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -20,17 +22,17 @@ import (
 // PostsHandler handles HTTP requests for platform posts
 type PostsHandler struct {
 	pool         *pgxpool.Pool
-	postRepo     *models.PlatformPostRepository
-	hubRepo      *models.HubRepository
-	userRepo     *models.UserRepository
-	modRepo      *models.HubModeratorRepository
-	feedRepo     *models.FeedRepository
+	postRepo     ports.PlatformPostRepository
+	hubRepo      ports.HubRepository
+	userRepo     ports.UserRepository
+	modRepo      ports.HubModeratorRepository
+	feedRepo     ports.FeedRepository
 	settingsRepo *repository.HubSettingsRepository
 	notifService *services.NotificationService
 }
 
 // NewPostsHandler creates a new posts handler
-func NewPostsHandler(pool *pgxpool.Pool, postRepo *models.PlatformPostRepository, hubRepo *models.HubRepository, userRepo *models.UserRepository, modRepo *models.HubModeratorRepository, feedRepo *models.FeedRepository, settingsRepo *repository.HubSettingsRepository) *PostsHandler {
+func NewPostsHandler(pool *pgxpool.Pool, postRepo ports.PlatformPostRepository, hubRepo ports.HubRepository, userRepo ports.UserRepository, modRepo ports.HubModeratorRepository, feedRepo ports.FeedRepository, settingsRepo *repository.HubSettingsRepository) *PostsHandler {
 	return &PostsHandler{
 		pool:         pool,
 		postRepo:     postRepo,
@@ -47,12 +49,21 @@ func (h *PostsHandler) SetNotificationService(notifService *services.Notificatio
 	h.notifService = notifService
 }
 
-// GetSubredditPosts handles GET /api/v1/subreddits/:name/posts
-// Returns local platform posts that have been crossposted to a subreddit
+// GetSubredditPosts returns local platform posts crossposted to a subreddit.
+// @Summary      Get subreddit posts
+// @Tags         Posts
+// @Produce      json
+// @Param        name    path   string  true   "Subreddit name"
+// @Param        limit   query  int     false  "Page size (default 20)"
+// @Param        offset  query  int     false  "Offset"
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /subreddits/{name}/posts [get]
 func (h *PostsHandler) GetSubredditPosts(c *gin.Context) {
 	subredditName := c.Param("name")
 	if subredditName == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Subreddit name is required"})
+		RespondError(c, http.StatusBadRequest, "Subreddit name is required")
 		return
 	}
 
@@ -69,14 +80,14 @@ func (h *PostsHandler) GetSubredditPosts(c *gin.Context) {
 
 	// Get optional user ID for vote information
 	var userID *int
-	if uid, exists := c.Get("user_id"); exists {
-		uidInt := uid.(int)
+	if uid, _ := middleware.GetOptionalUserID(c); uid != 0 {
+		uidInt := uid
 		userID = &uidInt
 	}
 
 	startTime, endTime, timeRangeKey, err := parseTopTimeRange(c, sortBy)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		RespondError(c, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -85,7 +96,7 @@ func (h *PostsHandler) GetSubredditPosts(c *gin.Context) {
 	if cursorParam != "" {
 		decoded, err := decodePlatformPostCursor(cursorParam)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid cursor"})
+			RespondError(c, http.StatusBadRequest, "Invalid cursor")
 			return
 		}
 		cursor = decoded
@@ -165,12 +176,22 @@ type UpdatePostRequest struct {
 	ThumbnailURL *string  `json:"thumbnail_url"`
 }
 
-// CreatePost handles POST /api/v1/posts
+// CreatePost creates a new post.
+// @Summary      Create post
+// @Tags         Posts
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Success      201  {object}  models.PlatformPost
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /posts [post]
 func (h *PostsHandler) CreatePost(c *gin.Context) {
 	// Get user ID from context (set by AuthRequired middleware)
-	userID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
 		return
 	}
 	if c.GetBool("shadow_banned") {
@@ -186,13 +207,13 @@ func (h *PostsHandler) CreatePost(c *gin.Context) {
 	}
 	fmt.Printf("[CreatePost] Parsed NSFW=%v hub_id=%v target_subreddit=%v\n", req.NSFW, req.HubID, req.TargetSubreddit)
 	if req.Body != nil && len(*req.Body) > maxPostBodyLength {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Post body must be less than 10,000 characters"})
+		RespondError(c, http.StatusBadRequest, "Post body must be less than 10,000 characters")
 		return
 	}
 
 	// Validate: hub_id is required for all platform posts
 	if req.HubID == nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "hub_id is required"})
+		RespondError(c, http.StatusBadRequest, "hub_id is required")
 		return
 	}
 
@@ -209,7 +230,7 @@ func (h *PostsHandler) CreatePost(c *gin.Context) {
 			return
 		}
 		if hub == nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Hub not found"})
+			RespondError(c, http.StatusBadRequest, "Hub not found")
 			return
 		}
 		hubID = req.HubID
@@ -221,23 +242,23 @@ func (h *PostsHandler) CreatePost(c *gin.Context) {
 			settings, err := h.settingsRepo.GetByHubID(c.Request.Context(), hub.ID)
 			if err == nil {
 				if postContentType == "text" && !settings.AllowTextPosts {
-					c.JSON(http.StatusBadRequest, gin.H{"error": "This hub does not allow text posts"})
+					RespondError(c, http.StatusBadRequest, "This hub does not allow text posts")
 					return
 				}
 				if postContentType == "link" && !settings.AllowLinkPosts {
-					c.JSON(http.StatusBadRequest, gin.H{"error": "This hub does not allow link posts"})
+					RespondError(c, http.StatusBadRequest, "This hub does not allow link posts")
 					return
 				}
 				if postContentType == "image" && !settings.AllowImagePosts {
-					c.JSON(http.StatusBadRequest, gin.H{"error": "This hub does not allow image posts"})
+					RespondError(c, http.StatusBadRequest, "This hub does not allow image posts")
 					return
 				}
 				if postContentType == "video" && !settings.AllowVideoPosts {
-					c.JSON(http.StatusBadRequest, gin.H{"error": "This hub does not allow video posts"})
+					RespondError(c, http.StatusBadRequest, "This hub does not allow video posts")
 					return
 				}
 			} else if err != pgx.ErrNoRows {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load hub settings"})
+				RespondError(c, http.StatusInternalServerError, "Failed to load hub settings")
 				return
 			} else {
 				useContentOptionsFallback = true
@@ -247,19 +268,19 @@ func (h *PostsHandler) CreatePost(c *gin.Context) {
 		if useContentOptionsFallback {
 			// Fallback to hub content_options if settings aren't available
 			if hub.ContentOptions == "links_only" && postContentType != "link" {
-				c.JSON(http.StatusBadRequest, gin.H{"error": "This hub only accepts link posts"})
+				RespondError(c, http.StatusBadRequest, "This hub only accepts link posts")
 				return
 			}
 			if hub.ContentOptions == "text_only" && postContentType != "text" {
-				c.JSON(http.StatusBadRequest, gin.H{"error": "This hub only accepts text posts"})
+				RespondError(c, http.StatusBadRequest, "This hub only accepts text posts")
 				return
 			}
 			if hub.ContentOptions == "images_only" && postContentType != "image" {
-				c.JSON(http.StatusBadRequest, gin.H{"error": "This hub only accepts image posts"})
+				RespondError(c, http.StatusBadRequest, "This hub only accepts image posts")
 				return
 			}
 			if hub.ContentOptions == "videos_only" && postContentType != "video" {
-				c.JSON(http.StatusBadRequest, gin.H{"error": "This hub only accepts video posts"})
+				RespondError(c, http.StatusBadRequest, "This hub only accepts video posts")
 				return
 			}
 		}
@@ -267,7 +288,7 @@ func (h *PostsHandler) CreatePost(c *gin.Context) {
 	// hubID remains set for all posts (target_subreddit is optional)
 
 	post := &models.PlatformPost{
-		AuthorID:        userID.(int),
+		AuthorID:        userID,
 		HubID:           hubID,
 		Title:           req.Title,
 		Body:            req.Body,
@@ -290,8 +311,8 @@ func (h *PostsHandler) CreatePost(c *gin.Context) {
 
 	// Default upvote by author
 	upvote := true
-	fmt.Printf("[CreatePost] Attempting to vote on post %d for user %d\n", post.ID, userID.(int))
-	voteErr := h.postRepo.Vote(c.Request.Context(), post.ID, userID.(int), &upvote)
+	fmt.Printf("[CreatePost] Attempting to vote on post %d for user %d\n", post.ID, userID)
+	voteErr := h.postRepo.Vote(c.Request.Context(), post.ID, userID, &upvote)
 	if voteErr != nil {
 		// Log the error but don't fail the post creation
 		// The post exists, just without the auto-upvote
@@ -302,7 +323,7 @@ func (h *PostsHandler) CreatePost(c *gin.Context) {
 	}
 
 	// Re-fetch post to get updated vote counts from DB (with user's vote info)
-	uid := userID.(int)
+	uid := userID
 	updatedPost, err := h.postRepo.GetByIDWithUser(c.Request.Context(), post.ID, &uid)
 	if err != nil {
 		// If we can't fetch, return the original post object
@@ -324,19 +345,28 @@ func (h *PostsHandler) CreatePost(c *gin.Context) {
 	c.JSON(http.StatusCreated, updatedPost)
 }
 
-// GetPost handles GET /api/v1/posts/:id
+// GetPost returns a single post by ID.
+// @Summary      Get post
+// @Tags         Posts
+// @Produce      json
+// @Param        id  path  int  true  "Post ID"
+// @Success      200  {object}  models.PlatformPost
+// @Failure      400  {object}  gin.H
+// @Failure      404  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /posts/{id} [get]
 func (h *PostsHandler) GetPost(c *gin.Context) {
 	postID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid post ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid post ID")
 		return
 	}
 	hubNameParam := strings.TrimSpace(c.Query("hub"))
 
 	// Get optional user ID for vote information
 	var userID *int
-	if uid, exists := c.Get("user_id"); exists {
-		uidInt := uid.(int)
+	if uid, _ := middleware.GetOptionalUserID(c); uid != 0 {
+		uidInt := uid
 		userID = &uidInt
 	}
 
@@ -347,7 +377,7 @@ func (h *PostsHandler) GetPost(c *gin.Context) {
 	}
 
 	if post == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Post not found"})
+		RespondError(c, http.StatusNotFound, "Post not found")
 		return
 	}
 
@@ -358,7 +388,7 @@ func (h *PostsHandler) GetPost(c *gin.Context) {
 			return
 		}
 		if hub == nil || post.HubID == nil || *post.HubID != hub.ID {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Post not found in hub"})
+			RespondError(c, http.StatusNotFound, "Post not found in hub")
 			return
 		}
 	}
@@ -405,7 +435,17 @@ func resolvePostContentType(req CreatePostRequest) string {
 	return "link"
 }
 
-// GetFeed handles GET /api/v1/posts/feed
+// GetFeed returns a paginated feed of posts for a hub.
+// @Summary      Get posts feed
+// @Tags         Posts
+// @Produce      json
+// @Param        hub      query  string  false  "Hub name"
+// @Param        sort     query  string  false  "Sort: hot | new | top"
+// @Param        limit    query  int     false  "Page size (default 20)"
+// @Param        offset   query  int     false  "Offset"
+// @Success      200  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /posts/feed [get]
 func (h *PostsHandler) GetFeed(c *gin.Context) {
 	// Parse query parameters
 	sortBy := c.DefaultQuery("sort", "new") // "new", "hot", "score"
@@ -420,13 +460,13 @@ func (h *PostsHandler) GetFeed(c *gin.Context) {
 	}
 
 	if sourceFilter != "" && sourceFilter != "platform" && sourceFilter != "reddit" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid source filter. Must be 'platform' or 'reddit'"})
+		RespondError(c, http.StatusBadRequest, "Invalid source filter. Must be 'platform' or 'reddit'")
 		return
 	}
 
 	if hubName != "" {
 		if sourceFilter == "reddit" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Cannot filter by hub when requesting Reddit-only feed"})
+			RespondError(c, http.StatusBadRequest, "Cannot filter by hub when requesting Reddit-only feed")
 			return
 		}
 		sr, err := h.hubRepo.GetByName(c.Request.Context(), hubName)
@@ -435,7 +475,7 @@ func (h *PostsHandler) GetFeed(c *gin.Context) {
 			return
 		}
 		if sr == nil {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Hub not found"})
+			RespondError(c, http.StatusNotFound, "Hub not found")
 			return
 		}
 		posts, err := h.postRepo.GetByHub(c.Request.Context(), sr.ID, sortBy, limit, offset)
@@ -468,19 +508,37 @@ func (h *PostsHandler) GetFeed(c *gin.Context) {
 	})
 }
 
-// GetUserPosts handles GET /api/v1/posts/user/:username
+// GetUserPosts returns posts by a specific user (internal helper).
+// @Summary      Get user posts (internal)
+// @Tags         Posts
+// @Produce      json
+// @Success      200  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /posts/user/:username [get]
 func (h *PostsHandler) GetUserPosts(c *gin.Context) {
 	// This would require looking up the user by username first
 	// For now, we'll skip this and implement it later when needed
-	c.JSON(http.StatusNotImplemented, gin.H{"error": "Not implemented yet"})
+	RespondError(c, http.StatusNotImplemented, "Not implemented yet")
 }
 
-// UpdatePost handles PUT /api/v1/posts/:id
+// UpdatePost updates an existing post.
+// @Summary      Update post
+// @Tags         Posts
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Param        id  path  int  true  "Post ID"
+// @Success      200  {object}  models.PlatformPost
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      404  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /posts/{id} [put]
 func (h *PostsHandler) UpdatePost(c *gin.Context) {
 	// Get user ID from context
-	userID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
 		return
 	}
 	role, _ := c.Get("role")
@@ -488,7 +546,7 @@ func (h *PostsHandler) UpdatePost(c *gin.Context) {
 
 	postID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid post ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid post ID")
 		return
 	}
 
@@ -500,20 +558,20 @@ func (h *PostsHandler) UpdatePost(c *gin.Context) {
 	}
 
 	if existingPost == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Post not found"})
+		RespondError(c, http.StatusNotFound, "Post not found")
 		return
 	}
 
 	// Verify user owns this post or is a global moderator/admin or hub moderator
 	isHubMod := false
 	if h.modRepo != nil && existingPost.HubID != nil {
-		if ok, err := h.modRepo.IsModerator(c.Request.Context(), *existingPost.HubID, userID.(int)); err == nil {
+		if ok, err := h.modRepo.IsModerator(c.Request.Context(), *existingPost.HubID, userID); err == nil {
 			isHubMod = ok
 		}
 	}
 
-	if existingPost.AuthorID != userID.(int) && roleStr != "moderator" && roleStr != "admin" && !isHubMod {
-		c.JSON(http.StatusForbidden, gin.H{"error": "You can only edit your own posts"})
+	if existingPost.AuthorID != userID && roleStr != "moderator" && roleStr != "admin" && !isHubMod {
+		RespondError(c, http.StatusForbidden, "You can only edit your own posts")
 		return
 	}
 
@@ -523,7 +581,7 @@ func (h *PostsHandler) UpdatePost(c *gin.Context) {
 		return
 	}
 	if req.Body != nil && len(*req.Body) > maxPostBodyLength {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Post body must be less than 10,000 characters"})
+		RespondError(c, http.StatusBadRequest, "Post body must be less than 10,000 characters")
 		return
 	}
 
@@ -543,16 +601,28 @@ func (h *PostsHandler) UpdatePost(c *gin.Context) {
 	c.JSON(http.StatusOK, existingPost)
 }
 
-// DeletePost handles DELETE /api/v1/posts/:id
+// DeletePost deletes a post.
+// @Summary      Delete post
+// @Tags         Posts
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Param        id  path  int  true  "Post ID"
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      404  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /posts/{id} [delete]
 type DeletePostRequest struct {
 	Reason string `json:"reason"`
 }
 
 func (h *PostsHandler) DeletePost(c *gin.Context) {
 	// Get user ID from context
-	userID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
 		return
 	}
 	role, _ := c.Get("role")
@@ -560,7 +630,7 @@ func (h *PostsHandler) DeletePost(c *gin.Context) {
 
 	postID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid post ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid post ID")
 		return
 	}
 
@@ -582,29 +652,29 @@ func (h *PostsHandler) DeletePost(c *gin.Context) {
 	}
 
 	if existingPost == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Post not found"})
+		RespondError(c, http.StatusNotFound, "Post not found")
 		return
 	}
 
 	// Verify user owns this post or is admin or hub mod
 	isHubMod := false
 	if h.modRepo != nil && existingPost.HubID != nil {
-		if ok, err := h.modRepo.IsModerator(c.Request.Context(), *existingPost.HubID, userID.(int)); err == nil {
+		if ok, err := h.modRepo.IsModerator(c.Request.Context(), *existingPost.HubID, userID); err == nil {
 			isHubMod = ok
 		}
 	}
 
-	if existingPost.AuthorID != userID.(int) && roleStr != "admin" && !isHubMod {
-		c.JSON(http.StatusForbidden, gin.H{"error": "You can only delete your own posts"})
+	if existingPost.AuthorID != userID && roleStr != "admin" && !isHubMod {
+		RespondError(c, http.StatusForbidden, "You can only delete your own posts")
 		return
 	}
 
 	// Check if this is an admin/moderator deletion (not author)
-	isModeratorAction := existingPost.AuthorID != userID.(int) && (roleStr == "admin" || isHubMod)
+	isModeratorAction := existingPost.AuthorID != userID && (roleStr == "admin" || isHubMod)
 
 	// If it's a moderator action and no reason provided, require one
 	if isModeratorAction && req.Reason == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Deletion reason is required for moderator actions"})
+		RespondError(c, http.StatusBadRequest, "Deletion reason is required for moderator actions")
 		return
 	}
 
@@ -615,7 +685,7 @@ func (h *PostsHandler) DeletePost(c *gin.Context) {
 
 	// Send modmail notification if this is a moderator action
 	if isModeratorAction && req.Reason != "" && existingPost.HubID != nil {
-		go h.sendPostDeletionModMail(existingPost, userID.(int), req.Reason, roleStr)
+		go h.sendPostDeletionModMail(existingPost, userID, req.Reason, roleStr)
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Post deleted successfully"})
@@ -728,18 +798,29 @@ func (h *PostsHandler) sendPostDeletionModMail(post *models.PlatformPost, modera
 	tx.Commit(ctx)
 }
 
-// VotePost handles POST /api/v1/posts/:id/vote
+// VotePost votes on a post (upvote, downvote, or clear).
+// @Summary      Vote on post
+// @Tags         Posts
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Param        id  path  int  true  "Post ID"
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      404  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /posts/{id}/vote [post]
 func (h *PostsHandler) VotePost(c *gin.Context) {
 	// Get user ID from context
-	userID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
 		return
 	}
 
 	postID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid post ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid post ID")
 		return
 	}
 
@@ -751,7 +832,7 @@ func (h *PostsHandler) VotePost(c *gin.Context) {
 		return
 	}
 
-	if err := h.postRepo.Vote(c.Request.Context(), postID, userID.(int), req.IsUpvote); err != nil {
+	if err := h.postRepo.Vote(c.Request.Context(), postID, userID, req.IsUpvote); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to vote on post", "details": err.Error()})
 		return
 	}

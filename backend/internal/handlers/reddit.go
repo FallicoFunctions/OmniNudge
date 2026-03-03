@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"github.com/omninudge/backend/internal/ports"
 	"context"
 	"encoding/json"
 	"errors"
@@ -25,7 +26,7 @@ const redditCacheTTL = 15 * time.Minute
 // RedditHandler handles HTTP requests for browsing Reddit content
 type RedditHandler struct {
 	redditClient *services.RedditClient
-	redditRepo   *models.RedditPostRepository
+	redditRepo   ports.RedditPostRepository
 }
 
 // ProxyRedditMedia handles GET /api/v1/reddit/media/proxy?url=...
@@ -42,25 +43,25 @@ func (h *RedditHandler) ProxyRedditMedia(c *gin.Context) {
 		}
 	}
 	if rawURL == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "url query param is required"})
+		RespondError(c, http.StatusBadRequest, "url query param is required")
 		return
 	}
 
 	parsedURL, err := url.Parse(rawURL)
 	if err != nil || parsedURL.Scheme != "https" || parsedURL.Host == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid url"})
+		RespondError(c, http.StatusBadRequest, "invalid url")
 		return
 	}
 
 	host := strings.ToLower(parsedURL.Host)
 	if host != "v.redd.it" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "unsupported host"})
+		RespondError(c, http.StatusBadRequest, "unsupported host")
 		return
 	}
 
 	req, err := http.NewRequestWithContext(c.Request.Context(), http.MethodGet, parsedURL.String(), nil)
 	if err != nil {
-		c.JSON(http.StatusBadGateway, gin.H{"error": "failed to create proxy request"})
+		RespondError(c, http.StatusBadGateway, "failed to create proxy request")
 		return
 	}
 
@@ -75,7 +76,7 @@ func (h *RedditHandler) ProxyRedditMedia(c *gin.Context) {
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		c.JSON(http.StatusBadGateway, gin.H{"error": "failed to fetch media"})
+		RespondError(c, http.StatusBadGateway, "failed to fetch media")
 		return
 	}
 	defer resp.Body.Close()
@@ -99,7 +100,7 @@ func (h *RedditHandler) ProxyRedditMedia(c *gin.Context) {
 }
 
 // NewRedditHandler creates a new Reddit handler
-func NewRedditHandler(redditClient *services.RedditClient, redditRepo *models.RedditPostRepository) *RedditHandler {
+func NewRedditHandler(redditClient *services.RedditClient, redditRepo ports.RedditPostRepository) *RedditHandler {
 	return &RedditHandler{
 		redditClient: redditClient,
 		redditRepo:   redditRepo,
@@ -115,7 +116,7 @@ func NewRedditHandlerForTest(redditClient *services.RedditClient) *RedditHandler
 func (h *RedditHandler) GetSubredditPosts(c *gin.Context) {
 	subreddit := c.Param("subreddit")
 	if subreddit == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Subreddit name is required"})
+		RespondError(c, http.StatusBadRequest, "Subreddit name is required")
 		return
 	}
 
@@ -160,7 +161,7 @@ func (h *RedditHandler) GetSubredditPosts(c *gin.Context) {
 func (h *RedditHandler) GetSubredditAbout(c *gin.Context) {
 	subreddit := c.Param("subreddit")
 	if subreddit == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Subreddit name is required"})
+		RespondError(c, http.StatusBadRequest, "Subreddit name is required")
 		return
 	}
 
@@ -220,7 +221,7 @@ func (h *RedditHandler) GetPostComments(c *gin.Context) {
 	postID := c.Param("postId")
 
 	if subreddit == "" || postID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Subreddit and post ID are required"})
+		RespondError(c, http.StatusBadRequest, "Subreddit and post ID are required")
 		return
 	}
 
@@ -250,7 +251,7 @@ func (h *RedditHandler) GetPostGalleryImages(c *gin.Context) {
 	postID := c.Param("postId")
 
 	if subreddit == "" || postID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Subreddit and post ID are required"})
+		RespondError(c, http.StatusBadRequest, "Subreddit and post ID are required")
 		return
 	}
 
@@ -265,39 +266,39 @@ func (h *RedditHandler) GetPostGalleryImages(c *gin.Context) {
 	// Reddit returns an array: [post_listing, comments_listing]
 	resultArray, ok := result.([]interface{})
 	if !ok || len(resultArray) == 0 {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid response format from Reddit"})
+		RespondError(c, http.StatusInternalServerError, "Invalid response format from Reddit")
 		return
 	}
 
 	// Get the post listing (first element)
 	postListing, ok := resultArray[0].(map[string]interface{})
 	if !ok {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid post listing format"})
+		RespondError(c, http.StatusInternalServerError, "Invalid post listing format")
 		return
 	}
 
 	// Navigate to post data
 	data, ok := postListing["data"].(map[string]interface{})
 	if !ok {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid post data format"})
+		RespondError(c, http.StatusInternalServerError, "Invalid post data format")
 		return
 	}
 
 	children, ok := data["children"].([]interface{})
 	if !ok || len(children) == 0 {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "No post found"})
+		RespondError(c, http.StatusInternalServerError, "No post found")
 		return
 	}
 
 	child, ok := children[0].(map[string]interface{})
 	if !ok {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid child format"})
+		RespondError(c, http.StatusInternalServerError, "Invalid child format")
 		return
 	}
 
 	postData, ok := child["data"].(map[string]interface{})
 	if !ok {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid post data"})
+		RespondError(c, http.StatusInternalServerError, "Invalid post data")
 		return
 	}
 
@@ -359,7 +360,7 @@ func (h *RedditHandler) GetPostGalleryImages(c *gin.Context) {
 func (h *RedditHandler) SearchPosts(c *gin.Context) {
 	query := c.Query("q")
 	if query == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Search query is required"})
+		RespondError(c, http.StatusBadRequest, "Search query is required")
 		return
 	}
 
@@ -405,7 +406,7 @@ func (h *RedditHandler) SearchPosts(c *gin.Context) {
 func (h *RedditHandler) SearchRedditUsers(c *gin.Context) {
 	query := strings.TrimSpace(c.Query("q"))
 	if query == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Search query is required"})
+		RespondError(c, http.StatusBadRequest, "Search query is required")
 		return
 	}
 
@@ -461,7 +462,7 @@ func (h *RedditHandler) SearchRedditUsers(c *gin.Context) {
 func (h *RedditHandler) AutocompleteSubreddits(c *gin.Context) {
 	query := strings.TrimSpace(c.Query("q"))
 	if query == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Query is required"})
+		RespondError(c, http.StatusBadRequest, "Query is required")
 		return
 	}
 
@@ -485,7 +486,7 @@ func (h *RedditHandler) AutocompleteSubreddits(c *gin.Context) {
 func (h *RedditHandler) SearchSubreddits(c *gin.Context) {
 	query := strings.TrimSpace(c.Query("q"))
 	if query == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Query is required"})
+		RespondError(c, http.StatusBadRequest, "Query is required")
 		return
 	}
 
@@ -527,7 +528,7 @@ func (h *RedditHandler) GetRedditUserListing(c *gin.Context) {
 	username := c.Param("username")
 	section := strings.ToLower(c.Param("section"))
 	if username == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Username is required"})
+		RespondError(c, http.StatusBadRequest, "Username is required")
 		return
 	}
 	if section == "" {
@@ -536,7 +537,7 @@ func (h *RedditHandler) GetRedditUserListing(c *gin.Context) {
 	switch section {
 	case "overview", "comments", "submitted":
 	default:
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid section"})
+		RespondError(c, http.StatusBadRequest, "Invalid section")
 		return
 	}
 	sort := c.DefaultQuery("sort", "new")
@@ -563,7 +564,7 @@ func (h *RedditHandler) GetRedditUserListing(c *gin.Context) {
 func (h *RedditHandler) GetRedditUserAbout(c *gin.Context) {
 	username := c.Param("username")
 	if username == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Username is required"})
+		RespondError(c, http.StatusBadRequest, "Username is required")
 		return
 	}
 
@@ -580,7 +581,7 @@ func (h *RedditHandler) GetRedditUserAbout(c *gin.Context) {
 func (h *RedditHandler) GetRedditUserTrophies(c *gin.Context) {
 	username := c.Param("username")
 	if username == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Username is required"})
+		RespondError(c, http.StatusBadRequest, "Username is required")
 		return
 	}
 
@@ -597,7 +598,7 @@ func (h *RedditHandler) GetRedditUserTrophies(c *gin.Context) {
 func (h *RedditHandler) GetRedditUserModerated(c *gin.Context) {
 	username := c.Param("username")
 	if username == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Username is required"})
+		RespondError(c, http.StatusBadRequest, "Username is required")
 		return
 	}
 
@@ -615,7 +616,7 @@ func (h *RedditHandler) GetRedditUserModerated(c *gin.Context) {
 func (h *RedditHandler) GetSubredditMedia(c *gin.Context) {
 	subreddit := c.Param("subreddit")
 	if subreddit == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Subreddit name is required"})
+		RespondError(c, http.StatusBadRequest, "Subreddit name is required")
 		return
 	}
 
@@ -874,7 +875,7 @@ func (h *RedditHandler) GetSubredditWikiPage(c *gin.Context) {
 	revision := c.Query("revision")
 
 	if subreddit == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Subreddit name is required"})
+		RespondError(c, http.StatusBadRequest, "Subreddit name is required")
 		return
 	}
 
@@ -893,11 +894,11 @@ func (h *RedditHandler) GetSubredditWikiPage(c *gin.Context) {
 	wikiPage, err := h.redditClient.GetSubredditWikiPage(ctx, subreddit, pagePath, revision)
 	if err != nil {
 		if errors.Is(err, services.ErrRedditNotFound) {
-			c.JSON(http.StatusNotFound, gin.H{"error": fmt.Sprintf("Wiki page not found: %s", pagePath)})
+			RespondError(c, http.StatusNotFound, fmt.Sprintf("Wiki page not found: %s", pagePath))
 			return
 		}
 		log.Printf("Error fetching wiki page for r/%s/wiki/%s: %v", subreddit, pagePath, err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch wiki page"})
+		RespondError(c, http.StatusInternalServerError, "Failed to fetch wiki page")
 		return
 	}
 
@@ -912,7 +913,7 @@ func (h *RedditHandler) CompareSubredditWikiRevisions(c *gin.Context) {
 	toRevision := strings.TrimSpace(c.Query("to"))
 
 	if subreddit == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Subreddit name is required"})
+		RespondError(c, http.StatusBadRequest, "Subreddit name is required")
 		return
 	}
 
@@ -923,11 +924,11 @@ func (h *RedditHandler) CompareSubredditWikiRevisions(c *gin.Context) {
 		pagePath = "index"
 	}
 	if fromRevision == "" || toRevision == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Both from and to revision IDs are required"})
+		RespondError(c, http.StatusBadRequest, "Both from and to revision IDs are required")
 		return
 	}
 	if fromRevision == toRevision {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Revision IDs must be different"})
+		RespondError(c, http.StatusBadRequest, "Revision IDs must be different")
 		return
 	}
 
@@ -935,22 +936,22 @@ func (h *RedditHandler) CompareSubredditWikiRevisions(c *gin.Context) {
 	fromData, err := h.redditClient.GetSubredditWikiPage(ctx, subreddit, pagePath, fromRevision)
 	if err != nil {
 		if errors.Is(err, services.ErrRedditNotFound) {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Older revision not found"})
+			RespondError(c, http.StatusNotFound, "Older revision not found")
 			return
 		}
 		log.Printf("Error fetching from revision for r/%s/wiki/%s: %v", subreddit, pagePath, err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch older revision"})
+		RespondError(c, http.StatusInternalServerError, "Failed to fetch older revision")
 		return
 	}
 
 	toData, err := h.redditClient.GetSubredditWikiPage(ctx, subreddit, pagePath, toRevision)
 	if err != nil {
 		if errors.Is(err, services.ErrRedditNotFound) {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Newer revision not found"})
+			RespondError(c, http.StatusNotFound, "Newer revision not found")
 			return
 		}
 		log.Printf("Error fetching to revision for r/%s/wiki/%s: %v", subreddit, pagePath, err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch newer revision"})
+		RespondError(c, http.StatusInternalServerError, "Failed to fetch newer revision")
 		return
 	}
 
@@ -976,11 +977,11 @@ func (h *RedditHandler) GetWikiPage(c *gin.Context) {
 	wikiPage, err := h.redditClient.GetWikiPage(ctx, pagePath)
 	if err != nil {
 		if errors.Is(err, services.ErrRedditNotFound) {
-			c.JSON(http.StatusNotFound, gin.H{"error": fmt.Sprintf("Wiki page not found: %s", pagePath)})
+			RespondError(c, http.StatusNotFound, fmt.Sprintf("Wiki page not found: %s", pagePath))
 			return
 		}
 		log.Printf("Error fetching wiki page wiki/%s: %v", pagePath, err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch wiki page"})
+		RespondError(c, http.StatusInternalServerError, "Failed to fetch wiki page")
 		return
 	}
 
@@ -992,7 +993,7 @@ func (h *RedditHandler) GetSubredditWikiRevisions(c *gin.Context) {
 	subreddit := c.Param("subreddit")
 	pagePath := resolveWikiPagePath(c, "pagePath", "rest")
 	if subreddit == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Subreddit name is required"})
+		RespondError(c, http.StatusBadRequest, "Subreddit name is required")
 		return
 	}
 	if pagePath == "" {
@@ -1004,11 +1005,11 @@ func (h *RedditHandler) GetSubredditWikiRevisions(c *gin.Context) {
 	listing, err := h.redditClient.GetSubredditWikiRevisions(c.Request.Context(), subreddit, pagePath, limit, after)
 	if err != nil {
 		if errors.Is(err, services.ErrRedditNotFound) {
-			c.JSON(http.StatusNotFound, gin.H{"error": fmt.Sprintf("Wiki page not found: %s", pagePath)})
+			RespondError(c, http.StatusNotFound, fmt.Sprintf("Wiki page not found: %s", pagePath))
 			return
 		}
 		log.Printf("Error fetching wiki revisions for r/%s/wiki/%s: %v", subreddit, pagePath, err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch wiki revisions"})
+		RespondError(c, http.StatusInternalServerError, "Failed to fetch wiki revisions")
 		return
 	}
 
@@ -1026,7 +1027,7 @@ func (h *RedditHandler) GetSubredditWikiDiscussions(c *gin.Context) {
 	subreddit := c.Param("subreddit")
 	pagePath := resolveWikiPagePath(c, "pagePath", "rest")
 	if subreddit == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Subreddit name is required"})
+		RespondError(c, http.StatusBadRequest, "Subreddit name is required")
 		return
 	}
 	if pagePath == "" {
@@ -1039,11 +1040,11 @@ func (h *RedditHandler) GetSubredditWikiDiscussions(c *gin.Context) {
 	listing, err := h.redditClient.GetSubredditWikiDiscussions(c.Request.Context(), subreddit, pagePath, limit, after)
 	if err != nil {
 		if errors.Is(err, services.ErrRedditNotFound) {
-			c.JSON(http.StatusNotFound, gin.H{"error": fmt.Sprintf("Wiki page not found: %s", pagePath)})
+			RespondError(c, http.StatusNotFound, fmt.Sprintf("Wiki page not found: %s", pagePath))
 			return
 		}
 		log.Printf("Error fetching wiki discussions for r/%s/wiki/%s: %v", subreddit, pagePath, err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch wiki discussions"})
+		RespondError(c, http.StatusInternalServerError, "Failed to fetch wiki discussions")
 		return
 	}
 

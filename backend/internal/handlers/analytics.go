@@ -17,8 +17,15 @@ func NewAnalyticsHandler(svc *services.AnalyticsService) *AnalyticsHandler {
 	return &AnalyticsHandler{svc: svc}
 }
 
-// TrackEvent records an analytics event
-// POST /api/v1/analytics/track
+// TrackEvent records an analytics event.
+// @Summary      Track analytics event
+// @Tags         Analytics
+// @Accept       json
+// @Produce      json
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /analytics/track [post]
 func (h *AnalyticsHandler) TrackEvent(c *gin.Context) {
 	userID := c.GetInt("user_id") // May be 0 if not authenticated
 
@@ -30,7 +37,7 @@ func (h *AnalyticsHandler) TrackEvent(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request"})
+		RespondError(c, http.StatusBadRequest, "Invalid request")
 		return
 	}
 
@@ -58,15 +65,22 @@ func (h *AnalyticsHandler) TrackEvent(c *gin.Context) {
 	}
 
 	if err := h.svc.TrackEvent(c.Request.Context(), event); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to track event"})
+		RespondError(c, http.StatusInternalServerError, "Failed to track event")
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{"status": "tracked"})
 }
 
-// StartSession creates a new session
-// POST /api/v1/analytics/session/start
+// StartSession creates a new analytics session.
+// @Summary      Start analytics session
+// @Tags         Analytics
+// @Accept       json
+// @Produce      json
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /analytics/session/start [post]
 func (h *AnalyticsHandler) StartSession(c *gin.Context) {
 	userID := c.GetInt("user_id")
 
@@ -76,19 +90,19 @@ func (h *AnalyticsHandler) StartSession(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		RespondError(c, http.StatusBadRequest, err.Error())
 		return
 	}
 
 	sessionID, err := uuid.Parse(req.SessionID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid session ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid session ID")
 		return
 	}
 
 	anonymousID, err := uuid.Parse(req.AnonymousID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid anonymous ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid anonymous ID")
 		return
 	}
 
@@ -98,45 +112,60 @@ func (h *AnalyticsHandler) StartSession(c *gin.Context) {
 	}
 
 	if err := h.svc.StartSession(c.Request.Context(), sessionID, anonymousID, uidPtr, c.Request.UserAgent(), c.ClientIP()); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to start session"})
+		RespondError(c, http.StatusInternalServerError, "Failed to start session")
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{"status": "started"})
 }
 
-// EndSession ends a session
-// POST /api/v1/analytics/session/end
+// EndSession ends an analytics session.
+// @Summary      End analytics session
+// @Tags         Analytics
+// @Accept       json
+// @Produce      json
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /analytics/session/end [post]
 func (h *AnalyticsHandler) EndSession(c *gin.Context) {
 	var req struct {
 		SessionID string `json:"session_id" binding:"required"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		RespondError(c, http.StatusBadRequest, err.Error())
 		return
 	}
 
 	sessionID, err := uuid.Parse(req.SessionID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid session ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid session ID")
 		return
 	}
 
 	if err := h.svc.EndSession(c.Request.Context(), sessionID); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to end session"})
+		RespondError(c, http.StatusInternalServerError, "Failed to end session")
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{"status": "ended"})
 }
 
-// Identify links an anonymous ID to a logged-in user
-// POST /api/v1/analytics/identify
+// Identify links an anonymous ID to a logged-in user.
+// @Summary      Identify analytics user
+// @Tags         Analytics
+// @Accept       json
+// @Produce      json
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /analytics/identify [post]
 func (h *AnalyticsHandler) Identify(c *gin.Context) {
 	userID := c.GetInt("user_id")
 	if userID == 0 {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Authentication required"})
+		RespondError(c, http.StatusUnauthorized, "Authentication required")
 		return
 	}
 
@@ -145,37 +174,44 @@ func (h *AnalyticsHandler) Identify(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		RespondError(c, http.StatusBadRequest, err.Error())
 		return
 	}
 
 	anonymousID, err := uuid.Parse(req.AnonymousID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid anonymous ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid anonymous ID")
 		return
 	}
 
 	if err := h.svc.AliasUser(c.Request.Context(), userID, anonymousID); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to alias user"})
+		RespondError(c, http.StatusInternalServerError, "Failed to alias user")
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{"status": "identified"})
 }
 
-// GetDashboard returns analytics dashboard data (admin only)
-// GET /api/v1/admin/analytics/dashboard
+// GetDashboard returns analytics dashboard data.
+// @Summary      Get analytics dashboard
+// @Tags         Admin
+// @Security     BearerAuth
+// @Produce      json
+// @Success      200  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /admin/analytics/dashboard [get]
 func (h *AnalyticsHandler) GetDashboard(c *gin.Context) {
 	days := 30
 	dau, err := h.svc.GetDailyActiveUsers(c.Request.Context(), days)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get DAU"})
+		RespondError(c, http.StatusInternalServerError, "Failed to get DAU")
 		return
 	}
 
 	topEvents, err := h.svc.GetTopEvents(c.Request.Context(), 10)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get top events"})
+		RespondError(c, http.StatusInternalServerError, "Failed to get top events")
 		return
 	}
 
@@ -191,11 +227,18 @@ func (h *AnalyticsHandler) GetDashboard(c *gin.Context) {
 	})
 }
 
-// RefreshAnalytics manually refreshes materialized views (admin only)
-// POST /api/v1/admin/analytics/refresh
+// RefreshAnalytics manually refreshes analytics materialized views.
+// @Summary      Refresh analytics views
+// @Tags         Admin
+// @Security     BearerAuth
+// @Produce      json
+// @Success      200  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /admin/analytics/refresh [post]
 func (h *AnalyticsHandler) RefreshAnalytics(c *gin.Context) {
 	if err := h.svc.RefreshMaterializedViews(c.Request.Context()); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to refresh views"})
+		RespondError(c, http.StatusInternalServerError, "Failed to refresh views")
 		return
 	}
 

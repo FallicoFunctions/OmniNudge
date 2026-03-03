@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"github.com/omninudge/backend/internal/ports"
+	"github.com/omninudge/backend/internal/api/middleware"
 	"context"
 	"errors"
 	"fmt"
@@ -16,10 +18,10 @@ import (
 
 // SavedItemsHandler manages saved posts and comments
 type SavedItemsHandler struct {
-	savedRepo         *models.SavedItemsRepository
-	postRepo          *models.PlatformPostRepository
-	postCommentRepo   *models.PostCommentRepository
-	redditCommentRepo *models.RedditPostCommentRepository
+	savedRepo         ports.SavedItemsRepository
+	postRepo          ports.PlatformPostRepository
+	postCommentRepo   ports.PostCommentRepository
+	redditCommentRepo ports.RedditPostCommentRepository
 	redditClient      redditPostFetcher
 }
 
@@ -42,7 +44,7 @@ type saveRedditPostRequest struct {
 }
 
 // NewSavedItemsHandler constructs the handler
-func NewSavedItemsHandler(savedRepo *models.SavedItemsRepository, postRepo *models.PlatformPostRepository, postCommentRepo *models.PostCommentRepository, redditCommentRepo *models.RedditPostCommentRepository, redditClient redditPostFetcher) *SavedItemsHandler {
+func NewSavedItemsHandler(savedRepo ports.SavedItemsRepository, postRepo ports.PlatformPostRepository, postCommentRepo ports.PostCommentRepository, redditCommentRepo ports.RedditPostCommentRepository, redditClient redditPostFetcher) *SavedItemsHandler {
 	return &SavedItemsHandler{
 		savedRepo:         savedRepo,
 		postRepo:          postRepo,
@@ -52,21 +54,27 @@ func NewSavedItemsHandler(savedRepo *models.SavedItemsRepository, postRepo *mode
 	}
 }
 
-// GetSavedItems handles GET /api/v1/users/me/saved
+// GetSavedItems returns saved posts and comments for the current user.
+// @Summary      Get saved items
+// @Tags         SavedItems
+// @Security     BearerAuth
+// @Produce      json
+// @Success      200  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /users/me/saved [get]
 func (h *SavedItemsHandler) GetSavedItems(c *gin.Context) {
-	userID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+	intUserID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
 		return
 	}
-	intUserID := userID.(int)
 	filterType := c.DefaultQuery("type", "all")
 	validTypes := map[string]bool{
 		"all": true, "posts": true, "reddit_posts": true,
 		"post_comments": true, "reddit_comments": true, "reddit_api_comments": true,
 	}
 	if !validTypes[filterType] {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid type filter. Use all, posts, reddit_posts, post_comments, reddit_comments, or reddit_api_comments"})
+		RespondError(c, http.StatusBadRequest, "Invalid type filter. Use all, posts, reddit_posts, post_comments, reddit_comments, or reddit_api_comments")
 		return
 	}
 
@@ -223,11 +231,18 @@ func normalizeSavedText(value string) string {
 	return strings.ToLower(strings.TrimSpace(value))
 }
 
-// GetHiddenItems handles GET /api/v1/users/me/hidden
+// GetHiddenItems returns hidden posts for the current user.
+// @Summary      Get hidden items
+// @Tags         SavedItems
+// @Security     BearerAuth
+// @Produce      json
+// @Success      200  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /users/me/hidden [get]
 func (h *SavedItemsHandler) GetHiddenItems(c *gin.Context) {
-	userID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
 		return
 	}
 
@@ -236,13 +251,13 @@ func (h *SavedItemsHandler) GetHiddenItems(c *gin.Context) {
 		"all": true, "posts": true, "reddit_posts": true,
 	}
 	if !validTypes[filterType] {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid type filter. Use all, posts, or reddit_posts"})
+		RespondError(c, http.StatusBadRequest, "Invalid type filter. Use all, posts, or reddit_posts")
 		return
 	}
 
 	response := gin.H{}
 	if filterType == "all" || filterType == "posts" {
-		posts, err := h.savedRepo.GetHiddenPosts(c.Request.Context(), userID.(int))
+		posts, err := h.savedRepo.GetHiddenPosts(c.Request.Context(), userID)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch hidden posts", "details": err.Error()})
 			return
@@ -251,7 +266,7 @@ func (h *SavedItemsHandler) GetHiddenItems(c *gin.Context) {
 	}
 
 	if filterType == "all" || filterType == "reddit_posts" {
-		redditPosts, err := h.savedRepo.GetHiddenRedditPosts(c.Request.Context(), userID.(int))
+		redditPosts, err := h.savedRepo.GetHiddenRedditPosts(c.Request.Context(), userID)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch hidden Reddit posts", "details": err.Error()})
 			return
@@ -263,17 +278,25 @@ func (h *SavedItemsHandler) GetHiddenItems(c *gin.Context) {
 	c.JSON(http.StatusOK, response)
 }
 
-// SavePost handles POST /api/v1/posts/:id/save
+// SavePost saves a platform post.
+// @Summary      Save post
+// @Tags         SavedItems
+// @Security     BearerAuth
+// @Produce      json
+// @Param        id  path  int  true  "Post ID"
+// @Success      200  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /posts/{id}/save [post]
 func (h *SavedItemsHandler) SavePost(c *gin.Context) {
-	userID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
 		return
 	}
 
 	postID, err := strconv.Atoi(c.Param("id"))
 	if err != nil || postID <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid post ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid post ID")
 		return
 	}
 
@@ -283,21 +306,21 @@ func (h *SavedItemsHandler) SavePost(c *gin.Context) {
 		return
 	}
 	if post == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Post not found"})
+		RespondError(c, http.StatusNotFound, "Post not found")
 		return
 	}
 
-	alreadySaved, err := h.savedRepo.IsPostSaved(c.Request.Context(), userID.(int), postID)
+	alreadySaved, err := h.savedRepo.IsPostSaved(c.Request.Context(), userID, postID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check saved status", "details": err.Error()})
 		return
 	}
 	if alreadySaved {
-		c.JSON(http.StatusConflict, gin.H{"error": "Post already saved"})
+		RespondError(c, http.StatusConflict, "Post already saved")
 		return
 	}
 
-	if err := h.savedRepo.SavePost(c.Request.Context(), userID.(int), postID); err != nil {
+	if err := h.savedRepo.SavePost(c.Request.Context(), userID, postID); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save post", "details": err.Error()})
 		return
 	}
@@ -308,21 +331,29 @@ func (h *SavedItemsHandler) SavePost(c *gin.Context) {
 	})
 }
 
-// UnsavePost handles DELETE /api/v1/posts/:id/save
+// UnsavePost removes a platform post from saved items.
+// @Summary      Unsave post
+// @Tags         SavedItems
+// @Security     BearerAuth
+// @Produce      json
+// @Param        id  path  int  true  "Post ID"
+// @Success      200  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /posts/{id}/save [delete]
 func (h *SavedItemsHandler) UnsavePost(c *gin.Context) {
-	userID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
 		return
 	}
 
 	postID, err := strconv.Atoi(c.Param("id"))
 	if err != nil || postID <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid post ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid post ID")
 		return
 	}
 
-	if err := h.savedRepo.RemovePost(c.Request.Context(), userID.(int), postID); err != nil {
+	if err := h.savedRepo.RemovePost(c.Request.Context(), userID, postID); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to unsave post", "details": err.Error()})
 		return
 	}
@@ -333,17 +364,27 @@ func (h *SavedItemsHandler) UnsavePost(c *gin.Context) {
 	})
 }
 
-// SaveRedditComment handles POST /api/v1/reddit/posts/:subreddit/:postId/comments/:commentId/save
+// SaveRedditComment saves a Reddit comment.
+// @Summary      Save Reddit comment
+// @Tags         SavedItems
+// @Security     BearerAuth
+// @Produce      json
+// @Param        subreddit  path  string  true  "Subreddit"
+// @Param        postId     path  string  true  "Post ID"
+// @Param        commentId  path  string  true  "Comment ID"
+// @Success      200  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /reddit/posts/{subreddit}/{postId}/comments/{commentId}/save [post]
 func (h *SavedItemsHandler) SaveRedditComment(c *gin.Context) {
-	userID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
 		return
 	}
 
 	commentID, err := strconv.Atoi(c.Param("commentId"))
 	if err != nil || commentID <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid comment ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid comment ID")
 		return
 	}
 
@@ -353,17 +394,17 @@ func (h *SavedItemsHandler) SaveRedditComment(c *gin.Context) {
 		return
 	}
 	if comment == nil || comment.DeletedAt != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Comment not found"})
+		RespondError(c, http.StatusNotFound, "Comment not found")
 		return
 	}
 
 	// Ensure comment belongs to route context
 	if comment.Subreddit != c.Param("subreddit") || comment.RedditPostID != c.Param("postId") {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Comment does not belong to this post"})
+		RespondError(c, http.StatusBadRequest, "Comment does not belong to this post")
 		return
 	}
 
-	if err := h.savedRepo.SaveRedditComment(c.Request.Context(), userID.(int), commentID); err != nil {
+	if err := h.savedRepo.SaveRedditComment(c.Request.Context(), userID, commentID); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save comment", "details": err.Error()})
 		return
 	}
@@ -371,21 +412,31 @@ func (h *SavedItemsHandler) SaveRedditComment(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"saved": true})
 }
 
-// UnsaveRedditComment handles DELETE /api/v1/reddit/posts/:subreddit/:postId/comments/:commentId/save
+// UnsaveRedditComment removes a Reddit comment from saved items.
+// @Summary      Unsave Reddit comment
+// @Tags         SavedItems
+// @Security     BearerAuth
+// @Produce      json
+// @Param        subreddit  path  string  true  "Subreddit"
+// @Param        postId     path  string  true  "Post ID"
+// @Param        commentId  path  string  true  "Comment ID"
+// @Success      200  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /reddit/posts/{subreddit}/{postId}/comments/{commentId}/save [delete]
 func (h *SavedItemsHandler) UnsaveRedditComment(c *gin.Context) {
-	userID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
 		return
 	}
 
 	commentID, err := strconv.Atoi(c.Param("commentId"))
 	if err != nil || commentID <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid comment ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid comment ID")
 		return
 	}
 
-	if err := h.savedRepo.RemoveRedditComment(c.Request.Context(), userID.(int), commentID); err != nil {
+	if err := h.savedRepo.RemoveRedditComment(c.Request.Context(), userID, commentID); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to unsave comment", "details": err.Error()})
 		return
 	}
@@ -393,11 +444,20 @@ func (h *SavedItemsHandler) UnsaveRedditComment(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"saved": false})
 }
 
-// SaveRedditAPIComment handles POST /api/v1/reddit/api-comments/save
+// SaveRedditAPIComment saves a Reddit API comment by ID.
+// @Summary      Save Reddit API comment
+// @Tags         SavedItems
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /reddit/api-comments/save [post]
 func (h *SavedItemsHandler) SaveRedditAPIComment(c *gin.Context) {
-	userID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
 		return
 	}
 
@@ -432,7 +492,7 @@ func (h *SavedItemsHandler) SaveRedditAPIComment(c *gin.Context) {
 		ParentID:        req.ParentID,
 	}
 
-	if err := h.savedRepo.SaveRedditAPIComment(c.Request.Context(), userID.(int), comment); err != nil {
+	if err := h.savedRepo.SaveRedditAPIComment(c.Request.Context(), userID, comment); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save comment", "details": err.Error()})
 		return
 	}
@@ -440,21 +500,29 @@ func (h *SavedItemsHandler) SaveRedditAPIComment(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"saved": true})
 }
 
-// UnsaveRedditAPIComment handles DELETE /api/v1/reddit/api-comments/:commentId/save
+// UnsaveRedditAPIComment removes a Reddit API comment from saved items.
+// @Summary      Unsave Reddit API comment
+// @Tags         SavedItems
+// @Security     BearerAuth
+// @Produce      json
+// @Param        commentId  path  string  true  "Comment ID"
+// @Success      200  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /reddit/api-comments/{commentId}/save [delete]
 func (h *SavedItemsHandler) UnsaveRedditAPIComment(c *gin.Context) {
-	userID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
 		return
 	}
 
 	redditCommentID := c.Param("commentId")
 	if redditCommentID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid comment ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid comment ID")
 		return
 	}
 
-	if err := h.savedRepo.RemoveRedditAPIComment(c.Request.Context(), userID.(int), redditCommentID); err != nil {
+	if err := h.savedRepo.RemoveRedditAPIComment(c.Request.Context(), userID, redditCommentID); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to unsave comment", "details": err.Error()})
 		return
 	}
@@ -462,17 +530,25 @@ func (h *SavedItemsHandler) UnsaveRedditAPIComment(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"saved": false})
 }
 
-// SavePostComment handles POST /api/v1/comments/:commentId/save
+// SavePostComment saves a platform post comment.
+// @Summary      Save post comment
+// @Tags         SavedItems
+// @Security     BearerAuth
+// @Produce      json
+// @Param        commentId  path  int  true  "Comment ID"
+// @Success      200  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /comments/{commentId}/save [post]
 func (h *SavedItemsHandler) SavePostComment(c *gin.Context) {
-	userID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
 		return
 	}
 
 	commentID, err := strconv.Atoi(c.Param("commentId"))
 	if err != nil || commentID <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid comment ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid comment ID")
 		return
 	}
 
@@ -482,11 +558,11 @@ func (h *SavedItemsHandler) SavePostComment(c *gin.Context) {
 		return
 	}
 	if comment == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Comment not found"})
+		RespondError(c, http.StatusNotFound, "Comment not found")
 		return
 	}
 
-	if err := h.savedRepo.SavePostComment(c.Request.Context(), userID.(int), commentID); err != nil {
+	if err := h.savedRepo.SavePostComment(c.Request.Context(), userID, commentID); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save comment", "details": err.Error()})
 		return
 	}
@@ -494,21 +570,29 @@ func (h *SavedItemsHandler) SavePostComment(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"saved": true})
 }
 
-// UnsavePostComment handles DELETE /api/v1/comments/:commentId/save
+// UnsavePostComment removes a platform comment from saved items.
+// @Summary      Unsave post comment
+// @Tags         SavedItems
+// @Security     BearerAuth
+// @Produce      json
+// @Param        commentId  path  int  true  "Comment ID"
+// @Success      200  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /comments/{commentId}/save [delete]
 func (h *SavedItemsHandler) UnsavePostComment(c *gin.Context) {
-	userID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
 		return
 	}
 
 	commentID, err := strconv.Atoi(c.Param("commentId"))
 	if err != nil || commentID <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid comment ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid comment ID")
 		return
 	}
 
-	if err := h.savedRepo.RemovePostComment(c.Request.Context(), userID.(int), commentID); err != nil {
+	if err := h.savedRepo.RemovePostComment(c.Request.Context(), userID, commentID); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to unsave comment", "details": err.Error()})
 		return
 	}
@@ -516,11 +600,20 @@ func (h *SavedItemsHandler) UnsavePostComment(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"saved": false})
 }
 
-// SaveRedditPost handles POST /api/v1/reddit/posts/:subreddit/:postId/save
+// SaveRedditPost saves a Reddit post.
+// @Summary      Save Reddit post
+// @Tags         SavedItems
+// @Security     BearerAuth
+// @Produce      json
+// @Param        subreddit  path  string  true  "Subreddit"
+// @Param        postId     path  string  true  "Post ID"
+// @Success      200  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /reddit/posts/{subreddit}/{postId}/save [post]
 func (h *SavedItemsHandler) SaveRedditPost(c *gin.Context) {
-	userID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
 		return
 	}
 
@@ -528,7 +621,7 @@ func (h *SavedItemsHandler) SaveRedditPost(c *gin.Context) {
 	postId := c.Param("postId")
 
 	if subreddit == "" || postId == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid subreddit or post ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid subreddit or post ID")
 		return
 	}
 
@@ -538,7 +631,7 @@ func (h *SavedItemsHandler) SaveRedditPost(c *gin.Context) {
 		return
 	}
 
-	if err := h.savedRepo.SaveRedditPost(c.Request.Context(), userID.(int), &models.RedditPostDetails{
+	if err := h.savedRepo.SaveRedditPost(c.Request.Context(), userID, &models.RedditPostDetails{
 		Subreddit:    subreddit,
 		RedditPostID: postId,
 		Title:        req.Title,
@@ -555,11 +648,20 @@ func (h *SavedItemsHandler) SaveRedditPost(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"saved": true})
 }
 
-// UnsaveRedditPost handles DELETE /api/v1/reddit/posts/:subreddit/:postId/save
+// UnsaveRedditPost removes a Reddit post from saved items.
+// @Summary      Unsave Reddit post
+// @Tags         SavedItems
+// @Security     BearerAuth
+// @Produce      json
+// @Param        subreddit  path  string  true  "Subreddit"
+// @Param        postId     path  string  true  "Post ID"
+// @Success      200  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /reddit/posts/{subreddit}/{postId}/save [delete]
 func (h *SavedItemsHandler) UnsaveRedditPost(c *gin.Context) {
-	userID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
 		return
 	}
 
@@ -567,11 +669,11 @@ func (h *SavedItemsHandler) UnsaveRedditPost(c *gin.Context) {
 	postId := c.Param("postId")
 
 	if subreddit == "" || postId == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid subreddit or post ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid subreddit or post ID")
 		return
 	}
 
-	if err := h.savedRepo.RemoveRedditPost(c.Request.Context(), userID.(int), subreddit, postId); err != nil {
+	if err := h.savedRepo.RemoveRedditPost(c.Request.Context(), userID, subreddit, postId); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to unsave Reddit post", "details": err.Error()})
 		return
 	}
@@ -579,21 +681,29 @@ func (h *SavedItemsHandler) UnsaveRedditPost(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"saved": false})
 }
 
-// HidePost handles POST /api/v1/posts/:id/hide
+// HidePost hides a platform post from feeds.
+// @Summary      Hide post
+// @Tags         SavedItems
+// @Security     BearerAuth
+// @Produce      json
+// @Param        id  path  int  true  "Post ID"
+// @Success      200  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /posts/{id}/hide [post]
 func (h *SavedItemsHandler) HidePost(c *gin.Context) {
-	userID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
 		return
 	}
 
 	postID, err := strconv.Atoi(c.Param("id"))
 	if err != nil || postID <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid post ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid post ID")
 		return
 	}
 
-	if err := h.savedRepo.HidePost(c.Request.Context(), userID.(int), postID); err != nil {
+	if err := h.savedRepo.HidePost(c.Request.Context(), userID, postID); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to hide post", "details": err.Error()})
 		return
 	}
@@ -601,21 +711,29 @@ func (h *SavedItemsHandler) HidePost(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"hidden": true})
 }
 
-// UnhidePost handles DELETE /api/v1/posts/:id/hide
+// UnhidePost un-hides a platform post.
+// @Summary      Unhide post
+// @Tags         SavedItems
+// @Security     BearerAuth
+// @Produce      json
+// @Param        id  path  int  true  "Post ID"
+// @Success      200  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /posts/{id}/hide [delete]
 func (h *SavedItemsHandler) UnhidePost(c *gin.Context) {
-	userID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
 		return
 	}
 
 	postID, err := strconv.Atoi(c.Param("id"))
 	if err != nil || postID <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid post ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid post ID")
 		return
 	}
 
-	if err := h.savedRepo.UnhidePost(c.Request.Context(), userID.(int), postID); err != nil {
+	if err := h.savedRepo.UnhidePost(c.Request.Context(), userID, postID); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to unhide post", "details": err.Error()})
 		return
 	}
@@ -623,11 +741,20 @@ func (h *SavedItemsHandler) UnhidePost(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"hidden": false})
 }
 
-// HideRedditPost handles POST /api/v1/reddit/posts/:subreddit/:postId/hide
+// HideRedditPost hides a Reddit post from feeds.
+// @Summary      Hide Reddit post
+// @Tags         SavedItems
+// @Security     BearerAuth
+// @Produce      json
+// @Param        subreddit  path  string  true  "Subreddit"
+// @Param        postId     path  string  true  "Post ID"
+// @Success      200  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /reddit/posts/{subreddit}/{postId}/hide [post]
 func (h *SavedItemsHandler) HideRedditPost(c *gin.Context) {
-	userID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
 		return
 	}
 
@@ -635,11 +762,11 @@ func (h *SavedItemsHandler) HideRedditPost(c *gin.Context) {
 	postId := c.Param("postId")
 
 	if subreddit == "" || postId == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid subreddit or post ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid subreddit or post ID")
 		return
 	}
 
-	if err := h.savedRepo.HideRedditPost(c.Request.Context(), userID.(int), subreddit, postId); err != nil {
+	if err := h.savedRepo.HideRedditPost(c.Request.Context(), userID, subreddit, postId); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to hide Reddit post", "details": err.Error()})
 		return
 	}
@@ -647,11 +774,20 @@ func (h *SavedItemsHandler) HideRedditPost(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"hidden": true})
 }
 
-// UnhideRedditPost handles DELETE /api/v1/reddit/posts/:subreddit/:postId/hide
+// UnhideRedditPost un-hides a Reddit post.
+// @Summary      Unhide Reddit post
+// @Tags         SavedItems
+// @Security     BearerAuth
+// @Produce      json
+// @Param        subreddit  path  string  true  "Subreddit"
+// @Param        postId     path  string  true  "Post ID"
+// @Success      200  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /reddit/posts/{subreddit}/{postId}/hide [delete]
 func (h *SavedItemsHandler) UnhideRedditPost(c *gin.Context) {
-	userID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
 		return
 	}
 
@@ -659,11 +795,11 @@ func (h *SavedItemsHandler) UnhideRedditPost(c *gin.Context) {
 	postId := c.Param("postId")
 
 	if subreddit == "" || postId == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid subreddit or post ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid subreddit or post ID")
 		return
 	}
 
-	if err := h.savedRepo.UnhideRedditPost(c.Request.Context(), userID.(int), subreddit, postId); err != nil {
+	if err := h.savedRepo.UnhideRedditPost(c.Request.Context(), userID, subreddit, postId); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to unhide Reddit post", "details": err.Error()})
 		return
 	}

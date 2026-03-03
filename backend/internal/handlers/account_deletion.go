@@ -24,8 +24,17 @@ func NewAccountDeletionHandler(db *pgxpool.Pool, queueClient *queue.QueueClient)
 	}
 }
 
-// RequestAccountDeletion soft-deletes account with 30-day grace period
-// POST /api/v1/account/delete
+// RequestAccountDeletion schedules account deletion with a 30-day grace period.
+// @Summary      Request account deletion
+// @Tags         Account
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /account/delete [post]
 func (h *AccountDeletionHandler) RequestAccountDeletion(c *gin.Context) {
 	userID := c.GetInt("user_id")
 
@@ -35,7 +44,7 @@ func (h *AccountDeletionHandler) RequestAccountDeletion(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request"})
+		RespondError(c, http.StatusBadRequest, "Invalid request")
 		return
 	}
 
@@ -55,13 +64,13 @@ func (h *AccountDeletionHandler) RequestAccountDeletion(c *gin.Context) {
 		SELECT password_hash, email, username FROM users WHERE id = $1
 	`, userID).Scan(&storedPasswordHash, &email, &username)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to verify user"})
+		RespondError(c, http.StatusInternalServerError, "Failed to verify user")
 		return
 	}
 
 	// Verify password using bcrypt
 	if err := utils.CheckPassword(storedPasswordHash, req.Password); err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid password"})
+		RespondError(c, http.StatusUnauthorized, "Invalid password")
 		return
 	}
 
@@ -78,7 +87,7 @@ func (h *AccountDeletionHandler) RequestAccountDeletion(c *gin.Context) {
 	`, deletionDate, userID)
 
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete account"})
+		RespondError(c, http.StatusInternalServerError, "Failed to delete account")
 		return
 	}
 
@@ -132,8 +141,16 @@ This is an automated message. Please do not reply to this email.`,
 	})
 }
 
-// CancelAccountDeletion cancels pending deletion during grace period
-// POST /api/v1/account/cancel-deletion
+// CancelAccountDeletion cancels a pending account deletion during the grace period.
+// @Summary      Cancel account deletion
+// @Tags         Account
+// @Security     BearerAuth
+// @Produce      json
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /account/cancel-deletion [post]
 func (h *AccountDeletionHandler) CancelAccountDeletion(c *gin.Context) {
 	userID := c.GetInt("user_id")
 
@@ -173,7 +190,7 @@ func (h *AccountDeletionHandler) CancelAccountDeletion(c *gin.Context) {
 	`, userID)
 
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to cancel deletion"})
+		RespondError(c, http.StatusInternalServerError, "Failed to cancel deletion")
 		return
 	}
 
@@ -216,8 +233,15 @@ This is an automated message. Please do not reply to this email.`,
 	})
 }
 
-// GetAccountDeletionStatus checks if account is pending deletion
-// GET /api/v1/account/deletion-status
+// GetAccountDeletionStatus returns whether the account is pending deletion.
+// @Summary      Get account deletion status
+// @Tags         Account
+// @Security     BearerAuth
+// @Produce      json
+// @Success      200  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /account/deletion-status [get]
 func (h *AccountDeletionHandler) GetAccountDeletionStatus(c *gin.Context) {
 	userID := c.GetInt("user_id")
 
@@ -230,7 +254,7 @@ func (h *AccountDeletionHandler) GetAccountDeletionStatus(c *gin.Context) {
 	`, userID).Scan(&deletedAt, &permanentDeletionAt)
 
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check deletion status"})
+		RespondError(c, http.StatusInternalServerError, "Failed to check deletion status")
 		return
 	}
 

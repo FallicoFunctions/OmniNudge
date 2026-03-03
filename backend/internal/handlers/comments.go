@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"github.com/omninudge/backend/internal/ports"
+	"github.com/omninudge/backend/internal/api/middleware"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -17,16 +19,16 @@ import (
 // CommentsHandler handles HTTP requests for post comments
 type CommentsHandler struct {
 	pool         *pgxpool.Pool
-	commentRepo  *models.PostCommentRepository
-	postRepo     *models.PlatformPostRepository
-	hubRepo      *models.HubRepository
-	userRepo     *models.UserRepository
-	modRepo      *models.HubModeratorRepository
+	commentRepo  ports.PostCommentRepository
+	postRepo     ports.PlatformPostRepository
+	hubRepo      ports.HubRepository
+	userRepo     ports.UserRepository
+	modRepo      ports.HubModeratorRepository
 	notifService *services.NotificationService
 }
 
 // NewCommentsHandler creates a new comments handler
-func NewCommentsHandler(pool *pgxpool.Pool, commentRepo *models.PostCommentRepository, postRepo *models.PlatformPostRepository, hubRepo *models.HubRepository, userRepo *models.UserRepository, modRepo *models.HubModeratorRepository) *CommentsHandler {
+func NewCommentsHandler(pool *pgxpool.Pool, commentRepo ports.PostCommentRepository, postRepo ports.PlatformPostRepository, hubRepo ports.HubRepository, userRepo ports.UserRepository, modRepo ports.HubModeratorRepository) *CommentsHandler {
 	return &CommentsHandler{
 		pool:        pool,
 		commentRepo: commentRepo,
@@ -53,18 +55,30 @@ type UpdateCommentRequest struct {
 	Body string `json:"body" binding:"required,min=1"`
 }
 
-// CreateComment handles POST /api/v1/posts/:postId/comments
+// CreateComment adds a comment to a post.
+// @Summary      Create comment
+// @Tags         Comments
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Param        id    path  int                    true  "Post ID"
+// @Param        body  body  CreateCommentRequest   true  "Comment"
+// @Success      201  {object}  models.PostComment
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      404  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /posts/{id}/comments [post]
 func (h *CommentsHandler) CreateComment(c *gin.Context) {
 	// Get user ID from context (set by AuthRequired middleware)
-	userID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
 		return
 	}
 
 	postID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid post ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid post ID")
 		return
 	}
 
@@ -75,7 +89,7 @@ func (h *CommentsHandler) CreateComment(c *gin.Context) {
 		return
 	}
 	if post == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Post not found"})
+		RespondError(c, http.StatusNotFound, "Post not found")
 		return
 	}
 
@@ -93,19 +107,19 @@ func (h *CommentsHandler) CreateComment(c *gin.Context) {
 			return
 		}
 		if parentComment == nil {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Parent comment not found"})
+			RespondError(c, http.StatusNotFound, "Parent comment not found")
 			return
 		}
 		// Verify parent comment belongs to the same post
 		if parentComment.PostID != postID {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Parent comment does not belong to this post"})
+			RespondError(c, http.StatusBadRequest, "Parent comment does not belong to this post")
 			return
 		}
 	}
 
 	comment := &models.PostComment{
 		PostID:          postID,
-		UserID:          userID.(int),
+		UserID:          userID,
 		ParentCommentID: req.ParentCommentID,
 		Body:            req.Body,
 	}
@@ -123,7 +137,7 @@ func (h *CommentsHandler) CreateComment(c *gin.Context) {
 
 	// Default upvote by author (best-effort)
 	upvote := true
-	_ = h.commentRepo.Vote(c.Request.Context(), comment.ID, userID.(int), &upvote)
+	_ = h.commentRepo.Vote(c.Request.Context(), comment.ID, userID, &upvote)
 	comment.Score++
 	comment.Upvotes++
 
@@ -132,7 +146,7 @@ func (h *CommentsHandler) CreateComment(c *gin.Context) {
 		go func() {
 			parentComment, err := h.commentRepo.GetByID(c.Request.Context(), *req.ParentCommentID)
 			if err == nil && parentComment != nil {
-				_ = h.notifService.NotifyCommentReply(c.Request.Context(), comment.ID, parentComment.UserID, userID.(int))
+				_ = h.notifService.NotifyCommentReply(c.Request.Context(), comment.ID, parentComment.UserID, userID)
 			}
 		}()
 	}
@@ -146,11 +160,22 @@ func (h *CommentsHandler) CreateComment(c *gin.Context) {
 	c.JSON(http.StatusCreated, fullComment)
 }
 
-// GetComments handles GET /api/v1/posts/:postId/comments
+// GetComments returns top-level comments for a post.
+// @Summary      Get post comments
+// @Tags         Comments
+// @Produce      json
+// @Param        id      path   int     true   "Post ID"
+// @Param        limit   query  int     false  "Page size (default 20)"
+// @Param        offset  query  int     false  "Offset"
+// @Param        sort    query  string  false  "Sort: hot | new | top"
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /posts/{id}/comments [get]
 func (h *CommentsHandler) GetComments(c *gin.Context) {
 	postID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid post ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid post ID")
 		return
 	}
 
@@ -165,10 +190,8 @@ func (h *CommentsHandler) GetComments(c *gin.Context) {
 	}
 
 	var userIDPtr *int
-	if userID, ok := c.Get("user_id"); ok {
-		if uid, ok := userID.(int); ok {
-			userIDPtr = &uid
-		}
+	if userID, _ := middleware.GetOptionalUserID(c); userID != 0 {
+			userIDPtr = &userID
 	}
 
 	comments, err := h.commentRepo.GetByPostID(c.Request.Context(), postID, sortBy, limit, offset, userIDPtr)
@@ -189,11 +212,20 @@ func (h *CommentsHandler) GetComments(c *gin.Context) {
 	})
 }
 
-// GetComment handles GET /api/v1/comments/:id
+// GetComment returns a single comment.
+// @Summary      Get comment
+// @Tags         Comments
+// @Produce      json
+// @Param        id  path  int  true  "Comment ID"
+// @Success      200  {object}  models.PostComment
+// @Failure      400  {object}  gin.H
+// @Failure      404  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /comments/{id} [get]
 func (h *CommentsHandler) GetComment(c *gin.Context) {
 	commentID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid comment ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid comment ID")
 		return
 	}
 
@@ -204,18 +236,28 @@ func (h *CommentsHandler) GetComment(c *gin.Context) {
 	}
 
 	if comment == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Comment not found"})
+		RespondError(c, http.StatusNotFound, "Comment not found")
 		return
 	}
 
 	c.JSON(http.StatusOK, comment)
 }
 
-// GetCommentReplies handles GET /api/v1/comments/:id/replies
+// GetCommentReplies returns replies to a comment.
+// @Summary      Get comment replies
+// @Tags         Comments
+// @Produce      json
+// @Param        id      path   int  true   "Comment ID"
+// @Param        limit   query  int  false  "Page size"
+// @Param        offset  query  int  false  "Offset"
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /comments/{id}/replies [get]
 func (h *CommentsHandler) GetCommentReplies(c *gin.Context) {
 	commentID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid comment ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid comment ID")
 		return
 	}
 
@@ -230,10 +272,8 @@ func (h *CommentsHandler) GetCommentReplies(c *gin.Context) {
 	}
 
 	var userIDPtr *int
-	if userID, ok := c.Get("user_id"); ok {
-		if uid, ok := userID.(int); ok {
-			userIDPtr = &uid
-		}
+	if userID, _ := middleware.GetOptionalUserID(c); userID != 0 {
+			userIDPtr = &userID
 	}
 
 	replies, err := h.commentRepo.GetReplies(c.Request.Context(), commentID, sortBy, limit, offset, userIDPtr)
@@ -254,12 +294,25 @@ func (h *CommentsHandler) GetCommentReplies(c *gin.Context) {
 	})
 }
 
-// UpdateComment handles PUT /api/v1/comments/:id
+// UpdateComment edits a comment's text.
+// @Summary      Update comment
+// @Tags         Comments
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Param        id    path  int                   true  "Comment ID"
+// @Param        body  body  UpdateCommentRequest  true  "Updated comment"
+// @Success      200  {object}  models.PostComment
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      404  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /comments/{id} [put]
 func (h *CommentsHandler) UpdateComment(c *gin.Context) {
 	// Get user ID from context
-	userID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
 		return
 	}
 	role, _ := c.Get("role")
@@ -267,7 +320,7 @@ func (h *CommentsHandler) UpdateComment(c *gin.Context) {
 
 	commentID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid comment ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid comment ID")
 		return
 	}
 
@@ -279,7 +332,7 @@ func (h *CommentsHandler) UpdateComment(c *gin.Context) {
 	}
 
 	if existingComment == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Comment not found"})
+		RespondError(c, http.StatusNotFound, "Comment not found")
 		return
 	}
 
@@ -287,15 +340,15 @@ func (h *CommentsHandler) UpdateComment(c *gin.Context) {
 	isHubMod := false
 	if h.modRepo != nil {
 		if post, _ := h.postRepo.GetByID(c.Request.Context(), existingComment.PostID); post != nil && post.HubID != nil {
-			if ok, err := h.modRepo.IsModerator(c.Request.Context(), *post.HubID, userID.(int)); err == nil {
+			if ok, err := h.modRepo.IsModerator(c.Request.Context(), *post.HubID, userID); err == nil {
 				isHubMod = ok
 			}
 		}
 	}
 
 	// Verify user owns this comment or is mod/admin (global or hub)
-	if existingComment.UserID != userID.(int) && roleStr != "moderator" && roleStr != "admin" && !isHubMod {
-		c.JSON(http.StatusForbidden, gin.H{"error": "You can only edit your own comments"})
+	if existingComment.UserID != userID && roleStr != "moderator" && roleStr != "admin" && !isHubMod {
+		RespondError(c, http.StatusForbidden, "You can only edit your own comments")
 		return
 	}
 
@@ -316,16 +369,28 @@ func (h *CommentsHandler) UpdateComment(c *gin.Context) {
 	c.JSON(http.StatusOK, existingComment)
 }
 
-// DeleteComment handles DELETE /api/v1/comments/:id
+// DeleteComment removes a comment.
+// @Summary      Delete comment
+// @Tags         Comments
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Param        id  path  int  true  "Comment ID"
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      404  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /comments/{id} [delete]
 type DeleteCommentRequest struct {
 	Reason string `json:"reason"`
 }
 
 func (h *CommentsHandler) DeleteComment(c *gin.Context) {
 	// Get user ID from context
-	userID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
 		return
 	}
 	role, _ := c.Get("role")
@@ -333,7 +398,7 @@ func (h *CommentsHandler) DeleteComment(c *gin.Context) {
 
 	commentID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid comment ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid comment ID")
 		return
 	}
 
@@ -355,37 +420,37 @@ func (h *CommentsHandler) DeleteComment(c *gin.Context) {
 	}
 
 	if existingComment == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Comment not found"})
+		RespondError(c, http.StatusNotFound, "Comment not found")
 		return
 	}
 
 	// Get the post to check hub moderator status and for modmail
 	post, err := h.postRepo.GetByID(c.Request.Context(), existingComment.PostID)
 	if err != nil || post == nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get post"})
+		RespondError(c, http.StatusInternalServerError, "Failed to get post")
 		return
 	}
 
 	// Hub mod check
 	isHubMod := false
 	if h.modRepo != nil && post.HubID != nil {
-		if ok, err := h.modRepo.IsModerator(c.Request.Context(), *post.HubID, userID.(int)); err == nil {
+		if ok, err := h.modRepo.IsModerator(c.Request.Context(), *post.HubID, userID); err == nil {
 			isHubMod = ok
 		}
 	}
 
 	// Verify user owns this comment or is admin or hub mod
-	if existingComment.UserID != userID.(int) && roleStr != "admin" && !isHubMod {
-		c.JSON(http.StatusForbidden, gin.H{"error": "You can only delete your own comments"})
+	if existingComment.UserID != userID && roleStr != "admin" && !isHubMod {
+		RespondError(c, http.StatusForbidden, "You can only delete your own comments")
 		return
 	}
 
 	// Check if this is an admin/moderator deletion (not author)
-	isModeratorAction := existingComment.UserID != userID.(int) && (roleStr == "admin" || isHubMod)
+	isModeratorAction := existingComment.UserID != userID && (roleStr == "admin" || isHubMod)
 
 	// If it's a moderator action and no reason provided, require one
 	if isModeratorAction && req.Reason == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Deletion reason is required for moderator actions"})
+		RespondError(c, http.StatusBadRequest, "Deletion reason is required for moderator actions")
 		return
 	}
 
@@ -396,7 +461,7 @@ func (h *CommentsHandler) DeleteComment(c *gin.Context) {
 
 	// Send modmail notification if this is a moderator action
 	if isModeratorAction && req.Reason != "" && post.HubID != nil {
-		go h.sendCommentDeletionModMail(existingComment, post, userID.(int), req.Reason, roleStr)
+		go h.sendCommentDeletionModMail(existingComment, post, userID, req.Reason, roleStr)
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Comment deleted successfully"})
@@ -521,23 +586,34 @@ type UpdateCommentPreferencesRequest struct {
 	DisableInboxReplies bool `json:"disable_inbox_replies"`
 }
 
-// UpdateCommentPreferences handles POST /api/v1/posts/:postId/comments/:commentId/preferences
+// UpdateCommentPreferences toggles reply notification preferences for a comment.
+// @Summary      Update comment preferences
+// @Tags         Comments
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Param        id         path  int  true  "Post ID"
+// @Param        commentId  path  int  true  "Comment ID"
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /posts/{id}/comments/{commentId}/preferences [post]
 func (h *CommentsHandler) UpdateCommentPreferences(c *gin.Context) {
-	userID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
 		return
 	}
 
 	postID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid post ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid post ID")
 		return
 	}
 
 	commentID, err := strconv.Atoi(c.Param("commentId"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid comment ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid comment ID")
 		return
 	}
 
@@ -547,12 +623,12 @@ func (h *CommentsHandler) UpdateCommentPreferences(c *gin.Context) {
 		return
 	}
 	if comment == nil || comment.PostID != postID {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Comment not found"})
+		RespondError(c, http.StatusNotFound, "Comment not found")
 		return
 	}
 
-	if comment.UserID != userID.(int) {
-		c.JSON(http.StatusForbidden, gin.H{"error": "You can only update your own comments"})
+	if comment.UserID != userID {
+		RespondError(c, http.StatusForbidden, "You can only update your own comments")
 		return
 	}
 
@@ -562,7 +638,7 @@ func (h *CommentsHandler) UpdateCommentPreferences(c *gin.Context) {
 		return
 	}
 
-	if err := h.commentRepo.SetInboxRepliesDisabled(c.Request.Context(), commentID, userID.(int), req.DisableInboxReplies); err != nil {
+	if err := h.commentRepo.SetInboxRepliesDisabled(c.Request.Context(), commentID, userID, req.DisableInboxReplies); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update preferences", "details": err.Error()})
 		return
 	}
@@ -570,18 +646,29 @@ func (h *CommentsHandler) UpdateCommentPreferences(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"disable_inbox_replies": req.DisableInboxReplies})
 }
 
-// VoteComment handles POST /api/v1/comments/:id/vote
+// VoteComment votes on a comment.
+// @Summary      Vote on comment
+// @Tags         Comments
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Param        id  path  int  true  "Comment ID"
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      404  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /comments/{id}/vote [post]
 func (h *CommentsHandler) VoteComment(c *gin.Context) {
 	// Get user ID from context
-	userID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
 		return
 	}
 
 	commentID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid comment ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid comment ID")
 		return
 	}
 
@@ -593,7 +680,7 @@ func (h *CommentsHandler) VoteComment(c *gin.Context) {
 		return
 	}
 
-	if err := h.commentRepo.Vote(c.Request.Context(), commentID, userID.(int), req.IsUpvote); err != nil {
+	if err := h.commentRepo.Vote(c.Request.Context(), commentID, userID, req.IsUpvote); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to vote on comment", "details": err.Error()})
 		return
 	}

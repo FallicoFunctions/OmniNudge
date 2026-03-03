@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"github.com/omninudge/backend/internal/api/middleware"
 	"net/http"
 	"strconv"
 
@@ -31,17 +32,17 @@ func (h *HubThemesHandler) GetActiveTheme(c *gin.Context) {
 	hubName := c.Param("name")
 	hubID, err := h.settingsRepo.GetHubIDByName(c.Request.Context(), hubName)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Hub not found"})
+		RespondError(c, http.StatusNotFound, "Hub not found")
 		return
 	}
 
 	theme, err := h.themesRepo.GetActiveTheme(c.Request.Context(), hubID)
 	if err != nil {
 		if err == pgx.ErrNoRows {
-			c.JSON(http.StatusNotFound, gin.H{"error": "No active theme"})
+			RespondError(c, http.StatusNotFound, "No active theme")
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get theme"})
+		RespondError(c, http.StatusInternalServerError, "Failed to get theme")
 		return
 	}
 
@@ -51,29 +52,28 @@ func (h *HubThemesHandler) GetActiveTheme(c *gin.Context) {
 // GetAllThemes handles GET /api/v1/hubs/:name/themes
 // Returns all theme versions for a hub (moderator only)
 func (h *HubThemesHandler) GetAllThemes(c *gin.Context) {
-	userID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
 		return
 	}
 
 	hubName := c.Param("name")
 	hubID, err := h.settingsRepo.GetHubIDByName(c.Request.Context(), hubName)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Hub not found"})
+		RespondError(c, http.StatusNotFound, "Hub not found")
 		return
 	}
 
 	// Check permissions: must be at least a moderator
-	role, err := h.settingsRepo.GetModeratorRole(c.Request.Context(), hubID, userID.(int))
+	role, err := h.settingsRepo.GetModeratorRole(c.Request.Context(), hubID, userID)
 	if err != nil || role == nil {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Not a moderator"})
+		RespondError(c, http.StatusForbidden, "Not a moderator")
 		return
 	}
 
 	themes, err := h.themesRepo.GetAllThemes(c.Request.Context(), hubID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get themes"})
+		RespondError(c, http.StatusInternalServerError, "Failed to get themes")
 		return
 	}
 
@@ -83,39 +83,38 @@ func (h *HubThemesHandler) GetAllThemes(c *gin.Context) {
 // CreateTheme handles POST /api/v1/hubs/:name/themes
 // Creates a new theme (requires full_moderator or owner)
 func (h *HubThemesHandler) CreateTheme(c *gin.Context) {
-	userID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
 		return
 	}
 
 	hubName := c.Param("name")
 	hubID, err := h.settingsRepo.GetHubIDByName(c.Request.Context(), hubName)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Hub not found"})
+		RespondError(c, http.StatusNotFound, "Hub not found")
 		return
 	}
 
 	// Check permissions: must be full_moderator or owner
-	role, err := h.settingsRepo.GetModeratorRole(c.Request.Context(), hubID, userID.(int))
+	role, err := h.settingsRepo.GetModeratorRole(c.Request.Context(), hubID, userID)
 	if err != nil || role == nil {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Not a moderator"})
+		RespondError(c, http.StatusForbidden, "Not a moderator")
 		return
 	}
 
 	if *role != models.ModeratorRoleOwner && *role != models.ModeratorRoleFullModerator {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Requires owner or full_moderator role"})
+		RespondError(c, http.StatusForbidden, "Requires owner or full_moderator role")
 		return
 	}
 
 	var theme models.HubTheme
 	if err := c.ShouldBindJSON(&theme); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
+		RespondError(c, http.StatusBadRequest, "Invalid request body")
 		return
 	}
 
 	theme.HubID = hubID
-	theme.CreatedBy = userID.(int)
+	theme.CreatedBy = userID
 	theme.Version = 1 // New theme starts at version 1
 
 	// Sanitize CSS if provided
@@ -130,7 +129,7 @@ func (h *HubThemesHandler) CreateTheme(c *gin.Context) {
 
 	themeID, err := h.themesRepo.CreateTheme(c.Request.Context(), &theme)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create theme"})
+		RespondError(c, http.StatusInternalServerError, "Failed to create theme")
 		return
 	}
 
@@ -143,40 +142,39 @@ func (h *HubThemesHandler) CreateTheme(c *gin.Context) {
 // UpdateTheme handles PUT /api/v1/hubs/:name/themes/:id
 // Updates a theme (creates new version) (requires full_moderator or owner)
 func (h *HubThemesHandler) UpdateTheme(c *gin.Context) {
-	userID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
 		return
 	}
 
 	hubName := c.Param("name")
 	hubID, err := h.settingsRepo.GetHubIDByName(c.Request.Context(), hubName)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Hub not found"})
+		RespondError(c, http.StatusNotFound, "Hub not found")
 		return
 	}
 
 	themeID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid theme ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid theme ID")
 		return
 	}
 
 	// Check permissions: must be full_moderator or owner
-	role, err := h.settingsRepo.GetModeratorRole(c.Request.Context(), hubID, userID.(int))
+	role, err := h.settingsRepo.GetModeratorRole(c.Request.Context(), hubID, userID)
 	if err != nil || role == nil {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Not a moderator"})
+		RespondError(c, http.StatusForbidden, "Not a moderator")
 		return
 	}
 
 	if *role != models.ModeratorRoleOwner && *role != models.ModeratorRoleFullModerator {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Requires owner or full_moderator role"})
+		RespondError(c, http.StatusForbidden, "Requires owner or full_moderator role")
 		return
 	}
 
 	var theme models.HubTheme
 	if err := c.ShouldBindJSON(&theme); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
+		RespondError(c, http.StatusBadRequest, "Invalid request body")
 		return
 	}
 
@@ -193,9 +191,9 @@ func (h *HubThemesHandler) UpdateTheme(c *gin.Context) {
 		theme.CSSContent = &sanitized
 	}
 
-	newThemeID, err := h.themesRepo.UpdateTheme(c.Request.Context(), &theme, userID.(int))
+	newThemeID, err := h.themesRepo.UpdateTheme(c.Request.Context(), &theme, userID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update theme"})
+		RespondError(c, http.StatusInternalServerError, "Failed to update theme")
 		return
 	}
 
@@ -208,39 +206,38 @@ func (h *HubThemesHandler) UpdateTheme(c *gin.Context) {
 // ActivateTheme handles POST /api/v1/hubs/:name/themes/:id/activate
 // Activates a specific theme version (requires full_moderator or owner)
 func (h *HubThemesHandler) ActivateTheme(c *gin.Context) {
-	userID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
 		return
 	}
 
 	hubName := c.Param("name")
 	hubID, err := h.settingsRepo.GetHubIDByName(c.Request.Context(), hubName)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Hub not found"})
+		RespondError(c, http.StatusNotFound, "Hub not found")
 		return
 	}
 
 	themeID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid theme ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid theme ID")
 		return
 	}
 
 	// Check permissions: must be full_moderator or owner
-	role, err := h.settingsRepo.GetModeratorRole(c.Request.Context(), hubID, userID.(int))
+	role, err := h.settingsRepo.GetModeratorRole(c.Request.Context(), hubID, userID)
 	if err != nil || role == nil {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Not a moderator"})
+		RespondError(c, http.StatusForbidden, "Not a moderator")
 		return
 	}
 
 	if *role != models.ModeratorRoleOwner && *role != models.ModeratorRoleFullModerator {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Requires owner or full_moderator role"})
+		RespondError(c, http.StatusForbidden, "Requires owner or full_moderator role")
 		return
 	}
 
 	if err := h.themesRepo.ActivateTheme(c.Request.Context(), themeID, hubID); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to activate theme"})
+		RespondError(c, http.StatusInternalServerError, "Failed to activate theme")
 		return
 	}
 
@@ -250,34 +247,33 @@ func (h *HubThemesHandler) ActivateTheme(c *gin.Context) {
 // DeleteTheme handles DELETE /api/v1/hubs/:name/themes/:id
 // Deletes a theme (cannot delete active theme) (requires owner)
 func (h *HubThemesHandler) DeleteTheme(c *gin.Context) {
-	userID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
 		return
 	}
 
 	hubName := c.Param("name")
 	hubID, err := h.settingsRepo.GetHubIDByName(c.Request.Context(), hubName)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Hub not found"})
+		RespondError(c, http.StatusNotFound, "Hub not found")
 		return
 	}
 
 	themeID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid theme ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid theme ID")
 		return
 	}
 
 	// Check permissions: must be owner
-	role, err := h.settingsRepo.GetModeratorRole(c.Request.Context(), hubID, userID.(int))
+	role, err := h.settingsRepo.GetModeratorRole(c.Request.Context(), hubID, userID)
 	if err != nil || role == nil || *role != models.ModeratorRoleOwner {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Requires owner role"})
+		RespondError(c, http.StatusForbidden, "Requires owner role")
 		return
 	}
 
 	if err := h.themesRepo.DeleteTheme(c.Request.Context(), themeID); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		RespondError(c, http.StatusInternalServerError, err.Error())
 		return
 	}
 
@@ -287,23 +283,22 @@ func (h *HubThemesHandler) DeleteTheme(c *gin.Context) {
 // PreviewTheme handles POST /api/v1/hubs/:name/themes/preview
 // Returns sanitized and scoped CSS for preview (requires moderator)
 func (h *HubThemesHandler) PreviewTheme(c *gin.Context) {
-	userID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
 		return
 	}
 
 	hubName := c.Param("name")
 	hubID, err := h.settingsRepo.GetHubIDByName(c.Request.Context(), hubName)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Hub not found"})
+		RespondError(c, http.StatusNotFound, "Hub not found")
 		return
 	}
 
 	// Check permissions: must be at least a moderator
-	role, err := h.settingsRepo.GetModeratorRole(c.Request.Context(), hubID, userID.(int))
+	role, err := h.settingsRepo.GetModeratorRole(c.Request.Context(), hubID, userID)
 	if err != nil || role == nil {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Not a moderator"})
+		RespondError(c, http.StatusForbidden, "Not a moderator")
 		return
 	}
 
@@ -316,7 +311,7 @@ func (h *HubThemesHandler) PreviewTheme(c *gin.Context) {
 		ApplyToPostDetail bool   `json:"apply_to_post_detail"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
+		RespondError(c, http.StatusBadRequest, "Invalid request body")
 		return
 	}
 

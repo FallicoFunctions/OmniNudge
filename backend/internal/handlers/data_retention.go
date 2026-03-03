@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"github.com/omninudge/backend/internal/api/middleware"
 	"fmt"
 	"net/http"
 	"time"
@@ -26,8 +27,16 @@ type RetentionStatus struct {
 	SizeEstimate    string    `json:"size_estimate"`
 }
 
-// GetRetentionStatus returns the status of data retention policies
-// GET /api/v1/admin/retention/status
+// GetRetentionStatus returns the current data retention status.
+// @Summary      Get retention status
+// @Tags         DataRetention
+// @Security     BearerAuth
+// @Produce      json
+// @Success      200  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /admin/retention/status [get]
 func (h *DataRetentionHandler) GetRetentionStatus(c *gin.Context) {
 	ctx := c.Request.Context()
 
@@ -36,7 +45,7 @@ func (h *DataRetentionHandler) GetRetentionStatus(c *gin.Context) {
 		SELECT data_type, retention_days FROM retention_settings WHERE enabled = TRUE
 	`)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load retention settings"})
+		RespondError(c, http.StatusInternalServerError, "Failed to load retention settings")
 		return
 	}
 	defer settingsRows.Close()
@@ -149,8 +158,16 @@ func (h *DataRetentionHandler) GetRetentionStatus(c *gin.Context) {
 	})
 }
 
-// GetRetentionPolicy returns the current retention policies from database
-// GET /api/v1/admin/retention/policy
+// GetRetentionPolicy returns configured data retention policies.
+// @Summary      Get retention policies
+// @Tags         DataRetention
+// @Security     BearerAuth
+// @Produce      json
+// @Success      200  {array}   gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /admin/retention/policy [get]
 func (h *DataRetentionHandler) GetRetentionPolicy(c *gin.Context) {
 	ctx := c.Request.Context()
 
@@ -169,7 +186,7 @@ func (h *DataRetentionHandler) GetRetentionPolicy(c *gin.Context) {
 			END
 	`)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch retention policies"})
+		RespondError(c, http.StatusInternalServerError, "Failed to fetch retention policies")
 		return
 	}
 	defer rows.Close()
@@ -208,16 +225,26 @@ func (h *DataRetentionHandler) GetRetentionPolicy(c *gin.Context) {
 	})
 }
 
-// UpdateRetentionPolicy updates a retention policy
-// PUT /api/v1/admin/retention/policy/:data_type
+// UpdateRetentionPolicy updates a data retention policy.
+// @Summary      Update retention policy
+// @Tags         DataRetention
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Param        data_type  path  string  true  "Data type"
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /admin/retention/policy/{data_type} [put]
 func (h *DataRetentionHandler) UpdateRetentionPolicy(c *gin.Context) {
 	ctx := c.Request.Context()
 	dataType := c.Param("data_type")
 
 	// Get user ID from context (set by auth middleware)
-	userID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
 		return
 	}
 
@@ -228,7 +255,7 @@ func (h *DataRetentionHandler) UpdateRetentionPolicy(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		RespondError(c, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -238,7 +265,7 @@ func (h *DataRetentionHandler) UpdateRetentionPolicy(c *gin.Context) {
 		SELECT EXISTS(SELECT 1 FROM retention_settings WHERE data_type = $1)
 	`, dataType).Scan(&exists_check)
 	if err != nil || !exists_check {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Data type not found"})
+		RespondError(c, http.StatusNotFound, "Data type not found")
 		return
 	}
 
@@ -269,7 +296,7 @@ func (h *DataRetentionHandler) UpdateRetentionPolicy(c *gin.Context) {
 
 	_, err = h.db.Exec(ctx, query, args...)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update retention policy"})
+		RespondError(c, http.StatusInternalServerError, "Failed to update retention policy")
 		return
 	}
 
@@ -280,8 +307,16 @@ func (h *DataRetentionHandler) UpdateRetentionPolicy(c *gin.Context) {
 	})
 }
 
-// GetRetentionHistory returns the audit history of retention policy changes
-// GET /api/v1/admin/retention/history
+// GetRetentionHistory returns audit history of retention policy changes.
+// @Summary      Get retention history
+// @Tags         DataRetention
+// @Security     BearerAuth
+// @Produce      json
+// @Success      200  {array}   gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /admin/retention/history [get]
 func (h *DataRetentionHandler) GetRetentionHistory(c *gin.Context) {
 	ctx := c.Request.Context()
 	dataType := c.Query("data_type") // optional filter
@@ -310,7 +345,7 @@ func (h *DataRetentionHandler) GetRetentionHistory(c *gin.Context) {
 
 	rows, err := h.db.Query(ctx, query, args...)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch retention history"})
+		RespondError(c, http.StatusInternalServerError, "Failed to fetch retention history")
 		return
 	}
 	defer rows.Close()

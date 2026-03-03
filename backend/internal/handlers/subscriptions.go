@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"github.com/omninudge/backend/internal/ports"
+	"github.com/omninudge/backend/internal/api/middleware"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -9,16 +11,16 @@ import (
 
 // SubscriptionsHandler handles subscription operations
 type SubscriptionsHandler struct {
-	hubSubRepo       *models.HubSubscriptionRepository
-	subredditSubRepo *models.SubredditSubscriptionRepository
-	hubRepo          *models.HubRepository
+	hubSubRepo       ports.HubSubscriptionRepository
+	subredditSubRepo ports.SubredditSubscriptionRepository
+	hubRepo          ports.HubRepository
 }
 
 // NewSubscriptionsHandler creates a new subscriptions handler
 func NewSubscriptionsHandler(
-	hubSubRepo *models.HubSubscriptionRepository,
-	subredditSubRepo *models.SubredditSubscriptionRepository,
-	hubRepo *models.HubRepository,
+	hubSubRepo ports.HubSubscriptionRepository,
+	subredditSubRepo ports.SubredditSubscriptionRepository,
+	hubRepo ports.HubRepository,
 ) *SubscriptionsHandler {
 	return &SubscriptionsHandler{
 		hubSubRepo:       hubSubRepo,
@@ -27,11 +29,20 @@ func NewSubscriptionsHandler(
 	}
 }
 
-// SubscribeToHub handles POST /api/v1/hubs/:name/subscribe
+// SubscribeToHub subscribes the current user to a hub.
+// @Summary      Subscribe to hub
+// @Tags         Subscriptions
+// @Security     BearerAuth
+// @Produce      json
+// @Param        name  path  string  true  "Hub name"
+// @Success      200  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      404  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /hubs/{name}/subscribe [post]
 func (h *SubscriptionsHandler) SubscribeToHub(c *gin.Context) {
-	userID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
 		return
 	}
 
@@ -42,11 +53,11 @@ func (h *SubscriptionsHandler) SubscribeToHub(c *gin.Context) {
 		return
 	}
 	if hub == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Hub not found"})
+		RespondError(c, http.StatusNotFound, "Hub not found")
 		return
 	}
 
-	err = h.hubSubRepo.Subscribe(c.Request.Context(), userID.(int), hub.ID)
+	err = h.hubSubRepo.Subscribe(c.Request.Context(), userID, hub.ID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to subscribe", "details": err.Error()})
 		return
@@ -66,11 +77,19 @@ func (h *SubscriptionsHandler) SubscribeToHub(c *gin.Context) {
 	})
 }
 
-// UnsubscribeFromHub handles DELETE /api/v1/hubs/:name/unsubscribe
+// UnsubscribeFromHub unsubscribes the current user from a hub.
+// @Summary      Unsubscribe from hub
+// @Tags         Subscriptions
+// @Security     BearerAuth
+// @Produce      json
+// @Param        name  path  string  true  "Hub name"
+// @Success      200  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /hubs/{name}/unsubscribe [delete]
 func (h *SubscriptionsHandler) UnsubscribeFromHub(c *gin.Context) {
-	userID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
 		return
 	}
 
@@ -81,11 +100,11 @@ func (h *SubscriptionsHandler) UnsubscribeFromHub(c *gin.Context) {
 		return
 	}
 	if hub == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Hub not found"})
+		RespondError(c, http.StatusNotFound, "Hub not found")
 		return
 	}
 
-	err = h.hubSubRepo.Unsubscribe(c.Request.Context(), userID.(int), hub.ID)
+	err = h.hubSubRepo.Unsubscribe(c.Request.Context(), userID, hub.ID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to unsubscribe", "details": err.Error()})
 		return
@@ -105,8 +124,16 @@ func (h *SubscriptionsHandler) UnsubscribeFromHub(c *gin.Context) {
 	})
 }
 
-// CheckHubSubscription handles GET /api/v1/hubs/:name/subscription
-// Optional auth - returns subscription status if authenticated, otherwise returns public info
+// CheckHubSubscription checks whether the current user is subscribed to a hub.
+// @Summary      Check hub subscription
+// @Tags         Subscriptions
+// @Security     BearerAuth
+// @Produce      json
+// @Param        name  path  string  true  "Hub name"
+// @Success      200  {object}  gin.H
+// @Failure      404  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /hubs/{name}/subscription [get]
 func (h *SubscriptionsHandler) CheckHubSubscription(c *gin.Context) {
 	hubName := c.Param("name")
 	hub, err := h.hubRepo.GetByName(c.Request.Context(), hubName)
@@ -115,16 +142,16 @@ func (h *SubscriptionsHandler) CheckHubSubscription(c *gin.Context) {
 		return
 	}
 	if hub == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Hub not found"})
+		RespondError(c, http.StatusNotFound, "Hub not found")
 		return
 	}
 
 	// Check if user is authenticated
-	userID, authenticated := c.Get("user_id")
+	userID, authenticated := middleware.GetOptionalUserID(c)
 
 	if authenticated {
 		// Check subscription status
-		isSubscribed, err := h.hubSubRepo.IsSubscribed(c.Request.Context(), userID.(int), hub.ID)
+		isSubscribed, err := h.hubSubRepo.IsSubscribed(c.Request.Context(), userID, hub.ID)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check subscription", "details": err.Error()})
 			return
@@ -143,15 +170,22 @@ func (h *SubscriptionsHandler) CheckHubSubscription(c *gin.Context) {
 	}
 }
 
-// GetUserHubSubscriptions handles GET /api/v1/users/me/subscriptions/hubs
+// GetUserHubSubscriptions returns hubs the current user is subscribed to.
+// @Summary      Get hub subscriptions
+// @Tags         Subscriptions
+// @Security     BearerAuth
+// @Produce      json
+// @Success      200  {array}   gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /users/me/subscriptions/hubs [get]
 func (h *SubscriptionsHandler) GetUserHubSubscriptions(c *gin.Context) {
-	userID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
 		return
 	}
 
-	subscriptions, err := h.hubSubRepo.GetUserSubscriptions(c.Request.Context(), userID.(int))
+	subscriptions, err := h.hubSubRepo.GetUserSubscriptions(c.Request.Context(), userID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch subscriptions", "details": err.Error()})
 		return
@@ -211,21 +245,29 @@ func (h *SubscriptionsHandler) GetUserHubSubscriptions(c *gin.Context) {
 	})
 }
 
-// SubscribeToSubreddit handles POST /api/v1/subreddits/:name/subscribe
+// SubscribeToSubreddit subscribes the current user to a subreddit.
+// @Summary      Subscribe to subreddit
+// @Tags         Subscriptions
+// @Security     BearerAuth
+// @Produce      json
+// @Param        name  path  string  true  "Subreddit name"
+// @Success      200  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /subreddits/{name}/subscribe [post]
 func (h *SubscriptionsHandler) SubscribeToSubreddit(c *gin.Context) {
-	userID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
 		return
 	}
 
 	subredditName := c.Param("name")
 	if subredditName == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Subreddit name is required"})
+		RespondError(c, http.StatusBadRequest, "Subreddit name is required")
 		return
 	}
 
-	err := h.subredditSubRepo.Subscribe(c.Request.Context(), userID.(int), subredditName)
+	err := h.subredditSubRepo.Subscribe(c.Request.Context(), userID, subredditName)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to subscribe", "details": err.Error()})
 		return
@@ -238,21 +280,29 @@ func (h *SubscriptionsHandler) SubscribeToSubreddit(c *gin.Context) {
 	})
 }
 
-// UnsubscribeFromSubreddit handles DELETE /api/v1/subreddits/:name/unsubscribe
+// UnsubscribeFromSubreddit unsubscribes the current user from a subreddit.
+// @Summary      Unsubscribe from subreddit
+// @Tags         Subscriptions
+// @Security     BearerAuth
+// @Produce      json
+// @Param        name  path  string  true  "Subreddit name"
+// @Success      200  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /subreddits/{name}/unsubscribe [delete]
 func (h *SubscriptionsHandler) UnsubscribeFromSubreddit(c *gin.Context) {
-	userID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
 		return
 	}
 
 	subredditName := c.Param("name")
 	if subredditName == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Subreddit name is required"})
+		RespondError(c, http.StatusBadRequest, "Subreddit name is required")
 		return
 	}
 
-	err := h.subredditSubRepo.Unsubscribe(c.Request.Context(), userID.(int), subredditName)
+	err := h.subredditSubRepo.Unsubscribe(c.Request.Context(), userID, subredditName)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to unsubscribe", "details": err.Error()})
 		return
@@ -265,16 +315,24 @@ func (h *SubscriptionsHandler) UnsubscribeFromSubreddit(c *gin.Context) {
 	})
 }
 
-// CheckSubredditSubscription handles GET /api/v1/subreddits/:name/subscription
+// CheckSubredditSubscription checks whether the current user follows a subreddit.
+// @Summary      Check subreddit subscription
+// @Tags         Subscriptions
+// @Security     BearerAuth
+// @Produce      json
+// @Param        name  path  string  true  "Subreddit name"
+// @Success      200  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /subreddits/{name}/subscription [get]
 func (h *SubscriptionsHandler) CheckSubredditSubscription(c *gin.Context) {
 	subredditName := c.Param("name")
 	if subredditName == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Subreddit name is required"})
+		RespondError(c, http.StatusBadRequest, "Subreddit name is required")
 		return
 	}
 
 	// Check if user is authenticated
-	userID, authenticated := c.Get("user_id")
+	userID, authenticated := middleware.GetOptionalUserID(c)
 
 	response := gin.H{
 		"subreddit":     subredditName,
@@ -283,7 +341,7 @@ func (h *SubscriptionsHandler) CheckSubredditSubscription(c *gin.Context) {
 	}
 
 	if authenticated {
-		isSubscribed, err := h.subredditSubRepo.IsSubscribed(c.Request.Context(), userID.(int), subredditName)
+		isSubscribed, err := h.subredditSubRepo.IsSubscribed(c.Request.Context(), userID, subredditName)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check subscription", "details": err.Error()})
 			return
@@ -296,15 +354,22 @@ func (h *SubscriptionsHandler) CheckSubredditSubscription(c *gin.Context) {
 	c.JSON(http.StatusOK, response)
 }
 
-// GetUserSubredditSubscriptions handles GET /api/v1/users/me/subscriptions/subreddits
+// GetUserSubredditSubscriptions returns subreddits the current user follows.
+// @Summary      Get subreddit subscriptions
+// @Tags         Subscriptions
+// @Security     BearerAuth
+// @Produce      json
+// @Success      200  {array}   gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /users/me/subscriptions/subreddits [get]
 func (h *SubscriptionsHandler) GetUserSubredditSubscriptions(c *gin.Context) {
-	userID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
 		return
 	}
 
-	subscriptions, err := h.subredditSubRepo.GetUserSubscriptions(c.Request.Context(), userID.(int))
+	subscriptions, err := h.subredditSubRepo.GetUserSubscriptions(c.Request.Context(), userID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch subscriptions", "details": err.Error()})
 		return

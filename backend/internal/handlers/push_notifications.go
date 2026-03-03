@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"github.com/omninudge/backend/internal/ports"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -11,11 +12,11 @@ import (
 
 type PushNotificationHandler struct {
 	db        *pgxpool.Pool
-	tokenRepo *models.DeviceTokenRepository
+	tokenRepo ports.DeviceTokenRepository
 	firebase  *services.FirebaseService
 }
 
-func NewPushNotificationHandler(db *pgxpool.Pool, tokenRepo *models.DeviceTokenRepository, firebase *services.FirebaseService) *PushNotificationHandler {
+func NewPushNotificationHandler(db *pgxpool.Pool, tokenRepo ports.DeviceTokenRepository, firebase *services.FirebaseService) *PushNotificationHandler {
 	return &PushNotificationHandler{
 		db:        db,
 		tokenRepo: tokenRepo,
@@ -23,8 +24,17 @@ func NewPushNotificationHandler(db *pgxpool.Pool, tokenRepo *models.DeviceTokenR
 	}
 }
 
-// RegisterDeviceToken registers a device token for push notifications
-// POST /api/v1/devices/register
+// RegisterDeviceToken registers a device token for push notifications.
+// @Summary      Register device token
+// @Tags         PushNotifications
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /devices/register [post]
 func (h *PushNotificationHandler) RegisterDeviceToken(c *gin.Context) {
 	userID := c.GetInt("user_id")
 
@@ -35,7 +45,7 @@ func (h *PushNotificationHandler) RegisterDeviceToken(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request"})
+		RespondError(c, http.StatusBadRequest, "Invalid request")
 		return
 	}
 
@@ -47,15 +57,24 @@ func (h *PushNotificationHandler) RegisterDeviceToken(c *gin.Context) {
 	}
 
 	if err := h.tokenRepo.Upsert(c.Request.Context(), dt); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to register device token"})
+		RespondError(c, http.StatusInternalServerError, "Failed to register device token")
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{"status": "registered", "device": dt})
 }
 
-// UnregisterDeviceToken removes a device token
-// DELETE /api/v1/devices/unregister
+// UnregisterDeviceToken removes a device push token.
+// @Summary      Unregister device token
+// @Tags         PushNotifications
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /devices/unregister [delete]
 func (h *PushNotificationHandler) UnregisterDeviceToken(c *gin.Context) {
 	userID := c.GetInt("user_id")
 
@@ -64,46 +83,60 @@ func (h *PushNotificationHandler) UnregisterDeviceToken(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request"})
+		RespondError(c, http.StatusBadRequest, "Invalid request")
 		return
 	}
 
 	if err := h.tokenRepo.DeleteByUserAndToken(c.Request.Context(), userID, req.Token); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to unregister device token"})
+		RespondError(c, http.StatusInternalServerError, "Failed to unregister device token")
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{"status": "unregistered"})
 }
 
-// GetUserDevices returns all registered devices for the current user
-// GET /api/v1/devices
+// GetUserDevices returns all registered push devices for the current user.
+// @Summary      Get registered devices
+// @Tags         PushNotifications
+// @Security     BearerAuth
+// @Produce      json
+// @Success      200  {array}   gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /devices [get]
 func (h *PushNotificationHandler) GetUserDevices(c *gin.Context) {
 	userID := c.GetInt("user_id")
 
 	devices, err := h.tokenRepo.GetByUserID(c.Request.Context(), userID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get devices"})
+		RespondError(c, http.StatusInternalServerError, "Failed to get devices")
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{"devices": devices})
 }
 
-// TestNotification sends a test notification to the current user (for testing)
-// POST /api/v1/devices/test
+// TestNotification sends a test push notification to the current user.
+// @Summary      Send test notification
+// @Tags         PushNotifications
+// @Security     BearerAuth
+// @Produce      json
+// @Success      200  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /devices/test [post]
 func (h *PushNotificationHandler) TestNotification(c *gin.Context) {
 	userID := c.GetInt("user_id")
 
 	// Get all device tokens for this user
 	tokens, err := h.tokenRepo.GetByUserID(c.Request.Context(), userID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get device tokens"})
+		RespondError(c, http.StatusInternalServerError, "Failed to get device tokens")
 		return
 	}
 
 	if len(tokens) == 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "No devices registered"})
+		RespondError(c, http.StatusBadRequest, "No devices registered")
 		return
 	}
 
@@ -125,7 +158,7 @@ func (h *PushNotificationHandler) TestNotification(c *gin.Context) {
 	}
 
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to send test notification"})
+		RespondError(c, http.StatusInternalServerError, "Failed to send test notification")
 		return
 	}
 

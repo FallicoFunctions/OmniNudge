@@ -10,7 +10,11 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/omninudge/backend/internal/models"
+	"github.com/omninudge/backend/internal/ports"
 )
+
+// Compile-time check.
+var _ ports.HubSettingsRepository = (*HubSettingsRepository)(nil)
 
 type HubSettingsRepository struct {
 	pool *pgxpool.Pool
@@ -522,4 +526,16 @@ func (r *HubSettingsRepository) RemoveModerator(ctx context.Context, hubID int, 
 
 	_, err := r.pool.Exec(ctx, query, hubID, userID)
 	return err
+}
+
+// IsModerator checks if a user is a moderator of a hub (satisfies helpers.ModeratorChecker).
+func (r *HubSettingsRepository) IsModerator(ctx context.Context, hubID, userID int) (bool, error) {
+	var exists bool
+	err := r.pool.QueryRow(ctx, `
+		SELECT EXISTS (
+			SELECT 1 FROM hub_moderators
+			WHERE hub_id = $1 AND user_id = $2
+		)
+	`, hubID, userID).Scan(&exists)
+	return exists, err
 }
