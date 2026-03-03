@@ -26,7 +26,8 @@ type Config struct {
 	Retention   RetentionConfig
 	FrontendURL  string
 	AppEnv       string
-	MetricsToken string // Bearer token for /metrics endpoint; empty = unrestricted (dev only)
+	MetricsToken  string // Bearer token for /metrics endpoint; empty = unrestricted (dev only)
+	AsynqmonToken string // Bearer token for /admin/queues dashboard; empty = unrestricted (dev only)
 }
 
 // RetentionConfig holds data retention settings
@@ -202,7 +203,8 @@ func Load() (*Config, error) {
 		},
 		FrontendURL:  getEnv("FRONTEND_URL", "http://localhost:5176"),
 		AppEnv:       getEnv("APP_ENV", "development"),
-		MetricsToken: getEnv("METRICS_TOKEN", ""),
+		MetricsToken:  getEnv("METRICS_TOKEN", ""),
+		AsynqmonToken: getEnv("ASYNQMON_TOKEN", ""),
 	}
 
 	return cfg, nil
