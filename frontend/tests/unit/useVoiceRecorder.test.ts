@@ -1,43 +1,65 @@
-import { act, renderHook } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useVoiceRecorder } from '../../src/hooks/useVoiceRecorder';
-
-let mockMicDeviceId = '';
-
-vi.mock('../../src/contexts/SettingsContext', () => ({
-  useSettings: () => ({
-    micDeviceId: mockMicDeviceId,
-  }),
-}));
 
 type MockTrack = { stop: ReturnType<typeof vi.fn> };
 type MockStream = { getTracks: () => MockTrack[] };
 
-class FakeScriptProcessor {
-  onaudioprocess: ((event: { inputBuffer: { getChannelData: (channel: number) => Float32Array } }) => void) | null = null;
-  connect = vi.fn();
-  disconnect = vi.fn();
+class FakeMediaRecorder {
+  static isTypeSupported(type: string): boolean {
+    return type === 'audio/webm;codecs=opus';
+  }
+
+  state: 'inactive' | 'recording' | 'paused' = 'inactive';
+  mimeType = 'audio/webm;codecs=opus';
+  ondataavailable: ((event: { data: Blob }) => void) | null = null;
+  onstop: (() => void) | null = null;
+  private readonly chunk = new Blob(['voice-bytes'], { type: 'audio/webm' });
+
+  constructor(_stream: MediaStream, _options?: MediaRecorderOptions) {}
+
+  start(_timeslice?: number) {
+    this.state = 'recording';
+  }
+
+  stop() {
+    this.state = 'inactive';
+    this.ondataavailable?.({ data: this.chunk });
+    this.onstop?.();
+  }
+
+  pause() {
+    this.state = 'paused';
+  }
+
+  resume() {
+    this.state = 'recording';
+  }
+}
+
+class FakeAnalyser {
+  fftSize = 0;
+  frequencyBinCount = 32;
+  getByteFrequencyData = vi.fn((arr: Uint8Array) => {
+    arr.fill(10);
+  });
 }
 
 class FakeAudioContext {
-  static lastInstance: FakeAudioContext | null = null;
-  sampleRate = 44100;
-  destination = {};
-  processor = new FakeScriptProcessor();
   createMediaStreamSource = vi.fn(() => ({ connect: vi.fn() }));
-  createScriptProcessor = vi.fn(() => this.processor as unknown as ScriptProcessorNode);
+  createAnalyser = vi.fn(() => new FakeAnalyser() as unknown as AnalyserNode);
   close = vi.fn(async () => undefined);
-
-  constructor() {
-    FakeAudioContext.lastInstance = this;
-  }
 }
 
 describe('useVoiceRecorder', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
-    mockMicDeviceId = '';
-    localStorage.setItem('auth_token', 'test-token');
+
+    Object.defineProperty(globalThis, 'MediaRecorder', {
+      value: FakeMediaRecorder,
+      configurable: true,
+      writable: true,
+    });
 
     Object.defineProperty(globalThis, 'AudioContext', {
       value: FakeAudioContext,
@@ -46,118 +68,74 @@ describe('useVoiceRecorder', () => {
     });
   });
 
-  it('reports MediaRecorder support when available', () => {
-    class MediaRecorderMock {
-      static isTypeSupported(type: string): boolean {
-        return type === 'audio/webm';
-      }
-    }
-    Object.defineProperty(globalThis, 'MediaRecorder', {
-      value: MediaRecorderMock,
-      configurable: true,
-      writable: true,
-    });
-
-    const { result } = renderHook(() => useVoiceRecorder());
-    expect(result.current.isMediaRecorderSupported).toBe(true);
-  });
-
-  it('uses Web Audio fallback and completes server-side encoding flow when MediaRecorder is unavailable', async () => {
-    Object.defineProperty(globalThis, 'MediaRecorder', {
-      value: undefined,
-      configurable: true,
-      writable: true,
-    });
-
+  it('starts and stops recording, producing an audio blob', async () => {
     const stop = vi.fn();
-    const stream: MockStream = {
-      getTracks: () => [{ stop }],
-    };
+    const stream: MockStream = { getTracks: () => [{ stop }] };
     const getUserMedia = vi.fn(async () => stream as unknown as MediaStream);
     Object.defineProperty(navigator, 'mediaDevices', {
       value: { getUserMedia },
       configurable: true,
     });
 
-    const fetchMock = vi.fn()
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ url: '/uploads/voice/test.webm' }),
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        blob: async () => new Blob(['encoded'], { type: 'audio/webm' }),
-      });
-    vi.stubGlobal('fetch', fetchMock);
-
-    const onRecordingComplete = vi.fn();
-    const { result } = renderHook(() =>
-      useVoiceRecorder({
-        onRecordingComplete,
-      })
-    );
+    const { result } = renderHook(() => useVoiceRecorder());
 
     await act(async () => {
-      await result.current.startRecording();
+      await result.current.start();
+    });
+    expect(result.current.state).toBe('recording');
+    expect(getUserMedia).toHaveBeenCalledWith({ audio: true });
+
+    act(() => {
+      result.current.stop();
     });
 
-    const audioContext = FakeAudioContext.lastInstance;
-    expect(audioContext).not.toBeNull();
-    audioContext?.processor.onaudioprocess?.({
-      inputBuffer: { getChannelData: () => new Float32Array([0.2, -0.2, 0.1]) },
+    await waitFor(() => {
+      expect(result.current.state).toBe('stopped');
+      expect(result.current.audioBlob).not.toBeNull();
     });
-
-    await act(async () => {
-      await result.current.stopRecording();
-    });
-
-    expect(fetchMock).toHaveBeenCalledTimes(2);
-    expect(onRecordingComplete).toHaveBeenCalledTimes(1);
     expect(stop).toHaveBeenCalled();
   });
 
-  it('applies selected microphone device id to getUserMedia constraints', async () => {
-    Object.defineProperty(globalThis, 'MediaRecorder', {
-      value: undefined,
-      configurable: true,
-      writable: true,
+  it('handles microphone permission errors', async () => {
+    const getUserMedia = vi.fn(async () => {
+      throw Object.assign(new Error('denied'), { name: 'NotAllowedError' });
     });
-    mockMicDeviceId = 'mic-123';
+    Object.defineProperty(navigator, 'mediaDevices', {
+      value: { getUserMedia },
+      configurable: true,
+    });
 
+    const { result } = renderHook(() => useVoiceRecorder());
+
+    await act(async () => {
+      await result.current.start();
+    });
+
+    expect(result.current.state).toBe('error');
+    expect(result.current.error).toBeTruthy();
+  });
+
+  it('resets recording state on cancel', async () => {
     const stop = vi.fn();
-    const stream: MockStream = {
-      getTracks: () => [{ stop }],
-    };
+    const stream: MockStream = { getTracks: () => [{ stop }] };
     const getUserMedia = vi.fn(async () => stream as unknown as MediaStream);
     Object.defineProperty(navigator, 'mediaDevices', {
       value: { getUserMedia },
       configurable: true,
     });
 
-    const fetchMock = vi.fn()
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ url: '/uploads/voice/test.webm' }),
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        blob: async () => new Blob(['encoded'], { type: 'audio/webm' }),
-      });
-    vi.stubGlobal('fetch', fetchMock);
-
     const { result } = renderHook(() => useVoiceRecorder());
     await act(async () => {
-      await result.current.startRecording();
+      await result.current.start();
     });
 
-    expect(getUserMedia).toHaveBeenCalledWith({
-      audio: { deviceId: { exact: 'mic-123' } },
+    act(() => {
+      result.current.cancel();
     });
 
-    await act(async () => {
-      await result.current.cancelRecording();
-    });
+    expect(result.current.state).toBe('idle');
+    expect(result.current.audioBlob).toBeNull();
+    expect(result.current.durationSeconds).toBe(0);
     expect(stop).toHaveBeenCalled();
   });
 });
-

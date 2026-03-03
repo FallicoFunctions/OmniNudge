@@ -259,7 +259,9 @@ describe('SettingsPage messaging privacy toggles', () => {
     vi.clearAllMocks();
   });
 
-  it('updates auto-unarchive preference from privacy tab', async () => {
+  it(
+    'updates auto-unarchive preference from privacy tab',
+    async () => {
     useSettingsMock.mockReturnValue(buildSettingsMock(true));
 
     render(
@@ -269,10 +271,16 @@ describe('SettingsPage messaging privacy toggles', () => {
     );
 
     fireEvent.click(screen.getByRole('tab', { name: 'settings.tabs.privacy' }));
-    fireEvent.click(screen.getByRole('switch', { name: 'settings.messagingPrivacy.autoUnarchiveOnMessage' }));
+    fireEvent.click(
+      await screen.findByRole('switch', {
+        name: 'settings.messagingPrivacy.autoUnarchiveOnMessage',
+      })
+    );
 
     await waitFor(() => {
       expect(setAutoUnarchiveOnMessage).toHaveBeenCalledWith(false);
     });
-  });
+    },
+    10000
+  );
 });

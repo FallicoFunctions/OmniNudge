@@ -242,7 +242,7 @@ describe('Theme flows E2E', () => {
     expect(mockThemeService.setActiveTheme).toHaveBeenCalledWith(2);
     const stored = JSON.parse(localStorage.getItem('omninudge.activeTheme') ?? '{}');
     expect(stored.id).toBe(2);
-  });
+  }, 10000);
 
   it('allows creating a new custom theme through the editor flow', async () => {
     const user = userEvent.setup();

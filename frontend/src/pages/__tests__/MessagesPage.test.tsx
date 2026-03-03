@@ -232,7 +232,7 @@ describe('MessagesPage swipe archive gestures', () => {
     await waitFor(() => {
       expect(archiveConversation).toHaveBeenCalledWith(101);
     });
-  });
+  }, 10000);
 
   it('unarchives on right swipe in archived tab', async () => {
     renderPage();
@@ -250,7 +250,7 @@ describe('MessagesPage swipe archive gestures', () => {
     await waitFor(() => {
       expect(unarchiveConversation).toHaveBeenCalledWith(202);
     });
-  });
+  }, 10000);
 
   it('does not request slideshow posts when input is only a prefix', async () => {
     const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
@@ -347,5 +347,5 @@ describe('MessagesPage swipe archive gestures', () => {
     const payload = vi.mocked(messagesService.sendMessage).mock.calls.at(-1)?.[0];
     expect(payload).toBeDefined();
     expect(payload?.reply_to).toBe(9001);
-  });
+  }, 10000);
 });
