@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import EmptyState from '../../src/components/ui/EmptyState';
+import { EmptyState } from '../../src/components/empty/EmptyState';
 
 describe('EmptyState', () => {
   it('renders with title and description', () => {
@@ -17,7 +17,7 @@ describe('EmptyState', () => {
   });
 
   it('renders custom icon', () => {
-    render(<EmptyState icon="🎨" title="Empty" />);
+    render(<EmptyState iconNode="🎨" title="Empty" />);
     expect(screen.getByText('🎨')).toBeInTheDocument();
   });
 
