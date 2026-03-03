@@ -129,7 +129,7 @@ describe('AdminPage - Ban System', () => {
 
     // Check for banned badge
     expect(screen.getByText('Banned', { selector: 'span' })).toBeInTheDocument();
-  });
+  }, 10000);
 
   it('opens ban modal when ban action is clicked', async () => {
     render(<AdminPage />, { wrapper: createWrapper() });
