@@ -609,8 +609,8 @@ func main() {
 	// Protected by ASYNQMON_TOKEN bearer token; empty token allows unrestricted access (dev only).
 	// In production always set ASYNQMON_TOKEN to a strong random secret.
 	if redisAvailable {
-		if cfg.AsynqmonToken == "" {
-			zlog.Warn().Msg("ASYNQMON_TOKEN is not set — /admin/queues dashboard is publicly accessible; set this in production")
+		if cfg.AsynqmonToken == "" && cfg.AppEnv == "production" {
+			zlog.Warn().Msg("ASYNQMON_TOKEN is not set — /admin/queues dashboard is publicly accessible in production")
 		}
 
 		mon := asynqmon.New(asynqmon.Options{
@@ -632,23 +632,12 @@ func main() {
 			c.Next()
 		}
 
-		// asynqmonHandler bridges net/http to gin for the asynqmon SPA.
-		asynqmonHandler := func(c *gin.Context) {
-			mon.ServeHTTP(c.Writer, c.Request)
-		}
-
-		// Asynqmon uses GET for the UI, POST/DELETE for job management actions.
-		// @Summary      Queue monitoring dashboard
-		// @Description  Asynqmon web UI — view and manage background job queues.
-		// @Tags         Admin
-		// @Security     BearerAuth
-		// @Success      200  "HTML dashboard"
-		// @Failure      401  "Unauthorized"
-		// @Router       /admin/queues [get]
+		// Asynqmon uses GET (UI), POST (pause/resume/run/archive/cancel), DELETE (delete tasks/queues).
+		// Confirmed from asynqmon v0.7.2 handler.go — no PATCH or PUT routes exist.
 		adminQueues := router.Group("/admin/queues", asynqmonAuth)
 		for _, method := range []string{http.MethodGet, http.MethodPost, http.MethodDelete} {
-			adminQueues.Handle(method, "", asynqmonHandler)
-			adminQueues.Handle(method, "/*path", asynqmonHandler)
+			adminQueues.Handle(method, "", func(c *gin.Context) { mon.ServeHTTP(c.Writer, c.Request) })
+			adminQueues.Handle(method, "/*path", func(c *gin.Context) { mon.ServeHTTP(c.Writer, c.Request) })
 		}
 
 		zlog.Info().Str("path", "/admin/queues").Msg("Asynqmon queue dashboard enabled")
@@ -1386,3 +1375,19 @@ func main() {
 
 	zlog.Info().Msg("Server exited")
 }
+
+// asynqmonDashboard is a swaggo documentation stub for the Asynqmon queue
+// monitoring dashboard. The actual handler is wired inline in main() because
+// asynqmon provides a net/http handler that cannot be expressed as a named
+// gin HandlerFunc. This stub exists solely so swag init can generate the
+// OpenAPI entry for the route.
+//
+// @Summary      Queue monitoring dashboard
+// @Description  Asynqmon web UI — view and manage background job queues (active, pending, scheduled, retry, dead). Requires Redis to be available.
+// @Tags         Admin
+// @Security     BearerAuth
+// @Produce      html
+// @Success      200  "HTML dashboard"
+// @Failure      401  {object}  response.ErrorResponse  "Unauthorized — ASYNQMON_TOKEN required in production"
+// @Router       /admin/queues [get]
+func asynqmonDashboard() {} //nolint:unused
