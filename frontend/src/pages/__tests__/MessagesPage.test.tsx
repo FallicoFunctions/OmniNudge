@@ -269,7 +269,7 @@ describe('MessagesPage swipe archive gestures', () => {
     expect(redditService.getSubredditPosts).not.toHaveBeenCalled();
 
     alertSpy.mockRestore();
-  });
+  }, 10000);
 
   it('does not open conversation when checkbox receives keyboard events', async () => {
     renderPage();
@@ -311,7 +311,7 @@ describe('MessagesPage swipe archive gestures', () => {
         })
       );
     });
-  });
+  }, 10000);
 
   it('opens thread view from thread preview and requests thread data', async () => {
     renderPage();

@@ -213,7 +213,12 @@ export function useCallManager(): UseCallManagerReturn {
   // F13: enumerate video input devices.
   const refreshDevices = useCallback(async () => {
     try {
-      const devices = await navigator.mediaDevices.enumerateDevices()
+      const mediaDevices = navigator.mediaDevices
+      if (!mediaDevices?.enumerateDevices) {
+        setCameraDevices([])
+        return
+      }
+      const devices = await mediaDevices.enumerateDevices()
       const videoInputs = devices.filter((d) => d.kind === 'videoinput')
       setCameraDevices(videoInputs)
     } catch (err) {

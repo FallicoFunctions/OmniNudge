@@ -9,5 +9,6 @@ export default defineConfig({
     globals: true,
     css: false,
     testTimeout: 10000,
+    slowTestThreshold: 5000,
   },
 });
