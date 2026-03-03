@@ -148,7 +148,7 @@ func (h *ThemesHandler) CreateTheme(c *gin.Context) {
 
 	var req createThemeRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request", "details": err.Error()})
+		RespondError(c, http.StatusBadRequest, "Invalid request")
 		return
 	}
 
@@ -194,7 +194,7 @@ func (h *ThemesHandler) CreateTheme(c *gin.Context) {
 	if req.CustomCSS != nil && *req.CustomCSS != "" {
 		if err := h.sanitizer.Sanitize(*req.CustomCSS); err != nil {
 			log.Printf("CSS sanitization failed for user %d: %v", userID, err)
-			c.JSON(http.StatusBadRequest, gin.H{"error": "CSS validation failed", "details": err.Error()})
+			RespondError(c, http.StatusBadRequest, "CSS validation failed")
 			return
 		}
 	}
@@ -221,7 +221,7 @@ func (h *ThemesHandler) CreateTheme(c *gin.Context) {
 	created, err := h.themeRepo.Create(c.Request.Context(), theme)
 	if err != nil {
 		log.Printf("Failed to create theme for user %d: %v", userID, err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create theme", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to create theme")
 		return
 	}
 
@@ -249,7 +249,7 @@ func (h *ThemesHandler) GetTheme(c *gin.Context) {
 
 	theme, err := h.themeRepo.GetByID(c.Request.Context(), themeID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch theme", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to fetch theme")
 		return
 	}
 
@@ -308,7 +308,7 @@ func (h *ThemesHandler) GetMyThemes(c *gin.Context) {
 		themes, err = h.themeRepo.GetByUserID(c.Request.Context(), userID, limitArg, offset)
 	}
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch themes", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to fetch themes")
 		return
 	}
 
@@ -409,7 +409,7 @@ func (h *ThemesHandler) UpdateTheme(c *gin.Context) {
 	if req.CustomCSS != nil {
 		if *req.CustomCSS != "" {
 			if err := h.sanitizer.Sanitize(*req.CustomCSS); err != nil {
-				c.JSON(http.StatusBadRequest, gin.H{"error": "CSS validation failed", "details": err.Error()})
+				RespondError(c, http.StatusBadRequest, "CSS validation failed")
 				return
 			}
 			theme.CustomCSS = req.CustomCSS
@@ -502,7 +502,7 @@ func (h *ThemesHandler) DeleteTheme(c *gin.Context) {
 func (h *ThemesHandler) GetPredefinedThemes(c *gin.Context) {
 	themes, err := h.themeRepo.GetPredefinedThemes(c.Request.Context())
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch predefined themes", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to fetch predefined themes")
 		return
 	}
 
@@ -570,7 +570,7 @@ func (h *ThemesHandler) BrowseThemes(c *gin.Context) {
 		themes, err = h.themeRepo.GetPublicThemes(c.Request.Context(), limitArg, offset, categoryPtr)
 	}
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch public themes", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to fetch public themes")
 		return
 	}
 

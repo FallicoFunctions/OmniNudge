@@ -18,7 +18,14 @@ func NewSubredditPresenceHandler(presence *services.PresenceStore) *SubredditPre
 	return &SubredditPresenceHandler{presence: presence}
 }
 
-// PingSubredditPresence handles POST /api/v1/subreddits/:name/active-users/ping
+// PingSubredditPresence handles POST /api/v1/subreddits/:name/active-users/ping.
+// @Summary      Ping subreddit presence
+// @Tags         Reddit
+// @Produce      json
+// @Param        name  path      string  true  "Subreddit name"
+// @Success      200   {object}  gin.H
+// @Failure      400   {object}  gin.H
+// @Router       /subreddits/{name}/active-users/ping [post]
 func (h *SubredditPresenceHandler) PingSubredditPresence(c *gin.Context) {
 	subreddit := strings.TrimSpace(c.Param("name"))
 	if subreddit == "" {
@@ -42,7 +49,14 @@ func (h *SubredditPresenceHandler) PingSubredditPresence(c *gin.Context) {
 	})
 }
 
-// GetSubredditActiveUsers handles GET /api/v1/subreddits/:name/active-users
+// GetSubredditActiveUsers handles GET /api/v1/subreddits/:name/active-users.
+// @Summary      Get subreddit active users
+// @Tags         Reddit
+// @Produce      json
+// @Param        name  path      string  true  "Subreddit name"
+// @Success      200   {object}  gin.H
+// @Failure      400   {object}  gin.H
+// @Router       /subreddits/{name}/active-users [get]
 func (h *SubredditPresenceHandler) GetSubredditActiveUsers(c *gin.Context) {
 	subreddit := strings.TrimSpace(c.Param("name"))
 	if subreddit == "" {

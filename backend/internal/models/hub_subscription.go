@@ -25,75 +25,28 @@ func NewHubSubscriptionRepository(pool *pgxpool.Pool) *HubSubscriptionRepository
 	return &HubSubscriptionRepository{pool: pool}
 }
 
-// Subscribe subscribes a user to a hub
-// Uses ON CONFLICT DO NOTHING to handle duplicate subscriptions
-// Increments hub subscriber_count atomically
+// Subscribe subscribes a user to a hub.
+// Uses ON CONFLICT DO NOTHING to handle duplicate subscriptions.
+// subscriber_count is maintained by the trg_hub_subscriber_count_inc trigger
+// (migration 093); no manual UPDATE is needed here.
 func (r *HubSubscriptionRepository) Subscribe(ctx context.Context, userID, hubID int) error {
-	tx, err := r.pool.Begin(ctx)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback(ctx)
-
-	// Insert subscription (ignore if already exists)
-	_, err = tx.Exec(ctx, `
+	_, err := r.pool.Exec(ctx, `
 		INSERT INTO hub_subscriptions (user_id, hub_id)
 		VALUES ($1, $2)
 		ON CONFLICT (user_id, hub_id) DO NOTHING
 	`, userID, hubID)
-	if err != nil {
-		return err
-	}
-
-	// Increment subscriber count
-	_, err = tx.Exec(ctx, `
-		UPDATE hubs
-		SET subscriber_count = subscriber_count + 1
-		WHERE id = $1
-		AND NOT EXISTS (
-			SELECT 1 FROM hub_subscriptions
-			WHERE user_id = $2 AND hub_id = $1
-			AND subscribed_at < NOW() - INTERVAL '1 second'
-		)
-	`, hubID, userID)
-	if err != nil {
-		return err
-	}
-
-	return tx.Commit(ctx)
+	return err
 }
 
-// Unsubscribe unsubscribes a user from a hub
-// Decrements hub subscriber_count atomically
+// Unsubscribe unsubscribes a user from a hub.
+// subscriber_count is maintained by the trg_hub_subscriber_count_dec trigger
+// (migration 093); no manual UPDATE is needed here.
 func (r *HubSubscriptionRepository) Unsubscribe(ctx context.Context, userID, hubID int) error {
-	tx, err := r.pool.Begin(ctx)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback(ctx)
-
-	// Delete subscription
-	cmdTag, err := tx.Exec(ctx, `
+	_, err := r.pool.Exec(ctx, `
 		DELETE FROM hub_subscriptions
 		WHERE user_id = $1 AND hub_id = $2
 	`, userID, hubID)
-	if err != nil {
-		return err
-	}
-
-	// Only decrement if a row was actually deleted
-	if cmdTag.RowsAffected() > 0 {
-		_, err = tx.Exec(ctx, `
-			UPDATE hubs
-			SET subscriber_count = GREATEST(subscriber_count - 1, 0)
-			WHERE id = $1
-		`, hubID)
-		if err != nil {
-			return err
-		}
-	}
-
-	return tx.Commit(ctx)
+	return err
 }
 
 // IsSubscribed checks if a user is subscribed to a hub

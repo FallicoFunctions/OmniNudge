@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	apiresponse "github.com/omninudge/backend/internal/api/response"
 	"github.com/omninudge/backend/internal/services"
 )
 
@@ -17,7 +18,7 @@ func AuthRequired(authService *services.AuthService) gin.HandlerFunc {
 		if authHeader != "" {
 			parts := strings.Split(authHeader, " ")
 			if len(parts) != 2 || strings.ToLower(parts[0]) != "bearer" {
-				c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid authorization format. Use: Bearer <token>"})
+				apiresponse.WriteError(c, http.StatusUnauthorized, "Invalid authorization format. Use: Bearer <token>")
 				c.Abort()
 				return
 			}
@@ -29,17 +30,17 @@ func AuthRequired(authService *services.AuthService) gin.HandlerFunc {
 		}
 
 		if tokenString == "" {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Authorization header required"})
+			apiresponse.WriteError(c, http.StatusUnauthorized, "Authorization header required")
 			c.Abort()
 			return
 		}
 
 		claims, err := authService.ValidateJWT(tokenString)
 		if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid or expired token"})
-		c.Abort()
-		return
-	}
+			apiresponse.WriteError(c, http.StatusUnauthorized, "Invalid or expired token")
+			c.Abort()
+			return
+		}
 
 		// Set user info in context for handlers to use
 		c.Set("user_id", claims.UserID)
@@ -61,13 +62,13 @@ func RequireRole(allowedRoles ...string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		roleVal, exists := c.Get("role")
 		if !exists {
-			c.JSON(http.StatusForbidden, gin.H{"error": "Insufficient permissions"})
+			apiresponse.WriteError(c, http.StatusForbidden, "Insufficient permissions")
 			c.Abort()
 			return
 		}
 		role, ok := roleVal.(string)
 		if !ok || !roleSet[role] {
-			c.JSON(http.StatusForbidden, gin.H{"error": "Insufficient permissions"})
+			apiresponse.WriteError(c, http.StatusForbidden, "Insufficient permissions")
 			c.Abort()
 			return
 		}
@@ -92,7 +93,7 @@ func CORS() gin.HandlerFunc {
 			"http://localhost:5177",
 			"http://localhost:5178",
 			"http://localhost:5179",
-			}
+		}
 
 		allowed := false
 		for _, o := range allowedOrigins {

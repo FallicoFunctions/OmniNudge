@@ -69,7 +69,7 @@ type ConversationUser struct {
 func (h *ConversationsHandler) ensureConversationParticipant(c *gin.Context, conversationID int, userID int) (*models.Conversation, bool) {
 	conversation, err := h.conversationRepo.GetByID(c.Request.Context(), conversationID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get conversation", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to get conversation")
 		return nil, false
 	}
 	if conversation == nil {
@@ -90,7 +90,7 @@ func (h *ConversationsHandler) ensureConversationParticipant(c *gin.Context, con
 			WHERE conversation_id = $1 AND user_id = $2
 		`, conversationID, userID).Scan(&count)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to verify conversation participant", "details": err.Error()})
+			RespondError(c, http.StatusInternalServerError, "Failed to verify conversation participant")
 			return nil, false
 		}
 		if count == 0 {
@@ -122,7 +122,7 @@ func (h *ConversationsHandler) CreateConversation(c *gin.Context) {
 
 	var req CreateConversationRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body", "details": err.Error()})
+		RespondError(c, http.StatusBadRequest, "Invalid request body")
 		return
 	}
 
@@ -135,7 +135,7 @@ func (h *ConversationsHandler) CreateConversation(c *gin.Context) {
 	// Verify other user exists
 	otherUser, err := h.userRepo.GetByID(c.Request.Context(), req.OtherUserID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get user", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to get user")
 		return
 	}
 	if otherUser == nil {
@@ -154,7 +154,7 @@ func (h *ConversationsHandler) CreateConversation(c *gin.Context) {
 		)
 	`, userID, req.OtherUserID).Scan(&blockedByEither)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check blocking status", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to check blocking status")
 		return
 	}
 	if blockedByEither {
@@ -165,7 +165,7 @@ func (h *ConversationsHandler) CreateConversation(c *gin.Context) {
 	// Create or get existing conversation
 	conversation, err := h.conversationRepo.Create(c.Request.Context(), userID, req.OtherUserID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create conversation", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to create conversation")
 		return
 	}
 
@@ -239,7 +239,7 @@ func (h *ConversationsHandler) GetConversations(c *gin.Context) {
 		}
 	}
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get conversations", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to get conversations")
 		return
 	}
 
@@ -419,7 +419,7 @@ func (h *ConversationsHandler) GetConversation(c *gin.Context) {
 			SELECT created_at, last_message_at FROM conversations WHERE id = $1
 		`, conversationID).Scan(&createdAt, &lastMessageAt)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load conversation", "details": err.Error()})
+			RespondError(c, http.StatusInternalServerError, "Failed to load conversation")
 			return
 		}
 
@@ -450,7 +450,7 @@ func (h *ConversationsHandler) GetConversation(c *gin.Context) {
 
 	conversation, err := h.conversationRepo.GetByID(c.Request.Context(), conversationID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get conversation", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to get conversation")
 		return
 	}
 
@@ -532,7 +532,7 @@ func (h *ConversationsHandler) DeleteConversation(c *gin.Context) {
 	// Verify conversation exists and user is a participant
 	conversation, err := h.conversationRepo.GetByID(c.Request.Context(), conversationID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get conversation", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to get conversation")
 		return
 	}
 
@@ -549,14 +549,14 @@ func (h *ConversationsHandler) DeleteConversation(c *gin.Context) {
 	if deleteFor == "both" {
 		// Hard delete all user's messages
 		if err := h.conversationRepo.HardDeleteMessages(c.Request.Context(), conversationID, userID); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete messages", "details": err.Error()})
+			RespondError(c, http.StatusInternalServerError, "Failed to delete messages")
 			return
 		}
 	}
 
 	// Soft delete conversation for this user
 	if err := h.conversationRepo.SoftDeleteForUser(c.Request.Context(), conversationID, userID); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete conversation", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to delete conversation")
 		return
 	}
 
@@ -598,7 +598,7 @@ func (h *ConversationsHandler) ArchiveConversation(c *gin.Context) {
 	// Verify conversation exists and user is a participant
 	conversation, err := h.conversationRepo.GetByID(c.Request.Context(), conversationID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get conversation", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to get conversation")
 		return
 	}
 
@@ -629,7 +629,7 @@ func (h *ConversationsHandler) ArchiveConversation(c *gin.Context) {
 
 	// Archive the conversation
 	if err := h.conversationRepo.Archive(c.Request.Context(), conversationID, userID); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to archive conversation", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to archive conversation")
 		return
 	}
 
@@ -655,7 +655,7 @@ func (h *ConversationsHandler) ArchiveConversationBatch(c *gin.Context) {
 
 	var req ArchiveBatchRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body", "details": err.Error()})
+		RespondError(c, http.StatusBadRequest, "Invalid request body")
 		return
 	}
 	if len(req.ConversationIDs) == 0 {
@@ -683,12 +683,10 @@ func (h *ConversationsHandler) ArchiveConversationBatch(c *gin.Context) {
 
 	if err := h.conversationRepo.ArchiveBatch(c.Request.Context(), uniqueIDs, userID); err != nil {
 		if err == pgx.ErrNoRows {
-			c.JSON(http.StatusForbidden, gin.H{
-				"error": "One or more conversations are invalid or you are not a participant",
-			})
+			RespondError(c, http.StatusForbidden, "One or more conversations are invalid or you are not a participant")
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to archive conversations", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to archive conversations")
 		return
 	}
 
@@ -728,7 +726,7 @@ func (h *ConversationsHandler) UnarchiveConversation(c *gin.Context) {
 			RespondError(c, http.StatusForbidden, "You are not a participant in this conversation or conversation is not archived")
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to unarchive conversation", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to unarchive conversation")
 		return
 	}
 
@@ -763,7 +761,7 @@ func (h *ConversationsHandler) MuteConversation(c *gin.Context) {
 	}
 
 	if err := h.conversationRepo.SetMuted(c.Request.Context(), conversationID, userID, true); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to mute conversation", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to mute conversation")
 		return
 	}
 
@@ -798,7 +796,7 @@ func (h *ConversationsHandler) UnmuteConversation(c *gin.Context) {
 	}
 
 	if err := h.conversationRepo.SetMuted(c.Request.Context(), conversationID, userID, false); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to unmute conversation", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to unmute conversation")
 		return
 	}
 

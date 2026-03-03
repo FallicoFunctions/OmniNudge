@@ -27,6 +27,16 @@ func NewUploadsHandler(mediaRepo ports.MediaFileRepository, uploadsRoot string) 
 }
 
 // ServeUpload serves upload assets and blocks media files that are not scan-clean.
+// @Summary      Serve uploaded file
+// @Tags         Uploads
+// @Produce      application/octet-stream
+// @Param        filepath  path      string  true  "File path"
+// @Success      200       {file}    binary
+// @Failure      400       {object}  gin.H
+// @Failure      404       {object}  gin.H
+// @Failure      423       {object}  gin.H
+// @Failure      410       {object}  gin.H
+// @Router       /uploads/{filepath} [get]
 func (h *UploadsHandler) ServeUpload(c *gin.Context) {
 	cleanRelPath, ok := cleanUploadPath(c.Param("filepath"))
 	if !ok {

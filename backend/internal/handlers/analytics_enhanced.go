@@ -19,8 +19,15 @@ func NewAnalyticsEnhancedHandler(svc *services.AnalyticsServiceEnhanced) *Analyt
 	return &AnalyticsEnhancedHandler{svc: svc}
 }
 
-// TrackEvent records an analytics event (called by frontend)
-// POST /api/v1/analytics/track
+// TrackEvent records an analytics event (called by frontend).
+// @Summary      Track analytics event
+// @Tags         Analytics
+// @Accept       json
+// @Produce      json
+// @Param        body  body      object  true  "Event payload"
+// @Success      200   {object}  gin.H
+// @Failure      400   {object}  gin.H
+// @Router       /analytics/track [post]
 func (h *AnalyticsEnhancedHandler) TrackEvent(c *gin.Context) {
 	userID := c.GetInt("user_id")
 
@@ -58,8 +65,14 @@ func (h *AnalyticsEnhancedHandler) TrackEvent(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"status": "tracked"})
 }
 
-// GetDashboard returns comprehensive analytics dashboard data (admin only)
-// GET /api/v1/admin/analytics/dashboard
+// GetDashboard returns comprehensive analytics dashboard data (admin only).
+// @Summary      Get analytics dashboard
+// @Tags         Analytics
+// @Produce      json
+// @Param        days  query     int  false  "Days to look back (default 30)"
+// @Success      200   {object}  gin.H
+// @Security     BearerAuth
+// @Router       /admin/analytics/dashboard [get]
 func (h *AnalyticsEnhancedHandler) GetDashboard(c *gin.Context) {
 	ctx := c.Request.Context()
 
@@ -153,8 +166,15 @@ func (h *AnalyticsEnhancedHandler) GetDashboard(c *gin.Context) {
 	})
 }
 
-// GetEventStats returns stats for a specific event
-// GET /api/v1/admin/analytics/events/:event_name
+// GetEventStats returns stats for a specific event.
+// @Summary      Get event statistics
+// @Tags         Analytics
+// @Produce      json
+// @Param        event_name  path      string  true  "Event name"
+// @Param        days        query     int     false "Days to look back"
+// @Success      200         {object}  gin.H
+// @Security     BearerAuth
+// @Router       /admin/analytics/events/{event_name} [get]
 func (h *AnalyticsEnhancedHandler) GetEventStats(c *gin.Context) {
 	eventName := c.Param("event_name")
 	if eventName == "" {
@@ -183,8 +203,14 @@ func (h *AnalyticsEnhancedHandler) GetEventStats(c *gin.Context) {
 	})
 }
 
-// GetUserCohort returns retention data for a signup cohort
-// GET /api/v1/admin/analytics/cohort
+// GetUserCohort returns retention data for a signup cohort.
+// @Summary      Get user cohort retention
+// @Tags         Analytics
+// @Produce      json
+// @Param        cohort_date  query     string  false "Cohort date (YYYY-MM-DD)"
+// @Success      200          {object}  gin.H
+// @Security     BearerAuth
+// @Router       /admin/analytics/cohort [get]
 func (h *AnalyticsEnhancedHandler) GetUserCohort(c *gin.Context) {
 	dateParam := c.Query("signup_date")
 	if dateParam == "" {
@@ -218,8 +244,14 @@ func (h *AnalyticsEnhancedHandler) GetUserCohort(c *gin.Context) {
 	})
 }
 
-// GetFunnelAnalysis returns conversion funnel data
-// GET /api/v1/admin/analytics/funnel
+// GetFunnelAnalysis returns conversion funnel data.
+// @Summary      Get funnel analysis
+// @Tags         Analytics
+// @Produce      json
+// @Param        days  query     int  false "Days to look back"
+// @Success      200   {object}  gin.H
+// @Security     BearerAuth
+// @Router       /admin/analytics/funnel [get]
 func (h *AnalyticsEnhancedHandler) GetFunnelAnalysis(c *gin.Context) {
 	startEvent := c.Query("start_event")
 	endEvent := c.Query("end_event")
@@ -250,8 +282,15 @@ func (h *AnalyticsEnhancedHandler) GetFunnelAnalysis(c *gin.Context) {
 	})
 }
 
-// GetDeviceBreakdown returns device/browser/OS statistics
-// GET /api/v1/admin/analytics/devices?days=7&limit=10
+// GetDeviceBreakdown returns device/browser/OS statistics.
+// @Summary      Get device breakdown
+// @Tags         Analytics
+// @Produce      json
+// @Param        days   query     int  false "Days to look back (default 7)"
+// @Param        limit  query     int  false "Max results (default 10)"
+// @Success      200    {object}  gin.H
+// @Security     BearerAuth
+// @Router       /admin/analytics/devices [get]
 func (h *AnalyticsEnhancedHandler) GetDeviceBreakdown(c *gin.Context) {
 	daysParam := c.DefaultQuery("days", "7")
 	days, err := strconv.Atoi(daysParam)
@@ -281,8 +320,15 @@ func (h *AnalyticsEnhancedHandler) GetDeviceBreakdown(c *gin.Context) {
 	})
 }
 
-// GetGeographicBreakdown returns country/city statistics
-// GET /api/v1/admin/analytics/geo?days=7&limit=10
+// GetGeographicBreakdown returns country/city statistics.
+// @Summary      Get geographic breakdown
+// @Tags         Analytics
+// @Produce      json
+// @Param        days   query     int  false "Days to look back (default 7)"
+// @Param        limit  query     int  false "Max results (default 10)"
+// @Success      200    {object}  gin.H
+// @Security     BearerAuth
+// @Router       /admin/analytics/geo [get]
 func (h *AnalyticsEnhancedHandler) GetGeographicBreakdown(c *gin.Context) {
 	daysParam := c.DefaultQuery("days", "7")
 	days, err := strconv.Atoi(daysParam)
@@ -375,8 +421,14 @@ func (h *AnalyticsEnhancedHandler) getBreakdownByField(ctx context.Context, fiel
 	return results
 }
 
-// RefreshMaterializedViews manually refreshes analytics views (admin only)
-// POST /api/v1/admin/analytics/refresh
+// RefreshMaterializedViews manually refreshes analytics views (admin only).
+// @Summary      Refresh analytics materialized views
+// @Tags         Analytics
+// @Produce      json
+// @Success      200  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Security     BearerAuth
+// @Router       /admin/analytics/refresh [post]
 func (h *AnalyticsEnhancedHandler) RefreshMaterializedViews(c *gin.Context) {
 	ctx := c.Request.Context()
 

@@ -82,7 +82,7 @@ func (h *SavedItemsHandler) GetSavedItems(c *gin.Context) {
 	if filterType == "all" || filterType == "posts" {
 		posts, err := h.savedRepo.GetSavedPosts(c.Request.Context(), intUserID)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch saved posts", "details": err.Error()})
+			RespondError(c, http.StatusInternalServerError, "Failed to fetch saved posts")
 			return
 		}
 		if posts == nil {
@@ -94,7 +94,7 @@ func (h *SavedItemsHandler) GetSavedItems(c *gin.Context) {
 	if filterType == "all" || filterType == "reddit_posts" {
 		redditPosts, err := h.savedRepo.GetSavedRedditPosts(c.Request.Context(), intUserID)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch saved Reddit posts", "details": err.Error()})
+			RespondError(c, http.StatusInternalServerError, "Failed to fetch saved Reddit posts")
 			return
 		}
 		filteredPosts, removed := h.pruneRemovedRedditPosts(c, intUserID, redditPosts)
@@ -110,7 +110,7 @@ func (h *SavedItemsHandler) GetSavedItems(c *gin.Context) {
 	if filterType == "all" || filterType == "post_comments" {
 		comments, err := h.savedRepo.GetSavedPostComments(c.Request.Context(), intUserID)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch saved site comments", "details": err.Error()})
+			RespondError(c, http.StatusInternalServerError, "Failed to fetch saved site comments")
 			return
 		}
 		if comments == nil {
@@ -122,7 +122,7 @@ func (h *SavedItemsHandler) GetSavedItems(c *gin.Context) {
 	if filterType == "all" || filterType == "reddit_comments" {
 		comments, err := h.savedRepo.GetSavedRedditComments(c.Request.Context(), intUserID)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch saved comments", "details": err.Error()})
+			RespondError(c, http.StatusInternalServerError, "Failed to fetch saved comments")
 			return
 		}
 		if comments == nil {
@@ -134,7 +134,7 @@ func (h *SavedItemsHandler) GetSavedItems(c *gin.Context) {
 	if filterType == "all" || filterType == "reddit_api_comments" {
 		apiComments, err := h.savedRepo.GetSavedRedditAPIComments(c.Request.Context(), intUserID)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch saved Reddit API comments", "details": err.Error()})
+			RespondError(c, http.StatusInternalServerError, "Failed to fetch saved Reddit API comments")
 			return
 		}
 		if apiComments == nil {
@@ -259,7 +259,7 @@ func (h *SavedItemsHandler) GetHiddenItems(c *gin.Context) {
 	if filterType == "all" || filterType == "posts" {
 		posts, err := h.savedRepo.GetHiddenPosts(c.Request.Context(), userID)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch hidden posts", "details": err.Error()})
+			RespondError(c, http.StatusInternalServerError, "Failed to fetch hidden posts")
 			return
 		}
 		response["hidden_posts"] = posts
@@ -268,7 +268,7 @@ func (h *SavedItemsHandler) GetHiddenItems(c *gin.Context) {
 	if filterType == "all" || filterType == "reddit_posts" {
 		redditPosts, err := h.savedRepo.GetHiddenRedditPosts(c.Request.Context(), userID)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch hidden Reddit posts", "details": err.Error()})
+			RespondError(c, http.StatusInternalServerError, "Failed to fetch hidden Reddit posts")
 			return
 		}
 		response["hidden_reddit_posts"] = redditPosts
@@ -302,7 +302,7 @@ func (h *SavedItemsHandler) SavePost(c *gin.Context) {
 
 	post, err := h.postRepo.GetByID(c.Request.Context(), postID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch post", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to fetch post")
 		return
 	}
 	if post == nil {
@@ -312,7 +312,7 @@ func (h *SavedItemsHandler) SavePost(c *gin.Context) {
 
 	alreadySaved, err := h.savedRepo.IsPostSaved(c.Request.Context(), userID, postID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check saved status", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to check saved status")
 		return
 	}
 	if alreadySaved {
@@ -321,7 +321,7 @@ func (h *SavedItemsHandler) SavePost(c *gin.Context) {
 	}
 
 	if err := h.savedRepo.SavePost(c.Request.Context(), userID, postID); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save post", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to save post")
 		return
 	}
 
@@ -354,7 +354,7 @@ func (h *SavedItemsHandler) UnsavePost(c *gin.Context) {
 	}
 
 	if err := h.savedRepo.RemovePost(c.Request.Context(), userID, postID); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to unsave post", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to unsave post")
 		return
 	}
 
@@ -390,7 +390,7 @@ func (h *SavedItemsHandler) SaveRedditComment(c *gin.Context) {
 
 	comment, err := h.redditCommentRepo.GetByID(c.Request.Context(), commentID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch comment", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to fetch comment")
 		return
 	}
 	if comment == nil || comment.DeletedAt != nil {
@@ -405,7 +405,7 @@ func (h *SavedItemsHandler) SaveRedditComment(c *gin.Context) {
 	}
 
 	if err := h.savedRepo.SaveRedditComment(c.Request.Context(), userID, commentID); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save comment", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to save comment")
 		return
 	}
 
@@ -437,7 +437,7 @@ func (h *SavedItemsHandler) UnsaveRedditComment(c *gin.Context) {
 	}
 
 	if err := h.savedRepo.RemoveRedditComment(c.Request.Context(), userID, commentID); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to unsave comment", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to unsave comment")
 		return
 	}
 
@@ -475,7 +475,7 @@ func (h *SavedItemsHandler) SaveRedditAPIComment(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request", "details": err.Error()})
+		RespondError(c, http.StatusBadRequest, "Invalid request")
 		return
 	}
 
@@ -493,7 +493,7 @@ func (h *SavedItemsHandler) SaveRedditAPIComment(c *gin.Context) {
 	}
 
 	if err := h.savedRepo.SaveRedditAPIComment(c.Request.Context(), userID, comment); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save comment", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to save comment")
 		return
 	}
 
@@ -523,7 +523,7 @@ func (h *SavedItemsHandler) UnsaveRedditAPIComment(c *gin.Context) {
 	}
 
 	if err := h.savedRepo.RemoveRedditAPIComment(c.Request.Context(), userID, redditCommentID); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to unsave comment", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to unsave comment")
 		return
 	}
 
@@ -554,7 +554,7 @@ func (h *SavedItemsHandler) SavePostComment(c *gin.Context) {
 
 	comment, err := h.postCommentRepo.GetByID(c.Request.Context(), commentID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch comment", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to fetch comment")
 		return
 	}
 	if comment == nil {
@@ -563,7 +563,7 @@ func (h *SavedItemsHandler) SavePostComment(c *gin.Context) {
 	}
 
 	if err := h.savedRepo.SavePostComment(c.Request.Context(), userID, commentID); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save comment", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to save comment")
 		return
 	}
 
@@ -593,7 +593,7 @@ func (h *SavedItemsHandler) UnsavePostComment(c *gin.Context) {
 	}
 
 	if err := h.savedRepo.RemovePostComment(c.Request.Context(), userID, commentID); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to unsave comment", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to unsave comment")
 		return
 	}
 
@@ -627,7 +627,7 @@ func (h *SavedItemsHandler) SaveRedditPost(c *gin.Context) {
 
 	var req saveRedditPostRequest
 	if err := c.ShouldBindJSON(&req); err != nil && !errors.Is(err, io.EOF) {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body", "details": err.Error()})
+		RespondError(c, http.StatusBadRequest, "Invalid request body")
 		return
 	}
 
@@ -641,7 +641,7 @@ func (h *SavedItemsHandler) SaveRedditPost(c *gin.Context) {
 		Thumbnail:    req.Thumbnail,
 		CreatedUTC:   req.CreatedUTC,
 	}); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save Reddit post", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to save Reddit post")
 		return
 	}
 
@@ -674,7 +674,7 @@ func (h *SavedItemsHandler) UnsaveRedditPost(c *gin.Context) {
 	}
 
 	if err := h.savedRepo.RemoveRedditPost(c.Request.Context(), userID, subreddit, postId); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to unsave Reddit post", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to unsave Reddit post")
 		return
 	}
 
@@ -704,7 +704,7 @@ func (h *SavedItemsHandler) HidePost(c *gin.Context) {
 	}
 
 	if err := h.savedRepo.HidePost(c.Request.Context(), userID, postID); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to hide post", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to hide post")
 		return
 	}
 
@@ -734,7 +734,7 @@ func (h *SavedItemsHandler) UnhidePost(c *gin.Context) {
 	}
 
 	if err := h.savedRepo.UnhidePost(c.Request.Context(), userID, postID); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to unhide post", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to unhide post")
 		return
 	}
 
@@ -767,7 +767,7 @@ func (h *SavedItemsHandler) HideRedditPost(c *gin.Context) {
 	}
 
 	if err := h.savedRepo.HideRedditPost(c.Request.Context(), userID, subreddit, postId); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to hide Reddit post", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to hide Reddit post")
 		return
 	}
 
@@ -800,7 +800,7 @@ func (h *SavedItemsHandler) UnhideRedditPost(c *gin.Context) {
 	}
 
 	if err := h.savedRepo.UnhideRedditPost(c.Request.Context(), userID, subreddit, postId); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to unhide Reddit post", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to unhide Reddit post")
 		return
 	}
 

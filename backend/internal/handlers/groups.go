@@ -247,7 +247,7 @@ func (h *GroupHandler) CreateGroup(c *gin.Context) {
 
 	var req CreateGroupRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request", "details": err.Error()})
+		RespondError(c, http.StatusBadRequest, "Invalid request")
 		return
 	}
 
@@ -309,7 +309,7 @@ func (h *GroupHandler) CreateGroup(c *gin.Context) {
 		RETURNING id, created_at, last_message_at
 	`, req.Name, avatarURL, description, userID).Scan(&conversationID, &createdAt, &lastMessageAt)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create group", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to create group")
 		return
 	}
 
@@ -319,7 +319,7 @@ func (h *GroupHandler) CreateGroup(c *gin.Context) {
 		VALUES ($1, $2, 'owner', CURRENT_TIMESTAMP)
 	`, conversationID, userID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to add creator", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to add creator")
 		return
 	}
 
@@ -738,7 +738,7 @@ func (h *GroupHandler) UpdateGroup(c *gin.Context) {
 		&conv.CreatedAt, &conv.LastMessageAt,
 	)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update group", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to update group")
 		return
 	}
 
@@ -843,7 +843,7 @@ func (h *GroupHandler) UpdateGroupSettings(c *gin.Context) {
 	`, conversationID, req.AnyoneCanInvite, req.AnyoneCanPin, req.MessageHistoryVisible, req.SlowModeSeconds).
 		Scan(&s.AnyoneCanInvite, &s.AnyoneCanPin, &s.MessageHistoryVisible, &s.SlowModeSeconds)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update settings", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to update settings")
 		return
 	}
 
@@ -930,7 +930,7 @@ func (h *GroupHandler) CreateGroupInvite(c *gin.Context) {
 	`, conversationID, req.UserID, userID).
 		Scan(&invite.ID, &invite.ConversationID, &invite.Status, &invite.ExpiresAt, &invite.CreatedAt)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create invite", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to create invite")
 		return
 	}
 

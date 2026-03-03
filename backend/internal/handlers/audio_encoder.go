@@ -38,8 +38,18 @@ func NewAudioEncoderHandler(
 	}
 }
 
-// EncodeAudio processes raw audio from iOS devices and encodes to WebM/Opus
-// POST /api/v1/media/encode-audio
+// EncodeAudio processes raw audio from iOS devices and encodes to WebM/Opus.
+// @Summary      Encode audio
+// @Tags         Media
+// @Security     BearerAuth
+// @Accept       multipart/form-data
+// @Produce      json
+// @Param        audio  formData  file  true  "Raw audio file"
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /media/encode-audio [post]
 func (h *AudioEncoderHandler) EncodeAudio(c *gin.Context) {
 	userID := c.GetInt("user_id")
 

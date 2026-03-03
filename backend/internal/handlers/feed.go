@@ -180,7 +180,7 @@ func (h *FeedHandler) GetHomeFeed(c *gin.Context) {
 		)
 
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch feed", "details": err.Error()})
+			RespondError(c, http.StatusInternalServerError, "Failed to fetch feed")
 			return
 		}
 	} else {
@@ -202,7 +202,7 @@ func (h *FeedHandler) GetHomeFeed(c *gin.Context) {
 		)
 
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch feed", "details": err.Error()})
+			RespondError(c, http.StatusInternalServerError, "Failed to fetch feed")
 			return
 		}
 

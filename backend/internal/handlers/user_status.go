@@ -20,7 +20,13 @@ func NewUserStatusHandler(hub HubInterface) *UserStatusHandler {
 	}
 }
 
-// GetUserStatus handles GET /api/v1/users/:username/status
+// GetUserStatus handles GET /api/v1/users/:username/status.
+// @Summary      Get single user online status
+// @Tags         Users
+// @Produce      json
+// @Param        username  path      string  true  "Username"
+// @Success      501       {object}  gin.H
+// @Router       /users/{username}/status [get]
 func (h *UserStatusHandler) GetUserStatus(c *gin.Context) {
 	// For this endpoint, we need to convert username to user ID
 	// This would require a user repository lookup
@@ -30,7 +36,14 @@ func (h *UserStatusHandler) GetUserStatus(c *gin.Context) {
 	})
 }
 
-// GetUsersStatus handles GET /api/v1/users/status?user_ids=1,2,3
+// GetUsersStatus handles GET /api/v1/users/status?user_ids=1,2,3.
+// @Summary      Get multiple users online status
+// @Tags         Users
+// @Produce      json
+// @Param        user_ids  query     string  true  "Comma-separated user IDs"
+// @Success      200       {object}  gin.H
+// @Failure      400       {object}  gin.H
+// @Router       /users/status [get]
 func (h *UserStatusHandler) GetUsersStatus(c *gin.Context) {
 	userIDsStr := c.Query("user_ids")
 	if userIDsStr == "" {

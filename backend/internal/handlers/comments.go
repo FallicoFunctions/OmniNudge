@@ -85,7 +85,7 @@ func (h *CommentsHandler) CreateComment(c *gin.Context) {
 	// Verify post exists
 	post, err := h.postRepo.GetByID(c.Request.Context(), postID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get post", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to get post")
 		return
 	}
 	if post == nil {
@@ -95,7 +95,7 @@ func (h *CommentsHandler) CreateComment(c *gin.Context) {
 
 	var req CreateCommentRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body", "details": err.Error()})
+		RespondError(c, http.StatusBadRequest, "Invalid request body")
 		return
 	}
 
@@ -103,7 +103,7 @@ func (h *CommentsHandler) CreateComment(c *gin.Context) {
 	if req.ParentCommentID != nil {
 		parentComment, err := h.commentRepo.GetByID(c.Request.Context(), *req.ParentCommentID)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get parent comment", "details": err.Error()})
+			RespondError(c, http.StatusInternalServerError, "Failed to get parent comment")
 			return
 		}
 		if parentComment == nil {
@@ -131,7 +131,7 @@ func (h *CommentsHandler) CreateComment(c *gin.Context) {
 	}
 
 	if err := h.commentRepo.Create(c.Request.Context(), comment); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create comment", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to create comment")
 		return
 	}
 
@@ -196,7 +196,7 @@ func (h *CommentsHandler) GetComments(c *gin.Context) {
 
 	comments, err := h.commentRepo.GetByPostID(c.Request.Context(), postID, sortBy, limit, offset, userIDPtr)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get comments", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to get comments")
 		return
 	}
 
@@ -231,7 +231,7 @@ func (h *CommentsHandler) GetComment(c *gin.Context) {
 
 	comment, err := h.commentRepo.GetByID(c.Request.Context(), commentID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get comment", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to get comment")
 		return
 	}
 
@@ -278,7 +278,7 @@ func (h *CommentsHandler) GetCommentReplies(c *gin.Context) {
 
 	replies, err := h.commentRepo.GetReplies(c.Request.Context(), commentID, sortBy, limit, offset, userIDPtr)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get replies", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to get replies")
 		return
 	}
 
@@ -327,7 +327,7 @@ func (h *CommentsHandler) UpdateComment(c *gin.Context) {
 	// Get existing comment to verify ownership
 	existingComment, err := h.commentRepo.GetByID(c.Request.Context(), commentID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get comment", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to get comment")
 		return
 	}
 
@@ -354,7 +354,7 @@ func (h *CommentsHandler) UpdateComment(c *gin.Context) {
 
 	var req UpdateCommentRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body", "details": err.Error()})
+		RespondError(c, http.StatusBadRequest, "Invalid request body")
 		return
 	}
 
@@ -362,7 +362,7 @@ func (h *CommentsHandler) UpdateComment(c *gin.Context) {
 	existingComment.Body = req.Body
 
 	if err := h.commentRepo.Update(c.Request.Context(), existingComment); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update comment", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to update comment")
 		return
 	}
 
@@ -415,7 +415,7 @@ func (h *CommentsHandler) DeleteComment(c *gin.Context) {
 	// Get existing comment to verify ownership
 	existingComment, err := h.commentRepo.GetByID(c.Request.Context(), commentID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get comment", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to get comment")
 		return
 	}
 
@@ -455,7 +455,7 @@ func (h *CommentsHandler) DeleteComment(c *gin.Context) {
 	}
 
 	if err := h.commentRepo.SoftDelete(c.Request.Context(), commentID); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete comment", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to delete comment")
 		return
 	}
 
@@ -619,7 +619,7 @@ func (h *CommentsHandler) UpdateCommentPreferences(c *gin.Context) {
 
 	comment, err := h.commentRepo.GetByID(c.Request.Context(), commentID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load comment", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to load comment")
 		return
 	}
 	if comment == nil || comment.PostID != postID {
@@ -634,12 +634,12 @@ func (h *CommentsHandler) UpdateCommentPreferences(c *gin.Context) {
 
 	var req UpdateCommentPreferencesRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body", "details": err.Error()})
+		RespondError(c, http.StatusBadRequest, "Invalid request body")
 		return
 	}
 
 	if err := h.commentRepo.SetInboxRepliesDisabled(c.Request.Context(), commentID, userID, req.DisableInboxReplies); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update preferences", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to update preferences")
 		return
 	}
 
@@ -676,19 +676,19 @@ func (h *CommentsHandler) VoteComment(c *gin.Context) {
 		IsUpvote *bool `json:"is_upvote"` // true=upvote, false=downvote, null=remove
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body", "details": err.Error()})
+		RespondError(c, http.StatusBadRequest, "Invalid request body")
 		return
 	}
 
 	if err := h.commentRepo.Vote(c.Request.Context(), commentID, userID, req.IsUpvote); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to vote on comment", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to vote on comment")
 		return
 	}
 
 	// Get updated comment
 	comment, err := h.commentRepo.GetByID(c.Request.Context(), commentID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get updated comment", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to get updated comment")
 		return
 	}
 

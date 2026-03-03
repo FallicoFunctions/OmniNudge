@@ -126,7 +126,7 @@ func (h *MediaGalleryHandler) GetConversationMedia(c *gin.Context) {
 	// Execute query
 	rows, err := h.pool.Query(c.Request.Context(), query, args...)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch media", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to fetch media")
 		return
 	}
 	defer rows.Close()

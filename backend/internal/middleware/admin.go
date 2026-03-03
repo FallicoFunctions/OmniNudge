@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	apiresponse "github.com/omninudge/backend/internal/api/response"
 )
 
 // AdminRequired middleware ensures the user has admin role
@@ -12,7 +13,7 @@ func AdminRequired() gin.HandlerFunc {
 		// Check if user is authenticated
 		_, exists := c.Get("user_id")
 		if !exists {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+			apiresponse.WriteError(c, http.StatusUnauthorized, "Unauthorized")
 			c.Abort()
 			return
 		}
@@ -30,7 +31,7 @@ func AdminRequired() gin.HandlerFunc {
 			}
 		}
 
-		c.JSON(http.StatusForbidden, gin.H{"error": "Forbidden: Admin access required"})
+		apiresponse.WriteError(c, http.StatusForbidden, "Forbidden: Admin access required")
 		c.Abort()
 	}
 }

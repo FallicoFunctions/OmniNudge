@@ -53,7 +53,7 @@ func (h *AdminHandler) PromoteUser(c *gin.Context) {
 		Role string `json:"role" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request", "details": err.Error()})
+		RespondError(c, http.StatusBadRequest, "Invalid request")
 		return
 	}
 
@@ -61,14 +61,12 @@ func (h *AdminHandler) PromoteUser(c *gin.Context) {
 	switch req.Role {
 	case "user", "admin":
 	default:
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "Invalid role. Use hub moderator assignment for per-hub moderators.",
-		})
+		RespondError(c, http.StatusBadRequest, "Invalid role. Use hub moderator assignment for per-hub moderators.")
 		return
 	}
 
 	if err := h.userRepo.UpdateRole(c.Request.Context(), targetID, req.Role); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update role", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to update role")
 		return
 	}
 
@@ -110,7 +108,7 @@ func (h *AdminHandler) BanUser(c *gin.Context) {
 	}
 
 	if err := h.userRepo.BanUser(c.Request.Context(), targetID, req.Reason, req.ShowReason, adminID); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to ban user", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to ban user")
 		return
 	}
 
@@ -151,7 +149,7 @@ func (h *AdminHandler) ShadowBanUser(c *gin.Context) {
 	}
 
 	if err := h.userRepo.ShadowBanUser(c.Request.Context(), targetID, req.Reason, req.ShowReason, adminID); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to shadow ban user", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to shadow ban user")
 		return
 	}
 
@@ -191,7 +189,7 @@ func (h *AdminHandler) UnbanUser(c *gin.Context) {
 	}
 
 	if err := h.userRepo.UnbanUser(c.Request.Context(), targetID, req.Reason, adminID); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to unban user", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to unban user")
 		return
 	}
 
@@ -231,7 +229,7 @@ func (h *AdminHandler) SoftDeleteUser(c *gin.Context) {
 	}
 
 	if err := h.userRepo.SoftDeleteUser(c.Request.Context(), targetID, req.Reason, adminID); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete user", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to delete user")
 		return
 	}
 
@@ -258,7 +256,7 @@ func (h *AdminHandler) GetBanHistory(c *gin.Context) {
 
 	history, err := h.userRepo.GetBanHistory(c.Request.Context(), targetID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch ban history", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to fetch ban history")
 		return
 	}
 
@@ -315,7 +313,7 @@ func (h *AdminHandler) GetAllBanHistory(c *gin.Context) {
 		history, err = h.userRepo.GetAllBanHistory(c.Request.Context(), limitArg, offset)
 	}
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch ban history", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to fetch ban history")
 		return
 	}
 
@@ -323,7 +321,7 @@ func (h *AdminHandler) GetAllBanHistory(c *gin.Context) {
 	var totalCount int
 	countQuery := "SELECT COUNT(*) FROM ban_history"
 	if err := h.pool.QueryRow(c.Request.Context(), countQuery).Scan(&totalCount); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to count ban history", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to count ban history")
 		return
 	}
 
@@ -440,7 +438,7 @@ func (h *AdminHandler) ListUsers(c *gin.Context) {
 	}
 	var totalCount int
 	if err := h.pool.QueryRow(c.Request.Context(), countQuery, args...).Scan(&totalCount); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to count users", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to count users")
 		return
 	}
 
@@ -455,7 +453,7 @@ func (h *AdminHandler) ListUsers(c *gin.Context) {
 
 	rows, err := h.pool.Query(c.Request.Context(), baseQuery, args...)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch users", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to fetch users")
 		return
 	}
 	defer rows.Close()
@@ -502,7 +500,7 @@ func (h *AdminHandler) ListUsers(c *gin.Context) {
 		var row userRow
 		if err := rows.Scan(&row.ID, &row.Username, &row.Email, &row.RedditID, &row.Role, &row.CreatedAt, &row.LastSeen, &row.Bio, &row.AvatarURL,
 			&row.ShadowBanned, &row.Banned, &row.Deleted, &row.BanReason, &row.ShowBanReason, &row.BannedAt, &row.BannedBy); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to scan user", "details": err.Error()})
+			RespondError(c, http.StatusInternalServerError, "Failed to scan user")
 			return
 		}
 		var lastSeenStr *string
@@ -623,7 +621,7 @@ func (h *AdminHandler) GetSiteStats(c *gin.Context) {
 	for i := 0; i < len(queries); i++ {
 		result := <-resultsChan
 		if result.err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch stats", "details": result.err.Error()})
+			RespondError(c, http.StatusInternalServerError, "Failed to fetch stats")
 			return
 		}
 	}
@@ -645,7 +643,7 @@ func (h *AdminHandler) GetSiteStats(c *gin.Context) {
 		&stats.ReviewedReports,
 		&stats.DismissedReports,
 	); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch report status stats", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to fetch report status stats")
 		return
 	}
 
@@ -654,7 +652,7 @@ func (h *AdminHandler) GetSiteStats(c *gin.Context) {
 		FROM reports
 		WHERE resolved_at IS NOT NULL
 	`).Scan(&stats.AvgReportResolutionHours); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch average report resolution time", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to fetch average report resolution time")
 		return
 	}
 
@@ -694,7 +692,7 @@ func (h *AdminHandler) GetHubModerators(c *gin.Context) {
 
 	rows, err := h.pool.Query(c.Request.Context(), query, hubID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch moderators", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to fetch moderators")
 		return
 	}
 	defer rows.Close()
@@ -712,7 +710,7 @@ func (h *AdminHandler) GetHubModerators(c *gin.Context) {
 	for rows.Next() {
 		var m ModeratorResponse
 		if err := rows.Scan(&m.ID, &m.UserID, &m.HubID, &m.AddedBy, &m.AddedAt, &m.Username); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to scan moderator", "details": err.Error()})
+			RespondError(c, http.StatusInternalServerError, "Failed to scan moderator")
 			return
 		}
 		moderators = append(moderators, m)
@@ -747,7 +745,7 @@ func (h *AdminHandler) RemoveHubModerator(c *gin.Context) {
 	}
 
 	if err := h.hubModRepo.RemoveModerator(c.Request.Context(), hubID, userID); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to remove moderator", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to remove moderator")
 		return
 	}
 

@@ -18,8 +18,17 @@ func NewJobsHandler(queueClient *queue.QueueClient) *JobsHandler {
 	return &JobsHandler{queueClient: queueClient}
 }
 
-// GetJobStatus returns the status of a background job
-// GET /api/v1/jobs/:queue/:id
+// GetJobStatus returns the status of a background job.
+// @Summary      Get job status
+// @Tags         Jobs
+// @Produce      json
+// @Param        queue  path      string  true  "Queue name"
+// @Param        id     path      string  true  "Job ID"
+// @Success      200    {object}  gin.H
+// @Failure      400    {object}  gin.H
+// @Failure      404    {object}  gin.H
+// @Security     BearerAuth
+// @Router       /jobs/{queue}/{id} [get]
 func (h *JobsHandler) GetJobStatus(c *gin.Context) {
 	queueName := c.Param("queue")
 	jobID := c.Param("id")

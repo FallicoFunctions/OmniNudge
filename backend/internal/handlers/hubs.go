@@ -89,7 +89,7 @@ func (h *HubsHandler) Create(c *gin.Context) {
 
 	var req CreateHubRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body", "details": err.Error()})
+		RespondError(c, http.StatusBadRequest, "Invalid request body")
 		return
 	}
 
@@ -167,13 +167,13 @@ func (h *HubsHandler) Create(c *gin.Context) {
 			RespondError(c, http.StatusConflict, "Hub already exists")
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create hub", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to create hub")
 		return
 	}
 
 	if len(req.DenyKeywords) > 0 {
 		if err := h.hubRepo.UpsertHubTopicFilters(c.Request.Context(), hub.ID, req.DenyKeywords); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save hub deny keywords", "details": err.Error()})
+			RespondError(c, http.StatusInternalServerError, "Failed to save hub deny keywords")
 			return
 		}
 	}
@@ -182,7 +182,7 @@ func (h *HubsHandler) Create(c *gin.Context) {
 		settings := buildDefaultHubSettings(hub.ID, req.Type, allowText, allowLink, allowImage, allowVideo)
 		creatorID := userID
 		if err := h.settingsRepo.EnsureDefaults(c.Request.Context(), settings, &creatorID); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to initialize hub settings", "details": err.Error()})
+			RespondError(c, http.StatusInternalServerError, "Failed to initialize hub settings")
 			return
 		}
 	}
@@ -208,7 +208,7 @@ func (h *HubsHandler) Get(c *gin.Context) {
 	name := c.Param("name")
 	hub, err := h.hubRepo.GetByName(c.Request.Context(), name)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch hub", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to fetch hub")
 		return
 	}
 	if hub == nil {
@@ -220,7 +220,7 @@ func (h *HubsHandler) Get(c *gin.Context) {
 	if h.modRepo != nil {
 		moderators, err := h.modRepo.GetModeratorsForHub(c.Request.Context(), hub.ID)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load moderators", "details": err.Error()})
+			RespondError(c, http.StatusInternalServerError, "Failed to load moderators")
 			return
 		}
 		response["moderators"] = moderatorsResponse(moderators)
@@ -255,7 +255,7 @@ func (h *HubsHandler) List(c *gin.Context) {
 		hubs, err = h.hubRepo.List(c.Request.Context(), limit, offset, includeNsfw)
 	}
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to list hubs", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to list hubs")
 		return
 	}
 
@@ -283,7 +283,7 @@ func (h *HubsHandler) GetPosts(c *gin.Context) {
 	name := c.Param("name")
 	hub, err := h.hubRepo.GetByName(c.Request.Context(), name)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch hub", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to fetch hub")
 		return
 	}
 	if hub == nil {
@@ -317,16 +317,16 @@ func (h *HubsHandler) GetPosts(c *gin.Context) {
 				createdBy = hub.CreatedBy
 			}
 			if err := h.settingsRepo.EnsureDefaults(c.Request.Context(), defaults, createdBy); err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch hub settings", "details": err.Error()})
+				RespondError(c, http.StatusInternalServerError, "Failed to fetch hub settings")
 				return
 			}
 			settings, err = h.settingsRepo.GetByHubID(c.Request.Context(), hub.ID)
 			if err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch hub settings", "details": err.Error()})
+				RespondError(c, http.StatusInternalServerError, "Failed to fetch hub settings")
 				return
 			}
 		} else {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch hub settings", "details": err.Error()})
+			RespondError(c, http.StatusInternalServerError, "Failed to fetch hub settings")
 			return
 		}
 	}
@@ -336,7 +336,7 @@ func (h *HubsHandler) GetPosts(c *gin.Context) {
 		if userID != nil {
 			hasAccess, err = h.CanUserAccessHub(c.Request.Context(), hub.ID, *userID)
 			if err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check access", "details": err.Error()})
+				RespondError(c, http.StatusInternalServerError, "Failed to check access")
 				return
 			}
 		}
@@ -467,7 +467,7 @@ func (h *HubsHandler) GetPosts(c *gin.Context) {
 			posts, err = h.postRepo.GetByHubWithCursor(c.Request.Context(), hub.ID, sortBy, limitPlusOne, cursor, userID, startTime, endTime)
 		}
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch posts", "details": err.Error()})
+			RespondError(c, http.StatusInternalServerError, "Failed to fetch posts")
 			return
 		}
 		if len(posts) > limit {
@@ -485,7 +485,7 @@ func (h *HubsHandler) GetPosts(c *gin.Context) {
 			posts, err = h.postRepo.GetByHubWithUser(c.Request.Context(), hub.ID, sortBy, limit, offset, userID, startTime, endTime)
 		}
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch posts", "details": err.Error()})
+			RespondError(c, http.StatusInternalServerError, "Failed to fetch posts")
 			return
 		}
 		hasMore = len(posts) == limit
@@ -526,7 +526,7 @@ func (h *HubsHandler) AddModerator(c *gin.Context) {
 	name := c.Param("name")
 	hub, err := h.hubRepo.GetByName(c.Request.Context(), name)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch hub", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to fetch hub")
 		return
 	}
 	if hub == nil {
@@ -538,7 +538,7 @@ func (h *HubsHandler) AddModerator(c *gin.Context) {
 		UserID int `json:"user_id" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body", "details": err.Error()})
+		RespondError(c, http.StatusBadRequest, "Invalid request body")
 		return
 	}
 
@@ -548,7 +548,7 @@ func (h *HubsHandler) AddModerator(c *gin.Context) {
 	}
 
 	if err := h.modRepo.AddModerator(c.Request.Context(), hub.ID, req.UserID); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to add moderator", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to add moderator")
 		return
 	}
 
@@ -578,7 +578,7 @@ func (h *HubsHandler) GetUserHubs(c *gin.Context) {
 
 	hubs, err := h.hubRepo.List(c.Request.Context(), limit, 0, true)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch user hubs", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to fetch user hubs")
 		return
 	}
 
@@ -600,7 +600,7 @@ func (h *HubsHandler) GetUserHubs(c *gin.Context) {
 func (h *HubsHandler) GetAgentTargets(c *gin.Context) {
 	targets, err := h.hubRepo.ListAgentTargets(c.Request.Context())
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch hub targets", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to fetch hub targets")
 		return
 	}
 
@@ -640,7 +640,7 @@ func (h *HubsHandler) CrosspostToHub(c *gin.Context) {
 	hubName := c.Param("name")
 	hub, err := h.hubRepo.GetByName(c.Request.Context(), hubName)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch hub", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to fetch hub")
 		return
 	}
 	if hub == nil {
@@ -650,7 +650,7 @@ func (h *HubsHandler) CrosspostToHub(c *gin.Context) {
 
 	var req CrosspostRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body", "details": err.Error()})
+		RespondError(c, http.StatusBadRequest, "Invalid request body")
 		return
 	}
 
@@ -694,14 +694,14 @@ func (h *HubsHandler) CrosspostToHub(c *gin.Context) {
 	post.CrosspostedAt = &crosspostedAt
 
 	if err := h.postRepo.Create(c.Request.Context(), post); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create crosspost", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to create crosspost")
 		return
 	}
 
 	if post.CrosspostedAt != nil {
 		normalized := post.CrosspostedAt.UTC()
 		if err := h.postRepo.UpdateCreatedAt(c.Request.Context(), post.ID, normalized); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to finalize crosspost timestamp", "details": err.Error()})
+			RespondError(c, http.StatusInternalServerError, "Failed to finalize crosspost timestamp")
 			return
 		}
 		post.CreatedAt = normalized
@@ -797,7 +797,7 @@ func (h *HubsHandler) CrosspostToSubreddit(c *gin.Context) {
 
 	var req CrosspostRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body", "details": err.Error()})
+		RespondError(c, http.StatusBadRequest, "Invalid request body")
 		return
 	}
 
@@ -842,14 +842,14 @@ func (h *HubsHandler) CrosspostToSubreddit(c *gin.Context) {
 	post.CrosspostedAt = &crosspostedAt
 
 	if err := h.postRepo.Create(c.Request.Context(), post); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create crosspost", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to create crosspost")
 		return
 	}
 
 	if post.CrosspostedAt != nil {
 		normalized := post.CrosspostedAt.UTC()
 		if err := h.postRepo.UpdateCreatedAt(c.Request.Context(), post.ID, normalized); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to finalize crosspost timestamp", "details": err.Error()})
+			RespondError(c, http.StatusInternalServerError, "Failed to finalize crosspost timestamp")
 			return
 		}
 		post.CreatedAt = normalized
@@ -886,7 +886,7 @@ func (h *HubsHandler) GetPopularFeed(c *gin.Context) {
 		var err error
 		subscribedHubIDs, err = h.hubSubRepo.GetSubscribedHubIDs(c.Request.Context(), userID)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch subscriptions", "details": err.Error()})
+			RespondError(c, http.StatusInternalServerError, "Failed to fetch subscriptions")
 			return
 		}
 	}
@@ -933,7 +933,7 @@ func (h *HubsHandler) GetPopularFeed(c *gin.Context) {
 		)
 	}
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch feed", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to fetch feed")
 		return
 	}
 
@@ -1009,7 +1009,7 @@ func (h *HubsHandler) GetAllFeed(c *gin.Context) {
 		posts, err = h.postRepo.GetAllFeed(c.Request.Context(), sortBy, limit, offset, startTime, endTime)
 	}
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch feed", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to fetch feed")
 		return
 	}
 
@@ -1065,7 +1065,7 @@ func (h *HubsHandler) SearchHubs(c *gin.Context) {
 
 	hubs, err := h.hubRepo.SearchHubs(c.Request.Context(), query, limit)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to search hubs", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to search hubs")
 		return
 	}
 
@@ -1092,7 +1092,7 @@ func (h *HubsHandler) GetTrendingHubs(c *gin.Context) {
 
 	hubs, err := h.hubRepo.GetTrendingHubs(c.Request.Context(), limit)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch trending hubs", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to fetch trending hubs")
 		return
 	}
 
@@ -1124,7 +1124,7 @@ func (h *HubsHandler) UpdateHubNSFW(c *gin.Context) {
 	hubName := c.Param("name")
 	hub, err := h.hubRepo.GetByName(c.Request.Context(), hubName)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch hub", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to fetch hub")
 		return
 	}
 	if hub == nil {
@@ -1156,7 +1156,7 @@ func (h *HubsHandler) UpdateHubNSFW(c *gin.Context) {
 	}
 
 	if err := h.hubRepo.UpdateNSFW(c.Request.Context(), hub.ID, req.NSFW); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update NSFW status", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to update NSFW status")
 		return
 	}
 

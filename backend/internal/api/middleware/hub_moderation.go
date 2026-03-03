@@ -8,6 +8,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5"
+	apiresponse "github.com/omninudge/backend/internal/api/response"
 	"github.com/omninudge/backend/internal/permissions"
 	"github.com/omninudge/backend/internal/ports"
 )
@@ -27,12 +28,12 @@ func RequireHubModeratorOrAdmin(
 			if errors.Is(err, errUnknownHubScope) || errors.Is(err, errMissingHubAssociation) {
 				status = http.StatusBadRequest
 			}
-			c.JSON(status, gin.H{"error": err.Error()})
+			apiresponse.WriteError(c, status, err.Error())
 			c.Abort()
 			return
 		}
 		if hubID == 0 {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Hub not found"})
+			apiresponse.WriteError(c, http.StatusNotFound, "Hub not found")
 			c.Abort()
 			return
 		}
@@ -46,19 +47,19 @@ func RequireHubModeratorOrAdmin(
 
 		userIDVal, exists := c.Get("user_id")
 		if !exists {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+			apiresponse.WriteError(c, http.StatusUnauthorized, "Unauthorized")
 			c.Abort()
 			return
 		}
 
 		isMod, err := hubModRepo.IsModerator(c.Request.Context(), hubID, userIDVal.(int))
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to verify moderator permissions"})
+			apiresponse.WriteError(c, http.StatusInternalServerError, "Failed to verify moderator permissions")
 			c.Abort()
 			return
 		}
 		if !isMod {
-			c.JSON(http.StatusForbidden, gin.H{"error": "Not a moderator"})
+			apiresponse.WriteError(c, http.StatusForbidden, "Not a moderator")
 			c.Abort()
 			return
 		}

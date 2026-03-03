@@ -31,6 +31,13 @@ type RedditHandler struct {
 
 // ProxyRedditMedia handles GET /api/v1/reddit/media/proxy?url=...
 // Used for audio streams that Firefox blocks when requested directly from v.redd.it.
+// @Summary      Proxy Reddit media
+// @Tags         Reddit
+// @Produce      application/octet-stream
+// @Param        url  query     string  true  "Media URL to proxy"
+// @Success      200  {file}    binary
+// @Failure      400  {object}  gin.H
+// @Router       /reddit/media/proxy [get]
 func (h *RedditHandler) ProxyRedditMedia(c *gin.Context) {
 	rawURL := strings.TrimSpace(c.Query("url"))
 	if rawURL == "" {
@@ -112,7 +119,17 @@ func NewRedditHandlerForTest(redditClient *services.RedditClient) *RedditHandler
 	return &RedditHandler{redditClient: redditClient}
 }
 
-// GetSubredditPosts handles GET /api/v1/reddit/r/:subreddit
+// GetSubredditPosts handles GET /api/v1/reddit/r/:subreddit.
+// @Summary      Get subreddit posts
+// @Tags         Reddit
+// @Produce      json
+// @Param        subreddit  path      string  true  "Subreddit name"
+// @Param        sort       query     string  false "Sort order"
+// @Param        after      query     string  false "Pagination cursor"
+// @Param        limit      query     int     false "Number of results"
+// @Success      200        {object}  gin.H
+// @Failure      400        {object}  gin.H
+// @Router       /reddit/r/{subreddit} [get]
 func (h *RedditHandler) GetSubredditPosts(c *gin.Context) {
 	subreddit := c.Param("subreddit")
 	if subreddit == "" {
@@ -134,7 +151,7 @@ func (h *RedditHandler) GetSubredditPosts(c *gin.Context) {
 	// Fetch from Reddit
 	listing, err := h.redditClient.GetSubredditPosts(c.Request.Context(), subreddit, sort, timeFilter, limit, after)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch subreddit posts", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to fetch subreddit posts")
 		return
 	}
 	cacheKey := fmt.Sprintf("sr:%s:%s:%s:%d:%s", strings.ToLower(subreddit), sort, timeFilter, limit, after)
@@ -157,7 +174,14 @@ func (h *RedditHandler) GetSubredditPosts(c *gin.Context) {
 	})
 }
 
-// GetSubredditAbout handles GET /api/v1/reddit/r/:subreddit/about
+// GetSubredditAbout handles GET /api/v1/reddit/r/:subreddit/about.
+// @Summary      Get subreddit info
+// @Tags         Reddit
+// @Produce      json
+// @Param        subreddit  path      string  true  "Subreddit name"
+// @Success      200        {object}  gin.H
+// @Failure      500        {object}  gin.H
+// @Router       /reddit/r/{subreddit}/about [get]
 func (h *RedditHandler) GetSubredditAbout(c *gin.Context) {
 	subreddit := c.Param("subreddit")
 	if subreddit == "" {
@@ -167,7 +191,7 @@ func (h *RedditHandler) GetSubredditAbout(c *gin.Context) {
 
 	about, err := h.redditClient.GetSubredditAbout(c.Request.Context(), subreddit)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch subreddit details", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to fetch subreddit details")
 		return
 	}
 
@@ -177,7 +201,15 @@ func (h *RedditHandler) GetSubredditAbout(c *gin.Context) {
 	})
 }
 
-// GetFrontPage handles GET /api/v1/reddit/frontpage
+// GetFrontPage handles GET /api/v1/reddit/frontpage.
+// @Summary      Get Reddit frontpage posts
+// @Tags         Reddit
+// @Produce      json
+// @Param        sort   query     string  false "Sort order"
+// @Param        after  query     string  false "Pagination cursor"
+// @Param        limit  query     int     false "Number of results"
+// @Success      200    {object}  gin.H
+// @Router       /reddit/frontpage [get]
 func (h *RedditHandler) GetFrontPage(c *gin.Context) {
 	// Parse query parameters
 	sort := c.DefaultQuery("sort", "hot")
@@ -193,7 +225,7 @@ func (h *RedditHandler) GetFrontPage(c *gin.Context) {
 	// Fetch from Reddit
 	listing, err := h.redditClient.GetFrontPage(c.Request.Context(), sort, timeFilter, limit, after)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch front page", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to fetch front page")
 		return
 	}
 	cacheKey := fmt.Sprintf("front:%s:%s:%d:%s", sort, timeFilter, limit, after)
@@ -215,7 +247,15 @@ func (h *RedditHandler) GetFrontPage(c *gin.Context) {
 	})
 }
 
-// GetPostComments handles GET /api/v1/reddit/r/:subreddit/comments/:postId
+// GetPostComments handles GET /api/v1/reddit/r/:subreddit/comments/:postId.
+// @Summary      Get Reddit post comments
+// @Tags         Reddit
+// @Produce      json
+// @Param        subreddit  path      string  true  "Subreddit name"
+// @Param        postId     path      string  true  "Post ID"
+// @Success      200        {object}  gin.H
+// @Failure      500        {object}  gin.H
+// @Router       /reddit/r/{subreddit}/comments/{postId} [get]
 func (h *RedditHandler) GetPostComments(c *gin.Context) {
 	subreddit := c.Param("subreddit")
 	postID := c.Param("postId")
@@ -237,7 +277,7 @@ func (h *RedditHandler) GetPostComments(c *gin.Context) {
 	// Fetch from Reddit
 	result, err := h.redditClient.GetPostComments(c.Request.Context(), subreddit, postID, sort, limit)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch comments", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to fetch comments")
 		return
 	}
 
@@ -245,7 +285,15 @@ func (h *RedditHandler) GetPostComments(c *gin.Context) {
 	c.JSON(http.StatusOK, result)
 }
 
-// GetPostGalleryImages handles GET /api/v1/reddit/r/:subreddit/gallery/:postId
+// GetPostGalleryImages handles GET /api/v1/reddit/r/:subreddit/gallery/:postId.
+// @Summary      Get Reddit post gallery images
+// @Tags         Reddit
+// @Produce      json
+// @Param        subreddit  path      string  true  "Subreddit name"
+// @Param        postId     path      string  true  "Post ID"
+// @Success      200        {object}  gin.H
+// @Failure      500        {object}  gin.H
+// @Router       /reddit/r/{subreddit}/gallery/{postId} [get]
 func (h *RedditHandler) GetPostGalleryImages(c *gin.Context) {
 	subreddit := c.Param("subreddit")
 	postID := c.Param("postId")
@@ -258,7 +306,7 @@ func (h *RedditHandler) GetPostGalleryImages(c *gin.Context) {
 	// Fetch post data from Reddit
 	result, err := h.redditClient.GetPostComments(c.Request.Context(), subreddit, postID, "", 0)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch post data", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to fetch post data")
 		return
 	}
 
@@ -356,7 +404,17 @@ func (h *RedditHandler) GetPostGalleryImages(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"images": imageURLs})
 }
 
-// SearchPosts handles GET /api/v1/reddit/search
+// SearchPosts handles GET /api/v1/reddit/search.
+// @Summary      Search Reddit posts
+// @Tags         Reddit
+// @Produce      json
+// @Param        q      query     string  true  "Search query"
+// @Param        sort   query     string  false "Sort order"
+// @Param        after  query     string  false "Pagination cursor"
+// @Param        limit  query     int     false "Number of results"
+// @Success      200    {object}  gin.H
+// @Failure      400    {object}  gin.H
+// @Router       /reddit/search [get]
 func (h *RedditHandler) SearchPosts(c *gin.Context) {
 	query := c.Query("q")
 	if query == "" {
@@ -380,7 +438,7 @@ func (h *RedditHandler) SearchPosts(c *gin.Context) {
 	// Fetch from Reddit
 	listing, err := h.redditClient.SearchPosts(c.Request.Context(), query, subreddit, sort, timeFilter, limit, after, includeNSFW)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to search posts", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to search posts")
 		return
 	}
 
@@ -402,7 +460,16 @@ func (h *RedditHandler) SearchPosts(c *gin.Context) {
 	})
 }
 
-// SearchRedditUsers handles GET /api/v1/reddit/users/search
+// SearchRedditUsers handles GET /api/v1/reddit/users/search.
+// @Summary      Search Reddit users
+// @Tags         Reddit
+// @Produce      json
+// @Param        q      query     string  true  "Search query"
+// @Param        after  query     string  false "Pagination cursor"
+// @Param        limit  query     int     false "Number of results"
+// @Success      200    {object}  gin.H
+// @Failure      400    {object}  gin.H
+// @Router       /reddit/users/search [get]
 func (h *RedditHandler) SearchRedditUsers(c *gin.Context) {
 	query := strings.TrimSpace(c.Query("q"))
 	if query == "" {
@@ -419,7 +486,7 @@ func (h *RedditHandler) SearchRedditUsers(c *gin.Context) {
 
 	listing, err := h.redditClient.SearchUsers(c.Request.Context(), query, limit, after, includeNSFW)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to search users", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to search users")
 		return
 	}
 
@@ -458,7 +525,14 @@ func (h *RedditHandler) SearchRedditUsers(c *gin.Context) {
 	})
 }
 
-// AutocompleteSubreddits handles GET /api/v1/reddit/subreddits/autocomplete
+// AutocompleteSubreddits handles GET /api/v1/reddit/subreddits/autocomplete.
+// @Summary      Autocomplete subreddit names
+// @Tags         Reddit
+// @Produce      json
+// @Param        q  query     string  true  "Partial subreddit name"
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Router       /reddit/subreddits/autocomplete [get]
 func (h *RedditHandler) AutocompleteSubreddits(c *gin.Context) {
 	query := strings.TrimSpace(c.Query("q"))
 	if query == "" {
@@ -473,7 +547,7 @@ func (h *RedditHandler) AutocompleteSubreddits(c *gin.Context) {
 
 	suggestions, err := h.redditClient.AutocompleteSubreddits(c.Request.Context(), query, limit)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch subreddit suggestions", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to fetch subreddit suggestions")
 		return
 	}
 
@@ -482,7 +556,16 @@ func (h *RedditHandler) AutocompleteSubreddits(c *gin.Context) {
 	})
 }
 
-// SearchSubreddits handles GET /api/v1/reddit/subreddits/search
+// SearchSubreddits handles GET /api/v1/reddit/subreddits/search.
+// @Summary      Search subreddits
+// @Tags         Reddit
+// @Produce      json
+// @Param        q      query     string  true  "Search query"
+// @Param        after  query     string  false "Pagination cursor"
+// @Param        limit  query     int     false "Number of results"
+// @Success      200    {object}  gin.H
+// @Failure      400    {object}  gin.H
+// @Router       /reddit/subreddits/search [get]
 func (h *RedditHandler) SearchSubreddits(c *gin.Context) {
 	query := strings.TrimSpace(c.Query("q"))
 	if query == "" {
@@ -499,7 +582,7 @@ func (h *RedditHandler) SearchSubreddits(c *gin.Context) {
 
 	results, nextAfter, err := h.redditClient.SearchSubreddits(c.Request.Context(), query, limit, after)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to search subreddits", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to search subreddits")
 		return
 	}
 
@@ -522,8 +605,17 @@ func (h *RedditHandler) SearchSubreddits(c *gin.Context) {
 	})
 }
 
-// GetRedditUserListing handles GET /api/v1/reddit/user/:username/:section
-
+// GetRedditUserListing handles GET /api/v1/reddit/user/:username/:section.
+// @Summary      Get Reddit user listing
+// @Tags         Reddit
+// @Produce      json
+// @Param        username  path      string  true  "Reddit username"
+// @Param        section   path      string  true  "Section (submitted/comments/saved/etc)"
+// @Param        sort      query     string  false "Sort order"
+// @Param        after     query     string  false "Pagination cursor"
+// @Success      200       {object}  gin.H
+// @Failure      400       {object}  gin.H
+// @Router       /reddit/user/{username}/{section} [get]
 func (h *RedditHandler) GetRedditUserListing(c *gin.Context) {
 	username := c.Param("username")
 	section := strings.ToLower(c.Param("section"))
@@ -546,7 +638,7 @@ func (h *RedditHandler) GetRedditUserListing(c *gin.Context) {
 
 	listing, err := h.redditClient.GetUserListing(c.Request.Context(), username, section, sort, limit, after)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch user activity", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to fetch user activity")
 		return
 	}
 
@@ -560,7 +652,14 @@ func (h *RedditHandler) GetRedditUserListing(c *gin.Context) {
 	})
 }
 
-// GetRedditUserAbout handles GET /api/v1/reddit/user/:username/about
+// GetRedditUserAbout handles GET /api/v1/reddit/user/:username/about.
+// @Summary      Get Reddit user profile
+// @Tags         Reddit
+// @Produce      json
+// @Param        username  path      string  true  "Reddit username"
+// @Success      200       {object}  gin.H
+// @Failure      500       {object}  gin.H
+// @Router       /reddit/user/{username}/about [get]
 func (h *RedditHandler) GetRedditUserAbout(c *gin.Context) {
 	username := c.Param("username")
 	if username == "" {
@@ -570,14 +669,21 @@ func (h *RedditHandler) GetRedditUserAbout(c *gin.Context) {
 
 	about, err := h.redditClient.GetUserAbout(c.Request.Context(), username)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch user", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to fetch user")
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{"user": about})
 }
 
-// GetRedditUserTrophies handles GET /api/v1/reddit/user/:username/trophies
+// GetRedditUserTrophies handles GET /api/v1/reddit/user/:username/trophies.
+// @Summary      Get Reddit user trophies
+// @Tags         Reddit
+// @Produce      json
+// @Param        username  path      string  true  "Reddit username"
+// @Success      200       {object}  gin.H
+// @Failure      500       {object}  gin.H
+// @Router       /reddit/user/{username}/trophies [get]
 func (h *RedditHandler) GetRedditUserTrophies(c *gin.Context) {
 	username := c.Param("username")
 	if username == "" {
@@ -587,14 +693,21 @@ func (h *RedditHandler) GetRedditUserTrophies(c *gin.Context) {
 
 	trophies, err := h.redditClient.GetUserTrophies(c.Request.Context(), username)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch trophies", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to fetch trophies")
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{"trophies": trophies})
 }
 
-// GetRedditUserModerated handles GET /api/v1/reddit/user/:username/moderated
+// GetRedditUserModerated handles GET /api/v1/reddit/user/:username/moderated.
+// @Summary      Get subreddits moderated by user
+// @Tags         Reddit
+// @Produce      json
+// @Param        username  path      string  true  "Reddit username"
+// @Success      200       {object}  gin.H
+// @Failure      500       {object}  gin.H
+// @Router       /reddit/user/{username}/moderated [get]
 func (h *RedditHandler) GetRedditUserModerated(c *gin.Context) {
 	username := c.Param("username")
 	if username == "" {
@@ -604,15 +717,25 @@ func (h *RedditHandler) GetRedditUserModerated(c *gin.Context) {
 
 	subs, err := h.redditClient.GetUserModeratedSubreddits(c.Request.Context(), username)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch moderated subreddits", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to fetch moderated subreddits")
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{"moderated": subs})
 }
 
-// GetSubredditMedia handles GET /api/v1/reddit/r/:subreddit/media
+// GetSubredditMedia handles GET /api/v1/reddit/r/:subreddit/media.
 // Returns only posts with media (images/videos) for slideshow feature
+// @Summary      Get subreddit media posts
+// @Tags         Reddit
+// @Produce      json
+// @Param        subreddit  path      string  true  "Subreddit name"
+// @Param        sort       query     string  false "Sort order"
+// @Param        after      query     string  false "Pagination cursor"
+// @Param        limit      query     int     false "Number of results"
+// @Success      200        {object}  gin.H
+// @Failure      400        {object}  gin.H
+// @Router       /reddit/r/{subreddit}/media [get]
 func (h *RedditHandler) GetSubredditMedia(c *gin.Context) {
 	subreddit := c.Param("subreddit")
 	if subreddit == "" {
@@ -634,7 +757,7 @@ func (h *RedditHandler) GetSubredditMedia(c *gin.Context) {
 	// Fetch from Reddit - get more posts to ensure we have enough media
 	listing, err := h.redditClient.GetSubredditPosts(c.Request.Context(), subreddit, sort, timeFilter, 100, after)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch subreddit posts", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to fetch subreddit posts")
 		return
 	}
 	cacheKey := fmt.Sprintf("media:%s:%s:%s:%s", strings.ToLower(subreddit), sort, timeFilter, after)
@@ -868,7 +991,15 @@ func sanitizeThumbnail(thumbnail string) string {
 	return ""
 }
 
-// GetSubredditWikiPage handles GET /api/v1/reddit/r/:subreddit/wiki/:pagePath
+// GetSubredditWikiPage handles GET /api/v1/reddit/r/:subreddit/wiki/:pagePath.
+// @Summary      Get subreddit wiki page
+// @Tags         Reddit
+// @Produce      json
+// @Param        subreddit  path      string  true  "Subreddit name"
+// @Param        pagePath   path      string  true  "Wiki page path"
+// @Success      200        {object}  gin.H
+// @Failure      500        {object}  gin.H
+// @Router       /reddit/r/{subreddit}/wiki/{pagePath} [get]
 func (h *RedditHandler) GetSubredditWikiPage(c *gin.Context) {
 	subreddit := c.Param("subreddit")
 	pagePath := resolveWikiPagePath(c, "pagePath", "rest")
@@ -906,6 +1037,16 @@ func (h *RedditHandler) GetSubredditWikiPage(c *gin.Context) {
 }
 
 // CompareSubredditWikiRevisions fetches two specific revisions to compare their content.
+// @Summary      Compare subreddit wiki revisions
+// @Tags         Reddit
+// @Produce      json
+// @Param        subreddit  path      string  true  "Subreddit name"
+// @Param        pagePath   path      string  true  "Wiki page path"
+// @Param        revA       query     string  true  "First revision ID"
+// @Param        revB       query     string  true  "Second revision ID"
+// @Success      200        {object}  gin.H
+// @Failure      400        {object}  gin.H
+// @Router       /reddit/r/{subreddit}/wiki/compare/{pagePath} [get]
 func (h *RedditHandler) CompareSubredditWikiRevisions(c *gin.Context) {
 	subreddit := c.Param("subreddit")
 	pagePath := resolveWikiPagePath(c, "pagePath", "rest")
@@ -965,7 +1106,14 @@ func (h *RedditHandler) CompareSubredditWikiRevisions(c *gin.Context) {
 	})
 }
 
-// GetWikiPage handles GET /api/v1/reddit/wiki/:pagePath
+// GetWikiPage handles GET /api/v1/reddit/wiki/:pagePath.
+// @Summary      Get Reddit wiki page
+// @Tags         Reddit
+// @Produce      json
+// @Param        pagePath  path      string  true  "Wiki page path"
+// @Success      200       {object}  gin.H
+// @Failure      500       {object}  gin.H
+// @Router       /reddit/wiki/{pagePath} [get]
 func (h *RedditHandler) GetWikiPage(c *gin.Context) {
 	pagePath := c.Param("pagePath")
 
@@ -988,7 +1136,15 @@ func (h *RedditHandler) GetWikiPage(c *gin.Context) {
 	c.JSON(http.StatusOK, wikiPage)
 }
 
-// GetSubredditWikiRevisions handles GET /api/v1/reddit/r/:subreddit/wiki/revisions/:pagePath
+// GetSubredditWikiRevisions handles GET /api/v1/reddit/r/:subreddit/wiki/revisions/:pagePath.
+// @Summary      Get subreddit wiki page revisions
+// @Tags         Reddit
+// @Produce      json
+// @Param        subreddit  path      string  true  "Subreddit name"
+// @Param        pagePath   path      string  true  "Wiki page path"
+// @Success      200        {object}  gin.H
+// @Failure      500        {object}  gin.H
+// @Router       /reddit/r/{subreddit}/wiki/revisions/{pagePath} [get]
 func (h *RedditHandler) GetSubredditWikiRevisions(c *gin.Context) {
 	subreddit := c.Param("subreddit")
 	pagePath := resolveWikiPagePath(c, "pagePath", "rest")
@@ -1022,7 +1178,15 @@ func (h *RedditHandler) GetSubredditWikiRevisions(c *gin.Context) {
 	})
 }
 
-// GetSubredditWikiDiscussions handles GET /api/v1/reddit/r/:subreddit/wiki/discussions/:pagePath
+// GetSubredditWikiDiscussions handles GET /api/v1/reddit/r/:subreddit/wiki/discussions/:pagePath.
+// @Summary      Get subreddit wiki page discussions
+// @Tags         Reddit
+// @Produce      json
+// @Param        subreddit  path      string  true  "Subreddit name"
+// @Param        pagePath   path      string  true  "Wiki page path"
+// @Success      200        {object}  gin.H
+// @Failure      500        {object}  gin.H
+// @Router       /reddit/r/{subreddit}/wiki/discussions/{pagePath} [get]
 func (h *RedditHandler) GetSubredditWikiDiscussions(c *gin.Context) {
 	subreddit := c.Param("subreddit")
 	pagePath := resolveWikiPagePath(c, "pagePath", "rest")

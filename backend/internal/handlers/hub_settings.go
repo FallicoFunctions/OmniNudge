@@ -28,8 +28,15 @@ func NewHubSettingsHandler(hubRepo ports.HubRepository, settingsRepo *repository
 	}
 }
 
-// GetHubSettings handles GET /api/v1/hubs/:name/settings
+// GetHubSettings handles GET /api/v1/hubs/:name/settings.
 // Returns hub settings (public can see some, mods see all)
+// @Summary      Get hub settings
+// @Tags         Hubs
+// @Produce      json
+// @Param        name  path      string  true  "Hub name"
+// @Success      200   {object}  gin.H
+// @Failure      404   {object}  gin.H
+// @Router       /hubs/{name}/settings [get]
 func (h *HubSettingsHandler) GetHubSettings(c *gin.Context) {
 	hubName := c.Param("name")
 
@@ -56,17 +63,17 @@ func (h *HubSettingsHandler) GetHubSettings(c *gin.Context) {
 				createdBy = hub.CreatedBy
 			}
 			if err := h.settingsRepo.EnsureDefaults(c.Request.Context(), defaults, createdBy); err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to initialize hub settings", "details": err.Error()})
+				RespondError(c, http.StatusInternalServerError, "Failed to initialize hub settings")
 				return
 			}
 
 			settings, err = h.settingsRepo.GetByHubID(c.Request.Context(), hubID)
 			if err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get settings", "details": err.Error()})
+				RespondError(c, http.StatusInternalServerError, "Failed to get settings")
 				return
 			}
 		} else {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get settings", "details": err.Error()})
+			RespondError(c, http.StatusInternalServerError, "Failed to get settings")
 			return
 		}
 	}
@@ -94,8 +101,20 @@ func (h *HubSettingsHandler) GetHubSettings(c *gin.Context) {
 	c.JSON(http.StatusOK, settings)
 }
 
-// UpdateHubSettings handles PUT /api/v1/hubs/:name/settings
+// UpdateHubSettings handles PUT /api/v1/hubs/:name/settings.
 // Updates hub settings (requires owner or full_moderator role)
+// @Summary      Update hub settings
+// @Tags         Hubs
+// @Accept       json
+// @Produce      json
+// @Param        name  path      string  true  "Hub name"
+// @Param        body  body      object  true  "Settings payload"
+// @Success      200   {object}  gin.H
+// @Failure      400   {object}  gin.H
+// @Failure      403   {object}  gin.H
+// @Failure      404   {object}  gin.H
+// @Security     BearerAuth
+// @Router       /hubs/{name}/settings [put]
 func (h *HubSettingsHandler) UpdateHubSettings(c *gin.Context) {
 	userID, ok := middleware.GetAuthenticatedUserID(c)
 	if !ok {
@@ -142,8 +161,15 @@ func (h *HubSettingsHandler) UpdateHubSettings(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Settings updated successfully"})
 }
 
-// GetHubModerators handles GET /api/v1/hubs/:name/moderators
+// GetHubModerators handles GET /api/v1/hubs/:name/moderators.
 // Returns list of all moderators with their roles
+// @Summary      Get hub moderators
+// @Tags         Hubs
+// @Produce      json
+// @Param        name  path      string  true  "Hub name"
+// @Success      200   {object}  gin.H
+// @Failure      404   {object}  gin.H
+// @Router       /hubs/{name}/moderators [get]
 func (h *HubSettingsHandler) GetHubModerators(c *gin.Context) {
 	hubName := c.Param("name")
 	hubID, err := h.getHubIDByName(c, hubName)
@@ -161,8 +187,20 @@ func (h *HubSettingsHandler) GetHubModerators(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"moderators": moderators})
 }
 
-// AddHubModerator handles POST /api/v1/hubs/:name/moderators
+// AddHubModerator handles POST /api/v1/hubs/:name/moderators.
 // Adds a new moderator (requires owner role)
+// @Summary      Add hub moderator
+// @Tags         Hubs
+// @Accept       json
+// @Produce      json
+// @Param        name  path      string  true  "Hub name"
+// @Param        body  body      object  true  "Moderator info"
+// @Success      201   {object}  gin.H
+// @Failure      400   {object}  gin.H
+// @Failure      403   {object}  gin.H
+// @Failure      404   {object}  gin.H
+// @Security     BearerAuth
+// @Router       /hubs/{name}/moderators [post]
 func (h *HubSettingsHandler) AddHubModerator(c *gin.Context) {
 	userID, ok := middleware.GetAuthenticatedUserID(c)
 	if !ok {
@@ -217,8 +255,20 @@ func (h *HubSettingsHandler) AddHubModerator(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Moderator added successfully"})
 }
 
-// UpdateModeratorRole handles PATCH /api/v1/hubs/:name/moderators/:user_id
+// UpdateModeratorRole handles PATCH /api/v1/hubs/:name/moderators/:user_id.
 // Updates a moderator's role (requires owner role)
+// @Summary      Update moderator role
+// @Tags         Hubs
+// @Accept       json
+// @Produce      json
+// @Param        name     path      string  true  "Hub name"
+// @Param        user_id  path      int     true  "User ID"
+// @Param        body     body      object  true  "Role payload"
+// @Success      200      {object}  gin.H
+// @Failure      400      {object}  gin.H
+// @Failure      403      {object}  gin.H
+// @Security     BearerAuth
+// @Router       /hubs/{name}/moderators/{user_id} [patch]
 func (h *HubSettingsHandler) UpdateModeratorRole(c *gin.Context) {
 	userID, ok := middleware.GetAuthenticatedUserID(c)
 	if !ok {
@@ -267,8 +317,18 @@ func (h *HubSettingsHandler) UpdateModeratorRole(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Moderator role updated successfully"})
 }
 
-// RemoveHubModerator handles DELETE /api/v1/hubs/:name/moderators/:user_id
+// RemoveHubModerator handles DELETE /api/v1/hubs/:name/moderators/:user_id.
 // Removes a moderator (requires owner role, cannot remove owner)
+// @Summary      Remove hub moderator
+// @Tags         Hubs
+// @Produce      json
+// @Param        name     path      string  true  "Hub name"
+// @Param        user_id  path      int     true  "User ID"
+// @Success      200      {object}  gin.H
+// @Failure      400      {object}  gin.H
+// @Failure      403      {object}  gin.H
+// @Security     BearerAuth
+// @Router       /hubs/{name}/moderators/{user_id} [delete]
 func (h *HubSettingsHandler) RemoveHubModerator(c *gin.Context) {
 	userID, ok := middleware.GetAuthenticatedUserID(c)
 	if !ok {

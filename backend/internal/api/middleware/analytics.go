@@ -7,6 +7,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	apiresponse "github.com/omninudge/backend/internal/api/response"
 	"github.com/omninudge/backend/internal/services"
 )
 
@@ -109,15 +110,15 @@ func shouldSkipTracking(path string) bool {
 func determineEventName(method, path string) string {
 	// Map common patterns to semantic event names
 	patterns := map[string]string{
-		"/api/v1/posts":        services.EventPostViewed,
-		"/api/v1/hubs":         services.EventHubViewed,
-		"/api/v1/messages":     "api_messages_accessed",
-		"/api/v1/search":       services.EventSearchPerformed,
-		"/api/v1/users/me":     "profile_viewed",
-		"/api/v1/settings":     "settings_accessed",
-		"/api/v1/auth/login":   services.EventLogin,
-		"/api/v1/auth/signup":  services.EventSignup,
-		"/api/v1/auth/logout":  services.EventLogout,
+		"/api/v1/posts":       services.EventPostViewed,
+		"/api/v1/hubs":        services.EventHubViewed,
+		"/api/v1/messages":    "api_messages_accessed",
+		"/api/v1/search":      services.EventSearchPerformed,
+		"/api/v1/users/me":    "profile_viewed",
+		"/api/v1/settings":    "settings_accessed",
+		"/api/v1/auth/login":  services.EventLogin,
+		"/api/v1/auth/signup": services.EventSignup,
+		"/api/v1/auth/logout": services.EventLogout,
 	}
 
 	// Check for exact matches first
@@ -157,13 +158,13 @@ func getOrCreateSessionID(c *gin.Context) uuid.UUID {
 
 	// Set cookie (30 minute session)
 	c.SetCookie(
-		"session_id",          // name
-		sessionID.String(),    // value
-		1800,                  // maxAge (30 minutes)
-		"/",                   // path
-		"",                    // domain
-		isSecure,              // secure (true if HTTPS)
-		true,                  // httpOnly
+		"session_id",       // name
+		sessionID.String(), // value
+		1800,               // maxAge (30 minutes)
+		"/",                // path
+		"",                 // domain
+		isSecure,           // secure (true if HTTPS)
+		true,               // httpOnly
 	)
 
 	return sessionID
@@ -180,7 +181,7 @@ func PageViewTracker(analyticsService *services.AnalyticsServiceEnhanced) gin.Ha
 		}
 
 		if err := c.ShouldBindJSON(&req); err != nil {
-			c.JSON(400, gin.H{"error": "Invalid request"})
+			apiresponse.WriteError(c, 400, "Invalid request")
 			return
 		}
 
@@ -212,7 +213,7 @@ func PageViewTracker(analyticsService *services.AnalyticsServiceEnhanced) gin.Ha
 		enriched.SessionID = &sessionID
 
 		if err := analyticsService.TrackEventAsync(c.Request.Context(), enriched); err != nil {
-			c.JSON(500, gin.H{"error": "Failed to track page view"})
+			apiresponse.WriteError(c, 500, "Failed to track page view")
 			return
 		}
 

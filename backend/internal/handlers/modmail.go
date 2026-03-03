@@ -151,7 +151,7 @@ func (h *ModMailHandler) GetModMailRecipients(c *gin.Context) {
 	hubName := c.Param("hub_name")
 	hub, err := h.hubRepo.GetByName(c.Request.Context(), hubName)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get hub", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to get hub")
 		return
 	}
 	if hub == nil {
@@ -258,7 +258,7 @@ func (h *ModMailHandler) CreateModMail(c *gin.Context) {
 
 	var req CreateModMailRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request", "details": err.Error()})
+		RespondError(c, http.StatusBadRequest, "Invalid request")
 		return
 	}
 
@@ -279,7 +279,7 @@ func (h *ModMailHandler) CreateModMail(c *gin.Context) {
 	// Get hub by name
 	hub, err := h.hubRepo.GetByName(c.Request.Context(), req.HubName)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get hub", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to get hub")
 		return
 	}
 	if hub == nil {
@@ -303,7 +303,7 @@ func (h *ModMailHandler) CreateModMail(c *gin.Context) {
 		RETURNING id
 	`, hub.ID, req.Subject).Scan(&conversationID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create conversation", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to create conversation")
 		return
 	}
 
@@ -357,9 +357,7 @@ func (h *ModMailHandler) CreateModMail(c *gin.Context) {
 			return
 		}
 		if hasBlockingConflict {
-			c.JSON(http.StatusForbidden, gin.H{
-				"error": "Cannot create mod mail due to blocking settings with one or more moderators",
-			})
+			RespondError(c, http.StatusForbidden, "Cannot create mod mail due to blocking settings with one or more moderators")
 			return
 		}
 	}
@@ -409,7 +407,7 @@ func (h *ModMailHandler) CreateModMail(c *gin.Context) {
 		RETURNING id
 	`, conversationID, userID, encryptedContent, req.SenderEncryptedContent, req.EncryptionVersion, isMulti, req.SharedEncryptionIV).Scan(&messageID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create message", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to create message")
 		return
 	}
 
@@ -427,7 +425,7 @@ func (h *ModMailHandler) CreateModMail(c *gin.Context) {
 			SELECT $1, UNNEST($2::int[]), UNNEST($3::text[])
 		`, messageID, userIDs, encryptedKeys)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to store recipient keys", "details": err.Error()})
+			RespondError(c, http.StatusInternalServerError, "Failed to store recipient keys")
 			return
 		}
 	}
@@ -505,7 +503,7 @@ func (h *ModMailHandler) GetModMailForHub(c *gin.Context) {
 
 	rows, err := h.pool.Query(c.Request.Context(), query, args...)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get conversations", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to get conversations")
 		return
 	}
 	defer rows.Close()
@@ -514,7 +512,7 @@ func (h *ModMailHandler) GetModMailForHub(c *gin.Context) {
 	for rows.Next() {
 		var conv ModMailConversationDetails
 		if err := rows.Scan(&conv.ID, &conv.HubID, &conv.Subject, &conv.Status, &conv.CreatedAt, &conv.LastMessageAt); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to scan conversation", "details": err.Error()})
+			RespondError(c, http.StatusInternalServerError, "Failed to scan conversation")
 			return
 		}
 		conv.HubName = hubName
@@ -540,7 +538,7 @@ func (h *ModMailHandler) GetModMailForHub(c *gin.Context) {
 	for i := 0; i < len(conversations); i++ {
 		result := <-resultsChan
 		if result.err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to enrich conversation", "details": result.err.Error()})
+			RespondError(c, http.StatusInternalServerError, "Failed to enrich conversation")
 			return
 		}
 	}
@@ -618,7 +616,7 @@ func (h *ModMailHandler) GetUserModMail(c *gin.Context) {
 	for i := 0; i < len(conversations); i++ {
 		result := <-resultsChan
 		if result.err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to enrich conversation", "details": result.err.Error()})
+			RespondError(c, http.StatusInternalServerError, "Failed to enrich conversation")
 			return
 		}
 	}
@@ -743,7 +741,7 @@ func (h *ModMailHandler) UpdateModMailStatus(c *gin.Context) {
 		Status string `json:"status" binding:"required,oneof=open archived resolved"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request", "details": err.Error()})
+		RespondError(c, http.StatusBadRequest, "Invalid request")
 		return
 	}
 
@@ -756,14 +754,14 @@ func (h *ModMailHandler) UpdateModMailStatus(c *gin.Context) {
 		SELECT hub_id FROM conversations WHERE id = $1 AND conversation_type = 'mod_mail'
 	`, conversationID).Scan(&hubID)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Conversation not found", "details": err.Error()})
+		RespondError(c, http.StatusNotFound, "Conversation not found")
 		return
 	}
 
 	// Check if user is moderator (or admin)
 	isMod, err := permissions.RequireHubModeratorOrAdmin(c, hubID, h.hubModRepo)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check moderator status", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to check moderator status")
 		return
 	}
 	if !isMod {
@@ -781,7 +779,7 @@ func (h *ModMailHandler) UpdateModMailStatus(c *gin.Context) {
 		WHERE id = $3
 	`, req.Status, userID, conversationID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update status", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to update status")
 		return
 	}
 

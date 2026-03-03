@@ -233,7 +233,7 @@ func (h *SearchHandler) SearchComments(c *gin.Context) {
 	args = append(args, cursorArgs...)
 	rows, err := h.pool.Query(c.Request.Context(), sql, args...)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Search failed", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Search failed")
 		return
 	}
 	defer rows.Close()
@@ -365,7 +365,7 @@ func (h *SearchHandler) SearchUsers(c *gin.Context) {
 	args = append(args, cursorArgs...)
 	rows, err := h.pool.Query(c.Request.Context(), sql, args...)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Search failed", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Search failed")
 		return
 	}
 	defer rows.Close()
@@ -496,7 +496,7 @@ func (h *SearchHandler) SearchHubs(c *gin.Context) {
 	args = append(args, cursorArgs...)
 	rows, err := h.pool.Query(c.Request.Context(), sql, args...)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Search failed", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Search failed")
 		return
 	}
 	defer rows.Close()
@@ -788,7 +788,7 @@ func (h *SearchHandler) SearchMessages(c *gin.Context) {
 	countSQL := "SELECT COUNT(*) " + baseWhere
 	var total int
 	if err := h.pool.QueryRow(c.Request.Context(), countSQL, args...).Scan(&total); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Search failed", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Search failed")
 		return
 	}
 	searchResultCount = total
@@ -820,7 +820,7 @@ func (h *SearchHandler) SearchMessages(c *gin.Context) {
 	dataArgs := append(append([]interface{}{}, args...), limit, offset)
 	rows, err := h.pool.Query(c.Request.Context(), querySQL, dataArgs...)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Search failed", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Search failed")
 		return
 	}
 	defer rows.Close()

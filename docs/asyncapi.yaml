@@ -1,0 +1,221 @@
+asyncapi: 2.6.0
+info:
+  title: OmniNudge Realtime WebSocket API
+  version: 1.0.0
+  description: |
+    Realtime protocol for authenticated websocket events.
+    Transport path is `/api/v1/ws` and requires a valid API auth context.
+defaultContentType: application/json
+servers:
+  local:
+    url: localhost:8080/api/v1/ws
+    protocol: ws
+    description: Local development websocket endpoint.
+  production:
+    url: api.omninudge.com/api/v1/ws
+    protocol: wss
+    description: Production websocket endpoint.
+channels:
+  typing:
+    description: Client sends typing status for a conversation.
+    publish:
+      summary: Send typing indicator
+      operationId: sendTypingIndicator
+      message:
+        $ref: '#/components/messages/TypingClientMessage'
+  realtime-events:
+    description: Server emits realtime events for presence, typing, state sync, and errors.
+    subscribe:
+      summary: Receive realtime events
+      operationId: receiveRealtimeEvents
+      message:
+        oneOf:
+          - $ref: '#/components/messages/InitialStateMessage'
+          - $ref: '#/components/messages/UserOnlineMessage'
+          - $ref: '#/components/messages/UserOfflineMessage'
+          - $ref: '#/components/messages/TypingServerMessage'
+          - $ref: '#/components/messages/FeatureFlagUpdatedMessage'
+          - $ref: '#/components/messages/ErrorMessage'
+components:
+  messages:
+    TypingClientMessage:
+      name: TypingClientMessage
+      title: Typing message sent by client
+      payload:
+        type: object
+        required:
+          - type
+          - payload
+        properties:
+          type:
+            type: string
+            enum: [typing]
+          payload:
+            type: object
+            required:
+              - conversation_id
+              - is_typing
+            properties:
+              conversation_id:
+                type: integer
+              recipient_id:
+                type: integer
+                description: Accepted but ignored by server; recipients are derived server-side.
+              is_typing:
+                type: boolean
+    InitialStateMessage:
+      name: InitialStateMessage
+      title: Initial online state after connection
+      payload:
+        type: object
+        required:
+          - recipient_id
+          - type
+          - payload
+        properties:
+          recipient_id:
+            type: integer
+          type:
+            type: string
+            enum: [initial_state]
+          payload:
+            type: object
+            required:
+              - online_users
+            properties:
+              online_users:
+                type: array
+                items:
+                  type: integer
+    UserOnlineMessage:
+      name: UserOnlineMessage
+      title: Presence online event
+      payload:
+        type: object
+        required:
+          - recipient_id
+          - type
+          - payload
+        properties:
+          recipient_id:
+            type: integer
+          type:
+            type: string
+            enum: [user_online]
+          payload:
+            type: object
+            required:
+              - user_id
+            properties:
+              user_id:
+                type: integer
+    UserOfflineMessage:
+      name: UserOfflineMessage
+      title: Presence offline event
+      payload:
+        type: object
+        required:
+          - recipient_id
+          - type
+          - payload
+        properties:
+          recipient_id:
+            type: integer
+          type:
+            type: string
+            enum: [user_offline]
+          payload:
+            type: object
+            required:
+              - user_id
+            properties:
+              user_id:
+                type: integer
+    TypingServerMessage:
+      name: TypingServerMessage
+      title: Typing indicator broadcast from server
+      payload:
+        type: object
+        required:
+          - recipient_id
+          - type
+          - payload
+        properties:
+          recipient_id:
+            type: integer
+          type:
+            type: string
+            enum: [typing]
+          payload:
+            type: object
+            required:
+              - conversation_id
+              - user_id
+              - is_typing
+            properties:
+              conversation_id:
+                type: integer
+              user_id:
+                type: integer
+              is_typing:
+                type: boolean
+    FeatureFlagUpdatedMessage:
+      name: FeatureFlagUpdatedMessage
+      title: Feature flag update broadcast
+      payload:
+        type: object
+        required:
+          - recipient_id
+          - type
+          - payload
+        properties:
+          recipient_id:
+            type: integer
+          type:
+            type: string
+            enum: [feature_flag_updated]
+          payload:
+            type: object
+            required:
+              - type
+              - key
+              - enabled
+            properties:
+              type:
+                type: string
+                enum: [feature_flag_updated]
+              key:
+                type: string
+              enabled:
+                type: boolean
+              percentage:
+                type: integer
+                nullable: true
+    ErrorMessage:
+      name: ErrorMessage
+      title: Error event emitted to client
+      payload:
+        type: object
+        required:
+          - recipient_id
+          - type
+          - payload
+        properties:
+          recipient_id:
+            type: integer
+          type:
+            type: string
+            enum: [error]
+          payload:
+            type: object
+            required:
+              - code
+              - message
+            properties:
+              code:
+                type: string
+                enum:
+                  - RATE_LIMIT_EXCEEDED
+                  - UNAUTHORIZED_CONVERSATION_ACCESS
+              message:
+                type: string
