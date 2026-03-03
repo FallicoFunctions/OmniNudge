@@ -32,7 +32,15 @@ func NewLogHandler(analytics *services.AnalyticsService) *LogHandler {
 	return &LogHandler{analytics: analytics}
 }
 
-// HandleFrontendLogs handles frontend log submissions
+// HandleFrontendLogs handles frontend log submissions.
+// @Summary      Submit frontend logs
+// @Tags         Logs
+// @Accept       json
+// @Produce      json
+// @Param        body  body      FrontendLogEntry  true  "Log entry"
+// @Success      200   {object}  gin.H
+// @Failure      400   {object}  gin.H
+// @Router       /logs/frontend [post]
 func (h *LogHandler) HandleFrontendLogs(c *gin.Context) {
 	var entry FrontendLogEntry
 	if err := c.ShouldBindJSON(&entry); err != nil {

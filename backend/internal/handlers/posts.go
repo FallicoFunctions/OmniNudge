@@ -111,7 +111,7 @@ func (h *PostsHandler) GetSubredditPosts(c *gin.Context) {
 		posts, err = h.postRepo.GetBySubredditWithUser(c.Request.Context(), subredditName, sortBy, limit, offset, userID, startTime, endTime)
 	}
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch posts", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to fetch posts")
 		return
 	}
 
@@ -202,7 +202,7 @@ func (h *PostsHandler) CreatePost(c *gin.Context) {
 
 	var req CreatePostRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body", "details": err.Error()})
+		RespondError(c, http.StatusBadRequest, "Invalid request body")
 		return
 	}
 	fmt.Printf("[CreatePost] Parsed NSFW=%v hub_id=%v target_subreddit=%v\n", req.NSFW, req.HubID, req.TargetSubreddit)
@@ -226,7 +226,7 @@ func (h *PostsHandler) CreatePost(c *gin.Context) {
 		// Direct hub posting
 		hub, err = h.hubRepo.GetByID(c.Request.Context(), *req.HubID)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch hub", "details": err.Error()})
+			RespondError(c, http.StatusInternalServerError, "Failed to fetch hub")
 			return
 		}
 		if hub == nil {
@@ -303,7 +303,7 @@ func (h *PostsHandler) CreatePost(c *gin.Context) {
 
 	if err := h.postRepo.Create(c.Request.Context(), post); err != nil {
 		fmt.Printf("[CreatePost] Create failed: %v\n", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create post", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to create post")
 		return
 	}
 
@@ -372,7 +372,7 @@ func (h *PostsHandler) GetPost(c *gin.Context) {
 
 	post, err := h.postRepo.GetByIDWithUser(c.Request.Context(), postID, userID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get post", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to get post")
 		return
 	}
 
@@ -384,7 +384,7 @@ func (h *PostsHandler) GetPost(c *gin.Context) {
 	if hubNameParam != "" {
 		hub, err := h.hubRepo.GetByName(c.Request.Context(), hubNameParam)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch hub", "details": err.Error()})
+			RespondError(c, http.StatusInternalServerError, "Failed to fetch hub")
 			return
 		}
 		if hub == nil || post.HubID == nil || *post.HubID != hub.ID {
@@ -471,7 +471,7 @@ func (h *PostsHandler) GetFeed(c *gin.Context) {
 		}
 		sr, err := h.hubRepo.GetByName(c.Request.Context(), hubName)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch hub", "details": err.Error()})
+			RespondError(c, http.StatusInternalServerError, "Failed to fetch hub")
 			return
 		}
 		if sr == nil {
@@ -480,7 +480,7 @@ func (h *PostsHandler) GetFeed(c *gin.Context) {
 		}
 		posts, err := h.postRepo.GetByHub(c.Request.Context(), sr.ID, sortBy, limit, offset)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get feed", "details": err.Error()})
+			RespondError(c, http.StatusInternalServerError, "Failed to get feed")
 			return
 		}
 		c.JSON(http.StatusOK, gin.H{
@@ -495,7 +495,7 @@ func (h *PostsHandler) GetFeed(c *gin.Context) {
 
 	items, err := h.feedRepo.GetUnifiedFeed(c.Request.Context(), sortBy, limit, offset, sourceFilter)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get feed", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to get feed")
 		return
 	}
 
@@ -553,7 +553,7 @@ func (h *PostsHandler) UpdatePost(c *gin.Context) {
 	// Get existing post to verify ownership
 	existingPost, err := h.postRepo.GetByID(c.Request.Context(), postID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get post", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to get post")
 		return
 	}
 
@@ -577,7 +577,7 @@ func (h *PostsHandler) UpdatePost(c *gin.Context) {
 
 	var req UpdatePostRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body", "details": err.Error()})
+		RespondError(c, http.StatusBadRequest, "Invalid request body")
 		return
 	}
 	if req.Body != nil && len(*req.Body) > maxPostBodyLength {
@@ -594,7 +594,7 @@ func (h *PostsHandler) UpdatePost(c *gin.Context) {
 	existingPost.ThumbnailURL = req.ThumbnailURL
 
 	if err := h.postRepo.Update(c.Request.Context(), existingPost); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update post", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to update post")
 		return
 	}
 
@@ -647,7 +647,7 @@ func (h *PostsHandler) DeletePost(c *gin.Context) {
 	// Get existing post to verify ownership
 	existingPost, err := h.postRepo.GetByID(c.Request.Context(), postID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get post", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to get post")
 		return
 	}
 
@@ -679,7 +679,7 @@ func (h *PostsHandler) DeletePost(c *gin.Context) {
 	}
 
 	if err := h.postRepo.SoftDelete(c.Request.Context(), postID); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete post", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to delete post")
 		return
 	}
 
@@ -828,19 +828,19 @@ func (h *PostsHandler) VotePost(c *gin.Context) {
 		IsUpvote *bool `json:"is_upvote"` // true=upvote, false=downvote, null=remove
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body", "details": err.Error()})
+		RespondError(c, http.StatusBadRequest, "Invalid request body")
 		return
 	}
 
 	if err := h.postRepo.Vote(c.Request.Context(), postID, userID, req.IsUpvote); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to vote on post", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to vote on post")
 		return
 	}
 
 	// Get updated post
 	post, err := h.postRepo.GetByID(c.Request.Context(), postID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get updated post", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to get updated post")
 		return
 	}
 

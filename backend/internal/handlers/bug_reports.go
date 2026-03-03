@@ -65,7 +65,7 @@ type CreateBugReportRequest struct {
 func (h *BugReportsHandler) CreateBugReport(c *gin.Context) {
 	var req CreateBugReportRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body", "details": err.Error()})
+		RespondError(c, http.StatusBadRequest, "Invalid request body")
 		return
 	}
 	feedbackType := strings.TrimSpace(req.FeedbackType)
@@ -112,7 +112,7 @@ func (h *BugReportsHandler) CreateBugReport(c *gin.Context) {
 				RespondError(c, http.StatusBadRequest, "Screenshot file not found")
 				return
 			}
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to validate screenshot", "details": err.Error()})
+			RespondError(c, http.StatusInternalServerError, "Failed to validate screenshot")
 			return
 		}
 
@@ -143,7 +143,7 @@ func (h *BugReportsHandler) CreateBugReport(c *gin.Context) {
 	}
 
 	if err := h.bugReportRepo.Create(c.Request.Context(), report); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create bug report", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to create bug report")
 		return
 	}
 
@@ -252,7 +252,7 @@ func (h *BugReportsHandler) GetBugReports(c *gin.Context) {
 		)
 	}
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch bug reports", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to fetch bug reports")
 		return
 	}
 
@@ -308,12 +308,12 @@ func (h *BugReportsHandler) UpdateBugReport(c *gin.Context) {
 
 	var req UpdateBugReportRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body", "details": err.Error()})
+		RespondError(c, http.StatusBadRequest, "Invalid request body")
 		return
 	}
 
 	if err := h.bugReportRepo.Update(c.Request.Context(), id, req.Status, req.AdminNotes); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update bug report", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to update bug report")
 		return
 	}
 
@@ -337,7 +337,7 @@ func (h *BugReportsHandler) GetKnownBugs(c *gin.Context) {
 
 	bugs, err := h.knownBugRepo.GetAll(c.Request.Context(), statusPtr)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch known bugs", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to fetch known bugs")
 		return
 	}
 
@@ -374,7 +374,7 @@ type CreateKnownBugRequest struct {
 func (h *BugReportsHandler) CreateKnownBug(c *gin.Context) {
 	var req CreateKnownBugRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body", "details": err.Error()})
+		RespondError(c, http.StatusBadRequest, "Invalid request body")
 		return
 	}
 
@@ -389,7 +389,7 @@ func (h *BugReportsHandler) CreateKnownBug(c *gin.Context) {
 	}
 
 	if err := h.knownBugRepo.Create(c.Request.Context(), bug); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create known bug", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to create known bug")
 		return
 	}
 
@@ -429,7 +429,7 @@ func (h *BugReportsHandler) UpdateKnownBug(c *gin.Context) {
 
 	var req UpdateKnownBugRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body", "details": err.Error()})
+		RespondError(c, http.StatusBadRequest, "Invalid request body")
 		return
 	}
 
@@ -450,7 +450,7 @@ func (h *BugReportsHandler) UpdateKnownBug(c *gin.Context) {
 	}
 
 	if err := h.knownBugRepo.Update(c.Request.Context(), bug); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update known bug", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to update known bug")
 		return
 	}
 
@@ -476,7 +476,7 @@ func (h *BugReportsHandler) DeleteKnownBug(c *gin.Context) {
 	}
 
 	if err := h.knownBugRepo.Delete(c.Request.Context(), id); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete known bug", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to delete known bug")
 		return
 	}
 

@@ -51,6 +51,9 @@ func NewVirusScanHandler(mediaRepo ports.MediaFileRepository, scanner services.V
 			}
 			return fmt.Errorf("failed to load media %d for scan: %w", payload.FileID, err)
 		}
+		if media == nil {
+			return fmt.Errorf("media file_id=%d no longer exists: %w", payload.FileID, asynq.SkipRetry)
+		}
 
 		_, err = os.Stat(media.StoragePath)
 		if err != nil {

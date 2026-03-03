@@ -317,7 +317,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		locked, err := h.lockoutService.IsLocked(ctx, normalizedUsername, ipAddress)
 		if err != nil {
 			slog.Error("lockout check failed", "error", err, "ip", ipAddress)
-			c.JSON(http.StatusServiceUnavailable, gin.H{"error": "service temporarily unavailable"})
+			RespondError(c, http.StatusServiceUnavailable, "service temporarily unavailable")
 			c.Abort()
 			return
 		}
@@ -393,13 +393,13 @@ func (h *AuthHandler) UpdatePublicKey(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body", "details": err.Error()})
+		RespondError(c, http.StatusBadRequest, "Invalid request body")
 		return
 	}
 
 	// Update public key in database
 	if err := h.userRepo.UpdatePublicKey(c.Request.Context(), userID, req.PublicKey); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update public key", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to update public key")
 		return
 	}
 
@@ -441,7 +441,7 @@ func (h *AuthHandler) GetPublicKeys(c *gin.Context) {
 	// Fetch public keys for all users in one query
 	publicKeys, err := h.userRepo.GetPublicKeysByIDs(c.Request.Context(), userIDs)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch public keys", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to fetch public keys")
 		return
 	}
 

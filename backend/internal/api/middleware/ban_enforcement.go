@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	apiresponse "github.com/omninudge/backend/internal/api/response"
 	"github.com/omninudge/backend/internal/models"
 )
 
@@ -17,35 +18,43 @@ func BanEnforcement(userRepo banStatusProvider) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userIDVal, exists := c.Get("user_id")
 		if !exists {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+			apiresponse.WriteError(c, http.StatusUnauthorized, "User not authenticated")
 			c.Abort()
 			return
 		}
 
 		userID, ok := userIDVal.(int)
 		if !ok {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid user context"})
+			apiresponse.WriteError(c, http.StatusUnauthorized, "Invalid user context")
 			c.Abort()
 			return
 		}
 
 		status, err := userRepo.GetBanStatus(c.Request.Context(), userID)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to verify user status"})
+			apiresponse.WriteError(c, http.StatusInternalServerError, "Failed to verify user status")
 			c.Abort()
 			return
 		}
 		if status == nil {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "User not found"})
+			apiresponse.WriteError(c, http.StatusUnauthorized, "User not found")
 			c.Abort()
 			return
 		}
 
 		// Block banned or deleted users
 		if status.Banned || status.Deleted {
-			resp := gin.H{"error": "Account is banned"}
+			message := "Account is banned"
 			if status.Deleted {
-				resp["error"] = "Account is deleted"
+				message = "Account is deleted"
+			}
+			resp := gin.H{
+				"error":   message,
+				"code":    apiresponse.CodeFromStatus(http.StatusUnauthorized),
+				"message": message,
+			}
+			if requestID := apiresponse.RequestIDFromContext(c); requestID != "" {
+				resp["request_id"] = requestID
 			}
 			if status.ShowBanReason && status.BanReason != nil && *status.BanReason != "" {
 				resp["reason"] = *status.BanReason

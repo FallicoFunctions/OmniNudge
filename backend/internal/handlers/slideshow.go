@@ -144,7 +144,7 @@ func (h *SlideshowHandler) StartSlideshow(c *gin.Context) {
 
 	err = h.slideshowRepo.CreateSession(c.Request.Context(), session)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create slideshow session", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to create slideshow session")
 		return
 	}
 

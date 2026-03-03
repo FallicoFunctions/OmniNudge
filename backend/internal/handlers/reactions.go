@@ -74,7 +74,7 @@ func (h *ReactionsHandler) AddReaction(c *gin.Context) {
 
 	var req AddReactionRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body", "details": err.Error()})
+		RespondError(c, http.StatusBadRequest, "Invalid request body")
 		return
 	}
 

@@ -24,8 +24,13 @@ func NewHealthHandler(db *pgxpool.Pool, redis *redis.Client) *HealthHandler {
 	}
 }
 
-// LivenessProbe checks if the application is running
+// LivenessProbe checks if the application is running.
 // Used by Kubernetes liveness probe
+// @Summary      Liveness probe
+// @Tags         Health
+// @Produce      json
+// @Success      200  {object}  gin.H
+// @Router       /health/liveness [get]
 func (h *HealthHandler) LivenessProbe(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"status": "alive",
@@ -33,8 +38,14 @@ func (h *HealthHandler) LivenessProbe(c *gin.Context) {
 	})
 }
 
-// ReadinessProbe checks if the application is ready to serve traffic
+// ReadinessProbe checks if the application is ready to serve traffic.
 // Used by Kubernetes readiness probe
+// @Summary      Readiness probe
+// @Tags         Health
+// @Produce      json
+// @Success      200   {object}  gin.H
+// @Failure      503   {object}  gin.H
+// @Router       /health/readiness [get]
 func (h *HealthHandler) ReadinessProbe(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 2*time.Second)
 	defer cancel()
@@ -82,7 +93,12 @@ func (h *HealthHandler) ReadinessProbe(c *gin.Context) {
 	})
 }
 
-// HealthCheck provides detailed health information
+// HealthCheck provides detailed health information.
+// @Summary      Detailed health check
+// @Tags         Health
+// @Produce      json
+// @Success      200  {object}  gin.H
+// @Router       /health [get]
 func (h *HealthHandler) HealthCheck(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
 	defer cancel()

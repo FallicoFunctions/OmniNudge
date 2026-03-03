@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	apiresponse "github.com/omninudge/backend/internal/api/response"
 	"github.com/omninudge/backend/internal/models"
 )
 
@@ -35,7 +36,7 @@ func CheckHubModerator(ctx context.Context, modRepo ModeratorChecker, hubID, use
 func RequireModeratorRole(c *gin.Context, modRepo ModeratorChecker, hubID, userID int) (*models.ModeratorRole, bool) {
 	role, err := modRepo.GetModeratorRole(c.Request.Context(), hubID, userID)
 	if err != nil || role == nil {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Not a moderator"})
+		apiresponse.WriteError(c, http.StatusForbidden, "Not a moderator")
 		return nil, false
 	}
 	return role, true
@@ -46,7 +47,7 @@ func RequireModeratorRole(c *gin.Context, modRepo ModeratorChecker, hubID, userI
 // Returns true if authorized, false otherwise.
 func RequireModeratorRoleLevel(c *gin.Context, role *models.ModeratorRole, allowedRoles []models.ModeratorRole, errorMsg string) bool {
 	if role == nil {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Not a moderator"})
+		apiresponse.WriteError(c, http.StatusForbidden, "Not a moderator")
 		return false
 	}
 
@@ -59,7 +60,7 @@ func RequireModeratorRoleLevel(c *gin.Context, role *models.ModeratorRole, allow
 	if errorMsg == "" {
 		errorMsg = "Insufficient permissions"
 	}
-	c.JSON(http.StatusForbidden, gin.H{"error": errorMsg})
+	apiresponse.WriteError(c, http.StatusForbidden, errorMsg)
 	return false
 }
 

@@ -91,7 +91,7 @@ func (h *MediaHandler) UploadMedia(c *gin.Context) {
 
 	file, header, err := c.Request.FormFile("file")
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "File is required", "details": err.Error()})
+		RespondError(c, http.StatusBadRequest, "File is required")
 		return
 	}
 	defer file.Close()
@@ -102,7 +102,7 @@ func (h *MediaHandler) UploadMedia(c *gin.Context) {
 
 	usedBytes, err := h.mediaRepo.GetTrackedStorageByUserID(c.Request.Context(), userID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to evaluate storage quota", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to evaluate storage quota")
 		return
 	}
 	capBytes := resolveStorageCapForRole(c.GetString("role"), h.quota)
@@ -119,7 +119,7 @@ func (h *MediaHandler) UploadMedia(c *gin.Context) {
 
 	uploadDir := "uploads"
 	if err := os.MkdirAll(uploadDir, 0o755); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to prepare storage directory", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to prepare storage directory")
 		return
 	}
 
@@ -136,7 +136,7 @@ func (h *MediaHandler) UploadMedia(c *gin.Context) {
 
 	dst, err := os.Create(storagePath)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create file", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to create file")
 		return
 	}
 	defer dst.Close()
@@ -203,7 +203,7 @@ func (h *MediaHandler) UploadMedia(c *gin.Context) {
 	if n > 0 {
 		if _, err := dst.Write(sniff[:n]); err != nil {
 			_ = os.Remove(storagePath)
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save file", "details": err.Error()})
+			RespondError(c, http.StatusInternalServerError, "Failed to save file")
 			return
 		}
 	}
@@ -212,7 +212,7 @@ func (h *MediaHandler) UploadMedia(c *gin.Context) {
 	total += written
 	if err != nil {
 		_ = os.Remove(storagePath)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save file", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to save file")
 		return
 	}
 
@@ -276,7 +276,7 @@ func (h *MediaHandler) UploadMedia(c *gin.Context) {
 	}
 
 	if err := h.mediaRepo.Create(c.Request.Context(), media); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save media record", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to save media record")
 		return
 	}
 
@@ -285,9 +285,7 @@ func (h *MediaHandler) UploadMedia(c *gin.Context) {
 		if deleteErr := h.mediaRepo.DeleteByID(c.Request.Context(), media.ID); deleteErr != nil {
 			log.Printf("failed to rollback media record %d after scan enqueue failure: %v", media.ID, deleteErr)
 		}
-		c.JSON(http.StatusServiceUnavailable, gin.H{
-			"error": "Upload temporarily unavailable while security scanning is offline",
-		})
+		RespondError(c, http.StatusServiceUnavailable, "Upload temporarily unavailable while security scanning is offline")
 		return
 	}
 
@@ -324,7 +322,7 @@ func (h *MediaHandler) GetThumbnail(c *gin.Context) {
 			RespondError(c, http.StatusNotFound, "Media file not found")
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch media file", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to fetch media file")
 		return
 	}
 
@@ -375,7 +373,7 @@ func (h *MediaHandler) BatchUploadMedia(c *gin.Context) {
 
 	// Parse multipart form
 	if err := c.Request.ParseMultipartForm(maxBatchUploadSize); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to parse form", "details": err.Error()})
+		RespondError(c, http.StatusBadRequest, "Failed to parse form")
 		return
 	}
 
@@ -394,7 +392,7 @@ func (h *MediaHandler) BatchUploadMedia(c *gin.Context) {
 
 	usedBytes, err := h.mediaRepo.GetTrackedStorageByUserID(c.Request.Context(), userID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to evaluate storage quota", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to evaluate storage quota")
 		return
 	}
 	capBytes := resolveStorageCapForRole(c.GetString("role"), h.quota)

@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	apiresponse "github.com/omninudge/backend/internal/api/response"
 )
 
 // errorTranslations maps message keys to localized strings
@@ -52,7 +53,14 @@ func RespondError(c *gin.Context, statusCode int, message string, err error) {
 		}
 	}
 
-	response := gin.H{"error": message}
+	response := gin.H{
+		"error":   message,
+		"code":    apiresponse.CodeFromStatus(statusCode),
+		"message": message,
+	}
+	if requestID := apiresponse.RequestIDFromContext(c); requestID != "" {
+		response["request_id"] = requestID
+	}
 	if err != nil {
 		response["details"] = err.Error()
 	}

@@ -89,6 +89,23 @@ func (h *Hub) Run() {
 			}
 
 		case message := <-h.broadcast:
+			// RecipientID 0 is a reserved internal "broadcast to all clients" target.
+			if message.RecipientID == 0 {
+				h.mu.Lock()
+				for userID, client := range h.clients {
+					select {
+					case client.Send <- message:
+						// Message sent successfully
+					default:
+						// Client's send channel is full, close it
+						close(client.Send)
+						delete(h.clients, userID)
+					}
+				}
+				h.mu.Unlock()
+				continue
+			}
+
 			h.mu.RLock()
 			client, ok := h.clients[message.RecipientID]
 			h.mu.RUnlock()

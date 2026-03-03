@@ -429,7 +429,7 @@ func (h *MessagesHandler) SendMessage(c *gin.Context) {
 
 	var req SendMessageRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body", "details": err.Error()})
+		RespondError(c, http.StatusBadRequest, "Invalid request body")
 		return
 	}
 
@@ -462,7 +462,7 @@ func (h *MessagesHandler) SendMessage(c *gin.Context) {
 		if err.Error() == "no rows in result set" {
 			RespondError(c, http.StatusNotFound, "Conversation not found")
 		} else {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get conversation", "details": err.Error()})
+			RespondError(c, http.StatusInternalServerError, "Failed to get conversation")
 		}
 		return
 	}
@@ -553,7 +553,7 @@ func (h *MessagesHandler) SendMessage(c *gin.Context) {
 		// For regular conversations, use the existing method
 		conversation, err := h.conversationRepo.GetByID(c.Request.Context(), req.ConversationID)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get conversation", "details": err.Error()})
+			RespondError(c, http.StatusInternalServerError, "Failed to get conversation")
 			return
 		}
 
@@ -608,7 +608,7 @@ func (h *MessagesHandler) SendMessage(c *gin.Context) {
 				RespondError(c, http.StatusNotFound, "Reply target message not found")
 				return
 			}
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to validate reply target", "details": err.Error()})
+			RespondError(c, http.StatusInternalServerError, "Failed to validate reply target")
 			return
 		}
 		if parentConversationID != req.ConversationID {
@@ -639,7 +639,7 @@ func (h *MessagesHandler) SendMessage(c *gin.Context) {
 			FROM ancestors
 		`, *effectiveReplyTo).Scan(&parentDepth)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to calculate thread depth", "details": err.Error()})
+			RespondError(c, http.StatusInternalServerError, "Failed to calculate thread depth")
 			return
 		}
 		if parentDepth >= maxThreadDepth {
@@ -719,7 +719,7 @@ func (h *MessagesHandler) SendMessage(c *gin.Context) {
 	}
 
 	if err := h.messageRepo.Create(c.Request.Context(), message); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to send message", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to send message")
 		return
 	}
 	if effectiveReplyTo != nil {
@@ -730,7 +730,7 @@ func (h *MessagesHandler) SendMessage(c *gin.Context) {
 			WHERE id = $1
 		`, *effectiveReplyTo); err != nil {
 			_, _ = h.pool.Exec(c.Request.Context(), `DELETE FROM messages WHERE id = $1`, message.ID)
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update thread metadata", "details": err.Error()})
+			RespondError(c, http.StatusInternalServerError, "Failed to update thread metadata")
 			return
 		}
 
@@ -742,7 +742,7 @@ func (h *MessagesHandler) SendMessage(c *gin.Context) {
 				WHERE id = $1
 			`, *threadRoot); err != nil {
 				_, _ = h.pool.Exec(c.Request.Context(), `DELETE FROM messages WHERE id = $1`, message.ID)
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update root thread metadata", "details": err.Error()})
+				RespondError(c, http.StatusInternalServerError, "Failed to update root thread metadata")
 				return
 			}
 		}
@@ -880,7 +880,7 @@ func (h *MessagesHandler) ForwardMessage(c *gin.Context) {
 
 	var req ForwardMessageRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body", "details": err.Error()})
+		RespondError(c, http.StatusBadRequest, "Invalid request body")
 		return
 	}
 	if req.MessageID <= 0 {
@@ -917,13 +917,13 @@ func (h *MessagesHandler) ForwardMessage(c *gin.Context) {
 			RespondError(c, http.StatusNotFound, "Message not found")
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load message", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to load message")
 		return
 	}
 
 	canAccessOriginalConversation, err := h.canAccessConversation(ctx, original.ConversationID, userID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to validate source conversation access", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to validate source conversation access")
 		return
 	}
 	if !canAccessOriginalConversation {
@@ -933,7 +933,7 @@ func (h *MessagesHandler) ForwardMessage(c *gin.Context) {
 
 	sourceConversationType, err := h.getConversationType(ctx, original.ConversationID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load source conversation type", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to load source conversation type")
 		return
 	}
 	if sourceConversationType == "dm" {
@@ -945,7 +945,7 @@ func (h *MessagesHandler) ForwardMessage(c *gin.Context) {
 
 	sourceParticipantIDs, err := h.getConversationParticipantIDs(ctx, original.ConversationID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load source participants", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to load source participants")
 		return
 	}
 	sourceParticipants := make(map[int]struct{}, len(sourceParticipantIDs))
@@ -975,7 +975,7 @@ func (h *MessagesHandler) ForwardMessage(c *gin.Context) {
 	for _, targetConversationID := range dedupedConversationIDs {
 		canAccessTargetConversation, err := h.canAccessConversation(ctx, targetConversationID, userID)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to validate target conversation access", "details": err.Error()})
+			RespondError(c, http.StatusInternalServerError, "Failed to validate target conversation access")
 			return
 		}
 		if !canAccessTargetConversation {
@@ -984,7 +984,7 @@ func (h *MessagesHandler) ForwardMessage(c *gin.Context) {
 		}
 		targetParticipantIDs, err := h.getConversationParticipantIDs(ctx, targetConversationID)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load target participants", "details": err.Error()})
+			RespondError(c, http.StatusInternalServerError, "Failed to load target participants")
 			return
 		}
 		targetParticipants := make(map[int]struct{}, len(targetParticipantIDs))
@@ -997,7 +997,7 @@ func (h *MessagesHandler) ForwardMessage(c *gin.Context) {
 
 		targetConversationType, err := h.getConversationType(ctx, targetConversationID)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load target conversation type", "details": err.Error()})
+			RespondError(c, http.StatusInternalServerError, "Failed to load target conversation type")
 			return
 		}
 		if isEncryptedForward {
@@ -1017,7 +1017,7 @@ func (h *MessagesHandler) ForwardMessage(c *gin.Context) {
 		if targetConversationType == "dm" {
 			targetConversation, err := h.conversationRepo.GetByID(ctx, targetConversationID)
 			if err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load target conversation", "details": err.Error()})
+				RespondError(c, http.StatusInternalServerError, "Failed to load target conversation")
 				return
 			}
 			if targetConversation == nil {
@@ -1034,7 +1034,7 @@ func (h *MessagesHandler) ForwardMessage(c *gin.Context) {
 					WHERE blocker_id = $1 AND blocked_id = $2
 				)
 			`, targetRecipientID, userID).Scan(&isBlocked); err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check blocking status", "details": err.Error()})
+				RespondError(c, http.StatusInternalServerError, "Failed to check blocking status")
 				return
 			}
 			if isBlocked {
@@ -1073,7 +1073,7 @@ func (h *MessagesHandler) ForwardMessage(c *gin.Context) {
 
 	tx, err := h.pool.Begin(ctx)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to start forward transaction", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to start forward transaction")
 		return
 	}
 	defer tx.Rollback(ctx)
@@ -1202,7 +1202,7 @@ func (h *MessagesHandler) ForwardMessage(c *gin.Context) {
 			newMessage.SharedEncryptionIV,
 		).Scan(&newMessage.ID, &newMessage.SentAt)
 		if createErr != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create forwarded message", "details": createErr.Error()})
+			RespondError(c, http.StatusInternalServerError, "Failed to create forwarded message")
 			return
 		}
 		if newMessage.IsMultiRecipient && len(newMessage.RecipientKeys) > 0 {
@@ -1211,7 +1211,7 @@ func (h *MessagesHandler) ForwardMessage(c *gin.Context) {
 					INSERT INTO message_recipient_keys (message_id, user_id, encrypted_key)
 					VALUES ($1, $2, $3)
 				`, newMessage.ID, participantID, encryptedKey); err != nil {
-					c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to persist recipient keys", "details": err.Error()})
+					RespondError(c, http.StatusInternalServerError, "Failed to persist recipient keys")
 					return
 				}
 			}
@@ -1222,7 +1222,7 @@ func (h *MessagesHandler) ForwardMessage(c *gin.Context) {
 			SET forwarded_from = $2
 			WHERE id = $1
 		`, newMessage.ID, original.ID); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to annotate forwarded message", "details": err.Error()})
+			RespondError(c, http.StatusInternalServerError, "Failed to annotate forwarded message")
 			return
 		}
 
@@ -1231,7 +1231,7 @@ func (h *MessagesHandler) ForwardMessage(c *gin.Context) {
 			SET last_message_at = CURRENT_TIMESTAMP
 			WHERE id = $1
 		`, target.conversationID); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update conversation timestamp", "details": err.Error()})
+			RespondError(c, http.StatusInternalServerError, "Failed to update conversation timestamp")
 			return
 		}
 
@@ -1244,12 +1244,12 @@ func (h *MessagesHandler) ForwardMessage(c *gin.Context) {
 		SET forward_count = forward_count + $2
 		WHERE id = $1
 	`, original.ID, len(forwardedMessageIDs)); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to increment forward count", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to increment forward count")
 		return
 	}
 
 	if err := tx.Commit(ctx); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to commit forwarded messages", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to commit forwarded messages")
 		return
 	}
 
@@ -1357,13 +1357,13 @@ func (h *MessagesHandler) GetForwardInfo(c *gin.Context) {
 			RespondError(c, http.StatusNotFound, "Message not found")
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load message", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to load message")
 		return
 	}
 
 	canAccessConversation, err := h.canAccessConversation(ctx, conversationID, userID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to validate conversation access", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to validate conversation access")
 		return
 	}
 	if !canAccessConversation {
@@ -1386,7 +1386,7 @@ func (h *MessagesHandler) GetForwardInfo(c *gin.Context) {
 				originalSenderID = 0
 				forwardCount = 0
 			} else {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load original message", "details": err.Error()})
+				RespondError(c, http.StatusInternalServerError, "Failed to load original message")
 				return
 			}
 		}
@@ -1400,7 +1400,7 @@ func (h *MessagesHandler) GetForwardInfo(c *gin.Context) {
 			WHERE id = $1
 		`, originalSenderID).Scan(&originalSenderUsername); err != nil {
 			if !errors.Is(err, pgx.ErrNoRows) {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load original sender", "details": err.Error()})
+				RespondError(c, http.StatusInternalServerError, "Failed to load original sender")
 				return
 			}
 		}
@@ -1410,7 +1410,7 @@ func (h *MessagesHandler) GetForwardInfo(c *gin.Context) {
 	if originalConversationID > 0 {
 		canAccessOriginalConversation, err := h.canAccessConversation(ctx, originalConversationID, userID)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to validate original conversation access", "details": err.Error()})
+			RespondError(c, http.StatusInternalServerError, "Failed to validate original conversation access")
 			return
 		}
 		if canAccessOriginalConversation {
@@ -1457,7 +1457,7 @@ func (h *MessagesHandler) EditMessage(c *gin.Context) {
 
 	var req EditMessageRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body", "details": err.Error()})
+		RespondError(c, http.StatusBadRequest, "Invalid request body")
 		return
 	}
 	if strings.TrimSpace(req.EncryptedContent) == "" {
@@ -1510,7 +1510,7 @@ func (h *MessagesHandler) EditMessage(c *gin.Context) {
 			RespondError(c, http.StatusNotFound, "Message not found")
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load message", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to load message")
 		return
 	}
 
@@ -1536,7 +1536,7 @@ func (h *MessagesHandler) EditMessage(c *gin.Context) {
 		    (message_id, content, encrypted_content, sender_encrypted_content, encryption_version, edited_by)
 		VALUES ($1, $2, $3, $4, $5, $6)
 	`, messageID, currentEncryptedContent, currentEncryptedContent, currentSenderEncryptedContent, currentEncryptionVersion, userID); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to store edit history", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to store edit history")
 		return
 	}
 
@@ -1567,7 +1567,7 @@ func (h *MessagesHandler) EditMessage(c *gin.Context) {
 		WHERE id = $1
 		RETURNING edited_at
 	`, messageID, req.EncryptedContent, nextSenderEncryptedContent, nextEncryptionVersion, originalContentToPersist).Scan(&editedAt); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update message", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to update message")
 		return
 	}
 
@@ -1589,7 +1589,7 @@ func (h *MessagesHandler) EditMessage(c *gin.Context) {
 
 	updatedMessage, err := h.messageRepo.GetByID(ctx, messageID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Message updated but failed to load response", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Message updated but failed to load response")
 		return
 	}
 
@@ -1676,13 +1676,13 @@ func (h *MessagesHandler) GetMessageHistory(c *gin.Context) {
 			RespondError(c, http.StatusNotFound, "Message not found")
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load message", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to load message")
 		return
 	}
 
 	canAccess, err := h.canAccessConversation(ctx, conversationID, userID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to validate conversation access", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to validate conversation access")
 		return
 	}
 	if !canAccess {
@@ -1697,7 +1697,7 @@ func (h *MessagesHandler) GetMessageHistory(c *gin.Context) {
 		WHERE message_id = $1
 	`, messageID).Scan(&total)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load message edit history", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to load message edit history")
 		return
 	}
 
@@ -1710,7 +1710,7 @@ func (h *MessagesHandler) GetMessageHistory(c *gin.Context) {
 		LIMIT $2 OFFSET $3
 	`, messageID, limit, offset)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load message edit history", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to load message edit history")
 		return
 	}
 	defer rows.Close()
@@ -1728,13 +1728,13 @@ func (h *MessagesHandler) GetMessageHistory(c *gin.Context) {
 			&entry.EditedAt,
 			&entry.EditedBy,
 		); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to parse message edit history", "details": err.Error()})
+			RespondError(c, http.StatusInternalServerError, "Failed to parse message edit history")
 			return
 		}
 		history = append(history, entry)
 	}
 	if err := rows.Err(); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to iterate message edit history", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to iterate message edit history")
 		return
 	}
 
@@ -1790,7 +1790,7 @@ func (h *MessagesHandler) GetMessages(c *gin.Context) {
 		if err.Error() == "no rows in result set" {
 			RespondError(c, http.StatusNotFound, "Conversation not found")
 		} else {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get conversation", "details": err.Error()})
+			RespondError(c, http.StatusInternalServerError, "Failed to get conversation")
 		}
 		return
 	}
@@ -1823,7 +1823,7 @@ func (h *MessagesHandler) GetMessages(c *gin.Context) {
 		// For regular conversations, use the existing method
 		conversation, err := h.conversationRepo.GetByID(c.Request.Context(), conversationID)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get conversation", "details": err.Error()})
+			RespondError(c, http.StatusInternalServerError, "Failed to get conversation")
 			return
 		}
 
@@ -1901,7 +1901,7 @@ func (h *MessagesHandler) GetMessages(c *gin.Context) {
 		}
 	}
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get messages", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to get messages")
 		return
 	}
 
@@ -1989,13 +1989,13 @@ func (h *MessagesHandler) GetThread(c *gin.Context) {
 			RespondError(c, http.StatusNotFound, "Message not found")
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load message", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to load message")
 		return
 	}
 
 	canAccess, err := h.canAccessConversation(c.Request.Context(), targetMessage.ConversationID, userID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to validate conversation access", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to validate conversation access")
 		return
 	}
 	if !canAccess {
@@ -2004,7 +2004,7 @@ func (h *MessagesHandler) GetThread(c *gin.Context) {
 	}
 	blocked, err := h.isSenderBlockedByViewer(c.Request.Context(), userID, targetMessage.SenderID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check blocking status", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to check blocking status")
 		return
 	}
 	if blocked && targetMessage.SenderID != userID {
@@ -2025,13 +2025,13 @@ func (h *MessagesHandler) GetThread(c *gin.Context) {
 				RespondError(c, http.StatusNotFound, "Thread root message not found")
 				return
 			}
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load thread root", "details": err.Error()})
+			RespondError(c, http.StatusInternalServerError, "Failed to load thread root")
 			return
 		}
 	}
 	blocked, err = h.isSenderBlockedByViewer(c.Request.Context(), userID, rootMessage.SenderID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check blocking status", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to check blocking status")
 		return
 	}
 	if blocked && rootMessage.SenderID != userID {
@@ -2047,7 +2047,7 @@ func (h *MessagesHandler) GetThread(c *gin.Context) {
 
 	conversationType, err := h.getConversationType(c.Request.Context(), rootMessage.ConversationID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load conversation type", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to load conversation type")
 		return
 	}
 
@@ -2123,13 +2123,13 @@ func (h *MessagesHandler) GetThread(c *gin.Context) {
 
 	var totalReplies int
 	if err := h.pool.QueryRow(c.Request.Context(), countQuery, rootMessage.ConversationID, rootID, userID).Scan(&totalReplies); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to count thread replies", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to count thread replies")
 		return
 	}
 
 	rows, err := h.pool.Query(c.Request.Context(), idQuery, rootMessage.ConversationID, rootID, userID, limit, offset)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to list thread replies", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to list thread replies")
 		return
 	}
 	defer rows.Close()
@@ -2138,13 +2138,13 @@ func (h *MessagesHandler) GetThread(c *gin.Context) {
 	for rows.Next() {
 		var id int
 		if err := rows.Scan(&id); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to scan thread replies", "details": err.Error()})
+			RespondError(c, http.StatusInternalServerError, "Failed to scan thread replies")
 			return
 		}
 		replyIDs = append(replyIDs, id)
 	}
 	if err := rows.Err(); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to read thread replies", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to read thread replies")
 		return
 	}
 
@@ -2152,7 +2152,7 @@ func (h *MessagesHandler) GetThread(c *gin.Context) {
 	for _, id := range replyIDs {
 		msg, err := h.messageRepo.GetByID(c.Request.Context(), id)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load thread reply", "details": err.Error()})
+			RespondError(c, http.StatusInternalServerError, "Failed to load thread reply")
 			return
 		}
 		replies = append(replies, msg)
@@ -2199,13 +2199,13 @@ func (h *MessagesHandler) setThreadMuted(c *gin.Context, muted bool) {
 			RespondError(c, http.StatusNotFound, "Message not found")
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load message", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to load message")
 		return
 	}
 
 	canAccess, err := h.canAccessConversation(c.Request.Context(), targetMessage.ConversationID, userID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to validate conversation access", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to validate conversation access")
 		return
 	}
 	if !canAccess {
@@ -2225,7 +2225,7 @@ func (h *MessagesHandler) setThreadMuted(c *gin.Context, muted bool) {
 		DO UPDATE SET muted = EXCLUDED.muted, updated_at = CURRENT_TIMESTAMP
 	`, rootID, userID, muted)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update thread mute setting", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to update thread mute setting")
 		return
 	}
 
@@ -2301,7 +2301,7 @@ func (h *MessagesHandler) MarkAsRead(c *gin.Context) {
 		if err.Error() == "no rows in result set" {
 			RespondError(c, http.StatusNotFound, "Conversation not found")
 		} else {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get conversation", "details": err.Error()})
+			RespondError(c, http.StatusInternalServerError, "Failed to get conversation")
 		}
 		return
 	}
@@ -2334,7 +2334,7 @@ func (h *MessagesHandler) MarkAsRead(c *gin.Context) {
 		// For DM conversations, use the traditional method
 		conversation, err := h.conversationRepo.GetByID(c.Request.Context(), conversationID)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get conversation", "details": err.Error()})
+			RespondError(c, http.StatusInternalServerError, "Failed to get conversation")
 			return
 		}
 		if conversation == nil {
@@ -2363,7 +2363,7 @@ func (h *MessagesHandler) MarkAsRead(c *gin.Context) {
 	`
 	rows, err := h.pool.Query(c.Request.Context(), query, conversationID, userID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get unread messages", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to get unread messages")
 		return
 	}
 	defer rows.Close()
@@ -2378,7 +2378,7 @@ func (h *MessagesHandler) MarkAsRead(c *gin.Context) {
 			SenderID int
 		}
 		if err := rows.Scan(&msg.ID, &msg.SenderID); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to scan messages", "details": err.Error()})
+			RespondError(c, http.StatusInternalServerError, "Failed to scan messages")
 			return
 		}
 		unreadMessages = append(unreadMessages, msg)
@@ -2387,7 +2387,7 @@ func (h *MessagesHandler) MarkAsRead(c *gin.Context) {
 	// Check if user has read receipts enabled before marking as read
 	userSettings, err := h.userSettingsRepo.GetByUserID(c.Request.Context(), userID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get user settings", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to get user settings")
 		return
 	}
 
@@ -2395,7 +2395,7 @@ func (h *MessagesHandler) MarkAsRead(c *gin.Context) {
 	if userSettings == nil {
 		userSettings, err = h.userSettingsRepo.CreateDefault(c.Request.Context(), userID)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create user settings", "details": err.Error()})
+			RespondError(c, http.StatusInternalServerError, "Failed to create user settings")
 			return
 		}
 	}
@@ -2409,7 +2409,7 @@ func (h *MessagesHandler) MarkAsRead(c *gin.Context) {
 
 	// Mark all messages as read for this user
 	if err := h.messageRepo.MarkAllAsRead(c.Request.Context(), conversationID, userID); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to mark messages as read", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to mark messages as read")
 		return
 	}
 
@@ -2509,7 +2509,7 @@ func (h *MessagesHandler) MarkSingleMessageAsRead(c *gin.Context) {
 	// Get message to verify user is the recipient
 	message, err := h.messageRepo.GetByID(c.Request.Context(), messageID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get message", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to get message")
 		return
 	}
 
@@ -2533,7 +2533,7 @@ func (h *MessagesHandler) MarkSingleMessageAsRead(c *gin.Context) {
 	// Check if user has read receipts enabled before marking as read
 	userSettings, err := h.userSettingsRepo.GetByUserID(c.Request.Context(), userID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get user settings", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to get user settings")
 		return
 	}
 
@@ -2541,7 +2541,7 @@ func (h *MessagesHandler) MarkSingleMessageAsRead(c *gin.Context) {
 	if userSettings == nil {
 		userSettings, err = h.userSettingsRepo.CreateDefault(c.Request.Context(), userID)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create user settings", "details": err.Error()})
+			RespondError(c, http.StatusInternalServerError, "Failed to create user settings")
 			return
 		}
 	}
@@ -2555,14 +2555,14 @@ func (h *MessagesHandler) MarkSingleMessageAsRead(c *gin.Context) {
 
 	// Mark message as read
 	if err := h.messageRepo.MarkAsRead(c.Request.Context(), messageID); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to mark message as read", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to mark message as read")
 		return
 	}
 
 	// Reload to get read_at timestamp
 	updatedMsg, err := h.messageRepo.GetByID(c.Request.Context(), messageID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to reload message", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to reload message")
 		return
 	}
 
@@ -2620,7 +2620,7 @@ func (h *MessagesHandler) DeleteMessage(c *gin.Context) {
 	// Get message to verify user is a participant
 	message, err := h.messageRepo.GetByID(c.Request.Context(), messageID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get message", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to get message")
 		return
 	}
 
@@ -2641,13 +2641,13 @@ func (h *MessagesHandler) DeleteMessage(c *gin.Context) {
 		}
 
 		if err := h.messageRepo.SoftDeleteForBoth(c.Request.Context(), messageID); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete message for both users", "details": err.Error()})
+			RespondError(c, http.StatusInternalServerError, "Failed to delete message for both users")
 			return
 		}
 	} else {
 		// Soft delete for this user
 		if err := h.messageRepo.SoftDeleteForUser(c.Request.Context(), messageID, userID); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete message", "details": err.Error()})
+			RespondError(c, http.StatusInternalServerError, "Failed to delete message")
 			return
 		}
 	}

@@ -153,7 +153,7 @@ func (h *UsersHandler) getUserProfileResponse(c *gin.Context, loadUser func() (*
 	user, err := loadUser()
 	if err != nil {
 		resultState = "error"
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch user", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to fetch user")
 		return
 	}
 	if user == nil {
@@ -188,7 +188,7 @@ func (h *UsersHandler) getUserProfileResponse(c *gin.Context, loadUser func() (*
 		isFriend, err := h.friendRepo.AreUsersFriends(c.Request.Context(), user.ID, viewerID)
 		if err != nil {
 			resultState = "error"
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to validate profile access", "details": err.Error()})
+			RespondError(c, http.StatusInternalServerError, "Failed to validate profile access")
 			return
 		}
 		viewerIsFriend = isFriend
@@ -207,7 +207,7 @@ func (h *UsersHandler) getUserProfileResponse(c *gin.Context, loadUser func() (*
 		profile, err := h.userProfRepo.GetByUserID(c.Request.Context(), user.ID)
 		if err != nil {
 			resultState = "error"
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch user profile", "details": err.Error()})
+			RespondError(c, http.StatusInternalServerError, "Failed to fetch user profile")
 			return
 		}
 		if profile != nil {
@@ -238,7 +238,7 @@ func (h *UsersHandler) getUserProfileResponse(c *gin.Context, loadUser func() (*
 		hubs, err := h.hubModRepo.GetHubsForModerator(c.Request.Context(), user.ID)
 		if err != nil {
 			resultState = "error"
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch moderated hubs", "details": err.Error()})
+			RespondError(c, http.StatusInternalServerError, "Failed to fetch moderated hubs")
 			return
 		}
 		for _, hub := range hubs {
@@ -305,7 +305,7 @@ func (h *UsersHandler) GetUserPosts(c *gin.Context) {
 
 	user, err := h.userRepo.GetByUsername(c.Request.Context(), username)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch user", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to fetch user")
 		return
 	}
 	if user == nil {
@@ -321,7 +321,7 @@ func (h *UsersHandler) GetUserPosts(c *gin.Context) {
 
 	posts, err := h.postRepo.GetByAuthor(c.Request.Context(), user.ID, limit, offset)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch posts", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to fetch posts")
 		return
 	}
 
@@ -349,7 +349,7 @@ func (h *UsersHandler) GetAgentState(c *gin.Context) {
 
 	var req AgentStateRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body", "details": err.Error()})
+		RespondError(c, http.StatusBadRequest, "Invalid request body")
 		return
 	}
 
@@ -404,7 +404,7 @@ func (h *UsersHandler) GetUserComments(c *gin.Context) {
 
 	user, err := h.userRepo.GetByUsername(c.Request.Context(), username)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch user", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to fetch user")
 		return
 	}
 	if user == nil {
@@ -420,7 +420,7 @@ func (h *UsersHandler) GetUserComments(c *gin.Context) {
 
 	comments, err := h.commentRepo.GetByUserID(c.Request.Context(), user.ID, limit, offset)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch comments", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to fetch comments")
 		return
 	}
 
@@ -609,7 +609,7 @@ func (h *UsersHandler) UploadMyAvatar(c *gin.Context) {
 				RespondError(c, http.StatusRequestEntityTooLarge, "Avatar exceeds 5MB limit")
 				return
 			}
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Avatar file is required", "details": err.Error()})
+			RespondError(c, http.StatusBadRequest, "Avatar file is required")
 			return
 		}
 	}
@@ -631,7 +631,7 @@ func (h *UsersHandler) UploadMyAvatar(c *gin.Context) {
 
 	uploadDir := filepath.Join("uploads", "avatars")
 	if err := os.MkdirAll(uploadDir, 0o755); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to prepare avatar storage", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to prepare avatar storage")
 		return
 	}
 
@@ -639,7 +639,7 @@ func (h *UsersHandler) UploadMyAvatar(c *gin.Context) {
 	originalPath := filepath.Join(uploadDir, filename)
 	dst, err := os.Create(originalPath)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create avatar file", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to create avatar file")
 		return
 	}
 	defer dst.Close()
@@ -673,7 +673,7 @@ func (h *UsersHandler) UploadMyAvatar(c *gin.Context) {
 	}
 	if n > 0 {
 		if _, err := dst.Write(sniff[:n]); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to write avatar file", "details": err.Error()})
+			RespondError(c, http.StatusInternalServerError, "Failed to write avatar file")
 			return
 		}
 	}
@@ -681,7 +681,7 @@ func (h *UsersHandler) UploadMyAvatar(c *gin.Context) {
 	written, err := io.Copy(dst, limited)
 	total += written
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save avatar file", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to save avatar file")
 		return
 	}
 	if total > maxAvatarUploadSize {
@@ -691,7 +691,7 @@ func (h *UsersHandler) UploadMyAvatar(c *gin.Context) {
 
 	thumbPath, err = h.thumbService.GenerateSquareThumbnail(originalPath, avatarThumbSize)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate avatar thumbnail", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to generate avatar thumbnail")
 		return
 	}
 

@@ -26,8 +26,15 @@ func NewHubThemesHandler(themesRepo *repository.HubThemesRepository, settingsRep
 	}
 }
 
-// GetActiveTheme handles GET /api/v1/hubs/:name/theme
+// GetActiveTheme handles GET /api/v1/hubs/:name/theme.
 // Returns the active theme for a hub (public access)
+// @Summary      Get active hub theme
+// @Tags         Hubs
+// @Produce      json
+// @Param        name  path      string  true  "Hub name"
+// @Success      200   {object}  gin.H
+// @Failure      404   {object}  gin.H
+// @Router       /hubs/{name}/theme [get]
 func (h *HubThemesHandler) GetActiveTheme(c *gin.Context) {
 	hubName := c.Param("name")
 	hubID, err := h.settingsRepo.GetHubIDByName(c.Request.Context(), hubName)
@@ -49,8 +56,16 @@ func (h *HubThemesHandler) GetActiveTheme(c *gin.Context) {
 	c.JSON(http.StatusOK, theme)
 }
 
-// GetAllThemes handles GET /api/v1/hubs/:name/themes
+// GetAllThemes handles GET /api/v1/hubs/:name/themes.
 // Returns all theme versions for a hub (moderator only)
+// @Summary      Get all hub themes
+// @Tags         Hubs
+// @Produce      json
+// @Param        name  path      string  true  "Hub name"
+// @Success      200   {object}  gin.H
+// @Failure      403   {object}  gin.H
+// @Security     BearerAuth
+// @Router       /hubs/{name}/themes [get]
 func (h *HubThemesHandler) GetAllThemes(c *gin.Context) {
 	userID, ok := middleware.GetAuthenticatedUserID(c)
 	if !ok {
@@ -80,8 +95,19 @@ func (h *HubThemesHandler) GetAllThemes(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"themes": themes})
 }
 
-// CreateTheme handles POST /api/v1/hubs/:name/themes
+// CreateTheme handles POST /api/v1/hubs/:name/themes.
 // Creates a new theme (requires full_moderator or owner)
+// @Summary      Create hub theme
+// @Tags         Hubs
+// @Accept       json
+// @Produce      json
+// @Param        name  path      string  true  "Hub name"
+// @Param        body  body      object  true  "Theme payload"
+// @Success      201   {object}  gin.H
+// @Failure      400   {object}  gin.H
+// @Failure      403   {object}  gin.H
+// @Security     BearerAuth
+// @Router       /hubs/{name}/themes [post]
 func (h *HubThemesHandler) CreateTheme(c *gin.Context) {
 	userID, ok := middleware.GetAuthenticatedUserID(c)
 	if !ok {
@@ -121,7 +147,7 @@ func (h *HubThemesHandler) CreateTheme(c *gin.Context) {
 	if theme.CSSContent != nil && *theme.CSSContent != "" {
 		sanitized, err := h.cssSanitizer.Sanitize(*theme.CSSContent)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid CSS", "details": err.Error()})
+			RespondError(c, http.StatusBadRequest, "Invalid CSS")
 			return
 		}
 		theme.CSSContent = &sanitized
@@ -139,8 +165,20 @@ func (h *HubThemesHandler) CreateTheme(c *gin.Context) {
 	})
 }
 
-// UpdateTheme handles PUT /api/v1/hubs/:name/themes/:id
+// UpdateTheme handles PUT /api/v1/hubs/:name/themes/:id.
 // Updates a theme (creates new version) (requires full_moderator or owner)
+// @Summary      Update hub theme
+// @Tags         Hubs
+// @Accept       json
+// @Produce      json
+// @Param        name  path      string  true  "Hub name"
+// @Param        id    path      int     true  "Theme ID"
+// @Param        body  body      object  true  "Theme payload"
+// @Success      200   {object}  gin.H
+// @Failure      400   {object}  gin.H
+// @Failure      403   {object}  gin.H
+// @Security     BearerAuth
+// @Router       /hubs/{name}/themes/{id} [put]
 func (h *HubThemesHandler) UpdateTheme(c *gin.Context) {
 	userID, ok := middleware.GetAuthenticatedUserID(c)
 	if !ok {
@@ -185,7 +223,7 @@ func (h *HubThemesHandler) UpdateTheme(c *gin.Context) {
 	if theme.CSSContent != nil && *theme.CSSContent != "" {
 		sanitized, err := h.cssSanitizer.Sanitize(*theme.CSSContent)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid CSS", "details": err.Error()})
+			RespondError(c, http.StatusBadRequest, "Invalid CSS")
 			return
 		}
 		theme.CSSContent = &sanitized
@@ -203,8 +241,18 @@ func (h *HubThemesHandler) UpdateTheme(c *gin.Context) {
 	})
 }
 
-// ActivateTheme handles POST /api/v1/hubs/:name/themes/:id/activate
+// ActivateTheme handles POST /api/v1/hubs/:name/themes/:id/activate.
 // Activates a specific theme version (requires full_moderator or owner)
+// @Summary      Activate hub theme
+// @Tags         Hubs
+// @Produce      json
+// @Param        name  path      string  true  "Hub name"
+// @Param        id    path      int     true  "Theme ID"
+// @Success      200   {object}  gin.H
+// @Failure      400   {object}  gin.H
+// @Failure      403   {object}  gin.H
+// @Security     BearerAuth
+// @Router       /hubs/{name}/themes/{id}/activate [post]
 func (h *HubThemesHandler) ActivateTheme(c *gin.Context) {
 	userID, ok := middleware.GetAuthenticatedUserID(c)
 	if !ok {
@@ -244,8 +292,18 @@ func (h *HubThemesHandler) ActivateTheme(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Theme activated successfully"})
 }
 
-// DeleteTheme handles DELETE /api/v1/hubs/:name/themes/:id
+// DeleteTheme handles DELETE /api/v1/hubs/:name/themes/:id.
 // Deletes a theme (cannot delete active theme) (requires owner)
+// @Summary      Delete hub theme
+// @Tags         Hubs
+// @Produce      json
+// @Param        name  path      string  true  "Hub name"
+// @Param        id    path      int     true  "Theme ID"
+// @Success      200   {object}  gin.H
+// @Failure      400   {object}  gin.H
+// @Failure      403   {object}  gin.H
+// @Security     BearerAuth
+// @Router       /hubs/{name}/themes/{id} [delete]
 func (h *HubThemesHandler) DeleteTheme(c *gin.Context) {
 	userID, ok := middleware.GetAuthenticatedUserID(c)
 	if !ok {
@@ -280,8 +338,19 @@ func (h *HubThemesHandler) DeleteTheme(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Theme deleted successfully"})
 }
 
-// PreviewTheme handles POST /api/v1/hubs/:name/themes/preview
+// PreviewTheme handles POST /api/v1/hubs/:name/themes/preview.
 // Returns sanitized and scoped CSS for preview (requires moderator)
+// @Summary      Preview hub theme CSS
+// @Tags         Hubs
+// @Accept       json
+// @Produce      json
+// @Param        name  path      string  true  "Hub name"
+// @Param        body  body      object  true  "Theme CSS payload"
+// @Success      200   {object}  gin.H
+// @Failure      400   {object}  gin.H
+// @Failure      403   {object}  gin.H
+// @Security     BearerAuth
+// @Router       /hubs/{name}/themes/preview [post]
 func (h *HubThemesHandler) PreviewTheme(c *gin.Context) {
 	userID, ok := middleware.GetAuthenticatedUserID(c)
 	if !ok {
@@ -318,7 +387,7 @@ func (h *HubThemesHandler) PreviewTheme(c *gin.Context) {
 	// Sanitize CSS
 	sanitized, err := h.cssSanitizer.Sanitize(req.CSSContent)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid CSS", "details": err.Error()})
+		RespondError(c, http.StatusBadRequest, "Invalid CSS")
 		return
 	}
 

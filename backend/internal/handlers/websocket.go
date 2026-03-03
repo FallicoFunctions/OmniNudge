@@ -73,7 +73,14 @@ func NewWebSocketHandler(hub *websocket.Hub, authorizer *websocket.Authorizer, s
 	}
 }
 
-// HandleWebSocket handles WebSocket upgrade requests
+// HandleWebSocket handles WebSocket upgrade requests.
+// @Summary      Establish WebSocket connection
+// @Tags         WebSocket
+// @Produce      json
+// @Success      101  {object}  gin.H  "Switching Protocols"
+// @Failure      401  {object}  gin.H
+// @Security     BearerAuth
+// @Router       /ws [get]
 func (h *WebSocketHandler) HandleWebSocket(c *gin.Context) {
 	log.Printf("WebSocket connection attempt from %s", c.ClientIP())
 

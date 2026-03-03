@@ -43,8 +43,17 @@ type CreateRedditCommentRequest struct {
 	ParentRedditCommentID *string `json:"parent_reddit_comment_id"` // Reddit API comment ID to reply to
 }
 
-// GetRedditPostComments handles GET /api/v1/reddit/posts/:subreddit/:postId/comments
+// GetRedditPostComments handles GET /api/v1/reddit/posts/:subreddit/:postId/comments.
 // Returns local comments created by your platform's users for this Reddit post
+// @Summary      Get local comments for a Reddit post
+// @Tags         Reddit
+// @Produce      json
+// @Param        subreddit  path      string  true  "Subreddit name"
+// @Param        postId     path      string  true  "Reddit post ID"
+// @Param        sort       query     string  false "Sort order"
+// @Success      200        {object}  gin.H
+// @Failure      400        {object}  gin.H
+// @Router       /reddit/posts/{subreddit}/{postId}/comments [get]
 func (h *RedditCommentsHandler) GetRedditPostComments(c *gin.Context) {
 	subreddit := c.Param("subreddit")
 	postID := c.Param("postId")
@@ -70,7 +79,7 @@ func (h *RedditCommentsHandler) GetRedditPostComments(c *gin.Context) {
 	}
 
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch comments", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to fetch comments")
 		return
 	}
 
@@ -115,8 +124,19 @@ func (h *RedditCommentsHandler) GetRedditPostComments(c *gin.Context) {
 	})
 }
 
-// CreateRedditPostComment handles POST /api/v1/reddit/posts/:subreddit/:postId/comments
+// CreateRedditPostComment handles POST /api/v1/reddit/posts/:subreddit/:postId/comments.
 // Creates a local comment on a Reddit post (visible only on your platform)
+// @Summary      Create local comment on Reddit post
+// @Tags         Reddit
+// @Accept       json
+// @Produce      json
+// @Param        subreddit  path      string                     true  "Subreddit name"
+// @Param        postId     path      string                     true  "Reddit post ID"
+// @Param        body       body      CreateRedditCommentRequest true  "Comment content"
+// @Success      201        {object}  models.RedditPostComment
+// @Failure      400        {object}  gin.H
+// @Security     BearerAuth
+// @Router       /reddit/posts/{subreddit}/{postId}/comments [post]
 func (h *RedditCommentsHandler) CreateRedditPostComment(c *gin.Context) {
 	// Get user ID from context
 	userID, ok := middleware.GetAuthenticatedUserID(c)
@@ -134,7 +154,7 @@ func (h *RedditCommentsHandler) CreateRedditPostComment(c *gin.Context) {
 
 	var req CreateRedditCommentRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body", "details": err.Error()})
+		RespondError(c, http.StatusBadRequest, "Invalid request body")
 		return
 	}
 
@@ -142,7 +162,7 @@ func (h *RedditCommentsHandler) CreateRedditPostComment(c *gin.Context) {
 	if req.ParentCommentID != nil {
 		parentComment, err := h.redditCommentRepo.GetByID(c.Request.Context(), *req.ParentCommentID)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get parent comment", "details": err.Error()})
+			RespondError(c, http.StatusInternalServerError, "Failed to get parent comment")
 			return
 		}
 		if parentComment == nil {
@@ -167,7 +187,7 @@ func (h *RedditCommentsHandler) CreateRedditPostComment(c *gin.Context) {
 	}
 
 	if err := h.redditCommentRepo.Create(c.Request.Context(), comment); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create comment", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to create comment")
 		return
 	}
 
@@ -195,7 +215,21 @@ type UpdateRedditCommentRequest struct {
 	Content string `json:"content" binding:"required,min=1"`
 }
 
-// UpdateRedditPostComment allows users to edit their site-only Reddit comments
+// UpdateRedditPostComment allows users to edit their site-only Reddit comments.
+// @Summary      Edit local Reddit comment
+// @Tags         Reddit
+// @Accept       json
+// @Produce      json
+// @Param        subreddit  path      string                     true  "Subreddit name"
+// @Param        postId     path      string                     true  "Reddit post ID"
+// @Param        commentId  path      int                        true  "Comment ID"
+// @Param        body       body      UpdateRedditCommentRequest true  "Updated content"
+// @Success      200        {object}  models.RedditPostComment
+// @Failure      400        {object}  gin.H
+// @Failure      403        {object}  gin.H
+// @Failure      404        {object}  gin.H
+// @Security     BearerAuth
+// @Router       /reddit/posts/{subreddit}/{postId}/comments/{commentId} [put]
 func (h *RedditCommentsHandler) UpdateRedditPostComment(c *gin.Context) {
 	userID, ok := middleware.GetAuthenticatedUserID(c)
 	if !ok {
@@ -210,7 +244,7 @@ func (h *RedditCommentsHandler) UpdateRedditPostComment(c *gin.Context) {
 
 	comment, err := h.redditCommentRepo.GetByID(c.Request.Context(), commentID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch comment", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to fetch comment")
 		return
 	}
 
@@ -231,25 +265,37 @@ func (h *RedditCommentsHandler) UpdateRedditPostComment(c *gin.Context) {
 
 	var req UpdateRedditCommentRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body", "details": err.Error()})
+		RespondError(c, http.StatusBadRequest, "Invalid request body")
 		return
 	}
 
 	if err := h.redditCommentRepo.Update(c.Request.Context(), commentID, req.Content); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update comment", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to update comment")
 		return
 	}
 
 	updated, err := h.redditCommentRepo.GetByID(c.Request.Context(), commentID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load updated comment", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to load updated comment")
 		return
 	}
 
 	c.JSON(http.StatusOK, updated)
 }
 
-// DeleteRedditPostComment handles DELETE requests for user comments
+// DeleteRedditPostComment handles DELETE requests for user comments.
+// @Summary      Delete local Reddit comment
+// @Tags         Reddit
+// @Produce      json
+// @Param        subreddit  path      string  true  "Subreddit name"
+// @Param        postId     path      string  true  "Reddit post ID"
+// @Param        commentId  path      int     true  "Comment ID"
+// @Success      200        {object}  gin.H
+// @Failure      400        {object}  gin.H
+// @Failure      403        {object}  gin.H
+// @Failure      404        {object}  gin.H
+// @Security     BearerAuth
+// @Router       /reddit/posts/{subreddit}/{postId}/comments/{commentId} [delete]
 func (h *RedditCommentsHandler) DeleteRedditPostComment(c *gin.Context) {
 	userID, ok := middleware.GetAuthenticatedUserID(c)
 	if !ok {
@@ -264,7 +310,7 @@ func (h *RedditCommentsHandler) DeleteRedditPostComment(c *gin.Context) {
 
 	comment, err := h.redditCommentRepo.GetByID(c.Request.Context(), commentID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch comment", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to fetch comment")
 		return
 	}
 	if comment == nil || comment.DeletedAt != nil {
@@ -283,7 +329,7 @@ func (h *RedditCommentsHandler) DeleteRedditPostComment(c *gin.Context) {
 	}
 
 	if err := h.redditCommentRepo.Delete(c.Request.Context(), commentID); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete comment", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to delete comment")
 		return
 	}
 
@@ -295,7 +341,20 @@ type UpdateRedditCommentPreferencesRequest struct {
 	DisableInboxReplies bool `json:"disable_inbox_replies"`
 }
 
-// UpdateRedditPostCommentPreferences handles preference changes for a comment
+// UpdateRedditPostCommentPreferences handles preference changes for a comment.
+// @Summary      Update Reddit comment preferences
+// @Tags         Reddit
+// @Accept       json
+// @Produce      json
+// @Param        subreddit  path      string                                 true  "Subreddit name"
+// @Param        postId     path      string                                 true  "Reddit post ID"
+// @Param        commentId  path      int                                    true  "Comment ID"
+// @Param        body       body      UpdateRedditCommentPreferencesRequest  true  "Preferences"
+// @Success      200        {object}  gin.H
+// @Failure      400        {object}  gin.H
+// @Failure      403        {object}  gin.H
+// @Security     BearerAuth
+// @Router       /reddit/posts/{subreddit}/{postId}/comments/{commentId}/preferences [patch]
 func (h *RedditCommentsHandler) UpdateRedditPostCommentPreferences(c *gin.Context) {
 	userID, ok := middleware.GetAuthenticatedUserID(c)
 	if !ok {
@@ -310,7 +369,7 @@ func (h *RedditCommentsHandler) UpdateRedditPostCommentPreferences(c *gin.Contex
 
 	comment, err := h.redditCommentRepo.GetByID(c.Request.Context(), commentID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch comment", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to fetch comment")
 		return
 	}
 	if comment == nil || comment.DeletedAt != nil {
@@ -330,12 +389,12 @@ func (h *RedditCommentsHandler) UpdateRedditPostCommentPreferences(c *gin.Contex
 
 	var req UpdateRedditCommentPreferencesRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body", "details": err.Error()})
+		RespondError(c, http.StatusBadRequest, "Invalid request body")
 		return
 	}
 
 	if err := h.redditCommentRepo.SetInboxRepliesDisabled(c.Request.Context(), commentID, userID, req.DisableInboxReplies); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update preferences", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to update preferences")
 		return
 	}
 
@@ -347,9 +406,21 @@ type VoteRedditCommentRequest struct {
 	Vote int `json:"vote" binding:"required,oneof=-1 0 1"` // -1 = downvote, 0 = remove vote, 1 = upvote
 }
 
-// VoteRedditPostComment handles POST /api/v1/reddit/posts/:subreddit/:postId/comments/:commentId/vote
-// Allows users to upvote (1), downvote (-1), or remove their vote (0)
-// If user clicks same vote twice, it removes the vote
+// VoteRedditPostComment handles POST /api/v1/reddit/posts/:subreddit/:postId/comments/:commentId/vote.
+// Allows users to upvote (1), downvote (-1), or remove their vote (0).
+// If user clicks same vote twice, it removes the vote.
+// @Summary      Vote on local Reddit comment
+// @Tags         Reddit
+// @Accept       json
+// @Produce      json
+// @Param        subreddit  path      string                   true  "Subreddit name"
+// @Param        postId     path      string                   true  "Reddit post ID"
+// @Param        commentId  path      int                      true  "Comment ID"
+// @Param        body       body      VoteRedditCommentRequest true  "Vote"
+// @Success      200        {object}  gin.H
+// @Failure      400        {object}  gin.H
+// @Security     BearerAuth
+// @Router       /reddit/posts/{subreddit}/{postId}/comments/{commentId}/vote [post]
 func (h *RedditCommentsHandler) VoteRedditPostComment(c *gin.Context) {
 	// Get user ID from context (authentication required)
 	userID, ok := middleware.GetAuthenticatedUserID(c)
@@ -368,14 +439,14 @@ func (h *RedditCommentsHandler) VoteRedditPostComment(c *gin.Context) {
 	// Parse vote request
 	var req VoteRedditCommentRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body. Vote must be -1 (downvote), 0 (remove), or 1 (upvote)", "details": err.Error()})
+		RespondError(c, http.StatusBadRequest, "Invalid request body. Vote must be -1 (downvote), 0 (remove), or 1 (upvote)")
 		return
 	}
 
 	// Get current user's vote
 	currentVote, err := h.redditCommentRepo.GetUserVote(c.Request.Context(), commentID, userID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get current vote", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to get current vote")
 		return
 	}
 
@@ -387,7 +458,7 @@ func (h *RedditCommentsHandler) VoteRedditPostComment(c *gin.Context) {
 
 	// Set the vote
 	if err := h.redditCommentRepo.SetVote(c.Request.Context(), commentID, userID, newVote); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update vote", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to update vote")
 		return
 	}
 

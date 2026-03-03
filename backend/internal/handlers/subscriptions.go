@@ -49,7 +49,7 @@ func (h *SubscriptionsHandler) SubscribeToHub(c *gin.Context) {
 	hubName := c.Param("name")
 	hub, err := h.hubRepo.GetByName(c.Request.Context(), hubName)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch hub", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to fetch hub")
 		return
 	}
 	if hub == nil {
@@ -59,7 +59,7 @@ func (h *SubscriptionsHandler) SubscribeToHub(c *gin.Context) {
 
 	err = h.hubSubRepo.Subscribe(c.Request.Context(), userID, hub.ID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to subscribe", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to subscribe")
 		return
 	}
 
@@ -96,7 +96,7 @@ func (h *SubscriptionsHandler) UnsubscribeFromHub(c *gin.Context) {
 	hubName := c.Param("name")
 	hub, err := h.hubRepo.GetByName(c.Request.Context(), hubName)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch hub", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to fetch hub")
 		return
 	}
 	if hub == nil {
@@ -106,7 +106,7 @@ func (h *SubscriptionsHandler) UnsubscribeFromHub(c *gin.Context) {
 
 	err = h.hubSubRepo.Unsubscribe(c.Request.Context(), userID, hub.ID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to unsubscribe", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to unsubscribe")
 		return
 	}
 
@@ -138,7 +138,7 @@ func (h *SubscriptionsHandler) CheckHubSubscription(c *gin.Context) {
 	hubName := c.Param("name")
 	hub, err := h.hubRepo.GetByName(c.Request.Context(), hubName)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch hub", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to fetch hub")
 		return
 	}
 	if hub == nil {
@@ -153,7 +153,7 @@ func (h *SubscriptionsHandler) CheckHubSubscription(c *gin.Context) {
 		// Check subscription status
 		isSubscribed, err := h.hubSubRepo.IsSubscribed(c.Request.Context(), userID, hub.ID)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check subscription", "details": err.Error()})
+			RespondError(c, http.StatusInternalServerError, "Failed to check subscription")
 			return
 		}
 
@@ -187,7 +187,7 @@ func (h *SubscriptionsHandler) GetUserHubSubscriptions(c *gin.Context) {
 
 	subscriptions, err := h.hubSubRepo.GetUserSubscriptions(c.Request.Context(), userID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch subscriptions", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to fetch subscriptions")
 		return
 	}
 
@@ -269,7 +269,7 @@ func (h *SubscriptionsHandler) SubscribeToSubreddit(c *gin.Context) {
 
 	err := h.subredditSubRepo.Subscribe(c.Request.Context(), userID, subredditName)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to subscribe", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to subscribe")
 		return
 	}
 
@@ -304,7 +304,7 @@ func (h *SubscriptionsHandler) UnsubscribeFromSubreddit(c *gin.Context) {
 
 	err := h.subredditSubRepo.Unsubscribe(c.Request.Context(), userID, subredditName)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to unsubscribe", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to unsubscribe")
 		return
 	}
 
@@ -343,7 +343,7 @@ func (h *SubscriptionsHandler) CheckSubredditSubscription(c *gin.Context) {
 	if authenticated {
 		isSubscribed, err := h.subredditSubRepo.IsSubscribed(c.Request.Context(), userID, subredditName)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check subscription", "details": err.Error()})
+			RespondError(c, http.StatusInternalServerError, "Failed to check subscription")
 			return
 		}
 
@@ -371,7 +371,7 @@ func (h *SubscriptionsHandler) GetUserSubredditSubscriptions(c *gin.Context) {
 
 	subscriptions, err := h.subredditSubRepo.GetUserSubscriptions(c.Request.Context(), userID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch subscriptions", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to fetch subscriptions")
 		return
 	}
 

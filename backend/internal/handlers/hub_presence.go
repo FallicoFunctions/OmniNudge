@@ -18,7 +18,14 @@ func NewHubPresenceHandler(presence *services.PresenceStore) *HubPresenceHandler
 	return &HubPresenceHandler{presence: presence}
 }
 
-// PingHubPresence handles POST /api/v1/hubs/:name/active-users/ping
+// PingHubPresence handles POST /api/v1/hubs/:name/active-users/ping.
+// @Summary      Ping hub presence
+// @Tags         Hubs
+// @Produce      json
+// @Param        name  path      string  true  "Hub name"
+// @Success      200   {object}  gin.H
+// @Failure      400   {object}  gin.H
+// @Router       /hubs/{name}/active-users/ping [post]
 func (h *HubPresenceHandler) PingHubPresence(c *gin.Context) {
 	hubName := strings.TrimSpace(c.Param("name"))
 	if hubName == "" {
@@ -36,7 +43,14 @@ func (h *HubPresenceHandler) PingHubPresence(c *gin.Context) {
 	})
 }
 
-// GetHubActiveUsers handles GET /api/v1/hubs/:name/active-users
+// GetHubActiveUsers handles GET /api/v1/hubs/:name/active-users.
+// @Summary      Get hub active users
+// @Tags         Hubs
+// @Produce      json
+// @Param        name  path      string  true  "Hub name"
+// @Success      200   {object}  gin.H
+// @Failure      400   {object}  gin.H
+// @Router       /hubs/{name}/active-users [get]
 func (h *HubPresenceHandler) GetHubActiveUsers(c *gin.Context) {
 	hubName := strings.TrimSpace(c.Param("name"))
 	if hubName == "" {

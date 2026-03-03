@@ -590,6 +590,45 @@ definitions:
           type: string
         type: array
     type: object
+  github_com_omninudge_backend_internal_models.RedditPostComment:
+    properties:
+      content:
+        type: string
+      created_at:
+        type: string
+      deleted_at:
+        type: string
+      downs:
+        type: integer
+      id:
+        type: integer
+      inbox_replies_disabled:
+        type: boolean
+      parent_comment_id:
+        type: integer
+      parent_reddit_comment_id:
+        description: Reddit API comment ID this is replying to
+        type: string
+      reddit_post_id:
+        type: string
+      reddit_post_title:
+        type: string
+      score:
+        type: integer
+      subreddit:
+        type: string
+      updated_at:
+        type: string
+      ups:
+        type: integer
+      user_id:
+        type: integer
+      user_vote:
+        description: -1, 0, or 1 representing current user's vote
+        type: integer
+      username:
+        type: string
+    type: object
   github_com_omninudge_backend_internal_models.RemovalReason:
     properties:
       created_at:
@@ -839,6 +878,13 @@ definitions:
     required:
     - emoji
     type: object
+  internal_handlers.AddUserAccessRequest:
+    properties:
+      username:
+        type: string
+    required:
+    - username
+    type: object
   internal_handlers.CombinedFeedItem:
     properties:
       post: {}
@@ -846,6 +892,11 @@ definitions:
         type: integer
       source:
         description: '"hub" or "reddit"'
+        type: string
+    type: object
+  internal_handlers.CreateAccessRequest:
+    properties:
+      message:
         type: string
     type: object
   internal_handlers.CreateBugReportRequest:
@@ -937,6 +988,20 @@ definitions:
     - status
     - title
     type: object
+  internal_handlers.CreateRedditCommentRequest:
+    properties:
+      content:
+        minLength: 1
+        type: string
+      parent_comment_id:
+        description: Local comment ID to reply to
+        type: integer
+      parent_reddit_comment_id:
+        description: Reddit API comment ID to reply to
+        type: string
+    required:
+    - content
+    type: object
   internal_handlers.CreateReportRequest:
     properties:
       description:
@@ -968,6 +1033,26 @@ definitions:
         type: string
     required:
     - title
+    type: object
+  internal_handlers.FrontendLogEntry:
+    properties:
+      context:
+        additionalProperties: true
+        type: object
+      level:
+        type: string
+      message:
+        type: string
+      page_url:
+        type: string
+      session_id:
+        type: string
+      timestamp:
+        type: string
+      user_agent:
+        type: string
+      user_id:
+        type: string
     type: object
   internal_handlers.GetReactionsResponse:
     properties:
@@ -1040,6 +1125,19 @@ definitions:
     - status
     - title
     type: object
+  internal_handlers.UpdateRedditCommentPreferencesRequest:
+    properties:
+      disable_inbox_replies:
+        type: boolean
+    type: object
+  internal_handlers.UpdateRedditCommentRequest:
+    properties:
+      content:
+        minLength: 1
+        type: string
+    required:
+    - content
+    type: object
   internal_handlers.UpdateReportStatusRequest:
     properties:
       status:
@@ -1072,6 +1170,18 @@ definitions:
         type: string
       username:
         type: string
+    type: object
+  internal_handlers.VoteRedditCommentRequest:
+    properties:
+      vote:
+        description: -1 = downvote, 0 = remove vote, 1 = upvote
+        enum:
+        - -1
+        - 0
+        - 1
+        type: integer
+    required:
+    - vote
     type: object
   internal_handlers.signalRequest:
     properties:
@@ -1109,6 +1219,62 @@ info:
   title: OmniNudge API
   version: "1.0"
 paths:
+  /access-requests/{request_id}/approve:
+    post:
+      parameters:
+      - description: Request ID
+        in: path
+        name: request_id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/gin.H'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/gin.H'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/gin.H'
+      security:
+      - BearerAuth: []
+      summary: Approve access request
+      tags:
+      - Moderation
+  /access-requests/{request_id}/deny:
+    post:
+      parameters:
+      - description: Request ID
+        in: path
+        name: request_id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/gin.H'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/gin.H'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/gin.H'
+      security:
+      - BearerAuth: []
+      summary: Deny access request
+      tags:
+      - Moderation
   /account/cancel-deletion:
     post:
       produces:
@@ -1267,8 +1433,13 @@ paths:
       summary: List export requests
       tags:
       - DataExport
-  /admin/analytics/dashboard:
+  /admin/analytics/cohort:
     get:
+      parameters:
+      - description: Cohort date (YYYY-MM-DD)
+        in: query
+        name: cohort_date
+        type: string
       produces:
       - application/json
       responses:
@@ -1276,19 +1447,119 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/gin.H'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/gin.H'
-        "500":
-          description: Internal Server Error
+      security:
+      - BearerAuth: []
+      summary: Get user cohort retention
+      tags:
+      - Analytics
+  /admin/analytics/dashboard:
+    get:
+      parameters:
+      - description: Days to look back (default 30)
+        in: query
+        name: days
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
           schema:
             $ref: '#/definitions/gin.H'
       security:
       - BearerAuth: []
       summary: Get analytics dashboard
       tags:
-      - Admin
+      - Analytics
+  /admin/analytics/devices:
+    get:
+      parameters:
+      - description: Days to look back (default 7)
+        in: query
+        name: days
+        type: integer
+      - description: Max results (default 10)
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/gin.H'
+      security:
+      - BearerAuth: []
+      summary: Get device breakdown
+      tags:
+      - Analytics
+  /admin/analytics/events/{event_name}:
+    get:
+      parameters:
+      - description: Event name
+        in: path
+        name: event_name
+        required: true
+        type: string
+      - description: Days to look back
+        in: query
+        name: days
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/gin.H'
+      security:
+      - BearerAuth: []
+      summary: Get event statistics
+      tags:
+      - Analytics
+  /admin/analytics/funnel:
+    get:
+      parameters:
+      - description: Days to look back
+        in: query
+        name: days
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/gin.H'
+      security:
+      - BearerAuth: []
+      summary: Get funnel analysis
+      tags:
+      - Analytics
+  /admin/analytics/geo:
+    get:
+      parameters:
+      - description: Days to look back (default 7)
+        in: query
+        name: days
+        type: integer
+      - description: Max results (default 10)
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/gin.H'
+      security:
+      - BearerAuth: []
+      summary: Get geographic breakdown
+      tags:
+      - Analytics
   /admin/analytics/refresh:
     post:
       produces:
@@ -1298,19 +1569,15 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/gin.H'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/gin.H'
         "500":
           description: Internal Server Error
           schema:
             $ref: '#/definitions/gin.H'
       security:
       - BearerAuth: []
-      summary: Refresh analytics views
+      summary: Refresh analytics materialized views
       tags:
-      - Admin
+      - Analytics
   /admin/ban-history:
     get:
       parameters:
@@ -2363,6 +2630,13 @@ paths:
     post:
       consumes:
       - application/json
+      parameters:
+      - description: Event payload
+        in: body
+        name: body
+        required: true
+        schema:
+          type: object
       produces:
       - application/json
       responses:
@@ -2372,10 +2646,6 @@ paths:
             $ref: '#/definitions/gin.H'
         "400":
           description: Bad Request
-          schema:
-            $ref: '#/definitions/gin.H'
-        "500":
-          description: Internal Server Error
           schema:
             $ref: '#/definitions/gin.H'
       summary: Track analytics event
@@ -5136,6 +5406,46 @@ paths:
       summary: Discover groups
       tags:
       - Groups
+  /health:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/gin.H'
+      summary: Detailed health check
+      tags:
+      - Health
+  /health/liveness:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/gin.H'
+      summary: Liveness probe
+      tags:
+      - Health
+  /health/readiness:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/gin.H'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/gin.H'
+      summary: Readiness probe
+      tags:
+      - Health
   /hubs:
     get:
       parameters:
@@ -5225,6 +5535,113 @@ paths:
       summary: Get hub
       tags:
       - Hubs
+  /hubs/{name}/access-request:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Hub name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: Optional message
+        in: body
+        name: body
+        schema:
+          $ref: '#/definitions/internal_handlers.CreateAccessRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/gin.H'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/gin.H'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/gin.H'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/gin.H'
+      security:
+      - BearerAuth: []
+      summary: Create hub access request
+      tags:
+      - Hubs
+  /hubs/{name}/access-request/status:
+    get:
+      parameters:
+      - description: Hub name
+        in: path
+        name: name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/gin.H'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/gin.H'
+      security:
+      - BearerAuth: []
+      summary: Check access request status
+      tags:
+      - Hubs
+  /hubs/{name}/active-users:
+    get:
+      parameters:
+      - description: Hub name
+        in: path
+        name: name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/gin.H'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/gin.H'
+      summary: Get hub active users
+      tags:
+      - Hubs
+  /hubs/{name}/active-users/ping:
+    post:
+      parameters:
+      - description: Hub name
+        in: path
+        name: name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/gin.H'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/gin.H'
+      summary: Ping hub presence
+      tags:
+      - Hubs
   /hubs/{name}/crosspost:
     post:
       consumes:
@@ -5267,6 +5684,140 @@ paths:
       security:
       - BearerAuth: []
       summary: Crosspost to hub
+      tags:
+      - Hubs
+  /hubs/{name}/moderators:
+    get:
+      parameters:
+      - description: Hub name
+        in: path
+        name: name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/gin.H'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/gin.H'
+      summary: Get hub moderators
+      tags:
+      - Hubs
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Hub name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: Moderator info
+        in: body
+        name: body
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/gin.H'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/gin.H'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/gin.H'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/gin.H'
+      security:
+      - BearerAuth: []
+      summary: Add hub moderator
+      tags:
+      - Hubs
+  /hubs/{name}/moderators/{user_id}:
+    delete:
+      parameters:
+      - description: Hub name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: User ID
+        in: path
+        name: user_id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/gin.H'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/gin.H'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/gin.H'
+      security:
+      - BearerAuth: []
+      summary: Remove hub moderator
+      tags:
+      - Hubs
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: Hub name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: User ID
+        in: path
+        name: user_id
+        required: true
+        type: integer
+      - description: Role payload
+        in: body
+        name: body
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/gin.H'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/gin.H'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/gin.H'
+      security:
+      - BearerAuth: []
+      summary: Update moderator role
       tags:
       - Hubs
   /hubs/{name}/nsfw:
@@ -5349,6 +5900,67 @@ paths:
       summary: Get hub posts
       tags:
       - Hubs
+  /hubs/{name}/settings:
+    get:
+      parameters:
+      - description: Hub name
+        in: path
+        name: name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/gin.H'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/gin.H'
+      summary: Get hub settings
+      tags:
+      - Hubs
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: Hub name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: Settings payload
+        in: body
+        name: body
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/gin.H'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/gin.H'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/gin.H'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/gin.H'
+      security:
+      - BearerAuth: []
+      summary: Update hub settings
+      tags:
+      - Hubs
   /hubs/{name}/subscribe:
     post:
       parameters:
@@ -5409,6 +6021,229 @@ paths:
       summary: Check hub subscription
       tags:
       - Subscriptions
+  /hubs/{name}/theme:
+    get:
+      parameters:
+      - description: Hub name
+        in: path
+        name: name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/gin.H'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/gin.H'
+      summary: Get active hub theme
+      tags:
+      - Hubs
+  /hubs/{name}/themes:
+    get:
+      parameters:
+      - description: Hub name
+        in: path
+        name: name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/gin.H'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/gin.H'
+      security:
+      - BearerAuth: []
+      summary: Get all hub themes
+      tags:
+      - Hubs
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Hub name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: Theme payload
+        in: body
+        name: body
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/gin.H'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/gin.H'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/gin.H'
+      security:
+      - BearerAuth: []
+      summary: Create hub theme
+      tags:
+      - Hubs
+  /hubs/{name}/themes/{id}:
+    delete:
+      parameters:
+      - description: Hub name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: Theme ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/gin.H'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/gin.H'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/gin.H'
+      security:
+      - BearerAuth: []
+      summary: Delete hub theme
+      tags:
+      - Hubs
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: Hub name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: Theme ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Theme payload
+        in: body
+        name: body
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/gin.H'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/gin.H'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/gin.H'
+      security:
+      - BearerAuth: []
+      summary: Update hub theme
+      tags:
+      - Hubs
+  /hubs/{name}/themes/{id}/activate:
+    post:
+      parameters:
+      - description: Hub name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: Theme ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/gin.H'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/gin.H'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/gin.H'
+      security:
+      - BearerAuth: []
+      summary: Activate hub theme
+      tags:
+      - Hubs
+  /hubs/{name}/themes/preview:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Hub name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: Theme CSS payload
+        in: body
+        name: body
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/gin.H'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/gin.H'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/gin.H'
+      security:
+      - BearerAuth: []
+      summary: Preview hub theme CSS
+      tags:
+      - Hubs
   /hubs/{name}/unsubscribe:
     delete:
       parameters:
@@ -5437,6 +6272,71 @@ paths:
       summary: Unsubscribe from hub
       tags:
       - Subscriptions
+  /hubs/{name}/wiki/{pagePath}:
+    get:
+      parameters:
+      - description: Hub name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: Wiki page path
+        in: path
+        name: pagePath
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/gin.H'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/gin.H'
+      summary: Get hub wiki page
+      tags:
+      - Hubs
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: Hub name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: Wiki page path
+        in: path
+        name: pagePath
+        type: string
+      - description: Wiki page content
+        in: body
+        name: body
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/gin.H'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/gin.H'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/gin.H'
+      security:
+      - BearerAuth: []
+      summary: Update hub wiki page
+      tags:
+      - Hubs
   /hubs/agent-targets:
     get:
       produces:
@@ -5568,6 +6468,64 @@ paths:
       summary: Get trending hubs
       tags:
       - Hubs
+  /jobs/{queue}/{id}:
+    get:
+      parameters:
+      - description: Queue name
+        in: path
+        name: queue
+        required: true
+        type: string
+      - description: Job ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/gin.H'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/gin.H'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/gin.H'
+      security:
+      - BearerAuth: []
+      summary: Get job status
+      tags:
+      - Jobs
+  /logs/frontend:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Log entry
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_handlers.FrontendLogEntry'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/gin.H'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/gin.H'
+      summary: Submit frontend logs
+      tags:
+      - Logs
   /media/batch-upload:
     post:
       consumes:
@@ -6559,6 +7517,66 @@ paths:
       summary: Remove comment
       tags:
       - ModerationV2
+  /mod/hubs/{hub_name}/access-requests:
+    get:
+      parameters:
+      - description: Hub name
+        in: path
+        name: hub_name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/gin.H'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/gin.H'
+      security:
+      - BearerAuth: []
+      summary: Get pending access requests
+      tags:
+      - Moderation
+  /mod/hubs/{hub_name}/access-requests/add-user:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Hub name
+        in: path
+        name: hub_name
+        required: true
+        type: string
+      - description: Username
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_handlers.AddUserAccessRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/gin.H'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/gin.H'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/gin.H'
+      security:
+      - BearerAuth: []
+      summary: Add user access by username
+      tags:
+      - Moderation
   /mod/hubs/{hub_name}/pinned-order:
     post:
       consumes:
@@ -7796,6 +8814,257 @@ paths:
       summary: Save Reddit API comment
       tags:
       - SavedItems
+  /reddit/frontpage:
+    get:
+      parameters:
+      - description: Sort order
+        in: query
+        name: sort
+        type: string
+      - description: Pagination cursor
+        in: query
+        name: after
+        type: string
+      - description: Number of results
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/gin.H'
+      summary: Get Reddit frontpage posts
+      tags:
+      - Reddit
+  /reddit/media/proxy:
+    get:
+      parameters:
+      - description: Media URL to proxy
+        in: query
+        name: url
+        required: true
+        type: string
+      produces:
+      - application/octet-stream
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: file
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/gin.H'
+      summary: Proxy Reddit media
+      tags:
+      - Reddit
+  /reddit/posts/{subreddit}/{postId}/comments:
+    get:
+      parameters:
+      - description: Subreddit name
+        in: path
+        name: subreddit
+        required: true
+        type: string
+      - description: Reddit post ID
+        in: path
+        name: postId
+        required: true
+        type: string
+      - description: Sort order
+        in: query
+        name: sort
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/gin.H'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/gin.H'
+      summary: Get local comments for a Reddit post
+      tags:
+      - Reddit
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Subreddit name
+        in: path
+        name: subreddit
+        required: true
+        type: string
+      - description: Reddit post ID
+        in: path
+        name: postId
+        required: true
+        type: string
+      - description: Comment content
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_handlers.CreateRedditCommentRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/github_com_omninudge_backend_internal_models.RedditPostComment'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/gin.H'
+      security:
+      - BearerAuth: []
+      summary: Create local comment on Reddit post
+      tags:
+      - Reddit
+  /reddit/posts/{subreddit}/{postId}/comments/{commentId}:
+    delete:
+      parameters:
+      - description: Subreddit name
+        in: path
+        name: subreddit
+        required: true
+        type: string
+      - description: Reddit post ID
+        in: path
+        name: postId
+        required: true
+        type: string
+      - description: Comment ID
+        in: path
+        name: commentId
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/gin.H'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/gin.H'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/gin.H'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/gin.H'
+      security:
+      - BearerAuth: []
+      summary: Delete local Reddit comment
+      tags:
+      - Reddit
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: Subreddit name
+        in: path
+        name: subreddit
+        required: true
+        type: string
+      - description: Reddit post ID
+        in: path
+        name: postId
+        required: true
+        type: string
+      - description: Comment ID
+        in: path
+        name: commentId
+        required: true
+        type: integer
+      - description: Updated content
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_handlers.UpdateRedditCommentRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_omninudge_backend_internal_models.RedditPostComment'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/gin.H'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/gin.H'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/gin.H'
+      security:
+      - BearerAuth: []
+      summary: Edit local Reddit comment
+      tags:
+      - Reddit
+  /reddit/posts/{subreddit}/{postId}/comments/{commentId}/preferences:
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: Subreddit name
+        in: path
+        name: subreddit
+        required: true
+        type: string
+      - description: Reddit post ID
+        in: path
+        name: postId
+        required: true
+        type: string
+      - description: Comment ID
+        in: path
+        name: commentId
+        required: true
+        type: integer
+      - description: Preferences
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_handlers.UpdateRedditCommentPreferencesRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/gin.H'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/gin.H'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/gin.H'
+      security:
+      - BearerAuth: []
+      summary: Update Reddit comment preferences
+      tags:
+      - Reddit
   /reddit/posts/{subreddit}/{postId}/comments/{commentId}/save:
     delete:
       parameters:
@@ -7871,6 +9140,48 @@ paths:
       summary: Save Reddit comment
       tags:
       - SavedItems
+  /reddit/posts/{subreddit}/{postId}/comments/{commentId}/vote:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Subreddit name
+        in: path
+        name: subreddit
+        required: true
+        type: string
+      - description: Reddit post ID
+        in: path
+        name: postId
+        required: true
+        type: string
+      - description: Comment ID
+        in: path
+        name: commentId
+        required: true
+        type: integer
+      - description: Vote
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_handlers.VoteRedditCommentRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/gin.H'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/gin.H'
+      security:
+      - BearerAuth: []
+      summary: Vote on local Reddit comment
+      tags:
+      - Reddit
   /reddit/posts/{subreddit}/{postId}/hide:
     delete:
       parameters:
@@ -8001,6 +9312,507 @@ paths:
       summary: Save Reddit post
       tags:
       - SavedItems
+  /reddit/r/{subreddit}:
+    get:
+      parameters:
+      - description: Subreddit name
+        in: path
+        name: subreddit
+        required: true
+        type: string
+      - description: Sort order
+        in: query
+        name: sort
+        type: string
+      - description: Pagination cursor
+        in: query
+        name: after
+        type: string
+      - description: Number of results
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/gin.H'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/gin.H'
+      summary: Get subreddit posts
+      tags:
+      - Reddit
+  /reddit/r/{subreddit}/about:
+    get:
+      parameters:
+      - description: Subreddit name
+        in: path
+        name: subreddit
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/gin.H'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/gin.H'
+      summary: Get subreddit info
+      tags:
+      - Reddit
+  /reddit/r/{subreddit}/comments/{postId}:
+    get:
+      parameters:
+      - description: Subreddit name
+        in: path
+        name: subreddit
+        required: true
+        type: string
+      - description: Post ID
+        in: path
+        name: postId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/gin.H'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/gin.H'
+      summary: Get Reddit post comments
+      tags:
+      - Reddit
+  /reddit/r/{subreddit}/gallery/{postId}:
+    get:
+      parameters:
+      - description: Subreddit name
+        in: path
+        name: subreddit
+        required: true
+        type: string
+      - description: Post ID
+        in: path
+        name: postId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/gin.H'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/gin.H'
+      summary: Get Reddit post gallery images
+      tags:
+      - Reddit
+  /reddit/r/{subreddit}/media:
+    get:
+      parameters:
+      - description: Subreddit name
+        in: path
+        name: subreddit
+        required: true
+        type: string
+      - description: Sort order
+        in: query
+        name: sort
+        type: string
+      - description: Pagination cursor
+        in: query
+        name: after
+        type: string
+      - description: Number of results
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/gin.H'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/gin.H'
+      summary: Get subreddit media posts
+      tags:
+      - Reddit
+  /reddit/r/{subreddit}/wiki/{pagePath}:
+    get:
+      parameters:
+      - description: Subreddit name
+        in: path
+        name: subreddit
+        required: true
+        type: string
+      - description: Wiki page path
+        in: path
+        name: pagePath
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/gin.H'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/gin.H'
+      summary: Get subreddit wiki page
+      tags:
+      - Reddit
+  /reddit/r/{subreddit}/wiki/compare/{pagePath}:
+    get:
+      parameters:
+      - description: Subreddit name
+        in: path
+        name: subreddit
+        required: true
+        type: string
+      - description: Wiki page path
+        in: path
+        name: pagePath
+        required: true
+        type: string
+      - description: First revision ID
+        in: query
+        name: revA
+        required: true
+        type: string
+      - description: Second revision ID
+        in: query
+        name: revB
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/gin.H'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/gin.H'
+      summary: Compare subreddit wiki revisions
+      tags:
+      - Reddit
+  /reddit/r/{subreddit}/wiki/discussions/{pagePath}:
+    get:
+      parameters:
+      - description: Subreddit name
+        in: path
+        name: subreddit
+        required: true
+        type: string
+      - description: Wiki page path
+        in: path
+        name: pagePath
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/gin.H'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/gin.H'
+      summary: Get subreddit wiki page discussions
+      tags:
+      - Reddit
+  /reddit/r/{subreddit}/wiki/revisions/{pagePath}:
+    get:
+      parameters:
+      - description: Subreddit name
+        in: path
+        name: subreddit
+        required: true
+        type: string
+      - description: Wiki page path
+        in: path
+        name: pagePath
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/gin.H'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/gin.H'
+      summary: Get subreddit wiki page revisions
+      tags:
+      - Reddit
+  /reddit/search:
+    get:
+      parameters:
+      - description: Search query
+        in: query
+        name: q
+        required: true
+        type: string
+      - description: Sort order
+        in: query
+        name: sort
+        type: string
+      - description: Pagination cursor
+        in: query
+        name: after
+        type: string
+      - description: Number of results
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/gin.H'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/gin.H'
+      summary: Search Reddit posts
+      tags:
+      - Reddit
+  /reddit/subreddits/autocomplete:
+    get:
+      parameters:
+      - description: Partial subreddit name
+        in: query
+        name: q
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/gin.H'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/gin.H'
+      summary: Autocomplete subreddit names
+      tags:
+      - Reddit
+  /reddit/subreddits/search:
+    get:
+      parameters:
+      - description: Search query
+        in: query
+        name: q
+        required: true
+        type: string
+      - description: Pagination cursor
+        in: query
+        name: after
+        type: string
+      - description: Number of results
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/gin.H'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/gin.H'
+      summary: Search subreddits
+      tags:
+      - Reddit
+  /reddit/user/{username}/{section}:
+    get:
+      parameters:
+      - description: Reddit username
+        in: path
+        name: username
+        required: true
+        type: string
+      - description: Section (submitted/comments/saved/etc)
+        in: path
+        name: section
+        required: true
+        type: string
+      - description: Sort order
+        in: query
+        name: sort
+        type: string
+      - description: Pagination cursor
+        in: query
+        name: after
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/gin.H'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/gin.H'
+      summary: Get Reddit user listing
+      tags:
+      - Reddit
+  /reddit/user/{username}/about:
+    get:
+      parameters:
+      - description: Reddit username
+        in: path
+        name: username
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/gin.H'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/gin.H'
+      summary: Get Reddit user profile
+      tags:
+      - Reddit
+  /reddit/user/{username}/moderated:
+    get:
+      parameters:
+      - description: Reddit username
+        in: path
+        name: username
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/gin.H'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/gin.H'
+      summary: Get subreddits moderated by user
+      tags:
+      - Reddit
+  /reddit/user/{username}/trophies:
+    get:
+      parameters:
+      - description: Reddit username
+        in: path
+        name: username
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/gin.H'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/gin.H'
+      summary: Get Reddit user trophies
+      tags:
+      - Reddit
+  /reddit/users/search:
+    get:
+      parameters:
+      - description: Search query
+        in: query
+        name: q
+        required: true
+        type: string
+      - description: Pagination cursor
+        in: query
+        name: after
+        type: string
+      - description: Number of results
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/gin.H'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/gin.H'
+      summary: Search Reddit users
+      tags:
+      - Reddit
+  /reddit/wiki/{pagePath}:
+    get:
+      parameters:
+      - description: Wiki page path
+        in: path
+        name: pagePath
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/gin.H'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/gin.H'
+      summary: Get Reddit wiki page
+      tags:
+      - Reddit
   /reports:
     post:
       consumes:
@@ -8474,6 +10286,50 @@ paths:
       summary: Transfer slideshow control
       tags:
       - Slideshow
+  /subreddits/{name}/active-users:
+    get:
+      parameters:
+      - description: Subreddit name
+        in: path
+        name: name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/gin.H'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/gin.H'
+      summary: Get subreddit active users
+      tags:
+      - Reddit
+  /subreddits/{name}/active-users/ping:
+    post:
+      parameters:
+      - description: Subreddit name
+        in: path
+        name: name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/gin.H'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/gin.H'
+      summary: Ping subreddit presence
+      tags:
+      - Reddit
   /subreddits/{name}/crosspost:
     post:
       consumes:
@@ -8825,6 +10681,40 @@ paths:
       summary: Get predefined themes
       tags:
       - Themes
+  /uploads/{filepath}:
+    get:
+      parameters:
+      - description: File path
+        in: path
+        name: filepath
+        required: true
+        type: string
+      produces:
+      - application/octet-stream
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: file
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/gin.H'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/gin.H'
+        "410":
+          description: Gone
+          schema:
+            $ref: '#/definitions/gin.H'
+        "423":
+          description: Locked
+          schema:
+            $ref: '#/definitions/gin.H'
+      summary: Serve uploaded file
+      tags:
+      - Uploads
   /users/{username}:
     get:
       parameters:
@@ -8925,6 +10815,24 @@ paths:
           schema:
             $ref: '#/definitions/gin.H'
       summary: Get user posts
+      tags:
+      - Users
+  /users/{username}/status:
+    get:
+      parameters:
+      - description: Username
+        in: path
+        name: username
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "501":
+          description: Not Implemented
+          schema:
+            $ref: '#/definitions/gin.H'
+      summary: Get single user online status
       tags:
       - Users
   /users/block:
@@ -9099,6 +11007,20 @@ paths:
       summary: Get user profile by ID
       tags:
       - Users
+  /users/me/access-requests:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/gin.H'
+      security:
+      - BearerAuth: []
+      summary: Get my access requests
+      tags:
+      - Hubs
   /users/me/agent/browse:
     post:
       produces:
@@ -9354,6 +11276,24 @@ paths:
       summary: Get saved items
       tags:
       - SavedItems
+  /users/me/storage:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/gin.H'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/gin.H'
+      security:
+      - BearerAuth: []
+      summary: Get my storage usage
+      tags:
+      - Users
   /users/me/subscriptions/hubs:
     get:
       produces:
@@ -9402,6 +11342,28 @@ paths:
       summary: Get subreddit subscriptions
       tags:
       - Subscriptions
+  /users/status:
+    get:
+      parameters:
+      - description: Comma-separated user IDs
+        in: query
+        name: user_ids
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/gin.H'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/gin.H'
+      summary: Get multiple users online status
+      tags:
+      - Users
   /voice/{id}/download:
     get:
       parameters:
@@ -9432,6 +11394,24 @@ paths:
       summary: Download voice message
       tags:
       - VoiceMessages
+  /ws:
+    get:
+      produces:
+      - application/json
+      responses:
+        "101":
+          description: Switching Protocols
+          schema:
+            $ref: '#/definitions/gin.H'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/gin.H'
+      security:
+      - BearerAuth: []
+      summary: Establish WebSocket connection
+      tags:
+      - WebSocket
 securityDefinitions:
   BearerAuth:
     description: 'JWT Bearer token. Format: "Bearer {token}"'

@@ -122,7 +122,7 @@ func (h *ModerationHandler) CreateReport(c *gin.Context) {
 
 	var req CreateReportRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request", "details": err.Error()})
+		RespondError(c, http.StatusBadRequest, "Invalid request")
 		return
 	}
 
@@ -144,15 +144,13 @@ func (h *ModerationHandler) CreateReport(c *gin.Context) {
 		return
 	}
 	if _, ok := validReportReasons[req.Reason]; !ok {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "Invalid reason. Use one of: spam, harassment, illegal_content, csam, violence, hate_speech, other",
-		})
+		RespondError(c, http.StatusBadRequest, "Invalid reason. Use one of: spam, harassment, illegal_content, csam, violence, hate_speech, other")
 		return
 	}
 
 	reportCount, err := h.reportRepo.CountByReporterSince(c.Request.Context(), userID, time.Now().Add(-24*time.Hour))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check report limit", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to check report limit")
 		return
 	}
 	if reportCount >= maxReportsPer24Hours {
@@ -177,7 +175,7 @@ func (h *ModerationHandler) CreateReport(c *gin.Context) {
 	}
 
 	if err := h.reportRepo.Create(c.Request.Context(), report); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to submit report", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to submit report")
 		return
 	}
 	monitoring.RecordModerationReportCreated(req.Reason, req.TargetType)
@@ -190,12 +188,12 @@ func (h *ModerationHandler) CreateReport(c *gin.Context) {
 			time.Now().Add(-24*time.Hour),
 		)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to evaluate report threshold", "details": err.Error()})
+			RespondError(c, http.StatusInternalServerError, "Failed to evaluate report threshold")
 			return
 		}
 		if distinctReporters >= autoSuspendReportThreshold {
 			if err := h.userRepo.AutoSuspendForReports(c.Request.Context(), req.TargetID, autoSuspendReason); err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to auto-suspend reported user", "details": err.Error()})
+				RespondError(c, http.StatusInternalServerError, "Failed to auto-suspend reported user")
 				return
 			}
 			monitoring.RecordModerationAutoSuspension()
@@ -362,7 +360,7 @@ func (h *ModerationHandler) ListReports(c *gin.Context) {
 		reports, err = h.reportRepo.ListByStatus(c.Request.Context(), status, limitArg, offset)
 	}
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to list reports", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to list reports")
 		return
 	}
 
@@ -412,7 +410,7 @@ func (h *ModerationHandler) UpdateReportStatus(c *gin.Context) {
 
 	var req UpdateReportStatusRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body", "details": err.Error()})
+		RespondError(c, http.StatusBadRequest, "Invalid request body")
 		return
 	}
 
@@ -424,12 +422,12 @@ func (h *ModerationHandler) UpdateReportStatus(c *gin.Context) {
 
 	currentReport, err := h.reportRepo.GetByID(c.Request.Context(), id)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch report", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to fetch report")
 		return
 	}
 
 	if err := h.reportRepo.UpdateStatus(c.Request.Context(), id, req.Status); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update status", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to update status")
 		return
 	}
 
@@ -441,11 +439,11 @@ func (h *ModerationHandler) UpdateReportStatus(c *gin.Context) {
 
 	updatedReport, err := h.reportRepo.GetByID(c.Request.Context(), id)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch updated report", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to fetch updated report")
 		return
 	}
 	if err := h.broadcastModerationReportEvent(c.Request.Context(), moderationReportUpdatedEventType, updatedReport); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to broadcast report event", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to broadcast report event")
 		return
 	}
 

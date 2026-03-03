@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	apiresponse "github.com/omninudge/backend/internal/api/response"
 )
 
 // GetAuthenticatedUserID extracts the authenticated user ID from the gin context.
@@ -18,7 +19,7 @@ import (
 func GetAuthenticatedUserID(c *gin.Context) (int, bool) {
 	val, exists := c.Get("user_id")
 	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		apiresponse.WriteError(c, http.StatusUnauthorized, "User not authenticated")
 		return 0, false
 	}
 	// claims.UserID is stored as int by AuthRequired middleware (services.JWTClaims.UserID int).

@@ -27,7 +27,13 @@ func NewStorageHandler(mediaRepo ports.MediaFileRepository, quota MediaQuotaConf
 }
 
 // GetMyStorage returns tracked storage usage and quota.
-// GET /api/v1/users/me/storage
+// @Summary      Get my storage usage
+// @Tags         Users
+// @Produce      json
+// @Success      200  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Security     BearerAuth
+// @Router       /users/me/storage [get]
 func (h *StorageHandler) GetMyStorage(c *gin.Context) {
 	userID, ok := middleware.GetAuthenticatedUserID(c)
 	if !ok {
@@ -36,7 +42,7 @@ func (h *StorageHandler) GetMyStorage(c *gin.Context) {
 
 	used, err := h.mediaRepo.GetTrackedStorageByUserID(c.Request.Context(), userID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get storage usage", "details": err.Error()})
+		RespondError(c, http.StatusInternalServerError, "Failed to get storage usage")
 		return
 	}
 
