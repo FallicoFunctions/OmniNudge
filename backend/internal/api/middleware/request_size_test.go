@@ -68,3 +68,26 @@ func TestRequestSizeLimiter_RouteMiddlewareOverridesGroupLimit(t *testing.T) {
 
 	require.Equal(t, http.StatusOK, rec.Code)
 }
+
+func TestRequestSizeLimiter_BlocksKnownOversizeEvenOnPartialRead(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	router.Use(RequestSizeLimiter(1024))
+	router.POST("/test", func(c *gin.Context) {
+		buf := make([]byte, 8)
+		_, err := c.Request.Body.Read(buf)
+		var maxErr *http.MaxBytesError
+		if err != nil && errors.As(err, &maxErr) {
+			c.Status(http.StatusRequestEntityTooLarge)
+			return
+		}
+		require.NoError(t, err)
+		c.Status(http.StatusOK)
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "/test", bytes.NewReader(make([]byte, 2048)))
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusRequestEntityTooLarge, rec.Code)
+}

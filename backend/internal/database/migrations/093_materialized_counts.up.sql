@@ -235,9 +235,12 @@ $$ LANGUAGE plpgsql;
 CREATE OR REPLACE FUNCTION handle_post_hub_change()
 RETURNS TRIGGER AS $$
 BEGIN
-    -- Only adjust counts when hub_id actually changes AND the post is active
-    -- (not soft-deleted). Soft-deleted posts are already excluded from counters.
-    IF NEW.hub_id IS DISTINCT FROM OLD.hub_id AND NEW.is_deleted = FALSE THEN
+    -- Only adjust counts when hub_id actually changes and the post remained
+    -- active both before and after the update. This avoids double-adjusting
+    -- counters when undelete + hub-change happen in the same UPDATE statement.
+    IF NEW.hub_id IS DISTINCT FROM OLD.hub_id
+       AND NEW.is_deleted = FALSE
+       AND OLD.is_deleted = FALSE THEN
         IF OLD.hub_id IS NOT NULL THEN
             UPDATE hubs SET post_count = GREATEST(post_count - 1, 0) WHERE id = OLD.hub_id;
         END IF;

@@ -11,12 +11,20 @@ import (
 // Unlike http.MaxBytesReader, its limit can be adjusted by later middleware so
 // route-specific handlers can override a broader group limit.
 type sizeLimitedBody struct {
-	body  io.ReadCloser
-	limit int64
-	read  int64
+	body          io.ReadCloser
+	limit         int64
+	read          int64
+	contentLength int64
 }
 
 func (b *sizeLimitedBody) Read(p []byte) (int, error) {
+	// If Content-Length is known and already exceeds the active limit, fail fast
+	// on the first attempted read. This prevents partial-read bypasses where a
+	// handler reads only a small prefix and returns success.
+	if b.contentLength >= 0 && b.contentLength > b.limit {
+		return 0, &http.MaxBytesError{Limit: b.limit}
+	}
+
 	remaining := b.limit - b.read
 	if remaining <= 0 {
 		var probe [1]byte
@@ -63,7 +71,11 @@ func RequestSizeLimiter(maxBytes int64) gin.HandlerFunc {
 
 		// Wrap the body so a lying client cannot bypass the check by sending a
 		// small Content-Length header but a large body.
-		c.Request.Body = &sizeLimitedBody{body: c.Request.Body, limit: maxBytes}
+		c.Request.Body = &sizeLimitedBody{
+			body:          c.Request.Body,
+			limit:         maxBytes,
+			contentLength: c.Request.ContentLength,
+		}
 
 		c.Next()
 	}
