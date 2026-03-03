@@ -13,6 +13,14 @@ import (
 var (
 	ErrUsernameTaken = errors.New("username is already taken")
 	ErrEmailTaken    = errors.New("email is already registered")
+
+	// Ban permission errors.
+	ErrBannerNotAdmin = errors.New("only administrators can ban users")
+
+	// Delete permission errors.
+	ErrCannotDeleteSelf  = errors.New("cannot delete your own account")
+	ErrDeleterNotAdmin   = errors.New("only administrators can delete users")
+	ErrCannotDeleteAdmin = errors.New("cannot delete administrator accounts")
 )
 
 // UserRepository is the minimal read interface required by UserDomainService.
@@ -71,7 +79,7 @@ func (s *UserDomainService) CheckEmailAvailable(ctx context.Context, email strin
 // later called, providing defence-in-depth.
 func (s *UserDomainService) CanUserBan(banner, target *domain.User) error {
 	if banner.Role != "admin" {
-		return errors.New("only administrators can ban users")
+		return ErrBannerNotAdmin
 	}
 	if target.Role == "admin" {
 		return domain.ErrCannotBanAdmin
@@ -89,13 +97,13 @@ func (s *UserDomainService) CanUserBan(banner, target *domain.User) error {
 // Note: same raw-entity design rationale as CanUserBan.
 func (s *UserDomainService) CanUserDelete(deleter, target *domain.User) error {
 	if deleter.ID == target.ID {
-		return errors.New("cannot delete your own account")
+		return ErrCannotDeleteSelf
 	}
 	if deleter.Role != "admin" {
-		return errors.New("only administrators can delete users")
+		return ErrDeleterNotAdmin
 	}
 	if target.Role == "admin" {
-		return errors.New("cannot delete administrator accounts")
+		return ErrCannotDeleteAdmin
 	}
 	return nil
 }

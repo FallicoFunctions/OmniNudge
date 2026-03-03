@@ -207,13 +207,14 @@ func (u *UserAggregate) Delete(reason string, deletedBy int) error {
 
 // ChangePassword validates the old password then replaces it with a newly
 // created Password value object (which enforces strength requirements).
-// Returns ErrUserBanned or ErrUserDeleted if the account is not active.
+// Returns ErrUserDeleted or ErrUserBanned if the account is not active.
+// Deleted is checked before banned because deletion is the terminal state.
 func (u *UserAggregate) ChangePassword(oldPassword, newPassword string) error {
-	if u.banned {
-		return ErrUserBanned
-	}
 	if u.deleted {
 		return ErrUserDeleted
+	}
+	if u.banned {
+		return ErrUserBanned
 	}
 	if !u.password.Verify(oldPassword) {
 		return ErrInvalidPassword
