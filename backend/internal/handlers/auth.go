@@ -355,9 +355,10 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		if resetErr := h.lockoutService.Reset(ctx, normalizedUsername); resetErr != nil {
 			slog.Error("lockout reset", "error", resetErr)
 		}
-		if resetErr := h.lockoutService.ResetIP(ctx, ipAddress); resetErr != nil {
-			slog.Error("lockout reset IP", "error", resetErr)
-		}
+		// Do not reset IP-wide failures on single-account success:
+		// that would allow an attacker with one valid credential behind the same
+		// NAT/proxy to repeatedly clear IP lockout history and continue brute-forcing
+		// other accounts.
 	}
 	h.logAudit(ctx, &user.ID, "login_success", "user", &user.ID,
 		ipAddress, c.Request.UserAgent(),

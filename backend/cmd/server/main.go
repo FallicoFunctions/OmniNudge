@@ -549,8 +549,8 @@ func main() {
 	// NOTE on interaction with api.Use(middleware.RequestSizeLimiter(1<<20)) below:
 	// The global 50 MB MaxBytesReader here is a safety net for non-API routes
 	// (uploads, WebSocket upgrades, etc.).  For API routes, RequestSizeLimiter
-	// fires its Content-Length early-rejection check before any body bytes are
-	// read, so the global wrapper is never actually consumed on those routes.
+	// enforces the lower per-route cap at read-time, so the global wrapper is
+	// typically not consumed for API payload-size enforcement.
 	// The two limits are therefore complementary and do not conflict.
 	router.Use(func(c *gin.Context) {
 		c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 50<<20)
