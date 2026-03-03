@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -254,6 +255,9 @@ func (r *BugReportRepository) GetByID(ctx context.Context, id int) (*BugReport, 
 		&report.UpdatedAt,
 		&report.Username,
 	)
+	if err == pgx.ErrNoRows {
+		return nil, nil
+	}
 	if err != nil {
 		return nil, err
 	}

@@ -6,20 +6,21 @@ import (
 	"log"
 	"time"
 
-	"github.com/omninudge/backend/internal/models"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/omninudge/backend/internal/models"
+	"github.com/omninudge/backend/internal/ports"
 )
 
 // BaselineCalculatorService calculates user activity baselines
 type BaselineCalculatorService struct {
 	pool         *pgxpool.Pool
-	baselineRepo *models.UserBaselineRepository
+	baselineRepo ports.UserBaselineRepository
 }
 
 // NewBaselineCalculatorService creates a new baseline calculator service
 func NewBaselineCalculatorService(
 	pool *pgxpool.Pool,
-	baselineRepo *models.UserBaselineRepository,
+	baselineRepo ports.UserBaselineRepository,
 ) *BaselineCalculatorService {
 	return &BaselineCalculatorService{
 		pool:         pool,

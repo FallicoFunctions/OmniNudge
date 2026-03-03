@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"github.com/omninudge/backend/internal/ports"
 	"net/http"
 	"strconv"
 
@@ -14,16 +15,16 @@ import (
 // SlideshowHandler handles HTTP requests for slideshow coordination
 type SlideshowHandler struct {
 	pool         *pgxpool.Pool
-	slideshowRepo *models.SlideshowRepository
-	conversationRepo *models.ConversationRepository
+	slideshowRepo ports.SlideshowRepository
+	conversationRepo ports.ConversationRepository
 	hub          *websocket.Hub
 }
 
 // NewSlideshowHandler creates a new slideshow handler
 func NewSlideshowHandler(
 	pool *pgxpool.Pool,
-	slideshowRepo *models.SlideshowRepository,
-	conversationRepo *models.ConversationRepository,
+	slideshowRepo ports.SlideshowRepository,
+	conversationRepo ports.ConversationRepository,
 	hub *websocket.Hub,
 ) *SlideshowHandler {
 	return &SlideshowHandler{
@@ -34,12 +35,23 @@ func NewSlideshowHandler(
 	}
 }
 
-// StartSlideshow handles POST /api/v1/conversations/:id/slideshow
+// StartSlideshow starts a slideshow for a conversation.
+// @Summary      Start slideshow
+// @Tags         Slideshow
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Param        id  path  int  true  "Conversation ID"
+// @Success      201  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /conversations/{id}/slideshow [post]
 func (h *SlideshowHandler) StartSlideshow(c *gin.Context) {
 	userID := c.GetInt("user_id")
 	conversationID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid conversation ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid conversation ID")
 		return
 	}
 
@@ -47,26 +59,26 @@ func (h *SlideshowHandler) StartSlideshow(c *gin.Context) {
 	conversation, err := h.conversationRepo.GetByID(c.Request.Context(), conversationID)
 	if err != nil {
 		if err == pgx.ErrNoRows {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Conversation not found"})
+			RespondError(c, http.StatusNotFound, "Conversation not found")
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch conversation"})
+		RespondError(c, http.StatusInternalServerError, "Failed to fetch conversation")
 		return
 	}
 
 	if !conversation.IsParticipant(userID) {
-		c.JSON(http.StatusForbidden, gin.H{"error": "You are not part of this conversation"})
+		RespondError(c, http.StatusForbidden, "You are not part of this conversation")
 		return
 	}
 
 	// Check if slideshow already exists
 	existingSlideshow, err := h.slideshowRepo.GetByConversationID(c.Request.Context(), conversationID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check existing slideshow"})
+		RespondError(c, http.StatusInternalServerError, "Failed to check existing slideshow")
 		return
 	}
 	if existingSlideshow != nil {
-		c.JSON(http.StatusConflict, gin.H{"error": "A slideshow is already active for this conversation"})
+		RespondError(c, http.StatusConflict, "A slideshow is already active for this conversation")
 		return
 	}
 
@@ -81,25 +93,25 @@ func (h *SlideshowHandler) StartSlideshow(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		RespondError(c, http.StatusBadRequest, err.Error())
 		return
 	}
 
 	// Validate slideshow type
 	if req.SlideshowType != "personal" && req.SlideshowType != "reddit" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid slideshow type. Must be 'personal' or 'reddit'"})
+		RespondError(c, http.StatusBadRequest, "Invalid slideshow type. Must be 'personal' or 'reddit'")
 		return
 	}
 
 	// Validate Reddit slideshow requirements
 	if req.SlideshowType == "reddit" && req.Subreddit == nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Subreddit is required for Reddit slideshows"})
+		RespondError(c, http.StatusBadRequest, "Subreddit is required for Reddit slideshows")
 		return
 	}
 
 	// Validate personal slideshow requirements
 	if req.SlideshowType == "personal" && len(req.MediaFileIDs) == 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "At least one media file is required for personal slideshows"})
+		RespondError(c, http.StatusBadRequest, "At least one media file is required for personal slideshows")
 		return
 	}
 
@@ -139,7 +151,7 @@ func (h *SlideshowHandler) StartSlideshow(c *gin.Context) {
 	// For personal slideshows, add media items
 	if req.SlideshowType == "personal" {
 		if err := h.slideshowRepo.AddMediaItems(c.Request.Context(), session.ID, req.MediaFileIDs); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to add media items"})
+			RespondError(c, http.StatusInternalServerError, "Failed to add media items")
 			return
 		}
 	}
@@ -168,12 +180,24 @@ func (h *SlideshowHandler) StartSlideshow(c *gin.Context) {
 	c.JSON(http.StatusCreated, session)
 }
 
-// NavigateSlideshow handles POST /api/v1/slideshows/:id/navigate
+// NavigateSlideshow advances to the next/previous slide.
+// @Summary      Navigate slideshow
+// @Tags         Slideshow
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Param        id  path  int  true  "Slideshow ID"
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /slideshows/{id}/navigate [post]
 func (h *SlideshowHandler) NavigateSlideshow(c *gin.Context) {
 	userID := c.GetInt("user_id")
 	sessionID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid slideshow ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid slideshow ID")
 		return
 	}
 
@@ -181,16 +205,16 @@ func (h *SlideshowHandler) NavigateSlideshow(c *gin.Context) {
 	session, err := h.slideshowRepo.GetByID(c.Request.Context(), sessionID)
 	if err != nil {
 		if err == pgx.ErrNoRows {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Slideshow not found"})
+			RespondError(c, http.StatusNotFound, "Slideshow not found")
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch slideshow"})
+		RespondError(c, http.StatusInternalServerError, "Failed to fetch slideshow")
 		return
 	}
 
 	// Verify user is the controller
 	if session.ControllerUserID != userID {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Only the controller can navigate the slideshow"})
+		RespondError(c, http.StatusForbidden, "Only the controller can navigate the slideshow")
 		return
 	}
 
@@ -200,27 +224,27 @@ func (h *SlideshowHandler) NavigateSlideshow(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		RespondError(c, http.StatusBadRequest, err.Error())
 		return
 	}
 
 	// Validate index
 	if req.Index < 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Index must be non-negative"})
+		RespondError(c, http.StatusBadRequest, "Index must be non-negative")
 		return
 	}
 
 	// Update current index
 	err = h.slideshowRepo.UpdateCurrentIndex(c.Request.Context(), sessionID, req.Index)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update slideshow"})
+		RespondError(c, http.StatusInternalServerError, "Failed to update slideshow")
 		return
 	}
 
 	// Get conversation to notify both users
 	conversation, err := h.conversationRepo.GetByID(c.Request.Context(), session.ConversationID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch conversation"})
+		RespondError(c, http.StatusInternalServerError, "Failed to fetch conversation")
 		return
 	}
 
@@ -243,12 +267,24 @@ func (h *SlideshowHandler) NavigateSlideshow(c *gin.Context) {
 	})
 }
 
-// TransferControl handles POST /api/v1/slideshows/:id/transfer-control
+// TransferControl transfers slideshow control to another user.
+// @Summary      Transfer slideshow control
+// @Tags         Slideshow
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Param        id  path  int  true  "Slideshow ID"
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /slideshows/{id}/transfer-control [post]
 func (h *SlideshowHandler) TransferControl(c *gin.Context) {
 	userID := c.GetInt("user_id")
 	sessionID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid slideshow ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid slideshow ID")
 		return
 	}
 
@@ -256,37 +292,37 @@ func (h *SlideshowHandler) TransferControl(c *gin.Context) {
 	session, err := h.slideshowRepo.GetByID(c.Request.Context(), sessionID)
 	if err != nil {
 		if err == pgx.ErrNoRows {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Slideshow not found"})
+			RespondError(c, http.StatusNotFound, "Slideshow not found")
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch slideshow"})
+		RespondError(c, http.StatusInternalServerError, "Failed to fetch slideshow")
 		return
 	}
 
 	// Verify user is the current controller
 	if session.ControllerUserID != userID {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Only the controller can transfer control"})
+		RespondError(c, http.StatusForbidden, "Only the controller can transfer control")
 		return
 	}
 
 	// Get conversation to find the other user
 	conversation, err := h.conversationRepo.GetByID(c.Request.Context(), session.ConversationID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch conversation"})
+		RespondError(c, http.StatusInternalServerError, "Failed to fetch conversation")
 		return
 	}
 
 	// Determine the other user
 	newControllerID := conversation.GetOtherUserID(userID)
 	if newControllerID == 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Cannot determine other user"})
+		RespondError(c, http.StatusBadRequest, "Cannot determine other user")
 		return
 	}
 
 	// Update controller
 	err = h.slideshowRepo.UpdateController(c.Request.Context(), sessionID, newControllerID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to transfer control"})
+		RespondError(c, http.StatusInternalServerError, "Failed to transfer control")
 		return
 	}
 
@@ -309,12 +345,24 @@ func (h *SlideshowHandler) TransferControl(c *gin.Context) {
 	})
 }
 
-// UpdateAutoAdvance handles PUT /api/v1/slideshows/:id/auto-advance
+// UpdateAutoAdvance toggles auto-advance for a slideshow.
+// @Summary      Update auto-advance
+// @Tags         Slideshow
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Param        id  path  int  true  "Slideshow ID"
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /slideshows/{id}/auto-advance [put]
 func (h *SlideshowHandler) UpdateAutoAdvance(c *gin.Context) {
 	userID := c.GetInt("user_id")
 	sessionID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid slideshow ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid slideshow ID")
 		return
 	}
 
@@ -322,16 +370,16 @@ func (h *SlideshowHandler) UpdateAutoAdvance(c *gin.Context) {
 	session, err := h.slideshowRepo.GetByID(c.Request.Context(), sessionID)
 	if err != nil {
 		if err == pgx.ErrNoRows {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Slideshow not found"})
+			RespondError(c, http.StatusNotFound, "Slideshow not found")
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch slideshow"})
+		RespondError(c, http.StatusInternalServerError, "Failed to fetch slideshow")
 		return
 	}
 
 	// Verify user is the controller
 	if session.ControllerUserID != userID {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Only the controller can update auto-advance"})
+		RespondError(c, http.StatusForbidden, "Only the controller can update auto-advance")
 		return
 	}
 
@@ -342,7 +390,7 @@ func (h *SlideshowHandler) UpdateAutoAdvance(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		RespondError(c, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -357,21 +405,21 @@ func (h *SlideshowHandler) UpdateAutoAdvance(c *gin.Context) {
 	}
 
 	if !validInterval && req.AutoAdvance {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Auto-advance interval must be one of: 3, 5, 10, 15, 30 seconds"})
+		RespondError(c, http.StatusBadRequest, "Auto-advance interval must be one of: 3, 5, 10, 15, 30 seconds")
 		return
 	}
 
 	// Update auto-advance settings
 	err = h.slideshowRepo.UpdateAutoAdvance(c.Request.Context(), sessionID, req.AutoAdvance, req.AutoAdvanceInterval)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update auto-advance"})
+		RespondError(c, http.StatusInternalServerError, "Failed to update auto-advance")
 		return
 	}
 
 	// Get conversation to notify both users
 	conversation, err := h.conversationRepo.GetByID(c.Request.Context(), session.ConversationID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch conversation"})
+		RespondError(c, http.StatusInternalServerError, "Failed to fetch conversation")
 		return
 	}
 
@@ -395,12 +443,22 @@ func (h *SlideshowHandler) UpdateAutoAdvance(c *gin.Context) {
 	})
 }
 
-// StopSlideshow handles DELETE /api/v1/slideshows/:id
+// StopSlideshow stops an active slideshow.
+// @Summary      Stop slideshow
+// @Tags         Slideshow
+// @Security     BearerAuth
+// @Produce      json
+// @Param        id  path  int  true  "Slideshow ID"
+// @Success      200  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /slideshows/{id} [delete]
 func (h *SlideshowHandler) StopSlideshow(c *gin.Context) {
 	userID := c.GetInt("user_id")
 	sessionID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid slideshow ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid slideshow ID")
 		return
 	}
 
@@ -408,30 +466,30 @@ func (h *SlideshowHandler) StopSlideshow(c *gin.Context) {
 	session, err := h.slideshowRepo.GetByID(c.Request.Context(), sessionID)
 	if err != nil {
 		if err == pgx.ErrNoRows {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Slideshow not found"})
+			RespondError(c, http.StatusNotFound, "Slideshow not found")
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch slideshow"})
+		RespondError(c, http.StatusInternalServerError, "Failed to fetch slideshow")
 		return
 	}
 
 	// Get conversation to verify user access
 	conversation, err := h.conversationRepo.GetByID(c.Request.Context(), session.ConversationID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch conversation"})
+		RespondError(c, http.StatusInternalServerError, "Failed to fetch conversation")
 		return
 	}
 
 	// Verify user is part of the conversation
 	if !conversation.IsParticipant(userID) {
-		c.JSON(http.StatusForbidden, gin.H{"error": "You are not part of this conversation"})
+		RespondError(c, http.StatusForbidden, "You are not part of this conversation")
 		return
 	}
 
 	// Delete slideshow session
 	err = h.slideshowRepo.Delete(c.Request.Context(), sessionID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to stop slideshow"})
+		RespondError(c, http.StatusInternalServerError, "Failed to stop slideshow")
 		return
 	}
 
@@ -451,12 +509,22 @@ func (h *SlideshowHandler) StopSlideshow(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Slideshow stopped successfully"})
 }
 
-// GetSlideshow handles GET /api/v1/conversations/:id/slideshow
+// GetSlideshow returns the current slideshow state for a conversation.
+// @Summary      Get slideshow
+// @Tags         Slideshow
+// @Security     BearerAuth
+// @Produce      json
+// @Param        id  path  int  true  "Conversation ID"
+// @Success      200  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      404  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /conversations/{id}/slideshow [get]
 func (h *SlideshowHandler) GetSlideshow(c *gin.Context) {
 	userID := c.GetInt("user_id")
 	conversationID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid conversation ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid conversation ID")
 		return
 	}
 
@@ -464,26 +532,26 @@ func (h *SlideshowHandler) GetSlideshow(c *gin.Context) {
 	conversation, err := h.conversationRepo.GetByID(c.Request.Context(), conversationID)
 	if err != nil {
 		if err == pgx.ErrNoRows {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Conversation not found"})
+			RespondError(c, http.StatusNotFound, "Conversation not found")
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch conversation"})
+		RespondError(c, http.StatusInternalServerError, "Failed to fetch conversation")
 		return
 	}
 
 	if !conversation.IsParticipant(userID) {
-		c.JSON(http.StatusForbidden, gin.H{"error": "You are not part of this conversation"})
+		RespondError(c, http.StatusForbidden, "You are not part of this conversation")
 		return
 	}
 
 	// Get slideshow session
 	session, err := h.slideshowRepo.GetByConversationID(c.Request.Context(), conversationID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch slideshow"})
+		RespondError(c, http.StatusInternalServerError, "Failed to fetch slideshow")
 		return
 	}
 	if session == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "No active slideshow"})
+		RespondError(c, http.StatusNotFound, "No active slideshow")
 		return
 	}
 

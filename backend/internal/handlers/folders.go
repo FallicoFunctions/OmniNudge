@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"github.com/omninudge/backend/internal/ports"
+	"github.com/omninudge/backend/internal/api/middleware"
 	"errors"
 	"net/http"
 	"strconv"
@@ -15,10 +17,10 @@ import (
 
 type FoldersHandler struct {
 	pool             *pgxpool.Pool
-	conversationRepo *models.ConversationRepository
+	conversationRepo ports.ConversationRepository
 }
 
-func NewFoldersHandler(pool *pgxpool.Pool, conversationRepo *models.ConversationRepository) *FoldersHandler {
+func NewFoldersHandler(pool *pgxpool.Pool, conversationRepo ports.ConversationRepository) *FoldersHandler {
 	return &FoldersHandler{
 		pool:             pool,
 		conversationRepo: conversationRepo,
@@ -52,19 +54,24 @@ type reorderFoldersRequest struct {
 }
 
 func (h *FoldersHandler) getUserID(c *gin.Context) (int, bool) {
-	userIDValue, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Not authenticated"})
-		return 0, false
-	}
-	userID, ok := userIDValue.(int)
+	userID, ok := middleware.GetAuthenticatedUserID(c)
 	if !ok {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid user id"})
 		return 0, false
 	}
 	return userID, true
 }
 
+// CreateFolder creates a new conversation folder.
+// @Summary      Create folder
+// @Tags         Folders
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Success      201  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /folders [post]
 func (h *FoldersHandler) CreateFolder(c *gin.Context) {
 	userID, ok := h.getUserID(c)
 	if !ok {
@@ -73,13 +80,13 @@ func (h *FoldersHandler) CreateFolder(c *gin.Context) {
 
 	var req createFolderRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
+		RespondError(c, http.StatusBadRequest, "Invalid request body")
 		return
 	}
 
 	name := strings.TrimSpace(req.Name)
 	if name == "" || len(name) > 50 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Folder name must be between 1 and 50 characters"})
+		RespondError(c, http.StatusBadRequest, "Folder name must be between 1 and 50 characters")
 		return
 	}
 	color := strings.TrimSpace(req.Color)
@@ -118,6 +125,15 @@ func (h *FoldersHandler) CreateFolder(c *gin.Context) {
 	c.JSON(http.StatusCreated, folder)
 }
 
+// ListFolders returns all folders for the current user.
+// @Summary      List folders
+// @Tags         Folders
+// @Security     BearerAuth
+// @Produce      json
+// @Success      200  {array}   gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /folders [get]
 func (h *FoldersHandler) ListFolders(c *gin.Context) {
 	userID, ok := h.getUserID(c)
 	if !ok {
@@ -134,7 +150,7 @@ func (h *FoldersHandler) ListFolders(c *gin.Context) {
 		ORDER BY f.position ASC, f.id ASC
 	`, userID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to list folders"})
+		RespondError(c, http.StatusInternalServerError, "Failed to list folders")
 		return
 	}
 	defer rows.Close()
@@ -151,7 +167,7 @@ func (h *FoldersHandler) ListFolders(c *gin.Context) {
 			&folder.Position,
 			&folder.ConversationCount,
 		); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to list folders"})
+			RespondError(c, http.StatusInternalServerError, "Failed to list folders")
 			return
 		}
 		folders = append(folders, folder)
@@ -160,6 +176,19 @@ func (h *FoldersHandler) ListFolders(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"folders": folders})
 }
 
+// UpdateFolder updates a conversation folder.
+// @Summary      Update folder
+// @Tags         Folders
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Param        id  path  int  true  "Folder ID"
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      404  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /folders/{id} [put]
 func (h *FoldersHandler) UpdateFolder(c *gin.Context) {
 	userID, ok := h.getUserID(c)
 	if !ok {
@@ -168,13 +197,13 @@ func (h *FoldersHandler) UpdateFolder(c *gin.Context) {
 
 	folderID, err := strconv.Atoi(c.Param("id"))
 	if err != nil || folderID <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid folder id"})
+		RespondError(c, http.StatusBadRequest, "Invalid folder id")
 		return
 	}
 
 	var req updateFolderRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
+		RespondError(c, http.StatusBadRequest, "Invalid request body")
 		return
 	}
 
@@ -192,18 +221,18 @@ func (h *FoldersHandler) UpdateFolder(c *gin.Context) {
 		&current.Position,
 	)
 	if err == pgx.ErrNoRows {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Folder not found"})
+		RespondError(c, http.StatusNotFound, "Folder not found")
 		return
 	}
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load folder"})
+		RespondError(c, http.StatusInternalServerError, "Failed to load folder")
 		return
 	}
 
 	if req.Name != nil {
 		name := strings.TrimSpace(*req.Name)
 		if name == "" || len(name) > 50 {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Folder name must be between 1 and 50 characters"})
+			RespondError(c, http.StatusBadRequest, "Folder name must be between 1 and 50 characters")
 			return
 		}
 		current.Name = name
@@ -211,7 +240,7 @@ func (h *FoldersHandler) UpdateFolder(c *gin.Context) {
 	if req.Color != nil {
 		color := strings.TrimSpace(*req.Color)
 		if color == "" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Folder color cannot be empty"})
+			RespondError(c, http.StatusBadRequest, "Folder color cannot be empty")
 			return
 		}
 		current.Color = color
@@ -219,7 +248,7 @@ func (h *FoldersHandler) UpdateFolder(c *gin.Context) {
 	if req.Icon != nil {
 		icon := strings.TrimSpace(*req.Icon)
 		if icon == "" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Folder icon cannot be empty"})
+			RespondError(c, http.StatusBadRequest, "Folder icon cannot be empty")
 			return
 		}
 		current.Icon = icon
@@ -246,6 +275,17 @@ func (h *FoldersHandler) UpdateFolder(c *gin.Context) {
 	c.JSON(http.StatusOK, current)
 }
 
+// DeleteFolder deletes a conversation folder.
+// @Summary      Delete folder
+// @Tags         Folders
+// @Security     BearerAuth
+// @Produce      json
+// @Param        id  path  int  true  "Folder ID"
+// @Success      204
+// @Failure      401  {object}  gin.H
+// @Failure      404  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /folders/{id} [delete]
 func (h *FoldersHandler) DeleteFolder(c *gin.Context) {
 	userID, ok := h.getUserID(c)
 	if !ok {
@@ -253,7 +293,7 @@ func (h *FoldersHandler) DeleteFolder(c *gin.Context) {
 	}
 	folderID, err := strconv.Atoi(c.Param("id"))
 	if err != nil || folderID <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid folder id"})
+		RespondError(c, http.StatusBadRequest, "Invalid folder id")
 		return
 	}
 
@@ -262,17 +302,28 @@ func (h *FoldersHandler) DeleteFolder(c *gin.Context) {
 		WHERE id = $1 AND user_id = $2
 	`, folderID, userID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete folder"})
+		RespondError(c, http.StatusInternalServerError, "Failed to delete folder")
 		return
 	}
 	if tag.RowsAffected() == 0 {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Folder not found"})
+		RespondError(c, http.StatusNotFound, "Folder not found")
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Folder deleted"})
 }
 
+// ReorderFolders updates the display order of folders.
+// @Summary      Reorder folders
+// @Tags         Folders
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /folders/reorder [put]
 func (h *FoldersHandler) ReorderFolders(c *gin.Context) {
 	userID, ok := h.getUserID(c)
 	if !ok {
@@ -281,17 +332,17 @@ func (h *FoldersHandler) ReorderFolders(c *gin.Context) {
 
 	var req reorderFoldersRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
+		RespondError(c, http.StatusBadRequest, "Invalid request body")
 		return
 	}
 	if len(req.FolderIDs) == 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "folder_ids cannot be empty"})
+		RespondError(c, http.StatusBadRequest, "folder_ids cannot be empty")
 		return
 	}
 
 	tx, err := h.pool.Begin(c.Request.Context())
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to start reorder transaction"})
+		RespondError(c, http.StatusInternalServerError, "Failed to start reorder transaction")
 		return
 	}
 	defer tx.Rollback(c.Request.Context())
@@ -304,11 +355,11 @@ func (h *FoldersHandler) ReorderFolders(c *gin.Context) {
 		  AND id = ANY($2)
 	`, userID, req.FolderIDs).Scan(&ownedCount)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to validate folder ownership"})
+		RespondError(c, http.StatusInternalServerError, "Failed to validate folder ownership")
 		return
 	}
 	if ownedCount != len(req.FolderIDs) {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "One or more folders are invalid"})
+		RespondError(c, http.StatusBadRequest, "One or more folders are invalid")
 		return
 	}
 
@@ -318,19 +369,32 @@ func (h *FoldersHandler) ReorderFolders(c *gin.Context) {
 			SET position = $1, updated_at = NOW()
 			WHERE id = $2 AND user_id = $3
 		`, idx, folderID, userID); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to reorder folders"})
+			RespondError(c, http.StatusInternalServerError, "Failed to reorder folders")
 			return
 		}
 	}
 
 	if err := tx.Commit(c.Request.Context()); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to reorder folders"})
+		RespondError(c, http.StatusInternalServerError, "Failed to reorder folders")
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Folders reordered"})
 }
 
+// AddConversationToFolder adds a conversation to a folder.
+// @Summary      Add conversation to folder
+// @Tags         Folders
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Param        id  path  int  true  "Folder ID"
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      404  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /folders/{id}/conversations [post]
 func (h *FoldersHandler) AddConversationToFolder(c *gin.Context) {
 	userID, ok := h.getUserID(c)
 	if !ok {
@@ -360,6 +424,18 @@ func (h *FoldersHandler) AddConversationToFolder(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{"message": "Conversation added to folder"})
 }
 
+// RemoveConversationFromFolder removes a conversation from a folder.
+// @Summary      Remove conversation from folder
+// @Tags         Folders
+// @Security     BearerAuth
+// @Produce      json
+// @Param        id               path  int  true  "Folder ID"
+// @Param        conversation_id  path  int  true  "Conversation ID"
+// @Success      204
+// @Failure      401  {object}  gin.H
+// @Failure      404  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /folders/{id}/conversations/{conversation_id} [delete]
 func (h *FoldersHandler) RemoveConversationFromFolder(c *gin.Context) {
 	userID, ok := h.getUserID(c)
 	if !ok {
@@ -379,17 +455,28 @@ func (h *FoldersHandler) RemoveConversationFromFolder(c *gin.Context) {
 		WHERE folder_id = $1 AND conversation_id = $2
 	`, folderID, convID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to remove conversation from folder"})
+		RespondError(c, http.StatusInternalServerError, "Failed to remove conversation from folder")
 		return
 	}
 	if tag.RowsAffected() == 0 {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Conversation is not in this folder"})
+		RespondError(c, http.StatusNotFound, "Conversation is not in this folder")
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Conversation removed from folder"})
 }
 
+// GetFolderConversations returns conversations in a folder.
+// @Summary      Get folder conversations
+// @Tags         Folders
+// @Security     BearerAuth
+// @Produce      json
+// @Param        id  path  int  true  "Folder ID"
+// @Success      200  {array}   gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      404  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /folders/{id}/conversations [get]
 func (h *FoldersHandler) GetFolderConversations(c *gin.Context) {
 	userID, ok := h.getUserID(c)
 	if !ok {
@@ -397,7 +484,7 @@ func (h *FoldersHandler) GetFolderConversations(c *gin.Context) {
 	}
 	folderID, err := strconv.Atoi(c.Param("id"))
 	if err != nil || folderID <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid folder id"})
+		RespondError(c, http.StatusBadRequest, "Invalid folder id")
 		return
 	}
 
@@ -413,7 +500,7 @@ func (h *FoldersHandler) GetFolderConversations(c *gin.Context) {
 		ORDER BY c.last_message_at DESC
 	`, folderID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load folder conversations"})
+		RespondError(c, http.StatusInternalServerError, "Failed to load folder conversations")
 		return
 	}
 	defer rows.Close()
@@ -422,7 +509,7 @@ func (h *FoldersHandler) GetFolderConversations(c *gin.Context) {
 	for rows.Next() {
 		conv := &models.Conversation{}
 		if err := rows.Scan(&conv.ID, &conv.User1ID, &conv.User2ID, &conv.CreatedAt, &conv.LastMessageAt, &conv.ConversationType); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load folder conversations"})
+			RespondError(c, http.StatusInternalServerError, "Failed to load folder conversations")
 			return
 		}
 		conversations = append(conversations, conv)
@@ -431,6 +518,16 @@ func (h *FoldersHandler) GetFolderConversations(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"conversations": conversations})
 }
 
+// GetConversationFolders returns folders containing a conversation.
+// @Summary      Get conversation folders
+// @Tags         Folders
+// @Security     BearerAuth
+// @Produce      json
+// @Param        conversation_id  path  int  true  "Conversation ID"
+// @Success      200  {array}   gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /conversations/{conversation_id}/folders [get]
 func (h *FoldersHandler) GetConversationFolders(c *gin.Context) {
 	userID, ok := h.getUserID(c)
 	if !ok {
@@ -438,7 +535,7 @@ func (h *FoldersHandler) GetConversationFolders(c *gin.Context) {
 	}
 	convID, err := strconv.Atoi(c.Param("id"))
 	if err != nil || convID <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid conversation id"})
+		RespondError(c, http.StatusBadRequest, "Invalid conversation id")
 		return
 	}
 
@@ -455,7 +552,7 @@ func (h *FoldersHandler) GetConversationFolders(c *gin.Context) {
 		ORDER BY f.position ASC, f.id ASC
 	`, convID, userID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load folders for conversation"})
+		RespondError(c, http.StatusInternalServerError, "Failed to load folders for conversation")
 		return
 	}
 	defer rows.Close()
@@ -464,7 +561,7 @@ func (h *FoldersHandler) GetConversationFolders(c *gin.Context) {
 	for rows.Next() {
 		var folder Folder
 		if err := rows.Scan(&folder.ID, &folder.UserID, &folder.Name, &folder.Color, &folder.Icon, &folder.Position); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load folders for conversation"})
+			RespondError(c, http.StatusInternalServerError, "Failed to load folders for conversation")
 			return
 		}
 		folders = append(folders, folder)
@@ -476,12 +573,12 @@ func (h *FoldersHandler) GetConversationFolders(c *gin.Context) {
 func parseFolderAndConversationIDs(c *gin.Context) (int, int, bool) {
 	folderID, err := strconv.Atoi(c.Param("id"))
 	if err != nil || folderID <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid folder id"})
+		RespondError(c, http.StatusBadRequest, "Invalid folder id")
 		return 0, 0, false
 	}
 	convID, err := strconv.Atoi(c.Param("conv_id"))
 	if err != nil || convID <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid conversation id"})
+		RespondError(c, http.StatusBadRequest, "Invalid conversation id")
 		return 0, 0, false
 	}
 	return folderID, convID, true
@@ -495,11 +592,11 @@ func (h *FoldersHandler) ensureFolderOwnership(c *gin.Context, folderID int, use
 		WHERE id = $1 AND user_id = $2
 	`, folderID, userID).Scan(&count)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to validate folder"})
+		RespondError(c, http.StatusInternalServerError, "Failed to validate folder")
 		return false
 	}
 	if count == 0 {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Folder not found"})
+		RespondError(c, http.StatusNotFound, "Folder not found")
 		return false
 	}
 	return true
@@ -508,11 +605,11 @@ func (h *FoldersHandler) ensureFolderOwnership(c *gin.Context, folderID int, use
 func (h *FoldersHandler) ensureConversationAccess(c *gin.Context, conversationID int, userID int) bool {
 	conversation, err := h.conversationRepo.GetByID(c.Request.Context(), conversationID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get conversation"})
+		RespondError(c, http.StatusInternalServerError, "Failed to get conversation")
 		return false
 	}
 	if conversation == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Conversation not found"})
+		RespondError(c, http.StatusNotFound, "Conversation not found")
 		return false
 	}
 	if conversation.ConversationType == "mod_mail" {
@@ -522,17 +619,17 @@ func (h *FoldersHandler) ensureConversationAccess(c *gin.Context, conversationID
 			WHERE conversation_id = $1 AND user_id = $2
 		`, conversationID, userID).Scan(&participantCount)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to verify conversation access"})
+			RespondError(c, http.StatusInternalServerError, "Failed to verify conversation access")
 			return false
 		}
 		if participantCount == 0 {
-			c.JSON(http.StatusForbidden, gin.H{"error": "You are not a participant in this conversation"})
+			RespondError(c, http.StatusForbidden, "You are not a participant in this conversation")
 			return false
 		}
 		return true
 	}
 	if !conversation.IsParticipant(userID) {
-		c.JSON(http.StatusForbidden, gin.H{"error": "You are not a participant in this conversation"})
+		RespondError(c, http.StatusForbidden, "You are not a participant in this conversation")
 		return false
 	}
 	return true
@@ -543,15 +640,15 @@ func (h *FoldersHandler) handleFolderMutationError(c *gin.Context, err error) {
 	if errors.As(err, &pgErr) {
 		switch pgErr.Code {
 		case "23505":
-			c.JSON(http.StatusConflict, gin.H{"error": "Folder or membership already exists"})
+			RespondError(c, http.StatusConflict, "Folder or membership already exists")
 			return
 		case "23503":
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid folder or conversation reference"})
+			RespondError(c, http.StatusBadRequest, "Invalid folder or conversation reference")
 			return
 		case "P0001":
-			c.JSON(http.StatusBadRequest, gin.H{"error": pgErr.Message})
+			RespondError(c, http.StatusBadRequest, pgErr.Message)
 			return
 		}
 	}
-	c.JSON(http.StatusInternalServerError, gin.H{"error": "Folder operation failed"})
+	RespondError(c, http.StatusInternalServerError, "Folder operation failed")
 }

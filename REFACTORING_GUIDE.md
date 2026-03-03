@@ -2,6 +2,39 @@
 
 This document describes the reusable components and utilities created to eliminate code duplication across the OmniNudge project.
 
+---
+
+## GROUND TRUTH (Updated 2026-02-26)
+
+### What Already EXISTS in the Codebase ✓
+
+**Frontend UI components** (`frontend/src/components/ui/`):
+- `Button.tsx` ✓
+- `Alert.tsx` ✓
+- `Input.tsx` ✓
+- `Textarea.tsx` ✓
+- `ModalHeader.tsx` ✓
+- `ModalCloseButton.tsx` ✓
+- `AboutPanel.tsx` ✓
+- `ConfirmDialog.tsx` ✓
+- `LoadingSpinner.tsx` ✓
+- `Toast.tsx` + `ToastContainer.tsx` ✓
+- `index.ts` barrel export ✓
+
+**Backend utilities**:
+- `internal/utils/pagination.go` ✓
+- `internal/utils/cursor.go` ✓
+- `internal/helpers/permissions.go` ✓
+
+**What DOES NOT exist yet**:
+- `internal/api/middleware/auth_helpers.go` (`GetAuthenticatedUserID` / `GetOptionalUserID`) — will be built in REFACTOR_01
+- `internal/services/mocks/` — will be built in REFACTOR_02/03
+
+### Adoption Status
+The UI components exist but are not yet adopted everywhere — many pages still use inline button/alert/input patterns. Adoption will happen incrementally as each screen is touched during feature work. Do not do a mass adoption sweep; use components on new code and when touching existing code.
+
+---
+
 ## Overview
 
 Based on a comprehensive audit of the codebase, we identified significant code duplication (~15-20%) across both frontend and backend. This refactoring introduces reusable components and utilities to eliminate this redundancy.

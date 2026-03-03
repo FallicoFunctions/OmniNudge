@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"github.com/omninudge/backend/internal/ports"
+	"github.com/omninudge/backend/internal/api/middleware"
 	"errors"
 	"net/http"
 	"strconv"
@@ -13,12 +15,12 @@ import (
 )
 
 type HubSettingsHandler struct {
-	hubRepo      *models.HubRepository
+	hubRepo      ports.HubRepository
 	settingsRepo *repository.HubSettingsRepository
-	userRepo     *models.UserRepository
+	userRepo     ports.UserRepository
 }
 
-func NewHubSettingsHandler(hubRepo *models.HubRepository, settingsRepo *repository.HubSettingsRepository, userRepo *models.UserRepository) *HubSettingsHandler {
+func NewHubSettingsHandler(hubRepo ports.HubRepository, settingsRepo *repository.HubSettingsRepository, userRepo ports.UserRepository) *HubSettingsHandler {
 	return &HubSettingsHandler{
 		hubRepo:      hubRepo,
 		settingsRepo: settingsRepo,
@@ -34,7 +36,7 @@ func (h *HubSettingsHandler) GetHubSettings(c *gin.Context) {
 	// Get hub ID from name
 	hubID, err := h.getHubIDByName(c, hubName)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Hub not found"})
+		RespondError(c, http.StatusNotFound, "Hub not found")
 		return
 	}
 
@@ -43,7 +45,7 @@ func (h *HubSettingsHandler) GetHubSettings(c *gin.Context) {
 		if errors.Is(err, pgx.ErrNoRows) || h.hubRepo != nil {
 			hub, hubErr := h.hubRepo.GetByName(c.Request.Context(), hubName)
 			if hubErr != nil || hub == nil {
-				c.JSON(http.StatusNotFound, gin.H{"error": "Hub not found"})
+				RespondError(c, http.StatusNotFound, "Hub not found")
 				return
 			}
 
@@ -70,10 +72,9 @@ func (h *HubSettingsHandler) GetHubSettings(c *gin.Context) {
 	}
 
 	// Check if user is a moderator
-	userID, exists := c.Get("user_id")
 	isModerator := false
-	if exists {
-		role, err := h.settingsRepo.GetModeratorRole(c.Request.Context(), hubID, userID.(int))
+	if userID, ok := middleware.GetOptionalUserID(c); ok {
+		role, err := h.settingsRepo.GetModeratorRole(c.Request.Context(), hubID, userID)
 		isModerator = (err == nil && role != nil)
 	}
 
@@ -96,36 +97,35 @@ func (h *HubSettingsHandler) GetHubSettings(c *gin.Context) {
 // UpdateHubSettings handles PUT /api/v1/hubs/:name/settings
 // Updates hub settings (requires owner or full_moderator role)
 func (h *HubSettingsHandler) UpdateHubSettings(c *gin.Context) {
-	userID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
 		return
 	}
 
 	hubName := c.Param("name")
 	hubID, err := h.getHubIDByName(c, hubName)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Hub not found"})
+		RespondError(c, http.StatusNotFound, "Hub not found")
 		return
 	}
 
 	if !helpers.IsAdmin(c) {
 		// Check permissions: must be owner or full_moderator
-		role, err := h.settingsRepo.GetModeratorRole(c.Request.Context(), hubID, userID.(int))
+		role, err := h.settingsRepo.GetModeratorRole(c.Request.Context(), hubID, userID)
 		if err != nil || role == nil {
-			c.JSON(http.StatusForbidden, gin.H{"error": "Not a moderator"})
+			RespondError(c, http.StatusForbidden, "Not a moderator")
 			return
 		}
 
 		if *role != models.ModeratorRoleOwner && *role != models.ModeratorRoleFullModerator {
-			c.JSON(http.StatusForbidden, gin.H{"error": "Requires owner or full_moderator role"})
+			RespondError(c, http.StatusForbidden, "Requires owner or full_moderator role")
 			return
 		}
 	}
 
 	var settings models.HubSettings
 	if err := c.ShouldBindJSON(&settings); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
+		RespondError(c, http.StatusBadRequest, "Invalid request body")
 		return
 	}
 
@@ -134,8 +134,8 @@ func (h *HubSettingsHandler) UpdateHubSettings(c *gin.Context) {
 		settings.BannedWords = nil
 	}
 
-	if err := h.settingsRepo.Update(c.Request.Context(), &settings, userID.(int)); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update settings"})
+	if err := h.settingsRepo.Update(c.Request.Context(), &settings, userID); err != nil {
+		RespondError(c, http.StatusInternalServerError, "Failed to update settings")
 		return
 	}
 
@@ -148,13 +148,13 @@ func (h *HubSettingsHandler) GetHubModerators(c *gin.Context) {
 	hubName := c.Param("name")
 	hubID, err := h.getHubIDByName(c, hubName)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Hub not found"})
+		RespondError(c, http.StatusNotFound, "Hub not found")
 		return
 	}
 
 	moderators, err := h.settingsRepo.GetHubModerators(c.Request.Context(), hubID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get moderators"})
+		RespondError(c, http.StatusInternalServerError, "Failed to get moderators")
 		return
 	}
 
@@ -164,23 +164,22 @@ func (h *HubSettingsHandler) GetHubModerators(c *gin.Context) {
 // AddHubModerator handles POST /api/v1/hubs/:name/moderators
 // Adds a new moderator (requires owner role)
 func (h *HubSettingsHandler) AddHubModerator(c *gin.Context) {
-	userID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
 		return
 	}
 
 	hubName := c.Param("name")
 	hubID, err := h.getHubIDByName(c, hubName)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Hub not found"})
+		RespondError(c, http.StatusNotFound, "Hub not found")
 		return
 	}
 
 	// Check permissions: must be owner
-	role, err := h.settingsRepo.GetModeratorRole(c.Request.Context(), hubID, userID.(int))
+	role, err := h.settingsRepo.GetModeratorRole(c.Request.Context(), hubID, userID)
 	if err != nil || role == nil || *role != models.ModeratorRoleOwner {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Requires owner role"})
+		RespondError(c, http.StatusForbidden, "Requires owner role")
 		return
 	}
 
@@ -189,29 +188,29 @@ func (h *HubSettingsHandler) AddHubModerator(c *gin.Context) {
 		Role     models.ModeratorRole `json:"role" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
+		RespondError(c, http.StatusBadRequest, "Invalid request body")
 		return
 	}
 
 	// Validate role
 	if req.Role != models.ModeratorRoleFullModerator && req.Role != models.ModeratorRoleModerator {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid role. Can only add full_moderator or moderator"})
+		RespondError(c, http.StatusBadRequest, "Invalid role. Can only add full_moderator or moderator")
 		return
 	}
 
 	// Look up user by username (case-insensitive)
 	targetUser, err := h.userRepo.GetByUsername(c.Request.Context(), req.Username)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to look up user"})
+		RespondError(c, http.StatusInternalServerError, "Failed to look up user")
 		return
 	}
 	if targetUser == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		RespondError(c, http.StatusNotFound, "User not found")
 		return
 	}
 
 	if err := h.settingsRepo.AddModerator(c.Request.Context(), hubID, targetUser.ID, req.Role); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to add moderator"})
+		RespondError(c, http.StatusInternalServerError, "Failed to add moderator")
 		return
 	}
 
@@ -221,29 +220,28 @@ func (h *HubSettingsHandler) AddHubModerator(c *gin.Context) {
 // UpdateModeratorRole handles PATCH /api/v1/hubs/:name/moderators/:user_id
 // Updates a moderator's role (requires owner role)
 func (h *HubSettingsHandler) UpdateModeratorRole(c *gin.Context) {
-	userID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
 		return
 	}
 
 	hubName := c.Param("name")
 	hubID, err := h.getHubIDByName(c, hubName)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Hub not found"})
+		RespondError(c, http.StatusNotFound, "Hub not found")
 		return
 	}
 
 	targetUserID, err := strconv.Atoi(c.Param("user_id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid user ID")
 		return
 	}
 
 	// Check permissions: must be owner
-	role, err := h.settingsRepo.GetModeratorRole(c.Request.Context(), hubID, userID.(int))
+	role, err := h.settingsRepo.GetModeratorRole(c.Request.Context(), hubID, userID)
 	if err != nil || role == nil || *role != models.ModeratorRoleOwner {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Requires owner role"})
+		RespondError(c, http.StatusForbidden, "Requires owner role")
 		return
 	}
 
@@ -251,18 +249,18 @@ func (h *HubSettingsHandler) UpdateModeratorRole(c *gin.Context) {
 		Role models.ModeratorRole `json:"role" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
+		RespondError(c, http.StatusBadRequest, "Invalid request body")
 		return
 	}
 
 	// Cannot change owner role
 	if req.Role == models.ModeratorRoleOwner {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Cannot change owner role"})
+		RespondError(c, http.StatusBadRequest, "Cannot change owner role")
 		return
 	}
 
 	if err := h.settingsRepo.UpdateModeratorRole(c.Request.Context(), hubID, targetUserID, req.Role); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update moderator role"})
+		RespondError(c, http.StatusInternalServerError, "Failed to update moderator role")
 		return
 	}
 
@@ -272,35 +270,34 @@ func (h *HubSettingsHandler) UpdateModeratorRole(c *gin.Context) {
 // RemoveHubModerator handles DELETE /api/v1/hubs/:name/moderators/:user_id
 // Removes a moderator (requires owner role, cannot remove owner)
 func (h *HubSettingsHandler) RemoveHubModerator(c *gin.Context) {
-	userID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
 		return
 	}
 
 	hubName := c.Param("name")
 	hubID, err := h.getHubIDByName(c, hubName)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Hub not found"})
+		RespondError(c, http.StatusNotFound, "Hub not found")
 		return
 	}
 
 	targetUserID, err := strconv.Atoi(c.Param("user_id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid user ID")
 		return
 	}
 
 	// Check permissions: must be owner
-	role, err := h.settingsRepo.GetModeratorRole(c.Request.Context(), hubID, userID.(int))
+	role, err := h.settingsRepo.GetModeratorRole(c.Request.Context(), hubID, userID)
 	if err != nil || role == nil || *role != models.ModeratorRoleOwner {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Requires owner role"})
+		RespondError(c, http.StatusForbidden, "Requires owner role")
 		return
 	}
 
 	// The repository will prevent removing owner role
 	if err := h.settingsRepo.RemoveModerator(c.Request.Context(), hubID, targetUserID); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to remove moderator"})
+		RespondError(c, http.StatusInternalServerError, "Failed to remove moderator")
 		return
 	}
 

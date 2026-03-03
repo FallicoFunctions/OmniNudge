@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"github.com/omninudge/backend/internal/ports"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -11,11 +12,11 @@ import (
 )
 
 type UploadsHandler struct {
-	mediaRepo   *models.MediaFileRepository
+	mediaRepo   ports.MediaFileRepository
 	uploadsRoot string
 }
 
-func NewUploadsHandler(mediaRepo *models.MediaFileRepository, uploadsRoot string) *UploadsHandler {
+func NewUploadsHandler(mediaRepo ports.MediaFileRepository, uploadsRoot string) *UploadsHandler {
 	if uploadsRoot == "" {
 		uploadsRoot = "./uploads"
 	}
@@ -29,7 +30,7 @@ func NewUploadsHandler(mediaRepo *models.MediaFileRepository, uploadsRoot string
 func (h *UploadsHandler) ServeUpload(c *gin.Context) {
 	cleanRelPath, ok := cleanUploadPath(c.Param("filepath"))
 	if !ok {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid file path"})
+		RespondError(c, http.StatusBadRequest, "Invalid file path")
 		return
 	}
 	publicURL := "/uploads/" + filepath.ToSlash(cleanRelPath)
@@ -38,7 +39,7 @@ func (h *UploadsHandler) ServeUpload(c *gin.Context) {
 	if h.mediaRepo != nil {
 		media, err := h.mediaRepo.GetByPublicURL(c.Request.Context(), publicURL)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to validate media access"})
+			RespondError(c, http.StatusInternalServerError, "Failed to validate media access")
 			return
 		}
 		if media == nil {
@@ -46,7 +47,7 @@ func (h *UploadsHandler) ServeUpload(c *gin.Context) {
 			if ok {
 				media, err = h.mediaRepo.GetByPublicURL(c.Request.Context(), derivedURL)
 				if err != nil {
-					c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to validate media access"})
+					RespondError(c, http.StatusInternalServerError, "Failed to validate media access")
 					return
 				}
 			}
@@ -60,7 +61,7 @@ func (h *UploadsHandler) ServeUpload(c *gin.Context) {
 			switch media.ScanStatus {
 			case models.MediaScanStatusClean:
 			case models.MediaScanStatusInfected:
-				c.JSON(http.StatusGone, gin.H{"error": "File is unavailable"})
+				RespondError(c, http.StatusGone, "File is unavailable")
 				return
 			default:
 				c.JSON(http.StatusLocked, gin.H{
@@ -71,22 +72,22 @@ func (h *UploadsHandler) ServeUpload(c *gin.Context) {
 			}
 		}
 	} else if !allowUntracked {
-		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "Upload access validation unavailable"})
+		RespondError(c, http.StatusServiceUnavailable, "Upload access validation unavailable")
 		return
 	}
 
 	absRoot, err := filepath.Abs(h.uploadsRoot)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to resolve upload root"})
+		RespondError(c, http.StatusInternalServerError, "Failed to resolve upload root")
 		return
 	}
 	absFile, err := filepath.Abs(filepath.Join(absRoot, filepath.FromSlash(cleanRelPath)))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid file path"})
+		RespondError(c, http.StatusBadRequest, "Invalid file path")
 		return
 	}
 	if !strings.HasPrefix(absFile, absRoot+string(filepath.Separator)) && absFile != absRoot {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid file path"})
+		RespondError(c, http.StatusBadRequest, "Invalid file path")
 		return
 	}
 

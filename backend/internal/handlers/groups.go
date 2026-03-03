@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"github.com/omninudge/backend/internal/api/middleware"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -130,11 +131,11 @@ func (h *GroupHandler) getUserRoleInGroup(c *gin.Context, conversationID, userID
 func (h *GroupHandler) ensureGroupParticipant(c *gin.Context, conversationID, userID int) (string, bool) {
 	role, err := h.getUserRoleInGroup(c, conversationID, userID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check membership"})
+		RespondError(c, http.StatusInternalServerError, "Failed to check membership")
 		return "", false
 	}
 	if role == "" {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Not a member of this group"})
+		RespondError(c, http.StatusForbidden, "Not a member of this group")
 		return "", false
 	}
 	return role, true
@@ -145,7 +146,7 @@ func (h *GroupHandler) ensureGroupParticipant(c *gin.Context, conversationID, us
 func (h *GroupHandler) ensureGroupExists(c *gin.Context) (int, bool) {
 	conversationID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid conversation ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid conversation ID")
 		return 0, false
 	}
 	var isGroup bool
@@ -153,15 +154,15 @@ func (h *GroupHandler) ensureGroupExists(c *gin.Context) (int, bool) {
 		SELECT is_group FROM conversations WHERE id = $1
 	`, conversationID).Scan(&isGroup)
 	if err == pgx.ErrNoRows {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Conversation not found"})
+		RespondError(c, http.StatusNotFound, "Conversation not found")
 		return 0, false
 	}
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch conversation"})
+		RespondError(c, http.StatusInternalServerError, "Failed to fetch conversation")
 		return 0, false
 	}
 	if !isGroup {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "This is not a group conversation"})
+		RespondError(c, http.StatusBadRequest, "This is not a group conversation")
 		return 0, false
 	}
 	return conversationID, true
@@ -227,10 +228,22 @@ func (h *GroupHandler) getGroupParticipantIDs(ctx *gin.Context, conversationID i
 
 // ─── CreateGroup ──────────────────────────────────────────────────────────────
 
-// CreateGroup handles POST /api/v1/conversations/groups
+// CreateGroup creates a new group conversation.
+// @Summary      Create group
+// @Tags         Groups
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Success      201  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /conversations/groups [post]
 func (h *GroupHandler) CreateGroup(c *gin.Context) {
-	userIDVal, _ := c.Get("user_id")
-	userID := userIDVal.(int)
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
+		return
+	}
 
 	var req CreateGroupRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -239,7 +252,7 @@ func (h *GroupHandler) CreateGroup(c *gin.Context) {
 	}
 
 	if len(req.Name) == 0 || len(req.Name) > 100 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Group name must be 1–100 characters"})
+		RespondError(c, http.StatusBadRequest, "Group name must be 1–100 characters")
 		return
 	}
 	// De-duplicate and exclude creator from participant list
@@ -253,11 +266,11 @@ func (h *GroupHandler) CreateGroup(c *gin.Context) {
 	}
 	// Total participants = creator + unique others; minimum 2 others → 3 total
 	if len(unique) < 2 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "A group needs at least 2 other participants (3 total)"})
+		RespondError(c, http.StatusBadRequest, "A group needs at least 2 other participants (3 total)")
 		return
 	}
 	if len(unique) > 249 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Maximum 250 participants per group"})
+		RespondError(c, http.StatusBadRequest, "Maximum 250 participants per group")
 		return
 	}
 	participants := make([]int, 0, len(unique)+1)
@@ -266,18 +279,18 @@ func (h *GroupHandler) CreateGroup(c *gin.Context) {
 
 	blocked, err := h.hasBlockingWithinUsers(c, participants)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check blocking status"})
+		RespondError(c, http.StatusInternalServerError, "Failed to check blocking status")
 		return
 	}
 	if blocked {
-		c.JSON(http.StatusForbidden, gin.H{"error": blockingSettingsErrorMessage})
+		RespondError(c, http.StatusForbidden, blockingSettingsErrorMessage)
 		return
 	}
 
 	ctx := c.Request.Context()
 	tx, err := h.pool.Begin(ctx)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to start transaction"})
+		RespondError(c, http.StatusInternalServerError, "Failed to start transaction")
 		return
 	}
 	defer tx.Rollback(ctx)
@@ -318,7 +331,7 @@ func (h *GroupHandler) CreateGroup(c *gin.Context) {
 			ON CONFLICT (conversation_id, user_id) DO NOTHING
 		`, conversationID, participantID, userID)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to add participant %d", participantID)})
+			RespondError(c, http.StatusInternalServerError, fmt.Sprintf("Failed to add participant %d", participantID))
 			return
 		}
 	}
@@ -335,12 +348,12 @@ func (h *GroupHandler) CreateGroup(c *gin.Context) {
 		VALUES ($1, $2, $3, $4)
 	`, conversationID, anyoneCanInvite, anyoneCanPin, historyVisible)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create group settings"})
+		RespondError(c, http.StatusInternalServerError, "Failed to create group settings")
 		return
 	}
 
 	if err := tx.Commit(ctx); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to commit transaction"})
+		RespondError(c, http.StatusInternalServerError, "Failed to commit transaction")
 		return
 	}
 
@@ -372,10 +385,22 @@ func (h *GroupHandler) CreateGroup(c *gin.Context) {
 
 // ─── GetGroupParticipants ─────────────────────────────────────────────────────
 
-// GetGroupParticipants handles GET /api/v1/conversations/:id/participants
+// GetGroupParticipants returns participants of a group conversation.
+// @Summary      Get group participants
+// @Tags         Groups
+// @Security     BearerAuth
+// @Produce      json
+// @Param        id  path  int  true  "Conversation ID"
+// @Success      200  {array}   gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /conversations/{id}/participants [get]
 func (h *GroupHandler) GetGroupParticipants(c *gin.Context) {
-	userIDVal, _ := c.Get("user_id")
-	userID := userIDVal.(int)
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
+		return
+	}
 
 	conversationID, ok := h.ensureGroupExists(c)
 	if !ok {
@@ -395,7 +420,7 @@ func (h *GroupHandler) GetGroupParticipants(c *gin.Context) {
 			cp.joined_at ASC
 	`, conversationID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch participants"})
+		RespondError(c, http.StatusInternalServerError, "Failed to fetch participants")
 		return
 	}
 	defer rows.Close()
@@ -404,13 +429,13 @@ func (h *GroupHandler) GetGroupParticipants(c *gin.Context) {
 	for rows.Next() {
 		var p GroupParticipantResponse
 		if err := rows.Scan(&p.UserID, &p.Username, &p.AvatarURL, &p.Role, &p.JoinedAt, &p.InvitedBy); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to scan participant"})
+			RespondError(c, http.StatusInternalServerError, "Failed to scan participant")
 			return
 		}
 		participants = append(participants, p)
 	}
 	if err := rows.Err(); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to read participants"})
+		RespondError(c, http.StatusInternalServerError, "Failed to read participants")
 		return
 	}
 
@@ -419,10 +444,24 @@ func (h *GroupHandler) GetGroupParticipants(c *gin.Context) {
 
 // ─── AddGroupParticipant ──────────────────────────────────────────────────────
 
-// AddGroupParticipant handles POST /api/v1/conversations/:id/participants
+// AddGroupParticipant adds a user to a group conversation.
+// @Summary      Add group participant
+// @Tags         Groups
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Param        id  path  int  true  "Conversation ID"
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /conversations/{id}/participants [post]
 func (h *GroupHandler) AddGroupParticipant(c *gin.Context) {
-	userIDVal, _ := c.Get("user_id")
-	userID := userIDVal.(int)
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
+		return
+	}
 
 	conversationID, ok := h.ensureGroupExists(c)
 	if !ok {
@@ -435,7 +474,7 @@ func (h *GroupHandler) AddGroupParticipant(c *gin.Context) {
 
 	var req AddParticipantRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request"})
+		RespondError(c, http.StatusBadRequest, "Invalid request")
 		return
 	}
 
@@ -448,7 +487,7 @@ func (h *GroupHandler) AddGroupParticipant(c *gin.Context) {
 			SELECT COALESCE(anyone_can_invite, false) FROM group_settings WHERE conversation_id = $1
 		`, conversationID).Scan(&anyoneCanInvite)
 		if !anyoneCanInvite {
-			c.JSON(http.StatusForbidden, gin.H{"error": "Only admins can add participants"})
+			RespondError(c, http.StatusForbidden, "Only admins can add participants")
 			return
 		}
 	}
@@ -459,33 +498,33 @@ func (h *GroupHandler) AddGroupParticipant(c *gin.Context) {
 		SELECT COUNT(*) FROM conversation_participants WHERE conversation_id = $1
 	`, conversationID).Scan(&count)
 	if count >= 250 {
-		c.JSON(http.StatusConflict, gin.H{"error": "Group is full (max 250 members)"})
+		RespondError(c, http.StatusConflict, "Group is full (max 250 members)")
 		return
 	}
 
 	// Check if already a member
 	existingRole, err := h.getUserRoleInGroup(c, conversationID, req.UserID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check existing membership"})
+		RespondError(c, http.StatusInternalServerError, "Failed to check existing membership")
 		return
 	}
 	if existingRole != "" {
-		c.JSON(http.StatusConflict, gin.H{"error": "User is already a member"})
+		RespondError(c, http.StatusConflict, "User is already a member")
 		return
 	}
 	participants, err := h.getGroupParticipantIDs(c, conversationID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check blocking status"})
+		RespondError(c, http.StatusInternalServerError, "Failed to check blocking status")
 		return
 	}
 	participants = append(participants, req.UserID)
 	blocked, err := h.hasBlockingWithinUsers(c, participants)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check blocking status"})
+		RespondError(c, http.StatusInternalServerError, "Failed to check blocking status")
 		return
 	}
 	if blocked {
-		c.JSON(http.StatusForbidden, gin.H{"error": blockingSettingsErrorMessage})
+		RespondError(c, http.StatusForbidden, blockingSettingsErrorMessage)
 		return
 	}
 
@@ -494,7 +533,7 @@ func (h *GroupHandler) AddGroupParticipant(c *gin.Context) {
 		VALUES ($1, $2, 'member', CURRENT_TIMESTAMP, $3)
 	`, conversationID, req.UserID, userID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to add participant"})
+		RespondError(c, http.StatusInternalServerError, "Failed to add participant")
 		return
 	}
 
@@ -503,10 +542,23 @@ func (h *GroupHandler) AddGroupParticipant(c *gin.Context) {
 
 // ─── RemoveGroupParticipant ───────────────────────────────────────────────────
 
-// RemoveGroupParticipant handles DELETE /api/v1/conversations/:id/participants/:user_id
+// RemoveGroupParticipant removes a user from a group conversation.
+// @Summary      Remove group participant
+// @Tags         Groups
+// @Security     BearerAuth
+// @Produce      json
+// @Param        id       path  int  true  "Conversation ID"
+// @Param        user_id  path  int  true  "User ID"
+// @Success      200  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /conversations/{id}/participants/{user_id} [delete]
 func (h *GroupHandler) RemoveGroupParticipant(c *gin.Context) {
-	userIDVal, _ := c.Get("user_id")
-	userID := userIDVal.(int)
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
+		return
+	}
 
 	conversationID, ok := h.ensureGroupExists(c)
 	if !ok {
@@ -519,26 +571,26 @@ func (h *GroupHandler) RemoveGroupParticipant(c *gin.Context) {
 
 	targetID, err := strconv.Atoi(c.Param("user_id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid user ID")
 		return
 	}
 
 	// Can remove self, or admin/owner can remove members
 	if targetID != userID {
 		if requesterRole == "member" {
-			c.JSON(http.StatusForbidden, gin.H{"error": "Only admins can remove participants"})
+			RespondError(c, http.StatusForbidden, "Only admins can remove participants")
 			return
 		}
 		targetRole, _ := h.getUserRoleInGroup(c, conversationID, targetID)
 		if targetRole == "owner" {
-			c.JSON(http.StatusForbidden, gin.H{"error": "Cannot remove the group owner"})
+			RespondError(c, http.StatusForbidden, "Cannot remove the group owner")
 			return
 		}
 	}
 
 	// If removing self as owner, block unless transferring
 	if targetID == userID && requesterRole == "owner" {
-		c.JSON(http.StatusConflict, gin.H{"error": "Must transfer ownership before leaving"})
+		RespondError(c, http.StatusConflict, "Must transfer ownership before leaving")
 		return
 	}
 
@@ -547,11 +599,11 @@ func (h *GroupHandler) RemoveGroupParticipant(c *gin.Context) {
 		WHERE conversation_id = $1 AND user_id = $2
 	`, conversationID, targetID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to remove participant"})
+		RespondError(c, http.StatusInternalServerError, "Failed to remove participant")
 		return
 	}
 	if result.RowsAffected() == 0 {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Participant not found"})
+		RespondError(c, http.StatusNotFound, "Participant not found")
 		return
 	}
 
@@ -560,10 +612,25 @@ func (h *GroupHandler) RemoveGroupParticipant(c *gin.Context) {
 
 // ─── UpdateParticipantRole ────────────────────────────────────────────────────
 
-// UpdateParticipantRole handles PATCH /api/v1/conversations/:id/participants/:user_id
+// UpdateParticipantRole updates a participant's role in a group.
+// @Summary      Update participant role
+// @Tags         Groups
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Param        id       path  int  true  "Conversation ID"
+// @Param        user_id  path  int  true  "User ID"
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /conversations/{id}/participants/{user_id} [patch]
 func (h *GroupHandler) UpdateParticipantRole(c *gin.Context) {
-	userIDVal, _ := c.Get("user_id")
-	userID := userIDVal.(int)
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
+		return
+	}
 
 	conversationID, ok := h.ensureGroupExists(c)
 	if !ok {
@@ -574,27 +641,27 @@ func (h *GroupHandler) UpdateParticipantRole(c *gin.Context) {
 		return
 	}
 	if requesterRole != "owner" {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Only the owner can change roles"})
+		RespondError(c, http.StatusForbidden, "Only the owner can change roles")
 		return
 	}
 
 	targetID, err := strconv.Atoi(c.Param("user_id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid user ID")
 		return
 	}
 	if targetID == userID {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Cannot change your own role"})
+		RespondError(c, http.StatusBadRequest, "Cannot change your own role")
 		return
 	}
 
 	var req UpdateParticipantRoleRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request"})
+		RespondError(c, http.StatusBadRequest, "Invalid request")
 		return
 	}
 	if req.Role != "admin" && req.Role != "member" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Role must be 'admin' or 'member'"})
+		RespondError(c, http.StatusBadRequest, "Role must be 'admin' or 'member'")
 		return
 	}
 
@@ -604,11 +671,11 @@ func (h *GroupHandler) UpdateParticipantRole(c *gin.Context) {
 		WHERE conversation_id = $1 AND user_id = $2
 	`, conversationID, targetID, req.Role)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update role"})
+		RespondError(c, http.StatusInternalServerError, "Failed to update role")
 		return
 	}
 	if result.RowsAffected() == 0 {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Participant not found"})
+		RespondError(c, http.StatusNotFound, "Participant not found")
 		return
 	}
 
@@ -617,10 +684,24 @@ func (h *GroupHandler) UpdateParticipantRole(c *gin.Context) {
 
 // ─── UpdateGroup ──────────────────────────────────────────────────────────────
 
-// UpdateGroup handles PATCH /api/v1/conversations/:id/group
+// UpdateGroup updates group metadata (name, avatar, description).
+// @Summary      Update group
+// @Tags         Groups
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Param        id  path  int  true  "Conversation ID"
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /conversations/{id}/group [patch]
 func (h *GroupHandler) UpdateGroup(c *gin.Context) {
-	userIDVal, _ := c.Get("user_id")
-	userID := userIDVal.(int)
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
+		return
+	}
 
 	conversationID, ok := h.ensureGroupExists(c)
 	if !ok {
@@ -631,13 +712,13 @@ func (h *GroupHandler) UpdateGroup(c *gin.Context) {
 		return
 	}
 	if role == "member" {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Only admins can update group info"})
+		RespondError(c, http.StatusForbidden, "Only admins can update group info")
 		return
 	}
 
 	var req UpdateGroupRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request"})
+		RespondError(c, http.StatusBadRequest, "Invalid request")
 		return
 	}
 
@@ -666,10 +747,22 @@ func (h *GroupHandler) UpdateGroup(c *gin.Context) {
 
 // ─── GetGroupSettings ─────────────────────────────────────────────────────────
 
-// GetGroupSettings handles GET /api/v1/conversations/:id/settings
+// GetGroupSettings returns settings for a group conversation.
+// @Summary      Get group settings
+// @Tags         Groups
+// @Security     BearerAuth
+// @Produce      json
+// @Param        id  path  int  true  "Conversation ID"
+// @Success      200  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /conversations/{id}/settings [get]
 func (h *GroupHandler) GetGroupSettings(c *gin.Context) {
-	userIDVal, _ := c.Get("user_id")
-	userID := userIDVal.(int)
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
+		return
+	}
 
 	conversationID, ok := h.ensureGroupExists(c)
 	if !ok {
@@ -689,7 +782,7 @@ func (h *GroupHandler) GetGroupSettings(c *gin.Context) {
 		// Return defaults if settings row not found
 		s = GroupSettingsResponse{MessageHistoryVisible: true}
 	} else if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch settings"})
+		RespondError(c, http.StatusInternalServerError, "Failed to fetch settings")
 		return
 	}
 
@@ -698,10 +791,24 @@ func (h *GroupHandler) GetGroupSettings(c *gin.Context) {
 
 // ─── UpdateGroupSettings ──────────────────────────────────────────────────────
 
-// UpdateGroupSettings handles PATCH /api/v1/conversations/:id/settings
+// UpdateGroupSettings updates settings for a group conversation.
+// @Summary      Update group settings
+// @Tags         Groups
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Param        id  path  int  true  "Conversation ID"
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /conversations/{id}/settings [patch]
 func (h *GroupHandler) UpdateGroupSettings(c *gin.Context) {
-	userIDVal, _ := c.Get("user_id")
-	userID := userIDVal.(int)
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
+		return
+	}
 
 	conversationID, ok := h.ensureGroupExists(c)
 	if !ok {
@@ -712,13 +819,13 @@ func (h *GroupHandler) UpdateGroupSettings(c *gin.Context) {
 		return
 	}
 	if role == "member" {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Only admins can update settings"})
+		RespondError(c, http.StatusForbidden, "Only admins can update settings")
 		return
 	}
 
 	var req UpdateGroupSettingsRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request"})
+		RespondError(c, http.StatusBadRequest, "Invalid request")
 		return
 	}
 
@@ -745,10 +852,24 @@ func (h *GroupHandler) UpdateGroupSettings(c *gin.Context) {
 
 // ─── CreateGroupInvite ────────────────────────────────────────────────────────
 
-// CreateGroupInvite handles POST /api/v1/conversations/:id/invites
+// CreateGroupInvite creates an invite to a group conversation.
+// @Summary      Create group invite
+// @Tags         Groups
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Param        id  path  int  true  "Conversation ID"
+// @Success      201  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /conversations/{id}/invites [post]
 func (h *GroupHandler) CreateGroupInvite(c *gin.Context) {
-	userIDVal, _ := c.Get("user_id")
-	userID := userIDVal.(int)
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
+		return
+	}
 
 	conversationID, ok := h.ensureGroupExists(c)
 	if !ok {
@@ -766,36 +887,36 @@ func (h *GroupHandler) CreateGroupInvite(c *gin.Context) {
 			SELECT COALESCE(anyone_can_invite, false) FROM group_settings WHERE conversation_id = $1
 		`, conversationID).Scan(&anyoneCanInvite)
 		if !anyoneCanInvite {
-			c.JSON(http.StatusForbidden, gin.H{"error": "Only admins can send invites"})
+			RespondError(c, http.StatusForbidden, "Only admins can send invites")
 			return
 		}
 	}
 
 	var req CreateGroupInviteRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request"})
+		RespondError(c, http.StatusBadRequest, "Invalid request")
 		return
 	}
 
 	// Check target not already a member
 	existingRole, _ := h.getUserRoleInGroup(c, conversationID, req.UserID)
 	if existingRole != "" {
-		c.JSON(http.StatusConflict, gin.H{"error": "User is already a member"})
+		RespondError(c, http.StatusConflict, "User is already a member")
 		return
 	}
 	participants, err := h.getGroupParticipantIDs(c, conversationID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check blocking status"})
+		RespondError(c, http.StatusInternalServerError, "Failed to check blocking status")
 		return
 	}
 	participants = append(participants, req.UserID)
 	blocked, err := h.hasBlockingWithinUsers(c, participants)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check blocking status"})
+		RespondError(c, http.StatusInternalServerError, "Failed to check blocking status")
 		return
 	}
 	if blocked {
-		c.JSON(http.StatusForbidden, gin.H{"error": blockingSettingsErrorMessage})
+		RespondError(c, http.StatusForbidden, blockingSettingsErrorMessage)
 		return
 	}
 
@@ -818,14 +939,26 @@ func (h *GroupHandler) CreateGroupInvite(c *gin.Context) {
 
 // ─── AcceptGroupInvite ────────────────────────────────────────────────────────
 
-// AcceptGroupInvite handles POST /api/v1/group-invites/:id/accept
+// AcceptGroupInvite accepts a group conversation invite.
+// @Summary      Accept group invite
+// @Tags         Groups
+// @Security     BearerAuth
+// @Produce      json
+// @Param        id  path  int  true  "Invite ID"
+// @Success      200  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      404  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /group-invites/{id}/accept [post]
 func (h *GroupHandler) AcceptGroupInvite(c *gin.Context) {
-	userIDVal, _ := c.Get("user_id")
-	userID := userIDVal.(int)
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
+		return
+	}
 
 	inviteID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid invite ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid invite ID")
 		return
 	}
 
@@ -840,49 +973,49 @@ func (h *GroupHandler) AcceptGroupInvite(c *gin.Context) {
 		WHERE id = $1 AND invited_user_id = $2
 	`, inviteID, userID).Scan(&conversationID, &invitedBy, &status, &expiresAt)
 	if err == pgx.ErrNoRows {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Invite not found"})
+		RespondError(c, http.StatusNotFound, "Invite not found")
 		return
 	}
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch invite"})
+		RespondError(c, http.StatusInternalServerError, "Failed to fetch invite")
 		return
 	}
 	if status != "pending" {
-		c.JSON(http.StatusConflict, gin.H{"error": "Invite is no longer pending"})
+		RespondError(c, http.StatusConflict, "Invite is no longer pending")
 		return
 	}
 	if expiresAt.Before(time.Now()) {
-		c.JSON(http.StatusGone, gin.H{"error": "Invite has expired"})
+		RespondError(c, http.StatusGone, "Invite has expired")
 		return
 	}
 	blocked, err := h.hasBlockingRelationship(c, userID, invitedBy)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check blocking status"})
+		RespondError(c, http.StatusInternalServerError, "Failed to check blocking status")
 		return
 	}
 	if blocked {
-		c.JSON(http.StatusForbidden, gin.H{"error": blockingSettingsErrorMessage})
+		RespondError(c, http.StatusForbidden, blockingSettingsErrorMessage)
 		return
 	}
 	participants, err := h.getGroupParticipantIDs(c, conversationID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check blocking status"})
+		RespondError(c, http.StatusInternalServerError, "Failed to check blocking status")
 		return
 	}
 	participants = append(participants, userID)
 	blocked, err = h.hasBlockingWithinUsers(c, participants)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check blocking status"})
+		RespondError(c, http.StatusInternalServerError, "Failed to check blocking status")
 		return
 	}
 	if blocked {
-		c.JSON(http.StatusForbidden, gin.H{"error": blockingSettingsErrorMessage})
+		RespondError(c, http.StatusForbidden, blockingSettingsErrorMessage)
 		return
 	}
 
 	tx, err := h.pool.Begin(ctx)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to start transaction"})
+		RespondError(c, http.StatusInternalServerError, "Failed to start transaction")
 		return
 	}
 	defer tx.Rollback(ctx)
@@ -893,7 +1026,7 @@ func (h *GroupHandler) AcceptGroupInvite(c *gin.Context) {
 		ON CONFLICT (conversation_id, user_id) DO NOTHING
 	`, conversationID, userID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to join group"})
+		RespondError(c, http.StatusInternalServerError, "Failed to join group")
 		return
 	}
 
@@ -902,12 +1035,12 @@ func (h *GroupHandler) AcceptGroupInvite(c *gin.Context) {
 		WHERE id = $1
 	`, inviteID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update invite"})
+		RespondError(c, http.StatusInternalServerError, "Failed to update invite")
 		return
 	}
 
 	if err := tx.Commit(ctx); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to commit"})
+		RespondError(c, http.StatusInternalServerError, "Failed to commit")
 		return
 	}
 
@@ -916,14 +1049,26 @@ func (h *GroupHandler) AcceptGroupInvite(c *gin.Context) {
 
 // ─── DeclineGroupInvite ───────────────────────────────────────────────────────
 
-// DeclineGroupInvite handles DELETE /api/v1/group-invites/:id/decline
+// DeclineGroupInvite declines a group conversation invite.
+// @Summary      Decline group invite
+// @Tags         Groups
+// @Security     BearerAuth
+// @Produce      json
+// @Param        id  path  int  true  "Invite ID"
+// @Success      200  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      404  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /group-invites/{id}/decline [delete]
 func (h *GroupHandler) DeclineGroupInvite(c *gin.Context) {
-	userIDVal, _ := c.Get("user_id")
-	userID := userIDVal.(int)
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
+		return
+	}
 
 	inviteID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid invite ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid invite ID")
 		return
 	}
 
@@ -933,11 +1078,11 @@ func (h *GroupHandler) DeclineGroupInvite(c *gin.Context) {
 		WHERE id = $1 AND invited_user_id = $2 AND status = 'pending'
 	`, inviteID, userID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to decline invite"})
+		RespondError(c, http.StatusInternalServerError, "Failed to decline invite")
 		return
 	}
 	if result.RowsAffected() == 0 {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Invite not found or already processed"})
+		RespondError(c, http.StatusNotFound, "Invite not found or already processed")
 		return
 	}
 
@@ -946,10 +1091,20 @@ func (h *GroupHandler) DeclineGroupInvite(c *gin.Context) {
 
 // ─── GetMyGroupInvites ────────────────────────────────────────────────────────
 
-// GetMyGroupInvites handles GET /api/v1/users/me/group-invites
+// GetMyGroupInvites returns pending group invites for the current user.
+// @Summary      Get my group invites
+// @Tags         Groups
+// @Security     BearerAuth
+// @Produce      json
+// @Success      200  {array}   gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /users/me/group-invites [get]
 func (h *GroupHandler) GetMyGroupInvites(c *gin.Context) {
-	userIDVal, _ := c.Get("user_id")
-	userID := userIDVal.(int)
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
+		return
+	}
 
 	rows, err := h.pool.Query(c.Request.Context(), `
 		SELECT gi.id, gi.conversation_id, c.group_name, c.group_avatar_url,
@@ -965,7 +1120,7 @@ func (h *GroupHandler) GetMyGroupInvites(c *gin.Context) {
 		LIMIT 50
 	`, userID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch invites"})
+		RespondError(c, http.StatusInternalServerError, "Failed to fetch invites")
 		return
 	}
 	defer rows.Close()
@@ -978,7 +1133,7 @@ func (h *GroupHandler) GetMyGroupInvites(c *gin.Context) {
 			&inv.ID, &inv.ConversationID, &inv.GroupName, &inv.GroupAvatarURL,
 			&invitedByUsername, &inv.Status, &inv.ExpiresAt, &inv.CreatedAt,
 		); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to scan invite"})
+			RespondError(c, http.StatusInternalServerError, "Failed to scan invite")
 			return
 		}
 		inv.InvitedByUsername = &invitedByUsername
@@ -990,10 +1145,22 @@ func (h *GroupHandler) GetMyGroupInvites(c *gin.Context) {
 
 // ─── LeaveGroup ───────────────────────────────────────────────────────────────
 
-// LeaveGroup handles POST /api/v1/conversations/:id/leave
+// LeaveGroup removes the current user from a group conversation.
+// @Summary      Leave group
+// @Tags         Groups
+// @Security     BearerAuth
+// @Produce      json
+// @Param        id  path  int  true  "Conversation ID"
+// @Success      200  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /conversations/{id}/leave [post]
 func (h *GroupHandler) LeaveGroup(c *gin.Context) {
-	userIDVal, _ := c.Get("user_id")
-	userID := userIDVal.(int)
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
+		return
+	}
 
 	conversationID, ok := h.ensureGroupExists(c)
 	if !ok {
@@ -1005,7 +1172,7 @@ func (h *GroupHandler) LeaveGroup(c *gin.Context) {
 	}
 
 	if role == "owner" {
-		c.JSON(http.StatusConflict, gin.H{"error": "Must transfer ownership before leaving"})
+		RespondError(c, http.StatusConflict, "Must transfer ownership before leaving")
 		return
 	}
 
@@ -1013,7 +1180,7 @@ func (h *GroupHandler) LeaveGroup(c *gin.Context) {
 		DELETE FROM conversation_participants WHERE conversation_id = $1 AND user_id = $2
 	`, conversationID, userID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to leave group"})
+		RespondError(c, http.StatusInternalServerError, "Failed to leave group")
 		return
 	}
 
@@ -1022,10 +1189,24 @@ func (h *GroupHandler) LeaveGroup(c *gin.Context) {
 
 // ─── TransferOwnership ────────────────────────────────────────────────────────
 
-// TransferOwnership handles POST /api/v1/conversations/:id/transfer-ownership
+// TransferOwnership transfers group ownership to another participant.
+// @Summary      Transfer group ownership
+// @Tags         Groups
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Param        id  path  int  true  "Conversation ID"
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /conversations/{id}/transfer-ownership [post]
 func (h *GroupHandler) TransferOwnership(c *gin.Context) {
-	userIDVal, _ := c.Get("user_id")
-	userID := userIDVal.(int)
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
+		return
+	}
 
 	conversationID, ok := h.ensureGroupExists(c)
 	if !ok {
@@ -1036,31 +1217,31 @@ func (h *GroupHandler) TransferOwnership(c *gin.Context) {
 		return
 	}
 	if role != "owner" {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Only the owner can transfer ownership"})
+		RespondError(c, http.StatusForbidden, "Only the owner can transfer ownership")
 		return
 	}
 
 	var req TransferOwnershipRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request"})
+		RespondError(c, http.StatusBadRequest, "Invalid request")
 		return
 	}
 	if req.NewOwnerUserID == userID {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Cannot transfer ownership to yourself"})
+		RespondError(c, http.StatusBadRequest, "Cannot transfer ownership to yourself")
 		return
 	}
 
 	// Verify new owner is a member
 	newOwnerRole, err := h.getUserRoleInGroup(c, conversationID, req.NewOwnerUserID)
 	if err != nil || newOwnerRole == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "New owner must be a current member"})
+		RespondError(c, http.StatusBadRequest, "New owner must be a current member")
 		return
 	}
 
 	ctx := c.Request.Context()
 	tx, err := h.pool.Begin(ctx)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to start transaction"})
+		RespondError(c, http.StatusInternalServerError, "Failed to start transaction")
 		return
 	}
 	defer tx.Rollback(ctx)
@@ -1070,7 +1251,7 @@ func (h *GroupHandler) TransferOwnership(c *gin.Context) {
 		UPDATE conversation_participants SET role = 'admin' WHERE conversation_id = $1 AND user_id = $2
 	`, conversationID, userID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update old owner"})
+		RespondError(c, http.StatusInternalServerError, "Failed to update old owner")
 		return
 	}
 
@@ -1079,12 +1260,12 @@ func (h *GroupHandler) TransferOwnership(c *gin.Context) {
 		UPDATE conversation_participants SET role = 'owner' WHERE conversation_id = $1 AND user_id = $2
 	`, conversationID, req.NewOwnerUserID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update new owner"})
+		RespondError(c, http.StatusInternalServerError, "Failed to update new owner")
 		return
 	}
 
 	if err := tx.Commit(ctx); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to commit"})
+		RespondError(c, http.StatusInternalServerError, "Failed to commit")
 		return
 	}
 
@@ -1093,7 +1274,17 @@ func (h *GroupHandler) TransferOwnership(c *gin.Context) {
 
 // ─── DiscoverGroups ───────────────────────────────────────────────────────────
 
-// DiscoverGroups handles GET /api/v1/groups/discover
+// DiscoverGroups returns public groups available to join.
+// @Summary      Discover groups
+// @Tags         Groups
+// @Security     BearerAuth
+// @Produce      json
+// @Param        q      query  string  false  "Search query"
+// @Param        limit  query  int     false  "Max results"
+// @Success      200  {array}   gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /groups/discover [get]
 func (h *GroupHandler) DiscoverGroups(c *gin.Context) {
 	query := c.Query("q")
 	limit := 20
@@ -1129,7 +1320,7 @@ func (h *GroupHandler) DiscoverGroups(c *gin.Context) {
 	}
 
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch groups"})
+		RespondError(c, http.StatusInternalServerError, "Failed to fetch groups")
 		return
 	}
 

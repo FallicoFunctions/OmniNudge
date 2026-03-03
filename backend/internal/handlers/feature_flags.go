@@ -20,34 +20,60 @@ func NewFeatureFlagHandler(svc *services.FeatureFlagService) *FeatureFlagHandler
 
 // Admin endpoints
 
-// ListFlags returns all feature flags (admin only)
-// GET /api/v1/admin/feature-flags
+// ListFlags returns all feature flags.
+// @Summary      List feature flags
+// @Tags         FeatureFlags
+// @Security     BearerAuth
+// @Produce      json
+// @Success      200  {array}   models.FeatureFlag
+// @Failure      401  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /admin/feature-flags [get]
 func (h *FeatureFlagHandler) ListFlags(c *gin.Context) {
 	flags, err := h.svc.ListFlags(c.Request.Context())
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to list flags"})
+		RespondError(c, http.StatusInternalServerError, "Failed to list flags")
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{"flags": flags})
 }
 
-// GetFeatureFlag returns a specific flag (admin only)
-// GET /api/v1/admin/feature-flags/:key
+// GetFeatureFlag returns a specific feature flag.
+// @Summary      Get feature flag
+// @Tags         FeatureFlags
+// @Security     BearerAuth
+// @Produce      json
+// @Param        key  path  string  true  "Flag key"
+// @Success      200  {object}  models.FeatureFlag
+// @Failure      401  {object}  gin.H
+// @Failure      404  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /admin/feature-flags/{key} [get]
 func (h *FeatureFlagHandler) GetFeatureFlag(c *gin.Context) {
 	key := c.Param("key")
 
 	flag, err := h.svc.GetFeatureFlag(c.Request.Context(), key)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Flag not found"})
+		RespondError(c, http.StatusNotFound, "Flag not found")
 		return
 	}
 
 	c.JSON(http.StatusOK, flag)
 }
 
-// CreateFlag creates a new feature flag (admin only)
-// POST /api/v1/admin/feature-flags
+// CreateFlag creates a new feature flag.
+// @Summary      Create feature flag
+// @Tags         FeatureFlags
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Success      201  {object}  models.FeatureFlag
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /admin/feature-flags [post]
 func (h *FeatureFlagHandler) CreateFlag(c *gin.Context) {
 	var req struct {
 		Key         string `json:"key" binding:"required"`
@@ -58,12 +84,12 @@ func (h *FeatureFlagHandler) CreateFlag(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		RespondError(c, http.StatusBadRequest, err.Error())
 		return
 	}
 
 	if req.Percentage != nil && (*req.Percentage < 0 || *req.Percentage > 100) {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Percentage must be 0-100"})
+		RespondError(c, http.StatusBadRequest, "Percentage must be 0-100")
 		return
 	}
 
@@ -82,15 +108,26 @@ func (h *FeatureFlagHandler) CreateFlag(c *gin.Context) {
 
 	adminID := int64(c.GetInt("user_id"))
 	if err := h.svc.CreateFlag(c.Request.Context(), flag, adminID); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		RespondError(c, http.StatusBadRequest, err.Error())
 		return
 	}
 
 	c.JSON(http.StatusCreated, flag)
 }
 
-// UpdateFlag updates a feature flag (admin only)
-// PUT /api/v1/admin/feature-flags/:key
+// UpdateFlag updates an existing feature flag.
+// @Summary      Update feature flag
+// @Tags         FeatureFlags
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Param        key  path  string  true  "Flag key"
+// @Success      200  {object}  models.FeatureFlag
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      404  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /admin/feature-flags/{key} [put]
 func (h *FeatureFlagHandler) UpdateFlag(c *gin.Context) {
 	key := c.Param("key")
 
@@ -101,12 +138,12 @@ func (h *FeatureFlagHandler) UpdateFlag(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		RespondError(c, http.StatusBadRequest, err.Error())
 		return
 	}
 
 	if req.Percentage != nil && (*req.Percentage < 0 || *req.Percentage > 100) {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Percentage must be 0-100"})
+		RespondError(c, http.StatusBadRequest, "Percentage must be 0-100")
 		return
 	}
 
@@ -123,29 +160,47 @@ func (h *FeatureFlagHandler) UpdateFlag(c *gin.Context) {
 
 	adminID := int64(c.GetInt("user_id"))
 	if err := h.svc.UpdateFlag(c.Request.Context(), key, updates, adminID); err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		RespondError(c, http.StatusNotFound, err.Error())
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{"success": true})
 }
 
-// DeleteFlag deletes a feature flag (admin only)
-// DELETE /api/v1/admin/feature-flags/:key
+// DeleteFlag deletes a feature flag.
+// @Summary      Delete feature flag
+// @Tags         FeatureFlags
+// @Security     BearerAuth
+// @Produce      json
+// @Param        key  path  string  true  "Flag key"
+// @Success      204
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /admin/feature-flags/{key} [delete]
 func (h *FeatureFlagHandler) DeleteFlag(c *gin.Context) {
 	key := c.Param("key")
 	adminID := int64(c.GetInt("user_id"))
 
 	if err := h.svc.DeleteFlag(c.Request.Context(), key, adminID); err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		RespondError(c, http.StatusNotFound, err.Error())
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{"success": true})
 }
 
-// SetOverride sets a user override (admin only)
-// POST /api/v1/admin/feature-flags/:key/overrides
+// SetOverride sets a per-user flag override.
+// @Summary      Set flag override
+// @Tags         FeatureFlags
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Param        key  path  string  true  "Flag key"
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /admin/feature-flags/{key}/overrides [post]
 func (h *FeatureFlagHandler) SetOverride(c *gin.Context) {
 	key := c.Param("key")
 
@@ -155,47 +210,64 @@ func (h *FeatureFlagHandler) SetOverride(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		RespondError(c, http.StatusBadRequest, err.Error())
 		return
 	}
 
 	adminID := int64(c.GetInt("user_id"))
 	if err := h.svc.SetUserOverride(c.Request.Context(), key, req.UserID, req.Enabled, adminID); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		RespondError(c, http.StatusBadRequest, err.Error())
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{"success": true})
 }
 
-// RemoveOverride removes a user override (admin only)
-// DELETE /api/v1/admin/feature-flags/:key/overrides/:userID
+// RemoveOverride removes a per-user flag override.
+// @Summary      Remove flag override
+// @Tags         FeatureFlags
+// @Security     BearerAuth
+// @Produce      json
+// @Param        key     path  string  true  "Flag key"
+// @Param        userID  path  int     true  "User ID"
+// @Success      204
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /admin/feature-flags/{key}/overrides/{userID} [delete]
 func (h *FeatureFlagHandler) RemoveOverride(c *gin.Context) {
 	key := c.Param("key")
 	userID, err := strconv.ParseInt(c.Param("userID"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid user ID")
 		return
 	}
 
 	adminID := int64(c.GetInt("user_id"))
 	if err := h.svc.RemoveUserOverride(c.Request.Context(), key, userID, adminID); err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		RespondError(c, http.StatusNotFound, err.Error())
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{"success": true})
 }
 
-// GetAuditLog returns audit log for a flag (admin only)
-// GET /api/v1/admin/feature-flags/:key/audit
+// GetAuditLog returns the audit log for a feature flag.
+// @Summary      Get flag audit log
+// @Tags         FeatureFlags
+// @Security     BearerAuth
+// @Produce      json
+// @Param        key  path  string  true  "Flag key"
+// @Success      200  {array}   gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /admin/feature-flags/{key}/audit [get]
 func (h *FeatureFlagHandler) GetAuditLog(c *gin.Context) {
 	key := c.Param("key")
 	limit := 100
 
 	logs, err := h.svc.GetAuditLog(c.Request.Context(), key, limit)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get audit log"})
+		RespondError(c, http.StatusInternalServerError, "Failed to get audit log")
 		return
 	}
 
@@ -204,9 +276,16 @@ func (h *FeatureFlagHandler) GetAuditLog(c *gin.Context) {
 
 // Client endpoint
 
-// GetUserFlags returns enabled flags for current user
-// GET /api/v1/feature-flags
-// Supports batch query: ?keys=feature_groups,feature_reactions
+// GetUserFlags returns enabled feature flags for the current user.
+// @Summary      Get my feature flags
+// @Tags         FeatureFlags
+// @Security     BearerAuth
+// @Produce      json
+// @Param        keys  query  string  false  "Comma-separated flag keys"
+// @Success      200  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /feature-flags [get]
 func (h *FeatureFlagHandler) GetUserFlags(c *gin.Context) {
 	userID := int64(c.GetInt("user_id"))
 
@@ -231,7 +310,7 @@ func (h *FeatureFlagHandler) GetUserFlags(c *gin.Context) {
 		// Return all enabled flags for user
 		flags, err := h.svc.GetUserFlags(c.Request.Context(), userID)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get flags"})
+			RespondError(c, http.StatusInternalServerError, "Failed to get flags")
 			return
 		}
 

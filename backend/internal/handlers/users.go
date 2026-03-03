@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"github.com/omninudge/backend/internal/ports"
 	"context"
 	"encoding/json"
 	"errors"
@@ -23,28 +24,28 @@ import (
 
 // UsersHandler serves public user profile data and profile management
 type UsersHandler struct {
-	userRepo     *models.UserRepository
-	userProfRepo *models.UserProfileRepository
-	friendRepo   *models.UserFriendshipRepository
-	settingsRepo *models.UserSettingsRepository
-	postRepo     *models.PlatformPostRepository
-	commentRepo  *models.PostCommentRepository
+	userRepo     ports.UserRepository
+	userProfRepo ports.UserProfileRepository
+	friendRepo   ports.UserFriendshipRepository
+	settingsRepo ports.UserSettingsRepository
+	postRepo     ports.PlatformPostRepository
+	commentRepo  ports.PostCommentRepository
 	authService  *services.AuthService
-	hubModRepo   *models.HubModeratorRepository
+	hubModRepo   ports.HubModeratorRepository
 	cache        services.Cache
 	thumbService *services.ThumbnailService
 }
 
 // NewUsersHandler creates a new UsersHandler
 func NewUsersHandler(
-	userRepo *models.UserRepository,
-	userProfRepo *models.UserProfileRepository,
-	friendRepo *models.UserFriendshipRepository,
-	settingsRepo *models.UserSettingsRepository,
-	postRepo *models.PlatformPostRepository,
-	commentRepo *models.PostCommentRepository,
+	userRepo ports.UserRepository,
+	userProfRepo ports.UserProfileRepository,
+	friendRepo ports.UserFriendshipRepository,
+	settingsRepo ports.UserSettingsRepository,
+	postRepo ports.PlatformPostRepository,
+	commentRepo ports.PostCommentRepository,
 	authService *services.AuthService,
-	hubModRepo *models.HubModeratorRepository,
+	hubModRepo ports.HubModeratorRepository,
 	cache services.Cache,
 	thumbService *services.ThumbnailService,
 ) *UsersHandler {
@@ -103,7 +104,15 @@ type AgentStateResponse struct {
 	RepliedComments []int `json:"replied_comments"`
 }
 
-// GetUserProfile handles GET /api/v1/users/:username
+// GetUserProfile returns a public user profile by username.
+// @Summary      Get user profile
+// @Tags         Users
+// @Produce      json
+// @Param        username  path  string  true  "Username"
+// @Success      200  {object}  UserProfileResponse
+// @Failure      404  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /users/{username} [get]
 func (h *UsersHandler) GetUserProfile(c *gin.Context) {
 	username := c.Param("username")
 	h.getUserProfileResponse(c, func() (*models.User, error) {
@@ -111,12 +120,21 @@ func (h *UsersHandler) GetUserProfile(c *gin.Context) {
 	})
 }
 
-// GetUserProfileByID handles GET /api/v1/users/id/:id/profile
+// GetUserProfileByID returns a public user profile by numeric ID.
+// @Summary      Get user profile by ID
+// @Tags         Users
+// @Produce      json
+// @Param        id  path  int  true  "User ID"
+// @Success      200  {object}  UserProfileResponse
+// @Failure      400  {object}  gin.H
+// @Failure      404  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /users/id/{id}/profile [get]
 func (h *UsersHandler) GetUserProfileByID(c *gin.Context) {
 	idStr := c.Param("id")
 	userID, err := strconv.Atoi(idStr)
 	if err != nil || userID <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user id"})
+		RespondError(c, http.StatusBadRequest, "Invalid user id")
 		return
 	}
 	h.getUserProfileResponse(c, func() (*models.User, error) {
@@ -140,15 +158,13 @@ func (h *UsersHandler) getUserProfileResponse(c *gin.Context, loadUser func() (*
 	}
 	if user == nil {
 		resultState = "not_found"
-		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		RespondError(c, http.StatusNotFound, "User not found")
 		return
 	}
 
 	var viewerID int
-	if v, exists := c.Get("user_id"); exists {
-		if id, ok := v.(int); ok {
-			viewerID = id
-		}
+	if v, _ := middleware.GetOptionalUserID(c); v != 0 {
+			viewerID = v
 	}
 
 	showLastSeen := true
@@ -180,7 +196,7 @@ func (h *UsersHandler) getUserProfileResponse(c *gin.Context, loadUser func() (*
 
 	if !canViewerSeeProfile(user.ID, viewerID, profileVisibility, viewerIsFriend) {
 		resultState = "not_found"
-		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		RespondError(c, http.StatusNotFound, "User not found")
 		return
 	}
 
@@ -272,7 +288,18 @@ func canViewerSeeProfile(profileUserID, viewerID int, profileVisibility string, 
 	}
 }
 
-// GetUserPosts handles GET /api/v1/users/:username/posts
+// GetUserPosts returns posts by a user.
+// @Summary      Get user posts
+// @Tags         Users
+// @Produce      json
+// @Param        username  path   string  true   "Username"
+// @Param        limit     query  int     false  "Page size (default 20)"
+// @Param        offset    query  int     false  "Offset"
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      404  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /users/{username}/posts [get]
 func (h *UsersHandler) GetUserPosts(c *gin.Context) {
 	username := c.Param("username")
 
@@ -282,7 +309,7 @@ func (h *UsersHandler) GetUserPosts(c *gin.Context) {
 		return
 	}
 	if user == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		RespondError(c, http.StatusNotFound, "User not found")
 		return
 	}
 
@@ -305,11 +332,18 @@ func (h *UsersHandler) GetUserPosts(c *gin.Context) {
 	})
 }
 
-// GetAgentState handles POST /api/v1/users/me/agent/state
+// GetAgentState returns the authenticated user's agent activity state.
+// @Summary      Get agent state
+// @Tags         Users
+// @Security     BearerAuth
+// @Produce      json
+// @Success      200  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /users/me/agent/state [post]
 func (h *UsersHandler) GetAgentState(c *gin.Context) {
-	userID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
 		return
 	}
 
@@ -319,29 +353,29 @@ func (h *UsersHandler) GetAgentState(c *gin.Context) {
 		return
 	}
 
-	uid := userID.(int)
+	uid := userID
 
 	votedPosts, err := h.postRepo.GetUserVotedPostIDs(c.Request.Context(), uid, req.PostIDs)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch voted posts"})
+		RespondError(c, http.StatusInternalServerError, "Failed to fetch voted posts")
 		return
 	}
 
 	commentedPosts, err := h.commentRepo.GetUserCommentedPostIDs(c.Request.Context(), uid, req.PostIDs)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch commented posts"})
+		RespondError(c, http.StatusInternalServerError, "Failed to fetch commented posts")
 		return
 	}
 
 	votedComments, err := h.commentRepo.GetUserVotedCommentIDs(c.Request.Context(), uid, req.CommentIDs)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch voted comments"})
+		RespondError(c, http.StatusInternalServerError, "Failed to fetch voted comments")
 		return
 	}
 
 	repliedComments, err := h.commentRepo.GetUserRepliedCommentIDs(c.Request.Context(), uid, req.CommentIDs)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch replied comments"})
+		RespondError(c, http.StatusInternalServerError, "Failed to fetch replied comments")
 		return
 	}
 
@@ -353,7 +387,18 @@ func (h *UsersHandler) GetAgentState(c *gin.Context) {
 	})
 }
 
-// GetUserComments handles GET /api/v1/users/:username/comments
+// GetUserComments returns comments by a user.
+// @Summary      Get user comments
+// @Tags         Users
+// @Produce      json
+// @Param        username  path   string  true   "Username"
+// @Param        limit     query  int     false  "Page size (default 20)"
+// @Param        offset    query  int     false  "Offset"
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      404  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /users/{username}/comments [get]
 func (h *UsersHandler) GetUserComments(c *gin.Context) {
 	username := c.Param("username")
 
@@ -363,7 +408,7 @@ func (h *UsersHandler) GetUserComments(c *gin.Context) {
 		return
 	}
 	if user == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		RespondError(c, http.StatusNotFound, "User not found")
 		return
 	}
 
@@ -424,24 +469,34 @@ func isRequestBodyTooLarge(err error) bool {
 	return strings.Contains(strings.ToLower(err.Error()), "request body too large")
 }
 
-// UpdateProfile handles PUT /api/v1/users/profile
+// UpdateProfile updates the authenticated user's profile.
+// @Summary      Update profile
+// @Tags         Users
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Success      200  {object}  models.User
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /users/me/profile [put]
 func (h *UsersHandler) UpdateProfile(c *gin.Context) {
 	userID := c.GetInt("user_id")
 
 	var req updateProfileRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request"})
+		RespondError(c, http.StatusBadRequest, "Invalid request")
 		return
 	}
 
 	// Get current user
 	user, err := h.userRepo.GetByID(c.Request.Context(), userID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch user"})
+		RespondError(c, http.StatusInternalServerError, "Failed to fetch user")
 		return
 	}
 	if user == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		RespondError(c, http.StatusNotFound, "User not found")
 		return
 	}
 
@@ -449,7 +504,7 @@ func (h *UsersHandler) UpdateProfile(c *gin.Context) {
 	if req.Bio != nil {
 		bio := strings.TrimSpace(*req.Bio)
 		if len(bio) > 500 {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Bio must be 500 characters or less"})
+			RespondError(c, http.StatusBadRequest, "Bio must be 500 characters or less")
 			return
 		}
 		if bio == "" {
@@ -463,7 +518,7 @@ func (h *UsersHandler) UpdateProfile(c *gin.Context) {
 	if h.userProfRepo != nil {
 		existingProfile, err := h.userProfRepo.GetByUserID(c.Request.Context(), user.ID)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch user profile"})
+			RespondError(c, http.StatusInternalServerError, "Failed to fetch user profile")
 			return
 		}
 		if existingProfile != nil {
@@ -473,7 +528,7 @@ func (h *UsersHandler) UpdateProfile(c *gin.Context) {
 	if req.Status != nil {
 		status := strings.TrimSpace(*req.Status)
 		if len(status) > 500 {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Status text must be 500 characters or less"})
+			RespondError(c, http.StatusBadRequest, "Status text must be 500 characters or less")
 			return
 		}
 		if status == "" {
@@ -491,20 +546,20 @@ func (h *UsersHandler) UpdateProfile(c *gin.Context) {
 		} else {
 			// Basic URL validation
 			if !strings.HasPrefix(avatarURL, "http://") && !strings.HasPrefix(avatarURL, "https://") {
-				c.JSON(http.StatusBadRequest, gin.H{"error": "Avatar URL must be a valid HTTP(S) URL"})
+				RespondError(c, http.StatusBadRequest, "Avatar URL must be a valid HTTP(S) URL")
 				return
 			}
 			user.AvatarURL = &avatarURL
 		}
 	}
 	// Update profile
-	if err := h.userRepo.UpdateProfile(c.Request.Context(), user.ID, user.Bio, user.AvatarURL); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update profile"})
+	if err := h.userRepo.UpdateProfile(c.Request.Context(), user.ID, user.Bio, user.AvatarURL, nil); err != nil {
+		RespondError(c, http.StatusInternalServerError, "Failed to update profile")
 		return
 	}
 	if h.userProfRepo != nil {
 		if err := h.userProfRepo.Upsert(c.Request.Context(), user.ID, user.Bio, user.AvatarURL, statusText); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update user profile"})
+			RespondError(c, http.StatusInternalServerError, "Failed to update user profile")
 			return
 		}
 	}
@@ -526,7 +581,17 @@ func (h *UsersHandler) UpdateProfile(c *gin.Context) {
 	})
 }
 
-// UploadMyAvatar handles POST /api/v1/users/me/avatar
+// UploadMyAvatar uploads a new avatar image for the authenticated user.
+// @Summary      Upload avatar
+// @Tags         Users
+// @Security     BearerAuth
+// @Accept       multipart/form-data
+// @Produce      json
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /users/me/avatar [post]
 func (h *UsersHandler) UploadMyAvatar(c *gin.Context) {
 	userID := c.GetInt("user_id")
 
@@ -534,14 +599,14 @@ func (h *UsersHandler) UploadMyAvatar(c *gin.Context) {
 	file, header, err := c.Request.FormFile("avatar")
 	if err != nil {
 		if isRequestBodyTooLarge(err) {
-			c.JSON(http.StatusRequestEntityTooLarge, gin.H{"error": "Avatar exceeds 5MB limit"})
+			RespondError(c, http.StatusRequestEntityTooLarge, "Avatar exceeds 5MB limit")
 			return
 		}
 		// Support generic uploader clients that use "file".
 		file, header, err = c.Request.FormFile("file")
 		if err != nil {
 			if isRequestBodyTooLarge(err) {
-				c.JSON(http.StatusRequestEntityTooLarge, gin.H{"error": "Avatar exceeds 5MB limit"})
+				RespondError(c, http.StatusRequestEntityTooLarge, "Avatar exceeds 5MB limit")
 				return
 			}
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Avatar file is required", "details": err.Error()})
@@ -551,7 +616,7 @@ func (h *UsersHandler) UploadMyAvatar(c *gin.Context) {
 	defer file.Close()
 
 	if header.Size <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Empty avatar file is not allowed"})
+		RespondError(c, http.StatusBadRequest, "Empty avatar file is not allowed")
 		return
 	}
 
@@ -560,7 +625,7 @@ func (h *UsersHandler) UploadMyAvatar(c *gin.Context) {
 	switch ext {
 	case ".jpg", ".jpeg", ".png", ".gif", ".webp":
 	default:
-		c.JSON(http.StatusUnsupportedMediaType, gin.H{"error": "Unsupported avatar file extension"})
+		RespondError(c, http.StatusUnsupportedMediaType, "Unsupported avatar file extension")
 		return
 	}
 
@@ -595,15 +660,15 @@ func (h *UsersHandler) UploadMyAvatar(c *gin.Context) {
 
 	detected := http.DetectContentType(sniff[:n])
 	if !services.IsImageType(detected) {
-		c.JSON(http.StatusUnsupportedMediaType, gin.H{"error": "Avatar must be an image"})
+		RespondError(c, http.StatusUnsupportedMediaType, "Avatar must be an image")
 		return
 	}
 	if !middleware.ValidateExtensionMatchesMIME(safeName, detected) {
-		c.JSON(http.StatusUnsupportedMediaType, gin.H{"error": "Avatar extension does not match file type"})
+		RespondError(c, http.StatusUnsupportedMediaType, "Avatar extension does not match file type")
 		return
 	}
 	if !middleware.ValidateNoSuspiciousSignatures(sniff[:n], detected) {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Avatar file contains suspicious data"})
+		RespondError(c, http.StatusBadRequest, "Avatar file contains suspicious data")
 		return
 	}
 	if n > 0 {
@@ -620,7 +685,7 @@ func (h *UsersHandler) UploadMyAvatar(c *gin.Context) {
 		return
 	}
 	if total > maxAvatarUploadSize {
-		c.JSON(http.StatusRequestEntityTooLarge, gin.H{"error": "Avatar exceeds 5MB limit"})
+		RespondError(c, http.StatusRequestEntityTooLarge, "Avatar exceeds 5MB limit")
 		return
 	}
 
@@ -632,7 +697,7 @@ func (h *UsersHandler) UploadMyAvatar(c *gin.Context) {
 
 	width, height, err := h.thumbService.GetImageDimensions(thumbPath)
 	if err != nil || width != avatarThumbSize || height != avatarThumbSize {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to verify avatar thumbnail dimensions"})
+		RespondError(c, http.StatusInternalServerError, "Failed to verify avatar thumbnail dimensions")
 		return
 	}
 
@@ -640,11 +705,11 @@ func (h *UsersHandler) UploadMyAvatar(c *gin.Context) {
 
 	user, err := h.userRepo.GetByID(c.Request.Context(), userID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch user"})
+		RespondError(c, http.StatusInternalServerError, "Failed to fetch user")
 		return
 	}
 	if user == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		RespondError(c, http.StatusNotFound, "User not found")
 		return
 	}
 	var oldAvatarLocalPath string
@@ -655,8 +720,8 @@ func (h *UsersHandler) UploadMyAvatar(c *gin.Context) {
 	}
 	user.AvatarURL = &avatarURL
 
-	if err := h.userRepo.UpdateProfile(c.Request.Context(), user.ID, user.Bio, user.AvatarURL); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update user avatar"})
+	if err := h.userRepo.UpdateProfile(c.Request.Context(), user.ID, user.Bio, user.AvatarURL, nil); err != nil {
+		RespondError(c, http.StatusInternalServerError, "Failed to update user avatar")
 		return
 	}
 
@@ -664,7 +729,7 @@ func (h *UsersHandler) UploadMyAvatar(c *gin.Context) {
 		var statusText *string
 		profile, err := h.userProfRepo.GetByUserID(c.Request.Context(), user.ID)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch user profile"})
+			RespondError(c, http.StatusInternalServerError, "Failed to fetch user profile")
 			return
 		}
 		if profile != nil {
@@ -674,7 +739,7 @@ func (h *UsersHandler) UploadMyAvatar(c *gin.Context) {
 			}
 		}
 		if err := h.userProfRepo.Upsert(c.Request.Context(), user.ID, user.Bio, user.AvatarURL, statusText); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to persist user avatar"})
+			RespondError(c, http.StatusInternalServerError, "Failed to persist user avatar")
 			return
 		}
 	}
@@ -691,7 +756,15 @@ func (h *UsersHandler) UploadMyAvatar(c *gin.Context) {
 	})
 }
 
-// GetMyProfile handles GET /api/v1/users/me/profile
+// GetMyProfile returns the authenticated user's own profile.
+// @Summary      Get my profile
+// @Tags         Users
+// @Security     BearerAuth
+// @Produce      json
+// @Success      200  {object}  UserProfileResponse
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /users/me/profile [get]
 func (h *UsersHandler) GetMyProfile(c *gin.Context) {
 	userID := c.GetInt("user_id")
 	h.getUserProfileResponse(c, func() (*models.User, error) {
@@ -704,43 +777,53 @@ type changePasswordRequest struct {
 	NewPassword     string `json:"new_password" binding:"required,min=8"`
 }
 
-// ChangePassword handles POST /api/v1/users/change-password
+// ChangePassword changes the authenticated user's password.
+// @Summary      Change password
+// @Tags         Users
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /users/change-password [post]
 func (h *UsersHandler) ChangePassword(c *gin.Context) {
 	userID := c.GetInt("user_id")
 
 	var req changePasswordRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request. Password must be at least 8 characters"})
+		RespondError(c, http.StatusBadRequest, "Invalid request. Password must be at least 8 characters")
 		return
 	}
 
 	// Get current user
 	user, err := h.userRepo.GetByID(c.Request.Context(), userID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch user"})
+		RespondError(c, http.StatusInternalServerError, "Failed to fetch user")
 		return
 	}
 	if user == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		RespondError(c, http.StatusNotFound, "User not found")
 		return
 	}
 
 	// Verify current password
 	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.CurrentPassword)); err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Current password is incorrect"})
+		RespondError(c, http.StatusUnauthorized, "Current password is incorrect")
 		return
 	}
 
 	// Hash new password
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), bcrypt.DefaultCost)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to hash password"})
+		RespondError(c, http.StatusInternalServerError, "Failed to hash password")
 		return
 	}
 
 	// Update password
 	if err := h.userRepo.UpdatePassword(c.Request.Context(), user.ID, string(hashedPassword)); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update password"})
+		RespondError(c, http.StatusInternalServerError, "Failed to update password")
 		return
 	}
 
@@ -752,56 +835,73 @@ type updateEmailRequest struct {
 	EmailConfirm string `json:"email_confirm" binding:"required"`
 }
 
-// UpdateEmail handles PUT /api/v1/users/email
+// UpdateEmail updates the authenticated user's email address.
+// @Summary      Update email
+// @Tags         Users
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Success      200  {object}  gin.H
+// @Failure      400  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /users/email [put]
 func (h *UsersHandler) UpdateEmail(c *gin.Context) {
 	userID := c.GetInt("user_id")
 
 	var req updateEmailRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request. Please provide a valid email address"})
+		RespondError(c, http.StatusBadRequest, "Invalid request. Please provide a valid email address")
 		return
 	}
 
 	if req.Email != req.EmailConfirm {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Email addresses do not match"})
+		RespondError(c, http.StatusBadRequest, "Email addresses do not match")
 		return
 	}
 
 	normalizedEmail := strings.ToLower(strings.TrimSpace(req.Email))
 	if normalizedEmail == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Email cannot be empty"})
+		RespondError(c, http.StatusBadRequest, "Email cannot be empty")
 		return
 	}
 
 	atIndex := strings.Index(normalizedEmail, "@")
 	if atIndex < 1 || atIndex >= len(normalizedEmail)-1 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid email format"})
+		RespondError(c, http.StatusBadRequest, "Invalid email format")
 		return
 	}
 
 	if err := h.userRepo.UpdateEmail(c.Request.Context(), userID, &normalizedEmail); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update email"})
+		RespondError(c, http.StatusInternalServerError, "Failed to update email")
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Email updated successfully"})
 }
 
-// Ping updates the user's last_seen timestamp without fetching the profile
+// Ping updates the user's last_seen timestamp without fetching the profile.
+// @Summary      Ping (update last seen)
+// @Tags         Users
+// @Security     BearerAuth
+// @Produce      json
+// @Success      200  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /users/me/ping [post]
 func (h *UsersHandler) Ping(c *gin.Context) {
-	userID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
 		return
 	}
 
 	lastSeen := time.Now().UTC()
 
-	if err := h.userRepo.UpdateLastSeen(c.Request.Context(), userID.(int)); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update last seen"})
+	if err := h.userRepo.UpdateLastSeen(c.Request.Context(), userID); err != nil {
+		RespondError(c, http.StatusInternalServerError, "Failed to update last seen")
 		return
 	}
-	h.invalidateProfileResponseCache(c.Request.Context(), userID.(int))
+	h.invalidateProfileResponseCache(c.Request.Context(), userID)
 
 	c.JSON(http.StatusOK, gin.H{
 		"last_seen": lastSeen.Format(time.RFC3339),
@@ -853,18 +953,25 @@ func (h *UsersHandler) invalidateProfileResponseCache(ctx context.Context, profi
 	}
 }
 
-// UpdateLastAgentPostAt updates the last_agent_post_at timestamp for the authenticated user
+// UpdateLastAgentPostAt updates the last_agent_post_at timestamp for the authenticated user.
+// @Summary      Record agent post activity
+// @Tags         Users
+// @Security     BearerAuth
+// @Produce      json
+// @Success      200  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /users/me/agent/post [post]
 func (h *UsersHandler) UpdateLastAgentPostAt(c *gin.Context) {
-	userID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Not authenticated"})
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
 		return
 	}
 
 	timestamp := time.Now()
 
-	if err := h.userRepo.UpdateLastAgentPostAt(c.Request.Context(), userID.(int), timestamp); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update last agent post timestamp"})
+	if err := h.userRepo.UpdateLastAgentPostAt(c.Request.Context(), userID, timestamp); err != nil {
+		RespondError(c, http.StatusInternalServerError, "Failed to update last agent post timestamp")
 		return
 	}
 
@@ -873,18 +980,25 @@ func (h *UsersHandler) UpdateLastAgentPostAt(c *gin.Context) {
 	})
 }
 
-// UpdateLastAgentBrowseAt updates the last_agent_browse_at timestamp for the authenticated user
+// UpdateLastAgentBrowseAt updates the last_agent_browse_at timestamp for the authenticated user.
+// @Summary      Record agent browse activity
+// @Tags         Users
+// @Security     BearerAuth
+// @Produce      json
+// @Success      200  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /users/me/agent/browse [post]
 func (h *UsersHandler) UpdateLastAgentBrowseAt(c *gin.Context) {
-	userID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Not authenticated"})
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
 		return
 	}
 
 	timestamp := time.Now()
 
-	if err := h.userRepo.UpdateLastAgentBrowseAt(c.Request.Context(), userID.(int), timestamp); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update last agent browse timestamp"})
+	if err := h.userRepo.UpdateLastAgentBrowseAt(c.Request.Context(), userID, timestamp); err != nil {
+		RespondError(c, http.StatusInternalServerError, "Failed to update last agent browse timestamp")
 		return
 	}
 

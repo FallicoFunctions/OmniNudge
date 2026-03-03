@@ -33,12 +33,25 @@ type MediaItem struct {
 	IsMine        bool      `json:"is_mine"`    // True if current user sent it
 }
 
-// GetConversationMedia handles GET /api/v1/conversations/:id/media
+// GetConversationMedia returns paginated media files for a conversation.
+// @Summary      Get conversation media
+// @Tags         Media
+// @Security     BearerAuth
+// @Produce      json
+// @Param        id          path   int     true   "Conversation ID"
+// @Param        media_type  query  string  false  "Filter by type (image, video, audio)"
+// @Param        limit       query  int     false  "Max results"
+// @Param        before_id   query  int     false  "Cursor"
+// @Success      200  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /conversations/{id}/media [get]
 func (h *MediaGalleryHandler) GetConversationMedia(c *gin.Context) {
 	userID := c.GetInt("user_id")
 	conversationID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid conversation ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid conversation ID")
 		return
 	}
 
@@ -49,7 +62,7 @@ func (h *MediaGalleryHandler) GetConversationMedia(c *gin.Context) {
 
 	// Validate filter
 	if filter != "all" && filter != "mine" && filter != "theirs" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid filter. Must be 'all', 'mine', or 'theirs'"})
+		RespondError(c, http.StatusBadRequest, "Invalid filter. Must be 'all', 'mine', or 'theirs'")
 		return
 	}
 
@@ -67,15 +80,15 @@ func (h *MediaGalleryHandler) GetConversationMedia(c *gin.Context) {
 
 	if err != nil {
 		if err == pgx.ErrNoRows {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Conversation not found"})
+			RespondError(c, http.StatusNotFound, "Conversation not found")
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch conversation"})
+		RespondError(c, http.StatusInternalServerError, "Failed to fetch conversation")
 		return
 	}
 
 	if user1ID != userID && user2ID != userID {
-		c.JSON(http.StatusForbidden, gin.H{"error": "You are not part of this conversation"})
+		RespondError(c, http.StatusForbidden, "You are not part of this conversation")
 		return
 	}
 
@@ -133,7 +146,7 @@ func (h *MediaGalleryHandler) GetConversationMedia(c *gin.Context) {
 			&item.SentAt,
 		)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to parse media"})
+			RespondError(c, http.StatusInternalServerError, "Failed to parse media")
 			return
 		}
 
@@ -142,7 +155,7 @@ func (h *MediaGalleryHandler) GetConversationMedia(c *gin.Context) {
 	}
 
 	if err := rows.Err(); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to iterate media"})
+		RespondError(c, http.StatusInternalServerError, "Failed to iterate media")
 		return
 	}
 
@@ -168,7 +181,7 @@ func (h *MediaGalleryHandler) GetConversationMedia(c *gin.Context) {
 	}
 
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to count media"})
+		RespondError(c, http.StatusInternalServerError, "Failed to count media")
 		return
 	}
 
@@ -182,19 +195,31 @@ func (h *MediaGalleryHandler) GetConversationMedia(c *gin.Context) {
 	})
 }
 
-// FindMediaIndex handles GET /api/v1/conversations/:id/media/:messageId/index
-// Returns the index of a specific message in the filtered media gallery
+// FindMediaIndex returns the gallery index of a specific media message.
+// @Summary      Find media index
+// @Tags         Media
+// @Security     BearerAuth
+// @Produce      json
+// @Param        id         path   int     true   "Conversation ID"
+// @Param        messageId  path   int     true   "Message ID"
+// @Param        media_type query  string  false  "Media type filter"
+// @Success      200  {object}  gin.H
+// @Failure      401  {object}  gin.H
+// @Failure      403  {object}  gin.H
+// @Failure      404  {object}  gin.H
+// @Failure      500  {object}  gin.H
+// @Router       /conversations/{id}/media/{messageId}/index [get]
 func (h *MediaGalleryHandler) FindMediaIndex(c *gin.Context) {
 	userID := c.GetInt("user_id")
 	conversationID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid conversation ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid conversation ID")
 		return
 	}
 
 	messageID, err := strconv.Atoi(c.Param("messageId"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid message ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid message ID")
 		return
 	}
 
@@ -202,7 +227,7 @@ func (h *MediaGalleryHandler) FindMediaIndex(c *gin.Context) {
 
 	// Validate filter
 	if filter != "all" && filter != "mine" && filter != "theirs" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid filter"})
+		RespondError(c, http.StatusBadRequest, "Invalid filter")
 		return
 	}
 
@@ -215,15 +240,15 @@ func (h *MediaGalleryHandler) FindMediaIndex(c *gin.Context) {
 
 	if err != nil {
 		if err == pgx.ErrNoRows {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Conversation not found"})
+			RespondError(c, http.StatusNotFound, "Conversation not found")
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch conversation"})
+		RespondError(c, http.StatusInternalServerError, "Failed to fetch conversation")
 		return
 	}
 
 	if user1ID != userID && user2ID != userID {
-		c.JSON(http.StatusForbidden, gin.H{"error": "You are not part of this conversation"})
+		RespondError(c, http.StatusForbidden, "You are not part of this conversation")
 		return
 	}
 
@@ -268,10 +293,10 @@ func (h *MediaGalleryHandler) FindMediaIndex(c *gin.Context) {
 	err = h.pool.QueryRow(c.Request.Context(), indexQuery, args...).Scan(&index)
 	if err != nil {
 		if err == pgx.ErrNoRows {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Message not found in media gallery"})
+			RespondError(c, http.StatusNotFound, "Message not found in media gallery")
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to find media index"})
+		RespondError(c, http.StatusInternalServerError, "Failed to find media index")
 		return
 	}
 

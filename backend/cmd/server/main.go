@@ -1,30 +1,54 @@
+// @title           OmniNudge API
+// @version         1.0
+// @description     OmniNudge social platform API
+// @termsOfService  http://omninudge.com/terms/
+// @contact.name    OmniNudge Support
+// @contact.email   support@omninudge.com
+// @license.name    Proprietary
+// @host            localhost:8080
+// @BasePath        /api/v1
+// @securityDefinitions.apikey BearerAuth
+// @in header
+// @name Authorization
+// @description JWT Bearer token. Format: "Bearer {token}"
+
 package main
 
 import (
 	"context"
 	"log"
 	"net/http"
+	nethttppprof "net/http/pprof"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	_ "github.com/omninudge/backend/docs"
 	"github.com/omninudge/backend/internal/api/middleware"
+	ginSwagger "github.com/swaggo/gin-swagger"
+	swaggerFiles "github.com/swaggo/files"
+	"github.com/omninudge/backend/internal/audit"
 	"github.com/omninudge/backend/internal/config"
 	"github.com/omninudge/backend/internal/tracing"
 	"github.com/omninudge/backend/internal/database"
 	"github.com/omninudge/backend/internal/handlers"
-	"github.com/omninudge/backend/internal/models"
+	"github.com/omninudge/backend/internal/jobs"
 	"github.com/omninudge/backend/internal/monitoring"
+	"github.com/omninudge/backend/internal/observability"
 	"github.com/omninudge/backend/internal/queue"
+	"github.com/omninudge/backend/internal/domain/events"
+	"github.com/omninudge/backend/internal/eventhandlers"
 	"github.com/omninudge/backend/internal/repository"
 	"github.com/omninudge/backend/internal/services"
 	"github.com/omninudge/backend/internal/utils"
 	"github.com/omninudge/backend/internal/websocket"
 	"github.com/omninudge/backend/internal/workers"
+	"github.com/omninudge/backend/pkg/logger"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/redis/go-redis/v9"
+	zlog "github.com/rs/zerolog/log"
 )
 
 // serviceName is the OTel / log service identifier — single source of truth.
@@ -44,84 +68,94 @@ func main() {
 		log.Fatalf("Failed to load config: %v", err)
 	}
 
-	log.Printf("Starting OmniNudge server (version=%s env=%s)", appVersion, cfg.AppEnv)
+	// Initialize zerolog structured logger — must come before any other log calls.
+	logger.Initialize(cfg.AppEnv, appVersion, serviceName)
+
+	// Initialize Sentry error tracking (no-op when SENTRY_DSN is empty).
+	observability.InitSentry(os.Getenv("SENTRY_DSN"), cfg.AppEnv, appVersion)
+	defer observability.FlushSentry()
+
+	// Initialize Pyroscope continuous profiling (no-op when PYROSCOPE_SERVER_ADDRESS is empty).
+	observability.InitPyroscope(os.Getenv("PYROSCOPE_SERVER_ADDRESS"), serviceName, cfg.AppEnv)
+
+	zlog.Info().Str("version", appVersion).Str("env", cfg.AppEnv).Msg("Starting OmniNudge server")
 
 	// Initialize OpenTelemetry tracing (P0-040)
 	tracingShutdown, err := tracing.Setup(context.Background(), serviceName, appVersion)
 	if err != nil {
-		log.Printf("Warning: failed to initialize tracing: %v", err)
+		zlog.Warn().Err(err).Msg("Warning: failed to initialize tracing")
 	} else {
 		defer func() {
 			if err := tracingShutdown(context.Background()); err != nil {
-				log.Printf("Warning: tracing shutdown error: %v", err)
+				zlog.Warn().Err(err).Msg("Warning: tracing shutdown error")
 			}
 		}()
-		log.Println("OpenTelemetry tracing initialized")
+		zlog.Info().Msg("OpenTelemetry tracing initialized")
 	}
 
 	// Initialize email encryption
 	if err := utils.SetEncryptionKey(cfg.Encryption.Key); err != nil {
-		log.Fatalf("Failed to initialize email encryption: %v", err)
+		zlog.Fatal().Err(err).Msg("Failed to initialize email encryption")
 	}
-	log.Println("Email encryption initialized")
+	zlog.Info().Msg("Email encryption initialized")
 
 	// Connect to database
 	db, err := database.New(cfg.Database.DatabaseURL())
 	if err != nil {
-		log.Fatalf("Failed to connect to database: %v", err)
+		zlog.Fatal().Err(err).Msg("Failed to connect to database")
 	}
 	defer db.Close()
-	log.Printf("Connected to PostgreSQL database: %s", cfg.Database.DBName)
+	zlog.Info().Str("db", cfg.Database.DBName).Msg("Connected to PostgreSQL database")
 
 	if cfg.Database.AutoMigrate {
-		log.Println("Running database migrations...")
+		zlog.Info().Msg("Running database migrations...")
 		migrateCtx, migrateCancel := context.WithTimeout(context.Background(), 2*time.Minute)
 		defer migrateCancel()
 		if err := db.Migrate(migrateCtx); err != nil {
-			log.Fatalf("Failed to run migrations: %v", err)
+			zlog.Fatal().Err(err).Msg("Failed to run migrations")
 		}
-		log.Println("Migrations complete")
+		zlog.Info().Msg("Migrations complete")
 	} else {
-		log.Println("Skipping embedded database migrations (DB_AUTO_MIGRATE=false)")
+		zlog.Info().Msg("Skipping embedded database migrations (DB_AUTO_MIGRATE=false)")
 	}
 
 	// Initialize repositories
-	userRepo := models.NewUserRepository(db.Pool)
-	userSettingsRepo := models.NewUserSettingsRepository(db.Pool)
-	postRepo := models.NewPlatformPostRepository(db.Pool)
-	commentRepo := models.NewPostCommentRepository(db.Pool)
-	conversationRepo := models.NewConversationRepository(db.Pool)
-	messageRepo := models.NewMessageRepository(db.Pool)
-	mediaRepo := models.NewMediaFileRepository(db.Pool)
-	hubRepo := models.NewHubRepository(db.Pool)
-	reportRepo := models.NewReportRepository(db.Pool)
-	hubModRepo := models.NewHubModeratorRepository(db.Pool)
-	notificationRepo := models.NewNotificationRepository(db.Pool)
-	baselineRepo := models.NewUserBaselineRepository(db.Pool)
-	batchRepo := models.NewNotificationBatchRepository(db.Pool)
-	slideshowRepo := models.NewSlideshowRepository(db.Pool)
-	redditPostRepo := models.NewRedditPostRepository(db.Pool)
-	passwordResetRepo := models.NewPasswordResetRepository(db.Pool)
-	feedRepo := models.NewFeedRepository(db.Pool)
-	themeRepo := models.NewUserThemeRepository(db.Pool)
-	themeOverrideRepo := models.NewUserThemeOverrideRepository(db.Pool)
-	installedThemeRepo := models.NewUserInstalledThemeRepository(db.Pool)
-	redditCommentRepo := models.NewRedditPostCommentRepository(db.Pool)
-	savedItemsRepo := models.NewSavedItemsRepository(db.Pool)
-	hubSubRepo := models.NewHubSubscriptionRepository(db.Pool)
-	subredditSubRepo := models.NewSubredditSubscriptionRepository(db.Pool)
-	tokenRepo := models.NewDeviceTokenRepository(db.Pool)
+	userRepo := repository.NewPostgresUserRepository(db.Pool)
+	userSettingsRepo := repository.NewPostgresUserSettingsRepository(db.Pool)
+	postRepo := repository.NewPostgresPlatformPostRepository(db.Pool)
+	commentRepo := repository.NewPostgresPostCommentRepository(db.Pool)
+	conversationRepo := repository.NewPostgresConversationRepository(db.Pool)
+	messageRepo := repository.NewPostgresMessageRepository(db.Pool)
+	mediaRepo := repository.NewPostgresMediaFileRepository(db.Pool)
+	hubRepo := repository.NewPostgresHubRepository(db.Pool)
+	reportRepo := repository.NewPostgresReportRepository(db.Pool)
+	hubModRepo := repository.NewPostgresHubModeratorRepository(db.Pool)
+	notificationRepo := repository.NewPostgresNotificationRepository(db.Pool)
+	baselineRepo := repository.NewPostgresUserBaselineRepository(db.Pool)
+	batchRepo := repository.NewPostgresNotificationBatchRepository(db.Pool)
+	slideshowRepo := repository.NewPostgresSlideshowRepository(db.Pool)
+	redditPostRepo := repository.NewPostgresRedditPostRepository(db.Pool)
+	passwordResetRepo := repository.NewPostgresPasswordResetRepository(db.Pool)
+	feedRepo := repository.NewPostgresFeedRepository(db.Pool)
+	themeRepo := repository.NewPostgresUserThemeRepository(db.Pool)
+	themeOverrideRepo := repository.NewPostgresUserThemeOverrideRepository(db.Pool)
+	installedThemeRepo := repository.NewPostgresUserInstalledThemeRepository(db.Pool)
+	redditCommentRepo := repository.NewPostgresRedditPostCommentRepository(db.Pool)
+	savedItemsRepo := repository.NewPostgresSavedItemsRepository(db.Pool)
+	hubSubRepo := repository.NewPostgresHubSubscriptionRepository(db.Pool)
+	subredditSubRepo := repository.NewPostgresSubredditSubscriptionRepository(db.Pool)
+	tokenRepo := repository.NewPostgresDeviceTokenRepository(db.Pool)
 
 	// Feature 1: Message Reactions repository
-	messageReactionRepo := models.NewMessageReactionRepository(db.Pool)
-	userProfileRepo := models.NewUserProfileRepository(db.Pool)
-	userFriendshipRepo := models.NewUserFriendshipRepository(db.Pool)
+	messageReactionRepo := repository.NewPostgresMessageReactionRepository(db.Pool)
+	userProfileRepo := repository.NewPostgresUserProfileRepository(db.Pool)
+	userFriendshipRepo := repository.NewPostgresUserFriendshipRepository(db.Pool)
 
 	// Moderation Phase 1 repositories
-	hubBanRepo := models.NewHubBanRepository(db.Pool)
-	removalReasonRepo := models.NewRemovalReasonRepository(db.Pool)
-	removedContentRepo := models.NewRemovedContentRepository(db.Pool)
-	modLogRepo := models.NewModLogRepository(db.Pool)
+	hubBanRepo := repository.NewPostgresHubBanRepository(db.Pool)
+	removalReasonRepo := repository.NewPostgresRemovalReasonRepository(db.Pool)
+	removedContentRepo := repository.NewPostgresRemovedContentRepository(db.Pool)
+	modLogRepo := repository.NewPostgresModLogRepository(db.Pool)
 
 	// Hub Settings and Themes repositories (from repository package)
 	hubSettingsRepo := repository.NewHubSettingsRepository(db.Pool)
@@ -129,17 +163,33 @@ func main() {
 	hubWikiRepo := repository.NewHubWikiRepository(db.Pool)
 
 	// Access request repository
-	hubAccessRequestRepo := models.NewHubAccessRequestRepository(db.Pool)
+	hubAccessRequestRepo := repository.NewPostgresHubAccessRequestRepository(db.Pool)
 
 	// Bug reporting repositories
-	bugReportRepo := models.NewBugReportRepository(db.Pool)
-	knownBugRepo := models.NewKnownBugRepository(db.Pool)
+	bugReportRepo := repository.NewPostgresBugReportRepository(db.Pool)
+	knownBugRepo := repository.NewPostgresKnownBugRepository(db.Pool)
 
 	// Initialize WebSocket hub
 	hub := websocket.NewHub()
 	go hub.Run()
 
+	// Initialize domain event bus and register event handlers.
+	// Log events in non-production environments so they can be inspected via
+	// GetEventLog in tests and staging. In production the log is disabled to
+	// prevent the slice growing without bound.
+	eventBus := events.NewEventBus(cfg.AppEnv != "production")
+	userEventHandlers := eventhandlers.NewUserEventHandlers()
+	eventBus.Subscribe("UserRegistered", userEventHandlers.OnUserRegistered)
+	eventBus.Subscribe("UserBanned", userEventHandlers.OnUserBanned)
+	eventBus.Subscribe("UserUnbanned", userEventHandlers.OnUserUnbanned)
+	eventBus.Subscribe("UserDeleted", userEventHandlers.OnUserDeleted)
+	eventBus.Subscribe("PasswordChanged", userEventHandlers.OnPasswordChanged)
+	zlog.Info().Msg("Domain event bus initialized")
+
 	// Initialize services
+	if cfg.Turnstile.Secret == "" {
+		zlog.Warn().Msg("Turnstile.Secret is not configured — CAPTCHA validation is disabled")
+	}
 	authService := services.NewAuthService(
 		cfg.Reddit.ClientID,
 		cfg.Reddit.ClientSecret,
@@ -157,31 +207,45 @@ func main() {
 		rc := redis.NewClient(&redis.Options{
 			Addr:     cfg.Redis.Addr,
 			Password: cfg.Redis.Password,
+			// DialTimeout shorter than the ping context (750ms) so the TCP dial
+			// does not outlive the context and leak a goroutine/fd on slow DNS.
+			DialTimeout: 500 * time.Millisecond,
 		})
-		pingCtx, cancel := context.WithTimeout(context.Background(), 750*time.Millisecond)
-		defer cancel()
-		if err := rc.Ping(pingCtx).Err(); err != nil {
-			log.Printf("Warning: Redis unavailable at %s (disabling Redis-backed cache and job queue): %v", cfg.Redis.Addr, err)
+		pingCtx, pingCancel := context.WithTimeout(context.Background(), 750*time.Millisecond)
+		pingErr := rc.Ping(pingCtx).Err()
+		pingCancel()
+		if pingErr != nil {
+			zlog.Warn().Str("addr", cfg.Redis.Addr).Err(pingErr).Msg("Redis unavailable, disabling Redis-backed cache and job queue")
 			_ = rc.Close()
 		} else {
 			redisClient = rc
 			redisAvailable = true
-			log.Printf("Connected to Redis at %s", cfg.Redis.Addr)
+			zlog.Info().Str("addr", cfg.Redis.Addr).Msg("Connected to Redis")
 		}
 	} else {
-		log.Println("Redis not configured")
+		zlog.Info().Msg("Redis not configured")
 	}
 
 	var cache services.Cache
 	var cacheType string
 	if redisAvailable {
-		cache = services.NewRedisCache(cfg.Redis.Addr, cfg.Redis.Password, 2*time.Second)
+		// ResilientRedisCache wraps the go-redis client with a gobreaker circuit
+		// breaker (opens after 5 consecutive failures) and singleflight to prevent
+		// thundering-herd on cache misses.
+		// NOTE: we do NOT call resilientCache.Close() separately on shutdown because
+		// ResilientRedisCache.Close() is equivalent to redisClient.Close(), which is
+		// already called below at graceful shutdown. Calling it twice would be a no-op
+		// for go-redis, but we keep a single close site to avoid confusion.
+		cache = services.NewResilientRedisCacheWithClient(redisClient)
 		cacheType = "redis"
 	} else {
-		// Use in-memory cache as fallback
-		cache = services.NewMemoryCache()
+		// Use in-memory cache as fallback. Retain the concrete pointer so we
+		// can call Stop() on graceful shutdown to terminate the cleanup goroutine.
+		memCache := services.NewMemoryCache()
+		defer memCache.Stop()
+		cache = memCache
 		cacheType = "memory"
-		log.Println("Using in-memory cache (Redis unavailable)")
+		zlog.Info().Msg("Using in-memory cache (Redis unavailable)")
 	}
 	cache = services.NewInstrumentedCache(cache, cacheType)
 	redditClient := services.NewRedditClient(
@@ -196,9 +260,9 @@ func main() {
 	var queueClient *queue.QueueClient
 	if redisAvailable {
 		queueClient = queue.NewQueueClient(cfg.Redis.Addr, cfg.Redis.Password)
-		log.Println("Job queue client initialized")
+		zlog.Info().Msg("Job queue client initialized")
 	} else {
-		log.Println("Warning: Job queue disabled (Redis unavailable)")
+		zlog.Warn().Msg("Job queue disabled (Redis unavailable)")
 	}
 
 	// Initialize Firebase Cloud Messaging (P0-042)
@@ -207,10 +271,10 @@ func main() {
 		var err error
 		firebaseService, err = services.NewFirebaseService(cfg.Firebase.CredentialsPath)
 		if err != nil {
-			log.Printf("Warning: Failed to initialize Firebase: %v", err)
+			zlog.Warn().Err(err).Msg("Failed to initialize Firebase")
 		}
 	} else {
-		log.Println("Firebase credentials not configured, push notifications disabled")
+		zlog.Info().Msg("Firebase credentials not configured, push notifications disabled")
 	}
 
 	// Initialize notification services
@@ -243,13 +307,13 @@ func main() {
 	// Initialize storage service (P0-016)
 	storageService, err := services.NewLocalStorageService("./uploads/exports", cfg.FrontendURL+"/uploads/exports")
 	if err != nil {
-		log.Fatalf("Failed to initialize storage service: %v", err)
+		zlog.Fatal().Err(err).Msg("Failed to initialize storage service")
 	}
 
 	// Initialize voice storage service (F11)
 	voiceStorage, err := services.NewLocalStorageService("./uploads/voice", cfg.FrontendURL+"/uploads/voice")
 	if err != nil {
-		log.Fatalf("Failed to initialize voice storage: %v", err)
+		zlog.Fatal().Err(err).Msg("Failed to initialize voice storage")
 	}
 
 	// Declare virusScanner at package scope so it can be passed to voice handler.
@@ -271,13 +335,13 @@ func main() {
 		cfg.SMTP.FromName,
 	)
 	if cfg.SMTP.Host != "" {
-		log.Println("Email service initialized")
+		zlog.Info().Msg("Email service initialized")
 	} else {
-		log.Println("Warning: SMTP not configured, emails will not be sent")
+		zlog.Warn().Msg("SMTP not configured, emails will not be sent")
 	}
 
 	// Start job queue worker (P0-002: background job processing)
-	if queueClient != nil && cfg.Redis.Addr != "" {
+	if queueClient != nil {
 		jobWorker := queue.NewWorker(cfg.Redis.Addr, cfg.Redis.Password, 10) // 10 concurrent workers
 		queueThumbnailService := services.NewThumbnailService()
 		if cfg.VirusScan.Enabled {
@@ -287,10 +351,10 @@ func main() {
 				time.Duration(cfg.VirusScan.TimeoutSeconds)*time.Second,
 			)
 			if err := virusScanner.Ping(context.Background()); err != nil {
-				log.Printf("Warning: ClamAV ping failed: %v", err)
+				zlog.Warn().Err(err).Msg("ClamAV ping failed")
 			}
 		} else {
-			log.Println("Warning: Virus scan disabled via VIRUS_SCAN_ENABLED=false")
+			zlog.Warn().Msg("Virus scan disabled via VIRUS_SCAN_ENABLED=false")
 		}
 
 		// Register job handlers
@@ -308,16 +372,35 @@ func main() {
 
 		// Start worker in background
 		go func() {
-			log.Println("Starting job queue worker...")
+			zlog.Info().Msg("Starting job queue worker...")
 			if err := jobWorker.Start(); err != nil {
-				log.Printf("Job queue worker error: %v", err)
+				zlog.Error().Err(err).Msg("Job queue worker error")
 			}
 		}()
-		log.Println("Job queue worker started with 10 concurrent workers")
+		zlog.Info().Msg("Job queue worker started with 10 concurrent workers")
 	}
 
+	// Initialize audit logger (REFACTOR_05: security hardening)
+	auditLogger := audit.NewAuditLogger(db.Pool)
+
+	// Initialize account lockout service (REFACTOR_05: brute-force protection)
+	lockoutService := services.NewAccountLockoutService(db.Pool)
+
+	// Start security cleanup job (REFACTOR_05: purge stale failed_login_attempts and audit_logs).
+	// The context is derived from a cancel function that is called during graceful
+	// shutdown so the goroutine is not leaked after the HTTP server stops.
+	// Fix 2: defer cleanupCancel immediately after creation so all exit paths
+	// (panic, fatal, normal shutdown) trigger cancellation — the explicit call
+	// below during shutdown is kept for clarity but the defer is the safety net.
+	cleanupCtx, cleanupCancel := context.WithCancel(context.Background())
+	defer cleanupCancel()
+	go jobs.NewCleanupJob(db.Pool).Start(cleanupCtx)
+
 	// Start background workers
-	workerCtx := context.Background()
+	// Fix 10: use a single cancellable context for all background workers so
+	// they are cleanly cancelled on graceful shutdown.
+	workerCtx, workerCancel := context.WithCancel(context.Background())
+	defer workerCancel()
 	workerManager := workers.NewWorkerManager(
 		notificationService,
 		baselineCalculatorService,
@@ -335,10 +418,10 @@ func main() {
 	go retentionWorker.Start(workerCtx)
 
 	// Initialize repositories for email verification
-	emailVerificationRepo := models.NewEmailVerificationRepository(db.Pool)
+	emailVerificationRepo := repository.NewPostgresEmailVerificationRepository(db.Pool)
 
 	// Initialize handlers
-	authHandler := handlers.NewAuthHandler(authService, userRepo, emailService, passwordResetRepo, emailVerificationRepo, cfg.FrontendURL)
+	authHandler := handlers.NewAuthHandler(authService, userRepo, emailService, passwordResetRepo, emailVerificationRepo, cfg.FrontendURL, auditLogger, lockoutService)
 	settingsHandler := handlers.NewSettingsHandler(userSettingsRepo)
 	postsHandler := handlers.NewPostsHandler(db.Pool, postRepo, hubRepo, userRepo, hubModRepo, feedRepo, hubSettingsRepo)
 	commentsHandler := handlers.NewCommentsHandler(db.Pool, commentRepo, postRepo, hubRepo, userRepo, hubModRepo)
@@ -426,9 +509,9 @@ func main() {
 
 	// Check ffmpeg availability for iOS audio encoding (P0-003)
 	if err := handlers.CheckFFmpegAvailability(); err != nil {
-		log.Printf("Warning: FFmpeg not available - iOS voice recording will not work: %v", err)
+		zlog.Warn().Err(err).Msg("FFmpeg not available - iOS voice recording will not work")
 	} else {
-		log.Println("FFmpeg available for audio encoding")
+		zlog.Info().Msg("FFmpeg available for audio encoding")
 	}
 
 	// Inject notification service into handlers
@@ -453,6 +536,7 @@ func main() {
 	// 12. Metrics     — measures handler latency last so compression is included
 	router := gin.New()
 	router.Use(gin.Recovery())
+	router.Use(observability.SentryMiddleware())
 	router.Use(middleware.RequestID())
 	router.Use(middleware.Tracing(serviceName))
 	router.Use(middleware.StructuredLogger())
@@ -461,7 +545,13 @@ func main() {
 	router.Use(middleware.APIVersion())
 	router.Use(middleware.CacheControl())
 	router.Use(middleware.Compression())
-	// Reject request bodies larger than 50 MB (protects against OOM DoS)
+	// Reject request bodies larger than 50 MB (protects against OOM DoS).
+	// NOTE on interaction with api.Use(middleware.RequestSizeLimiter(1<<20)) below:
+	// The global 50 MB MaxBytesReader here is a safety net for non-API routes
+	// (uploads, WebSocket upgrades, etc.).  For API routes, RequestSizeLimiter
+	// fires its Content-Length early-rejection check before any body bytes are
+	// read, so the global wrapper is never actually consumed on those routes.
+	// The two limits are therefore complementary and do not conflict.
 	router.Use(func(c *gin.Context) {
 		c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 50<<20)
 		c.Next()
@@ -508,6 +598,11 @@ func main() {
 		promhttp.Handler().ServeHTTP(c.Writer, c.Request)
 	})
 
+	// Swagger UI (disabled in production)
+	if cfg.AppEnv != "production" {
+		router.GET("/api/v1/docs/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
+	}
+
 	// Liveness — process is running (used by Kubernetes liveness probe)
 	router.GET("/health/liveness", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "alive", "version": appVersion})
@@ -548,6 +643,9 @@ func main() {
 	// API v1 routes
 	api := router.Group("/api/v1")
 	api.Use(middleware.I18nMiddleware())
+	// Apply a 1 MB body-size cap on all API routes.  Upload endpoints override
+	// this with a more generous 10 MB limit registered at the route level.
+	api.Use(middleware.RequestSizeLimiter(1 << 20))
 	{
 		// Ping endpoint (no auth required)
 		api.GET("/ping", func(c *gin.Context) {
@@ -993,10 +1091,12 @@ func main() {
 			protected.GET("/conversations/:id/media", mediaGalleryHandler.GetConversationMedia)
 			protected.GET("/conversations/:id/media/:messageId/index", mediaGalleryHandler.FindMediaIndex)
 
-			// Media upload (with rate limiting: 10 uploads per minute)
-			protected.POST("/media/upload", uploadRateLimiter.Middleware(), mediaHandler.UploadMedia)
+			// Media upload (with rate limiting: 10 uploads per minute).
+			// A 10 MB per-request cap overrides the 1 MB API-wide limit set above.
+			uploadSizeLimiter := middleware.RequestSizeLimiter(10 << 20)
+			protected.POST("/media/upload", uploadRateLimiter.Middleware(), uploadSizeLimiter, mediaHandler.UploadMedia)
 			// Batch media upload (same request rate limiter as single upload; per-request file count capped in handler)
-			protected.POST("/media/batch-upload", uploadRateLimiter.Middleware(), mediaHandler.BatchUploadMedia)
+			protected.POST("/media/batch-upload", uploadRateLimiter.Middleware(), uploadSizeLimiter, mediaHandler.BatchUploadMedia)
 			protected.GET("/files/:id/thumbnail", mediaHandler.GetThumbnail)
 			// Audio encoding for iOS Safari (P0-003)
 			protected.POST("/media/encode-audio", audioEncoderHandler.EncodeAudio)
@@ -1141,21 +1241,63 @@ func main() {
 		}
 	}
 
+	// Admin-only pprof profiling endpoints.
+	// Access requires a valid JWT with role=admin.
+	// In production, additionally restrict these routes at the load-balancer
+	// or network layer so they are never reachable from the public internet.
+	//
+	// We use a dedicated ServeMux (not http.DefaultServeMux) for the catch-all
+	// /:name handler to avoid exposing any third-party handlers that may have
+	// registered themselves on DefaultServeMux via init().
+	pprofMux := http.NewServeMux()
+	pprofMux.HandleFunc("/debug/pprof/", nethttppprof.Index)
+	pprofMux.HandleFunc("/debug/pprof/cmdline", nethttppprof.Cmdline)
+	pprofMux.HandleFunc("/debug/pprof/profile", nethttppprof.Profile)
+	pprofMux.HandleFunc("/debug/pprof/symbol", nethttppprof.Symbol)
+	pprofMux.HandleFunc("/debug/pprof/trace", nethttppprof.Trace)
+
+	pprofGroup := router.Group("/debug/pprof",
+		middleware.AuthRequired(authService),
+		middleware.RequireRole("admin"),
+	)
+	{
+		pprofGroup.GET("/", gin.WrapF(nethttppprof.Index))
+		pprofGroup.GET("/cmdline", gin.WrapF(nethttppprof.Cmdline))
+		pprofGroup.GET("/profile", gin.WrapF(nethttppprof.Profile))
+		pprofGroup.GET("/symbol", gin.WrapF(nethttppprof.Symbol))
+		// /symbol also accepts POST requests (pprof client sends POST with addresses).
+		pprofGroup.POST("/symbol", gin.WrapF(nethttppprof.Symbol))
+		pprofGroup.GET("/trace", gin.WrapF(nethttppprof.Trace))
+		// Catch-all for named profiles (heap, goroutine, block, mutex, threadcreate, …).
+		// Uses the dedicated pprofMux (not http.DefaultServeMux) so only explicitly
+		// registered pprof handlers are reachable — third-party init() handlers on
+		// DefaultServeMux are intentionally excluded.
+		// gin.WrapH preserves r.URL.Path (e.g. /debug/pprof/heap) so pprofMux
+		// dispatches correctly without path rewriting.
+		pprofGroup.GET("/:name", gin.WrapH(pprofMux))
+	}
+
 	// Create HTTP server
 	addr := cfg.Server.Host + ":" + cfg.Server.Port
 	srv := &http.Server{
-		Addr:         addr,
-		Handler:      router,
-		ReadTimeout:  15 * time.Second,
-		WriteTimeout: 15 * time.Second,
+		Addr: addr,
+		// ReadHeaderTimeout guards against Slowloris attacks (slow header delivery).
+		// It is a separate timeout from ReadTimeout and must be set explicitly.
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       15 * time.Second,
+		// WriteTimeout must exceed the longest possible pprof CPU profile duration.
+		// The default /debug/pprof/profile runs for 30 s; clients may request up
+		// to 60 s via ?seconds=60.  65 s provides a 5-second safety margin.
+		WriteTimeout: 65 * time.Second,
 		IdleTimeout:  60 * time.Second,
+		Handler:      router,
 	}
 
 	// Start server in a goroutine
 	go func() {
-		log.Printf("Server listening on http://%s", addr)
+		zlog.Info().Str("addr", addr).Msg("Server listening")
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("Failed to start server: %v", err)
+			zlog.Fatal().Err(err).Msg("Failed to start server")
 		}
 	}()
 
@@ -1163,22 +1305,33 @@ func main() {
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
-	log.Println("Shutting down server...")
+	zlog.Info().Msg("Shutting down server...")
 
 	// Give outstanding requests 5 seconds to complete
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	if err := srv.Shutdown(ctx); err != nil {
-		log.Fatalf("Server forced to shutdown: %v", err)
+		zlog.Fatal().Err(err).Msg("Server forced to shutdown")
 	}
 
 	// Stop rate limiter eviction goroutines.
+	// ORDERING: these Stop() calls must run AFTER srv.Shutdown() (so no new
+	// requests arrive) but BEFORE the process exits. cleanupCancel() and
+	// workerCancel() are deferred and fire on return from main() — after this
+	// block. Do not move these Stop() calls into defers without careful ordering.
 	reactionRateLimiter.Stop()
 	themeCreationLimiter.Stop()
 	themePreviewLimiter.Stop()
 	generalLimiter.Stop()
 	uploadRateLimiter.Stop()
 
-	log.Println("Server exited")
+	// Close Redis connection pool after all handlers have stopped.
+	if redisClient != nil {
+		if err := redisClient.Close(); err != nil {
+			zlog.Warn().Err(err).Msg("Error closing Redis client")
+		}
+	}
+
+	zlog.Info().Msg("Server exited")
 }

@@ -34,7 +34,7 @@ func (h *UserStatusHandler) GetUserStatus(c *gin.Context) {
 func (h *UserStatusHandler) GetUsersStatus(c *gin.Context) {
 	userIDsStr := c.Query("user_ids")
 	if userIDsStr == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "user_ids parameter is required"})
+		RespondError(c, http.StatusBadRequest, "user_ids parameter is required")
 		return
 	}
 
@@ -44,7 +44,7 @@ func (h *UserStatusHandler) GetUsersStatus(c *gin.Context) {
 	for _, idStr := range userIDStrings {
 		id, err := strconv.Atoi(strings.TrimSpace(idStr))
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user ID format"})
+			RespondError(c, http.StatusBadRequest, "Invalid user ID format")
 			return
 		}
 		userIDs = append(userIDs, id)
@@ -52,7 +52,7 @@ func (h *UserStatusHandler) GetUsersStatus(c *gin.Context) {
 
 	// Limit to prevent abuse
 	if len(userIDs) > 100 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Maximum 100 user IDs allowed"})
+		RespondError(c, http.StatusBadRequest, "Maximum 100 user IDs allowed")
 		return
 	}
 

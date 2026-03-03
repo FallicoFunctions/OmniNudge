@@ -4,7 +4,7 @@ import (
 	"errors"
 
 	"github.com/gin-gonic/gin"
-	"github.com/omninudge/backend/internal/models"
+	"github.com/omninudge/backend/internal/ports"
 )
 
 func IsAdminContext(c *gin.Context) bool {
@@ -23,7 +23,7 @@ func IsAdminContext(c *gin.Context) bool {
 	return false
 }
 
-func RequireHubModeratorOrAdmin(c *gin.Context, hubID int, hubModRepo *models.HubModeratorRepository) (bool, error) {
+func RequireHubModeratorOrAdmin(c *gin.Context, hubID int, hubModRepo ports.HubModeratorRepository) (bool, error) {
 	if IsAdminContext(c) {
 		return true, nil
 	}
@@ -37,8 +37,8 @@ func RequireHubModeratorOrAdmin(c *gin.Context, hubID int, hubModRepo *models.Hu
 func RequireHubModeratorOrAdminByName(
 	c *gin.Context,
 	hubName string,
-	hubRepo *models.HubRepository,
-	hubModRepo *models.HubModeratorRepository,
+	hubRepo ports.HubRepository,
+	hubModRepo ports.HubModeratorRepository,
 ) (int, bool, error) {
 	hub, err := hubRepo.GetByName(c.Request.Context(), hubName)
 	if err != nil {

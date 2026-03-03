@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"github.com/omninudge/backend/internal/api/middleware"
 	"context"
 	"fmt"
 	"net/http"
@@ -50,19 +51,19 @@ func (h *RedditCommentsHandler) GetRedditPostComments(c *gin.Context) {
 	sortBy := c.Query("sort")
 
 	if subreddit == "" || postID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Subreddit and post ID are required"})
+		RespondError(c, http.StatusBadRequest, "Subreddit and post ID are required")
 		return
 	}
 
 	// Try to get user ID (optional - endpoint works for both authenticated and anonymous users)
-	userID, hasUser := c.Get("user_id")
+	userID, hasUser := middleware.GetOptionalUserID(c)
 
 	var comments []*models.RedditPostComment
 	var err error
 
 	if hasUser {
 		// Fetch comments with user votes
-		comments, err = h.redditCommentRepo.GetByRedditPostWithUserVotes(c.Request.Context(), subreddit, postID, userID.(int))
+		comments, err = h.redditCommentRepo.GetByRedditPostWithUserVotes(c.Request.Context(), subreddit, postID, userID)
 	} else {
 		// Fetch comments without user votes
 		comments, err = h.redditCommentRepo.GetByRedditPost(c.Request.Context(), subreddit, postID)
@@ -118,9 +119,8 @@ func (h *RedditCommentsHandler) GetRedditPostComments(c *gin.Context) {
 // Creates a local comment on a Reddit post (visible only on your platform)
 func (h *RedditCommentsHandler) CreateRedditPostComment(c *gin.Context) {
 	// Get user ID from context
-	userID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
 		return
 	}
 
@@ -128,7 +128,7 @@ func (h *RedditCommentsHandler) CreateRedditPostComment(c *gin.Context) {
 	postID := c.Param("postId")
 
 	if subreddit == "" || postID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Subreddit and post ID are required"})
+		RespondError(c, http.StatusBadRequest, "Subreddit and post ID are required")
 		return
 	}
 
@@ -146,12 +146,12 @@ func (h *RedditCommentsHandler) CreateRedditPostComment(c *gin.Context) {
 			return
 		}
 		if parentComment == nil {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Parent comment not found"})
+			RespondError(c, http.StatusNotFound, "Parent comment not found")
 			return
 		}
 		// Verify parent comment belongs to the same Reddit post
 		if parentComment.Subreddit != subreddit || parentComment.RedditPostID != postID {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Parent comment does not belong to this Reddit post"})
+			RespondError(c, http.StatusBadRequest, "Parent comment does not belong to this Reddit post")
 			return
 		}
 	}
@@ -160,7 +160,7 @@ func (h *RedditCommentsHandler) CreateRedditPostComment(c *gin.Context) {
 	comment := &models.RedditPostComment{
 		Subreddit:             subreddit,
 		RedditPostID:          postID,
-		UserID:                userID.(int),
+		UserID:                userID,
 		ParentCommentID:       req.ParentCommentID,
 		ParentRedditCommentID: req.ParentRedditCommentID,
 		Content:               req.Content,
@@ -197,15 +197,14 @@ type UpdateRedditCommentRequest struct {
 
 // UpdateRedditPostComment allows users to edit their site-only Reddit comments
 func (h *RedditCommentsHandler) UpdateRedditPostComment(c *gin.Context) {
-	userID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
 		return
 	}
 
 	commentID, err := strconv.Atoi(c.Param("commentId"))
 	if err != nil || commentID <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid comment ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid comment ID")
 		return
 	}
 
@@ -216,17 +215,17 @@ func (h *RedditCommentsHandler) UpdateRedditPostComment(c *gin.Context) {
 	}
 
 	if comment == nil || comment.DeletedAt != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Comment not found"})
+		RespondError(c, http.StatusNotFound, "Comment not found")
 		return
 	}
 
 	if comment.Subreddit != c.Param("subreddit") || comment.RedditPostID != c.Param("postId") {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Comment does not belong to this Reddit post"})
+		RespondError(c, http.StatusBadRequest, "Comment does not belong to this Reddit post")
 		return
 	}
 
-	if comment.UserID != userID.(int) {
-		c.JSON(http.StatusForbidden, gin.H{"error": "You can only edit your own comments"})
+	if comment.UserID != userID {
+		RespondError(c, http.StatusForbidden, "You can only edit your own comments")
 		return
 	}
 
@@ -252,15 +251,14 @@ func (h *RedditCommentsHandler) UpdateRedditPostComment(c *gin.Context) {
 
 // DeleteRedditPostComment handles DELETE requests for user comments
 func (h *RedditCommentsHandler) DeleteRedditPostComment(c *gin.Context) {
-	userID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
 		return
 	}
 
 	commentID, err := strconv.Atoi(c.Param("commentId"))
 	if err != nil || commentID <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid comment ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid comment ID")
 		return
 	}
 
@@ -270,17 +268,17 @@ func (h *RedditCommentsHandler) DeleteRedditPostComment(c *gin.Context) {
 		return
 	}
 	if comment == nil || comment.DeletedAt != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Comment not found"})
+		RespondError(c, http.StatusNotFound, "Comment not found")
 		return
 	}
 
 	if comment.Subreddit != c.Param("subreddit") || comment.RedditPostID != c.Param("postId") {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Comment does not belong to this Reddit post"})
+		RespondError(c, http.StatusBadRequest, "Comment does not belong to this Reddit post")
 		return
 	}
 
-	if comment.UserID != userID.(int) {
-		c.JSON(http.StatusForbidden, gin.H{"error": "You can only delete your own comments"})
+	if comment.UserID != userID {
+		RespondError(c, http.StatusForbidden, "You can only delete your own comments")
 		return
 	}
 
@@ -299,15 +297,14 @@ type UpdateRedditCommentPreferencesRequest struct {
 
 // UpdateRedditPostCommentPreferences handles preference changes for a comment
 func (h *RedditCommentsHandler) UpdateRedditPostCommentPreferences(c *gin.Context) {
-	userID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
 		return
 	}
 
 	commentID, err := strconv.Atoi(c.Param("commentId"))
 	if err != nil || commentID <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid comment ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid comment ID")
 		return
 	}
 
@@ -317,17 +314,17 @@ func (h *RedditCommentsHandler) UpdateRedditPostCommentPreferences(c *gin.Contex
 		return
 	}
 	if comment == nil || comment.DeletedAt != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Comment not found"})
+		RespondError(c, http.StatusNotFound, "Comment not found")
 		return
 	}
 
 	if comment.Subreddit != c.Param("subreddit") || comment.RedditPostID != c.Param("postId") {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Comment does not belong to this Reddit post"})
+		RespondError(c, http.StatusBadRequest, "Comment does not belong to this Reddit post")
 		return
 	}
 
-	if comment.UserID != userID.(int) {
-		c.JSON(http.StatusForbidden, gin.H{"error": "You can only update your own comments"})
+	if comment.UserID != userID {
+		RespondError(c, http.StatusForbidden, "You can only update your own comments")
 		return
 	}
 
@@ -337,7 +334,7 @@ func (h *RedditCommentsHandler) UpdateRedditPostCommentPreferences(c *gin.Contex
 		return
 	}
 
-	if err := h.redditCommentRepo.SetInboxRepliesDisabled(c.Request.Context(), commentID, userID.(int), req.DisableInboxReplies); err != nil {
+	if err := h.redditCommentRepo.SetInboxRepliesDisabled(c.Request.Context(), commentID, userID, req.DisableInboxReplies); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update preferences", "details": err.Error()})
 		return
 	}
@@ -355,18 +352,16 @@ type VoteRedditCommentRequest struct {
 // If user clicks same vote twice, it removes the vote
 func (h *RedditCommentsHandler) VoteRedditPostComment(c *gin.Context) {
 	// Get user ID from context (authentication required)
-	userIDInterface, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
 		return
 	}
-	userID := userIDInterface.(int)
 
 	// Parse comment ID from URL parameter
 	commentIDStr := c.Param("commentId")
 	commentID := 0
 	if _, err := fmt.Sscanf(commentIDStr, "%d", &commentID); err != nil || commentID <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid comment ID"})
+		RespondError(c, http.StatusBadRequest, "Invalid comment ID")
 		return
 	}
 

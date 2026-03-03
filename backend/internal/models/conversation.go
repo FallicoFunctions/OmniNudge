@@ -317,7 +317,7 @@ func (r *ConversationRepository) GetByUserIDWithCursor(
 	}
 
 	if cursor != nil {
-		query += fmt.Sprintf(" AND (last_message_at, id) < ($%d, $%d)", paramIdx, paramIdx+1)
+		query += fmt.Sprintf(" AND (conversations.last_message_at, conversations.id) < ($%d, $%d)", paramIdx, paramIdx+1)
 		args = append(args, cursor.Timestamp, cursor.ID)
 		paramIdx += 2
 	}
@@ -521,7 +521,7 @@ func (r *ConversationRepository) GetArchivedByUserIDWithCursor(
 	args := []interface{}{userID}
 	paramIdx := 2
 	if cursor != nil {
-		query += fmt.Sprintf(" AND (last_message_at, id) < ($%d, $%d)", paramIdx, paramIdx+1)
+		query += fmt.Sprintf(" AND (conversations.last_message_at, conversations.id) < ($%d, $%d)", paramIdx, paramIdx+1)
 		args = append(args, cursor.Timestamp, cursor.ID)
 		paramIdx += 2
 	}
