@@ -27,6 +27,8 @@ import (
 	"github.com/gin-gonic/gin"
 	_ "github.com/omninudge/backend/docs"
 	"github.com/omninudge/backend/internal/api/middleware"
+	"github.com/hibiken/asynq"
+	"github.com/hibiken/asynqmon"
 	ginSwagger "github.com/swaggo/gin-swagger"
 	swaggerFiles "github.com/swaggo/files"
 	"github.com/omninudge/backend/internal/audit"
@@ -601,6 +603,38 @@ func main() {
 	// Swagger UI (disabled in production)
 	if cfg.AppEnv != "production" {
 		router.GET("/api/v1/docs/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
+	}
+
+	// Asynqmon — queue monitoring dashboard at /admin/queues
+	// Protected by ASYNQMON_TOKEN bearer token; empty token allows unrestricted access (dev only).
+	// In production always set ASYNQMON_TOKEN to a strong random secret.
+	if redisAvailable {
+		mon := asynqmon.New(asynqmon.Options{
+			RootPath: "/admin/queues",
+			RedisConnOpt: asynq.RedisClientOpt{
+				Addr:     cfg.Redis.Addr,
+				Password: cfg.Redis.Password,
+			},
+		})
+		router.Any("/admin/queues", func(c *gin.Context) {
+			if token := cfg.AsynqmonToken; token != "" {
+				if c.GetHeader("Authorization") != "Bearer "+token {
+					c.AbortWithStatus(http.StatusUnauthorized)
+					return
+				}
+			}
+			mon.ServeHTTP(c.Writer, c.Request)
+		})
+		router.Any("/admin/queues/*path", func(c *gin.Context) {
+			if token := cfg.AsynqmonToken; token != "" {
+				if c.GetHeader("Authorization") != "Bearer "+token {
+					c.AbortWithStatus(http.StatusUnauthorized)
+					return
+				}
+			}
+			mon.ServeHTTP(c.Writer, c.Request)
+		})
+		zlog.Info().Str("path", "/admin/queues").Msg("Asynqmon queue dashboard enabled")
 	}
 
 	// Liveness — process is running (used by Kubernetes liveness probe)
