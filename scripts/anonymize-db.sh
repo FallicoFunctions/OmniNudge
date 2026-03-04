@@ -56,6 +56,7 @@ while [[ $# -gt 0 ]]; do
     --dump)     DUMP_FILE="$2";  shift 2 ;;
     --host)     DB_HOST="$2";    shift 2 ;;
     --port)     DB_PORT="$2";    shift 2 ;;
+    --user)     DB_USER_ARG="$2"; shift 2 ;;
     *) echo "Unknown argument: $1"; exit 1 ;;
   esac
 done
@@ -81,6 +82,11 @@ else
   # Fall back to env vars (useful in CI or local dev)
   DB_USER="${DB_USER:-omninudge_user}"
   DB_PASSWORD="${DB_PASSWORD:-}"
+fi
+
+# --user flag overrides everything
+if [ -n "${DB_USER_ARG:-}" ]; then
+  DB_USER="$DB_USER_ARG"
 fi
 
 export PGPASSWORD="$DB_PASSWORD"
@@ -189,28 +195,30 @@ UPDATE media_files SET
                         ELSE NULL END;
 
 -- ── audit_logs ────────────────────────────────────────────────────────────────
--- Preserve action type and timestamps (useful for testing audit flow)
--- but wipe the details JSON which may contain IPs, user agents, payloads
+-- Preserve action, target_type, target_id, and timestamps (useful for testing).
+-- Wipe ip_address, user_agent, and metadata which contain PII.
 UPDATE audit_logs SET
-  details = '{"anonymized": true}'::jsonb
-  WHERE details IS NOT NULL;
+  ip_address = NULL,
+  user_agent = NULL,
+  metadata   = '{}'::jsonb;
 
 -- ── notifications ─────────────────────────────────────────────────────────────
--- Wipe any notification body text that may contain user-generated content
+-- The message column may contain user-generated content (post titles, usernames).
 UPDATE notifications SET
-  content = CASE WHEN content IS NOT NULL THEN '[anonymized]' ELSE NULL END;
+  message = '[anonymized]';
 
 -- ── device_tokens (push notification tokens) ──────────────────────────────────
--- FCM/APNS tokens are per-device credentials; must be scrubbed
+-- FCM/APNS tokens are per-device credentials; must be scrubbed.
+-- Table exists from migration 019 — no existence guard needed.
 UPDATE device_tokens SET
-  token = 'anon_device_token_' || id
-  WHERE token IS NOT NULL;
+  token = 'anon_device_token_' || id;
 
--- ── password_reset_tokens ─────────────────────────────────────────────────────
-DELETE FROM password_reset_tokens;
+-- ── password_resets ───────────────────────────────────────────────────────────
+-- Table is named password_resets (migration 024), not password_reset_tokens.
+DELETE FROM password_resets;
 
 -- ── failed_login_attempts ─────────────────────────────────────────────────────
--- Contains IP addresses
+-- Contains IP addresses.
 DELETE FROM failed_login_attempts;
 
 -- ── analytics_events ──────────────────────────────────────────────────────────
