@@ -26,15 +26,14 @@ npm run build
 echo -e "${GREEN}✓ Frontend built${NC}"
 echo ""
 
-# Step 2: Create backup on server
+# Step 2: Create backup on server (files + database)
 echo -e "${YELLOW}Step 2: Creating backup on server...${NC}"
 BACKUP_NAME="backup-$(date +%Y%m%d-%H%M%S)"
 ssh "$SERVER" bash << EOF
-  # Create backup directory if it doesn't exist
+  set -e
   mkdir -p /var/www/omninudge/backups
 
-  # Create backup
-  echo "Creating backup: $BACKUP_NAME"
+  echo "Creating file backup: ${BACKUP_NAME}.tar.gz"
   cd /var/www/omninudge
   tar -czf backups/${BACKUP_NAME}.tar.gz \
     --exclude='backups' \
@@ -43,14 +42,31 @@ ssh "$SERVER" bash << EOF
     --exclude='.git' \
     backend frontend
 
-  # List last 5 backups
-  echo "Recent backups:"
-  ls -lht backups/*.tar.gz 2>/dev/null | head -5 || echo "This is the first backup"
+  # Database backup — load credentials from the .env file written by deploy-app.sh
+  if [ -f /var/www/omninudge/backend/.env ]; then
+    DB_USER=\$(grep '^DB_USER=' /var/www/omninudge/backend/.env | cut -d= -f2)
+    DB_PASSWORD=\$(grep '^DB_PASSWORD=' /var/www/omninudge/backend/.env | cut -d= -f2)
+    DB_NAME=\$(grep '^DB_NAME=' /var/www/omninudge/backend/.env | cut -d= -f2)
+    if [ -n "\$DB_USER" ] && [ -n "\$DB_NAME" ]; then
+      echo "Creating database backup: ${BACKUP_NAME}.sql.gz"
+      PGPASSWORD="\$DB_PASSWORD" pg_dump -U "\$DB_USER" -h localhost "\$DB_NAME" \
+        | gzip > /var/www/omninudge/backups/${BACKUP_NAME}.sql.gz
+      echo "✓ Database backed up ($(du -sh /var/www/omninudge/backups/${BACKUP_NAME}.sql.gz | cut -f1))"
+    else
+      echo "⚠️  Could not read DB credentials — skipping database backup"
+    fi
+  else
+    echo "⚠️  No .env file found — skipping database backup"
+  fi
 
-  # Clean up old backups (keep last 10)
-  ls -t backups/*.tar.gz 2>/dev/null | tail -n +11 | xargs -r rm
+  echo "Recent backups:"
+  ls -lht /var/www/omninudge/backups/ 2>/dev/null | head -8 || echo "This is the first backup"
+
+  # Keep last 10 of each backup type
+  ls -t /var/www/omninudge/backups/*.tar.gz 2>/dev/null | tail -n +11 | xargs -r rm
+  ls -t /var/www/omninudge/backups/*.sql.gz 2>/dev/null | tail -n +11 | xargs -r rm
 EOF
-echo -e "${GREEN}✓ Backup created: ${BACKUP_NAME}.tar.gz${NC}"
+echo -e "${GREEN}✓ Backup created: ${BACKUP_NAME} (files + database)${NC}"
 echo ""
 
 # Step 3: Upload frontend build
@@ -109,5 +125,6 @@ echo "  1. Visit https://omninudge.com to verify the deployment"
 echo "  2. Check backend logs: ssh $SERVER 'journalctl -u omninudge-backend -f'"
 echo ""
 echo "To restore from backup if needed:"
-echo "  ssh $SERVER 'cd /var/www/omninudge && tar -xzf backups/${BACKUP_NAME}.tar.gz'"
+echo "  Files:    ssh $SERVER 'cd /var/www/omninudge && tar -xzf backups/${BACKUP_NAME}.tar.gz'"
+echo "  Database: ssh $SERVER 'source /var/www/omninudge/backend/.env && PGPASSWORD=\$DB_PASSWORD gunzip -c /var/www/omninudge/backups/${BACKUP_NAME}.sql.gz | psql -U \$DB_USER -h localhost \$DB_NAME'"
 echo ""
