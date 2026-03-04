@@ -3,7 +3,7 @@
 # Usage: deploy-on
 #   (Can be run from any directory)
 
-set -e
+set -eo pipefail
 
 # Colors for output
 RED='\033[0;31m'

@@ -16,14 +16,17 @@
 #   bash anonymize-db.sh --dump /path/to/backup.sql.gz --target omninudge_staging
 #
 # What gets anonymized:
-#   users          — email, password_hash, reddit tokens, bio, avatar_url,
+#   users          — username, email, password_hash, reddit tokens, bio, avatar_url,
 #                    encrypted_private_key, access_token, refresh_token
 #   messages       — encrypted_content replaced with placeholder
-#   bug_reports    — description, page_url
+#   bug_reports    — description, page_url, admin_notes
 #   invitations    — invitation_code, invitation_link
 #   media_files    — original_filename, storage_url, storage_path, thumbnail_url
-#   audit_logs     — details column (may contain request metadata)
-#   notifications  — content column
+#   audit_logs     — ip_address, user_agent, metadata
+#   notifications  — message column
+#   device_tokens  — token (FCM/APNS credentials)
+# Deleted entirely: password_resets, failed_login_attempts, analytics_events,
+#                   user_sessions
 #
 # What is NOT anonymized (safe, non-PII):
 #   - IDs, timestamps, counts, votes, karma
@@ -56,7 +59,8 @@ while [[ $# -gt 0 ]]; do
     --dump)     DUMP_FILE="$2";  shift 2 ;;
     --host)     DB_HOST="$2";    shift 2 ;;
     --port)     DB_PORT="$2";    shift 2 ;;
-    --user)     DB_USER_ARG="$2"; shift 2 ;;
+    --user)     DB_USER_ARG="$2";     shift 2 ;;
+    --password) DB_PASSWORD_ARG="$2"; shift 2 ;;
     *) echo "Unknown argument: $1"; exit 1 ;;
   esac
 done
@@ -84,10 +88,9 @@ else
   DB_PASSWORD="${DB_PASSWORD:-}"
 fi
 
-# --user flag overrides everything
-if [ -n "${DB_USER_ARG:-}" ]; then
-  DB_USER="$DB_USER_ARG"
-fi
+# --user / --password flags override .env values
+if [ -n "${DB_USER_ARG:-}" ];     then DB_USER="$DB_USER_ARG";         fi
+if [ -n "${DB_PASSWORD_ARG:-}" ]; then DB_PASSWORD="$DB_PASSWORD_ARG"; fi
 
 export PGPASSWORD="$DB_PASSWORD"
 
@@ -145,6 +148,8 @@ $PSQL -d "$TARGET_DB" -v ON_ERROR_STOP=1 << 'SQL'
 --   ($2a$12$... = bcrypt cost 12, value "password")
 -- Wipe OAuth tokens, private keys, bio, avatar
 UPDATE users SET
+  username           = 'user_' || id,
+  username_normalized= 'user_' || id,
   email              = CASE WHEN email IS NOT NULL
                          THEN 'user_' || id || '@anon.invalid'
                          ELSE NULL END,
@@ -157,6 +162,7 @@ UPDATE users SET
   public_key         = NULL,
   avatar_url         = NULL,
   bio                = NULL,
+  ban_reason         = CASE WHEN ban_reason IS NOT NULL THEN '[anonymized]' ELSE NULL END,
   reddit_id          = CASE WHEN reddit_id IS NOT NULL
                          THEN 'anon_reddit_' || id
                          ELSE NULL END,
