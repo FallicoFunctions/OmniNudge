@@ -1,0 +1,24 @@
+# Dependencies (rebuilt in image)
+node_modules/
+
+# Build output (rebuilt in image)
+dist/
+storybook-static/
+
+# Development files
+.env
+.env.*
+*.local
+
+# Documentation
+*.md
+
+# Git
+.git/
+.gitignore
+
+# Test files
+**/*.test.ts
+**/*.test.tsx
+**/tests/
+coverage/
