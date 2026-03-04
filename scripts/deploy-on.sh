@@ -51,12 +51,14 @@ ssh "$SERVER" bash << EOF
       echo "Creating database backup: ${BACKUP_NAME}.sql.gz"
       PGPASSWORD="\$DB_PASSWORD" pg_dump -U "\$DB_USER" -h localhost "\$DB_NAME" \
         | gzip > /var/www/omninudge/backups/${BACKUP_NAME}.sql.gz
-      echo "✓ Database backed up ($(du -sh /var/www/omninudge/backups/${BACKUP_NAME}.sql.gz | cut -f1))"
+      echo "✓ Database backed up (\$(du -sh /var/www/omninudge/backups/${BACKUP_NAME}.sql.gz | cut -f1))"
     else
-      echo "⚠️  Could not read DB credentials — skipping database backup"
+      echo "❌ Could not read DB credentials — aborting deploy (no database backup)"
+      exit 1
     fi
   else
-    echo "⚠️  No .env file found — skipping database backup"
+    echo "❌ No .env file found — aborting deploy (no database backup)"
+    exit 1
   fi
 
   echo "Recent backups:"
@@ -118,7 +120,7 @@ echo ""
 
 echo -e "${GREEN}Deployment complete!${NC}"
 echo ""
-echo "Backup created: ${BACKUP_NAME}.tar.gz"
+echo "Backup created: ${BACKUP_NAME} (.tar.gz + .sql.gz)"
 echo ""
 echo "Next steps:"
 echo "  1. Visit https://omninudge.com to verify the deployment"
@@ -126,5 +128,5 @@ echo "  2. Check backend logs: ssh $SERVER 'journalctl -u omninudge-backend -f'"
 echo ""
 echo "To restore from backup if needed:"
 echo "  Files:    ssh $SERVER 'cd /var/www/omninudge && tar -xzf backups/${BACKUP_NAME}.tar.gz'"
-echo "  Database: ssh $SERVER 'source /var/www/omninudge/backend/.env && PGPASSWORD=\$DB_PASSWORD gunzip -c /var/www/omninudge/backups/${BACKUP_NAME}.sql.gz | psql -U \$DB_USER -h localhost \$DB_NAME'"
+echo "  Database: ssh $SERVER 'DB_USER=\$(grep ^DB_USER= /var/www/omninudge/backend/.env | cut -d= -f2); DB_PASSWORD=\$(grep ^DB_PASSWORD= /var/www/omninudge/backend/.env | cut -d= -f2); DB_NAME=\$(grep ^DB_NAME= /var/www/omninudge/backend/.env | cut -d= -f2); PGPASSWORD=\$DB_PASSWORD gunzip -c /var/www/omninudge/backups/${BACKUP_NAME}.sql.gz | psql -U \$DB_USER -h localhost \$DB_NAME'"
 echo ""
