@@ -1,0 +1,23 @@
+# Build artifacts
+/out/
+
+# Test files (not needed in image)
+**/*_test.go
+**/testdata/
+**/testutil/
+
+# Development files
+.env
+.env.*
+*.local
+
+# Documentation
+*.md
+docs/
+
+# Git
+.git/
+.gitignore
+
+# Uploads (mounted as a volume at runtime)
+uploads/
