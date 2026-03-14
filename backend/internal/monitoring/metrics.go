@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/omninudge/backend/internal/metrics"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 )
@@ -25,84 +26,13 @@ func newMetricFactory() promauto.Factory {
 }
 
 var (
-	// HTTP Metrics
-	HTTPRequestsTotal = metricFactory.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: "omninudge_http_requests_total",
-			Help: "Total number of HTTP requests by method, path, and status",
-		},
-		[]string{"method", "path", "status"},
-	)
-
-	HTTPRequestDuration = metricFactory.NewHistogramVec(
-		prometheus.HistogramOpts{
-			Name:    "omninudge_http_request_duration_seconds",
-			Help:    "HTTP request duration in seconds",
-			Buckets: prometheus.DefBuckets,
-		},
-		[]string{"method", "path"},
-	)
-
 	// WebSocket Metrics
-	WebSocketConnectionsActive = metricFactory.NewGauge(
-		prometheus.GaugeOpts{
-			Name: "omninudge_websocket_connections_active",
-			Help: "Number of active WebSocket connections",
-		},
-	)
-
 	WebSocketMessagesTotal = metricFactory.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "omninudge_websocket_messages_total",
 			Help: "Total number of WebSocket messages by type",
 		},
 		[]string{"type"}, // message, typing, online_status
-	)
-
-	WebSocketMessagesSent = metricFactory.NewCounter(
-		prometheus.CounterOpts{
-			Name: "omninudge_websocket_messages_sent_total",
-			Help: "Total number of WebSocket messages sent",
-		},
-	)
-
-	WebSocketMessagesReceived = metricFactory.NewCounter(
-		prometheus.CounterOpts{
-			Name: "omninudge_websocket_messages_received_total",
-			Help: "Total number of WebSocket messages received",
-		},
-	)
-
-	// Database Metrics
-	DatabaseQueriesTotal = metricFactory.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: "omninudge_database_queries_total",
-			Help: "Total number of database queries by operation",
-		},
-		[]string{"operation"}, // select, insert, update, delete
-	)
-
-	DatabaseQueryDuration = metricFactory.NewHistogramVec(
-		prometheus.HistogramOpts{
-			Name:    "omninudge_database_query_duration_seconds",
-			Help:    "Database query duration in seconds",
-			Buckets: []float64{.001, .005, .01, .025, .05, .1, .25, .5, 1, 2.5, 5, 10},
-		},
-		[]string{"operation"},
-	)
-
-	DatabaseConnectionsActive = metricFactory.NewGauge(
-		prometheus.GaugeOpts{
-			Name: "omninudge_database_connections_active",
-			Help: "Number of active database connections",
-		},
-	)
-
-	DatabaseConnectionsIdle = metricFactory.NewGauge(
-		prometheus.GaugeOpts{
-			Name: "omninudge_database_connections_idle",
-			Help: "Number of idle database connections",
-		},
 	)
 
 	// Redis Metrics
@@ -264,27 +194,12 @@ var (
 	)
 
 	// Reddit API Metrics
-	RedditAPIRequests = metricFactory.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: "omninudge_reddit_api_requests_total",
-			Help: "Total number of Reddit API requests by endpoint",
-		},
-		[]string{"endpoint"},
-	)
-
 	RedditAPIErrors = metricFactory.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "omninudge_reddit_api_errors_total",
 			Help: "Total number of Reddit API errors by type",
 		},
 		[]string{"type"}, // rate_limit, timeout, server_error, client_error
-	)
-
-	RedditAPIRateLimitRemaining = metricFactory.NewGauge(
-		prometheus.GaugeOpts{
-			Name: "omninudge_reddit_api_rate_limit_remaining",
-			Help: "Reddit API rate limit remaining",
-		},
 	)
 
 	// System Metrics
@@ -397,14 +312,14 @@ var (
 
 // RecordHTTPRequest records an HTTP request metric
 func RecordHTTPRequest(method, path string, status int, duration time.Duration) {
-	HTTPRequestsTotal.WithLabelValues(method, path, strconv.Itoa(status)).Inc()
-	HTTPRequestDuration.WithLabelValues(method, path).Observe(duration.Seconds())
+	metrics.HTTPRequestsTotal.WithLabelValues(method, path, strconv.Itoa(status)).Inc()
+	metrics.HTTPRequestDuration.WithLabelValues(method, path).Observe(duration.Seconds())
 }
 
 // RecordDatabaseQuery records a database query metric
 func RecordDatabaseQuery(operation string, duration time.Duration) {
-	DatabaseQueriesTotal.WithLabelValues(operation).Inc()
-	DatabaseQueryDuration.WithLabelValues(operation).Observe(duration.Seconds())
+	metrics.DatabaseQueriesTotal.WithLabelValues(operation, "").Inc()
+	metrics.DatabaseQueryDuration.WithLabelValues(operation, "").Observe(duration.Seconds())
 }
 
 // RecordRedisOperation records a Redis operation metric
@@ -448,8 +363,8 @@ func RecordError(errorType, severity string) {
 
 // UpdateDatabasePoolStats updates database connection pool metrics
 func UpdateDatabasePoolStats(active, idle int) {
-	DatabaseConnectionsActive.Set(float64(active))
-	DatabaseConnectionsIdle.Set(float64(idle))
+	metrics.DatabaseConnectionsActive.Set(float64(active))
+	metrics.DatabaseConnectionsIdle.Set(float64(idle))
 }
 
 // UpdateQueueDepth updates queue depth metric
@@ -465,12 +380,12 @@ func UpdateUserStats(total, online int) {
 
 // IncrementWebSocketConnections increments active WebSocket connections
 func IncrementWebSocketConnections() {
-	WebSocketConnectionsActive.Inc()
+	metrics.WebSocketConnectionsActive.Inc()
 }
 
 // DecrementWebSocketConnections decrements active WebSocket connections
 func DecrementWebSocketConnections() {
-	WebSocketConnectionsActive.Dec()
+	metrics.WebSocketConnectionsActive.Dec()
 }
 
 func RecordModerationReportCreated(reason, targetType string) {

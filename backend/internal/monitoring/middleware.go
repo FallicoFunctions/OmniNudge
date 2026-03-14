@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/omninudge/backend/internal/metrics"
 )
 
 // MetricsMiddleware records HTTP request metrics
@@ -48,13 +49,13 @@ func (t *WebSocketMetricsTracker) OnDisconnect() {
 
 // OnMessageSent records a WebSocket message sent
 func (t *WebSocketMetricsTracker) OnMessageSent(messageType string) {
-	WebSocketMessagesSent.Inc()
+	metrics.WebSocketMessagesSent.WithLabelValues(messageType).Inc()
 	WebSocketMessagesTotal.WithLabelValues(messageType).Inc()
 }
 
 // OnMessageReceived records a WebSocket message received
 func (t *WebSocketMetricsTracker) OnMessageReceived(messageType string) {
-	WebSocketMessagesReceived.Inc()
+	metrics.WebSocketMessagesReceived.WithLabelValues(messageType).Inc()
 	WebSocketMessagesTotal.WithLabelValues(messageType).Inc()
 }
 
