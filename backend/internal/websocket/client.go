@@ -4,11 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"log"
 	"time"
 
 	"github.com/gorilla/websocket"
 	"github.com/omninudge/backend/internal/models"
+	zlog "github.com/rs/zerolog/log"
 )
 
 const (
@@ -137,8 +137,12 @@ func (c *Client) buildTypingBroadcasts(ctx context.Context, typingData typingPay
 		return nil, err
 	}
 	if !canAccess {
-		log.Printf("[SECURITY] Unauthorized typing event: user_id=%d, conversation_id=%d, remote_addr=%s",
-			c.UserID, typingData.ConversationID, c.RemoteAddr)
+		zlog.Warn().
+			Int("user_id", c.UserID).
+			Int("conversation_id", typingData.ConversationID).
+			Str("remote_addr", c.RemoteAddr).
+			Str("event_type", "unauthorized_typing_event").
+			Msg("websocket: unauthorized typing event")
 		return nil, errUnauthorizedConversationAccess
 	}
 
@@ -259,8 +263,12 @@ func (c *Client) checkRateLimit() bool {
 	// Increment and check
 	c.messageCount++
 	if c.messageCount > maxMessagesPerMinute {
-		log.Printf("[SECURITY] Rate limit exceeded for user_id=%d from %s (UserAgent: %s)",
-			c.UserID, c.RemoteAddr, c.UserAgent)
+		zlog.Warn().
+			Int("user_id", c.UserID).
+			Str("remote_addr", c.RemoteAddr).
+			Str("user_agent", c.UserAgent).
+			Str("event_type", "rate_limit_exceeded").
+			Msg("websocket: rate limit exceeded")
 		return false
 	}
 
@@ -270,10 +278,20 @@ func (c *Client) checkRateLimit() bool {
 // readPump pumps messages from the WebSocket connection to the hub
 func (c *Client) readPump() {
 	defer func() {
-		c.Hub.unregister <- c
+		// Non-blocking send to unregister: if hub.Run() has already exited
+		// (e.g. during server shutdown), the unregister channel has no reader
+		// and a blocking send would leak this goroutine permanently.
+		select {
+		case c.Hub.unregister <- c:
+		default:
+		}
 		c.Conn.Close()
-		log.Printf("[AUDIT] WebSocket disconnected: user_id=%d, duration=%v, remote_addr=%s",
-			c.UserID, time.Since(c.ConnectedAt), c.RemoteAddr)
+		zlog.Info().
+			Int("user_id", c.UserID).
+			Dur("duration", time.Since(c.ConnectedAt)).
+			Str("remote_addr", c.RemoteAddr).
+			Str("event_type", "ws_disconnected").
+			Msg("websocket: client disconnected")
 	}()
 
 	c.Conn.SetReadDeadline(time.Now().Add(pongWait))
@@ -287,21 +305,25 @@ func (c *Client) readPump() {
 		_, message, err := c.Conn.ReadMessage()
 		if err != nil {
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-				log.Printf("WebSocket error: %v", err)
+				zlog.Warn().Err(err).Int("user_id", c.UserID).Msg("websocket: unexpected close error")
 			}
 			break
 		}
 
 		// Rate limiting check (P0-004)
 		if !c.checkRateLimit() {
-			// Send rate limit error
-			c.Send <- &Message{
+			// Best-effort: notify client of rate limit. Non-blocking so a full
+			// or closed Send channel does not block/panic the readPump goroutine.
+			select {
+			case c.Send <- &Message{
 				RecipientID: c.UserID,
 				Type:        "error",
 				Payload: map[string]interface{}{
 					"code":    "RATE_LIMIT_EXCEEDED",
 					"message": "Too many messages. Please slow down.",
 				},
+			}:
+			default:
 			}
 			continue
 		}
@@ -313,7 +335,7 @@ func (c *Client) readPump() {
 		}
 
 		if err := json.Unmarshal(message, &incomingMsg); err != nil {
-			log.Printf("Failed to parse message: %v", err)
+			zlog.Warn().Err(err).Int("user_id", c.UserID).Msg("websocket: failed to parse message")
 			continue
 		}
 
@@ -322,7 +344,7 @@ func (c *Client) readPump() {
 		case "typing":
 			var typingData typingPayload
 			if err := json.Unmarshal(incomingMsg.Payload, &typingData); err != nil {
-				log.Printf("Failed to parse typing data: %v", err)
+				zlog.Warn().Err(err).Int("user_id", c.UserID).Msg("websocket: failed to parse typing payload")
 				continue
 			}
 
@@ -332,17 +354,22 @@ func (c *Client) readPump() {
 			cancel()
 			if err != nil {
 				if errors.Is(err, errUnauthorizedConversationAccess) {
-					c.Send <- &Message{
+					// Best-effort: notify client. Non-blocking to avoid blocking readPump
+					// if writePump has exited and the Send channel is full or closed.
+					select {
+					case c.Send <- &Message{
 						RecipientID: c.UserID,
 						Type:        "error",
 						Payload: map[string]interface{}{
 							"code":    "UNAUTHORIZED_CONVERSATION_ACCESS",
 							"message": "You are not authorized to send events for this conversation.",
 						},
+					}:
+					default:
 					}
 					continue
 				}
-				log.Printf("Authorization/settings error for typing event: %v", err)
+				zlog.Error().Err(err).Int("user_id", c.UserID).Msg("websocket: authorization/settings error for typing event")
 				continue
 			}
 			for _, msg := range msgs {
@@ -350,7 +377,7 @@ func (c *Client) readPump() {
 			}
 
 		default:
-			log.Printf("Unknown message type: %s", incomingMsg.Type)
+			zlog.Debug().Str("type", incomingMsg.Type).Int("user_id", c.UserID).Msg("websocket: unknown message type")
 		}
 	}
 }
@@ -375,7 +402,7 @@ func (c *Client) writePump() {
 
 			// Send message as JSON
 			if err := c.Conn.WriteJSON(message); err != nil {
-				log.Printf("Failed to write message: %v", err)
+				zlog.Warn().Err(err).Int("user_id", c.UserID).Msg("websocket: failed to write message")
 				return
 			}
 

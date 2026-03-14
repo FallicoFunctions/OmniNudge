@@ -6,13 +6,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"path/filepath"
 	"time"
 
 	"github.com/hibiken/asynq"
 	"github.com/jackc/pgx/v5/pgxpool"
+	zlog "github.com/rs/zerolog/log"
+
 	"github.com/omninudge/backend/internal/services"
 	"github.com/omninudge/backend/internal/utils"
 )
@@ -25,8 +26,7 @@ func NewDataExportHandler(db *pgxpool.Pool, storage services.StorageService, mas
 			return fmt.Errorf("json.Unmarshal failed: %v: %w", err, asynq.SkipRetry)
 		}
 
-		log.Printf("[DATA EXPORT] Starting export for user_id=%d export_id=%s types=%v",
-			payload.UserID, payload.ExportID, payload.DataTypes)
+		zlog.Info().Int("user_id", payload.UserID).Str("export_id", payload.ExportID).Strs("types", payload.DataTypes).Msg("data_export: starting")
 
 		// Update status to processing
 		_, err := db.Exec(ctx, `
@@ -94,12 +94,12 @@ func NewDataExportHandler(db *pgxpool.Pool, storage services.StorageService, mas
 			case "encryption_keys":
 				data, err = exportEncryptionKeysData(ctx, db, payload.UserID)
 			default:
-				log.Printf("[DATA EXPORT] Unknown data type: %s", dataType)
+				zlog.Warn().Str("data_type", dataType).Str("export_id", payload.ExportID).Msg("data_export: unknown data type, skipping")
 				continue
 			}
 
 			if err != nil {
-				log.Printf("[DATA EXPORT] Failed to export %s: %v", dataType, err)
+				zlog.Warn().Err(err).Str("data_type", dataType).Str("export_id", payload.ExportID).Msg("data_export: failed to export data type")
 				data = map[string]string{"error": err.Error()}
 			}
 
@@ -107,14 +107,14 @@ func NewDataExportHandler(db *pgxpool.Pool, storage services.StorageService, mas
 			filePath := filepath.Join(tempDir, dataType+".json")
 			file, err := os.Create(filePath)
 			if err != nil {
-				log.Printf("[DATA EXPORT] Failed to create file %s: %v", filePath, err)
+				zlog.Warn().Err(err).Str("file_path", filePath).Str("export_id", payload.ExportID).Msg("data_export: failed to create temp file")
 				continue
 			}
 
 			encoder := json.NewEncoder(file)
 			encoder.SetIndent("", "  ")
 			if err := encoder.Encode(data); err != nil {
-				log.Printf("[DATA EXPORT] Failed to encode %s: %v", dataType, err)
+				zlog.Warn().Err(err).Str("data_type", dataType).Str("export_id", payload.ExportID).Msg("data_export: failed to encode data type")
 			}
 			file.Close()
 		}
@@ -159,7 +159,7 @@ func NewDataExportHandler(db *pgxpool.Pool, storage services.StorageService, mas
 		fileSize := fileInfo.Size()
 
 		storageKey := fmt.Sprintf("exports/%d/%s.zip", payload.UserID, payload.ExportID)
-		downloadURL, err := storage.Upload(ctx, storageKey, finalZip)
+		downloadURL, err := storage.Upload(ctx, storageKey, finalZip, "application/zip")
 		if err != nil {
 			return updateExportFailed(ctx, db, payload.ExportID, fmt.Sprintf("Failed to upload to storage: %v", err))
 		}
@@ -196,20 +196,22 @@ func NewDataExportHandler(db *pgxpool.Pool, storage services.StorageService, mas
 			_ = email.SendEmail([]string{userEmail}, subject, body, "")
 		}
 
-		log.Printf("[DATA EXPORT] Export complete: user_id=%d export_id=%s size=%d bytes",
-			payload.UserID, payload.ExportID, fileSize)
+		zlog.Info().Int("user_id", payload.UserID).Str("export_id", payload.ExportID).Int64("size_bytes", fileSize).Msg("data_export: export complete")
 
 		return nil
 	}
 }
 
 func updateExportFailed(ctx context.Context, db *pgxpool.Pool, exportID, errorMsg string) error {
-	_, err := db.Exec(ctx, `
+	_, dbErr := db.Exec(ctx, `
 		UPDATE data_export_requests
 		SET status = 'failed', completed_at = NOW(), error_message = $1
 		WHERE export_id = $2
 	`, errorMsg, exportID)
-	return fmt.Errorf("%s: %w", errorMsg, err)
+	if dbErr != nil {
+		return fmt.Errorf("%s (also failed to update DB: %w)", errorMsg, dbErr)
+	}
+	return fmt.Errorf("%s", errorMsg)
 }
 
 func exportProfileData(ctx context.Context, db *pgxpool.Pool, userID int) (interface{}, error) {

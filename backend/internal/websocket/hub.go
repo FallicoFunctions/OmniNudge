@@ -1,8 +1,10 @@
 package websocket
 
 import (
-	"log"
 	"sync"
+
+	"github.com/gorilla/websocket"
+	zlog "github.com/rs/zerolog/log"
 )
 
 // Hub maintains the set of active clients and broadcasts messages
@@ -21,6 +23,12 @@ type Hub struct {
 
 	// Mutex to protect clients map
 	mu sync.RWMutex
+
+	// done is closed by Shutdown() to signal Run() to exit the event loop.
+	done chan struct{}
+	// closing is set to true by Shutdown() under mu so that new registrations
+	// arriving after shutdown began are not leaked.
+	closing bool
 }
 
 // Message represents a WebSocket message to broadcast
@@ -37,24 +45,33 @@ func NewHub() *Hub {
 		broadcast:  make(chan *Message, 256),
 		register:   make(chan *Client),
 		unregister: make(chan *Client),
+		done:       make(chan struct{}),
 	}
 }
 
-// Run starts the hub
+// Run starts the hub event loop. It exits when Shutdown() closes the done channel.
 func (h *Hub) Run() {
 	for {
 		select {
+		case <-h.done:
+			return
 		case client := <-h.register:
 			h.mu.Lock()
+			// Reject new registrations during shutdown to avoid leaking connections.
+			if h.closing {
+				h.mu.Unlock()
+				close(client.Send)
+				continue
+			}
 			if existing, ok := h.clients[client.UserID]; ok {
 				// "Last connection wins": close previous connection for this user.
 				close(existing.Send)
 				delete(h.clients, client.UserID)
-				log.Printf("Client replaced: user_id=%d", client.UserID)
+				zlog.Info().Int("user_id", client.UserID).Msg("websocket: client replaced (new connection for same user)")
 			}
 			h.clients[client.UserID] = client
 			h.mu.Unlock()
-			log.Printf("Client registered: user_id=%d", client.UserID)
+			zlog.Info().Int("user_id", client.UserID).Msg("websocket: client registered")
 
 			// Send initial state to newly connected client
 			onlineUserIDs := h.GetOnlineUsers()
@@ -65,7 +82,7 @@ func (h *Hub) Run() {
 					"online_users": onlineUserIDs,
 				},
 			}
-			log.Printf("Sent initial state to user_id=%d with %d online users", client.UserID, len(onlineUserIDs))
+			zlog.Info().Int("user_id", client.UserID).Int("online_users", len(onlineUserIDs)).Msg("websocket: sent initial state")
 
 			// Broadcast user_online event to all other connected users
 			h.broadcastUserStatus(client.UserID, true)
@@ -79,7 +96,7 @@ func (h *Hub) Run() {
 			if current, ok := h.clients[client.UserID]; ok && current == client {
 				delete(h.clients, client.UserID)
 				close(client.Send)
-				log.Printf("Client unregistered: user_id=%d", client.UserID)
+				zlog.Info().Int("user_id", client.UserID).Msg("websocket: client unregistered")
 
 				// Broadcast user_offline event to all other connected users
 				h.mu.Unlock()
@@ -216,4 +233,58 @@ func (h *Hub) BroadcastFeatureFlagUpdate(key string, enabled bool, percentage *i
 		Type:        "feature_flag_updated",
 		Payload:     event,
 	})
+}
+
+// Shutdown signals all connected clients to disconnect and stops the Run() loop.
+// It is safe to call exactly once during graceful server shutdown.
+//
+// Shutdown acquires the write lock, marks the hub as closing (so Run() will
+// reject new registrations), sends a "server_shutdown" notification to every
+// connected client, closes each client's Send channel so their writePump
+// exits cleanly, and finally closes the done channel so Run() returns.
+func (h *Hub) Shutdown() {
+	h.mu.Lock()
+
+	// Guard against double-Shutdown (e.g. called from a defer and explicitly).
+	if h.closing {
+		h.mu.Unlock()
+		return
+	}
+	h.closing = true
+	count := len(h.clients)
+
+	for _, client := range h.clients {
+		// Best-effort: notify the client before closing its channel.
+		// Use a recover in case the writePump has already exited and the Send
+		// channel was closed from another goroutine — sending on a closed
+		// channel panics in Go.
+		func() {
+			defer func() { recover() }() //nolint:errcheck
+			select {
+			case client.Send <- &Message{
+				RecipientID: client.UserID,
+				Type:        "server_shutdown",
+				Payload: map[string]interface{}{
+					"code":   websocket.CloseGoingAway,
+					"reason": "server shutting down",
+				},
+			}:
+			default:
+			}
+		}()
+		// Closing the channel triggers the writePump to send a WS CloseMessage
+		// and exit. Use a recover in case it was already closed.
+		func() {
+			defer func() { recover() }() //nolint:errcheck
+			close(client.Send)
+		}()
+		delete(h.clients, client.UserID)
+	}
+
+	h.mu.Unlock()
+
+	// Signal Run() to exit its event loop.
+	close(h.done)
+
+	zlog.Info().Int("connections_closed", count).Msg("websocket hub shutdown complete")
 }
