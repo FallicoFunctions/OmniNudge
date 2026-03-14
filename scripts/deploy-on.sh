@@ -30,7 +30,7 @@ echo ""
 echo -e "${YELLOW}Step 2: Creating backup on server...${NC}"
 BACKUP_NAME="backup-$(date +%Y%m%d-%H%M%S)"
 ssh "$SERVER" bash << EOF
-  set -e
+  set -eo pipefail
   mkdir -p /var/www/omninudge/backups
 
   echo "Creating file backup: ${BACKUP_NAME}.tar.gz"
@@ -40,6 +40,12 @@ ssh "$SERVER" bash << EOF
     --exclude='*.log' \
     --exclude='node_modules' \
     --exclude='.git' \
+    --exclude='.gocache' \
+    --exclude='.cache' \
+    --exclude='bin' \
+    --exclude='omninudge-server' \
+    --exclude='*.test' \
+    --exclude='dump.rdb' \
     backend frontend
 
   # Database backup — load credentials from the .env file written by deploy-app.sh
@@ -64,8 +70,8 @@ ssh "$SERVER" bash << EOF
   echo "Recent backups:"
   ls -lht /var/www/omninudge/backups/ 2>/dev/null | head -8 || echo "This is the first backup"
 
-  # Keep last 10 of each backup type
-  ls -t /var/www/omninudge/backups/*.tar.gz 2>/dev/null | tail -n +11 | xargs -r rm
+  # Keep last 5 file backups, last 10 database backups
+  ls -t /var/www/omninudge/backups/*.tar.gz 2>/dev/null | tail -n +6 | xargs -r rm
   ls -t /var/www/omninudge/backups/*.sql.gz 2>/dev/null | tail -n +11 | xargs -r rm
 EOF
 echo -e "${GREEN}✓ Backup created: ${BACKUP_NAME} (files + database)${NC}"
@@ -89,13 +95,17 @@ echo ""
 
 # Step 5: Build and restart backend on server
 echo -e "${YELLOW}Step 5: Building and restarting backend on server...${NC}"
-ssh "$SERVER" << 'EOF'
+# Compute version locally (server has no .git — rsync excludes it)
+BUILD_VERSION=$(git -C "$PROJECT_ROOT" rev-parse --short HEAD 2>/dev/null || echo "unknown")
+echo "Version: ${BUILD_VERSION}"
+ssh "$SERVER" BUILD_VERSION="$BUILD_VERSION" bash << 'EOF'
+set -eo pipefail
 cd /var/www/omninudge/backend
 export PATH=$PATH:/usr/local/go/bin
 
 # Build backend
 echo "Building backend..."
-go build -o omninudge-server ./cmd/server
+go build -ldflags="-X main.appVersion=${BUILD_VERSION}" -o omninudge-server ./cmd/server
 
 # Restart backend service
 echo "Restarting backend service..."
@@ -110,9 +120,11 @@ echo ""
 
 # Step 6: Verify deployment
 echo -e "${YELLOW}Step 6: Verifying deployment...${NC}"
-HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "https://omninudge.com")
-if [ "$HTTP_STATUS" -eq 200 ]; then
+HTTP_STATUS=$(curl -s -m 15 -o /dev/null -w "%{http_code}" "https://omninudge.com" 2>/dev/null || true)
+if [ "${HTTP_STATUS:-0}" = "200" ]; then
   echo -e "${GREEN}✓ Site is responding (HTTP $HTTP_STATUS)${NC}"
+elif [ -z "$HTTP_STATUS" ] || [ "$HTTP_STATUS" = "000" ]; then
+  echo -e "${RED}✗ Site unreachable (curl failed or timed out)${NC}"
 else
   echo -e "${RED}✗ Site returned HTTP $HTTP_STATUS${NC}"
 fi
