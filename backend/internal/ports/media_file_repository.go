@@ -13,10 +13,15 @@ type MediaFileRepository interface {
 	GetByID(ctx context.Context, id int) (*domain.MediaFile, error)
 	GetTotalStorageByUserID(ctx context.Context, userID int) (int64, error)
 	GetTrackedStorageByUserID(ctx context.Context, userID int) (int64, error)
+	IncrementTrackedStorageByUserID(ctx context.Context, userID int, delta int64) error
 	UpdateThumbnailURL(ctx context.Context, mediaID int, thumbnailURL string) error
 	DeleteByID(ctx context.Context, mediaID int) error
 	GetByPublicURL(ctx context.Context, publicURL string) (*domain.MediaFile, error)
 	MarkScanClean(ctx context.Context, mediaID int) error
 	MarkScanError(ctx context.Context, mediaID int, scanErr string) error
 	MarkScanInfected(ctx context.Context, mediaID int, reason string) error
+	// FindByStoragePath looks up a media file by its storage path / upload key.
+	// Returns (nil, nil) when no record is found (not an error).
+	// BUG-6: Used by ConfirmUpload for idempotency — if the record already exists, return it.
+	FindByStoragePath(ctx context.Context, storagePath string) (*domain.MediaFile, error)
 }
