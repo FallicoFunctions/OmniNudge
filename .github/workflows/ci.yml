@@ -70,7 +70,14 @@ jobs:
         env:
           TEST_DATABASE_URL: postgres://omninudge:omninudge@localhost:5432/omninudge_test?sslmode=disable
           REDIS_ADDR: localhost:6379
-        run: go test -v -race -count=1 -timeout=5m -coverprofile=coverage.out ./internal/...
+        run: go test -v -race -count=1 -timeout=10m -coverprofile=coverage.out ./internal/...
+
+      - name: Run integration tests
+        working-directory: backend
+        env:
+          TEST_DATABASE_URL: postgres://omninudge:omninudge@localhost:5432/omninudge_test?sslmode=disable
+          REDIS_ADDR: localhost:6379
+        run: go test -v -race -count=1 -timeout=5m -tags=integration ./internal/integration/...
 
       - name: Show coverage summary
         working-directory: backend
@@ -81,14 +88,22 @@ jobs:
         run: |
           COVERAGE=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | tr -d '%')
           echo "Total coverage: ${COVERAGE}%"
-          if (( $(echo "$COVERAGE < 50" | bc -l) )); then
-            echo "Coverage ${COVERAGE}% is below threshold 50%"
+          if (( $(echo "$COVERAGE < 70" | bc -l) )); then
+            echo "Coverage ${COVERAGE}% is below threshold 70%"
             exit 1
           fi
 
-      - name: Build
+      - name: Build server
         working-directory: backend
         run: go build ./cmd/server/...
+
+      - name: Build seed tool
+        working-directory: backend
+        run: go build ./cmd/seed/...
+
+      - name: Build worker
+        working-directory: backend
+        run: go build ./cmd/worker/...
 
   # ─── Frontend: TypeScript + React ──────────────────────────────────────────
   frontend:
@@ -133,6 +148,129 @@ jobs:
         working-directory: frontend
         run: npm run build
 
+  # ─── E2E: Playwright ────────────────────────────────────────────────────────
+  e2e:
+    name: E2E Tests (Playwright)
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: omninudge
+          POSTGRES_PASSWORD: omninudge
+          POSTGRES_DB: omninudge_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Download backend dependencies
+        working-directory: backend
+        run: go mod download
+
+      - name: Run migrations
+        working-directory: backend
+        env:
+          DB_HOST: localhost
+          DB_PORT: 5432
+          DB_USER: omninudge
+          DB_PASSWORD: omninudge
+          DB_NAME: omninudge_test
+          DB_SSLMODE: disable
+        run: go run ./cmd/migrate/... -action=up
+
+      - name: Seed test data
+        working-directory: backend
+        env:
+          DB_HOST: localhost
+          DB_PORT: 5432
+          DB_USER: omninudge
+          DB_PASSWORD: omninudge
+          DB_NAME: omninudge_test
+          DB_SSLMODE: disable
+          REDIS_ADDR: localhost:6379
+        run: go run ./cmd/seed/... --count=5
+
+      - name: Start backend server
+        working-directory: backend
+        env:
+          DB_HOST: localhost
+          DB_PORT: 5432
+          DB_USER: omninudge
+          DB_PASSWORD: omninudge
+          DB_NAME: omninudge_test
+          DB_SSLMODE: disable
+          REDIS_ADDR: localhost:6379
+          PORT: 8080
+          JWT_SECRET: ci-test-secret-do-not-use-in-prod
+        run: go run ./cmd/server/... &
+
+      - name: Wait for backend to be ready
+        run: |
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:8080/health/liveness; then
+              echo "Backend ready"
+              exit 0
+            fi
+            echo "Waiting... ($i/30)"
+            sleep 2
+          done
+          echo "ERROR: backend did not become ready after 60s"
+          exit 1
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Install Playwright browsers
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+
+      - name: Run Playwright E2E tests
+        working-directory: frontend
+        env:
+          VITE_API_BASE_URL: http://localhost:8080
+        run: npx playwright test --project=chromium
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: frontend/playwright-report/
+          retention-days: 7
+
   # ─── Migration safety check ────────────────────────────────────────────────
   migrations:
     name: Migration rollback safety
@@ -165,8 +303,13 @@ jobs:
       - name: Run migrations up
         working-directory: backend
         env:
-          DATABASE_URL: postgres://omninudge:omninudge@localhost:5432/omninudge_migrations?sslmode=disable
-        run: go run ./cmd/migrate/... up
+          DB_HOST: localhost
+          DB_PORT: 5432
+          DB_USER: omninudge
+          DB_PASSWORD: omninudge
+          DB_NAME: omninudge_migrations
+          DB_SSLMODE: disable
+        run: go run ./cmd/migrate/... -action=up
 
       - name: Verify all up files have matching down files
         working-directory: backend/internal/database/migrations
