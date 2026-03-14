@@ -371,10 +371,13 @@ function RedditCommentView({
   const [replyText, setReplyText] = useState('');
   const [isReplying, setIsReplying] = useState(false);
   const formattedTimestamp = useMemo(() => {
+    const ts = comment.data.created_utc;
+    if (!ts || !isFinite(ts)) return '';
+    const date = new Date(ts * 1000);
     if (useRelativeTime) {
-      return formatRelativeTimeIntl(new Date(comment.data.created_utc * 1000));
+      return formatRelativeTimeIntl(date);
     }
-    return formatDate(new Date(comment.data.created_utc * 1000), {
+    return formatDate(date, {
       month: 'short',
       day: 'numeric',
       hour: 'numeric',
@@ -717,10 +720,12 @@ function LocalCommentView({
   const isSaved = savedCommentIds.has(comment.id);
   const inboxDisabled = comment.inbox_replies_disabled ?? false;
   const formattedTimestamp = useMemo(() => {
+    const date = comment.created_at ? new Date(comment.created_at) : null;
+    if (!date || !isFinite(date.getTime())) return '';
     if (useRelativeTime) {
-      return formatRelativeTimeIntl(comment.created_at);
+      return formatRelativeTimeIntl(date);
     }
-    return formatDate(comment.created_at, {
+    return formatDate(date, {
       month: 'short',
       day: 'numeric',
       hour: 'numeric',

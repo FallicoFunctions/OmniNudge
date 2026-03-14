@@ -23,7 +23,8 @@ export function useFormat() {
   /**
    * Format a number based on the current locale
    */
-  const formatNumber = (num: number, options?: Intl.NumberFormatOptions) => {
+  const formatNumber = (num: number | null | undefined, options?: Intl.NumberFormatOptions): string => {
+    if (num == null || !isFinite(num)) return '—';
     return new Intl.NumberFormat(locale, options).format(num);
   };
 
