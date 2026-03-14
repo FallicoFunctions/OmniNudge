@@ -1,6 +1,8 @@
 package metrics
 
 import (
+	"os"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -8,10 +10,22 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
+// metricFactory uses an isolated registry in test binaries to prevent duplicate
+// registration panics when both internal/metrics and internal/monitoring are
+// imported in the same test binary.
+var metricFactory = newMetricFactory()
+
+func newMetricFactory() promauto.Factory {
+	if strings.HasSuffix(os.Args[0], ".test") {
+		return promauto.With(prometheus.NewRegistry())
+	}
+	return promauto.With(prometheus.DefaultRegisterer)
+}
+
 // Prometheus metrics for monitoring
 var (
 	// HTTP metrics
-	HTTPRequestsTotal = promauto.NewCounterVec(
+	HTTPRequestsTotal = metricFactory.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "omninudge_http_requests_total",
 			Help: "Total number of HTTP requests",
@@ -19,7 +33,7 @@ var (
 		[]string{"method", "path", "status"},
 	)
 
-	HTTPRequestDuration = promauto.NewHistogramVec(
+	HTTPRequestDuration = metricFactory.NewHistogramVec(
 		prometheus.HistogramOpts{
 			Name:    "omninudge_http_request_duration_seconds",
 			Help:    "HTTP request duration in seconds",
@@ -28,7 +42,7 @@ var (
 		[]string{"method", "path"},
 	)
 
-	HTTPRequestSize = promauto.NewHistogramVec(
+	HTTPRequestSize = metricFactory.NewHistogramVec(
 		prometheus.HistogramOpts{
 			Name:    "omninudge_http_request_size_bytes",
 			Help:    "HTTP request size in bytes",
@@ -37,7 +51,7 @@ var (
 		[]string{"method", "path"},
 	)
 
-	HTTPResponseSize = promauto.NewHistogramVec(
+	HTTPResponseSize = metricFactory.NewHistogramVec(
 		prometheus.HistogramOpts{
 			Name:    "omninudge_http_response_size_bytes",
 			Help:    "HTTP response size in bytes",
@@ -47,21 +61,21 @@ var (
 	)
 
 	// WebSocket metrics
-	WebSocketConnectionsActive = promauto.NewGauge(
+	WebSocketConnectionsActive = metricFactory.NewGauge(
 		prometheus.GaugeOpts{
 			Name: "omninudge_websocket_connections_active",
 			Help: "Number of active WebSocket connections",
 		},
 	)
 
-	WebSocketConnectionsTotal = promauto.NewCounter(
+	WebSocketConnectionsTotal = metricFactory.NewCounter(
 		prometheus.CounterOpts{
 			Name: "omninudge_websocket_connections_total",
 			Help: "Total number of WebSocket connections established",
 		},
 	)
 
-	WebSocketMessagesReceived = promauto.NewCounterVec(
+	WebSocketMessagesReceived = metricFactory.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "omninudge_websocket_messages_received_total",
 			Help: "Total number of WebSocket messages received",
@@ -69,7 +83,7 @@ var (
 		[]string{"message_type"},
 	)
 
-	WebSocketMessagesSent = promauto.NewCounterVec(
+	WebSocketMessagesSent = metricFactory.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "omninudge_websocket_messages_sent_total",
 			Help: "Total number of WebSocket messages sent",
@@ -77,7 +91,7 @@ var (
 		[]string{"message_type"},
 	)
 
-	WebSocketErrors = promauto.NewCounterVec(
+	WebSocketErrors = metricFactory.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "omninudge_websocket_errors_total",
 			Help: "Total number of WebSocket errors",
@@ -86,7 +100,7 @@ var (
 	)
 
 	// Database metrics
-	DatabaseQueriesTotal = promauto.NewCounterVec(
+	DatabaseQueriesTotal = metricFactory.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "omninudge_database_queries_total",
 			Help: "Total number of database queries",
@@ -94,7 +108,7 @@ var (
 		[]string{"operation", "table"},
 	)
 
-	DatabaseQueryDuration = promauto.NewHistogramVec(
+	DatabaseQueryDuration = metricFactory.NewHistogramVec(
 		prometheus.HistogramOpts{
 			Name:    "omninudge_database_query_duration_seconds",
 			Help:    "Database query duration in seconds",
@@ -103,14 +117,14 @@ var (
 		[]string{"operation", "table"},
 	)
 
-	DatabaseConnectionsActive = promauto.NewGauge(
+	DatabaseConnectionsActive = metricFactory.NewGauge(
 		prometheus.GaugeOpts{
 			Name: "omninudge_database_connections_active",
 			Help: "Number of active database connections",
 		},
 	)
 
-	DatabaseConnectionsIdle = promauto.NewGauge(
+	DatabaseConnectionsIdle = metricFactory.NewGauge(
 		prometheus.GaugeOpts{
 			Name: "omninudge_database_connections_idle",
 			Help: "Number of idle database connections",
@@ -118,21 +132,21 @@ var (
 	)
 
 	// Message metrics
-	MessagesCreatedTotal = promauto.NewCounter(
+	MessagesCreatedTotal = metricFactory.NewCounter(
 		prometheus.CounterOpts{
 			Name: "omninudge_messages_created_total",
 			Help: "Total number of messages created",
 		},
 	)
 
-	MessagesSentTotal = promauto.NewCounter(
+	MessagesSentTotal = metricFactory.NewCounter(
 		prometheus.CounterOpts{
 			Name: "omninudge_messages_sent_total",
 			Help: "Total number of messages sent successfully",
 		},
 	)
 
-	MessagesFailedTotal = promauto.NewCounterVec(
+	MessagesFailedTotal = metricFactory.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "omninudge_messages_failed_total",
 			Help: "Total number of failed message sends",
@@ -140,7 +154,7 @@ var (
 		[]string{"reason"},
 	)
 
-	MessageSendDuration = promauto.NewHistogram(
+	MessageSendDuration = metricFactory.NewHistogram(
 		prometheus.HistogramOpts{
 			Name:    "omninudge_message_send_duration_seconds",
 			Help:    "Time to send a message (including encryption)",
@@ -149,7 +163,7 @@ var (
 	)
 
 	// Encryption metrics
-	EncryptionOperationsTotal = promauto.NewCounterVec(
+	EncryptionOperationsTotal = metricFactory.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "omninudge_encryption_operations_total",
 			Help: "Total number of encryption operations",
@@ -157,7 +171,7 @@ var (
 		[]string{"operation", "algorithm"},
 	)
 
-	EncryptionDuration = promauto.NewHistogramVec(
+	EncryptionDuration = metricFactory.NewHistogramVec(
 		prometheus.HistogramOpts{
 			Name:    "omninudge_encryption_duration_seconds",
 			Help:    "Encryption operation duration in seconds",
@@ -167,7 +181,7 @@ var (
 	)
 
 	// Cache metrics (with key_prefix label for per-prefix observability)
-	CacheHits = promauto.NewCounterVec(
+	CacheHits = metricFactory.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "omninudge_cache_hits_total",
 			Help: "Total cache hits",
@@ -175,7 +189,7 @@ var (
 		[]string{"cache_type", "key_prefix"},
 	)
 
-	CacheMisses = promauto.NewCounterVec(
+	CacheMisses = metricFactory.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "omninudge_cache_misses_total",
 			Help: "Total cache misses",
@@ -183,7 +197,7 @@ var (
 		[]string{"cache_type", "key_prefix"},
 	)
 
-	CacheErrors = promauto.NewCounterVec(
+	CacheErrors = metricFactory.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "omninudge_cache_errors_total",
 			Help: "Total cache errors",
@@ -191,7 +205,7 @@ var (
 		[]string{"cache_type", "operation"},
 	)
 
-	CacheEvictionsTotal = promauto.NewCounterVec(
+	CacheEvictionsTotal = metricFactory.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "omninudge_cache_evictions_total",
 			Help: "Total number of cache evictions",
@@ -200,14 +214,14 @@ var (
 	)
 
 	// Rate limiting metrics
-	RateLimitHitsTotal = promauto.NewCounter(
+	RateLimitHitsTotal = metricFactory.NewCounter(
 		prometheus.CounterOpts{
 			Name: "omninudge_rate_limit_hits_total",
 			Help: "Total number of rate limit events across all tiers (warn + throttle + block).",
 		},
 	)
 
-	RateLimitRequestsTotal = promauto.NewCounterVec(
+	RateLimitRequestsTotal = metricFactory.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "omninudge_rate_limit_requests_total",
 			Help: "Total number of requests checked by rate limiter",
@@ -215,7 +229,7 @@ var (
 		[]string{"limit_type"},
 	)
 
-	RateLimitWarningsTotal = promauto.NewCounterVec(
+	RateLimitWarningsTotal = metricFactory.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "omninudge_rate_limit_warnings_total",
 			Help: "Total number of rate limit warnings (token budget < 20%)",
@@ -223,7 +237,7 @@ var (
 		[]string{"endpoint"},
 	)
 
-	RateLimitThrottledTotal = promauto.NewCounterVec(
+	RateLimitThrottledTotal = metricFactory.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "omninudge_rate_limit_throttled_total",
 			Help: "Total number of throttled requests (artificial delay applied)",
@@ -231,7 +245,7 @@ var (
 		[]string{"endpoint"},
 	)
 
-	RateLimitBlockedTotal = promauto.NewCounterVec(
+	RateLimitBlockedTotal = metricFactory.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "omninudge_rate_limit_blocked_total",
 			Help: "Total number of blocked requests (429 returned)",
@@ -240,7 +254,7 @@ var (
 	)
 
 	// File upload metrics
-	FileUploadsTotal = promauto.NewCounterVec(
+	FileUploadsTotal = metricFactory.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "omninudge_file_uploads_total",
 			Help: "Total number of file uploads",
@@ -248,7 +262,7 @@ var (
 		[]string{"file_type"},
 	)
 
-	FileUploadSize = promauto.NewHistogramVec(
+	FileUploadSize = metricFactory.NewHistogramVec(
 		prometheus.HistogramOpts{
 			Name:    "omninudge_file_upload_size_bytes",
 			Help:    "File upload size in bytes",
@@ -257,7 +271,7 @@ var (
 		[]string{"file_type"},
 	)
 
-	FileUploadDuration = promauto.NewHistogramVec(
+	FileUploadDuration = metricFactory.NewHistogramVec(
 		prometheus.HistogramOpts{
 			Name:    "omninudge_file_upload_duration_seconds",
 			Help:    "File upload duration in seconds",
@@ -267,7 +281,7 @@ var (
 	)
 
 	// Job queue metrics
-	JobsEnqueuedTotal = promauto.NewCounterVec(
+	JobsEnqueuedTotal = metricFactory.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "omninudge_jobs_enqueued_total",
 			Help: "Total number of jobs enqueued",
@@ -275,7 +289,7 @@ var (
 		[]string{"queue", "job_type"},
 	)
 
-	JobsCompletedTotal = promauto.NewCounterVec(
+	JobsCompletedTotal = metricFactory.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "omninudge_jobs_completed_total",
 			Help: "Total number of jobs completed",
@@ -283,7 +297,7 @@ var (
 		[]string{"queue", "job_type"},
 	)
 
-	JobsFailedTotal = promauto.NewCounterVec(
+	JobsFailedTotal = metricFactory.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "omninudge_jobs_failed_total",
 			Help: "Total number of jobs failed",
@@ -291,7 +305,7 @@ var (
 		[]string{"queue", "job_type"},
 	)
 
-	JobDuration = promauto.NewHistogramVec(
+	JobDuration = metricFactory.NewHistogramVec(
 		prometheus.HistogramOpts{
 			Name:    "omninudge_job_duration_seconds",
 			Help:    "Job processing duration in seconds",
@@ -301,7 +315,7 @@ var (
 	)
 
 	// Reddit API metrics
-	RedditAPIRequestsTotal = promauto.NewCounterVec(
+	RedditAPIRequestsTotal = metricFactory.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "omninudge_reddit_api_requests_total",
 			Help: "Total number of Reddit API requests",
@@ -309,7 +323,7 @@ var (
 		[]string{"endpoint", "status"},
 	)
 
-	RedditAPIRequestDuration = promauto.NewHistogramVec(
+	RedditAPIRequestDuration = metricFactory.NewHistogramVec(
 		prometheus.HistogramOpts{
 			Name:    "omninudge_reddit_api_request_duration_seconds",
 			Help:    "Reddit API request duration in seconds",
@@ -318,7 +332,7 @@ var (
 		[]string{"endpoint"},
 	)
 
-	RedditAPIRateLimitRemaining = promauto.NewGauge(
+	RedditAPIRateLimitRemaining = metricFactory.NewGauge(
 		prometheus.GaugeOpts{
 			Name: "omninudge_reddit_api_rate_limit_remaining",
 			Help: "Remaining Reddit API requests before rate limit",
