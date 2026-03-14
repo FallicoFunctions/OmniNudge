@@ -16,7 +16,6 @@ package main
 
 import (
 	"context"
-	"log"
 	"net/http"
 	nethttppprof "net/http/pprof"
 	"os"
@@ -67,7 +66,9 @@ func main() {
 	// Load configuration
 	cfg, err := config.Load()
 	if err != nil {
-		log.Fatalf("Failed to load config: %v", err)
+		// zerolog's global logger is operational before Initialize() is called
+		// (it defaults to os.Stderr with info level). Fatal() logs and calls os.Exit(1).
+		zlog.Fatal().Err(err).Msg("Failed to load config")
 	}
 
 	// Initialize zerolog structured logger — must come before any other log calls.
@@ -303,19 +304,64 @@ func main() {
 	// Initialize feature flag service (P0-012)
 	featureFlagService := services.NewFeatureFlagService(featureFlagRepo, redisClient, hub, cfg.AppEnv)
 
+	// Background goroutine: auto-rollback feature flags when error thresholds are exceeded.
+	// Reuses cleanupCtx so it stops cleanly on graceful shutdown.
+	rollbackCtx, rollbackCancel := context.WithCancel(context.Background())
+	defer rollbackCancel()
+	go func() {
+		ticker := time.NewTicker(60 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				featureFlagService.CheckAutoRollbacks(rollbackCtx)
+			case <-rollbackCtx.Done():
+				return
+			}
+		}
+	}()
+
 	// Initialize analytics service (P0-027)
 	analyticsService := services.NewAnalyticsService(db.Pool)
 
-	// Initialize storage service (P0-016)
-	storageService, err := services.NewLocalStorageService("./uploads/exports", cfg.FrontendURL+"/uploads/exports")
-	if err != nil {
-		zlog.Fatal().Err(err).Msg("Failed to initialize storage service")
+	// Initialize storage service (P0-016 / REFACTOR_13)
+	// STORAGE_BACKEND=s3 enables S3/CloudFront; defaults to local filesystem.
+	var storageService services.StorageService
+	var s3StorageService *services.S3StorageService
+	switch cfg.Storage.StorageBackend {
+	case "s3":
+		s3Svc, err := services.NewS3StorageService(cfg)
+		if err != nil {
+			zlog.Fatal().Err(err).Msg("Failed to init S3 storage service")
+		}
+		// SEC-5: Zero the S3 secret key from memory now that the client is built.
+		cfg.Storage.S3SecretKey = ""
+		storageService = s3Svc
+		s3StorageService = s3Svc
+		zlog.Info().Str("bucket", cfg.Storage.S3Bucket).Str("region", cfg.Storage.S3Region).Msg("S3 storage initialized")
+	default:
+		// NOTE: These paths are relative to the server's working directory.
+		// Ensure the binary is started from the project root, or set absolute paths via environment variables.
+		localSvc, err := services.NewLocalStorageService("./uploads", cfg.FrontendURL+"/uploads")
+		if err != nil {
+			zlog.Fatal().Err(err).Msg("Failed to initialize local storage service")
+		}
+		storageService = localSvc
+		zlog.Info().Msg("Local filesystem storage initialized")
 	}
 
-	// Initialize voice storage service (F11)
-	voiceStorage, err := services.NewLocalStorageService("./uploads/voice", cfg.FrontendURL+"/uploads/voice")
-	if err != nil {
-		zlog.Fatal().Err(err).Msg("Failed to initialize voice storage")
+	// Initialize voice storage service (F11).
+	// When S3 is active, reuse the same service — key prefixes distinguish files.
+	// When local, use a dedicated voice uploads directory.
+	var voiceStorage services.StorageService
+	if cfg.Storage.StorageBackend == "s3" {
+		voiceStorage = storageService
+	} else {
+		vs, err := services.NewLocalStorageService("./uploads/voice", cfg.FrontendURL+"/uploads/voice")
+		if err != nil {
+			zlog.Fatal().Err(err).Msg("Failed to initialize voice storage")
+		}
+		voiceStorage = vs
 	}
 
 	// Declare virusScanner at package scope so it can be passed to voice handler.
@@ -324,23 +370,38 @@ func main() {
 	// Initialize scrubber service (P0-017)
 	scrubberService := services.NewScrubberService(db.Pool, storageService)
 
-	// Inject storage service into appropriate handlers/workers if needed
-	_ = storageService // Will be used by export worker
-
 	// Initialize email service (P0-036)
-	emailService := services.NewEmailService(
-		cfg.SMTP.Host,
-		cfg.SMTP.Port,
-		cfg.SMTP.User,
-		cfg.SMTP.Password,
-		cfg.SMTP.FromAddress,
-		cfg.SMTP.FromName,
-	)
-	if cfg.SMTP.Host != "" {
-		zlog.Info().Msg("Email service initialized")
-	} else {
-		zlog.Warn().Msg("SMTP not configured, emails will not be sent")
+	// Provider selection order: SendGrid > Mailgun > SMTP > stub (logs only).
+	emailService := services.NewEmailServiceFull(services.EmailServiceConfig{
+		SendGridAPIKey: cfg.SMTP.SendGridAPIKey,
+		MailgunAPIKey:  cfg.SMTP.MailgunAPIKey,
+		MailgunDomain:  cfg.SMTP.MailgunDomain,
+		SMTPHost:       cfg.SMTP.Host,
+		SMTPPort:       cfg.SMTP.Port,
+		SMTPUser:       cfg.SMTP.User,
+		SMTPPassword:   cfg.SMTP.Password,
+		FromAddress:    cfg.SMTP.FromAddress,
+		FromName:       cfg.SMTP.FromName,
+		FrontendURL:    cfg.FrontendURL,
+	})
+	switch {
+	case cfg.SMTP.SendGridAPIKey != "":
+		zlog.Info().Msg("Email service initialized (provider: SendGrid)")
+	case cfg.SMTP.MailgunAPIKey != "":
+		zlog.Info().Str("domain", cfg.SMTP.MailgunDomain).Msg("Email service initialized (provider: Mailgun)")
+	case cfg.SMTP.Host != "":
+		zlog.Info().Str("host", cfg.SMTP.Host).Msg("Email service initialized (provider: SMTP)")
+	default:
+		zlog.Warn().Msg("No email provider configured — emails will be logged but not sent")
 	}
+
+	// Initialize SMS service (stub mode unless Twilio credentials are configured).
+	smsService := services.NewSMSService(
+		cfg.Twilio.AccountSID,
+		cfg.Twilio.AuthToken,
+		cfg.Twilio.FromNumber,
+	)
+	_ = smsService // available for future use by handlers that need SMS
 
 	// Start job queue worker (P0-002: background job processing)
 	if queueClient != nil {
@@ -363,13 +424,19 @@ func main() {
 		jobWorker.RegisterAllHandlers(queue.JobHandlers{
 			EmailSend:           queue.NewEmailHandler(emailService),
 			DataExport:          queue.NewDataExportHandler(db.Pool, storageService, cfg.Encryption.Key, emailService),
-			VirusScan:           queue.NewVirusScanHandler(mediaRepo, virusScanner, cfg.VirusScan.FailClosed),
+			VirusScan:           queue.NewVirusScanHandler(mediaRepo, virusScanner, cfg.VirusScan.FailClosed, storageService),
 			Transcription:       queue.NewUnsupportedHandler(queue.JobTypeTranscription, "transcription backend pipeline is not yet implemented"),
 			Notification:        queue.NewNotificationHandler(tokenRepo, firebaseService),
 			ThumbnailGeneration: queue.NewThumbnailGenerationHandler(mediaRepo, queueThumbnailService),
 			ContentModeration:   queue.NewUnsupportedHandler(queue.JobTypeContentModeration, "content moderation backend is not yet implemented"),
 			MessageReencrypt:    queue.NewUnsupportedHandler(queue.JobTypeMessageReencrypt, "message re-encryption backend pipeline is not yet implemented"),
 			WaveformGeneration:  queue.NewWaveformJobHandler(db.Pool, voiceStorage).Handle,
+			VideoTranscode: func() func(context.Context, *asynq.Task) error {
+				if cfg.Storage.StorageBackend != "s3" {
+					zlog.Warn().Msg("video transcoding registered with local storage backend — HLS segments will not be CDN-served")
+				}
+				return queue.NewVideoTranscodeHandler(db.Pool, "./uploads/hls", storageService).Handle
+			}(),
 		})
 
 		// Start worker in background
@@ -397,6 +464,23 @@ func main() {
 	cleanupCtx, cleanupCancel := context.WithCancel(context.Background())
 	defer cleanupCancel()
 	go jobs.NewCleanupJob(db.Pool).Start(cleanupCtx)
+
+	// Start materialized view refresh job (refreshes analytics views every 5 minutes).
+	viewRefreshJob := jobs.NewRefreshMaterializedViewsJob(db.Pool, zlog.Logger)
+	go func() {
+		ticker := time.NewTicker(5 * time.Minute)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				if err := viewRefreshJob.Run(cleanupCtx); err != nil {
+					zlog.Error().Err(err).Msg("view refresh job failed")
+				}
+			case <-cleanupCtx.Done():
+				return
+			}
+		}
+	}()
 
 	// Start background workers
 	// Fix 10: use a single cancellable context for all background workers so
@@ -443,6 +527,13 @@ func main() {
 		ProTierBytes:  cfg.Media.ProTierQuotaBytes,
 	}
 	mediaHandler := handlers.NewMediaHandler(mediaRepo, thumbnailService, queueClient, mediaQuota, cfg.VirusScan.FailClosed)
+	// Inject storage service so all uploads go through the configured backend.
+	mediaHandler.SetStorageService(storageService)
+	// Also inject S3 service when S3 storage backend is active so presigned URL
+	// endpoint can generate PUT presigned URLs and CDN URLs.
+	if s3StorageService != nil {
+		mediaHandler.SetS3Service(s3StorageService)
+	}
 	storageHandler := handlers.NewStorageHandler(mediaRepo, mediaQuota)
 	hubsHandler := handlers.NewHubsHandlerWithAccessRequest(hubRepo, postRepo, hubModRepo, hubSubRepo, hubSettingsRepo, hubAccessRequestRepo)
 	subscriptionsHandler := handlers.NewSubscriptionsHandler(hubSubRepo, subredditSubRepo, hubRepo)
@@ -497,7 +588,7 @@ func main() {
 	groupHandler := handlers.NewGroupHandler(db.Pool)
 	dataRetentionHandler := handlers.NewDataRetentionHandler(db.Pool)
 	pushNotificationHandler := handlers.NewPushNotificationHandler(db.Pool, tokenRepo, firebaseService)
-	callsHandler := handlers.NewCallsHandler(db.Pool, hub)
+	callsHandler := handlers.NewCallsHandler(db.Pool, hub, cfg.TURN)
 
 	// Feature 1: Message Reactions handler + rate limiter
 	reactionsHandler := handlers.NewReactionsHandler(reactionService)
@@ -537,7 +628,7 @@ func main() {
 	//                   ctx.Done() will be cancelled automatically
 	// 12. Metrics     — measures handler latency last so compression is included
 	router := gin.New()
-	router.Use(gin.Recovery())
+	router.Use(middleware.Recovery())
 	router.Use(observability.SentryMiddleware())
 	router.Use(middleware.RequestID())
 	router.Use(middleware.Tracing(serviceName))
@@ -1140,6 +1231,9 @@ func main() {
 			protected.GET("/files/:id/thumbnail", mediaHandler.GetThumbnail)
 			// Audio encoding for iOS Safari (P0-003)
 			protected.POST("/media/encode-audio", audioEncoderHandler.EncodeAudio)
+			// S3 presigned upload URL (REFACTOR_13: direct-to-S3 uploads; 501 when local storage)
+			protected.POST("/media/presigned-url", uploadRateLimiter.Middleware(), mediaHandler.GetPresignedURL)
+			protected.POST("/media/confirm-upload", uploadRateLimiter.Middleware(), mediaHandler.ConfirmUpload)
 
 			// User profile management
 			protected.GET("/users/me/profile", usersHandler.GetMyProfile)
@@ -1347,13 +1441,28 @@ func main() {
 	<-quit
 	zlog.Info().Msg("Shutting down server...")
 
-	// Give outstanding requests 5 seconds to complete
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
+	// Give outstanding requests 30 seconds to complete (draining window).
+	shutdownStart := time.Now()
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer shutdownCancel()
 
-	if err := srv.Shutdown(ctx); err != nil {
-		zlog.Fatal().Err(err).Msg("Server forced to shutdown")
+	if err := srv.Shutdown(shutdownCtx); err != nil {
+		zlog.Error().Err(err).Msg("Server forced to shutdown")
 	}
+
+	// Drain WebSocket connections — send close frames to all connected clients.
+	hub.Shutdown()
+
+	// Close the queue client so no new jobs are enqueued after shutdown.
+	if queueClient != nil {
+		if err := queueClient.Close(); err != nil {
+			zlog.Warn().Err(err).Msg("Error closing queue client")
+		}
+	}
+
+	zlog.Info().
+		Dur("duration", time.Since(shutdownStart)).
+		Msg("shutdown complete")
 
 	// Stop rate limiter eviction goroutines.
 	// ORDERING: these Stop() calls must run AFTER srv.Shutdown() (so no new
