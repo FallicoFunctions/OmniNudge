@@ -2,6 +2,9 @@ package handlers
 
 import (
 	"context"
+	"crypto/hmac"
+	"crypto/sha1"
+	"encoding/base64"
 	"fmt"
 	"log"
 	"net/http"
@@ -10,6 +13,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/omninudge/backend/internal/config"
 	"github.com/omninudge/backend/internal/models"
 	"github.com/omninudge/backend/internal/websocket"
 )
@@ -18,11 +22,12 @@ import (
 type CallsHandler struct {
 	pool *pgxpool.Pool
 	hub  HubInterface
+	turn config.TURNConfig
 }
 
 // NewCallsHandler creates a new CallsHandler.
-func NewCallsHandler(pool *pgxpool.Pool, hub HubInterface) *CallsHandler {
-	return &CallsHandler{pool: pool, hub: hub}
+func NewCallsHandler(pool *pgxpool.Pool, hub HubInterface, turn config.TURNConfig) *CallsHandler {
+	return &CallsHandler{pool: pool, hub: hub, turn: turn}
 }
 
 // startCallRequest is the request body for starting a call.
@@ -459,12 +464,29 @@ func (h *CallsHandler) Signal(c *gin.Context) {
 // @Success 200 {object} gin.H
 // @Router /calls/ice-servers [get]
 func (h *CallsHandler) GetICEServers(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{
-		"ice_servers": []gin.H{
-			{"urls": "stun:stun.l.google.com:19302"},
-			{"urls": "stun:stun1.l.google.com:19302"},
-		},
-	})
+	iceServers := []gin.H{
+		{"urls": "stun:stun.l.google.com:19302"},
+		{"urls": "stun:stun1.l.google.com:19302"},
+	}
+
+	if h.turn.Host != "" && h.turn.Secret != "" {
+		// Generate time-limited HMAC-SHA1 credentials (RFC 5389 / coturn compatible).
+		// Username encodes expiry so credentials self-expire after 24h.
+		expiry := time.Now().Add(24 * time.Hour).Unix()
+		username := fmt.Sprintf("%d", expiry)
+		mac := hmac.New(sha1.New, []byte(h.turn.Secret))
+		mac.Write([]byte(username))
+		password := base64.StdEncoding.EncodeToString(mac.Sum(nil))
+
+		turnURL := fmt.Sprintf("turn:%s:%s", h.turn.Host, h.turn.Port)
+		turnsURL := fmt.Sprintf("turns:%s:%s?transport=tcp", h.turn.Host, "5349")
+		iceServers = append(iceServers,
+			gin.H{"urls": turnURL, "username": username, "credential": password},
+			gin.H{"urls": turnsURL, "username": username, "credential": password},
+		)
+	}
+
+	c.JSON(http.StatusOK, gin.H{"ice_servers": iceServers})
 }
 
 // StartScreenShare handles POST /api/v1/calls/:id/screen-share/start
