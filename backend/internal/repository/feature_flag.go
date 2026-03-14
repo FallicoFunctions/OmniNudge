@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -269,4 +271,81 @@ func (r *FeatureFlagRepository) GetAnyUserID(ctx context.Context) (int64, error)
 		return 0, err
 	}
 	return userID, nil
+}
+
+// AnalyticsEventsTableExists reports whether the analytics_events table exists in the DB.
+// Call this once per CheckAutoRollbacks run rather than per flag.
+func (r *FeatureFlagRepository) AnalyticsEventsTableExists(ctx context.Context) (bool, error) {
+	var exists bool
+	if err := r.pool.QueryRow(ctx,
+		`SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'analytics_events')`,
+	).Scan(&exists); err != nil {
+		return false, fmt.Errorf("AnalyticsEventsTableExists: %w", err)
+	}
+	return exists, nil
+}
+
+// GetFlagErrorRate returns the error-event rate for a given flag key over the last windowSeconds.
+// It counts events where event_name = 'error' AND properties->>'flag' = key, divided by all events
+// for that flag in the same window. Returns (rate, totalEvents, error).
+
+func (r *FeatureFlagRepository) GetFlagErrorRate(ctx context.Context, flagKey string, windowSeconds int) (rate float64, total int64, err error) {
+	since := time.Now().Add(-time.Duration(windowSeconds) * time.Second)
+	query := `
+		SELECT
+			COUNT(*) FILTER (WHERE event_name = 'error') AS errors,
+			COUNT(*) AS total
+		FROM analytics_events
+		WHERE created_at >= $1
+		  AND properties->>'flag' = $2
+	`
+	var errs int64
+	if err = r.pool.QueryRow(ctx, query, since, flagKey).Scan(&errs, &total); err != nil {
+		return 0, 0, fmt.Errorf("GetFlagErrorRate: %w", err)
+	}
+	if total == 0 {
+		return 0, 0, nil
+	}
+	return float64(errs) / float64(total), total, nil
+}
+
+// GetFlagsWithAutoRollback returns all enabled flags that have auto_rollback = true.
+func (r *FeatureFlagRepository) GetFlagsWithAutoRollback(ctx context.Context) ([]*models.FeatureFlag, error) {
+	rows, err := r.pool.Query(ctx, `
+		SELECT key, enabled, description, percentage, environment, auto_rollback, rollback, metadata, created_at, updated_at
+		FROM feature_flags
+		WHERE enabled = TRUE AND auto_rollback = TRUE AND rollback IS NOT NULL
+	`)
+	if err != nil {
+		return nil, fmt.Errorf("GetFlagsWithAutoRollback: %w", err)
+	}
+	defer rows.Close()
+
+	var flags []*models.FeatureFlag
+	for rows.Next() {
+		var flag models.FeatureFlag
+		var metadataJSON, rollbackJSON []byte
+		if err := rows.Scan(
+			&flag.Key, &flag.Enabled, &flag.Description, &flag.Percentage,
+			&flag.Environment, &flag.AutoRollback, &rollbackJSON, &metadataJSON,
+			&flag.CreatedAt, &flag.UpdatedAt,
+		); err != nil {
+			return nil, fmt.Errorf("GetFlagsWithAutoRollback scan: %w", err)
+		}
+		if len(metadataJSON) > 0 {
+			if err := json.Unmarshal(metadataJSON, &flag.Metadata); err != nil {
+				return nil, fmt.Errorf("GetFlagsWithAutoRollback unmarshal metadata for %q: %w", flag.Key, err)
+			}
+		}
+		if len(rollbackJSON) > 0 {
+			if err := json.Unmarshal(rollbackJSON, &flag.Rollback); err != nil {
+				return nil, fmt.Errorf("GetFlagsWithAutoRollback unmarshal rollback for %q: %w", flag.Key, err)
+			}
+		}
+		flags = append(flags, &flag)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("GetFlagsWithAutoRollback rows: %w", err)
+	}
+	return flags, nil
 }
