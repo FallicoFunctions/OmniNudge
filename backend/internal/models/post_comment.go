@@ -2,7 +2,6 @@ package models
 
 import (
 	"context"
-	"database/sql"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -147,7 +146,7 @@ func (r *PostCommentRepository) GetByID(ctx context.Context, id int) (*PostComme
 	)
 
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if err == pgx.ErrNoRows {
 			return nil, nil
 		}
 		return nil, err
@@ -500,7 +499,7 @@ func (r *PostCommentRepository) SoftDelete(ctx context.Context, commentID int) e
 	var postID int
 	err = tx.QueryRow(ctx, "SELECT post_id FROM post_comments WHERE id = $1 FOR UPDATE", commentID).Scan(&postID)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if err == pgx.ErrNoRows {
 			return nil
 		}
 		return err

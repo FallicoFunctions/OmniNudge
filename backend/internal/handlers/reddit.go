@@ -151,6 +151,10 @@ func (h *RedditHandler) GetSubredditPosts(c *gin.Context) {
 	// Fetch from Reddit
 	listing, err := h.redditClient.GetSubredditPosts(c.Request.Context(), subreddit, sort, timeFilter, limit, after)
 	if err != nil {
+		if isRedditNotFound(err) {
+			RespondError(c, http.StatusNotFound, "Subreddit not found")
+			return
+		}
 		RespondError(c, http.StatusInternalServerError, "Failed to fetch subreddit posts")
 		return
 	}
@@ -191,6 +195,10 @@ func (h *RedditHandler) GetSubredditAbout(c *gin.Context) {
 
 	about, err := h.redditClient.GetSubredditAbout(c.Request.Context(), subreddit)
 	if err != nil {
+		if isRedditNotFound(err) {
+			RespondError(c, http.StatusNotFound, "Subreddit not found")
+			return
+		}
 		RespondError(c, http.StatusInternalServerError, "Failed to fetch subreddit details")
 		return
 	}
@@ -1224,6 +1232,22 @@ func (h *RedditHandler) GetSubredditWikiDiscussions(c *gin.Context) {
 		"before":      listing.Data.Before,
 		"discussions": posts,
 	})
+}
+
+// isRedditNotFound returns true when the Reddit API rejected the request with a
+// client-side error (4xx), which typically means the subreddit or resource does
+// not exist or is too short to be valid.
+func isRedditNotFound(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := err.Error()
+	return strings.Contains(msg, "status 403") ||
+		strings.Contains(msg, "status 404") ||
+		strings.Contains(msg, "status 400") ||
+		strings.Contains(msg, "unexpected status 403") ||
+		strings.Contains(msg, "unexpected status 404") ||
+		strings.Contains(msg, "unexpected status 400")
 }
 
 func resolveWikiPagePath(c *gin.Context, primaryParam, restParam string) string {
