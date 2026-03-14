@@ -1,13 +1,17 @@
 package handlers
 
 import (
+	"bufio"
 	"context"
 	"net/http"
+	"runtime/debug"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
+	zlog "github.com/rs/zerolog/log"
 )
 
 // HealthHandler handles health check endpoints
@@ -22,6 +26,22 @@ func NewHealthHandler(db *pgxpool.Pool, redis *redis.Client) *HealthHandler {
 		db:    db,
 		redis: redis,
 	}
+}
+
+// getVersion returns the build version from runtime/debug build info.
+// Falls back to git short SHA if available, then "dev".
+func getVersion() string {
+	if info, ok := debug.ReadBuildInfo(); ok {
+		if info.Main.Version != "" && info.Main.Version != "(devel)" {
+			return info.Main.Version
+		}
+		for _, s := range info.Settings {
+			if s.Key == "vcs.revision" && len(s.Value) >= 7 {
+				return s.Value[:7]
+			}
+		}
+	}
+	return "dev"
 }
 
 // LivenessProbe checks if the application is running.
@@ -57,7 +77,9 @@ func (h *HealthHandler) ReadinessProbe(c *gin.Context) {
 	if h.db != nil {
 		err := h.db.Ping(ctx)
 		if err != nil {
-			checks["database"] = "unhealthy: " + err.Error()
+			// BUG-14: Do not expose raw error string; log server-side.
+			zlog.Error().Err(err).Msg("readiness: database unhealthy")
+			checks["database"] = "unhealthy"
 			ready = false
 		} else {
 			checks["database"] = "healthy"
@@ -70,7 +92,9 @@ func (h *HealthHandler) ReadinessProbe(c *gin.Context) {
 	if h.redis != nil {
 		err := h.redis.Ping(ctx).Err()
 		if err != nil {
-			checks["redis"] = "unhealthy: " + err.Error()
+			// BUG-14: Do not expose raw error string; log server-side.
+			zlog.Error().Err(err).Msg("readiness: redis unhealthy")
+			checks["redis"] = "unhealthy"
 			ready = false
 		} else {
 			checks["redis"] = "healthy"
@@ -98,6 +122,7 @@ func (h *HealthHandler) ReadinessProbe(c *gin.Context) {
 // @Tags         Health
 // @Produce      json
 // @Success      200  {object}  gin.H
+// @Failure      503  {object}  gin.H
 // @Router       /health [get]
 func (h *HealthHandler) HealthCheck(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
@@ -106,7 +131,7 @@ func (h *HealthHandler) HealthCheck(c *gin.Context) {
 	health := gin.H{
 		"status":    "healthy",
 		"timestamp": time.Now().Unix(),
-		"version":   "1.0.0", // TODO: Get from build info
+		"version":   getVersion(),
 		"services":  gin.H{},
 	}
 
@@ -132,7 +157,13 @@ func (h *HealthHandler) HealthCheck(c *gin.Context) {
 
 	health["services"] = services
 
-	c.JSON(http.StatusOK, health)
+	// BUG-15: Return 503 when any service is unhealthy or degraded.
+	httpStatus := http.StatusOK
+	if s, ok := health["status"].(string); ok && (s == "unhealthy" || s == "degraded") {
+		httpStatus = http.StatusServiceUnavailable
+	}
+
+	c.JSON(httpStatus, health)
 }
 
 func (h *HealthHandler) checkDatabase(ctx context.Context) gin.H {
@@ -142,9 +173,10 @@ func (h *HealthHandler) checkDatabase(ctx context.Context) gin.H {
 	latency := time.Since(start).Milliseconds()
 
 	if err != nil {
+		// BUG-14: Log error server-side; return generic "unhealthy" to caller.
+		zlog.Error().Err(err).Msg("health: database ping failed")
 		return gin.H{
 			"status":  "unhealthy",
-			"error":   err.Error(),
 			"latency": latency,
 		}
 	}
@@ -167,27 +199,59 @@ func (h *HealthHandler) checkRedis(ctx context.Context) gin.H {
 	latency := time.Since(start).Milliseconds()
 
 	if err != nil {
+		// BUG-14: Log error server-side; return generic "unhealthy" to caller.
+		zlog.Error().Err(err).Msg("health: redis ping failed")
 		return gin.H{
 			"status":  "unhealthy",
-			"error":   err.Error(),
 			"latency": latency,
 		}
 	}
 
-	// Get Redis info
-	info, err := h.redis.Info(ctx, "stats").Result()
-	if err != nil {
-		return gin.H{
-			"status":     "healthy",
-			"latency_ms": latency,
-			"ping":       pong,
-		}
-	}
+	// BUG-16: Parse Redis INFO output and return only safe, known fields.
+	// Do not return the raw multi-line INFO string in the response.
+	safeInfo := h.parseRedisInfoStats(ctx)
 
-	return gin.H{
+	result := gin.H{
 		"status":     "healthy",
 		"latency_ms": latency,
 		"ping":       pong,
-		"info":       info,
 	}
+	for k, v := range safeInfo {
+		result[k] = v
+	}
+	return result
+}
+
+// parseRedisInfoStats fetches Redis INFO stats and extracts only safe, known fields.
+// BUG-16: Only whitelisted fields are returned; raw INFO string is never exposed.
+func (h *HealthHandler) parseRedisInfoStats(ctx context.Context) map[string]string {
+	info, err := h.redis.Info(ctx, "stats", "clients", "memory").Result()
+	if err != nil {
+		return nil
+	}
+
+	allowed := map[string]bool{
+		"used_memory_human":        true,
+		"connected_clients":        true,
+		"total_commands_processed": true,
+	}
+
+	result := make(map[string]string, 3)
+	scanner := bufio.NewScanner(strings.NewReader(info))
+	for scanner.Scan() {
+		line := scanner.Text()
+		if strings.HasPrefix(line, "#") || line == "" {
+			continue
+		}
+		parts := strings.SplitN(line, ":", 2)
+		if len(parts) != 2 {
+			continue
+		}
+		key := strings.TrimSpace(parts[0])
+		val := strings.TrimSpace(parts[1])
+		if allowed[key] {
+			result[key] = val
+		}
+	}
+	return result
 }
