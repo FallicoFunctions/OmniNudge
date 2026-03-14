@@ -1,25 +1,27 @@
 package handlers
 
 import (
-	"github.com/omninudge/backend/internal/ports"
 	"context"
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"mime/multipart"
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5"
 	"github.com/omninudge/backend/internal/api/middleware"
 	"github.com/omninudge/backend/internal/models"
+	"github.com/omninudge/backend/internal/ports"
 	"github.com/omninudge/backend/internal/queue"
 	"github.com/omninudge/backend/internal/services"
+	zlog "github.com/rs/zerolog/log"
 )
 
 const (
@@ -28,6 +30,12 @@ const (
 	maxBatchFiles      = 10
 	maxImageDimension  = 8000
 )
+
+// presignTTL is the validity window for S3 presigned PUT URLs.
+// Adjust via rebuild if a different value is needed for your deployment.
+const presignTTL = time.Hour
+
+var presignSafeNameRe = regexp.MustCompile(`[^a-zA-Z0-9._-]`)
 
 type MediaQuotaConfig struct {
 	FreeTierBytes int64
@@ -41,6 +49,12 @@ type MediaHandler struct {
 	queueClient         *queue.QueueClient
 	quota               MediaQuotaConfig
 	virusScanFailClosed bool
+	// s3Service is set only when STORAGE_BACKEND=s3; nil for local storage.
+	s3Service *services.S3StorageService
+	// storageBackend is "local" or "s3".
+	storageBackend string
+	// storageService is the general storage backend used for all uploads.
+	storageService services.StorageService
 }
 
 // NewMediaHandler creates a new media handler
@@ -63,7 +77,22 @@ func NewMediaHandler(
 		queueClient:         queueClient,
 		quota:               quota,
 		virusScanFailClosed: virusScanFailClosed,
+		storageBackend:      "local",
 	}
+}
+
+// SetS3Service injects the S3 storage service and marks the storage backend as "s3".
+// Call this in main.go when STORAGE_BACKEND=s3.
+func (h *MediaHandler) SetS3Service(svc *services.S3StorageService) {
+	h.s3Service = svc
+	h.storageBackend = "s3"
+	h.storageService = svc
+}
+
+// SetStorageService injects a general StorageService into the handler.
+// This enables all uploads to go through the configured backend (local or S3).
+func (h *MediaHandler) SetStorageService(svc services.StorageService) {
+	h.storageService = svc
 }
 
 // UploadMedia uploads a media file.
@@ -227,6 +256,19 @@ func (h *MediaHandler) UploadMedia(c *gin.Context) {
 		return
 	}
 
+	// BUG-11: Post-upload quota check using the actual written total (not client-reported header.Size).
+	// The pre-check above uses header.Size as a DDoS guard; this is the authoritative check.
+	if usedBytes+total > capBytes {
+		_ = os.Remove(storagePath)
+		c.JSON(http.StatusRequestEntityTooLarge, gin.H{
+			"error":         "Storage quota exceeded",
+			"storage_used":  usedBytes,
+			"incoming_size": total,
+			"storage_quota": capBytes,
+		})
+		return
+	}
+
 	if err := middleware.ValidateStrictDocumentStructure(storagePath, safeName, contentType, sniff[:n]); err != nil {
 		_ = os.Remove(storagePath)
 		c.JSON(http.StatusUnsupportedMediaType, gin.H{
@@ -245,13 +287,35 @@ func (h *MediaHandler) UploadMedia(c *gin.Context) {
 		}
 	}
 
+	storageURL := "/uploads/" + newName
+	if h.storageService != nil {
+		uploadFile, openErr := os.Open(storagePath)
+		if openErr != nil {
+			_ = os.Remove(storagePath)
+			RespondError(c, http.StatusInternalServerError, "Failed to open file for storage upload")
+			return
+		}
+		uploadedURL, uploadErr := h.storageService.Upload(c.Request.Context(), newName, uploadFile, contentType)
+		uploadFile.Close()
+		if uploadErr != nil {
+			_ = os.Remove(storagePath)
+			zlog.Error().Err(uploadErr).Str("key", newName).Msg("storage upload failed")
+			RespondError(c, http.StatusInternalServerError, "Failed to upload file to storage backend")
+			return
+		}
+		storageURL = uploadedURL
+		if h.storageBackend == "s3" {
+			_ = os.Remove(storagePath)
+		}
+	}
+
 	media := &models.MediaFile{
 		UserID:           userID,
 		Filename:         newName,
 		OriginalFilename: safeName,
 		FileType:         contentType,
 		FileSize:         total,
-		StorageURL:       "/uploads/" + newName,
+		StorageURL:       storageURL,
 		StoragePath:      storagePath,
 		UsedInMessageID:  usedInMessageID,
 	}
@@ -280,10 +344,15 @@ func (h *MediaHandler) UploadMedia(c *gin.Context) {
 		return
 	}
 
+	// BUG-10: Track storage usage after successful Create.
+	if incrErr := h.mediaRepo.IncrementTrackedStorageByUserID(c.Request.Context(), userID, total); incrErr != nil {
+		zlog.Warn().Err(incrErr).Int("user_id", userID).Int64("size", total).Msg("failed to increment storage quota after upload")
+	}
+
 	if err := h.schedulePostUploadJobs(c.Request.Context(), media); err != nil {
 		_ = os.Remove(storagePath)
 		if deleteErr := h.mediaRepo.DeleteByID(c.Request.Context(), media.ID); deleteErr != nil {
-			log.Printf("failed to rollback media record %d after scan enqueue failure: %v", media.ID, deleteErr)
+			zlog.Warn().Err(deleteErr).Int("media_id", media.ID).Msg("failed to rollback media record after scan enqueue failure")
 		}
 		RespondError(c, http.StatusServiceUnavailable, "Upload temporarily unavailable while security scanning is offline")
 		return
@@ -431,13 +500,13 @@ func (h *MediaHandler) BatchUploadMedia(c *gin.Context) {
 
 	// Collect results
 	results := make([]*models.MediaFile, len(files))
-	var errors []string
+	var errs []string
 	successCount := 0
 
 	for i := 0; i < len(files); i++ {
 		result := <-resultsChan
 		if result.err != nil {
-			errors = append(errors, fmt.Sprintf("File %d: %v", result.index, result.err))
+			errs = append(errs, fmt.Sprintf("File %d: %v", result.index, result.err))
 		} else {
 			results[result.index] = result.media
 			successCount++
@@ -451,8 +520,8 @@ func (h *MediaHandler) BatchUploadMedia(c *gin.Context) {
 		"total_count":   len(files),
 	}
 
-	if len(errors) > 0 {
-		response["errors"] = errors
+	if len(errs) > 0 {
+		response["errors"] = errs
 	}
 
 	c.JSON(http.StatusOK, response)
@@ -540,13 +609,32 @@ func (h *MediaHandler) processSingleUpload(ctx context.Context, userID int, head
 		return nil, fmt.Errorf("invalid document structure: %w", err)
 	}
 
+	batchStorageURL := "/uploads/" + newName
+	if h.storageService != nil {
+		uploadFile, openErr := os.Open(storagePath)
+		if openErr != nil {
+			_ = os.Remove(storagePath)
+			return nil, fmt.Errorf("failed to open file for storage upload: %w", openErr)
+		}
+		uploadedURL, uploadErr := h.storageService.Upload(ctx, newName, uploadFile, contentType)
+		uploadFile.Close()
+		if uploadErr != nil {
+			_ = os.Remove(storagePath)
+			return nil, fmt.Errorf("failed to upload file to storage backend: %w", uploadErr)
+		}
+		batchStorageURL = uploadedURL
+		if h.storageBackend == "s3" {
+			_ = os.Remove(storagePath)
+		}
+	}
+
 	media := &models.MediaFile{
 		UserID:           userID,
 		Filename:         newName,
 		OriginalFilename: safeName,
 		FileType:         contentType,
 		FileSize:         header.Size,
-		StorageURL:       "/uploads/" + newName,
+		StorageURL:       batchStorageURL,
 		StoragePath:      storagePath,
 	}
 
@@ -568,10 +656,15 @@ func (h *MediaHandler) processSingleUpload(ctx context.Context, userID int, head
 		return nil, fmt.Errorf("failed to save media record: %w", err)
 	}
 
+	// BUG-10: Track storage usage after successful Create in batch path.
+	if incrErr := h.mediaRepo.IncrementTrackedStorageByUserID(ctx, userID, media.FileSize); incrErr != nil {
+		zlog.Warn().Err(incrErr).Int("user_id", userID).Int64("size", media.FileSize).Msg("failed to increment storage quota after batch upload")
+	}
+
 	if err := h.schedulePostUploadJobs(ctx, media); err != nil {
 		_ = os.Remove(storagePath)
 		if deleteErr := h.mediaRepo.DeleteByID(ctx, media.ID); deleteErr != nil {
-			log.Printf("failed to rollback media record %d after scan enqueue failure: %v", media.ID, deleteErr)
+			zlog.Warn().Err(deleteErr).Int("media_id", media.ID).Msg("failed to rollback media record after scan enqueue failure")
 		}
 		return nil, fmt.Errorf("security scan unavailable: %w", err)
 	}
@@ -582,9 +675,9 @@ func (h *MediaHandler) processSingleUpload(ctx context.Context, userID int, head
 func (h *MediaHandler) schedulePostUploadJobs(ctx context.Context, media *models.MediaFile) error {
 	if h.queueClient != nil {
 		if err := h.queueClient.EnqueueVirusScan(ctx, media.ID, media.StoragePath, "", media.UserID); err != nil {
-			log.Printf("failed to enqueue virus scan for media %d: %v", media.ID, err)
+			zlog.Warn().Err(err).Int("media_id", media.ID).Msg("failed to enqueue virus scan")
 			if markErr := h.mediaRepo.MarkScanError(ctx, media.ID, "virus scan queue unavailable"); markErr != nil {
-				log.Printf("failed to mark media %d scan error: %v", media.ID, markErr)
+				zlog.Warn().Err(markErr).Int("media_id", media.ID).Msg("failed to mark media scan error")
 			}
 			if h.virusScanFailClosed {
 				return err
@@ -599,7 +692,7 @@ func (h *MediaHandler) schedulePostUploadJobs(ctx context.Context, media *models
 				thumbnailType = "video"
 			}
 			if err := h.queueClient.EnqueueThumbnailGeneration(ctx, media.ID, media.StorageURL, thumbnailType); err != nil {
-				log.Printf("failed to enqueue thumbnail generation for media %d: %v", media.ID, err)
+				zlog.Warn().Err(err).Int("media_id", media.ID).Msg("failed to enqueue thumbnail generation")
 				if services.IsImageType(media.FileType) {
 					h.generateAndStoreThumbnail(ctx, media)
 				}
@@ -610,7 +703,7 @@ func (h *MediaHandler) schedulePostUploadJobs(ctx context.Context, media *models
 	}
 
 	if markErr := h.mediaRepo.MarkScanError(ctx, media.ID, "virus scan queue unavailable"); markErr != nil {
-		log.Printf("failed to mark media %d scan error: %v", media.ID, markErr)
+		zlog.Warn().Err(markErr).Int("media_id", media.ID).Msg("failed to mark media scan error")
 	}
 	if h.virusScanFailClosed {
 		return fmt.Errorf("virus scan queue unavailable")
@@ -629,7 +722,7 @@ func (h *MediaHandler) generateAndStoreThumbnail(ctx context.Context, media *mod
 	if services.IsImageType(media.FileType) {
 		thumbSet, err := h.thumbnailService.GenerateImageThumbnails(media.StoragePath)
 		if err != nil {
-			log.Printf("failed to generate thumbnail for media %d: %v", media.ID, err)
+			zlog.Warn().Err(err).Int("media_id", media.ID).Msg("failed to generate thumbnail")
 			return
 		}
 		thumbnailPath = thumbSet.PrimaryPath
@@ -637,7 +730,7 @@ func (h *MediaHandler) generateAndStoreThumbnail(ctx context.Context, media *mod
 		var err error
 		thumbnailPath, err = h.thumbnailService.GenerateThumbnail(media.StoragePath)
 		if err != nil {
-			log.Printf("failed to generate thumbnail for media %d: %v", media.ID, err)
+			zlog.Warn().Err(err).Int("media_id", media.ID).Msg("failed to generate thumbnail")
 			return
 		}
 	}
@@ -645,7 +738,7 @@ func (h *MediaHandler) generateAndStoreThumbnail(ctx context.Context, media *mod
 	thumbnailName := filepath.Base(thumbnailPath)
 	thumbnailURL := "/uploads/" + thumbnailName
 	if err := h.mediaRepo.UpdateThumbnailURL(ctx, media.ID, thumbnailURL); err != nil {
-		log.Printf("failed to persist thumbnail URL for media %d: %v", media.ID, err)
+		zlog.Warn().Err(err).Int("media_id", media.ID).Msg("failed to persist thumbnail URL")
 		return
 	}
 
@@ -659,4 +752,328 @@ func resolveStorageCapForRole(role string, quota MediaQuotaConfig) int64 {
 	default:
 		return quota.FreeTierBytes
 	}
+}
+
+// presignedURLRequest is the request body for POST /api/v1/media/presigned-url.
+type presignedURLRequest struct {
+	Filename    string `json:"filename" binding:"required"`
+	ContentType string `json:"content_type" binding:"required"`
+	FileSize    int64  `json:"file_size" binding:"required,min=1"`
+}
+
+// presignedURLResponse is the response body for POST /api/v1/media/presigned-url.
+type presignedURLResponse struct {
+	UploadURL string `json:"upload_url"`
+	Key       string `json:"key"`
+	CDNURL    string `json:"cdn_url"`
+	ExpiresIn int    `json:"expires_in"` // seconds
+}
+
+// GetPresignedURL generates a presigned PUT URL for direct S3 uploads.
+// Only available when STORAGE_BACKEND=s3. Returns 501 for local storage.
+//
+// TODO(presigned-upload): No media_files record is created here.
+// The client must call POST /api/v1/media/confirm-upload after completing the S3 PUT.
+// Until that endpoint is added, presigned uploads are not tracked in the database,
+// virus scanning is not triggered, and quota enforcement does not apply.
+//
+// @Summary      Get S3 presigned upload URL
+// @Description  Returns a presigned S3 PUT URL for direct browser-to-S3 upload.
+// @Description  NOTE: cdn_url is the anticipated URL once upload completes — the file is not accessible until after PUT succeeds.
+// @Description  NOTE: Caller must create a media_files record separately; this endpoint does not track uploads in the database.
+// @Tags         Media
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Param        body  body      presignedURLRequest   true  "Upload metadata"
+// @Success      200   {object}  presignedURLResponse
+// @Failure      400   {object}  gin.H  "Invalid request or file size out of range"
+// @Failure      401   {object}  gin.H
+// @Failure      413   {object}  gin.H  "File size exceeds maximum allowed"
+// @Failure      415   {object}  gin.H  "Unsupported content type"
+// @Failure      501   {object}  gin.H  "S3 not configured"
+// @Router       /media/presigned-url [post]
+func (h *MediaHandler) GetPresignedURL(c *gin.Context) {
+	if h.storageBackend != "s3" || h.s3Service == nil {
+		RespondError(c, http.StatusNotImplemented, "presigned URLs are only available when STORAGE_BACKEND=s3")
+		return
+	}
+
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
+		return
+	}
+
+	var req presignedURLRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		RespondError(c, http.StatusBadRequest, "Invalid request body: "+err.Error())
+		return
+	}
+
+	// Quota check: ensure the incoming file would not exceed the user's storage cap.
+	// TODO(presigned-upload): This check uses req.FileSize (client-supplied) because the
+	// file has not been uploaded yet. The actual file size should be verified after upload
+	// via a confirm-upload endpoint.
+	usedBytes, quotaErr := h.mediaRepo.GetTrackedStorageByUserID(c.Request.Context(), userID)
+	if quotaErr != nil {
+		RespondError(c, http.StatusInternalServerError, "Failed to evaluate storage quota")
+		return
+	}
+	capBytes := resolveStorageCapForRole(c.GetString("role"), h.quota)
+	if usedBytes+req.FileSize > capBytes {
+		c.JSON(http.StatusRequestEntityTooLarge, gin.H{
+			"error":            "Storage quota exceeded",
+			"storage_used":     usedBytes,
+			"incoming_size":    req.FileSize,
+			"storage_quota":    capBytes,
+			"storage_quota_gb": capBytes / (1024 * 1024 * 1024),
+		})
+		return
+	}
+
+	// SEC-2: Validate content type against allowlist.
+	allowedPresignTypes := map[string]bool{
+		"video/mp4":       true,
+		"video/webm":      true,
+		"video/quicktime": true,
+		"image/jpeg":      true,
+		"image/png":       true,
+		"image/gif":       true,
+		"image/webp":      true,
+		"audio/mpeg":      true,
+		"audio/wav":       true,
+		"audio/ogg":       true,
+	}
+	if !allowedPresignTypes[req.ContentType] {
+		RespondError(c, http.StatusUnsupportedMediaType, "Unsupported content type")
+		return
+	}
+
+	// SEC-2: Validate file size (1 byte minimum, 100 MB maximum).
+	const maxPresignedFileSize = 100 * 1024 * 1024 // 100MB
+	if req.FileSize <= 0 || req.FileSize > maxPresignedFileSize {
+		RespondError(c, http.StatusBadRequest, "file_size must be between 1 and 104857600 bytes")
+		return
+	}
+
+	// SEC-1: Sanitize filename to prevent path traversal.
+	safeName := filepath.Base(req.Filename)
+	safeName = presignSafeNameRe.ReplaceAllString(safeName, "_")
+	if safeName == "" || safeName == "." {
+		RespondError(c, http.StatusBadRequest, "Invalid filename")
+		return
+	}
+	var contentTypeExtensions = map[string][]string{
+		"image/jpeg":      {".jpg", ".jpeg"},
+		"image/png":       {".png"},
+		"image/gif":       {".gif"},
+		"image/webp":      {".webp"},
+		"video/mp4":       {".mp4"},
+		"video/webm":      {".webm"},
+		"video/quicktime": {".mov", ".qt"},
+		"audio/webm":      {".webm"},
+		"audio/mpeg":      {".mp3"},
+		"audio/ogg":       {".ogg"},
+		"audio/wav":       {".wav"},
+	}
+	ext := strings.ToLower(filepath.Ext(safeName))
+	if allowedExts, ok := contentTypeExtensions[req.ContentType]; ok {
+		validExt := false
+		for _, allowed := range allowedExts {
+			if ext == allowed {
+				validExt = true
+				break
+			}
+		}
+		if !validExt {
+			RespondError(c, http.StatusBadRequest, "file extension does not match content type")
+			return
+		}
+	}
+
+	key := fmt.Sprintf("uploads/%d/%d_%s", userID, time.Now().UnixNano(), safeName)
+
+	zlog.Info().Int("user_id", userID).Str("key", key).Str("content_type", req.ContentType).Int64("file_size", req.FileSize).Int("expires_in", int(presignTTL.Seconds())).Msg("presigned upload URL issued")
+
+	uploadURL, err := h.s3Service.GeneratePresignedPutURL(c.Request.Context(), key, req.ContentType, presignTTL)
+	if err != nil {
+		zlog.Error().Err(err).Int("user_id", userID).Msg("presigned URL generation failed")
+		RespondError(c, http.StatusInternalServerError, "Failed to generate upload URL")
+		return
+	}
+
+	cdnURL := h.s3Service.PublicURL(key)
+
+	c.JSON(http.StatusOK, presignedURLResponse{
+		UploadURL: uploadURL,
+		Key:       key,
+		CDNURL:    cdnURL,
+		ExpiresIn: int(presignTTL.Seconds()),
+	})
+}
+
+// confirmUploadRequest is the request body for POST /api/v1/media/confirm-upload.
+// The client echoes back the filename and content_type it supplied to /media/presigned-url
+// so the server can create a complete media_files record without trusting the S3 key alone.
+type confirmUploadRequest struct {
+	UploadKey        string `json:"upload_key" binding:"required"`
+	FileSize         int64  `json:"file_size" binding:"required,min=1"`
+	OriginalFilename string `json:"original_filename" binding:"required"`
+	ContentType      string `json:"content_type" binding:"required"`
+}
+
+// confirmUploadResponse is the response body for POST /api/v1/media/confirm-upload.
+type confirmUploadResponse struct {
+	URL     string `json:"url"`
+	MediaID int    `json:"media_id"`
+}
+
+// ConfirmUpload records a completed S3 direct upload and updates the user's storage quota.
+// The client calls this after successfully completing the S3 presigned PUT.
+//
+// @Summary      Confirm completed S3 upload
+// @Description  Called after the client finishes the presigned PUT to S3. Records the upload
+// @Description  in the database, updates storage quota, and returns the CDN URL.
+// @Tags         Media
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Param        body  body      confirmUploadRequest   true  "Upload confirmation"
+// @Success      200   {object}  confirmUploadResponse
+// @Failure      400   {object}  gin.H  "Invalid request or key does not belong to user"
+// @Failure      401   {object}  gin.H
+// @Failure      501   {object}  gin.H  "S3 not configured"
+// @Router       /media/confirm-upload [post]
+func (h *MediaHandler) ConfirmUpload(c *gin.Context) {
+	if h.storageBackend != "s3" || h.s3Service == nil {
+		RespondError(c, http.StatusNotImplemented, "confirm-upload is only available when STORAGE_BACKEND=s3")
+		return
+	}
+
+	userID, ok := middleware.GetAuthenticatedUserID(c)
+	if !ok {
+		return
+	}
+
+	var req confirmUploadRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		RespondError(c, http.StatusBadRequest, "Invalid request body: "+err.Error())
+		return
+	}
+
+	// Validate content type against the same allowlist used by GetPresignedURL.
+	allowedConfirmTypes := map[string]bool{
+		"video/mp4":       true,
+		"video/webm":      true,
+		"video/quicktime": true,
+		"image/jpeg":      true,
+		"image/png":       true,
+		"image/gif":       true,
+		"image/webp":      true,
+		"audio/mpeg":      true,
+		"audio/wav":       true,
+		"audio/ogg":       true,
+	}
+	if !allowedConfirmTypes[req.ContentType] {
+		RespondError(c, http.StatusUnsupportedMediaType, "Unsupported content type")
+		return
+	}
+
+	// Validate the upload key belongs to the authenticated user.
+	// Key format: uploads/{userID}/{timestamp}_{filename}
+	expectedPrefix := fmt.Sprintf("uploads/%d/", userID)
+	if len(req.UploadKey) <= len(expectedPrefix) || req.UploadKey[:len(expectedPrefix)] != expectedPrefix {
+		RespondError(c, http.StatusBadRequest, "upload_key does not belong to authenticated user")
+		return
+	}
+
+	// Replay prevention — if a media_files record already exists for this upload_key,
+	// return 200 idempotently with the existing record. Do not double-count quota.
+	existing, lookupErr := h.mediaRepo.FindByStoragePath(c.Request.Context(), req.UploadKey)
+	if lookupErr != nil {
+		zlog.Error().Err(lookupErr).Int("user_id", userID).Str("key", req.UploadKey).Msg("confirm-upload: failed to check for existing media record")
+		RespondError(c, http.StatusInternalServerError, "Failed to validate upload")
+		return
+	}
+	if existing != nil {
+		zlog.Info().Int("user_id", userID).Str("key", req.UploadKey).Msg("confirm-upload: record already exists, returning idempotent response")
+		c.JSON(http.StatusOK, confirmUploadResponse{URL: h.s3Service.PublicURL(req.UploadKey), MediaID: existing.ID})
+		return
+	}
+
+	// Get the actual object size from S3 HeadObject — never trust the client-supplied file_size.
+	actualSize, headErr := h.storageService.GetObjectSize(c.Request.Context(), req.UploadKey)
+	if headErr != nil {
+		zlog.Error().Err(headErr).Int("user_id", userID).Str("key", req.UploadKey).Msg("confirm-upload: HeadObject failed — object may not exist yet")
+		RespondError(c, http.StatusBadRequest, "Could not verify uploaded object; ensure the S3 PUT completed successfully")
+		return
+	}
+
+	// Quota check using the actual S3 object size before committing anything.
+	usedBytes, quotaErr := h.mediaRepo.GetTrackedStorageByUserID(c.Request.Context(), userID)
+	if quotaErr != nil {
+		zlog.Error().Err(quotaErr).Int("user_id", userID).Msg("confirm-upload: failed to read storage quota")
+		RespondError(c, http.StatusInternalServerError, "Failed to evaluate storage quota")
+		return
+	}
+	capBytes := resolveStorageCapForRole(c.GetString("role"), h.quota)
+	if usedBytes+actualSize > capBytes {
+		c.JSON(http.StatusRequestEntityTooLarge, gin.H{
+			"error":            "Storage quota exceeded",
+			"storage_used":     usedBytes,
+			"incoming_size":    actualSize,
+			"storage_quota":    capBytes,
+			"storage_quota_gb": capBytes / (1024 * 1024 * 1024),
+		})
+		return
+	}
+
+	cdnURL := h.s3Service.PublicURL(req.UploadKey)
+
+	// Derive a safe stored filename from the upload key (last path segment).
+	storedFilename := filepath.Base(req.UploadKey)
+
+	// Sanitize the client-supplied original filename.
+	safeOriginal := filepath.Base(req.OriginalFilename)
+	safeOriginal = presignSafeNameRe.ReplaceAllString(safeOriginal, "_")
+	if safeOriginal == "" || safeOriginal == "." {
+		safeOriginal = storedFilename
+	}
+
+	// Persist the media_files record BEFORE incrementing quota so that:
+	//   (a) the idempotency guard works on any subsequent replay, and
+	//   (b) quota is only incremented when we have a committed DB row.
+	media := &models.MediaFile{
+		UserID:           userID,
+		Filename:         storedFilename,
+		OriginalFilename: safeOriginal,
+		FileType:         req.ContentType,
+		FileSize:         actualSize,
+		StorageURL:       cdnURL,
+		StoragePath:      req.UploadKey,
+		ScanStatus:       models.MediaScanStatusPending,
+	}
+	if err := h.mediaRepo.Create(c.Request.Context(), media); err != nil {
+		zlog.Error().Err(err).Int("user_id", userID).Str("key", req.UploadKey).Msg("confirm-upload: failed to create media_files record")
+		RespondError(c, http.StatusInternalServerError, "Failed to record upload")
+		return
+	}
+
+	// Increment quota after the DB row is committed. A failure here is logged
+	// as a warning (not fatal) — the media record exists and the file is accessible;
+	// quota will self-correct on the next GetTotalStorageByUserID reconciliation.
+	if incrErr := h.mediaRepo.IncrementTrackedStorageByUserID(c.Request.Context(), userID, actualSize); incrErr != nil {
+		zlog.Warn().Err(incrErr).Int("user_id", userID).Str("key", req.UploadKey).Int64("size", actualSize).Msg("confirm-upload: media record created but quota increment failed — will reconcile")
+	}
+
+	// Enqueue virus scan job if a queue client is configured.
+	if h.queueClient != nil {
+		if err := h.queueClient.EnqueueVirusScan(c.Request.Context(), media.ID, media.StoragePath, media.StoragePath, userID); err != nil {
+			zlog.Warn().Err(err).Int("media_id", media.ID).Msg("confirm-upload: failed to enqueue virus scan")
+		}
+	}
+
+	zlog.Info().Int("user_id", userID).Int("media_id", media.ID).Str("key", req.UploadKey).Int64("actual_size", actualSize).Msg("confirm-upload: upload confirmed and recorded")
+
+	c.JSON(http.StatusOK, confirmUploadResponse{URL: cdnURL, MediaID: media.ID})
 }
