@@ -14,6 +14,7 @@ import (
 	"github.com/omninudge/backend/internal/repository"
 	"github.com/omninudge/backend/internal/websocket"
 	"github.com/redis/go-redis/v9"
+	zlog "github.com/rs/zerolog/log"
 )
 
 // FeatureFlagService manages feature flags with Redis caching and percentage rollout
@@ -59,6 +60,10 @@ func (s *FeatureFlagService) IsEnabled(ctx context.Context, key string, userID *
 	flag, err := s.GetFeatureFlag(ctx, key)
 	if err != nil {
 		return false, err
+	}
+	// Flag not found — treat as disabled rather than panicking
+	if flag == nil {
+		return false, nil
 	}
 
 	// 3. Check environment match
@@ -381,6 +386,118 @@ func (s *FeatureFlagService) invalidateCache(ctx context.Context, key string) {
 
 	// Delete flags list cache
 	s.redis.Del(ctx, fmt.Sprintf(cacheFlagsList, s.env))
+}
+
+// CheckAutoRollbacks scans all enabled flags with auto_rollback=true and disables any
+// whose rollback thresholds are exceeded. It is intended to be called periodically
+// (e.g. every 60 seconds) by a background goroutine.
+func (s *FeatureFlagService) CheckAutoRollbacks(ctx context.Context) {
+	flags, err := s.repo.GetFlagsWithAutoRollback(ctx)
+	if err != nil {
+		zlog.Error().Err(err).Msg("feature-flag auto-rollback: failed to load flags")
+		return
+	}
+	if len(flags) == 0 {
+		return
+	}
+
+	// Check table existence once per run, not per flag.
+	analyticsAvailable, err := s.repo.AnalyticsEventsTableExists(ctx)
+	if err != nil {
+		zlog.Error().Err(err).Msg("feature-flag auto-rollback: could not check analytics_events table, skipping run")
+		return
+	}
+
+	// Resolve system user ID once for all potential rollbacks this run.
+	systemUserID := int64(1)
+	if id, err := s.repo.GetAnyUserID(ctx); err != nil {
+		zlog.Warn().Err(err).Msg("feature-flag auto-rollback: could not resolve system user, falling back to ID 1")
+	} else {
+		systemUserID = id
+	}
+
+	for _, flag := range flags {
+		trigger := flag.Rollback
+		if trigger == nil {
+			continue
+		}
+
+		if !analyticsAvailable {
+			continue
+		}
+
+		windowSeconds := trigger.WindowSeconds
+		if windowSeconds <= 0 {
+			windowSeconds = 60
+			zlog.Warn().Str("flag", flag.Key).Msg("feature-flag auto-rollback: window_seconds not set, defaulting to 60s")
+		}
+		minSample := trigger.MinSampleSize
+		if minSample <= 0 {
+			minSample = 100
+			zlog.Warn().Str("flag", flag.Key).Msg("feature-flag auto-rollback: min_sample_size not set, defaulting to 100")
+		}
+
+		rate, total, err := s.repo.GetFlagErrorRate(ctx, flag.Key, windowSeconds)
+		if err != nil {
+			zlog.Error().Err(err).Str("flag", flag.Key).Msg("feature-flag auto-rollback: error fetching error rate")
+			continue
+		}
+		if total < int64(minSample) {
+			continue
+		}
+
+		exceeded := false
+		switch trigger.MetricType {
+		case "error_rate":
+			exceeded = rate >= trigger.Threshold
+		case "crash_rate":
+			exceeded = rate >= trigger.CrashRateThreshold
+		}
+
+		if !exceeded {
+			continue
+		}
+
+		// Determine which threshold was exceeded for logging.
+		threshold := trigger.Threshold
+		if trigger.MetricType == "crash_rate" {
+			threshold = trigger.CrashRateThreshold
+		}
+
+		// Disable the flag using an independent timeout so a cancelled rollbackCtx
+		// does not abort mid-operation and leave the flag partially updated.
+		disableCtx, disableCancel := context.WithTimeout(context.Background(), 15*time.Second)
+		updateErr := s.UpdateFlag(disableCtx, flag.Key, map[string]interface{}{"enabled": false}, systemUserID)
+		disableCancel()
+		if updateErr != nil {
+			zlog.Error().Err(updateErr).Str("flag", flag.Key).Msg("feature-flag auto-rollback: failed to disable flag")
+			continue
+		}
+		zlog.Warn().
+			Str("flag", flag.Key).
+			Str("metric", trigger.MetricType).
+			Float64("rate", rate).
+			Float64("threshold", threshold).
+			Int64("sample", total).
+			Msg("feature-flag auto-rollback triggered")
+
+		// Audit log the auto-rollback
+		s.createAuditLogIfPossible(ctx, &models.FeatureFlagAudit{
+			FlagKey:    flag.Key,
+			ChangeType: "auto_rollback",
+			ChangedBy:  systemUserID,
+			OldValue:   map[string]interface{}{"enabled": true},
+			NewValue: map[string]interface{}{
+				"enabled":    false,
+				"reason":     "auto_rollback_triggered",
+				"metric":     trigger.MetricType,
+				"rate":       rate,
+				"threshold":  trigger.Threshold,
+				"sample":     total,
+				"window_sec": windowSeconds,
+			},
+		})
+	}
 }
 
 // validateFlagKey validates flag key format

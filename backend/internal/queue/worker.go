@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
+	zlog "github.com/rs/zerolog/log"
 	"time"
 
 	"github.com/hibiken/asynq"
@@ -26,7 +26,7 @@ func NewWorker(redisAddr string, password string, concurrency int) *Worker {
 	retryDelayFunc := asynq.RetryDelayFunc(func(n int, e error, t *asynq.Task) time.Duration {
 		// Exponential backoff: 1s, 2s, 4s
 		delay := time.Duration(1<<uint(n)) * time.Second
-		log.Printf("Job %s failed (attempt %d), retrying in %v: %v", t.Type(), n+1, delay, e)
+		zlog.Warn().Str("type", t.Type()).Int("attempt", n+1).Dur("retry_in", delay).Err(e).Msg("job failed, will retry")
 		return delay
 	})
 
@@ -57,7 +57,7 @@ func NewWorker(redisAddr string, password string, concurrency int) *Worker {
 				if v := ctx.Value("retried"); v != nil {
 					retried = v.(int)
 				}
-				log.Printf("Job %s (id=%s) failed: %v (retried %d times)", task.Type(), task.ResultWriter().TaskID(), err, retried)
+				zlog.Error().Str("type", task.Type()).Str("id", task.ResultWriter().TaskID()).Err(err).Int("retried", retried).Msg("job failed permanently")
 			}),
 
 			// Shutdown timeout
@@ -108,6 +108,9 @@ func (w *Worker) RegisterAllHandlers(handlers JobHandlers) {
 	if handlers.WaveformGeneration != nil {
 		w.RegisterHandler(JobTypeWaveform, handlers.WaveformGeneration)
 	}
+	if handlers.VideoTranscode != nil {
+		w.RegisterHandler(JobTypeVideoTranscode, handlers.VideoTranscode)
+	}
 }
 
 // JobHandlers groups all job handler functions
@@ -121,17 +124,18 @@ type JobHandlers struct {
 	ContentModeration   JobHandler
 	MessageReencrypt    JobHandler
 	WaveformGeneration  JobHandler
+	VideoTranscode      JobHandler
 }
 
 // Start starts the worker server
 func (w *Worker) Start() error {
-	log.Println("Starting job worker...")
+	zlog.Info().Msg("Starting job worker...")
 	return w.server.Run(w.mux)
 }
 
 // Shutdown gracefully shuts down the worker
 func (w *Worker) Shutdown() {
-	log.Println("Shutting down job worker...")
+	zlog.Info().Msg("Shutting down job worker...")
 	w.server.Shutdown()
 }
 
@@ -163,7 +167,7 @@ func HandleNotification(ctx context.Context, task *asynq.Task) error {
 	if len(payload.UserIDs) == 0 {
 		return fmt.Errorf("notification payload has no user_ids: %w", asynq.SkipRetry)
 	}
-	log.Printf("Notification task accepted for %d user(s)", len(payload.UserIDs))
+	zlog.Info().Int("user_count", len(payload.UserIDs)).Msg("notification task accepted")
 	return nil
 }
 

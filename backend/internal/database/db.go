@@ -3,7 +3,6 @@ package database
 import (
 	"context"
 	"fmt"
-	"log/slog"
 	"math"
 	"os"
 	"strconv"
@@ -11,6 +10,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	zlog "github.com/rs/zerolog/log"
 )
 
 // DB wraps the PostgreSQL connection pool. It is safe for concurrent use;
@@ -33,11 +33,11 @@ func poolIntEnv(key string, defaultVal int32) int32 {
 	}
 	v, err := strconv.Atoi(s)
 	if err != nil || v <= 0 || v > math.MaxInt32 {
-		slog.Warn("invalid pool size env var; using default",
-			slog.String("key", key),
-			slog.String("value", s),
-			slog.Int("default", int(defaultVal)),
-		)
+		zlog.Warn().
+			Str("key", key).
+			Str("value", s).
+			Int("default", int(defaultVal)).
+			Msg("database: invalid pool size env var; using default")
 		return defaultVal
 	}
 	return int32(v)
@@ -59,16 +59,21 @@ func New(databaseURL string) (*DB, error) {
 	maxConns := poolIntEnv("DB_MAX_CONNS", 50)
 	minConns := poolIntEnv("DB_MIN_CONNS", 10)
 	if minConns > maxConns {
-		slog.Warn("DB_MIN_CONNS > DB_MAX_CONNS; clamping min to max",
-			slog.Int("min_conns", int(minConns)),
-			slog.Int("max_conns", int(maxConns)),
-		)
+		zlog.Warn().
+			Int("min_conns", int(minConns)).
+			Int("max_conns", int(maxConns)).
+			Msg("database: DB_MIN_CONNS > DB_MAX_CONNS; clamping min to max")
 		minConns = maxConns
 	}
 	config.MaxConns = maxConns
 	config.MinConns = minConns
-	config.MaxConnLifetime = 30 * time.Minute
-	config.MaxConnIdleTime = 1 * time.Minute
+	config.MaxConnLifetime = 5 * time.Minute
+	config.MaxConnIdleTime = 30 * time.Second
+	config.HealthCheckPeriod = 1 * time.Minute
+	// ConnectTimeout covers TCP dial + TLS handshake + PostgreSQL auth.
+	// Configured via DB_CONNECT_TIMEOUT_SECS env var (default 5 s).
+	connectTimeoutSecs := poolIntEnv("DB_CONNECT_TIMEOUT_SECS", 5)
+	config.ConnConfig.ConnectTimeout = time.Duration(connectTimeoutSecs) * time.Second
 
 	// Wire slow-query analyzer into the pool tracer.
 	// Passing nil for logger causes slow-query logs to use slog.Default() at

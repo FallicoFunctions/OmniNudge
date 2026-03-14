@@ -3,9 +3,9 @@ package websocket
 import (
 	"context"
 	"fmt"
-	"log"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	zlog "github.com/rs/zerolog/log"
 )
 
 // Authorizer checks if users are authorized to access conversations
@@ -33,7 +33,11 @@ func (a *Authorizer) CanAccessConversation(ctx context.Context, userID, conversa
 	}
 
 	if !exists {
-		log.Printf("[SECURITY] Unauthorized conversation access attempt: user_id=%d, conversation_id=%d", userID, conversationID)
+		zlog.Warn().
+			Int("user_id", userID).
+			Int("conversation_id", conversationID).
+			Str("event_type", "unauthorized_conversation_access").
+			Msg("websocket: unauthorized conversation access attempt")
 	}
 
 	return exists, nil
@@ -90,7 +94,11 @@ func (a *Authorizer) CanSendMessage(ctx context.Context, userID, conversationID 
 	}
 
 	if isBlocked {
-		log.Printf("[SECURITY] Blocked user message attempt: user_id=%d, conversation_id=%d", userID, conversationID)
+		zlog.Warn().
+			Int("user_id", userID).
+			Int("conversation_id", conversationID).
+			Str("event_type", "blocked_user_message_attempt").
+			Msg("websocket: blocked user attempted to send message")
 		return false, nil
 	}
 
@@ -113,7 +121,11 @@ func (a *Authorizer) CanSendToUser(ctx context.Context, senderID, recipientID in
 	}
 
 	if isBlocked {
-		log.Printf("[SECURITY] Blocked user DM attempt: sender=%d, recipient=%d", senderID, recipientID)
+		zlog.Warn().
+			Int("sender_id", senderID).
+			Int("recipient_id", recipientID).
+			Str("event_type", "blocked_user_dm_attempt").
+			Msg("websocket: blocked user attempted direct message")
 		return false, nil
 	}
 
