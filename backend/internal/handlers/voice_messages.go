@@ -199,7 +199,7 @@ func (h *VoiceMessagesHandler) UploadVoice(c *gin.Context) {
 	}
 	defer f.Close()
 
-	if _, err := h.storage.Upload(c.Request.Context(), storageKey, f); err != nil {
+	if _, err := h.storage.Upload(c.Request.Context(), storageKey, f, mimeType); err != nil {
 		log.Printf("voice upload: storage upload failed: %v", err)
 		RespondError(c, http.StatusInternalServerError, "Failed to store audio file")
 		return
