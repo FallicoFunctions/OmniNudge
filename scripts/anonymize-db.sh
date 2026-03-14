@@ -219,6 +219,15 @@ UPDATE notifications SET
 UPDATE device_tokens SET
   token = 'anon_device_token_' || id;
 
+-- ── post_comments ────────────────────────────────────────────────────────────
+-- body may contain user-generated content
+DO $$
+BEGIN
+  IF EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'post_comments') THEN
+    UPDATE post_comments SET body = '[anonymized]';
+  END IF;
+END $$;
+
 -- ── password_resets ───────────────────────────────────────────────────────────
 -- Table is named password_resets (migration 024), not password_reset_tokens.
 DELETE FROM password_resets;
@@ -265,6 +274,14 @@ REAL_EMAILS=$($PSQL -d "$TARGET_DB" -t -A -c \
   "SELECT COUNT(*) FROM users WHERE email NOT LIKE '%@anon.invalid' AND email IS NOT NULL;")
 if [ "$REAL_EMAILS" -gt 0 ]; then
   echo -e "${RED}✗ WARNING: $REAL_EMAILS user(s) still have non-anonymized emails!${NC}"
+  exit 1
+fi
+
+# Sanity check: no real usernames remain
+REAL_USERNAMES=$($PSQL -d "$TARGET_DB" -t -A -c \
+  "SELECT COUNT(*) FROM users WHERE username NOT LIKE 'user\\_%';")
+if [ "$REAL_USERNAMES" -gt 0 ]; then
+  echo -e "${RED}✗ WARNING: $REAL_USERNAMES user(s) still have non-anonymized usernames!${NC}"
   exit 1
 fi
 
