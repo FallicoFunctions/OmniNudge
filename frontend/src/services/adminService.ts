@@ -73,4 +73,60 @@ export const adminService = {
   async getSiteStats(): Promise<SiteStats> {
     return api.get<SiteStats>('/admin/stats');
   },
+
+  // ===== ANALYTICS =====
+
+  async getAnalyticsDashboard(): Promise<{
+    dau: Array<{ date: string; count: number }>;
+    top_events: Array<{ event_name: string; count: number }>;
+    recent_events: Array<{ event_name: string; user_id: number; created_at: string }>;
+    last_updated: string;
+  }> {
+    return api.get('/admin/analytics/dashboard');
+  },
+
+  async refreshAnalytics(): Promise<{ message: string }> {
+    return api.post('/admin/analytics/refresh', {});
+  },
+
+  // ===== DATA RETENTION =====
+
+  async getRetentionStatus(): Promise<{
+    retention_status: Array<{
+      data_type: string;
+      retention_period: string;
+      cutoff: string;
+      count: number;
+      size_estimate: string;
+    }>;
+    last_cleanup: string;
+    next_cleanup: string;
+  }> {
+    return api.get('/admin/retention/status');
+  },
+
+  async getRetentionPolicies(): Promise<{
+    policies: Array<{
+      data_type: string;
+      retention_days: number;
+      retention_period: string;
+      enabled: boolean;
+      description: string;
+      action: string;
+      reason: string;
+      updated_at: string;
+    }>;
+    gdpr_compliance: boolean;
+    automated_enforcement: boolean;
+  }> {
+    return api.get('/admin/retention/policy');
+  },
+
+  async updateRetentionPolicy(dataType: string, retentionDays: number, enabled?: boolean, reason?: string): Promise<{ message: string }> {
+    return api.put(`/admin/retention/policy/${dataType}`, { retention_days: retentionDays, enabled, reason });
+  },
+
+  async getRetentionHistory(): Promise<{ history: Array<{ data_type: string; changed_by: number; old_days: number; new_days: number; reason: string; changed_at: string }> }> {
+    return api.get('/admin/retention/history');
+  },
 };

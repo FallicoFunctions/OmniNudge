@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../contexts/AuthContext';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { adminService } from '../services/adminService';
 import { bugReportService } from '../services/bugReportService';
 import type { Hub } from '../services/hubsService';
@@ -13,7 +13,7 @@ import { resolveMediaUrl } from '../utils/mediaUrl';
 import { useFormat } from '../hooks/useFormat';
 import { useTranslation } from 'react-i18next';
 
-type TabType = 'stats' | 'users' | 'moderators' | 'ban-activity' | 'bug-reports';
+type TabType = 'stats' | 'users' | 'moderators' | 'ban-activity' | 'bug-reports' | 'analytics' | 'retention';
 
 export default function AdminPage() {
   const { t } = useTranslation();
@@ -87,6 +87,32 @@ export default function AdminPage() {
           >
             {t('adminPage.tabs.bugReports')}
           </button>
+          <button
+            onClick={() => setActiveTab('analytics')}
+            className={`pb-3 px-1 border-b-2 font-medium transition-colors ${
+              activeTab === 'analytics'
+                ? 'border-[var(--color-primary)] text-[var(--color-primary)]'
+                : 'border-transparent text-[var(--color-text-secondary)] hover:text-[var(--color-text)] hover:border-[var(--color-border)]'
+            }`}
+          >
+            Analytics
+          </button>
+          <button
+            onClick={() => setActiveTab('retention')}
+            className={`pb-3 px-1 border-b-2 font-medium transition-colors ${
+              activeTab === 'retention'
+                ? 'border-[var(--color-primary)] text-[var(--color-primary)]'
+                : 'border-transparent text-[var(--color-text-secondary)] hover:text-[var(--color-text)] hover:border-[var(--color-border)]'
+            }`}
+          >
+            Data Retention
+          </button>
+          <Link
+            to="/admin/feature-flags"
+            className="pb-3 px-1 border-b-2 border-transparent font-medium text-[var(--color-text-secondary)] hover:text-[var(--color-text)] hover:border-[var(--color-border)] transition-colors"
+          >
+            Feature Flags ↗
+          </Link>
         </nav>
       </div>
 
@@ -95,6 +121,8 @@ export default function AdminPage() {
       {activeTab === 'moderators' && <ModeratorsTab />}
       {activeTab === 'ban-activity' && <BanActivityTab />}
       {activeTab === 'bug-reports' && <BugReportsTab />}
+      {activeTab === 'analytics' && <AnalyticsTab />}
+      {activeTab === 'retention' && <RetentionTab />}
     </div>
   );
 }
@@ -1809,6 +1837,284 @@ function BanActivityTab() {
           />
         </>
       )}
+    </div>
+  );
+}
+
+// ─── Analytics Tab ────────────────────────────────────────────────────────────
+
+function safeFormatDate(dateString?: string | null): string {
+  if (!dateString) return '—';
+  try {
+    const d = new Date(dateString);
+    return isNaN(d.getTime()) ? '—' : d.toLocaleString();
+  } catch {
+    return '—';
+  }
+}
+
+function AnalyticsTab() {
+  const queryClient = useQueryClient();
+
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['admin', 'analytics-dashboard'],
+    queryFn: () => adminService.getAnalyticsDashboard(),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const refreshMutation = useMutation({
+    mutationFn: () => adminService.refreshAnalytics(),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin', 'analytics-dashboard'] });
+    },
+  });
+
+  if (isLoading) return <div className="text-[var(--color-text-secondary)] py-8 text-center">Loading analytics...</div>;
+  if (error) return <div className="text-[var(--color-error)] py-8 text-center">Failed to load analytics dashboard.</div>;
+
+  const dau = data?.dau ?? [];
+  const topEvents = data?.top_events ?? [];
+  const maxDau = dau.reduce((m, d) => Math.max(m, d.count), 1);
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-xl font-semibold">Analytics Dashboard</h2>
+          <p className="text-sm text-[var(--color-text-secondary)] mt-0.5">
+            Last updated: {safeFormatDate(data?.last_updated)}
+          </p>
+        </div>
+        <div className="flex flex-col items-end gap-1">
+          <button
+            onClick={() => refreshMutation.mutate()}
+            disabled={refreshMutation.isPending}
+            className="px-4 py-2 bg-[var(--color-primary)] text-white rounded-lg text-sm font-medium hover:bg-[var(--color-primary-dark)] disabled:opacity-50 transition-colors"
+          >
+            {refreshMutation.isPending ? 'Refreshing...' : 'Refresh Views'}
+          </button>
+          {refreshMutation.isError && (
+            <p className="text-xs text-[var(--color-error)]">Refresh failed. Please try again.</p>
+          )}
+        </div>
+      </div>
+
+      {/* Daily Active Users chart */}
+      <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl p-6">
+        <h3 className="text-base font-semibold mb-4">Daily Active Users (Last 30 Days)</h3>
+        {dau.length === 0 ? (
+          <p className="text-[var(--color-text-secondary)] text-sm">No DAU data available.</p>
+        ) : (
+          <div className="flex items-end gap-1 h-40">
+            {dau.map((d) => (
+              <div key={d.date} className="flex-1 flex flex-col items-center gap-1 group relative" title={`${d.date}: ${d.count} users`}>
+                <div
+                  className="w-full bg-[var(--color-primary)] rounded-t opacity-80 group-hover:opacity-100 transition-opacity"
+                  style={{ height: `${Math.max((d.count / maxDau) * 100, 2)}%` }}
+                />
+              </div>
+            ))}
+          </div>
+        )}
+        <div className="flex justify-between mt-2 text-xs text-[var(--color-text-secondary)]">
+          <span>{dau[0]?.date ?? ''}</span>
+          <span>{dau[dau.length - 1]?.date ?? ''}</span>
+        </div>
+      </div>
+
+      {/* Top Events */}
+      <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl p-6">
+        <h3 className="text-base font-semibold mb-4">Top Events (All Time)</h3>
+        {topEvents.length === 0 ? (
+          <p className="text-[var(--color-text-secondary)] text-sm">No event data available.</p>
+        ) : (
+          <div className="space-y-3">
+            {topEvents.map((ev) => {
+              const maxCount = topEvents[0].count;
+              return (
+                <div key={ev.event_name} className="flex items-center gap-3">
+                  <span className="text-sm font-medium w-48 truncate">{ev.event_name}</span>
+                  <div className="flex-1 bg-[var(--color-border)] rounded-full h-2">
+                    <div
+                      className="bg-[var(--color-primary)] h-2 rounded-full"
+                      style={{ width: `${(ev.count / maxCount) * 100}%` }}
+                    />
+                  </div>
+                  <span className="text-sm text-[var(--color-text-secondary)] w-16 text-right">{ev.count.toLocaleString()}</span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Data Retention Tab ────────────────────────────────────────────────────────
+
+function RetentionTab() {
+  const queryClient = useQueryClient();
+  const [editingPolicy, setEditingPolicy] = useState<string | null>(null);
+  const [editDays, setEditDays] = useState('');
+  const [editReason, setEditReason] = useState('');
+
+  const statusQuery = useQuery({
+    queryKey: ['admin', 'retention-status'],
+    queryFn: () => adminService.getRetentionStatus(),
+    staleTime: 60 * 1000,
+  });
+
+  const policiesQuery = useQuery({
+    queryKey: ['admin', 'retention-policies'],
+    queryFn: () => adminService.getRetentionPolicies(),
+    staleTime: 60 * 1000,
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: ({ dataType, days, reason }: { dataType: string; days: number; reason: string }) =>
+      adminService.updateRetentionPolicy(dataType, days, undefined, reason),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin', 'retention-policies'] });
+      queryClient.invalidateQueries({ queryKey: ['admin', 'retention-status'] });
+      setEditingPolicy(null);
+    },
+    onError: () => {
+      // Keep edit form open so the user can retry or cancel
+    },
+  });
+
+  const status = statusQuery.data?.retention_status ?? [];
+  const policies = policiesQuery.data?.policies ?? [];
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-xl font-semibold">Data Retention</h2>
+        <p className="text-sm text-[var(--color-text-secondary)] mt-0.5">
+          GDPR-compliant automated data cleanup · Runs daily at 2:00 AM ·{' '}
+          <span className="text-[var(--color-text)]">
+            Next: {safeFormatDate(statusQuery.data?.next_cleanup)}
+          </span>
+        </p>
+      </div>
+
+      {/* Status: data pending cleanup */}
+      <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl p-6">
+        <h3 className="text-base font-semibold mb-4">Pending Cleanup</h3>
+        {statusQuery.isLoading ? (
+          <p className="text-[var(--color-text-secondary)] text-sm">Loading...</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-[var(--color-border)]">
+                  <th className="text-left py-2 pr-4 font-semibold">Data Type</th>
+                  <th className="text-left py-2 pr-4 font-semibold">Retention Period</th>
+                  <th className="text-right py-2 pr-4 font-semibold">Records</th>
+                  <th className="text-right py-2 font-semibold">Est. Size</th>
+                </tr>
+              </thead>
+              <tbody>
+                {status.map((s) => (
+                  <tr key={s.data_type} className="border-b border-[var(--color-border)] last:border-0">
+                    <td className="py-2 pr-4 font-medium">{s.data_type}</td>
+                    <td className="py-2 pr-4 text-[var(--color-text-secondary)]">{s.retention_period}</td>
+                    <td className={`py-2 pr-4 text-right ${s.count > 0 ? 'text-[var(--color-warning)]' : 'text-[var(--color-text-secondary)]'}`}>
+                      {s.count.toLocaleString()}
+                    </td>
+                    <td className="py-2 text-right text-[var(--color-text-secondary)]">{s.size_estimate}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Policies: edit retention periods */}
+      <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-base font-semibold">Retention Policies</h3>
+          {policiesQuery.data?.gdpr_compliance && (
+            <span className="text-xs px-2 py-1 rounded-full font-medium text-[var(--color-success)] bg-[var(--color-success)]/10">
+              GDPR Compliant
+            </span>
+          )}
+        </div>
+        {policiesQuery.isLoading ? (
+          <p className="text-[var(--color-text-secondary)] text-sm">Loading...</p>
+        ) : (
+          <div className="space-y-3">
+            {policies.map((p) => (
+              <div key={p.data_type} className="flex items-start gap-4 py-3 border-b border-[var(--color-border)] last:border-0">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium text-sm">{p.data_type}</span>
+                    <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${
+                      p.enabled
+                        ? 'text-[var(--color-success)] bg-[var(--color-success)]/10'
+                        : 'text-[var(--color-text-muted)] bg-[var(--color-border)]'
+                    }`}>
+                      {p.enabled ? 'Active' : 'Disabled'}
+                    </span>
+                  </div>
+                  <p className="text-xs text-[var(--color-text-secondary)] mt-0.5">{p.description}</p>
+                  <p className="text-xs text-[var(--color-text-secondary)]">Action: {p.action}</p>
+                </div>
+                <div className="text-right shrink-0">
+                  {editingPolicy === p.data_type ? (
+                    <div className="flex flex-col items-end gap-1">
+                      <div className="flex flex-wrap items-center gap-2 justify-end">
+                        <input
+                          type="number"
+                          min={1}
+                          value={editDays}
+                          onChange={(e) => setEditDays(e.target.value)}
+                          className="w-20 px-2 py-1 text-sm border border-[var(--color-border)] rounded bg-[var(--color-bg)] text-[var(--color-text)]"
+                          placeholder="Days"
+                        />
+                        <input
+                          type="text"
+                          value={editReason}
+                          onChange={(e) => setEditReason(e.target.value)}
+                          className="w-36 px-2 py-1 text-sm border border-[var(--color-border)] rounded bg-[var(--color-bg)] text-[var(--color-text)]"
+                          placeholder="Reason (optional)"
+                        />
+                        <button
+                          onClick={() => updateMutation.mutate({ dataType: p.data_type, days: Number(editDays), reason: editReason })}
+                          disabled={!editDays || Number(editDays) < 1 || isNaN(Number(editDays)) || updateMutation.isPending}
+                          className="px-3 py-1 bg-[var(--color-primary)] text-white text-sm rounded disabled:opacity-50"
+                        >
+                          {updateMutation.isPending ? 'Saving…' : 'Save'}
+                        </button>
+                        <button onClick={() => setEditingPolicy(null)} className="px-3 py-1 text-sm text-[var(--color-text-secondary)]">
+                          Cancel
+                        </button>
+                      </div>
+                      {updateMutation.isError && editingPolicy === p.data_type && (
+                        <p className="text-xs text-[var(--color-error)]">Failed to save. Please try again.</p>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-3">
+                      <span className="text-sm font-medium">{p.retention_period}</span>
+                      {p.data_type !== 'audit_logs' && (
+                        <button
+                          onClick={() => { setEditingPolicy(p.data_type); setEditDays(String(p.retention_days)); setEditReason(''); }}
+                          className="text-xs text-[var(--color-primary)] hover:underline"
+                        >
+                          Edit
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
