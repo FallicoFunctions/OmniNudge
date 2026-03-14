@@ -6,24 +6,25 @@ import (
 )
 
 const RequestIDHeader = "X-Request-ID"
+const RequestIDKey = "request_id"
 
-// RequestID middleware generates or extracts request ID
+// RequestID injects a unique request ID into every request context.
+// Reuses the client-supplied X-Request-ID header if it is a valid UUID;
+// otherwise generates a new one. The resolved ID is echoed back in the
+// X-Request-ID response header so clients can correlate requests with logs.
 func RequestID() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// Try to get request ID from header (for distributed tracing)
 		requestID := c.GetHeader(RequestIDHeader)
 
-		// Generate new ID if not present
-		if requestID == "" {
+		// Only reuse the client-supplied ID if it is a valid UUID.
+		// This prevents request forgery through crafted ID headers while
+		// still allowing distributed tracing across services.
+		if _, err := uuid.Parse(requestID); err != nil {
 			requestID = uuid.New().String()
 		}
 
-		// Store in context
-		c.Set("request_id", requestID)
-
-		// Return in response header
+		c.Set(RequestIDKey, requestID)
 		c.Header(RequestIDHeader, requestID)
-
 		c.Next()
 	}
 }
